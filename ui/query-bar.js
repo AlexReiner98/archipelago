@@ -11,6 +11,7 @@
 import { api, asWords, h, state, wordsOf } from './base.js';
 import { numberOf } from './lens-base.js';
 import { ranked, around, uses } from './picker-rank.js';
+import { isWord, offered, onlySaid } from './only-words.js';
 import { pickTerm } from './term-pick.js';
 import { ARROW, NEXT_WAY, relations, titles, typeTitle, types, wayOf, withWay } from './words.js';
 
@@ -72,7 +73,7 @@ function termOf(written) {
   if (isId(s)) return { id: s };
   if (s.startsWith('#') && relations.has('tagged') && s.slice(1).trim()) return { link: `tagged ${s.slice(1).trim()}` };
   const [, first, rest] = /^(\S+)\s+(.+)$/.exec(s) ?? [];
-  if (first?.toLowerCase() === 'only') return typeNamed(rest.trim()) ? { only: typeNamed(rest.trim()) } : null;
+  if (first?.toLowerCase() === 'only') return typeNamed(rest.trim()) ? { only: typeNamed(rest.trim()) } : isWord(rest) ? { only: rest.trim() } : null;
   if (first?.toLowerCase() === 'within') return isId(rest.trim()) ? { within: rest.trim() } : null;
   if (first?.toLowerCase() === 'in' && isId(rest.trim())) return { in: rest.trim() };
   if (first && linkNamed(first)) return { link: `${linkNamed(first)} ${rest.trim()}` };
@@ -91,6 +92,8 @@ function added(lens, term) {
   if (term.only) f.only = [...new Set([...(f.only ?? []), term.only])];
   if (term.within) f.within = [...new Set([...(f.within ?? []), term.within])];
   if (term.exclude) f.exclude = [...new Set([...(f.exclude ?? ['system']), term.exclude])];
+  // Only what is done finds nothing while Not leaves the closed out: it takes that away.
+  if (term.only === 'done' && f.exclude?.includes('closed')) f.exclude = f.exclude.filter((x) => x !== 'closed');
   return { ...lens, filter: f };
 }
 
@@ -133,7 +136,7 @@ export function filterSaid(f, redraw) {
     ...[...linkGroups(f.links ?? []).values()].map((l) => `${termWords(l[0], redraw)}${l.length > 1 ? ` +${l.length - 1}` : ''}`),
     some(f.ids, (id) => nameOf(id, redraw), (l) => `${l.length} items`),
     some(f.in, (id) => `in ${nameOf(id, redraw)}`, (l) => `in ${l.length} items`),
-    some(f.only, (t) => `only ${typeTitle(t)}`, (l) => `only ${l.length} types`),
+    some(f.only, (t) => `only ${onlySaid(t, typeTitle, (id) => nameOf(id, redraw))}`, (l) => `only ${onlySaid(l[0], typeTitle, (id) => nameOf(id, redraw))} +${l.length - 1}`),
     some(f.within, (id) => `within ${nameOf(id, redraw)}`, (l) => `within ${l.length} items`),
   ].filter(Boolean).join(' · ');
 }
@@ -180,16 +183,19 @@ export function drawQuery(lens, view, go, lead) {
       },
     },
   });
-  // What Only narrows Find to: a type, or within an item.
+  // What Only narrows Find to: its words (done, blocked, owner me…), a type, or within an item.
   const narrowTo = (anchor, field, value) => pickTerm(anchor, {
     label: 'Only',
-    groups: groupsOf(ranked(typeChoices().filter((t) => !(f.only ?? []).includes(t.id)), here.types, near.uses?.types), (t) => ({ label: t.title, title: 'Only what is of this type', pick: () => go(added(but(field, value), { only: t.id })) })),
+    groups: [
+      { label: '', items: offered(f.only ?? [], numberOf(state.style, 'only_since_days')).map(({ word, title }) => ({ label: word, title, pick: () => go(added(but(field, value), { only: word })) })) },
+      ...groupsOf(ranked(typeChoices().filter((t) => !(f.only ?? []).includes(t.id)), here.types, near.uses?.types), (t) => ({ label: t.title, title: 'Only what is of this type', pick: () => go(added(but(field, value), { only: t.id })) })),
+    ],
     typed: {
-      placeholder: 'A type, or an item id…',
-      title: 'Only what is of a type, or within an item (its id), at any depth',
+      placeholder: 'status todo, owner Sam, a type, an id…',
+      title: 'Only what is so (done, blocked, status <s>, owner me or a person, no owner, over estimate, changed or made since 7d or a date, by owner, by agent), of a type, or within an item (its id), at any depth',
       pick: (written) => {
         const s = written.trim();
-        const t = isId(s) ? { within: s } : typeNamed(s) ? { only: typeNamed(s) } : null;
+        const t = isId(s) ? { within: s } : isWord(s) ? { only: s.replace(/\s+/g, ' ') } : typeNamed(s) ? { only: typeNamed(s) } : null;
         if (t) go(added(but(field, value), t));
         return Boolean(t);
       },
@@ -227,7 +233,7 @@ export function drawQuery(lens, view, go, lead) {
     ...(f.in ?? []).map((id) => term('q-in', `in ${nameOf(id, redraw)}`, 'All that is in this item, at any depth', 'in', id, addToFilter)),
   ].filter(Boolean);
   const onlyTerms = [
-    ...(f.only ?? []).map((t) => term('q-narrow', typeTitle(t), 'Only what is of this type, of what Find finds', 'only', t, narrowTo)),
+    ...(f.only ?? []).map((t) => term('q-narrow', onlySaid(t, typeTitle, (id) => nameOf(id, redraw)), isWord(t) ? 'Only what is so, of what Find finds' : 'Only what is of this type, of what Find finds', 'only', t, narrowTo)),
     ...(f.within ?? []).map((id) => term('q-narrow', `within ${nameOf(id, redraw)}`, 'Only what is within this item, at any depth, of what Find finds', 'within', id, narrowTo)),
   ];
   const notTerms = exclude.map((x) => term('q-out', x === 'closed' || x === 'system' ? x : typeTitle(x), 'Left out of everything', 'exclude', x, leaveOut));
@@ -289,7 +295,7 @@ export function drawQuery(lens, view, go, lead) {
       h('button', { type: 'button', class: 'q-save q-word q-edit-toggle', title: editing ? 'Done editing the lens' : 'Edit the lens: what it finds, only, not, and walks along', 'aria-expanded': String(editing), onclick: toggle }, editing ? 'Done' : 'Edit')),
     h('div', { class: 'q-edit', role: 'group', 'aria-label': 'Edit the lens', hidden: !editing, onkeydown: (ev) => ev.key === 'Escape' && toggle() },
       part('q-filter', 'Find', 'What any of these finds is drawn', findTerms, (a) => addToFilter(a), 'Find more'),
-      part('q-only', 'Only', 'What Find finds must all be so', onlyTerms, (a) => narrowTo(a), 'Only what is of a type, or within an item'),
+      part('q-only', 'Only', 'What Find finds must all be so', onlyTerms, (a) => narrowTo(a), 'Only what is so, of a type, or within an item'),
       part('q-not', 'Not', 'Left out of everything, what the walk reaches included', notTerms, (a) => leaveOut(a), 'Leave something out'),
       part('q-walk-part', 'Walk', 'From what Find finds, along these links, each its own way', walkTerms, (a) => walkAlong(a), 'Walk along a link',
         walking && h('span', { class: 'switch q-steps', title: 'How many steps the walk takes' },

@@ -8,6 +8,7 @@
 
 import { SYSTEM } from './head.ts';
 import type { Archipelago } from './pelago.ts';
+import { checkedAfter, holding, readWord, wordConditions, type Narrowing } from './lens-only.ts';
 import { rankSql } from './search.ts';
 
 /** One link term of a filter: the items that have a link of this type to `to` (or, with `from`, the items `from` links to). */
@@ -23,8 +24,8 @@ export type Found = 'text' | 'type' | 'id' | 'link' | 'in';
 export interface FlatLens {
   /** What picks the seeds: any item any of these finds. */
   include: { text?: string[]; types?: string[]; ids?: string[]; links?: LinkTerm[]; in?: string[] };
-  /** What must all hold of a seed as well: one of these types (flavours too), and part of each of these items, however far down. */
-  narrow: { only?: string[]; within?: string[] };
+  /** What must all hold of a seed as well: one of these types (flavours too), part of each of these items, however far down, and each of Only's words (src/lens-only.ts). */
+  narrow: { only?: string[]; within?: string[]; words?: string[] };
   /** What is left out of everything: closed, system, or a type (its flavours too). */
   exclude: string[];
   /** The link types followed, each as named (`depends_on>` out, `depends_on<` in, `depends_on` either way), and how many steps. */
@@ -81,11 +82,16 @@ export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLe
   }
   for (const type of include.types ?? []) if (!l.registry.types.has(l.registry.canonical(type))) throw new Error(`filter.types: unknown type "${type}"`);
   const narrow: FlatLens['narrow'] = {};
-  if (filter.only !== undefined && (filter.only as unknown[]).length !== 0) narrow.only = names(filter.only, 'filter.only');
+  // Only takes types and plain words (decision e_xe5dx55e): a term that reads as a word is one, else it is a type.
+  const onlyTerms = filter.only === undefined ? [] : names(filter.only, 'filter.only');
+  const onlyWords = onlyTerms.filter((t) => readWord(t) !== undefined);
+  const onlyTypes = onlyTerms.filter((t) => !onlyWords.includes(t));
+  if (onlyTypes.length) narrow.only = onlyTypes;
+  if (onlyWords.length) narrow.words = onlyWords;
   if (filter.within !== undefined && (filter.within as unknown[]).length !== 0) narrow.within = names(filter.within, 'filter.within');
-  for (const type of narrow.only ?? []) if (!l.registry.types.has(l.registry.canonical(type))) throw new Error(`filter.only: unknown type "${type}"`);
+  for (const type of narrow.only ?? []) if (!l.registry.types.has(l.registry.canonical(type))) throw new Error(`filter.only: unknown type "${type}": no type nor one of Only's words (done, blocked, status <s>, owner me|<person>, no owner, over estimate, changed since <7d|date>, made since <7d|date>, by owner, by agent)`);
   if (!include.text?.length && !include.types?.length && !include.ids?.length && !include.links?.length && !include.in?.length)
-    throw new Error(narrow.only || narrow.within
+    throw new Error(narrow.only || narrow.within || narrow.words
       ? 'A lens includes something (filter: text, types, ids, links or in) for only and within to narrow: they narrow what the filter includes, and alone would read the whole map.'
       : 'A lens includes something (filter: text, types, ids, links or in): a filter that includes nothing would read the whole map.');
   const exclude = filter.exclude === undefined ? EXCLUDE_DEFAULT : names(filter.exclude, 'filter.exclude');
@@ -118,8 +124,17 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   const only = lens.narrow.only?.flatMap((t) => l.registry.family(t));
   const within = lens.narrow.within && (await l.db.query<{ id: string }>('select id from entity where id = any($1::text[]) and archived_at is null', [lens.narrow.within])).rows.map((r) => r.id);
   const hidden = within !== undefined && within.length < new Set(lens.narrow.within).size;
-  const narrowing = [...(only ? [only] : []), ...(within ? [within] : [])];
-  const narrows = (n: number) => [only && `e.type = any($${n}::text[])`, within && `(select count(*) from part_closure c where c.descendant = e.id and c.ancestor = any($${n + (only ? 1 : 0)}::text[])) = cardinality($${n + (only ? 1 : 0)}::text[])`].filter(Boolean);
+  const me = l.viewer || (await l.setting<string>('me')) || null;
+  // Each narrowing term, numbered in order after what it follows: the types, within, then Only's words that are a
+  // condition on the row. The words checked on what a read found (blocked, by owner, by agent) are not among them.
+  const words = (lens.narrow.words ?? []).map((w) => readWord(w)!);
+  const terms: Narrowing[] = [
+    ...(only ? [{ cond: 'e.type = any($?::text[])', param: only }] : []),
+    ...(within ? [{ cond: '(select count(*) from part_closure c where c.descendant = e.id and c.ancestor = any($?::text[])) = cardinality($?::text[])', param: within }] : []),
+    ...(await wordConditions(l, words, me)),
+  ];
+  const narrowing = terms.filter((t) => t.param !== undefined).map((t) => t.param);
+  const narrows = (n: number) => terms.map((t) => (t.param === undefined ? t.cond : t.cond.replaceAll('$?', `$${n++}`)));
   const narrowed = (n: number) => [keep(n), ...narrows(n + 1)].join(' and ');
   // Each read finds ids only; what is sent of them is read once, at the end. A seed is found narrowed; a step of the walk is not.
   const read = async (cond: string, sql: (keep: string) => string, own: unknown[], more: unknown[]) => (await l.db.query<{ id: string }>(sql(cond), [...own, leftOut, ...more])).rows.map((r) => r.id);
@@ -138,7 +153,11 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
       if (room() > 0) sent.add(id);
     }
   };
-  const me = l.viewer || (await l.setting<string>('me')) || null;
+  // Only's words checked on what a read found: then each read of seeds finds as many as one answer may send, for them
+  // to keep what they hold of.
+  const checked = checkedAfter(words);
+  const reach = () => (checked ? LENS_LIMIT : room());
+  const holds = async (found: string[]) => (checked ? holding(l, words, found) : found);
   // A term's end is an item's id, or else its name: the items so titled (any case) of the types that end of the link
   // takes ("tagged Urgent" is the tag named Urgent), as the viewer may see them.
   const ends = async (term: LinkTerm, end: string) => {
@@ -155,34 +174,35 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   const { ids, links, text, types } = lens.include;
   // An item named by id is always drawn: Not leaves out only what other terms find and what the walk reaches
   // (decision e_yasbwj45), and Only still narrows it.
-  if (ids?.length && !hidden) add((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${['e.archived_at is null', ...narrows(2)].join(' and ')}`, [ids, ...narrowing])).rows.map((r) => r.id), 'id');
+  if (ids?.length && !hidden) add(await holds((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${['e.archived_at is null', ...narrows(2)].join(' and ')}`, [ids, ...narrowing])).rows.map((r) => r.id)), 'id');
   for (const term of links ?? []) {
     if (room() <= 0) break;
     const end = term.to ?? term.from!;
     const at = end === 'me' ? (me ? [me] : []) : await ends(term, end);
     if (!at.length) continue;
     const [near, far] = term.to !== undefined ? ['from_id', 'to_id'] : ['to_id', 'from_id'];
-    add(await seed((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), room()]), 'link');
+    add(await holds(await seed((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), reach()])), 'link');
   }
   // What is in an item, at any depth, read from the part_of closure (decision e_tvsdqjeq), the newest first; in an item
   // the viewer cannot see, nothing is.
   const inside = lens.include.in && (await l.db.query<{ id: string }>('select id from entity where id = any($1::text[]) and archived_at is null', [lens.include.in])).rows.map((r) => r.id);
-  if (inside?.length && room() > 0) add(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [inside, room()]), 'in');
+  if (inside?.length && room() > 0) add(await holds(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [inside, reach()])), 'in');
   // The text is the search read's own (src/search.ts): the words in any form in the title or note, or as typed anywhere
   // in the title, the best match first; only when that finds nothing, titles with a word close to what was typed.
   // How many it found in all is kept (`matched`), counted over what the viewer may see and the filter keeps.
   let matched: number | undefined;
-  for (const words of hidden ? [] : (text ?? [])) {
+  for (const said of hidden ? [] : (text ?? [])) {
     if (room() <= 0) break;
     const finding = async (near: boolean) => (await l.db.query<{ id: string; n: number }>(
       `select e.id, count(*) over ()::int as n from entity e where e.id in (select pelago_search_ids($1, ${near})) and ${narrowed(3)} order by ${rankSql('$1', 'e.')} desc, e.updated_at desc, e.id limit $2`,
-      [words, room(), leftOut, ...narrowing])).rows;
+      [said, reach(), leftOut, ...narrowing])).rows;
     let rows = await finding(false);
     if (!rows.length) rows = await finding(true);
-    matched = (matched ?? 0) + (rows[0]?.n ?? 0);
-    add(rows.map((r) => r.id), 'text');
+    const found = await holds(rows.map((r) => r.id));
+    matched = (matched ?? 0) + (checked ? found.length : (rows[0]?.n ?? 0));
+    add(found, 'text');
   }
-  if (types?.length && room() > 0) add(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [types.flatMap((t) => l.registry.family(t)), room()]), 'type');
+  if (types?.length && room() > 0) add(await holds(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [types.flatMap((t) => l.registry.family(t)), reach()])), 'type');
 
   // The walk: a step at a time along the links named, each the way it is named (out along it, in to it, or either), to
   // what the filter does not exclude. An excluded item is not walked through. Each step is bounded by the ids reached

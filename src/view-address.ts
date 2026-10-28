@@ -50,6 +50,9 @@ export async function viewAddress(l: Archipelago, input: ViewAsked): Promise<str
       if (types?.length) query.set('types', types.join(','));
       if (ids?.length) query.set('ids', ids.join(','));
       if (inside?.length) query.set('in', inside.join(','));
+      const only = [...(lens.narrow.only ?? []), ...(lens.narrow.words ?? [])];
+      if (only.length) query.set('only', only.join(','));
+      if (lens.narrow.within?.length) query.set('within', lens.narrow.within.join(','));
       for (const t of links ?? []) query.append('link', `${t.link} ${t.to ?? t.from}`);
       if (asked.filter?.exclude !== undefined) query.set('exclude', lens.exclude.join(','));
       if (walked) query.set('over', lens.walk.over === 'all' ? 'all' : (lens.walk.over as string[]).join(','));

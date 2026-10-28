@@ -33,8 +33,11 @@ never structure. Containment is a projection the server keeps (the
 The filter has two kinds of term. Those that include add seeds, each its
 own (text, types, ids, links such as `tagged e_x`, `in` an item: all that
 is part of it at any depth, from the part_of closure; a union); those that
-narrow must all hold of a seed (an AND: `only`, types; `within`, items it
-is part of at any depth, read from the part_of closure). What it
+narrow must all hold of a seed (an AND: `only`, types, and plain words,
+`done`, `blocked`, `status <s>`, `owner me`, `no owner`, `over estimate`,
+`changed since 7d`, `made since <date>`, `by owner`, `by agent`, read in
+`src/lens-only.ts`, e_xe5dx55e; `within`, items it is part of at any depth,
+read from the part_of closure). What it
 excludes applies to everything the walk reaches, never to an item named
 by id (e_yasbwj45); the
 walk follows the link types named, each out (→, `depends_on>`), in (←,
@@ -51,7 +54,8 @@ whole map. Search is the filter's text; tags are a core `tag` type and a
   drawn whatever Not says, and the walk from it still keeps Not".
 - `test/lens-terms.test.ts`: "Find in an item: all that is part of it at any
   depth, of any type, not the item itself"; "the walk follows each link out,
-  in or either way, as it is named".
+  in or either way, as it is named"; "Only's plain words: each must hold of
+  every seed, and the walk is not narrowed".
 - `test/find-lens.test.ts`: "in a browser, the find bar sets the text of the
   canvas lens".
 
