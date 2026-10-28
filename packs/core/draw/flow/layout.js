@@ -1,8 +1,8 @@
 // A flow's layout, apart from its drawing (the core pack's flow drawing, index.js): a flat graph on one plane, where
 // depth is never drawn (e_ktdensts). Every item is a step. depends_on is the order: a step leads to another when the
 // other depends on it, read from the top down and routed at right angles. Every other link (part_of first) is a quiet
-// tie that pulls its two ends near and is drawn straight; nothing is grouped, boxed or nested. What is tied together
-// is one cluster, laid out by Sugiyama's method (layers by longest path along the order, a waypoint where a wire
+// tie that pulls its two ends near, routed at right angles round the steps (./free.js); nothing is grouped, boxed or
+// nested. What is tied together is one cluster, laid out by Sugiyama's method (layers by longest path along the order, a waypoint where a wire
 // passes a layer, barycentre sweeps and, while it is small, a search of the layers and sifting for the order, then
 // straightened) and its wires routed each on a track of its own. A step in no order sits a layer under what it is
 // part of, or a layer above the first of what is part of it. A step put by hand (`placed`) stays exactly where it was
@@ -10,7 +10,7 @@
 // open question is a scenario, and a choice nothing follows yet ends in a step of its own. Pure: an answer in,
 // geometry out; `measure(text, px)` gives a title's width at a size.
 
-import { drawnPaths, field, outlineRoute, route, take, tieRoute } from './free.js';
+import { route, routeTies } from './free.js';
 import { acyclic, flatten, grouped, highest, lowest, NEAR, ORDER, QUIET, placeOutline, reduced, wrapLeaves } from './graph.js';
 
 /** Past this many steps in a cluster the layer search and the sifting are skipped: they grow with the square of the steps. */
@@ -487,14 +487,12 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
       const others = steps.filter((n) => n.id !== e.a && n.id !== e.b).map((n) => box(n.id));
       chains.push({ ...e, key: `${e.a} ${e.b}`, path: [e.a, e.b], dashed: potential.has(e.b), points: route(box(e.a), box(e.b), LEAD_OUT, others) });
     }
-  // Each tie keeps off what is drawn already (the order's wires, then the ties before it), or shares a bus out of one step.
-  const around = field(steps.map((n) => ({ id: n.id, ...box(n.id) })), LAYER_GAP);
-  const taken = drawnPaths(LEAD_OUT / 2);
-  for (const c of chains) take(taken, c.points, [c.a, c.b]);
-  // A tie into an outline's leaf runs down its column's bus, from halfway down to the outline's first row (./free.js).
+  // Each tie round the steps and off what is drawn already, or on a bus out of a step it shares (./free.js); a tie into
+  // an outline's leaf runs down its column's bus, from a lane of its own above the outline's first row.
   const outlineOf = new Map(laid.flatMap((c) => c.outlines.flatMap((o) => o.leaves.map((l) => [`${l} ${o.parent}`, lowest(o.leaves.filter((_, k) => k % o.rows === 0).map((f) => y.get(f) - nodes.get(f).h / 2))]))));
-  for (const t of ties) t.points = outlineOf.has(`${t.a} ${t.b}`) ? outlineRoute(box(t.b), box(t.a), outlineOf.get(`${t.a} ${t.b}`), LEAD_OUT) : tieRoute({ id: t.a, ...box(t.a) }, { id: t.b, ...box(t.b) }, LEAD_OUT, around, taken);
-  const reachX = [...steps.map((n) => x.get(n.id) + n.w / 2), ...chains.flatMap((c) => c.points.map((p) => p[0]))];
-  const reachY = [...steps.map((n) => y.get(n.id) + n.h / 2), ...chains.flatMap((c) => c.points.map((p) => p[1]))];
+  routeTies(ties, steps.map((n) => ({ id: n.id, ...box(n.id) })), chains, outlineOf, { lead: LEAD_OUT, cell: LAYER_GAP, track: TRACK });
+  const drawn = [...chains, ...ties].flatMap((c) => c.points);
+  const reachX = [...steps.map((n) => x.get(n.id) + n.w / 2), ...drawn.map((p) => p[0])];
+  const reachY = [...steps.map((n) => y.get(n.id) + n.h / 2), ...drawn.map((p) => p[1])];
   return { nodes, all, chains, ties, breaks, potential, x, y, width: highest(reachX) + MARGIN, height: highest(reachY) + MARGIN };
 }
