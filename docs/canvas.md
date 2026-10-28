@@ -31,11 +31,18 @@ never structure. Containment is a projection the server keeps (the
 
 ### 3. The lens is a filter, a walk and a limit, and the only bound
 The filter has two kinds of term. Those that include add seeds, each its
-own (text, types, ids, links such as `tagged e_x`: a union); those that
-narrow must all hold of a seed (an AND: `only`, types; `within`, items it
-is part of at any depth, read from the part_of closure). What it
-excludes applies to everything the walk reaches; the
-walk follows the link types named, either way, for some steps; the limit
+own (text, types, ids, links such as `tagged e_x`, `in` an item: all that
+is part of it at any depth, from the part_of closure; a union); those that
+narrow must all hold of a seed (an AND: `only`, types, and plain words,
+`done`, `blocked`, `status <s>`, `owner me`, `no owner`, `over estimate`,
+`changed since 7d`, `made since <date>`, `by owner`, `by agent`, read in
+`src/lens-only.ts`, e_xe5dx55e; `within`, items it is part of at any depth,
+read from the part_of closure). What it
+excludes applies to everything the walk reaches, never to an item named
+by id (e_yasbwj45); the
+walk follows the link types named, each out (→, `depends_on>`), in (←,
+`depends_on<`) or either way (↔, as a lens kept before ways were said), for
+some steps, a click on its arrow in the bar turning it (e_gue6cg6q); the limit
 caps it. A filter that includes nothing is refused, so no canvas reads the
 whole map. Search is the filter's text; tags are a core `tag` type and a
 `tagged` link, filtered by and, in the house style, not drawn.
@@ -43,15 +50,26 @@ whole map. Search is the filter's text; tags are a core `tag` type and a
   "what is excluded is left out of everything the walk reaches, and is not
   walked through"; "the limit caps what is sent, seeds first, and says it
   cut"; "the text is the search read"; "narrowing: only and within must all
-  hold of every seed, not of what the walk reaches".
+  hold of every seed, not of what the walk reaches"; "an item named by id is
+  drawn whatever Not says, and the walk from it still keeps Not".
+- `test/lens-terms.test.ts`: "Find in an item: all that is part of it at any
+  depth, of any type, not the item itself"; "the walk follows each link out,
+  in or either way, as it is named"; "Only's plain words: each must hold of
+  every seed, and the walk is not narrowed".
 - `test/find-lens.test.ts`: "in a browser, the find bar sets the text of the
   canvas lens".
 
 ### 4. Lens and style are the whole surface, for people and agents
-A person grows a canvas by editing its lens (a click adds an id, find sets
-the text, the query bar changes any term), and an agent reads the same lens
+A person grows a canvas by editing its lens in find, at the canvas's foot,
+which is the query's (e_2a4mddx8): at rest it says the lens in one line;
+open, a row for each part rises above it; typed, it lists what the words
+could be, each said by its kind, Words first and lit (a click only opens an
+item's page, e_jedng69e). The top keeps the view's band. An agent reads the same lens
 (`query` name `flat`) and points the page at one (`report` action `show`
-with `lens`). The page calls no tool an agent lacks for it. The bar's
+with `lens`). The page calls no tool an agent lacks for it. A term is made
+by picking its kind, then the thing (an item by its name from a list, kept
+by its id); nothing written is taken for a term, and a name an agent writes
+is answered by its id or refused when two items share it (e_45sgrfqd). The bar's
 pickers (the walk's links, the box's types) lead with what the canvas
 draws, then what lies one step around it (the same `flat` read, walked
 once), then the rest; a retired or dormant type or link type is never
@@ -205,8 +223,8 @@ name dragged onto a side of another docks it there (onto its middle swaps
 them), the line between two shares the room, and × closes it; the last one stays. One pane alone has no strip: the bar floats
 over its top, as the page's canvas always did.
 
-The pane last touched is in focus: the query bar and find act on it and sit
-in its strip (decision e_h2pqjy2q). The address is its address
+The pane last touched is in focus: the view's band sits in its strip and
+find acts on its lens (decision e_h2pqjy2q). The address is its address
 (`pane-address.js`): `#/v?…` says its lens, and an item's page open over it
 is `#/e/<id>?…` with that lens beside it. Moving focus rewrites the address
 without a step of the browser's; a lens given to a pane in focus is one. Each
@@ -215,9 +233,8 @@ every pane as it was, history included: a step for each lens it is given,
 none for typing or for a page opened over it (e_ssnyd3ex). ‹ › in the bar,
 dimmed with nowhere to go, and the browser's own back and forward, all act on
 the pane in focus. A click on a node in any pane puts that pane in focus,
-adds the node to its filter and opens its page in the sheet over it. What is
-typed in the bar's box and whether its filter is unfolded are the pane's:
-another pane or tab starts without them. On a page taller than wide a row is
+adds the node to its filter and opens its page in the sheet over it. Find shuts when
+another pane or tab comes into focus, and what was typed goes. On a page taller than wide a row is
 drawn as a column. The top bar runs across the page over the sheet, one pane
 or several: the sheet opens under it.
 

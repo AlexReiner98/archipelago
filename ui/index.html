@@ -32,8 +32,12 @@
         </div>
       </details>
     </nav>
-    <div id="query" role="toolbar" aria-label="The lens" hidden></div>
-    <form id="find" role="search"></form>
+    <div id="query" role="toolbar" aria-label="The view" hidden></div>
+    <form id="find" role="search">
+      <div id="find-rows" class="q-edit" role="group" aria-label="The lens, part by part"></div>
+      <div class="find-choices" role="listbox" aria-label="What the words could be" hidden></div>
+      <div class="find-row"><div id="find-lens" class="q-lens" role="group" aria-label="The lens"></div></div>
+    </form>
     <aside id="sheet" aria-label="The item">
       <button id="sheet-close" type="button" title="Back to the canvas (Esc)">×</button>
       <main id="main"></main>

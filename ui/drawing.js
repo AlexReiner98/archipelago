@@ -5,7 +5,7 @@
 // each drawing's code is sent once and kept by its hash. A drawing whose scene asks for a surface has the frames it
 // paints in its worker shown on a canvas laid over its picture (surface.js).
 
-import { h } from './base.js';
+import { frameSandbox, h } from './base.js';
 import { dragOf, wireHover } from './drag.js';
 import { HELD } from './ghosts.js';
 import { tipOf } from './drawing-tip.js';
@@ -47,7 +47,7 @@ export function warmDrawings() {
   // A frame taken off the page (a page that draws its body anew) is started again: its workers went with it.
   if (sandbox?.frame.isConnected) return sandbox;
   // Not hidden: a frame that is not drawn has its worker slowed many times over. It is drawn with no size instead (flow.css).
-  const frame = h('iframe', { class: 'drawing-sandbox', sandbox: 'allow-scripts', src: '/draw.html', title: 'Where drawings run', tabindex: '-1', 'aria-hidden': 'true' });
+  const frame = h('iframe', { class: 'drawing-sandbox', sandbox: frameSandbox(), src: '/draw.html', title: 'Where drawings run', tabindex: '-1', 'aria-hidden': 'true' });
   const loads = new Map();
   sandbox = { frame, loads, ready: null };
   sandbox.ready = new Promise((resolve) => {

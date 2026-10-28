@@ -35,6 +35,7 @@ import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './
 import { notify } from './notify.ts';
 import { backupAll, parseBackup, parseVault } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
+import { env } from './env.ts';
 import { serveConnect } from './connect.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import { serveHook } from './hooks.ts';
@@ -100,7 +101,7 @@ class Refused extends Error {
 }
 export { lenient } from './mcp.ts';
 
-export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }; proxies?: string; leading?: () => boolean } = {}): Server {
+export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }; proxies?: string; leading?: () => boolean; unsandboxed?: boolean } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
   // The server's own Chrome may reach it by another name, from a container beside it (src/looks.ts).
@@ -279,11 +280,14 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           'x-content-type-options': 'nosniff',
           'referrer-policy': 'no-referrer',
           ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
-          ...(file === 'draw.html' && { 'content-security-policy': DRAW_POLICY }),
+          ...(file === 'draw.html' && { 'content-security-policy': options.unsandboxed ? DRAW_POLICY.replace('sandbox allow-scripts; ', '') : DRAW_POLICY }),
           // The frame has an origin of its own, so what it loads from here it loads as a stranger.
           ...((file === 'draw.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
         });
-        return res.end(file === 'layout.css' ? lengthsSheet((await workspaces.get(DEFAULT_WORKSPACE)).pelago.registry.packs) : page ? await uiPage(file) : served!.body);
+        const html = page && (await uiPage(file));
+        // Marked so the page makes its drawing frames with no sandbox (ui/base.js frameSandbox), as draw.html is served.
+        if (html && options.unsandboxed) return res.end(html.replace('<html', '<html data-draw-sandbox="off"'));
+        return res.end(file === 'layout.css' ? lengthsSheet((await workspaces.get(DEFAULT_WORKSPACE)).pelago.registry.packs) : html || served!.body);
       }
 
       if (req.method === 'GET' && url.pathname === '/whoami') {
@@ -422,7 +426,10 @@ If that process is not a pelago server, delete ${lock}.`);
     process.exit(1);
   }
 
-  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, sites: config.sites, proxies: config.trustedProxies, leading: () => leader?.leading ?? false });
+  // Drawings with one wall, the worker: for a browser that loads no sandboxed frame. A dev server with no tokens only.
+  const unsandboxed = config.dev && config.auth !== 'tokens' && env('UNSANDBOXED') === '1';
+  if (unsandboxed) console.log('unsandboxed: drawing frames share the page’s origin (PELAGO_UNSANDBOXED=1)');
+  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, sites: config.sites, proxies: config.trustedProxies, leading: () => leader?.leading ?? false, unsandboxed });
   // The port is taken before any database is opened: a second server started
   // by mistake must fail here, never open data another server is writing.
   server.on('error', (err: NodeJS.ErrnoException) => {

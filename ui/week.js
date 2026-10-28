@@ -1,4 +1,5 @@
 import { api, h, state } from './base.js';
+import { keepInSight } from './menu-place.js';
 import { chip } from './words.js';
 
 // ---- Time ------------------------------------------------------------------
@@ -60,6 +61,7 @@ export function workPicker(initial, onPick) {
       ),
     );
     list.hidden = !hits.length;
+    keepInSight(list);
   };
   input.oninput = () => ((picked = null), find());
   input.onblur = () => setTimeout(() => (list.hidden = true), 150);

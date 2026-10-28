@@ -1,7 +1,7 @@
 // A canvas: the map drawn in a pane (ui/panes.js), every pane alike. What is drawn is a flat lens (a filter, a walk and
 // a limit: decision e_sdsaxxq4), kept as the pane's address (v?..., ui/tabs.js) and shown and edited in the query bar
 // (ui/query-bar.js) while its pane is in focus: every change of what is drawn is a change of that lens. A click on an
-// item adds it to the filter and opens its page; the find bar adds text. It is drawn in the drawing its style names (the
+// item opens its page and leaves the lens as it was (decision e_jedng69e); the find bar sets its words. It is drawn in the drawing its style names (the
 // flow, by the canvas pack's preset, unless a nearer style says otherwise), so a canvas has no look of its own: it keeps
 // which lens is up, lights the item whose page is open, and moves as the reader chose in the settings menu: fitted on
 // every change, or left where they put it.
@@ -9,20 +9,22 @@
 import { api, hooks, state } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { canvasSwitch } from './canvases.js';
+import { numberOf } from './lens-base.js';
 import { FOCUS, flatView } from './lens.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
 
 const sheet = document.getElementById('sheet');
-/** Home: the map's top (what stands at the altitude of the workspace or a project) and what is directly in each, open. */
+/**
+ * Home: open projects (what stands at a project's altitude) and whatever waits on the viewer, with no walk and a short
+ * limit, so the first canvas answers one question (decision e_5stjvfvb). Growing it is a step taken from an item.
+ */
 export const home = () => ({
-  filter: { types: (state.schema?.types ?? []).filter((t) => !t.dormant && (t.altitude === 'workspace' || t.altitude === 'project')).map((t) => t.id), exclude: ['closed', 'system'] },
-  walk: { over: ['part_of'], steps: 1 },
+  filter: { types: (state.schema?.types ?? []).filter((t) => !t.dormant && t.altitude === 'project').map((t) => t.id), links: ['waits_on me'], exclude: ['closed', 'system'] },
+  limit: numberOf(state.style, 'home_limit'),
 });
 /** The canvas an item's address opens when no lens is asked: the item and what it holds, depends on and waits on. */
 export const focusOn = (id) => ({ filter: { ids: [id] }, walk: { over: FOCUS, steps: 1 } });
-/** The lens with this item in its filter: growing a canvas is editing its lens. */
-export const withItem = (lens, id) => (lens.filter.ids?.includes(id) ? lens : { ...lens, filter: { ...lens.filter, ids: [...(lens.filter.ids ?? []), id] } });
 /** The canvas as places are kept for it: the saved canvas up (ui/canvases.js), else the first item its filter names, else the whole map (''). */
 const canvasOf = (lens, asked) => asked?.canvas ?? lens.filter.ids?.[0] ?? '';
 
@@ -57,7 +59,7 @@ export const refreshCanvas = (tail = false) => all.forEach((c) => c.refresh(tail
 
 /**
  * A canvas drawn in `host`, for a pane: `pane.go(lens)` draws another lens there (null for Home), `pane.open(href)`
- * another saved canvas, `pane.opened(id, lens)` opens an item's page from a click on it, the lens grown by it.
+ * another saved canvas, `pane.opened(id, lens)` opens an item's page from a click on it, over that lens.
  */
 export function canvasIn(host, pane) {
   /** What is up: the lens asked for, the view drawing it, the item lit in it, the style as asked, where it was left. */
@@ -149,12 +151,13 @@ export function canvasIn(host, pane) {
     if (settings.fit) c.fit();
     else if (at?.kept) c.moves()?.restore(at.kept);
   }).observe(host, { childList: true, subtree: true });
-  // A click on an item drawn adds it to the lens's filter, and opens its page over the canvas.
+  // A click on an item drawn opens its page over the canvas, the lens as it was: reading an item does not reshape what
+  // is drawn (the owner, 28 Oct 2026, e_jedng69e).
   host.addEventListener('click', (ev) => {
     const id = /^#\/e\/(e_[a-z0-9]{8})$/.exec(ev.target.closest?.('a')?.getAttribute('href') ?? '')?.[1];
     if (!id || !at || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button !== 0) return;
     ev.preventDefault();
-    pane.opened(id, withItem(at.lens, id));
+    pane.opened(id, at.lens);
   });
   // Let go on the canvas (ui/drag.js): kept on the page, and in the picture's places, so a redraw keeps it where it was put.
   host.addEventListener('drawing-drop', (ev) => {

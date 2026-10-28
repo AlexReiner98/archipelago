@@ -9,6 +9,7 @@
 import { api, h, hooks } from './base.js';
 import { readFlatLens } from './lens.js';
 import { lookMode } from './look.js';
+import { placeBy } from './menu-place.js';
 import { windowOf, windows } from './pane-busy.js';
 import { heard, nameOf } from './pane-route.js';
 import { activeAt, activeIs, draw, paneAt, paneButtons, startPanes } from './panes.js';
@@ -178,9 +179,7 @@ function tabMenu(anchor, t) {
     ].filter(Boolean),
   );
   menuEl.showPopover();
-  const r = anchor.getBoundingClientRect();
-  menuEl.style.left = `${Math.max(0, Math.min(r.left, innerWidth - menuEl.offsetWidth))}px`;
-  menuEl.style.top = `${r.bottom}px`;
+  placeBy(menuEl, anchor);
 }
 
 /** The query bar's own: the pane's buttons (in a popped window, dock back). Whom the tab follows and a new tab are the strip's. */

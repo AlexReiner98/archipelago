@@ -67,8 +67,8 @@ test('the walk goes either way along the links named, for the steps asked', asyn
 
 test('what is excluded is left out of everything the walk reaches, and is not walked through', async () => {
   const { l, made } = await chain();
-  const open = await flatLens(l, { filter: { ids: [made.a, made.x], exclude: ['closed'] }, walk: { over: ['depends_on'], steps: 1 } });
-  assert.deepEqual(titles(open), ['Flat lens', 'Tags'], 'a closed seed and a closed neighbour alike');
+  const open = await flatLens(l, { filter: { ids: [made.a], exclude: ['closed'] }, walk: { over: ['depends_on'], steps: 1 } });
+  assert.deepEqual(titles(open), ['Flat lens', 'Tags'], 'the closed neighbour is left out');
   const noTasks = await flatLens(l, { filter: { ids: [made.n], exclude: ['task'] }, walk: { over: 'all', steps: 3 } });
   assert.deepEqual(titles(noTasks), ['A note on it'], 'the walk stops at the task it may not send');
 });
@@ -182,4 +182,35 @@ test('within an item the viewer cannot see, nothing is', async () => {
   const { s } = await l.as(bo).change({ kind: 'human', name: 'bo', person: bo }, { ops: [{ op: 'create', ref: 's', type: 'project', title: 'Bo private', visibility: 'private' }, { op: 'link', type: 'part_of', from: made.d, to: 's' }], reason: 'test' }).then((r) => (r as { created: Record<string, string> }).created);
   assert.deepEqual(titles(await flatLens(l.as(bo), { filter: { types: ['task'], within: [s] } })), ['Saved canvases']);
   assert.deepEqual(titles(await flatLens(l.as('e_someone'), { filter: { types: ['task'], within: [s] } })), [], 'what is in it is not told');
+});
+
+test('each item says why it is there: the terms that found it, or the step of the walk that reached it', async () => {
+  const { l, made } = await chain();
+  const answer = await flatLens(l, { filter: { ids: [made.c], text: 'query bar', types: ['note'] }, walk: { over: ['depends_on'], steps: 2 } });
+  const why = Object.fromEntries(answer.items.map((i: any) => [i.title, i.found ?? i.step]));
+  assert.deepEqual(why['Query bar'], ['id', 'text'], 'found by its id and by the words');
+  assert.deepEqual(why['A note on it'], ['type']);
+  assert.equal(why['Tags'], 1, 'one step of the walk from what was found');
+  assert.equal(why['Flat lens'], 2, 'two steps');
+  const linked = await flatLens(l, { filter: { links: [`waits_on ${made.bo}`] } });
+  assert.deepEqual((linked.items[0] as any).found, ['link']);
+});
+
+test('several sets of words are each a term: what any of them finds is a seed', async () => {
+  const { l } = await chain();
+  assert.deepEqual(titles(await flatLens(l, { filter: { text: ['canvases', 'tags'] } })), ['Saved canvases', 'Tags']);
+  assert.deepEqual(titles(await flatLens(l, { filter: { text: ['canvases', ' ', 'canvases'] } })), ['Saved canvases'], 'blank and repeated sets go');
+  const read = await flatLens(l, { filter: { text: ['canvases', 'tags'] } });
+  assert.deepEqual(read.lens.include.text, ['canvases', 'tags']);
+  assert.equal(read.matched, 2, 'matched counts what all the sets found');
+});
+
+test('an item named by id is drawn whatever Not says, and the walk from it still keeps Not', async () => {
+  const { l, made } = await chain();
+  const [run] = Object.values(await make(l, [{ op: 'create', ref: 'r', type: 'run', title: 'A session' }, { op: 'link', type: 'works_on', from: 'r', to: made.x }]));
+  assert.equal((await flatLens(l, { filter: { ids: [run] } })).items[0]?.title, 'A session', 'a system kind, named, under the default Not');
+  const closed = await flatLens(l, { filter: { ids: [made.x], exclude: ['closed'] }, walk: { over: ['depends_on'], steps: 1 } });
+  assert.deepEqual(titles(closed), ['Done already', 'Flat lens'], 'the closed item named is drawn; what the walk reaches is still kept by Not');
+  assert.deepEqual(titles(await flatLens(l, { filter: { ids: [made.x, run] }, walk: { over: 'all', steps: 1 } })), ['A session', 'Done already', 'Flat lens'], 'the run named is drawn; a run reached would not be');
+  assert.deepEqual(titles(await flatLens(l, { filter: { ids: [made.x, made.n], only: ['note'] } })), ['A note on it'], 'Only still narrows it');
 });

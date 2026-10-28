@@ -154,7 +154,7 @@ reply ending, commits accounted for) is `docs/agents.md`.
   that code a page to touch, a way to the network, or anything typed. After
   changing `ui/draw.js`, `ui/draw.html`, `ui/marks.js`, `ui/surface.js` or the frame's policy in
   `src/server.ts`, run a hostile style against it in a real browser (the
-  browser pane will not load a sandboxed frame); `test/drawings.test.ts`
+  browser pane will not load a sandboxed frame; to see drawings there, start a dev server with `PELAGO_UNSANDBOXED=1`, which drops that wall and keeps the worker); `test/drawings.test.ts`
   does, in headless Chrome.
 
 ## UI rules
@@ -172,7 +172,7 @@ The canvas keeps to these (the flat canvas, 25 Oct 2026: document
   scale and how much text shows, never structure.
 - **Lens and style are the whole surface.** What a canvas shows is a flat
   lens (a filter of terms that add seeds and terms that must all hold of
-  them, a walk, a limit), always in sight in the query bar; how it
+  them, a walk, a limit), always in sight in find at the canvas's foot; how it
   looks is a style. A click adds to the filter and a search sets its text:
   growing a canvas is editing its lens. A person and an agent read the same
   lens (`query` name `flat`), and the page calls no tool an agent lacks for

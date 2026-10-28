@@ -9,18 +9,20 @@ option, optgroup { background: var(--panel); color: var(--text); }
 /* The canvas: the panes of the tab in sight (ui/panes.js), every one alike; one alone is drawn edge to edge, its frame
    the whole page. */
 #canvas { position: fixed; inset: 0; background: var(--ln-sea, var(--bg)); }
-/* The safe zone of a pane alone: the bar and the query bar above, the find bar below. A drawing starts under the bars,
+/* The safe zone of a pane alone: the bar and the view's band above, find (the lens) below. A drawing starts under the bars,
    so they never cover it, and runs to the foot of the page, with find drawn over it: no room is kept for find. A drawing
    on the plane is fitted above find; one that scrolls (a list, a grid) keeps room for it after its end only, so its
    last row can be scrolled out from under it. Among several, each pane's strip holds the bar instead. */
-#canvas { --safe-top: calc(var(--strip) + var(--box-9) + var(--space-4)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
+#canvas { --safe-top: calc(var(--strip) + var(--space-4)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
 body[data-panes="1"] #canvas .pane-canvas .lens-view { padding: var(--safe-top) 0 var(--safe-bottom); }
 body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.lf-stage), body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.code-stage) { padding: var(--safe-top) 0 0; }
 /* A style's own code fills its pane, not the height a document gives its frame. */
 #canvas .code-stage { height: 100%; }
 #canvas .code-stage > .lens-frame { height: 100%; min-height: 0; }
 /* The key, always in sight on a pane alone: in the safe zone, under the query bar, scrolled when it is longer than the room. */
-body[data-panes="1"] #canvas .lf-legend { top: var(--safe-top); bottom: auto; max-height: calc(100% - var(--safe-top) - var(--safe-bottom)); overflow-y: auto; pointer-events: auto; }
+/* Among several, the pane the query bar is over keeps its drawing and key below the bar too (ui/query-bar.js keepClear). */
+#canvas > .pane.pane-active > .pane-canvas .lens-view { padding-top: var(--safe-top); }
+body[data-panes="1"] #canvas .lf-legend { bottom: auto; max-height: min(var(--ln-legend-most-height), calc(100% - var(--safe-top) - var(--safe-bottom))); overflow-y: auto; pointer-events: auto; }
 #canvas .pane-canvas > .lens-wrap > .lens-bar { position: absolute; z-index: 2; top: calc(var(--box-9) + var(--space-5)); left: var(--space-9); right: var(--space-9); width: auto; pointer-events: none; }
 #canvas .pane-canvas > .lens-wrap > .lens-bar > * { pointer-events: auto; }
 #canvas .lens-view > .lens-error { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
@@ -75,6 +77,13 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 .term-pick-list { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
 .term-pick-list > * { flex: none; }
 .term-pick-typed { color: var(--accent); }
+.term-pick.finding { width: var(--menu-find); }
+.term-pick-noted { display: flex; gap: var(--space-5); }
+.term-pick-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.term-pick-note { flex: none; color: var(--muted); }
+.term-pick-on::after { content: ' ›'; color: var(--muted); }
+.term-pick-back { text-align: left; border: 0; background: none; padding: var(--space-3) var(--space-5); color: var(--muted); font: inherit; cursor: pointer; }
+.term-pick-back:hover { color: var(--text); }
 .term-pick-held { display: flex; align-items: center; }
 .term-pick-held > .term-pick-item { flex: 1; min-width: 0; }
 .term-pick-x { flex: none; border: 0; background: none; padding: var(--space-3) var(--space-5); color: var(--muted); cursor: pointer; }
@@ -92,45 +101,52 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--sheet), 50%)); }
 #query .q-view { pointer-events: auto; display: flex; align-items: center; min-width: 0; overflow: hidden; box-sizing: border-box; height: var(--strip); padding: 0 var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); }
 #query .q-view > .q-canvas { display: inline-flex; align-items: center; gap: var(--space-6); padding: 0; background: none; border: 0; border-radius: 0; }
-#query .q-lens { pointer-events: auto; display: flex; align-items: center; gap: var(--space-5); box-sizing: border-box; height: var(--box-9); padding: 0 var(--space-5); background: var(--bg); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-4); }
-#query .q-sum { flex: 0 1 auto; min-width: 0; margin-right: auto; overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
-#query .q-sum-part + .q-sum-part { margin-left: var(--space-8); }
-#query .q-sum-part > .q-label { margin-right: var(--space-4); }
-/* The nodes: what the filter adds, each by name, then what it leaves out, muted and struck through, a word apart. */
-#query .q-sum-part > .q-kept + *, #query .q-sum-part > .q-struck + * { margin-left: var(--space-5); }
-#query .q-sum-part > .q-struck { color: var(--muted); text-decoration: line-through; }
-/* The query's words open its editor too: pointing at them lights Edit (or Done), not the words. */
-#query .q-lens:has(> .q-sum:hover) > .q-edit-toggle { color: var(--text); background: var(--accent-soft); }
-#query .q-lens > .q-count { flex: none; }
-/* Edit: a row for each part under the line, the width of the view, its word in a column of its own and its terms after it, as many as fit (ui/query-bar.js fitRows). */
-#query .q-edit { pointer-events: auto; display: grid; grid-template-columns: max-content minmax(0, 1fr); box-sizing: border-box; padding: 0 var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-4); }
-#query .q-edit[hidden] { display: none; }
-#query .q-edit > .q-part { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: var(--box-8); }
-#query .q-edit > .q-part + .q-part { border-top: var(--border-1) solid var(--line); }
-#query .q-edit > .q-part > .q-label { padding-right: var(--space-8); }
-#query .q-terms { display: flex; align-items: center; gap: var(--space-6); min-width: 0; overflow: hidden; }
-#query .q-terms > [hidden] { display: none; }
-#query .q-label { flex: none; color: var(--muted); font-size: var(--text-2); text-transform: uppercase; letter-spacing: var(--track-2); }
-#query .q-label.q-sub { margin-left: var(--space-6); }
+/* At rest the find bar says the lens in one line, its words the query's (ui/query-bar.js); a click or / opens it to type (ui/find.js). */
+#find .q-lens { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-5); box-sizing: border-box; height: var(--box-9); padding: 0 var(--space-6); font-size: var(--text-4); cursor: text; }
+#find .q-lens > .q-key { flex: none; color: var(--muted); }
+#find .q-sum > .q-hint { color: var(--muted); font-size: var(--text-6); }
+#find .q-sum { flex: 0 1 auto; min-width: 0; margin-right: auto; overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+/* Each part of the line gives way as the line narrows, the longest most, cut with its own ellipsis: no part leaves it. */
+#find .q-sum { display: flex; }
+#find .q-sum-part { flex: 0 1 auto; min-width: var(--line-part-least); overflow: hidden; text-overflow: ellipsis; }
+#find .q-sum-part + .q-sum-part { margin-left: var(--space-8); }
+#find .q-sum-part > .q-label { margin-right: var(--space-4); }
+/* Find: each term by name, joined by a muted "or" (any of them adds). */
+#find .q-sum-part > .q-or { margin: 0 var(--space-4); color: var(--muted); }
+#find .q-lens > .q-count { flex: none; }
+/* While find is open with nothing typed, a row for each part rises above it, the width of find, its word in a column of its own and its terms after it, as many as fit (ui/query-bar.js fitRows). */
+#find .q-edit { display: grid; grid-template-columns: max-content minmax(0, 1fr); box-sizing: border-box; margin: 0 0 var(--space-4); padding: 0 var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); font-size: var(--text-4); white-space: nowrap; }
+#find:not(.open) .q-edit, #find.typing .q-edit, #find.open .q-lens, #find:not(.open) input[type=search] { display: none; }
+#find .q-edit > .q-part { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: var(--box-8); }
+#find .q-edit > .q-part + .q-part { border-top: var(--border-1) solid var(--line); }
+#find .q-edit > .q-part > .q-label { padding-right: var(--space-8); cursor: pointer; }
+/* The part find is in, before its box: its word, as the rows say it. */
+#find .find-mode { padding-left: var(--space-6); color: var(--accent); }
+#find .q-terms { display: flex; align-items: center; gap: var(--space-6); min-width: 0; overflow: hidden; }
+#find .q-terms > [hidden] { display: none; }
+/* Open to edit, a term is said whole: a row shows those that fit and how many more, never a term cut short. */
+#find .q-edit .q-term .q-said { max-width: none; }
+#find .q-edit .q-term { flex: none; }
+#find .q-label { flex: none; color: var(--muted); font-size: var(--text-2); text-transform: uppercase; letter-spacing: var(--track-2); }
 /* Each part's own +, and how many more it holds than are in sight: a mark that opens its menu. */
-#query .q-add, #query .q-more { flex: none; border: 0; background: none; padding: var(--space-2) var(--space-4); border-radius: var(--radius-2); font: inherit; color: var(--accent); cursor: pointer; }
-#query .q-add { font-size: var(--text-6); line-height: 1; }
-#query .q-add:hover, #query .q-more:hover { background: var(--accent-soft); }
-#query .q-term { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text); }
-#query .q-term.q-out { color: var(--muted); }
-#query .q-term.q-narrow { color: var(--accent); }
-#query .q-term button, #query .q-term .q-said { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; max-width: var(--select-least); overflow: hidden; text-overflow: ellipsis; }
-#query .q-term .q-said:hover { text-decoration: underline; text-underline-offset: var(--space-3); }
-#query .q-term.q-walk .q-said { font-family: var(--type-water-family); font-weight: var(--type-water-weight); font-style: var(--type-water-style); text-transform: var(--type-water-case); letter-spacing: var(--type-water-track); }
-#query .q-term .q-x { color: var(--muted); }
-#query .q-term .q-x:hover { color: var(--text); }
-#query .q-steps { gap: var(--space-3); }
-#query .q-steps button, #query .q-steps button.on { border: 0; background: none; padding: 0 var(--space-2); margin: 0; font: inherit; color: var(--muted); }
-#query .q-steps button.on { color: var(--text); font-weight: 600; }
-#query .q-steps button:hover:not(:disabled):not(.on) { color: var(--text); }
-#query .q-limit { width: auto; min-width: 0; border: 0; background: none; padding: 0; font: inherit; color: inherit; }
-#query .q-count { color: var(--muted); }
-#query .q-count.cut { color: var(--accent); }
+#find .q-add, #find .q-more { flex: none; border: 0; background: none; padding: var(--space-2) var(--space-4); border-radius: var(--radius-2); font: inherit; color: var(--accent); cursor: pointer; }
+#find .q-add { font-size: var(--text-6); line-height: 1; }
+#find .q-add:hover, #find .q-more:hover { background: var(--accent-soft); }
+#find .q-term { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text); }
+#find .q-term.q-out { color: var(--muted); }
+#find .q-term.q-narrow { color: var(--accent); }
+#find .q-term button, #find .q-term .q-said { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; max-width: var(--select-least); overflow: hidden; text-overflow: ellipsis; }
+#find .q-term .q-said:hover { text-decoration: underline; text-underline-offset: var(--space-3); }
+#find .q-term.q-walk .q-said { font-family: var(--type-water-family); font-weight: var(--type-water-weight); font-style: var(--type-water-style); text-transform: var(--type-water-case); letter-spacing: var(--type-water-track); }
+#find .q-term .q-x { color: var(--muted); }
+#find .q-term .q-x:hover { color: var(--text); }
+#find .q-steps { gap: var(--space-3); }
+#find .q-steps button, #find .q-steps button.on { border: 0; background: none; padding: 0 var(--space-2); margin: 0; font: inherit; color: var(--muted); }
+#find .q-steps button.on { color: var(--text); font-weight: 600; }
+#find .q-steps button:hover:not(:disabled):not(.on) { color: var(--text); }
+#find .q-limit { width: auto; min-width: 0; border: 0; background: none; padding: 0; font: inherit; color: inherit; }
+#find .q-count { color: var(--muted); }
+#find .q-count.cut { color: var(--accent); }
 /* The canvas's name never shrinks away. */
 #query .q-canvas { flex: 1 1 auto; min-width: 0; overflow: hidden; }
 #query .q-canvas > * { flex: none; }
@@ -139,7 +155,7 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #query .q-canvas > .q-split { margin-left: auto; }
 /* Narrow (ui/query-bar.js fitBar): the buttons' words go, then the pickers shrink, and last back and forward, Split
    and the pickers' marks; the query's line drops how many are drawn once its words have little room. */
-#query .tight .q-word-text, #query .tightest .q-travel, #query .q-lens.tight > .q-count { display: none; }
+#query .tight .q-word-text, #query .tightest .q-travel, #find .q-lens.tight > .q-count { display: none; }
 #query .tight .q-save.q-word { width: var(--box-7); padding: 0; }
 #query .tighter .q-canvas > .q-pick { flex: 0 1 auto; min-width: var(--box-10); }
 /* A picker's mark sits close before it, and goes only with back and forward: its tooltip says what it is. */
@@ -170,15 +186,19 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #whoami:empty { display: none; }
 #whoami select { width: 100%; padding: var(--space-3) var(--space-4); margin: var(--space-2) 0; }
 
-/* Find: one bar at the canvas's foot; what its words would find is said in one line above it. */
+/* Find: one bar at the canvas's foot that is the query's (decision e_2a4mddx8): at rest the lens in a line; open, its rows above it; typed, the choices of what the words could be. */
 #find { position: fixed; z-index: 3; left: calc(var(--active-left, 0%) + (100% - var(--active-left, 0%) - var(--active-right, 0%)) / 2); bottom: calc(var(--active-bottom, 0%) + var(--space-9)); transform: translateX(-50%); width: min(var(--find-most), calc(100% - var(--active-left, 0%) - var(--active-right, 0%) - 2 * var(--space-9))); margin: 0; }
 body[data-sheet="open"] #find { left: calc(var(--active-left, 0%) + (100% - var(--active-left, 0%) - max(var(--active-right, 0%), min(var(--sheet), 50%))) / 2); width: min(var(--find-most), calc(100% - var(--active-left, 0%) - max(var(--active-right, 0%), min(var(--sheet), 50%)) - 2 * var(--space-9))); }
 #find .find-row { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.12); }
 #find input[type=search] { flex: 1; min-width: 0; border: 0; background: none; padding: var(--space-4) var(--space-7); font-size: var(--text-6); outline: none; }
-#find .find-peek { display: flex; gap: var(--space-5); align-items: center; min-width: 0; margin: 0 0 var(--space-4); padding: var(--space-4) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); white-space: nowrap; }
-#find .find-peek[hidden] { display: none; }
-#find .find-peek .gist { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-#find .find-peek > .quiet-button { flex: none; }
+/* Typed, the choices of what the words could be, each said by its kind, the lit one first (Words): what Enter takes. In the look of every dropdown (ui/menus.css). */
+#find .find-choices { display: grid; margin: 0 0 var(--space-4); padding: var(--space-4); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); white-space: nowrap; }
+#find .find-choices[hidden], #find:not(.typing) .find-choices { display: none; }
+#find .find-choice { display: flex; gap: var(--space-6); align-items: center; min-width: 0; max-width: none; }
+#find .find-choice.lit { background: var(--accent-soft); }
+#find .find-choice > .q-label { width: var(--box-10); }
+#find .find-choice > .find-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#find .find-choice > .find-note { flex: none; color: var(--muted); font-size: var(--text-2); }
 
 /* The sheet: one thing read as a document, over the canvas's right side, never more than half the screen. On a phone
    (the phone-width block of ui/style.css) it is the whole screen; the bar and find keep a narrow screen's room there too. */

@@ -61,9 +61,8 @@ async function route(pulse = false) {
   startTabs();
   const params = new URLSearchParams(query);
   // The canvas: the pane in focus draws the lens the address says (ui/query-bar.js shows it); an item's page with none
-  // keeps what is up when it draws the item, and else opens on the item. An address from before the flat lens (?in=)
-  // opens on what it names.
-  if (params.has('in')) return void location.replace(`#/v?from=${params.get('in')}`);
+  // keeps what is up when it draws the item, and else opens on the item. (?in= is Find's term for what is in an item,
+  // e_93a7ch6k: an address from before the flat lens that used it for the item it opened on now draws what is in it.)
   if (pulse) refreshCanvas(true);
   else if (name === 'e' && arg) toAddress(atOf(location.hash) ?? (canvasHas(arg) ? undefined : `e/${arg}`), arg);
   else if (!SHEET[name]) toAddress(atOf(location.hash) ?? 'v', params.get('here') ?? undefined);

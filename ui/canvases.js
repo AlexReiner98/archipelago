@@ -5,12 +5,12 @@
 // The views kept before the flat lens were translated into such canvases when the workspace opened
 // (src/lens-saved.ts); a view kept about an item is listed on Home under the views of items, folded.
 
-import { api, ask, h, hooks, state, tell } from './base.js';
+import { api, ask, h, hooks, state, tell, wordsOf } from './base.js';
 import { flatQuery, flatView } from './lens.js';
 import { filterSaid, fitBar } from './query-bar.js';
 import { canvasMenu } from './canvas-menu.js';
 import { lookSwitch } from './look-switch.js';
-import { isA, typeTitle } from './words.js';
+import { ARROW, isA, typeTitle, wayOf } from './words.js';
 
 const TYPE = 'lens';
 /**
@@ -68,9 +68,9 @@ export function keptView(id, { key = `kept:${id}`, style = {} } = {}) {
       const steps = Array.isArray(got.entity.props?.steps) ? got.entity.props.steps : undefined;
       const told = (steps ?? []).flatMap((s) => [...(s.add ?? []), ...(s.remove ?? []), ...Object.keys(s.titles ?? {}), ...Object.keys(s.fields ?? {}), ...Object.keys(s.flag ?? {})]);
       if (told.length) kept.lens.filter.ids = [...new Set([...(kept.lens.filter.ids ?? []), ...told])];
-      // It starts from what it is about, where it draws that or what is in it (within it, or the end of a link term); else from the one item it names.
+      // It starts from what it is about, where it draws that or what is in it (in it, within it, or the end of a link term); else from the one item it names.
       const ids = kept.lens.filter.ids ?? [];
-      const ends = [...(kept.lens.filter.within ?? []), ...(kept.lens.filter.links ?? []).map((t) => (typeof t === 'string' ? t.split(/\s+/).slice(1).join(' ') : t.to))];
+      const ends = [...(kept.lens.filter.in ?? []), ...(kept.lens.filter.within ?? []), ...(kept.lens.filter.links ?? []).map((t) => (typeof t === 'string' ? t.split(/\s+/).slice(1).join(' ') : t.to))];
       const from = ids.includes(of) || ends.includes(of) ? of : ids.length === 1 ? ids[0] : true;
       const view = flatView({ lens: kept.lens, style: { ...kept.style, ...style }, of, key, nest: from, ...(steps && { extra: { steps } }) });
       Object.defineProperty(host, 'answer', { get: () => view.answer, configurable: true });
@@ -166,9 +166,9 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
 /** What a lens finds, in a few words: its terms, then its walk. */
 function lensWords(lens) {
   const f = lens.filter ?? {};
-  const said = [f.text && `“${f.text}”`, ...(f.types ?? []).map(typeTitle), f.ids?.length && `${f.ids.length} item${f.ids.length === 1 ? '' : 's'}`, ...(f.links ?? []), ...(f.only ?? []).map((t) => `only ${typeTitle(t)}`), f.within?.length && `within ${f.within.length} item${f.within.length === 1 ? '' : 's'}`].filter(Boolean);
+  const said = [...wordsOf(f).map((w) => `“${w}”`), ...(f.types ?? []).map(typeTitle), f.ids?.length && `${f.ids.length} item${f.ids.length === 1 ? '' : 's'}`, ...(f.links ?? []), f.in?.length && `in ${f.in.length} item${f.in.length === 1 ? '' : 's'}`, ...(f.only ?? []).map((t) => `only ${typeTitle(t)}`), f.within?.length && `within ${f.within.length} item${f.within.length === 1 ? '' : 's'}`].filter(Boolean);
   const over = lens.walk?.over;
-  if (over === 'all' || over?.length) said.push(`${over === 'all' ? 'every link' : over.join(', ').replaceAll('_', ' ')} × ${lens.walk.steps}`);
+  if (over === 'all' || over?.length) said.push(`${over === 'all' ? 'every link' : over.map((t) => ((w) => `${ARROW[w.way]} ${w.link}`)(wayOf(t))).join(', ').replaceAll('_', ' ')} × ${lens.walk.steps}`);
   return said.join(' · ');
 }
 

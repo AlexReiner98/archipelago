@@ -25,19 +25,30 @@ canvas as a flat graph", with its decisions.
   hold of a seed, such as a type within an item; and what is left out), a walk along the
   link types named for some steps, and a limit. It is kept in the address
   (`#/v?<lens>`, or `#/e/<id>?<lens>` with an item's page over it) and
-  always in sight in the **query bar**, as chips changed in place.
+  always in sight in **find**, at the canvas's foot: one line at rest, a
+  row for each part while it is open (e_2a4mddx8).
 - **A style says how it looks,** and which drawing draws it: the core flow,
   by the canvas pack's preset, unless a nearer style says otherwise.
 - **Home (`#/`) is the map's top:** what stands at the altitude of the
   workspace or a project, open, with what is directly in each.
 
 ### Growing a canvas
-- **A click on a node adds it to the filter** and opens its page in the
-  sheet. Hover shows its title and the start of its note.
-- **Find, at the canvas's foot, sets the seeds.** Typing shows in one line
-  how many it would find and their first names; Enter draws them in place of
-  what was found, + or Shift+Enter adds them to it. What narrows and what is
-  left out stay.
+- **A click on a node opens its page** in the sheet and leaves the lens as
+  it was (the owner, 28 Oct 2026). Hover shows its title and the start of
+  its note.
+- **Find, at the canvas's foot, is the query.** A click or / opens it, and
+  its rows (Find, Only, Not, Walk, Limit) rise above it. Typing lists what the
+  words could be, each said by its kind: Words first and lit, then In and
+  Item for each item found by name, a Tag, a Type, a Link to me. A part's
+  word and a space (only, not, walk, limit), or a click on a row's word,
+  puts find in that part and offers its choices; Backspace goes back to Find.
+  A kind's word first (within, type, status, owner; in, item, tag) offers
+  that kind alone, found by the rest, and a name's last word naming a type
+  ("archipelago project") narrows it to that type. Find makes no items.
+  Enter takes the lit one and find stays open, emptied and back in Find, for
+  the next term (the words in place of those find set before, any other term
+  added); Shift+Enter adds the words as another set; Escape empties what was
+  typed, then leaves the part, then shuts find.
 - **An item's address alone** (`#/e/<id>`) keeps the canvas when it draws
   the item, and otherwise draws the item with what it holds, depends on and
   waits on.
@@ -83,8 +94,8 @@ canvas as a flat graph", with its decisions.
   For you. What the item page holds is being settled with the owner (task
   "The page as a bare markdown file"); what is settled is above: Save, a
   status of its own, and no list of links.
-- **Nothing else is on screen:** the top bar (the query bar, the mark, the
-  menu) and find. The key, fit and snap are settings in the menu, kept in the
+- **Nothing else is on screen:** the top bar (the view's band, the mark, the
+  menu) and find, which holds the lens. The key, fit and snap are settings in the menu, kept in the
   reader's browser.
 
 ### Staying current

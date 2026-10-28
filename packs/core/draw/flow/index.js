@@ -32,8 +32,10 @@ const linkName = (type) => {
   return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
-function lit(i, style) {
+function lit(i, style, words) {
   if (Array.isArray(style.only)) return style.only.includes(i.id);
+  // What the lens's words found among the rest it draws stays lit, the rest dimmed (Find's hits, e_d9q8b5zr).
+  if (words) return Boolean(i.found?.includes('text'));
   return style.lit === 'you' ? Boolean(i.state.needs_you) : style.lit === 'blocked' ? Boolean(i.state.blocked) : true;
 }
 
@@ -105,7 +107,9 @@ export function picture({ answer, style, reduced, width, height }, tools) {
   const size = { width: g.width, height: g.height };
 
   const yours = (i) => Boolean(i.state.needs_you);
-  const dotOf = (i) => (!i.open ? 'done' : yours(i) ? 'you' : i.state.blocked ? 'blocked' : i.state.sessions ? 'session' : '');
+  // What a step's dot says first: that it waits on you, is blocked or is under way; else its status, in its colour.
+  const dotOf = (i) => (!i.open ? '' : yours(i) ? 'you' : i.state.blocked ? 'blocked' : i.state.sessions ? 'session' : '');
+  const statusOf = (i) => String(i.status ?? (i.open ? 'open' : 'done'));
   // The start of a note: its first paragraph, cut where the style says a note's opening is cut.
   const opening = (i) => {
     const text = String(i.body ?? i.gist ?? '').split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
@@ -142,25 +146,33 @@ export function picture({ answer, style, reduced, width, height }, tools) {
   // same type every time unless another type in this picture has it. A colour is a class with a rule of its own: a drawing sets no style on a mark.
   const named = style.link_colours && typeof style.link_colours === 'object' ? style.link_colours : {};
   const hues = Array.isArray(style.link_hues) && style.link_hues.length ? style.link_hues : Array.isArray(style.hues) ? style.hues : [];
-  // A type not named starts at the hue its name picks, and steps past those another type in this picture has.
-  const present = [...new Set([...(g.chains.length ? [ORDER_TYPE] : []), ...g.ties.map((t) => t.type)])].sort();
-  const taken = new Set(present.filter((type) => HEX.test(String(named[type]))).map((type) => named[type].toLowerCase()));
-  const given = new Map();
-  for (const type of present.filter((t) => !HEX.test(String(named[t])) && hues.length)) {
-    let k = [...type].reduce((s, ch) => (s * 31 + ch.charCodeAt(0)) >>> 0, 7) % hues.length;
-    for (let tries = 0; tries < hues.length && taken.has(String(hues[k]).toLowerCase()); tries++) k = (k + 1) % hues.length;
-    taken.add(String(hues[k]).toLowerCase());
-    given.set(type, hues[k]);
-  }
-  const colourOf = (type) => (HEX.test(String(named[type])) ? named[type] : given.get(type) ?? null);
+  /** The colour of each name: the one `given` names, else the hue its name picks, stepping past those another in this picture has. */
+  const coloursOf = (present, given, from) => {
+    const taken = new Set(present.filter((name) => HEX.test(String(given[name]))).map((name) => given[name].toLowerCase()));
+    const out = new Map(present.filter((name) => HEX.test(String(given[name]))).map((name) => [name, given[name]]));
+    for (const name of present.filter((t) => !HEX.test(String(given[t])) && from.length)) {
+      let k = [...name].reduce((s, ch) => (s * 31 + ch.charCodeAt(0)) >>> 0, 7) % from.length;
+      for (let tries = 0; tries < from.length && taken.has(String(from[k]).toLowerCase()); tries++) k = (k + 1) % from.length;
+      taken.add(String(from[k]).toLowerCase());
+      out.set(name, from[k]);
+    }
+    return out;
+  };
+  const linkColours = coloursOf([...new Set([...(g.chains.length ? [ORDER_TYPE] : []), ...g.ties.map((t) => t.type)])].sort(), named, hues);
+  // Each status its colour too, as each link type has one: the style's (status_colours), else one of status_hues (link_hues when not set).
+  const statusHues = Array.isArray(style.status_hues) && style.status_hues.length ? style.status_hues : hues;
+  const statusColours = coloursOf([...new Set(steps.filter((n) => !n.stub).map((n) => statusOf(n.item)))].sort(), style.status_colours && typeof style.status_colours === 'object' ? style.status_colours : {}, statusHues);
   const colourRules = new Set();
-  const kind = (type) => {
-    const hex = colourOf(type);
+  /** A colour is a class with a rule of its own: a drawing sets no style on a mark. */
+  const colourClass = (hex, prefix, variable) => {
     if (typeof hex !== 'string' || !HEX.test(hex)) return '';
-    const cls = `lf-k-${hex.slice(1).toLowerCase()}`;
-    colourRules.add(`.${cls} { --lf-link: ${hex}; }`);
+    const cls = `lf-${prefix}-${hex.slice(1).toLowerCase()}`;
+    colourRules.add(`.${cls} { --lf-${variable}: ${hex}; }`);
     return ` ${cls}`;
   };
+  const kind = (type) => colourClass(linkColours.get(type), 'k', 'link');
+  /** A step's dot: filled in the colour of what it says first; else its status's, a ring while open and filled once closed. */
+  const dotClass = (i) => dotOf(i) || `st${i.open ? '' : ' shut'}${colourClass(statusColours.get(statusOf(i)), 's', 'status')}`;
   // A part in its place's colour: a class with a rule of its own, as a link's colour is.
   const placeClass = (hex) => {
     const cls = `lf-p-${hex.slice(1).toLowerCase()}`;
@@ -190,7 +202,7 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held'].filter(Boolean).join(' ');
     const body = [
       outline(n.shape, X, Y, n.w, n.h, CORNER),
-      !n.stub && m('circle', { cx: left - z('dot_gap'), cy: Y, r: z('dot'), class: `lf-dot ${dotOf(i)}` }),
+      !n.stub && m('circle', { cx: left - z('dot_gap'), cy: Y, r: z('dot'), class: `lf-dot ${dotClass(i)}` }),
       m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, fit(i.title, room, n.stub ? STUB_TEXT : TEXT)),
     ];
     const key = `s:${n.id}`;
@@ -214,18 +226,16 @@ export function picture({ answer, style, reduced, width, height }, tools) {
   });
   const svg = m('svg', { viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, breakLayer, stepLayer, saysLayer, [...stepBadges.values()], linkBadges.map((b) => b.mark));
 
-  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/drawings.md). An open step
-  // with no other mark is said by its own status ("Up", "Open"), each one its steps have, never a word of the drawing's.
-  const restWords = () => {
-    const said = [...new Set(steps.filter((n) => !n.stub && dotOf(n.item) === '').map((n) => String(n.item.status ?? 'open').replaceAll('_', ' ')))];
-    const words = said.join(', ');
-    return words.charAt(0).toUpperCase() + words.slice(1);
-  };
+  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/drawings.md). A step with no
+  // other mark is said by its own status ("Todo", "Decided"), one row for each its steps have, in its colour.
+  const statusWords = (status) => ((w) => w.charAt(0).toUpperCase() + w.slice(1))(status.replaceAll('_', ' '));
+  const statusRows = () => [...new Map(steps.filter((n) => !n.stub && !dotOf(n.item)).map((n) => [statusOf(n.item), n.item])).entries()]
+    .sort(([a], [b]) => a.localeCompare(b)).map(([status, i]) => [dotClass(i), statusWords(status)]);
   const mark = (inner, label) => ({ glyph: m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, inner), label });
   const uses = (test) => steps.some(test);
   const key = [
     [['box', 'Work'], ['diamond', 'Question'], ['pill', 'Event'], ['sheet', 'Record'], ['end', 'Possible end']].filter(([shape]) => uses((n) => n.shape === shape)).map(([shape, label]) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, 11, 7, 20, shape === 'diamond' ? 12 : 11, CORNER)), label)),
-    [['done', 'Done'], ['blocked', 'Blocked'], ['you', 'Waits on you'], ['session', 'Under way'], ['', restWords()]].filter(([dot]) => uses((n) => !n.stub && dotOf(n.item) === dot)).map(([dot, label]) => mark(m('circle', { cx: 11, cy: 7, r: 4, class: `lf-dot ${dot}` }), label)),
+    [...[['blocked', 'Blocked'], ['you', 'Waits on you'], ['session', 'Under way']].filter(([dot]) => uses((n) => !n.stub && dotOf(n.item) === dot)), ...statusRows()].map(([dot, label]) => mark(m('circle', { cx: 11, cy: 7, r: 4, class: `lf-dot ${dot}` }), label)),
     shownAs.places.filter((p) => steps.some((n) => !n.stub && shownAs.of.get(n.id) === p.id)).map((p) => mark(m('g', { class: `lf-step placed ${placeClass(p.hex)}` }, outline('box', 11, 7, 20, 11, CORNER)), p.within ? `${p.title}, in ${p.within}` : p.title)),
     g.chains.length > 0 && mark(m('path', { d: 'M1 7H21', class: `lf-wire${kind(ORDER_TYPE)}` }), 'Leads to'),
     g.chains.some((c) => c.dashed) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire dashed' }), 'If chosen'),
@@ -234,8 +244,11 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     (stepBadges.size > 0 || linkBadges.length > 0) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire held' }), 'Held for you'),
   ].flat().filter(Boolean);
 
-  // What stays lit, as the style says: the rest dimmed.
-  const dimmed = (now) => [...dims.keys()].filter((id) => !lit(g.nodes.get(id).item, now));
+  // What stays lit, as the style says: the rest dimmed. Where the lens's words found some of what is drawn and not all,
+  // what they found is lit.
+  const hits = answer.items.filter((i) => i.found?.includes('text')).length;
+  const words = hits > 0 && hits < answer.items.length;
+  const dimmed = (now) => [...dims.keys()].filter((id) => !lit(g.nodes.get(id).item, now, words));
   for (const id of dimmed(style)) addClass(dims.get(id), 'dim');
   /** Light the wires and ties of a step, or of none. */
   const light = (id) => [

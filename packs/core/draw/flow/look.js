@@ -15,7 +15,9 @@ export const css = `
 .lf-step.stub text { font-size: var(--ln-flow-stub-text); }
 .lf-step.dim { opacity: var(--ln-dim); }
 .lf-dot { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-flow-dot-ring); }
-.lf-dot.done { fill: var(--ln-done); stroke: none; } .lf-dot.you { fill: var(--ln-you); stroke: none; }
+/* A status's own colour (status_colours): a ring while open, filled once closed. */
+.lf-dot.st { stroke: var(--lf-status, var(--ln-muted)); } .lf-dot.st.shut { fill: var(--lf-status, var(--ln-done)); stroke: none; }
+.lf-dot.you { fill: var(--ln-you); stroke: none; }
 .lf-dot.blocked { fill: var(--ln-blocked); stroke: none; } .lf-dot.session { fill: var(--ln-session); stroke: none; }
 .lf-wire { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }
 .lf-wire.dashed { stroke-dasharray: var(--ln-flow-dash-choice); }

@@ -1,103 +1,193 @@
-// Find: a bar at the canvas's foot that sets the text of the lens of the pane the bar acts on (decision e_sdsaxxq4:
-// search is the text term of the filter). Enter sets the words and keeps every other term of the query; Shift+Enter
-// draws only what the words find, the other seeds gone (the owner, 28 Oct 2026, over e_c3g6gwqq). What is found becomes
-// seeds, the walk carries on from them, and it is drawn with what it is tied to; what narrows and what is left out stay. Typing shows what the words would find, in one line above the bar
-// (how many, the first few names); clearing the bar takes the term out. / puts the cursor in it.
-// The search is the flat lens's text term, the search read's own (src/lens-flat.ts): types and what is left out are
-// the query bar's terms, so what it would find is read under the canvas's exclusions.
+// Find: the bar at the canvas's foot that is the query's (decision e_2a4mddx8). At rest it says the lens of the pane
+// the bar acts on in one line (drawn by ui/query-bar.js). A click or / opens it to type, and the lens's rows (Find,
+// Only, Not, Walk, Limit) rise above it. Typing swaps the rows for the choices of what the words could be, each said
+// by its kind (ui/find-choices.js): Words first and lit, so nothing is guessed (decision e_45sgrfqd). ↑↓ move the
+// light; Enter takes it and find stays open, emptied, to refine further: words in place of the words find set before,
+// every other term and the walk kept, or another term added; Shift+Enter adds the words as another set, found as
+// well (e_e3k797d3). Typing a part's word and a space
+// ("only ", "not ", "walk ", "limit "), or a click on a row's word, puts find in that part: its mark stands before the
+// box and the choices are that part's; Backspace in an empty box goes back to Find. Escape empties what was typed, then
+// leaves the part, then shuts find; so does a click away from it.
 
-import { api, h, state } from './base.js';
-import { goHome, goLens, home, lensNow } from './canvas.js';
+import { api, asWords, h, state, wordsOf } from './base.js';
+import { goLens, home, lensNow } from './canvas.js';
+import { MODES, choicesFor, ledBy, wordsChoice } from './find-choices.js';
 import { numberOf } from './lens-base.js';
-import { workType } from './words.js';
+import { added, fitBar } from './query-bar.js';
 
 const bar = document.getElementById('find');
-const peek = h('div', { class: 'find-peek', hidden: true, role: 'status' });
-const input = h('input', { type: 'search', name: 'q', placeholder: 'Find on the map  /', autocomplete: 'off', 'aria-label': 'Find on the map', title: 'Words to find: Enter draws what they find on the canvas, with what it is tied to' });
+const list = bar.querySelector('.find-choices');
+const row = bar.querySelector('.find-row');
+const said = document.getElementById('find-lens');
+const rows = document.getElementById('find-rows');
+/** The part of the lens find is in, by its word, and its mark before the box. */
+let mode = 'Find';
+const mark = h('span', { class: 'q-label find-mode', title: 'The part find is in: type another part’s word and a space to go there; Backspace goes back to Find' }, 'Find');
+const PLACEHOLDER = { Find: 'Find on the map', Only: 'Only what is so: done, a type, within…', Not: 'Leave out: closed, a type', Walk: 'Walk along a link', Limit: 'The most items drawn' };
+const input = h('input', { type: 'search', name: 'q', placeholder: 'Find on the map', autocomplete: 'off', 'aria-label': 'Find on the map', title: 'Choose what the words are: ↑↓, then Enter; Shift+Enter adds the words as another set' });
 let asked = 0;
+/** The choices drawn, what was typed when they were, and the lit one. */
+let choices = [];
+let shownFor = '';
+let lit = 0;
 
 const lensUp = () => lensNow() ?? home();
-const includes = (f) => Boolean(f.text || f.types?.length || f.ids?.length || f.links?.length);
-/** Draw the lens with these words as its filter's text, its other terms kept; or (`alone`) the words in place of the other seeds. */
-function drawText(q, alone = false) {
-  peek.hidden = true;
-  const { only, within, exclude, ...seeds } = lensUp().filter;
-  const kept = { ...(only && { only }), ...(within && { within }), ...(exclude && { exclude }) };
-  goLens({ ...lensUp(), filter: alone ? { ...kept, text: q } : { ...seeds, ...kept, text: q } });
+
+/** Open find to type in: the lens's rows rise above it. */
+function open() {
+  if (bar.classList.contains('open')) return input.focus();
+  bar.classList.add('open');
+  input.focus();
+  fitBar();
 }
-/** Take the text out of the canvas's lens; a lens left including nothing is Home (or the open item's own canvas). */
-function takeOut() {
-  peek.hidden = true;
-  const lens = lensNow();
-  if (!lens?.filter.text) return;
-  const { text, ...filter } = lens.filter;
-  if (includes(filter)) return goLens({ ...lens, filter });
-  const open = /^#\/e\/(e_[a-z0-9]{8})/.exec(location.hash)?.[1];
-  if (open) location.hash = `#/e/${open}`;
-  else goHome();
+/** Empty find to type the next term: back in Find, its rows in sight with what was just added, the cursor kept in it. */
+function again() {
+  bar.classList.remove('typing');
+  input.value = '';
+  toMode('Find', false);
+  choices = [];
+  list.hidden = true;
+}
+/** Shut find: what was typed goes, and the lens is said in its line again. */
+function shut() {
+  again();
+  bar.classList.remove('open');
+  if (bar.contains(document.activeElement)) document.activeElement.blur();
 }
 
-/** Ask what the words would find under the canvas's exclusions, and say it in one line. */
+/** Put find in a part of the lens, and say its choices (`look`, unless it is shutting). */
+function toMode(m, looking = true) {
+  mode = m;
+  mark.textContent = m;
+  input.placeholder = PLACEHOLDER[m];
+  if (looking) (input.focus(), look());
+}
+
+/**
+ * Take a choice: a part to go into; words in place of those find set before, or (`add`) as one more set; a link to
+ * walk along; a limit; any other term added to the lens. Find stays open with the cursor in it, to refine further.
+ */
+function take(choice, add = false) {
+  if (!choice) return;
+  if (choice.mode) return void ((input.value = ''), toMode(choice.mode));
+  again();
+  input.focus();
+  const lens = lensUp();
+  if (choice.walk) {
+    const { over = [], steps = 0 } = lens.walk ?? {};
+    return goLens({ ...lens, walk: { over: choice.walk === 'all' ? 'all' : [...(over === 'all' ? [] : over), choice.walk], steps: steps || 1 } });
+  }
+  if (choice.limit) return goLens({ ...lens, limit: choice.limit });
+  if (choice.words) {
+    const { text, ...rest } = lens.filter;
+    return goLens({ ...lens, filter: { ...rest, ...asWords(add ? [...wordsOf({ text }), choice.words] : [choice.words]) } });
+  }
+  goLens(added(lens, choice.term));
+}
+
+/** Draw the choices, the lit one marked. */
+function drawChoices() {
+  list.replaceChildren(...choices.map((c, i) => h('button', { type: 'button', role: 'option', class: `term-pick-item find-choice${i === lit ? ' lit' : ''}`, 'aria-selected': String(i === lit), title: c.title, onclick: (ev) => take(c, ev.shiftKey) },
+    h('span', { class: 'q-label' }, c.kind),
+    h('span', { class: 'find-name' }, c.label),
+    c.note && h('span', { class: 'find-note' }, c.note))));
+  list.hidden = !choices.length;
+  // What was typed when they were drawn: Enter takes only choices drawn for what is typed now.
+  list.dataset.for = shownFor;
+}
+
+/** What the words could be: the words at once, the rest once the search answers; how many the words find, under the canvas's Not. */
 async function look() {
   const q = input.value.trim();
   const mine = ++asked;
-  if (!q || q === lensNow()?.filter.text) return void (peek.hidden = true);
-  let said;
-  try {
-    const exclude = lensUp().filter.exclude;
-    const found = await api('view', { name: 'flat', params: { filter: { text: q, ...(exclude && { exclude }) }, limit: numberOf(state.style, 'find_peek_names') } });
-    const names = found.items.map((i) => i.title);
-    said = [
-      h('span', { class: 'count', title: 'How many the words find' }, String(found.matched ?? names.length)),
-      h('span', { class: 'gist grow', title: names.join('\n') }, names.length ? names.join(' · ') : 'Nothing matches.'),
-      names.length > 0 && h('button', { type: 'button', class: 'quiet-button', title: 'Draw what the words find, the rest of the query kept (Enter)', onclick: () => drawText(q) }, 'Draw'),
-      names.length > 0 && includes(lensUp().filter) && h('button', { type: 'button', class: 'quiet-button', title: 'Draw only what the words find, in place of what is drawn (Shift+Enter)', onclick: () => drawText(q, true) }, 'Alone'),
-      h('button', { type: 'button', class: 'quiet-button', title: `A new item named "${q}"`, onclick: () => ((peek.hidden = true), (location.hash = `#/new/${workType()}?title=${encodeURIComponent(q)}`)) }, 'New'),
-    ];
-  } catch (err) {
-    said = [h('span', { class: 'gist grow error', title: err.message }, err.message)];
-  }
+  const finding = mode === 'Find';
+  bar.classList.toggle('typing', Boolean(q) || !finding);
+  if (finding && !q) return void ((choices = []), (list.hidden = true));
+  // In Find the words are drawn at once, unless a kind's word leads them: then that kind's choices come first.
+  const seeded = finding && !ledBy(mode, q);
+  choices = seeded ? [wordsChoice(q)] : [];
+  shownFor = seeded ? q : '';
+  lit = 0;
+  drawChoices();
+  const lens = lensUp();
+  const exclude = lens.filter.exclude;
+  const most = numberOf(state.style, 'find_choice_items');
+  const [all, counted] = await Promise.all([
+    choicesFor(mode, q, { most, wide: numberOf(state.style, 'term_find_most'), lens }),
+    finding ? api('view', { name: 'flat', params: { filter: { text: q, ...(exclude && { exclude }) }, limit: most } }).catch(() => null) : null,
+  ]);
   if (mine !== asked) return;
-  peek.replaceChildren(...said);
-  peek.hidden = false;
+  const words = all.find((x) => x.words === q);
+  if (words && counted) words.note = `${counted.matched ?? counted.items.length} found`;
+  shownFor = q;
+  choices = all;
+  drawChoices();
 }
-
-/** The bar shows the lens's text, unless it is being written. */
-const keepUp = () => document.activeElement !== input && (input.value = lensNow()?.filter.text ?? '');
 
 /** The bar, drawn once. */
 export function drawFind() {
-  if (bar.childElementCount) return;
+  if (row.contains(input)) return;
+  row.append(mark, input);
   let wait;
   input.addEventListener('input', (ev) => {
     // Typing here is not an edit a redraw of the page would lose.
     ev.stopPropagation();
     clearTimeout(wait);
+    // A part's word and a space put find in that part: the word is the mode, not words to find.
+    const [, word, rest] = /^(\S+)\s(.*)$/.exec(input.value) ?? [];
+    const into = word && MODES.find((m) => m.toLowerCase() === word.toLowerCase());
+    if (into) return void ((input.value = rest), toMode(into));
+    bar.classList.toggle('typing', Boolean(input.value.trim()) || mode !== 'Find');
     wait = setTimeout(look, 160);
   });
-  // The bar's own × (and Esc in it) empties it: the term goes out of the lens.
-  input.addEventListener('search', () => !input.value.trim() && takeOut());
-  // Enter keeps the rest of the query; Shift+Enter draws only what the words find. A form's submit does not say Shift, so the key is read here.
-  let alone = false;
-  input.addEventListener('keydown', (ev) => ev.key === 'Enter' && (alone = ev.shiftKey));
+  input.addEventListener('focus', open);
+  said.addEventListener('click', open);
+  // A row's word puts find in that part.
+  rows.addEventListener('click', (ev) => {
+    const word = ev.target.closest?.('.q-part > .q-label')?.textContent;
+    if (MODES.includes(word)) toMode(word);
+  });
+  // Enter takes the lit choice; Shift+Enter adds the words as another set. A form's submit does not say Shift, so the key
+  // is read here; and the form holds the limit's field too, so Enter submits it itself.
+  let add = false;
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') (ev.preventDefault(), (add = ev.shiftKey), bar.requestSubmit());
+    if (ev.key === 'Backspace' && !input.value && mode !== 'Find') (ev.preventDefault(), toMode('Find'));
+    if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && choices.length) {
+      ev.preventDefault();
+      lit = (lit + (ev.key === 'ArrowDown' ? 1 : choices.length - 1)) % choices.length;
+      drawChoices();
+    }
+  });
   bar.addEventListener('submit', (ev) => {
     ev.preventDefault();
     clearTimeout(wait);
     const q = input.value.trim();
-    q ? drawText(q, alone) : takeOut();
-    alone = false;
+    // Only a choice drawn for what is typed now is taken. In Find, typed faster than the choices came, the words are
+    // what is taken, as they come first; led by a kind's word, or in another part, nothing is, until its choices come.
+    const ready = shownFor === q && choices[lit];
+    if (ready) take(choices[lit], add);
+    else if (q && mode === 'Find' && !ledBy(mode, q)) take(wordsChoice(q), add);
+    add = false;
   });
-  bar.replaceChildren(peek, h('div', { class: 'find-row' }, input));
-  addEventListener('hashchange', () => setTimeout(keepUp, 0));
-  // Another pane or tab in focus: the bar says its lens's text, and what was typed for the last one goes.
-  addEventListener('pane-focus', () => setTimeout(() => ((peek.hidden = true), keepUp()), 0));
-  // The page's first lens is put up just after the bar is drawn (ui/app.js).
-  setTimeout(keepUp, 0);
+  // Another pane or tab in focus: find shuts, and says that lens.
+  // Another pane or tab in focus: find shuts, and says that lens; not while it is being typed in (a lens given to a new
+  // tab puts its pane in focus).
+  addEventListener('pane-focus', () => !bar.contains(document.activeElement) && shut());
 }
 
 addEventListener('keydown', (ev) => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? '') || document.activeElement?.isContentEditable;
-  if (ev.key === '/' && !typing) (ev.preventDefault(), input.focus());
-  if (ev.key === 'Escape' && !peek.hidden) (peek.hidden = true, input.blur());
+  if (ev.key === '/' && !typing) (ev.preventDefault(), open());
+  // Escape empties what was typed, then leaves the part, then shuts find, wherever in it the focus is; a menu its rows
+  // opened shuts first, by itself.
+  if (ev.key === 'Escape' && bar.classList.contains('open') && !document.querySelector('.term-pick:popover-open')) {
+    ev.preventDefault();
+    if (input.value) (input.value = '', look());
+    else if (mode !== 'Find') toMode('Find');
+    else shut();
+  }
 });
-document.addEventListener('click', (ev) => !bar.contains(ev.target) && (peek.hidden = true));
+// A press away from find shuts it; one in a menu its rows opened (ui/term-pick.js) does not. Read on the press, before a
+// row's × or a choice redraws what was pressed.
+document.addEventListener('pointerdown', (ev) => bar.classList.contains('open') && !bar.contains(ev.target) && !ev.target.closest?.('.term-pick') && shut());

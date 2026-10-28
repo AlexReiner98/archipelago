@@ -1,27 +1,31 @@
-// The query bar: the canvas's lens, always in sight in one line under the view's (decision e_sdsaxxq4): the search's
-// words (set in the find bar, ui/find.js), what the filter adds and leaves out, and the walk, said in a few words,
-// and how many items are drawn. Edit opens a row for each part under it, each saying what it is in a word: the filter
+// The query bar: the canvas's lens, always in sight (decision e_sdsaxxq4). The view's band stays at the top; the lens
+// is said in one line in the find bar at the canvas's foot (decision e_2a4mddx8): the search's words, what the filter
+// adds and leaves out, and the walk, in a few words, and how many items are drawn. Opening find (ui/find.js) shows a
+// row for each part above it, each saying what it is in a word: the filter
 // (types, tags, items, links; what narrows them, only a type, within an item; and what it leaves out), the walk (the
 // links it follows, how many steps) and the limit. A row shows as many terms as fit and how many more, those a click
 // away, and has its own + that opens one menu
-// (ui/term-pick.js) to add to it; a term's words open it again to change that term, its × takes it away. Every change
+// (ui/term-pick.js) to add to it: a kind, then the thing of that kind (ui/term-kinds.js), never words taken for a term; a term's words open it again to change that term, its × takes it away. Every change
 // is a new lens, handed to `go` (the canvas puts it in the address and draws it). The menus lead with what this canvas
 // and its neighbourhood use (ui/picker-rank.js). No term or part is a box inside a box (rule e_vgs9vt5j).
 
-import { api, h, state } from './base.js';
+import { api, asWords, h, state, wordsOf } from './base.js';
 import { numberOf } from './lens-base.js';
 import { ranked, around, uses } from './picker-rank.js';
+import { isWord, onlySaid } from './only-words.js';
+import { findKinds, onlyKinds } from './term-kinds.js';
 import { pickTerm } from './term-pick.js';
-import { relations, titles, typeTitle, types } from './words.js';
+import { ARROW, NEXT_WAY, relations, titles, typeTitle, types, wayOf, withWay } from './words.js';
 
 const bar = document.getElementById('query');
+/** Where find holds the lens: its line at rest, and its rows while it is open (ui/find.js). */
+const line = document.getElementById('find-lens');
+const rows = document.getElementById('find-rows');
 /** Items the bar has asked the names of, so each is asked once. */
 const asking = new Set();
 /** What is used one step around the canvas, asked once for each lens (`key`), and the bar drawn last. */
 let near = { key: '', uses: null };
 let last = null;
-/** Whether the query is open to edit, a row for each part under its line; kept as the lens changes. */
-let editing = false;
 
 /**
  * Ask what is used one step around what the canvas draws, and draw the bar again with it: once for each lens, so what
@@ -45,59 +49,43 @@ function groupsOf(list, item) {
 }
 
 const isId = (s) => /^e_[a-z0-9]{8}$/.test(s);
-/** A type by its id or its title, any case. */
-const typeNamed = (s) => (types.has(s) ? s : [...types.values()].find((t) => !t.dormant && t.title.toLowerCase() === s.toLowerCase())?.id);
-/** A link type by its id or its title, any case. */
-const linkNamed = (s) => (relations.has(s) ? s : [...relations.values()].find((r) => r.title?.toLowerCase() === s.toLowerCase())?.id);
 const linkTitle = (id) => relations.get(id)?.title ?? id.replaceAll('_', ' ');
 /** An item named by its title, once the page knows it; until then a mark, and the name asked for. */
 function nameOf(id, redraw) {
   if (titles.has(id)) return titles.get(id);
   if (!asking.has(id)) {
     asking.add(id);
-    api('get', { id }).then((got) => (titles.set(id, got.entity.title), redraw())).catch(() => {});
+    // Asked once more if the first answer does not come (a server still starting), then left as the mark.
+    const ask = (again) => api('get', { id }).then((got) => (titles.set(id, got.entity.title), redraw())).catch(() => again && ask(false));
+    ask(true);
   }
   return '…';
 }
 
-/** What a term written in the box is: `-x` leaves x out, `only <type>` and `within <id>` narrow, an id is an item, `#name` a tag, `<link> <end>` a link, a type by its name, else text. */
-function termOf(written) {
-  const s = written.trim();
-  if (!s) return null;
-  if (/^[-−]/.test(s)) {
-    const x = s.slice(1).trim();
-    const left = ['closed', 'system'].includes(x.toLowerCase()) ? x.toLowerCase() : typeNamed(x);
-    return left ? { exclude: left } : null;
-  }
-  if (isId(s)) return { id: s };
-  if (s.startsWith('#') && relations.has('tagged') && s.slice(1).trim()) return { link: `tagged ${s.slice(1).trim()}` };
-  const [, first, rest] = /^(\S+)\s+(.+)$/.exec(s) ?? [];
-  if (first?.toLowerCase() === 'only') return typeNamed(rest.trim()) ? { only: typeNamed(rest.trim()) } : null;
-  if (first?.toLowerCase() === 'within') return isId(rest.trim()) ? { within: rest.trim() } : null;
-  if (first && linkNamed(first)) return { link: `${linkNamed(first)} ${rest.trim()}` };
-  if (typeNamed(s)) return { type: typeNamed(s) };
-  return { text: s };
-}
-
 /** The lens with one term added to its filter. */
-function added(lens, term) {
+export function added(lens, term) {
   const f = { ...lens.filter };
-  if (term.text) f.text = term.text;
+  if (term.text) Object.assign(f, asWords([...wordsOf(f), term.text]));
   if (term.type) f.types = [...new Set([...(f.types ?? []), term.type])];
   if (term.id) f.ids = [...new Set([...(f.ids ?? []), term.id])];
   if (term.link) f.links = [...new Set([...(f.links ?? []), term.link])];
+  if (term.in) f.in = [...new Set([...(f.in ?? []), term.in])];
   if (term.only) f.only = [...new Set([...(f.only ?? []), term.only])];
   if (term.within) f.within = [...new Set([...(f.within ?? []), term.within])];
   if (term.exclude) f.exclude = [...new Set([...(f.exclude ?? ['system']), term.exclude])];
+  // Only what is done finds nothing while Not leaves the closed out: it takes that away.
+  if (term.only === 'done' && f.exclude?.includes('closed')) f.exclude = f.exclude.filter((x) => x !== 'closed');
   return { ...lens, filter: f };
 }
 
 /** The lens with one of its filter's terms taken out: `field` and the value it holds. */
 function without(lens, field, value) {
   const f = { ...lens.filter };
-  if (field === 'text') delete f.text;
-  else f[field] = (f[field] ?? (field === 'exclude' ? ['system'] : [])).filter((v) => v !== value);
-  if (field !== 'exclude' && !f[field]?.length) delete f[field];
+  if (field === 'text') {
+    delete f.text;
+    Object.assign(f, asWords(wordsOf(lens.filter).filter((w) => w !== value)));
+  } else f[field] = (f[field] ?? (field === 'exclude' ? ['system'] : [])).filter((v) => v !== value);
+  if (field !== 'exclude' && field !== 'text' && !f[field]?.length) delete f[field];
   return { ...lens, filter: f };
 }
 
@@ -123,12 +111,13 @@ export function filterSaid(f, redraw) {
   const some = (list, one, many) => (list?.length ? (list.length === 1 ? one(list[0]) : many(list)) : null);
   const tags = (f.links ?? []).filter((t) => t.startsWith('tagged '));
   return [
-    f.text && `“${f.text}”`,
+    ...wordsOf(f).map((w) => `“${w}”`),
     some(f.types, typeTitle, (l) => `${l.length} types`),
     some(tags, (t) => termWords(t, redraw), (l) => `${termWords(l[0], redraw)} +${l.length - 1}`),
     ...[...linkGroups(f.links ?? []).values()].map((l) => `${termWords(l[0], redraw)}${l.length > 1 ? ` +${l.length - 1}` : ''}`),
     some(f.ids, (id) => nameOf(id, redraw), (l) => `${l.length} items`),
-    some(f.only, (t) => `only ${typeTitle(t)}`, (l) => `only ${l.length} types`),
+    some(f.in, (id) => `in ${nameOf(id, redraw)}`, (l) => `in ${l.length} items`),
+    some(f.only, (t) => `only ${onlySaid(t, typeTitle, (id) => nameOf(id, redraw))}`, (l) => `only ${onlySaid(l[0], typeTitle, (id) => nameOf(id, redraw))} +${l.length - 1}`),
     some(f.within, (id) => `within ${nameOf(id, redraw)}`, (l) => `within ${l.length} items`),
   ].filter(Boolean).join(' · ');
 }
@@ -143,8 +132,8 @@ export function drawQuery(lens, view, go, lead) {
   if (answer) lookAround(lens, answer);
   const here = uses(answer?.items, answer?.links);
   const exclude = f.exclude ?? ['system'];
-  const filled = (lens.filter.text || lens.filter.types?.length || lens.filter.ids?.length || lens.filter.links?.length);
-  const includes = [f.text ? 1 : 0, f.types?.length ?? 0, f.ids?.length ?? 0, f.links?.length ?? 0].reduce((a, b) => a + b, 0);
+  const includes = [wordsOf(f).length, f.types?.length ?? 0, f.ids?.length ?? 0, f.links?.length ?? 0, f.in?.length ?? 0].reduce((a, b) => a + b, 0);
+  const filled = includes > 0;
   /** The lens with term `field` `value` taken out, when one is being changed; else as it is. */
   const but = (field, value) => (field ? without(lens, field, value) : lens);
   /** A term: its words, a click to change it in its part's menu, an × to take it away. The last term the filter includes is not taken away: a lens includes something. */
@@ -161,23 +150,23 @@ export function drawQuery(lens, view, go, lead) {
     };
   };
   const typeChoices = () => [...types.values()].filter((t) => !t.system && t.kind !== 'system');
-  // What the filter adds: words, a type, #tag, a link and its end, an item id; only a type or within an item to narrow.
-  const addToFilter = (anchor, field, value) => pickTerm(anchor, {
-    label: 'Add to the filter',
-    groups: groupsOf(ranked(typeChoices(), here.types, near.uses?.types), (t) => ({ label: t.title, title: 'Items of this type, the newest first', pick: () => go(added(but(field, value), { type: t.id })) })),
-    typed: {
-      placeholder: 'A type, #tag, only a type…',
-      title: 'Words to find; a type; #tag; a link and its end (waits_on me); an item id; only a type, or within an item id, to narrow what it finds',
-      pick: (written) => {
-        const t = termOf(written);
-        if (t) go(added(but(field, value), t));
-        return Boolean(t);
-      },
-    },
+  // What Find and Only add: a kind, then the thing (decision e_45sgrfqd, ui/term-kinds.js); nothing written is guessed.
+  const kinds = (field, value) => ({
+    add: (term) => go(added(but(field, value), term)),
+    typeGroups: (pick) => groupsOf(ranked(typeChoices(), here.types, near.uses?.types), (t) => ({ label: t.title, title: t.description ?? t.title, pick: () => pick(t) })),
+    linkGroups: (pick) => groupsOf(ranked([...relations.values()].filter((r) => !r.id.startsWith('sys.') && r.id !== 'tagged'), here.links, near.uses?.links), (r) => ({ label: r.title ?? r.id, title: r.description ?? r.title, ...pick(r) })),
+    hasTags: relations.has('tagged'),
+    most: numberOf(state.style, 'term_find_most'),
+    have: f.only ?? [],
+    // The statuses in use here first, then those of the types Find and Only name.
+    statuses: [...new Set([...(answer?.items ?? []).map((i) => i.status), ...[...(f.types ?? []), ...(f.only ?? []).filter((t) => !isWord(t))].flatMap((t) => [...(types.get(t)?.statuses.open ?? []), ...(types.get(t)?.statuses.closed ?? [])])])].filter(Boolean),
+    days: ['only_since_short', 'only_since_days', 'only_since_long'].map((n) => numberOf(state.style, n)),
   });
-  // What is left out of everything: closed, system, or a type.
+  const addToFilter = (anchor, field, value) => pickTerm(anchor, findKinds(kinds(field, value)));
+  const narrowTo = (anchor, field, value) => pickTerm(anchor, onlyKinds(kinds(field, value)));
+  // What Not leaves out of everything: closed, system, or a type.
   const leaveOut = (anchor, field, value) => pickTerm(anchor, {
-    label: 'Leave out',
+    label: 'Not',
     groups: [
       { label: '', items: ['closed', 'system'].filter((x) => !exclude.includes(x)).map((x) => ({ label: x, title: x === 'closed' ? 'What is done or closed' : 'What the system keeps', pick: () => go(added(but(field, value), { exclude: x })) })) },
       ...groupsOf(ranked(typeChoices().filter((t) => !exclude.includes(t.id)), here.types, near.uses?.types), (t) => ({ label: t.title, title: 'Items of this type', pick: () => go(added(but(field, value), { exclude: t.id })) })),
@@ -186,28 +175,44 @@ export function drawQuery(lens, view, go, lead) {
   const { over, steps } = lens.walk ?? { over: [], steps: 0 };
   const walked = over === 'all' ? [] : over;
   const walk = (change) => go({ ...lens, walk: { over, steps, ...change } });
+  /** A walked link in words: its way's arrow, then its title. */
+  const waySaid = (t) => ((w) => `${ARROW[w.way]} ${linkTitle(w.link)}`)(wayOf(t));
   // What the walk follows: every link, or one more link type, those used here first.
   const walkAlong = (anchor) => pickTerm(anchor, {
-    label: 'Walk along a link',
+    label: 'Walk',
     groups: [
       over !== 'all' && { label: '', items: [{ label: 'every link', title: 'Every link, either way', pick: () => walk({ over: 'all', steps: steps || 1 }) }] },
-      ...groupsOf(ranked([...relations.values()].filter((r) => !r.id.startsWith('sys.') && !walked.includes(r.id)), here.links, near.uses?.links), (r) => ({ label: r.title ?? r.id, title: 'Along this link, either way', pick: () => walk({ over: [...walked, r.id], steps: steps || 1 }) })),
+      ...groupsOf(ranked([...relations.values()].filter((r) => !r.id.startsWith('sys.') && !walked.some((t) => wayOf(t).link === r.id)), here.links, near.uses?.links), (r) => ({ label: r.title ?? r.id, title: 'Along this link, either way: its arrow turns it', pick: () => walk({ over: [...walked, r.id], steps: steps || 1 }) })),
     ].filter(Boolean),
   });
-  const filterTerms = [
+  // The lens's parts by their words (decision e_drt4g872): Find what adds, any of it; Only what must all hold of it; Not
+  // what is left out of everything but an item named, what the walk reaches included.
+  const findTerms = [
+    ...wordsOf(f).map((w) => term('q-text', `“${w}”`, 'Words to find, set in the find bar', 'text', w, addToFilter)),
     ...(f.types ?? []).map((t) => term('q-type', typeTitle(t), 'Items of this type, the newest first', 'types', t, addToFilter)),
     ...(f.links ?? []).filter((t) => t.startsWith('tagged ')).map((t) => term('q-tag', termWords(t, redraw), 'Items with this tag', 'links', t, addToFilter)),
     ...(f.links ?? []).filter((t) => !t.startsWith('tagged ')).map((t) => term('q-link', termWords(t, redraw), `Items with this link: ${termWords(t, redraw)}`, 'links', t, addToFilter)),
     ...(f.ids ?? []).map((id) => term('q-id', nameOf(id, redraw), 'This item', 'ids', id, addToFilter)),
-    ...(f.only ?? []).map((t) => term('q-narrow', `only ${typeTitle(t)}`, 'Only what is of this type, of what the filter finds', 'only', t, addToFilter)),
-    ...(f.within ?? []).map((id) => term('q-narrow', `within ${nameOf(id, redraw)}`, 'Only what is within this item, at any depth, of what the filter finds', 'within', id, addToFilter)),
+    ...(f.in ?? []).map((id) => term('q-in', `in ${nameOf(id, redraw)}`, 'All that is in this item, at any depth', 'in', id, addToFilter)),
   ].filter(Boolean);
-  // What is left out is in the filter's row too, each marked −: left out of everything, what the walk reaches included.
-  const leftTerms = exclude.map((x) => term('q-out', `− ${x === 'closed' || x === 'system' ? x : typeTitle(x)}`, 'Left out of everything', 'exclude', x, leaveOut));
-  const walkTerm = (said, drop) => ({ said, title: 'Along this link, either way', drop, el: h('span', { class: 'q-term q-walk' }, h('span', { class: 'q-said' }, said), h('button', { type: 'button', class: 'q-x', title: 'Take it out', 'aria-label': `Take out ${said}`, onclick: drop }, '×')) });
+  const onlyTerms = [
+    ...(f.only ?? []).map((t) => term('q-narrow', onlySaid(t, typeTitle, (id) => nameOf(id, redraw)), isWord(t) ? 'Only what is so, of what Find finds' : 'Only what is of this type, of what Find finds', 'only', t, narrowTo)),
+    ...(f.within ?? []).map((id) => term('q-narrow', `within ${nameOf(id, redraw)}`, 'Only what is within this item, at any depth, of what Find finds', 'within', id, narrowTo)),
+  ];
+  const notTerms = exclude.map((x) => term('q-out', x === 'closed' || x === 'system' ? x : typeTitle(x), 'Left out of everything', 'exclude', x, leaveOut));
+  // A walked link: its arrow, a click turning it out (→), in (←) or either way (↔); its title; its ×.
+  const wayTitle = { either: 'Either way along this link', out: 'Out along this link, from what it starts at', in: 'In along this link, to what it starts at' };
+  const walkTerm = (said, drop, t) => {
+    const w = t && wayOf(t);
+    const turn = w && (() => walk({ over: walked.map((o) => (o === t ? withWay(w.link, NEXT_WAY[w.way]) : o)) }));
+    return { said, title: w ? wayTitle[w.way] : 'Every link, either way', drop, el: h('span', { class: 'q-term q-walk' },
+      w && h('button', { type: 'button', class: 'q-way', title: `${wayTitle[w.way]}: turn it`, 'aria-label': `Turn the way of ${said}`, onclick: turn }, ARROW[w.way]),
+      h('span', { class: 'q-said' }, w ? linkTitle(w.link) : said),
+      h('button', { type: 'button', class: 'q-x', title: 'Take it out', 'aria-label': `Take out ${said}`, onclick: drop }, '×')) };
+  };
   const walkTerms = over === 'all'
     ? [walkTerm('every link', () => walk({ over: [], steps: 0 }))]
-    : walked.map((r) => walkTerm(linkTitle(r), () => walk({ over: walked.filter((o) => o !== r), steps: walked.length > 1 ? steps : 0 })));
+    : walked.map((r) => walkTerm(waySaid(r), () => walk({ over: walked.filter((o) => o !== r), steps: walked.length > 1 ? steps : 0 }), r));
   // A part of the query, a row of the editor: its word, its terms, as many as the row has room for and how many more
   // (those a click away, each with its ×), and its own + to add one.
   const part = (cls, word, title, list, add, addLabel, ...rest) => {
@@ -224,46 +229,46 @@ export function drawQuery(lens, view, go, lead) {
   };
   const walking = over === 'all' || walked.length > 0;
   const limit = lens.limit ?? answer?.lens?.limit ?? '';
-  const drawn = answer && h('span', { class: `q-count${answer.cut ? ' cut' : ''}`, title: answer.cut ? 'The limit cut what the lens finds' : 'Items drawn' }, `${answer.items.length}${answer.cut ? '+' : ''} drawn`);
+  const drawn = answer && h('span', { class: `q-count${answer.cut ? ' cut' : ''}`, title: answer.cut ? 'The limit cut what the lens finds' : 'Items drawn, of the limit' }, `${answer.items.length}${answer.cut ? '+' : ''}${limit ? ` of ${limit}` : ''}`);
   const failed = view?.failed && h('span', { class: 'q-count cut', title: view.failed }, '!');
-  // The query in one line, each part by the word its row in the editor has: the search's words (set in the find bar, not
-  // a row of the editor); the nodes: what the filter's other terms add, each by name, then struck through what it leaves
-  // out beyond the system's own; and the edges the walk follows. The whole of it, in words, is the line's tooltip.
-  const { text, ...terms } = f;
-  const kept = filterTerms.map((t) => t.said);
+  // The lens in one line, each part by the word its row in the editor has: Find, its terms joined by "or" (any of them
+  // adds); Only, what must all hold; Not, what is left out beyond the system's own; Walk, the links and ×steps. The
+  // whole of it, in words, is the line's tooltip.
+  const or = (list) => list.flatMap((x, i) => (i ? [h('span', { class: 'q-or' }, 'or'), x] : [x]));
+  const found = findTerms.map((t) => t.said);
+  const narrowed = onlyTerms.map((t) => t.said);
   const out = exclude.filter((x) => x !== 'system').map((x) => (x === 'closed' ? x : typeTitle(x)));
-  const walkSaid = `${over === 'all' ? 'every link' : walked.map(linkTitle).join(', ')} (${steps} ${steps === 1 ? 'step' : 'steps'})`;
+  const walkSaid = `${over === 'all' ? 'every link' : walked.map(waySaid).join(', ')} ×${steps}`;
   const parts = [
-    text && ['Search', `“${text}”`],
-    (kept.length > 0 || out.length > 0) && ['Nodes', [...kept.map((x) => h('span', { class: 'q-kept' }, x)), ...out.map((x) => h('s', { class: 'q-struck', title: `${x}: left out` }, x))]],
-    walking && ['Edges', walkSaid],
+    found.length > 0 && ['Find', or(found.map((x) => h('span', { class: 'q-kept' }, x)))],
+    narrowed.length > 0 && ['Only', narrowed.join(', ')],
+    out.length > 0 && ['Not', out.join(', ')],
+    walking && ['Walk', walkSaid],
   ].filter(Boolean);
-  const said = [text && `Search: “${text}”`, kept.length > 0 && `Nodes: ${kept.join(', ')}`, out.length > 0 && `not ${out.join(', ')}`, walking && `Edges: ${walkSaid}`].filter(Boolean).join(' · ');
-  const toggle = () => ((editing = !editing), redraw());
-  // Three bands, one under the other: the view (the canvas up and what is done with it, joined to its tab or its pane's
-  // strip), the query in one line, and, while it is being edited, a row for each part of it under that line.
-  bar.replaceChildren(
-    h('div', { class: 'q-view', role: 'group', 'aria-label': 'The view' }, lead ?? ''),
-    h('div', { class: 'q-lens', role: 'group', 'aria-label': 'The query' },
-      h('button', { type: 'button', class: 'q-sum', title: `${said}: edit the query`, 'aria-expanded': String(editing), onclick: toggle },
-        parts.map(([word, what]) => h('span', { class: 'q-sum-part' }, h('span', { class: 'q-label' }, word), what))),
-      drawn, failed,
-      h('button', { type: 'button', class: 'q-save q-word q-edit-toggle', title: editing ? 'Done editing the query' : 'Edit the query: what it finds, leaves out and walks along', 'aria-expanded': String(editing), onclick: toggle }, editing ? 'Done' : 'Edit')),
-    h('div', { class: 'q-edit', role: 'group', 'aria-label': 'Edit the query', hidden: !editing, onkeydown: (ev) => ev.key === 'Escape' && toggle() },
-      part('q-filter', 'Nodes', 'What it finds is drawn, but what it leaves out (−)', [...filterTerms, ...leftTerms], (a) => addToFilter(a), 'Add to the filter',
-        h('button', { type: 'button', class: 'q-add q-less', title: 'Leave something out', 'aria-label': 'Leave something out', onclick: (ev) => leaveOut(ev.currentTarget) }, '−')),
-      part('q-walk-part', 'Edges', 'From what the filter finds, along these links either way', walkTerms, (a) => walkAlong(a), 'Walk along a link',
-        walking && h('span', { class: 'q-label q-sub', title: 'How many steps the walk takes' }, 'Steps'),
-        walking && h('span', { class: 'switch q-steps', title: 'How many steps the walk takes' },
-          h('button', { type: 'button', title: 'One step fewer', disabled: steps <= 1, onclick: () => walk({ steps: steps - 1 }) }, '−'),
-          h('button', { type: 'button', class: 'on', title: 'Steps' }, String(steps)),
-          h('button', { type: 'button', title: 'One step more', onclick: () => walk({ steps: steps + 1 }) }, '+'))),
-      h('div', { class: 'q-part', title: 'The limit: the most items drawn' },
-        h('span', { class: 'q-label', title: 'The most items drawn' }, 'Limit'),
-        h('span', { class: 'q-terms' },
-          h('input', { class: 'q-limit', inputmode: 'numeric', value: limit, size: String(limit).length || 1, 'aria-label': 'The most items drawn', title: 'The most items drawn', onchange: (ev) => Number(ev.target.value) >= 1 && go({ ...lens, limit: Math.round(Number(ev.target.value)) }) }),
-          drawn && drawn.cloneNode(true))),
-    ),
+  const said = parts.map(([word]) => `${word} ${{ Find: found.join(' or '), Only: narrowed.join(', '), Not: out.join(', '), Walk: walkSaid }[word]}`).join(' · ');
+  // The view's band at the top, joined to its tab or its pane's strip; the lens in one line in find, and a row for each
+  // part of it above find while find is open.
+  bar.replaceChildren(h('div', { class: 'q-view', role: 'group', 'aria-label': 'The view' }, lead ?? ''));
+  line?.replaceChildren(...[
+    h('button', { type: 'button', class: 'q-sum', title: filled ? `${said}: change it` : 'Find on the map' },
+      filled ? parts.map(([word, what]) => h('span', { class: 'q-sum-part' }, h('span', { class: 'q-label' }, word), what)) : h('span', { class: 'q-hint' }, 'Find on the map')),
+    drawn, failed,
+    h('span', { class: 'q-key', title: '/ opens it' }, '/'),
+  ].filter(Boolean));
+  rows?.replaceChildren(
+    part('q-filter', 'Find', 'What any of these finds is drawn', findTerms, (a) => addToFilter(a), 'Find more'),
+    part('q-only', 'Only', 'What Find finds must all be so', onlyTerms, (a) => narrowTo(a), 'Only what is so, of a type, or within an item'),
+    part('q-not', 'Not', 'Left out of everything, what the walk reaches included', notTerms, (a) => leaveOut(a), 'Leave something out'),
+    part('q-walk-part', 'Walk', 'From what Find finds, along these links, each its own way', walkTerms, (a) => walkAlong(a), 'Walk along a link',
+      walking && h('span', { class: 'switch q-steps', title: 'How many steps the walk takes' },
+        h('button', { type: 'button', title: 'One step fewer', disabled: steps <= 1, onclick: () => walk({ steps: steps - 1 }) }, '−'),
+        h('button', { type: 'button', class: 'on', title: 'Steps' }, `×${steps}`),
+        h('button', { type: 'button', title: 'One step more', onclick: () => walk({ steps: steps + 1 }) }, '+'))),
+    h('div', { class: 'q-part', title: 'The limit: the most items drawn' },
+      h('span', { class: 'q-label', title: 'The most items drawn' }, 'Limit'),
+      h('span', { class: 'q-terms' },
+        h('input', { class: 'q-limit', inputmode: 'numeric', value: limit, size: String(limit).length || 1, 'aria-label': 'The most items drawn', title: 'The most items drawn', onchange: (ev) => Number(ev.target.value) >= 1 && go({ ...lens, limit: Math.round(Number(ev.target.value)) }) }),
+        drawn && drawn.cloneNode(true))),
   );
   bar.hidden = !filled;
   fitBar();
@@ -271,7 +276,7 @@ export function drawQuery(lens, view, go, lead) {
 
 /** Each row of the editor shows as many of its terms as it has room for, and how many more: drawn again as the bar's width changes. */
 function fitRows() {
-  for (const row of bar.querySelectorAll('.q-edit > .q-part')) {
+  for (const row of rows?.querySelectorAll(':scope > .q-part') ?? []) {
     const box = row.querySelector('.q-terms');
     const more = box.querySelector(':scope > .q-more');
     if (!more) continue;
@@ -303,7 +308,6 @@ export function fitBar() {
     const canvas = view.querySelector('.q-canvas');
     for (const step of ['tight', 'tighter', 'tightest']) if (over(view) || over(canvas)) view.classList.add(step);
   }
-  const line = bar.querySelector('.q-lens');
   if (line) {
     line.classList.remove('tight');
     const sum = line.querySelector('.q-sum');
@@ -311,6 +315,23 @@ export function fitBar() {
     if (over(line) || (sum && over(sum) && sum.clientWidth * 3 < line.clientWidth)) line.classList.add('tight');
   }
   fitRows();
+  keepClear();
+}
+
+/**
+ * The pane the bar acts on keeps what it draws below the view's band: its top safe zone is
+ * where the bar ends over it (the owner, 28 Oct 2026). Other panes keep the stylesheet's.
+ */
+function keepClear() {
+  const under = document.querySelector('#canvas > .pane.pane-active > .pane-canvas');
+  for (const c of document.querySelectorAll('#canvas > .pane > .pane-canvas')) if (c !== under) c.style.removeProperty('--safe-top');
+  if (!under || bar.hidden) return under?.style.removeProperty('--safe-top');
+  const below = Math.max(0, Math.round(bar.getBoundingClientRect().bottom - under.getBoundingClientRect().top));
+  under.style.setProperty('--safe-top', `calc(${below}px + var(--space-4))`);
 }
 const fits = new ResizeObserver(() => fitBar());
 if (bar) fits.observe(bar);
+// Find's line and rows are measured once in sight: opening find sizes its rows.
+for (const el of [line, rows]) if (el) fits.observe(el);
+addEventListener('pane-focus', () => setTimeout(keepClear, 0));
+addEventListener('resize', keepClear);
