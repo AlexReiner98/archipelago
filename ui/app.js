@@ -10,6 +10,7 @@ import { drawFind } from './find.js';
 import { signupPage, welcome } from './signup.js';
 import { home } from './home.js';
 import { entity } from './item.js';
+import { flatQuery } from './lens.js';
 import { stale } from './live.js';
 import { drawNav, screenOfPage, screenPage } from './nav.js';
 import { loadSchema, typeChoice, types, workType } from './words.js';
@@ -29,7 +30,10 @@ addEventListener('keydown', (ev) => ev.key === 'Escape' && document.body.dataset
 async function drawMarks() {
   const [held, mine] = await Promise.all([api('proposals').catch(() => []), api('view', { name: 'attention', params: { person: 'me', reasons: ['waits_on', 'to_confirm', 'due', 'unsettled'], limit: 50 } }).catch(() => ({ items: [] }))]);
   const n = held.length + mine.items.length;
-  document.getElementById('marks').replaceChildren(n ? h('a', { class: `count${held.length ? ' held' : ''}`, href: '#/you', title: [held.length && `${held.length} held for your word`, mine.items.length && `${mine.items.length} your move`].filter(Boolean).join(', ') }, String(n)) : '');
+  // What is held is answered on the page that holds it; else the mark opens a canvas of what waits on you (the bar names
+  // it by the saved canvas that draws the same, a pack's or the owner's).
+  const href = held.length ? '#/you' : `#/v?${flatQuery({ filter: { links: ['waits_on me'] } })}`;
+  document.getElementById('marks').replaceChildren(n ? h('a', { class: `count${held.length ? ' held' : ''}`, href, title: [held.length && `${held.length} held for your word`, mine.items.length && `${mine.items.length} your move`].filter(Boolean).join(', ') }, String(n)) : '');
 }
 
 /** `pulse`: the map changed under the page, which is drawn again where it stands. */

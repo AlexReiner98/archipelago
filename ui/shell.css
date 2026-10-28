@@ -64,14 +64,11 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 /* New tab: on the line of the tabs' own buttons, as a browser's + is (its glyph sits a hairline lower than × and ⋯, so it is lifted by one), in the text's colour so it reads at a glance. */
 #tabs > .tab-new { pointer-events: auto; align-self: flex-end; margin: 0 0 calc((var(--box-8) - var(--box-7)) / 2 + var(--border-1)) var(--space-3); color: var(--text); }
 /* The tab in sight's menu: whom it follows, pop out. A popover, so the strip does not clip it. */
-.tab-menu, .term-pick { position: fixed; inset: auto; margin: var(--space-3) 0 0; display: grid; min-width: var(--menu-least); padding: var(--space-4); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); box-shadow: 0 var(--space-4) var(--space-10) rgb(0 0 0 / 0.22); }
+/* Drawn as every open list is (ui/style.css, decision e_eqsuv24q). */
+.tab-menu, .term-pick { position: fixed; inset: auto; margin: var(--space-3) 0 0; }
 .tab-menu:not(:popover-open), .term-pick:not(:popover-open) { display: none; }
-.tab-menu > button { text-align: left; border: 0; background: none; padding: var(--space-4) var(--space-6); border-radius: var(--radius-2); white-space: nowrap; cursor: pointer; }
-.tab-menu > button:hover { background: var(--accent-soft); }
 .tab-menu > button[aria-checked="true"] { font-weight: 600; }
 .tab-menu > button[aria-checked="true"]::after { content: ' ✓'; color: var(--accent); }
-.tab-menu > .tab-menu-head { padding: var(--space-3) var(--space-6); color: var(--muted); font-size: var(--text-2); }
-.tab-menu > hr { width: 100%; margin: var(--space-3) 0; border: 0; border-top: var(--border-1) solid var(--line); }
 /* A part's menu (ui/term-pick.js): a field to narrow or write in, then the choices by group, and what the part holds. */
 .term-pick { width: var(--menu-least); max-height: var(--scroll-most); grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
 .term-pick-field { margin: 0 0 var(--space-3); padding: var(--space-4) var(--space-5); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); background: var(--bg); color: var(--text); font: inherit; outline: none; }
@@ -79,9 +76,6 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 .term-pick-field.wrong { border-color: var(--bad); }
 .term-pick-list { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
 .term-pick-list > * { flex: none; }
-.term-pick-head { padding: var(--space-4) var(--space-5) var(--space-2); color: var(--muted); font-size: var(--text-2); text-transform: uppercase; letter-spacing: var(--track-2); }
-.term-pick-item { text-align: left; border: 0; background: none; padding: var(--space-4) var(--space-5); border-radius: var(--radius-2); color: var(--text); font: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-.term-pick-item:hover, .term-pick-item:focus-visible { background: var(--accent-soft); outline: none; }
 .term-pick-typed { color: var(--accent); }
 .term-pick.finding { width: var(--menu-find); }
 .term-pick-noted { display: flex; gap: var(--space-5); }
@@ -156,11 +150,15 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 /* Back and forward sit together at the start, as a browser's do; Split goes to the far end. */
 #query .q-canvas > .q-travel + .q-travel { margin-left: calc(-1 * var(--space-5)); }
 #query .q-canvas > .q-split { margin-left: auto; }
-/* Narrow (ui/query-bar.js fitBar): the buttons' words go, then back and forward, then Split, and the canvas's name shrinks; the
-   query's line drops how many are drawn once its words have little room. */
-#query .tight .q-word-text, #query .tighter .q-travel, #query .q-lens.tight > .q-count { display: none; }
+/* Narrow (ui/query-bar.js fitBar): the buttons' words go, then the pickers shrink, and last back and forward, Split
+   and the pickers' marks; the query's line drops how many are drawn once its words have little room. */
+#query .tight .q-word-text, #query .tightest .q-travel, #query .q-lens.tight > .q-count { display: none; }
 #query .tight .q-save.q-word { width: var(--box-7); padding: 0; }
-#query .tightest .q-canvas > .q-pick { flex: 0 1 auto; min-width: 0; }
+#query .tighter .q-canvas > .q-pick { flex: 0 1 auto; min-width: var(--box-10); }
+/* A picker's mark sits close before it, and goes only with back and forward: its tooltip says what it is. */
+#query .q-pick-label { display: inline-flex; align-items: center; }
+#query .q-canvas > .q-pick-label + .q-pick { margin-left: calc(-1 * var(--space-5)); }
+#query .tightest .q-pick-label { display: none; }
 #query .tightest .q-split { display: none; }
 #query .q-pick { field-sizing: content; min-width: 0; border: 0; background: none; font-size: var(--text-3); font-weight: 600; max-width: var(--select-least); text-overflow: ellipsis; }
 #marks .count { display: inline-flex; align-items: center; justify-content: center; min-width: var(--box-8); height: var(--box-8); padding: 0 var(--space-5); font-size: var(--text-4); text-decoration: none; }

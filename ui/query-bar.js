@@ -299,6 +299,8 @@ export function fitBar() {
   if (!bar) return;
   const over = (el) => el && el.scrollWidth > el.clientWidth + 1;
   const view = bar.querySelector('.q-view');
+  // The band is narrowed by more than the bar: the strip of the pane it stands in takes room beside it.
+  if (view) fits.observe(view);
   if (view) {
     view.classList.remove('tight', 'tighter', 'tightest');
     const canvas = view.querySelector('.q-canvas');
@@ -326,6 +328,7 @@ function keepClear() {
   const below = Math.max(0, Math.round(bar.getBoundingClientRect().bottom - under.getBoundingClientRect().top));
   under.style.setProperty('--safe-top', `calc(${below}px + var(--space-4))`);
 }
-if (bar) new ResizeObserver(fitBar).observe(bar);
+const fits = new ResizeObserver(() => fitBar());
+if (bar) fits.observe(bar);
 addEventListener('pane-focus', () => setTimeout(keepClear, 0));
 addEventListener('resize', keepClear);
