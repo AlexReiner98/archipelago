@@ -139,8 +139,11 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #query .q-count { color: var(--muted); }
 #query .q-count.cut { color: var(--accent); }
 /* The canvas's name never shrinks away. */
-#query .q-canvas { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+#query .q-canvas { flex: 1 1 auto; min-width: 0; overflow: hidden; }
 #query .q-canvas > * { flex: none; }
+/* Back and forward sit together at the start, as a browser's do; Split goes to the far end. */
+#query .q-canvas > .q-travel + .q-travel { margin-left: calc(-1 * var(--space-5)); }
+#query .q-canvas > .q-split { margin-left: auto; }
 /* Narrow (ui/query-bar.js fitBar): the buttons' words go, then back and forward, then Split, and the canvas's name shrinks; the
    query's line drops how many are drawn once its words have little room. */
 #query .tight .q-word-text, #query .tighter .q-travel, #query .q-lens.tight > .q-count { display: none; }

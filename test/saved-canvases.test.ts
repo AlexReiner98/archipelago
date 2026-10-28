@@ -61,7 +61,7 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
       assert.ok(await until(`document.querySelector('#query .q-pick')?.title.startsWith('Not saved')`), 'the bar says what is up is not saved');
 
       // Saved from the bar: a name asked in the page.
-      await page.evaluate(`document.querySelector('#query .q-save').click()`);
+      await page.evaluate(`document.querySelector('#query .q-save[aria-label="Save this canvas"]').click()`);
       assert.ok(await until(`Boolean(document.querySelector('dialog.ask[open] textarea'))`), 'a name is asked');
       await page.evaluate(`(() => { const d = document.querySelector('dialog.ask'); d.querySelector('textarea').value = ${JSON.stringify(name)}; d.querySelector('button[value="ok"]').click(); })()`);
       assert.ok(await until(`${picked} === ${JSON.stringify(name)}`), `the bar names it: ${await page.evaluate(picked)}`);
