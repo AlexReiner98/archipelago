@@ -138,22 +138,23 @@ test("a flat lens's answer is drawn: every item a step, part_of a tie, depends_o
   const links = [link('part_of', 'a', 'p'), link('part_of', 'b', 'p'), link('part_of', 'c', 'p'), link('depends_on', 'b', 'a'), link('depends_on', 'c', 'b'), link('link', 'q', 'c'), link('tagged', 'd', 't')];
   const g = layout({ items, links, undrawn: ['tagged'], measure, sizes: house.sizes });
   checks(g);
-  assert.deepEqual([...g.nodes.keys()].sort(), ['a', 'b', 'c', 'd', 'p', 'q', 't'], 'every item a step');
+  assert.deepEqual([...g.nodes.values()].filter((n: any) => !n.dummy).map((n: any) => n.id).sort(), ['a', 'b', 'c', 'd', 'p', 'q', 't'], 'every item a step');
   assert.deepEqual(g.chains.map((c: any) => c.key), ['a b', 'b c'], 'the order');
   assert.deepEqual(g.ties.map((t: any) => `${t.type} ${t.a} ${t.b}`).sort(), ['link q c', 'part_of a p', 'part_of b p', 'part_of c p'], 'every other link a tie, but what the style leaves undrawn');
   assert.ok(g.y.get('a') < g.y.get('b') && g.y.get('b') < g.y.get('c'), 'read from the top down');
 });
 
-test('many leaves of one, in no order, wrap under it as an outline: each tie down its column and into a side', () => {
+test("many leaves of one, in no order, wrap under it in a block: its ties one bus, down into each leaf's head", () => {
   const leaves = Array.from({ length: 14 }, (_, k) => item(`l${k}`));
   const g = run(leaves, []);
   checks(g);
   const rows = new Set(leaves.map((l) => g.y.get(l.id)));
   assert.ok(rows.size > 1, 'wrapped');
   assert.ok(Math.min(...rows) > g.y.get('r'), 'under what they are part of');
+  assert.equal(new Set(g.ties.map((t: any) => JSON.stringify(t.points.slice(0, 2)))).size, 1, 'the ties leave it at one place, as one bus');
   for (const l of leaves) {
     const t = g.ties.find((t: any) => t.a === l.id), [[x1, y1], [x2, y2]] = t.points.slice(-2);
-    assert.ok(y1 === y2 && y2 === g.y.get(l.id) && x2 === g.x.get(l.id) - g.nodes.get(l.id).w / 2 && x1 < x2, `${l.id} is entered from its left side`);
+    assert.ok(x1 === x2 && y1 < y2 && Math.abs(y2 - (g.y.get(l.id) - g.nodes.get(l.id).h / 2)) < 0.5, `${l.id} is come into from above`);
   }
 });
 
