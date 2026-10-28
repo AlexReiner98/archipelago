@@ -193,7 +193,7 @@ The main canvas is the one the address draws, and the sheet opens over it.
 Others can stand beside it, as a code editor's groups do: ◫ in the bar
 opens the canvas up in a pane beside it, a pane's name dragged onto a side of
 another docks it there (onto its middle swaps them), the line between two
-shares the room, and ⤢ makes a pane the main canvas. Each pane is a lens and
+shares the room, ⤢ keeps only that pane and × closes it. Each pane is a lens and
 a style of its own, held in its own store and kept current from the log like
 the main one; its places are its canvas's. Every pane is live: the query bar
 and find act on the one last touched, and sit over it (decision e_h2pqjy2q).
@@ -203,8 +203,9 @@ forward (‹ › in the bar): a step for each
 lens it is given, none for typing or for a page opened over it (e_ssnyd3ex).
 What is typed in the bar's box and whether its filter is unfolded are the
 pane's: another pane or tab starts without them. On a page taller than wide
-a row is drawn as a column. A docked pane keeps ⠿, ⤢ and × in its strip in
-focus or not; in focus the bar takes its name's place between them, and ‹ ›
+a row is drawn as a column. Every pane, the main one too, keeps ⠿, ⤢ and × in
+its strip in focus or not, so none is special but in which canvas the address
+draws (the owner, 28 Oct 2026): the main one closed, the next takes its place; in focus the bar takes its name's place between them, and ‹ ›
 stay in the bar, dimmed with nowhere to go. The top bar runs across the page over the sheet,
 one pane or several: the sheet opens under it.
 

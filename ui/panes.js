@@ -55,7 +55,7 @@ function paneEl(id) {
   const button = (title, mark, onclick) => h('button', { type: 'button', class: 'pane-act', title, 'aria-label': title, onclick }, mark);
   // Its controls stand in its strip in focus or not: in focus, the query bar takes the name's place between them.
   const grip = h('span', { class: 'pane-act pane-grip', title: 'Drag to dock it elsewhere', 'aria-label': 'Move this pane' }, '⠿');
-  const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, grip, name, mark, button('Open it as the main canvas', '⤢', () => toMain(id)), button('Close this pane', '×', () => close(id))), body);
+  const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, grip, name, mark, button('Keep only this pane', '⤢', () => only(id)), button('Close this pane', '×', () => close(id))), body);
   for (const handle of [grip, name]) handle.addEventListener('pointerdown', (ev) => dragPane(ev, id, el, { groups: groupEls, drop }));
   const entry = { el, body, name, mark, view: null, at: null, back: [], forth: [] };
   drawn.set(id, entry);
@@ -116,9 +116,6 @@ export function activeIs(id) {
   const t = front();
   if (t && t.focus !== id) ((t.focus = id), keep());
   if (focused !== `${t?.id}:${id}`) ((focused = `${t?.id}:${id}`), dispatchEvent(new Event('pane-focus')));
-  for (const [g, e] of drawn) e.el.classList.toggle('pane-active', g === id);
-  document.getElementById('canvas').classList.toggle('pane-active', id === 'main' && drawn.size > 0);
-  document.body.dataset.active = id === 'main' ? 'main' : 'pane';
   frameActive();
   const e = drawn.get(id);
   activate(e?.view ? { lens: e.lens, asked: e.asked, view: e.view, go: (lens) => goPane(id, `v?${flatQuery(lens, e.asked)}`), open: (href) => goPane(id, asPane(href)) } : null);
@@ -140,20 +137,34 @@ const edge = (side, v) => {
 /** The frame of the pane the bar acts on, for the bar and find to sit in (ui/shell.css: --active-*). */
 let frames = [];
 function frameActive() {
+  // Which pane is in focus is marked on every one, the main one too, each time the panes are drawn.
+  for (const [g, e] of drawn) e.el.classList.toggle('pane-active', g === active);
+  document.getElementById('canvas').classList.toggle('pane-active', active === 'main' && drawn.size > 0);
+  document.body.dataset.active = active === 'main' ? 'main' : 'pane';
   const box = frames.find(([g]) => g === active)?.[1] ?? frames.find(([g]) => g === 'main')?.[1];
   for (const side of ['left', 'right', 'top', 'bottom']) document.body.style.setProperty(`--active-${side}`, edge(side, box?.[side] ?? 0));
-  // Out of focus, the main pane says its name in its strip, as a docked one does, and the name an agent gave it.
-  mainName.hidden = active === 'main' || !drawn.size;
+  // The main pane keeps the strip every pane has while there are several, its name there out of focus, with the name an agent gave it.
+  mainBar.el.hidden = !drawn.size;
   const href = canvasHref();
   const canvas = /canvas=(e_[a-z0-9]{8})/.exec(href)?.[1];
-  mainName.textContent = (canvas && titles.get(canvas)) || (href === '#/' ? 'Home' : filterSaid(readFlatLens(href.split('?')[1] ?? '').lens.filter, frameActive)) || 'Canvas';
-  if (front().slot) mainName.append(h('span', { class: 'pane-follows' }, front().slot));
+  mainBar.name.textContent = (canvas && titles.get(canvas)) || (href === '#/' ? 'Home' : filterSaid(readFlatLens(href.split('?')[1] ?? '').lens.filter, frameActive)) || 'Canvas';
+  mainBar.mark.textContent = front().slot ?? '';
+  mainBar.mark.hidden = !mainBar.mark.textContent;
   for (const [g, e] of drawn) {
     e.mark.textContent = front().panes[g]?.slot ?? '';
     e.mark.hidden = !e.mark.textContent;
   }
 }
-const mainName = document.body.appendChild(h('div', { id: 'main-name', hidden: true, title: 'The main canvas: press to work in it' }));
+/** The main pane's strip, the same as every docked pane's: its ⠿, its name, ⤢ and ×. */
+const mainBar = (() => {
+  const button = (title, mark, onclick) => h('button', { type: 'button', class: 'pane-act', title, 'aria-label': title, onclick }, mark);
+  const grip = h('span', { class: 'pane-act pane-grip', title: 'Drag to dock it elsewhere', 'aria-label': 'Move this pane' }, '⠿');
+  const name = h('span', { class: 'pane-name', title: 'Drag to dock it elsewhere' }, 'Canvas');
+  const mark = h('span', { class: 'pane-follows', hidden: true });
+  const el = document.body.appendChild(h('header', { id: 'main-name', class: 'pane-bar', hidden: true }, grip, name, mark, button('Keep only this pane', '⤢', () => only('main')), button('Close this pane', '×', () => close('main'))));
+  for (const handle of [grip, name]) handle.addEventListener('pointerdown', (ev) => dragPane(ev, 'main', document.getElementById('canvas'), { groups: groupEls, drop }));
+  return { el, name, mark };
+})();
 
 // ---- The main pane's back and forth, for each tab: a step each time it draws another lens (ui/canvas.js tells), none for a page.
 
@@ -246,7 +257,7 @@ export function draw() {
   dispatchEvent(new Event('resize'));
 }
 
-// ---- What can be done with a pane: open, move, close, make main.
+// ---- What can be done with a pane, the main one too: open, move, close, keep only it.
 
 /**
  * Open this address in a pane on this side of the pane `by` (the main one, unless named) in tab `t` (the one in
@@ -274,11 +285,23 @@ export function place(id, side, by, t = front()) {
 }
 export function close(id) {
   const t = front();
+  // The main pane closed, the next takes its place: what it draws becomes the main canvas's, and its frame goes.
+  if (id === 'main') {
+    const next = t.groups.find((g) => g !== 'main');
+    if (!next) return;
+    toMain(next);
+    return close(next);
+  }
   t.groups = t.groups.filter((g) => g !== id);
   delete t.panes[id];
   even();
   keep();
   draw();
+}
+/** Only this pane in the tab in sight: what it draws on the main canvas, the others closed. */
+function only(id) {
+  if (id !== 'main') toMain(id);
+  alone();
 }
 /** Only the main pane, in the tab in sight. */
 export function alone() {
@@ -315,7 +338,7 @@ addEventListener('resize', () => {
 // The sheet opening or shutting changes the room the panes share.
 new MutationObserver(() => started && front().groups.length > 1 && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
 
-/** The query bar's own for the pane it acts on, the same in every pane: back and forth (dimmed with nowhere to go) and split. A docked pane's move, make main and close stay in its strip. */
+/** The query bar's own for the pane it acts on, the same in every pane: back and forth (dimmed with nowhere to go) and split. Each pane's move, keep only it and close stay in its strip. */
 export function paneButtons() {
   const { back, forth } = historyNow();
   const button = (label, title, mark, onclick, off, cls = 'q-save') => h('button', { type: 'button', class: cls, title, 'aria-label': label, disabled: off, onclick }, mark);
