@@ -9,6 +9,7 @@
 // answer in, geometry out; `measure(text, px)` gives a title's width at a size.
 
 import { route, routeTies } from './free.js';
+import { lines } from './lines.js';
 import { acyclic, flatten, grouped, highest, ORDER, QUIET, reduced } from './graph.js';
 import { lay as layCluster } from './layers.js';
 
@@ -61,12 +62,19 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
   const markOn = (id) => (after.get(id) ?? []).forEach((v) => potential.has(v) || (potential.add(v), markOn(v)));
   decisions.forEach((d) => markOn(d.id));
 
-  // ---- Sizes: a step is as wide as its name.
+  // ---- Sizes: a step is as wide as its name, in two lines where one is too few (./lines.js), and a line taller for
+  // the second. A choice's end keeps to one line. The gap between lines is the style's (flow_line_height), or the
+  // text's own size and a quarter where a style names none.
+  const LINE = sizes.flow_line_height ?? TEXT * 1.25;
   for (const n of nodes.values()) {
-    const text = Math.min(measure(n.item.title, n.stub ? STUB_TEXT : TEXT), MAX_TEXT);
-    if (n.shape === 'diamond') [n.w, n.h] = [text + DIAMOND_PAD, DIAMOND_H];
+    const px = n.stub ? STUB_TEXT : TEXT;
+    n.lines = n.shape === 'end' ? [n.item.title] : lines(n.item.title, MAX_TEXT, (t) => measure(t, px));
+    n.line = LINE;
+    const text = Math.min(highest(n.lines.map((t) => measure(t, px))), MAX_TEXT);
+    const more = (n.lines.length - 1) * LINE;
+    if (n.shape === 'diamond') [n.w, n.h] = [text + DIAMOND_PAD, DIAMOND_H + more];
     else if (n.shape === 'end') [n.w, n.h] = [text + END_PAD, END_H];
-    else [n.w, n.h] = [text + BOX_PAD, n.shape === 'sheet' ? SHEET_H : BOX_H];
+    else [n.w, n.h] = [text + BOX_PAD, (n.shape === 'sheet' ? SHEET_H : BOX_H) + more];
   }
 
   // ---- Clusters: what the order and the ties join, apart from the steps put by hand.

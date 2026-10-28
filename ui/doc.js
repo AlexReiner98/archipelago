@@ -7,6 +7,9 @@ import { warmDrawings } from './drawing.js';
 import { checkedCss } from './marks.js';
 import { readSpans, readText } from './text.js';
 import { applyTheme } from './theme.js';
+import { startTips } from './tip.js';
+
+startTips();
 
 const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');

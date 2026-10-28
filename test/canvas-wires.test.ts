@@ -1,8 +1,6 @@
-// Wires drawn by hand and held changes as ghosts, on the canvas in a real browser (skipped where there is no Chrome):
-// a wire drawn from a step's edge to another step asks which link it is and makes it through change, drawn at once as
-// the person's and pending, then as it is once its fact arrives; one refused is taken back. An agent's held link is
-// drawn dashed where it would land and applied there by the person; an agent's held item is a faint step, declined
-// there.
+// The canvas in a real browser (skipped where there is no Chrome): a click on a step opens its page with the canvas
+// where it stands and the step lit; no wire is drawn by hand. An agent's held link is drawn dashed where it would
+// land and applied there by the person; an agent's held item is a faint step, declined there.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -11,7 +9,7 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-test('in a browser, a wire drawn by hand becomes a link, and a held change is drawn and decided where it would land', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, opening a step keeps the canvas still and lights it, and a held change is decided where it would land', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {
     reason: 'test',
@@ -38,49 +36,24 @@ test('in a browser, a wire drawn by hand becomes a link, and a held change is dr
   /** Press the dialog's button whose words match. */
   const choose = (words: RegExp) => page.evaluate<boolean>(`(() => { const b = [...document.querySelectorAll('dialog.ask button')].find((b) => ${words}.test(b.textContent)); b?.click(); return Boolean(b); })()`);
   const links = async (id: string) => (await call('/api/get', undefined, { id })).result.outgoing.map((r: { type: string; id: string }) => `${r.type} ${r.id}`) as string[];
-  /** Whether the map has this link within a few seconds: the page draws a wire as pending before its change has answered. */
-  const linked = async (id: string, link: string) => {
-    for (const end = Date.now() + 5000; Date.now() < end; await wait(150)) if ((await links(id)).includes(link)) return true;
-    return false;
-  };
   const probe = () => page.evaluate<string>(`JSON.stringify({ wires: [...document.querySelectorAll('#canvas svg[role=img] .lf-wire, #canvas svg[role=img] .lf-tie')].map((p) => p.getAttribute('class')), ghosts: document.querySelectorAll('#canvas .lf-step.ghost').length, badges: document.querySelectorAll('#canvas .lf-held').length, dialog: document.querySelector('dialog.ask')?.textContent })`);
   try {
     assert.ok(await until(`Boolean(${step(made.a)}) && Boolean(${step(made.b)})`), `the steps are drawn: ${await page.evaluate("document.querySelector('#canvas')?.innerText.slice(0, 600)")} ${page.logs().join('\n')}`);
     await page.evaluate(`(localStorage.setItem('pelago-follow', 'off'), (document.querySelector('#follow input').checked = false))`);
     await wait(800);
 
-    // ---- A wire drawn by hand, from the edge of the first step to the second.
-    const drawWire = async (from: string, to: string) => {
-      const [ra, rb] = [await rect(step(from)), await rect(step(to))];
-      const start: [number, number] = [ra.x + 2, ra.y + ra.h / 2];
-      const end: [number, number] = [rb.x + rb.w / 2, rb.y + rb.h / 2];
-      await mouse('mouseMoved', start, 0);
-      assert.equal(await page.evaluate(`document.querySelector('#canvas .lens-view').dataset.wire`), 'edge', 'the pointer on the edge says a press there draws a wire');
-      await mouse('mousePressed', start);
-      for (let k = 1; k <= 10; k++) (await mouse('mouseMoved', [start[0] + ((end[0] - start[0]) * k) / 10, start[1] + ((end[1] - start[1]) * k) / 10]), await wait(20));
-      assert.ok(await page.evaluate(`Boolean(document.querySelector('#canvas .wire-draft.onto'))`), 'the line follows the pointer, solid over a step it can end on');
-      await mouse('mouseReleased', end, 0);
-      return ra;
-    };
-    const before = await drawWire(made.a, made.b);
-    assert.ok(await until(`Boolean(document.querySelector('dialog.ask .ask-choices'))`, 5000), `asked which link: ${await probe()}`);
-    assert.ok(!(await page.evaluate<boolean>(`Boolean(document.querySelector('#canvas .wire-draft'))`)), 'the line is gone once let go');
+    // ---- A click on a step opens its page over the canvas: the canvas stays where it stands, the step lit.
+    const before = await rect(step(made.a));
+    await click([before.x + before.w / 2, before.y + before.h / 2]);
+    assert.ok(await until(`document.body.dataset.sheet === 'open' && Boolean(document.querySelector('#canvas .lf-step.here'))`, 5000), `its page is open, the step lit: ${await page.evaluate(`JSON.stringify([document.body.dataset.sheet, location.hash, document.querySelectorAll('#canvas .lf-step.here').length, document.querySelectorAll('.lf-step.here').length])`)} ${await probe()}`);
+    await wait(600);
     const after = await rect(step(made.a));
-    assert.ok(Math.abs(after.x - before.x) < 1 && Math.abs(after.y - before.y) < 1, 'a wire does not move the step it starts on');
-    assert.ok(await choose(/^depends on$/), `"depends on" is offered: ${await probe()}`);
-    assert.ok(await until(`Boolean(document.querySelector('#canvas svg[role=img] .lf-wire.held.mine'))`, 3000), `drawn at once as pending: ${await probe()}`);
-    assert.ok(await linked(made.a, `depends_on ${made.b}`), 'a link, made through change');
-    assert.ok(await until(`document.querySelectorAll('#canvas svg[role=img] .lf-wire').length === 1 && !document.querySelector('#canvas svg[role=img] .held')`), `drawn as it is once its fact arrives: ${await probe()}`);
+    assert.ok(Math.abs(after.x - before.x) < 1 && Math.abs(after.y - before.y) < 1, `the canvas does not move: ${JSON.stringify([before, after])}`);
+    await page.evaluate(`document.getElementById('sheet-close').click()`);
+    assert.ok(await until(`!document.body.dataset.sheet && !document.querySelector('#canvas .lf-step.here')`, 5000), 'shut, nothing lit');
 
-    // ---- One refused is taken back.
-    await page.evaluate(`(() => { const was = window.fetch; window.fetch = (url, init) => String(url).endsWith('/api/change') ? Promise.resolve(new Response(JSON.stringify({ error: 'refused for the test' }), { status: 400 })) : was(url, init); window.unrefuse = () => (window.fetch = was); })()`);
-    await drawWire(made.d, made.b);
-    assert.ok(await until(`Boolean(document.querySelector('dialog.ask .ask-choices'))`, 5000), 'asked again');
-    assert.ok(await choose(/^depends on$/));
-    assert.ok(await until(`/refused for the test/.test(document.querySelector('dialog.ask')?.textContent ?? '')`, 5000), `the refusal is said: ${await probe()}`);
-    assert.ok(!(await page.evaluate<boolean>(`Boolean(document.querySelector('#canvas svg[role=img] .held'))`)), `taken back: ${await probe()}`);
-    await page.evaluate(`(window.unrefuse(), document.querySelector('dialog.ask button').click())`);
-    assert.ok(!(await links(made.d)).some((l) => l.startsWith('depends_on')), 'nothing made');
+    // ---- A step's edge draws no wire: a press there is a click, as anywhere on it.
+    assert.ok(!(await page.evaluate<boolean>(`'wire' in document.querySelector('#canvas .lens-view').dataset`)), 'no wire is offered');
 
     // ---- An agent's held link, drawn dashed where it would land, applied there.
     const held = (await call('/agent/change', undefined, { actor: 'robot', reason: 'held link test', ops: [{ op: 'link', type: 'depends_on', from: made.d, to: made.b }] })).result;
@@ -92,7 +65,7 @@ test('in a browser, a wire drawn by hand becomes a link, and a held change is dr
     await click([at.x + at.w / 2, at.y + at.h / 2]);
     assert.ok(await until(`/Apply/.test(document.querySelector('dialog.ask')?.textContent ?? '')`, 5000), `the change is put to the person: ${await probe()}`);
     assert.ok(await choose(/^Apply$/));
-    assert.ok(await until(`!document.querySelector('#canvas svg[role=img] .held') && document.querySelectorAll('#canvas svg[role=img] .lf-wire').length === 2`), `applied in place, drawn as it is: ${await probe()}`);
+    assert.ok(await until(`!document.querySelector('#canvas svg[role=img] .held') && document.querySelectorAll('#canvas svg[role=img] .lf-wire').length === 1`), `applied in place, drawn as it is: ${await probe()}`);
     assert.ok((await links(made.d)).includes(`depends_on ${made.b}`), 'on the map');
     assert.ok((await call('/api/proposals', undefined, { status: 'approved' })).result.some((p: { id: string }) => p.id === held.proposal), 'approved through decide');
 

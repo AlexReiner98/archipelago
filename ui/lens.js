@@ -91,7 +91,8 @@ const list = (value) => (value ?? '').split(',').filter(Boolean);
  * A flat lens and a style, as the end of an address says them: ?text=…&types=…&ids=…&link=tagged e_x&in=e_p&only=…&within=e_y
  * &exclude=closed&over=part_of&steps=1&limit=500 (a link term each `link`; only and within narrow what the rest finds;
  * exclude with nothing after it leaves nothing out). An
- * address from before the flat lens (?from=e_x) opens on that item. A lens that includes nothing is null. `canvas` names
+ * address from before the flat lens (?from=e_x) opens on that item. A lens that includes nothing is null, unless the
+ * address says so (`nothing`: every Find term taken out, drawn as an empty canvas). `canvas` names
  * the saved canvas it is drawn on (ui/canvases.js): its places, its name in the bar.
  */
 export function readFlatLens(query) {
@@ -108,16 +109,20 @@ export function readFlatLens(query) {
   if (p.has('exclude')) filter.exclude = list(p.get('exclude'));
   const style = {};
   for (const key of ['lit', 'shape', 'style', 'canvas']) if (p.get(key)) style[key] = p.get(key);
-  if (!filter.text && !filter.types?.length && !filter.ids?.length && !filter.links?.length && !filter.in?.length) return { lens: null, style };
+  if (!includesAny(filter) && !p.has('nothing')) return { lens: null, style };
   const over = p.get('over') === 'all' ? 'all' : p.has('over') ? list(p.get('over')) : p.has('from') ? FOCUS : [];
   const lens = { filter, walk: { over, steps: p.has('steps') ? Number(p.get('steps')) : over.length ? 1 : 0 } };
   if (p.has('limit')) lens.limit = Number(p.get('limit'));
   return { lens, style };
 }
 
+/** Whether a filter includes anything: one that does not is answered with nothing, here, never sent to be read. */
+export const includesAny = (f) => Boolean(wordsOf(f).length || f.types?.length || f.ids?.length || f.links?.length || f.in?.length);
+
 /** The end of the address that says this flat lens (and the style asked of it): what readFlatLens reads back. */
 export function flatQuery(lens, style = {}) {
   const p = new URLSearchParams();
+  if (!includesAny(lens.filter)) p.set('nothing', '');
   const { text, types, ids, links, in: inside, only, within, exclude } = lens.filter;
   for (const words of wordsOf({ text })) p.append('text', words);
   if (types?.length) p.set('types', types.join(','));
@@ -209,6 +214,14 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     if (!coded && !drawn) saidDrawn(body, 'drawn');
   };
   const load = async (refreshing = false) => {
+    // A lens that includes nothing draws nothing: the server would refuse it, as never the whole map.
+    if (!includesAny(lens.filter)) {
+      host.answer = { items: [], links: [], lens };
+      host.failed = null;
+      host.dispatchEvent(new CustomEvent('lens-answer'));
+      body.replaceChildren();
+      return saidDrawn(body, 'empty');
+    }
     let store;
     try {
       [store, look] = await Promise.all([

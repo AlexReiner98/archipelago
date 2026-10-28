@@ -183,7 +183,7 @@ The canvas keeps to these (the flat canvas, 25 Oct 2026: document
 - **Places never carry meaning.** Where a person puts a node is kept in the
   places stream, one place per canvas and item, read only to draw it there.
   A grouping that matters is made as a link.
-- **Every gesture is a change.** A wire drawn, a status, Save in the sheet:
+- **Every gesture is a change.** A status, Save in the sheet:
   each is `change` on the person's authority, through the one write path, and
   a held change is drawn as a ghost where it would land. Moves are the one
   batch that is not, written to the places stream before the next action.

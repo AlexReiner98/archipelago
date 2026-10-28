@@ -136,10 +136,9 @@ export function drawQuery(lens, view, go, lead) {
   const filled = includes > 0;
   /** The lens with term `field` `value` taken out, when one is being changed; else as it is. */
   const but = (field, value) => (field ? without(lens, field, value) : lens);
-  /** A term: its words, a click to change it in its part's menu, an × to take it away. The last term the filter includes is not taken away: a lens includes something. */
+  /** A term: its words, a click to change it in its part's menu, an × to take it away. The last term Find has may go too: the canvas is then empty. */
   const term = (cls, said, title, field, value, edit) => {
-    const alone = !['exclude', 'only', 'within'].includes(field) && includes === 1;
-    const drop = alone ? null : () => go(without(lens, field, value));
+    const drop = () => go(without(lens, field, value));
     return {
       said,
       title,
@@ -253,7 +252,6 @@ export function drawQuery(lens, view, go, lead) {
     h('button', { type: 'button', class: 'q-sum', title: filled ? `${said}: change it` : 'Find on the map' },
       filled ? parts.map(([word, what]) => h('span', { class: 'q-sum-part' }, h('span', { class: 'q-label' }, word), what)) : h('span', { class: 'q-hint' }, 'Find on the map')),
     drawn, failed,
-    h('span', { class: 'q-key', title: '/ opens it' }, '/'),
   ].filter(Boolean));
   rows?.replaceChildren(
     part('q-filter', 'Find', 'What any of these finds is drawn', findTerms, (a) => addToFilter(a), 'Find more'),

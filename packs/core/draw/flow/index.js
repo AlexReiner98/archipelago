@@ -207,7 +207,10 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     const body = [
       outline(n.shape, X, Y, n.w, n.h, CORNER),
       !n.stub && m('circle', { cx: left - z('dot_gap'), cy: Y, r: z('dot'), class: `lf-dot ${dotClass(i)}` }),
-      m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, fit(i.title, room, n.stub ? STUB_TEXT : TEXT)),
+      // Its name in the lines the layout gave it (./lines.js): a second line under the first, the two about the middle.
+      n.lines?.length > 1
+        ? m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, ...n.lines.map((line, k) => m('tspan', { x: left, dy: k ? n.line : (-(n.lines.length - 1) * n.line) / 2 }, fit(line, room, n.stub ? STUB_TEXT : TEXT))))
+        : m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, fit(i.title, room, n.stub ? STUB_TEXT : TEXT)),
     ];
     const key = `s:${n.id}`;
     keyed.set(key, i.id);
@@ -319,7 +322,9 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     },
     restyle(now) {
       const off = new Set(dimmed(now));
-      return [...dims.keys()].map((id) => ({ key: dims.get(id)[1].key, toggle: { dim: off.has(id) } }));
+      // The step whose page is open is lit, and only it: the page says which (here) as it opens and shuts one.
+      const lit = steps.filter((n) => !n.stub).map((n) => ({ key: `s:${n.id}`, toggle: { here: n.item.id === now.here } }));
+      return [...[...dims.keys()].map((id) => ({ key: dims.get(id)[1].key, toggle: { dim: off.has(id) } })), ...lit];
     },
   };
 }

@@ -19,10 +19,10 @@ body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.lf-stage), body[data-p
 /* A style's own code fills its pane, not the height a document gives its frame. */
 #canvas .code-stage { height: 100%; }
 #canvas .code-stage > .lens-frame { height: 100%; min-height: 0; }
-/* The key, always in sight on a pane alone: in the safe zone, under the query bar, scrolled when it is longer than the room. */
+/* The key, always in sight on a pane alone: in the safe zone, under the query bar, as long as it is. */
 /* Among several, the pane the query bar is over keeps its drawing and key below the bar too (ui/query-bar.js keepClear). */
 #canvas > .pane.pane-active > .pane-canvas .lens-view { padding-top: var(--safe-top); }
-body[data-panes="1"] #canvas .lf-legend { bottom: auto; max-height: min(var(--ln-legend-most-height), calc(100% - var(--safe-top) - var(--safe-bottom))); overflow-y: auto; pointer-events: auto; }
+body[data-panes="1"] #canvas .lf-legend { bottom: auto; pointer-events: auto; }
 #canvas .pane-canvas > .lens-wrap > .lens-bar { position: absolute; z-index: 2; top: calc(var(--box-9) + var(--space-5)); left: var(--space-9); right: var(--space-9); width: auto; pointer-events: none; }
 #canvas .pane-canvas > .lens-wrap > .lens-bar > * { pointer-events: auto; }
 #canvas .lens-view > .lens-error { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
@@ -103,7 +103,6 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #query .q-view > .q-canvas { display: inline-flex; align-items: center; gap: var(--space-6); padding: 0; background: none; border: 0; border-radius: 0; }
 /* At rest the find bar says the lens in one line, its words the query's (ui/query-bar.js); a click or / opens it to type (ui/find.js). */
 #find .q-lens { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-5); box-sizing: border-box; height: var(--box-9); padding: 0 var(--space-6); font-size: var(--text-4); cursor: text; }
-#find .q-lens > .q-key { flex: none; color: var(--muted); }
 #find .q-sum > .q-hint { color: var(--muted); font-size: var(--text-6); }
 #find .q-sum { flex: 0 1 auto; min-width: 0; margin-right: auto; overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
 /* Each part of the line gives way as the line narrows, the longest most, cut with its own ellipsis: no part leaves it. */
@@ -164,8 +163,6 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #query .tightest .q-pick-label { display: none; }
 #query .tightest .q-split { display: none; }
 #query .q-pick { field-sizing: content; min-width: 0; border: 0; background: none; font-size: var(--text-3); font-weight: 600; max-width: var(--select-least); text-overflow: ellipsis; }
-#marks .count { display: inline-flex; align-items: center; justify-content: center; min-width: var(--box-8); height: var(--box-8); padding: 0 var(--space-5); font-size: var(--text-4); text-decoration: none; }
-#marks .count.held { background: var(--warn); }
 #more > summary:hover { color: var(--text); background: var(--accent-soft); }
 #listening { flex: none; color: var(--ok); font-size: var(--text-3); white-space: nowrap; }
 #listening::before { content: "● "; }
@@ -189,8 +186,14 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 /* Find: one bar at the canvas's foot that is the query's (decision e_2a4mddx8): at rest the lens in a line; open, its rows above it; typed, the choices of what the words could be. */
 #find { position: fixed; z-index: 3; left: calc(var(--active-left, 0%) + (100% - var(--active-left, 0%) - var(--active-right, 0%)) / 2); bottom: calc(var(--active-bottom, 0%) + var(--space-9)); transform: translateX(-50%); width: min(var(--find-most), calc(100% - var(--active-left, 0%) - var(--active-right, 0%) - 2 * var(--space-9))); margin: 0; }
 body[data-sheet="open"] #find { left: calc(var(--active-left, 0%) + (100% - var(--active-left, 0%) - max(var(--active-right, 0%), min(var(--sheet), 50%))) / 2); width: min(var(--find-most), calc(100% - var(--active-left, 0%) - max(var(--active-right, 0%), min(var(--sheet), 50%)) - 2 * var(--space-9))); }
-#find .find-row { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.12); }
-#find input[type=search] { flex: 1; min-width: 0; border: 0; background: none; padding: var(--space-4) var(--space-7); font-size: var(--text-6); outline: none; }
+#find .find-row { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.12); cursor: text; transition: border-color 0.12s; }
+/* At rest it reads as a field to type in: a magnifier before it, its edge lit under the pointer; open, lit as focused. */
+#find .find-row:hover, #find.open .find-row { border-color: var(--accent); }
+#find .find-icon { flex: none; width: var(--box-5); height: var(--box-5); margin-left: var(--space-5); fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; }
+#find .find-row:hover .find-icon, #find.open .find-icon { stroke: var(--accent); }
+/* Open or at rest, the bar is the same height: the box is the line's height. */
+#find input[type=search] { flex: 1; min-width: 0; box-sizing: border-box; height: var(--box-9); border: 0; background: none; padding: 0 var(--space-6); font-size: var(--text-6); outline: none; }
+#find:not(.open) .find-mode { display: none; }
 /* Typed, the choices of what the words could be, each said by its kind, the lit one first (Words): what Enter takes. In the look of every dropdown (ui/menus.css). */
 #find .find-choices { display: grid; margin: 0 0 var(--space-4); padding: var(--space-4); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); white-space: nowrap; }
 #find .find-choices[hidden], #find:not(.typing) .find-choices { display: none; }
