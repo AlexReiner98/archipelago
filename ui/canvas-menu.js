@@ -5,7 +5,7 @@
 import { h, hooks } from './base.js';
 
 export function canvasMenu() {
-  const box = h('details', { class: 'menu q-more' }, h('summary', { title: 'Arrange, Fit, Snap', 'aria-label': 'More for this canvas' }, '⋯'));
+  const box = h('details', { class: 'menu q-band-menu' }, h('summary', { title: 'Arrange, Fit, Snap', 'aria-label': 'More for this canvas' }, '⋯'));
   const now = hooks.canvasNow;
   if (!now) return box;
   // A toggle draws the menu again, so its mark says what is on now.

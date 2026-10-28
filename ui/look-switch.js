@@ -18,10 +18,13 @@ const chosenOf = (style) => (style.style ? `style:${style.style}` : style.shape 
 
 /** The switch: choosing goes to the same lens with the style chosen, the canvas and what is lit kept. */
 export function lookSwitch(lens, style, open) {
-  const pick = h('select', { class: 'q-pick q-look', 'aria-label': 'Style', title: 'The style this canvas is drawn in' });
+  const pick = h('select', { class: 'q-pick q-look', 'aria-label': 'Style' });
   const shapes = [{ shape: 'list', title: 'List' }, ...(state.schema?.shapes ?? [])];
   const fill = (kept) => {
     const now = chosenOf(style);
+    // Cut short in a narrow pane, the style chosen is still named in its tooltip.
+    const said = [...shapes.map((s) => [`shape:${s.shape}`, s.title]), ...kept.map((s) => [`style:${s.id}`, s.title])].find(([value]) => value === now)?.[1] ?? 'House';
+    pick.title = `Style: ${said}`;
     pick.replaceChildren(
       h('option', { value: '', selected: !now }, 'House'),
       ...shapes.map((s) => h('option', { value: `shape:${s.shape}`, selected: now === `shape:${s.shape}` }, s.title)),

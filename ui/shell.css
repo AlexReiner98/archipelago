@@ -143,11 +143,14 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 /* Back and forward sit together at the start, as a browser's do; Split goes to the far end. */
 #query .q-canvas > .q-travel + .q-travel { margin-left: calc(-1 * var(--space-5)); }
 #query .q-canvas > .q-split { margin-left: auto; }
-/* Narrow (ui/query-bar.js fitBar): the buttons' words go, then back and forward, then Split, and the canvas's name shrinks; the
-   query's line drops how many are drawn once its words have little room. */
-#query .tight .q-word-text, #query .tighter .q-travel, #query .q-lens.tight > .q-count { display: none; }
+/* The canvas's menu is a mark the size of the buttons beside it, on the band's surface. */
+#query .q-band-menu { flex: none; }
+#query .q-band-menu > summary { width: var(--box-7); padding: 0; border: 0; background: none; color: inherit; text-align: center; }
+/* Narrow (ui/query-bar.js fitBar): the buttons' words go, then the canvas's name and its style shrink, then back and
+   forward and Split go; the query's line drops how many are drawn once its words have little room. */
+#query .tight .q-word-text, #query .tightest .q-travel, #query .q-lens.tight > .q-count { display: none; }
 #query .tight .q-save.q-word { width: var(--box-7); padding: 0; }
-#query .tightest .q-canvas > .q-pick { flex: 0 1 auto; min-width: 0; }
+#query .tighter .q-canvas > .q-pick { flex: 0 1 auto; min-width: var(--box-10); }
 #query .tightest .q-split { display: none; }
 #query .q-pick { field-sizing: content; min-width: 0; border: 0; background: none; font-size: var(--text-3); font-weight: 600; max-width: var(--select-least); text-overflow: ellipsis; }
 #marks .count { display: inline-flex; align-items: center; justify-content: center; min-width: var(--box-8); height: var(--box-8); padding: 0 var(--space-5); font-size: var(--text-4); text-decoration: none; }
