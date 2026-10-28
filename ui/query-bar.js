@@ -1,7 +1,8 @@
-// The query bar: the canvas's lens, always in sight and plain to read, on one row under the view's (decision
-// e_sdsaxxq4). Its parts each say what they are in a word: the filter (text, types, tags, items, links; and what narrows
+// The query bar: the canvas's lens, always in sight in one line under the view's (decision e_sdsaxxq4): what the
+// filter finds, the walk and what is left out, said in a few words, and how many items are drawn. Edit opens a row for
+// each part under it, each saying what it is in a word: the filter (text, types, tags, items, links; and what narrows
 // them, only a type, within an item), what is left out, the walk (the links it follows, how many steps) and the limit.
-// Each part shows its first terms and how many more, all of them a click away, and has its own + that opens one menu
+// A row shows its first terms and how many more, all of them a click away, and has its own + that opens one menu
 // (ui/term-pick.js) to add to it; a term's words open it again to change that term, its × takes it away. Every change
 // is a new lens, handed to `go` (the canvas puts it in the address and draws it). The menus lead with what this canvas
 // and its neighbourhood use (ui/picker-rank.js). No term or part is a box inside a box (rule e_vgs9vt5j).
@@ -18,6 +19,8 @@ const asking = new Set();
 /** What is used one step around the canvas, asked once for each lens (`key`), and the bar drawn last. */
 let near = { key: '', uses: null };
 let last = null;
+/** Whether the query is open to edit, a row for each part under its line; kept as the lens changes. */
+let editing = false;
 
 /**
  * Ask what is used one step around what the canvas draws, and draw the bar again with it: once for each lens, so what
@@ -204,40 +207,76 @@ export function drawQuery(lens, view, go, lead) {
   const walkTerms = over === 'all'
     ? [walkTerm('every link', () => walk({ over: [], steps: 0 }))]
     : walked.map((r) => walkTerm(linkTitle(r), () => walk({ over: walked.filter((o) => o !== r), steps: walked.length > 1 ? steps : 0 })));
-  // A part of the query: its word, its first terms and how many more (all of them a click away, each with its ×), and its own + to add one.
-  const most = numberOf(state.style, 'query_terms_most');
+  // A part of the query, a row of the editor: its word, its terms, as many as the row has room for and how many more
+  // (all of them a click away, each with its ×), and its own + to add one.
   const part = (cls, word, title, list, add, addLabel, ...rest) => {
     const plus = h('button', { type: 'button', class: 'q-add', title: addLabel, 'aria-label': addLabel, onclick: (ev) => add(ev.currentTarget) }, '+');
-    const more = list.slice(most);
     const all = (ev) => pickTerm(ev.currentTarget, { label: word, held: list.map((t) => ({ label: t.said, title: t.title, open: () => add(plus), drop: t.drop })) });
-    return h('span', { class: `q-part ${cls}`, title },
+    for (const t of list) t.el.dataset.said = t.said;
+    return h('div', { class: `q-part ${cls}`, title },
       h('span', { class: 'q-label', title }, word),
-      list.slice(0, most).map((t) => t.el),
-      more.length > 0 && h('button', { type: 'button', class: 'q-more', title: more.map((t) => t.said).join(' · '), 'aria-label': `${more.length} more`, onclick: all }, `+${more.length} more`),
-      plus,
-      rest);
+      h('span', { class: 'q-terms' },
+        list.map((t) => t.el),
+        list.length > 0 && h('button', { type: 'button', class: 'q-more', hidden: true, onclick: all }),
+        plus,
+        rest));
   };
   const walking = over === 'all' || walked.length > 0;
-  // Two rows, one under the other: the view (the canvas up and what is done with it, joined to its tab or its pane's
-  // strip), then the query (the filter, what is left out, the walk, the limit), so a tab, a view and a lens each read as what it is.
+  const limit = lens.limit ?? answer?.lens?.limit ?? '';
+  const drawn = answer && h('span', { class: `q-count${answer.cut ? ' cut' : ''}`, title: answer.cut ? 'The limit cut what the lens finds' : 'Items drawn' }, `${answer.items.length}${answer.cut ? '+' : ''} drawn`);
+  const failed = view?.failed && h('span', { class: 'q-count cut', title: view.failed }, '!');
+  // The query in one line: what the filter finds, the walk, and what is left out beyond the system's own; the whole of it is the line's tooltip.
+  const leftSaid = exclude.filter((x) => x !== 'system').map((x) => (x === 'closed' ? x : typeTitle(x)));
+  const said = [
+    filterSaid(f, redraw),
+    walking && `→ ${over === 'all' ? 'every link' : walked.map(linkTitle).join(', ')}${steps > 1 ? ` ×${steps}` : ''}`,
+    leftSaid.length > 0 && `without ${leftSaid.join(', ')}`,
+  ].filter(Boolean).join('  ');
+  const toggle = () => ((editing = !editing), redraw());
+  // Three bands, one under the other: the view (the canvas up and what is done with it, joined to its tab or its pane's
+  // strip), the query in one line, and, while it is being edited, a row for each part of it under that line.
   bar.replaceChildren(
     h('div', { class: 'q-view', role: 'group', 'aria-label': 'The view' }, lead ?? ''),
     h('div', { class: 'q-lens', role: 'group', 'aria-label': 'The query' },
+      h('button', { type: 'button', class: 'q-sum', title: `${said}: edit the query`, 'aria-expanded': String(editing), onclick: toggle }, said),
+      drawn, failed,
+      h('button', { type: 'button', class: 'q-save q-word q-edit-toggle', title: editing ? 'Done editing the query' : 'Edit the query: what it finds, leaves out and walks along', 'aria-expanded': String(editing), onclick: toggle }, editing ? 'Done' : 'Edit')),
+    h('div', { class: 'q-edit', role: 'group', 'aria-label': 'Edit the query', hidden: !editing, onkeydown: (ev) => ev.key === 'Escape' && toggle() },
       part('q-filter', 'Filter', 'What it finds is drawn', filterTerms, (a) => addToFilter(a), 'Add to the filter'),
       part('q-left', 'Left out', 'Left out of everything, what the walk reaches included', leftTerms, (a) => leaveOut(a), 'Leave something out'),
       part('q-walk-part', 'Walk', 'From what the filter finds, along these links either way', walkTerms, (a) => walkAlong(a), 'Walk along a link',
-        walking && h('span', { class: 'q-label', title: 'How many steps the walk takes' }, 'Steps'),
+        walking && h('span', { class: 'q-label q-sub', title: 'How many steps the walk takes' }, 'Steps'),
         walking && h('span', { class: 'switch q-steps', title: 'How many steps the walk takes' },
           h('button', { type: 'button', title: 'One step fewer', disabled: steps <= 1, onclick: () => walk({ steps: steps - 1 }) }, '−'),
           h('button', { type: 'button', class: 'on', title: 'Steps' }, String(steps)),
           h('button', { type: 'button', title: 'One step more', onclick: () => walk({ steps: steps + 1 }) }, '+'))),
-      h('span', { class: 'q-part', title: 'The limit: the most items drawn' },
+      h('div', { class: 'q-part', title: 'The limit: the most items drawn' },
         h('span', { class: 'q-label', title: 'The most items drawn' }, 'Limit'),
-        h('input', { class: 'q-limit', inputmode: 'numeric', value: lens.limit ?? answer?.lens?.limit ?? '', size: String(lens.limit ?? answer?.lens?.limit ?? '').length || 1, 'aria-label': 'The most items drawn', title: 'The most items drawn', onchange: (ev) => Number(ev.target.value) >= 1 && go({ ...lens, limit: Math.round(Number(ev.target.value)) }) }),
-        answer && h('span', { class: `q-count${answer.cut ? ' cut' : ''}`, title: answer.cut ? 'The limit cut what the lens finds' : 'Items drawn' }, `${answer.items.length}${answer.cut ? '+' : ''} drawn`),
-        view?.failed && h('span', { class: 'q-count cut', title: view.failed }, '!'),
-      ),
+        h('span', { class: 'q-terms' },
+          h('input', { class: 'q-limit', inputmode: 'numeric', value: limit, size: String(limit).length || 1, 'aria-label': 'The most items drawn', title: 'The most items drawn', onchange: (ev) => Number(ev.target.value) >= 1 && go({ ...lens, limit: Math.round(Number(ev.target.value)) }) }),
+          drawn && drawn.cloneNode(true))),
     ),
   );
   bar.hidden = !filled;
+  fitRows();
 }
+
+/** Each row of the editor shows as many of its terms as it has room for, and how many more: drawn again as the bar's width changes. */
+function fitRows() {
+  for (const row of bar.querySelectorAll('.q-edit > .q-part')) {
+    const box = row.querySelector('.q-terms');
+    const more = box.querySelector(':scope > .q-more');
+    if (!more) continue;
+    const terms = [...box.querySelectorAll(':scope > .q-term')];
+    for (const t of terms) t.hidden = false;
+    more.hidden = true;
+    let shown = terms.length;
+    while (shown > 1 && box.scrollWidth > box.clientWidth + 1) {
+      terms[--shown].hidden = true;
+      const rest = terms.slice(shown);
+      Object.assign(more, { hidden: false, textContent: `+${rest.length} more`, title: rest.map((t) => t.dataset.said).join(' · ') });
+      more.setAttribute('aria-label', `${rest.length} more`);
+    }
+  }
+}
+if (bar) new ResizeObserver(fitRows).observe(bar);

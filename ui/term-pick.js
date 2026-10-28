@@ -14,7 +14,7 @@ document.body.append(menu);
  * whether they were taken. `held` (optional) lists what the part holds, each { label, title, open, drop }, drawn first.
  */
 export function pickTerm(anchor, { label, groups = [], typed, held }) {
-  const field = (typed || groups.some((g) => g.items.length > 8)) && h('input', { type: 'search', class: 'term-pick-field', placeholder: typed?.placeholder ?? 'Find a choice', title: typed?.title ?? '', 'aria-label': label, autocomplete: 'off' });
+  const field = (typed || groups.some((g) => g.items.length > 8)) ? h('input', { type: 'search', class: 'term-pick-field', placeholder: typed?.placeholder ?? 'Find a choice', title: typed?.title ?? '', 'aria-label': label, autocomplete: 'off' }) : null;
   const list = h('div', { class: 'term-pick-list' });
   const close = () => menu.hidePopover();
   const take = (item) => (close(), item.pick());

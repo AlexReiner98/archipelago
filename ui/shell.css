@@ -84,25 +84,33 @@ body { --band: calc(var(--box-9) + 2 * var(--space-4)); --strip: calc(var(--box-
 .term-pick-x:hover { color: var(--text); }
 #nav .brand { flex: none; font-family: var(--type-wordmark-family); font-weight: var(--type-wordmark-weight); font-style: var(--type-wordmark-style); text-transform: var(--type-wordmark-case); letter-spacing: var(--type-wordmark-track); font-size: var(--text-7); color: var(--text); text-decoration: none; padding: 0 var(--space-3); }
 #nav .brand .workspace-name { display: none; }
-/* The query bar (ui/query-bar.js): the canvas's lens on one line under the top bar, its terms as chips; what does not fit scrolls along it. */
 /* Under the tabs, two bands, each the width of the pane: the view, in the panel's colour and joined to the tab in sight
    (or the strip of the pane in focus), with the canvas up and what is done with it; then the query, in the page's
-   colour. No box holds another (rule e_vgs9vt5j): the filter, the walk and the limit are parts of the query's band set
-   apart by a line, and each term is its words and its ×, with no shape of its own. */
+   colour, in one line, with its editor under it when open. No box holds another (rule e_vgs9vt5j): the filter, the walk
+   and the limit are rows of the editor set apart by a line, and each term is its words and its ×, with no shape of its own. */
 #query { position: fixed; z-index: 2; top: var(--active-top, 0%); left: var(--active-left, 0%); right: var(--active-right, 0%); display: flex; flex-direction: column; white-space: nowrap; pointer-events: none; }
 #query[hidden] { display: none; }
 body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--sheet), 50%)); }
 #query .q-view { pointer-events: auto; display: flex; align-items: center; box-sizing: border-box; height: var(--strip); padding: 0 var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); }
-#query .q-view > .q-canvas { padding: 0; background: none; border: 0; border-radius: 0; }
-#query .q-lens { pointer-events: auto; display: flex; align-items: stretch; box-sizing: border-box; height: var(--box-9); padding: 0 var(--space-5); background: var(--bg); border-bottom: var(--border-1) solid var(--line); overflow-x: auto; scrollbar-width: none; font-size: var(--text-4); }
-#query .q-part { flex: none; display: inline-flex; align-items: center; gap: var(--space-6); padding: 0 var(--space-8); }
+#query .q-view > .q-canvas { display: inline-flex; align-items: center; gap: var(--space-6); padding: 0; background: none; border: 0; border-radius: 0; }
+#query .q-lens { pointer-events: auto; display: flex; align-items: center; gap: var(--space-5); box-sizing: border-box; height: var(--box-9); padding: 0 var(--space-5); background: var(--bg); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-4); }
+#query .q-sum { flex: 0 1 auto; min-width: 0; margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: pre; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+#query .q-sum:hover { text-decoration: underline; text-underline-offset: var(--space-3); }
+#query .q-lens > .q-count { flex: none; }
+/* Edit: a row for each part under the line, the width of the view, its word in a column of its own and its terms after it, as many as fit (ui/query-bar.js fitRows). */
+#query .q-edit { pointer-events: auto; display: grid; grid-template-columns: max-content minmax(0, 1fr); box-sizing: border-box; padding: 0 var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-4); }
+#query .q-edit[hidden] { display: none; }
+#query .q-edit > .q-part { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: var(--box-9); }
+#query .q-edit > .q-part + .q-part { border-top: var(--border-1) solid var(--line); }
+#query .q-edit > .q-part > .q-label { padding-right: var(--space-8); }
+#query .q-terms { display: flex; align-items: center; gap: var(--space-6); min-width: 0; overflow: hidden; }
+#query .q-terms > [hidden] { display: none; }
 #query .q-label { flex: none; color: var(--muted); font-size: var(--text-2); text-transform: uppercase; letter-spacing: var(--track-2); }
+#query .q-label.q-sub { margin-left: var(--space-6); }
 /* Each part's own +, and how many more it holds than are in sight: a mark that opens its menu. */
 #query .q-add, #query .q-more { flex: none; border: 0; background: none; padding: var(--space-2) var(--space-4); border-radius: var(--radius-2); font: inherit; color: var(--accent); cursor: pointer; }
 #query .q-add { font-size: var(--text-6); line-height: 1; }
 #query .q-add:hover, #query .q-more:hover { background: var(--accent-soft); }
-#query .q-lens > .q-part:first-of-type { padding-left: 0; }
-#query .q-lens > .q-part + .q-part { border-left: var(--border-1) solid var(--line); }
 #query .q-term { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text); }
 #query .q-term.q-out { color: var(--muted); }
 #query .q-term.q-narrow { color: var(--accent); }
