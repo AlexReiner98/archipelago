@@ -93,7 +93,9 @@ function nameOfTab(t) {
   }
   if (/^e_[a-z0-9]{8}$/.test(id)) return { name: titles.get(id) ?? '…' };
   const lens = id ? readFlatLens(id.split('?')[1] ?? '').lens : null;
-  return { name: (lens && filterSaid(lens.filter, drawStrip)) || 'Home' };
+  // Named by what it finds but its types, which say little of a tab; by its types only when it has nothing else.
+  const { types, ...rest } = lens?.filter ?? {};
+  return { name: (lens && (filterSaid(rest, drawStrip) || filterSaid(lens.filter, drawStrip))) || 'Home' };
 }
 /** The items a tab is named by whose titles were asked for, once each. */
 const asked = new Set();
