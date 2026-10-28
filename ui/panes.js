@@ -55,7 +55,7 @@ function paneEl(id) {
   const button = (title, mark, onclick) => h('button', { type: 'button', class: 'pane-act', title, 'aria-label': title, onclick }, mark);
   // Its controls stand in its strip in focus or not: in focus, the query bar takes the name's place between them.
   const grip = h('span', { class: 'pane-act pane-grip', title: 'Drag to dock it elsewhere', 'aria-label': 'Move this pane' }, '⠿');
-  const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, grip, name, mark, button('Keep only this pane', '⤢', () => only(id)), button('Close this pane', '×', () => close(id))), body);
+  const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, grip, name, mark, button('Close this pane', '×', () => close(id))), body);
   for (const handle of [grip, name]) handle.addEventListener('pointerdown', (ev) => dragPane(ev, id, el, { groups: groupEls, drop }));
   const entry = { el, body, name, mark, view: null, at: null, back: [], forth: [] };
   drawn.set(id, entry);
@@ -155,13 +155,13 @@ function frameActive() {
     e.mark.hidden = !e.mark.textContent;
   }
 }
-/** The main pane's strip, the same as every docked pane's: its ⠿, its name, ⤢ and ×. */
+/** The main pane's strip, the same as every docked pane's: its ⠿, its name and ×. */
 const mainBar = (() => {
   const button = (title, mark, onclick) => h('button', { type: 'button', class: 'pane-act', title, 'aria-label': title, onclick }, mark);
   const grip = h('span', { class: 'pane-act pane-grip', title: 'Drag to dock it elsewhere', 'aria-label': 'Move this pane' }, '⠿');
   const name = h('span', { class: 'pane-name', title: 'Drag to dock it elsewhere' }, 'Canvas');
   const mark = h('span', { class: 'pane-follows', hidden: true });
-  const el = document.body.appendChild(h('header', { id: 'main-name', class: 'pane-bar', hidden: true }, grip, name, mark, button('Keep only this pane', '⤢', () => only('main')), button('Close this pane', '×', () => close('main'))));
+  const el = document.body.appendChild(h('header', { id: 'main-name', class: 'pane-bar', hidden: true }, grip, name, mark, button('Close this pane', '×', () => close('main'))));
   for (const handle of [grip, name]) handle.addEventListener('pointerdown', (ev) => dragPane(ev, 'main', document.getElementById('canvas'), { groups: groupEls, drop }));
   return { el, name, mark };
 })();
@@ -297,11 +297,6 @@ export function close(id) {
   even();
   keep();
   draw();
-}
-/** Only this pane in the tab in sight: what it draws on the main canvas, the others closed. */
-function only(id) {
-  if (id !== 'main') toMain(id);
-  alone();
 }
 /** Only the main pane, in the tab in sight. */
 export function alone() {

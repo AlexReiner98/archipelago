@@ -337,10 +337,10 @@ body:has(#canvas.pane-active) #main-name { box-shadow: inset 0 var(--border-2, v
    bar fills the strip of the pane it acts on, and the others show their names there. The main pane's strip is the same
    as a docked one's (#main-name), so no pane is special but in which canvas the address draws. */
 #panes .pane-bar, #main-name { box-sizing: border-box; height: var(--strip); padding-top: 0; padding-bottom: 0; }
-/* In focus, the bar takes the place of the pane's name, between its ⠿ and its ⤢ ×, which stay where they are. */
+/* In focus, the bar takes the place of the pane's name, between its ⠿ and its ×, which stay where they are. */
 #panes > .pane.pane-active > .pane-bar > .pane-name, #panes > .pane.pane-active > .pane-bar > .pane-follows, body:has(#canvas.pane-active) #main-name > :is(.pane-name, .pane-follows) { visibility: hidden; }
 .pane-bar .pane-grip { cursor: grab; user-select: none; touch-action: none; }
-body[data-active="pane"] #query .q-view, body:has(#canvas.pane-active) #query .q-view { margin: 0 calc(var(--space-5) + 2 * var(--box-7) + 2 * var(--space-3)) 0 calc(var(--space-5) + var(--box-7) + var(--space-3)); padding: 0; background: none; border: 0; }
+body[data-active="pane"] #query .q-view, body:has(#canvas.pane-active) #query .q-view { margin: 0 calc(var(--space-5) + var(--box-7) + var(--space-3)); padding: 0; background: none; border: 0; }
 #panes > .pane-sash.row { top: var(--band, 0%); }
 #main-name { position: fixed; z-index: 1; top: var(--main-top, 0%); left: var(--main-left, 0%); right: var(--main-right, 0%); }
 #main-name[hidden] { display: none; }

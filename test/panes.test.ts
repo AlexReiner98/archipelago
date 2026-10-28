@@ -96,14 +96,9 @@ test('in a browser, a show opens a canvas in a pane beside the main one, both ke
     const split = () => page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
     await split();
     await until('a pane again', async () => (await panes()).length === 1);
-    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#main-name [aria-label]')].map((b) => b.getAttribute('aria-label'))`), ['Move this pane', 'Keep only this pane', 'Close this pane'], 'the main pane has the same controls');
+    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#main-name [aria-label]')].map((b) => b.getAttribute('aria-label'))`), ['Move this pane', 'Close this pane'], 'the main pane has the same controls');
     await page.evaluate(`document.querySelector('#main-name [aria-label="Close this pane"]').click()`);
     await until('the main pane closed, the other in its place', async () => (await panes()).length === 0 && (await page.evaluate<boolean>(`document.querySelector('#canvas svg')?.textContent.includes('First step, renamed') ?? false`)));
-    // ⤢ keeps only the pane it is on.
-    await split();
-    await until('a pane once more', async () => (await panes()).length === 1);
-    await page.evaluate(`document.querySelector('.pane [aria-label="Keep only this pane"]').click()`);
-    await until('only that pane, drawn as the main canvas', async () => (await panes()).length === 0 && (await page.evaluate<boolean>(`document.querySelector('#canvas svg')?.textContent.includes('First step, renamed') ?? false`)));
   } finally {
     page.close();
   }
