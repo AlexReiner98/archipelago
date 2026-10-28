@@ -18,11 +18,11 @@ export interface LinkTerm {
 }
 
 /** Which term of the filter found an item: its words, a type, an id named, a link term. */
-export type Found = 'text' | 'type' | 'id' | 'link';
+export type Found = 'text' | 'type' | 'id' | 'link' | 'in';
 
 export interface FlatLens {
   /** What picks the seeds: any item any of these finds. */
-  include: { text?: string[]; types?: string[]; ids?: string[]; links?: LinkTerm[] };
+  include: { text?: string[]; types?: string[]; ids?: string[]; links?: LinkTerm[]; in?: string[] };
   /** What must all hold of a seed as well: one of these types (flavours too), and part of each of these items, however far down. */
   narrow: { only?: string[]; within?: string[] };
   /** What is left out of everything: closed, system, or a type (its flavours too). */
@@ -61,13 +61,14 @@ function readTerm(l: Archipelago, term: unknown): LinkTerm {
 /** The flat lens asked for, each field checked. A filter that includes nothing is refused: never the whole map. */
 export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLens {
   const filter = (input.filter ?? {}) as Record<string, unknown>;
-  if (typeof filter !== 'object' || Array.isArray(filter)) throw new Error('filter must be an object: { text, types, ids, links, only, within, exclude }');
+  if (typeof filter !== 'object' || Array.isArray(filter)) throw new Error('filter must be an object: { text, types, ids, links, in, only, within, exclude }');
   const include: FlatLens['include'] = {};
   // Words: one set, or several (each its own term, as Shift+Enter in the find bar adds one, e_e3k797d3).
   const words = [...new Set((Array.isArray(filter.text) ? filter.text : [filter.text]).filter((w) => w != null).map((w) => String(w).trim()).filter(Boolean))];
   if (words.length) include.text = words;
   if (filter.types !== undefined) include.types = names(filter.types, 'filter.types');
   if (filter.ids !== undefined) include.ids = names(filter.ids, 'filter.ids');
+  if (filter.in !== undefined && (filter.in as unknown[]).length !== 0) include.in = names(filter.in, 'filter.in');
   if (filter.links !== undefined) {
     if (!Array.isArray(filter.links)) throw new Error('filter.links must be a list of link terms');
     include.links = filter.links.map((t) => readTerm(l, t));
@@ -77,10 +78,10 @@ export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLe
   if (filter.only !== undefined && (filter.only as unknown[]).length !== 0) narrow.only = names(filter.only, 'filter.only');
   if (filter.within !== undefined && (filter.within as unknown[]).length !== 0) narrow.within = names(filter.within, 'filter.within');
   for (const type of narrow.only ?? []) if (!l.registry.types.has(l.registry.canonical(type))) throw new Error(`filter.only: unknown type "${type}"`);
-  if (!include.text?.length && !include.types?.length && !include.ids?.length && !include.links?.length)
+  if (!include.text?.length && !include.types?.length && !include.ids?.length && !include.links?.length && !include.in?.length)
     throw new Error(narrow.only || narrow.within
-      ? 'A lens includes something (filter: text, types, ids or links) for only and within to narrow: they narrow what the filter includes, and alone would read the whole map.'
-      : 'A lens includes something (filter: text, types, ids or links): a filter that includes nothing would read the whole map.');
+      ? 'A lens includes something (filter: text, types, ids, links or in) for only and within to narrow: they narrow what the filter includes, and alone would read the whole map.'
+      : 'A lens includes something (filter: text, types, ids, links or in): a filter that includes nothing would read the whole map.');
   const exclude = filter.exclude === undefined ? EXCLUDE_DEFAULT : names(filter.exclude, 'filter.exclude');
   for (const x of exclude) if (x !== 'closed' && x !== SYSTEM && !l.registry.types.has(l.registry.canonical(x))) throw new Error(`filter.exclude: "${x}" is not closed, system or a type`);
   const walkIn = (input.walk ?? {}) as Record<string, unknown>;
@@ -143,7 +144,8 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
     return rows.map((r) => r.id);
   };
 
-  // The seeds, each narrowed: ids first, then what a link term finds, what the text finds, the newest of each type named.
+  // The seeds, each narrowed: ids first, then what a link term finds, what is in an item, what the text finds, the
+  // newest of each type named.
   const { ids, links, text, types } = lens.include;
   // An item named by id is always drawn: Not leaves out only what other terms find and what the walk reaches
   // (decision e_yasbwj45), and Only still narrows it.
@@ -156,6 +158,10 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
     const [near, far] = term.to !== undefined ? ['from_id', 'to_id'] : ['to_id', 'from_id'];
     add(await seed((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), room()]), 'link');
   }
+  // What is in an item, at any depth, read from the part_of closure (decision e_tvsdqjeq), the newest first; in an item
+  // the viewer cannot see, nothing is.
+  const inside = lens.include.in && (await l.db.query<{ id: string }>('select id from entity where id = any($1::text[]) and archived_at is null', [lens.include.in])).rows.map((r) => r.id);
+  if (inside?.length && room() > 0) add(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [inside, room()]), 'in');
   // The text is the search read's own (src/search.ts): the words in any form in the title or note, or as typed anywhere
   // in the title, the best match first; only when that finds nothing, titles with a word close to what was typed.
   // How many it found in all is kept (`matched`), counted over what the viewer may see and the filter keeps.

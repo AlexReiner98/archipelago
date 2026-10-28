@@ -60,7 +60,7 @@ function nameOf(id, redraw) {
   return '…';
 }
 
-/** What a term written in the box is: `-x` leaves x out, `only <type>` and `within <id>` narrow, an id is an item, `#name` a tag, `<link> <end>` a link, a type by its name, else text. */
+/** What a term written in the box is: `-x` leaves x out, `only <type>` and `within <id>` narrow, an id is an item, `in <id>` what is in it, `#name` a tag, `<link> <end>` a link, a type by its name, else text. */
 function termOf(written) {
   const s = written.trim();
   if (!s) return null;
@@ -74,6 +74,7 @@ function termOf(written) {
   const [, first, rest] = /^(\S+)\s+(.+)$/.exec(s) ?? [];
   if (first?.toLowerCase() === 'only') return typeNamed(rest.trim()) ? { only: typeNamed(rest.trim()) } : null;
   if (first?.toLowerCase() === 'within') return isId(rest.trim()) ? { within: rest.trim() } : null;
+  if (first?.toLowerCase() === 'in' && isId(rest.trim())) return { in: rest.trim() };
   if (first && linkNamed(first)) return { link: `${linkNamed(first)} ${rest.trim()}` };
   if (typeNamed(s)) return { type: typeNamed(s) };
   return { text: s };
@@ -86,6 +87,7 @@ function added(lens, term) {
   if (term.type) f.types = [...new Set([...(f.types ?? []), term.type])];
   if (term.id) f.ids = [...new Set([...(f.ids ?? []), term.id])];
   if (term.link) f.links = [...new Set([...(f.links ?? []), term.link])];
+  if (term.in) f.in = [...new Set([...(f.in ?? []), term.in])];
   if (term.only) f.only = [...new Set([...(f.only ?? []), term.only])];
   if (term.within) f.within = [...new Set([...(f.within ?? []), term.within])];
   if (term.exclude) f.exclude = [...new Set([...(f.exclude ?? ['system']), term.exclude])];
@@ -130,6 +132,7 @@ export function filterSaid(f, redraw) {
     some(tags, (t) => termWords(t, redraw), (l) => `${termWords(l[0], redraw)} +${l.length - 1}`),
     ...[...linkGroups(f.links ?? []).values()].map((l) => `${termWords(l[0], redraw)}${l.length > 1 ? ` +${l.length - 1}` : ''}`),
     some(f.ids, (id) => nameOf(id, redraw), (l) => `${l.length} items`),
+    some(f.in, (id) => `in ${nameOf(id, redraw)}`, (l) => `in ${l.length} items`),
     some(f.only, (t) => `only ${typeTitle(t)}`, (l) => `only ${l.length} types`),
     some(f.within, (id) => `within ${nameOf(id, redraw)}`, (l) => `within ${l.length} items`),
   ].filter(Boolean).join(' · ');
@@ -145,8 +148,8 @@ export function drawQuery(lens, view, go, lead) {
   if (answer) lookAround(lens, answer);
   const here = uses(answer?.items, answer?.links);
   const exclude = f.exclude ?? ['system'];
-  const filled = (wordsOf(lens.filter).length || lens.filter.types?.length || lens.filter.ids?.length || lens.filter.links?.length);
-  const includes = [wordsOf(f).length, f.types?.length ?? 0, f.ids?.length ?? 0, f.links?.length ?? 0].reduce((a, b) => a + b, 0);
+  const includes = [wordsOf(f).length, f.types?.length ?? 0, f.ids?.length ?? 0, f.links?.length ?? 0, f.in?.length ?? 0].reduce((a, b) => a + b, 0);
+  const filled = includes > 0;
   /** The lens with term `field` `value` taken out, when one is being changed; else as it is. */
   const but = (field, value) => (field ? without(lens, field, value) : lens);
   /** A term: its words, a click to change it in its part's menu, an × to take it away. The last term the filter includes is not taken away: a lens includes something. */
@@ -163,13 +166,13 @@ export function drawQuery(lens, view, go, lead) {
     };
   };
   const typeChoices = () => [...types.values()].filter((t) => !t.system && t.kind !== 'system');
-  // What Find adds: words, a type, #tag, a link and its end, an item id (or, typed, only a type or within an item).
+  // What Find adds: words, a type, #tag, a link and its end, an item id, what is in an item (or, typed, only a type or within an item).
   const addToFilter = (anchor, field, value) => pickTerm(anchor, {
     label: 'Find',
     groups: groupsOf(ranked(typeChoices(), here.types, near.uses?.types), (t) => ({ label: t.title, title: 'Items of this type, the newest first', pick: () => go(added(but(field, value), { type: t.id })) })),
     typed: {
-      placeholder: 'Words, a type, #tag…',
-      title: 'Words to find; a type; #tag; a link and its end (waits_on me); an item id',
+      placeholder: 'Words, a type, #tag, in e_…',
+      title: 'Words to find; a type; #tag; a link and its end (waits_on me); an item id; in and an item id, for all that is in it',
       pick: (written) => {
         const t = termOf(written);
         if (t) go(added(but(field, value), t));
@@ -219,6 +222,7 @@ export function drawQuery(lens, view, go, lead) {
     ...(f.links ?? []).filter((t) => t.startsWith('tagged ')).map((t) => term('q-tag', termWords(t, redraw), 'Items with this tag', 'links', t, addToFilter)),
     ...(f.links ?? []).filter((t) => !t.startsWith('tagged ')).map((t) => term('q-link', termWords(t, redraw), `Items with this link: ${termWords(t, redraw)}`, 'links', t, addToFilter)),
     ...(f.ids ?? []).map((id) => term('q-id', nameOf(id, redraw), 'This item', 'ids', id, addToFilter)),
+    ...(f.in ?? []).map((id) => term('q-in', `in ${nameOf(id, redraw)}`, 'All that is in this item, at any depth', 'in', id, addToFilter)),
   ].filter(Boolean);
   const onlyTerms = [
     ...(f.only ?? []).map((t) => term('q-narrow', typeTitle(t), 'Only what is of this type, of what Find finds', 'only', t, narrowTo)),

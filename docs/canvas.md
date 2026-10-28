@@ -31,7 +31,8 @@ never structure. Containment is a projection the server keeps (the
 
 ### 3. The lens is a filter, a walk and a limit, and the only bound
 The filter has two kinds of term. Those that include add seeds, each its
-own (text, types, ids, links such as `tagged e_x`: a union); those that
+own (text, types, ids, links such as `tagged e_x`, `in` an item: all that
+is part of it at any depth, from the part_of closure; a union); those that
 narrow must all hold of a seed (an AND: `only`, types; `within`, items it
 is part of at any depth, read from the part_of closure). What it
 excludes applies to everything the walk reaches, never to an item named
@@ -46,6 +47,8 @@ whole map. Search is the filter's text; tags are a core `tag` type and a
   cut"; "the text is the search read"; "narrowing: only and within must all
   hold of every seed, not of what the walk reaches"; "an item named by id is
   drawn whatever Not says, and the walk from it still keeps Not".
+- `test/lens-terms.test.ts`: "Find in an item: all that is part of it at any
+  depth, of any type, not the item itself".
 - `test/find-lens.test.ts`: "in a browser, the find bar sets the text of the
   canvas lens".
 

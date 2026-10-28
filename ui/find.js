@@ -16,7 +16,7 @@ const input = h('input', { type: 'search', name: 'q', placeholder: 'Find on the 
 let asked = 0;
 
 const lensUp = () => lensNow() ?? home();
-const includes = (f) => Boolean(wordsOf(f).length || f.types?.length || f.ids?.length || f.links?.length);
+const includes = (f) => Boolean(wordsOf(f).length || f.types?.length || f.ids?.length || f.links?.length || f.in?.length);
 /** Draw the lens with these words in place of the words it had, the rest kept; or (`add`) as one more set of words. */
 function drawText(q, add = false) {
   peek.hidden = true;

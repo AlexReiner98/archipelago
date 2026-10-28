@@ -52,8 +52,8 @@ export async function keptPicture(l: Archipelago, id: string, have?: unknown) {
   // It starts from what it is about, where it draws that; else from the one item it names (as the lens's from was).
   const { rows } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'about' and from_id = $1 and valid_to is null order by id`, [id]);
   const ids = list((lens.filter as Props).ids);
-  // Or what it draws what is in: the items it is narrowed within, and the ends of its link terms.
-  const ends = [...list((lens.filter as Props).within), ...list((lens.filter as Props).links).map((t) => t.split(/\s+/).slice(1).join(' '))];
+  // Or what it draws what is in: the items it finds in or is narrowed within, and the ends of its link terms.
+  const ends = [...list((lens.filter as Props).in), ...list((lens.filter as Props).within), ...list((lens.filter as Props).links).map((t) => t.split(/\s+/).slice(1).join(' '))];
   const from = rows.map((r) => r.to_id).find((x) => ids.includes(x) || ends.includes(x)) ?? (ids.length === 1 ? ids[0] : undefined);
   return { ...answer, lens: { ...answer.lens, ...(from && { from }) }, ...(steps && { steps }), style: await drawn(l, style, have ?? []) };
 }

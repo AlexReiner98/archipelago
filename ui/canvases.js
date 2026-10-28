@@ -56,9 +56,9 @@ export function keptView(id, { key = `kept:${id}`, style = {} } = {}) {
       const steps = Array.isArray(got.entity.props?.steps) ? got.entity.props.steps : undefined;
       const told = (steps ?? []).flatMap((s) => [...(s.add ?? []), ...(s.remove ?? []), ...Object.keys(s.titles ?? {}), ...Object.keys(s.fields ?? {}), ...Object.keys(s.flag ?? {})]);
       if (told.length) kept.lens.filter.ids = [...new Set([...(kept.lens.filter.ids ?? []), ...told])];
-      // It starts from what it is about, where it draws that or what is in it (within it, or the end of a link term); else from the one item it names.
+      // It starts from what it is about, where it draws that or what is in it (in it, within it, or the end of a link term); else from the one item it names.
       const ids = kept.lens.filter.ids ?? [];
-      const ends = [...(kept.lens.filter.within ?? []), ...(kept.lens.filter.links ?? []).map((t) => (typeof t === 'string' ? t.split(/\s+/).slice(1).join(' ') : t.to))];
+      const ends = [...(kept.lens.filter.in ?? []), ...(kept.lens.filter.within ?? []), ...(kept.lens.filter.links ?? []).map((t) => (typeof t === 'string' ? t.split(/\s+/).slice(1).join(' ') : t.to))];
       const from = ids.includes(of) || ends.includes(of) ? of : ids.length === 1 ? ids[0] : true;
       const view = flatView({ lens: kept.lens, style: { ...kept.style, ...style }, of, key, nest: from, ...(steps && { extra: { steps } }) });
       Object.defineProperty(host, 'answer', { get: () => view.answer, configurable: true });
