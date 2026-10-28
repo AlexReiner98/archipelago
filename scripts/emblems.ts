@@ -8,8 +8,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { open } from '../test/browser.ts';
 
 const SKETCH = process.env.SKETCH ?? 'http://localhost:3210/ridges/';
-/** The size it is drawn at, in pixels, before the page's scale. */
-const SIZE = 64;
+/** The size it is drawn at, in pixels, and the page's scale: shown at 64 (emblem_size), its empty margin then cut away. */
+const SIZE = 128;
+const SCALE = 1.5;
 /** Each style's place in the sketch, every one its own. */
 const PLACES: Record<string, string> = {
   'core.house': 'arctic',
@@ -31,7 +32,7 @@ const GROUND = '#161614';
 const presets = readFileSync(new URL('../sketches/ridges/presets-backup-2026-10-26.json', import.meta.url), 'utf8');
 const page = await open(SKETCH);
 try {
-  await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 2, mobile: false });
+  await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: SCALE, mobile: false });
   await page.evaluate(`localStorage.setItem('archipelago-ridges-presets', JSON.stringify(${presets}.presets))`);
   await page.go(SKETCH);
   const drawn = async (place: string) =>
@@ -48,8 +49,15 @@ try {
       document.querySelector('[data-ground="${GROUND}"]').click();
       await new Promise((r) => setTimeout(r, 600));
       CanvasRenderingContext2D.prototype.fillRect = fill;
-      const c = [...document.querySelectorAll('#sizes canvas')].find((c) => c.width === ${SIZE * 2});
-      return c.toDataURL('image/png');
+      const c = [...document.querySelectorAll('#sizes canvas')].find((c) => c.width === ${SIZE * SCALE});
+      // Its empty margin cut away: the smallest square round what is drawn, so the emblem fills where it is shown.
+      const { data } = c.getContext('2d').getImageData(0, 0, c.width, c.height);
+      let [x0, y0, x1, y1] = [c.width, c.height, 0, 0];
+      for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (data[(y * c.width + x) * 4 + 3] > 8) [x0, y0, x1, y1] = [Math.min(x0, x), Math.min(y0, y), Math.max(x1, x), Math.max(y1, y)];
+      const side = Math.max(x1 - x0, y1 - y0) + 1, out = document.createElement('canvas');
+      out.width = out.height = side;
+      out.getContext('2d').drawImage(c, x0, y0, x1 - x0 + 1, y1 - y0 + 1, (side - (x1 - x0 + 1)) / 2, (side - (y1 - y0 + 1)) / 2, x1 - x0 + 1, y1 - y0 + 1);
+      return out.toDataURL('image/png');
     })()`);
   // Put in each pack's file in place, its other lines kept as they are: a theme's props stand on one line after its
   // id, the house style's one field a line.

@@ -29,12 +29,12 @@ option, optgroup { background: var(--panel); color: var(--text); }
 #canvas .lens-view > .empty, #canvas .lens-view > .error, #canvas .lens-view > .lens-error { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
 
 /* The bar: where the canvas stands, what waits for you, and the menu. */
-#nav { position: fixed; z-index: 5; top: var(--space-4); left: var(--space-9); right: var(--space-9); height: var(--box-9); display: flex; align-items: center; gap: var(--space-5); min-width: 0; pointer-events: none; }
+#nav { position: fixed; z-index: 5; top: var(--space-4); left: var(--space-9); right: var(--space-9); height: calc(var(--band) - 2 * var(--space-4)); display: flex; align-items: center; gap: var(--space-5); min-width: 0; pointer-events: none; }
 #nav > * { pointer-events: auto; }
 /* The bar runs across the page over the sheet, one pane or several: the sheet opens under it (the owner, 27 Oct 2026). */
 /* One layout for one pane or several: the bar in a band across the top, over the sheet, and every pane under it with
    its strip, so nothing moves or changes width when a tab is split. */
-body { --band: calc(var(--box-9) + 2 * var(--space-4)); --strip: calc(var(--box-9) + 2 * var(--space-3)); }
+body { --band: calc(max(var(--box-9), var(--emblem-size, var(--box-9))) + 2 * var(--space-4)); --strip: calc(var(--box-9) + 2 * var(--space-3)); }
 /* The lines of the frame are one system: a line under the tabs across the page, the tab in sight standing on it in the
    panel's colour; a line under each band; one line between two panes, which is what is dragged and lights when it is
    (ui/panes.js). Nothing draws a border of its own around a view. */
@@ -44,7 +44,7 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
    They stand on one line across the bar, square below and rounded above; the one in sight is raised in the panel's
    colour over that line, its top in the accent or its session's hue. No tab changes its size or controls when another
    comes into sight. */
-#tabs { align-self: stretch; display: flex; align-items: flex-end; gap: var(--space-1); min-width: 0; margin-bottom: calc(var(--box-9) + var(--space-4) - var(--band)); padding: 0 var(--space-3); overflow-x: auto; scrollbar-width: none; }
+#tabs { align-self: stretch; display: flex; align-items: flex-end; gap: var(--space-1); min-width: 0; margin-bottom: calc(-1 * var(--space-4)); padding: 0 var(--space-3); overflow-x: auto; scrollbar-width: none; }
 #tabs > .tab { pointer-events: auto; flex: 0 1 auto; max-width: 40%; min-width: calc(var(--box-8) + 2 * var(--box-7) + var(--space-6)); box-sizing: border-box; display: inline-flex; align-items: center; gap: 0; height: var(--box-8); padding: 0 var(--space-1) 0 var(--space-6); background: none; border: var(--border-1) solid transparent; border-bottom: 0; border-radius: var(--radius-3) var(--radius-3) 0 0; color: var(--muted); font-size: var(--text-5); white-space: nowrap; overflow: hidden; cursor: pointer; user-select: none; touch-action: none; }
 #tabs > .tab:hover { color: var(--text); background: var(--accent-soft); }
 #tabs > .tab[aria-selected="true"] { color: var(--text); background: var(--panel); border-color: var(--line); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
@@ -52,7 +52,7 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 #tabs > .tab[data-unseen] { color: var(--text); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
 #tabs > .tab.tab-shown { animation: tab-shown 1.2s ease 2; }
 @keyframes tab-shown { 50% { background: var(--accent-soft); } }
-#tabs .tab-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#tabs .tab-name { min-width: 0; margin-right: var(--space-5); overflow: hidden; text-overflow: ellipsis; }
 #tabs .tab-name.who-session::before { margin-right: var(--space-3); }
 #tabs > .tab[data-follows="none"] .tab-name { font-style: italic; }
 /* Every control on the strip, in the bar and on a pane is a button a finger finds: a square of one size, its mark large enough to read. */
@@ -87,7 +87,7 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 .term-pick-x { flex: none; border: 0; background: none; padding: var(--space-3) var(--space-5); color: var(--muted); cursor: pointer; }
 .term-pick-x:hover { color: var(--text); }
 /* The emblem, the theme's own (its style's emblem, ui/theme.js), in place of the name: the name is still what it is called. */
-#nav .brand { flex: none; width: var(--box-9); height: var(--box-9); background: var(--emblem) center / contain no-repeat; border-radius: var(--radius-2); font-size: 0; color: transparent; text-decoration: none; }
+#nav .brand { flex: none; width: var(--emblem-size, var(--box-9)); height: var(--emblem-size, var(--box-9)); background: var(--emblem) center / contain no-repeat; border-radius: var(--radius-2); font-size: 0; color: transparent; text-decoration: none; }
 #nav .brand > .error { font-size: var(--text-2); }
 #nav .brand .workspace-name { display: none; }
 /* Under the tabs, two bands, each the width of the pane: the view, in the panel's colour and joined to the tab in sight
