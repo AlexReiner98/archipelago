@@ -85,6 +85,7 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     await until('two panes', async () => (await panes()).length === 2);
     await press(1);
     await until('the second is in focus', async () => (await panes())[1][3]);
+    await until('the second draws what the first did', async () => (await draws(1, 'First step, renamed')));
     await find('Second');
     // Find sets the words of the second's lens and keeps the rest of it (e_e3k797d3): what it drew stays, what the words find joins it.
     await until('the second draws what find found', async () => (await draws(1, 'Second step, renamed')) && (await draws(1, 'First step, renamed')) && (await draws(0, 'First step, renamed')) && !(await draws(0, 'Second step')));
