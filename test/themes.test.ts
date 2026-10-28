@@ -72,3 +72,12 @@ test('each theme is chosen, and holds its contrast: text, muted, accent and stat
     if (!light.mark) assert.deepEqual([t.light.accent, t.dark.accent], [light.sea, dark.sea], `${theme.title}'s accent is its sea`);
   }
 });
+
+test('each theme carries its own emblem, a PNG drawn in its place\'s colours, and the house style one too', () => {
+  const png = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/;
+  const emblems = themes.map((t) => (t.props as { emblem?: string }).emblem ?? '');
+  for (const [i, e] of emblems.entries()) assert.match(e, png, `${themes[i].title} has an emblem`);
+  assert.match(styleOf('core', 'core.house').emblem, png, 'the house style has one');
+  const all = [...emblems, styleOf('core', 'core.house').emblem];
+  assert.equal(new Set(all).size, all.length, 'every one its own');
+});

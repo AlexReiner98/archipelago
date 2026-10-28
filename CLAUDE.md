@@ -224,8 +224,12 @@ spatial where it can be):
 - **One word for each idea.** Item, link, kind, type, field, view,
   drawing, pack, change, rule, the map, as `docs/glossary.md` defines them;
   `npm test` refuses the retired words in the UI and the tool text.
-- **A mark for a state.** Status, age, authority and counts are pills, marks
-  and numbers, not sentences.
+- **A mark for a state.** Status, age, authority and counts are marks and
+  numbers, not sentences.
+- **No pills.** Controls and terms are not each wrapped in a capsule, and no
+  box holds more boxes: a group is a band or a row set apart by space and a
+  line, and what is in it is plain text and marks on that surface. Smaller
+  corners do not meet it (the owner, 27 Oct 2026; rule e_vgs9vt5j on the map).
 - **One or two actions in sight.** What is done rarely goes in a `menu`.
 - **Connections are drawn, never listed.** What an item is tied to is a
   wire on the canvas (the flow, by the canvas pack's preset, or a view's own

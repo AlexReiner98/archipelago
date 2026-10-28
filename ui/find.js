@@ -1,7 +1,7 @@
-// Find: a bar at the canvas's foot that sets the seeds of the lens of the pane the bar acts on (decision e_sdsaxxq4:
-// search is the text term of the filter; e_c3g6gwqq: Enter replaces the seeds, + or Shift+Enter adds, a gesture and
-// not a mode). What is found becomes seeds, the walk carries on from them, and it is drawn in place with what it is
-// tied to; what narrows and what is left out stay. Typing shows what the words would find, in one line above the bar
+// Find: a bar at the canvas's foot that sets the text of the lens of the pane the bar acts on (decision e_sdsaxxq4:
+// search is the text term of the filter). Enter sets the words and keeps every other term of the query; Shift+Enter
+// draws only what the words find, the other seeds gone (the owner, 28 Oct 2026, over e_c3g6gwqq). What is found becomes
+// seeds, the walk carries on from them, and it is drawn with what it is tied to; what narrows and what is left out stay. Typing shows what the words would find, in one line above the bar
 // (how many, the first few names); clearing the bar takes the term out. / puts the cursor in it.
 // The search is the flat lens's text term, the search read's own (src/lens-flat.ts): types and what is left out are
 // the query bar's terms, so what it would find is read under the canvas's exclusions.
@@ -18,12 +18,12 @@ let asked = 0;
 
 const lensUp = () => lensNow() ?? home();
 const includes = (f) => Boolean(f.text || f.types?.length || f.ids?.length || f.links?.length);
-/** Draw the lens with these words as its filter's text: in place of what it found (`add` false), or beside it. */
-function drawText(q, add = false) {
+/** Draw the lens with these words as its filter's text, its other terms kept; or (`alone`) the words in place of the other seeds. */
+function drawText(q, alone = false) {
   peek.hidden = true;
   const { only, within, exclude, ...seeds } = lensUp().filter;
   const kept = { ...(only && { only }), ...(within && { within }), ...(exclude && { exclude }) };
-  goLens({ ...lensUp(), filter: add ? { ...seeds, ...kept, text: q } : { ...kept, text: q } });
+  goLens({ ...lensUp(), filter: alone ? { ...kept, text: q } : { ...seeds, ...kept, text: q } });
 }
 /** Take the text out of the canvas's lens; a lens left including nothing is Home (or the open item's own canvas). */
 function takeOut() {
@@ -50,8 +50,8 @@ async function look() {
     said = [
       h('span', { class: 'count', title: 'How many the words find' }, String(found.matched ?? names.length)),
       h('span', { class: 'gist grow', title: names.join('\n') }, names.length ? names.join(' · ') : 'Nothing matches.'),
-      names.length > 0 && h('button', { type: 'button', class: 'quiet-button', title: 'Draw what the words find, in place of what is drawn (Enter)', onclick: () => drawText(q) }, 'Draw'),
-      names.length > 0 && includes(lensUp().filter) && h('button', { type: 'button', class: 'quiet-button', title: 'Add what the words find to what is drawn (Shift+Enter)', 'aria-label': 'Add', onclick: () => drawText(q, true) }, '+'),
+      names.length > 0 && h('button', { type: 'button', class: 'quiet-button', title: 'Draw what the words find, the rest of the query kept (Enter)', onclick: () => drawText(q) }, 'Draw'),
+      names.length > 0 && includes(lensUp().filter) && h('button', { type: 'button', class: 'quiet-button', title: 'Draw only what the words find, in place of what is drawn (Shift+Enter)', onclick: () => drawText(q, true) }, 'Alone'),
       h('button', { type: 'button', class: 'quiet-button', title: `A new item named "${q}"`, onclick: () => ((peek.hidden = true), (location.hash = `#/new/${workType()}?title=${encodeURIComponent(q)}`)) }, 'New'),
     ];
   } catch (err) {
@@ -77,19 +77,22 @@ export function drawFind() {
   });
   // The bar's own × (and Esc in it) empties it: the term goes out of the lens.
   input.addEventListener('search', () => !input.value.trim() && takeOut());
-  // Enter replaces what is drawn; Shift+Enter adds to it. A form's submit does not say Shift, so the key is read here.
-  let adding = false;
-  input.addEventListener('keydown', (ev) => ev.key === 'Enter' && (adding = ev.shiftKey));
+  // Enter keeps the rest of the query; Shift+Enter draws only what the words find. A form's submit does not say Shift, so the key is read here.
+  let alone = false;
+  input.addEventListener('keydown', (ev) => ev.key === 'Enter' && (alone = ev.shiftKey));
   bar.addEventListener('submit', (ev) => {
     ev.preventDefault();
     clearTimeout(wait);
     const q = input.value.trim();
-    q ? drawText(q, adding) : takeOut();
-    adding = false;
+    q ? drawText(q, alone) : takeOut();
+    alone = false;
   });
   bar.replaceChildren(peek, h('div', { class: 'find-row' }, input));
   addEventListener('hashchange', () => setTimeout(keepUp, 0));
-  keepUp();
+  // Another pane or tab in focus: the bar says its lens's text, and what was typed for the last one goes.
+  addEventListener('pane-focus', () => setTimeout(() => ((peek.hidden = true), keepUp()), 0));
+  // The page's first lens is put up just after the bar is drawn (ui/app.js).
+  setTimeout(keepUp, 0);
 }
 
 addEventListener('keydown', (ev) => {

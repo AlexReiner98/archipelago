@@ -7,6 +7,7 @@
 
 import { api, ask, h, hooks, tell } from './base.js';
 import { flatQuery, flatView } from './lens.js';
+import { filterSaid, fitBar } from './query-bar.js';
 import { isA, typeTitle } from './words.js';
 
 const TYPE = 'lens';
@@ -96,6 +97,15 @@ async function save(lens, style, current, open) {
   if (id) open(`#/v?${flatQuery(lens, { ...style, canvas: id })}`);
 }
 
+/** Save's mark: a disk, drawn in the button's own colour at the size of its text. */
+function saveMark() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs) => Object.entries(attrs).reduce((e, [k, v]) => (e.setAttribute(k, v), e), document.createElementNS(NS, tag));
+  const svg = el('svg', { viewBox: '0 0 16 16', class: 'q-mark', 'aria-hidden': 'true' });
+  svg.append(el('path', { d: 'M2.5 2.5h9l2 2v9h-11z' }), el('path', { d: 'M5 2.5v3.5h5v-3.5' }), el('path', { d: 'M5 13.5v-4h6v4' }));
+  return svg;
+}
+
 /** The saved canvas the canvas draws now, if one is: Home marks it. */
 let up = null;
 
@@ -108,12 +118,17 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const changed = current && edited(current, lens, style);
     const pick = h(
       'select',
-      { class: 'q-pick', 'aria-label': 'Saved canvases', title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not a saved canvas', onchange: (ev) => ev.target.value && open(ev.target.value) },
-      !current && !isHome && h('option', { value: '', selected: true }, 'Not saved'),
+      { class: 'q-pick', 'aria-label': 'Saved canvases', title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not saved: Save keeps it', onchange: (ev) => ev.target.value && open(ev.target.value) },
+      // Not saved, it is named as its tab and its pane are: by what its filter finds.
+      !current && !isHome && h('option', { value: '', selected: true }, filterSaid(lens.filter, () => {}) || 'Canvas'),
       h('option', { value: '#/', selected: isHome && !current }, 'Home'),
       all.map((c) => h('option', { value: canvasAt(c.id), selected: c === current }, `${c.title}${c === current && changed ? ' •' : ''}`)),
     );
-    part.replaceChildren(pick, h('button', { type: 'button', class: 'q-save', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, '☆'), ...(hooks.paneButtons?.() ?? []));
+    // In a browser's order: back and forward, then the canvas up, as its address, with Save beside it, and Split at the end.
+    const own = hooks.paneButtons?.() ?? [];
+    const travel = own.filter((b) => b.classList.contains('q-travel'));
+    part.replaceChildren(...travel, pick, h('button', { type: 'button', class: 'q-save q-word', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, 'Save')), ...own.filter((b) => !travel.includes(b)));
+    fitBar();
   });
   return part;
 }
@@ -151,7 +166,7 @@ export async function canvasesPiece(host, title) {
       'section',
       { class: 'card wide canvases', style: 'margin-bottom: var(--space-8); min-width: 0' },
       h('header', {}, h('h2', {}, title)),
-      own.length ? h('ul', { class: 'rows' }, own.map((c) => row(c, now))) : h('div', { class: 'empty', title: '☆ in the bar keeps what is up as one' }, 'None saved yet.'),
+      own.length ? h('ul', { class: 'rows' }, own.map((c) => row(c, now))) : h('div', { class: 'empty', title: 'Save in the bar keeps what is up as one' }, 'None saved yet.'),
       items.length > 0 && h('details', { class: 'old-views' }, h('summary', { class: 'muted small', title: 'Canvases kept as views of one item' }, `Views of items (${items.length})`), h('ul', { class: 'rows' }, items.map((c) => row(c, now)))),
     ),
   );

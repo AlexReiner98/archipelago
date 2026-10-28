@@ -12,6 +12,7 @@ import { activate, canvasHref, focusOn, home, sheetOver, withItem } from './canv
 import { canvasLens } from './canvases.js';
 import { flatQuery, flatView, readFlatLens } from './lens.js';
 import { dragPane, sashes } from './pane-drag.js';
+import { filterSaid } from './query-bar.js';
 import { unfollow } from './replica.js';
 import { asPane, drawable, front, keep, named, newId } from './tabs.js';
 import { titles } from './words.js';
@@ -52,8 +53,10 @@ function paneEl(id) {
   const mark = h('span', { class: 'pane-follows', hidden: true });
   const body = h('div', { class: 'pane-canvas' });
   const button = (title, mark, onclick) => h('button', { type: 'button', class: 'pane-act', title, 'aria-label': title, onclick }, mark);
-  const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, name, mark, button('Open it as the main canvas', '⤢', () => toMain(id)), button('Close this pane', '×', () => close(id))), body);
-  name.addEventListener('pointerdown', (ev) => dragPane(ev, id, el, { groups: groupEls, drop }));
+  // Its controls stand in its strip in focus or not: in focus, the query bar takes the name's place between them.
+  const grip = h('span', { class: 'pane-act pane-grip', title: 'Drag to dock it elsewhere', 'aria-label': 'Move this pane' }, '⠿');
+  const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, grip, name, mark, button('Close this pane', '×', () => close(id))), body);
+  for (const handle of [grip, name]) handle.addEventListener('pointerdown', (ev) => dragPane(ev, id, el, { groups: groupEls, drop }));
   const entry = { el, body, name, mark, view: null, at: null, back: [], forth: [] };
   drawn.set(id, entry);
   fitOnMount(body);
@@ -71,8 +74,12 @@ function load(id, at) {
     .then(({ lens, style }) => {
       if (drawn.get(id) !== entry || entry.at !== at) return;
       const canvas = style.canvas ?? lens.filter.ids?.[0] ?? '';
-      entry.name.textContent = (style.canvas && titles.get(style.canvas)) || (lens.filter.ids?.length === 1 && titles.get(lens.filter.ids[0])) || lens.filter.text || 'Canvas';
-      entry.name.title = `${entry.name.textContent}: drag to dock it elsewhere`;
+      // Named as its tab would be: a saved canvas by its name, else by what its filter finds.
+      const naming = () => {
+        entry.name.textContent = (style.canvas && titles.get(style.canvas)) || filterSaid(lens.filter, naming) || 'Canvas';
+        entry.name.title = `${entry.name.textContent}: drag to dock it elsewhere`;
+      };
+      naming();
       const placed = {};
       const view = flatView({ lens, style: { ...style, placed }, of: lens.filter.ids?.[0], key: `canvas:${canvas || 'map'}` });
       Object.assign(entry, { view, lens, asked: style });
@@ -100,12 +107,15 @@ export function goPane(id, at, step = true) {
 // there (a frame keeps its presses to itself), makes it the one.
 
 let active = 'main';
+/** The tab and pane the bar last acted on: when it moves to another, the bar and find start afresh there. */
+let focused = '';
 export function activeIs(id) {
   if (id !== 'main' && !drawn.has(id)) id = 'main';
   active = id;
-  for (const [g, e] of drawn) e.el.classList.toggle('pane-active', g === id);
-  document.getElementById('canvas').classList.toggle('pane-active', id === 'main' && drawn.size > 0);
-  document.body.dataset.active = id === 'main' ? 'main' : 'pane';
+  // Each tab keeps the pane last touched in it, for when it is brought into sight again (decision e_x9b9yv5g, asked).
+  const t = front();
+  if (t && t.focus !== id) ((t.focus = id), keep());
+  if (focused !== `${t?.id}:${id}`) ((focused = `${t?.id}:${id}`), dispatchEvent(new Event('pane-focus')));
   frameActive();
   const e = drawn.get(id);
   activate(e?.view ? { lens: e.lens, asked: e.asked, view: e.view, go: (lens) => goPane(id, `v?${flatQuery(lens, e.asked)}`), open: (href) => goPane(id, asPane(href)) } : null);
@@ -127,19 +137,34 @@ const edge = (side, v) => {
 /** The frame of the pane the bar acts on, for the bar and find to sit in (ui/shell.css: --active-*). */
 let frames = [];
 function frameActive() {
+  // Which pane is in focus is marked on every one, the main one too, each time the panes are drawn.
+  for (const [g, e] of drawn) e.el.classList.toggle('pane-active', g === active);
+  document.getElementById('canvas').classList.toggle('pane-active', active === 'main' && drawn.size > 0);
+  document.body.dataset.active = active === 'main' ? 'main' : 'pane';
   const box = frames.find(([g]) => g === active)?.[1] ?? frames.find(([g]) => g === 'main')?.[1];
   for (const side of ['left', 'right', 'top', 'bottom']) document.body.style.setProperty(`--active-${side}`, edge(side, box?.[side] ?? 0));
-  // Out of focus, the main pane says its name in its strip, as a docked one does, and the name an agent gave it.
-  mainName.hidden = active === 'main' || !drawn.size;
-  const canvas = /canvas=(e_[a-z0-9]{8})/.exec(canvasHref())?.[1];
-  mainName.textContent = (canvas && titles.get(canvas)) || 'Canvas';
-  if (front().slot) mainName.append(h('span', { class: 'pane-follows' }, front().slot));
+  // The main pane keeps the strip every pane has while there are several, its name there out of focus, with the name an agent gave it.
+  mainBar.el.hidden = !drawn.size;
+  const href = canvasHref();
+  const canvas = /canvas=(e_[a-z0-9]{8})/.exec(href)?.[1];
+  mainBar.name.textContent = (canvas && titles.get(canvas)) || (href === '#/' ? 'Home' : filterSaid(readFlatLens(href.split('?')[1] ?? '').lens.filter, frameActive)) || 'Canvas';
+  mainBar.mark.textContent = front().slot ?? '';
+  mainBar.mark.hidden = !mainBar.mark.textContent;
   for (const [g, e] of drawn) {
     e.mark.textContent = front().panes[g]?.slot ?? '';
     e.mark.hidden = !e.mark.textContent;
   }
 }
-const mainName = document.body.appendChild(h('div', { id: 'main-name', hidden: true, title: 'The main canvas: press to work in it' }));
+/** The main pane's strip, the same as every docked pane's: its ⠿, its name and ×. */
+const mainBar = (() => {
+  const button = (title, mark, onclick) => h('button', { type: 'button', class: 'pane-act', title, 'aria-label': title, onclick }, mark);
+  const grip = h('span', { class: 'pane-act pane-grip', title: 'Drag to dock it elsewhere', 'aria-label': 'Move this pane' }, '⠿');
+  const name = h('span', { class: 'pane-name', title: 'Drag to dock it elsewhere' }, 'Canvas');
+  const mark = h('span', { class: 'pane-follows', hidden: true });
+  const el = document.body.appendChild(h('header', { id: 'main-name', class: 'pane-bar', hidden: true }, grip, name, mark, button('Close this pane', '×', () => close('main'))));
+  for (const handle of [grip, name]) handle.addEventListener('pointerdown', (ev) => dragPane(ev, 'main', document.getElementById('canvas'), { groups: groupEls, drop }));
+  return { el, name, mark };
+})();
 
 // ---- The main pane's back and forth, for each tab: a step each time it draws another lens (ui/canvas.js tells), none for a page.
 
@@ -232,7 +257,7 @@ export function draw() {
   dispatchEvent(new Event('resize'));
 }
 
-// ---- What can be done with a pane: open, move, close, make main.
+// ---- What can be done with a pane, the main one too: open, move, close, keep only it.
 
 /**
  * Open this address in a pane on this side of the pane `by` (the main one, unless named) in tab `t` (the one in
@@ -260,6 +285,13 @@ export function place(id, side, by, t = front()) {
 }
 export function close(id) {
   const t = front();
+  // The main pane closed, the next takes its place: what it draws becomes the main canvas's, and its frame goes.
+  if (id === 'main') {
+    const next = t.groups.find((g) => g !== 'main');
+    if (!next) return;
+    toMain(next);
+    return close(next);
+  }
   t.groups = t.groups.filter((g) => g !== id);
   delete t.panes[id];
   even();
@@ -301,22 +333,16 @@ addEventListener('resize', () => {
 // The sheet opening or shutting changes the room the panes share.
 new MutationObserver(() => started && front().groups.length > 1 && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
 
-/** The query bar's own for the pane it acts on: move it, back and forth, split, and for a docked pane make main and close. */
+/** The query bar's own for the pane it acts on, the same in every pane: back and forth (dimmed with nowhere to go) and split. Each pane's move, keep only it and close stay in its strip. */
 export function paneButtons() {
   const { back, forth } = historyNow();
-  const button = (label, title, mark, onclick, off) => h('button', { type: 'button', class: 'q-save', title, 'aria-label': label, disabled: off, onclick }, mark);
-  // A docked pane in focus has its names covered by the bar: what they offered is here, and it is dragged from ⠿.
+  const button = (label, title, mark, onclick, off, cls = 'q-save') => h('button', { type: 'button', class: cls, title, 'aria-label': label, disabled: off, onclick }, mark);
   const entry = active === 'main' ? null : drawn.get(active);
-  const grip = entry ? h('button', { type: 'button', class: 'q-save q-grip', title: 'Drag to dock this pane elsewhere', 'aria-label': 'Move this pane' }, '⠿') : null;
-  grip?.addEventListener('pointerdown', (ev) => dragPane(ev, active, entry.el, { groups: groupEls, drop }));
   return [
-    grip,
-    button('Back', 'Back to what this pane drew before', '‹', () => travel(-1), !back.length),
-    button('Forward', 'Forward again', '›', () => travel(1), !forth.length),
-    button('Split', 'Split: open this canvas in a pane beside it (drag the pane’s name to dock it elsewhere)', '◫', () => openPane(asPane(active === 'main' ? canvasHref() : `#/${entry.at}`), 'right', active)),
-    entry && button('Make main', 'Open it as the main canvas', '⤢', () => toMain(active)),
-    entry && button('Close', 'Close this pane', '×', () => close(active)),
-  ].filter(Boolean);
+    button('Back', 'Back to what this pane drew before', '‹', () => travel(-1), !back.length, 'q-save q-travel'),
+    button('Forward', 'Forward again', '›', () => travel(1), !forth.length, 'q-save q-travel'),
+    button('Split', 'Split: open this canvas in a pane beside it (drag the pane’s name to dock it elsewhere)', ['◫', h('span', { class: 'q-word-text' }, 'Split')], () => openPane(asPane(active === 'main' ? canvasHref() : `#/${entry.at}`), 'right', active), false, 'q-save q-word q-split'),
+  ];
 }
 /** The address the pane the bar acts on draws, for a new tab to open on. */
 export const activeAt = () => (active === 'main' ? canvasHref() : `#/${drawn.get(active)?.at ?? ''}`);

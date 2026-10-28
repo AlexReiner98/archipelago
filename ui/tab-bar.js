@@ -3,13 +3,16 @@
 // (ui/words.js), so their work mirrors into the page without squeezing a pane or opening a window; where a step lands
 // is ui/pane-route.js. There is no most: many tabs shrink to their mark and first letters (e_q3amet26). A tab, not a
 // pane, pops out into a window of its own, from its strip or dragged out of the page, and docks back whole (e_ezb7s3a7).
-// One tab alone shows no strip, as before there were tabs.
+// What is the tab's own lives on the strip, never in the query bar, which shows the lens (decision e_j7ggggjr, asked):
+// every tab has ⋯ (whom it follows, pop out) and ×, the same in sight or not, and + ends the strip, which shows with one tab too.
 
 import { api, h, hooks } from './base.js';
+import { readFlatLens } from './lens.js';
 import { lookMode } from './look.js';
 import { windowOf, windows } from './pane-busy.js';
 import { heard, nameOf } from './pane-route.js';
 import { activeAt, activeIs, draw, paneButtons, startPanes } from './panes.js';
+import { filterSaid } from './query-bar.js';
 import { front, freshTab, isOutKey, keep, landed, listKey, named, outKey, outTabs, poppedTab, read, save, tabOf, tabs } from './tabs.js';
 import { sessionHue, titles } from './words.js';
 
@@ -22,7 +25,8 @@ function show(t) {
   t.unseen = false;
   keep();
   draw();
-  activeIs('main');
+  // The bar goes back to the pane last touched in it (decision e_x9b9yv5g, asked).
+  activeIs(t.focus ?? 'main');
   drawStrip();
   if ((location.hash || '#/') !== t.at) location.hash = t.at;
 }
@@ -78,7 +82,7 @@ function popOut(id) {
 
 // ---- The strip: a tab for each, in the top bar.
 
-/** What a tab is called: the session it follows, in its hue, else what its canvas draws. */
+/** What a tab is called: the session it follows, in its hue, else what its canvas draws (a saved canvas or an item by its name, a lens by what it finds). */
 function nameOfTab(t) {
   const session = t.follows && !['all', 'none'].includes(t.follows) ? t.follows : null;
   if (session) return { name: heard.has(session) ? nameOf(session) : (t.named ?? nameOf(session)), hue: sessionHue(heard.get(session)?.name ?? t.named), session };
@@ -87,7 +91,11 @@ function nameOfTab(t) {
     asked.add(id);
     api('get', { id }).then((got) => (titles.set(id, got.entity.title), drawStrip()), () => {});
   }
-  return { name: (id && titles.get(id)) || (id ? 'Canvas' : 'Home') };
+  if (/^e_[a-z0-9]{8}$/.test(id)) return { name: titles.get(id) ?? '…' };
+  const lens = id ? readFlatLens(id.split('?')[1] ?? '').lens : null;
+  // Named by what it finds but its types, which say little of a tab; by its types only when it has nothing else.
+  const { types, ...rest } = lens?.filter ?? {};
+  return { name: (lens && (filterSaid(rest, drawStrip) || filterSaid(lens.filter, drawStrip))) || 'Home' };
 }
 /** The items a tab is named by whose titles were asked for, once each. */
 const asked = new Set();
@@ -108,7 +116,7 @@ function pressTab(ev, t, out) {
 function tabEl(t, out) {
   const { name, hue, session } = nameOfTab(t);
   const inSight = t.id === tabs.front && !out;
-  const whom = t.follows === 'none' ? 'follows nobody' : session ? 'its session’s tab' : 'follows everyone';
+  const whom = t.follows === 'none' ? 'follows nobody' : session ? 'follows its session' : 'follows everyone';
   const act = (label, mark, onclick) => h('button', { type: 'button', class: 'tab-act', title: label, 'aria-label': label, onclick }, mark);
   const el = h(
     'div',
@@ -119,12 +127,14 @@ function tabEl(t, out) {
       'aria-selected': String(inSight),
       'data-tab': t.id,
       'data-unseen': t.unseen && !inSight ? 'true' : null,
+      'data-follows': t.follows === 'none' ? 'none' : null,
       title: [name, whom, out && 'in a window of its own: press to go to it', !out && !inSight && 'drag it out of the page to pop it out'].filter(Boolean).join(' · '),
       style: hue ? `--session-hue: ${hue}` : null,
     },
     h('span', { class: `tab-name${session ? ' who-session' : ''}` }, name),
-    inSight && act('Pop this tab out into a window of its own', '⧉', () => popOut(t.id)),
-    inSight && act('Close this tab', '×', () => closeTab(t.id)),
+    // Every tab has the same controls, in sight or not, so nothing moves when another is brought into sight.
+    !out && act('This tab: whom it follows, pop it out', '⋯', (ev) => tabMenu(ev.currentTarget, t)),
+    !out && tabs.list.length > 1 && act('Close this tab', '×', () => closeTab(t.id)),
   );
   el.addEventListener('pointerdown', (ev) => pressTab(ev, t, out));
   el.addEventListener('keydown', (ev) => ev.key === 'Enter' && toFront(t.id));
@@ -136,48 +146,46 @@ export function drawStrip() {
   if (!strip || poppedTab) return;
   const out = outTabs().filter((t) => !tabOf(t.id));
   const all = [...tabs.list.map((t) => [t, false]), ...out.map((t) => [t, true])];
-  strip.replaceChildren(...(all.length > 1 ? all.map(([t, o]) => tabEl(t, o)) : []));
+  const fresh = h('button', { type: 'button', class: 'tab-new', title: 'New tab: this canvas in a tab of its own', 'aria-label': 'New tab', onclick: () => openTab(activeAt()) }, '+');
+  strip.replaceChildren(...all.map(([t, o]) => tabEl(t, o)), fresh);
   document.body.dataset.tabs = String(all.length);
 }
 
 // ---- Whom the tab in sight follows: everyone, nobody, or one session (its run, or the agent's name).
 
 /** The reader picks whom the tab in sight follows; a session it held lets go of it. */
-function setFollows(follows) {
-  const t = front();
+function setFollows(follows, t = front()) {
   Object.assign(t, { follows, named: heard.has(follows) ? nameOf(follows) : undefined });
   for (const key of [...landed.keys()]) if (key.startsWith(`${t.id}:`)) landed.delete(key);
   keep();
   drawStrip();
 }
-/** The picker in the bar: everyone, nobody, the sessions heard from lately, newest first. */
-function followsPicker() {
-  const t = front();
+/** A tab's menu, over everything (a popover: the strip clips what hangs below it): whom it follows (everyone, nobody, the sessions heard from lately, newest first), and pop out. */
+const menuEl = h('div', { class: 'menu-items tab-menu', popover: 'auto', role: 'menu', 'aria-label': 'This tab' });
+document.body.append(menuEl);
+function tabMenu(anchor, t) {
   const now = t.follows ?? 'all';
   const sessions = [...heard].sort(([, a], [, b]) => b.at - a.at).map(([key]) => key);
   if (!['all', 'none', ...sessions].includes(now)) sessions.unshift(now);
-  const pick = h(
-    'select',
-    { class: 'q-follows', title: 'Whose shows and changes this tab follows', 'aria-label': 'Whom this tab follows', onchange: (ev) => setFollows(ev.target.value) },
-    h('option', { value: 'all' }, 'Everyone'),
-    h('option', { value: 'none' }, 'Nobody'),
-    ...sessions.map((key) => h('option', { value: key, title: key }, key === now && !heard.has(key) ? (t.named ?? nameOf(key)) : nameOf(key))),
+  const pick = (key, said, title) => h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(key === now), title, onclick: () => (menuEl.hidePopover(), setFollows(key, t)) }, said);
+  menuEl.replaceChildren(
+    h('div', { class: 'tab-menu-head', title: 'Whose shows and changes come into this tab' }, 'Follows'),
+    pick('all', 'Everyone', 'Every session’s, unless another tab follows it'),
+    pick('none', 'Nobody', 'No agent moves this tab'),
+    ...sessions.map((key) => pick(key, key === now && !heard.has(key) ? (t.named ?? nameOf(key)) : nameOf(key), key)),
+    tabs.list.length > 1 && h('hr'),
+    tabs.list.length > 1 && h('button', { type: 'button', role: 'menuitem', title: 'Into a window of its own: ⇲ there docks it back', onclick: () => (menuEl.hidePopover(), popOut(t.id)) }, 'Pop out'),
   );
-  pick.value = now;
-  return pick;
+  menuEl.showPopover();
+  const r = anchor.getBoundingClientRect();
+  menuEl.style.left = `${Math.max(0, Math.min(r.left, innerWidth - menuEl.offsetWidth))}px`;
+  menuEl.style.top = `${r.bottom}px`;
 }
 
-/** The query bar's own: the pane's buttons, whom the tab follows, and a new tab on this canvas (in a popped window, dock back). */
+/** The query bar's own: the pane's buttons (in a popped window, dock back). Whom the tab follows and a new tab are the strip's. */
 hooks.paneButtons = () => {
-  const own = paneButtons();
-  const grip = own[0]?.classList.contains('q-grip') ? [own.shift()] : [];
   const button = (label, title, mark, onclick) => h('button', { type: 'button', class: 'q-save', title, 'aria-label': label, onclick }, mark);
-  return [
-    ...grip,
-    !poppedTab && followsPicker(),
-    ...own,
-    poppedTab ? button('Dock back', 'Dock this window back into the main one, as a tab', '⇲', dockBack) : button('New tab', 'Open this canvas in a tab of its own', '⊞', () => openTab(activeAt())),
-  ].filter(Boolean);
+  return [...paneButtons(), poppedTab && button('Dock back', 'Dock this window back into the main one, as a tab', '⇲', dockBack)].filter(Boolean);
 };
 
 // ---- In a window popped out: the tab keeps itself where the main page reads it, docks back whole, and is let go when closed.

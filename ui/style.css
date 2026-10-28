@@ -348,8 +348,7 @@ button.quiet-button { padding: var(--space-2) var(--space-6); font-size: var(--t
 
 @media (max-width: 720px) {
   .ops td.kind { width: auto; }
-  #nav { top: calc(var(--main-top, 0%) + var(--space-5)); left: calc(var(--main-left, 0%) + var(--space-5)); right: calc(var(--main-right, 0%) + var(--space-5)); }
-  #query { top: calc(var(--active-top, 0%) + var(--box-9) + var(--space-5)); left: calc(var(--active-left, 0%) + var(--space-5)); right: calc(var(--active-right, 0%) + var(--space-5)); }
+  #nav { left: var(--space-5); right: var(--space-5); }
   #main { padding: var(--space-9) var(--space-8) var(--space-14); }
   #find { bottom: calc(var(--active-bottom, 0%) + var(--space-5)); }
 }
@@ -561,7 +560,7 @@ details.menu > .menu-items > button { max-width: var(--menu-item-most); overflow
   .row-top:not(.nowrap-row) > .grow { flex-basis: 100%; }
   table.list td { overflow-wrap: anywhere; }
   .toolbar.facts > .grow { display: none; }
-  #sheet { width: 100%; }
+  #sheet { width: 100%; } body[data-sheet="open"] #query { visibility: hidden; }
 }
 
 /* What a thing is for: asked for, not printed. A dotted line under a heading, or a small ? beside a control. */
