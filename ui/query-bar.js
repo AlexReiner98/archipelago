@@ -55,7 +55,9 @@ function nameOf(id, redraw) {
   if (titles.has(id)) return titles.get(id);
   if (!asking.has(id)) {
     asking.add(id);
-    api('get', { id }).then((got) => (titles.set(id, got.entity.title), redraw())).catch(() => {});
+    // Asked once more if the first answer does not come (a server still starting), then left as the mark.
+    const ask = (again) => api('get', { id }).then((got) => (titles.set(id, got.entity.title), redraw())).catch(() => again && ask(false));
+    ask(true);
   }
   return '…';
 }
