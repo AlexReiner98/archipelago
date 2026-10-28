@@ -155,8 +155,7 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #query .q-pick { field-sizing: content; min-width: 0; border: 0; background: none; font-size: var(--text-3); font-weight: 600; max-width: var(--select-least); text-overflow: ellipsis; }
 #marks .count { display: inline-flex; align-items: center; justify-content: center; min-width: var(--box-8); height: var(--box-8); padding: 0 var(--space-5); font-size: var(--text-4); text-decoration: none; }
 #marks .count.held { background: var(--warn); }
-#new-item { display: inline-grid; place-items: center; width: var(--box-8); height: var(--box-8); border-radius: var(--radius-2); color: var(--muted); font-size: var(--text-8); line-height: 1; text-decoration: none; }
-#new-item:hover, #more > summary:hover { color: var(--text); background: var(--accent-soft); }
+#more > summary:hover { color: var(--text); background: var(--accent-soft); }
 #listening { flex: none; color: var(--ok); font-size: var(--text-3); white-space: nowrap; }
 #listening::before { content: "● "; }
 #listening[hidden] { display: none; }
