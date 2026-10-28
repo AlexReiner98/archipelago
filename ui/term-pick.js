@@ -7,6 +7,7 @@
 // say what a choice adds.
 
 import { h } from './base.js';
+import { placeBy } from './menu-place.js';
 
 const menu = h('div', { class: 'menu-items term-pick', popover: 'auto', role: 'dialog' });
 document.body.append(menu);
@@ -47,6 +48,8 @@ export function pickTerm(anchor, first) {
         ...found.map(button),
         q && typed ? h('button', { type: 'button', class: 'term-pick-item term-pick-typed', title: typed.title, onclick: () => (typed.pick(q) ? close() : field.classList.add('wrong')) }, `Add “${q}”`) : null,
       ].filter(Boolean));
+      // Its height changes with what is found: placed again, so it stays in sight.
+      if (menu.matches(':popover-open')) placeBy(menu, anchor);
     };
     // Items found by name, asked as the field changes; an answer to an older question is dropped.
     let asked = 0;
@@ -79,8 +82,6 @@ export function pickTerm(anchor, first) {
   };
   open(first);
   menu.showPopover();
-  const r = anchor.getBoundingClientRect();
-  menu.style.left = `${Math.max(0, Math.min(r.left, innerWidth - menu.offsetWidth))}px`;
-  menu.style.top = `${r.bottom}px`;
+  placeBy(menu, anchor);
   menu.querySelector('input')?.focus();
 }

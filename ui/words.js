@@ -2,6 +2,8 @@
 
 import { applyTheme } from './theme.js';
 import { api, h, state } from './base.js';
+// A menu (below) is placed in sight each time it opens.
+import './menu-place.js';
 
 // ---- shared lookups ------------------------------------------------------
 

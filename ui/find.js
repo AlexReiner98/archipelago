@@ -21,7 +21,7 @@ const said = document.getElementById('find-lens');
 const rows = document.getElementById('find-rows');
 /** The part of the lens find is in, by its word, and its mark before the box. */
 let mode = 'Find';
-const mark = h('span', { class: 'q-label find-mode', hidden: true, title: 'The part find is in: Backspace goes back to Find' });
+const mark = h('span', { class: 'q-label find-mode', title: 'The part find is in: type another part’s word and a space to go there; Backspace goes back to Find' }, 'Find');
 const PLACEHOLDER = { Find: 'Find on the map', Only: 'Only what is so: done, a type, within…', Not: 'Leave out: closed, a type', Walk: 'Walk along a link', Limit: 'The most items drawn' };
 const input = h('input', { type: 'search', name: 'q', placeholder: 'Find on the map', autocomplete: 'off', 'aria-label': 'Find on the map', title: 'Choose what the words are: ↑↓, then Enter; Shift+Enter adds the words as another set' });
 let asked = 0;
@@ -52,7 +52,6 @@ function shut() {
 function toMode(m, looking = true) {
   mode = m;
   mark.textContent = m;
-  mark.hidden = m === 'Find';
   input.placeholder = PLACEHOLDER[m];
   if (looking) (input.focus(), look());
 }
@@ -122,7 +121,7 @@ export function drawFind() {
     // A part's word and a space put find in that part: the word is the mode, not words to find.
     const [, word, rest] = /^(\S+)\s(.*)$/.exec(input.value) ?? [];
     const into = word && MODES.find((m) => m.toLowerCase() === word.toLowerCase());
-    if (into && into !== mode) return void ((input.value = rest), toMode(into));
+    if (into) return void ((input.value = rest), toMode(into));
     bar.classList.toggle('typing', Boolean(input.value.trim()) || mode !== 'Find');
     wait = setTimeout(look, 160);
   });

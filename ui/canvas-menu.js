@@ -4,6 +4,7 @@
 // menu does (a popover: the band clips what hangs below it), drawn as every open list is (ui/menus.css).
 
 import { h, hooks } from './base.js';
+import { placeBy } from './menu-place.js';
 
 const list = h('div', { class: 'menu-items tab-menu', popover: 'auto', role: 'menu', 'aria-label': 'This canvas' });
 document.body.append(list);
@@ -20,10 +21,8 @@ function open(anchor) {
     item('Snap', 'Let what you move go on a soft grid', () => now.toggle('snap'), Boolean(now.settings.snap)),
   );
   if (!list.matches(':popover-open')) list.showPopover();
-  // Under the ⋯, its right edge on the ⋯'s, kept on the page.
-  const r = anchor.getBoundingClientRect();
-  list.style.left = `${Math.max(0, Math.min(r.right - list.offsetWidth, innerWidth - list.offsetWidth))}px`;
-  list.style.top = `${r.bottom}px`;
+  // By the ⋯, its right edge on the ⋯'s, kept in sight.
+  placeBy(list, anchor, { end: true });
 }
 
 export function canvasMenu() {
