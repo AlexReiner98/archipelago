@@ -45,6 +45,20 @@
         "sketches/serve.mjs"
       ],
       "port": 3210
+    },
+    {
+      "name": "archipelago-findstudy",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "env": {
+        "PELAGO_PORT": "3111",
+        "PELAGO_DATA": "runs/data-findstudy",
+        "PELAGO_UNSANDBOXED": "1"
+      },
+      "port": 3111
     }
   ]
 }
