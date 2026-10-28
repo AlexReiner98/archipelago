@@ -1,4 +1,4 @@
-// Tabs at the top of the page (decision e_mzer5m4t): each a whole canvas and the panes split beside it (ui/panes.js),
+// Tabs at the top of the page (decision e_mzer5m4t): each a set of panes side by side, every one alike (ui/panes.js),
 // kept by ui/tabs.js. Several sessions at work each keep a tab of their own, named by the session and marked in its hue
 // (ui/words.js), so their work mirrors into the page without squeezing a pane or opening a window; where a step lands
 // is ui/pane-route.js. There is no most: many tabs shrink to their mark and first letters (e_q3amet26). A tab, not a
@@ -11,35 +11,35 @@ import { readFlatLens } from './lens.js';
 import { lookMode } from './look.js';
 import { windowOf, windows } from './pane-busy.js';
 import { heard, nameOf } from './pane-route.js';
-import { activeAt, activeIs, draw, paneButtons, startPanes } from './panes.js';
+import { activeAt, activeIs, draw, paneAt, paneButtons, startPanes } from './panes.js';
 import { filterSaid } from './query-bar.js';
-import { front, freshTab, isOutKey, keep, landed, listKey, named, outKey, outTabs, poppedTab, read, save, tabOf, tabs } from './tabs.js';
+import { focusOf, front, freshTab, isOutKey, keep, landed, listKey, named, outKey, outTabs, poppedTab, read, save, tabHref, tabOf, tabs } from './tabs.js';
 import { sessionHue, titles } from './words.js';
 
 read();
 const strip = document.getElementById('tabs');
 
-/** Bring tab `t` into sight: its panes drawn, its canvas at the address it keeps. */
+/** Bring tab `t` into sight: its panes drawn, the address its pane in focus's, the page it had open over it open again. */
 function show(t) {
   tabs.front = t.id;
   t.unseen = false;
   keep();
   draw();
   // The bar goes back to the pane last touched in it (decision e_x9b9yv5g, asked).
-  activeIs(t.focus ?? 'main');
+  activeIs(focusOf(t));
   drawStrip();
-  if ((location.hash || '#/') !== t.at) location.hash = t.at;
+  const href = tabHref(t);
+  if ((location.hash || '#/') !== href) location.replace(href);
 }
 /** Bring tab `id` into sight, keeping where the one in sight stands. */
 export function toFront(id) {
   const t = tabOf(id);
   if (!t || id === tabs.front) return;
-  front().at = location.hash || '#/';
   show(t);
 }
 /** Open a tab on this address (`own`: whom it follows, its name), in sight or in the background, marked. Answers its id. */
 export function openTab(at, own = {}, inSight = true) {
-  const t = freshTab({ at, ...own });
+  const t = freshTab(paneAt(at), own);
   tabs.list.push(t);
   if (inSight) toFront(t.id);
   else arrived(t.id);
@@ -69,9 +69,8 @@ function closeTab(id) {
 function popOut(id) {
   const t = tabOf(id);
   if (!t || tabs.list.length < 2) return;
-  if (id === tabs.front) t.at = location.hash || '#/';
   save(outKey(id), t);
-  const win = window.open(`${location.pathname}${t.at}`, `pelago-tab:${id}`, `popup,width=${Math.round(innerWidth / 2)},height=${Math.round(innerHeight)}`);
+  const win = window.open(`${location.pathname}${tabHref(t)}`, `pelago-tab:${id}`, `popup,width=${Math.round(innerWidth / 2)},height=${Math.round(innerHeight)}`);
   if (!win) return save(outKey(id), null);
   windows.set(id, win);
   const n = tabs.list.indexOf(t);
@@ -82,11 +81,11 @@ function popOut(id) {
 
 // ---- The strip: a tab for each, in the top bar.
 
-/** What a tab is called: the session it follows, in its hue, else what its canvas draws (a saved canvas or an item by its name, a lens by what it finds). */
+/** What a tab is called: the session it follows, in its hue, else what its pane in focus draws (a saved canvas or an item by its name, a lens by what it finds). */
 function nameOfTab(t) {
   const session = t.follows && !['all', 'none'].includes(t.follows) ? t.follows : null;
   if (session) return { name: heard.has(session) ? nameOf(session) : (t.named ?? nameOf(session)), hue: sessionHue(heard.get(session)?.name ?? t.named), session };
-  const id = named(t.at);
+  const id = named(t.panes[focusOf(t)]?.at);
   if (/^e_[a-z0-9]{8}$/.test(id) && !titles.has(id) && !asked.has(id)) {
     asked.add(id);
     api('get', { id }).then((got) => (titles.set(id, got.entity.title), drawStrip()), () => {});
@@ -192,7 +191,6 @@ hooks.paneButtons = () => {
 
 let docking = false;
 function dockBack() {
-  front().at = location.hash || '#/';
   save(outKey(poppedTab), { ...front(), docked: true });
   docking = true;
   window.close();
@@ -207,14 +205,14 @@ if (poppedTab) {
   setTimeout(keep, 0);
 }
 
-// The canvas in sight moving is the tab's: it keeps where it stands, and its name in the strip.
+// The page open over the tab in sight is the tab's: it keeps it, and its name in the strip follows its panes.
+const sheetOf = (hash) => (/^#\/(e\/e_[a-z0-9]{8}|s\/[^?]*|workspace|you|new[^?]*)/.exec(hash)?.[1]);
 addEventListener('hashchange', () => {
-  front().at = location.hash || '#/';
+  front().sheet = sheetOf(location.hash);
   keep();
   drawStrip();
 });
-const moved = hooks.canvasMoved;
-hooks.canvasMoved = () => (moved?.(), drawStrip());
+hooks.paneMoved = () => drawStrip();
 // What a popped window docked back or let go, or another of the reader's pages changed, is drawn here as it is kept.
 addEventListener('storage', (ev) => {
   if (poppedTab) return;
@@ -240,8 +238,8 @@ export function startTabs() {
   // A look's page (the server's own, ui/look.js) draws the view it was asked for alone.
   if (lookMode || started) return;
   started = true;
-  // The page opened on an address: that is where the tab in sight stands.
-  front().at = location.hash || '#/';
+  // The page opened on an address: the page it names is open over the tab in sight (its lens goes to the pane in focus, ui/app.js).
+  front().sheet = sheetOf(location.hash);
   keep();
   startPanes();
   drawStrip();

@@ -6,27 +6,24 @@ body { overflow: hidden; }
 /* A select's open list in the theme, also where the select itself is drawn bare (the query bar, the sheet's marks). */
 option, optgroup { background: var(--panel); color: var(--text); }
 
-/* The canvas: the view drawn edge to edge, its frame the whole page. */
-#canvas { position: fixed; inset: var(--main-top, 0%) var(--main-right, 0%) var(--main-bottom, 0%) var(--main-left, 0%); background: var(--ln-sea, var(--bg)); }
-#canvas > .lens-wrap, #canvas .lens-view { height: 100%; }
-/* The safe zone: the bar and the query bar above, the find bar below. A drawing starts under the bars, so they never
-   cover it, and runs to the foot of the page, with find drawn over it: no room is kept for find. A drawing on the
-   plane is fitted above find; one that scrolls (a list, a grid) keeps room for it after its end only, so its last row
-   can be scrolled out from under it. */
+/* The canvas: the panes of the tab in sight (ui/panes.js), every one alike; one alone is drawn edge to edge, its frame
+   the whole page. */
+#canvas { position: fixed; inset: 0; background: var(--ln-sea, var(--bg)); }
+/* The safe zone of a pane alone: the bar and the query bar above, the find bar below. A drawing starts under the bars,
+   so they never cover it, and runs to the foot of the page, with find drawn over it: no room is kept for find. A drawing
+   on the plane is fitted above find; one that scrolls (a list, a grid) keeps room for it after its end only, so its
+   last row can be scrolled out from under it. Among several, each pane's strip holds the bar instead. */
 #canvas { --safe-top: calc(var(--strip) + var(--box-9) + var(--space-4)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
-#canvas .lens-view { position: relative; box-sizing: border-box; padding: var(--safe-top) 0 var(--safe-bottom); overflow: auto; }
-#canvas .lens-view:has(.lf-stage), #canvas .lens-view:has(.code-stage) { padding: var(--safe-top) 0 0; overflow: hidden; }
-/* A style's own code fills its canvas or pane, not the height a document gives its frame. */
-#canvas .code-stage, #panes .pane-canvas .code-stage { height: 100%; }
-#canvas .code-stage > .lens-frame, #panes .pane-canvas .code-stage > .lens-frame { height: 100%; min-height: 0; }
-#canvas .lf-stage { height: 100%; }
-/* The key is shown when the reader turns it on in the settings menu (ui/canvas.js); the drawing's own controls are not drawn. */
-/* The key, always in sight on the canvas: in the safe zone, under the query bar, scrolled when it is longer than the room. */
-#canvas .lf-legend { top: var(--safe-top); bottom: auto; max-height: calc(100% - var(--safe-top) - var(--safe-bottom)); overflow-y: auto; pointer-events: auto; }
-#canvas > .lens-wrap > .lens-bar { position: absolute; z-index: 2; top: calc(var(--box-9) + var(--space-5)); left: var(--space-9); right: var(--space-9); width: auto; pointer-events: none; }
-#canvas > .lens-wrap > .lens-bar > * { pointer-events: auto; }
-#canvas .lens-view > .toolbar { display: none; }
-#canvas .lens-view > .empty, #canvas .lens-view > .error, #canvas .lens-view > .lens-error { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
+body[data-panes="1"] #canvas .pane-canvas .lens-view { padding: var(--safe-top) 0 var(--safe-bottom); }
+body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.lf-stage), body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.code-stage) { padding: var(--safe-top) 0 0; }
+/* A style's own code fills its pane, not the height a document gives its frame. */
+#canvas .code-stage { height: 100%; }
+#canvas .code-stage > .lens-frame { height: 100%; min-height: 0; }
+/* The key, always in sight on a pane alone: in the safe zone, under the query bar, scrolled when it is longer than the room. */
+body[data-panes="1"] #canvas .lf-legend { top: var(--safe-top); bottom: auto; max-height: calc(100% - var(--safe-top) - var(--safe-bottom)); overflow-y: auto; pointer-events: auto; }
+#canvas .pane-canvas > .lens-wrap > .lens-bar { position: absolute; z-index: 2; top: calc(var(--box-9) + var(--space-5)); left: var(--space-9); right: var(--space-9); width: auto; pointer-events: none; }
+#canvas .pane-canvas > .lens-wrap > .lens-bar > * { pointer-events: auto; }
+#canvas .lens-view > .lens-error { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
 
 /* The bar: where the canvas stands, what waits for you, and the menu. */
 #nav { position: fixed; z-index: 5; top: var(--space-4); left: var(--space-9); right: var(--space-9); height: calc(var(--band) - 2 * var(--space-4)); display: flex; align-items: center; gap: var(--space-5); min-width: 0; pointer-events: none; }
@@ -289,33 +286,33 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 .signup-email { flex: 2; min-width: var(--field-least); }
 .signup-error { padding: 0 var(--space-8) var(--space-8); }
 
-/* Panes (ui/panes.js): the canvases docked beside the main one in a tab, each with its name, a way to make it main
-   and to close it. Their frames are set by the layout as shares of the page; the line between two is dragged. */
-#panes > .pane { position: fixed; z-index: 1; display: flex; flex-direction: column; background: var(--ln-sea, var(--bg)); box-sizing: border-box; }
-#panes > .pane.pane-shown { animation: pane-shown 1.2s ease; }
+/* Panes (ui/panes.js): the canvases of a tab, each with its name, a way to keep only it and to close it. Their
+   frames are set by the layout as shares of the page; the line between two is dragged. */
+#canvas > .pane { position: fixed; inset: 0; z-index: 1; display: flex; flex-direction: column; background: var(--ln-sea, var(--bg)); box-sizing: border-box; }
+#canvas > .pane.pane-shown { animation: pane-shown 1.2s ease; }
 @keyframes pane-shown { from { box-shadow: inset 0 0 0 var(--border-2, var(--border-1)) var(--accent); } to { box-shadow: none; } }
-#panes .pane-bar, #main-name { flex: none; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); min-width: 0; }
+#canvas .pane-bar { flex: none; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); min-width: 0; }
 .pane-bar .pane-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-3); font-weight: 600; cursor: grab; user-select: none; touch-action: none; padding: var(--space-2) var(--space-3); }
 .pane-bar .pane-follows { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2, var(--text-3)); color: var(--accent); background: var(--accent-soft); border-radius: var(--radius-2); padding: 0 var(--space-3); margin-left: var(--space-3); }
 .pane-bar .pane-follows[hidden] { display: none; }
-#panes .pane-canvas { position: relative; flex: 1; min-height: 0; overflow: hidden; }
-#panes .pane-canvas > .lens-wrap, #panes .pane-canvas .lens-view { height: 100%; }
-#panes .pane-canvas .lens-view { position: relative; box-sizing: border-box; overflow: auto; }
-#panes .pane-canvas .lens-view:has(.lf-stage) { overflow: hidden; }
-#panes .pane-canvas .lf-stage { height: 100%; }
-#panes .pane-canvas .lens-view > .toolbar { display: none; }
-#panes .pane-canvas > .empty, #panes .pane-canvas > .error, #panes .pane-canvas .lens-view > .empty { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
+#canvas .pane-canvas { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+#canvas .pane-canvas > .lens-wrap, #canvas .pane-canvas .lens-view { height: 100%; }
+#canvas .pane-canvas .lens-view { position: relative; box-sizing: border-box; overflow: auto; }
+#canvas .pane-canvas .lens-view:has(.lf-stage) { overflow: hidden; }
+#canvas .pane-canvas .lf-stage { height: 100%; }
+#canvas .pane-canvas .lens-view > .toolbar { display: none; }
+#canvas .pane-canvas > .empty, #canvas .pane-canvas > .error, #canvas .pane-canvas .lens-view > .empty { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
 /* The line between two panes: drawn by the sash itself, over the bands it crosses, wider and in the accent while it is
    pointed at or dragged; what takes the pointer is wider than what is drawn. */
-#panes > .pane-sash { position: fixed; z-index: 3; background: transparent; }
-#panes > .pane-sash.row { top: 0; bottom: 0; width: var(--space-4); transform: translateX(-50%); cursor: col-resize; }
-#panes > .pane-sash.column { left: 0; right: 0; height: var(--space-4); transform: translateY(-50%); cursor: row-resize; }
-#panes > .pane-sash::after { content: ''; position: absolute; background: var(--line); }
-#panes > .pane-sash.row::after { top: 0; bottom: 0; left: 50%; width: var(--border-1); transform: translateX(-50%); }
-#panes > .pane-sash.column::after { left: 0; right: 0; top: 50%; height: var(--border-1); transform: translateY(-50%); }
-#panes > .pane-sash:hover::after, body[data-dragging="sash"] #panes > .pane-sash::after { background: var(--accent); }
-#panes > .pane-sash.row:hover::after, body[data-dragging="sash"] #panes > .pane-sash.row::after { width: var(--border-3); }
-#panes > .pane-sash.column:hover::after, body[data-dragging="sash"] #panes > .pane-sash.column::after { height: var(--border-3); }
+#canvas > .pane-sash { position: fixed; z-index: 3; background: transparent; }
+#canvas > .pane-sash.row { top: 0; bottom: 0; width: var(--space-4); transform: translateX(-50%); cursor: col-resize; }
+#canvas > .pane-sash.column { left: 0; right: 0; height: var(--space-4); transform: translateY(-50%); cursor: row-resize; }
+#canvas > .pane-sash::after { content: ''; position: absolute; background: var(--line); }
+#canvas > .pane-sash.row::after { top: 0; bottom: 0; left: 50%; width: var(--border-1); transform: translateX(-50%); }
+#canvas > .pane-sash.column::after { left: 0; right: 0; top: 50%; height: var(--border-1); transform: translateY(-50%); }
+#canvas > .pane-sash:hover::after, body[data-dragging="sash"] #canvas > .pane-sash::after { background: var(--accent); }
+#canvas > .pane-sash.row:hover::after, body[data-dragging="sash"] #canvas > .pane-sash.row::after { width: var(--border-3); }
+#canvas > .pane-sash.column:hover::after, body[data-dragging="sash"] #canvas > .pane-sash.column::after { height: var(--border-3); }
 /* While a pane or a line is dragged, a style's frame does not take the pointer from the page. */
 body[data-dragging] { user-select: none; }
 body[data-dragging] iframe { pointer-events: none; }
@@ -324,20 +321,17 @@ body[data-dragging="pane"] { cursor: grabbing; }
 .pane-zone[hidden] { display: none; }
 
 /* The pane the bar and find act on, among several: a line of the accent along its top; the names of the others quiet. */
-#panes > .pane.pane-active > .pane-bar { box-shadow: inset 0 var(--border-2, var(--border-1)) 0 var(--accent); }
-#panes > .pane:not(.pane-active) .pane-name, body:not(:has(#canvas.pane-active)) #main-name .pane-name { color: var(--muted); font-weight: 400; }
-body:has(#canvas.pane-active) #main-name { box-shadow: inset 0 var(--border-2, var(--border-1)) 0 var(--accent); }
+#canvas > .pane.pane-active > .pane-bar { box-shadow: inset 0 var(--border-2, var(--border-1)) 0 var(--accent); }
+#canvas > .pane:not(.pane-active) .pane-name { color: var(--muted); font-weight: 400; }
 /* A pane not in focus takes the first press on a style's frame itself (a frame keeps its presses), and is then in focus. */
-#panes > .pane:not(.pane-active) > .pane-canvas:has(iframe)::after, body[data-active="pane"] #canvas:has(iframe)::after { content: ''; position: absolute; inset: 0; z-index: 3; cursor: pointer; }
+#canvas > .pane:not(.pane-active) > .pane-canvas:has(iframe)::after { content: ''; position: absolute; inset: 0; z-index: 3; cursor: pointer; }
 /* Several panes: the top bar runs in a band across the page and over the sheet, the panes and the sheet under it.
    Every pane keeps a strip of one height at its top, in or out of focus, so nothing moves when focus does: the query
-   bar fills the strip of the pane it acts on, and the others show their names there. The main pane's strip is the same
-   as a docked one's (#main-name), so no pane is special but in which canvas the address draws. */
-#panes .pane-bar, #main-name { box-sizing: border-box; height: var(--strip); padding-top: 0; padding-bottom: 0; }
+   bar fills the strip of the pane it acts on, and the others show their names there. A pane alone has no strip. */
+#canvas .pane-bar { box-sizing: border-box; height: var(--strip); padding-top: 0; padding-bottom: 0; }
 /* In focus, the bar takes the place of the pane's name, between its ⠿ and its ⤢ ×, which stay where they are. */
-#panes > .pane.pane-active > .pane-bar > .pane-name, #panes > .pane.pane-active > .pane-bar > .pane-follows, body:has(#canvas.pane-active) #main-name > :is(.pane-name, .pane-follows) { visibility: hidden; }
+#canvas > .pane.pane-active > .pane-bar > .pane-name, #canvas > .pane.pane-active > .pane-bar > .pane-follows { visibility: hidden; }
+body[data-panes="1"] #canvas .pane-bar { display: none; }
 .pane-bar .pane-grip { cursor: grab; user-select: none; touch-action: none; }
-body[data-active="pane"] #query .q-view, body:has(#canvas.pane-active) #query .q-view { margin: 0 calc(var(--space-5) + 2 * var(--box-7) + 2 * var(--space-3)) 0 calc(var(--space-5) + var(--box-7) + var(--space-3)); padding: 0; background: none; border: 0; }
-#panes > .pane-sash.row { top: var(--band, 0%); }
-#main-name { position: fixed; z-index: 1; top: var(--main-top, 0%); left: var(--main-left, 0%); right: var(--main-right, 0%); }
-#main-name[hidden] { display: none; }
+body:not([data-panes="1"]) #query .q-view { margin: 0 calc(var(--space-5) + 2 * var(--box-7) + 2 * var(--space-3)) 0 calc(var(--space-5) + var(--box-7) + var(--space-3)); padding: 0; background: none; border: 0; }
+#canvas > .pane-sash.row { top: var(--band, 0%); }
