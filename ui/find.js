@@ -7,7 +7,7 @@
 // the query bar's terms, so what it would find is read under the canvas's exclusions.
 
 import { api, h, state } from './base.js';
-import { goLens, home, lensNow, mainActive } from './canvas.js';
+import { goHome, goLens, home, lensNow } from './canvas.js';
 import { numberOf } from './lens-base.js';
 import { workType } from './words.js';
 
@@ -32,9 +32,9 @@ function takeOut() {
   if (!lens?.filter.text) return;
   const { text, ...filter } = lens.filter;
   if (includes(filter)) return goLens({ ...lens, filter });
-  if (!mainActive()) return goLens(home());
   const open = /^#\/e\/(e_[a-z0-9]{8})/.exec(location.hash)?.[1];
-  location.hash = open ? `#/e/${open}` : '#/';
+  if (open) location.hash = `#/e/${open}`;
+  else goHome();
 }
 
 /** Ask what the words would find under the canvas's exclusions, and say it in one line. */
