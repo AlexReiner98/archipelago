@@ -36,7 +36,8 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
   };
   const drawn = `[...document.querySelectorAll('#canvas svg a')].map((a) => a.textContent)`;
   const has = (title: string) => `${drawn}.some((t) => t.includes(${JSON.stringify(title)}))`;
-  const type = (q: string) => page.evaluate(`(() => { const i = document.querySelector('#find input[type=search]'); i.focus(); i.value = ${JSON.stringify(q)}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  // Typed as a person does: find opened by a click on its line, then the words.
+  const type = (q: string) => page.evaluate(`(() => { if (!document.getElementById('find').classList.contains('open')) document.getElementById('find-lens').click(); const i = document.querySelector('#find input[type=search]'); i.value = ${JSON.stringify(q)}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   // Enter, or with Shift held to add what the words find.
   const enter = (shift = false) => page.evaluate(`(() => { document.querySelector('#find input[type=search]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: ${shift}, bubbles: true })); document.querySelector('#find').requestSubmit(); })()`);
   // A set of words taken out by its × in find's Find row.
@@ -63,7 +64,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && ${has('Site works')} && ${has('Gutters')}`), `Enter finds the words, the walk kept: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
       assert.ok(await page.evaluate(has('Elsewhere')), 'the rest of the lens stays');
       assert.ok(await until(`document.querySelector('#find .q-sum')?.textContent.startsWith('Find“roof”or')`), 'the query bar says the words as a Find term, joined by or');
-      assert.ok(await page.evaluate(`${list}.hidden && !document.getElementById('find').classList.contains('open')`), 'find shuts once it is drawn');
+      assert.ok(await until(`${list}.hidden && document.getElementById('find').classList.contains('open') && document.activeElement === document.querySelector('#find input[type=search]') && !document.querySelector('#find input[type=search]').value`), `find stays open and emptied, the cursor in it, to refine further: ${await page.evaluate(`JSON.stringify([${list}.hidden, document.getElementById('find').className, document.activeElement?.outerHTML.slice(0, 80)])`)}`);
       if (shots) writeFileSync(`${shots}/find-drawn-${width}.png`, await page.screenshot());
       // Enter again puts new words in place of those the bar set, and nothing else.
       await type('walls');
@@ -96,7 +97,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
     await type('done');
     assert.ok(await until(`${list}.dataset.for === 'done' && ${list}.querySelector('.find-choice.lit')?.textContent === 'Worddone'`), `Only's own choices, the first lit: ${await page.evaluate(`${list}.textContent`)}`);
     await enter();
-    assert.ok(await until(`location.hash.includes('only=done') && !document.getElementById('find').classList.contains('open')`), `Enter takes it as an Only term: ${await page.evaluate('location.hash')}`);
+    assert.ok(await until(`location.hash.includes('only=done') && document.querySelector('#find .find-mode').textContent === 'Find'`), `Enter takes it as an Only term: ${await page.evaluate('location.hash')}`);
     // A kind's word leading what is typed offers that kind alone, found by the rest: "within site" is Within Site works.
     await type('only ');
     await type('within site');

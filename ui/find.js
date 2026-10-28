@@ -2,8 +2,9 @@
 // the bar acts on in one line (drawn by ui/query-bar.js). A click or / opens it to type, and the lens's rows (Find,
 // Only, Not, Walk, Limit) rise above it. Typing swaps the rows for the choices of what the words could be, each said
 // by its kind (ui/find-choices.js): Words first and lit, so nothing is guessed (decision e_45sgrfqd). ↑↓ move the
-// light; Enter takes it: words in place of the words find set before, every other term and the walk kept, or another
-// term added; Shift+Enter adds the words as another set, found as well (e_e3k797d3). Typing a part's word and a space
+// light; Enter takes it and find stays open, emptied, to refine further: words in place of the words find set before,
+// every other term and the walk kept, or another term added; Shift+Enter adds the words as another set, found as
+// well (e_e3k797d3). Typing a part's word and a space
 // ("only ", "not ", "walk ", "limit "), or a click on a row's word, puts find in that part: its mark stands before the
 // box and the choices are that part's; Backspace in an empty box goes back to Find. Escape empties what was typed, then
 // leaves the part, then shuts find; so does a click away from it.
@@ -39,13 +40,18 @@ function open() {
   input.focus();
   fitBar();
 }
-/** Shut find: what was typed goes, and the lens is said in its line again. */
-function shut() {
-  bar.classList.remove('open', 'typing');
+/** Empty find to type the next term: back in Find, its rows in sight with what was just added, the cursor kept in it. */
+function again() {
+  bar.classList.remove('typing');
   input.value = '';
   toMode('Find', false);
   choices = [];
   list.hidden = true;
+}
+/** Shut find: what was typed goes, and the lens is said in its line again. */
+function shut() {
+  again();
+  bar.classList.remove('open');
   if (bar.contains(document.activeElement)) document.activeElement.blur();
 }
 
@@ -59,12 +65,13 @@ function toMode(m, looking = true) {
 
 /**
  * Take a choice: a part to go into; words in place of those find set before, or (`add`) as one more set; a link to
- * walk along; a limit; any other term added to the lens.
+ * walk along; a limit; any other term added to the lens. Find stays open with the cursor in it, to refine further.
  */
 function take(choice, add = false) {
   if (!choice) return;
   if (choice.mode) return void ((input.value = ''), toMode(choice.mode));
-  shut();
+  again();
+  input.focus();
   const lens = lensUp();
   if (choice.walk) {
     const { over = [], steps = 0 } = lens.walk ?? {};
@@ -164,7 +171,9 @@ export function drawFind() {
     add = false;
   });
   // Another pane or tab in focus: find shuts, and says that lens.
-  addEventListener('pane-focus', shut);
+  // Another pane or tab in focus: find shuts, and says that lens; not while it is being typed in (a lens given to a new
+  // tab puts its pane in focus).
+  addEventListener('pane-focus', () => !bar.contains(document.activeElement) && shut());
 }
 
 addEventListener('keydown', (ev) => {

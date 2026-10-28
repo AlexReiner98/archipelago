@@ -45,9 +45,10 @@ canvas as a flat graph", with its decisions.
   A kind's word first (within, type, status, owner; in, item, tag) offers
   that kind alone, found by the rest, and a name's last word naming a type
   ("archipelago project") narrows it to that type. Find makes no items.
-  Enter takes the lit one (the words in place of those find set before, any
-  other term added); Shift+Enter adds the words as another set; Escape
-  empties what was typed, then shuts find.
+  Enter takes the lit one and find stays open, emptied and back in Find, for
+  the next term (the words in place of those find set before, any other term
+  added); Shift+Enter adds the words as another set; Escape empties what was
+  typed, then leaves the part, then shuts find.
 - **An item's address alone** (`#/e/<id>`) keeps the canvas when it draws
   the item, and otherwise draws the item with what it holds, depends on and
   waits on.
