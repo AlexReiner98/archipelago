@@ -118,13 +118,19 @@ function drawnMark(...strokes) {
   svg.append(...strokes.map((d) => el('path', { d })));
   return svg;
 }
-const dot = (x, y) => `M${x - 2} ${y}a2 2 0 1 0 4 0a2 2 0 1 0 -4 0`;
+const dot = (x, y, r = 2) => `M${x - r} ${y}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
 /** Save's mark: a disk. */
 const saveMark = () => drawnMark('M2.5 2.5h9l2 2v9h-11z', 'M5 2.5v3.5h5v-3.5', 'M5 13.5v-4h6v4');
 /** The canvas picker's mark: three items and the links between them. */
 const canvasMark = () => drawnMark(dot(4, 12), dot(12, 4), dot(12, 12), 'M5.5 10.5l5-5', 'M6 12h4');
-/** The style picker's mark: a brush. */
-const styleMark = () => drawnMark('M2.5 13.5c0-2.2 1.2-3.6 3.1-3.6 1.2 0 2 .8 2 2 0 1.9-2.4 1.6-5.1 1.6z', 'M7 9.6l6.5-7.1');
+/** The style picker's mark: a palette with its paints, and a brush beside it. */
+const styleMark = () =>
+  drawnMark(
+    'M6.5 1.5a5.5 5.5 0 1 0 0 11c.7 0 1.1-.4 1.1-1s-.5-.8-.5-1.4.5-1 1.1-1h.8a3 3 0 0 0 3-3c0-2.6-2.4-4.6-5.5-4.6z',
+    dot(3.9, 7.2, 0.6), dot(5, 4.4, 0.6), dot(8, 4, 0.6),
+    'M15.4 6l-3.2 5.8',
+    'M12.2 11.8c-.8 0-1.4.6-1.4 1.3 0 .5-.3.8-.8 1 1.5.4 2.9-.4 2.9-1.6',
+  );
 
 /** The saved canvas the canvas draws now, if one is: Home marks it. */
 let up = null;
