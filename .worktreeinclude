@@ -1,0 +1,6 @@
+# Archipelago's setup: what it wrote, for each worktree Claude Code makes
+.mcp.json
+.claude/settings.json
+.claude/pelago-hook.mjs
+.claude/pelago.md
+.claude/skills/pelago-bump/references/home.md
