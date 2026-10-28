@@ -127,6 +127,12 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
     await until('a pane once more', async () => (await panes()).length === 2);
     assert.deepEqual(await page.evaluate(`[...${nth(1)}.querySelectorAll('.pane-bar [aria-label]')].map((b) => b.getAttribute('aria-label'))`), ['Move this pane', 'Close this pane'], 'every pane has the same controls');
+    // A pane of the reader's own splits too: Split opens a second of it, not the pane it finds drawing the same.
+    await page.evaluate(`${nth(0)}.querySelector('[aria-label="Close this pane"]').click()`);
+    await until('the reader’s pane alone', async () => (await panes()).length === 1);
+    await press(0);
+    await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
+    await until('the reader’s pane split', async () => (await panes()).length === 2);
   } finally {
     page.close();
   }
