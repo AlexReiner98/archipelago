@@ -34,7 +34,8 @@ test('in a browser, the query bar shows what narrows the filter as chips of thei
   };
   const drawn = `[...document.querySelectorAll('#canvas svg a')].map((a) => a.textContent)`;
   const has = (title: string) => `${drawn}.some((t) => t.includes(${JSON.stringify(title)}))`;
-  const chips = `[...document.querySelectorAll('#query .q-narrow .q-said')].map((c) => c.textContent)`;
+  // The narrowing terms in sight, then those beyond what fits, which its part's "+N more" names.
+  const chips = `[...[...document.querySelectorAll('#query .q-narrow .q-said')].map((c) => c.textContent), ...(document.querySelector('#query .q-filter .q-more')?.title.split(' · ') ?? [])].filter((t) => /^(only|within) /.test(t))`;
   // Written in the filter's own menu, opened from its +.
   const box = (q: string) => page.evaluate(`(() => { document.querySelector('#query [aria-label="Add to the filter"]').click(); const i = document.querySelector('.term-pick-field'); i.value = ${JSON.stringify(q)}; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); })()`);
   const shots = process.env.PELAGO_SHOTS;
