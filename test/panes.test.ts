@@ -58,7 +58,7 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = ${nth(n)}.querySelector('.pane-canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.bottom - 20]; })())`));
     for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
   };
-  const find = (words: string) => page.evaluate(`(() => { const input = document.querySelector('#find input'); input.value = ${JSON.stringify(words)}; input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true })); document.getElementById('find').requestSubmit(); })()`);
+  const find = (words: string) => page.evaluate(`(() => { const input = document.querySelector('#find input'); input.value = ${JSON.stringify(words)}; input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); document.getElementById('find').requestSubmit(); })()`);
   try {
     await page.evaluate(`localStorage.setItem('pelago-follow', 'on')`);
     await wait(3000);
@@ -106,9 +106,10 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     await until('both panes again', async () => (await panes()).length === 2 && (await draws(0, 'First step, renamed')) && (await draws(1, 'Second step, renamed')) && (await panes())[0][3]);
     await press(1);
     await until('the second keeps its history', () => page.evaluate<boolean>(`!document.querySelector('#query [aria-label="Back"]').disabled`));
-    // A click on a node in either pane opens its page over it, the item added to that pane's lens.
+    // A click on a node in either pane opens its page over it, that pane's lens as it was (e_jedng69e): the second
+    // finds by its words, and the item clicked is not added to them.
     await page.evaluate(`${nth(1)}.querySelector('svg a[href="#/e/${made.b}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
-    await until('its page is open over the second', async () => (await page.evaluate<boolean>(`document.body.dataset.sheet === 'open' && location.hash.startsWith('#/e/${made.b}?') && location.hash.includes('Second')`)) && (await panes())[1][3]);
+    await until('its page is open over the second', async () => (await page.evaluate<boolean>(`document.body.dataset.sheet === 'open' && location.hash.startsWith('#/e/${made.b}?') && location.hash.includes('text=Second') && !location.hash.includes('ids=')`)) && (await panes())[1][3]);
     await page.evaluate(`${nth(0)}.querySelector('svg a[href="#/e/${made.a}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
     await until('its page is open over the first', async () => (await page.evaluate<boolean>(`location.hash.startsWith('#/e/${made.a}?') && !location.hash.includes('Second')`)) && (await panes())[0][3]);
     await page.evaluate(`document.getElementById('sheet-close').click()`);

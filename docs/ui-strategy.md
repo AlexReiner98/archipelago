@@ -32,12 +32,12 @@ canvas as a flat graph", with its decisions.
   workspace or a project, open, with what is directly in each.
 
 ### Growing a canvas
-- **A click on a node adds it to the filter** and opens its page in the
-  sheet. Hover shows its title and the start of its note.
+- **A click on a node opens its page** in the sheet and leaves the lens as
+  it was (the owner, 28 Oct 2026). Hover shows its title and the start of
+  its note.
 - **Find, at the canvas's foot, sets the seeds.** Typing shows in one line
   how many it would find and their first names; Enter draws them in place of
-  what was found, + or Shift+Enter adds them to it. What narrows and what is
-  left out stay.
+  the lens, what it leaves out kept; Shift+Enter adds them to it.
 - **An item's address alone** (`#/e/<id>`) keeps the canvas when it draws
   the item, and otherwise draws the item with what it holds, depends on and
   waits on.

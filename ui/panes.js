@@ -70,7 +70,7 @@ function paneEl(id) {
   const canvas = canvasIn(body, {
     go: (lens) => goPane(id, lens ? `v?${flatQuery(lens, canvas.asked)}` : 'v'),
     open: (href) => goPane(id, paneAt(href)),
-    // A click on an item: this pane is the one in focus, its lens grown by the item, the item's page open over it.
+    // A click on an item: this pane is the one in focus, its lens as it was, the item's page open over it.
     opened: (item, lens) => {
       activeIs(id);
       location.hash = `#/e/${item}?${flatQuery(lens, canvas.asked)}`;

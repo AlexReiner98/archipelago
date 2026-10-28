@@ -48,8 +48,8 @@ whole map. Search is the filter's text; tags are a core `tag` type and a
   canvas lens".
 
 ### 4. Lens and style are the whole surface, for people and agents
-A person grows a canvas by editing its lens (a click adds an id, find sets
-the text, the query bar changes any term), and an agent reads the same lens
+A person grows a canvas by editing its lens (find sets its words, the query
+bar changes any term; a click only opens an item's page, e_jedng69e), and an agent reads the same lens
 (`query` name `flat`) and points the page at one (`report` action `show`
 with `lens`). The page calls no tool an agent lacks for it. The bar's
 pickers (the walk's links, the box's types) lead with what the canvas
