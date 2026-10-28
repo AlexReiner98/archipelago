@@ -36,8 +36,8 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
   const has = (title: string) => `${drawn}.some((t) => t.includes(${JSON.stringify(title)}))`;
   // The Only row's terms in sight, then those beyond what fits, which its "+N more" names.
   const chips = `[...[...document.querySelectorAll('#query .q-only .q-narrow .q-said')].map((c) => c.textContent), ...(document.querySelector('#query .q-only .q-more:not([hidden])')?.title.split(' · ') ?? [])]`;
-  // Written in Find's own menu, opened from its +.
-  const box = (q: string) => page.evaluate(`(() => { document.querySelector('#query [aria-label="Find more"]').click(); const i = document.querySelector('.term-pick-field'); i.value = ${JSON.stringify(q)}; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); })()`);
+  // Picked in a row's menu, opened from its +: a kind, then the thing (decision e_45sgrfqd); nothing is written to be guessed.
+  const pick = (plus: string, ...path: string[]) => page.evaluate(`(async () => { document.querySelector('#query [aria-label=${JSON.stringify(plus)}]').click(); for (const label of ${JSON.stringify(path)}) { await new Promise((r) => setTimeout(r, 50)); [...document.querySelectorAll('.term-pick .term-pick-item')].find((b) => b.textContent === label).click(); } })()`);
   const shots = process.env.PELAGO_SHOTS;
   try {
     assert.ok(await until(has('Which tiles?')), `the narrowed canvas is drawn: ${page.logs().join('\n')}`);
@@ -53,9 +53,9 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
     }
     await page.send('Emulation.clearDeviceMetricsOverride');
     // The box narrows: more types found, then only one of them.
-    await box('task');
+    await pick('Find more', 'Type', 'Task');
     assert.ok(await until(`${has('Gutters')} && ${has('Which tiles?')}`), `a type more is found within it: ${page.logs().join('\n')}`);
-    await box('only Task');
+    await pick('Only what is so, of a type, or within an item', 'Type', 'Task');
     assert.ok(await until(`location.hash.includes('only=task') && ${has('Gutters')} && !${has('Which tiles?')}`), `only narrows what is found: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
     assert.ok(await until(`${chips}.join('|') === 'Task|within Site works'`), `each narrowing a term of Only: ${await page.evaluate(`JSON.stringify(${chips})`)}`);
     // Its × takes it out, and what it held back is drawn again.

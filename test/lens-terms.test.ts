@@ -98,3 +98,23 @@ test("Only's plain words: each must hold of every seed, and the walk is not narr
   await assert.rejects(flatLens(l, { filter: { in: [made.p], only: ['nope'] } }), /unknown type "nope": no type nor one of Only's words/);
   assert.equal(await viewAddress(l, { lens: { filter: { in: [made.p], only: ['task', 'owner me'] } } }), `v?in=${made.p}&only=task%2Cowner+me`);
 });
+
+test('a name is never guessed: one item so named is answered by its id, two are refused', async () => {
+  const { l, made } = await project();
+  const more = await make(l, [
+    { op: 'create', ref: 'u', type: 'tag', title: 'Urgent' },
+    { op: 'create', ref: 'sam', type: 'person', title: 'Sam' },
+    { op: 'create', ref: 'sam2', type: 'person', title: 'sam' },
+    { op: 'create', ref: 'bo', type: 'person', title: 'Bo' },
+    { op: 'link', type: 'tagged', from: made.a, to: 'u' },
+  ]);
+  await make(l, [{ op: 'update', id: made.o, owner: more.bo }]);
+  const tagged = await flatLens(l, { filter: { links: ['tagged urgent'] } });
+  assert.deepEqual([titles(tagged), tagged.lens.include.links], [['Find in'], [{ link: 'tagged', to: more.u }]], 'the end named is said back by its id');
+  const owned = await flatLens(l, { filter: { ids: [made.o, made.a], only: ['owner Bo'] } });
+  assert.deepEqual([titles(owned), owned.lens.narrow.words], [['Elsewhere'], [`owner ${more.bo}`]]);
+  await make(l, [{ op: 'create', type: 'tag', title: 'URGENT' }]);
+  await assert.rejects(flatLens(l, { filter: { links: ['tagged Urgent'] } }), /2 items are named "Urgent".*by its id/);
+  await assert.rejects(flatLens(l, { filter: { in: [made.p], only: ['owner Sam'] } }), /2 are named "Sam".*by its id/);
+  assert.deepEqual(titles(await flatLens(l, { filter: { in: [made.p], only: [`owner ${more.sam}`] } })), [], 'by its id, the one meant');
+});

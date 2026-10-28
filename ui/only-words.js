@@ -17,16 +17,12 @@ const MEANS = {
   done: 'What is done or closed',
   blocked: 'What waits on something open, someone, or a resource that is not free',
   'no owner': 'What nobody owns',
-  'owner me': 'What is mine',
   'over estimate': 'What has used more tokens than it was estimated to take',
   'by owner': 'What the owner last set the status of, or an agent on their word',
   'by agent': 'What an agent last set the status of, on its own judgment',
 };
 
-/** The words Only's menu offers, those already in the lens left out; `days` is how far back changed and made since look. */
-export function offered(have, days) {
-  const since = (word) => ({ [`${word} since ${days}d`]: `What was ${word} in the last ${days} days` });
-  return Object.entries({ done: MEANS.done, blocked: MEANS.blocked, 'owner me': MEANS['owner me'], 'no owner': MEANS['no owner'], ...since('changed'), ...since('made'), 'over estimate': MEANS['over estimate'], 'by owner': MEANS['by owner'], 'by agent': MEANS['by agent'] })
-    .filter(([word]) => !have.includes(word))
-    .map(([word, title]) => ({ word, title }));
+/** The words Only's menu offers in one click (those that take nothing after them), those already in the lens left out. */
+export function offered(have) {
+  return ['done', 'blocked', 'no owner', 'over estimate', 'by owner', 'by agent'].filter((word) => !have.includes(word)).map((word) => ({ word, title: MEANS[word] }));
 }

@@ -133,6 +133,8 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
     ...(within ? [{ cond: '(select count(*) from part_closure c where c.descendant = e.id and c.ancestor = any($?::text[])) = cardinality($?::text[])', param: within }] : []),
     ...(await wordConditions(l, words, me)),
   ];
+  // An owner named by name is answered by its id, as a link's end is.
+  if (lens.narrow.words) lens.narrow.words = lens.narrow.words.map((said, i) => (words[i].word === 'owner' ? `owner ${(words[i] as { who: string }).who}` : said));
   const narrowing = terms.filter((t) => t.param !== undefined).map((t) => t.param);
   const narrows = (n: number) => terms.map((t) => (t.param === undefined ? t.cond : t.cond.replaceAll('$?', `$${n++}`)));
   const narrowed = (n: number) => [keep(n), ...narrows(n + 1)].join(' and ');
@@ -158,14 +160,17 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   const checked = checkedAfter(words);
   const reach = () => (checked ? LENS_LIMIT : room());
   const holds = async (found: string[]) => (checked ? holding(l, words, found) : found);
-  // A term's end is an item's id, or else its name: the items so titled (any case) of the types that end of the link
-  // takes ("tagged Urgent" is the tag named Urgent), as the viewer may see them.
+  // A term's end is an item's id, or else its name: the one item so titled (any case) of the types that end of the
+  // link takes ("tagged Urgent" is the tag named Urgent), as the viewer may see it. Nothing is guessed (decision
+  // e_45sgrfqd): a name two items share is refused, and the lens answered says the end by its id.
   const ends = async (term: LinkTerm, end: string) => {
     if ((await l.db.query('select 1 from entity where id = $1', [end])).rows.length) return [end];
     const def = l.registry.relations.get(term.link)!;
     const takes = term.to !== undefined ? def.to : def.from;
     const types = takes.includes('*') ? null : takes.flatMap((t) => l.registry.family(t));
-    const { rows } = await l.db.query<{ id: string }>(`select id from entity where lower(title) = lower($1) and archived_at is null${types ? ' and type = any($3::text[])' : ''} order by updated_at desc, id limit $2`, [end, LENS_LIMIT, ...(types ? [types] : [])]);
+    const { rows } = await l.db.query<{ id: string; type: string }>(`select id, type from entity where lower(title) = lower($1) and archived_at is null${types ? ' and type = any($3::text[])' : ''} order by updated_at desc, id limit $2`, [end, 5, ...(types ? [types] : [])]);
+    if (rows.length > 1) throw new Error(`filter.links: "${term.link} ${end}": ${rows.length > 4 ? 'many items are' : `${rows.length} items are`} named "${end}" (${rows.map((r) => `${r.id}, a ${r.type}`).join('; ')}): name the one meant by its id`);
+    if (rows[0]) term.to !== undefined ? (term.to = rows[0].id) : (term.from = rows[0].id);
     return rows.map((r) => r.id);
   };
 

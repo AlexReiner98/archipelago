@@ -4,14 +4,15 @@
 // (types, tags, items, links; what narrows them, only a type, within an item; and what it leaves out), the walk (the
 // links it follows, how many steps) and the limit. A row shows as many terms as fit and how many more, those a click
 // away, and has its own + that opens one menu
-// (ui/term-pick.js) to add to it; a term's words open it again to change that term, its × takes it away. Every change
+// (ui/term-pick.js) to add to it: a kind, then the thing of that kind (ui/term-kinds.js), never words taken for a term; a term's words open it again to change that term, its × takes it away. Every change
 // is a new lens, handed to `go` (the canvas puts it in the address and draws it). The menus lead with what this canvas
 // and its neighbourhood use (ui/picker-rank.js). No term or part is a box inside a box (rule e_vgs9vt5j).
 
 import { api, asWords, h, state, wordsOf } from './base.js';
 import { numberOf } from './lens-base.js';
 import { ranked, around, uses } from './picker-rank.js';
-import { isWord, offered, onlySaid } from './only-words.js';
+import { isWord, onlySaid } from './only-words.js';
+import { findKinds, onlyKinds } from './term-kinds.js';
 import { pickTerm } from './term-pick.js';
 import { ARROW, NEXT_WAY, relations, titles, typeTitle, types, wayOf, withWay } from './words.js';
 
@@ -46,10 +47,6 @@ function groupsOf(list, item) {
 }
 
 const isId = (s) => /^e_[a-z0-9]{8}$/.test(s);
-/** A type by its id or its title, any case. */
-const typeNamed = (s) => (types.has(s) ? s : [...types.values()].find((t) => !t.dormant && t.title.toLowerCase() === s.toLowerCase())?.id);
-/** A link type by its id or its title, any case. */
-const linkNamed = (s) => (relations.has(s) ? s : [...relations.values()].find((r) => r.title?.toLowerCase() === s.toLowerCase())?.id);
 const linkTitle = (id) => relations.get(id)?.title ?? id.replaceAll('_', ' ');
 /** An item named by its title, once the page knows it; until then a mark, and the name asked for. */
 function nameOf(id, redraw) {
@@ -59,26 +56,6 @@ function nameOf(id, redraw) {
     api('get', { id }).then((got) => (titles.set(id, got.entity.title), redraw())).catch(() => {});
   }
   return '…';
-}
-
-/** What a term written in the box is: `-x` leaves x out, `only <type>` and `within <id>` narrow, an id is an item, `in <id>` what is in it, `#name` a tag, `<link> <end>` a link, a type by its name, else text. */
-function termOf(written) {
-  const s = written.trim();
-  if (!s) return null;
-  if (/^[-−]/.test(s)) {
-    const x = s.slice(1).trim();
-    const left = ['closed', 'system'].includes(x.toLowerCase()) ? x.toLowerCase() : typeNamed(x);
-    return left ? { exclude: left } : null;
-  }
-  if (isId(s)) return { id: s };
-  if (s.startsWith('#') && relations.has('tagged') && s.slice(1).trim()) return { link: `tagged ${s.slice(1).trim()}` };
-  const [, first, rest] = /^(\S+)\s+(.+)$/.exec(s) ?? [];
-  if (first?.toLowerCase() === 'only') return typeNamed(rest.trim()) ? { only: typeNamed(rest.trim()) } : isWord(rest) ? { only: rest.trim() } : null;
-  if (first?.toLowerCase() === 'within') return isId(rest.trim()) ? { within: rest.trim() } : null;
-  if (first?.toLowerCase() === 'in' && isId(rest.trim())) return { in: rest.trim() };
-  if (first && linkNamed(first)) return { link: `${linkNamed(first)} ${rest.trim()}` };
-  if (typeNamed(s)) return { type: typeNamed(s) };
-  return { text: s };
 }
 
 /** The lens with one term added to its filter. */
@@ -169,38 +146,20 @@ export function drawQuery(lens, view, go, lead) {
     };
   };
   const typeChoices = () => [...types.values()].filter((t) => !t.system && t.kind !== 'system');
-  // What Find adds: words, a type, #tag, a link and its end, an item id, what is in an item (or, typed, only a type or within an item).
-  const addToFilter = (anchor, field, value) => pickTerm(anchor, {
-    label: 'Find',
-    groups: groupsOf(ranked(typeChoices(), here.types, near.uses?.types), (t) => ({ label: t.title, title: 'Items of this type, the newest first', pick: () => go(added(but(field, value), { type: t.id })) })),
-    typed: {
-      placeholder: 'Words, a type, #tag, in e_…',
-      title: 'Words to find; a type; #tag; a link and its end (waits_on me); an item id; in and an item id, for all that is in it',
-      pick: (written) => {
-        const t = termOf(written);
-        if (t) go(added(but(field, value), t));
-        return Boolean(t);
-      },
-    },
+  // What Find and Only add: a kind, then the thing (decision e_45sgrfqd, ui/term-kinds.js); nothing written is guessed.
+  const kinds = (field, value) => ({
+    add: (term) => go(added(but(field, value), term)),
+    typeGroups: (pick) => groupsOf(ranked(typeChoices(), here.types, near.uses?.types), (t) => ({ label: t.title, title: t.description ?? t.title, pick: () => pick(t) })),
+    linkGroups: (pick) => groupsOf(ranked([...relations.values()].filter((r) => !r.id.startsWith('sys.') && r.id !== 'tagged'), here.links, near.uses?.links), (r) => ({ label: r.title ?? r.id, title: r.description ?? r.title, ...pick(r) })),
+    hasTags: relations.has('tagged'),
+    most: numberOf(state.style, 'term_find_most'),
+    have: f.only ?? [],
+    // The statuses in use here first, then those of the types Find and Only name.
+    statuses: [...new Set([...(answer?.items ?? []).map((i) => i.status), ...[...(f.types ?? []), ...(f.only ?? []).filter((t) => !isWord(t))].flatMap((t) => [...(types.get(t)?.statuses.open ?? []), ...(types.get(t)?.statuses.closed ?? [])])])].filter(Boolean),
+    days: ['only_since_short', 'only_since_days', 'only_since_long'].map((n) => numberOf(state.style, n)),
   });
-  // What Only narrows Find to: its words (done, blocked, owner me…), a type, or within an item.
-  const narrowTo = (anchor, field, value) => pickTerm(anchor, {
-    label: 'Only',
-    groups: [
-      { label: '', items: offered(f.only ?? [], numberOf(state.style, 'only_since_days')).map(({ word, title }) => ({ label: word, title, pick: () => go(added(but(field, value), { only: word })) })) },
-      ...groupsOf(ranked(typeChoices().filter((t) => !(f.only ?? []).includes(t.id)), here.types, near.uses?.types), (t) => ({ label: t.title, title: 'Only what is of this type', pick: () => go(added(but(field, value), { only: t.id })) })),
-    ],
-    typed: {
-      placeholder: 'status todo, owner Sam, a type, an id…',
-      title: 'Only what is so (done, blocked, status <s>, owner me or a person, no owner, over estimate, changed or made since 7d or a date, by owner, by agent), of a type, or within an item (its id), at any depth',
-      pick: (written) => {
-        const s = written.trim();
-        const t = isId(s) ? { within: s } : isWord(s) ? { only: s.replace(/\s+/g, ' ') } : typeNamed(s) ? { only: typeNamed(s) } : null;
-        if (t) go(added(but(field, value), t));
-        return Boolean(t);
-      },
-    },
-  });
+  const addToFilter = (anchor, field, value) => pickTerm(anchor, findKinds(kinds(field, value)));
+  const narrowTo = (anchor, field, value) => pickTerm(anchor, onlyKinds(kinds(field, value)));
   // What Not leaves out of everything: closed, system, or a type.
   const leaveOut = (anchor, field, value) => pickTerm(anchor, {
     label: 'Not',

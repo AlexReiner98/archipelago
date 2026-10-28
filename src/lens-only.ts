@@ -58,16 +58,21 @@ export async function wordConditions(l: Archipelago, words: Word[], me: string |
     else if (w.word === 'status') out.push({ cond: 'e.status = $?', param: w.status });
     else if (w.word === 'changed since') out.push({ cond: 'e.updated_at >= $?::timestamptz', param: w.since.toISOString() });
     else if (w.word === 'made since') out.push({ cond: 'e.created_at >= $?::timestamptz', param: w.since.toISOString() });
-    else if (w.word === 'owner') out.push({ cond: 'e.owner = any($?::text[])', param: await people(l, w.who, me) });
+    else if (w.word === 'owner') {
+      const who = await people(l, w.who, me);
+      if (w.who !== 'me' && who.length === 1) w.who = who[0];
+      out.push({ cond: 'e.owner = any($?::text[])', param: who });
+    }
   }
   return out;
 }
 
-/** Who a word names: me, a person's id, or the people and agents so titled (any case), as the viewer may see them. */
+/** Who a word names: me, a person's id, or the one person or agent so titled (any case), as the viewer may see them; a name two share is refused, never guessed (decision e_45sgrfqd). */
 async function people(l: Archipelago, who: string, me: string | null): Promise<string[]> {
   if (who.toLowerCase() === 'me') return me ? [me] : [];
   if ((await l.db.query('select 1 from entity where id = $1', [who])).rows.length) return [who];
-  const { rows } = await l.db.query<{ id: string }>(`select id from entity where lower(title) = lower($1) and kind = 'actor' and archived_at is null order by id limit $2`, [who, 50]);
+  const { rows } = await l.db.query<{ id: string; type: string }>(`select id, type from entity where lower(title) = lower($1) and kind = 'actor' and archived_at is null order by id limit $2`, [who, 5]);
+  if (rows.length > 1) throw new Error(`filter.only: "owner ${who}": ${rows.length} are named "${who}" (${rows.map((r) => `${r.id}, a ${r.type}`).join('; ')}): name the one meant by its id`);
   return rows.map((r) => r.id);
 }
 
