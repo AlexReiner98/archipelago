@@ -154,7 +154,7 @@ reply ending, commits accounted for) is `docs/agents.md`.
   that code a page to touch, a way to the network, or anything typed. After
   changing `ui/draw.js`, `ui/draw.html`, `ui/marks.js`, `ui/surface.js` or the frame's policy in
   `src/server.ts`, run a hostile style against it in a real browser (the
-  browser pane will not load a sandboxed frame); `test/drawings.test.ts`
+  browser pane will not load a sandboxed frame; to see drawings there, start a dev server with `PELAGO_UNSANDBOXED=1`, which drops that wall and keeps the worker); `test/drawings.test.ts`
   does, in headless Chrome.
 
 ## UI rules

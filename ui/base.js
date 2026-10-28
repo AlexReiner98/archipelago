@@ -32,6 +32,10 @@ export function h(tag, attrs, ...kids) {
   return el;
 }
 
+// The sandbox of a frame drawing code runs in. Only a dev server started with PELAGO_UNSANDBOXED=1 marks the page to
+// drop it, for a browser that loads no sandboxed frame (the desktop app's pane); the worker inside is still a wall.
+export const frameSandbox = () => (document.documentElement.dataset.drawSandbox === 'off' ? null : 'allow-scripts');
+
 // Questions are asked in the page rather than with confirm() and prompt(), so
 // they can be styled and browser automation can answer them. Resolves to null
 // when dismissed; otherwise true, or the text typed when `input` is given, or,
