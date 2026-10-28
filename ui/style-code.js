@@ -1,6 +1,6 @@
 // A style that carries its own code: the drawing a person or an agent wrote for their own project.
 
-import { api, h } from './base.js';
+import { api, frameSandbox, h } from './base.js';
 import { STYLE_COLORS, litSwitch } from './lens-base.js';
 import { saidDrawn } from './look.js';
 
@@ -29,7 +29,7 @@ export function drawCode(host, answer, style, keep, _place, coder) {
   const run = (host.coded = { code, fields: JSON.stringify(fields), data, frame: undefined, hear: undefined });
   const draw = () => {
     error.hidden = true;
-    run.frame = h('iframe', { class: 'lens-frame', sandbox: 'allow-scripts', src: '/draw.html', title: 'The map, drawn by this style' });
+    run.frame = h('iframe', { class: 'lens-frame', sandbox: frameSandbox(), src: '/draw.html', title: 'The map, drawn by this style' });
     stage.replaceChildren(run.frame);
     // A frame that never says it is ready was not let in by the browser: say so, not a blank.
     const mine = run.frame;

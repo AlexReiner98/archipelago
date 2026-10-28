@@ -38,10 +38,13 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
       return null;
     }
   };
-  // The marks are what is directly in the picture, and in a bare group directly in it (a layer).
+  // The marks are what is directly in the picture, and in a bare group directly in it (a layer). Each is measured shown:
+  // a mark not drawn has no box (a browser answers one at the origin), and kept so it would stay out of sight wherever
+  // the reader went, until the origin came into view (e_wsexbmgf). The cull that follows puts out what is not in view.
   const read = () => {
-    const els = [...svg.children].flatMap((el) => (el.tagName === 'g' && !el.attributes.length ? [...el.children] : [el]));
-    marks = els.filter((el) => el.tagName !== 'defs' && el.tagName !== 'title').map((el) => ({ el, at: box(el), off: el.getAttribute('display') === 'none' }));
+    const els = [...svg.children].flatMap((el) => (el.tagName === 'g' && !el.attributes.length ? [...el.children] : [el])).filter((el) => el.tagName !== 'defs' && el.tagName !== 'title');
+    for (const el of els) el.removeAttribute('display');
+    marks = els.map((el) => ({ el, at: box(el), off: false }));
     const text = svg.querySelector('text');
     textPx = text ? parseFloat(getComputedStyle(text).fontSize) || 0 : 0;
   };

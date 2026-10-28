@@ -30,6 +30,23 @@ test('an agent makes and changes a saved canvas through change, and report show 
   assert.ok(!drawn.items.some((i) => i.id === id), 'not drawn on a canvas of the work');
 });
 
+test("a pack ships canvases as presets: the schema offers each, its lens answers, and the owner keeps their version under its id", async () => {
+  const l = await fresh();
+  const { canvases, shapes } = (await callTool(l, human, 'schema', {})) as { canvases: { id: string; pack: string; title: string; props: { filter: Record<string, unknown>; walk: unknown } }[]; shapes: { shape: string }[] };
+  const waiting = canvases.find((c) => c.id === 'core.waiting');
+  assert.ok(waiting && waiting.pack === 'core' && waiting.title, 'core ships what waits on you');
+  assert.ok(shapes.some((s) => s.shape === 'flow'), 'the shapes the drawings draw, for the style switch');
+  // What waits on the person looking: the lens answers as a saved one does.
+  const { me } = await l.init(human, { name: 'Me' });
+  const { t } = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'T' }]);
+  await l.change(human, { reason: 'test', ops: [{ op: 'link', type: 'waits_on', from: t, to: me }] });
+  const drawn = (await callTool(l, human, 'view', { name: 'flat', params: { filter: waiting.props.filter, walk: waiting.props.walk } })) as { items: { id: string }[] };
+  assert.ok(drawn.items.some((i) => i.id === t), 'what waits on you is drawn');
+  const kept = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: waiting.title, props: { ...waiting.props, preset: waiting.id } }] })) as { created: Record<string, string> };
+  const got = (await callTool(l, human, 'query', { name: 'get', params: { id: kept.created.c } })) as { entity: { props: Record<string, unknown> } };
+  assert.equal(got.entity.props.preset, 'core.waiting', 'the owner’s version names the preset it stands for');
+});
+
 test('in a browser, a canvas is saved from the bar, listed on Home, opened and switched to, its places its own', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {
@@ -58,10 +75,10 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
       const name = `Saved at ${width}`;
       await page.go(`${base}/#/v?ids=${made.p}&over=part_of&steps=1`);
       assert.ok(await until(drawn(made.a)), `drawn: ${page.logs().join('\n')}`);
-      assert.ok(await until(`${picked} === 'Not saved'`), 'the bar says what is up is not saved');
+      assert.ok(await until(`document.querySelector('#query .q-pick')?.title.startsWith('Not saved')`), 'the bar says what is up is not saved');
 
       // Saved from the bar: a name asked in the page.
-      await page.evaluate(`document.querySelector('#query .q-save').click()`);
+      await page.evaluate(`document.querySelector('#query .q-save[aria-label="Save this canvas"]').click()`);
       assert.ok(await until(`Boolean(document.querySelector('dialog.ask[open] textarea'))`), 'a name is asked');
       await page.evaluate(`(() => { const d = document.querySelector('dialog.ask'); d.querySelector('textarea').value = ${JSON.stringify(name)}; d.querySelector('button[value="ok"]').click(); })()`);
       assert.ok(await until(`${picked} === ${JSON.stringify(name)}`), `the bar names it: ${await page.evaluate(picked)}`);
@@ -71,7 +88,7 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
       assert.equal(await canvasUp(), saved.id, 'its id in the address');
 
       // Moved on it: written under its own id, not the item's canvas or the map's.
-      await page.evaluate(`document.getElementById('canvas').dispatchEvent(new CustomEvent('drawing-drop', { detail: { id: '${made.a}', x: ${width}, y: 77 } }))`);
+      await page.evaluate(`document.querySelector('#canvas .pane-canvas').dispatchEvent(new CustomEvent('drawing-drop', { detail: { id: '${made.a}', x: ${width}, y: 77 } }))`);
       await page.evaluate(`location.hash = '#/'`);
       let mine: Record<string, [number, number]> = {};
       for (const end = Date.now() + 10000; Date.now() < end && !mine[made.a]; await wait(200)) mine = (await call('/api/places', undefined, { canvas: saved.id })).result;
@@ -100,7 +117,7 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
     assert.equal(await canvasUp(), other);
     assert.ok(await until(`${picked} === 'The other one'`), 'named in the bar');
     // As a chip, or in the folded line when the bar is narrow (560 px, from the loop above).
-    assert.ok(await until(`[...document.querySelectorAll('#query .q-id, #query .q-sum')].some((c) => c.textContent.includes('Another project'))`), 'its lens in the bar');
+    assert.ok(await until(`[...document.querySelectorAll('#find .q-id, #find .q-more')].some((c) => (c.textContent + c.title).includes('Another project'))`), 'its lens in the bar');
     await page.evaluate(`(() => { const s = document.querySelector('#query .q-pick'); s.value = [...s.options].find((o) => o.textContent === 'Saved at 1280').value; s.dispatchEvent(new Event('change')); })()`);
     assert.ok(await until(drawn(made.a)), 'switched from the bar');
     assert.ok(await until(`${picked} === 'Saved at 1280'`));

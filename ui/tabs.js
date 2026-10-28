@@ -1,5 +1,6 @@
-// The reader's tabs (ui/tab-bar.js): each a whole canvas and the panes split beside it (ui/panes.js), which stay
-// together in it (decision e_mzer5m4t). Where they stand is the reader's, kept in this browser for each workspace, as
+// The reader's tabs (ui/tab-bar.js): each a set of panes side by side (ui/panes.js), all of one kind, which stay
+// together in it (decision e_mzer5m4t). Each pane keeps its own address and its own back and forth, here, so a reload
+// draws every pane as it was. Where they stand is the reader's, kept in this browser for each workspace, as
 // the canvas's settings are: never on the map, and meaning nothing. A tab follows everyone, nobody or one session
 // (ui/pane-route.js). One popped out into a window of its own (e_ezb7s3a7) is kept apart, under its own key, by that
 // window, so the two pages never write over each other; the main page reads it there, and takes it back when docked.
@@ -14,9 +15,25 @@ export const listKey = () => `pelago-tabs:${ws()}`;
 export const outKey = (id) => `pelago-tab:${ws()}:${id}`;
 export const isOutKey = (key) => key?.startsWith(`pelago-tab:${ws()}:`);
 export const newId = (prefix) => `${prefix}${Math.random().toString(36).slice(2, 10)}`;
-/** A tab: the address its canvas draws, whom it follows, and the panes split beside it, each its share. */
-export const freshTab = (more = {}) => ({ id: newId('t'), at: '#/', follows: 'all', dir: 'row', groups: ['main'], sizes: [1], panes: {}, ...more });
-const sound = (t) => typeof t?.id === 'string' && t.groups?.includes('main') && t.sizes?.length === t.groups.length;
+/** A pane: the address it draws, its back and forth, and whose it is (`slot`, a name a session gave it; `held`, the session it is for). */
+export const freshPane = (at, more = {}) => ({ at: asPane(at || '#/'), back: [], forth: [], ...more });
+/** A tab: its panes, each its share, whom it follows, and the pane last touched in it; `sheet`, the page open over it when it was last in sight. */
+export function freshTab(at = '#/', { slot, held, ...more } = {}) {
+  const p = newId('p');
+  return { id: newId('t'), follows: 'all', dir: 'row', groups: [p], sizes: [1], panes: { [p]: freshPane(at, { ...(slot && { slot }), ...(held && { held }) }) }, focus: p, ...more };
+}
+/** A tab kept before every pane was equal (its canvas `main`, its address `at`): the canvas becomes a pane like the others. */
+function upgrade(t) {
+  if (!t?.groups?.includes('main')) return t;
+  const p = newId('p');
+  const { at, slot, ...rest } = t;
+  rest.panes = { ...(t.panes ?? {}), [p]: freshPane(at, slot ? { slot } : {}) };
+  rest.groups = t.groups.map((g) => (g === 'main' ? p : g));
+  if (!t.focus || t.focus === 'main') rest.focus = p;
+  for (const [key, l] of landed) if (key === `${t.id}:main`) (landed.delete(key), landed.set(`${t.id}:${p}`, l));
+  return rest;
+}
+const sound = (t) => typeof t?.id === 'string' && t.groups?.length > 0 && t.sizes?.length === t.groups.length && t.groups.every((g) => t.panes?.[g]);
 
 const load = (key, from = localStorage) => {
   try {
@@ -48,7 +65,7 @@ export function outTabs() {
     for (let n = 0; n < localStorage.length; n++) {
       const key = localStorage.key(n);
       if (!isOutKey(key)) continue;
-      const t = load(key);
+      const t = upgrade(load(key));
       if (!sound(t)) continue;
       if (t.docked && !poppedTab) {
         const { docked: _, ...back } = t;
@@ -65,19 +82,19 @@ export function outTabs() {
 /** Read the tabs kept: in a popped window its one tab (kept for a reload in the window's own session), else the page's. */
 export function read() {
   if (poppedTab) {
-    const t = load(outKey(poppedTab)) ?? load('pelago-tab', sessionStorage);
-    tabs.list = [sound(t) ? t : freshTab({ id: poppedTab, at: location.hash })];
+    const t = upgrade(load(outKey(poppedTab)) ?? load('pelago-tab', sessionStorage));
+    tabs.list = [sound(t) ? t : freshTab(location.hash, { id: poppedTab })];
     tabs.front = poppedTab;
     return;
   }
   const got = load(listKey());
-  tabs.list = (got?.tabs ?? []).filter(sound);
-  outTabs();
-  if (!tabs.list.length) tabs.list = [freshTab({ at: location.hash || '#/' })];
-  tabs.front = tabs.list.some((t) => t.id === got?.front) ? got.front : tabs.list[0].id;
   // Which session holds which tab outlives a reload, as long as it is recent.
   landed.clear();
   for (const [key, l] of Object.entries(got?.landed ?? {})) if (Date.now() - l.at < 600_000) landed.set(key, l);
+  tabs.list = (got?.tabs ?? []).map(upgrade).filter(sound);
+  outTabs();
+  if (!tabs.list.length) tabs.list = [freshTab(location.hash || '#/')];
+  tabs.front = tabs.list.some((t) => t.id === got?.front) ? got.front : tabs.list[0].id;
 }
 export function keep() {
   if (poppedTab) return save(outKey(poppedTab), front());
@@ -93,3 +110,18 @@ export const named = (at) => {
 };
 /** An address of the page (#/v?…, #/) as a pane's own. */
 export const asPane = (href) => href.replace(/^#\//, '') || 'v';
+/** A pane's address as the page's: Home is #/. */
+export const hrefOf = (at) => (!at || at === 'v' ? '#/' : `#/${at}`);
+/** The pane of tab `t` last touched, else its first. */
+export const focusOf = (t) => (t.groups.includes(t.focus) ? t.focus : t.groups[0]);
+/**
+ * The address a tab stands at: its pane in focus, under the page open over it (an item's page keeps the pane's lens
+ * beside it, as a click on a node writes it).
+ */
+export function tabHref(t) {
+  const href = hrefOf(t.panes[focusOf(t)]?.at);
+  if (!t.sheet) return href;
+  if (!/^e\/e_[a-z0-9]{8}$/.test(t.sheet)) return `#/${t.sheet}`;
+  const query = href.split('?')[1];
+  return `#/${t.sheet}${query ? `?${query}` : ''}`;
+}

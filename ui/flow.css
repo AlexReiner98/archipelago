@@ -5,7 +5,7 @@
 .lf-stage[data-text="none"] > svg text { display: none; }
 .lf-stage > svg { display: block; width: 100%; height: 100%; }
 /* What the marks mean: a card in the frame's corner, one mark to a line, whatever the zoom. */
-.lf-legend { position: absolute; top: var(--ln-legend-inset); left: var(--ln-legend-inset); display: flex; flex-direction: column; gap: var(--ln-legend-gap); padding: var(--ln-legend-pad-y) var(--ln-legend-pad-x); background: var(--ln-land); border: var(--ln-rule) solid var(--ln-line); border-radius: var(--ln-radius-size); color: var(--ln-text); font-size: var(--ln-legend-text); pointer-events: none; }
+.lf-legend { position: absolute; top: var(--ln-legend-inset); left: var(--ln-legend-inset); display: flex; flex-direction: column; gap: var(--ln-legend-gap); padding: var(--ln-legend-pad-y) var(--ln-legend-pad-x); background: var(--ln-land); border: var(--ln-rule) solid var(--ln-line); border-radius: var(--ln-radius-size); color: var(--ln-text); font-size: var(--ln-legend-text); pointer-events: none; box-sizing: border-box; }
 .lf-legend span { display: flex; gap: var(--ln-legend-mark-gap); align-items: center; white-space: nowrap; }
 /* A row's words are one line, as long as they are; a row for an item opens its page. */
 .lf-legend span > span, .lf-legend a { display: block; color: inherit; text-decoration: none; }

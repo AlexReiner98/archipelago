@@ -154,7 +154,7 @@ reply ending, commits accounted for) is `docs/agents.md`.
   that code a page to touch, a way to the network, or anything typed. After
   changing `ui/draw.js`, `ui/draw.html`, `ui/marks.js`, `ui/surface.js` or the frame's policy in
   `src/server.ts`, run a hostile style against it in a real browser (the
-  browser pane will not load a sandboxed frame); `test/drawings.test.ts`
+  browser pane will not load a sandboxed frame; to see drawings there, start a dev server with `PELAGO_UNSANDBOXED=1`, which drops that wall and keeps the worker); `test/drawings.test.ts`
   does, in headless Chrome.
 
 ## UI rules
@@ -172,7 +172,7 @@ The canvas keeps to these (the flat canvas, 25 Oct 2026: document
   scale and how much text shows, never structure.
 - **Lens and style are the whole surface.** What a canvas shows is a flat
   lens (a filter of terms that add seeds and terms that must all hold of
-  them, a walk, a limit), always in sight in the query bar; how it
+  them, a walk, a limit), always in sight in find at the canvas's foot; how it
   looks is a style. A click adds to the filter and a search sets its text:
   growing a canvas is editing its lens. A person and an agent read the same
   lens (`query` name `flat`), and the page calls no tool an agent lacks for
@@ -224,8 +224,12 @@ spatial where it can be):
 - **One word for each idea.** Item, link, kind, type, field, view,
   drawing, pack, change, rule, the map, as `docs/glossary.md` defines them;
   `npm test` refuses the retired words in the UI and the tool text.
-- **A mark for a state.** Status, age, authority and counts are pills, marks
-  and numbers, not sentences.
+- **A mark for a state.** Status, age, authority and counts are marks and
+  numbers, not sentences.
+- **No pills.** Controls and terms are not each wrapped in a capsule, and no
+  box holds more boxes: a group is a band or a row set apart by space and a
+  line, and what is in it is plain text and marks on that surface. Smaller
+  corners do not meet it (the owner, 27 Oct 2026; rule e_vgs9vt5j on the map).
 - **One or two actions in sight.** What is done rarely goes in a `menu`.
 - **Connections are drawn, never listed.** What an item is tied to is a
   wire on the canvas (the flow, by the canvas pack's preset, or a view's own
@@ -320,3 +324,9 @@ shard, to add to both matrices in `.github/workflows/tests.yml`.
 
 The UI asks its questions in the page (`ask` and `tell` in `ui/base.js`), so
 browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.
+
+## Archipelago
+
+This project's work is kept in Archipelago (https://app.archipelago.tools). How to work with it:
+
+@.claude/pelago.md

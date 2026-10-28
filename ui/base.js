@@ -32,6 +32,15 @@ export function h(tag, attrs, ...kids) {
   return el;
 }
 
+/** A lens's sets of words, each its own Find term: one or several (the find bar's Shift+Enter adds a set, e_e3k797d3). */
+export const wordsOf = (filter) => [].concat(filter?.text ?? []).filter(Boolean);
+/** The words as a filter keeps them: one set as itself, several as a list, none left out. */
+export const asWords = (sets) => { const w = [...new Set(sets.map((s) => s.trim()).filter(Boolean))]; return w.length > 1 ? { text: w } : w.length ? { text: w[0] } : {}; };
+
+// The sandbox of a frame drawing code runs in. Only a dev server started with PELAGO_UNSANDBOXED=1 marks the page to
+// drop it, for a browser that loads no sandboxed frame (the desktop app's pane); the worker inside is still a wall.
+export const frameSandbox = () => (document.documentElement.dataset.drawSandbox === 'off' ? null : 'allow-scripts');
+
 // Questions are asked in the page rather than with confirm() and prompt(), so
 // they can be styled and browser automation can answer them. Resolves to null
 // when dismissed; otherwise true, or the text typed when `input` is given, or,

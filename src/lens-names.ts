@@ -15,7 +15,9 @@ export function renamedLens(props: Props, from: string, to: string, what: 'entit
     if (types || only || exclude) out.filter = { ...filter, ...(types && { types }), ...(only && { only }), ...(exclude && { exclude }) };
     return out;
   }
-  const over = swap(walk.over);
+  // A walked link may say its way (`depends_on>`, `depends_on<`): renamed, it keeps it.
+  const named = (n: unknown) => typeof n === 'string' && [from, `${from}>`, `${from}<`].includes(n);
+  const over = Array.isArray(walk.over) && walk.over.some(named) ? walk.over.map((n) => (named(n) ? `${to}${(n as string).slice(from.length)}` : n)) : undefined;
   if (over) out.walk = { ...walk, over };
   const term = (t: unknown) =>
     typeof t === 'string' && t.startsWith(`${from} `) ? `${to}${t.slice(from.length)}` : t && typeof t === 'object' && (t as Props).link === from ? { ...(t as Props), link: to } : t;

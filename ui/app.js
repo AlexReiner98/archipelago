@@ -4,18 +4,19 @@
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
 import { SignInNeeded, api, h, hooks, join, main, part, showIdentity, signIn, state, store } from './base.js';
-import { canvasHas, canvasHref, focusOn, lensNow, mark, refreshCanvas, showCanvas } from './canvas.js';
-import { openCanvas } from './canvases.js';
+import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { mayLeave, newItem } from './draft.js';
 import { drawFind } from './find.js';
 import { signupPage, welcome } from './signup.js';
 import { home } from './home.js';
 import { entity } from './item.js';
-import { readFlatLens } from './lens.js';
+import { flatQuery } from './lens.js';
 import { stale } from './live.js';
 import { drawNav, screenOfPage, screenPage } from './nav.js';
 import { loadSchema, typeChoice, types, workType } from './words.js';
+import { atOf } from './pane-address.js';
 import { startTabs } from './pane-land.js';
+import { hrefNow, toAddress } from './panes.js';
 import { startTips } from './tip.js';
 import { workspace } from './workspace.js';
 
@@ -23,7 +24,7 @@ import { workspace } from './workspace.js';
 const SHEET = { e: 'item', new: 'item', s: 'screen', workspace: 'workspace', you: 'you' };
 const sheet = document.getElementById('sheet');
 startTips();
-const close = () => (location.hash = canvasHref());
+const close = () => (location.hash = hrefNow());
 document.getElementById('sheet-close').addEventListener('click', close);
 addEventListener('keydown', (ev) => ev.key === 'Escape' && document.body.dataset.sheet && !document.querySelector('dialog[open]') && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? '') && close());
 
@@ -31,7 +32,10 @@ addEventListener('keydown', (ev) => ev.key === 'Escape' && document.body.dataset
 async function drawMarks() {
   const [held, mine] = await Promise.all([api('proposals').catch(() => []), api('view', { name: 'attention', params: { person: 'me', reasons: ['waits_on', 'to_confirm', 'due', 'unsettled'], limit: 50 } }).catch(() => ({ items: [] }))]);
   const n = held.length + mine.items.length;
-  document.getElementById('marks').replaceChildren(n ? h('a', { class: `count${held.length ? ' held' : ''}`, href: '#/you', title: [held.length && `${held.length} held for your word`, mine.items.length && `${mine.items.length} your move`].filter(Boolean).join(', ') }, String(n)) : '');
+  // What is held is answered on the page that holds it; else the mark opens a canvas of what waits on you (the bar names
+  // it by the saved canvas that draws the same, a pack's or the owner's).
+  const href = held.length ? '#/you' : `#/v?${flatQuery({ filter: { links: ['waits_on me'] } })}`;
+  document.getElementById('marks').replaceChildren(n ? h('a', { class: `count${held.length ? ' held' : ''}`, href, title: [held.length && `${held.length} held for your word`, mine.items.length && `${mine.items.length} your move`].filter(Boolean).join(', ') }, String(n)) : '');
 }
 
 /** `pulse`: the map changed under the page, which is drawn again where it stands. */
@@ -58,19 +62,13 @@ async function route(pulse = false) {
   drawNav();
   startTabs();
   const params = new URLSearchParams(query);
-  // The canvas: the lens the address says (ui/query-bar.js shows it); an item's page with none keeps what is up when
-  // it draws the item, and else opens on the item. An address from before the flat lens (?in=) opens on what it names.
-  const asked = readFlatLens(params.has('in') ? `from=${params.get('in')}` : query);
-  // A saved canvas named alone opens with its lens and style put in the address.
-  if (name === 'v' && !asked.lens && asked.style.canvas) return void openCanvas(asked.style.canvas);
+  // The canvas: the pane in focus draws the lens the address says (ui/query-bar.js shows it); an item's page with none
+  // keeps what is up when it draws the item, and else opens on the item. (?in= is Find's term for what is in an item,
+  // e_93a7ch6k: an address from before the flat lens that used it for the item it opened on now draws what is in it.)
   if (pulse) refreshCanvas(true);
-  else if (name === 'v') showCanvas(asked.lens, params.get('here') ?? undefined, asked.style);
-  else if (name === 'e' && arg) {
-    if (asked.lens) showCanvas(asked.lens, arg, asked.style);
-    else if (lensNow() && canvasHas(arg)) mark(arg);
-    else showCanvas(focusOn(arg), arg);
-  } else if (!SHEET[name] || !document.querySelector('#canvas .lens-wrap')) showCanvas(null);
-  if (name !== 'e') mark(undefined);
+  else if (name === 'e' && arg) toAddress(atOf(location.hash) ?? (canvasHas(arg) ? undefined : `e/${arg}`), arg);
+  else if (!SHEET[name]) toAddress(atOf(location.hash) ?? 'v', params.get('here') ?? undefined);
+  if (name !== 'e') mark(params.get('here') ?? undefined);
   // The sheet: open over the canvas for what it holds, else shut.
   const page = SHEET[name];
   document.body.dataset.sheet = page ? 'open' : '';

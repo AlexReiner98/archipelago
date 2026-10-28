@@ -2,6 +2,8 @@
 
 import { applyTheme } from './theme.js';
 import { api, h, state } from './base.js';
+// A menu (below) is placed in sight each time it opens.
+import './menu-place.js';
 
 // ---- shared lookups ------------------------------------------------------
 
@@ -37,6 +39,16 @@ export const isA = (typeId, ancestor) => {
 export const fits = (allowed, typeId) => allowed.some((a) => a === '*' || isA(typeId, a));
 // Relations the system keeps itself (what a session works on, who holds a resource) are not edited by hand.
 export const kept = (relId) => relId.startsWith('sys.') || relId === 'holds';
+/** A link the walk follows and which way (decision e_gue6cg6q): `>` out along it, `<` in to it, else either way. */
+export const wayOf = (term) => {
+  const way = term.endsWith('>') ? 'out' : term.endsWith('<') ? 'in' : 'either';
+  return { link: way === 'either' ? term : term.slice(0, -1), way };
+};
+/** A walked link written with its way, as the lens keeps it. */
+export const withWay = (link, way) => `${link}${{ out: '>', in: '<' }[way] ?? ''}`;
+/** Each way's arrow, and the way a click on it turns to. */
+export const ARROW = { either: '↔', out: '→', in: '←' };
+export const NEXT_WAY = { either: 'out', out: 'in', in: 'either' };
 
 export const when = (ts) => new Date(ts).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 export const daysAgo = (ts) => {
@@ -218,8 +230,13 @@ export function menu(label, items) {
   const box = h('details', { class: 'menu' }, h('summary', {}, label), h('div', { class: 'menu-items' }, items.filter(Boolean).map(([text, onclick, cls]) => h('button', { class: cls ?? '', onclick: (ev) => ((box.open = false), onclick(ev)) }, text))));
   return box;
 }
+// A menu shuts on a click anywhere else, and once one of its options is chosen (☰ and what it holds included); a tick
+// (a checkbox, or an item that is one) keeps it open, as more than one may be ticked.
+const isTick = (el) => el.matches('[role="menuitemcheckbox"], input[type="checkbox"]') || Boolean(el.matches('label') && el.querySelector('input[type="checkbox"]'));
 document.addEventListener('click', (ev) => {
-  for (const open of document.querySelectorAll('details.menu[open]')) if (!open.contains(ev.target)) open.open = false;
+  const hit = ev.target.closest?.('.menu-items :is(button, a, label, input)');
+  const option = hit && !isTick(hit) ? hit : null;
+  for (const open of document.querySelectorAll('details.menu[open]')) if (!open.contains(ev.target) || (option && open.contains(option))) open.open = false;
 });
 
 /** When an open item was last changed or confirmed, as a mark that turns as it ages. */

@@ -1,4 +1,4 @@
-import { api, h } from './base.js';
+import { api, asWords, h, wordsOf } from './base.js';
 import { replicate } from './live.js';
 import { unfollow } from './replica.js';
 import { drawWith, drawings, warmDrawings } from './drawing.js';
@@ -88,7 +88,7 @@ export const FOCUS = ['part_of', 'depends_on', 'waits_on'];
 const list = (value) => (value ?? '').split(',').filter(Boolean);
 
 /**
- * A flat lens and a style, as the end of an address says them: ?text=…&types=…&ids=…&link=tagged e_x&only=…&within=e_y
+ * A flat lens and a style, as the end of an address says them: ?text=…&types=…&ids=…&link=tagged e_x&in=e_p&only=…&within=e_y
  * &exclude=closed&over=part_of&steps=1&limit=500 (a link term each `link`; only and within narrow what the rest finds;
  * exclude with nothing after it leaves nothing out). An
  * address from before the flat lens (?from=e_x) opens on that item. A lens that includes nothing is null. `canvas` names
@@ -98,16 +98,17 @@ export function readFlatLens(query) {
   const p = new URLSearchParams(query);
   const filter = {};
   const ids = [...list(p.get('from')), ...list(p.get('ids'))];
-  if (p.get('text')?.trim()) filter.text = p.get('text').trim();
+  Object.assign(filter, asWords(p.getAll('text')));
   if (p.get('types')) filter.types = list(p.get('types'));
   if (ids.length) filter.ids = [...new Set(ids)];
   if (p.getAll('link').length) filter.links = p.getAll('link').filter(Boolean);
+  if (p.get('in')) filter.in = list(p.get('in'));
   if (p.get('only')) filter.only = list(p.get('only'));
   if (p.get('within')) filter.within = list(p.get('within'));
   if (p.has('exclude')) filter.exclude = list(p.get('exclude'));
   const style = {};
   for (const key of ['lit', 'shape', 'style', 'canvas']) if (p.get(key)) style[key] = p.get(key);
-  if (!filter.text && !filter.types?.length && !filter.ids?.length && !filter.links?.length) return { lens: null, style };
+  if (!filter.text && !filter.types?.length && !filter.ids?.length && !filter.links?.length && !filter.in?.length) return { lens: null, style };
   const over = p.get('over') === 'all' ? 'all' : p.has('over') ? list(p.get('over')) : p.has('from') ? FOCUS : [];
   const lens = { filter, walk: { over, steps: p.has('steps') ? Number(p.get('steps')) : over.length ? 1 : 0 } };
   if (p.has('limit')) lens.limit = Number(p.get('limit'));
@@ -117,11 +118,12 @@ export function readFlatLens(query) {
 /** The end of the address that says this flat lens (and the style asked of it): what readFlatLens reads back. */
 export function flatQuery(lens, style = {}) {
   const p = new URLSearchParams();
-  const { text, types, ids, links, only, within, exclude } = lens.filter;
-  if (text) p.set('text', text);
+  const { text, types, ids, links, in: inside, only, within, exclude } = lens.filter;
+  for (const words of wordsOf({ text })) p.append('text', words);
   if (types?.length) p.set('types', types.join(','));
   if (ids?.length) p.set('ids', ids.join(','));
   for (const term of links ?? []) p.append('link', term);
+  if (inside?.length) p.set('in', inside.join(','));
   if (only?.length) p.set('only', only.join(','));
   if (within?.length) p.set('within', within.join(','));
   if (exclude) p.set('exclude', exclude.join(','));
