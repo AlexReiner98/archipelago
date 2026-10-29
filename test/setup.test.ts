@@ -142,7 +142,19 @@ test('the hook script takes a Claude Code hook to whichever server the machine i
   writeFileSync(transcript, JSON.stringify({ type: 'assistant', uuid: 'a1', message: { id: 'm1', usage: { input_tokens: 1200, output_tokens: 300 } } }) + '\n');
   assert.deepEqual([(await hook('stop', { session_id: 'desk-1', transcript_path: transcript }, { PELAGO_AGENT_TOKEN: robot })).out, open.length], ['{}', 1]);
   assert.equal((await call('/agent/get', robot, { id: open[0].id })).result.entity.props.tokens_used, 1500);
-  await hook('session-end', { session_id: 'desk-1', reason: 'exit' }, { PELAGO_AGENT_TOKEN: robot });
+  // A file read or changed: what bites there is said once a session, from the path alone, and what was said is kept beside the run.
+  const { make } = await import('./map.ts');
+  await make((await workspaces.get('default')).pelago, [{ op: 'create', type: 'instruction', title: 'The pane cannot load draw.html', body: 'Start with PELAGO_UNSANDBOXED=1.', props: { for: ['file:ui/draw.*'] } }]);
+  const checkout = mkdtempSync(join(tmpdir(), 'pelago-checkout-'));
+  await new Promise((done) => spawn('git', ['init', '-q', checkout]).on('close', done));
+  const read = (path: string) => hook('file-used', { session_id: 'desk-1', cwd: checkout, tool_name: 'Read', tool_input: { file_path: path }, tool_response: { file: { content: 'secret' } } }, { PELAGO_AGENT_TOKEN: robot });
+  const first = await read(join(checkout, 'ui', 'draw.html'));
+  assert.match(JSON.parse(first.out).hookSpecificOutput.additionalContext, /^Archipelago, on .*draw\.html:\n- The pane cannot load draw\.html\. Start with PELAGO_UNSANDBOXED=1\.$/);
+  assert.equal(JSON.parse(first.out).said, undefined, 'what it said is the hook’s, not Claude Code’s');
+  assert.match(readFileSync(join(checkout, '.git', 'pelago-runs', 'desk-1.said'), 'utf8'), /^e_\w+\n$/);
+  assert.deepEqual([(await read(join(checkout, 'ui', 'draw.js'))).out, (await read(join(checkout, 'src', 'a.ts'))).out], ['{}', '{}'], 'once a session; and nothing for a file nothing names');
+  await hook('session-end', { session_id: 'desk-1', reason: 'exit', cwd: checkout }, { PELAGO_AGENT_TOKEN: robot });
+  assert.ok(!existsSync(join(checkout, '.git', 'pelago-runs', 'desk-1.said')), 'the end takes it out');
   assert.equal((await call('/agent/view', robot, { name: 'sessions' })).result.open.length, 0, 'and is closed there');
 
   // A client with an old tool list sends an input it does not know as a string: it is taken as what it spells.

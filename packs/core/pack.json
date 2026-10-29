@@ -41,7 +41,9 @@
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
         "owner": { "type": "string", "column": true, "description": "Id of the person or agent responsible. Kept in the item's row." },
         "confidence": { "type": "number", "column": true, "description": "0 to 1: how sure the author is that this is true. Kept in the item's row." },
-        "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." }
+        "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." },
+        "seen_working": { "type": "boolean", "description": "false when it is built, merged or done and nobody has yet seen it work where it is used; true once someone has. Left out, nothing is claimed either way." },
+        "to_see": { "type": "string", "description": "With seen_working false: what would show it working, and where to look." }
       }
     },
     {
@@ -186,6 +188,7 @@
         "filter": { "type": "json", "description": "What it finds: { text, types, ids, links, in, only, within, exclude }, as query flat's filter. It must include something." },
         "walk": { "type": "json", "description": "From what the filter finds, along these links: { over: a list of link types (each either way, or with > out along it, < in to it) or \"all\", steps }." },
         "limit": { "type": "number", "description": "The most items it draws." },
+        "view": { "type": "string", "description": "A view whose answer is items and links (such as usage), drawn in place of what a filter finds: then it needs no filter." },
         "style": { "type": "json", "description": "How it is drawn: { shape, lit, style } (a built-in drawing, what stays lit, a style kept on the map by its id)." },
         "pins": { "type": "json", "description": "Items kept on it by hand, as a list of ids: drawn with what the filter finds." },
         "pinned": { "type": "boolean", "description": "Kept in sight by the owner: first on Home." },
@@ -255,7 +258,7 @@
       "description": "What agents are told, in its note, and where (for): as a style is how things look, an instruction is what an agent is asked to do. A pack ships them as presets; one kept on the map with the preset's id (preset) is the owner's version of it, its note and fields over the preset's; retired, the preset is not said. One kept about a repository is said only to sessions there, and over the workspace's of the same preset. A name in braces ({run}) is filled in by where it is said.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
-        "for": { "type": "json", "description": "Where it is said, as a list: session_start (when a session begins), unaccounted_commits (when it begins in a checkout with commits no one has accounted for; {count} and {commits} are filled in), working_rules (the rules file a project is given), tool:<name> (the description of an agent's tool)." },
+        "for": { "type": "json", "description": "Where it is said, as a list: session_start (when a session begins), unaccounted_commits (when it begins in a checkout with commits no one has accounted for; {count} and {commits} are filled in), working_rules (the rules file a project is given), tool:<name> (the description of an agent's tool), file:<glob> (to a session about to read or change a file the glob names, as ui/draw.* or src/**/*.ts: what bites there and the way round it)." },
         "order": { "type": "number", "description": "Its place among what is said there: the lowest first." },
         "preset": { "type": "string", "description": "The id of the pack's instruction this is the owner's version of.", "system": true }
       }
@@ -391,6 +394,11 @@
         "surface": {
           "type": "string",
           "description": "Where it runs, e.g. claude-code."
+        },
+        "git": {
+          "type": "json",
+          "description": "Where its checkout stood when it was last heard from: branch, head (the commit), worktree (the folder), unpushed (commits no remote has) and dirty (files not committed). Said by the hook at each turn's end and at the end.",
+          "system": true
         },
         "cwd": {
           "type": "string"

@@ -18,7 +18,7 @@ export const MAP_TABLES = ['entity', 'relation', 'event', 'log_entry', 'log_fact
  * operational writes in src/pelago.ts (operational, claim, release, and apply for what is made at once).
  */
 export const ON_THE_MAP: Record<string, string> = {
-  sessions: "A run's tokens_used (shared onto the work it is on), story and stale flag: kept at once by operational and appended to the sessions stream; its start, end and task are facts; its heartbeat (last_seen, active, busy) is in no stream.",
+  sessions: "A run's tokens_used (shared onto the work it is on), story and stale flag: kept at once by operational and appended to the sessions stream; its start, end and task are facts; its heartbeat (last_seen, active, busy) and where its checkout stands (git, src/git-state.ts) are in no stream.",
   claims: 'A holds link from holder to resource: made by claim and ended by release, at once, appended to the claims stream.',
   notifications: 'A notification item, made by apply at once and never held; who may read it is set by operational and appended to the notifications stream.',
   automations: "An automation's last_run, last_fired and last_result, the event cursor and run_once marks: kept at once, appended to the automations stream.",
@@ -28,7 +28,7 @@ export const ON_THE_MAP: Record<string, string> = {
 };
 
 /** The fields operational may write on an item. Anything else on an item is a fact, and changes through change. */
-export const KEPT_FIELDS = ['last_seen', 'active', 'busy', 'tokens_used', 'story', 'stale_flagged', 'last_run', 'last_fired', 'last_result', 'rechecked_at'];
+export const KEPT_FIELDS = ['last_seen', 'active', 'busy', 'git', 'tokens_used', 'story', 'stale_flagged', 'last_run', 'last_fired', 'last_result', 'rechecked_at'];
 
 /** Tables beside the map, each with the rule it keeps. */
 export const STORES: Record<string, string> = {
@@ -37,6 +37,9 @@ export const STORES: Record<string, string> = {
   setting: "The workspace's settings and sealed secrets: set by the human or by the server, never by an agent's change; each set appended to the settings stream (a secret by its name only).",
   member: 'Who belongs to the workspace, by email: written by an admin or a server pack, read only by the whole database.',
   part_closure: 'What is inside what, all the way down: a projection of the open part_of links, kept by the projector in the append (src/closure.ts), made again whole after a restore.',
+  bytes_added: "What each append adds to the log, in bytes, by the item or link its facts are about: rows only inserted by the append (src/bytes.ts), so writers at once never wait on each other, and folded into item_bytes and type_bytes before those are read.",
+  item_bytes: "What each item (and all links, as one) adds to the log, in bytes, by its id and type: bytes_added folded under one lock (src/bytes.ts), made again whole from the log after a restore; never a fact, never backed up.",
+  type_bytes: 'The bytes of item_bytes summed by type: kept with it.',
   mention: "What names an item in its note or fields: a projection of items' text, kept by the projector as each is written (src/mentions.ts), made again whole after a restore.",
   proposal: 'The review queue, a projection of the log: a held change’s record in the pending stream makes its row, the entry that decides it in the fact stream says what became of it (src/replay.ts).',
   published: 'A document as it was published, frozen: written only when a human publishes.',
@@ -63,6 +66,7 @@ export const STORES: Record<string, string> = {
 export const VIEWS_OPERATIONAL: Record<string, string> = {
   sessions: 'The runs open now and the last that ended: the sessions store above, read as kept.',
   notifications: "The human's unread notifications: the notifications store above, newest first.",
+  usage: "What the workspace's plan limits, used: the database's own count of each table's size, the counts kept beside the log (item_bytes), the sessions store's runs at work, and the server's counts of requests and looks.",
   spent: "What runs report they cost: the sessions store's tokens_used and cost_usd, summed by where they ran.",
   story: 'What a session told of its work: the story the sessions store keeps on its run.',
   changed_since: 'The log, counted and cut to its newest events: what happened, not what the map is.',

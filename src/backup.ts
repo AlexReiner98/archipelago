@@ -25,6 +25,7 @@ import { indexWorkspace } from './control-index.ts';
 import type { Registry } from './packs.ts';
 import { restoreRows } from './pelago.ts';
 import { regatherAll } from './closure.ts';
+import { recountBytes } from './bytes.ts';
 import { mentionedAll } from './mentions.ts';
 import { databaseFor } from './pg.ts';
 import { analyzeAll, analyzeDue } from './stats.ts';
@@ -135,6 +136,7 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
     // What is inside what is a projection of the links just written: made again whole.
     await regatherAll(tx, ['part_of']);
     await mentionedAll(tx);
+    await recountBytes(tx);
     // The types it defined for itself go in its database, where the server looks for them.
     for (const def of (given.local_pack as { types?: { id: string }[] } | null)?.types ?? []) await addLocalType(tx, def);
     if (as !== undefined && as !== given.workspace?.id) {
@@ -199,6 +201,7 @@ export async function merge(db: Db, given: Dump, options: { workspace: string; s
       const rels = await restoreRows(tx, entities, JSON.stringify(here(relations.filter((r) => !held(r)))));
       await regatherAll(tx, ['part_of']);
       await mentionedAll(tx);
+      await recountBytes(tx);
       const { rows: props } = await tx.query<{ added: boolean }>(
         `insert into proposal select * from jsonb_populate_recordset(null::proposal, $1::jsonb)
          on conflict (id) do update set status = excluded.status, decided_by = excluded.decided_by, decided_at = excluded.decided_at, note = excluded.note
