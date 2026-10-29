@@ -86,6 +86,8 @@ export function describe(parts: Part[], most = 160): string {
 export const GUARD = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
 /** A public page loads its own scripts and styles, talks only to this server, frames only the sandbox its pictures are drawn in, and is never framed. */
 export const POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+/** A published document's page, which this server's own page may also frame, to read it on the canvas (ui/reader-frame.js). */
+export const READER_POLICY = POLICY.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
 
 const escape = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 

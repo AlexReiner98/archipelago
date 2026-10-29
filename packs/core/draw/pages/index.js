@@ -1,64 +1,45 @@
-// A lens answer drawn as pages: each item a page, its note read whole as a reader meets it (./text.js), side by side
-// on the canvas, so documents are read and reviewed where they stand. A line holding only an item's id brings that
-// item in there, as a section under its own title, the way a document is published (src/documents.ts); an item a page
-// brings in is not a page of its own as well. Every title leads to its item's page, where it is changed. It is laid
-// out by the page, not drawn to a size: the frame does not pan or zoom it. Its look is ./look.js.
+// A lens answer drawn as pages: each document a row, its draft beside what is published, each drawn by the reader
+// itself (the page's `reader` mark, ui/reader-frame.js), so it reads and looks as the site does, figures and drawings
+// included, and says whether the draft differs from what is published. A line of a note holding only an item's id
+// brings that item in as a section (src/documents.ts): an item another page brings in is read there, not as a row of
+// its own. Each title leads to its item's page, where it is changed. It is laid out by the page, not drawn to a size:
+// the frame does not pan or zoom it. Its look is ./look.js.
 
 import { css } from './look.js';
 import { m } from './marks.js';
-import { blocks, render } from './text.js';
 
-/** How deep a section may bring in sections of its own before it is only named. */
-const DEPTH = 3;
+/** A line that brings an item in: its id and nothing else (src/documents.ts). */
+const SECTION = /^[ \t]*(e_[a-z0-9]{8})[ \t]*$/gm;
+/** The ids a note brings in. The notes come whole (`notes` in pack.json), so a section far down is found too. */
+const sectionsOf = (body) => [...String(body ?? '').matchAll(SECTION)].map((hit) => hit[1]);
 
-/** What the page says when there is nothing to read. */
-const quiet = (text) => m('div', { class: 'pg-empty' }, text);
-
-/**
- * The pages. `input` is what the page gives every drawing: the answer (its items' notes whole, as the drawing asks,
- * `notes` in pack.json), and the style.
- */
+/** The pages. `input` is what the page gives every drawing: the answer, its items' notes whole, and the style. */
 export function picture({ answer, style }) {
   const items = answer.items.filter((i) => !i.pending || i.pending.op !== 'create');
   if (!items.length) return { scene: { message: 'Nothing to read with this lens.' } };
-  const byId = new Map(items.map((i) => [i.id, i]));
-  const titles = new Map(items.map((i) => [i.id, i.title]));
-  const read = new Map(items.map((i) => [i.id, blocks(i.body)]));
-  // An item another page brings in is read there; what nothing brings in is a page, in the lens's order.
-  const brought = new Set(items.flatMap((i) => read.get(i.id).flatMap((b) => (b.section && b.section !== i.id ? [b.section] : []))));
+  // An item another page brings in is read there; what nothing brings in is a row, in the lens's order. A loop (two
+  // notes bringing each other in) leaves nothing on top: then each is a row.
+  const brought = new Set(items.flatMap((i) => sectionsOf(i.body).filter((id) => id !== i.id)));
   const tops = items.filter((i) => !brought.has(i.id));
-  // A loop (two notes bringing each other in) leaves nothing on top: then every item is a page.
-  const pages = tops.length ? tops : items;
+  const rows = tops.length ? tops : items;
 
-  const section = (seen, depth) => (id) => {
-    const item = byId.get(id);
-    if (!item) return m('div', { class: 'pg-missing' }, m('a', { href: `#/e/${id}`, title: `${id}: not in this lens` }, titles.get(id) ?? id), ' is brought in here');
-    if (seen.has(id) || depth > DEPTH) return m('div', { class: 'pg-missing' }, m('a', { href: `#/e/${id}` }, item.title), ' again');
-    const inner = new Set(seen).add(id);
-    const said = read.get(id);
+  const byId = new Map(items.map((i) => [i.id, i]));
+  // When it or a section it brings in last changed: a reader reads it again when that moves.
+  const changed = (item) => [item, ...sectionsOf(item.body).map((id) => byId.get(id))].filter(Boolean).map((i) => String(i.updated_at ?? '')).sort().at(-1);
+
+  const row = (item) => {
+    const sections = sectionsOf(item.body).length;
+    const meta = [item.type, item.status, sections && `${sections} section${sections === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
     return m(
       'div',
-      { class: `pg-section${item.open === false ? ' closed' : ''}` },
-      m('div', { class: 'pg-h pg-h2' }, m('a', { href: `#/e/${id}`, title: [item.title, item.status].filter(Boolean).join(': ') }, item.title)),
-      said.length ? render(said, titles, section(inner, depth + 1)) : quiet('Nothing written yet'),
-    );
-  };
-
-  const page = (item) => {
-    const said = read.get(item.id);
-    const counted = said.filter((b) => b.section).length;
-    const meta = [item.type, item.status, counted && `${counted} section${counted === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
-    return m(
-      'div',
-      { key: `p:${item.id}`, class: `pg-page${item.id === style.here ? ' here' : ''}` },
-      m('a', { class: 'pg-title', href: `#/e/${item.id}`, title: item.title }, item.title),
-      m('div', { class: 'pg-meta', title: meta }, meta),
-      said.length ? render(said, titles, section(new Set([item.id]), 1)) : quiet('Nothing written yet'),
+      { key: `p:${item.id}`, class: `pg-row${item.id === style.here ? ' here' : ''}` },
+      m('div', { class: 'pg-head' }, m('a', { class: 'pg-title', href: `#/e/${item.id}`, title: item.title }, item.title), m('span', { class: 'pg-meta', title: meta }, meta)),
+      m('div', { class: 'pg-pair' }, m('reader', { item: item.id, as: 'draft', at: changed(item) }), m('reader', { item: item.id, as: 'published', at: changed(item) })),
     );
   };
 
   return {
-    scene: { css, svg: m('div', { class: 'pg-stage' }, pages.map(page)), key: [], ...(byId.has(style.here) && pages.some((p) => p.id === style.here) && { focus: `p:${style.here}` }) },
+    scene: { css, svg: m('div', { class: 'pg-stage' }, rows.map(row)), key: [], ...(rows.some((r) => r.id === style.here) && { focus: `p:${style.here}` }) },
     on: () => [],
     restyle: () => [],
   };

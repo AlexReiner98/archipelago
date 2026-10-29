@@ -165,6 +165,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `term-kinds.js`, `term-pick.js` | a row's +: its kinds, then the things of that kind, picked, never guessed |
 | `canvases.js` | saved canvases: the bar's switch, Save, Home's list |
 | `drawing.js`, `draw.html`, `draw.js`, `marks.js` | a drawing run in the sandbox; its marks checked and mounted |
+| `reader-frame.js` | the one mark the page makes itself: a document's draft or published page, read in a frame on the canvas |
 | `pan-zoom.js` | the infinite plane |
 | `drag.js`, `canvas-wires.js` | moving a node; drawing a wire and making its link |
 | `live.js`, `replica.js`, `ghosts.js` | tailing the log; the store; held changes drawn into it |
