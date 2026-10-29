@@ -12,7 +12,8 @@ import { join } from 'node:path';
 import { bearer } from './auth.ts';
 import { normalEmail } from './mail.ts';
 import { recordAgreement } from './agreements.ts';
-import { emailOfLink, LINK_MINUTES, redeem, redeemTyped, requestSignIn, typedWorks, workspaceOfCode } from './members.ts';
+import { workspacesOf } from './control-index.ts';
+import { emailOfLink, LINK_MINUTES, redeem, redeemTyped, requestSignIn, triesSpent, typedWorks, workspaceOfCode } from './members.ts';
 import { serverPacksOf } from './server-host.ts';
 import { serveServerPack } from './server-routes.ts';
 import { pollSignup, receiveLemon, signedByLemon, signupOffer, startSignup } from './signup.ts';
@@ -60,7 +61,7 @@ export interface ConnectRoutes {
   tokens: boolean;
   /** The workspace a request that names none is for. */
   fallback: string;
-  workspaces: Pick<Workspaces, 'has' | 'get' | 'hold' | 'list' | 'create'>;
+  workspaces: Pick<Workspaces, 'has' | 'get' | 'hold' | 'list' | 'create' | 'control'>;
   /** True, and the request answered, when its address has asked too often. */
   tooOften: () => boolean;
   body: () => Promise<unknown>;
@@ -133,7 +134,7 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
       return reply(res, 200, await receiveLemon(at.workspaces, raw));
     } catch (err) {
       console.error(`lemon squeezy delivery: ${(err as Error).message}`);
-      return reply(res, 500, { error: (err as Error).message });
+      return reply(res, 500, { error: 'The delivery could not be taken in.' });
     }
   }
   // Signing in by email: a link asked for at an address, and a link opened, its code traded once for a token.
@@ -142,6 +143,11 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     if (at.tooOften()) return;
     const body = ((await at.body()) ?? {}) as { email?: unknown; code?: unknown; agree?: unknown };
     const all = async () => (await at.workspaces.list()).map((w) => ({ ...w, db: async () => (await at.workspaces.get(w.id)).pelago.db }));
+    // Only the workspaces this address is a member of are opened: an unknown address opens none (src/control-index.ts).
+    const theirs = async (email: string) => {
+      const ids = new Set(await workspacesOf(await at.workspaces.control(), email, all));
+      return (await at.workspaces.list()).filter((w) => ids.has(w.id)).map((w) => ({ ...w, db: async () => (await at.workspaces.get(w.id)).pelago.db }));
+    };
     // Before a code is traded, the documents this person has not agreed to at their current version: recorded if the
     // request agrees to them, else answered so the page can ask. The code is not spent while anything is owed.
     const owes = async (email: string) => {
@@ -153,7 +159,7 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
       const email = normalEmail(body.email);
       if (!email) return reply(res, 400, { error: 'That is not an email address.' });
       // Answered at once and the same either way: whether the address is a member anywhere is not told.
-      if (!askedLately(email)) void requestSignIn(await all(), email, origin).catch((err) => console.error(`sign-in mail to ${email} failed:`, (err as Error).message));
+      if (!askedLately(email)) void requestSignIn(await theirs(email), email, origin).catch((err) => console.error(`sign-in mail to ${email} failed:`, (err as Error).message));
       return reply(res, 200, { sent_to: email });
     }
     // A code from the mail, typed with the address it was sent to.
@@ -161,11 +167,15 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
       const email = normalEmail(body.email);
       if (!email) return reply(res, 400, { error: 'That is not an email address.' });
       // Asked only once the code is known to work, so the answer says nothing of an address the asker cannot sign in as.
-      if (await typedWorks(await all(), email, String(body.code ?? ''))) {
+      // The tries are counted before the code is looked at, so past them nothing says whether a code would work.
+      const control = (await at.workspaces.get(at.fallback)).pelago.db;
+      if (await triesSpent(control, email)) return reply(res, 429, { error: `Too many wrong codes for this address. Wait ${LINK_MINUTES} minutes, then ask for a new email.` });
+      const mine = await theirs(email);
+      if (await typedWorks(mine, email, String(body.code ?? ''))) {
         const owed = await owes(email);
         if (owed.length) return reply(res, 200, { agree: owed });
       }
-      const traded = await redeemTyped(await all(), (await at.workspaces.get(at.fallback)).pelago.db, email, String(body.code ?? ''));
+      const traded = await redeemTyped(mine, control, email, String(body.code ?? ''));
       if (traded === 'tries') return reply(res, 429, { error: `Too many wrong codes for this address. Wait ${LINK_MINUTES} minutes, then ask for a new email.` });
       return traded === 'gone' ? reply(res, 410, { error: 'That code was not accepted: it may be mistyped, used or run out.' }) : reply(res, 200, traded);
     }

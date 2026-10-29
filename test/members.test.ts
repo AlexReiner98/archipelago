@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
+import { dump } from '../src/backup.ts';
+import { workspacesOf } from '../src/control-index.ts';
 import { CODE_TRIES } from '../src/members.ts';
+import { dumpVault } from '../src/vault.ts';
 import { codeSentTo, mailbox, serve } from './serve.ts';
 
 test('an admin adds a member by email; the invitation signs them in once, for a month, as an admin or not', async () => {
@@ -103,4 +106,39 @@ test('an admin changes a member’s standing or removes them, and their sign-ins
   await new Promise((r) => setTimeout(r, 200));
   assert.equal(mailbox.length, before, 'and are sent no link');
   assert.deepEqual((await call('/api/member_list', alex)).result, []);
+});
+
+test('a sign-in opens only the workspaces its address belongs to, as the index says, after a restore too', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const operator = (await workspaces.ensureOperator())!;
+  const acme = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const main = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  await call('/api/member_add', main, { email: 'dee@example.com' });
+  await call('/api/member_add', acme, { email: 'ann@example.com' });
+  // The first ask on a database that never had the index makes it, from every workspace, once.
+  await call('/connect/sign-in', undefined, { email: 'first@example.com' });
+  await new Promise((r) => setTimeout(r, 200));
+  const opened: string[] = [];
+  const get = workspaces.get.bind(workspaces);
+  workspaces.get = (id) => (opened.push(id), get(id));
+  await workspaces.closeIdle(0);
+
+  // Random addresses, the attack: no workspace's database is opened for them.
+  for (let i = 0; i < 5; i++) await call('/connect/sign-in', undefined, { email: `stranger${i}@example.com` });
+  await call('/connect/code', undefined, { email: 'stranger9@example.com', code: 'AAAA-AAAA' });
+  await new Promise((r) => setTimeout(r, 200));
+  assert.ok(!opened.includes('acme'), 'an unknown address opens no workspace');
+  const before = mailbox.length;
+  await call('/connect/sign-in', undefined, { email: 'ann@example.com' });
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(mailbox.length, before + 1, 'a member is still sent their link');
+  assert.ok(opened.includes('acme'));
+
+  // A member taken out leaves the index; a workspace made from a backup brings its members into it.
+  await call('/api/member_set', acme, { email: 'ann@example.com', remove: true });
+  const control = await workspaces.control();
+  assert.deepEqual(await workspacesOf(control, 'ann@example.com', async () => []), []);
+  const db = (await workspaces.get('default')).pelago.db;
+  await workspaces.create('copy', 'Copy', { ...(await dump(db, { id: 'default', name: 'Default' })), vault: await dumpVault(db) });
+  assert.deepEqual(await workspacesOf(control, 'dee@example.com', async () => []), ['default', 'copy']);
 });

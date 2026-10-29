@@ -6,6 +6,7 @@
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { newId, type Db, type Q } from './db.ts';
+import { indexToken } from './control-index.ts';
 import { record } from './streams.ts';
 import type { Actor, May } from './pelago.ts';
 
@@ -76,6 +77,8 @@ export async function createToken(db: Q, workspace: string, input: { kind: 'huma
      values ($1, $2, $3, $4, $5, $6, $7, case when $8::int is null then null else now() + ($8::int || ' days')::interval end, $9::jsonb, $9::jsonb, $10)`,
     [id, hash(token), `…${token.slice(-6)}`, input.kind, input.name.trim(), input.entity ?? null, Boolean(input.admin) && !agent, input.expires_days ?? null, within, agent ? (input.may ?? 'change') : 'change'],
   );
+  // Noted beside the workspaces, so a token nobody made is refused before its workspace is opened (src/control-index.ts).
+  await indexToken(hash(token), workspace);
   return { id, token, kind: input.kind, name: input.name.trim(), note: 'Keep this token now: it is not stored and cannot be shown again.' };
 }
 

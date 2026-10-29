@@ -539,9 +539,11 @@ kept if it does not answer. A workspace with no account runs on the server's
 model, if it has one: set `PELAGO_MODEL_URL` to an OpenAI-compatible base
 (LiteLLM: `http://litellm:4000/v1`) and `PELAGO_MODEL_KEY` to its key.
 `PELAGO_MODEL_SHARED=off` keeps that model from workspaces (a hosted server, so
-none runs on the operator's bill), and `PELAGO_MODEL_PRIVATE_URLS=off` refuses
-a compatible server on the server's own network (loopback, private and
-link-local addresses). Prompt caching is Anthropic's alone, and a run's cost
+none runs on the operator's bill), and `PELAGO_PRIVATE_URLS=off` (or
+`PELAGO_MODEL_PRIVATE_URLS=off`, its first name) refuses a compatible server on
+the server's own network (loopback, private and link-local addresses), and a
+connection checked there: held to on every call, by the address each call
+connects to. No such call follows a redirect. Prompt caching is Anthropic's alone, and a run's cost
 is still priced at Anthropic's rates.
 
 **Or the server hears the push through a webhook added by hand.** Pushes are
@@ -859,7 +861,8 @@ change that:
 - **The mail it sends** goes out from the server itself, straight to the
   recipient's mail servers, so it passes through no mail service elsewhere.
   `PELAGO_MAIL_FROM` names the sender (`Archipelago <signin@example.com>`);
-  without it nothing is sent and each message is written to the server's log.
+  without it nothing is sent, and the server's log says only each message's
+  subject: never its text, which holds sign-in links and codes.
   For it to arrive, and not as spam, the sending domain needs: an SPF record
   naming the server's address (`v=spf1 ip4:<address> -all`), a DKIM key
   (`openssl genrsa -out dkim.pem 2048`; the private key in `PELAGO_DKIM_KEY`,

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, createVerify, generateKeyPairSync } from 'node:crypto';
 import { createServer, type AddressInfo } from 'node:net';
 import { test } from 'node:test';
-import { compose, dkimSign, normalEmail, quotedPrintable, relaxedBody } from '../src/mail.ts';
+import { compose, dkimSign, normalEmail, quotedPrintable, relaxedBody, sendMail } from '../src/mail.ts';
 import { deliver, dotStuff, relay } from '../src/smtp.ts';
 
 test('an address is kept trimmed and in lower case, and what is not one is refused', () => {
@@ -99,4 +99,21 @@ test('the body is quoted-printable: plain text stays readable, nothing else is l
     [['Reply-To', 'alex@b.ca'], ['Content-Transfer-Encoding', 'quoted-printable'], ['Auto-Submitted', 'auto-generated']],
   );
   assert.equal(body, 'Hi\r\n');
+});
+
+test('with no sender set, a mail is not sent and the log keeps its subject only, never the link in it', async () => {
+  const before = process.env.PELAGO_MAIL_FROM;
+  delete process.env.PELAGO_MAIL_FROM;
+  const logged: string[] = [];
+  const log = console.log;
+  console.log = (...said: unknown[]) => void logged.push(said.join(' '));
+  try {
+    await sendMail({ to: 'kim@example.com', subject: 'Your Archipelago sign-in link', text: 'https://app.example/#/join/inv_default_abc\nOr type this code: ABCD-EFGH' });
+  } finally {
+    console.log = log;
+    if (before !== undefined) process.env.PELAGO_MAIL_FROM = before;
+  }
+  assert.equal(logged.length, 1);
+  assert.match(logged[0], /not sent.*Your Archipelago sign-in link/);
+  assert.doesNotMatch(logged[0], /join|ABCD|kim@/, 'no link, code or address in the log');
 });
