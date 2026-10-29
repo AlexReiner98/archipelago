@@ -19,7 +19,8 @@ const workspaceId = () => (workspace ??= fetch('/whoami', { headers: authHeaders
 const states = new Map();
 const stateOf = (id, at) => {
   const key = `${id} ${at}`;
-  if (!states.has(key)) states.set(key, api('published', { id }).catch(() => ({ published: false })));
+  // A check that fails says nothing: never "not published" for what could not be asked.
+  if (!states.has(key)) states.set(key, api('published', { id }).catch(() => null));
   return states.get(key);
 };
 
@@ -58,12 +59,12 @@ export function readerFrame(attrs, fail) {
       said.textContent = 'Private · as you see it';
       return slot.replaceChildren(fitted(h('iframe', { src: `/read/${id}`, title: `Private: ${id}`, loading: 'lazy' })));
     }
-    if (as === 'published' && !state.published) {
-      said.textContent = 'Not published';
+    if (as === 'published' && !state?.published) {
+      said.textContent = state ? 'Not published' : 'Published: could not tell';
       return el.classList.add('none');
     }
-    said.textContent = as === 'published' ? 'Published' : !state.published ? 'Draft · not published yet' : state.changed ? 'Draft · differs from what is published' : 'Draft · as published';
-    el.classList.toggle('changed', as === 'draft' && Boolean(state.changed));
+    said.textContent = as === 'published' ? 'Published' : !state ? 'Draft' : !state.published ? 'Draft · not published yet' : state.changed ? 'Draft · differs from what is published' : 'Draft · as published';
+    el.classList.toggle('changed', as === 'draft' && Boolean(state?.changed));
     const src = as === 'draft' ? `/preview/${id}` : `/p/${await workspaceId()}/${id}`;
     slot.replaceChildren(fitted(h('iframe', { src, title: `${as === 'draft' ? 'Draft' : 'Published'}: ${id}`, loading: 'lazy' })));
   });
