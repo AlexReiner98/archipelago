@@ -54,6 +54,7 @@ async function freeze(l: Archipelago, id: string, draft = false) {
 export async function wouldPublish(l: Archipelago, id: string) {
   const doc = ID.test(id) ? await l.entity(id) : null;
   if (!doc || !readable(l).includes(doc.type)) throw new Error(`"${id}" is not a document that can be public.`);
+  if (doc.private_to) throw new Error(`"${doc.title}" is private: share it, and its preview shows it as it would be published.`);
   return freeze(l, id, doc.visibility !== 'public');
 }
 

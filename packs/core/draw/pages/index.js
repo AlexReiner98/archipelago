@@ -1,4 +1,5 @@
-// A lens answer drawn as pages: each document a row, its draft beside what is published, each drawn by the reader
+// A lens answer drawn as pages: each document a row, its draft beside what is published (a private one as its reader
+// sees it, alone), each drawn by the reader
 // itself (the page's `reader` mark, ui/reader-frame.js), so it reads and looks as the site does, figures and drawings
 // included, and says whether the draft differs from what is published. A line of a note holding only an item's id
 // brings that item in as a section (src/documents.ts): an item another page brings in is read there, not as a row of
@@ -34,7 +35,10 @@ export function picture({ answer, style }) {
       'div',
       { key: `p:${item.id}`, class: `pg-row${item.id === style.here ? ' here' : ''}` },
       m('div', { class: 'pg-head' }, m('a', { class: 'pg-title', href: `#/e/${item.id}`, title: item.title }, item.title), m('span', { class: 'pg-meta', title: meta }, meta)),
-      m('div', { class: 'pg-pair' }, m('reader', { item: item.id, as: 'draft', at: changed(item) }), m('reader', { item: item.id, as: 'published', at: changed(item) })),
+      // A private one cannot be published, so it has no preview: it is read as its reader sees it, on its own.
+      item.visibility === 'private'
+        ? m('div', { class: 'pg-pair' }, m('reader', { item: item.id, as: 'own', at: changed(item) }))
+        : m('div', { class: 'pg-pair' }, m('reader', { item: item.id, as: 'draft', at: changed(item) }), m('reader', { item: item.id, as: 'published', at: changed(item) })),
     );
   };
 

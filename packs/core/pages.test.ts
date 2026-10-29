@@ -47,3 +47,9 @@ test('only marks a drawing may send, and a stylesheet the page takes', () => {
   // No quote, backslash, & or < (ui/marks.js, cssFor).
   assert.doesNotMatch(scene.css, /[\\"'&<]/);
 });
+
+test('a private document has no preview: it is read as its reader sees it, alone', () => {
+  const doc = { ...item('e_mine0000', 'Notes to self', 'Text.'), visibility: 'private' };
+  const readers = marks(draw([doc]).svg).filter((x) => x[0] === 'reader').map((x) => [x[1].item, x[1].as]);
+  assert.deepEqual(readers, [['e_mine0000', 'own']]);
+});

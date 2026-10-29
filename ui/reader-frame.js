@@ -1,6 +1,7 @@
 // A document as its reader meets it, in a frame on the canvas: the `reader` mark a drawing may make (ui/marks.js), as
 // the pages drawing does. Its draft is the preview, what publishing it would give now (/preview/<id>); its published
-// page is what visitors read (/p/<workspace>/<id>). Each is drawn by the reader itself (ui/doc.js), so it reads and
+// page is what visitors read (/p/<workspace>/<id>); one that cannot be published (a private one) is read as the person
+// looking sees it (/read/<id>). Each is drawn by the reader itself (ui/doc.js), so it reads and
 // looks as the site does, figures and drawings included. A drawing names only the item and which of the two; the page
 // makes the address, says whether the draft differs from what is published (the published read), and loads the frame
 // once it comes into sight. The frame is as tall as what it holds, so the canvas scrolls, not the frame.
@@ -8,7 +9,7 @@
 import { api, authHeaders, h } from './base.js';
 
 const ID = /^e_[a-z0-9]{8}$/;
-export const AS = ['draft', 'published'];
+export const AS = ['draft', 'published', 'own'];
 
 /** The workspace this page reads, for a published page's address: asked once. */
 let workspace;
@@ -53,6 +54,10 @@ export function readerFrame(attrs, fail) {
   const el = h('div', { class: `rd ${as}` }, said, slot);
   whenSeen(el, async () => {
     const state = await stateOf(id, String(attrs.at ?? ''));
+    if (as === 'own') {
+      said.textContent = 'Private · as you see it';
+      return slot.replaceChildren(fitted(h('iframe', { src: `/read/${id}`, title: `Private: ${id}`, loading: 'lazy' })));
+    }
     if (as === 'published' && !state.published) {
       said.textContent = 'Not published';
       return el.classList.add('none');
