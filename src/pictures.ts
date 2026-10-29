@@ -3,6 +3,7 @@
 
 import { createHash } from 'node:crypto';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
+import { roomToStore } from './plan.ts';
 
 /** The most a kept picture may weigh. A capture of a view at screen size is well under it. */
 export const PICTURE_MAX = 1_000_000;
@@ -22,6 +23,7 @@ export async function putPicture(l: Archipelago, actor: Actor, input: { result: 
   const bytes = Buffer.from(input.data, 'base64');
   if (!bytes.length) throw new Error('picture_put: "data" is empty. Send the file as base64.');
   if (bytes.length > PICTURE_MAX) throw new Error(`picture_put: the picture is ${bytes.length} bytes; the most kept is ${PICTURE_MAX}. Make it smaller.`);
+  await roomToStore(l.workspace);
   await l.db.query(
     `insert into picture (entity_id, content_type, bytes, size) values ($1, $2, decode($3, 'base64'), $4)
      on conflict (entity_id) do update set content_type = excluded.content_type, bytes = excluded.bytes, size = excluded.size, created_at = now()`,

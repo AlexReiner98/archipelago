@@ -4,6 +4,9 @@
 import { z } from 'zod';
 import { endedOf } from './ended.ts';
 import { limitOf } from './members.ts';
+import { looksThisHour } from './looks.ts';
+import { sessionsAwake } from './sessions.ts';
+import { requestsThisMinute, storageOf, useOf, type Limits } from './plan.ts';
 import { acceptedSenders, wholeMap } from './outbox.ts';
 import { actorId, type Archipelago } from './pelago.ts';
 import { askedLately } from './replies.ts';
@@ -31,14 +34,22 @@ async function replyRules(l: Archipelago, lifted: Record<string, boolean>) {
   });
 }
 
+/** How much of what its plan limits the workspace uses now (src/plan.ts), each said as the Plan card shows it. */
+async function planUse(l: Archipelago, limits: Limits) {
+  const { db } = await wholeMap(l);
+  const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from member where removed_at is null`);
+  return useOf(limits, { members: rows[0].n, storage: await storageOf(l.workspace), requests: requestsThisMinute(l.workspace), sessions: await sessionsAwake(l), looks: looksThisHour(l.workspace) });
+}
+
 export const WORKSPACE_TOOLS: Record<string, Tool> = {
   workspace_info: {
-    description: 'This workspace’s settings: its id, its owner (null until one is set with init), the default visibility of new things, whether agents’ changes are applied as they are made or held for a human, whether agents may download backups or publish documents, and which workspaces it accepts notifications from.',
+    description: 'This workspace’s settings: its id, its owner (null until one is set with init), the default visibility of new things, whether agents’ changes are applied as they are made or held for a human, whether agents may download backups or publish documents, which workspaces it accepts notifications from, and on a workspace sold on a plan, its limits (member_limit) and how much of each it uses (use).',
     humanOnly: true,
     input: {},
     run: async (l) => {
       const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on e.id = s.value #>> '{}' where s.key = 'me'`);
-      return { ...(await settings(l)), owner: rows[0] ?? null, member_limit: (await limitOf(l.workspace)) ?? null, ended: (await endedOf(l.workspace)) ?? null };
+      const limits = await limitOf(l.workspace);
+      return { ...(await settings(l)), owner: rows[0] ?? null, member_limit: limits ?? null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
     },
   },
   workspace_set: {

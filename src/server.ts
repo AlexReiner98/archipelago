@@ -33,7 +33,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './auth.ts'; import { firstStart } from './first-start.ts';
 import { notify } from './notify.ts';
-import { backupAll, parseBackup, parseVault } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts';
+import { backupAll, parseBackup, parseVault } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts'; import { configurePlan, requestWait, slowTokensAt, storageBytes, tooManyRequests } from './plan.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { env } from './env.ts';
 import { serveConnect } from './connect.ts';
@@ -96,14 +96,16 @@ const MIME: Record<string, string> = { html: 'text/html', js: 'text/javascript',
 
 class Refused extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  readonly retry?: number;
+  constructor(status: number, message: string, retry?: number) {
     super(message);
     this.status = status;
+    this.retry = retry;
   }
 }
 export { lenient } from './mcp.ts';
 
-export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; signIn?: Limit }; proxies?: string; leading?: () => boolean; unsandboxed?: boolean } = {}): Server {
+export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; token?: Limit; signIn?: Limit }; proxies?: string; leading?: () => boolean; unsandboxed?: boolean } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
   // The server's own Chrome may reach it by another name, from a container beside it (src/looks.ts).
@@ -118,7 +120,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   serverPacks.origin = named[0] ? `https://${named[0]}` : `http://127.0.0.1:${port}`;
   configureConnections(serverPacks);
   setReach({ hold: (id) => workspaces.hold(id), connection: async (id, pack) => { const c = await serverPacks.connectionOf(pack, id); return c ? { id: c.id, account: c.account } : null; }, via: (id, pack, host, path) => serverPacks.lent(pack, host, id, path) });
-  configureMembers({ origin: origins.at(-1)!, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, limitOf: async (id) => memberLimit((await workspaces.get('default')).pelago.db, id) }); configureIndex(() => workspaces.control()); configureEnded(async (id) => (id === 'default' ? undefined : readEnded((await workspaces.get('default')).pelago.db, id)));
+  configureMembers({ origin: origins.at(-1)!, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, limitOf: async (id) => (id === 'default' ? undefined : memberLimit((await workspaces.get('default')).pelago.db, id)) }); configureIndex(() => workspaces.control()); configureEnded(async (id) => (id === 'default' ? undefined : readEnded((await workspaces.get('default')).pelago.db, id))); configurePlan({ storageOf: async (id) => storageBytes((await workspaces.get(id)).pelago.db) }); slowTokensAt(options.limits?.token);
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
   const running = { commit: startedFrom(), started: new Date().toISOString() };
@@ -180,6 +182,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       await unindexToken(control, hashSecret(token));
       throw deny();
     }
+    const slow = await requestWait(ws.id, token); if (slow) throw new Refused(429, await tooManyRequests(ws.id, slow), slow);
     if (identity.newPlace)
       await notify(ws.pelago, { kind: 'agent', name: 'pelago' }, {
         title: `The token "${identity.actor.name}" was used from a new place`,
@@ -399,6 +402,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           const socket = req.socket as IncomingMessage['socket'] | null; // gone already when the sender has hung up
           res.once('finish', () => setTimeout(() => socket?.destroy(), 1000).unref());
         }
+        if (err.retry) res.setHeader('retry-after', String(err.retry));
         return send(res, err.status, { error: err.message });
       }
       // What went wrong is the log's: the database's own words are not handed to whoever asked.

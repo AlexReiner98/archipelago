@@ -25,6 +25,12 @@ export const PUBLIC_LIMIT: Limit = { each: 120, all: 1200 };
 export const DELIVERY_LIMIT: Limit = { each: 300 };
 
 /**
+ * Requests with a good token, from one token: a page opening a canvas makes some fifty, an agent at work a few a
+ * second at most. Past it, an agent in a loop is slowed before it slows every workspace on the process.
+ */
+export const TOKEN_LIMIT: Limit = { each: 600 };
+
+/**
  * Signing in and buying, counted apart from the pages: a flood of either keeps
  * neither the other nor the published pages from anyone.
  */
@@ -51,7 +57,9 @@ const REMEMBERED = 20_000;
 /**
  * A count of requests by address, a minute at a time. `take` answers 0 when
  * the request may go ahead, or the seconds until it may be asked again;
- * `full` answers the same without counting anything.
+ * `full` answers the same without counting anything. `each` there, when given, is
+ * this address's own limit in place of the limiter's; `count` says how many it
+ * has made this minute.
  */
 export function limiter(limit: Limit, now: () => number = Date.now) {
   let began = now();
@@ -64,20 +72,24 @@ export function limiter(limit: Limit, now: () => number = Date.now) {
     counts.clear();
   };
   const wait = () => Math.max(1, Math.ceil((began + WINDOW_MS - now()) / 1000));
-  const over = (address: string) => (counts.get(address) ?? 0) >= limit.each || (limit.all !== undefined && total >= limit.all);
+  const over = (address: string, each: number) => (counts.get(address) ?? 0) >= each || (limit.all !== undefined && total >= limit.all);
   return {
-    full(given: string): number {
+    full(given: string, each = limit.each): number {
       fresh();
-      return over(counted(given)) ? wait() : 0;
+      return over(counted(given), each) ? wait() : 0;
     },
-    take(given: string): number {
+    take(given: string, each = limit.each): number {
       fresh();
       const address = counted(given);
       const asked = counts.get(address) ?? 0;
-      if (over(address)) return wait();
+      if (over(address, each)) return wait();
       if (asked || counts.size < REMEMBERED) counts.set(address, asked + 1);
       total++;
       return 0;
+    },
+    count(given: string): number {
+      fresh();
+      return counts.get(counted(given)) ?? 0;
     },
   };
 }
