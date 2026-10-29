@@ -117,12 +117,18 @@ function calendar(answer, style, c) {
       return { mine, cols: cols.length };
     });
   });
-  // Each lane as wide as the most it holds at once that week; one with nothing in hours a sliver.
+  // Each lane as wide as the most it holds at once that week; one with nothing in hours a sliver. One that holds
+  // something is at least wide enough to be named, where the day has room: a person's few blocks beside many agents.
   const weight = lanes.map((_, i) => Math.max(...packed.map((day) => day[i].cols)) || 0.25);
   const total = weight.reduce((sum, w) => sum + w, 0) || 1;
+  const least = z('lane_named_from');
+  const lifted = weight.map((w) => w >= 1 && (w / total) * colW < least);
+  const owed = lifted.filter(Boolean).length * least;
+  const rest = weight.reduce((sum, w, i) => sum + (lifted[i] ? 0 : w), 0) || 1;
+  const widths = owed && owed < colW / 2 ? weight.map((w, i) => (lifted[i] ? least : (w / rest) * (colW - owed))) : weight.map((w) => (w / total) * colW);
   // Each lane's left edge and width within a day.
   const laneX = [];
-  lanes.reduce((x, _, i) => (laneX.push([x, (weight[i] / total) * colW]), x + (weight[i] / total) * colW), 0);
+  lanes.reduce((x, _, i) => (laneX.push([x, widths[i]]), x + widths[i]), 0);
   const named = lanes.length > 1 && Math.min(...laneX.filter((_, i) => weight[i] >= 1).map(([, w]) => w)) >= z('lane_named_from');
   const chip = z('chip');
   const daysOf = (b) => [...Array(days).keys()].filter((d) => b.end > dayAt(from, d) && b.start < dayAt(from, d + 1));

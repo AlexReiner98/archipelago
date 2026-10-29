@@ -77,6 +77,16 @@ test('a flat lens on a time axis places each item it sends, and says its window 
   assert.equal(of('gym')!.time!.length, 3, 'a repeat on each of its days');
   assert.deepEqual(of('meet')!.time, [{ start: '2026-10-14T14:00:00.000Z', end: '2026-10-14T15:30:00.000Z', by: 'when' }]);
 
+
+  // Filed by who each is for: what no one holds is the workspace owner's, and the agents' sessions a lane of their own.
+  const lanes = (await flatLens(l, { filter: { types: ['routine', 'event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lanes: { key: string | null; title: string }[]; items: (Item & { lane?: string | null })[] };
+  assert.deepEqual(lanes.lanes, [{ key: null, title: 'No one' }], 'with no owner set, what no one holds is no one’s');
+  assert.ok(lanes.items.every((i) => i.lane === null));
+  const alex = ((await l.change(human, { reason: 'test', ops: [{ op: 'create', type: 'person', title: 'Alex' }] })) as { created: Record<string, string> }).created['#1'];
+  await l.db.query(`insert into setting (key, value) values ('me', $1::jsonb)`, [JSON.stringify(alex)]);
+  const mine = (await flatLens(l, { filter: { types: ['routine'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lanes: unknown[]; items: { lane?: string }[] };
+  assert.deepEqual([mine.lanes, mine.items[0].lane], [[{ key: alex, title: 'Alex' }], alex], 'the owner’s lane, by name');
+
   const plain = (await flatLens(l, { filter: { types: ['routine'] } })) as unknown as { lens: { time?: unknown }; items: Item[] };
   assert.equal(plain.lens.time, undefined, 'no window, no axis');
   assert.equal(plain.items[0].time, undefined);

@@ -136,3 +136,25 @@ export const DEFAULT_ZONE = 'America/Toronto';
 export async function zoneOf(l: Archipelago): Promise<string> {
   return (await l.setting<string>('time_zone')) || DEFAULT_ZONE;
 }
+
+/** The lane the agents' sessions are filed in: each at work at once drawn beside the others in it. */
+export const AGENTS = 'agents';
+
+/**
+ * The lanes of what is placed on a time axis, each item filed by who it is for: the person who holds it, what no one
+ * holds the workspace owner's (`me`: it is their calendar), and the sessions the agents' lane. People by name, then
+ * what no one holds when there is no owner to give it to, then the agents.
+ */
+export async function lanesOf(l: Archipelago, items: { id: string; type: string; owner: string | null }[], me: string | null) {
+  const lane = new Map(items.map((e) => [e.id, l.registry.isA(e.type, 'run') ? AGENTS : (e.owner ?? me)]));
+  const present = new Set(lane.values());
+  const people = [...present].filter((k): k is string => k !== null && k !== AGENTS);
+  const { rows } = await l.db.query<{ id: string; title: string }>('select id, title from entity where id = any($1::text[])', [people]);
+  const titles = new Map(rows.map((r) => [r.id, r.title]));
+  const lanes = [
+    ...people.map((key) => ({ key, title: titles.get(key) ?? 'Someone' })).sort((a, b) => a.title.localeCompare(b.title)),
+    ...(present.has(null) ? [{ key: null, title: 'No one' }] : []),
+    ...(present.has(AGENTS) ? [{ key: AGENTS, title: 'Agents' }] : []),
+  ];
+  return { lane, lanes };
+}
