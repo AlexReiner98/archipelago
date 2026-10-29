@@ -75,7 +75,13 @@ test('a repository’s work is split by what blocks it, due first, and its last 
 
 test('a handoff counts the last week: what was settled, what opened, the pushes and what each session said as it ended', async () => {
   const { answer } = await handler['software.handoff']({ repo: 'repo' }, ctxOver(ITEMS, OPTS));
-  assert.deepEqual(['note' in answer, answer.since], [false, '2026-10-09T12:00:00.000Z'], 'a week back, and a note kept as a handoff is not read');
+  assert.deepEqual(['note' in answer, answer.since, answer.from], [false, '2026-10-09T12:00:00.000Z', 'a week back'], 'with no session ended here, a week back; an automation’s run is not one; a note kept as a handoff is not read');
+  // From when the last session here to end began: its own work is counted, and what came after.
+  const session: Item = { id: 'sess', type: 'run', title: 'Iona', status: 'finished', is_open: false, created_at: '2026-10-12T08:00:00Z', updated_at: '2026-10-12T20:00:00Z', props: { session_id: 's-1' } };
+  const counted = (await handler['software.handoff']({ repo: 'repo' }, ctxOver([...ITEMS, session], { ...OPTS, lives: { repo: [...OPTS.lives.repo, 'sess'] } }))).answer;
+  assert.deepEqual([counted.since, counted.from], ['2026-10-12T08:00:00.000Z', { session: 'sess', title: 'Iona', began: '2026-10-12T08:00:00.000Z' }]);
+  assert.deepEqual(counted.since_then.sessions.map((s: { id: string }) => s.id), ['run', 'sess']);
+  assert.equal((await handler['software.handoff']({ repo: 'repo', since: '2026-10-14T12:00:00Z' }, ctxOver([...ITEMS, session], OPTS))).answer.from, 'since', 'a since asked for wins');
   assert.deepEqual(answer.since_then.settled.map((i: { id: string }) => i.id), ['gone']);
   assert.deepEqual(answer.since_then.pushes.map((p: { head: string }) => p.head), ['abcdef0'], 'a tag is no push');
   assert.deepEqual(answer.since_then.sessions.map((s: { id: string; said: string }) => [s.id, s.said]), [['run', 'finished: all good']]);

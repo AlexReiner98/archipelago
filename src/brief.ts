@@ -59,8 +59,9 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
   }
   const ids = chain.map((c) => c.id);
 
-  // Its repository: a place it or what holds it lives in that is known by an address or a folder.
-  const [repo] = related('lives_in', ids).filter((p) => whereOf(l, p as unknown as Entity));
+  // Its repository: a place it or what holds it lives in that is known by an address or a folder; else such a place
+  // that holds it (a task part of the repository itself).
+  const [repo] = [...related('lives_in', ids), ...chain.slice(1)].filter((p) => whereOf(l, p as unknown as Entity));
   const needs = related('needs', [task.id]);
   // What the task rests on beyond structure (a rule that governs it, an issue it addresses, a question it assumes), by
   // the kind of link. From what holds it or what it needs, only questions and records: the rules and the decisions.

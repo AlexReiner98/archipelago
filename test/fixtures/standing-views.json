@@ -3772,6 +3772,7 @@
    "preset": "structure"
   },
   "handoff repo": {
+   "from": "a week back",
    "how": "Everything here is read off the map as it is now, and nothing is written down for the next session. What nobody has seen working is said on the item (seen_working false, what would show it in to_see) and listed as unseen: set it true once someone has. What sessions left on no remote or not committed is read off their checkouts (left). What bites in a file is an instruction kept about this repository with for: file:<glob> (traps), said in brief and when a session opens a file it names: make one when something bites and nothing can fix it, an issue when something can, and retire it when a change to its file makes it untrue. What comes next is read off the open work, by attention within this repository.",
    "last_push": null,
    "open": {
