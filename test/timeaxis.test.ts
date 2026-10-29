@@ -57,8 +57,8 @@ test('a read placed in time places what falls in its window, repeats as their da
 
 test('a window may be said from today, worked out in the zone', () => {
   const now = Date.parse('2026-10-29T02:00:00Z'); // still the 28th in Toronto
-  assert.deepEqual(resolveAxis({ from: '-6d', to: '7d' }, 'America/Toronto', now), { from: '2026-10-22', to: '2026-11-04' });
-  assert.deepEqual(resolveAxis({ from: 'today', to: '+0d' }, 'UTC', now), { from: '2026-10-29', to: '2026-10-29' });
+  assert.deepEqual(resolveAxis({ from: '-6d', to: '7d' }, 'America/Toronto', now), { from: '2026-10-22', to: '2026-11-04', zone: 'America/Toronto' });
+  assert.deepEqual(resolveAxis({ from: 'today', to: '+0d' }, 'UTC', now), { from: '2026-10-29', to: '2026-10-29', zone: 'UTC' });
   assert.throws(() => resolveAxis({ from: '3d', to: '-3d' }, 'UTC', now), /comes after/);
 });
 
@@ -73,7 +73,7 @@ test('a flat lens on a time axis places each item it sends, and says its window 
   })) as { created: Record<string, string> };
   const answer = (await flatLens(l, { filter: { types: ['routine', 'event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lens: { time: unknown }; items: Item[] };
   const of = (ref: string) => answer.items.find((i) => i.id === made.created[ref]);
-  assert.deepEqual(answer.lens.time, { from: '2026-10-12', to: '2026-10-18' });
+  assert.deepEqual(answer.lens.time, { from: '2026-10-12', to: '2026-10-18', zone: 'America/Toronto' }, 'its days counted in the workspace’s zone');
   assert.equal(of('gym')!.time!.length, 3, 'a repeat on each of its days');
   assert.deepEqual(of('meet')!.time, [{ start: '2026-10-14T14:00:00.000Z', end: '2026-10-14T15:30:00.000Z', by: 'when' }]);
 
