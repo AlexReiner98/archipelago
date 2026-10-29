@@ -7,7 +7,7 @@ import { findRepo, pushes, repoWork } from './repo.js';
 
 /** The kinds of thing that are true or not of the world, and so go stale: work, questions and problems. */
 export const GOES_STALE = ['task', 'decision', 'issue', 'hypothesis', 'feature'];
-/** How far back a handoff looks for what has happened, unless it is given since. */
+/** How far back a handoff looks for what has happened when no session here has ended, unless it is given since. */
 const HANDOFF_DAYS = 7;
 
 const HUBS_HOW =
@@ -27,8 +27,7 @@ const LEFT = 10;
  * it (git, said by the hook), when that run has ended with commits on no remote or files not committed, and no push to
  * its branch has come since.
  */
-async function leftBehind(ctx, repo) {
-  const runs = await ctx.read({ related: repo, relation: 'lives_in', direction: 'in', types: ['run'], newest: 'updated', fields: ['git'] });
+async function leftBehind(ctx, repo, runs) {
   const heard = new Set();
   const left = [];
   for (const r of runs) {
@@ -52,11 +51,17 @@ export async function handoff(input, ctx) {
   const repo = await findRepo(ctx, input.repo, 'handoff');
   if (input.since && Number.isNaN(Date.parse(input.since))) throw new Error('handoff: "since" must be an ISO date or date-time');
   const work = await repoWork({ repo: repo.id }, ctx);
-  const since = input.since ? new Date(input.since) : new Date(Date.parse(ctx.now) - HANDOFF_DAYS * 86_400_000);
+  // The repository's runs, the newest first. What happened is counted from when the last session here to end began
+  // (an agent's, which has a session id: not an automation's run), so its own work is in it as well as what came
+  // after; else a week back.
+  const runs = await ctx.read({ related: repo.id, relation: 'lives_in', direction: 'in', types: ['run'], newest: 'updated', fields: ['git', 'session_id'] });
+  const last = runs.find((r) => !r.is_open && r.props?.session_id);
+  const since = input.since ? new Date(input.since) : last ? new Date(last.created_at) : new Date(Date.parse(ctx.now) - HANDOFF_DAYS * 86_400_000);
+  const from = input.since ? 'since' : last ? { session: last.id, title: last.title, began: since.toISOString() } : 'a week back';
   const after = (t) => Date.parse(t) > since.getTime();
   // What goes stale and is the repository's, open or not, changed since then, newest first.
   const stale = (await ctx.read({ scope: repo.id, types: GOES_STALE, fields: [], since: since.toISOString() })).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || a.id.localeCompare(b.id));
-  const ran = (await ctx.read({ related: repo.id, relation: 'lives_in', direction: 'in', types: ['run'], newest: 'updated', fields: [] })).filter((r) => !r.is_open && after(r.updated_at)).slice(0, 10);
+  const ran = runs.filter((r) => !r.is_open && after(r.updated_at)).slice(0, 10);
   const ended = [];
   for (const r of ran) ended.push({ id: r.id, title: r.title, status: r.status, ended: r.updated_at, said: said((await ctx.read({ get: r.id }))?.body) });
   // What agents settled and the owner has not confirmed, as attention gives it to the owner.
@@ -66,7 +71,7 @@ export async function handoff(input, ctx) {
   const unshaped = (await ctx.read({ view: 'hubs', params: { within: repo.id } })).hubs.filter((h) => h.views === 0 && inRepo.has(h.id));
   // Built or done, and nobody has seen it work where it is used: said on the item itself.
   const unseen = (await ctx.read({ items: { type: 'work', where: { seen_working: false } }, fields: ['to_see'] })).filter((e) => inRepo.has(e.id));
-  const left = await leftBehind(ctx, repo.id);
+  const left = await leftBehind(ctx, repo.id, runs);
   // What bites in its files: the instructions said for files here, by the files they name.
   const traps = (await ctx.read({ view: 'instructions', params: { for: 'file:', about: repo.id } })).said.map(({ id, title, files }) => ({ id, title, files }));
   const pushed = await pushes(ctx, repo.id, since.toISOString(), 20);
@@ -82,6 +87,8 @@ export async function handoff(input, ctx) {
     // The owner is met in chat: what agents settled and they have not answered for comes with where things stand.
     ...(unconfirmed.count > 0 && { for_owner: unconfirmed }),
     since: since.toISOString(),
+    // What since is: when the last session here to end began, the since asked for, or a week back.
+    from,
     // How many of each, and the newest few of each: what changed, not every item it touched.
     since_then: {
       counts: { pushes: pushed.length, settled: settled.length, opened: opened.length, sessions: ended.length },
