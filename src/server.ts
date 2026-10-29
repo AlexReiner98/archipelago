@@ -259,7 +259,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // A document read by someone signed in, to print or save as a PDF: the same page a link opens, which reads the
       // document with the reader's own token. The page holds nothing; what it shows is what that token may see.
       if (req.method === 'GET' && /^\/read\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
-        res.writeHead(200, { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
+        // Framed by this server's own page alone, to read a private document on the canvas (ui/reader-frame.js).
+        res.writeHead(200, { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'" });
         return res.end(await uiPage('doc.html'));
       }
       // A document's preview, for someone signed in: the published page, drawn from what publishing would freeze now

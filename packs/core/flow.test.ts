@@ -120,8 +120,9 @@ test('two thousand steps in wide layers are laid out in a few seconds', () => {
   const items = Array.from({ length: 2000 }, (_, k) => item(`s${k}`));
   const links = items.flatMap((_, k) => [...(k % 20 ? [dep(`s${k}`, `s${k - 1}`)] : []), ...(k > 20 && k % 17 === 0 ? [dep(`s${k}`, `s${k - 17}`)] : [])]);
   const [g, took] = timed(() => run(items, links));
-  // About 1.3 s of work on 26 Oct 2026, near 4 s since the ties are routed round the steps and every line wired by one
-  // rule (28 Oct); the bound is well clear of that and still far under what it guards against.
+  // About 1.3 s alone (26 Oct 2026), 2.3 to 2.5 s once the ties were wired round the steps (29 Oct): 3 to 4 s of work,
+  // counting the collector's threads. Counted as work, not by the clock, it is not slowed by the shards run beside it,
+  // and the old layout's more than twelve seconds is still far over the bound.
   assert.ok(took < 8000, `laid out in ${Math.round(took)} ms of work`);
   assert.equal(g.all.filter((n: any) => !n.dummy).length, 2001);
 });

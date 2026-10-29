@@ -22,6 +22,9 @@ body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.lf-stage), body[data-p
 /* The key, always in sight on a pane alone: in the safe zone, under the query bar, as long as it is. */
 /* Among several, the pane the query bar is over keeps its drawing and key below the bar too (ui/query-bar.js keepClear). */
 #canvas > .pane.pane-active > .pane-canvas .lens-view { padding-top: var(--safe-top); }
+/* Where the bars stand over a pane, nothing drawn in it is ever seen under them, whatever a drawing's own styling says:
+   what scrolls is cut at the safe zone's top, and a drawing's fixed marks stay in its pane (contain). */
+body[data-panes="1"] #canvas .pane-canvas .lens-view, #canvas > .pane.pane-active > .pane-canvas .lens-view { clip-path: inset(var(--safe-top) 0 0 0); contain: paint; }
 body[data-panes="1"] #canvas .lf-legend { bottom: auto; pointer-events: auto; }
 #canvas .pane-canvas > .lens-wrap > .lens-bar { position: absolute; z-index: 2; top: calc(var(--box-9) + var(--space-5)); left: var(--space-9); right: var(--space-9); width: auto; pointer-events: none; }
 #canvas .pane-canvas > .lens-wrap > .lens-bar > * { pointer-events: auto; }
@@ -322,7 +325,8 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 .pane-bar .pane-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-3); font-weight: 600; cursor: grab; user-select: none; touch-action: none; padding: var(--space-2) var(--space-3); }
 .pane-bar .pane-follows { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2, var(--text-3)); color: var(--accent); background: var(--accent-soft); border-radius: var(--radius-2); padding: 0 var(--space-3); margin-left: var(--space-3); }
 .pane-bar .pane-follows[hidden] { display: none; }
-#canvas .pane-canvas { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+/* A pane is never scrolled itself, not even by code bringing a mark into sight: only what it holds scrolls. */
+#canvas .pane-canvas { position: relative; flex: 1; min-height: 0; overflow: clip; }
 #canvas .pane-canvas > .lens-wrap, #canvas .pane-canvas .lens-view { height: 100%; }
 #canvas .pane-canvas .lens-view { position: relative; box-sizing: border-box; overflow: auto; }
 #canvas .pane-canvas .lens-view:has(.lf-stage) { overflow: hidden; }

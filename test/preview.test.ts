@@ -4,6 +4,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
+import { wouldPublish } from '../src/published.ts';
+import { fresh, make } from './map.ts';
 import { serve } from './serve.ts';
 
 test('a document is previewed as publishing it would give it, before it is public, on both sides of a share', async () => {
@@ -25,6 +27,7 @@ test('a document is previewed as publishing it would give it, before it is publi
         { op: 'create', ref: 's', type: 'note', title: 'Costs', visibility: 'shared', body: 'Twenty an hour.' },
         { op: 'create', ref: 't', type: 'task', title: 'Write it', visibility: 'shared' },
         { op: 'create', ref: 'x', type: 'note', title: 'Our margin', visibility: 'private', body: 'Secret.' },
+        { op: 'create', ref: 'p', type: 'document', title: 'Notes to self', visibility: 'shared', body: 'Mine.' },
         { op: 'create', ref: 'l', type: 'lens', title: 'What it holds', visibility: 'shared', status: 'current', props: { filter: { types: ['task'] } } },
         { op: 'link', type: 'part_of', from: 's', to: 'd' },
         { op: 'link', type: 'part_of', from: 'l', to: 'd' },
@@ -45,6 +48,8 @@ test('a document is previewed as publishing it would give it, before it is publi
   assert.equal((await api(mine, 'published', { id: made.d })).published, false);
   assert.equal((await api(mine, 'get', { id: made.d })).entity.visibility, 'shared');
   assert.ok((await call(`/preview/${made.d}/data`, undefined, {})).error, 'only for someone signed in');
+  // A private one is read as its reader sees it (ui/reader-frame.js), its page framed by this server's own alone.
+  assert.match((await fetch(`${base}/read/${made.p}`)).headers.get('content-security-policy') ?? '', /frame-ancestors 'self'/);
   // Its page may be framed by this server's own page alone, to read the draft on the canvas (ui/reader-frame.js).
   assert.match((await fetch(`${base}/preview/${made.d}`)).headers.get('content-security-policy') ?? '', /frame-ancestors 'self'/);
 
@@ -87,4 +92,11 @@ test('a document shared only to be read is previewed nowhere, and its views are 
   await api(theirs, 'change', { reason: 'test', ops: [{ op: 'update', id: offer.id, status: 'accepted' }] });
   assert.match((await call(`/preview/${offer.id}/data`, theirs, {})).error, /to be read here, not published/);
   assert.equal((await api(theirs, 'document', { id: offer.id, drawn: true })).lenses, undefined);
+});
+
+test('a private document has no preview: it says so, by name', async () => {
+  const l = await fresh();
+  const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'document', title: 'Notes to self', visibility: 'private', body: 'Mine.' }]);
+  await l.db.query(`update entity set private_to = 'e_owner' where id = $1`, [p]);
+  await assert.rejects(wouldPublish(l, p), /"Notes to self" is private: share it/);
 });
