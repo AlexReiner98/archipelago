@@ -64,12 +64,14 @@ function toMode(m, looking = true) {
 }
 
 /**
- * Take a choice: a part to go into; words in place of those find set before, or (`add`) as one more set; a link to
+ * Take a choice: a part to go into; a view or a style to open; words in place of those find set before, or (`add`) as one more set; a link to
  * walk along; a limit; any other term added to the lens. Find stays open with the cursor in it, to refine further.
  */
 function take(choice, add = false) {
   if (!choice) return;
   if (choice.mode) return void ((input.value = ''), toMode(choice.mode));
+  // A view or a style is opened, not added: find shuts, and the pane goes there.
+  if (choice.href) return void (shut(), (location.hash = choice.href));
   again();
   input.focus();
   const lens = lensUp();
@@ -96,7 +98,10 @@ function drawChoices() {
   list.dataset.for = shownFor;
 }
 
-/** What the words could be: the words at once, the rest once the search answers; how many the words find, under the canvas's Not. */
+/**
+ * What the words could be: the words at once, the rest once the search answers; how many the words find under the
+ * canvas's Only, Within and Not, which Enter keeps, so the count is what Enter brings (task e_7bewev8v).
+ */
 async function look() {
   const q = input.value.trim();
   const mine = ++asked;
@@ -110,11 +115,11 @@ async function look() {
   lit = 0;
   drawChoices();
   const lens = lensUp();
-  const exclude = lens.filter.exclude;
+  const { only, within, exclude } = lens.filter;
   const most = numberOf(state.style, 'find_choice_items');
   const [all, counted] = await Promise.all([
     choicesFor(mode, q, { most, wide: numberOf(state.style, 'term_find_most'), lens }),
-    finding ? api('view', { name: 'flat', params: { filter: { text: q, ...(exclude && { exclude }) }, limit: most } }).catch(() => null) : null,
+    finding ? api('view', { name: 'flat', params: { filter: { text: q, ...(only && { only }), ...(within && { within }), ...(exclude && { exclude }) }, limit: most } }).catch(() => null) : null,
   ]);
   if (mine !== asked) return;
   const words = all.find((x) => x.words === q);

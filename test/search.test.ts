@@ -8,9 +8,12 @@ import { fresh, make } from './map.ts';
 /** Search as it was before the index (to 23 Oct 2026): every row's words read on each call. */
 async function before(db: Q, input: { q: string; type?: string[]; limit?: number }) {
   const run = async (near: boolean) => {
-    const params: unknown[] = [input.q];
+    // Near, each way of the words with two letters side by side swapped is tried too (since 29 Oct 2026).
+    const chars = [...input.q.slice(0, 64)];
+    const slips = [input.q, ...chars.slice(1).map((_, i) => input.q.slice(0, i) + input.q[i + 1] + input.q[i] + input.q.slice(i + 2))];
+    const params: unknown[] = near ? [input.q, slips] : [input.q];
     const TEXT = `to_tsvector('english', title || ' ' || body)`;
-    const where = [near ? `word_similarity($1, title) > 0.5` : `(title ilike '%' || $1 || '%' or ${TEXT} @@ websearch_to_tsquery('english', $1))`, 'archived_at is null'];
+    const where = [near ? `exists (select 1 from unnest($2::text[]) v where word_similarity(v, title) > 0.5)` : `(title ilike '%' || $1 || '%' or ${TEXT} @@ websearch_to_tsquery('english', $1))`, 'archived_at is null'];
     if (input.type) where.push(`type = any($${params.push(input.type)}::text[])`);
     // Ranked by the title alone since 25 Oct 2026 (src/search.ts rankSql): a note is matched, not ranked.
     const rank = `(case when title ilike '%' || $1 || '%' then 1 else 0 end) + similarity($1, title) + ts_rank(to_tsvector('english', title), websearch_to_tsquery('english', $1), 1) desc, `;
@@ -50,7 +53,7 @@ test('search through the indexes answers as reading every row did, for each view
   // A distinct time for each item, so that equal ranks fall in one order however the rows are read.
   await l.db.query(`update entity set updated_at = now() - (('x' || substr(md5(id), 1, 6))::bit(24)::int || ' seconds')::interval`);
 
-  const queries = ['model export', 'review', 'roof', 'rendr', 'revew', 'running', 'runs', '"roof the sheet"', '"the roof"', '-roof wall', 'roof or sun', 'the', 'of', 'Ap', 'ex', '%', 'apex model', 'nothing like this', 'privat'];
+  const queries = ['model export', 'review', 'roof', 'rendr', 'revew', 'reveiw', 'mdoel export', 'running', 'runs', '"roof the sheet"', '"the roof"', '-roof wall', 'roof or sun', 'the', 'of', 'Ap', 'ex', '%', 'apex model', 'nothing like this', 'privat'];
   const viewers: [string, Archipelago][] = [['the owner', l], ['Bo', l.as(bo)], ['someone else', l.as('e_someone')]];
   let found = 0;
   for (const [who, view] of viewers)
