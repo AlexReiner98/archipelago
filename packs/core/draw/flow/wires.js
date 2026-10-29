@@ -140,8 +140,14 @@ export function wire({ nodes, x, y, lines, layers, room, z }) {
   // A fan's track above another's costs a crossing where one of its drops down passes the other's track, and where one
   // of the other's drops up from its step passes its own.
   const inside = (v, f) => v > f.x1 + 0.5 && v < f.x2 - 0.5;
-  const downs = (f) => (f.flat ? [] : f.members.map((sg) => sg.hx)), ups = (f) => [f.fx, ...(f.flat ? f.members.map((sg) => sg.hx) : [])];
-  const cost = (a, b) => downs(a).filter((v) => inside(v, b)).length + ups(b).filter((v) => inside(v, a)).length;
+  // Each fan's drops down and up, read once: the cost below is asked of every pair in a gap.
+  for (const fan of fans) [fan.downs, fan.ups] = [fan.flat ? [] : fan.members.map((sg) => sg.hx), [fan.fx, ...(fan.flat ? fan.members.map((sg) => sg.hx) : [])]];
+  const within = (vs, f) => {
+    let n = 0;
+    for (const v of vs) if (inside(v, f)) n++;
+    return n;
+  };
+  const cost = (a, b) => within(a.downs, b) + within(b.ups, a);
   const tracks = layers.map(() => []);
   for (const fan of [...fans].sort((p, q) => q.x2 - q.x1 - (p.x2 - p.x1))) {
     const row = tracks[fan.gap];
@@ -187,12 +193,13 @@ export function wire({ nodes, x, y, lines, layers, room, z }) {
   // Where a drop of the order passes over another of the order's tracks, the drop is broken: the drafting way to show
   // wires that do not meet. A tie is drawn under the wires, and breaks nothing.
   const breaks = [], seen = new Set();
+  const orderTracks = tracks.map((row) => row.filter((o) => o.members[0].line.order));
   for (const sg of list.filter((sg) => sg.line.order))
     for (const [p, q] of [[sg.points[0], sg.points[1]], [sg.points[2], sg.points[3]]]) {
       const key = `${p[0]} ${p[1]} ${q[1]}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      for (const o of tracks[sg.gap]) if (o !== sg.fan && o.members[0].line.order && inside(p[0], o) && o.y > Math.min(p[1], q[1]) + 1 && o.y < Math.max(p[1], q[1]) - 1) breaks.push([p[0], o.y]);
+      for (const o of orderTracks[sg.gap]) if (o !== sg.fan && inside(p[0], o) && o.y > Math.min(p[1], q[1]) + 1 && o.y < Math.max(p[1], q[1]) - 1) breaks.push([p[0], o.y]);
     }
   return { breaks, height };
 }

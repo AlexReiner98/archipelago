@@ -112,9 +112,10 @@ test('two thousand steps in wide layers are laid out in a few seconds', () => {
   const started = performance.now();
   const g = run(items, links);
   const took = performance.now() - started;
-  // About 1.3 s alone (26 Oct 2026); the whole suite runs files side by side and slows it twice or three times over, so
-  // the bound is set well clear of that and still far under what it guards against.
-  assert.ok(took < 8000, `laid out in ${Math.round(took)} ms`);
+  // About 1.3 s alone (26 Oct 2026), 2.3 to 2.5 s once the ties were wired round the steps (29 Oct). The suite runs
+  // files side by side, which slows it two or three times over: 5 to 8 s in CI's shards. The old layout took more than
+  // twelve seconds alone, so twelve under load still tells it apart, with room for the run beside it.
+  assert.ok(took < 12000, `laid out in ${Math.round(took)} ms`);
   assert.equal(g.all.filter((n: any) => !n.dummy).length, 2001);
 });
 
