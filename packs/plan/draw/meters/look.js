@@ -3,7 +3,7 @@
 // share's colour is a class the drawing writes a rule for (hueRule): a drawing sets no style on a mark.
 
 export const css = `
-.mt-stage { display: flex; flex-direction: column; gap: var(--ln-meter-gap); padding: var(--ln-meter-pad); max-width: var(--ln-meter-most); color: var(--ln-text); font-size: var(--ln-text-size); }
+.mt-stage { display: flex; flex-direction: column; gap: var(--ln-meter-gap); padding: var(--ln-meter-pad); max-width: var(--ln-meter-most); margin: 0 auto; box-sizing: border-box; color: var(--ln-text); font-size: var(--ln-text-size); }
 .mt-head { display: flex; gap: var(--ln-meter-row-gap); color: var(--ln-muted); font-size: var(--ln-meter-head-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mt-band { display: flex; flex-direction: column; gap: var(--ln-meter-bar-gap); min-width: 0; }
 .mt-top { display: flex; align-items: baseline; gap: var(--ln-meter-row-gap); min-width: 0; }
