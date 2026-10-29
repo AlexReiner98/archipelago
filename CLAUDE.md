@@ -101,7 +101,7 @@ reply ending, commits accounted for) is `docs/agents.md`.
   (add `PELAGO_AUTH=tokens` to test identity). Delete it afterwards. Never
   point a second server at `data/`; the lock refuses it.
 - **Before changing the database schema, take a backup** with `capture` action `backup`
-  (the server also writes one every 6 hours, to `backups/default/`), then
+  (the server also writes one a day, to `backups/default/`), then
   confirm the item count and the log's entries are unchanged after the restart. Never copy `data/` while the
   server runs and call it a backup. A schema change never rewrites the log: an
   entry is kept as it was appended, and a new form is read through an

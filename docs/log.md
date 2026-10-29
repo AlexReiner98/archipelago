@@ -745,6 +745,12 @@ The vault is `src/vault.ts`, sealing `src/seal.ts`, the forget `src/forget.ts`
   is (an open question for the owner, `e_98ddd7ha`).
 - Values are opened for their reader in `entries`, `entry` and `factAt`;
   `stored` and `verify` read the log as it is kept.
+- A value of 128 bytes or more is compressed (raw deflate) before it is
+  sealed, when that makes it smaller, since sealed bytes do not compress:
+  its plaintext is then a zero byte and the deflated JSON. JSON never begins
+  with a zero byte, so values sealed before (29 Oct 2026) open unchanged.
+  Measured on the live map, sealed values were 6.5 of the fact log's 14.7 MB
+  and a drawing's code, kept whole at each of 24 versions, 4.2 (`e_cgctyctz`).
 
 ---
 
