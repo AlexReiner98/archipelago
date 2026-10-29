@@ -55,9 +55,9 @@ test('a handoff is read off the map, and nobody writes it down: the open work an
   assert.deepEqual(stand.since_then.opened.map((i: any) => i.title), ['The solver diverges on thin walls']);
   assert.deepEqual(stand.since_then.sessions.map((s: any) => [s.status, /^finished: Session ended \(exit\)/.test(s.said) || /Not reconciled/.test(s.said)]), [['finished', true]]);
   assert.ok(!stand.open.ready.some((i: any) => i.title === 'Write unit tests'), 'what is open is as the map has it now');
-  // The next session is told how much has moved in the last week, and what is left, unseen or bites here.
+  // The next session is told how much has moved since the last session here to end began, and what is left, unseen or bites here.
   await make(l, [{ op: 'update', id: made.offline, props: { seen_working: false } }]);
-  assert.match(await hookSessionStart(l, { session_id: 'h1', cwd: String.raw`C:\code\Apex` }), /Where things stand: view "handoff" with repo e_\w+\. In the last week: 1 push, 1 item settled, \d+ items opened, 1 session ended\. And 1 item nobody has seen working \(unseen\)\./);
+  assert.match(await hookSessionStart(l, { session_id: 'h1', cwd: String.raw`C:\code\Apex` }), /Where things stand: view "handoff" with repo e_\w+\. Since the last session here to end, \w+, began \(\d{4}-\d\d-\d\d \d\d:\d\d UTC\): 1 push, 1 item settled, 1 item opened, 1 session ended\. And 1 item nobody has seen working \(unseen\)\./);
   assert.equal(((await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo, since: new Date(Date.now() + 60_000).toISOString() } })) as any).since_then.settled.length, 0, 'counted from another moment when asked');
 
   // A note of a type held to a length (an old handoff) cannot be grown past it by an agent, only rewritten.
