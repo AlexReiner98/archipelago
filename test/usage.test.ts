@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { createToken } from '../src/auth.ts';
-import { recountBytes } from '../src/bytes.ts';
+import { foldBytes, recountBytes } from '../src/bytes.ts';
 import { runAct } from '../src/server-acts.ts';
 import { loadServerPacks } from '../src/server-packs.ts';
 import { serve } from './serve.ts';
@@ -93,6 +93,7 @@ test('the bytes counted as the log is written are what a count made again from t
   assert.ok(done.result, done.error);
   const read = async () => (await ws.pelago.db.query<{ id: string; type: string; bytes: string }>(`select id, type, bytes from item_bytes order by id`)).rows;
   const types = async () => (await ws.pelago.db.query<{ type: string; bytes: string }>(`select type, bytes from type_bytes order by type`)).rows;
+  await foldBytes(ws.pelago.db);
   const [kept, keptTypes] = [await read(), await types()];
   assert.ok(kept.some((r) => r.type === 'goal') && kept.some((r) => r.type === 'links'), 'items by type, links as one');
   await ws.pelago.db.transaction((tx) => recountBytes(tx));
