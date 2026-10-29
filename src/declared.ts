@@ -200,6 +200,8 @@ export interface DrawingDef {
   title: string;
   shape: string;
   modules: Record<string, string>;
+  /** "whole": the drawing reads each item's note whole, so the page asks the lens for them so (the flat read's `notes`). */
+  notes?: 'whole';
 }
 
 /** What a pack shows on the page of every item of the kinds or types it is on: one column of pieces. */

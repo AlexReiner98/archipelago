@@ -11,9 +11,10 @@
 // (PELAGO_MODEL_SHARED, on unless set off); otherwise nothing runs, and that is said plainly.
 
 import { lookup } from 'node:dns/promises';
-import { BlockList, isIP } from 'node:net';
+import { isIP } from 'node:net';
 import { env } from './env.ts';
 import { ANTHROPIC, anthropicHeaders, asker, bearer, OPENAI, shared, type Ask, type Endpoint } from './model.ts';
+import { guardedFetch, isPrivate, localName, privateRefused } from './outbound.ts';
 import type { Archipelago } from './pelago.ts';
 
 export type Provider = 'anthropic' | 'openai' | 'compatible';
@@ -60,10 +61,11 @@ export interface Connection {
 }
 
 type Fetch = typeof fetch;
-let make: (key: string | undefined, at: Endpoint) => Ask = (key, at) => asker(key, at);
-let fetching: Fetch = (...args) => fetch(...args);
+/** A workspace's account is asked through the guarded fetch (src/outbound.ts); the server's own model, by its operator's address. */
+let make: (key: string | undefined, at: Endpoint, f?: Fetch) => Ask = (key, at, f) => asker(key, at, f);
+let fetching: Fetch = (...args) => guardedFetch(...args);
 /** Tests: a model that answers from a script, and a fetch for the check made when an account is given. */
-export function configureModels(given: { ask?: (key: string | undefined, at: Endpoint) => Ask; fetch?: Fetch }): void {
+export function configureModels(given: { ask?: (key: string | undefined, at: Endpoint, f?: Fetch) => Ask; fetch?: Fetch }): void {
   if (given.ask) make = given.ask;
   if (given.fetch) fetching = given.fetch;
 }
@@ -88,7 +90,7 @@ async function stored(l: Archipelago): Promise<ModelAccount | undefined> {
 /** What this workspace's model calls run on: its own account, or the server's model where it is offered. Undefined: nothing. */
 export async function connection(l: Archipelago): Promise<Connection | undefined> {
   const a = await stored(l);
-  if (a) return { from: 'workspace', name: NAMES[a.provider], model: a.model || DEFAULT_MODEL, ask: make(a.key || undefined, endpointOf(a)), price: a.price ?? (a.provider === 'anthropic' ? ANTHROPIC_PRICE : undefined) };
+  if (a) return { from: 'workspace', name: NAMES[a.provider], model: a.model || DEFAULT_MODEL, ask: make(a.key || undefined, endpointOf(a), guardedFetch), price: a.price ?? (a.provider === 'anthropic' ? ANTHROPIC_PRICE : undefined) };
   const at = shared();
   if (at) return { from: 'server', name: 'The server’s model', model: DEFAULT_MODEL, ask: make(undefined, at) };
   return undefined;
@@ -109,15 +111,10 @@ export async function modelStatus(l: Archipelago, admin = true) {
   };
 }
 
-const PRIVATE = new BlockList();
-for (const [net, bits] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.168.0.0', 16]] as const) PRIVATE.addSubnet(net, bits, 'ipv4');
-for (const [net, bits] of [['::', 127], ['fc00::', 7], ['fe80::', 10]] as const) PRIVATE.addSubnet(net, bits, 'ipv6');
-const isPrivate = (ip: string): boolean => {
-  const v4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip)?.[1];
-  return v4 ? PRIVATE.check(v4, 'ipv4') : PRIVATE.check(ip, isIP(ip) === 6 ? 'ipv6' : 'ipv4');
-};
-
-/** A compatible server's address as it is kept, or why it is not one. PELAGO_MODEL_PRIVATE_URLS=off refuses one on this server's own network. */
+/**
+ * A compatible server's address as it is kept, or why it is not one. PELAGO_MODEL_PRIVATE_URLS=off refuses one on this
+ * server's own network: said here when it is given, and held to on every call (src/outbound.ts).
+ */
 export async function baseUrl(given: string | undefined): Promise<string> {
   let url: URL;
   try {
@@ -126,10 +123,10 @@ export async function baseUrl(given: string | undefined): Promise<string> {
     throw new Error('Give the server’s address, with its version: https://api.example.com/v1');
   }
   if (!/^https?:$/.test(url.protocol) || url.username || url.password || url.search || url.hash) throw new Error('Give the server’s address as https://host/v1, with nothing after it and no sign-in in it: the key goes in its own field.');
-  if (/^(off|false|0|no)$/i.test(env('MODEL_PRIVATE_URLS')?.trim() ?? '')) {
+  if (privateRefused()) {
     const host = url.hostname.replace(/^\[|\]$/g, '');
     const addresses = isIP(host) ? [host] : (await lookup(host, { all: true }).catch(() => [])).map((x) => x.address);
-    if (host === 'localhost' || host.endsWith('.localhost') || addresses.some(isPrivate)) throw new Error('This server does not call addresses on its own network: give the model server’s public address.');
+    if (localName(host) || addresses.some(isPrivate)) throw new Error('This server does not call addresses on its own network: give the model server’s public address.');
   }
   return url.href.replace(/\/+$/, '');
 }

@@ -116,13 +116,19 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
 }
 
 /**
+ * An address on this server, or its front page: a path, never //elsewhere. A browser drops tabs and line breaks from
+ * an address, so /<tab>/elsewhere would be //elsewhere: none is let by.
+ */
+export const onThisServer = (to: string) => (/^\/(?![/\\])/.test(to) && !/[\u0000-\u001f\u007f]/.test(to) ? to : '/');
+
+/**
  * Send a person who came back from another site on to where the pack says: an address on this server only. What went
  * wrong is shown them as a page, with the way back.
  */
 async function comeBack(res: ServerResponse, run: () => Promise<unknown>): Promise<unknown> {
   try {
     const to = String((((await run()) ?? {}) as { redirect?: unknown }).redirect ?? '/');
-    return res.writeHead(302, { ...GUARD, location: /^\/(?![/\\])/.test(to) ? to : '/' }).end();
+    return res.writeHead(302, { ...GUARD, location: onThisServer(to) }).end();
   } catch (err) {
     const said = (err as Error).message.replaceAll('&', '&amp;').replaceAll('<', '&lt;');
     const page = `<!doctype html><meta charset="utf-8"><title>Archipelago</title><p>${said}</p><p><a href="/#/workspace">Back to Archipelago</a></p>`;

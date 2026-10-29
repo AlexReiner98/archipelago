@@ -195,12 +195,14 @@ export async function factEvents(db: Q, input: EventQuery, limit: number): Promi
   if (input.action) rows = rows.filter((r) => r.action === input.action);
   rows = rows.slice(0, limit);
   const runOf = (r: (typeof rows)[number]) => (typeof r.detail.run === 'string' ? r.detail.run : undefined);
-  const targets = [...new Set(rows.flatMap((r) => [r.target_id, runOf(r)].filter((id): id is string => Boolean(id))))];
+  // A link's far end is asked too: a link to an item the viewer may not see is no event of theirs, its id not named.
+  const toOf = (r: (typeof rows)[number]) => (typeof r.detail.to === 'string' && r.action.startsWith('relation.') ? r.detail.to : undefined);
+  const targets = [...new Set(rows.flatMap((r) => [r.target_id, runOf(r), toOf(r)].filter((id): id is string => Boolean(id))))];
   const { rows: seen } = await db.query<{ id: string; title: string; type: string }>(`select id, title, type from entity where id = any($1::text[])`, [targets]);
   const known = new Map(seen.map((s) => [s.id, s]));
   // The session a change came from is named as it is everywhere: by its title.
   const session = (r: (typeof rows)[number]) => { const run = runOf(r); return run && known.has(run) ? { detail: { ...r.detail, run_name: known.get(run)!.title } } : {}; };
-  return rows.filter((r) => !r.target_id || known.has(r.target_id)).map((r) => ({ ...r, ...session(r), target_title: r.target_id ? known.get(r.target_id)!.title : null, target_type: r.target_id ? known.get(r.target_id)!.type : null }));
+  return rows.filter((r) => (!r.target_id || known.has(r.target_id)) && (!toOf(r) || known.has(toOf(r)!))).map((r) => ({ ...r, ...session(r), target_title: r.target_id ? known.get(r.target_id)!.title : null, target_type: r.target_id ? known.get(r.target_id)!.type : null }));
 }
 
 /** True of an event that was written here, false of one that arrived in a merged backup: those are history, not news. */

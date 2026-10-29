@@ -149,7 +149,17 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
     };
     asked.push(`${req.method} ${req.url}`);
     if (req.url === '/app') return isApp() ? say(200, renamed ? { slug: 'pelago-renamed', name: 'Archipelago (renamed)' } : { slug: 'pelago-test', name: 'Archipelago (test)' }) : say(401, { message: 'Bad credentials' });
-    if (req.method === 'POST' && req.url === '/app-manifests/thecode/conversions') return bearer ? say(401, { message: 'No credential is sent for this' }) : say(201, { id: 7, slug: 'pelago-test', name: 'Archipelago (test)', pem, webhook_secret: 'whsec' });
+    if (req.method === 'POST' && req.url === '/app-manifests/thecode/conversions') return bearer ? say(401, { message: 'No credential is sent for this' }) : say(201, { id: 7, slug: 'pelago-test', name: 'Archipelago (test)', pem, webhook_secret: 'whsec', client_id: 'Iv1.test', client_secret: 'cs-test' });
+    // A person signed in by the code GitHub sent them back with, and the installations they can manage.
+    if (req.method === 'POST' && req.url === '/login/oauth/access_token') {
+      let text = '';
+      return void req.on('data', (d) => (text += d)).on('end', () => {
+        const { client_id, client_secret, code } = JSON.parse(text);
+        const who = client_id === 'Iv1.test' && client_secret === 'cs-test' ? { ann: 'gho_ann', eve: 'gho_eve' }[code as string] : undefined;
+        say(200, who ? { access_token: who } : { error: 'bad_verification_code' });
+      });
+    }
+    if (req.url === '/user/installations?per_page=100') return bearer === 'gho_ann' ? say(200, { installations: [{ id: 42 }] }) : bearer === 'gho_eve' ? say(200, { installations: [] }) : say(401, { message: 'Bad credentials' });
     if (req.url === '/app/installations/42') return isApp() ? say(200, { account: { login: 'acme' } }) : say(401, { message: 'Bad credentials' });
     if (req.method === 'POST' && req.url === '/app/installations/42/access_tokens') return isApp() ? say(201, { token: 'ghs_forty-two', expires_at: new Date(Date.now() + 3600_000).toISOString() }) : say(401, { message: 'Bad credentials' });
     if (req.url?.startsWith('/repos/Acme/Tools/commits/')) return say(200, { sha: 'b'.repeat(40), commit: { message: 'Sharpen the tools. The whetstone still needs oiling.' }, files: [{ filename: 'tools/sharpen.ts', status: 'modified', additions: 4, deletions: 1, patch: '+  oil()' }] });
@@ -167,10 +177,12 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   await new Promise<void>((r) => hub.listen(0, '127.0.0.1', r));
   closers.push(async () => void hub.close());
   // The pack's hosts are moved to the stand-in, as a server's configuration may move them.
-  Object.assign(process.env, { PELAGO_HOST_GITHUB_APP_API: `http://127.0.0.1:${(hub.address() as AddressInfo).port}`, PELAGO_HOST_GITHUB_APP_WEB: 'https://github.test' });
+  Object.assign(process.env, { PELAGO_HOST_GITHUB_APP_API: `http://127.0.0.1:${(hub.address() as AddressInfo).port}`, PELAGO_HOST_GITHUB_APP_USER: `http://127.0.0.1:${(hub.address() as AddressInfo).port}`, PELAGO_HOST_GITHUB_APP_LOGIN: `http://127.0.0.1:${(hub.address() as AddressInfo).port}`, PELAGO_HOST_GITHUB_APP_WEB: 'https://github.test' });
   closers.push(async () => {
     delete process.env.PELAGO_HOST_GITHUB_APP_API;
     delete process.env.PELAGO_HOST_GITHUB_APP_WEB;
+    delete process.env.PELAGO_HOST_GITHUB_APP_USER;
+    delete process.env.PELAGO_HOST_GITHUB_APP_LOGIN;
   });
 
   const { workspaces, call, base } = await serve('tokens');
@@ -204,7 +216,7 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   assert.deepEqual(await theApp(), { pack: 'github_app', title: 'GitHub App', ready: true, name: 'Archipelago (test)', can_setup: false, connected: null });
   // The key and the secret GitHub handed over are the kernel's, sealed; the pack kept only the app's name.
   const { rows: kept } = await db.query<{ key: string; value: string }>(`select key, value from control_value where key like 'pack_secret:github_app:%' order by key`);
-  assert.deepEqual(kept.map((r) => [r.key, /^sealed:v1:/.test(r.value)]), [['pack_secret:github_app:app_id', true], ['pack_secret:github_app:hook', true], ['pack_secret:github_app:key', true]]);
+  assert.deepEqual(kept.map((r) => [r.key, /^sealed:v1:/.test(r.value)]), [['pack_secret:github_app:app_id', true], ['pack_secret:github_app:client_id', true], ['pack_secret:github_app:client_secret', true], ['pack_secret:github_app:hook', true], ['pack_secret:github_app:key', true]]);
   const { rows: store } = await db.query<{ value: unknown }>(`select value from pack_store where pack = 'github_app'`);
   assert.ok(!JSON.stringify(store).includes('PRIVATE KEY') && !JSON.stringify(store).includes('whsec'));
   assert.match((await call('/api/connections', admin, { pack: 'github_app', setup: true })).error, /already has its GitHub App/);
@@ -213,7 +225,11 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   const connect = (await call('/api/connections', admin, { pack: 'github_app', start: true })).result.url as string;
   assert.match(connect, /^https:\/\/github\.test\/apps\/pelago-test\/installations\/new\?state=default\.[0-9a-f]{48}$/);
   assert.equal((await page('/x/github_app/installed?installation_id=42&state=guessed')).status, 400);
-  assert.equal((await page(`/x/github_app/installed?installation_id=42&${connect.split('?')[1]}`)).status, 302);
+  // Someone signed in who cannot manage installation 42 on GitHub, or a code that signs nobody in, connects nothing.
+  assert.equal((await page(`/x/github_app/installed?installation_id=42&code=eve&${connect.split('?')[1]}`)).status, 400);
+  assert.equal((await page(`/x/github_app/installed?installation_id=42&code=forged&${connect.split('?')[1]}`)).status, 400);
+  assert.equal((await theApp()).connected, null);
+  assert.equal((await page(`/x/github_app/installed?installation_id=42&code=ann&${connect.split('?')[1]}`)).status, 302);
   assert.deepEqual((await theApp()).connected, { id: '42', account: 'acme' });
   assert.ok(asked.includes('GET /app/installations/42'), 'the installation was asked of GitHub, as the app');
   // Each repository chosen is in the map: the one it knew is left alone, the other is made with its address.
@@ -381,7 +397,7 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   assert.equal((await theApp()).connected, null);
   assert.equal((await deliver('push', push(42))).result.recorded, false);
   const again = (await call('/api/connections', admin, { pack: 'github_app', start: true })).result.url as string;
-  assert.equal((await page(`/x/github_app/installed?installation_id=42&${again.split('?')[1]}`)).status, 302);
+  assert.equal((await page(`/x/github_app/installed?installation_id=42&code=ann&${again.split('?')[1]}`)).status, 302);
   assert.equal((await deliver('installation', { action: 'deleted', installation: { id: 42 } })).result.forgotten, 42);
   assert.equal((await theApp()).connected, null);
   assert.equal((await deliver('push', push(42))).result.recorded, false);

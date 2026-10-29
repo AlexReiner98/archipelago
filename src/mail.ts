@@ -123,8 +123,9 @@ const dkimKey = () => {
 export async function sendMail(mail: Mail): Promise<void> {
   if (mailer) return mailer(mail);
   const from = env('MAIL_FROM');
+  // Unsent, the log says only that it was not: its text holds sign-in links and codes, which a log must not keep.
   if (!from) {
-    console.log(`mail (not sent: PELAGO_MAIL_FROM is not set) to ${mail.to}: ${mail.subject}\n${mail.text}`);
+    console.log(`mail not sent (PELAGO_MAIL_FROM is not set): "${mail.subject}"`);
     return;
   }
   const { headers, body } = compose(from, mail);

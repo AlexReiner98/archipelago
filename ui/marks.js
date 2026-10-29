@@ -4,7 +4,10 @@
 // is no script, no style attribute and no event handler, and its stylesheet is kept to its own host (cssFor).
 //
 // A mark is [tag, attributes, ...what is in it], a string being text. Two attributes are not drawn: `key`, the name
-// a patch uses for it, and `on`, the events the drawing is told of (enter, leave, click).
+// a patch uses for it, and `on`, the events the drawing is told of (enter, leave, click). One tag is the page's own:
+// `reader`, a document as its reader meets it, which the page makes from an item's id alone (ui/reader-frame.js).
+
+import { readerFrame } from './reader-frame.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const SVG_TAGS = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'title', 'a', 'defs', 'clipPath', 'linearGradient', 'radialGradient', 'stop']);
@@ -42,6 +45,11 @@ export function build(mark, keys, tell, svg = false, count = { n: 0 }) {
   if (!Array.isArray(mark) || typeof mark[0] !== 'string') fail('a mark that is not [tag, attributes, ...]');
   if (++count.n > mostMarks) fail(`more than ${mostMarks} marks`);
   const [tag, attrs = {}, ...kids] = mark;
+  if (tag === 'reader' && !svg) {
+    const el = readerFrame(attrs ?? {}, fail);
+    if (attrs?.key !== undefined) keys.set(String(attrs.key), el);
+    return el;
+  }
   const inSvg = svg || tag === 'svg';
   if (!(inSvg ? SVG_TAGS : HTML_TAGS).has(tag)) fail(`the tag "${tag}"`);
   const el = inSvg ? document.createElementNS(SVG, tag) : document.createElement(tag);

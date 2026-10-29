@@ -23,6 +23,14 @@ const host = createServer((req, res) => {
   if (req.url === '/who') return signed ? say(200, { iss: signed.iss, lasts: signed.exp - signed.iat }) : say(401, { message: 'Bad credentials' });
   if (req.method === 'POST' && req.url === '/trade/5') return signed ? say(201, { token: 'tok-5', until: new Date(Date.now() + 3600_000).toISOString() }) : say(401, { message: 'no' });
   if (req.url === '/mine') return say(auth === 'Bearer tok-5' ? 200 : 401, { auth });
+  if (req.method === 'POST' && req.url === '/oauth') {
+    let text = '';
+    return void req.on('data', (d) => (text += d)).on('end', () => {
+      const { client_id, client_secret, code } = JSON.parse(text);
+      say(200, client_id === 'cid' && client_secret === 'csec' && code === 'good-code' ? { access_token: 'person-token' } : { error: 'bad_verification_code' });
+    });
+  }
+  if (req.url === '/me') return say(auth === 'Bearer person-token' ? 200 : 401, { auth });
   if (req.method === 'POST' && req.url === '/make') return say(201, { slug: 'made', pem: 'NEW KEY', hook: 'new-hook' });
   say(404, { message: 'Not Found' });
 });
@@ -101,4 +109,31 @@ test('two addresses are of the same place however each is written', () => {
     ['', ''],
   ])
     assert.equal(samePlace(a, b), false, `${a} !~ ${b}`);
+});
+
+test('a person signed in by their one-time code: traded with secrets the pack never sees, used once, kept nowhere', async () => {
+  const control = await openDb();
+  const person: ServerPackFile = {
+    id: 'signin',
+    version: '1',
+    title: 'Sign in',
+    reach: {
+      server: {},
+      hosts: [{ id: 'user', base: `${base}/`, oauth: { host: 'login', path: '/oauth', client: 'cid', secret: 'csec', token: 'access_token' } }, { id: 'login', base: `${base}/` }],
+      secrets: [{ name: 'cid' }, { name: 'csec' }],
+    },
+  };
+  await assert.rejects(hostRequest(control, person, { host: 'user', path: '/me', user: 'good-code' }), /no cid yet/);
+  Object.assign(process.env, { PELAGO_SECRET_SIGNIN_CID: 'cid', PELAGO_SECRET_SIGNIN_CSEC: 'csec' });
+  after(() => {
+    delete process.env.PELAGO_SECRET_SIGNIN_CID;
+    delete process.env.PELAGO_SECRET_SIGNIN_CSEC;
+  });
+  const made = await hostRequest(control, person, { host: 'user', path: '/me', user: 'good-code' });
+  assert.deepEqual(made, { status: 200, body: { auth: 'Bearer person-token' } });
+  assert.ok(!JSON.stringify(made).includes('csec'), 'the client secret is not in what the pack is handed');
+  await assert.rejects(hostRequest(control, person, { host: 'user', path: '/me', user: 'forged' }), /did not sign that person in \(200: bad_verification_code\)/);
+  await assert.rejects(hostRequest(control, person, { host: 'user', path: '/me', user: '../x' }), /not a sign-in code/);
+  await assert.rejects(hostRequest(control, pack, { host: 'api', path: '/me', user: 'good-code' }), /signs no person in/);
+  assert.match(checkServerPack({ id: 'y', version: '1', title: 'Y', reach: { server: {}, hosts: [{ id: 'user', base: 'https://a.test', oauth: { host: 'nowhere', path: '/t', client: 'c', secret: 's', token: 't' } }], secrets: [{ name: 'c' }, { name: 's' }] } } as never, OWN_PACKS).join(), /oauth trade names another host of its own/);
 });

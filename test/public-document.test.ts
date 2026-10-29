@@ -46,7 +46,8 @@ test('a document a human makes public is read by anyone at its own address, with
   const page = await fetch(`${base}/p/default/${d}`);
   assert.equal(page.status, 200);
   assert.equal(page.headers.get('x-robots-tag'), null);
-  assert.match(page.headers.get('content-security-policy') ?? '', /frame-ancestors 'none'/);
+  // Framed by this server's own page only, to read it on the canvas beside its draft (ui/reader-frame.js).
+  assert.match(page.headers.get('content-security-policy') ?? '', /frame-ancestors 'self'/);
   const html = await page.text();
   assert.doesNotMatch(html, /noindex/);
   assert.match(html, /<title>Why maps<\/title>/);

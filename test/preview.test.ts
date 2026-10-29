@@ -7,7 +7,7 @@ import { createToken } from '../src/auth.ts';
 import { serve } from './serve.ts';
 
 test('a document is previewed as publishing it would give it, before it is public, on both sides of a share', async () => {
-  const { workspaces, call } = await serve('tokens');
+  const { workspaces, call, base } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
@@ -45,6 +45,8 @@ test('a document is previewed as publishing it would give it, before it is publi
   assert.equal((await api(mine, 'published', { id: made.d })).published, false);
   assert.equal((await api(mine, 'get', { id: made.d })).entity.visibility, 'shared');
   assert.ok((await call(`/preview/${made.d}/data`, undefined, {})).error, 'only for someone signed in');
+  // Its page may be framed by this server's own page alone, to read the draft on the canvas (ui/reader-frame.js).
+  assert.match((await fetch(`${base}/preview/${made.d}`)).headers.get('content-security-policy') ?? '', /frame-ancestors 'self'/);
 
   // The receiver's, shared to publish: as the sender gives it, its view drawn on the sender's map, in the receiver's site.
   await api(theirs, 'workspace_set', { accepts_from: ['default'] });

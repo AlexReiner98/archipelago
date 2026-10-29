@@ -12,7 +12,7 @@ import { isSealed, seal, unseal } from './secrets.ts';
 import { KEPT_FIELDS } from './operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from './streams.ts';
 import { search, type SearchInput } from './search.ts'; import { drawingOf } from './drawing-changes.ts';
 import { append, headOf, type Decision, type Fact } from './log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
-import { privateDependencies } from './private-deps.ts'; import { decideProposal, supersede } from './proposals.ts'; import { asOwner, forgetIn, type ForgetOp } from './forget.ts';
+import { privateDependencies } from './private-deps.ts'; import { decideProposal, supersede } from './proposals.ts'; import { asOwner, forgetIn, type ForgetOp } from './forget.ts'; import { guardedFetch } from './outbound.ts';
 
 export interface Actor {
   kind: 'human' | 'agent';
@@ -679,8 +679,8 @@ export class Archipelago {
     for (const conn of rows) {
       const url = conn.props.url as string | undefined;
       if (!url) continue;
-      // Any HTTP answer, even an error status, means something is listening.
-      const reachable = await fetch(url, { signal: AbortSignal.timeout(2000) }).then(() => true, () => false);
+      // Any HTTP answer, even an error status, means something is listening; asked through the guard (src/outbound.ts).
+      const reachable = await guardedFetch(url, { signal: AbortSignal.timeout(2000) }).then(() => true, () => false);
       const status = reachable ? 'available' : 'unavailable';
       await this.record('observations', actorId(actor), [['+', conn.id, 'status', status]]);
       if (status !== conn.status) {

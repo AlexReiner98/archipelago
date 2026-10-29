@@ -5,7 +5,7 @@
 
 import type { ServerResponse } from 'node:http';
 import type { Part } from './documents.ts';
-import { GUARD, POLICY } from './public-document.ts';
+import { GUARD, POLICY, READER_POLICY } from './public-document.ts';
 import { listen } from './published-live.ts';
 import { drawingCode, pageData, pictureAt, publishedPage, shareOf } from './published-page.ts';
 import { publishedDocument, publishedPicture } from './published.ts';
@@ -20,7 +20,7 @@ import type { Workspaces } from './workspaces.ts';
 export const publicPath = (workspace: string, id: string) => `/p/${workspace}/${id}`;
 
 /** Answer a GET under /p/: its page, its data, or one of its pictures. */
-export async function servePublic(res: ServerResponse, match: { workspace: string; id: string; what?: string; extra?: string; build?: string }, at: { workspaces: Workspaces; named: string[]; sites?: Record<string, string> }) {
+export async function servePublic(res: ServerResponse, match: { workspace: string; id: string; what?: string; extra?: string; build?: string }, at: { workspaces: Workspaces; named: string[]; sites?: Record<string, string>; from?: string }) {
   const { workspace, id, what, extra } = match;
   const none = () => res.writeHead(404, { ...GUARD, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Not found' }));
   const pelago = (await at.workspaces.has(workspace)) ? (await at.workspaces.get(workspace)).pelago : null;
@@ -37,7 +37,7 @@ export async function servePublic(res: ServerResponse, match: { workspace: strin
       const look = await pageLook(pelago!, { ...doc, id });
       const share = shareOf(doc, look.share);
       const page = await publishedPage(doc, canonical, site?.name, pageData({ ...doc, ...look, site }, path), share && pictureAt(at.named[0] ? `https://${at.named[0]}${path}` : path, share));
-      return res.writeHead(200, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': POLICY }).end(page);
+      return res.writeHead(200, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': READER_POLICY }).end(page);
     }
     // A product's page reads its data once open. What is not public, or not there, has no page at all.
     const found = pelago && (await pelago.forAnyone().db.query(`select 1 from entity where id = $1`, [id])).rows.length > 0;
@@ -52,7 +52,7 @@ export async function servePublic(res: ServerResponse, match: { workspace: strin
     return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ ...page, ...(await pageLook(pelago)) }));
   }
   // A page opened with ?live listens for its document being published again.
-  if (what === 'live') return doc ? listen(res, workspace, id, GUARD) : none();
+  if (what === 'live') return doc ? listen(res, workspace, id, GUARD, at.from) : none();
   // A drawing its pictures are drawn by, by its hash: the same for as long as anything is kept.
   if (what === 'drawing') {
     const code = doc && extra ? drawingCode(doc, extra) : null;

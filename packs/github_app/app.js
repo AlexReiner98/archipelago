@@ -6,8 +6,10 @@
 //      do; GitHub answers with its id, its key and the secret it signs with. The kernel keeps those three, sealed:
 //      this pack never sees them (keep, on the request).
 //   2. A workspace's admin connects GitHub: they choose repositories on GitHub, and GitHub sends them back with the
-//      installation's id, which is tied to their workspace (connection.make). Each chosen repository is put in
-//      that map (workspace.add).
+//      installation's id and a one-time code that signs them in. The id is tied to their workspace
+//      (connection.make) only if GitHub, asked as them, says they can manage that installation: an id in the address
+//      is only what the browser said, and another's installation not yet tied anywhere could be named. Each chosen
+//      repository is put in that map (workspace.add).
 //   3. GitHub delivers everything to one address, signed with the secret the kernel keeps. The installation says
 //      whose workspace it is for, and a push is handed to the GitHub pack there (workspace.deliver).
 //
@@ -20,6 +22,7 @@ import { CHECK, postCheck, rerun } from './checks.js';
 /** Back to the Workspace page, once done on GitHub. */
 const BACK = { redirect: '/#/workspace' };
 const NOT_STARTED = 'This was not started from Archipelago, or was started too long ago. Start again from the Workspace screen.';
+const NOT_SIGNED_IN = 'GitHub sent back no sign-in, so whose installation this is is not known. The server’s owner turns on “Request user authorization (OAuth) during installation” in the app’s settings on GitHub.';
 
 /** What GitHub answered, or why not. */
 async function ask(ctx, request) {
@@ -79,6 +82,9 @@ export async function manifest(input, ctx) {
         redirect_url: `${origin}/x/github_app/created`,
         setup_url: `${origin}/x/github_app/installed`,
         setup_on_update: true,
+        // The person who installs it is signed in too, so the installation is known to be theirs (installed).
+        request_oauth_on_install: true,
+        callback_urls: [`${origin}/x/github_app/installed`],
         // Only its owner's account can install it until they choose otherwise on GitHub.
         public: false,
         // Checks to post the one on the main branch (checks.js); pull requests to read the commits of one into it.
@@ -94,7 +100,7 @@ export async function created(input, ctx) {
   const begun = await ctx.act('begun.take', { state: input.state });
   if (begun.purpose !== 'setup') throw new Error(NOT_STARTED);
   if (!input.code) throw new Error('GitHub sent no code back.');
-  const made = await ctx.request({ host: 'api', method: 'POST', path: `/app-manifests/${encodeURIComponent(input.code)}/conversions`, anonymous: true, keep: { pem: 'key', webhook_secret: 'hook', id: 'app_id' } });
+  const made = await ctx.request({ host: 'api', method: 'POST', path: `/app-manifests/${encodeURIComponent(input.code)}/conversions`, anonymous: true, keep: { pem: 'key', webhook_secret: 'hook', id: 'app_id', client_id: 'client_id', client_secret: 'client_secret' } });
   const kept = made.kept ?? [];
   if (made.status >= 300 || !made.body?.slug || !['key', 'hook', 'app_id'].every((k) => kept.includes(k))) throw new Error(`GitHub did not hand over the app (${made.status}${made.body?.message ? `: ${made.body.message}` : ''}).`);
   await ctx.store.put('app', { slug: made.body.slug, name: made.body.name ?? made.body.slug });
@@ -125,15 +131,21 @@ export function addRepositories(ctx, installation, names, account) {
 
 /**
  * Sent back after choosing repositories: the first time with the word that says whose workspace it is for, later
- * (the choice changed on GitHub) without one, when the installation is known already.
+ * (the choice changed on GitHub) without one, when the installation is known already. Then nothing is read: anyone
+ * can open that address, and the repositories added arrive signed, as installation_repositories (the sweep of 29 Oct).
  */
 export async function installed(input, ctx) {
   const id = String(input.installation_id ?? '');
   if (!/^\d+$/.test(id)) throw new Error('GitHub sent no installation back.');
   let connection = await ctx.act('connection.get', { id });
+  if (connection && !input.state) return { answer: BACK };
   if (input.state || !connection) {
     if (!input.state || (await ctx.act('begun.get', { state: input.state })).purpose !== 'connect') throw new Error(NOT_STARTED);
-    // Asked of GitHub, as the app: the id in the address is only what the browser said.
+    // Asked of GitHub as the person who installed it: the id in the address is only what the browser said.
+    if (!input.code) throw new Error(NOT_SIGNED_IN);
+    const theirs = await ask(ctx, { host: 'user', path: '/user/installations?per_page=100', user: String(input.code) });
+    if (!(theirs.installations ?? []).some((i) => String(i.id) === id)) throw new Error('GitHub does not say you can manage that installation, so it was not connected. Connect again from the Workspace screen.');
+    // And as the app, for the account it is on.
     const about = await ask(ctx, { path: `/app/installations/${id}` });
     connection = await ctx.act('connection.make', { state: input.state, id, account: about.account?.login ?? '' });
   }

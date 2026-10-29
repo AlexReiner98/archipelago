@@ -9,7 +9,7 @@ import { dump, localPackOf } from './backup.ts';
 import { dumpVault, rewrap } from './vault.ts';
 import type { Q } from './db.ts';
 import { wholeMap } from './outbox.ts';
-import { actorId } from './pelago.ts';
+import { actorId, type Actor } from './pelago.ts';
 import { mayDo } from './rules.ts';
 import type { Tool } from './tools.ts';
 import { keep, take } from './transient.ts';
@@ -35,6 +35,24 @@ export async function serveBackupFile(db: Q | undefined, key: string, res: Serve
   res.end(found.file);
 }
 
+/**
+ * Whether an actor is an admin, or an agent acting for one: everything is in a backup, so an agent a member who is no
+ * admin made is refused it (the sweep of 29 Oct 2026). Its person is an admin when they are a member who is one, or
+ * hold a live admin sign-in. An agent tied to nobody passes only on a server with no tokens: with them, a token tied to
+ * nobody need not be an admin's, nor the agent it made.
+ */
+async function actsForAdmin(db: Q, actor: Actor): Promise<boolean> {
+  if (actor.kind === 'human') return Boolean(actor.admin);
+  if (actor.may && actor.may !== 'change') return false;
+  if (!actor.person) return !actor.token;
+  const { rows } = await db.query(
+    `select 1 from member where person_id = $1 and admin and removed_at is null
+     union all select 1 from token where entity_id = $1 and kind = 'human' and admin and revoked_at is null and (expires_at is null or expires_at > now()) limit 1`,
+    [actor.person],
+  );
+  return rows.length > 0;
+}
+
 export const BACKUP_TOOLS: Record<string, Tool> = {
   backup_download: {
     description:
@@ -43,9 +61,9 @@ export const BACKUP_TOOLS: Record<string, Tool> = {
       'Everything is in it, private items included, so an agent may call this only when the owner allows it on the Workspace page. To rehearse a change on it: node src/backup.ts restore <file> <new data folder>, then a throwaway server on that folder.',
     input: {},
     run: async (l, actor) => {
-      if (actor.kind === 'human' && !actor.admin) throw new Error('Only a workspace admin can download its backup.');
-      await mayDo(l.db, l.registry, actor.kind === 'human', 'backup_download');
       const whole = await wholeMap(l);
+      if (!(await actsForAdmin(whole.db, actor))) throw new Error('Only a workspace admin can download its backup.');
+      await mayDo(l.db, l.registry, actor.kind === 'human', 'backup_download');
       const taken = await dump(whole.db, { id: l.workspace, name: l.workspace }, localPackOf(whole.registry));
       const key = randomBytes(24).toString('base64url');
       const name = `archipelago-${l.workspace}-${taken.taken.replaceAll(':', '-')}.json.gz`;
