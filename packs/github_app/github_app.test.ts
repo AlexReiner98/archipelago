@@ -31,7 +31,8 @@ function ctxOver({ github = {} as Record<string, unknown>, connections = {} as R
         if (!begun[input.state]) throw new Error('This was not started from Archipelago');
         const purpose = begun[input.state];
         if (name === 'begun.take') delete begun[input.state];
-        return { purpose, workspace: 'acme' };
+        // The workspace that began it is named first in the word, as the kernel's are.
+        return { purpose, workspace: input.state.split('.')[0] };
       }
       if (name === 'connection.get') return connections[input.id] ?? null;
       if (name === 'connection.make') {
@@ -103,6 +104,16 @@ test('installed: the installation is asked of GitHub as the app, tied to the wor
   assert.deepEqual((await handler.installed({ installation_id: '42', setup_action: 'update' }, later.ctx)).answer, { redirect: '/#/workspace' });
   assert.deepEqual(later.acts.map(([n]) => n), ['connection.get']);
   assert.equal(later.requests.length, 0);
+  // Chosen again from the workspace it is tied to, through Connect: GitHub signs nobody in on a change, and nothing
+  // new is claimed, so it simply comes back.
+  const again = ctxOver({ github, connections: { '42': { workspace: 'acme', account: 'acme' } }, begun: { 'acme.c': 'connect' } });
+  assert.deepEqual((await handler.installed({ installation_id: '42', setup_action: 'update', state: 'acme.c' }, again.ctx)).answer, { redirect: '/#/workspace' });
+  assert.ok(!again.acts.some(([n]) => n === 'connection.make'));
+  assert.equal(again.requests.length, 0);
+  // Tied to another workspace, it is not taken without proof that whoever asks can manage it.
+  const other = ctxOver({ github, connections: { '42': { workspace: 'acme', account: 'acme' } }, begun: { 'eve.c': 'connect' } });
+  await assert.rejects(handler.installed({ installation_id: '42', setup_action: 'update', state: 'eve.c' }, other.ctx), /no sign-in/);
+  await assert.rejects(handler.installed({ installation_id: '42', state: 'eve.c', code: 'eve-code' }, other.ctx), /does not say you can manage that installation/);
   // Unknown and with no word, it is refused.
   await assert.rejects(handler.installed({ installation_id: '43' }, ctxOver({ github }).ctx), /not started from Archipelago/);
 });

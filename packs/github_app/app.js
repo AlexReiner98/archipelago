@@ -140,7 +140,11 @@ export async function installed(input, ctx) {
   let connection = await ctx.act('connection.get', { id });
   if (connection && !input.state) return { answer: BACK };
   if (input.state || !connection) {
-    if (!input.state || (await ctx.act('begun.get', { state: input.state })).purpose !== 'connect') throw new Error(NOT_STARTED);
+    const begun = input.state ? await ctx.act('begun.get', { state: input.state }) : undefined;
+    if (begun?.purpose !== 'connect') throw new Error(NOT_STARTED);
+    // Chosen again for the workspace it is tied to already: nothing new is claimed, so nothing is proved, and GitHub
+    // signs nobody in on a change. The repositories added arrive signed, as installation_repositories.
+    if (connection && connection.workspace === begun.workspace) return { answer: BACK };
     // Asked of GitHub as the person who installed it: the id in the address is only what the browser said.
     if (!input.code) throw new Error(NOT_SIGNED_IN);
     const theirs = await ask(ctx, { host: 'user', path: '/user/installations?per_page=100', user: String(input.code) });
