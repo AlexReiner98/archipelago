@@ -9,6 +9,8 @@ import type { Archipelago, May } from './pelago.ts';
 import { askOnReply } from './replies.ts';
 import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, resolveRun, sessionBegan, sessionHeard } from './sessions.ts';
 import { addTouched } from './touched.ts';
+import { fileSaid } from './file-said.ts';
+import { keepGit } from './git-state.ts';
 import { describeChanges, humanChanges, latestSeq } from './tools.ts';
 import { summed } from './summary.ts';
 import { keep, kept } from './transient.ts';
@@ -33,6 +35,11 @@ export interface HookBody {
   /** Claude Code's: the agent is going on because a Stop hook asked it to. */
   stop_hook_active?: unknown;
   setup?: string;
+  /** At the file-used event: the file read or changed, and the instructions the session has been told about files already. */
+  path?: unknown;
+  said?: unknown;
+  /** At a turn's end and at the end: where the checkout stands (src/git-state.ts). */
+  git?: unknown;
 }
 
 export interface HookCall {
@@ -71,6 +78,11 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   if (within.length && !(await hookWithin(pelago, within, body, event === 'session-start'))) {
     return event === 'session-start' ? { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: LIMITED } } : {};
   }
+  // A file read or changed: what bites there, said once (src/file-said.ts). The ids it said go back beside the answer, for the hook to keep.
+  if (event === 'file-used') {
+    const told = await fileSaid(pelago, body).catch((err) => void console.error(`hook file: ${(err as Error).message}`));
+    return told ? { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: told.text }, said: told.ids } : {};
+  }
   // Said in the server's log, so "did the hook run?" has an answer.
   console.log(`hook ${event} from session ${body.session_id ?? 'unknown'}`);
   // The hook counts what the session has used so far; it is recorded before anything else, so an ending session's last tokens reach its work.
@@ -79,6 +91,8 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   const run = event !== 'session-start' && body.session_id && (Array.isArray(body.touched) || Array.isArray(body.commits)) ? await resolveRun(pelago, body.session_id, true) : undefined;
   if (run) await addTouched(whole, run.id, body.touched).catch((err) => console.error(`hook touched: ${(err as Error).message}`));
   if (run) await addCommits(whole, run.id, body.commits).catch((err) => console.error(`hook commits: ${(err as Error).message}`));
+  // Where its checkout stands, kept on the run while it is open: at the end, before the run is closed.
+  if (event === 'stop' || event === 'session-end') await keepGit(pelago, body.session_id, body.git).catch((err) => console.error(`hook git: ${(err as Error).message}`));
   if (event === 'prompt') {
     // Each time the owner sends a session a message, the session is told what the owner has done in the map since
     // it last heard: a decision made in the UI reaches the session with the next thing they say.

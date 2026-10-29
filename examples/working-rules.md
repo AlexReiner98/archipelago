@@ -14,9 +14,9 @@ actions; `query` with name `actions` gives their inputs whole.
 ## At the start
 
 1. `query` with name `handoff` and params `repo` (the id the session hook gave). One
-   answer holds the last push, the handoff note, what has happened since it
-   was written, and the open work. Where the note and the lists disagree, the
-   lists are right. If it has `for_owner` with questions settled on an
+   answer holds the last push, what has happened lately, what sessions left
+   unpushed (`left`), what nobody has seen working (`unseen`), the traps in
+   the repository's files (`traps`), and the open work. If it has `for_owner` with questions settled on an
    agent's own judgment, show the owner those in your first reply and ask
    them to confirm or correct; record their answer with `settle`, action `confirmed`.
    If the session opened with no word from Archipelago, the
@@ -55,10 +55,12 @@ actions; `query` with name `actions` gives their inputs whole.
 
 ## Before you finish
 
-1. Bring the handoff note up to date: only what the map cannot know (what
-   nobody has seen working, what bites when working here, what you would do
-   next and why), one of each part. Replace what is there, do not add a
-   second "next" beside the first: the note is 3,000 characters at most.
+1. What you built and nobody has seen working: say so on the item
+   (`seen_working` false, and in `to_see` what would show it). What bit you
+   and nothing can fix: an `instruction` linked `about` the repository, its
+   title the trap, its note the way round it, `for` the files it bites in
+   (`file:<glob>`); what can be fixed is an issue. Nothing else is written
+   down for the next session: what is left unpushed is read off the checkout.
 2. `report` with action `session_end` and a summary. It lists what is still open here that nobody
    changed: change each, name it in `still_true` if you checked it, or in
    `cannot_tell` if you had nothing to do with it (`cannot_tell_rest: true`

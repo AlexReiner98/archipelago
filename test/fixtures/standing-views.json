@@ -3772,9 +3772,8 @@
    "preset": "structure"
   },
   "handoff repo": {
-   "how": "Nobody has written a handoff note for this repository. To write the first, create a handoff and link it lives_in to <repo> in the same change; this view finds it from then on. Everything but the note is read off the map as it is now: where the note and the lists disagree, the lists are right. When you finish, put in the note only what the map cannot know (what nobody has seen working, what bites when working here, what you would do next and why): one of each part, a few lines under a short title. Replace a part that is there (replace, or the whole note with body) rather than adding another beside it, and take out what is no longer so; the note may be 3000 characters at most. What is true of one item goes in that item's note. Do not repeat the open work, the last push or what was settled: they are here.",
+   "how": "Everything here is read off the map as it is now, and nothing is written down for the next session. What nobody has seen working is said on the item (seen_working false, what would show it in to_see) and listed as unseen: set it true once someone has. What sessions left on no remote or not committed is read off their checkouts (left). What bites in a file is an instruction kept about this repository with for: file:<glob> (traps), said in brief and when a session opens a file it names: make one when something bites and nothing can fix it, an issue when something can, and retire it when a change to its file makes it untrue. What comes next is read off the open work, by attention within this repository.",
    "last_push": null,
-   "note": null,
    "open": {
     "blocked": [
      {

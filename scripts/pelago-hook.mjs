@@ -6,7 +6,7 @@
 // those are not set. A machine connected while this was called Lattice has
 // them as LATTICE_URL and LATTICE_AGENT_TOKEN, and those are read too.
 //
-//   node scripts/pelago-hook.mjs session-start | prompt | stop | session-end
+//   node scripts/pelago-hook.mjs session-start | prompt | stop | session-end | file-used
 //
 // At the start it also says which repository the folder is a checkout of (its
 // origin), so the map knows the session's repository on any machine.
@@ -30,11 +30,18 @@
 // (CLAUDE_CODE_SESSION_ID), so a commit made in the session names its run, and one made by anybody else does not:
 // several sessions in one checkout each find their own.
 //
+// After a file is read or changed (file-used) it sends the file's path alone, never what is in it, and the
+// instructions the session has been told about files already, kept beside its run (pelago-runs/<session id>.said):
+// the server answers what bites in that file, said once a session.
+//
+// At the end of each turn and at the end it also says where the checkout stands (branch, commit, folder, commits no
+// remote has, files not committed), which the run keeps, so what a session left unpushed is known after it ends.
+//
 // It never fails the session: if the server is away it says so on stderr and
 // answers nothing.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // Which hand-out of Archipelago's files this project has: the setup writes it in, and the server says when it is behind.
@@ -169,6 +176,20 @@ function recentCommits(cwd) {
   }
 }
 
+/**
+ * Where the checkout stands, for the next session to know what this one left: its branch and commit, its folder, how
+ * many of its commits no remote has, and how many files are changed and not committed. Null outside a checkout.
+ */
+function gitState(cwd) {
+  const git = (...args) => execFileSync('git', ['-C', cwd || '.', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 }).trim();
+  try {
+    const head = git('rev-parse', 'HEAD');
+    return { branch: git('rev-parse', '--abbrev-ref', 'HEAD'), head, worktree: git('rev-parse', '--show-toplevel'), unpushed: Number(git('rev-list', '--count', head, '--not', '--remotes')), dirty: git('status', '--porcelain').split('\n').filter(Boolean).length };
+  } catch {
+    return null;
+  }
+}
+
 /** The file in the checkout's git folder (shared by its worktrees) that holds a session's run, or null outside a checkout. */
 function runFile(said) {
   if (typeof said.session_id !== 'string' || !/^[\w-]+$/.test(said.session_id)) return null;
@@ -192,6 +213,23 @@ if (name === 'session-start') {
   } catch {
     // Not a checkout, or no git here: the folder is all there is to go on.
   }
+} else if (name === 'file-used') {
+  // The path alone: what the tool read or wrote stays here.
+  try {
+    const said = JSON.parse(body);
+    const path = said.tool_input?.file_path ?? said.tool_input?.notebook_path;
+    if (typeof path !== 'string') process.exit(0);
+    const told = runFile(said);
+    let before = [];
+    try {
+      before = told ? readFileSync(`${told}.said`, 'utf8').split('\n').filter(Boolean) : [];
+    } catch {
+      // Nothing said yet.
+    }
+    body = JSON.stringify({ session_id: said.session_id, cwd: said.cwd, path, said: before });
+  } catch {
+    process.exit(0);
+  }
 } else {
   try {
     const said = JSON.parse(body);
@@ -204,6 +242,16 @@ if (name === 'session-start') {
     }
   } catch {
     // No count this time; what the hook is for still goes through.
+  }
+  // At a turn's end and at the end, where the checkout stands: so what a session leaves unpushed is known after it.
+  if (name === 'stop' || name === 'session-end') {
+    try {
+      const said = JSON.parse(body);
+      const git = gitState(said.cwd);
+      if (git) body = JSON.stringify({ ...said, git });
+    } catch {
+      // Not JSON: it goes as it came.
+    }
   }
 }
 
@@ -221,7 +269,16 @@ try {
     signal: AbortSignal.timeout(10_000),
   });
   const answer = await res.text();
-  if (res.ok) process.stdout.write(answer);
+  if (res.ok && name === 'file-used') {
+    // What it said is kept, so the next file's answer leaves it out; the rest is Claude Code's.
+    const { said: ids, ...rest } = JSON.parse(answer || '{}');
+    const told = Array.isArray(ids) && ids.length ? runFile(JSON.parse(body)) : null;
+    if (told) {
+      mkdirSync(resolve(told, '..'), { recursive: true });
+      appendFileSync(`${told}.said`, ids.map((id) => `${id}\n`).join(''));
+    }
+    process.stdout.write(JSON.stringify(rest));
+  } else if (res.ok) process.stdout.write(answer);
   else console.error(`Archipelago ${name} hook: ${base} answered ${res.status}`);
   const run = res.ok && name === 'session-start' ? res.headers.get('x-pelago-run') : null;
   if (run && /^[\w-]+$/.test(run)) {
@@ -243,7 +300,7 @@ try {
 if (name === 'session-end') {
   try {
     const file = runFile(JSON.parse(body));
-    if (file) rmSync(file, { force: true });
+    if (file) for (const kept of [file, `${file}.said`]) rmSync(kept, { force: true });
   } catch {
     // Nothing kept, or nothing to read it by.
   }

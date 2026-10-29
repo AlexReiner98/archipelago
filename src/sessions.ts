@@ -397,7 +397,7 @@ export async function sessionEnd(
       ended: false,
       unreconciled: left,
       unaccounted_commits: commits.length ? commits : undefined,
-      note: (commits.length ? 'Its commits listed in unaccounted_commits are not accounted for: for each, in one change, create its commit record (its full sha) with a settles link to each item it settles, or none. ' : '') + 'Not ended yet. These are open in the repository this session worked in or were touched by it (read, shown or changed: marked touched, and listed first), and nobody has changed them since it began. For each: if it is done or no longer as written, change it with change; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell (or send cannot_tell_rest: true for all you have not otherwise named and did not touch), and do not vouch for what you did not look at. Then call report with action session_end again.',
+      note: (commits.length ? 'Its commits listed in unaccounted_commits are not accounted for: for each, in one change, create its commit record (its full sha) with a settles link to each item it settles, or none. ' : '') + 'Not ended yet. First, what you built and nobody has seen working: say so on the item (seen_working false, to_see); and what bit you that nothing can fix: an instruction about this repository, for: file:<glob>. These are open in the repository this session worked in or were touched by it (read, shown or changed: marked touched, and listed first), and nobody has changed them since it began. For each: if it is done or no longer as written, change it with change; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell (or send cannot_tell_rest: true for all you have not otherwise named and did not touch), and do not vouch for what you did not look at. Then call report with action session_end again.',
     };
   }
   const said = [
@@ -445,12 +445,12 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   // Where the work there stands is the place's pack's to say: a repository's, the software pack's views.
   if (repo && canAsk(l, 'repo_work') && canAsk(l, 'handoff')) {
     const work = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'repo_work', { repo: repo.id })) as { ready: { id: string; title: string; type: string; last_confirmed: string | Date }[]; blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[] };
-    // Where things stand is read off the map; the session is told how much has moved since someone last wrote it down.
-    const stand = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'handoff', { repo: repo.id })) as { note: { id: string; title: string; written: string } | null; since_then: Record<'pushes' | 'settled' | 'opened' | 'sessions', unknown[]> & { counts: Record<'pushes' | 'settled' | 'opened' | 'sessions', number> }; to_shape?: { hubs: { id: string; title: string; inside: number }[] } };
+    // Where things stand is read off the map: how much has moved lately, and what sessions left, nobody has seen work, or bites here.
+    const stand = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'handoff', { repo: repo.id })) as { left?: unknown[]; unseen?: unknown[]; traps?: unknown[]; since_then: Record<'pushes' | 'settled' | 'opened' | 'sessions', unknown[]> & { counts: Record<'pushes' | 'settled' | 'opened' | 'sessions', number> }; to_shape?: { hubs: { id: string; title: string; inside: number }[] } };
     const n = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
     const then = stand.since_then;
-    const from = stand.note ? `Its note, "${stand.note.title}" (${stand.note.id}), was written ${new Date(stand.note.written).toISOString().slice(0, 10)}; since then` : 'Nobody has written a handoff note here; in the last week';
-    lines.push(`Where things stand: view "handoff" with repo ${repo.id}. ${from}: ${n(then.counts.pushes, 'push', 'pushes')}, ${n(then.counts.settled, 'item')} settled, ${n(then.counts.opened, 'item')} opened, ${n(then.counts.sessions, 'session')} ended.`);
+    const marks = [stand.left?.length && `${n(stand.left.length, 'checkout')} left unpushed (left)`, stand.unseen?.length && `${n(stand.unseen.length, 'item')} nobody has seen working (unseen)`, stand.traps?.length && `${n(stand.traps.length, 'trap')} in its files (traps)`].filter(Boolean);
+    lines.push(`Where things stand: view "handoff" with repo ${repo.id}. In the last week: ${n(then.counts.pushes, 'push', 'pushes')}, ${n(then.counts.settled, 'item')} settled, ${n(then.counts.opened, 'item')} opened, ${n(then.counts.sessions, 'session')} ended.${marks.length ? ` And ${marks.join(', ')}.` : ''}`);
     const kind = (t: { type: string }) => `${l.registry.type(t.type)?.title ?? t.type}: `;
     // What nobody has touched for a while is said to be so: it may no longer be true.
     const age = (t: { last_confirmed: string | Date }) => {

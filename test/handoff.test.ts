@@ -15,23 +15,18 @@ import { human, agent, fresh, make, laneSetup } from './map.ts';
 /** A view asked by its name, as the view tool asks it. */
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
-test('a handoff is read off the map: the note an agent wrote, and what has happened since it was written', async () => {
+test('a handoff is read off the map, and nobody writes it down: the open work and what has happened lately', async () => {
   const l = await fresh();
   const made = await laneSetup(l);
-  // With no note, it looks back a week, and says there is none.
   const bare = (await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo } })) as any;
-  assert.equal(bare.note, null);
-  assert.match(bare.how, new RegExp(`^Nobody has written a handoff note for this repository\\. To write the first, create a handoff and link it lives_in to ${made.repo}`));
+  assert.equal('note' in bare, false, 'there is no note to read or write');
+  assert.match(bare.how, /^Everything here is read off the map as it is now, and nothing is written down for the next session\./);
   assert.deepEqual(bare.open.ready.map((i: any) => i.title).sort(), ['Capture probe', 'Write unit tests']);
   assert.deepEqual(bare.open.blocked.map((i: any) => [i.title, i.waiting_on]), [['Tune the solver', ['Which target?']]]);
-  assert.match(await hookSessionStart(l, { session_id: 'h0', cwd: 'C:\\code\\Apex' }), /Where things stand: view "handoff" with repo e_\w+\. Nobody has written a handoff note here/);
+  await hookSessionStart(l, { session_id: 'h0', cwd: String.raw`C:\code\Apex` });
 
-  const { note } = await make(l, [
-    { op: 'create', ref: 'note', type: 'handoff', title: 'Apex handoff', body: 'Not seen\nThe probe has not been run on a real model.' },
-    { op: 'link', type: 'part_of', from: 'note', to: made.proj },
-  ]);
-  // Everything from here on happened after the note was written.
-  await l.db.query(`update entity set updated_at = now() - interval '1 hour', created_at = now() - interval '2 hours' where id = $1`, [note]);
+  // Everything from here on happened after this moment.
+  const mark = new Date(Date.now() - 1000).toISOString();
   await l.db.query(`update entity set created_at = now() - interval '2 hours' where id = any($1::text[])`, [[made.live, made.offline, made.gated]]);
   await l.log(l.db, { actor: 'github:someone', action: 'repo.push', target: made.repo, origin: 'github', reason: '1 commit to main: Tests for the solver', detail: { branch: 'main', after: 'abcdef0123456789' } });
   await make(l, [
@@ -40,12 +35,11 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
     { op: 'link', type: 'about', from: 'new', to: made.proj },
   ]);
   await hookSessionEnd(l, { session_id: 'h0', reason: 'exit' });
+  // A note kept as a handoff before there were none is not read.
+  await make(l, [{ op: 'create', ref: 'old', type: 'handoff', title: 'Apex handoff', body: 'Next\nRun the probe.' }, { op: 'link', type: 'lives_in', from: 'old', to: made.repo }]);
 
-  const stand = (await callTool(l, human, 'view', { name: 'handoff', params: { repo: 'apex repo' } })) as any;
-  assert.deepEqual([stand.note.id, stand.note.body], [note, 'Not seen\nThe probe has not been run on a real model.']);
-  assert.match(stand.how, /^Everything but the note/);
-  assert.equal(stand.note.characters, stand.note.body.length);
-
+  const stand = (await callTool(l, human, 'view', { name: 'handoff', params: { repo: 'apex repo', since: mark } })) as any;
+  assert.equal('note' in stand, false);
   // An agent is given a view without what it does not read: no empty fields on a row, and what blocks at the root by name.
   const forPerson = (await callTool(l, human, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any;
   const forAgent = (await callTool(l, agent, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any;
@@ -54,29 +48,24 @@ test('a handoff is read off the map: the note an agent wrote, and what has happe
   const blocked = (await callTool(l, agent, 'view', { name: 'attention', params: { reasons: ['blocked'], within: made.repo } })) as any;
   assert.deepEqual([blocked.items[0].reasons[0].why, 'due' in blocked.items[0], 'owner' in blocked.items[0]], ['blocked', false, false], 'an agent is given no empty fields');
   const told = (await callTool(l, agent, 'view', { name: 'handoff', params: { repo: made.repo } })) as any;
-  assert.deepEqual([told.note.id, told.open.ready.length, 'ready_count' in told.open], [note, stand.open.ready.length, false], 'a short list is given whole');
+  assert.deepEqual([told.open.ready.length, 'ready_count' in told.open], [stand.open.ready.length, false], 'a short list is given whole');
   assert.deepEqual(stand.last_push.head, 'abcdef0');
   assert.deepEqual(stand.since_then.pushes.map((p: any) => [p.branch, p.head, p.subject]), [['main', 'abcdef0', '1 commit to main: Tests for the solver']]);
   assert.deepEqual(stand.since_then.settled.map((i: any) => [i.title, i.status]), [['Write unit tests', 'done']]);
   assert.deepEqual(stand.since_then.opened.map((i: any) => i.title), ['The solver diverges on thin walls']);
   assert.deepEqual(stand.since_then.sessions.map((s: any) => [s.status, /^finished: Session ended \(exit\)/.test(s.said) || /Not reconciled/.test(s.said)]), [['finished', true]]);
-  assert.ok(!stand.open.ready.some((i: any) => i.title === 'Write unit tests'), 'what is open is as the map has it now, whatever the note says');
-  // The next session is told how far the note is behind.
-  assert.match(await hookSessionStart(l, { session_id: 'h1', cwd: 'C:\\code\\Apex' }), /Its note, "Apex handoff" \(e_\w+\), was written \d{4}-\d\d-\d\d; since then: 1 push, 1 item settled, 1 item opened, 1 session ended\./);
-  // Counted from another moment when asked.
-  assert.equal(((await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo, since: new Date(Date.now() + 60_000).toISOString() } })) as any).since_then.settled.length, 0);
+  assert.ok(!stand.open.ready.some((i: any) => i.title === 'Write unit tests'), 'what is open is as the map has it now');
+  // The next session is told how much has moved in the last week, and what is left, unseen or bites here.
+  await make(l, [{ op: 'update', id: made.offline, props: { seen_working: false } }]);
+  assert.match(await hookSessionStart(l, { session_id: 'h1', cwd: String.raw`C:\code\Apex` }), /Where things stand: view "handoff" with repo e_\w+\. In the last week: 1 push, 1 item settled, \d+ items opened, 1 session ended\. And 1 item nobody has seen working \(unseen\)\./);
+  assert.equal(((await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo, since: new Date(Date.now() + 60_000).toISOString() } })) as any).since_then.settled.length, 0, 'counted from another moment when asked');
 
-  // A note every session adds to is read by every session after: an agent cannot grow it past its length, only rewrite it.
+  // A note of a type held to a length (an old handoff) cannot be grown past it by an agent, only rewritten.
   const part = 'Next, and why\n' + 'Run the probe on a real model. '.repeat(40);
+  const note = (await l.db.query<{ id: string }>(`select id from entity where type = 'handoff'`)).rows[0].id;
   const grow = () => callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: note, append: part }] });
   for (let i = 0; i < 4; i++) await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, append: part }] });
   await assert.rejects(grow(), /the handoff note would be \d+ characters: 3000 at most[^]*Rewrite it whole/);
-  await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, body: 'x'.repeat(2500) }] });
-  assert.match(((await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo } })) as any).how, /^The note is 2500 of the 3000 characters it may be: there is no room to add to it/);
-  await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, append: part.repeat(2) }] });
-  assert.match(((await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo } })) as any).how, /^The note is \d+ characters, and may be 3000 at most/);
-  await assert.rejects(grow(), /3000 at most/);
-  // Over its length already, it can always be made shorter.
   const shorter = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: note, body: 'Next, and why\nRun the probe on a real model.' }] })) as any;
   assert.ok(['applied', 'proposed'].includes(shorter.status));
 });
@@ -331,3 +320,47 @@ test('a run in GitHub Actions reports what it used, once, and the repository add
   assert.equal((await l.proposals()).length, 0, 'a report is not a change to review');
 });
 
+
+test('what nobody has seen working is said on the item and listed in the handoff; a trap is said for the file it names', async () => {
+  const l = await fresh();
+  const made = await laneSetup(l);
+  await make(l, [{ op: 'update', id: made.offline, status: 'done', props: { seen_working: false, to_see: 'a run on a real model' } }]);
+  const unseen = ((await ask(l, 'handoff', { repo: made.repo })) as any).unseen;
+  assert.deepEqual(unseen.map((i: any) => [i.id, i.status, i.to_see]), [[made.offline, 'done', 'a run on a real model']]);
+  await make(l, [{ op: 'update', id: made.offline, props: { seen_working: true } }]);
+  assert.equal(((await ask(l, 'handoff', { repo: made.repo })) as any).unseen, undefined, 'seen, it leaves the list');
+  const { trap } = await make(l, [
+    { op: 'create', ref: 'trap', type: 'instruction', title: 'The pane cannot load draw.html', body: 'Drawings stay on Loading… in the browser pane: start with PELAGO_UNSANDBOXED=1.', props: { for: ['file:ui/draw.*'] } },
+    { op: 'link', type: 'about', from: 'trap', to: made.repo },
+  ]);
+  const said = async (path: string) => ((await ask(l, 'instructions', { for: `file:${path}`, about: made.repo })) as any).said.map((s: any) => s.id);
+  assert.deepEqual(await said(String.raw`C:\code\Apex\ui\draw.html`), [trap]);
+  assert.deepEqual(await said('ui/canvas.js'), []);
+  // A brief for work in the repository names every trap there, by the files it names, before any file is opened.
+  const brief = (await ask(l, 'brief', { task: made.offline })) as any;
+  assert.deepEqual(brief.traps, [{ id: trap, title: 'The pane cannot load draw.html', files: ['ui/draw.*'] }]);
+  assert.match(brief.text, /## Where it bites\n- ui\/draw\.\*: The pane cannot load draw\.html\. Drawings stay/);
+});
+
+test('where a session left its checkout is kept on its run at each turn and at its end, and the handoff says what is on no remote', async () => {
+  const { answerHook } = await import('../src/hook-answers.ts');
+  const hook = (event: string, body: Record<string, unknown>) => answerHook(event, { whole: l.db, pelago: l, within: [], body, running: { started: new Date().toISOString() }, origin: 'http://127.0.0.1' });
+  const l = await fresh();
+  const made = await laneSetup(l);
+  await hookSessionStart(l, { session_id: 'g1', cwd: String.raw`C:\code\Apex` });
+  const git = { branch: 'claude/probe', head: 'b'.repeat(40), worktree: 'C:/code/Apex', unpushed: 2, dirty: 1 };
+  await hook('stop', { session_id: 'g1', git });
+  const run = (await l.db.query<{ id: string; props: any }>(`select id, props from entity where type = 'run' and props->>'session_id' = 'g1'`)).rows[0];
+  assert.deepEqual(run.props.git, git, 'kept on the run, as the hook said it');
+  const logged = (await l.db.query<{ n: number }>(`select count(*)::int as n from log_entry`)).rows[0].n;
+  await hook('stop', { session_id: 'g1', git });
+  assert.equal((await l.db.query<{ n: number }>(`select count(*)::int as n from log_entry`)).rows[0].n, logged, 'the same again writes nothing to the log');
+  await hook('stop', { session_id: 'g1', git: { ...git, head: 'nothing' } });
+  assert.deepEqual((await l.db.query<{ props: any }>(`select props from entity where id = $1`, [run.id])).rows[0].props.git, git, 'what is not a checkout is not kept');
+  assert.equal(((await ask(l, 'handoff', { repo: made.repo })) as any).left, undefined, 'a session still at work has left nothing');
+  await hook('session-end', { session_id: 'g1', reason: 'exit', git: { ...git, unpushed: 3 } });
+  const left = ((await ask(l, 'handoff', { repo: made.repo })) as any).left;
+  assert.deepEqual(left.map((x: any) => [x.id, x.branch, x.unpushed, x.dirty]), [[run.id, 'claude/probe', 3, 1]], 'its last word, said as it ended');
+  await l.log(l.db, { actor: 'github:someone', action: 'repo.push', target: made.repo, origin: 'github', reason: '3 commits to claude/probe', detail: { branch: 'claude/probe', after: 'b'.repeat(40) } });
+  assert.equal(((await ask(l, 'handoff', { repo: made.repo })) as any).left, undefined, 'pushed since, it is no longer left');
+});
