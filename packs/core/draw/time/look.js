@@ -10,8 +10,10 @@ export const css = `
 .t-row { fill: var(--ln-text); font-size: var(--ln-small-text); }
 .t-lane { stroke: var(--ln-line); stroke-width: var(--ln-rule); stroke-dasharray: var(--ln-time-lane-dash); }
 .t-block { cursor: pointer; }
-.timeline .t-block .dot.t-hued { fill: var(--t-hue); }
+.timeline .t-block .dot.t-hued { fill: var(--t-hue); stroke: var(--t-hue); }
 .t-key-chip rect { fill: var(--t-hue); }
+.t-day-key rect { fill: var(--t-hue); }
+.t-day-key[role=link] { cursor: pointer; }
 .t-h-none { --t-hue: var(--ln-muted); }
 `;
 

@@ -217,5 +217,5 @@
       }
     }
   ],
-  "styles": [{ "id": "time.calendar", "type": "lens", "title": "Time", "props": { "filter": { "types": ["time_entry"] }, "walk": { "over": [], "steps": 0 }, "style": { "shape": "time" } } }, { "id": "time.invoice_page", "title": "An invoice's page", "on": ["invoice"], "props": { "page": { "head": "invoice" } } }]
+  "styles": [{ "id": "time.calendar", "type": "lens", "title": "Time", "props": { "filter": { "types": ["time_entry", "routine", "run"], "exclude": [] }, "walk": { "over": [], "steps": 0 }, "time": { "from": "-5d", "to": "1d" }, "style": { "shape": "time" } } }, { "id": "time.invoice_page", "title": "An invoice's page", "on": ["invoice"], "props": { "page": { "head": "invoice" } } }]
 }
