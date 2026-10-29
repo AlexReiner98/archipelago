@@ -20,9 +20,9 @@ test('a domain serves a workspace’s published pages at their address words, th
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'home', type: 'document', title: 'Welcome', visibility: 'shared', props: { path: 'home', menu: 0 }, body: 'The front page. Read {a}.' },
+        { op: 'create', ref: 'home', type: 'document', title: 'Welcome', visibility: 'shared', props: { path: 'home', menu: 0 }, body: 'The front page. Read {a}, or [an aside](/aside).' },
         { op: 'create', ref: 'a', type: 'document', title: 'How it works', visibility: 'shared', props: { path: 'how-it-works', menu: 1 }, body: 'How it works, in short. Back to {home}.' },
-        { op: 'create', ref: 'b', type: 'document', title: 'Not in the header', visibility: 'shared', props: { path: 'aside' }, body: 'An aside.' },
+        { op: 'create', ref: 'b', type: 'document', title: 'Not in the header', visibility: 'shared', props: { path: 'aside' }, body: 'An aside. Back [home](/), not [a draft](/draft).' },
         { op: 'create', ref: 'd', type: 'document', title: 'A draft', visibility: 'shared', props: { path: 'draft' }, body: 'Not published.' },
       ],
     })
@@ -39,7 +39,9 @@ test('a domain serves a workspace’s published pages at their address words, th
   assert.equal((await visit(base, '/home', 'site.test')).headers.location, '/');
   const frontData = JSON.parse((await visit(base, '/data', 'site.test')).body);
   assert.equal(frontData.title, 'Welcome');
-  assert.deepEqual(frontData.paths, { [a]: 'how-it-works' });
+  // A page it links to by id or by its address, published, has its address word given, so the reader can lead there.
+  assert.deepEqual(frontData.paths, { [a]: 'how-it-works', [b]: 'aside' });
+  assert.deepEqual(JSON.parse((await visit(base, '/aside/data', 'site.test')).body).paths, { [home]: 'home' }, 'one not published is not given');
 
   // A page at its address word, its header listing what has a place in the menu, the front page apart.
   const page = JSON.parse((await visit(base, '/how-it-works/data', 'site.test')).body);

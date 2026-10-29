@@ -2,8 +2,9 @@
 // the styles and views kept) rather than a picture of the work, and src/operational.ts names each with its rule.
 // Every picture of the work is a lens: a lens preset a pack declares (src/lens-presets.ts), asked by the same name.
 
-import { type Entity, type Archipelago } from './pelago.ts';
+import { type Actor, type Entity, type Archipelago } from './pelago.ts';
 import { spent } from './spent.ts';
+import { usage } from './usage.ts';
 import { factEvents } from './eventlog.ts';
 
 /** The most change sets' events changed_since counts: past that, its counts are of the newest. */
@@ -91,7 +92,8 @@ async function notifications(l: Archipelago) {
 
 export interface View {
   description: string;
-  run(l: Archipelago, input: Record<string, unknown>): Promise<unknown>;
+  /** `actor`: who asks, when the view answers some of it to an admin alone. */
+  run(l: Archipelago, input: Record<string, unknown>, actor?: Actor): Promise<unknown>;
 }
 
 export const VIEWS: Record<string, View> = {
@@ -102,6 +104,10 @@ export const VIEWS: Record<string, View> = {
   spent: {
     description: 'What agents spent over the last days, read from their runs: dollars where a run says what it cost, tokens where it does not, by where they ran. The money pack\u2019s costs view adds what is paid regularly. Params: days (default 30).',
     run: spent,
+  },
+  usage: {
+    description: 'How much of each limit of its plan the workspace uses, and what that use is made of, answered as a lens is (items and links), so the plan pack’s Usage canvas draws it. Each limit (storage, agent sessions at once, requests this minute, looks this hour; members for an admin) is an item whose use says used, shown, of and of_shown (what the plan allows, where it limits it), share, near and over; each part of it is an item part_of it: storage by what it is made of (facts, change sets, streams, images), then by type and the largest items (the bytes each has added to the log); sessions by name; requests and looks by who asked. A part that is an item names it (use.item). What you cannot see is summed with no title. Where no plan limits it, of is left out. Params: none.',
+    run: usage,
   },
   notifications: {
     description: 'Unread notifications for the human, newest first.',

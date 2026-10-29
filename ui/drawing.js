@@ -255,6 +255,8 @@ ${JSON.stringify(input)}`;
     host.redraw = redraw;
     // A picture the page lays out (HTML, a grid of cards; or one drawn to the page's width, `flat`) is not panned or zoomed: it is as wide as it needs, scrolled
     // across where the page is narrower, its key below it, brought to what it was opened from (`focus`, a mark's key).
+    // It scrolls in a box of its own between the bars (ui/shell.css), its scrollbar never under them.
+    host.classList.toggle('laid-out', !(picture instanceof SVGElement) || Boolean(scene.flat));
     if (!(picture instanceof SVGElement) || scene.flat) {
       legend?.classList.add('still');
       host.replaceChildren(...[before, beside(picture), legend, after].filter(Boolean));

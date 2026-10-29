@@ -109,6 +109,8 @@ export function readFlatLens(query) {
   if (p.has('exclude')) filter.exclude = list(p.get('exclude'));
   const style = {};
   for (const key of ['lit', 'shape', 'style', 'canvas']) if (p.get(key)) style[key] = p.get(key);
+  // A lens that names a view draws its answer in place of what a filter finds (the plan pack's usage).
+  if (p.get('view')) return { lens: { view: p.get('view'), filter: {}, walk: { over: [], steps: 0 } }, style };
   if (!includesAny(filter) && !p.has('nothing')) return { lens: null, style };
   const over = p.get('over') === 'all' ? 'all' : p.has('over') ? list(p.get('over')) : p.has('from') ? FOCUS : [];
   const lens = { filter, walk: { over, steps: p.has('steps') ? Number(p.get('steps')) : over.length ? 1 : 0 } };
@@ -122,7 +124,8 @@ export const includesAny = (f) => Boolean(wordsOf(f).length || f.types?.length |
 /** The end of the address that says this flat lens (and the style asked of it): what readFlatLens reads back. */
 export function flatQuery(lens, style = {}) {
   const p = new URLSearchParams();
-  if (!includesAny(lens.filter)) p.set('nothing', '');
+  if (lens.view) p.set('view', lens.view);
+  else if (!includesAny(lens.filter)) p.set('nothing', '');
   const { text, types, ids, links, in: inside, only, within, exclude } = lens.filter;
   for (const words of wordsOf({ text })) p.append('text', words);
   if (types?.length) p.set('types', types.join(','));
@@ -219,6 +222,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     if (!coded && !drawn) saidDrawn(body, 'drawn');
   };
   const load = async (refreshing = false) => {
+    if (lens.view) return loadView(refreshing);
     // A lens that includes nothing draws nothing: the server would refuse it, as never the whole map.
     if (!includesAny(lens.filter)) {
       host.answer = { items: [], links: [], lens };
@@ -254,6 +258,22 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
       draw({ ...raw, ...store.answer() }, { ...raw, ...store.drawn() }, true);
     });
     draw({ ...raw, ...store.answer() }, { ...raw, ...store.drawn() }, refreshing);
+  };
+  // A lens that names a view: its answer, asked as an agent asks it, is drawn as it comes. It is not a replica of the
+  // log (what it measures is not all facts), so it is asked again when the canvas is drawn again or refreshed.
+  const loadView = async (refreshing) => {
+    try {
+      [raw, look] = await Promise.all([
+        api('view', { name: lens.view }),
+        api('view', { name: 'style', params: { ...(of && { of }), ...(style.style && { style: style.style }), ...(style.canvas && { view: style.canvas }), ...(style.shape && { shape: style.shape }), have: [...drawings.keys()] } }),
+      ]);
+    } catch (err) {
+      host.failed = err.message;
+      host.dispatchEvent(new CustomEvent('lens-answer'));
+      saidDrawn(body, 'error', err.message);
+      return refreshing || body.replaceChildren(h('div', { class: 'error' }, err.message));
+    }
+    draw(raw, raw, refreshing);
   };
   warmDrawings();
   host.ready = load();
