@@ -143,7 +143,7 @@ test('in a browser, the flow drawing draws what the kernel drew: the same marks,
       }
     }
   } finally {
-    page.close();
+    await page.close();
   }
 });
 
@@ -190,7 +190,7 @@ test('in a browser, the architecture drawing draws what the kernel drew: the sam
     })()`);
     assert.equal(after, 21);
   } finally {
-    page.close();
+    await page.close();
   }
 });
 
@@ -260,7 +260,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
     })()`);
     assert.match(String(stopped), /did not answer for 12 seconds/);
   } finally {
-    page.close();
+    await page.close();
   }
 });
 
@@ -303,6 +303,6 @@ test('in a browser, a drawing that asks for a surface paints pixels over its pic
     assert.match(got.plain, /none-true/);
     assert.equal(got.surfaces, 0);
   } finally {
-    page.close();
+    await page.close();
   }
 });

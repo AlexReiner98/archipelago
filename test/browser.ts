@@ -21,7 +21,7 @@ export interface Page {
   screenshot: () => Promise<Buffer>;
   /** What the page logged and threw. */
   logs: () => string[];
-  close: () => void;
+  close: () => Promise<void>;
 }
 
 /** A page at url, in a Chrome of its own. */
@@ -34,7 +34,7 @@ export async function open(url: string): Promise<Page> {
   // Chrome says on its error stream where it listens. On a busy runner (many test files each starting one) it can be
   // slow to: it is given 45 seconds, and started once more if it says nothing by then.
   const start = () => {
-    const proc: ChildProcess = spawn(binary, ['--headless=new', ...ci, '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1280,900', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+    const proc: ChildProcess = spawn(binary, ['--headless=new', ...ci, '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update', '--disable-gpu', '--window-size=1280,900', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
     const address = new Promise<string>((resolve, reject) => {
       let said = '';
       const timer = setTimeout(() => (proc.kill(), reject(new Error(`Chrome did not start: ${said.slice(0, 300)}`))), 45000);
@@ -90,10 +90,13 @@ export async function open(url: string): Promise<Page> {
     },
     screenshot: async () => Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).result.data, 'base64'),
     logs: () => events.filter((e) => e.method === 'Runtime.consoleAPICalled' || e.method === 'Runtime.exceptionThrown').map((e) => JSON.stringify(e.params).slice(0, 500)),
-    close: () => {
+    // Chrome holds its profile until it has exited (on Windows, a while after the kill): wait for that, then remove it.
+    close: async () => {
       ws.close();
+      const exited = proc.exitCode !== null || proc.signalCode !== null ? Promise.resolve() : new Promise((r) => proc.once('exit', r));
       proc.kill();
-      setTimeout(() => { try { rmSync(dir, { recursive: true, force: true }); } catch {} }, 1000);
+      await Promise.race([exited, new Promise((r) => setTimeout(r, 5000))]);
+      try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch {}
     },
   };
 }

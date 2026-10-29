@@ -76,6 +76,6 @@ test('in a browser, agents at work never move the reader’s pane; a show lands 
     await page.evaluate(`location.hash = '#v?ids=${made.b}'`);
     assert.ok(await until(`location.hash === '#/v?ids=${made.b}' && document.body.dataset.sheet !== 'open'`), `the lens it names: ${await page.evaluate('location.hash')}`);
   } finally {
-    page.close();
+    await page.close();
   }
 });

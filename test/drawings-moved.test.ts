@@ -29,7 +29,7 @@ async function drawn(shape: string, cases: DrawingCase[]) {
     const sent = cases.map((c) => ({ ...c, style: { ...c.style, drawing } }));
     return (await page.evaluate(`(async () => { const { drawWith } = await import('/drawing.js'); return captureDrawings(drawWith, ${JSON.stringify(sent)}); })()`)) as Record<string, any>;
   } finally {
-    page.close();
+    await page.close();
   }
 }
 
