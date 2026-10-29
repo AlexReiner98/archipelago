@@ -9,7 +9,7 @@ import { api, ask, h, hooks, state, tell, wordsOf } from './base.js';
 import { flatQuery, flatView } from './lens.js';
 import { filterSaid, fitBar } from './query-bar.js';
 import { canvasMenu } from './canvas-menu.js';
-import { lookSwitch } from './look-switch.js';
+import { lookSwitch, styleDelete } from './look-switch.js';
 import { ARROW, isA, typeTitle, wayOf } from './words.js';
 
 const TYPE = 'lens';
@@ -171,7 +171,7 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const travel = own.filter((b) => b.classList.contains('q-travel'));
     // Each picker marked before it, its tooltip saying what it is.
     const named = (mark, title) => h('span', { class: 'q-label q-pick-label', title, 'aria-hidden': 'true' }, mark);
-    part.replaceChildren(...travel, named(canvasMark(), 'Canvas: the saved canvas up'), pick, named(styleMark(), 'Style: how this canvas is drawn'), lookSwitch(lens, style, open), h('button', { type: 'button', class: 'q-save q-word', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, 'Save')), ...(current && !current.preset ? [h('button', { type: 'button', class: 'q-save q-delete', title: `Delete “${current.title}”`, 'aria-label': 'Delete this saved canvas', onclick: () => drop(lens, style, current, open) }, binMark())] : []), ...own.filter((b) => !travel.includes(b)), canvasMenu());
+    part.replaceChildren(...travel, named(canvasMark(), 'Canvas: the saved canvas up'), pick, named(styleMark(), 'Style: how this canvas is drawn'), lookSwitch(lens, style, open), h('button', { type: 'button', class: 'q-save q-word', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, 'Save')), ...(current && !current.preset ? [h('button', { type: 'button', class: 'q-save q-delete', title: `Delete “${current.title}”`, 'aria-label': 'Delete this saved canvas', onclick: () => drop(lens, style, current, open) }, binMark())] : []), ...own.filter((b) => !travel.includes(b)), canvasMenu([styleDelete(lens, style, open)]));
     fitBar();
   });
   return part;
