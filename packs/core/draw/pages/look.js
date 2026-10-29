@@ -26,7 +26,7 @@ export const css = `
 .pg-link { border-bottom: var(--ln-rule) dotted var(--ln-muted); }
 .pg-table { display: table; width: 100%; border-collapse: collapse; font-size: var(--ln-small-text); }
 .pg-row { display: table-row; }
-.pg-row > span { display: table-cell; padding: var(--ln-grid-card-gap) var(--ln-pages-block-gap); border-bottom: var(--ln-rule) solid var(--ln-line); }
+.pg-row > span { display: table-cell; overflow-wrap: break-word; padding: var(--ln-grid-card-gap) var(--ln-pages-block-gap); border-bottom: var(--ln-rule) solid var(--ln-line); }
 .pg-row.head > span { font-weight: 700; }
 .pg-section { margin: var(--ln-pages-section-gap) 0; }
 .pg-section > .pg-h a { color: var(--ln-text); }
