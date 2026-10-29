@@ -20,6 +20,8 @@ export interface HostRequest {
   body?: unknown;
   /** Act as this account: the signed token is traded for its token first (the host's exchange). */
   as?: string;
+  /** Act as a person: their one-time code from the host's sign-in, traded for their token (the host's oauth). */
+  user?: string;
   /** Send no credential at all. */
   anonymous?: boolean;
   /** Fields of the answer to keep as the pack's secrets, by the name of each, and leave out of what it is handed. */
@@ -94,13 +96,29 @@ async function tradedFor(control: Q, pack: ServerPackFile, host: ServerHost, as:
   return answer[token] as string;
 }
 
+/** A person's token for one request, traded for their one-time code with the client's secrets: kept nowhere, seen by no pack. */
+async function personsToken(control: Q, pack: ServerPackFile, host: ServerHost, code: string): Promise<string> {
+  if (!host.oauth) throw new Error(`The host "${host.id}" signs no person in`);
+  if (!/^[\w-]{1,200}$/.test(code)) throw new Error('That is not a sign-in code.');
+  const { path, client, secret, token } = host.oauth;
+  const at = pack.reach?.hosts?.find((h) => h.id === host.oauth!.host);
+  if (!at) throw new Error(`The ${pack.id} pack declares no host "${host.oauth.host}"`);
+  const [id, key] = await Promise.all([serverSecret(control, pack, client), serverSecret(control, pack, secret)]);
+  if (!id || !key) throw new Error(`The ${pack.id} pack has no ${id ? secret : client} yet: nobody can be signed in through ${host.id}.`);
+  const made = await call(hostBase(pack.id, at), at, 'POST', path, undefined, { client_id: id, client_secret: key, code });
+  const answer = (made.body ?? {}) as Record<string, unknown>;
+  if (made.status >= 300 || typeof answer[token] !== 'string') throw new Error(`${host.id} did not sign that person in (${made.status}${answer.error_description ? `: ${answer.error_description}` : answer.error ? `: ${answer.error}` : ''})`);
+  return answer[token] as string;
+}
+
 /** Make one request for a server pack to a host it declares, with the credential the host says, and give back the answer. */
 export async function hostRequest(control: Q, pack: ServerPackFile, r: HostRequest): Promise<{ status: number; body: unknown; kept?: string[] }> {
   const host = pack.reach?.hosts?.find((h) => h.id === r.host);
   if (!host) throw new Error(`The ${pack.id} pack declares no host "${r.host}"`);
   let authorization: string | undefined;
   if (!r.anonymous) {
-    if (r.as !== undefined) {
+    if (r.user !== undefined) authorization = `Bearer ${await personsToken(control, pack, host, String(r.user))}`;
+    else if (r.as !== undefined) {
       if (!host.exchange) throw new Error(`The host "${host.id}" trades for no account's token`);
       authorization = `Bearer ${await tradedFor(control, pack, host, String(r.as))}`;
     } else if (host.sign) authorization = `Bearer ${await signed(control, pack, host)}`;

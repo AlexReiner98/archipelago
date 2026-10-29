@@ -72,8 +72,14 @@ const same = (a: unknown, b: unknown) => JSON.stringify(canon(JSON.parse(JSON.st
 
 type Said = Pick<Authority, 'of' | 'basis'>;
 
-/** Whether this actor may publish here: a human always, an agent where no rule refuses it (core's agent_publish, lifted by the owner). */
-const mayPublish = (l: Archipelago, actor: Actor) => mayDo(l.db, l.registry, actor.kind === 'human', 'publish');
+/**
+ * Whether this actor may publish here: a human always, an agent where no rule refuses it (core's agent_publish, lifted
+ * by the owner). A token that may only propose never does: publishing is not held, and it asks with publish_ask.
+ */
+async function mayPublish(l: Archipelago, actor: Actor) {
+  if (actor.may && actor.may !== 'change') throw new Error('This token may only propose: ask for the document to be published (ask, action publish_ask).');
+  await mayDo(l.db, l.registry, actor.kind === 'human', 'publish');
+}
 
 /** Publish a document as it stands: it becomes public, and what anyone reads of it is this, until it is published again. */
 export async function publish(l: Archipelago, actor: Actor, id: string, said?: Said) {

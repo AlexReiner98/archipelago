@@ -89,14 +89,12 @@ declared in the software pack (a view of `form: "tree"` in
 branches and work, which field orders them, and which statuses mean "now". A
 pack can declare another tree the same way, with no code.
 
-**Following agents.** With "Follow agents" ticked (in the menu), an
-agent can bring your page to what it is working on: every change it makes
-opens what it touched (or Changes, when the change waits there), and the `show`
-tool opens any item or screen with a one-line note. Anything you are in the
-middle of is kept, and so is a page you are reading (scrolled, pointed or typed
-in the last 20 seconds); the note offers the jump instead. Until you choose, it
-is ticked only while one agent at most is at work. Without following, a page
-stays still: a change redraws it, in place, only when it touches an item on it.
+**Following agents.** An agent's `show` opens what it names, with a
+one-line note, in a pane of its session's own beside yours, or in a tab of its
+own out of sight; it never takes the pane you are in or touched last. With
+"Follow agents" ticked (in the menu), what agents change and the story they
+tell are said in that line too, with the way there: nothing moves until you go.
+A change redraws a page, in place, only when it touches an item on it.
 
 **Agents hear you.** What you do in the UI reaches the agents working with
 you. An agent waiting in the `watch` tool is answered the moment you decide,
@@ -494,14 +492,19 @@ server, and may only read (contents and metadata). It is a server pack
 
 1. The server's owner creates it once: Workspace, Connections, **Set up**
    beside GitHub App, in the default workspace. Archipelago sends GitHub a
-   manifest, GitHub asks for a name, and hands over the app's id, key and
-   signing secret. The kernel keeps those three, sealed, in the default
-   workspace's database, where every server on it reads them; the pack never
-   sees them. They may be given by hand instead, as `PELAGO_GITHUB_APP_ID`,
-   `_KEY` and `_SECRET` (the name is then asked of GitHub).
+   manifest, GitHub asks for a name, and hands over the app's id, key,
+   signing secret, client id and client secret. The kernel keeps those,
+   sealed, in the default workspace's database, where every server on it
+   reads them; the pack never sees them. They may be given by hand instead,
+   as `PELAGO_GITHUB_APP_ID`, `_KEY`, `_SECRET`, `_CLIENT_ID` and
+   `_CLIENT_SECRET` (the name is then asked of GitHub).
 2. A workspace's admin presses **Connect** and chooses repositories on
-   GitHub. Each one chosen is put in the map with its address, and the
-   installation is tied to that workspace (a connection, in the control plane).
+   GitHub, which signs them in as it installs the app ("Request user
+   authorization (OAuth) during installation", its callback URL
+   `/x/github_app/installed`). The installation is tied to that workspace (a
+   connection, in the control plane) only if GitHub, asked as them, says they
+   can manage it: an installation id is only what the browser said. Each
+   repository chosen is put in the map with its address.
 3. Every push to a chosen repository arrives at `/x/github_app/hook/events`
    (or `/github/app/hook`, for an app created before it was a pack), signed
    with the app's secret, and is handed to the GitHub pack of the workspace
@@ -539,9 +542,11 @@ kept if it does not answer. A workspace with no account runs on the server's
 model, if it has one: set `PELAGO_MODEL_URL` to an OpenAI-compatible base
 (LiteLLM: `http://litellm:4000/v1`) and `PELAGO_MODEL_KEY` to its key.
 `PELAGO_MODEL_SHARED=off` keeps that model from workspaces (a hosted server, so
-none runs on the operator's bill), and `PELAGO_MODEL_PRIVATE_URLS=off` refuses
-a compatible server on the server's own network (loopback, private and
-link-local addresses). Prompt caching is Anthropic's alone, and a run's cost
+none runs on the operator's bill), and `PELAGO_PRIVATE_URLS=off` (or
+`PELAGO_MODEL_PRIVATE_URLS=off`, its first name) refuses a compatible server on
+the server's own network (loopback, private and link-local addresses), and a
+connection checked there: held to on every call, by the address each call
+connects to. No such call follows a redirect. Prompt caching is Anthropic's alone, and a run's cost
 is still priced at Anthropic's rates.
 
 **Or the server hears the push through a webhook added by hand.** Pushes are
@@ -745,8 +750,11 @@ change that:
   token says which workspace it belongs to and whether it is a human's or an
   agent's. A human token can approve, launch and manage tokens; an agent token
   cannot, on any endpoint.
-- **First start prints two secrets, once:** your human token for the default
-  workspace, and the operator secret.
+- **First start gives two secrets, once:** your human token for the default
+  workspace, and the operator secret. At a terminal they are printed; with
+  nobody at one (a container, a service) they are written to
+  `first-start-secrets.txt` beside the data folder, readable only by the
+  server's user, and the log says only where. Read it, then delete it.
 - **Tokens** are made with `token_create`, listed with `token_list` and
   revoked with `token_revoke` (human only); an agent's can be within some
   items (`within`) and may report, propose or change (`may`). Only a hash is stored. A launched
@@ -859,7 +867,8 @@ change that:
 - **The mail it sends** goes out from the server itself, straight to the
   recipient's mail servers, so it passes through no mail service elsewhere.
   `PELAGO_MAIL_FROM` names the sender (`Archipelago <signin@example.com>`);
-  without it nothing is sent and each message is written to the server's log.
+  without it nothing is sent, and the server's log says only each message's
+  subject: never its text, which holds sign-in links and codes.
   For it to arrive, and not as spam, the sending domain needs: an SPF record
   naming the server's address (`v=spf1 ip4:<address> -all`), a DKIM key
   (`openssl genrsa -out dkim.pem 2048`; the private key in `PELAGO_DKIM_KEY`,

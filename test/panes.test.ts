@@ -76,7 +76,11 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     // Its next show goes to its own pane again, which a side moves; alone keeps only that one.
     await show({ entity: views.f, pane: 'left' });
     await until('its pane moved to the left', async () => (await panes())[0]?.[0] === 'The first' && (await panes())[0][1] === 0);
+    // Alone closes no pane of the reader's (e_e7yfp2yg): only the reader does, by hand.
     await show({ entity: views.f, pane: 'alone' });
+    await wait(3000);
+    assert.equal((await panes()).length, 3, 'the reader’s panes stay');
+    for (const name of ['Home', 'The second']) await page.evaluate(`[...document.querySelectorAll('#canvas > .pane')].find((p) => p.querySelector('.pane-name').textContent === ${JSON.stringify(name)}).querySelector('[aria-label="Close this pane"]').click()`);
     await until('only its pane', async () => (await panes()).length === 1 && (await draws(0, 'First step, renamed')));
     assert.ok(await page.evaluate(`${nth(0)}.getBoundingClientRect().width > 1200`), 'the one pane has the page');
 

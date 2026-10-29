@@ -17,7 +17,8 @@ function ctxOver({ github = {} as Record<string, unknown>, connections = {} as R
     store: { get: async (k: string) => store[k] ?? null, put: async (k: string, v: unknown) => void (store[k] = v), take: async () => null },
     request: async (r: Request) => {
       requests.push(r);
-      const key = `${r.method ?? 'GET'} ${r.path}`;
+      // A request as a person is answered as GitHub would answer them, by the code that signs them in.
+      const key = `${r.method ?? 'GET'} ${r.path}${r.user ? ` as ${r.user}` : ''}`;
       if (!(key in github)) return { status: 404, body: { message: 'Not Found' } };
       const body = structuredClone(github[key]) as Record<string, unknown>;
       // The kernel keeps what it is told to and hands the rest on.
@@ -67,7 +68,8 @@ test('created once from its manifest: GitHub\'s key and secret go to the kernel,
   assert.deepEqual([manifest.hook_attributes.url, manifest.redirect_url, manifest.setup_url, manifest.public], ['https://map.test/x/github_app/hook/events', 'https://map.test/x/github_app/created', 'https://map.test/x/github_app/installed', false]);
   await assert.rejects(handler.manifest({ state: 'acme.c' }, ctx), /not started from Archipelago/, 'a word begun to connect does not create');
   assert.deepEqual((await handler.created({ code: 'abc', state: 'default.s' }, ctx)).answer, { redirect: '/#/workspace' });
-  assert.deepEqual(requests.at(-1), { host: 'api', method: 'POST', path: '/app-manifests/abc/conversions', anonymous: true, keep: { pem: 'key', webhook_secret: 'hook', id: 'app_id' } });
+  assert.deepEqual(requests.at(-1), { host: 'api', method: 'POST', path: '/app-manifests/abc/conversions', anonymous: true, keep: { pem: 'key', webhook_secret: 'hook', id: 'app_id', client_id: 'client_id', client_secret: 'client_secret' } });
+  assert.deepEqual([manifest.request_oauth_on_install, manifest.callback_urls], [true, ['https://map.test/x/github_app/installed']], 'whoever installs it is signed in too');
   assert.deepEqual(store.app, { slug: 'pelago-x', name: 'X' });
   await assert.rejects(handler.created({ code: 'abc', state: 'default.s' }, ctx), /not started/, 'once');
 
@@ -80,19 +82,27 @@ test('installed: the installation is asked of GitHub as the app, tied to the wor
   const github = {
     'GET /app/installations/42': { account: { login: 'acme' } },
     'GET /installation/repositories?per_page=100&page=1': { repositories: [{ full_name: 'Acme/Site' }, { full_name: 'Acme/Tools' }] },
+    'GET /user/installations?per_page=100 as ann-code': { installations: [{ id: 42 }] },
+    'GET /user/installations?per_page=100 as eve-code': { installations: [{ id: 7 }] },
   };
   const { ctx, acts, requests } = ctxOver({ github, begun: { 'acme.c': 'connect' } });
   await assert.rejects(handler.installed({ state: 'acme.c' }, ctx), /no installation back/);
-  assert.deepEqual((await handler.installed({ installation_id: '42', state: 'acme.c' }, ctx)).answer, { redirect: '/#/workspace' });
+  // Someone who names an installation that is not theirs, or comes back with no sign-in, connects nothing.
+  await assert.rejects(handler.installed({ installation_id: '42', state: 'acme.c', code: 'eve-code' }, ctx), /does not say you can manage that installation/);
+  await assert.rejects(handler.installed({ installation_id: '42', state: 'acme.c' }, ctx), /no sign-in/);
+  assert.ok(!acts.some(([n]) => n === 'connection.make'), 'nothing was tied to the workspace');
+  assert.deepEqual((await handler.installed({ installation_id: '42', state: 'acme.c', code: 'ann-code' }, ctx)).answer, { redirect: '/#/workspace' });
   assert.deepEqual(acts.find(([n]) => n === 'connection.make')![1], { state: 'acme.c', id: '42', account: 'acme' });
   assert.deepEqual(requests.find((r) => r.path.startsWith('/installation/'))!.as, '42', 'the repositories are read as the installation');
   const added = acts.find(([n]) => n === 'workspace.add')![1];
   assert.deepEqual([added.connection, added.type, added.unique, added.items, added.reason], ['42', 'repo', 'remote', [{ title: 'Site repo', props: { remote: 'https://github.com/Acme/Site' } }, { title: 'Tools repo', props: { remote: 'https://github.com/Acme/Tools' } }], 'Connected through the GitHub App on acme']);
 
-  // Chosen again later on GitHub, it comes back with no word: known already, it is not made again.
+  // Chosen again later on GitHub, it comes back with no word: known already, it is not made again, and nothing is
+  // read for an address anyone can open (the repositories added arrive signed).
   const later = ctxOver({ github, connections: { '42': { workspace: 'acme', account: 'acme' } } });
-  await handler.installed({ installation_id: '42', setup_action: 'update' }, later.ctx);
-  assert.deepEqual(later.acts.map(([n]) => n), ['connection.get', 'workspace.add']);
+  assert.deepEqual((await handler.installed({ installation_id: '42', setup_action: 'update' }, later.ctx)).answer, { redirect: '/#/workspace' });
+  assert.deepEqual(later.acts.map(([n]) => n), ['connection.get']);
+  assert.equal(later.requests.length, 0);
   // Unknown and with no word, it is refused.
   await assert.rejects(handler.installed({ installation_id: '43' }, ctxOver({ github }).ctx), /not started from Archipelago/);
 });

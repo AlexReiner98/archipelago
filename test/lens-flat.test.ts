@@ -203,6 +203,15 @@ test('several sets of words are each a term: what any of them finds is a seed', 
   const read = await flatLens(l, { filter: { text: ['canvases', 'tags'] } });
   assert.deepEqual(read.lens.include.text, ['canvases', 'tags']);
   assert.equal(read.matched, 2, 'matched counts what all the sets found');
+  const both = await flatLens(l, { filter: { text: ['query', 'query bar'] } });
+  assert.equal(both.matched, both.items.length, 'an item two sets find is counted once');
+});
+
+test('a word with two letters swapped finds what it was meant to', async () => {
+  const { l } = await chain();
+  assert.deepEqual(titles(await flatLens(l, { filter: { text: 'qurey bar' } })), ['Query bar']);
+  assert.deepEqual(titles(await flatLens(l, { filter: { text: 'qurey' } })), ['Query bar']);
+  assert.deepEqual((await l.search({ q: 'qurey' })).map((e) => e.title), ['Query bar']);
 });
 
 test('an item named by id is drawn whatever Not says, and the walk from it still keeps Not', async () => {
@@ -213,4 +222,17 @@ test('an item named by id is drawn whatever Not says, and the walk from it still
   assert.deepEqual(titles(closed), ['Done already', 'Flat lens'], 'the closed item named is drawn; what the walk reaches is still kept by Not');
   assert.deepEqual(titles(await flatLens(l, { filter: { ids: [made.x, run] }, walk: { over: 'all', steps: 1 } })), ['A session', 'Done already', 'Flat lens'], 'the run named is drawn; a run reached would not be');
   assert.deepEqual(titles(await flatLens(l, { filter: { ids: [made.x, made.n], only: ['note'] } })), ['A note on it'], 'Only still narrows it');
+});
+
+test('notes whole: each note sent whole and named in whole, for a drawing that reads them; else its start', async () => {
+  const { l, made } = await chain();
+  const long = `${'A long note. '.repeat(40)}The end.`;
+  await make(l, [{ op: 'update', id: made.a, body: long }]);
+  const cut = await flatLens(l, { filter: { ids: [made.a] } });
+  assert.ok(cut.items[0].body!.endsWith('…') && cut.items[0].body!.length < long.length, 'the start, for a hover');
+  assert.equal(cut.whole, undefined);
+  const whole = await flatLens(l, { filter: { ids: [made.a] }, notes: 'whole' });
+  assert.equal(whole.items[0].body, long);
+  assert.deepEqual(whole.whole, [made.a]);
+  await assert.rejects(flatLens(l, { filter: { ids: [made.a] }, notes: 'all' }), /notes must be "whole"/);
 });

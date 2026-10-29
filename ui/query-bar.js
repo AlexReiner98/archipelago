@@ -21,8 +21,11 @@ const bar = document.getElementById('query');
 /** Where find holds the lens: its line at rest, and its rows while it is open (ui/find.js). */
 const line = document.getElementById('find-lens');
 const rows = document.getElementById('find-rows');
-/** Items the bar has asked the names of, so each is asked once. */
-const asking = new Set();
+/**
+ * Items the bar has asked the names of, so each is asked once, with whatever waits to draw it: every one is drawn
+ * when the name comes. Only the first was before, and a part drawn again before a slow answer came stayed on "…".
+ */
+const asking = new Map();
 /** What is used one step around the canvas, asked once for each lens (`key`), and the bar drawn last. */
 let near = { key: '', uses: null };
 let last = null;
@@ -53,12 +56,21 @@ const linkTitle = (id) => relations.get(id)?.title ?? id.replaceAll('_', ' ');
 /** An item named by its title, once the page knows it; until then a mark, and the name asked for. */
 function nameOf(id, redraw) {
   if (titles.has(id)) return titles.get(id);
-  if (!asking.has(id)) {
-    asking.add(id);
-    // Asked once more if the first answer does not come (a server still starting), then left as the mark.
-    const ask = (again) => api('get', { id }).then((got) => (titles.set(id, got.entity.title), redraw())).catch(() => again && ask(false));
-    ask(true);
+  if (asking.has(id)) {
+    asking.get(id).add(redraw);
+    return '…';
   }
+  asking.set(id, new Set([redraw]));
+  // Asked once more if the first answer does not come (a server still starting), then left as the mark.
+  const ask = (again) =>
+    api('get', { id })
+      .then((got) => {
+        titles.set(id, got.entity.title);
+        for (const draw of asking.get(id) ?? []) draw();
+        asking.set(id, new Set());
+      })
+      .catch(() => again && ask(false));
+  ask(true);
   return '…';
 }
 

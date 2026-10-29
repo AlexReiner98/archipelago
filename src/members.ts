@@ -14,6 +14,7 @@ import { stillWritable } from './ended.ts';
 import type { Q } from './db.ts';
 import { normalEmail, sendMail } from './mail.ts';
 import { configurePlan, limitOf, limitsChanged, type Limits } from './plan.ts';
+import { indexMember } from './control-index.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import type { Tool } from './tools.ts';
@@ -41,6 +42,8 @@ export function configureMembers(given: Partial<typeof site> & { limitOf?: (id: 
   site = { ...site, ...rest };
   configurePlan({ ...(limits && { limitOf: limits }), ...(rest.nameOf && { nameOf: rest.nameOf }) });
 }
+/** Which workspaces each address belongs to is kept beside the workspaces too, so a sign-in opens only those (src/control-index.ts). */
+const noted = indexMember;
 
 /**
  * A workspace's limits are the server's, not its map's: a server pack sets them on a workspace it made (a plan with
@@ -87,6 +90,7 @@ export async function admitMember(whole: Archipelago, email: string, admin: bool
      on conflict (email) do update set person_id = excluded.person_id, admin = excluded.admin, removed_at = null`,
     [email, person, admin || first],
   );
+  await noted(email, whole.workspace, true);
   return person;
 }
 
@@ -101,6 +105,7 @@ export async function humanTokenAllowed(l: Archipelago, person: string | undefin
 export async function admitOwner(l: Archipelago, email: string): Promise<string> {
   const { me } = await l.init({ kind: 'human', name: email }, { name: email, email });
   await l.db.query(`insert into member (email, person_id, admin, added_by) values ($1, $2, true, 'signup') on conflict (email) do nothing`, [email, me]);
+  await noted(email, l.workspace, true);
   return me;
 }
 
@@ -153,6 +158,9 @@ export async function codeFor(db: Q, email: string, ms: number): Promise<string>
  * Trade a typed code for a month's token in the workspace it was sent for, once. Wrong ones are counted per address in
  * the server's own database (control), and past CODE_TRIES nothing is traded for that address until the count runs out.
  */
+/** Whether this address has used up its wrong codes for now. */
+export const triesSpent = async (control: Q, email: string) => ((await kept<number>(control, TRIES + email)) ?? 0) >= CODE_TRIES;
+
 export async function redeemTyped(workspaces: { id: string; db: () => Promise<Q> }[], control: Q, email: string, code: string): Promise<{ token: string } | 'gone' | 'tries'> {
   const tries = (await kept<number>(control, TRIES + email)) ?? 0;
   if (tries >= CODE_TRIES) return 'tries';
@@ -238,9 +246,11 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
          on conflict (email) do update set person_id = excluded.person_id, admin = excluded.admin, added_by = excluded.added_by, added_at = now(), removed_at = null`,
         [email, person, Boolean(input.admin), actor.name],
       );
+      await noted(email, l.workspace, true);
       // Two added at once may both have found room: counted again, the one past the limit is taken out.
       await roomForOneMore(whole.db, l.workspace, 1).catch(async (err) => {
         await whole.db.query(`update member set removed_at = now() where email = $1`, [email]);
+        await noted(email, l.workspace, false);
         throw err;
       });
       const name = await site.nameOf(l.workspace);
@@ -297,7 +307,9 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
       if (input.remove) {
         if (member.person_id === actor.person) throw new Error('You cannot remove yourself.');
         await whole.db.query(`update member set removed_at = now() where email = $1`, [member.email]);
-        await whole.db.query(`update token set revoked_at = now() where ${live}`, [member.person_id]);
+        // Every token tied to them ends, their agents' too: an agent acts as its person, who is no longer here.
+        await whole.db.query(`update token set revoked_at = now() where entity_id = $1 and revoked_at is null`, [member.person_id]);
+        await noted(member.email, l.workspace, false);
         return { removed: member.email };
       }
       if (input.admin === undefined) return member;

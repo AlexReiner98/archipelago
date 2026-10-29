@@ -30,22 +30,25 @@ never structure. Containment is a projection the server keeps (the
   only to draw" (the canvas asks for no nesting; the flat lens names none).
 
 ### 3. The lens is a filter, a walk and a limit, and the only bound
-The filter has two kinds of term. Those that include add seeds, each its
-own (text, types, ids, links such as `tagged e_x`, `in` an item: all that
-is part of it at any depth, from the part_of closure; a union); those that
-narrow must all hold of a seed (an AND: `only`, types, and plain words,
+Its parts have one name each, on the page and in an agent's answer: Find,
+Only, Not, Walk and Limit (e_drt4g872, `docs/glossary.md`). The filter has
+two kinds of term. Find's add seeds, each its own (words, types, ids, links
+such as `tagged e_x`, `in` an item: all that is part of it at any depth,
+from the part_of closure, e_tvsdqjeq; a union); Only's must all hold of a
+seed (an AND: types, and plain words,
 `done`, `blocked`, `status <s>`, `owner me`, `no owner`, `over estimate`,
 `changed since 7d`, `made since <date>`, `by owner`, `by agent`, read in
 `src/lens-only.ts`, e_xe5dx55e; `within`, items it is part of at any depth,
-read from the part_of closure). What it
-excludes applies to everything the walk reaches, never to an item named
-by id (e_yasbwj45); the
-walk follows the link types named, each out (→, `depends_on>`), in (←,
+read from the part_of closure). What Not
+leaves out applies to everything the walk reaches, never to an item named
+by id (e_yasbwj45); Walk
+follows the link types named, each out (→, `depends_on>`), in (←,
 `depends_on<`) or either way (↔, as a lens kept before ways were said), for
-some steps, a click on its arrow in the bar turning it (e_gue6cg6q); the limit
+some steps, a click on its arrow in the bar turning it (e_gue6cg6q); Limit
 caps it. A filter that includes nothing is refused, so no canvas reads the
-whole map. Search is the filter's text; tags are a core `tag` type and a
-`tagged` link, filtered by and, in the house style, not drawn.
+whole map. Words typed in find are a Find term, the filter's text; tags are
+a core `tag` type and a `tagged` link, found by and, in the house style, not
+drawn.
 - `test/lens-flat.test.ts`: "a filter that includes nothing is refused";
   "what is excluded is left out of everything the walk reaches, and is not
   walked through"; "the limit caps what is sent, seeds first, and says it
@@ -62,13 +65,15 @@ whole map. Search is the filter's text; tags are a core `tag` type and a
 ### 4. Lens and style are the whole surface, for people and agents
 A person grows a canvas by editing its lens in find, at the canvas's foot,
 which is the query's (e_2a4mddx8): at rest it says the lens in one line;
-open, a row for each part rises above it; typed, it lists what the words
-could be, each said by its kind, Words first and lit (a click only opens an
-item's page, e_jedng69e). The top keeps the view's band. An agent reads the same lens
+open, the rows Find, Only, Not, Walk and Limit rise above it; typed, it
+lists what the words could be, each said by its kind, Words first and lit,
+and a part's word and a space (`only `) puts it in that part (a click only
+opens an item's page, e_jedng69e). The top keeps the view's band. An agent reads the same lens
 (`query` name `flat`) and points the page at one (`report` action `show`
 with `lens`). The page calls no tool an agent lacks for it. A term is made
-by picking its kind, then the thing (an item by its name from a list, kept
-by its id); nothing written is taken for a term, and a name an agent writes
+by picking its kind, then the thing (Find's kinds: Words, Type, Tag, Link,
+Item, In; Only's: Type, Within, its plain words, Status, Owner, Changed or
+Made since; an item by its name from a list, kept by its id); nothing written is taken for a term, and a name an agent writes
 is answered by its id or refused when two items share it (e_45sgrfqd). The bar's
 pickers (the walk's links, the box's types) lead with what the canvas
 draws, then what lies one step around it (the same `flat` read, walked
@@ -154,10 +159,13 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `app.js` | routes the address to the canvas and the sheet |
 | `canvas.js` | a pane's canvas: its lens, Home's lens, clicks, moves batched, Arrange |
 | `lens.js` | the address codec (`readFlatLens`, `flatQuery`); `flatView` reads, holds and draws a lens |
-| `query-bar.js` | the lens as chips, changed in place |
-| `find.js` | the seeds as words, with a one-line peek: Enter replaces them, + or Shift+Enter adds (e_c3g6gwqq) |
+| `query-bar.js` | the lens said in one line at rest, and as the rows Find, Only, Not, Walk and Limit, changed in place |
+| `find.js` | the bar at the canvas's foot: opened, its rows; typed, what the words could be; Enter takes the lit choice, Shift+Enter adds the words (e_e3k797d3) |
+| `find-choices.js` | what typed words could be in each part, each said by its kind, Words first |
+| `term-kinds.js`, `term-pick.js` | a row's +: its kinds, then the things of that kind, picked, never guessed |
 | `canvases.js` | saved canvases: the bar's switch, Save, Home's list |
 | `drawing.js`, `draw.html`, `draw.js`, `marks.js` | a drawing run in the sandbox; its marks checked and mounted |
+| `reader-frame.js` | the one mark the page makes itself: a document's draft or published page, read in a frame on the canvas |
 | `pan-zoom.js` | the infinite plane |
 | `drag.js`, `canvas-wires.js` | moving a node; drawing a wire and making its link |
 | `live.js`, `replica.js`, `ghosts.js` | tailing the log; the store; held changes drawn into it |
@@ -257,44 +265,45 @@ like the canvas settings: never on the map, meaning nothing.
 Each tab follows everyone (the default), one session, or nobody (its name
 in italics): the reader picks it in ⋯. Where an agent's step lands is `pane-route.js`, worked
 out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
-- a session's show or change goes to the tab that follows it;
+- only a show lands: a change or a beat of a session's story moves nothing,
+  and with Follow agents on it is only said in the line at the foot, with Go
+  there (the owner, 29 Oct 2026, e_e7yfp2yg). A show lands whether or not the
+  page follows agents (e_jk63uduv);
+- a session's show goes to the tab that follows it;
 - else to a tab that follows everyone and no other session at work (a step
   within ten minutes) holds: the one where it holds a pane, the one it
   landed in, the one drawing it, else the one in sight;
 - when those are all held by other sessions, it gets a tab of its own,
-  following it;
+  following it, out of sight;
 - within the tab, a show's `pane` may be a name of the session's own ("map",
   "tests"): a pane by that name is split beside the others the first time and
   drawn in again each time it is named. Else it goes to the session's own
   pane: one held for it (a pane keeps whose it is, and says so in its strip,
   for as long as it stands, so a long session finds it again), else one that
   draws what it shows, else one nobody holds, else one split for it. Never
-  the pane in focus, where the reader may be at work beside it (the owner,
-  28 Oct 2026), unless it draws that already; in a tab that follows the
-  session alone every pane is its own;
-- a tab comes into sight unless the reader is at work in the one in sight or
-  another session showed there in the last half minute: then it is drawn in
-  the background, its mark rings, and the line at the foot offers Open tab
+  the pane the reader is in or touched last (the owner, 28 and 29 Oct 2026);
+  in a tab that follows the session alone every pane is its own;
+- no tab is brought into sight: a show into a tab out of sight is drawn
+  there, its mark rings, and the line at the foot offers Open tab
   (e_xjrpyysn);
 - a pane the reader is busy in (`pane-busy.js`: a press, scroll or key there
   in the last twenty seconds, text selected there, or words typed in the
   sheet and not saved; moving the pointer or turning a dial is not busy) is
   never taken, and no pane is split into a tab the reader is at work in: a
-  show goes to a tab of its own in the background instead. A step that is not
-  a show moves no tab its session has not shown into while others are at
-  work, opens none and brings none into sight; otherwise it waits as the line.
+  show goes to a tab of its own in the background instead.
 A side (`left`, `right`, `above`, `below`) puts the session's pane there in
-its tab, and `alone` closes the others; `main`, from before every pane was
-alike, is the session's own pane. A page that is not a canvas (a screen)
-opens in the sheet over the pane in focus. A session
+its tab; `alone` closes the others only in a tab that follows the session;
+`main`, from before every pane was alike, is the session's own pane. A page
+that is not a canvas (a screen) opens in the sheet only in a tab that follows
+the session, and is otherwise offered. A session
 is its run: a step carries the run it names (show, tell, session_update), or
-the one its agent last named (`src/presence.ts`). Following is on until the
-reader turns it off. A popped-out window follows no agent: the main page
-does, and draws a show for its tab in the window's pane in focus.
+the one its agent last named (`src/presence.ts`). A popped-out window follows
+no agent: the main page does, and draws a show for its tab in the window's
+pane in focus when that tab follows the session.
 
 ## What is not yet so
-- Find excludes only what the query bar's box excludes (closed, system, a
-  type); an item named to leave out is not yet a term of the lens.
+- Not leaves out only closed, system or a type; an item named to leave out
+  is not yet a term of the lens.
 - A kept view drawn in a document or a screen (`canvases.js` `keptView`)
   still nests what is inside what for the drawings that box it
   (architecture, grid, list). The canvas itself never does.
