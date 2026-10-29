@@ -259,7 +259,13 @@ ${JSON.stringify(input)}`;
       legend?.classList.add('still');
       host.replaceChildren(...[before, beside(picture), legend, after].filter(Boolean));
       const focus = keys.get(String(scene.focus));
-      if (focus) requestAnimationFrame(() => focus.scrollIntoView({ block: 'center', inline: 'center' }));
+      // Brought into sight by what scrolls inside the view that holds it, and nothing around it (the pane, the page).
+      if (focus) requestAnimationFrame(() => {
+        const around = [];
+        for (let el = host.parentElement; el; el = el.parentElement) around.push([el, el.scrollTop, el.scrollLeft]);
+        focus.scrollIntoView({ block: 'center', inline: 'center' });
+        for (const [el, top, left] of around) if (el.scrollTop !== top || el.scrollLeft !== left) el.scrollTo(left, top);
+      });
       return;
     }
     const { width, height } = scene.size ?? {};

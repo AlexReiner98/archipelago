@@ -118,12 +118,13 @@ export function lay(ids, edges, ties, { nodes, x, y, potential, aspect, z }) {
     const index = () => layers.forEach((list) => list.forEach((id, k) => pos.set(id, k)));
     index();
     // Crossings between one layer and the one above it, and in all.
+    // Two wires cross where one is left of the other above and right of it below: with the wires in order above (and,
+    // where they start together, below), that is each pair out of order below, counted as a merge sort meets them.
     const between = (k) => {
       if (k < 1 || k >= layers.length) return 0;
-      let count = 0;
       const pairs = layers[k].flatMap((b) => up.get(b).map((a) => [pos.get(a), pos.get(b)]));
-      for (let i = 0; i < pairs.length; i++) for (let j = i + 1; j < pairs.length; j++) if ((pairs[i][0] - pairs[j][0]) * (pairs[i][1] - pairs[j][1]) < 0) count++;
-      return count;
+      pairs.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+      return inversions(pairs.map((p) => p[1]));
     };
     const crossings = () => layers.reduce((sum, _, k) => sum + between(k), 0);
     const sweep = (k, toward) => {
@@ -204,7 +205,8 @@ export function lay(ids, edges, ties, { nodes, x, y, potential, aspect, z }) {
     const rank = (id) => (nodes.get(id).dummy ? (nodes.get(id).order ? 1.5 : 0.5) : flows(id) ? toward.get(id).length : 0);
     const done = new Set();
     const index = new Map(list.map((id, k) => [id, k]));
-    for (const id of [...list].sort((a, b) => rank(b) - rank(a))) {
+    const ranks = new Map(list.map((id) => [id, rank(id)]));
+    for (const id of [...list].sort((a, b) => ranks.get(b) - ranks.get(a))) {
       const k0 = index.get(id);
       // As near what it wants as the nearest steps already placed on either side let it be.
       let lo = -Infinity, hi = Infinity;
@@ -260,4 +262,21 @@ export function lay(ids, edges, ties, { nodes, x, y, potential, aspect, z }) {
   const chains = lines.filter((line) => line.order).map((line) => ({ ...line.link, key: `${line.from} ${line.to}`, path: line.path, dashed: potential.has(line.to), points: line.points }));
   for (const line of lines.filter((l) => !l.order)) Object.assign(line.link, { points: line.points, headAt: line.to === line.link.b ? 'end' : 'start' });
   return { ids: every, chains, breaks, width, height: Math.max(height, highest(all.map((n) => y.get(n.id) + n.h / 2))) };
+}
+
+/** How many pairs of a list stand in the wrong order (a later one strictly less than an earlier one): a merge sort's count. */
+function inversions(list) {
+  let count = 0;
+  const sort = (a) => {
+    if (a.length < 2) return a;
+    const mid = a.length >> 1, left = sort(a.slice(0, mid)), right = sort(a.slice(mid)), out = [];
+    let i = 0, j = 0;
+    while (i < left.length && j < right.length) {
+      if (right[j] < left[i]) ((count += left.length - i), out.push(right[j++]));
+      else out.push(left[i++]);
+    }
+    return out.concat(left.slice(i), right.slice(j));
+  };
+  sort(list);
+  return count;
 }
