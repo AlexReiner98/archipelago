@@ -13,7 +13,7 @@ import { stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId } from './pelago.ts';
-import { putPicture } from './pictures.ts';
+import { PICTURE_TYPES, putPicture } from './pictures.ts';
 import { tellStamp, took, watching } from './presence.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
 import { point } from './tool-change.ts';
@@ -162,7 +162,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     input: {
       result: z.string().describe('The id of the test result, or of the note or file the figure belongs to.'),
       data: z.string().min(1).describe('The file, as base64.'),
-      content_type: z.enum(['image/png', 'image/jpeg', 'image/webp']),
+      content_type: z.enum(PICTURE_TYPES).describe('An SVG is kept only when it is drawing alone: shapes, fills, strokes and text, with no script, style, link or fetch.'),
     },
     run: async (l, actor, input) => putPicture(l, actor, input),
   },

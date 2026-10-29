@@ -4,10 +4,12 @@
 import { createHash } from 'node:crypto';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { roomToStore } from './plan.ts';
+import { svgRefused } from './svg-figure.ts';
 
 /** The most a kept picture may weigh. A capture of a view at screen size is well under it. */
 export const PICTURE_MAX = 1_000_000;
-const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+/** An SVG is a figure baked from a drawing's shapes, kept only when it is drawing alone (src/svg-figure.ts). */
+export const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'] as const;
 
 /**
  * Keep the picture for an item whose page shows one (a screen of it draws a
@@ -19,10 +21,12 @@ const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 export async function putPicture(l: Archipelago, actor: Actor, input: { result: string; data: string; content_type: string }) {
   const result = await l.entity(input.result);
   if (!result || ![...l.registry.drawnWith('figure'), ...l.registry.family('lens')].includes(result.type)) throw new Error(`picture_put: "${input.result}" is not a test result, a note, a file or a lens: nothing whose page shows a picture.`);
-  if (!PICTURE_TYPES.includes(input.content_type)) throw new Error(`picture_put: the picture must be one of ${PICTURE_TYPES.join(', ')}, not ${input.content_type}.`);
+  if (!(PICTURE_TYPES as readonly string[]).includes(input.content_type)) throw new Error(`picture_put: the picture must be one of ${PICTURE_TYPES.join(', ')}, not ${input.content_type}.`);
   const bytes = Buffer.from(input.data, 'base64');
   if (!bytes.length) throw new Error('picture_put: "data" is empty. Send the file as base64.');
   if (bytes.length > PICTURE_MAX) throw new Error(`picture_put: the picture is ${bytes.length} bytes; the most kept is ${PICTURE_MAX}. Make it smaller.`);
+  const refused = input.content_type === 'image/svg+xml' ? svgRefused(bytes.toString('utf8')) : null;
+  if (refused) throw new Error(`picture_put: an SVG is kept only when it is drawing alone, and ${refused}.`);
   await roomToStore(l.workspace);
   await l.db.query(
     `insert into picture (entity_id, content_type, bytes, size) values ($1, $2, decode($3, 'base64'), $4)

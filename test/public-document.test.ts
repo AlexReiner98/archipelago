@@ -4,6 +4,8 @@ import { describe, publicDocument } from '../src/public-document.ts';
 import { gist } from '../src/published.ts';
 import { serve } from './serve.ts';
 
+// A figure baked from a drawing's shapes.
+const DRAWN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M1 1h8l-4 7Z" fill="#7a3" stroke="#222"/></svg>';
 // A one-pixel PNG.
 const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
@@ -24,7 +26,11 @@ test('a document a human makes public is read by anyone at its own address, with
     })
   ).result.created;
   const { d, s, p, o, q } = made;
-  for (const id of [s, p]) assert.equal((await call('/api/picture_put', undefined, { result: id, data: PIXEL, content_type: 'image/png' })).status, 200);
+  // The held section's figure is baked from a drawing, as SVG: kept only when it is drawing alone.
+  const svg = (text: string) => call('/api/picture_put', undefined, { result: s, data: Buffer.from(text).toString('base64'), content_type: 'image/svg+xml' });
+  assert.match(JSON.stringify(await svg('<svg><script>alert(1)</script></svg>')), /"status":400.*script/);
+  assert.equal((await svg(DRAWN)).status, 200);
+  assert.equal((await call('/api/picture_put', undefined, { result: p, data: PIXEL, content_type: 'image/png' })).status, 200);
   await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: q, visibility: 'public' }] });
 
   // Not public: nothing at its address, page or data.
@@ -67,7 +73,7 @@ test('a document a human makes public is read by anyone at its own address, with
 
   // A figure of what it shows, and of nothing else.
   const figure = await fetch(`${base}/p/default/${d}/picture/${s}`);
-  assert.deepEqual([figure.status, figure.headers.get('content-type')], [200, 'image/png']);
+  assert.deepEqual([figure.status, figure.headers.get('content-type'), figure.headers.get('content-security-policy'), await figure.text()], [200, 'image/svg+xml', "default-src 'none'", DRAWN]);
   assert.equal((await fetch(`${base}/p/default/${d}/picture/${p}`)).status, 404);
 
   // The database itself gives no other public item's note as a document's.
