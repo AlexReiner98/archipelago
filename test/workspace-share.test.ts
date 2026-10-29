@@ -78,6 +78,13 @@ test('a document shared with another workspace is read there once accepted, and 
   });
   // Its fields can be written by hand there, but the sender's database gives a share only to the workspace it was made out to.
   await assert.rejects(api(elsewhere, 'document', { id: forged.result.created.f }), /no longer shared/);
+  // Nor in the workspace it was made out to: a copy a member makes there, naming the same share, reads nothing.
+  const copy = await call('/api/change', theirs, {
+    reason: 'test',
+    ops: [{ op: 'create', ref: 'f', type: 'shared_document', title: 'Copy', status: 'accepted', props: { from_workspace: 'default', share: shared.share } }],
+  });
+  await assert.rejects(api(theirs, 'document', { id: copy.result.created.f }), /no longer shared/);
+  assert.equal((await api(theirs, 'document', { id: offer.id })).title, 'Proposal for Acme', 'the one it was made out to still reads');
 
   // The sender revokes it: it stops at once, and the receiver's item says it has ended.
   await api(mine, 'share_revoke', { id: shared.share });

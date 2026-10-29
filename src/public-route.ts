@@ -20,7 +20,7 @@ import type { Workspaces } from './workspaces.ts';
 export const publicPath = (workspace: string, id: string) => `/p/${workspace}/${id}`;
 
 /** Answer a GET under /p/: its page, its data, or one of its pictures. */
-export async function servePublic(res: ServerResponse, match: { workspace: string; id: string; what?: string; extra?: string; build?: string }, at: { workspaces: Workspaces; named: string[]; sites?: Record<string, string> }) {
+export async function servePublic(res: ServerResponse, match: { workspace: string; id: string; what?: string; extra?: string; build?: string }, at: { workspaces: Workspaces; named: string[]; sites?: Record<string, string>; from?: string }) {
   const { workspace, id, what, extra } = match;
   const none = () => res.writeHead(404, { ...GUARD, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Not found' }));
   const pelago = (await at.workspaces.has(workspace)) ? (await at.workspaces.get(workspace)).pelago : null;
@@ -52,7 +52,7 @@ export async function servePublic(res: ServerResponse, match: { workspace: strin
     return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ ...page, ...(await pageLook(pelago)) }));
   }
   // A page opened with ?live listens for its document being published again.
-  if (what === 'live') return doc ? listen(res, workspace, id, GUARD) : none();
+  if (what === 'live') return doc ? listen(res, workspace, id, GUARD, at.from) : none();
   // A drawing its pictures are drawn by, by its hash: the same for as long as anything is kept.
   if (what === 'drawing') {
     const code = doc && extra ? drawingCode(doc, extra) : null;

@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { hashSecret, newSecret, OPERATOR_RESET_FILE, sameSecret, validWorkspaceId } from './auth.ts';
 import { Automations } from './automations.ts';
 import { restore, type Dump } from './backup.ts';
+import { indexWorkspace } from './control-index.ts';
 import { addLocalType, addWorkspace, claimControlValue, controlValue, importControlFiles, importLocalPack, listWorkspaces, localTypes, OPERATOR, OPERATOR_RESET, removeWorkspace, setControlValue, takeControlValue } from './control.ts';
 import { startSchedules, stopSchedules } from './hooks.ts';
 import { openDb, type Database } from './db.ts';
@@ -232,6 +233,8 @@ export class Workspaces {
     }
     try {
       if (backup) await restore(db, backup, id);
+      // The members and tokens a backup brings can sign in here: the indexes beside the workspaces hear of them (src/control-index.ts).
+      if (backup) await indexWorkspace(await this.control(), id, db);
       // Types a workspace defines for itself are in its own database. Those kept in a folder before are taken in once.
       if (dataDir !== null) await importLocalPack(db, isDefault ? join(packsDir, LOCAL_PACK, 'pack.json') : join(rootDir, id, 'local-pack', 'pack.json'));
       const registry = new Registry(packsDir, packs, await localTypes<TypeDef>(db));

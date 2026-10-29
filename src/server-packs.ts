@@ -41,6 +41,12 @@ export interface ServerHost {
   sign?: { key: string; issuer: string; minutes?: number };
   /** Where the signed token is traded for a token to act as one account ({as} in the path), and the answer's fields. */
   exchange?: { path: string; token: string; expires: string };
+  /**
+   * Where a person's one-time code (from signing in on the host's site) is traded for a token to act as them: at
+   * path on another host the pack declares, with the secrets named client and secret, the token in the answer's
+   * field token. Used for one request and kept nowhere.
+   */
+  oauth?: { host: string; path: string; client: string; secret: string; token: string };
   /** A workspace pack may read (GET) from it as that workspace's connection to this pack (its via). */
   lend?: boolean;
 }
@@ -107,7 +113,8 @@ export function checkServerPack(p: Partial<Manifest>, folder: string): string[] 
   for (const s of secrets) if (!NAME.test(s)) problems.push(`"${s}" cannot name a secret`);
   for (const host of hosts) {
     if (!NAME.test(host.id) || !/^https?:\/\/\S+$/.test(host.base ?? '')) problems.push(`host "${host.id}" needs an id and an http(s) base`);
-    for (const name of [host.secret, host.sign?.key, host.sign?.issuer]) if (name !== undefined && !secrets.includes(name)) problems.push(`host "${host.id}" names the secret "${name}", which it does not declare`);
+    for (const name of [host.secret, host.sign?.key, host.sign?.issuer, host.oauth?.client, host.oauth?.secret]) if (name !== undefined && !secrets.includes(name)) problems.push(`host "${host.id}" names the secret "${name}", which it does not declare`);
+    if (host.oauth && (!hosts.some((h) => h.id === host.oauth!.host && !h.oauth) || !host.oauth.path?.startsWith('/') || !host.oauth.token || !host.oauth.client || !host.oauth.secret)) problems.push(`host "${host.id}": an oauth trade names another host of its own, a path, the client and secret it sends, and the token it answers with`);
     if (host.exchange && (!host.sign || !host.exchange.path?.includes('{as}') || !host.exchange.token || !host.exchange.expires)) problems.push(`host "${host.id}": an exchange trades a signed token, at a path with {as}, for a token and when it expires`);
   }
   for (const hook of webhooks) {

@@ -234,6 +234,8 @@ export const READ_TOOLS: Record<string, Tool> = {
       await listening(db, l.workspace, 1);
       try {
         for (;;) {
+          // A token revoked while it waits (its person removed, say) is told nothing more.
+          if (actor.token && !(await db.query(`select 1 from token where id = $1 and revoked_at is null and (expires_at is null or expires_at > now())`, [actor.token])).rows.length) throw new Error('This token was revoked while it waited.');
           const changes = await humanChanges(l, input.after);
           // An agent is told how many of each, and the newest few.
           const { newest, counts, more } = actor.kind === 'agent' ? summed(changes, (c) => c.action) : { newest: changes };
