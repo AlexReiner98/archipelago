@@ -31,7 +31,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
-import { bearer, createToken, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
+import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './auth.ts'; import { firstStart } from './first-start.ts';
 import { notify } from './notify.ts';
 import { backupAll, parseBackup, parseVault } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
@@ -42,12 +42,12 @@ import { serveHook } from './hooks.ts';
 import { serveMcp } from './mcp.ts';
 import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts';
 import type { Actor, Archipelago } from './pelago.ts';
-import { configureOutbox } from './outbox.ts';
+import { configureOutbox } from './outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from './control-index.ts';
 import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { setReach } from './pack-reach.ts'; import './agent-run.ts';
 import { pgLeader, soleLeader, type Leader } from './leader.ts';
 import { serverDuties } from './duties.ts';
 import { clientAddress, trustedProxies } from './address.ts';
-import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, type Limit } from './limit.ts';
+import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
 import { servePublic } from './public-route.ts'; import { serveSite, siteNav } from './site.ts';
 import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts';
 import { sharedDocument, sharedPicture } from './documents.ts';
@@ -101,7 +101,7 @@ class Refused extends Error {
 }
 export { lenient } from './mcp.ts';
 
-export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }; proxies?: string; leading?: () => boolean; unsandboxed?: boolean } = {}): Server {
+export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; signIn?: Limit }; proxies?: string; leading?: () => boolean; unsandboxed?: boolean } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
   // The server's own Chrome may reach it by another name, from a container beside it (src/looks.ts).
@@ -116,14 +116,14 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   serverPacks.origin = named[0] ? `https://${named[0]}` : `http://127.0.0.1:${port}`;
   configureConnections(serverPacks);
   setReach({ hold: (id) => workspaces.hold(id), connection: async (id, pack) => { const c = await serverPacks.connectionOf(pack, id); return c ? { id: c.id, account: c.account } : null; }, via: (id, pack, host, path) => serverPacks.lent(pack, host, id, path) });
-  configureMembers({ origin: origins.at(-1)!, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, limitOf: async (id) => memberLimit((await workspaces.get('default')).pelago.db, id) }); configureEnded(async (id) => (id === 'default' ? undefined : readEnded((await workspaces.get('default')).pelago.db, id)));
+  configureMembers({ origin: origins.at(-1)!, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, limitOf: async (id) => memberLimit((await workspaces.get('default')).pelago.db, id) }); configureIndex(() => workspaces.control()); configureEnded(async (id) => (id === 'default' ? undefined : readEnded((await workspaces.get('default')).pelago.db, id)));
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
   const running = { commit: startedFrom(), started: new Date().toISOString() };
 
   // What answers without a token is counted by address: the public pages and the setup script, and GitHub's deliveries.
   const open = limiter(options.limits?.open ?? PUBLIC_LIMIT);
-  const deliveries = limiter(options.limits?.deliveries ?? DELIVERY_LIMIT);
+  const deliveries = limiter(options.limits?.deliveries ?? DELIVERY_LIMIT), signIn = limiter(options.limits?.signIn ?? SIGN_IN_LIMIT);
   // A token that is refused is counted too: finding one wrong can mean opening a workspace's database first.
   const refusedTokens = limiter(options.limits?.refused ?? REFUSED_LIMIT);
   /** Where a request came from: what the proxies we trust say, not what the caller wrote ahead of them (src/address.ts). */
@@ -166,12 +166,18 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       return new Refused(401, 'A valid token is required. Send it as: Authorization: Bearer <token>');
     };
     if (!token || !id || !(await workspaces.has(id))) throw deny();
+    // A token nobody made for that workspace is refused before its database is opened (src/control-index.ts).
+    const control = await workspaces.control(), every = async () => (await workspaces.list()).map((w) => ({ id: w.id, db: async () => (await workspaces.get(w.id)).pelago.db }));
+    if (!(await tokenKnown(control, hashSecret(token), id, every))) throw deny();
     // The workspace stays open for as long as this request lasts, however long that is.
     res.once('close', workspaces.hold(id));
     const ws = await workspaces.get(id);
     // Where the request came from is a help in noticing a token used somewhere new, not a control.
     const identity = await verifyToken(ws.pelago.db, token, address || undefined, ws.pelago.workspace);
-    if (!identity) throw deny();
+    if (!identity) {
+      await unindexToken(control, hashSecret(token));
+      throw deny();
+    }
     if (identity.newPlace)
       await notify(ws.pelago, { kind: 'agent', name: 'pelago' }, {
         title: `The token "${identity.actor.name}" was used from a new place`,
@@ -210,17 +216,18 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       const host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined;
       if (site && (tooOften(req, res, open) || (await serveSite(res, url.pathname, { host, workspace: site, workspaces })))) return;
       if (req.method === 'GET' && url.pathname.startsWith('/backup-file/')) {
+        if (tooOften(req, res, open)) return; // a guessed key would otherwise open the workspace it names, again and again
         const [wsId, key] = url.pathname.slice(13).split('/');
         return await serveBackupFile(key && (await workspaces.has(wsId)) ? (await workspaces.get(wsId)).pelago.db : undefined, key ?? '', res);
       }
       // What a project needs to work with this server, and a running system's request for its token: no token needed.
       // A server pack answers at the addresses it had before it was a pack, too (a GitHub App set up then still sends there).
       const packPath = serverPacks.aliased(url.pathname) ?? url.pathname;
-      if (/^\/(connect|x)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX) });
+      if (/^\/(connect|x)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : /^\/connect\/(sign-in|code|join|signup)$/.test(packPath) ? signIn : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX) });
 
       // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture|drawing|live)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
-      if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces, named, sites }));
+      if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces, named, sites, from: addressOf(req) }));
 
       // A document given as a link: open to whoever holds it, with no login. The secret in the path is the only key, so
       // the page is never cached, never framed and never says where it was read from. What it shows is read through one
@@ -391,7 +398,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         }
         return send(res, err.status, { error: err.message });
       }
-      send(res, 500, { error: (err as Error).message });
+      // What went wrong is the log's: the database's own words are not handed to whoever asked.
+      console.error(`${req.method} ${req.url?.split('?')[0]}: ${(err as Error).stack ?? err}`);
+      send(res, 500, { error: 'Something went wrong on the server. Try again; if it goes on, tell its operator.' });
     }
   });
 }
@@ -462,14 +471,7 @@ If that process is not a pelago server, delete ${lock}.`);
       configureBackup(() => backupAll(workspaces, dir, keep, upload));
     }
     if (config.auth !== 'tokens') return;
-    // First start with tokens on: there is nobody to ask for a token yet, so
-    // make the two that everything else is created from, and show them once.
-    const operator = await workspaces.ensureOperator();
-    if (operator) console.log(`\nOperator secret (creates workspaces; shown once):\n  ${operator}`);
-    if (!(await hasHumanToken(main.pelago.db))) {
-      const owner = await createToken(main.pelago.db, DEFAULT_WORKSPACE, { kind: 'human', name: 'owner', admin: true });
-      console.log(`\nYour token for the default workspace (shown once):\n  ${owner.token}\nPaste it into the web UI, and set PELAGO_TOKEN for the CLI.`);
-    }
+    await firstStart(workspaces, main, join(config.dataDir, '..')); // the two everything is made from, given once (src/first-start.ts)
   });
   let idle: ReturnType<typeof setInterval> | undefined;
   let leader: Leader | undefined;

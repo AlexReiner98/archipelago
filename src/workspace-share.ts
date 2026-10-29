@@ -11,7 +11,7 @@ import { notify } from './notify.ts';
 import { acceptedSenders, otherMap } from './outbox.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { picturesOf } from './published-pictures.ts';
-import { unpublishShare } from './published-share.ts';
+import { madeOutTo, unpublishShare } from './published-share.ts';
 
 // ---- the sending side ----------------------------------------------------
 
@@ -65,8 +65,8 @@ export async function endShare(l: Archipelago, actor: Actor, share: string) {
 // ---- the receiving side --------------------------------------------------
 
 /** The map that shares an item, and its share, while the item is accepted here. */
-async function sharer(item: { status: string; props: Record<string, unknown> }) {
-  if (item.status !== 'accepted') return undefined;
+async function sharer(l: Archipelago, item: { id: string; type: string; status: string; props: Record<string, unknown> }) {
+  if (item.status !== 'accepted' || !(await madeOutTo(l, item))) return undefined;
   const from = await otherMap(String(item.props.from_workspace ?? ''));
   return from && { from, share: String(item.props.share ?? '') };
 }
@@ -75,7 +75,7 @@ async function sharer(item: { status: string; props: Record<string, unknown> }) 
 export async function readAny(l: Archipelago, id: string) {
   const item = await l.entity(id);
   if (item?.type !== SHARED) return readDocument(l, id);
-  const at = await sharer(item);
+  const at = await sharer(l, item);
   if (!at) throw new Error(item.status === 'offered' ? `"${item.title}" is offered by "${item.props.from_workspace}": accept it to read it here.` : `"${item.title}" is no longer shared with this workspace.`);
   const { rows } = await at.from.forAnyone().db.query<{ doc: Given | null }>(`select pelago_workspace_document($1, $2) as doc`, [at.share, l.workspace]);
   if (!rows[0]?.doc) throw new Error(`"${item.title}" is no longer shared with this workspace: "${item.props.from_workspace}" revoked it.`);
@@ -89,7 +89,7 @@ export async function readAny(l: Archipelago, id: string) {
  */
 export async function sharedPictures(l: Archipelago, id: string, sections: { id: string; type: string }[]) {
   const item = await l.entity(id);
-  const at = item?.type === SHARED ? await sharer(item) : undefined;
+  const at = item?.type === SHARED ? await sharer(l, item) : undefined;
   if (!at) return {};
   const { rows } = await at.from.forAnyone().db.query<{ publishable: boolean }>(`select pelago_workspace_publishable($1, $2) as publishable`, [at.share, l.workspace]);
   return rows[0]?.publishable ? picturesOf(at.from, sections, true) : {};
@@ -98,7 +98,7 @@ export async function sharedPictures(l: Archipelago, id: string, sections: { id:
 /** The figure of one section of a shared document, or null. */
 export async function sharedFigure(l: Archipelago, input: { via: string; id: string }) {
   const item = await l.entity(input.via);
-  const at = item?.type === SHARED ? await sharer(item) : undefined;
+  const at = item?.type === SHARED ? await sharer(l, item) : undefined;
   if (!at || !/^e_[a-z0-9]{8}$/.test(input.id)) return null;
   const { rows } = await at.from.forAnyone().db.query<{ content_type: string; data: string }>(
     `select content_type, encode(bytes, 'base64') as data from pelago_workspace_picture($1, $2, $3)`,

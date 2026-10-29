@@ -17,12 +17,21 @@
         "exchange": { "path": "/app/installations/{as}/access_tokens", "token": "token", "expires": "expires_at" },
         "lend": true
       },
-      { "id": "web", "base": "https://github.com" }
+      {
+        "id": "user",
+        "base": "https://api.github.com",
+        "headers": { "accept": "application/vnd.github+json", "x-github-api-version": "2022-11-28" },
+        "oauth": { "host": "login", "path": "/login/oauth/access_token", "client": "client_id", "secret": "client_secret", "token": "access_token" }
+      },
+      { "id": "web", "base": "https://github.com" },
+      { "id": "login", "base": "https://github.com" }
     ],
     "secrets": [
       { "name": "key", "env": "GITHUB_APP_KEY" },
       { "name": "hook", "env": "GITHUB_APP_SECRET" },
-      { "name": "app_id", "env": "GITHUB_APP_ID" }
+      { "name": "app_id", "env": "GITHUB_APP_ID" },
+      { "name": "client_id", "env": "GITHUB_APP_CLIENT_ID" },
+      { "name": "client_secret", "env": "GITHUB_APP_CLIENT_SECRET" }
     ],
     "webhooks": [
       {

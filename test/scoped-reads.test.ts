@@ -4,6 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { createToken, revokeToken } from '../src/auth.ts';
 import { callTool } from '../src/tools.ts';
 import { agent, fresh, human, make } from './map.ts';
 
@@ -54,4 +55,27 @@ test('an agent is told what changed as counts and the newest few, not the list',
   await make(l, Array.from({ length: 7 }, (_, i) => ({ op: 'create' as const, type: 'task', title: `More ${i}` })));
   const heard = (await callTool(l, agent, 'watch', { after: latest })) as { changes: unknown[]; counts: Record<string, number>; more: number; latest: number };
   assert.deepEqual([heard.changes.length, heard.counts['entity.create'], heard.more, heard.latest > latest], [5, 7, 2, true]);
+});
+
+test('a token revoked while it waits on watch is told nothing more', async () => {
+  const l = await fresh();
+  const made = await createToken(l.db, l.workspace, { kind: 'agent', name: 'listener' });
+  const robot = { ...agent, token: made.id };
+  const { latest } = (await callTool(l, robot, 'watch', {})) as { latest: number };
+  const waiting = callTool(l, robot, 'watch', { after: latest, wait_seconds: 10 });
+  await new Promise((r) => setTimeout(r, 1500)); // it is waiting, its token good
+  await revokeToken(l.db, made.id);
+  await make(l, [{ op: 'create', type: 'task', title: 'Said after the revoke' }]);
+  await assert.rejects(waiting, /revoked while it waited/);
+});
+
+test('a link to an item someone may not see is no event of theirs: its far end is not named', async () => {
+  const l = await fresh();
+  const people = await make(l, [{ op: 'create', ref: 'bo', type: 'person', title: 'Bo' }]);
+  const shared = await make(l, [{ op: 'create', ref: 's', type: 'task', title: 'Shared work', visibility: 'shared' }]);
+  const bo = l.as(people.bo);
+  const mine = (await bo.change({ kind: 'human', name: 'bo', person: people.bo }, { ops: [{ op: 'create', ref: 'p', type: 'note', title: 'Mine', visibility: 'private' }, { op: 'link', type: 'link', from: shared.s, to: 'p' }], reason: 'test' })) as { created: Record<string, string> };
+  const seen = async (who: typeof l) => JSON.stringify(await callTool(who, human, 'events', { limit: 50 }));
+  assert.ok((await seen(bo)).includes(mine.created.p), 'Bo sees his own link');
+  assert.ok(!(await seen(l.as('someone else'))).includes(mine.created.p), 'nobody else is told the id of what it reaches');
 });
