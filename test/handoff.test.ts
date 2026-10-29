@@ -340,6 +340,11 @@ test('what nobody has seen working is said on the item and listed in the handoff
   const brief = (await ask(l, 'brief', { task: made.offline })) as any;
   assert.deepEqual(brief.traps, [{ id: trap, title: 'The pane cannot load draw.html', files: ['ui/draw.*'] }]);
   assert.match(brief.text, /## Where it bites\n- ui\/draw\.\*: The pane cannot load draw\.html\. Drawings stay/);
+  // A task part of the repository itself, with nothing between, has it as its repository too.
+  const { direct } = await make(l, [{ op: 'create', ref: 'direct', type: 'task', title: 'Tidy the probe' }, { op: 'link', type: 'part_of', from: 'direct', to: made.repo }]);
+  const near = (await ask(l, 'brief', { task: direct })) as any;
+  assert.deepEqual([near.repo?.id, near.traps?.length], [made.repo, 1]);
+  assert.match(near.text, /^Repository: Apex repo \(/m);
 });
 
 test('where a session left its checkout is kept on its run at each turn and at its end, and the handoff says what is on no remote', async () => {
