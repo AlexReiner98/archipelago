@@ -371,14 +371,15 @@ becomes that item's id when the change is applied. An agent can ask for its
 own change to wait for a human with `hold: true`, even where agents' changes
 are applied as made.
 
-A handoff is mostly read off the map, so it does not go stale between
-sessions: the last push, what is open, and what has happened since the
-handoff note was written (pushes, what was settled or opened, the sessions
-that ended and what each said). The note (`handoff`) is the one part
-an agent writes, and holds only what the map cannot know: what bites when
-working here, what to do next and why. What nobody has seen working is said
-on the item (`seen_working` false, with what would show it in `to_see`) and
-listed in the handoff as `unseen`.
+A handoff is read off the map, so it does not go stale between sessions and
+nobody writes it: the last push, what is open, and what has happened in the
+last week (pushes, what was settled or opened, the sessions that ended and
+what each said). Beside those: what ended sessions left on no remote or not
+committed, from where each said its checkout stood (`left`); what nobody
+has seen working, said on the item with `seen_working` false (`unseen`);
+and what bites in the repository's files, kept as instructions `for`
+`file:<glob>` and said in a brief and when a session opens such a file
+(`traps`). What comes next is the open work's, by attention.
 
 ## Packs and flavours
 

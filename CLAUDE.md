@@ -12,10 +12,11 @@ where, and how that server is run.
 
 - **If your pelago tools are connected to a map that tracks this
   repository,** start with `query`, name `handoff`, and the repository. One
-  answer holds the last push, the handoff note, what has happened since, and
-  the open work. Say what you take on with `report` action `session_update`,
-  keep the map true as you go, and bring the handoff note up to date before
-  you finish.
+  answer holds the last push, what has happened lately, what sessions left
+  unpushed, what nobody has seen working, the traps in the repository's
+  files, and the open work. Say what you take on with `report` action
+  `session_update`, and keep the map true as you go: there is no handoff
+  note to write.
 - **The pelago tools are nine.** `query` reads (a view, a lens, or a read
   such as `get`, `search`, `schema`, `events`), `change` writes, `undo` takes
   a change set back, and every other action is called under its verb

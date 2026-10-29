@@ -17,7 +17,7 @@ const LINEAGE: Record<string, string[]> = {
 };
 
 /** What the kernel answers: items in a repository's scope, its pushes, what blocks what, and two of its own views. */
-function ctxOver(items: Item[], opts: { scope?: Record<string, string[]>; lives?: Record<string, string[]>; parts?: Record<string, string>; blocked?: Record<string, { roots: string[]; waits?: boolean }>; pushes?: unknown[] } = {}) {
+function ctxOver(items: Item[], opts: { scope?: Record<string, string[]>; lives?: Record<string, string[]>; parts?: Record<string, string>; blocked?: Record<string, { roots: string[]; waits?: boolean }>; pushes?: unknown[]; traps?: unknown[] } = {}) {
   const byId = new Map(items.map((e) => [e.id, { status: 'active', is_open: true, props: {}, body: '', created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z', ...e, is: LINEAGE[e.type] ?? [e.type] }]));
   const of = (ids: string[], types?: string[]) => ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])).filter((e) => !types || types.some((t) => e.is.includes(t)));
   return {
@@ -34,6 +34,7 @@ function ctxOver(items: Item[], opts: { scope?: Record<string, string[]>; lives?
       if (q.blocked) return Object.fromEntries(q.blocked.map((id: string) => [id, { blocked: Boolean(opts.blocked?.[id]), waits_on_someone: Boolean(opts.blocked?.[id]?.waits), roots: (opts.blocked?.[id]?.roots ?? []).map((r) => ({ id: r, title: byId.get(r)?.title })) }]));
       if (q.view === 'attention') return { items: [], counts: {} };
       if (q.view === 'hubs') return { hubs: [] };
+      if (q.view === 'instructions') return { said: opts.traps ?? [] };
       throw new Error(`no read ${JSON.stringify(q)}`);
     },
   };
@@ -72,15 +73,18 @@ test('a repository’s work is split by what blocks it, due first, and its last 
   assert.deepEqual(answer.last_push, { at: '2026-10-14T00:00:00Z', branch: 'main', head: 'abcdef0', subject: '1 commit to main: Probe' });
 });
 
-test('a handoff counts from its note: what was settled, what opened, the pushes and what each session said as it ended', async () => {
+test('a handoff counts the last week: what was settled, what opened, the pushes and what each session said as it ended', async () => {
   const { answer } = await handler['software.handoff']({ repo: 'repo' }, ctxOver(ITEMS, OPTS));
-  assert.deepEqual([answer.note.id, answer.note.characters, answer.since], ['note', 'Next\nRun the probe.'.length, '2026-10-12T00:00:00.000Z']);
+  assert.deepEqual(['note' in answer, answer.since], [false, '2026-10-09T12:00:00.000Z'], 'a week back, and a note kept as a handoff is not read');
   assert.deepEqual(answer.since_then.settled.map((i: { id: string }) => i.id), ['gone']);
   assert.deepEqual(answer.since_then.pushes.map((p: { head: string }) => p.head), ['abcdef0'], 'a tag is no push');
   assert.deepEqual(answer.since_then.sessions.map((s: { id: string; said: string }) => [s.id, s.said]), [['run', 'finished: all good']]);
   assert.deepEqual([answer.open.ready.length, answer.open.blocked[0].waiting_on], [2, ['Alex']]);
-  assert.match(answer.how, /^Everything but the note/);
+  assert.match(answer.how, /^Everything here is read off the map/);
   assert.equal(answer.unseen, undefined, 'nothing said to be unseen, no list');
+  assert.equal(answer.traps, undefined, 'no instruction for files, no traps');
+  const trapped = (await handler['software.handoff']({ repo: 'repo' }, ctxOver(ITEMS, { ...OPTS, traps: [{ id: 'i1', title: 'The pane cannot load draw.html', text: 'Start unsandboxed.', files: ['ui/draw.*'] }] }))).answer;
+  assert.deepEqual(trapped.traps, [{ id: 'i1', title: 'The pane cannot load draw.html', files: ['ui/draw.*'] }], 'by name and files, not their words');
   // Done and not yet seen working, here and in another repository: only this one's is listed, with what would show it.
   const unseenItems = [...ITEMS, { id: 'u', type: 'task', title: 'Rules on a reply', status: 'done', is_open: false, props: { seen_working: false, to_see: 'a real session' } }, { id: 'far', type: 'task', title: 'Elsewhere', props: { seen_working: false } }, { id: 'seen', type: 'task', title: 'Seen', props: { seen_working: true } }];
   const seen = (await handler['software.handoff']({ repo: 'repo' }, ctxOver(unseenItems, { ...OPTS, scope: { ...OPTS.scope, repo: [...OPTS.scope.repo, 'u', 'seen'] } }))).answer;
@@ -98,9 +102,6 @@ test('a handoff counts from its note: what was settled, what opened, the pushes 
   ];
   const left = (await handler['software.handoff']({ repo: 'repo' }, ctxOver([...ITEMS, ...runs], { ...OPTS, lives: { repo: [...OPTS.lives.repo, ...runs.map((r) => r.id)] } }))).answer.left;
   assert.deepEqual(left.map((l: any) => [l.id, l.branch, l.unpushed, l.dirty, l.head]), [['wip', 'wip', 2, 0, 'aaaaaaa']], 'an older word of the same checkout, a clean one since, a push to main since and an open session are not');
-  const bare = (await handler['software.handoff']({ repo: 'repo' }, ctxOver(ITEMS.filter((i) => i.id !== 'note'), OPTS))).answer;
-  assert.match(bare.how, /^Nobody has written a handoff note for this repository/);
-  assert.equal(bare.since, '2026-10-09T12:00:00.000Z', 'a week back with no note');
 });
 
 test('a re-check gives each project that has waited its oldest items, leaving out what waits on a person', async () => {
