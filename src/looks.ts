@@ -52,15 +52,22 @@ export async function passFor(db: Q, w: Whose, actor: string): Promise<string> {
   return pass;
 }
 
-const drawn = new Map<string, number[]>();
+const drawn = new Map<string, { t: number; by: string }[]>();
+const lastHour = (workspace: string, now = Date.now()) => (drawn.get(workspace) ?? []).filter((x) => x.t > now - 3_600_000);
 /** The looks drawn for a workspace in the last hour, by this process. */
-export const looksThisHour = (workspace: string) => (drawn.get(workspace) ?? []).filter((t) => t > Date.now() - 3_600_000).length;
-/** Another look for this workspace, unless it has had its plan's (else PER_HOUR) in the last hour. */
-export async function countLook(workspace: string) {
+export const looksThisHour = (workspace: string) => lastHour(workspace).length;
+/** The looks drawn for a workspace in the last hour, by who asked (the person whose view it was, else the agent). */
+export function looksBy(workspace: string): Map<string, number> {
+  const by = new Map<string, number>();
+  for (const x of lastHour(workspace)) by.set(x.by, (by.get(x.by) ?? 0) + 1);
+  return by;
+}
+/** Another look for this workspace, asked by `by`, unless it has had its plan's (else PER_HOUR) in the last hour. */
+export async function countLook(workspace: string, by = '') {
   const { most, limits } = await looksAllowed(workspace, PER_HOUR);
-  const now = Date.now(), had = (drawn.get(workspace) ?? []).filter((t) => t > now - 3_600_000);
+  const now = Date.now(), had = lastHour(workspace, now);
   if (had.length >= most) throw limits ? await overLimit(workspace, limits, 'looks', had.length, 'read one again with query picture, or wait') : new Error(`This workspace has had ${most} looks in the last hour: read one again with query picture, or wait.`);
-  drawn.set(workspace, [...had, now]);
+  drawn.set(workspace, [...had, { t: now, by }]);
 }
 
 interface Kept {
@@ -105,7 +112,7 @@ export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: s
     const had = was && (await keptWith<Kept>(db, `look:${whose(w)}:${was.look}`));
     if (was && had?.data) return answer(was.look, had.value, had.data, true);
   }
-  await countLook(w.workspace);
+  await countLook(w.workspace, w.viewer || actor);
   const pass = await passFor(db, w, actor);
   const got = await drawLook(`${origin}/?look#/${hash}`, pass, width, height, scheme);
   const look = `l_${randomBytes(6).toString('hex')}`;

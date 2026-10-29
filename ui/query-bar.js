@@ -87,7 +87,9 @@ export function added(lens, term) {
   if (term.exclude) f.exclude = [...new Set([...(f.exclude ?? ['system']), term.exclude])];
   // Only what is done finds nothing while Not leaves the closed out: it takes that away.
   if (term.only === 'done' && f.exclude?.includes('closed')) f.exclude = f.exclude.filter((x) => x !== 'closed');
-  return { ...lens, filter: f };
+  // A term added to a lens that names a view makes it a filter of the map again.
+  const { view: _view, ...rest } = lens;
+  return { ...rest, filter: f };
 }
 
 /** The lens with one of its filter's terms taken out: `field` and the value it holds. */

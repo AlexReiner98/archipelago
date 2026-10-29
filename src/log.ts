@@ -6,6 +6,7 @@
 
 import { GENESIS, entryHash } from './jcs.ts';
 import type { Q } from './db.ts';
+import { countBytes } from './bytes.ts';
 import { makePartitions, partitionMade } from './partitions.ts';
 import { openEntries, openValue, sealEntry } from './seal.ts';
 
@@ -126,6 +127,8 @@ export async function append(tx: Q, ws: string, stream: Stream, head: { id: stri
        from jsonb_array_elements($4::jsonb) with ordinality f(x, n)`,
       [stream, pos, at, JSON.stringify(facts)],
     );
+    // What each item adds to the log, counted as it is stored (src/bytes.ts).
+    await countBytes(tx, facts);
   }
   // Handed back in clear, as the caller said it: what it projects into today's tables.
   return { ...entry, ...head, keys: sealed.head.keys, facts: plain } as unknown as Entry;

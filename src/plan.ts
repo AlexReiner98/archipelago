@@ -103,12 +103,20 @@ export async function overLimit(workspace: string, limits: Limits, name: LimitNa
  * table's size: nothing is read row by row.
  */
 export async function storageBytes(db: Q): Promise<number> {
-  const { rows } = await db.query<{ n: string }>(
-    `select coalesce(sum(pg_total_relation_size(relid)), 0)::bigint as n from (
-       select relid from pg_partition_tree('log_entry') union all select relid from pg_partition_tree('log_fact')
-       union all select relid from pg_partition_tree('log_op') union all select 'picture'::regclass as relid) t`,
+  return Object.values(await storageParts(db)).reduce((a, b) => a + b, 0);
+}
+
+/** The parts storage counts, each in bytes as storageBytes reads them: the log's facts, its entries, the operational streams, the pictures. */
+export const STORED_PARTS = ['log_fact', 'log_entry', 'log_op', 'picture'] as const;
+export async function storageParts(db: Q): Promise<Record<(typeof STORED_PARTS)[number], number>> {
+  const { rows } = await db.query<{ part: (typeof STORED_PARTS)[number]; n: string }>(
+    `select part, coalesce(sum(pg_total_relation_size(relid)), 0)::bigint as n from (
+       select 'log_entry' as part, relid from pg_partition_tree('log_entry') union all select 'log_fact', relid from pg_partition_tree('log_fact')
+       union all select 'log_op', relid from pg_partition_tree('log_op') union all select 'picture', 'picture'::regclass as relid) t group by part`,
   );
-  return Number(rows[0].n);
+  const out = Object.fromEntries(STORED_PARTS.map((p) => [p, 0])) as Record<(typeof STORED_PARTS)[number], number>;
+  for (const r of rows) out[r.part] = Number(r.n);
+  return out;
 }
 
 const stored = new Map<string, { at: number; n: number }>();
@@ -161,14 +169,29 @@ export function slowTokensAt(limit: Limit = TOKEN_LIMIT): void {
 }
 const byWorkspace = limiter({ each: Number.MAX_SAFE_INTEGER });
 
-/** 0 when this request may go ahead (and it is counted), or the seconds until it may be asked again. */
-export async function requestWait(workspace: string, token: string): Promise<number> {
+/** Who asked, a minute at a time, by workspace: what the usage view says the requests are made of. */
+const asked = new Map<string, { began: number; by: Map<string, number> }>();
+/** The requests a workspace has made this minute, by who asked (a person's id, or "agent:" and the person an agent acts for). */
+export function requestsBy(workspace: string): Map<string, number> {
+  const now = asked.get(workspace);
+  return now && Date.now() - now.began < 60_000 ? now.by : new Map();
+}
+/** Whom a request is counted as, for the usage view: never the token. */
+export const askedAs = (actor: { kind: string; name: string; person?: string }) => (actor.kind === 'agent' ? `agent:${actor.person ?? actor.name}` : (actor.person ?? `human:${actor.name}`));
+
+/** 0 when this request may go ahead (and it is counted), or the seconds until it may be asked again. `who` is askedAs its actor. */
+export async function requestWait(workspace: string, token: string, who?: string): Promise<number> {
   const most = (await limitOf(workspace))?.requests;
   const waitWs = most ? byWorkspace.full(workspace, most) : 0;
   if (waitWs) return waitWs;
   const waitToken = byToken.take(`${workspace}:${token}`);
   if (waitToken) return waitToken;
   byWorkspace.take(workspace);
+  if (who) {
+    let now = asked.get(workspace);
+    if (!now || Date.now() - now.began >= 60_000) asked.set(workspace, (now = { began: Date.now(), by: new Map() }));
+    now.by.set(who, (now.by.get(who) ?? 0) + 1);
+  }
   return 0;
 }
 

@@ -37,6 +37,8 @@ export const STORES: Record<string, string> = {
   setting: "The workspace's settings and sealed secrets: set by the human or by the server, never by an agent's change; each set appended to the settings stream (a secret by its name only).",
   member: 'Who belongs to the workspace, by email: written by an admin or a server pack, read only by the whole database.',
   part_closure: 'What is inside what, all the way down: a projection of the open part_of links, kept by the projector in the append (src/closure.ts), made again whole after a restore.',
+  item_bytes: "What each item (and all links, as one) adds to the log, in bytes, by its id and type: a count kept by the append from the facts as stored (src/bytes.ts), made again whole from the log after a restore; never a fact, never backed up.",
+  type_bytes: 'The bytes of item_bytes summed by type: kept with it.',
   mention: "What names an item in its note or fields: a projection of items' text, kept by the projector as each is written (src/mentions.ts), made again whole after a restore.",
   proposal: 'The review queue, a projection of the log: a held change’s record in the pending stream makes its row, the entry that decides it in the fact stream says what became of it (src/replay.ts).',
   published: 'A document as it was published, frozen: written only when a human publishes.',
@@ -63,6 +65,7 @@ export const STORES: Record<string, string> = {
 export const VIEWS_OPERATIONAL: Record<string, string> = {
   sessions: 'The runs open now and the last that ended: the sessions store above, read as kept.',
   notifications: "The human's unread notifications: the notifications store above, newest first.",
+  usage: "What the workspace's plan limits, used: the database's own count of each table's size, the counts kept beside the log (item_bytes), the sessions store's runs at work, and the server's counts of requests and looks.",
   spent: "What runs report they cost: the sessions store's tokens_used and cost_usd, summed by where they ran.",
   story: 'What a session told of its work: the story the sessions store keeps on its run.',
   changed_since: 'The log, counted and cut to its newest events: what happened, not what the map is.',

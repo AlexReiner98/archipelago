@@ -39,7 +39,7 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
   assert.deepEqual([project.style.page.picture, project.style.page.notes], [true, 'open'], 'a project has the house style');
   const doc = await of(made.d);
   assert.deepEqual([doc.style.page.picture, doc.style.page.notes, doc.style.page.ties], [false, 'whole', 'open'], 'a document reads through, the rest of its page the house style\'s');
-  assert.deepEqual(doc.used.map((u) => u.preset), ['core.house', 'work.reader_colours', 'software.public_colours', 'canvas.house', 'work.reading']);
+  assert.deepEqual(doc.used.map((u) => u.preset), ['core.house', 'work.reader_colours', 'software.public_colours', 'plan.meters_look', 'canvas.house', 'work.reading']);
   // The owner's version of the reading preset: documents fold again, the picture still left out.
   await make(l, [{ op: 'create', ref: 'v', type: 'style', title: 'Mine', props: { preset: 'work.reading', page: { notes: 'folded' } } }]);
   const mine = await of(made.d);
@@ -57,7 +57,7 @@ test("the canvas pack's flow lies over a workspace style that says list, and und
   // A workspace style kept from before the canvas does not turn the canvas back into lists.
   const page = await of(made.p);
   assert.equal(page.style.shape, 'flow');
-  assert.deepEqual(page.used.map((u) => u.preset ?? u.id), ['core.house', 'work.reader_colours', 'software.public_colours', made.ws, 'canvas.house']);
+  assert.deepEqual(page.used.map((u) => u.preset ?? u.id), ['core.house', 'work.reader_colours', 'software.public_colours', 'plan.meters_look', made.ws, 'canvas.house']);
   // A style kept about the item is nearer, and wins.
   await make(l, [{ op: 'create', ref: 'own', type: 'style', title: 'P as a list', props: { shape: 'list' } }, { op: 'link', type: 'about', from: 'own', to: made.p }]);
   assert.equal((await of(made.p)).style.shape, 'list');

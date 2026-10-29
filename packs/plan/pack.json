@@ -1,0 +1,25 @@
+{
+  "id": "plan",
+  "version": "0.1.0",
+  "title": "Plan",
+  "description": "What a workspace's plan allows, and how much of it is used, drawn as one canvas: Usage, a bar for each limit with what it is made of. It reads core's usage view, which members and their agents ask alike. Take the pack out and the canvas goes; the view stays.",
+  "requires": ["core"],
+  "drawings": [
+    {
+      "id": "plan.meters",
+      "title": "Meters",
+      "shape": "meters",
+      "modules": { "index.js": "draw/meters/index.js", "look.js": "draw/meters/look.js", "marks.js": "draw/meters/marks.js" }
+    }
+  ],
+  "styles": [
+    { "id": "plan.usage", "type": "lens", "title": "Usage", "props": { "view": "usage", "style": { "shape": "meters" } } },
+    {
+      "id": "plan.meters_look",
+      "title": "The usage meters' lengths",
+      "props": {
+        "sizes": { "meter_pad": 16, "meter_gap": 22, "meter_most": 720, "meter_bar": 10, "meter_bar_gap": 8, "meter_row": 26, "meter_row_bar": 120, "meter_row_bar_height": 6, "meter_row_gap": 12, "meter_list_gap": 10, "meter_name_text": 15, "meter_head_text": 12, "meter_num": "9ch", "meter_track_mix": "45%", "meter_over_mix": "18%" }
+      }
+    }
+  ]
+}

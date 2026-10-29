@@ -33,7 +33,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './auth.ts'; import { firstStart } from './first-start.ts';
 import { notify } from './notify.ts';
-import { backupAll, parseBackup, parseVault } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts'; import { configurePlan, requestWait, slowTokensAt, storageBytes, tooManyRequests } from './plan.ts';
+import { backupAll, parseBackup, parseVault } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts'; import { askedAs, configurePlan, requestWait, slowTokensAt, storageBytes, tooManyRequests } from './plan.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { env } from './env.ts';
 import { serveConnect } from './connect.ts';
@@ -182,7 +182,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       await unindexToken(control, hashSecret(token));
       throw deny();
     }
-    const slow = await requestWait(ws.id, token); if (slow) throw new Refused(429, await tooManyRequests(ws.id, slow), slow);
+    const slow = await requestWait(ws.id, token, askedAs(identity.actor)); if (slow) throw new Refused(429, await tooManyRequests(ws.id, slow), slow);
     if (identity.newPlace)
       await notify(ws.pelago, { kind: 'agent', name: 'pelago' }, {
         title: `The token "${identity.actor.name}" was used from a new place`,
