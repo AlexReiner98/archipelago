@@ -9,11 +9,13 @@ import { actorId, type Actor, type Entity, type Archipelago, type Op } from './p
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
 import { heldResources } from './blocking.ts'; import { mintName } from './session-name.ts';
 import { toConfirm } from './confirm.ts'; import { commitRule } from './commit-rule.ts';
-import { sentCommits, unaccountedText } from './unaccounted.ts';
+import { sentCommits, unaccountedText } from './unaccounted.ts'; import { awakeSessions, roomForSession } from './plan.ts'; import { wholeMap } from './outbox.ts';
 import { STALE_DAYS } from './attention.ts'; import { instructionsFor } from './instructions.ts';
 import { VIEWS } from './views.ts'; import type { StartedBy } from './launcher.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts'; import { unaccountedBy } from './commits.ts';
 
 const now = () => new Date().toISOString();
+/** How many sessions are at work in the workspace, whoever's they are (src/plan.ts). */
+export const sessionsAwake = async (l: Archipelago) => awakeSessions((await wholeMap(l)).db, l.registry.family('run'));
 
 /** Find a run by its entity id or by the session id its surface gave it. */
 export async function resolveRun(l: Archipelago, key: string, openOnly = false): Promise<Entity | undefined> {
@@ -63,6 +65,7 @@ export async function sessionStart(
   }
   const task = input.task ? await l.entity(input.task) : undefined;
   if (input.task && !task) throw new Error(`No item "${input.task}" to work on`);
+  await roomForSession(l.workspace, () => sessionsAwake(l));
   const repo = await placeFor(l, input);
 
   const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };
