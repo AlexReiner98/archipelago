@@ -9,7 +9,7 @@
 //   > words, > [!NOTE] words           a callout (NOTE, TIP, IMPORTANT, WARNING, CAUTION), or a quote
 //   | a | b | over | --- | --: |       a table
 //   ``` ... ```                        code, as it is written
-//   **strong**, *said so*, `code`, [name](https://...), [name](e_xxxxxxxx), an address, an item's id
+//   **strong**, *said so*, `code`, [name](https://...), [name](e_xxxxxxxx), [name](/a-page), an address, an item's id
 
 /** A table, written as lines of | cells |, with a rule of dashes under its head (| --- | --: |). */
 const TABLE_ROW = /^\s*\|.*\|\s*$/;
@@ -118,11 +118,12 @@ export function ticked(text, line, done) {
   return { was: at, now: `${mark}[${done ? 'x' : ' '}]${at.slice(mark.length + 3)}` };
 }
 
-const SPANS = /`([^`]+)`|\*\*([^*]+)\*\*|(?<![\w*])\*([^*\s][^*]*?)\*(?![\w*])|\[([^\]]+)\]\((https?:\/\/[^)\s]+|e_[a-z0-9]{8})\)|(https?:\/\/[^\s)]+[^\s).,;:])|\b(e_[a-z0-9]{8})\b/g;
+const SPANS = /`([^`]+)`|\*\*([^*]+)\*\*|(?<![\w*])\*([^*\s][^*]*?)\*(?![\w*])|\[([^\]]+)\]\((https?:\/\/[^)\s]+|e_[a-z0-9]{8}|\/[a-z0-9-]*)\)|(https?:\/\/[^\s)]+[^\s).,;:])|\b(e_[a-z0-9]{8})\b/g;
 
 /**
  * A line's words as spans: { t: 'text', text }, { t: 'strong', spans }, { t: 'em', spans }, { t: 'code', text },
  * { t: 'link', href, text } (an address on the web; text null when the address is all there is), and
+ * { t: 'page', path, text } (a page of the site by its address, / for the front page), and
  * { t: 'item', id, text } (an item named by its id; text null when only its id is written).
  */
 export function readSpans(text) {
@@ -134,7 +135,7 @@ export function readSpans(text) {
     if (m[1] !== undefined) out.push({ t: 'code', text: m[1] });
     else if (m[2] !== undefined) out.push({ t: 'strong', spans: readSpans(m[2]) });
     else if (m[3] !== undefined) out.push({ t: 'em', spans: readSpans(m[3]) });
-    else if (m[4] !== undefined) out.push(m[5].startsWith('e_') ? { t: 'item', id: m[5], text: m[4] } : { t: 'link', href: m[5], text: m[4] });
+    else if (m[4] !== undefined) out.push(m[5].startsWith('e_') ? { t: 'item', id: m[5], text: m[4] } : m[5].startsWith('/') ? { t: 'page', path: m[5], text: m[4] } : { t: 'link', href: m[5], text: m[4] });
     else if (m[6] !== undefined) out.push({ t: 'link', href: m[6], text: null });
     else out.push({ t: 'item', id: m[7], text: null });
     at = m.index + m[0].length;
@@ -144,4 +145,4 @@ export function readSpans(text) {
 }
 
 /** The words of spans, as they read. */
-export const spanText = (spans) => spans.map((s) => (s.spans ? spanText(s.spans) : (s.text ?? s.href ?? s.id))).join('');
+export const spanText = (spans) => spans.map((s) => (s.spans ? spanText(s.spans) : (s.text ?? s.href ?? s.path ?? s.id))).join('');

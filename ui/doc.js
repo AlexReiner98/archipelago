@@ -56,8 +56,14 @@ let away = new Map();
 let paths = {};
 let onSite = false;
 const pageOf = (id) => (own ? `/read/${id}` : onSite && paths[id] ? (paths[id] === 'home' ? '/' : `/${paths[id]}`) : here.replace(/[^/]+$/, id));
+/** Where a link to a page of the site by its address (/quickstart, / for the front page) leads: there on the site's own domain, else to that page as it is read here, or nowhere when it is not published. */
+const pathTo = (path) => {
+  if (onSite) return path;
+  const id = Object.keys(paths).find((k) => (paths[k] === 'home' ? '/' : `/${paths[k]}`) === path);
+  return id ? pageOf(id) : null;
+};
 
-/** A line's words, read in the one dialect (ui/text.js): addresses on the web as links, a section's or another published document's id as a way to it. */
+/** A line's words, read in the one dialect (ui/text.js): addresses on the web as links, a section's or another published document's id or address as a way to it. */
 function inline(text, titles) {
   const draw = (spans) =>
     spans.map((s) => {
@@ -66,6 +72,7 @@ function inline(text, titles) {
       if (s.t === 'em') return h('em', {}, draw(s.spans));
       if (s.t === 'code') return h('code', {}, s.text);
       if (s.t === 'link') return h('a', { href: s.href, rel: 'noopener noreferrer', target: '_blank' }, s.text ?? s.href.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''));
+      if (s.t === 'page') return pathTo(s.path) ? h('a', { href: pathTo(s.path) }, s.text) : s.text;
       return titles.has(s.id) ? h('a', { href: `#${s.id}` }, s.text ?? titles.get(s.id)) : away.has(s.id) ? h('a', { href: pageOf(s.id) }, s.text ?? away.get(s.id)) : (s.text ?? '');
     });
   return draw(readSpans(text));
