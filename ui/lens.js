@@ -89,7 +89,8 @@ const list = (value) => (value ?? '').split(',').filter(Boolean);
 
 /**
  * A flat lens and a style, as the end of an address says them: ?text=…&types=…&ids=…&link=tagged e_x&in=e_p&only=…&within=e_y
- * &exclude=closed&over=part_of&steps=1&limit=500 (a link term each `link`; only and within narrow what the rest finds;
+ * &exclude=closed&over=part_of&steps=1&limit=500&time=-6d,7d (a link term each `link`; only and within narrow what the rest finds;
+ * time is a window each item is placed in, its ends dates or days from today;
  * exclude with nothing after it leaves nothing out). An
  * address from before the flat lens (?from=e_x) opens on that item. A lens that includes nothing is null, unless the
  * address says so (`nothing`: every Find term taken out, drawn as an empty canvas). `canvas` names
@@ -115,6 +116,8 @@ export function readFlatLens(query) {
   const over = p.get('over') === 'all' ? 'all' : p.has('over') ? list(p.get('over')) : p.has('from') ? FOCUS : [];
   const lens = { filter, walk: { over, steps: p.has('steps') ? Number(p.get('steps')) : over.length ? 1 : 0 } };
   if (p.has('limit')) lens.limit = Number(p.get('limit'));
+  const [from, to] = list(p.get('time'));
+  if (from && to) lens.time = { from, to };
   return { lens, style };
 }
 
@@ -139,6 +142,7 @@ export function flatQuery(lens, style = {}) {
   if (over === 'all' || over.length) p.set('over', over === 'all' ? 'all' : over.join(','));
   if (steps || over === 'all' || over.length) p.set('steps', String(steps));
   if (lens.limit) p.set('limit', String(lens.limit));
+  if (lens.time) p.set('time', `${lens.time.from},${lens.time.to}`);
   for (const key of ['lit', 'shape', 'style', 'canvas']) if (style[key]) p.set(key, style[key]);
   return p.toString();
 }
@@ -254,7 +258,8 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     store.on((changed) => {
       if (host.store !== store) return;
       if (!host.isConnected) return unfollow(store);
-      if (changed.missing.length) return load(true);
+      // On a time axis an item changed may fall elsewhere: where is the server's to work out, so the lens is read again.
+      if (changed.missing.length || (lens.time && changed.items.changed.length)) return load(true);
       draw({ ...raw, ...store.answer() }, { ...raw, ...store.drawn() }, true);
     });
     draw({ ...raw, ...store.answer() }, { ...raw, ...store.drawn() }, refreshing);

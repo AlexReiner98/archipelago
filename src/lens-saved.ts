@@ -20,12 +20,12 @@ const KEPT = 'lens';
 type Props = Record<string, unknown>;
 const list = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string' && v !== '') : []);
 
-/** The flat lens a kept view draws: its filter with its pins and what its steps name, its walk and its limit. */
+/** The flat lens a kept view draws: its filter with its pins and what its steps name, its walk, its limit and its window of time. */
 export function keptLens(props: Props) {
   const filter = { ...((props.filter ?? {}) as Props) };
   const ids = [...new Set([...list(filter.ids), ...list(props.pins), ...stepIds(props.steps)])];
   if (ids.length) filter.ids = ids;
-  return { filter, walk: props.walk ?? { over: [], steps: 0 }, ...(typeof props.limit === 'number' && { limit: props.limit }) };
+  return { filter, walk: props.walk ?? { over: [], steps: 0 }, ...(typeof props.limit === 'number' && { limit: props.limit }), ...(props.time != null && { time: props.time }) };
 }
 
 /** Whether an item's type is a kept view. */

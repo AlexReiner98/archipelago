@@ -36,15 +36,34 @@ const DAY = 86_400_000;
 /** The most days a window may cover when repeats are worked out. */
 const MAX_DAYS = 366 * 5;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** A day said from today: today, or so many days before or after it (-6d, 7d). */
+const FROM_TODAY = /^(today|[+-]?\d{1,4}d)$/;
 
-/** Read and check a lens's time axis. */
+/** Read and check a lens's time axis. Its ends may be said from today, worked out by `resolveAxis` when it is read. */
 export function readAxis(input: unknown): TimeAxis {
   const t = input as Partial<TimeAxis> | undefined;
-  const ok = (d: unknown) => typeof d === 'string' && !Number.isNaN(Date.parse(d));
-  if (!t || !ok(t.from) || !ok(t.to)) throw new Error('time is { from, to } (dates or date-times), and by: ["when", "bound"] if not both');
-  if (Date.parse(t.to!) < Date.parse(t.from!)) throw new Error('time.to comes after time.from');
+  const ok = (d: unknown) => typeof d === 'string' && (FROM_TODAY.test(d) || !Number.isNaN(Date.parse(d)));
+  if (!t || !ok(t.from) || !ok(t.to)) throw new Error('time is { from, to } (dates, date-times, today, or days from today as -6d or 7d), and by: ["when", "bound"] if not both');
+  const fixed = !FROM_TODAY.test(t.from!) && !FROM_TODAY.test(t.to!);
+  if (fixed && Date.parse(t.to!) < Date.parse(t.from!)) throw new Error('time.to comes after time.from');
   if (t.by !== undefined && (!Array.isArray(t.by) || t.by.some((b) => b !== 'when' && b !== 'bound'))) throw new Error('time.by is a list of when and bound');
   return { from: t.from!, to: t.to!, ...(t.by && { by: t.by }) };
+}
+
+/** The day an end said from today falls on, in a zone, as a date; any other end as it is. */
+function dayFrom(value: string, zone: string, now: number): string {
+  const said = FROM_TODAY.exec(value);
+  if (!said) return value;
+  const parts = Object.fromEntries(clock(zone).formatToParts(now).map((p) => [p.type, p.value]));
+  const today = Date.UTC(+parts.year, +parts.month - 1, +parts.day);
+  return new Date(today + (said[1] === 'today' ? 0 : parseInt(said[1], 10)) * DAY).toISOString().slice(0, 10);
+}
+
+/** A time axis with its ends said from today worked out, in the workspace's zone. */
+export function resolveAxis(axis: TimeAxis, zone: string, now = Date.now()): TimeAxis {
+  const resolved = { ...axis, from: dayFrom(axis.from, zone, now), to: dayFrom(axis.to, zone, now) };
+  if (Date.parse(resolved.to) < Date.parse(resolved.from)) throw new Error('time.to comes after time.from');
+  return resolved;
 }
 
 /** One clock for each zone: making one is slow, and every item placed in time asks it. */
@@ -117,3 +136,4 @@ export const DEFAULT_ZONE = 'America/Toronto';
 export async function zoneOf(l: Archipelago): Promise<string> {
   return (await l.setting<string>('time_zone')) || DEFAULT_ZONE;
 }
+

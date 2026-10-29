@@ -1,7 +1,8 @@
 // The flat lens (the decision "The lens is a filter, a walk and a limit", 25 Oct 2026): a filter, a walk and a limit,
 // and nothing else. What the filter includes picks the seeds; what it narrows by must all hold of every seed as well
 // (only these types, within these items); what it excludes applies to everything but an item named by id, what the walk reaches included; the walk follows the link types named, each out, in or either way, step by step; the limit is the most it sends.
-// The answer is items and the links among them: no containment, no places, no views, no style.
+// The answer is items and the links among them: no containment, no places, no views, no style. A lens may also name
+// a window of time (`time`, src/timeaxis.ts): it finds nothing more, and each item says where it falls in the window.
 //
 // Every read is bounded by the ids in hand, an end of a link, the type index or the limit, and runs as the viewer:
 // row-level security keeps what they may not see out of the seeds, the walk and the links alike.
@@ -10,6 +11,8 @@ import { SYSTEM } from './head.ts';
 import type { Archipelago } from './pelago.ts';
 import { checkedAfter, holding, readWord, wordConditions, type Narrowing } from './lens-only.ts';
 import { rankSql, searchIds, slipsOf } from './search.ts';
+import { fileOnAxis } from './timelanes.ts';
+import { placeAll, readAxis, resolveAxis, windowOf, zoneOf, type TimeAxis } from './timeaxis.ts';
 
 /** One link term of a filter: the items that have a link of this type to `to` (or, with `from`, the items `from` links to). */
 export interface LinkTerm {
@@ -32,6 +35,8 @@ export interface FlatLens {
   walk: { over: string[] | 'all'; steps: number };
   /** The most items sent. */
   limit: number;
+  /** A window of time each item is placed in, for a drawing along a time axis; its ends may be said from today. */
+  time?: TimeAxis;
 }
 
 /** What is left out unless the lens says otherwise: the app's own configuration. */
@@ -105,7 +110,7 @@ export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLe
   if (!Number.isInteger(steps) || (steps as number) < 0 || (steps as number) > MAX_STEPS) throw new Error(`walk.steps must be a whole number from 0 to ${MAX_STEPS}`);
   const limit = input.limit ?? FLAT_LIMIT;
   if (!Number.isInteger(limit) || (limit as number) < 1 || (limit as number) > LENS_LIMIT) throw new Error(`limit must be a whole number from 1 to ${LENS_LIMIT}`);
-  return { include, narrow, exclude, walk: { over, steps: steps as number }, limit: limit as number };
+  return { include, narrow, exclude, walk: { over, steps: steps as number }, limit: limit as number, ...(input.time !== undefined && { time: readAxis(input.time) }) };
 }
 
 interface Row {
@@ -120,6 +125,11 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   // How much of each note is sent is not the lens: the same items, their notes whole for a drawing that reads them.
   if (input.notes !== undefined && input.notes !== 'whole') throw new Error('notes must be "whole", or left out for the start of each note');
   const whole = input.notes === 'whole';
+  // On a time axis its ends said from today are worked out now, in the workspace's zone; a seed is open, or changed
+  // since the window began (as the old placed read had it), so the sessions of past months do not crowd it out.
+  const zone = lens.time && (await zoneOf(l));
+  if (lens.time) lens.time = resolveAxis(lens.time, zone!);
+  const inWindow = lens.time ? `(e.is_open or e.updated_at >= '${new Date(windowOf(lens.time, zone!)[0]).toISOString()}'::timestamptz)` : null;
   // What is excluded, as one condition on an item (as e); its last parameter is the types left out, with their flavours.
   const leftOut = lens.exclude.filter((x) => x !== 'closed' && x !== SYSTEM).flatMap((t) => l.registry.family(t));
   const keep = (n: number) => ['e.archived_at is null', lens.exclude.includes('closed') && 'e.is_open', lens.exclude.includes(SYSTEM) && `(e.kind is null or e.kind <> '${SYSTEM}')`, `e.type <> all($${n}::text[])`].filter(Boolean).join(' and ');
@@ -142,7 +152,7 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   if (lens.narrow.words) lens.narrow.words = lens.narrow.words.map((said, i) => (words[i].word === 'owner' ? `owner ${(words[i] as { who: string }).who}` : said));
   const narrowing = terms.filter((t) => t.param !== undefined).map((t) => t.param);
   const narrows = (n: number) => terms.map((t) => (t.param === undefined ? t.cond : t.cond.replaceAll('$?', `$${n++}`)));
-  const narrowed = (n: number) => [keep(n), ...narrows(n + 1)].join(' and ');
+  const narrowed = (n: number) => [keep(n), ...narrows(n + 1), inWindow].filter(Boolean).join(' and ');
   // Each read finds ids only; what is sent of them is read once, at the end. A seed is found narrowed; a step of the walk is not.
   const read = async (cond: string, sql: (keep: string) => string, own: unknown[], more: unknown[]) => (await l.db.query<{ id: string }>(sql(cond), [...own, leftOut, ...more])).rows.map((r) => r.id);
   const find = (sql: (keep: string) => string, own: unknown[]) => read(keep(own.length + 1), sql, own, []);
@@ -247,6 +257,10 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   const wholeIds = new Set(whole ? kept.slice(0, NOTES_WHOLE_MOST) : []);
   const byId = new Map(rows.map((r) => [r.id, r]));
   const items = kept.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+  // On a time axis, where each falls in its window.
+  const spans = lens.time && (await placeAll(l, items, lens.time, zone!));
+  // And whose lane each is in and what it counts toward (src/timelanes.ts): a person's, or each session its own.
+  const filed = spans && (await fileOnAxis(l, items, spans, me));
   // The links among what is sent, of every type: a canvas draws what ties what it shows.
   const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string; props: Record<string, unknown> }>(
     `with s(id) as (select unnest($1::text[])) select r.id, r.type, r.from_id, r.to_id, r.props from relation r join s a on a.id = r.from_id join s b on b.id = r.to_id where r.valid_to is null order by r.id`,
@@ -264,10 +278,14 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
         visibility: e.visibility, status: e.status, open: e.is_open, owner: e.owner,
         created_at: e.created_at, updated_at: e.updated_at,
         ...(Object.keys(fields).length && { fields }),
+        ...(spans && { time: filed!.filed.get(e.id) ?? spans.get(e.id) ?? [] }),
+        ...(filed?.lane.has(e.id) && { lane: filed.lane.get(e.id) }),
+        ...(filed?.stream.has(e.id) && { stream: filed.stream.get(e.id) }),
         ...(foundBy.has(e.id) ? { found: foundBy.get(e.id) } : stepOf.has(e.id) && { step: stepOf.get(e.id) }),
       };
     }),
     links: relations.map((r) => ({ id: r.id, type: r.type, from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
+    ...(filed && { lanes: filed.lanes, streams: filed.streams }),
     ...(cut && { cut: true }),
     ...(matched !== undefined && { matched }),
     // The items whose notes are sent whole, so a page keeping the answer current keeps those whole too (ui/replica.js).
