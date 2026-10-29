@@ -2,8 +2,8 @@
 // e_45sgrfqd). Find has a mode for each part of the lens, by its word: typing "only " (or Not, Walk, Limit) puts find
 // in that part, and its choices are that part's. In Find: Words first, always, and lit, so Enter takes the words
 // unless another is chosen; then, for the items the search read finds by name, all that is In each and the Item
-// itself (a tag as a Tag); a View or a Style kept on the map by its name, which opens it (a view in the pane, a style's
-// page) rather than adding a term; the types and the links whose names hold the words (a link to me). In Only: the plain words,
+// itself (a tag as a Tag); a View kept on the map by its name, which opens in the pane, and a Style (one kept by name,
+// a shape a drawing draws, or the house's), which the canvas is then drawn in, so one bar sets up the whole canvas; the types and the links whose names hold the words (a link to me). In Only: the plain words,
 // a Type, Within an item, a Status, an Owner. In Not: closed, system, a Type. In Walk: a link, out, in or either way,
 // or every link. In Limit: a number. Each choice says the change it makes, kept by id.
 
@@ -43,16 +43,21 @@ const KEPT = { View: 'lens', Style: 'style' };
 const keptAs = (type) => Object.keys(KEPT).find((k) => isA(type, KEPT[k]));
 /**
  * Views and styles by name. They are system items, so the words never find them (task e_933ptgfc): each is its own
- * choice, which opens it. A pack's view not kept on the map is offered by its title too, opened by its lens.
+ * choice. A view opens in the pane; a pack's view not kept on the map is offered by its title too, opened by its lens.
+ * A style is the canvas's: the shapes the drawings draw and the styles kept by name, as the bar's style switch offers
+ * them (ui/look-switch.js), and the house's.
  */
 const keptFound = async (q, most) => {
   if (!q) return [];
-  const [views, styles] = await Promise.all(Object.values(KEPT).map((type) => api('search', { q, type, open: true, limit: most }).catch(() => [])));
+  const [views, kept] = await Promise.all(Object.values(KEPT).map((type) => api('search', { q, type, open: true, limit: most }).catch(() => [])));
+  const shapes = [{ shape: 'list', title: 'List' }, ...(state.schema?.shapes ?? [])].filter((s) => has(s.title, q)).map((s) => ({ title: s.title, style: { shape: s.shape } }));
+  const named = kept.filter((s) => !s.props?.preset && !s.props?.on?.length).map((s) => ({ title: s.title, style: { style: s.id } }));
+  const styles = [...shapes, ...named, ...(has('House', q) ? [{ title: 'House', style: {} }] : [])].slice(0, most);
   const mine = new Set(views.map((v) => v.props?.preset).filter(Boolean));
   const presets = (state.schema?.canvases ?? []).filter((p) => !mine.has(p.id) && has(p.title, q)).map((p) => ({ ...p, preset: true, props: { ...p.props, preset: p.id } }));
   return [
     ...[...views, ...presets].slice(0, most).map((v) => ({ kind: 'View', label: v.title, note: '', title: `Open the view ${v.title}`, href: canvasAt(v) })),
-    ...styles.map((s) => ({ kind: 'Style', label: s.title, note: '', title: `Open the style ${s.title}`, href: `#/e/${s.id}` })),
+    ...styles.map((s) => ({ kind: 'Style', label: s.title, note: '', title: `Draw this canvas in the style ${s.title}`, style: s.style })),
   ];
 };
 
@@ -77,7 +82,7 @@ export function ledBy(mode, q) {
 
 /**
  * The choices for `q` in `mode`, in order: { kind, label, note, title, and one of words, term (added to the filter),
- * walk (a link to follow), limit, mode (find goes into that part) }. `c` is { most, wide, lens }: how many of each are
+ * walk (a link to follow), limit, href (a view to open), style (the canvas drawn in it), mode (find goes into that part) }. `c` is { most, wide, lens }: how many of each are
  * offered, how many of the one kind a kind's word asks for, and the lens up, so what it holds already is not offered
  * again. Led by a kind's word, only that kind is offered, found by the rest; in Find the whole of what was typed is
  * still offered as words, last.

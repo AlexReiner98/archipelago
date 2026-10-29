@@ -10,8 +10,9 @@
 // leaves the part, then shuts find; so does a click away from it.
 
 import { api, asWords, h, state, wordsOf } from './base.js';
-import { goLens, home, lensNow } from './canvas.js';
+import { goLens, home, lensNow, openHere, styleNow } from './canvas.js';
 import { MODES, choicesFor, ledBy, wordsChoice } from './find-choices.js';
+import { flatQuery } from './lens.js';
 import { numberOf } from './lens-base.js';
 import { added, fitBar } from './query-bar.js';
 
@@ -64,17 +65,21 @@ function toMode(m, looking = true) {
 }
 
 /**
- * Take a choice: a part to go into; a view or a style to open; words in place of those find set before, or (`add`) as one more set; a link to
+ * Take a choice: a part to go into; a view to open; a style to draw the canvas in; words in place of those find set before, or (`add`) as one more set; a link to
  * walk along; a limit; any other term added to the lens. Find stays open with the cursor in it, to refine further.
  */
 function take(choice, add = false) {
   if (!choice) return;
   if (choice.mode) return void ((input.value = ''), toMode(choice.mode));
-  // A view or a style is opened, not added: find shuts, and the pane goes there.
-  if (choice.href) return void (shut(), (location.hash = choice.href));
   again();
   input.focus();
+  // A view is opened in the pane, and a style draws the lens up in it, the saved canvas kept: find stays open to go on.
+  if (choice.href) return void openHere(choice.href);
   const lens = lensUp();
+  if (choice.style) {
+    const { shape: _s, style: _k, ...rest } = styleNow();
+    return void openHere(`#/v?${flatQuery(lens, { ...rest, ...choice.style })}`);
+  }
   if (choice.walk) {
     const { over = [], steps = 0 } = lens.walk ?? {};
     return goLens({ ...lens, walk: { over: choice.walk === 'all' ? 'all' : [...(over === 'all' ? [] : over), choice.walk], steps: steps || 1 } });
