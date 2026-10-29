@@ -22,6 +22,8 @@ export function republished(workspace: string, id: string) {
 /** Keep this response open as the stream a page listens to for its document. */
 export function listen(res: ServerResponse, workspace: string, id: string, headers: Record<string, string>, from = '') {
   const key = `${workspace}/${id}`;
+  // A page that left while its document was read is gone already: counted now, it would never be given back.
+  if (res.destroyed || res.closed || res.socket?.destroyed) return;
   const who = counted(from);
   if ((fromAddress.get(who) ?? 0) >= LIVE_EACH || (listening.get(key)?.size ?? 0) >= LIVE_DOCUMENT) {
     return res.writeHead(429, { ...headers, 'content-type': 'application/json', 'retry-after': '60' }).end(JSON.stringify({ error: 'Too many pages are listening already. Reload it in a minute.' }));

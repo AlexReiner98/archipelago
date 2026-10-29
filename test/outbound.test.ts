@@ -5,7 +5,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, test } from 'node:test';
 import { asker } from '../src/model.ts';
-import { guardedFetch } from '../src/outbound.ts';
+import { guardedFetch, isPrivate } from '../src/outbound.ts';
 import { fresh, human, make } from './map.ts';
 
 /** A server on this machine: one path answers, /hop redirects to it with a 307, which keeps a POST a POST. */
@@ -53,7 +53,7 @@ test('where the server refuses its own network, no call reaches it: by address, 
   await withEnv(refused, async () => {
     heard.length = 0;
     // localhost. is not caught by its name: the address it resolves to, as the socket is handed it, is.
-    for (const url of [`http://127.0.0.1:${port()}/`, `http://localhost:${port()}/`, `http://localhost.:${port()}/`, `http://[::ffff:127.0.0.1]:${port()}/`, 'http://169.254.169.254/latest/meta-data/']) {
+    for (const url of [`http://127.0.0.1:${port()}/`, `http://localhost:${port()}/`, `http://localhost.:${port()}/`, `http://[::ffff:127.0.0.1]:${port()}/`, 'http://169.254.169.254/latest/meta-data/', 'http://[64:ff9b::a9fe:a9fe]/', 'http://[::7f00:1]/', 'http://[2002:7f00:1::]/']) {
       await assert.rejects(guardedFetch(url, { signal: AbortSignal.timeout(2000) }), /own network/, url);
     }
     assert.deepEqual(heard, [], 'nothing on this machine was asked');
@@ -78,4 +78,9 @@ test('check_connections reaches no private address where they are refused, and f
     assert.equal(out.find((c) => c.id === created.hop)!.status, 'unavailable', 'a redirect is not followed');
     assert.ok(!heard.some((h) => h.includes('/inside')));
   });
+});
+
+test('an IPv6 address that carries an IPv4 one is judged by it', () => {
+  for (const ip of ['64:ff9b::7f00:1', '64:ff9b:1::a9fe:a9fe', '::7f00:1', '::ffff:7f00:1', '2002:a00:1::', '198.18.0.1', '240.0.0.1', 'ff02::1']) assert.ok(isPrivate(ip), ip);
+  for (const ip of ['8.8.8.8', '2606:4700::1111', '64:ff9b::808:808', '2002:808:808::', '::ffff:8.8.8.8']) assert.ok(!isPrivate(ip), ip);
 });

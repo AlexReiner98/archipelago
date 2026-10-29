@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { counted, limiter } from '../src/limit.ts';
-import { LIVE_EACH } from '../src/published-live.ts';
+import { listen as listenTo, LIVE_EACH } from '../src/published-live.ts';
 import { serve } from './serve.ts';
 
 test('an IPv6 address is counted by its /64, written any way', () => {
@@ -27,6 +27,13 @@ test('pages asked too often from everywhere leave signing in open, and the other
   // From one /64 claiming a new address each time, signing in stops at its own count; another caller still signs in.
   assert.deepEqual([await signIn('2001:db8:5:6::1'), await signIn('2001:db8:5:6::2'), await signIn('2001:db8:5:6::3')], [200, 200, 429]);
   assert.equal(await signIn('198.51.100.8'), 200);
+});
+
+test('a buyer’s page polling for its workspace is counted with the pages, not against signing in', async () => {
+  const { base } = await serve('tokens', { signIn: { each: 2 } });
+  const headers = { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.40' };
+  for (let i = 0; i < 3; i++) await fetch(base + '/connect/signup/su_abcdefgh', { method: 'POST', headers });
+  assert.equal((await fetch(base + '/connect/sign-in', { method: 'POST', headers, body: JSON.stringify({ email: 'b@example.com' }) })).status, 200);
 });
 
 test('a token nobody made is refused before its workspace is opened', async () => {
@@ -59,6 +66,15 @@ test('a published page’s live streams are capped from one address', async () =
   assert.equal(await listen('198.51.100.5'), 200, 'another address still listens');
   for (const ac of streams) ac.abort();
   await new Promise((r) => setTimeout(r, 200));
+  // A page that left before its stream began is not counted: else opening and resetting at once would use the address up.
+  for (let i = 0; i < LIVE_EACH + 2; i++) listenTo({ destroyed: true } as never, 'default', made, {}, '203.0.113.50');
+  assert.equal(await listen('203.0.113.50'), 200);
   assert.equal(await listen('2001:db8:9:9::1'), 200, 'a stream closed is given back');
   for (const ac of streams) ac.abort();
+});
+
+test('a backup link is counted as the open routes are: guessed keys cannot keep a workspace open', async () => {
+  const { base } = await serve('tokens', { open: { each: 2 } });
+  const get = async () => (await fetch(`${base}/backup-file/default/${'0'.repeat(32)}`, { headers: { 'x-forwarded-for': '198.51.100.30' } })).status;
+  assert.deepEqual([await get(), await get(), await get()], [404, 404, 429]);
 });

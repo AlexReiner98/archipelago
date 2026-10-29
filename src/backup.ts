@@ -21,6 +21,7 @@ import { basename, join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { isServer, openDb, type Db, type Q } from './db.ts';
 import { addLocalType, addWorkspace } from './control.ts';
+import { indexWorkspace } from './control-index.ts';
 import type { Registry } from './packs.ts';
 import { restoreRows } from './pelago.ts';
 import { regatherAll } from './closure.ts';
@@ -375,12 +376,19 @@ export async function restoreTo(backup: Dump, target: string): Promise<{ where: 
   const where = !isServer(target) ? target : id === 'default' ? target : await databaseFor(target, id);
   const db = await openDb(where);
   try {
-    // Another workspace is listed in the default one's database, where every server on it looks.
-    if (isServer(target) && id !== 'default') {
-      const control = await openDb(target);
-      await addWorkspace(control, { id, name: backup.workspace?.name ?? id }).finally(() => control.close());
+    const counts = await restore(db, backup);
+    // Another workspace is listed in the default one's database, where every server on it looks; and there its members
+    // and tokens are noted, so they sign in (src/control-index.ts). A new folder has no index yet, and makes it whole.
+    if (isServer(target)) {
+      const control = id === 'default' ? db : await openDb(target);
+      try {
+        if (id !== 'default') await addWorkspace(control, { id, name: backup.workspace?.name ?? id });
+        await indexWorkspace(control, id, db);
+      } finally {
+        if (control !== db) await control.close();
+      }
     }
-    return { where: isServer(where) ? `database ${new URL(where).pathname.slice(1)} on ${new URL(where).host}` : where, counts: await restore(db, backup) };
+    return { where: isServer(where) ? `database ${new URL(where).pathname.slice(1)} on ${new URL(where).host}` : where, counts };
   } finally {
     await db.close();
   }

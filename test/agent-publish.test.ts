@@ -48,6 +48,9 @@ test('with the owner’s allowance an agent publishes, and the log keeps on whos
   await assert.rejects(callTool(l, agent, 'publish', { id: doc, authority: { of: 'human' } }), /say what they said and where/);
   // Taking it down stays a human's.
   await assert.rejects(callTool(l, agent, 'unpublish', { id: doc }), /for humans only/);
+  // A token that may only propose is refused even so: publishing is never held, so it asks instead.
+  await assert.rejects(callTool(l, { ...agent, may: 'propose' }, 'publish', { id: doc }), /may only propose/);
+  await assert.rejects(callTool(l, { ...agent, may: 'propose' }, 'publish_all', { within: doc }), /may only propose/);
   // The owner takes the allowance back, and the agent is refused again.
   await callTool(l, owner, 'workspace_set', { agent_publish: false });
   await assert.rejects(callTool(l, agent, 'publish', { id: doc }), /Publishing is the owner’s here/);
