@@ -66,6 +66,6 @@ test('in a browser, a drawing gets a text field and asks for changes, which the 
     assert.match(JSON.stringify(pending), /drawing_reach/, 'held by the rule for what a drawing does not write');
     assert.equal(await inFrame(`document.querySelectorAll('canvas').length`), 1, 'the same frame: a new answer reached the code that listens for one, not a new picture');
   } finally {
-    page.close();
+    await page.close();
   }
 });

@@ -110,7 +110,7 @@ test('in a browser, the text and the first frame are on the page together, and t
     })()`);
     assert.deepEqual(said, { at: '', scripts: 0, drawn: true });
   } finally {
-    page.close();
+    await page.close();
   }
 });
 
@@ -141,7 +141,7 @@ test('in a browser, a page opened with ?live draws itself anew when published ag
     assert.equal(title, 'The system, renamed');
     assert.equal(await page.evaluate('window.stayed'), true, 'the page was not loaded again');
   } finally {
-    page.close();
+    await page.close();
   }
 });
 
@@ -164,7 +164,7 @@ test('in a browser, the workspace style’s page_css is how a published page loo
     assert.equal(await spacing(), 'normal');
     assert.equal(await page.evaluate(`document.querySelector('main h1').textContent`), 'The system');
   } finally {
-    page.close();
+    await page.close();
   }
 });
 
@@ -195,6 +195,6 @@ test('in a browser, a part hovered says what it is in a tip its drawing makes, b
     })()`);
     assert.deepEqual(got, { text: 'DoorsWhere everything comes in: the MCP server, the CLI and the web.', styled: 'solid', title: true, said: true, after: true, back: true, boxSays: false, nameSays: true });
   } finally {
-    page.close();
+    await page.close();
   }
 });

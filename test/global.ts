@@ -3,5 +3,5 @@
 import { blankImageFile } from '../src/db.ts';
 
 export async function globalSetup() {
-  if (!process.env.PELAGO_TEST_DATABASE_URL) process.env.PELAGO_TEST_IMAGE = await blankImageFile();
+  if (!process.env.PELAGO_TEST_DATABASE_URL) process.env.PELAGO_TEST_IMAGE ??= await blankImageFile();
 }

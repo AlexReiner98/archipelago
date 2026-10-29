@@ -52,6 +52,6 @@ test("in a browser, an agent's change reaches an open canvas without a lens read
     assert.ok(await until(drawn('Elsewhere')), `what a new link reaches is drawn: ${await page.evaluate(probe)} ${page.logs().join('\n')}`);
     assert.ok((await page.evaluate<number>('window.flatReads')) >= 1, 'read again for what it did not hold');
   } finally {
-    page.close();
+    await page.close();
   }
 });

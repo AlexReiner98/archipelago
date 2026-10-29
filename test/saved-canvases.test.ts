@@ -130,6 +130,6 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
     assert.ok(await until(`${picked} === 'A view of it'`), `opened as a canvas: ${page.logs().join(' | ')}`);
     assert.ok(await until(drawn(made.a)));
   } finally {
-    page.close();
+    await page.close();
   }
 });

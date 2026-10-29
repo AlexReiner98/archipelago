@@ -108,6 +108,6 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
     await page.go(`${base}/#/v?ids=${made.other}&text=gutters`);
     assert.ok(await until(`document.querySelector('#find .q-sum')?.textContent.includes('“gutters”')`), 'find says the lens up');
   } finally {
-    page.close();
+    await page.close();
   }
 });

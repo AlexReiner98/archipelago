@@ -64,6 +64,6 @@ test('in a browser, what comes into sight is drawn, though the picture changed w
     })()`);
     assert.equal(missing, 0, 'no mark in sight is left undrawn');
   } finally {
-    page.close();
+    await page.close();
   }
 });
