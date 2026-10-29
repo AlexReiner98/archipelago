@@ -203,6 +203,7 @@
       "fields": {
         "shape": { "type": "enum", "values": ["list", "flow", "grid", "time", "architecture", "pages"], "description": "One of the drawings that come built in, used when the style has no code of its own. architecture: a system read from the top down, each part a box (a store a cylinder, a client a pill) inside a box for the place it is part of (a host, a cloud), wires at right angles from a part to what it depends on or calls, each labelled with what the link says; a dot for each part's health (read from its status: up, degraded, down, being wired, planned), and each wire wired, not yet wired (dashed) or broken (red), by the link's own state or else by its two ends. list: a table, one line a row, its marks in columns; a thing that holds others a group that folds. grid: rows by what the start holds, columns by the lens's lanes, each thing a card; no lines are drawn. time: along a time axis (the lens's time), as a calendar of days with hours down (layout: calendar) or as bars across days (layout: bars, a Gantt chart), each lane a row; the one a lens on a time axis is drawn in unless said. flow: a flat graph read from the top down, each item a step showing its name (work a box, a question a diamond, an occurrence a pill, a record a sheet), wires at right angles from what is depended on to what depends on it, every other link (part_of first) a quiet tie at right angles round the steps that keeps its ends near, nothing nested, an open question's choices as dashed scenarios. pages: each document a row, its draft (the preview) beside what is published, each drawn by the reader itself, saying whether they differ; an item a document brings in as a section is read there, not as a row of its own. Any other look is code of its own. list unless said." },
         "lit": { "type": "enum", "values": ["all", "you", "blocked"], "description": "What stays lit as it opens." },
+        "order": { "type": "enum", "values": ["reading", "found", "title"], "description": "pages: the order of its rows. reading: as a reader meets the site (the front page, the header by menu, then what each page points at in the order it does, the rest by title, the footer last); found: as the lens finds them; title: by name. reading unless said." },
         "undrawn": { "type": "json", "description": "The link types drawn as no wire, as a list, e.g. [\"tagged\"]: the items are still drawn and still filtered by them. An empty list draws every link the drawing draws." },
         "link_colours": { "type": "json", "description": "A colour for each link type, by its name, as hex colours: the flow draws each wire and tie in its own, and a type not named here takes one of link_hues, the same each time unless another type in the picture has it." },
         "status_colours": { "type": "json", "description": "A colour for each status, by its name, as hex colours: the flow draws a step's dot in its status's, a ring while it is open and filled once closed; a status not named here takes one of status_hues." },
@@ -606,11 +607,13 @@
         },
         "path": {
           "type": "string",
-          "description": "Its address word once published here, as a document's: published only where the workspace that shares it allows it."
+          "description": "Its address word once published here, as a document's: published only where the workspace that shares it allows it.",
+          "shown": true
         },
         "menu": {
           "type": "number",
-          "description": "Its place in the site's header, lowest first, as a document's."
+          "description": "Its place in the site's header, lowest first, as a document's.",
+          "shown": true
         }
       }
     }

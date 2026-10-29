@@ -120,9 +120,9 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: u
   const person = !forPerson ? undefined : l.viewer === undefined ? await l.setting<string>('me') : l.viewer || undefined;
   const tried = typeof input.try === 'string' ? input.try : undefined;
   const read = await styleFor(l, await keptOf(l, 'style', named), { ...(item && { hub: item }), ...(view && { view }), ...(named && { named }), ...(person && { person }), ...(tried && { try: tried }) });
-  // A view kept on the map draws in the shape it keeps, and lights what it says, over every style.
+  // A view kept on the map draws in the shape it keeps, lights what it says and orders its rows as it says, over every style.
   const own = view === undefined ? undefined : ((await l.entity(view))?.props.style as Record<string, unknown> | undefined);
-  for (const key of ['shape', 'lit']) if (typeof own?.[key] === 'string') read.style[key] = own[key];
+  for (const key of ['shape', 'lit', 'order']) if (typeof own?.[key] === 'string') read.style[key] = own[key];
   // The shape the reader chose for this view (the view band's switch) over that, so its drawing comes with it.
   if (typeof input.shape === 'string' && input.shape) read.style.shape = input.shape;
   return input.have === undefined ? read : { ...read, style: await drawn(l, read.style, input.have) };
