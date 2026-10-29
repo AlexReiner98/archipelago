@@ -82,6 +82,6 @@ test('in a browser, the query line says the lens in one line at both widths', { 
     assert.ok(await until(`${lineSays}.includes('“roof”') && !${lineSays}.includes('gutters')`), `the first's lens again: ${await page.evaluate(lineSays)}`);
     assert.ok(await page.evaluate(inside(0)), 'and find under it');
   } finally {
-    page.close();
+    await page.close();
   }
 });

@@ -82,7 +82,7 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
     const after = await page.evaluate<{ mark: number; open: boolean }>(`({ mark: window.stillMark, open: [...document.querySelectorAll('.part[data-part="item"] details.section')].at(-1).open })`);
     assert.deepEqual(after, { mark: 1, open: true }, 'not reloaded, the open fold still open');
   } finally {
-    page.close();
+    await page.close();
   }
 });
 
@@ -129,6 +129,6 @@ test("in a browser, an agent's change reaches a store holding a flat lens's answ
     const seen = await page.evaluate<{ reads: number; links: number; added: string[] }>(`({ reads: window.reads, links: window.store.answer().links.length, added: window.heard.flatMap((c) => c.items.added) })`);
     assert.deepEqual(seen, { reads: 0, links: 2, added: [more.r] }, 'with no lens read, the new task and its link in the store, the listener told');
   } finally {
-    page.close();
+    await page.close();
   }
 });

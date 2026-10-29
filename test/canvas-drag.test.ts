@@ -62,6 +62,6 @@ test('in a browser, a step dragged on the canvas is kept in the places stream an
     assert.ok(await until(`Boolean(${step})`), 'drawn again');
     assert.ok(await until(`(() => { const m = ${middle}; return Math.abs(m[0] - ${placed[made.a][0]}) < 2 && Math.abs(m[1] - ${placed[made.a][1]}) < 2; })()`), `drawn where it was put: ${await page.evaluate(middle)} for ${placed[made.a]}`);
   } finally {
-    page.close();
+    await page.close();
   }
 });

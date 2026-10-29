@@ -93,6 +93,6 @@ test('in a browser, opening a step keeps the canvas still and lights it, and a h
     assert.ok(await until(`!document.querySelector('#canvas .lf-step.ghost') && !document.querySelector('#canvas .lf-held')`), `declined, gone: ${await probe()}`);
     assert.equal((await call('/api/proposals', undefined, {})).result.length, 0, 'nothing waits');
   } finally {
-    page.close();
+    await page.close();
   }
 });

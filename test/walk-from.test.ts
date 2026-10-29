@@ -51,6 +51,6 @@ test('in a browser, an item page walks from the item, in place of the lens or ad
     await page.evaluate(`[...document.querySelectorAll('#sheet .menu-items button')].find((b) => b.textContent === 'Walk from it, added to the lens').click()`);
     assert.ok(await until(`${drawn(made.a)} && ${drawn(made.c)} && ${drawn(made.d)} && ${drawn(made.b)}`), `added to the lens, the walk taken from every seed: ${await page.evaluate('location.hash')}`);
   } finally {
-    page.close();
+    await page.close();
   }
 });

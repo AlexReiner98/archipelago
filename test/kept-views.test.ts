@@ -75,6 +75,6 @@ test('in a browser, a document’s kept view is drawn as a canvas, the packs’ 
     assert.ok(await until(`(document.querySelector('#sheet')?.textContent ?? '').includes('Client Co')`), `the company's page: ${page.logs().join('\n')}`);
     assert.ok(!(await page.evaluate<boolean>(`Boolean(document.querySelector('#sheet .lens-card'))`)), 'no pack screen on a bare page');
   } finally {
-    page.close();
+    await page.close();
   }
 });

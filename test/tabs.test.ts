@@ -85,6 +85,6 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
       return now.length === 4 && !now.some((t) => t[3]) && now.some((t) => t[0] === sessions[1].name && t[1]);
     });
   } finally {
-    page.close();
+    await page.close();
   }
 });

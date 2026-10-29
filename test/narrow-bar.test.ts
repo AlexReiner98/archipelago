@@ -64,6 +64,6 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
     await page.evaluate(`[...document.querySelectorAll('#find .q-narrow')].find((c) => c.textContent.includes('within')).querySelector('.q-x').click()`);
     assert.ok(await until(`!location.hash.includes('within=') && ${has('Elsewhere?')}`), 'nor within');
   } finally {
-    page.close();
+    await page.close();
   }
 });

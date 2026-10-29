@@ -141,6 +141,6 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
     await until('the reader’s pane split', async () => (await panes()).length === 2);
   } finally {
-    page.close();
+    await page.close();
   }
 });
