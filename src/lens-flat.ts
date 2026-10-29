@@ -11,7 +11,8 @@ import { SYSTEM } from './head.ts';
 import type { Archipelago } from './pelago.ts';
 import { checkedAfter, holding, readWord, wordConditions, type Narrowing } from './lens-only.ts';
 import { rankSql, searchIds, slipsOf } from './search.ts';
-import { lanesOf, placeAll, readAxis, resolveAxis, windowOf, zoneOf, type TimeAxis } from './timeaxis.ts';
+import { fileOnAxis } from './timelanes.ts';
+import { placeAll, readAxis, resolveAxis, windowOf, zoneOf, type TimeAxis } from './timeaxis.ts';
 
 /** One link term of a filter: the items that have a link of this type to `to` (or, with `from`, the items `from` links to). */
 export interface LinkTerm {
@@ -258,8 +259,8 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   const items = kept.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
   // On a time axis, where each falls in its window.
   const spans = lens.time && (await placeAll(l, items, lens.time, zone!));
-  // And who each is for, a lane each: what falls in the window, filed by person, the agents' sessions beside them.
-  const filed = spans && (await lanesOf(l, items.filter((e) => spans.get(e.id)?.length), me));
+  // And whose lane each is in and what it counts toward (src/timelanes.ts): a person's, or each session its own.
+  const filed = spans && (await fileOnAxis(l, items, spans, me));
   // The links among what is sent, of every type: a canvas draws what ties what it shows.
   const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string; props: Record<string, unknown> }>(
     `with s(id) as (select unnest($1::text[])) select r.id, r.type, r.from_id, r.to_id, r.props from relation r join s a on a.id = r.from_id join s b on b.id = r.to_id where r.valid_to is null order by r.id`,
@@ -277,13 +278,14 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
         visibility: e.visibility, status: e.status, open: e.is_open, owner: e.owner,
         created_at: e.created_at, updated_at: e.updated_at,
         ...(Object.keys(fields).length && { fields }),
-        ...(spans && { time: spans.get(e.id) ?? [] }),
+        ...(spans && { time: filed!.filed.get(e.id) ?? spans.get(e.id) ?? [] }),
         ...(filed?.lane.has(e.id) && { lane: filed.lane.get(e.id) }),
+        ...(filed?.stream.has(e.id) && { stream: filed.stream.get(e.id) }),
         ...(foundBy.has(e.id) ? { found: foundBy.get(e.id) } : stepOf.has(e.id) && { step: stepOf.get(e.id) }),
       };
     }),
     links: relations.map((r) => ({ id: r.id, type: r.type, from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
-    ...(filed && { lanes: filed.lanes }),
+    ...(filed && { lanes: filed.lanes, streams: filed.streams }),
     ...(cut && { cut: true }),
     ...(matched !== undefined && { matched }),
     // The items whose notes are sent whole, so a page keeping the answer current keeps those whole too (ui/replica.js).

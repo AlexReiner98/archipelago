@@ -45,7 +45,7 @@ const said = (b) => `${nameOf(b)}${b.on ? `\n${b.item.title}` : ''}\n${b.end - b
 const lanesOf = (answer) => (answer.lanes ?? []).map((lane) => (lane && typeof lane === 'object' ? { key: lane.key, title: lane.title } : { key: lane, title: String(lane) }));
 
 /** What every layout shares: its sizes, its marks so far, and a block drawn so it opens its item. */
-function canvas(answer, style, width, story) {
+function canvas(answer, style, width, story, height) {
   const z = (name) => {
     const v = style.sizes?.[`time_${name}`];
     if (typeof v !== 'number') throw new Error(`The style names no size "time_${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
@@ -60,14 +60,14 @@ function canvas(answer, style, width, story) {
     shown.push({ key, ids: [b.item.id] });
     return m('g', { key, on: ['click'], class: group(b.item), role: 'link', ...(story && { opacity: 0 }) }, m('title', {}, rect.title), m('rect', { class: `dot${colour ? ` t-hued ${colour}` : ''}`, x: rect.x, y: rect.y, width: rect.width, height: rect.height, rx: 3 }));
   };
-  return { z, cut: cutAt(z('letter')), width: Math.max(width || 800, 320), rules, opens, shown, hued, block };
+  return { z, cut: cutAt(z('letter')), width: Math.max(width || 800, 320), height: height || 0, rules, opens, shown, hued, block };
 }
 
 /**
- * A column for each day, hours running down; within a day, a column for each lane (each person, and the sessions), so
- * what you did and what the agents did sit side by side. A lane is as wide as the most things it holds at once that
- * week, so a busy lane has room and an empty one is a sliver. Blocks that overlap in a lane sit side by side in it.
- * The hours shown are those things fall in, the working day at least, unless the style says (hours).
+ * A column for each day, hours running down; within a day, a column for each lane (each person, and each session), so
+ * what you did and what the agents did sit side by side. A lane takes room on the days it holds something, as wide as
+ * the most it holds at once that day. Blocks that overlap in a lane sit side by side in it. The hours shown are those
+ * things fall in, the working day at least, unless the style says (hours), as tall as the page has room for.
  */
 function calendar(answer, style, c) {
   const { z, cut, width } = c;
@@ -85,8 +85,19 @@ function calendar(answer, style, c) {
   const lanes = lanesOf(answer);
   const laneOf = (b) => Math.max(0, lanes.findIndex((l) => l.key === (b.item.lane ?? null)));
   const gutter = z('gutter');
-  const hourPx = z('hour');
   const colW = (width - gutter) / days;
+  const chip = z('chip');
+  const daysOf = (b) => [...Array(days).keys()].filter((d) => b.end > dayAt(from, d) && b.start < dayAt(from, d + 1));
+  const tops = all.filter(whole);
+  const strip = Math.max(0, ...[...Array(days).keys()].map((d) => tops.filter((b) => daysOf(b).includes(d)).length));
+  // Lanes are named under the day, where there is room.
+  const top = lanes.length > 1 ? z('head_named') : z('head');
+  const head = top + strip * chip;
+  // The hours as tall as the room the page gives, its key below them, so a day is read without scrolling; never
+  // shorter than the style's least, nor taller than its hour.
+  const streams = answer.streams ?? [];
+  const room = c.height - head - z(streams.length ? 'key_room' : 'fit_room');
+  const hourPx = c.height > 0 ? Math.max(z('hour_least'), Math.min(z('hour'), room / (h1 - h0))) : z('hour');
   // What falls on each day within the hours shown, lane by lane, packed: things at the same time in a lane sit side by side.
   const packed = [...Array(days).keys()].map((d) => {
     const dayStart = dayAt(from, d);
@@ -117,48 +128,47 @@ function calendar(answer, style, c) {
       return { mine, cols: cols.length };
     });
   });
-  // Each lane as wide as the most it holds at once that week; one with nothing in hours a sliver. One that holds
-  // something is at least wide enough to be named, where the day has room: a person's few blocks beside many agents.
-  const weight = lanes.map((_, i) => Math.max(...packed.map((day) => day[i].cols)) || 0.25);
-  const total = weight.reduce((sum, w) => sum + w, 0) || 1;
+  // Each day's lanes, those that hold something that day, each as wide as the most it holds at once; one that holds
+  // something is at least wide enough to be named where the day has room, so a person's few blocks are not a sliver
+  // beside many sessions. Each lane's left edge, width and how many it holds at once, within its day.
   const least = z('lane_named_from');
-  const lifted = weight.map((w) => w >= 1 && (w / total) * colW < least);
-  const owed = lifted.filter(Boolean).length * least;
-  const rest = weight.reduce((sum, w, i) => sum + (lifted[i] ? 0 : w), 0) || 1;
-  const widths = owed && owed < colW / 2 ? weight.map((w, i) => (lifted[i] ? least : (w / rest) * (colW - owed))) : weight.map((w) => (w / total) * colW);
-  // Each lane's left edge and width within a day.
-  const laneX = [];
-  lanes.reduce((x, _, i) => (laneX.push([x, widths[i]]), x + widths[i]), 0);
-  const named = lanes.length > 1 && Math.min(...laneX.filter((_, i) => weight[i] >= 1).map(([, w]) => w)) >= z('lane_named_from');
-  const chip = z('chip');
-  const daysOf = (b) => [...Array(days).keys()].filter((d) => b.end > dayAt(from, d) && b.start < dayAt(from, d + 1));
-  const tops = all.filter(whole);
-  const strip = Math.max(0, ...[...Array(days).keys()].map((d) => tops.filter((b) => daysOf(b).includes(d)).length));
-  const top = named ? z('head_named') : z('head');
-  const head = top + strip * chip;
+  const laneXs = packed.map((day) => {
+    const weight = day.map((p) => p.cols);
+    const total = weight.reduce((sum, w) => sum + w, 0);
+    if (!total) return day.map(() => [0, 0, 0]);
+    const lifted = weight.map((w) => w >= 1 && (w / total) * colW < least);
+    const owed = lifted.filter(Boolean).length * least;
+    const rest = weight.reduce((sum, w, i) => sum + (lifted[i] ? 0 : w), 0) || 1;
+    const widths = owed && owed < colW / 2 ? weight.map((w, i) => (lifted[i] ? least : (w / rest) * (colW - owed))) : weight.map((w) => (w / total) * colW);
+    let x = 0;
+    return widths.map((w, i) => ((x += w), [x - w, w, weight[i]]));
+  });
   const height = head + (h1 - h0) * hourPx;
   const marks = [];
   for (let d = 0; d < days; d++) {
     const x = gutter + d * colW;
     marks.push(m('line', { class: 't-rule', x1: x, x2: x, y1: 0, y2: height }), m('text', { class: 't-head', x: x + 4, y: 15 }, cut(fmtDay(dayAt(from, d)), colW - 6)));
-    // The lanes, named under the day where there is room, and parted by a fainter rule.
-    lanes.forEach((l, i) => {
-      const [lx, lw] = laneX[i];
-      if (i > 0) marks.push(m('line', { class: 't-lane', x1: x + lx, x2: x + lx, y1: top, y2: height }));
-      if (named && laneX[i][1] >= z('lane_named_from')) marks.push(m('text', { class: 't-hour', x: x + lx + 3, y: 30 }, m('title', {}, l.title), cut(l.title, lw - 6)));
-    });
+    // The lanes that day, named under the day where there is room, and parted by a fainter rule.
+    if (lanes.length > 1)
+      lanes.forEach((l, i) => {
+        const [lx, lw] = laneXs[d][i];
+        if (!lw) return;
+        // A rule beside a lane wide enough to name; sessions too narrow to name run on unparted.
+        const before = laneXs[d].slice(0, i).findLast(([, w]) => w > 0);
+        if (lx > 0 && (lw >= least || before?.[1] >= least)) marks.push(m('line', { class: 't-lane', x1: x + lx, x2: x + lx, y1: top, y2: height }));
+        if (lw >= least) marks.push(m('text', { class: 't-hour', x: x + lx + 3, y: 30 }, m('title', {}, l.title), cut(l.title, lw - 6)));
+      });
   }
   for (let hr = h0; hr <= h1; hr++) {
     const y = head + (hr - h0) * hourPx;
     marks.push(m('line', { class: 't-rule', x1: gutter, x2: width, y1: y, y2: y }), hr < h1 && m('text', { class: 't-hour', x: 2, y: y + 11 }, `${String(hr).padStart(2, '0')}:00`));
   }
   // What each block counts toward, as a colour of its own (the Time screen's colours, by project); none, the kind's colour.
-  const streams = answer.streams ?? [];
   const hueOf = new Map(streams.map((st, k) => [st.key, style.hues[k % style.hues.length]]));
   const streamTitle = new Map(streams.map((st) => [st.key, st.title]));
   const place = (b, x, y, w, hgt) => {
     const title = [said(b), b.stream && streamTitle.get(b.stream), lanes.length > 1 && lanes[laneOf(b)].title].filter(Boolean).join('\n');
-    marks.push(c.block(b, { title, x, y, width: Math.max(w, 3), height: hgt }, streams.length ? c.hued(hueOf.get(b.stream)) : null));
+    marks.push(c.block(b, { title, x, y, width: Math.max(w, 3), height: hgt }, streams.length && b.stream ? c.hued(hueOf.get(b.stream)) : null));
   };
   // The strip: each whole-day thing a bar across the days it covers, on the first row free on all of them.
   const rows = [];
@@ -174,9 +184,9 @@ function calendar(answer, style, c) {
     const dayStart = dayAt(from, d);
     for (let i = 0; i < Math.max(lanes.length, 1); i++) {
       const { mine } = packed[d][i];
-      const [lx, lw] = lanes.length ? laneX[i] : [0, colW];
-      // The same width for a column all week, so one session reads the same on a quiet day as on a busy one.
-      const w = (lw - 4) / Math.max(lanes.length ? weight[i] : packed[d][i].cols, 1);
+      const [lx, lw, most] = laneXs[d][i];
+      if (!lw) continue;
+      const w = (lw - 4) / Math.max(most, 1);
       // Down each strip, a block ends where the next begins: back-to-back stretches touch, never lie on each other.
       const at = mine.map((b) => ({ b, y: head + ((b.s - dayStart) / 3_600_000 - h0) * hourPx, hgt: Math.max(((b.e - b.s) / 3_600_000) * hourPx, MIN_BLOCK) })).sort((p, q) => p.b.col - q.b.col || p.y - q.y);
       // One too short to draw apart from the next (a session's minute here and minute there) is folded into it.
@@ -225,7 +235,7 @@ function bars(answer, style, c) {
 }
 
 /** Draw a lens's answer along its time axis, in the style's layout, as wide as the page gives it (`width`). */
-export function picture({ answer, style, width, reduced }, tools) {
+export function picture({ answer, style, width, height, reduced }, tools) {
   if (!answer.lens.time) return { scene: { message: 'This view has no time axis.' } };
   // A story lays out what its steps bring in, all of it, each block hidden until a step shows it.
   const story = Array.isArray(answer.steps) && answer.steps.length > 0;
@@ -233,15 +243,16 @@ export function picture({ answer, style, width, reduced }, tools) {
     const named = everyNamed(answer.steps);
     answer = { ...answer, items: answer.items.filter((i) => named.has(i.id) || i.id === answer.lens.from) };
   }
-  const c = { ...canvas(answer, style, width, story), story };
+  const c = { ...canvas(answer, style, width, story, height), story };
   const { svg, key } = (style.layout === 'bars' ? bars : calendar)(answer, style, c);
   let player = null;
   if (story) {
     const frames = statesOf(answer.steps);
     player = play({ answer, style, reduced, tools, shape: { frames, stage: (ctx) => reveal({ frames, marks: c.shown, ...ctx }) } });
   }
+  // A calendar fits its hours to the height it is given: drawn again when that settles (`shaped`).
   return {
-    scene: { css: [css, ...c.rules, story ? storyCss : ''].join('\n'), svg, key, flat: true, ...(player && { before: player.before, aside: player.after }) },
+    scene: { css: [css, ...c.rules, story ? storyCss : ''].join('\n'), svg, key, flat: true, ...(style.layout !== 'bars' && { shaped: true }), ...(player && { before: player.before, aside: player.after }) },
     end: player?.end,
     on(event) {
       if (player && (event.key === 'play' || event.key === 'chat' || event.key.startsWith('c:'))) return player.on(event);
