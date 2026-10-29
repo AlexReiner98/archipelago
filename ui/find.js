@@ -5,7 +5,7 @@
 // light; Enter takes it and find stays open, emptied, to refine further: words in place of the words find set before,
 // every other term and the walk kept, or another term added; Shift+Enter adds the words as another set, found as
 // well (e_e3k797d3). Typing a part's word and a space
-// ("only ", "not ", "walk ", "limit "), or a click on a row's word, puts find in that part: its mark stands before the
+// ("only ", "not ", "walk ", "limit ", and "view " or "style " to choose the canvas's), or a click on a row's word, puts find in that part: its mark stands before the
 // box and the choices are that part's; Backspace in an empty box goes back to Find. Escape empties what was typed, then
 // leaves the part, then shuts find; so does a click away from it.
 
@@ -24,7 +24,7 @@ const rows = document.getElementById('find-rows');
 /** The part of the lens find is in, by its word, and its mark before the box. */
 let mode = 'Find';
 const mark = h('span', { class: 'q-label find-mode', title: 'The part find is in: type another part’s word and a space to go there; Backspace goes back to Find' }, 'Find');
-const PLACEHOLDER = { Find: 'Find on the map', Only: 'Only what is so: done, a type, within…', Not: 'Leave out: closed, a type', Walk: 'Walk along a link', Limit: 'The most items drawn' };
+const PLACEHOLDER = { Find: 'Find on the map', Only: 'Only what is so: done, a type, within…', Not: 'Leave out: closed, a type', Walk: 'Walk along a link', Limit: 'The most items drawn', View: 'A saved view, by its name', Style: 'A style, by its name' };
 const input = h('input', { type: 'search', name: 'q', placeholder: 'Find on the map', autocomplete: 'off', 'aria-label': 'Find on the map', title: 'Choose what the words are: ↑↓, then Enter; Shift+Enter adds the words as another set' });
 let asked = 0;
 /** The choices drawn, what was typed when they were, and the lit one. */

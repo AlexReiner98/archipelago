@@ -1,10 +1,11 @@
 // What words typed in find could be (decision e_2a4mddx8), each choice said by its kind so nothing is guessed (decision
 // e_45sgrfqd). Find has a mode for each part of the lens, by its word: typing "only " (or Not, Walk, Limit) puts find
-// in that part, and its choices are that part's. In Find: Words first, always, and lit, so Enter takes the words
+// in that part, and its choices are that part's; "view " and "style " put it in choosing the canvas's view or style,
+// every one offered until what is typed narrows them, so one bar sets up the whole canvas. In Find: Words first, always, and lit, so Enter takes the words
 // unless another is chosen; then, for the items the search read finds by name, all that is In each and the Item
 // itself (a tag as a Tag); a View kept on the map by its name, which opens in the pane, and a Style (one kept by name,
-// a shape a drawing draws, or the house's), which the canvas is then drawn in, so one bar sets up the whole canvas; the types and the links whose names hold the words (a link to me). In Only: the plain words,
-// a Type, Within an item, a Status, an Owner. In Not: closed, system, a Type. In Walk: a link, out, in or either way,
+// a shape a drawing draws, or the house's), which the canvas is then drawn in; the types and the links whose names
+// hold the words (a link to me). In Only: the plain words, a Type, Within an item, a Status, an Owner. In Not: closed, system, a Type. In Walk: a link, out, in or either way,
 // or every link. In Limit: a number. Each choice says the change it makes, kept by id.
 
 import { api, state } from './base.js';
@@ -13,8 +14,8 @@ import { offered } from './only-words.js';
 import { ARROW, isA, relations, titles, typeChoice, typeTitle, types, withWay } from './words.js';
 
 /** The parts find can be in, by the word that puts it there. */
-export const MODES = ['Find', 'Only', 'Not', 'Walk', 'Limit'];
-const MEANS = { Find: 'What adds to the canvas', Only: 'What must all hold of what Find finds', Not: 'What is left out of everything', Walk: 'The links followed from what Find finds', Limit: 'The most items drawn' };
+export const MODES = ['Find', 'Only', 'Not', 'Walk', 'Limit', 'View', 'Style'];
+const MEANS = { Find: 'What adds to the canvas', Only: 'What must all hold of what Find finds', Not: 'What is left out of everything', Walk: 'The links followed from what Find finds', Limit: 'The most items drawn', View: 'A saved view to open', Style: 'The style the canvas is drawn in' };
 
 const has = (name, q) => String(name ?? '').toLowerCase().includes(q.toLowerCase());
 const typeList = (q, most) => [...types.values()].filter((t) => !t.system && t.kind !== 'system' && has(t.title, q)).slice(0, most);
@@ -47,14 +48,13 @@ const keptAs = (type) => Object.keys(KEPT).find((k) => isA(type, KEPT[k]));
  * A style is the canvas's: the shapes the drawings draw and the styles kept by name, as the bar's style switch offers
  * them (ui/look-switch.js), and the house's.
  */
-const keptFound = async (q, most) => {
-  if (!q) return [];
-  const [views, kept] = await Promise.all(Object.values(KEPT).map((type) => api('search', { q, type, open: true, limit: most }).catch(() => [])));
+const keptFound = async (q, most, kinds = Object.keys(KEPT)) => {
+  const [views, kept] = await Promise.all(Object.keys(KEPT).map((k) => (kinds.includes(k) ? api('search', { ...(q && { q }), type: KEPT[k], open: true, limit: most }).catch(() => []) : [])));
   const shapes = [{ shape: 'list', title: 'List' }, ...(state.schema?.shapes ?? [])].filter((s) => has(s.title, q)).map((s) => ({ title: s.title, style: { shape: s.shape } }));
   const named = kept.filter((s) => !s.props?.preset && !s.props?.on?.length).map((s) => ({ title: s.title, style: { style: s.id } }));
-  const styles = [...shapes, ...named, ...(has('House', q) ? [{ title: 'House', style: {} }] : [])].slice(0, most);
+  const styles = kinds.includes('Style') ? [...shapes, ...named, ...(has('House', q) ? [{ title: 'House', style: {} }] : [])].slice(0, most) : [];
   const mine = new Set(views.map((v) => v.props?.preset).filter(Boolean));
-  const presets = (state.schema?.canvases ?? []).filter((p) => !mine.has(p.id) && has(p.title, q)).map((p) => ({ ...p, preset: true, props: { ...p.props, preset: p.id } }));
+  const presets = (kinds.includes('View') ? (state.schema?.canvases ?? []) : []).filter((p) => !mine.has(p.id) && has(p.title, q)).map((p) => ({ ...p, preset: true, props: { ...p.props, preset: p.id } }));
   return [
     ...[...views, ...presets].slice(0, most).map((v) => ({ kind: 'View', label: v.title, note: '', title: `Open the view ${v.title}`, href: canvasAt(v) })),
     ...styles.map((s) => ({ kind: 'Style', label: s.title, note: '', title: `Draw this canvas in the style ${s.title}`, style: s.style })),
@@ -71,7 +71,7 @@ const modeChoices = (mode, q) => (q.length < 2 ? [] : MODES.filter((m) => m !== 
   .map((m) => ({ kind: m, label: `${MEANS[m].toLowerCase()} ›`, note: '', title: `${m}: ${MEANS[m].toLowerCase()} (type “${m.toLowerCase()} ” to go there)`, mode: m }));
 
 /** The kinds of choice in each part: one's word first in what is typed ("within archipelago") offers that kind alone. */
-const KINDS = { Find: ['Words', 'View', 'Style', 'In', 'Item', 'Tag', 'Type', 'Link'], Only: ['Word', 'Owner', 'Status', 'Type', 'Within'], Not: ['Type'], Walk: [], Limit: [] };
+const KINDS = { Find: ['Words', 'View', 'Style', 'In', 'Item', 'Tag', 'Type', 'Link'], Only: ['Word', 'Owner', 'Status', 'Type', 'Within'], Not: ['Type'], Walk: [], Limit: [], View: [], Style: [] };
 
 /** The kind whose word leads what is typed in `mode`, and the rest; or nothing. */
 export function ledBy(mode, q) {
@@ -124,6 +124,8 @@ export async function choicesFor(mode, q, c) {
     const typed = typeList(q, c.most).filter((t) => !out.includes(t.id)).map((t) => ({ kind: 'Type', label: typeChoice(t), note: '', title: `Leave out items of the type ${t.title}`, term: { exclude: t.id } }));
     return [...modeChoices(mode, q), ...kinds, ...typed];
   }
+  // View or Style: every one of that kind, narrowed by what is typed.
+  if (mode === 'View' || mode === 'Style') return [...modeChoices(mode, q), ...(await keptFound(q, c.wide, [mode]))];
   if (mode === 'Walk') {
     const every = has('every link', q) && c.lens.walk?.over !== 'all' ? [{ kind: 'Walk', label: 'every link', note: '', title: 'Every link, either way', walk: 'all' }] : [];
     const ways = linkList(q, c.most).flatMap((r) => ['out', 'in', 'either'].map((way) => ({ kind: 'Walk', label: `${ARROW[way]} ${r.title ?? r.id}`, note: '', title: { out: 'Out along this link', in: 'In along this link', either: 'Either way along this link' }[way], walk: withWay(r.id, way) })));
