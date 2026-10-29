@@ -170,6 +170,9 @@ const narrowed = (only) => (answer) => {
   return { ...answer, items, links: answer.links.filter((k) => ids.has(k.from) && ids.has(k.to)) };
 };
 
+/** The styles asked for (by what was asked) whose drawing reads each note whole. */
+const whole = new Set();
+
 /**
  * The canvas's picture of a flat lens: its answer (items and the links among them) drawn with the style of what it
  * opens on (`of`), by the drawing that style names. `only` draws the items of those types alone (a pack's picture of
@@ -186,6 +189,8 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   const keep = (change) => Object.assign(chosen, change);
   let look;
   let raw;
+  // Asked of a drawing that reads each note whole (the pages: `notes` on the drawing), the lens is read with them.
+  const asked = JSON.stringify([of, style.style, style.canvas, style.shape]);
   // The answer is held in a store kept current from the log (ui/replica.js): facts redraw it without the lens being
   // read again; only a link made to something it does not hold reads the lens again, since the walk may now reach more.
   // What is drawn is the answer with what is held for the owner and the links drawn here not yet answered for drawn
@@ -225,14 +230,20 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     let store;
     try {
       [store, look] = await Promise.all([
-        replicate(async () => (raw = await api('view', { name: 'flat', params: lens }))),
-        api('view', { name: 'style', params: { ...(of && { of }), ...(style.style && { style: style.style }), ...(style.canvas && { view: style.canvas }), have: [...drawings.keys()] } }),
+        replicate(async () => (raw = await api('view', { name: 'flat', params: { ...lens, ...(whole.has(asked) && { notes: 'whole' }) } }))),
+        api('view', { name: 'style', params: { ...(of && { of }), ...(style.style && { style: style.style }), ...(style.canvas && { view: style.canvas }), ...(style.shape && { shape: style.shape }), have: [...drawings.keys()] } }),
       ]);
     } catch (err) {
       host.failed = err.message;
       host.dispatchEvent(new CustomEvent('lens-answer'));
       saidDrawn(body, 'error', err.message);
       return refreshing || body.replaceChildren(h('div', { class: 'error' }, err.message));
+    }
+    // Read once more, the first time a style's drawing is found to want whole notes; from then on they are asked at once.
+    if (look.style?.drawing?.notes === 'whole' && !whole.has(asked)) {
+      whole.add(asked);
+      unfollow(store);
+      return load(refreshing);
     }
     if (host.store) unfollow(host.store);
     host.store = store;

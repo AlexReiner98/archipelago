@@ -62,3 +62,12 @@ test("the canvas pack's flow lies over a workspace style that says list, and und
   await make(l, [{ op: 'create', ref: 'own', type: 'style', title: 'P as a list', props: { shape: 'list' } }, { op: 'link', type: 'about', from: 'own', to: made.p }]);
   assert.equal((await of(made.p)).style.shape, 'list');
 });
+
+test('the form chosen in the view band reaches the style read, with its drawing; the pages ask for notes whole', async () => {
+  const l = await fresh();
+  const read = async (input: Record<string, unknown>) => ((await VIEWS.style.run(l, { ...input, have: [] })) as { style: any }).style;
+  assert.equal((await read({ shape: 'grid' })).drawing.id, 'core.grid');
+  const pages = (await read({ shape: 'pages' })).drawing;
+  assert.deepEqual([pages.id, pages.notes], ['core.pages', 'whole']);
+  assert.equal((await read({ shape: 'grid' })).drawing.notes, undefined, 'a drawing that reads the start of each note asks for nothing more');
+});
