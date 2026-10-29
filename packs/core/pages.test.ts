@@ -16,7 +16,7 @@ for (const [name, file] of Object.entries(core.drawings.find((d: any) => d.id ==
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 
 const item = (id: string, title: string, body = '') => ({ id, kind: 'record', type: 'document', title, body, open: true, status: 'draft' });
-const draw = (items: any[], here?: string) => picture({ answer: { items, links: [] }, style: { here } }, {}).scene;
+const draw = (items: any[], here?: string, order?: string) => picture({ answer: { items, links: [] }, style: { here, order } }, {}).scene;
 /** Every mark of a scene, flattened. */
 const marks = (mark: any): any[] => (Array.isArray(mark) && typeof mark[0] === 'string' ? [mark, ...mark.slice(2).flatMap(marks)] : []);
 
@@ -54,9 +54,9 @@ test('a private document has no preview: it is read as its reader sees it, alone
   assert.deepEqual(readers, [['e_mine0000', 'own']]);
 });
 
-test('the rows are in the order a reader meets the site, however recently each changed', () => {
+test('the rows are in the order a reader meets the site, however recently each changed, unless the style says another', () => {
   const page = (id: string, title: string, body: string, fields: Record<string, unknown> = {}) => ({ ...item(id, title, body), fields });
-  const scene = draw([
+  const pages = [
     // The lens gives them newest first; the order drawn is the site's own.
     page('e_zeta0000', 'Zeta, pointed at by nothing', 'Alone.'),
     page('e_deep0000', 'Deep page', 'Back to [the start](/).', { path: 'deep' }),
@@ -68,9 +68,11 @@ test('the rows are in the order a reader meets the site, however recently each c
     // Every page ends with the footer: it is read last, and what only it points at just before what nothing does.
     page('e_foot0000', 'Footer', '[Pricing](/pricing) · [Tools](/tools)', { path: 'footer' }),
     page('e_cost0000', 'Pricing', 'Plans.', { path: 'pricing' }),
-  ]);
-  assert.deepEqual(
-    scene.svg.slice(2).map((r: any) => r[1].key.slice(2)),
-    ['e_home0000', 'e_quik0000', 'e_tool0000', 'e_deep0000', 'e_prin0000', 'e_cost0000', 'e_alfa0000', 'e_zeta0000', 'e_foot0000'],
-  );
+  ];
+  const keys = (order?: string) => draw(pages, undefined, order).svg.slice(2).map((r: any) => r[1].key.slice(2));
+  assert.deepEqual(keys(), ['e_home0000', 'e_quik0000', 'e_tool0000', 'e_deep0000', 'e_prin0000', 'e_cost0000', 'e_alfa0000', 'e_zeta0000', 'e_foot0000']);
+  assert.deepEqual(keys('reading'), keys());
+  // The style may order them as the lens finds them, or by name.
+  assert.deepEqual(keys('found'), pages.map((p) => p.id));
+  assert.deepEqual(keys('title'), ['e_alfa0000', 'e_deep0000', 'e_foot0000', 'e_cost0000', 'e_prin0000', 'e_quik0000', 'e_tool0000', 'e_home0000', 'e_zeta0000']);
 });

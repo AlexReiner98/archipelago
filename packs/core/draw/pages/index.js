@@ -17,6 +17,8 @@ const sectionsOf = (body) => [...String(body ?? '').matchAll(SECTION)].map((hit)
 /** What a note points at, in the order it says it: a page of the site by its address (/quickstart, / for the front page) or an item by its id. */
 const POINTS = /\]\((\/[a-z0-9-]*)\)|\b(e_[a-z0-9]{8})\b/g;
 const pointsOf = (body) => [...String(body ?? '').matchAll(POINTS)].map((hit) => hit[1] ?? hit[2]);
+/** By name, then by id, so two of one name keep one order. */
+const byTitle = (a, b) => String(a.title).localeCompare(String(b.title)) || (a.id < b.id ? -1 : 1);
 
 /**
  * The rows in the order a reader meets the site, the same however recently each was changed: the front page (path
@@ -47,7 +49,7 @@ export function readingOrder(rows) {
     follow(f);
     for (let i = from; i < order.length; i++) follow(order[i]);
   }
-  const rest = rows.filter((r) => !seen.has(r)).sort((a, b) => String(a.title).localeCompare(String(b.title)) || (a.id < b.id ? -1 : 1));
+  const rest = rows.filter((r) => !seen.has(r)).sort(byTitle);
   return [...order, ...rest, ...foot];
 }
 
@@ -55,11 +57,12 @@ export function readingOrder(rows) {
 export function picture({ answer, style }) {
   const items = answer.items.filter((i) => !i.pending || i.pending.op !== 'create');
   if (!items.length) return { scene: { message: 'Nothing to read with this lens.' } };
-  // An item another page brings in is read there; what nothing brings in is a row, in reading order. A loop (two
-  // notes bringing each other in) leaves nothing on top: then each is a row.
+  // An item another page brings in is read there; what nothing brings in is a row, in the order the style says
+  // (order: reading unless said). A loop (two notes bringing each other in) leaves nothing on top: then each is a row.
   const brought = new Set(items.flatMap((i) => sectionsOf(i.body).filter((id) => id !== i.id)));
   const tops = items.filter((i) => !brought.has(i.id));
-  const rows = readingOrder(tops.length ? tops : items);
+  const found = tops.length ? tops : items;
+  const rows = style.order === 'found' ? found : style.order === 'title' ? [...found].sort(byTitle) : readingOrder(found);
 
   const byId = new Map(items.map((i) => [i.id, i]));
   // When it or a section it brings in last changed: a reader reads it again when that moves.
