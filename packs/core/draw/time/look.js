@@ -12,6 +12,8 @@ export const css = `
 .t-block { cursor: pointer; }
 .timeline .t-block .dot.t-hued { fill: var(--t-hue); stroke: var(--t-hue); }
 .t-key-chip rect { fill: var(--t-hue); }
+.t-day-key rect { fill: var(--t-hue); }
+.t-day-key[role=link] { cursor: pointer; }
 .t-h-none { --t-hue: var(--ln-muted); }
 `;
 

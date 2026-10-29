@@ -93,10 +93,27 @@ function calendar(answer, style, c) {
   // Lanes are named under the day, where there is room.
   const top = lanes.length > 1 ? z('head_named') : z('head');
   const head = top + strip * chip;
-  // The hours as tall as the room the page gives, its key below them, so a day is read without scrolling; never
-  // shorter than the style's least, nor taller than its hour.
+  // What each block counts toward, a colour each for as many as the style has colours: the most drawn first, and
+  // past the last colour but one, the rest together as Other in the muted colour (each still named on its block).
   const streams = answer.streams ?? [];
-  const room = c.height - head - z(streams.length ? 'key_room' : 'fit_room');
+  const drawnOf = new Map();
+  for (const b of all) if (b.stream) drawnOf.set(b.stream, (drawnOf.get(b.stream) ?? 0) + 1);
+  const ranked = streams.filter((st) => drawnOf.has(st.key)).sort((a, b) => drawnOf.get(b.key) - drawnOf.get(a.key) || a.title.localeCompare(b.title));
+  const hues = style.hues ?? [];
+  const own = ranked.length > hues.length ? ranked.slice(0, Math.max(hues.length - 1, 0)) : ranked;
+  const hueOf = new Map(own.map((st, k) => [st.key, hues[k]]));
+  // The key, a day at a time under its column: what that day's blocks count toward, the most drawn that week first,
+  // then Other. A colour means the same all week.
+  const dayKeys = [...Array(days).keys()].map((d) => {
+    const here = new Set(all.filter((b) => b.stream && daysOf(b).includes(d)).map((b) => b.stream));
+    const mine = own.filter((st) => here.has(st.key));
+    return [...mine.map((st) => ({ key: st.key, title: st.title, hex: hueOf.get(st.key) })), ...([...here].some((k) => !hueOf.has(k)) ? [{ key: null, title: 'Other', hex: undefined }] : [])];
+  });
+  const keyRows = Math.max(0, ...dayKeys.map((k) => k.length));
+  const keyHeight = keyRows ? z('day_key_gap') + keyRows * z('day_key_row') : 0;
+  // The hours as tall as the room the page gives, each day's key below them, so a week is read without scrolling;
+  // never shorter than the style's least, nor taller than its hour.
+  const room = c.height - head - z('fit_room') - keyHeight;
   const hourPx = c.height > 0 ? Math.max(z('hour_least'), Math.min(z('hour'), room / (h1 - h0))) : z('hour');
   // What falls on each day within the hours shown, lane by lane, packed: things at the same time in a lane sit side by side.
   const packed = [...Array(days).keys()].map((d) => {
@@ -163,12 +180,11 @@ function calendar(answer, style, c) {
     const y = head + (hr - h0) * hourPx;
     marks.push(m('line', { class: 't-rule', x1: gutter, x2: width, y1: y, y2: y }), hr < h1 && m('text', { class: 't-hour', x: 2, y: y + 11 }, `${String(hr).padStart(2, '0')}:00`));
   }
-  // What each block counts toward, as a colour of its own (the Time screen's colours, by project); none, the kind's colour.
-  const hueOf = new Map(streams.map((st, k) => [st.key, style.hues[k % style.hues.length]]));
+  // What each block counts toward, as its colour (Other muted); none, the kind's colour.
   const streamTitle = new Map(streams.map((st) => [st.key, st.title]));
   const place = (b, x, y, w, hgt) => {
     const title = [said(b), b.stream && streamTitle.get(b.stream), lanes.length > 1 && lanes[laneOf(b)].title].filter(Boolean).join('\n');
-    marks.push(c.block(b, { title, x, y, width: Math.max(w, 3), height: hgt }, streams.length && b.stream ? c.hued(hueOf.get(b.stream)) : null));
+    marks.push(c.block(b, { title, x, y, width: Math.max(w, 3), height: hgt }, b.stream ? c.hued(hueOf.get(b.stream)) : null));
   };
   // The strip: each whole-day thing a bar across the days it covers, on the first row free on all of them.
   const rows = [];
@@ -199,10 +215,18 @@ function calendar(answer, style, c) {
       for (const { b, y, hgt, gone } of at) if (!gone) place(b, gutter + d * colW + lx + 2 + b.col * w, y, w - 2, hgt);
     }
   }
-  // The key: what the colours count toward this week, each a link to its page.
-  const used = streams.filter((st) => all.some((b) => b.stream === st.key));
-  const key = used.map((st) => ({ glyph: m('svg', { width: 12, height: 12, viewBox: '0 0 12 12', class: 't-key-chip' }, m('rect', { x: 1, y: 1, width: 10, height: 10, rx: 2, class: c.hued(hueOf.get(st.key)) })), label: st.title, item: st.key }));
-  return { svg: m('svg', { class: 'timeline', width, height, viewBox: `0 0 ${width} ${height}` }, marks), key };
+  // Each day's key under its column: a chip and the name, cut to the column, whole on hover; a name opens its page.
+  const keyChip = z('day_key_chip');
+  dayKeys.forEach((entries, d) =>
+    entries.forEach((e, k) => {
+      const x = gutter + d * colW + 4, y = height + z('day_key_gap') + k * z('day_key_row');
+      const opens = e.key && `k:${d}:${k}`;
+      if (opens) c.opens.set(opens, e.key);
+      marks.push(m('g', { class: 't-day-key', ...(opens && { key: opens, on: ['click'], role: 'link' }) }, m('title', {}, e.title), m('rect', { class: c.hued(e.hex), x, y: y - keyChip, width: keyChip, height: keyChip, rx: 2 }), m('text', { class: 't-hour', x: x + keyChip + 4, y }, cut(e.title, colW - keyChip - 12))));
+    }),
+  );
+  const tall = height + keyHeight;
+  return { svg: m('svg', { class: 'timeline', width, height: tall, viewBox: `0 0 ${width} ${tall}` }, marks), key: null };
 }
 
 /** Each lane a row (each item its own when there are no lanes), its spans as bars across the days. */

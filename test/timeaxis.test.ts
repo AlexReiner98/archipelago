@@ -87,7 +87,7 @@ test('a flat lens on a time axis places each item it sends, and says its window 
   const mine = (await flatLens(l, { filter: { types: ['routine'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lanes: unknown[]; items: { lane?: string }[] };
   assert.deepEqual([mine.lanes, mine.items[0].lane], [[{ key: alex, title: 'Alex' }], alex], 'the owner’s lane, by name');
 
-  // Coloured by what it counts toward: the outermost item it sits in, named in streams.
+  // Coloured by what it counts toward: the group it sits in just under the outermost item, named in streams.
   const set = ((await l.change(human, { reason: 'test', ops: [
     { op: 'create', ref: 'p', type: 'project', title: 'Launch' },
     { op: 'create', ref: 't', type: 'task', title: 'Rehearse' },
@@ -96,8 +96,8 @@ test('a flat lens on a time axis places each item it sends, and says its window 
     { op: 'link', type: 'part_of', from: 'e', to: 't' },
   ] })) as { created: Record<string, string> }).created;
   const coloured = (await flatLens(l, { filter: { types: ['event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { streams: { key: string; title: string }[]; items: { id: string; stream?: string | null }[] };
-  assert.deepEqual(coloured.streams, [{ key: set.p, title: 'Launch' }]);
-  assert.deepEqual([coloured.items.find((i) => i.id === set.e)!.stream, coloured.items.find((i) => i.id === made.created.meet)!.stream], [set.p, null], 'what sits in nothing counts toward nothing');
+  assert.deepEqual(coloured.streams, [{ key: set.t, title: 'Rehearse' }]);
+  assert.deepEqual([coloured.items.find((i) => i.id === set.e)!.stream, coloured.items.find((i) => i.id === made.created.meet)!.stream], [set.t, null], 'what sits in nothing counts toward nothing');
 
   const plain = (await flatLens(l, { filter: { types: ['routine'] } })) as unknown as { lens: { time?: unknown }; items: Item[] };
   assert.equal(plain.lens.time, undefined, 'no window, no axis');
