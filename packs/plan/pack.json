@@ -18,7 +18,7 @@
       "id": "plan.meters_look",
       "title": "The usage meters' lengths",
       "props": {
-        "sizes": { "meter_pad": 16, "meter_gap": 22, "meter_most": 720, "meter_bar": 10, "meter_bar_gap": 8, "meter_row": 26, "meter_row_bar": 120, "meter_row_bar_height": 6, "meter_row_gap": 12, "meter_list_gap": 10, "meter_name_text": 15, "meter_head_text": 12, "meter_num": "9ch", "meter_track_mix": "45%", "meter_over_mix": "18%" }
+        "sizes": { "meter_pad": 16, "meter_gap": 22, "meter_most": 720, "meter_bar": 10, "meter_bar_gap": 8, "meter_row": 26, "meter_row_bar": 120, "meter_row_bar_height": 6, "meter_row_gap": 12, "meter_list_gap": 10, "meter_name_text": 15, "meter_head_text": 12, "meter_num": "9ch", "meter_chip": 9, "meter_chip_gap": 8, "meter_track_mix": "45%", "meter_over_mix": "18%" }
       }
     }
   ]

@@ -1,8 +1,9 @@
 // A plan's usage drawn as meters: a band for each limit (core's usage view answers them as items, each part part_of
 // its limit), its name and how much is used of what the plan allows, a bar filled to that share, warn or bad when
-// near or over, and under it what the use is made of. Storage's parts are shares of its bar, each a colour named in
-// the key; every other part is a row in a list under its bar (by type, the largest items, the sessions at work, who
-// asked), its name, a small bar of its share and its number, leading to its item's page where it stands for one.
+// near or over, and under it what the use is made of. Storage's parts are shares of its bar, each in a colour, and
+// listed first under it in that colour (Made of); every other part is a row in a list under its bar (by type, the
+// largest items, the sessions at work, who asked), its name, a small bar of its share and its number, leading to its
+// item's page where it stands for one. Everything is said in its band: the picture needs no key.
 // It is laid out by the page, not drawn to a size. Its look is ./look.js.
 
 import { css, hueClass, hueRule } from './look.js';
@@ -30,7 +31,6 @@ export function picture({ answer, style = {} }) {
     rules.add(hueRule(hex));
     return hueClass(hex);
   };
-  const key = [];
 
   const said = (u) => (u.of_shown ? [m('strong', {}, u.shown), ` of ${u.of_shown}`] : [m('strong', {}, u.shown)]);
   const tip = (title, u) => `${title}: ${u.shown}${u.of_shown ? ` of ${u.of_shown}` : ''}${u.over ? ', at the limit' : u.near ? ', near the limit' : ''}`;
@@ -45,30 +45,25 @@ export function picture({ answer, style = {} }) {
     const fill = shares.length
       ? shares.map((p, n) => {
           const w = at(p.use.share), hue = hueOf(n);
-          key.push({ glyph: m('svg', { width: 12, height: 12, viewBox: '0 0 12 12', class: `mt-key-chip ${hue}` }, m('rect', { x: 1, y: 1, width: 10, height: 10, rx: 2 })), label: `${p.title} · ${p.use.shown}` });
           const r = m('rect', { key: `s:${p.id}`, class: `mt-share ${hue}`, x, y: 0, width: w, height: 10 }, m('title', {}, `${p.title}: ${p.use.shown}`));
           x += w;
           return r;
         })
       : [m('rect', { class: 'mt-fill', x: 0, y: 0, width: at(u.share), height: 10 })];
-    const lists = [...new Set(rows.map((p) => p.use.list))].map((list) =>
-      m(
-        'div',
-        { class: 'mt-list' },
-        m('div', { class: 'mt-list-head' }, list),
-        rows.filter((p) => p.use.list === list).map((p) => {
-          const hidden = !p.use.item && /:hidden$/.test(p.id);
-          const attrs = { key: `r:${p.id}`, class: `mt-row${hidden ? ' hidden-part' : ''}`, title: `${p.title}: ${p.use.shown}` };
-          return m(
-            p.use.item ? 'a' : 'div',
-            p.use.item ? { ...attrs, href: `#/e/${p.use.item}` } : attrs,
-            m('span', { class: 'mt-row-name' }, p.title),
-            m('svg', { class: 'mt-row-bar', viewBox: `0 0 ${WIDE} 10`, preserveAspectRatio: 'none', 'aria-hidden': 'true' }, m('rect', { class: 'mt-track', x: 0, y: 0, width: WIDE, height: 10 }), m('rect', { class: 'mt-fill', x: 0, y: 0, width: at(p.use.share), height: 10 })),
-            m('span', { class: 'mt-row-num' }, p.use.shown),
-          );
-        }),
-      ),
-    );
+    // A row: its name (after its colour, for a share), a small bar of its share, its number.
+    const row = (p, hue) => {
+      const hidden = !p.use.item && /:hidden$/.test(p.id);
+      const attrs = { key: `r:${p.id}`, class: `mt-row${hidden ? ' hidden-part' : ''}${hue ? ` hued ${hue}` : ''}`, title: `${p.title}: ${p.use.shown}` };
+      return m(
+        p.use.item ? 'a' : 'div',
+        p.use.item ? { ...attrs, href: `#/e/${p.use.item}` } : attrs,
+        m('span', { class: 'mt-row-name' }, hue && m('svg', { class: 'mt-chip', viewBox: '0 0 10 10', 'aria-hidden': 'true' }, m('rect', { x: 0, y: 0, width: 10, height: 10, rx: 2 })), p.title),
+        m('svg', { class: 'mt-row-bar', viewBox: `0 0 ${WIDE} 10`, preserveAspectRatio: 'none', 'aria-hidden': 'true' }, m('rect', { class: 'mt-track', x: 0, y: 0, width: WIDE, height: 10 }), m('rect', { class: 'mt-fill', x: 0, y: 0, width: at(p.use.share), height: 10 })),
+        m('span', { class: 'mt-row-num' }, p.use.shown),
+      );
+    };
+    const list = (name, parts, hued) => m('div', { class: 'mt-list' }, m('div', { class: 'mt-list-head' }, name), parts.map((p, n) => row(p, hued && hueOf(n))));
+    const lists = [shares.length > 0 && list('Made of', shares, true), ...[...new Set(rows.map((p) => p.use.list))].map((name) => list(name, rows.filter((p) => p.use.list === name)))];
     return m(
       'div',
       { key: `l:${limit.id}`, class: `mt-band${u.over ? ' over' : u.near ? ' near' : ''}` },
@@ -81,5 +76,5 @@ export function picture({ answer, style = {} }) {
   const when = answer.as_of ? new Date(answer.as_of) : null;
   const head = m('div', { class: 'mt-head' }, m('span', {}, answer.plan ? `${answer.plan} plan` : 'No plan limits'), when && m('span', { title: when.toISOString() }, `as of ${when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`));
   const stage = m('div', { class: 'mt-stage' }, head, limits.map(band));
-  return { scene: { css: [css, ...rules].join('\n'), svg: stage, key }, on: () => [] };
+  return { scene: { css: [css, ...rules].join('\n'), svg: stage, key: [] }, on: () => [] };
 }

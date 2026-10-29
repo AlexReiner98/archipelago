@@ -1,5 +1,5 @@
 // The meters drawing (draw/meters/): the usage view's answer in, marks out. A band for each limit with its number
-// and a bar filled to its share; storage's shares in the bar, each named in the key; every other part a row in a list
+// and a bar filled to its share; storage's shares in the bar and listed under it in their colours; every other part a row in a list
 // under its bar, leading to its item's page where it stands for one, and what the reader cannot see untitled.
 
 import assert from 'node:assert/strict';
@@ -18,7 +18,7 @@ const marks = (mark: any): any[] => (Array.isArray(mark) && typeof mark[0] === '
 const limit = (name: string, use: Record<string, unknown>) => ({ id: `use:${name}`, kind: 'record', type: 'usage', title: name, open: true, status: 'within', use: { as: 'limit', ...use } });
 const part = (id: string, to: string, title: string, use: Record<string, unknown>) => [{ id, kind: 'record', type: 'usage', title, open: true, status: 'within', use }, { id: `u_${id}`, type: 'part_of', from: id, to: `use:${to}`, props: {} }];
 
-test('a band for each limit: its number, a bar filled to its share, its shares in the key and its rows in lists', () => {
+test('a band for each limit: its number, a bar filled to its share, and its shares and rows in lists under it', () => {
   const pieces = [
     part('use:storage:log_fact', 'storage', 'Facts', { as: 'share', used: 300e6, shown: '300 MB', share: 0.6 }),
     part('use:storage:picture', 'storage', 'Images', { as: 'share', used: 50e6, shown: '50 MB', share: 0.1 }),
@@ -39,7 +39,9 @@ test('a band for each limit: its number, a bar filled to its share, its shares i
   assert.match(bands[1][1].class, /\bover\b/, 'at the limit, said by its band');
   assert.equal(all.find((x) => x[1].key === 's:use:storage:log_fact')[1].width, '600', 'a share is as wide as its share of the allowance');
   assert.equal(all.find((x) => x[1].key === 's:use:storage:picture')[1].x, '600', 'shares follow one another');
-  assert.deepEqual(scene.key.map((k: any) => k.label), ['Facts · 300 MB', 'Images · 50 MB']);
+  assert.deepEqual(scene.key, [], 'everything is said in its band: no key at the foot');
+  const madeOf = all.find((x) => x[1].class === 'mt-list' && x[2][2] === 'Made of');
+  assert.deepEqual(madeOf.slice(3).map((r: any) => [r[1].key, /mt-h-2e7d4f|mt-h-2f5fb3/.exec(r[1].class)?.[0]]), [['r:use:storage:log_fact', 'mt-h-2e7d4f'], ['r:use:storage:picture', 'mt-h-2f5fb3']], 'storage’s shares are listed first under its bar, each in its colour');
   const row = all.find((x) => x[1].key === 'r:use:storage:item:e_aaaa0000');
   assert.equal(row[0], 'a');
   assert.equal(row[1].href, '#/e/e_aaaa0000', 'a part that stands for an item opens its page');

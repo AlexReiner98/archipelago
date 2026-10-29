@@ -143,7 +143,8 @@ export function drawQuery(lens, view, go, lead) {
   last = [lens, view, go, lead];
   const f = lens.filter;
   const answer = view?.answer;
-  if (answer) lookAround(lens, answer);
+  // A lens that names a view draws what is not items of the map: nothing to look around.
+  if (answer && !lens.view) lookAround(lens, answer);
   const here = uses(answer?.items, answer?.links);
   const exclude = f.exclude ?? ['system'];
   const includes = [wordsOf(f).length, f.types?.length ?? 0, f.ids?.length ?? 0, f.links?.length ?? 0, f.in?.length ?? 0].reduce((a, b) => a + b, 0);
@@ -282,7 +283,8 @@ export function drawQuery(lens, view, go, lead) {
         h('input', { class: 'q-limit', inputmode: 'numeric', value: limit, size: String(limit).length || 1, 'aria-label': 'The most items drawn', title: 'The most items drawn', onchange: (ev) => Number(ev.target.value) >= 1 && go({ ...lens, limit: Math.round(Number(ev.target.value)) }) }),
         drawn && drawn.cloneNode(true))),
   );
-  bar.hidden = !filled;
+  // A lens that names a view has no terms, and its band still says which canvas it is.
+  bar.hidden = !filled && !lens.view;
   fitBar();
 }
 

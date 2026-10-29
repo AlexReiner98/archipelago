@@ -28,7 +28,8 @@ a.mt-row:hover .mt-row-name { text-decoration: underline; }
 .mt-row-bar { display: block; width: 100%; height: var(--ln-meter-row-bar-height); }
 .mt-row-bar .mt-fill { fill: var(--ln-muted); }
 .mt-row-num { white-space: nowrap; color: var(--ln-muted); font-variant-numeric: tabular-nums; text-align: right; }
-.mt-key-chip rect { fill: var(--mt-hue); }
+.mt-chip { display: inline-block; width: var(--ln-meter-chip); height: var(--ln-meter-chip); margin-right: var(--ln-meter-chip-gap); }
+.mt-chip rect, .mt-row.hued .mt-row-bar .mt-fill { fill: var(--mt-hue); }
 `;
 
 /** The class a colour is drawn by, and its rule: named by the colour itself. */
