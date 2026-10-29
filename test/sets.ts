@@ -11,6 +11,7 @@ export const ROOT = join(import.meta.dirname, '..');
  */
 export const SLOW: Record<string, string> = {
   // A headless Chrome each, and the page loaded and driven in it: seconds per test, most of a core under load.
+  'test/agents-beside.test.ts': 'browser',
   'test/canvas-drag.test.ts': 'browser',
   'test/canvas-replica.test.ts': 'browser',
   'test/canvas-wires.test.ts': 'browser',
@@ -24,9 +25,11 @@ export const SLOW: Record<string, string> = {
   'test/narrow-bar.test.ts': 'browser',
   'test/panes.test.ts': 'browser',
   'test/published-frames.test.ts': 'browser',
+  'test/query-line.test.ts': 'browser',
   'test/saved-canvases.test.ts': 'browser',
   'test/stable-page.test.ts': 'browser',
   'test/tabs.test.ts': 'browser',
+  'test/walk-from.test.ts': 'browser',
   // A whole map moved, backed up, restored, migrated or pulled: databases opened, filled and replayed from the log,
   // 6 to 16 seconds of one process each. test:changed runs them for a change to what they import.
   'test/backup.test.ts': 'whole map',

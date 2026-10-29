@@ -89,14 +89,12 @@ declared in the software pack (a view of `form: "tree"` in
 branches and work, which field orders them, and which statuses mean "now". A
 pack can declare another tree the same way, with no code.
 
-**Following agents.** With "Follow agents" ticked (in the menu), an
-agent can bring your page to what it is working on: every change it makes
-opens what it touched (or Changes, when the change waits there), and the `show`
-tool opens any item or screen with a one-line note. Anything you are in the
-middle of is kept, and so is a page you are reading (scrolled, pointed or typed
-in the last 20 seconds); the note offers the jump instead. Until you choose, it
-is ticked only while one agent at most is at work. Without following, a page
-stays still: a change redraws it, in place, only when it touches an item on it.
+**Following agents.** An agent's `show` opens what it names, with a
+one-line note, in a pane of its session's own beside yours, or in a tab of its
+own out of sight; it never takes the pane you are in or touched last. With
+"Follow agents" ticked (in the menu), what agents change and the story they
+tell are said in that line too, with the way there: nothing moves until you go.
+A change redraws a page, in place, only when it touches an item on it.
 
 **Agents hear you.** What you do in the UI reaches the agents working with
 you. An agent waiting in the `watch` tool is answered the moment you decide,

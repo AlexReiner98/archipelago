@@ -35,8 +35,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
   show: {
     description:
       'Answer the human with a drawing on their canvas: a kept view (entity: a lens item, a saved canvas) or a lens and style of your own, or open an item\'s page or the workspace. ' +
-      'Their page goes there within a couple of seconds if it follows agents; one that does not offers the link instead. The answer says how many of their pages are open and how many follow you (pages). Add a short note saying what they are looking at. ' +
-      'An applied or proposed change already points the UI at what it touched; use this for everything else, and before a step worth watching. ' +
+      'It lands within a couple of seconds in a pane of your session’s own on each page of theirs that is open, beside the pane they are in, which it never takes. The answer says how many of their pages are open and how many take your shows (pages). Add a short note saying what they are looking at. ' +
+      'A change moves nothing on their page: show what is worth watching. ' +
       'With look: true, the answer also carries the picture of it, as an image: drawn by the server as you see the map, whether or not a page of theirs is open (query look takes one without moving their page).',
     input: {
       ...VIEW_INPUT,
@@ -53,7 +53,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
         .describe(
           'Which pane of their page it goes to. A name of your own ("map", "review") is a pane of your session’s: opened beside their main canvas the first time, drawn in again each time you name it, so you can keep two things in sight at once. ' +
             'A side (left, right, above, below) puts your session’s pane there; main is the main canvas; alone closes the other panes first. ' +
-            'Left out, it goes to the pane that follows your session, else to one that follows everyone and no other session at work holds, else to a new pane of your own. The owner picks whom each pane follows, and a pane following someone else is not yours to move. Only a canvas or an item goes to a pane.',
+            'Left out, it goes to the pane that follows your session, else to one of your own beside the pane they are in, opened the first time. The owner picks whom each tab follows, and a pane following someone else, or the one they are in, is not yours to move. Only a canvas or an item goes to a pane.',
         ),
       run: z.string().optional().describe('Your session’s run id, so the pane that follows your session is the one it goes to. Left out, the one you last named in a session_update or tell.'),
     },
