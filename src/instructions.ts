@@ -26,11 +26,14 @@ export interface Said {
   title: string;
   text: string;
   preset?: string;
+  /** For one said for files: the globs it names. */
+  files?: string[];
 }
 
 const listed = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
 
-const FILE = 'file:';
+/** Said for files: file:<glob> in `for`, and asked as file:<path>, or as file: alone for every one said for a file. */
+export const FILE = 'file:';
 /** A path as globs read it: forward slashes, no leading ./ */
 const slashed = (path: string) => path.replace(/\\/g, '/').replace(/^(\.\/)+/, '');
 /** A glob as a pattern: ** any folders, * any name within one, ? one character, the rest as written. */
@@ -39,8 +42,10 @@ const globRe = (glob: string) =>
 /** Whether a glob names a path: the whole of it, or its end from a folder on, so a path from the disk's root matches a glob from the checkout's. */
 export const globNames = (glob: string, path: string) => new RegExp(`(^|/)${globRe(glob)}$`, 'i').test(slashed(path));
 
-/** Whether what is said at `where` is said by these `for`s: the same place, or a file one of its globs names. */
-const saidAt = (fors: string[], where: string) => fors.includes(where) || (where.startsWith(FILE) && fors.some((f) => f.startsWith(FILE) && globNames(f.slice(FILE.length), where.slice(FILE.length))));
+/** Whether what is said at `where` is said by these `for`s: the same place, or a file one of its globs names (any file, for file: alone). */
+const saidAt = (fors: string[], where: string) =>
+  fors.includes(where) || (where.startsWith(FILE) && fors.some((f) => f.startsWith(FILE) && (where === FILE || globNames(f.slice(FILE.length), where.slice(FILE.length)))));
+const globsOf = (fors: string[]) => fors.filter((f) => f.startsWith(FILE)).map((f) => f.slice(FILE.length));
 
 /** What is said where (`for`), to a session about `about`: the presets under what the map keeps, in order. Pure: what is read is handed in. */
 export function said(presets: StyleDef[], kept: KeptInstruction[], where: string, about?: string): Said[] {
@@ -57,7 +62,7 @@ export function said(presets: StyleDef[], kept: KeptInstruction[], where: string
   return [...named.values()]
     .filter((one) => one.open && one.text.trim() && saidAt(listed(one.props.for), where))
     .sort((a, b) => order(a.props) - order(b.props) || a.at - b.at)
-    .map(({ id, title, text, preset }) => ({ id, title, text, ...(preset && { preset }) }));
+    .map(({ id, title, text, preset, props }) => ({ id, title, text, ...(preset && { preset }), ...(where.startsWith(FILE) && { files: globsOf(listed(props.for)) }) }));
 }
 
 /** A name in braces filled in from `fill`; one it does not have is left as it is. */

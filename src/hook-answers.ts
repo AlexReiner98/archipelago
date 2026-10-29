@@ -9,6 +9,7 @@ import type { Archipelago, May } from './pelago.ts';
 import { askOnReply } from './replies.ts';
 import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, resolveRun, sessionBegan, sessionHeard } from './sessions.ts';
 import { addTouched } from './touched.ts';
+import { fileSaid } from './file-said.ts';
 import { describeChanges, humanChanges, latestSeq } from './tools.ts';
 import { summed } from './summary.ts';
 import { keep, kept } from './transient.ts';
@@ -33,6 +34,9 @@ export interface HookBody {
   /** Claude Code's: the agent is going on because a Stop hook asked it to. */
   stop_hook_active?: unknown;
   setup?: string;
+  /** At the file-used event: the file read or changed, and the instructions the session has been told about files already. */
+  path?: unknown;
+  said?: unknown;
 }
 
 export interface HookCall {
@@ -70,6 +74,11 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   // A token within some items registers and speaks for sessions in the places that are theirs, and for no others.
   if (within.length && !(await hookWithin(pelago, within, body, event === 'session-start'))) {
     return event === 'session-start' ? { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: LIMITED } } : {};
+  }
+  // A file read or changed: what bites there, said once (src/file-said.ts). The ids it said go back beside the answer, for the hook to keep.
+  if (event === 'file-used') {
+    const told = await fileSaid(pelago, body).catch((err) => void console.error(`hook file: ${(err as Error).message}`));
+    return told ? { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: told.text }, said: told.ids } : {};
   }
   // Said in the server's log, so "did the hook run?" has an answer.
   console.log(`hook ${event} from session ${body.session_id ?? 'unknown'}`);

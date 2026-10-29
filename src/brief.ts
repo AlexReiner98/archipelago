@@ -6,6 +6,7 @@ import { commitRule } from './commit-rule.ts';
 import { blockGraph } from './blocking.ts';
 import { scanAround, type Row } from './region.ts';
 import { whereOf } from './places.ts';
+import { FILE, instructionsFor } from './instructions.ts';
 import { ACTIVE_HOLDS, type Entity, type Archipelago } from './pelago.ts';
 
 interface Brief {
@@ -106,6 +107,9 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
     lines.push('', `## ${title[0].toUpperCase()}${title.slice(1)}`);
     for (const { e: r } of ties.filter((t) => t.rel === rel)) lines.push(`- ${r.title} (${r.status})${r.props.outcome ? ` ${r.props.outcome}` : ''}${r.props.rationale ? ` Why: ${r.props.rationale}` : ''}${!r.props.outcome && notes.get(r.id) ? `: ${notes.get(r.id)}` : ''}`);
   }
+  // What bites in the files of its repository: the instructions said for files there, each with the files it names.
+  const traps = await instructionsFor(l, FILE, { ...(repo && { about: repo.id }) });
+  if (traps.length) lines.push('', '## Where it bites', ...traps.map((t) => `- ${t.files!.join(', ')}: ${t.title}. ${t.text}`));
   lines.push('', '## Reporting', `Register with pelago (capture, action session_start, task ${task.id}, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. ${commitRule(task.id)}`);
 
   const slim = (e: Row) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
@@ -117,6 +121,7 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
     root_blockers: roots.map((id) => names.get(id)),
     needs: needs.map((n) => ({ ...slim(n), exclusive: l.registry.capacity(n) !== Infinity, held_by: held.find((h) => h.to_id === n.id)?.title })),
     ties: ties.map(({ rel, e }) => ({ relation: rel, ...slim(e) })),
+    ...(traps.length > 0 && { traps: traps.map(({ id, title, files }) => ({ id, title, files })) }),
     text: lines.join('\n'),
   };
 }

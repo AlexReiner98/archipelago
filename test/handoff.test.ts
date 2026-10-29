@@ -347,4 +347,8 @@ test('what nobody has seen working is said on the item and listed in the handoff
   const said = async (path: string) => ((await ask(l, 'instructions', { for: `file:${path}`, about: made.repo })) as any).said.map((s: any) => s.id);
   assert.deepEqual(await said(String.raw`C:\code\Apex\ui\draw.html`), [trap]);
   assert.deepEqual(await said('ui/canvas.js'), []);
+  // A brief for work in the repository names every trap there, by the files it names, before any file is opened.
+  const brief = (await ask(l, 'brief', { task: made.offline })) as any;
+  assert.deepEqual(brief.traps, [{ id: trap, title: 'The pane cannot load draw.html', files: ['ui/draw.*'] }]);
+  assert.match(brief.text, /## Where it bites\n- ui\/draw\.\*: The pane cannot load draw\.html\. Drawings stay/);
 });

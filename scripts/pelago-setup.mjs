@@ -7,7 +7,7 @@
 //
 //   .mcp.json                         the pelago tools, for Claude Code
 //   .claude/pelago-hook.mjs          tells Archipelago a session started, was prompted, ended
-//   .claude/settings.json             the four hooks that run it
+//   .claude/settings.json             the five hooks that run it
 //   .claude/skills/pelago-bump/      how to record friction with Archipelago
 //   .claude/pelago.md                how to work with the map, read through CLAUDE.md
 //   .claude/pelago-setup.json        what the setup wrote, so it can be taken out again
@@ -188,7 +188,7 @@ function connect() {
   const settings = parsed('.claude/settings.json');
   const settingsOwn = hasHooks(settings);
   settings.hooks ??= {};
-  for (const [event, name, matcher] of [['SessionStart', 'session-start', 'startup|resume|clear'], ['UserPromptSubmit', 'prompt'], ['Stop', 'stop'], ['SessionEnd', 'session-end']]) {
+  for (const [event, name, matcher] of [['SessionStart', 'session-start', 'startup|resume|clear'], ['UserPromptSubmit', 'prompt'], ['Stop', 'stop'], ['SessionEnd', 'session-end'], ['PostToolUse', 'file-used', 'Read|Edit|Write|MultiEdit|NotebookEdit']]) {
     const list = (settings.hooks[event] ??= []);
     const command = `node ${HOOK} ${name}`;
     // A hook registered at another place (an older setup, or Archipelago's own repository running the script it
@@ -197,7 +197,7 @@ function connect() {
     if (ourHook.test(JSON.stringify(list))) continue;
     list.push({ ...(matcher && { matcher }), hooks: [{ type: 'command', command }] });
   }
-  put('.claude/settings.json', json(settings), { own: settingsOwn, note: settingsOwn ? '' : '(adds four hooks that run the script above)' });
+  put('.claude/settings.json', json(settings), { own: settingsOwn, note: settingsOwn ? '' : '(adds five hooks that run the script above)' });
 
   for (const [path, text] of Object.entries(OWN)) if (path !== HOOK) put(path, text, { own: true });
 
@@ -305,7 +305,7 @@ function remove() {
     }
     if (!Object.keys(settings.hooks).length) delete settings.hooks;
     const empty = !Object.keys(settings).length;
-    take('.claude/settings.json', empty ? null : json(settings), empty ? '(it holds nothing else)' : '(takes the four hooks out)');
+    take('.claude/settings.json', empty ? null : json(settings), empty ? '(it holds nothing else)' : '(takes the five hooks out)');
   }
 
   // What the setup wrote is known by the list it left. Without one (a project set up before there was a list),
