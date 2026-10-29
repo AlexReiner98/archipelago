@@ -494,14 +494,19 @@ server, and may only read (contents and metadata). It is a server pack
 
 1. The server's owner creates it once: Workspace, Connections, **Set up**
    beside GitHub App, in the default workspace. Archipelago sends GitHub a
-   manifest, GitHub asks for a name, and hands over the app's id, key and
-   signing secret. The kernel keeps those three, sealed, in the default
-   workspace's database, where every server on it reads them; the pack never
-   sees them. They may be given by hand instead, as `PELAGO_GITHUB_APP_ID`,
-   `_KEY` and `_SECRET` (the name is then asked of GitHub).
+   manifest, GitHub asks for a name, and hands over the app's id, key,
+   signing secret, client id and client secret. The kernel keeps those,
+   sealed, in the default workspace's database, where every server on it
+   reads them; the pack never sees them. They may be given by hand instead,
+   as `PELAGO_GITHUB_APP_ID`, `_KEY`, `_SECRET`, `_CLIENT_ID` and
+   `_CLIENT_SECRET` (the name is then asked of GitHub).
 2. A workspace's admin presses **Connect** and chooses repositories on
-   GitHub. Each one chosen is put in the map with its address, and the
-   installation is tied to that workspace (a connection, in the control plane).
+   GitHub, which signs them in as it installs the app ("Request user
+   authorization (OAuth) during installation", its callback URL
+   `/x/github_app/installed`). The installation is tied to that workspace (a
+   connection, in the control plane) only if GitHub, asked as them, says they
+   can manage it: an installation id is only what the browser said. Each
+   repository chosen is put in the map with its address.
 3. Every push to a chosen repository arrives at `/x/github_app/hook/events`
    (or `/github/app/hook`, for an app created before it was a pack), signed
    with the app's secret, and is handed to the GitHub pack of the workspace
