@@ -1,7 +1,8 @@
 // Where an agent's step lands among the owner's tabs and their panes (ui/pane-route.js), from whom each tab follows:
 // decisions e_622ev534 (a place per session), e_nwmx4tbd (an agent's panes by name), e_y7uz9pk9 (changes as shows),
 // and for tabs e_mzer5m4t (tabs at the top, each with its splits), e_q3amet26 (no most), e_xjrpyysn (a background tab
-// when the reader is busy), and a pane of its own for each session, never the reader's in focus (the owner, 28 Oct 2026).
+// when the reader is busy), and a pane of its own for each session, never the reader's in focus (the owner, 28 Oct 2026);
+// only a show lands, and no tab is brought into sight (the owner, 29 Oct 2026, e_e7yfp2yg, e_jk63uduv).
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -30,19 +31,19 @@ test('one session alone gets a pane of its own beside the one in focus, and keep
 test('several sessions of one agent each keep a tab, and come back to it', () => {
   // A second session at work gets a tab of its own; the first keeps its own.
   const tabs = [first({}, [its('e_aaaaaaaa', 60_000)])];
-  assert.deepEqual(route(step('e_bbbbbbbb'), tabs, at), { open: { follows: 'e_bbbbbbbb' }, front: true });
+  assert.deepEqual(route(step('e_bbbbbbbb'), tabs, at), { open: { follows: 'e_bbbbbbbb' }, front: false });
   assert.deepEqual(route(step('e_aaaaaaaa'), tabs, at), { tab: 't0', pane: 'p1', front: true });
   // With three tabs open, each session lands in its own and no other.
   const three = [first({}, [its('e_aaaaaaaa', 60_000)]), tab('t1', 'e_bbbbbbbb', held('e_bbbbbbbb', 50_000)), tab('t2', 'e_cccccccc', held('e_cccccccc', 40_000))];
-  assert.deepEqual(route(step('e_bbbbbbbb'), three, at), { tab: 't1', pane: 'p0', front: true });
-  assert.deepEqual(route(step('e_cccccccc'), three, at), { tab: 't2', pane: 'p0', front: true });
+  assert.deepEqual(route(step('e_bbbbbbbb'), three, at), { tab: 't1', pane: 'p0', front: false });
+  assert.deepEqual(route(step('e_cccccccc'), three, at), { tab: 't2', pane: 'p0', front: false });
   // A fourth: there is no most.
-  assert.deepEqual(route(step('e_dddddddd'), three, at), { open: { follows: 'e_dddddddd' }, front: true });
+  assert.deepEqual(route(step('e_dddddddd'), three, at), { open: { follows: 'e_dddddddd' }, front: false });
   // A session gone quiet lets go of the first tab, though its pane stays its own.
   assert.deepEqual(route(step('e_bbbbbbbb'), [first({}, [its('e_aaaaaaaa', 700_000)])], at), { tab: 't0', split: { side: 'right' }, front: true });
 });
 
-test('a tab comes into sight unless another session has just shown in the one in sight', () => {
+test('no tab is brought into sight: a show into another is drawn there, out of sight', () => {
   const tabs = [first({}, [its('e_aaaaaaaa', 5000)]), tab('t1', 'e_bbbbbbbb')];
   assert.deepEqual(route(step('e_bbbbbbbb'), tabs, at), { tab: 't1', pane: 'p0', front: false });
   assert.deepEqual(route(step('e_cccccccc'), tabs, at), { open: { follows: 'e_cccccccc' }, front: false });
@@ -52,7 +53,7 @@ test('a tab comes into sight unless another session has just shown in the one in
 
 test('a tab that follows another or nobody never takes the step', () => {
   const tabs = [tab('t0', 'e_aaaaaaaa', {}, [], { front: true }), tab('t1', 'e_bbbbbbbb')];
-  assert.deepEqual(route(step('e_bbbbbbbb'), tabs, at), { tab: 't1', pane: 'p0', front: true });
+  assert.deepEqual(route(step('e_bbbbbbbb'), tabs, at), { tab: 't1', pane: 'p0', front: false });
   // No tab follows everyone: a third session is only offered.
   assert.deepEqual(route(step('e_cccccccc'), tabs, at), { offer: true });
   assert.deepEqual(route(step('e_aaaaaaaa'), [tab('t0', 'none', {}, [], { front: true })], at), { offer: true });
@@ -68,32 +69,35 @@ test('one session keeps two panes by name in its tab, each drawn in again when n
   assert.deepEqual(route(step('e_bbbbbbbb', 'tests'), [...tabs, tab('t1', 'e_bbbbbbbb', { slot: 'tests' })], at), { tab: 't1', pane: 'p0', front: false });
 });
 
-test("a side moves the session's pane in its tab; a page that is not a canvas opens over the pane in focus", () => {
+test("a side moves the session's pane in its tab; alone and a page that is not a canvas only where the tab follows it", () => {
   assert.deepEqual(route(step('e_aaaaaaaa', 'left'), [first({}, [{ id: 'p1' }])], at), { tab: 't0', pane: 'p1', side: 'left', front: true });
   assert.deepEqual(route(step('e_aaaaaaaa', 'below'), [first()], at), { tab: 't0', split: { side: 'below' }, side: 'below', front: true });
-  assert.deepEqual(route(step('e_aaaaaaaa', 'alone'), [first({}, [{ id: 'p1' }])], at), { tab: 't0', pane: 'p1', side: 'alone', front: true });
+  // Alone would close the reader's panes: in a tab that follows everyone it is the session's pane alone that moves.
+  assert.deepEqual(route(step('e_aaaaaaaa', 'alone'), [first({}, [{ id: 'p1' }])], at), { tab: 't0', pane: 'p1', front: true });
+  assert.deepEqual(route(step('e_aaaaaaaa', 'alone'), [tab('t0', 'e_aaaaaaaa', {}, [{ id: 'p1' }], { front: true })], at), { tab: 't0', pane: 'p0', side: 'alone', front: true });
   // `main`, from before every pane was alike, is the session's own pane.
   assert.deepEqual(route(step('e_aaaaaaaa', 'main'), [first({}, [its('e_aaaaaaaa')])], at), { tab: 't0', pane: 'p1', front: true });
-  assert.deepEqual(route(step('e_aaaaaaaa'), [first({}, [its('e_aaaaaaaa')])], { ...at, drawable: false }), { tab: 't0', pane: 'p0', front: true });
+  assert.deepEqual(route(step('e_aaaaaaaa'), [first({}, [its('e_aaaaaaaa')])], { ...at, drawable: false }), { offer: true });
+  assert.deepEqual(route(step('e_aaaaaaaa'), [tab('t0', 'e_aaaaaaaa', {}, [], { front: true })], { ...at, drawable: false }), { tab: 't0', pane: 'p0', front: true });
 });
 
-test('within a tab, the pane drawing it already is lit, the one in focus too', () => {
+test('within a tab, the pane drawing it already is lit, never the one in focus', () => {
   assert.deepEqual(route(step('e_aaaaaaaa'), [first({}, [{ id: 'p1', draws: true }])], at), { tab: 't0', pane: 'p1', front: true });
-  assert.deepEqual(route(step('e_aaaaaaaa'), [first({ draws: true })], at), { tab: 't0', pane: 'p0', front: true });
+  assert.deepEqual(route(step('e_aaaaaaaa'), [first({ draws: true })], at), { tab: 't0', split: { side: 'right' }, front: true });
+  // Nor a pane held for it that the reader has since touched.
+  assert.deepEqual(route(step('e_aaaaaaaa'), [first(held('e_aaaaaaaa'))], at), { tab: 't0', split: { side: 'right' }, front: true });
   // Among tabs that follow everyone, the one drawing it.
-  assert.deepEqual(route(step('e_aaaaaaaa'), [first(), tab('t1', 'all', { draws: true })], at), { tab: 't1', pane: 'p0', front: true });
+  assert.deepEqual(route(step('e_aaaaaaaa'), [first(), tab('t1', 'all', {}, [{ id: 'p1', draws: true }])], at), { tab: 't1', pane: 'p1', front: false });
 });
 
-test('a change moves no tab its session has not shown into while others are at work, and brings none into sight', () => {
-  const change = (run: string) => step(run, undefined, 'change');
-  assert.deepEqual(route(change('e_cccccccc'), [first()], { ...at, others: 2 }), { offer: true });
-  assert.deepEqual(route(change('e_cccccccc'), [first(), tab('t1', 'e_cccccccc')], { ...at, others: 2 }), { tab: 't1', pane: 'p0', front: false });
-  assert.deepEqual(route(change('e_cccccccc'), [first({}, [its('e_cccccccc')])], { ...at, others: 2 }), { tab: 't0', pane: 'p1', front: true });
-  // Alone at work, its change goes where a show would, but opens nothing: with no pane of its own yet, it is offered.
-  assert.deepEqual(route(change('e_aaaaaaaa'), [first({}, [its('e_aaaaaaaa')])], at), { tab: 't0', pane: 'p1', front: true });
-  assert.deepEqual(route(change('e_aaaaaaaa'), [first()], at), { offer: true });
-  assert.deepEqual(route(change('e_aaaaaaaa'), [first({}, [its('e_bbbbbbbb')])], at), { offer: true });
-  assert.deepEqual(route({ ...change('e_aaaaaaaa'), pane: 'map' }, [first()], at), { offer: true });
+test('a change or a beat of the story moves nothing: it is only offered', () => {
+  for (const kind of ['change', 'story']) {
+    const of = (run: string) => step(run, undefined, kind);
+    assert.deepEqual(route(of('e_cccccccc'), [first()], at), { offer: true });
+    assert.deepEqual(route(of('e_cccccccc'), [first(), tab('t1', 'e_cccccccc')], at), { offer: true });
+    assert.deepEqual(route(of('e_aaaaaaaa'), [first({}, [its('e_aaaaaaaa')])], at), { offer: true });
+    assert.deepEqual(route({ ...of('e_aaaaaaaa'), pane: 'map' }, [first()], at), { offer: true });
+  }
 });
 
 test('a pane the reader is busy in is passed by: a show opens a tab of its own in the background, a change is offered', () => {
@@ -114,5 +118,7 @@ test('a tab popped out into a window of its own is drawn in its canvas, never br
   const out = [first({ busy: true }), tab('w1', 'e_aaaaaaaa', {}, [], { popped: true })];
   assert.deepEqual(route(step('e_aaaaaaaa', 'review'), out, at), { tab: 'w1', pane: 'p0', front: false });
   // A window the reader is at work in is passed by too.
-  assert.deepEqual(route(step('e_aaaaaaaa'), [first(), tab('w1', 'e_aaaaaaaa', { busy: true }, [], { popped: true })], at), { open: { follows: 'e_aaaaaaaa' }, front: true });
+  assert.deepEqual(route(step('e_aaaaaaaa'), [first(), tab('w1', 'e_aaaaaaaa', { busy: true }, [], { popped: true })], at), { open: { follows: 'e_aaaaaaaa' }, front: false });
+  // A window that follows everyone is not taken: the show goes beside the reader's pane here.
+  assert.deepEqual(route(step('e_aaaaaaaa'), [first(), tab('w1', 'all', {}, [], { popped: true })], at), { tab: 't0', split: { side: 'right' }, front: true });
 });

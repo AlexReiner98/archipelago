@@ -42,15 +42,27 @@ test('in a browser, opening a step keeps the canvas still and lights it, and a h
     await page.evaluate(`(localStorage.setItem('pelago-follow', 'off'), (document.querySelector('#follow input').checked = false))`);
     await wait(800);
 
-    // ---- A click on a step opens its page over the canvas: the canvas stays where it stands, the step lit.
+    // ---- A click on a step opens its page over the canvas: the canvas stays where it stands, as the reader moved and
+    // zoomed it, the step lit; shut, it is still there.
+    const box = await rect(`document.querySelector('#canvas .pane-canvas')`);
+    const from: [number, number] = [box.x + 30, box.y + box.h - 80];
+    await mouse('mousePressed', from);
+    for (let k = 1; k <= 6; k++) await mouse('mouseMoved', [from[0] + k * 12, from[1] - k * 6]);
+    await mouse('mouseReleased', [from[0] + 72, from[1] - 36], 0);
+    const near = await rect(step(made.a));
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: near.x + near.w / 2, y: near.y + near.h / 2, deltaX: 0, deltaY: -120 });
+    await wait(600);
     const before = await rect(step(made.a));
     await click([before.x + before.w / 2, before.y + before.h / 2]);
     assert.ok(await until(`document.body.dataset.sheet === 'open' && Boolean(document.querySelector('#canvas .lf-step.here'))`, 5000), `its page is open, the step lit: ${await page.evaluate(`JSON.stringify([document.body.dataset.sheet, location.hash, document.querySelectorAll('#canvas .lf-step.here').length, document.querySelectorAll('.lf-step.here').length])`)} ${await probe()}`);
     await wait(600);
     const after = await rect(step(made.a));
-    assert.ok(Math.abs(after.x - before.x) < 1 && Math.abs(after.y - before.y) < 1, `the canvas does not move: ${JSON.stringify([before, after])}`);
+    assert.ok(Math.abs(after.x - before.x) < 1 && Math.abs(after.y - before.y) < 1 && Math.abs(after.w - before.w) < 1, `the canvas does not move: ${JSON.stringify([before, after])}`);
     await page.evaluate(`document.getElementById('sheet-close').click()`);
     assert.ok(await until(`!document.body.dataset.sheet && !document.querySelector('#canvas .lf-step.here')`, 5000), 'shut, nothing lit');
+    await wait(600);
+    const shut = await rect(step(made.a));
+    assert.ok(Math.abs(shut.x - before.x) < 1 && Math.abs(shut.w - before.w) < 1, `shut, it stays where the reader left it: ${JSON.stringify([before, shut])}`);
 
     // ---- A step's edge draws no wire: a press there is a click, as anywhere on it.
     assert.ok(!(await page.evaluate<boolean>(`'wire' in document.querySelector('#canvas .lens-view').dataset`)), 'no wire is offered');

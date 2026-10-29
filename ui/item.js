@@ -3,12 +3,14 @@
 // behind draws that, with this item lit. Rare actions are in one menu; the page names no pack's type.
 
 import { api, ask, h, part, state, tell } from './base.js';
+import { goLens, lensNow } from './canvas.js';
 import { draftOf } from './draft.js';
 import { documentMenu, figureOf, readDocument } from './item-doc.js';
 import { readingOf } from './item-read.js';
 import { choicesOf } from './fields.js';
 import { choicesSection, fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
 import { relationEditor } from './item-links.js';
+import { added } from './query-bar.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
 import { actionForm, actionsFor, keepsFigure, readWhole } from './screens.js';
 import { idsIn, isA, label, menu, relations, titles, types } from './words.js';
@@ -108,6 +110,17 @@ export async function entity(id, here) {
     }
   };
 
+  // What it relates to, drawn one click from its page (decision e_jedng69e): the item found, and a walk of one step
+  // along the links it has, in place of the canvas's lens or added to it.
+  const along = [...new Set([...data.outgoing, ...data.incoming].map((r) => r.type).filter((t) => !t.startsWith('sys.')))];
+  const walkFrom = (add) => {
+    const now = lensNow();
+    if (!add || !now) return goLens({ filter: { ids: [id] }, walk: { over: along, steps: 1 } });
+    const over = now.walk?.over === 'all' ? 'all' : [...new Set([...(now.walk?.over ?? []), ...along])];
+    goLens({ ...added(now, { id }), walk: { over, steps: Math.max(1, now.walk?.steps ?? 0) } });
+  };
+  const walkSaid = along.map((t) => relations.get(t)?.title ?? t).join(', ');
+
   redraw.inPlace = inPlace;
   // Its title and note, written in place and saved as one change (ui/draft.js).
   // A document reads in its note's place as it will publish (ui/item-read.js); one shared from another workspace is
@@ -143,8 +156,10 @@ export async function entity(id, here) {
         { class: 'sheet-marks' },
         h('span', { class: 'grow' }),
         session && h('button', { class: 'quiet-button', title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
+        !e.archived_at && along.length > 0 && h('button', { class: 'quiet-button walk-from', title: `Draw it and what it links to, along ${walkSaid}, in place of the canvas's lens`, onclick: () => walkFrom(false) }, 'Walk from it'),
       menu('⋯', [
         !e.archived_at && ties.any && ['Edit links', ties.open],
+        !e.archived_at && along.length > 0 && ['Walk from it, added to the lens', () => walkFrom(true)],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
         // What packs offer to do with this kind of item.
         ...(e.archived_at ? [] : actionsFor(e.type).map((tool) => [tool.title ?? tool.tool, () => act(tool)])),

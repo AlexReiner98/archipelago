@@ -21,12 +21,10 @@ main.addEventListener('input', (e) => {
   if (e.target.matches?.('textarea, [contenteditable], input:not([type=range], [type=checkbox], [type=radio], [type=color])')) state.dirty = true;
 });
 
-// Following: an agent can point this page at what it is working on (the `show`
-// tool, and every change it makes). With "Follow agents" on, the page goes
-// there; a line at the bottom says who sent it and why. Anything half done on
-// the page, or a reader in the middle of reading it, is kept, and the line offers
-// the jump instead. It is on until the reader chooses: each session lands in a pane that follows it (ui/pane-route.js),
-// so several at work do not take the one canvas from each other.
+// Following: an agent shows this page what it is working on (the `show` tool), and it lands in a pane of that
+// session's own, beside the reader's, never the pane they are in or touched last (ui/pane-route.js); a line at the
+// bottom says who sent it and why. With "Follow agents" on, what else an agent does (its changes, its story) is said
+// in that line too, with the way there: it moves nothing (the owner, 29 Oct 2026, e_e7yfp2yg, e_jk63uduv).
 export const following = {
   get on() {
     // A window popped out of the main page (ui/tab-bar.js) draws one tab; the main page follows for it.
@@ -98,7 +96,7 @@ export let followedTimer;
 /** This page, among the owner's open pages: the server counts those that follow, so an agent's show says whether it landed. */
 const pageId = Math.random().toString(36).slice(2, 14);
 // A page the server draws for an agent's look is no page of the owner's: it is not counted, and follows nobody.
-const thisPage = () => (lookMode ? undefined : { page: pageId, on: following.on && chosen.kinds.has('show'), muted: [...chosen.muted] });
+const thisPage = () => (lookMode ? undefined : { page: pageId, on: true, muted: [...chosen.muted] });
 /** Where each agent that tells a story tells it: following it goes there, not from item to item. */
 export const storyOf = new Map();
 
@@ -114,26 +112,29 @@ export function follow(steps = []) {
     if (s.kind === 'story') storyOf.set(s.run ?? s.actor, s.hash);
   }
   followBox.checked = following.on;
-  // A page not following still offers what an agent showed: the line, and the way there.
-  const wanted = fresh.filter((s) => (following.on ? chosen.kinds.has(s.kind) : s.kind === 'show') && !chosen.muted.has(s.actor));
-  // The line says the last thing done; the page goes to the last that has a place. A step may have none: then the page stays.
+  // What a session shows lands, in a pane of its own, whether or not the page follows agents (e_jk63uduv); what else it
+  // does (a change, a beat of its story) is only said in the line, with the way there, for a page that follows it: it
+  // never moves a pane (the owner, 29 Oct 2026, e_e7yfp2yg).
+  const wanted = fresh.filter((s) => (s.kind === 'show' || (following.on && chosen.kinds.has(s.kind))) && !chosen.muted.has(s.actor));
+  // The line says the last thing done; the page goes to the last show that has a place. A step may have none: then the page stays.
   const to = wanted.at(-1);
   if (!to) return;
-  const place = wanted.findLast((s) => s.hash || storyOf.has(s.actor));
-  const there = place && `#/${storyOf.get(place.run ?? place.actor) ?? place.hash}`;
-  // A pane being read or worked in is passed by, not taken (ui/pane-busy.js): only a question open over the page, or
-  // following turned off, holds every pane.
-  const busy = !following.on || document.querySelector('dialog[open]');
+  const placeOf = (s) => (s.kind === 'story' ? storyOf.get(s.run ?? s.actor) : null) ?? s.hash;
+  const place = wanted.findLast((s) => s.kind === 'show' && s.hash);
+  const offeredAt = wanted.findLast((s) => placeOf(s));
+  const there = place ? `#/${place.hash}` : offeredAt && `#/${placeOf(offeredAt)}`;
+  // A pane being read or worked in is passed by, not taken (ui/pane-busy.js): only a question open over the page holds every pane.
+  const busy = Boolean(document.querySelector('dialog[open]'));
   // Which tab and pane it lands in, by whose step it is (ui/pane-land.js): a frame or 'popped' is a pane that drew it,
   // { open } a tab out of sight that drew it, null no tab that takes it: it is offered.
-  const landed = !busy && there && hooks.land ? hooks.land({ ...place, hash: there.slice(2) }) : null;
+  const landed = !busy && place && hooks.land ? hooks.land(place) : null;
   const aside = landed?.open;
   const offered = busy || !landed;
-  // Several sessions at once: each other session's last step with a place lands too, in its own tab, behind this one.
+  // Several sessions at once: each other session's last show lands too, in its own pane or tab.
   if (!busy && place && hooks.land) {
     const last = new Map();
-    for (const s of wanted) if (s !== place && sessionOf(s) !== sessionOf(place) && (s.hash || storyOf.has(s.actor))) last.set(sessionOf(s), s);
-    for (const s of last.values()) hooks.land({ ...s, hash: storyOf.get(s.run ?? s.actor) ?? s.hash });
+    for (const s of wanted) if (s !== place && s.kind === 'show' && s.hash && sessionOf(s) !== sessionOf(place)) last.set(sessionOf(s), s);
+    for (const s of last.values()) hooks.land(s);
   }
   followed.replaceChildren(
     ...[
@@ -141,7 +142,7 @@ export function follow(steps = []) {
       to.name ? sessionWho(to.name, to.actor) : h('strong', {}, to.actor.split('/').at(-1)),
       h('span', { class: 'grow', title: to.did ?? '' }, to.did ? to.did.split(/(?<=[.:;])\s/)[0] : offered || aside ? 'is working somewhere else' : 'brought you here'),
       aside && h('button', { title: `Bring ${nameOf(sessionOf(place))}’s tab into sight`, onclick: () => (aside(), (followed.hidden = true)) }, 'Open tab'),
-      offered && there && location.hash !== there && h('button', { onclick: () => ((location.hash = there), (followed.hidden = true)) }, 'Go there'),
+      (offered || !place) && there && location.hash !== there && h('button', { onclick: () => ((location.hash = there), (followed.hidden = true)) }, 'Go there'),
       following.on && h('button', { title: 'Stop following agents', onclick: () => ((following.on = followBox.checked = false), (followed.hidden = true)) }, 'Stop following'),
     ].filter(Boolean),
   );
