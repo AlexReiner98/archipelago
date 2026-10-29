@@ -6,6 +6,7 @@
 // it; one whose key is gone, or that they may not see, reads as its digest.
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import type { Q } from './db.ts';
 import type { Entry, Fact } from './log.ts';
 import { keysFor, keysIn, keysOf, type Key, type VaultDump } from './vault.ts';
@@ -35,11 +36,23 @@ export const digestOf = (v: Sealed): Digest => ({ $h: createHash('sha256').updat
 
 const aad = (ws: string, id: string, field: string) => Buffer.from(`${ws}\0${id}\0${field}`, 'utf8');
 
+// Sealed bytes do not compress, so a value is compressed before it is sealed, when that makes it smaller: a note, a
+// drawing's code. Its sealed text then begins with a zero byte, which JSON text never does, so a value sealed before
+// this (its JSON as it is) opens as it always did. Its length still says roughly how much was written, as it did.
+const SQUEEZE_FROM = 128;
+const SQUEEZED = Buffer.from([0]);
+function squeeze(text: Buffer): Buffer {
+  if (text.length < SQUEEZE_FROM) return text;
+  const small = deflateRawSync(text);
+  return small.length + SQUEEZED.length < text.length ? Buffer.concat([SQUEEZED, small]) : text;
+}
+const unsqueeze = (plain: Buffer) => (plain[0] === SQUEEZED[0] ? inflateRawSync(plain.subarray(SQUEEZED.length)) : plain);
+
 export function seal(key: Key, field: string, value: unknown): Sealed {
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key.key, iv);
   cipher.setAAD(aad(key.ws, key.id, field));
-  const body = Buffer.concat([cipher.update(JSON.stringify(value), 'utf8'), cipher.final(), cipher.getAuthTag()]);
+  const body = Buffer.concat([cipher.update(squeeze(Buffer.from(JSON.stringify(value), 'utf8'))), cipher.final(), cipher.getAuthTag()]);
   return { $k: key.version, $n: iv.toString('base64url'), $c: body.toString('base64url') };
 }
 
@@ -52,7 +65,7 @@ export function open(keys: Key[] | undefined, field: string, v: Sealed): unknown
     const decipher = createDecipheriv('aes-256-gcm', key.key, Buffer.from(v.$n, 'base64url'));
     decipher.setAAD(aad(key.ws, key.id, field));
     decipher.setAuthTag(bytes.subarray(bytes.length - 16));
-    return JSON.parse(Buffer.concat([decipher.update(bytes.subarray(0, bytes.length - 16)), decipher.final()]).toString('utf8'));
+    return JSON.parse(unsqueeze(Buffer.concat([decipher.update(bytes.subarray(0, bytes.length - 16)), decipher.final()])).toString('utf8'));
   } catch {
     return undefined;
   }
