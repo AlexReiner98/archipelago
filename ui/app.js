@@ -29,6 +29,8 @@ addEventListener('keydown', (ev) => ev.key === 'Escape' && document.body.dataset
 
 /** `pulse`: the map changed under the page, which is drawn again where it stands. */
 async function route(pulse = false) {
+  // An address as a show answers it, without its slash (#v?…, #e/…), is the page it names (e_jk63uduv).
+  if (/^#[^/]/.test(location.hash)) return void location.replace(`#/${location.hash.slice(1)}`);
   // What follows a ? says how the page is to be drawn (a lens and a style), not which page it is.
   const [where, query = ''] = location.hash.split('?');
   const [, name = '', arg] = where.split('/');
