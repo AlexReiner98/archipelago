@@ -125,12 +125,14 @@ export function addRepositories(ctx, installation, names, account) {
 
 /**
  * Sent back after choosing repositories: the first time with the word that says whose workspace it is for, later
- * (the choice changed on GitHub) without one, when the installation is known already.
+ * (the choice changed on GitHub) without one, when the installation is known already. Then nothing is read: anyone
+ * can open that address, and the repositories added arrive signed, as installation_repositories (the sweep of 29 Oct).
  */
 export async function installed(input, ctx) {
   const id = String(input.installation_id ?? '');
   if (!/^\d+$/.test(id)) throw new Error('GitHub sent no installation back.');
   let connection = await ctx.act('connection.get', { id });
+  if (connection && !input.state) return { answer: BACK };
   if (input.state || !connection) {
     if (!input.state || (await ctx.act('begun.get', { state: input.state })).purpose !== 'connect') throw new Error(NOT_STARTED);
     // Asked of GitHub, as the app: the id in the address is only what the browser said.

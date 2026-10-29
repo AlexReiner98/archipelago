@@ -31,7 +31,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
-import { bearer, createToken, hashSecret, hasHumanToken, verifyToken, workspaceOf } from './auth.ts';
+import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './auth.ts'; import { firstStart } from './first-start.ts';
 import { notify } from './notify.ts';
 import { backupAll, parseBackup, parseVault } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
@@ -471,14 +471,7 @@ If that process is not a pelago server, delete ${lock}.`);
       configureBackup(() => backupAll(workspaces, dir, keep, upload));
     }
     if (config.auth !== 'tokens') return;
-    // First start with tokens on: there is nobody to ask for a token yet, so
-    // make the two that everything else is created from, and show them once.
-    const operator = await workspaces.ensureOperator();
-    if (operator) console.log(`\nOperator secret (creates workspaces; shown once):\n  ${operator}`);
-    if (!(await hasHumanToken(main.pelago.db))) {
-      const owner = await createToken(main.pelago.db, DEFAULT_WORKSPACE, { kind: 'human', name: 'owner', admin: true });
-      console.log(`\nYour token for the default workspace (shown once):\n  ${owner.token}\nPaste it into the web UI, and set PELAGO_TOKEN for the CLI.`);
-    }
+    await firstStart(workspaces, main, join(config.dataDir, '..')); // the two everything is made from, given once (src/first-start.ts)
   });
   let idle: ReturnType<typeof setInterval> | undefined;
   let leader: Leader | undefined;

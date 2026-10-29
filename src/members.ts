@@ -313,7 +313,8 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
       if (input.remove) {
         if (member.person_id === actor.person) throw new Error('You cannot remove yourself.');
         await whole.db.query(`update member set removed_at = now() where email = $1`, [member.email]);
-        await whole.db.query(`update token set revoked_at = now() where ${live}`, [member.person_id]);
+        // Every token tied to them ends, their agents' too: an agent acts as its person, who is no longer here.
+        await whole.db.query(`update token set revoked_at = now() where entity_id = $1 and revoked_at is null`, [member.person_id]);
         await noted(member.email, l.workspace, false);
         return { removed: member.email };
       }

@@ -78,3 +78,9 @@ test('a backup link is counted as the open routes are: guessed keys cannot keep 
   const get = async () => (await fetch(`${base}/backup-file/default/${'0'.repeat(32)}`, { headers: { 'x-forwarded-for': '198.51.100.30' } })).status;
   assert.deepEqual([await get(), await get(), await get()], [404, 404, 429]);
 });
+
+test('a pack sends a person back only to an address on this server', async () => {
+  const { onThisServer } = await import('../src/server-routes.ts');
+  assert.equal(onThisServer('/#/workspace'), '/#/workspace');
+  for (const away of ['//evil.example', '/\\evil.example', '/\t/evil.example', '/\n/evil.example', 'https://evil.example', 'javascript:alert(1)']) assert.equal(onThisServer(away), '/', JSON.stringify(away));
+});

@@ -70,6 +70,7 @@ test('an agent a member who is no admin made is refused the backup, and so is on
   await l.db.query(`insert into member (email, person_id, admin, added_by) values ('pat@example.com', $1, false, 'test'), ('ada@example.com', $2, true, 'test')`, [pat, ada]);
   await assert.rejects(callTool(l, { ...agent, person: pat }, 'backup_download', {}), /Only a workspace admin/);
   await assert.rejects(callTool(l, { ...agent, may: 'propose' }, 'backup_download', {}), /Only a workspace admin/);
+  await assert.rejects(callTool(l, { ...agent, token: 'k_robot001' }, 'backup_download', {}), /Only a workspace admin/, 'a token tied to nobody is no admin’s');
   assert.ok(await fetched(l, (await callTool(l, { ...agent, person: ada }, 'backup_download', {})) as Made), 'an admin’s agent is given it');
 });
 

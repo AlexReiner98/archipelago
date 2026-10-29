@@ -747,8 +747,11 @@ change that:
   token says which workspace it belongs to and whether it is a human's or an
   agent's. A human token can approve, launch and manage tokens; an agent token
   cannot, on any endpoint.
-- **First start prints two secrets, once:** your human token for the default
-  workspace, and the operator secret.
+- **First start gives two secrets, once:** your human token for the default
+  workspace, and the operator secret. At a terminal they are printed; with
+  nobody at one (a container, a service) they are written to
+  `first-start-secrets.txt` beside the data folder, readable only by the
+  server's user, and the log says only where. Read it, then delete it.
 - **Tokens** are made with `token_create`, listed with `token_list` and
   revoked with `token_revoke` (human only); an agent's can be within some
   items (`within`) and may report, propose or change (`may`). Only a hash is stored. A launched

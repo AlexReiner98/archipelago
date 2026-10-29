@@ -4,17 +4,30 @@
 // sender's that the document does not bring in. Revoking the share takes it down here (unpublishShare).
 
 import { forReader, SHARED, type Given } from './documents.ts';
-import { otherMap } from './outbox.ts';
+import { otherMap, wholeMap } from './outbox.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { picturesOf } from './published-pictures.ts';
 
 const ID = /\be_[a-z0-9]{8}\b/g;
 
+/**
+ * Whether this item is the one a share was made out to here: the first item of this workspace that names it. A share
+ * accepted and kept private is not read again through a copy a member makes of it, naming the same share (the sweep
+ * of 29 Oct 2026).
+ */
+export async function madeOutTo(l: Archipelago, item: { id: string; type: string; props: Record<string, unknown> }): Promise<boolean> {
+  const { rows } = await (await wholeMap(l)).db.query<{ id: string }>(
+    `select id from entity where type = $1 and props->>'share' = $2 order by created_at, id limit 1`, // index entity_type
+    [item.type, String(item.props.share ?? '')],
+  );
+  return rows[0]?.id === item.id;
+}
+
 /** What a reader of this workspace's site is given of a shared document now, as the workspace that shares it gives it. */
 export async function freezeShared(l: Archipelago, item: Entity) {
   const workspace = String(item.props.from_workspace ?? '');
   const share = String(item.props.share ?? '');
-  const from = item.status === 'accepted' ? await otherMap(workspace) : undefined;
+  const from = item.status === 'accepted' && (await madeOutTo(l, item)) ? await otherMap(workspace) : undefined;
   if (!from) throw new Error(item.status === 'offered' ? `"${item.title}" is offered by "${workspace}": accept it before publishing it.` : `"${item.title}" is no longer shared with this workspace.`);
   const anyone = from.forAnyone().db;
   const { rows } = await anyone.query<{ doc: Given | null; publishable: boolean }>(`select pelago_workspace_document($1, $2) as doc, pelago_workspace_publishable($1, $2) as publishable`, [share, l.workspace]);

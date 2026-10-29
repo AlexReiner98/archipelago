@@ -38,12 +38,13 @@ export async function serveBackupFile(db: Q | undefined, key: string, res: Serve
 /**
  * Whether an actor is an admin, or an agent acting for one: everything is in a backup, so an agent a member who is no
  * admin made is refused it (the sweep of 29 Oct 2026). Its person is an admin when they are a member who is one, or
- * hold a live admin sign-in; an agent tied to nobody was made by a token tied to nobody, which only an admin makes.
+ * hold a live admin sign-in. An agent tied to nobody passes only on a server with no tokens: with them, a token tied to
+ * nobody need not be an admin's, nor the agent it made.
  */
 async function actsForAdmin(db: Q, actor: Actor): Promise<boolean> {
   if (actor.kind === 'human') return Boolean(actor.admin);
   if (actor.may && actor.may !== 'change') return false;
-  if (!actor.person) return true;
+  if (!actor.person) return !actor.token;
   const { rows } = await db.query(
     `select 1 from member where person_id = $1 and admin and removed_at is null
      union all select 1 from token where entity_id = $1 and kind = 'human' and admin and revoked_at is null and (expires_at is null or expires_at > now()) limit 1`,

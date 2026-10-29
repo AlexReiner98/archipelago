@@ -98,9 +98,12 @@ test('an admin changes a member’s standing or removes them, and their sign-ins
   assert.equal((await call('/api/member_set', alex, { email: 'sam@example.com', admin: true })).result.admin, true);
   assert.equal((await call('/whoami', sam, undefined, 'GET')).actor.admin, true, 'the sign-in they have is an admin’s now');
   assert.match((await call('/api/member_set', sam, { email: 'sam@example.com', remove: true })).error, /cannot remove yourself/);
+  const robot = (await call('/api/token_create', sam, { kind: 'agent', name: 'sam’s robot' })).result.token as string;
+  assert.equal((await call('/agent/query', robot, { name: 'schema' })).status, 200);
 
   await call('/api/member_set', alex, { email: 'sam@example.com', remove: true });
   assert.equal((await call('/whoami', sam, undefined, 'GET')).status, 401, 'removed, they are signed out');
+  assert.equal((await call('/agent/query', robot, { name: 'schema' })).status, 401, 'and so is every agent of theirs');
   const before = mailbox.length;
   await call('/connect/sign-in', undefined, { email: 'sam@example.com' });
   await new Promise((r) => setTimeout(r, 200));
