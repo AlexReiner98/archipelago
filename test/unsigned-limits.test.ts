@@ -55,10 +55,15 @@ test('a published page’s live streams are capped from one address', async () =
   const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'document', title: 'Live', visibility: 'shared', body: 'Words.' }] })).result.created.d;
   await call('/api/publish', undefined, { id: made });
   const streams: AbortController[] = [];
+  // Each answer is held, not only its status: fetch closes a stream nobody holds once it is collected, and the
+  // server rightly gives its place back, which is not what is being tried here.
+  const held: Response[] = [];
   const listen = async (address: string) => {
     const ac = new AbortController();
     streams.push(ac);
-    return (await fetch(`${base}/p/default/${made}/live`, { headers: { 'x-forwarded-for': address }, signal: ac.signal })).status;
+    const res = await fetch(`${base}/p/default/${made}/live`, { headers: { 'x-forwarded-for': address }, signal: ac.signal });
+    held.push(res);
+    return res.status;
   };
   const statuses: number[] = [];
   for (let i = 0; i <= LIVE_EACH; i++) statuses.push(await listen(`2001:db8:9:9::${i + 1}`));
