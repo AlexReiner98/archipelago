@@ -352,3 +352,26 @@ test('what nobody has seen working is said on the item and listed in the handoff
   assert.deepEqual(brief.traps, [{ id: trap, title: 'The pane cannot load draw.html', files: ['ui/draw.*'] }]);
   assert.match(brief.text, /## Where it bites\n- ui\/draw\.\*: The pane cannot load draw\.html\. Drawings stay/);
 });
+
+test('where a session left its checkout is kept on its run at each turn and at its end, and the handoff says what is on no remote', async () => {
+  const { answerHook } = await import('../src/hook-answers.ts');
+  const hook = (event: string, body: Record<string, unknown>) => answerHook(event, { whole: l.db, pelago: l, within: [], body, running: { started: new Date().toISOString() }, origin: 'http://127.0.0.1' });
+  const l = await fresh();
+  const made = await laneSetup(l);
+  await hookSessionStart(l, { session_id: 'g1', cwd: String.raw`C:\code\Apex` });
+  const git = { branch: 'claude/probe', head: 'b'.repeat(40), worktree: 'C:/code/Apex', unpushed: 2, dirty: 1 };
+  await hook('stop', { session_id: 'g1', git });
+  const run = (await l.db.query<{ id: string; props: any }>(`select id, props from entity where type = 'run' and props->>'session_id' = 'g1'`)).rows[0];
+  assert.deepEqual(run.props.git, git, 'kept on the run, as the hook said it');
+  const logged = (await l.db.query<{ n: number }>(`select count(*)::int as n from log_entry`)).rows[0].n;
+  await hook('stop', { session_id: 'g1', git });
+  assert.equal((await l.db.query<{ n: number }>(`select count(*)::int as n from log_entry`)).rows[0].n, logged, 'the same again writes nothing to the log');
+  await hook('stop', { session_id: 'g1', git: { ...git, head: 'nothing' } });
+  assert.deepEqual((await l.db.query<{ props: any }>(`select props from entity where id = $1`, [run.id])).rows[0].props.git, git, 'what is not a checkout is not kept');
+  assert.equal(((await ask(l, 'handoff', { repo: made.repo })) as any).left, undefined, 'a session still at work has left nothing');
+  await hook('session-end', { session_id: 'g1', reason: 'exit', git: { ...git, unpushed: 3 } });
+  const left = ((await ask(l, 'handoff', { repo: made.repo })) as any).left;
+  assert.deepEqual(left.map((x: any) => [x.id, x.branch, x.unpushed, x.dirty]), [[run.id, 'claude/probe', 3, 1]], 'its last word, said as it ended');
+  await l.log(l.db, { actor: 'github:someone', action: 'repo.push', target: made.repo, origin: 'github', reason: '3 commits to claude/probe', detail: { branch: 'claude/probe', after: 'b'.repeat(40) } });
+  assert.equal(((await ask(l, 'handoff', { repo: made.repo })) as any).left, undefined, 'pushed since, it is no longer left');
+});

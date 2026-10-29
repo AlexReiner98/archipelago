@@ -34,6 +34,9 @@
 // instructions the session has been told about files already, kept beside its run (pelago-runs/<session id>.said):
 // the server answers what bites in that file, said once a session.
 //
+// At the end of each turn and at the end it also says where the checkout stands (branch, commit, folder, commits no
+// remote has, files not committed), which the run keeps, so what a session left unpushed is known after it ends.
+//
 // It never fails the session: if the server is away it says so on stderr and
 // answers nothing.
 
@@ -173,6 +176,20 @@ function recentCommits(cwd) {
   }
 }
 
+/**
+ * Where the checkout stands, for the next session to know what this one left: its branch and commit, its folder, how
+ * many of its commits no remote has, and how many files are changed and not committed. Null outside a checkout.
+ */
+function gitState(cwd) {
+  const git = (...args) => execFileSync('git', ['-C', cwd || '.', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 }).trim();
+  try {
+    const head = git('rev-parse', 'HEAD');
+    return { branch: git('rev-parse', '--abbrev-ref', 'HEAD'), head, worktree: git('rev-parse', '--show-toplevel'), unpushed: Number(git('rev-list', '--count', head, '--not', '--remotes')), dirty: git('status', '--porcelain').split('\n').filter(Boolean).length };
+  } catch {
+    return null;
+  }
+}
+
 /** The file in the checkout's git folder (shared by its worktrees) that holds a session's run, or null outside a checkout. */
 function runFile(said) {
   if (typeof said.session_id !== 'string' || !/^[\w-]+$/.test(said.session_id)) return null;
@@ -225,6 +242,16 @@ if (name === 'session-start') {
     }
   } catch {
     // No count this time; what the hook is for still goes through.
+  }
+  // At a turn's end and at the end, where the checkout stands: so what a session leaves unpushed is known after it.
+  if (name === 'stop' || name === 'session-end') {
+    try {
+      const said = JSON.parse(body);
+      const git = gitState(said.cwd);
+      if (git) body = JSON.stringify({ ...said, git });
+    } catch {
+      // Not JSON: it goes as it came.
+    }
   }
 }
 

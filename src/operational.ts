@@ -18,7 +18,7 @@ export const MAP_TABLES = ['entity', 'relation', 'event', 'log_entry', 'log_fact
  * operational writes in src/pelago.ts (operational, claim, release, and apply for what is made at once).
  */
 export const ON_THE_MAP: Record<string, string> = {
-  sessions: "A run's tokens_used (shared onto the work it is on), story and stale flag: kept at once by operational and appended to the sessions stream; its start, end and task are facts; its heartbeat (last_seen, active, busy) is in no stream.",
+  sessions: "A run's tokens_used (shared onto the work it is on), story and stale flag: kept at once by operational and appended to the sessions stream; its start, end and task are facts; its heartbeat (last_seen, active, busy) and where its checkout stands (git, src/git-state.ts) are in no stream.",
   claims: 'A holds link from holder to resource: made by claim and ended by release, at once, appended to the claims stream.',
   notifications: 'A notification item, made by apply at once and never held; who may read it is set by operational and appended to the notifications stream.',
   automations: "An automation's last_run, last_fired and last_result, the event cursor and run_once marks: kept at once, appended to the automations stream.",
@@ -28,7 +28,7 @@ export const ON_THE_MAP: Record<string, string> = {
 };
 
 /** The fields operational may write on an item. Anything else on an item is a fact, and changes through change. */
-export const KEPT_FIELDS = ['last_seen', 'active', 'busy', 'tokens_used', 'story', 'stale_flagged', 'last_run', 'last_fired', 'last_result', 'rechecked_at'];
+export const KEPT_FIELDS = ['last_seen', 'active', 'busy', 'git', 'tokens_used', 'story', 'stale_flagged', 'last_run', 'last_fired', 'last_result', 'rechecked_at'];
 
 /** Tables beside the map, each with the rule it keeps. */
 export const STORES: Record<string, string> = {

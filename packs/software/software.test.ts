@@ -85,6 +85,19 @@ test('a handoff counts from its note: what was settled, what opened, the pushes 
   const unseenItems = [...ITEMS, { id: 'u', type: 'task', title: 'Rules on a reply', status: 'done', is_open: false, props: { seen_working: false, to_see: 'a real session' } }, { id: 'far', type: 'task', title: 'Elsewhere', props: { seen_working: false } }, { id: 'seen', type: 'task', title: 'Seen', props: { seen_working: true } }];
   const seen = (await handler['software.handoff']({ repo: 'repo' }, ctxOver(unseenItems, { ...OPTS, scope: { ...OPTS.scope, repo: [...OPTS.scope.repo, 'u', 'seen'] } }))).answer;
   assert.deepEqual(seen.unseen, [{ id: 'u', type: 'task', title: 'Rules on a reply', status: 'done', to_see: 'a real session' }]);
+  assert.equal(answer.left, undefined, 'no session said where its checkout stood, nothing left');
+  // What sessions left: the newest word of each checkout, when it ended with work on no remote and no push to its branch came since.
+  const git = (branch: string, worktree: string, unpushed: number, dirty = 0) => ({ branch, worktree, head: 'a'.repeat(40), unpushed, dirty });
+  const runs: Item[] = [
+    { id: 'wip', type: 'run', title: 'Iona', status: 'finished', is_open: false, updated_at: '2026-10-15T00:00:00Z', props: { git: git('wip', '/w/a', 2) } },
+    { id: 'old', type: 'run', title: 'Jura', status: 'finished', is_open: false, updated_at: '2026-10-11T00:00:00Z', props: { git: git('wip', '/w/a', 5) } },
+    { id: 'clean', type: 'run', title: 'Eigg', status: 'finished', is_open: false, updated_at: '2026-10-15T01:00:00Z', props: { git: git('main', '/w/b', 0, 0) } },
+    { id: 'dirty', type: 'run', title: 'Rum', status: 'finished', is_open: false, updated_at: '2026-10-14T00:00:00Z', props: { git: git('main', '/w/b', 0, 3) } },
+    { id: 'shipped', type: 'run', title: 'Coll', status: 'finished', is_open: false, updated_at: '2026-10-13T00:00:00Z', props: { git: git('main', '/w/c', 1) } },
+    { id: 'busy', type: 'run', title: 'Hoy', status: 'running', is_open: true, updated_at: '2026-10-16T00:00:00Z', props: { git: git('lens', '/w/d', 4) } },
+  ];
+  const left = (await handler['software.handoff']({ repo: 'repo' }, ctxOver([...ITEMS, ...runs], { ...OPTS, lives: { repo: [...OPTS.lives.repo, ...runs.map((r) => r.id)] } }))).answer.left;
+  assert.deepEqual(left.map((l: any) => [l.id, l.branch, l.unpushed, l.dirty, l.head]), [['wip', 'wip', 2, 0, 'aaaaaaa']], 'an older word of the same checkout, a clean one since, a push to main since and an open session are not');
   const bare = (await handler['software.handoff']({ repo: 'repo' }, ctxOver(ITEMS.filter((i) => i.id !== 'note'), OPTS))).answer;
   assert.match(bare.how, /^Nobody has written a handoff note for this repository/);
   assert.equal(bare.since, '2026-10-09T12:00:00.000Z', 'a week back with no note');
