@@ -44,7 +44,7 @@ import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from './control-index.ts';
 import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { setReach } from './pack-reach.ts'; import './agent-run.ts';
-import { pgLeader, soleLeader, type Leader } from './leader.ts';
+import { pgLeader, soleLeader, type Leader } from './leader.ts'; import { drained } from './drain.ts';
 import { serverDuties } from './duties.ts';
 import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
@@ -488,7 +488,7 @@ If that process is not a pelago server, delete ${lock}.`);
     clearInterval(idle);
     await leader?.stop();
     stopAllLaunched();
-    server.close();
+    await drained(server, config.dev ? 1_000 : undefined); // the requests in hand answered before their databases close (src/drain.ts)
     await workspaces.closeAll();
     rmSync(lock, { force: true });
     process.exit(code);
