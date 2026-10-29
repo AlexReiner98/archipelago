@@ -22,6 +22,17 @@ const run = (items: any[], links: any[], placed = {}) => layout({ items: [{ ...i
 const flat = (id: string, extra: Record<string, unknown> = {}) => ({ id, kind: 'work', type: 'task', title: `Step ${id}`, open: true, status: 'todo', ...extra });
 const link = (type: string, from: string, to: string) => ({ id: `r_${from}${to}`, type, from, to });
 
+/**
+ * What `f` answers, and the milliseconds of work it took: this process's CPU time, not the clock's. The whole suite
+ * runs files side by side, which slows the clock two or three times over and leaves the work as it was.
+ */
+function timed<T>(f: () => T): [T, number] {
+  const before = process.cpuUsage();
+  const answer = f();
+  const { user, system } = process.cpuUsage(before);
+  return [answer, (user + system) / 1000];
+}
+
 function checks(g: any) {
   const steps = g.all.filter((n: any) => !n.dummy);
   // No two steps overlap.
@@ -99,9 +110,8 @@ test('a large answer is laid out within the budget', () => {
   const n = LARGE * 2;
   const items = Array.from({ length: n }, (_, k) => item(`s${k}`));
   const links = items.slice(1).flatMap((_, k) => [dep(`s${k + 1}`, `s${k}`), ...(k > 2 ? [dep(`s${k + 1}`, `s${k - 3}`)] : [])]);
-  const started = performance.now();
-  const g = run(items, links);
-  assert.ok(performance.now() - started < 3000, 'laid out in under three seconds');
+  const [g, took] = timed(() => run(items, links));
+  assert.ok(took < 3000, `laid out in ${Math.round(took)} ms of work`);
   checks(g);
 });
 
@@ -109,12 +119,10 @@ test('two thousand steps in wide layers are laid out in a few seconds', () => {
   // A hundred chains of twenty, some across, all part of one: what the old layout took more than twelve seconds on.
   const items = Array.from({ length: 2000 }, (_, k) => item(`s${k}`));
   const links = items.flatMap((_, k) => [...(k % 20 ? [dep(`s${k}`, `s${k - 1}`)] : []), ...(k > 20 && k % 17 === 0 ? [dep(`s${k}`, `s${k - 17}`)] : [])]);
-  const started = performance.now();
-  const g = run(items, links);
-  const took = performance.now() - started;
-  // About 1.3 s alone (26 Oct 2026); the whole suite runs files side by side and slows it twice or three times over, so
-  // the bound is set well clear of that and still far under what it guards against.
-  assert.ok(took < 8000, `laid out in ${Math.round(took)} ms`);
+  const [g, took] = timed(() => run(items, links));
+  // About 1.3 s of work on 26 Oct 2026, near 4 s since the ties are routed round the steps and every line wired by one
+  // rule (28 Oct); the bound is well clear of that and still far under what it guards against.
+  assert.ok(took < 8000, `laid out in ${Math.round(took)} ms of work`);
   assert.equal(g.all.filter((n: any) => !n.dummy).length, 2001);
 });
 
