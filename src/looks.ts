@@ -10,6 +10,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Q } from './db.ts';
 import { drawLook } from './look-draw.ts';
 import { whose, type Whose } from './presence.ts';
+import { looksAllowed, overLimit } from './plan.ts';
 import { headPos } from './tail.ts';
 import { keep, kept, keptWith } from './transient.ts';
 
@@ -52,10 +53,13 @@ export async function passFor(db: Q, w: Whose, actor: string): Promise<string> {
 }
 
 const drawn = new Map<string, number[]>();
-/** Another look for this workspace, unless it has had PER_HOUR in the last hour. */
-function counted(workspace: string) {
+/** The looks drawn for a workspace in the last hour, by this process. */
+export const looksThisHour = (workspace: string) => (drawn.get(workspace) ?? []).filter((t) => t > Date.now() - 3_600_000).length;
+/** Another look for this workspace, unless it has had its plan's (else PER_HOUR) in the last hour. */
+export async function countLook(workspace: string) {
+  const { most, limits } = await looksAllowed(workspace, PER_HOUR);
   const now = Date.now(), had = (drawn.get(workspace) ?? []).filter((t) => t > now - 3_600_000);
-  if (had.length >= PER_HOUR) throw new Error(`This workspace has had ${PER_HOUR} looks in the last hour: read one again with query picture, or wait.`);
+  if (had.length >= most) throw limits ? await overLimit(workspace, limits, 'looks', had.length, 'read one again with query picture, or wait') : new Error(`This workspace has had ${most} looks in the last hour: read one again with query picture, or wait.`);
   drawn.set(workspace, [...had, now]);
 }
 
@@ -101,7 +105,7 @@ export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: s
     const had = was && (await keptWith<Kept>(db, `look:${whose(w)}:${was.look}`));
     if (was && had?.data) return answer(was.look, had.value, had.data, true);
   }
-  counted(w.workspace);
+  await countLook(w.workspace);
   const pass = await passFor(db, w, actor);
   const got = await drawLook(`${origin}/?look#/${hash}`, pass, width, height, scheme);
   const look = `l_${randomBytes(6).toString('hex')}`;
