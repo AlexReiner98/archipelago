@@ -19,6 +19,11 @@ const dayOf = (value) => {
   const d = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(value);
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 };
+/** The start of the day so many days after another: a day is not always 24 hours (the clocks change). */
+const dayAt = (day, n) => {
+  const d = new Date(day);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n).getTime();
+};
 const fmtDay = (t) => new Date(t).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 const fmtTime = (t) => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 /** As many letters as fit a width, at about `letter` pixels a letter (the style's time_letter). */
@@ -84,10 +89,10 @@ function calendar(answer, style, c) {
   const colW = (width - gutter) / days;
   // What falls on each day within the hours shown, lane by lane, packed: things at the same time in a lane sit side by side.
   const packed = [...Array(days).keys()].map((d) => {
-    const dayStart = from + d * DAY;
+    const dayStart = dayAt(from, d);
     const today = timed
       .map((b) => ({ ...b, s: Math.max(b.start, dayStart + h0 * 3_600_000), e: Math.min(b.end, dayStart + h1 * 3_600_000) }))
-      .filter((b) => b.end > dayStart && b.start < dayStart + DAY && (b.e > b.s || b.start === b.end))
+      .filter((b) => b.end > dayStart && b.start < dayAt(from, d + 1) && (b.e > b.s || b.start === b.end))
       .sort((a, b) => a.s - b.s);
     return [...Array(Math.max(lanes.length, 1)).keys()].map((i) => {
       const mine = lanes.length ? today.filter((b) => laneOf(b) === i) : today;
@@ -120,7 +125,7 @@ function calendar(answer, style, c) {
   lanes.reduce((x, _, i) => (laneX.push([x, (weight[i] / total) * colW]), x + (weight[i] / total) * colW), 0);
   const named = lanes.length > 1 && Math.min(...laneX.filter((_, i) => weight[i] >= 1).map(([, w]) => w)) >= z('lane_named_from');
   const chip = z('chip');
-  const daysOf = (b) => [...Array(days).keys()].filter((d) => b.end > from + d * DAY && b.start < from + (d + 1) * DAY);
+  const daysOf = (b) => [...Array(days).keys()].filter((d) => b.end > dayAt(from, d) && b.start < dayAt(from, d + 1));
   const tops = all.filter(whole);
   const strip = Math.max(0, ...[...Array(days).keys()].map((d) => tops.filter((b) => daysOf(b).includes(d)).length));
   const top = named ? z('head_named') : z('head');
@@ -129,7 +134,7 @@ function calendar(answer, style, c) {
   const marks = [];
   for (let d = 0; d < days; d++) {
     const x = gutter + d * colW;
-    marks.push(m('line', { class: 't-rule', x1: x, x2: x, y1: 0, y2: height }), m('text', { class: 't-head', x: x + 4, y: 15 }, cut(fmtDay(from + d * DAY), colW - 6)));
+    marks.push(m('line', { class: 't-rule', x1: x, x2: x, y1: 0, y2: height }), m('text', { class: 't-head', x: x + 4, y: 15 }, cut(fmtDay(dayAt(from, d)), colW - 6)));
     // The lanes, named under the day where there is room, and parted by a fainter rule.
     lanes.forEach((l, i) => {
       const [lx, lw] = laneX[i];
@@ -160,7 +165,7 @@ function calendar(answer, style, c) {
     place(b, gutter + covers[0] * colW + 2, top - 1 + row * chip, covers.length * colW - 4, chip - 3);
   }
   for (let d = 0; d < days; d++) {
-    const dayStart = from + d * DAY;
+    const dayStart = dayAt(from, d);
     for (let i = 0; i < Math.max(lanes.length, 1); i++) {
       const { mine } = packed[d][i];
       const [lx, lw] = lanes.length ? laneX[i] : [0, colW];
@@ -188,7 +193,7 @@ function calendar(answer, style, c) {
 function bars(answer, style, c) {
   const { z, cut, width } = c;
   const from = dayOf(answer.lens.time.from);
-  const to = dayOf(answer.lens.time.to) + DAY;
+  const to = dayAt(dayOf(answer.lens.time.to), 1);
   const label = Math.min(z('bar_label_most'), width * style.numbers?.time_bar_label_share);
   const rowH = z('bar_row');
   const head = z('head');
@@ -200,7 +205,7 @@ function bars(answer, style, c) {
   const marks = [];
   const days = Math.round((to - from) / DAY);
   const every = Math.max(1, Math.ceil(days / Math.floor((width - label) / z('bar_day_every'))));
-  for (let d = 0; d <= days; d += every) marks.push(m('line', { class: 't-rule', x1: x(from + d * DAY), x2: x(from + d * DAY), y1: 0, y2: height }), d < days && m('text', { class: 't-head', x: x(from + d * DAY) + 3, y: 15 }, fmtDay(from + d * DAY)));
+  for (let d = 0; d <= days; d += every) marks.push(m('line', { class: 't-rule', x1: x(dayAt(from, d)), x2: x(dayAt(from, d)), y1: 0, y2: height }), d < days && m('text', { class: 't-head', x: x(dayAt(from, d)) + 3, y: 15 }, fmtDay(dayAt(from, d))));
   // A row of its own item's waits hidden in a story, as its bar does.
   rows.forEach((r, i) => marks.push(m('text', { class: 't-row', x: 4, y: head + i * rowH + 16, ...(!answer.lanes?.length && c.story && { key: `r:${i}`, opacity: 0 }) }, m('title', {}, r.title), cut(r.title, label - 10))));
   if (!answer.lanes?.length && c.story) rows.forEach((r, i) => c.shown.push({ key: `r:${i}`, ids: [r.key] }));

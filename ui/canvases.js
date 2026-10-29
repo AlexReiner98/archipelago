@@ -37,7 +37,7 @@ export function canvasLens(item) {
   const filter = { ...(p.filter ?? {}) };
   const ids = [...new Set([...(filter.ids ?? []), ...(Array.isArray(p.pins) ? p.pins : [])])];
   if (ids.length) filter.ids = ids;
-  const lens = { ...(p.view && { view: p.view }), filter, walk: p.walk ?? { over: [], steps: 0 }, ...(p.limit && { limit: p.limit }) };
+  const lens = { ...(p.view && { view: p.view }), filter, walk: p.walk ?? { over: [], steps: 0 }, ...(p.limit && { limit: p.limit }), ...(p.time && { time: p.time }) };
   return { lens, style: { ...(p.style ?? {}), ...(!item.preset && { canvas: item.id }) } };
 }
 
@@ -98,9 +98,9 @@ async function save(lens, style, current, open) {
   const title = name || current?.title;
   if (!title) return tell('Not saved', 'A canvas needs a name.');
   if (title.length > 60) return tell('Not saved', 'A name is a few words: 60 characters at most.');
-  const { filter, walk, limit } = lens;
+  const { filter, walk, limit, time } = lens;
   // A pack's canvas saved under its own name is the owner's version of it, standing in its place.
-  const props = { filter, walk, limit: limit ?? null, style: keptStyle(style), ...(current?.preset && title === current.title && { preset: current.id }) };
+  const props = { filter, walk, limit: limit ?? null, time: time ?? null, style: keptStyle(style), ...(current?.preset && title === current.title && { preset: current.id }) };
   const same = all.find((c) => !c.preset && c.title.toLowerCase() === title.toLowerCase());
   const made = same
     ? await api('change', { ops: [{ op: 'update', id: same.id, props: { ...props, pins: null } }], reason: 'Saved from the query bar' })

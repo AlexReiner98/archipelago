@@ -9,7 +9,8 @@ import '../src/views.ts';
 import { answerRead } from '../src/packreads.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
-import { dayStart } from '../src/timeaxis.ts';
+import { flatLens } from '../src/lens-flat.ts';
+import { dayStart, resolveAxis } from '../src/timeaxis.ts';
 
 const human: Actor = { kind: 'human', name: 'test' };
 
@@ -52,4 +53,32 @@ test('a read placed in time places what falls in its window, repeats as their da
   const deadlines = await placed({ from: '2026-10-12', to: '2026-10-18', by: ['bound'] });
   assert.deepEqual(deadlines.map((i) => i.title), ['Send the forms'], 'only by bound');
   await assert.rejects(placed({ from: '2026-10-18', to: '2026-10-12' }), /comes after/);
+});
+
+test('a window may be said from today, worked out in the zone', () => {
+  const now = Date.parse('2026-10-29T02:00:00Z'); // still the 28th in Toronto
+  assert.deepEqual(resolveAxis({ from: '-6d', to: '7d' }, 'America/Toronto', now), { from: '2026-10-22', to: '2026-11-04' });
+  assert.deepEqual(resolveAxis({ from: 'today', to: '+0d' }, 'UTC', now), { from: '2026-10-29', to: '2026-10-29' });
+  assert.throws(() => resolveAxis({ from: '3d', to: '-3d' }, 'UTC', now), /comes after/);
+});
+
+test('a flat lens on a time axis places each item it sends, and says its window as dates', async () => {
+  const l = await map();
+  const made = (await l.change(human, {
+    reason: 'test',
+    ops: [
+      { op: 'create', ref: 'gym', type: 'routine', title: 'Gym', props: { from_time: '07:00', to_time: '08:00', days: [1, 3, 5], starts: '2026-10-01' } },
+      { op: 'create', ref: 'meet', type: 'event', title: 'Board meeting', props: { at: '2026-10-14T14:00:00Z', ends: '2026-10-14T15:30:00Z' } },
+    ],
+  })) as { created: Record<string, string> };
+  const answer = (await flatLens(l, { filter: { types: ['routine', 'event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lens: { time: unknown }; items: Item[] };
+  const of = (ref: string) => answer.items.find((i) => i.id === made.created[ref]);
+  assert.deepEqual(answer.lens.time, { from: '2026-10-12', to: '2026-10-18' });
+  assert.equal(of('gym')!.time!.length, 3, 'a repeat on each of its days');
+  assert.deepEqual(of('meet')!.time, [{ start: '2026-10-14T14:00:00.000Z', end: '2026-10-14T15:30:00.000Z', by: 'when' }]);
+
+  const plain = (await flatLens(l, { filter: { types: ['routine'] } })) as unknown as { lens: { time?: unknown }; items: Item[] };
+  assert.equal(plain.lens.time, undefined, 'no window, no axis');
+  assert.equal(plain.items[0].time, undefined);
+  await assert.rejects(flatLens(l, { filter: { types: ['routine'] }, time: { from: 'soon', to: '7d' } }), /time is/);
 });
