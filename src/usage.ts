@@ -34,7 +34,7 @@ interface Use {
   /** What the plan allows, and in words, when it limits this. */
   of?: number;
   of_shown?: string;
-  /** Used over what it is drawn against: its plan's allowance, else its limit's use (its share of it). */
+  /** Used over what it is drawn against: its plan's allowance, else its limit's use (its share of it); a limit with no allowance, 0. */
   share: number;
   near?: boolean;
   over?: boolean;
@@ -94,7 +94,7 @@ export async function usage(l: Archipelago, _input: Record<string, unknown>, act
       title: NAMES[name],
       open: true,
       status: at?.over ? 'over' : at?.near ? 'near' : 'within',
-      use: { as: 'limit', used: used[name], shown: show(name, used[name]), share: of ? ratio(used[name], of) : 1, ...(of && { of, of_shown: at!.of, near: at!.near, over: at!.over }) },
+      use: { as: 'limit', used: used[name], shown: show(name, used[name]), share: of ? ratio(used[name], of) : 0, ...(of && { of, of_shown: at!.of, near: at!.near, over: at!.over }) },
     });
     // What each part is drawn against: the plan's allowance, else the limit's own use.
     const against = of ?? used[name];
