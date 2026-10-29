@@ -4,6 +4,7 @@
 // before the forget cannot bring it back.
 
 import assert from 'node:assert/strict';
+import { createCipheriv, randomBytes } from 'node:crypto';
 import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,7 +15,7 @@ import { openDb } from '../src/db.ts';
 import { mentions } from '../src/forget.ts';
 import { entries, stored, verify, type Entry } from '../src/log.ts';
 import { Archipelago } from '../src/pelago.ts';
-import { isSealed, open } from '../src/seal.ts';
+import { isSealed, open, seal } from '../src/seal.ts';
 import { undo } from '../src/undo.ts';
 import { dumpVault, keysOf } from '../src/vault.ts';
 
@@ -170,4 +171,19 @@ test('a backup taken before a forget cannot bring the item back', async () => {
   writeFileSync(join(dir, '2026-09-01T00-00-00.000Z.json.gz'), '');
   backupVault(dir, vaultThen, Date.parse('2026-10-24T00:00:00Z'));
   assert.deepEqual(readdirSync(dir).filter((f) => f.startsWith('2026-09')), []);
+});
+
+test('a long value is compressed before it is sealed, and one sealed whole before that still opens', async () => {
+  const key = { ws: 'default', id: 'e_long0000', version: 1, key: randomBytes(32) };
+  const note = 'The plan keeps every change, and the change is kept whole. '.repeat(40);
+  const sealed = seal(key, 'body', note);
+  assert.ok(Buffer.from(sealed.$c, 'base64url').length < note.length / 4, 'the note is sealed compressed');
+  assert.equal(open([key], 'body', sealed), note);
+  assert.equal(open([key], 'body', seal(key, 'title', 'Short')), undefined, 'still bound to its field');
+  assert.equal(open([key], 'title', seal(key, 'title', 'Short')), 'Short', 'a short value is sealed as it is');
+  // As a value was sealed before compression: its JSON, as it is.
+  const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key.key, iv);
+  cipher.setAAD(Buffer.from(`default\0${key.id}\0body`, 'utf8'));
+  const old = { $k: 1, $n: iv.toString('base64url'), $c: Buffer.concat([cipher.update(JSON.stringify(note), 'utf8'), cipher.final(), cipher.getAuthTag()]).toString('base64url') };
+  assert.equal(open([key], 'body', old), note);
 });

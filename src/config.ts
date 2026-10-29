@@ -117,7 +117,7 @@ export function loadConfig(): Config {
   const [url, key] = [env('BACKUP_UPLOAD_URL'), env('BACKUP_UPLOAD_KEY')];
   const sendTo = url && key ? { url, key } : undefined;
   const wanted = fromFile.backup === false ? false : { ...(fromFile.backup as object | undefined) } as { dir?: string; everyHours?: number; keep?: number };
-  const backup = wanted && { dir: resolve(ROOT, env('BACKUP_DIR') ?? wanted.dir ?? join(dataDir, '..', 'backups')), everyHours: wanted.everyHours ?? 6, keep: wanted.keep ?? 28, upload: sendTo };
+  const backup = wanted && { dir: resolve(ROOT, env('BACKUP_DIR') ?? wanted.dir ?? join(dataDir, '..', 'backups')), everyHours: wanted.everyHours ?? 24, keep: wanted.keep ?? 7, upload: sendTo };
   const unreviewed = Object.fromEntries(Object.keys(DEFAULT_AGENT_POLICY).map((op) => [op, 'auto'])) as Policy;
   return {
     packs: fromFile.packs,

@@ -61,3 +61,28 @@ test('a step that fails leaves nothing of itself and no record, and says which i
   assert.equal((await db.query<{ t: string | null }>(`select to_regclass('half')::text as t`)).rows[0].t, null);
   await db.close();
 });
+
+test('step 27 drops the activity written before the log began, and keeps the rest', async () => {
+  const { fresh, make } = await import('./map.ts');
+  const { PRE_LOG_ACTIVITY } = await import('../src/eventlog.ts');
+  const l = await fresh();
+  await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'After the log began' }]);
+  const add = (seq: number | null, action: string) =>
+    l.db.query(`insert into event (${seq === null ? '' : 'seq, '}actor, action, reason, detail) values (${seq === null ? '' : `${seq}, `}'human:test', $1, 'test', '{}')`, [action]);
+  // Numbered before the log's first fact, as a map's rows were before it had a log.
+  await add(-3, 'entity.update');
+  await add(-2, 'relation.link');
+  await add(-1, 'session.start');
+  // Brought in since, as a merged backup's change sets are.
+  await add(null, 'entity.update');
+  await l.db.query(PRE_LOG_ACTIVITY);
+  const { rows } = await l.db.query<{ seq: string; action: string }>(`select seq, action from event where reason = 'test' order by seq`);
+  assert.deepEqual(rows.map((r) => [Number(r.seq) < 0, r.action]), [[true, 'session.start'], [false, 'entity.update']]);
+});
+
+test('a folder keeps a small write-ahead log', async () => {
+  const dir = folder();
+  const db = await openDb(dir);
+  assert.deepEqual((await db.query<{ min: string; max: string }>(`select current_setting('min_wal_size') as min, current_setting('max_wal_size') as max`)).rows[0], { min: '32MB', max: '64MB' });
+  await db.close();
+});

@@ -16,7 +16,7 @@ import { TRANSIENT } from './transient.ts';
 import { ITEM_KIND } from './head.ts';
 import { SEARCH_INDEX } from './search.ts';
 import { LOG } from './log.ts';
-import { ACTIVITY } from './eventlog.ts';
+import { ACTIVITY, PRE_LOG_ACTIVITY } from './eventlog.ts';
 import { VAULT } from './vault.ts';
 import { FORGET } from './forget.ts';
 import { OPLOG, OPLOG_GUARDED, OPLOG_SERVER } from './oplog.ts';
@@ -64,6 +64,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 24, name: 'the compacted streams sealed, guarded by row, and reached by a forget', sql: OPLOG_GUARDED },
   { version: 25, name: 'what is inside what, what names what, the indexes reads are bounded by, and visibility asked row by row', sql: CLOSURE + MENTIONS + READ_INDEXES + ROW_POLICIES + ACTIVE_HOLDS_BY_KEY },
   { version: 26, name: 'a document shared with another workspace may be published there', sql: SHARE_PUBLISHABLE },
+  { version: 27, name: 'the activity from before the log began, gone', sql: PRE_LOG_ACTIVITY },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;
