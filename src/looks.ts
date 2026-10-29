@@ -23,8 +23,8 @@ const PER_HOUR = 60;
 const LOOK = /^l_[0-9a-f]{12}$/;
 const PASS = /^look_([a-z0-9][a-z0-9-]{0,39})_[0-9a-f]{40}$/;
 
-/** What a look pass may call through /api: what the canvas reads to draw a view, and nothing that writes. */
-export const LOOK_READS = new Set(['view', 'places', 'schema', 'get', 'proposals', 'search', 'picture', 'document', 'events']);
+/** What a look pass may call through /api: what the canvas reads to draw a view (the pages ask whether each document is published), and nothing that writes. */
+export const LOOK_READS = new Set(['view', 'places', 'schema', 'get', 'proposals', 'search', 'picture', 'document', 'events', 'published']);
 
 /** Where the server's Chrome opens the app: this server, or the name another container knows it by. */
 let origin = 'http://127.0.0.1:3100';
