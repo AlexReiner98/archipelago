@@ -42,6 +42,8 @@ export class Replica {
     // Why each was in the answer (the terms that found it, or the walk's step): the answer's, not the log's, so kept apart.
     this.why = new Map((answer.items ?? []).filter((i) => i.found || i.step).map((i) => [i.id, i.found ? { found: i.found } : { step: i.step }]));
     this.links = new Map((answer.links ?? []).map((r) => [r.id, linkRow(r)]));
+    // The items whose notes the lens was asked to send whole (`notes`, for the pages): kept whole as they change.
+    this.whole = new Set(answer.whole ?? []);
     this.pos = pos;
     this.lens = answer.lens;
   }
@@ -58,7 +60,7 @@ export class Replica {
     const fields = Object.fromEntries(Object.entries(r.props ?? {}).filter(([k, v]) => v != null && this.kinds.shown?.(r.type, k) !== false));
     return {
       id: r.id, kind: r.kind, type: r.type, title: r.title,
-      ...(r.body && { body: r.body.length > NOTE_START ? `${r.body.slice(0, NOTE_START)}…` : r.body }),
+      ...(r.body && { body: r.body.length > NOTE_START && !this.whole?.has(id) ? `${r.body.slice(0, NOTE_START)}…` : r.body }),
       visibility: r.visibility, status: r.status, open: r.is_open, owner: r.owner, created_at: r.created_at, updated_at: r.updated_at,
       ...(Object.keys(fields).length && { fields }),
       ...this.why.get(id),

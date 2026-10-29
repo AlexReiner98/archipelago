@@ -44,6 +44,8 @@ const FLAT_LIMIT = 500;
 const MAX_STEPS = 6;
 /** How much of an item's note travels with it: enough to show on hover. */
 const NOTE_START = 280;
+/** Asked for whole (`notes: "whole"`, for a drawing that reads them, such as the pages), the notes of this many items, seeds first. */
+export const NOTES_WHOLE_MOST = 100;
 
 /** A link the walk follows and which way (decision e_gue6cg6q): `>` along it from the item it starts at, `<` back to it, else either. */
 export const wayOf = (term: string): { link: string; way: 'out' | 'in' | 'either' } => {
@@ -115,6 +117,9 @@ interface Row {
 /** The flat lens answered: the lens as read, the items (head and shown fields), the links among them, and whether the limit cut it. */
 export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   const lens = readFlat(l, input);
+  // How much of each note is sent is not the lens: the same items, their notes whole for a drawing that reads them.
+  if (input.notes !== undefined && input.notes !== 'whole') throw new Error('notes must be "whole", or left out for the start of each note');
+  const whole = input.notes === 'whole';
   // What is excluded, as one condition on an item (as e); its last parameter is the types left out, with their flavours.
   const leftOut = lens.exclude.filter((x) => x !== 'closed' && x !== SYSTEM).flatMap((t) => l.registry.family(t));
   const keep = (n: number) => ['e.archived_at is null', lens.exclude.includes('closed') && 'e.is_open', lens.exclude.includes(SYSTEM) && `(e.kind is null or e.kind <> '${SYSTEM}')`, `e.type <> all($${n}::text[])`].filter(Boolean).join(' and ');
@@ -238,7 +243,8 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
 
   const cut = sent.size > lens.limit;
   const kept = [...sent].slice(0, lens.limit);
-  const { rows } = await l.db.query<Row>(`select id, kind, type, title, left(body, ${NOTE_START + 1}) as body, visibility, status, is_open, owner, ${l.props}, created_at, updated_at from entity where id = any($1::text[])`, [kept]);
+  const { rows } = await l.db.query<Row>(`select id, kind, type, title, case when id = any($2::text[]) then body else left(body, ${NOTE_START + 1}) end as body, visibility, status, is_open, owner, ${l.props}, created_at, updated_at from entity where id = any($1::text[])`, [kept, whole ? kept.slice(0, NOTES_WHOLE_MOST) : []]);
+  const wholeIds = new Set(whole ? kept.slice(0, NOTES_WHOLE_MOST) : []);
   const byId = new Map(rows.map((r) => [r.id, r]));
   const items = kept.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
   // The links among what is sent, of every type: a canvas draws what ties what it shows.
@@ -253,8 +259,8 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
       const fields = Object.fromEntries(Object.entries(e.props ?? {}).filter(([key, value]) => defs[key]?.shown && value != null));
       return {
         id: e.id, kind: e.kind, type: e.type, title: e.title,
-        // The start of the note, for a hover: the whole of it is on the item's page.
-        ...(e.body && { body: e.body.length > NOTE_START ? `${e.body.slice(0, NOTE_START)}…` : e.body }),
+        // The start of the note, for a hover: the whole of it is on the item's page (or here, asked for whole).
+        ...(e.body && { body: e.body.length > NOTE_START && !wholeIds.has(e.id) ? `${e.body.slice(0, NOTE_START)}…` : e.body }),
         visibility: e.visibility, status: e.status, open: e.is_open, owner: e.owner,
         created_at: e.created_at, updated_at: e.updated_at,
         ...(Object.keys(fields).length && { fields }),
@@ -264,5 +270,7 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
     links: relations.map((r) => ({ id: r.id, type: r.type, from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
     ...(cut && { cut: true }),
     ...(matched !== undefined && { matched }),
+    // The items whose notes are sent whole, so a page keeping the answer current keeps those whole too (ui/replica.js).
+    ...(whole && { whole: items.filter((e) => wholeIds.has(e.id)).map((e) => e.id) }),
   };
 }

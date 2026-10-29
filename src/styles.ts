@@ -110,7 +110,7 @@ export async function withStyles<T extends { styles: Preset[] }>(l: Archipelago,
  * map when one is named (`style`), and a style kept about a view kept on the map when it is drawn (`view`). What the item page, the pages that are not pictures and the canvas read; asked
  * with `have` (the drawings' hashes the page holds), with the drawing it names, as a lens answer's style is.
  */
-export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: unknown; view?: unknown; have?: unknown; try?: unknown }, forPerson = true) {
+export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: unknown; view?: unknown; have?: unknown; try?: unknown; shape?: unknown }, forPerson = true) {
   const of = typeof input.of === 'string' ? input.of : undefined;
   const named = typeof input.style === 'string' ? input.style : undefined;
   const item = of === undefined ? undefined : (await l.db.query<{ id: string; type: string }>('select id, type from entity where id = $1', [of])).rows[0];
@@ -123,6 +123,8 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: u
   // A view kept on the map draws in the shape it keeps, and lights what it says, over every style.
   const own = view === undefined ? undefined : ((await l.entity(view))?.props.style as Record<string, unknown> | undefined);
   for (const key of ['shape', 'lit']) if (typeof own?.[key] === 'string') read.style[key] = own[key];
+  // The shape the reader chose for this view (the view band's switch) over that, so its drawing comes with it.
+  if (typeof input.shape === 'string' && input.shape) read.style.shape = input.shape;
   return input.have === undefined ? read : { ...read, style: await drawn(l, read.style, input.have) };
 }
 

@@ -30,22 +30,25 @@ never structure. Containment is a projection the server keeps (the
   only to draw" (the canvas asks for no nesting; the flat lens names none).
 
 ### 3. The lens is a filter, a walk and a limit, and the only bound
-The filter has two kinds of term. Those that include add seeds, each its
-own (text, types, ids, links such as `tagged e_x`, `in` an item: all that
-is part of it at any depth, from the part_of closure; a union); those that
-narrow must all hold of a seed (an AND: `only`, types, and plain words,
+Its parts have one name each, on the page and in an agent's answer: Find,
+Only, Not, Walk and Limit (e_drt4g872, `docs/glossary.md`). The filter has
+two kinds of term. Find's add seeds, each its own (words, types, ids, links
+such as `tagged e_x`, `in` an item: all that is part of it at any depth,
+from the part_of closure, e_tvsdqjeq; a union); Only's must all hold of a
+seed (an AND: types, and plain words,
 `done`, `blocked`, `status <s>`, `owner me`, `no owner`, `over estimate`,
 `changed since 7d`, `made since <date>`, `by owner`, `by agent`, read in
 `src/lens-only.ts`, e_xe5dx55e; `within`, items it is part of at any depth,
-read from the part_of closure). What it
-excludes applies to everything the walk reaches, never to an item named
-by id (e_yasbwj45); the
-walk follows the link types named, each out (→, `depends_on>`), in (←,
+read from the part_of closure). What Not
+leaves out applies to everything the walk reaches, never to an item named
+by id (e_yasbwj45); Walk
+follows the link types named, each out (→, `depends_on>`), in (←,
 `depends_on<`) or either way (↔, as a lens kept before ways were said), for
-some steps, a click on its arrow in the bar turning it (e_gue6cg6q); the limit
+some steps, a click on its arrow in the bar turning it (e_gue6cg6q); Limit
 caps it. A filter that includes nothing is refused, so no canvas reads the
-whole map. Search is the filter's text; tags are a core `tag` type and a
-`tagged` link, filtered by and, in the house style, not drawn.
+whole map. Words typed in find are a Find term, the filter's text; tags are
+a core `tag` type and a `tagged` link, found by and, in the house style, not
+drawn.
 - `test/lens-flat.test.ts`: "a filter that includes nothing is refused";
   "what is excluded is left out of everything the walk reaches, and is not
   walked through"; "the limit caps what is sent, seeds first, and says it
@@ -62,13 +65,15 @@ whole map. Search is the filter's text; tags are a core `tag` type and a
 ### 4. Lens and style are the whole surface, for people and agents
 A person grows a canvas by editing its lens in find, at the canvas's foot,
 which is the query's (e_2a4mddx8): at rest it says the lens in one line;
-open, a row for each part rises above it; typed, it lists what the words
-could be, each said by its kind, Words first and lit (a click only opens an
-item's page, e_jedng69e). The top keeps the view's band. An agent reads the same lens
+open, the rows Find, Only, Not, Walk and Limit rise above it; typed, it
+lists what the words could be, each said by its kind, Words first and lit,
+and a part's word and a space (`only `) puts it in that part (a click only
+opens an item's page, e_jedng69e). The top keeps the view's band. An agent reads the same lens
 (`query` name `flat`) and points the page at one (`report` action `show`
 with `lens`). The page calls no tool an agent lacks for it. A term is made
-by picking its kind, then the thing (an item by its name from a list, kept
-by its id); nothing written is taken for a term, and a name an agent writes
+by picking its kind, then the thing (Find's kinds: Words, Type, Tag, Link,
+Item, In; Only's: Type, Within, its plain words, Status, Owner, Changed or
+Made since; an item by its name from a list, kept by its id); nothing written is taken for a term, and a name an agent writes
 is answered by its id or refused when two items share it (e_45sgrfqd). The bar's
 pickers (the walk's links, the box's types) lead with what the canvas
 draws, then what lies one step around it (the same `flat` read, walked
@@ -154,10 +159,13 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `app.js` | routes the address to the canvas and the sheet |
 | `canvas.js` | a pane's canvas: its lens, Home's lens, clicks, moves batched, Arrange |
 | `lens.js` | the address codec (`readFlatLens`, `flatQuery`); `flatView` reads, holds and draws a lens |
-| `query-bar.js` | the lens as chips, changed in place |
-| `find.js` | the seeds as words, with a one-line peek: Enter replaces them, + or Shift+Enter adds (e_c3g6gwqq) |
+| `query-bar.js` | the lens said in one line at rest, and as the rows Find, Only, Not, Walk and Limit, changed in place |
+| `find.js` | the bar at the canvas's foot: opened, its rows; typed, what the words could be; Enter takes the lit choice, Shift+Enter adds the words (e_e3k797d3) |
+| `find-choices.js` | what typed words could be in each part, each said by its kind, Words first |
+| `term-kinds.js`, `term-pick.js` | a row's +: its kinds, then the things of that kind, picked, never guessed |
 | `canvases.js` | saved canvases: the bar's switch, Save, Home's list |
 | `drawing.js`, `draw.html`, `draw.js`, `marks.js` | a drawing run in the sandbox; its marks checked and mounted |
+| `reader-frame.js` | the one mark the page makes itself: a document's draft or published page, read in a frame on the canvas |
 | `pan-zoom.js` | the infinite plane |
 | `drag.js`, `canvas-wires.js` | moving a node; drawing a wire and making its link |
 | `live.js`, `replica.js`, `ghosts.js` | tailing the log; the store; held changes drawn into it |
@@ -294,8 +302,8 @@ no agent: the main page does, and draws a show for its tab in the window's
 pane in focus when that tab follows the session.
 
 ## What is not yet so
-- Find excludes only what the query bar's box excludes (closed, system, a
-  type); an item named to leave out is not yet a term of the lens.
+- Not leaves out only closed, system or a type; an item named to leave out
+  is not yet a term of the lens.
 - A kept view drawn in a document or a screen (`canvases.js` `keptView`)
   still nests what is inside what for the drawings that box it
   (architecture, grid, list). The canvas itself never does.

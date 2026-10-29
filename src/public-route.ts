@@ -5,7 +5,7 @@
 
 import type { ServerResponse } from 'node:http';
 import type { Part } from './documents.ts';
-import { GUARD, POLICY } from './public-document.ts';
+import { GUARD, POLICY, READER_POLICY } from './public-document.ts';
 import { listen } from './published-live.ts';
 import { drawingCode, pageData, pictureAt, publishedPage, shareOf } from './published-page.ts';
 import { publishedDocument, publishedPicture } from './published.ts';
@@ -37,7 +37,7 @@ export async function servePublic(res: ServerResponse, match: { workspace: strin
       const look = await pageLook(pelago!, { ...doc, id });
       const share = shareOf(doc, look.share);
       const page = await publishedPage(doc, canonical, site?.name, pageData({ ...doc, ...look, site }, path), share && pictureAt(at.named[0] ? `https://${at.named[0]}${path}` : path, share));
-      return res.writeHead(200, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': POLICY }).end(page);
+      return res.writeHead(200, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': READER_POLICY }).end(page);
     }
     // A product's page reads its data once open. What is not public, or not there, has no page at all.
     const found = pelago && (await pelago.forAnyone().db.query(`select 1 from entity where id = $1`, [id])).rows.length > 0;

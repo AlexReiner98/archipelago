@@ -107,8 +107,9 @@ system, or a type. **Walk** is the links followed from what Find finds, each
 out (→), in (←) or either way (↔), ×steps. **Limit** is the most items
 drawn, said as how many of it. In the code: the filter's `text`, `types`,
 `ids`, `links`, `in`; `only`, `within`; `exclude`; `walk`; `limit`
-(`src/lens-flat.ts`). Replaces *search*, *nodes* and *edges* where the bar
-meant these.
+(`src/lens-flat.ts`). Each term is made by choosing its kind, then the
+thing, never guessed from words (e_45sgrfqd). Replaces *search*, *nodes*,
+*edges*, *steps* and *alone* where the bar meant these.
 
 **canvas.** The page's one flat plane, where every item a lens reaches is a
 node and every link a wire; depth is never drawn (`docs/canvas.md`). A
@@ -203,4 +204,4 @@ true with its links. In the code: `commit` and
 | type pack | pack |
 | picture, where it means a view | view |
 | shape, where it means a drawing | drawing |
-| search, nodes, edges, where the query bar meant a part of a lens | Find, Only, Not, Walk |
+| search, nodes, edges, steps, alone, where the query bar meant a part of a lens | Find, Only, Not, Walk, Limit |
