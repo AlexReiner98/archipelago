@@ -53,3 +53,24 @@ test('a private document has no preview: it is read as its reader sees it, alone
   const readers = marks(draw([doc]).svg).filter((x) => x[0] === 'reader').map((x) => [x[1].item, x[1].as]);
   assert.deepEqual(readers, [['e_mine0000', 'own']]);
 });
+
+test('the rows are in the order a reader meets the site, however recently each changed', () => {
+  const page = (id: string, title: string, body: string, fields: Record<string, unknown> = {}) => ({ ...item(id, title, body), fields });
+  const scene = draw([
+    // The lens gives them newest first; the order drawn is the site's own.
+    page('e_zeta0000', 'Zeta, pointed at by nothing', 'Alone.'),
+    page('e_deep0000', 'Deep page', 'Back to [the start](/).', { path: 'deep' }),
+    page('e_alfa0000', 'Alpha, pointed at by nothing', 'Alone.'),
+    page('e_tool0000', 'Tools', 'See [deep](/deep).', { path: 'tools', menu: 2 }),
+    page('e_quik0000', 'Quickstart', 'Then e_prin0000.', { path: 'quickstart', menu: 1 }),
+    page('e_prin0000', 'Principles', 'Read [tools](/tools).', { path: 'principles' }),
+    page('e_home0000', 'Welcome', 'Start with [the quickstart](/quickstart) or [deep](/deep).', { path: 'home' }),
+    // Every page ends with the footer: it is read last, and what only it points at just before what nothing does.
+    page('e_foot0000', 'Footer', '[Pricing](/pricing) · [Tools](/tools)', { path: 'footer' }),
+    page('e_cost0000', 'Pricing', 'Plans.', { path: 'pricing' }),
+  ]);
+  assert.deepEqual(
+    scene.svg.slice(2).map((r: any) => r[1].key.slice(2)),
+    ['e_home0000', 'e_quik0000', 'e_tool0000', 'e_deep0000', 'e_prin0000', 'e_cost0000', 'e_alfa0000', 'e_zeta0000', 'e_foot0000'],
+  );
+});

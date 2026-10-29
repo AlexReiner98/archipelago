@@ -606,11 +606,13 @@
         },
         "path": {
           "type": "string",
-          "description": "Its address word once published here, as a document's: published only where the workspace that shares it allows it."
+          "description": "Its address word once published here, as a document's: published only where the workspace that shares it allows it.",
+          "shown": true
         },
         "menu": {
           "type": "number",
-          "description": "Its place in the site's header, lowest first, as a document's."
+          "description": "Its place in the site's header, lowest first, as a document's.",
+          "shown": true
         }
       }
     }
