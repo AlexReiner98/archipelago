@@ -6,7 +6,7 @@
 
 import { hooks } from './base.js';
 import { busy, windowOf } from './pane-busy.js';
-import { heard, nameOf, route, sessionOf } from './pane-route.js';
+import { nameOf, route, sessionOf } from './pane-route.js';
 import { activeId, flash, goPane, only, openPane, paneAt, place } from './panes.js';
 import { arrived, drawStrip, openTab, toFront } from './tab-bar.js';
 import { drawable, focusOf, keep, landed, named, outTabs, poppedTab, tabOf, tabs } from './tabs.js';
@@ -41,8 +41,7 @@ hooks.land = (step) => {
   const out = outTabs()
     .filter((t) => !tabOf(t.id) && windowOf(t.id))
     .map((t) => ({ id: t.id, follows: t.follows ?? 'all', popped: true, panes: [{ ...paneOf(t, focusOf(t), false), busy: busy(t.id) }] }));
-  const others = [...heard].filter(([key, o]) => key !== session && now - o.at < 600_000).length;
-  const to = route(step, [...docked, ...out], { now, recent: 600_000, settle: 30_000, others, drawable: drawable(at) });
+  const to = route(step, [...docked, ...out], { now, recent: 600_000, drawable: drawable(at) });
   // The pane is held for the session from now on, unless it is the reader's in focus (lit only because it drew this) or named.
   const lit = (t, pane) => {
     landed.set(`${t.id}:${pane}`, { session, at: now });

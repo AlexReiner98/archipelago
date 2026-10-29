@@ -2,7 +2,9 @@
 //
 // Text is matched as typed anywhere in the title, or as the same words in any form in the title or notes. Only when
 // that finds nothing are titles with a word close to what was typed taken instead: a slip of the keys should find
-// something, but "hosting" should not also bring up "posting".
+// something, but "hosting" should not also bring up "posting". Two letters swapped ("qurey") share too few trigrams
+// with the word meant to be close to it, so the near match also tries what was typed with each pair side by side
+// swapped back (issue e_3m3nt2e3).
 
 import type { Q } from './db.ts';
 import type { Entity } from './pelago.ts';
@@ -31,6 +33,17 @@ begin
 end $fn$;
 grant execute on function pelago_search_ids(text, boolean) to pelago_member;
 `;
+
+/**
+ * What was typed (`q`, a parameter or a column) and each way of it with two letters side by side swapped, as a table
+ * of one column, when `when` holds; else only as typed. The swaps are tried in the first 64 characters.
+ */
+export const slipsOf = (q: string, when = 'true') =>
+  `(select ${q}::text union select overlay(${q}::text placing substr(${q}::text, i + 1, 1) || substr(${q}::text, i, 1) from i for 2) from generate_series(1, least(length(${q}::text), 64) - 1) i where ${when})`;
+
+/** The ids the search finds for `q` (a parameter): as typed, or (near) titles close to it, a slip of two letters undone. */
+export const searchIds = (q: string, near: boolean) =>
+  near ? `select pelago_search_ids(v, true) from ${slipsOf(q)} slips(v)` : `select pelago_search_ids(${q}, false)`;
 
 export interface SearchInput {
   q?: string;
@@ -61,7 +74,7 @@ export async function search(db: Q, family: (type: string) => string[], input: S
     };
     let rank = '';
     if (input.q) {
-      add(`id in (select pelago_search_ids(?, ${near}))`, input.q);
+      add(`id in (${searchIds('?', near)})`, input.q);
       rank = `${rankSql(`$${params.length}`)} desc, `;
     }
     if (input.type) add(`type = any(?::text[])`, family(input.type));

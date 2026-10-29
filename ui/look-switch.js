@@ -3,7 +3,7 @@
 // map by name (not a version of a pack's, not on a kind or type); the house's is what is drawn with neither. A saved
 // canvas brings its own when it is opened, and Save keeps it with the lens.
 
-import { api, h, state } from './base.js';
+import { api, ask, h, state, tell } from './base.js';
 import { flatQuery } from './lens.js';
 
 /** The styles kept on the map by name, read once. */
@@ -12,6 +12,26 @@ const namedStyles = () =>
   (named ??= api('search', { type: 'style', open: true, limit: 100 })
     .then((rows) => rows.filter((s) => !s.props?.preset && !s.props?.on?.length).sort((a, b) => a.title.localeCompare(b.title)))
     .catch(() => []));
+
+/** Delete, in the band's menu while the pane is drawn with a style kept on the map: the style is archived (it leaves
+ *  the switch and stays in the history), and the pane is drawn as the house's. None for a shape or the house's. */
+export function styleDelete(lens, style, open) {
+  if (!style.style) return null;
+  const act = async () => {
+    const kept = (await namedStyles()).find((s) => s.id === style.style);
+    const title = kept?.title ?? 'this style';
+    if (!(await ask({ title: `Delete "${title}"?`, message: 'It leaves the styles to choose from but stays in the history.', action: 'Delete', danger: true }))) return;
+    try {
+      await api('change', { ops: [{ op: 'archive', id: style.style }], reason: `${title}: style deleted from the view band` });
+    } catch (err) {
+      return tell('That was not deleted', err.message);
+    }
+    named = null;
+    const { style: _k, ...rest } = style;
+    open(`#/v?${flatQuery(lens, rest)}`);
+  };
+  return { text: 'Delete style', title: 'Delete the style this canvas is drawn with', act, danger: true };
+}
 
 /** The style asked of a pane, as one choice: a shape, a style kept by its id, or the house's. */
 const chosenOf = (style) => (style.style ? `style:${style.style}` : style.shape ? `shape:${style.shape}` : '');

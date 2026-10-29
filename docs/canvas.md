@@ -265,40 +265,41 @@ like the canvas settings: never on the map, meaning nothing.
 Each tab follows everyone (the default), one session, or nobody (its name
 in italics): the reader picks it in ⋯. Where an agent's step lands is `pane-route.js`, worked
 out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
-- a session's show or change goes to the tab that follows it;
+- only a show lands: a change or a beat of a session's story moves nothing,
+  and with Follow agents on it is only said in the line at the foot, with Go
+  there (the owner, 29 Oct 2026, e_e7yfp2yg). A show lands whether or not the
+  page follows agents (e_jk63uduv);
+- a session's show goes to the tab that follows it;
 - else to a tab that follows everyone and no other session at work (a step
   within ten minutes) holds: the one where it holds a pane, the one it
   landed in, the one drawing it, else the one in sight;
 - when those are all held by other sessions, it gets a tab of its own,
-  following it;
+  following it, out of sight;
 - within the tab, a show's `pane` may be a name of the session's own ("map",
   "tests"): a pane by that name is split beside the others the first time and
   drawn in again each time it is named. Else it goes to the session's own
   pane: one held for it (a pane keeps whose it is, and says so in its strip,
   for as long as it stands, so a long session finds it again), else one that
   draws what it shows, else one nobody holds, else one split for it. Never
-  the pane in focus, where the reader may be at work beside it (the owner,
-  28 Oct 2026), unless it draws that already; in a tab that follows the
-  session alone every pane is its own;
-- a tab comes into sight unless the reader is at work in the one in sight or
-  another session showed there in the last half minute: then it is drawn in
-  the background, its mark rings, and the line at the foot offers Open tab
+  the pane the reader is in or touched last (the owner, 28 and 29 Oct 2026);
+  in a tab that follows the session alone every pane is its own;
+- no tab is brought into sight: a show into a tab out of sight is drawn
+  there, its mark rings, and the line at the foot offers Open tab
   (e_xjrpyysn);
 - a pane the reader is busy in (`pane-busy.js`: a press, scroll or key there
   in the last twenty seconds, text selected there, or words typed in the
   sheet and not saved; moving the pointer or turning a dial is not busy) is
   never taken, and no pane is split into a tab the reader is at work in: a
-  show goes to a tab of its own in the background instead. A step that is not
-  a show moves no tab its session has not shown into while others are at
-  work, opens none and brings none into sight; otherwise it waits as the line.
+  show goes to a tab of its own in the background instead.
 A side (`left`, `right`, `above`, `below`) puts the session's pane there in
-its tab, and `alone` closes the others; `main`, from before every pane was
-alike, is the session's own pane. A page that is not a canvas (a screen)
-opens in the sheet over the pane in focus. A session
+its tab; `alone` closes the others only in a tab that follows the session;
+`main`, from before every pane was alike, is the session's own pane. A page
+that is not a canvas (a screen) opens in the sheet only in a tab that follows
+the session, and is otherwise offered. A session
 is its run: a step carries the run it names (show, tell, session_update), or
-the one its agent last named (`src/presence.ts`). Following is on until the
-reader turns it off. A popped-out window follows no agent: the main page
-does, and draws a show for its tab in the window's pane in focus.
+the one its agent last named (`src/presence.ts`). A popped-out window follows
+no agent: the main page does, and draws a show for its tab in the window's
+pane in focus when that tab follows the session.
 
 ## What is not yet so
 - Not leaves out only closed, system or a type; an item named to leave out

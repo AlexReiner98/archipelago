@@ -4,7 +4,7 @@
 // item opens its page and leaves the lens as it was (decision e_jedng69e); the find bar sets its words. It is drawn in the drawing its style names (the
 // flow, by the canvas pack's preset, unless a nearer style says otherwise), so a canvas has no look of its own: it keeps
 // which lens is up, lights the item whose page is open, and moves as the reader chose in the settings menu: fitted on
-// every change, or left where they put it.
+// every change until they move it themselves (a page opened or shut then leaves it be), or left where they put it.
 
 import { api, hooks, state } from './base.js';
 import { wiresOn } from './canvas-wires.js';
@@ -44,6 +44,10 @@ function barNow() {
 export const lensNow = () => current?.lens ?? null;
 /** Draw this lens in the canvas in focus. */
 export const goLens = (lens) => current?.pane.go(lens);
+/** Open an address in the canvas in focus: a saved canvas, or a lens in a style, as the bar's switches do. */
+export const openHere = (href) => current?.pane.open(href);
+/** The style the canvas in focus was asked for (a shape, a style kept by id, the saved canvas up). */
+export const styleNow = () => current?.asked ?? {};
 /** Draw Home in the canvas in focus. */
 export const goHome = () => current?.pane.go(null);
 /** Whether the canvas in focus draws this item now. */
@@ -132,8 +136,16 @@ export function canvasIn(host, pane) {
     },
     /** The frame the drawing moves in now, and what moves it (ui/pan-zoom.js). */
     moves: () => at?.view?.querySelector('.lens-view')?.moves,
-    /** All of it in sight, beside the sheet and between the bars, when the reader asked for that. */
-    fit: () => settings.fit && c.moves()?.fit(covered(host), ...bars(host)),
+    /**
+     * All of it in sight, beside the sheet and between the bars, when the reader asked for that and has not moved it
+     * since its lens was drawn: a page opened or shut, or the window resized, does not undo their move. `force` (the
+     * setting turned on) fits it whatever they did.
+     */
+    fit(force = false) {
+      if (!settings.fit || (!force && at?.kept)) return;
+      if (at) at.kept = null;
+      c.moves()?.fit(covered(host), ...bars(host));
+    },
     snap() {
       if (at?.style) at.style.snap = Boolean(settings.snap);
     },
@@ -148,11 +160,11 @@ export function canvasIn(host, pane) {
   // Where the reader left it, each time they move it: a drawing drawn again (the map changed) is put back there.
   const keepIt = () => at && c.moves() && (at.kept = c.moves().state());
   for (const name of ['pointerup', 'wheel']) host.addEventListener(name, () => setTimeout(keepIt, 0), { passive: true });
-  // A drawing mounted anew (a new view, the map changed under it): fitted, or back where the reader left it.
+  // A drawing mounted anew (a new view, the map changed under it): back where the reader left it, else fitted.
   new MutationObserver((list) => {
     if (!list.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && (n.matches('.lf-stage') || n.querySelector?.('.lf-stage'))))) return;
-    if (settings.fit) c.fit();
-    else if (at?.kept) c.moves()?.restore(at.kept);
+    if (at?.kept) c.moves()?.restore(at.kept);
+    else c.fit();
   }).observe(host, { childList: true, subtree: true });
   // A click on an item drawn opens its page over the canvas, the lens as it was: reading an item does not reshape what
   // is drawn (the owner, 28 Oct 2026, e_jedng69e).
@@ -251,7 +263,7 @@ addEventListener('visibilitychange', () => document.hidden && writeMoves());
 
 // ---- What the reader chose for the canvas, in the view band's menu (decision e_yxp78scv): kept in this browser, the same for every pane.
 
-/** fit: all of it brought into sight on every change; else the reader alone moves it. The key is the style's (key). */
+/** fit: all of it brought into sight on every change until the reader moves it; else the reader alone moves it. The key is the style's (key). */
 const settings = { fit: true, snap: false };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem('pelago-canvas') ?? '{}'));
@@ -280,7 +292,7 @@ function toggle(name) {
   } catch {
     // Kept until the page is reloaded.
   }
-  all.forEach((c) => (c.snap(), c.fit()));
+  all.forEach((c) => (c.snap(), c.fit(true)));
 }
 // What the band's menu (ui/canvas-menu.js) acts on: Arrange the pane in focus, and the reader's toggles.
 hooks.canvasNow = { arrange: () => current?.arrange(), settings, toggle };

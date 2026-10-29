@@ -203,6 +203,15 @@ test('several sets of words are each a term: what any of them finds is a seed', 
   const read = await flatLens(l, { filter: { text: ['canvases', 'tags'] } });
   assert.deepEqual(read.lens.include.text, ['canvases', 'tags']);
   assert.equal(read.matched, 2, 'matched counts what all the sets found');
+  const both = await flatLens(l, { filter: { text: ['query', 'query bar'] } });
+  assert.equal(both.matched, both.items.length, 'an item two sets find is counted once');
+});
+
+test('a word with two letters swapped finds what it was meant to', async () => {
+  const { l } = await chain();
+  assert.deepEqual(titles(await flatLens(l, { filter: { text: 'qurey bar' } })), ['Query bar']);
+  assert.deepEqual(titles(await flatLens(l, { filter: { text: 'qurey' } })), ['Query bar']);
+  assert.deepEqual((await l.search({ q: 'qurey' })).map((e) => e.title), ['Query bar']);
 });
 
 test('an item named by id is drawn whatever Not says, and the walk from it still keeps Not', async () => {

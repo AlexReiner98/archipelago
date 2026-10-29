@@ -9,7 +9,7 @@
 import { SYSTEM } from './head.ts';
 import type { Archipelago } from './pelago.ts';
 import { checkedAfter, holding, readWord, wordConditions, type Narrowing } from './lens-only.ts';
-import { rankSql } from './search.ts';
+import { rankSql, searchIds, slipsOf } from './search.ts';
 
 /** One link term of a filter: the items that have a link of this type to `to` (or, with `from`, the items `from` links to). */
 export interface LinkTerm {
@@ -199,18 +199,31 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   if (inside?.length && room() > 0) add(await holds(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [inside, reach()])), 'in');
   // The text is the search read's own (src/search.ts): the words in any form in the title or note, or as typed anywhere
   // in the title, the best match first; only when that finds nothing, titles with a word close to what was typed.
-  // How many it found in all is kept (`matched`), counted over what the viewer may see and the filter keeps.
+  // How many it found in all is kept (`matched`), counted over what the viewer may see and the filter keeps; an item
+  // two sets of words both find is counted once (issue e_z4sg2n8f).
   let matched: number | undefined;
+  const asked: { said: string; near: boolean }[] = [];
+  const matchedIds = new Set<string>();
   for (const said of hidden ? [] : (text ?? [])) {
     if (room() <= 0) break;
     const finding = async (near: boolean) => (await l.db.query<{ id: string; n: number }>(
-      `select e.id, count(*) over ()::int as n from entity e where e.id in (select pelago_search_ids($1, ${near})) and ${narrowed(3)} order by ${rankSql('$1', 'e.')} desc, e.updated_at desc, e.id limit $2`,
+      `select e.id, count(*) over ()::int as n from entity e where e.id in (${searchIds('$1', near)}) and ${narrowed(3)} order by ${rankSql('$1', 'e.')} desc, e.updated_at desc, e.id limit $2`,
       [said, reach(), leftOut, ...narrowing])).rows;
+    let near = false;
     let rows = await finding(false);
-    if (!rows.length) rows = await finding(true);
+    if (!rows.length) rows = await finding((near = true));
     const found = await holds(rows.map((r) => r.id));
+    asked.push({ said, near });
+    for (const id of found) matchedIds.add(id);
     matched = (matched ?? 0) + (checked ? found.length : (rows[0]?.n ?? 0));
     add(found, 'text');
+  }
+  if (asked.length > 1 && matched) {
+    matched = checked
+      ? matchedIds.size
+      : (await l.db.query<{ n: number }>(
+          `select count(*)::int as n from entity e where e.id in (select pelago_search_ids(v, s.near) from unnest($1::text[], $2::boolean[]) s(q, near) cross join lateral ${slipsOf('s.q', 's.near')} slips(v)) and ${narrowed(3)}`,
+          [asked.map((a) => a.said), asked.map((a) => a.near), leftOut, ...narrowing])).rows[0].n;
   }
   if (types?.length && room() > 0) add(await holds(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [types.flatMap((t) => l.registry.family(t)), reach()])), 'type');
 
