@@ -41,9 +41,12 @@ async function freeze(l: Archipelago, id: string, draft = false) {
   if (!reader) throw new Error(`"${id}" is not a public document.`);
   const sections = reader.parts.flatMap((part) => ('section' in part ? [part.section] : []));
   const { lenses, types } = await picturesOf(l, sections, true);
-  // Its own address word and place in the header, and the address word of each document it links to.
+  // Its own address word and place in the header, and the address word of each document it links to: by its id, or
+  // by its address ([Quickstart](/quickstart), [home](/) for the front page).
   const props = (await l.entity(id))?.props ?? {};
-  const paths = Object.fromEntries(others.filter((o) => o.path && reader.links?.[o.id]).map((o) => [o.id, o.path]));
+  const said = JSON.stringify(reader.parts);
+  const linked = (o: { id: string; path: string | null }) => Boolean(reader.links?.[o.id]) || said.includes(`](/${o.path === 'home' ? '' : o.path})`);
+  const paths = Object.fromEntries(others.filter((o) => o.path && linked(o)).map((o) => [o.id, o.path]));
   return { ...reader, sections: sections.map((s) => s.id), lenses, types, path: pathOf(props.path), menu: typeof props.menu === 'number' ? props.menu : null, ...(Object.keys(paths).length && { paths }) };
 }
 

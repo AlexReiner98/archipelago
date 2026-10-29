@@ -15,6 +15,8 @@ export function drawSpans(text) {
       if (s.t === 'strong') return h('strong', {}, draw(s.spans));
       if (s.t === 'em') return h('em', {}, draw(s.spans));
       if (s.t === 'code') return h('code', { class: 'note-code' }, s.text);
+      // A page of the site by its address is the site's to lead to: here its words, its address in the tooltip.
+      if (s.t === 'page') return h('span', { title: s.path }, s.text);
       if (s.t === 'link') return h('a', { href: s.href, target: '_blank', rel: 'noopener noreferrer', title: s.href }, s.text ?? s.href.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''));
       return h('a', { href: `#/e/${s.id}`, class: 'note-item', title: titles.get(s.id) ?? 'Open it' }, s.text ?? titles.get(s.id) ?? 'this item');
     });

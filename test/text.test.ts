@@ -68,10 +68,10 @@ test('ticking changes one line of the note and nothing else', () => {
   assert.equal(ticked(NOTE, 5, true), null);
 });
 
-test('a line reads as spans: strong, said so, code, links and items', () => {
-  const spans = readSpans('See e_abcd1234, [the plan](e_wxyz9876), **bold** and *said* `x` and https://example.com/a.');
+test('a line reads as spans: strong, said so, code, links, pages of the site and items', () => {
+  const spans = readSpans('See e_abcd1234, [the plan](e_wxyz9876), **bold** and *said* `x` and https://example.com/a, [Start here](/quickstart) or [home](/).');
   assert.deepEqual(
-    spans.filter((s: { t: string }) => s.t !== 'text').map((s: { t: string; id?: string; text?: string | null; href?: string }) => [s.t, s.id ?? s.href ?? s.text]),
+    spans.filter((s: { t: string }) => s.t !== 'text').map((s: { t: string; id?: string; text?: string | null; href?: string; path?: string }) => [s.t, s.id ?? s.href ?? s.path ?? s.text]),
     [
       ['item', 'e_abcd1234'],
       ['item', 'e_wxyz9876'],
@@ -79,6 +79,8 @@ test('a line reads as spans: strong, said so, code, links and items', () => {
       ['em', undefined],
       ['code', 'x'],
       ['link', 'https://example.com/a'],
+      ['page', '/quickstart'],
+      ['page', '/'],
     ],
   );
 });
