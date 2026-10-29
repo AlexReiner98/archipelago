@@ -39,6 +39,8 @@ export async function handoff(input, ctx) {
   const unconfirmed = asked.to_confirm ? { ...asked.to_confirm, questions: asked.items.map((i) => ({ id: i.id, title: i.title, ...Object.fromEntries(Object.entries(i.reasons[0]).filter(([k]) => k !== 'why')) })) } : { count: 0 };
   const inRepo = new Set([repo.id, ...(await ctx.read({ scope: repo.id, fields: [] })).map((e) => e.id)]);
   const unshaped = (await ctx.read({ view: 'hubs', params: { within: repo.id } })).hubs.filter((h) => h.views === 0 && inRepo.has(h.id));
+  // Built or done, and nobody has seen it work where it is used: said on the item itself, not in the note.
+  const unseen = (await ctx.read({ items: { type: 'work', where: { seen_working: false } }, fields: ['to_see'] })).filter((e) => inRepo.has(e.id));
   const length = note?.body.length ?? 0;
   const pushed = await pushes(ctx, repo.id, since.toISOString(), 20);
   const settled = stale.filter((e) => !e.is_open && after(e.updated_at));
@@ -47,6 +49,7 @@ export async function handoff(input, ctx) {
     repo: work.repo,
     last_push: work.last_push,
     note: note ? { id: note.id, title: note.title, written: note.updated_at, characters: length, body: note.body } : null,
+    ...(unseen.length > 0 && { unseen: unseen.slice(0, 15).map((e) => ({ ...slim(e), ...(e.props?.to_see && { to_see: e.props.to_see }) })) }),
     // The owner is met in chat: what agents settled and they have not answered for comes with where things stand.
     ...(unconfirmed.count > 0 && { for_owner: unconfirmed }),
     since: since.toISOString(),
@@ -68,6 +71,6 @@ export async function handoff(input, ctx) {
         : note && length > HANDOFF_MAX * 0.8
           ? `The note is ${length} of the ${HANDOFF_MAX} characters it may be: there is no room to add to it, so replace its parts. `
           : '') +
-      `Everything but the note is read off the map as it is now: where the note and the lists disagree, the lists are right. When you finish, put in the note only what the map cannot know (what nobody has seen working, what bites when working here, what you would do next and why): one of each part, a few lines under a short title. Replace a part that is there (replace, or the whole note with body) rather than adding another beside it, and take out what is no longer so; the note may be ${HANDOFF_MAX} characters at most. What is true of one item goes in that item's note. Do not repeat the open work, the last push or what was settled: they are here.`,
+      `Everything but the note is read off the map as it is now: where the note and the lists disagree, the lists are right. What nobody has seen working is said on the item itself (seen_working false, and what would show it in to_see) and listed here as unseen; set seen_working true once it has been seen. When you finish, put in the note only what the map cannot know (what bites when working here, what you would do next and why): one of each part, a few lines under a short title. Replace a part that is there (replace, or the whole note with body) rather than adding another beside it, and take out what is no longer so; the note may be ${HANDOFF_MAX} characters at most. What is true of one item goes in that item's note. Do not repeat the open work, the last push or what was settled: they are here.`,
   };
 }

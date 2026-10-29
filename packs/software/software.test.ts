@@ -25,7 +25,7 @@ function ctxOver(items: Item[], opts: { scope?: Record<string, string[]>; lives?
     zone: 'America/Toronto',
     read: async (q: Record<string, any>) => {
       if (q.get) return byId.get(q.get) ?? null;
-      if (q.items) return [...byId.values()].filter((e) => e.is.includes(q.items.type));
+      if (q.items) return [...byId.values()].filter((e) => e.is.includes(q.items.type) && Object.entries(q.items.where ?? {}).every(([k, v]) => e.props[k] === v));
       if (q.scope) return of(opts.scope?.[q.scope] ?? [], q.types).filter((e) => q.open === undefined || e.is_open === q.open).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
       if (q.related && q.relation === 'lives_in' && q.direction === 'in') return of(opts.lives?.[q.related] ?? [], q.types);
       if (q.related && q.relation === 'lives_in') return Object.entries(opts.lives ?? {}).filter(([, ids]) => ids.includes(q.related)).map(([place]) => byId.get(place));
@@ -80,6 +80,11 @@ test('a handoff counts from its note: what was settled, what opened, the pushes 
   assert.deepEqual(answer.since_then.sessions.map((s: { id: string; said: string }) => [s.id, s.said]), [['run', 'finished: all good']]);
   assert.deepEqual([answer.open.ready.length, answer.open.blocked[0].waiting_on], [2, ['Alex']]);
   assert.match(answer.how, /^Everything but the note/);
+  assert.equal(answer.unseen, undefined, 'nothing said to be unseen, no list');
+  // Done and not yet seen working, here and in another repository: only this one's is listed, with what would show it.
+  const unseenItems = [...ITEMS, { id: 'u', type: 'task', title: 'Rules on a reply', status: 'done', is_open: false, props: { seen_working: false, to_see: 'a real session' } }, { id: 'far', type: 'task', title: 'Elsewhere', props: { seen_working: false } }, { id: 'seen', type: 'task', title: 'Seen', props: { seen_working: true } }];
+  const seen = (await handler['software.handoff']({ repo: 'repo' }, ctxOver(unseenItems, { ...OPTS, scope: { ...OPTS.scope, repo: [...OPTS.scope.repo, 'u', 'seen'] } }))).answer;
+  assert.deepEqual(seen.unseen, [{ id: 'u', type: 'task', title: 'Rules on a reply', status: 'done', to_see: 'a real session' }]);
   const bare = (await handler['software.handoff']({ repo: 'repo' }, ctxOver(ITEMS.filter((i) => i.id !== 'note'), OPTS))).answer;
   assert.match(bare.how, /^Nobody has written a handoff note for this repository/);
   assert.equal(bare.since, '2026-10-09T12:00:00.000Z', 'a week back with no note');

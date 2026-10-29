@@ -375,8 +375,10 @@ A handoff is mostly read off the map, so it does not go stale between
 sessions: the last push, what is open, and what has happened since the
 handoff note was written (pushes, what was settled or opened, the sessions
 that ended and what each said). The note (`handoff`) is the one part
-an agent writes, and holds only what the map cannot know: what nobody has
-seen working, what bites when working here, what to do next and why.
+an agent writes, and holds only what the map cannot know: what bites when
+working here, what to do next and why. What nobody has seen working is said
+on the item (`seen_working` false, with what would show it in `to_see`) and
+listed in the handoff as `unseen`.
 
 ## Packs and flavours
 

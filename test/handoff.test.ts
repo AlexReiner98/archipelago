@@ -331,3 +331,20 @@ test('a run in GitHub Actions reports what it used, once, and the repository add
   assert.equal((await l.proposals()).length, 0, 'a report is not a change to review');
 });
 
+
+test('what nobody has seen working is said on the item and listed in the handoff; a trap is said for the file it names', async () => {
+  const l = await fresh();
+  const made = await laneSetup(l);
+  await make(l, [{ op: 'update', id: made.offline, status: 'done', props: { seen_working: false, to_see: 'a run on a real model' } }]);
+  const unseen = ((await ask(l, 'handoff', { repo: made.repo })) as any).unseen;
+  assert.deepEqual(unseen.map((i: any) => [i.id, i.status, i.to_see]), [[made.offline, 'done', 'a run on a real model']]);
+  await make(l, [{ op: 'update', id: made.offline, props: { seen_working: true } }]);
+  assert.equal(((await ask(l, 'handoff', { repo: made.repo })) as any).unseen, undefined, 'seen, it leaves the list');
+  const { trap } = await make(l, [
+    { op: 'create', ref: 'trap', type: 'instruction', title: 'The pane cannot load draw.html', body: 'Drawings stay on Loading… in the browser pane: start with PELAGO_UNSANDBOXED=1.', props: { for: ['file:ui/draw.*'] } },
+    { op: 'link', type: 'about', from: 'trap', to: made.repo },
+  ]);
+  const said = async (path: string) => ((await ask(l, 'instructions', { for: `file:${path}`, about: made.repo })) as any).said.map((s: any) => s.id);
+  assert.deepEqual(await said(String.raw`C:\code\Apex\ui\draw.html`), [trap]);
+  assert.deepEqual(await said('ui/canvas.js'), []);
+});

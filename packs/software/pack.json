@@ -210,7 +210,7 @@
       "description": "Where a working session left things for the next one.",
       "note_max": {
         "chars": 3000,
-        "say": "It holds one of each part (not seen working, what bites here, next and why). Rewrite it whole with body: keep what is still so, drop what later work settled, and put what is true of one item in that item's note."
+        "say": "It holds one of each part (what bites here, next and why); what nobody has seen working is said on the item, with seen_working false. Rewrite it whole with body: keep what is still so, drop what later work settled, and put what is true of one item in that item's note."
       }
     },
     {

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { checkDeclared } from '../src/declared.ts';
-import { said, filled } from '../src/instructions.ts';
+import { said, filled, globNames } from '../src/instructions.ts';
 import { hookSessionStart } from '../src/sessions.ts';
 import { VIEWS } from '../src/views.ts';
 import { fresh, laneSetup, make } from './map.ts';
@@ -28,6 +28,18 @@ test('what is said: presets in order, the owner\'s version in its place, retired
   assert.deepEqual(said(presets, there, 'session_start', 'e_apex').map((s) => s.text), ['New one.', 'Say it here.', 'Say two.']);
   assert.deepEqual(said(presets, there, 'session_start', 'e_other').map((s) => s.text), ['New one.', 'Say it everywhere.', 'Say two.']);
   assert.equal(filled('run {run}, {unknown}', { run: 'r_1' }), 'run r_1, {unknown}');
+});
+
+test('an instruction for a file is said for a file its glob names, from the checkout or the disk, and nowhere else', () => {
+  assert.ok(globNames('ui/draw.*', 'ui/draw.js') && globNames('ui/draw.*', 'C:\\code\\archipelago\\ui\\draw.html') && globNames('ui/draw.*', './ui/draw.js'));
+  assert.ok(!globNames('ui/draw.*', 'ui/drawings/a.js') && !globNames('ui/draw.*', 'xui/draw.js'), 'a name within one folder, from a folder on');
+  assert.ok(globNames('src/**/*.ts', 'src/a.ts') && globNames('src/**/*.ts', 'src/x/y/a.ts') && !globNames('src/**/*.ts', 'src/a.js'));
+  assert.ok(globNames('test/?.test.ts', 'test/a.test.ts') && !globNames('test/?.test.ts', 'test/ab.test.ts'));
+  const traps = [kept('e_draw', { for: ['file:ui/draw.*'] }, 'The browser pane cannot load draw.html.'), kept('e_plan', { for: ['file:src/plan.ts', 'session_start'] }, 'Limits are read once in 10 s.')];
+  assert.deepEqual(said([], traps, 'file:ui/draw.html').map((s) => s.id), ['e_draw']);
+  assert.deepEqual(said([], traps, 'file:src/plan.ts').map((s) => s.id), ['e_plan']);
+  assert.deepEqual(said([], traps, 'file:src/other.ts'), []);
+  assert.deepEqual(said([], traps, 'session_start').map((s) => s.id), ['e_plan'], 'a glob is not a place of its own');
 });
 
 test('an instruction preset is checked as a style preset is: its words in body, only the fields its type lets a preset set', async () => {

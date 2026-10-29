@@ -1,5 +1,6 @@
 // What agents are told: the instructions the packs ship as presets, under those the map keeps, as styles are for
-// looks (src/styles.ts). Where each is said is its field `for`: session_start, working_rules, tool:<name>.
+// looks (src/styles.ts). Where each is said is its field `for`: session_start, working_rules, tool:<name>, or
+// file:<glob>, said to a session about to read or change a file the glob names (what bites there).
 //
 // Layers, the nearest last, each over one of the same name (its preset, or else its own id):
 //   a preset, an instruction kept about nothing (the workspace's), one kept about the repository a session is in.
@@ -29,6 +30,18 @@ export interface Said {
 
 const listed = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
 
+const FILE = 'file:';
+/** A path as globs read it: forward slashes, no leading ./ */
+const slashed = (path: string) => path.replace(/\\/g, '/').replace(/^(\.\/)+/, '');
+/** A glob as a pattern: ** any folders, * any name within one, ? one character, the rest as written. */
+const globRe = (glob: string) =>
+  slashed(glob).replace(/[.+^${}()|[\]]/g, '\\$&').replace(/\*\*\/|\*\*|\*|\?/g, (m) => (m === '**/' ? '(?:.*/)?' : m === '**' ? '.*' : m === '*' ? '[^/]*' : '[^/]'));
+/** Whether a glob names a path: the whole of it, or its end from a folder on, so a path from the disk's root matches a glob from the checkout's. */
+export const globNames = (glob: string, path: string) => new RegExp(`(^|/)${globRe(glob)}$`, 'i').test(slashed(path));
+
+/** Whether what is said at `where` is said by these `for`s: the same place, or a file one of its globs names. */
+const saidAt = (fors: string[], where: string) => fors.includes(where) || (where.startsWith(FILE) && fors.some((f) => f.startsWith(FILE) && globNames(f.slice(FILE.length), where.slice(FILE.length))));
+
 /** What is said where (`for`), to a session about `about`: the presets under what the map keeps, in order. Pure: what is read is handed in. */
 export function said(presets: StyleDef[], kept: KeptInstruction[], where: string, about?: string): Said[] {
   const named = new Map<string, { weight: number; at: number; id: string; title: string; open: boolean; text: string; props: Record<string, unknown>; preset?: string }>();
@@ -42,7 +55,7 @@ export function said(presets: StyleDef[], kept: KeptInstruction[], where: string
   }
   const order = (props: Record<string, unknown>) => (typeof props.order === 'number' ? props.order : Infinity);
   return [...named.values()]
-    .filter((one) => one.open && one.text.trim() && listed(one.props.for).includes(where))
+    .filter((one) => one.open && one.text.trim() && saidAt(listed(one.props.for), where))
     .sort((a, b) => order(a.props) - order(b.props) || a.at - b.at)
     .map(({ id, title, text, preset }) => ({ id, title, text, ...(preset && { preset }) }));
 }
