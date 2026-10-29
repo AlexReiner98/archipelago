@@ -110,6 +110,20 @@ async function save(lens, style, current, open) {
   if (id) open(`#/v?${flatQuery(lens, { ...style, canvas: id })}`);
 }
 
+/** Delete a saved canvas, after asking: it is retired (a lens's closed status), so it leaves the bar and Home and can
+ *  be used again from its page. What is up stays, no longer saved. */
+async function drop(lens, style, current, open) {
+  if (!(await ask({ title: `Delete “${current.title}”?`, message: 'It leaves the bar and Home. What is up stays, unsaved.', action: 'Delete', danger: true }))) return;
+  try {
+    await api('change', { ops: [{ op: 'update', id: current.id, status: 'retired' }], reason: 'Deleted from the query bar' });
+  } catch (err) {
+    return tell('Not deleted', err.message);
+  }
+  savedCanvases(true);
+  const { canvas: _c, ...rest } = style;
+  open(`#/v?${flatQuery(lens, rest)}`);
+}
+
 /** A mark drawn in the colour of what holds it, at the size of its text, from its strokes. */
 function drawnMark(...strokes) {
   const NS = 'http://www.w3.org/2000/svg';
@@ -121,6 +135,8 @@ function drawnMark(...strokes) {
 const dot = (x, y, r = 2) => `M${x - r} ${y}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
 /** Save's mark: a disk. */
 const saveMark = () => drawnMark('M2.5 2.5h9l2 2v9h-11z', 'M5 2.5v3.5h5v-3.5', 'M5 13.5v-4h6v4');
+/** Delete's mark: a bin. */
+const binMark = () => drawnMark('M2.5 4h11', 'M6 4v-1.5h4v1.5', 'M4 4l.8 9.5h6.4l.8-9.5', 'M6.7 6.5v4.5', 'M9.3 6.5v4.5');
 /** The canvas picker's mark: three items and the links between them. */
 const canvasMark = () => drawnMark(dot(4, 12), dot(12, 4), dot(12, 12), 'M5.5 10.5l5-5', 'M6 12h4');
 /** The style picker's mark: a palette with its paints, and a brush beside it. */
@@ -155,7 +171,7 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const travel = own.filter((b) => b.classList.contains('q-travel'));
     // Each picker marked before it, its tooltip saying what it is.
     const named = (mark, title) => h('span', { class: 'q-label q-pick-label', title, 'aria-hidden': 'true' }, mark);
-    part.replaceChildren(...travel, named(canvasMark(), 'Canvas: the saved canvas up'), pick, named(styleMark(), 'Style: how this canvas is drawn'), lookSwitch(lens, style, open), h('button', { type: 'button', class: 'q-save q-word', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, 'Save')), ...own.filter((b) => !travel.includes(b)), canvasMenu());
+    part.replaceChildren(...travel, named(canvasMark(), 'Canvas: the saved canvas up'), pick, named(styleMark(), 'Style: how this canvas is drawn'), lookSwitch(lens, style, open), h('button', { type: 'button', class: 'q-save q-word', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, 'Save')), ...(current && !current.preset ? [h('button', { type: 'button', class: 'q-save q-delete', title: `Delete “${current.title}”`, 'aria-label': 'Delete this saved canvas', onclick: () => drop(lens, style, current, open) }, binMark())] : []), ...own.filter((b) => !travel.includes(b)), canvasMenu());
     fitBar();
   });
   return part;
