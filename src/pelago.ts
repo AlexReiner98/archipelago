@@ -3,7 +3,7 @@
 
 import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts'; import { renamedLens } from './lens-names.ts';
 import { AGENT_CHANGES, agentChanges, decide, DEFAULT_AGENT_POLICY, type Policy, type Ruled } from './rules.ts';
-import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { authorityOf } from './authority.ts';
+import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.ts'; import { authorityOf } from './authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts'; import { mergeRefusals, once, overtaken } from './merge.ts';
 import { readEvents, type EventQuery } from './eventlog.ts';
@@ -247,7 +247,7 @@ export class Archipelago {
   /** measured: a report's reading (a part up or down), applied at once as a measurement, not anyone's judgment. */
   async change(actor: Actor, input: ChangeInput, measured = false) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
-    currentNames(this.registry, input.ops); await stillWritable(this.workspace); await mayWrite(this, actor, input.ops, measured);
+    currentNames(this.registry, input.ops); await stillWritable(this.workspace); await roomToStore(this.workspace); await mayWrite(this, actor, input.ops, measured);
     const { warnings } = await this.plan(input.ops);
     const me = actorId(actor);
     const claimed = input.authority;
@@ -409,7 +409,7 @@ export class Archipelago {
    * the ids it would make, with nothing written; ids: those ids, to make the same ones again.
    */
   async apply(actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority; token?: string; rule?: Decision; dry?: boolean; ids?: Record<string, string> } = {}) {
-    const ops = dropExcepted(input.ops, opts.except ?? []); await stillWritable(this.workspace);
+    const ops = dropExcepted(input.ops, opts.except ?? []); await stillWritable(this.workspace); if (!opts.dry) await roomToStore(this.workspace);
     if (!ops.length) throw new Error('Nothing left to apply after exclusions.');
     // Validate again: the map may have changed since this was proposed.
     const { warnings } = await this.plan(ops);

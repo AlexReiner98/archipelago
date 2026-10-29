@@ -13,6 +13,7 @@ import { controlValue, setControlValue, takeControlValue } from './control.ts';
 import { stillWritable } from './ended.ts';
 import type { Q } from './db.ts';
 import { normalEmail, sendMail } from './mail.ts';
+import { configurePlan, limitOf, limitsChanged, type Limits } from './plan.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import type { Tool } from './tools.ts';
@@ -30,38 +31,35 @@ export interface Member {
   added_at: string;
 }
 
-/** The most members a workspace may have, and what to say to the admin who would add one more (how to make room). */
-export interface MemberLimit {
-  members: number;
-  note?: string;
-  /** What the workspace is on, as the pack that set the limit names it ("Solo"), and where its admin manages that. */
-  plan?: string;
-  manage?: string;
-}
+/** A workspace's limits (src/plan.ts), members among them: the name it had when members were all a plan limited. */
+export type MemberLimit = Limits;
 
-let site = { origin: 'http://127.0.0.1:3100', nameOf: async (id: string) => id, limitOf: async (_id: string): Promise<MemberLimit | undefined> => undefined };
-/** Where the links in the mail lead, a workspace's name to put in it, and its member limit: the server says, when it starts. */
-export function configureMembers(given: Omit<typeof site, 'limitOf'> & Partial<Pick<typeof site, 'limitOf'>>) {
-  site = { ...site, ...given };
+let site = { origin: 'http://127.0.0.1:3100', nameOf: async (id: string) => id };
+/** Where the links in the mail lead, a workspace's name to put in it, and its limits: the server says, when it starts. */
+export function configureMembers(given: Partial<typeof site> & { limitOf?: (id: string) => Promise<Limits | undefined> }) {
+  const { limitOf: limits, ...rest } = given;
+  site = { ...site, ...rest };
+  configurePlan({ ...(limits && { limitOf: limits }), ...(rest.nameOf && { nameOf: rest.nameOf }) });
 }
 
 /**
- * A workspace's member limit is the server's, not its map's: a server pack sets it on a workspace it made (a plan with
+ * A workspace's limits are the server's, not its map's: a server pack sets them on a workspace it made (a plan with
  * room for so many), in the control values of the default workspace's database, where no workspace admin can reach.
+ * They are kept under the name they had when members were all a plan limited.
  */
 const limitKey = (workspace: string) => `member_limit:${workspace}`;
-/** A workspace's member limit, as the server says it. */
-export const limitOf = (workspace: string) => site.limitOf(workspace);
-export const memberLimit = (control: Q, workspace: string) => controlValue<MemberLimit>(control, limitKey(workspace));
-export async function setMemberLimit(control: Q, workspace: string, limit: MemberLimit | null): Promise<void> {
+export { limitOf };
+export const memberLimit = (control: Q, workspace: string) => controlValue<Limits>(control, limitKey(workspace));
+export async function setMemberLimit(control: Q, workspace: string, limit: Limits | null): Promise<void> {
   if (limit) await setControlValue(control, limitKey(workspace), limit);
   else await takeControlValue(control, limitKey(workspace));
+  limitsChanged(workspace);
 }
 
 /** Refuse one more member past the limit, saying how to make room. Those already in stay when a limit is lowered. */
 async function roomForOneMore(db: Q, workspace: string, added = 0): Promise<void> {
-  const limit = await site.limitOf(workspace);
-  if (!limit) return;
+  const limit = await limitOf(workspace);
+  if (!limit?.members) return;
   const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from member where removed_at is null`);
   if (rows[0].n - added < limit.members) return;
   const name = await site.nameOf(workspace);
@@ -94,7 +92,7 @@ export async function admitMember(whole: Archipelago, email: string, admin: bool
 
 /** On a workspace with a member limit a person signs in as a member: a human token for anyone else would be a seat unpaid for. */
 export async function humanTokenAllowed(l: Archipelago, person: string | undefined): Promise<void> {
-  if (!(await site.limitOf(l.workspace))) return;
+  if (!(await limitOf(l.workspace))) return;
   const { rows } = await (await wholeMap(l)).db.query(`select 1 from member where person_id = $1 and removed_at is null`, [person ?? '']);
   if (!rows.length) throw new Error('On this workspace a person signs in as a member: add them under Members first.');
 }

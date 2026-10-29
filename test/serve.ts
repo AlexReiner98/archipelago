@@ -25,7 +25,7 @@ after(async () => {
 });
 
 /** A server on its own port with in-memory databases and the repository's packs, read in place (test/map.ts). */
-export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; deliveries?: Limit; refused?: Limit }, sites?: Record<string, string>) {
+export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; token?: Limit }, sites?: Record<string, string>) {
   const root = mkdtempSync(join(tmpdir(), 'pelago-platform-'));
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(import.meta.dirname, '..', 'packs') });
   // The server checks the Host header against its port, so the port must be known first.
