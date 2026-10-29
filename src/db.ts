@@ -35,8 +35,15 @@ export async function openDb(where?: string): Promise<Database> {
   if (isServer(where)) return keepStatistics(await openPg(where, (db) => prepared(db, true)), true);
   mkdirSync(where, { recursive: true });
   const image = process.env.PELAGO_TEST_IMAGE && !existsSync(join(where, 'PG_VERSION')) ? await (blank ??= blankImage()) : undefined;
-  return keepStatistics(await prepared(new PGlite(where, { loadDataDir: image, extensions: { pg_trgm } })), false);
+  return keepStatistics(await prepared(new PGlite(where, { loadDataDir: image, extensions: { pg_trgm }, startParams: [...PGlite.defaultStartParams, ...WAL_KEPT] })), false);
 }
+
+/**
+ * How much write-ahead log a folder keeps. Postgres's own defaults (80 MB kept, up to 1 GB before a checkpoint) are
+ * for a server with many writers; one workspace's folder kept 185 of its 254 MB in it. With these it keeps some 30.
+ * The least Postgres takes is two segments of the log, 32 MB at its usual 16 MB a segment.
+ */
+const WAL_KEPT = ['-c', 'min_wal_size=32MB', '-c', 'max_wal_size=64MB'];
 
 // The steps of the schema this database lacks (src/migrate.ts). pg_trgm, which search uses for near-misses and typos,
 // is in the first; a Postgres server has it too.

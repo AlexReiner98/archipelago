@@ -257,3 +257,16 @@ create index if not exists log_fact_link_from on log_fact((value->>1)) where fie
 create index if not exists log_fact_merged_into on log_fact(value) where field = 'merged_into';
 create index if not exists log_entry_at on log_entry(at);
 `;
+
+/**
+ * Step 27. The activity from before the log began, gone: what change sets did is read from the log, and the event
+ * rows a map wrote of them before it had one were history of a legacy state that no read needs (the owner, 29 Oct
+ * 2026, question e_cgctyctz). They were two thirds of each backup. Only rows numbered before the log's first fact go;
+ * a merged backup's change sets, brought in since as events, stay.
+ */
+export const PRE_LOG_ACTIVITY = `
+delete from event ev
+ where ev.action in (${FACT_ACTIONS.map((a) => `'${a}'`).join(', ')})
+   and ev.seq < (select coalesce(min(f.seq), 0) from log_fact f) -- index log_fact_seq
+;
+`;

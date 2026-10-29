@@ -670,8 +670,8 @@ any other, and are held for review where the workspace holds agents' changes.
 
 ## Backups
 
-Every 6 hours the server writes each workspace out as one file,
-`backups/<workspace>/<time>.json.gz`, and keeps the newest 28 (a week). The
+Once a day the server writes each workspace out as one file,
+`backups/<workspace>/<time>.json.gz`, and keeps the newest 7 (a week). The
 file holds the log as it is stored, a snapshot of the projections at its
 head, and the tables beside the log; restored, the tables are that snapshot
 with the rest of the log projected on. Its words are sealed, so it is read
