@@ -44,6 +44,10 @@ function barNow() {
 export const lensNow = () => current?.lens ?? null;
 /** Draw this lens in the canvas in focus. */
 export const goLens = (lens) => current?.pane.go(lens);
+/** Open an address in the canvas in focus: a saved canvas, or a lens in a style, as the bar's switches do. */
+export const openHere = (href) => current?.pane.open(href);
+/** The style the canvas in focus was asked for (a shape, a style kept by id, the saved canvas up). */
+export const styleNow = () => current?.asked ?? {};
 /** Draw Home in the canvas in focus. */
 export const goHome = () => current?.pane.go(null);
 /** Whether the canvas in focus draws this item now. */

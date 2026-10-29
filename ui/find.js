@@ -5,13 +5,14 @@
 // light; Enter takes it and find stays open, emptied, to refine further: words in place of the words find set before,
 // every other term and the walk kept, or another term added; Shift+Enter adds the words as another set, found as
 // well (e_e3k797d3). Typing a part's word and a space
-// ("only ", "not ", "walk ", "limit "), or a click on a row's word, puts find in that part: its mark stands before the
+// ("only ", "not ", "walk ", "limit ", and "view " or "style " to choose the canvas's), or a click on a row's word, puts find in that part: its mark stands before the
 // box and the choices are that part's; Backspace in an empty box goes back to Find. Escape empties what was typed, then
 // leaves the part, then shuts find; so does a click away from it.
 
 import { api, asWords, h, state, wordsOf } from './base.js';
-import { goLens, home, lensNow } from './canvas.js';
+import { goLens, home, lensNow, openHere, styleNow } from './canvas.js';
 import { MODES, choicesFor, ledBy, wordsChoice } from './find-choices.js';
+import { flatQuery } from './lens.js';
 import { numberOf } from './lens-base.js';
 import { added, fitBar } from './query-bar.js';
 
@@ -23,7 +24,7 @@ const rows = document.getElementById('find-rows');
 /** The part of the lens find is in, by its word, and its mark before the box. */
 let mode = 'Find';
 const mark = h('span', { class: 'q-label find-mode', title: 'The part find is in: type another part’s word and a space to go there; Backspace goes back to Find' }, 'Find');
-const PLACEHOLDER = { Find: 'Find on the map', Only: 'Only what is so: done, a type, within…', Not: 'Leave out: closed, a type', Walk: 'Walk along a link', Limit: 'The most items drawn' };
+const PLACEHOLDER = { Find: 'Find on the map', Only: 'Only what is so: done, a type, within…', Not: 'Leave out: closed, a type', Walk: 'Walk along a link', Limit: 'The most items drawn', View: 'A saved view, by its name', Style: 'A style, by its name' };
 const input = h('input', { type: 'search', name: 'q', placeholder: 'Find on the map', autocomplete: 'off', 'aria-label': 'Find on the map', title: 'Choose what the words are: ↑↓, then Enter; Shift+Enter adds the words as another set' });
 let asked = 0;
 /** The choices drawn, what was typed when they were, and the lit one. */
@@ -64,7 +65,7 @@ function toMode(m, looking = true) {
 }
 
 /**
- * Take a choice: a part to go into; words in place of those find set before, or (`add`) as one more set; a link to
+ * Take a choice: a part to go into; a view to open; a style to draw the canvas in; words in place of those find set before, or (`add`) as one more set; a link to
  * walk along; a limit; any other term added to the lens. Find stays open with the cursor in it, to refine further.
  */
 function take(choice, add = false) {
@@ -72,7 +73,13 @@ function take(choice, add = false) {
   if (choice.mode) return void ((input.value = ''), toMode(choice.mode));
   again();
   input.focus();
+  // A view is opened in the pane, and a style draws the lens up in it, the saved canvas kept: find stays open to go on.
+  if (choice.href) return void openHere(choice.href);
   const lens = lensUp();
+  if (choice.style) {
+    const { shape: _s, style: _k, ...rest } = styleNow();
+    return void openHere(`#/v?${flatQuery(lens, { ...rest, ...choice.style })}`);
+  }
   if (choice.walk) {
     const { over = [], steps = 0 } = lens.walk ?? {};
     return goLens({ ...lens, walk: { over: choice.walk === 'all' ? 'all' : [...(over === 'all' ? [] : over), choice.walk], steps: steps || 1 } });
@@ -96,7 +103,10 @@ function drawChoices() {
   list.dataset.for = shownFor;
 }
 
-/** What the words could be: the words at once, the rest once the search answers; how many the words find, under the canvas's Not. */
+/**
+ * What the words could be: the words at once, the rest once the search answers; how many the words find under the
+ * canvas's Only, Within and Not, which Enter keeps, so the count is what Enter brings (task e_7bewev8v).
+ */
 async function look() {
   const q = input.value.trim();
   const mine = ++asked;
@@ -110,11 +120,11 @@ async function look() {
   lit = 0;
   drawChoices();
   const lens = lensUp();
-  const exclude = lens.filter.exclude;
+  const { only, within, exclude } = lens.filter;
   const most = numberOf(state.style, 'find_choice_items');
   const [all, counted] = await Promise.all([
     choicesFor(mode, q, { most, wide: numberOf(state.style, 'term_find_most'), lens }),
-    finding ? api('view', { name: 'flat', params: { filter: { text: q, ...(exclude && { exclude }) }, limit: most } }).catch(() => null) : null,
+    finding ? api('view', { name: 'flat', params: { filter: { text: q, ...(only && { only }), ...(within && { within }), ...(exclude && { exclude }) }, limit: most } }).catch(() => null) : null,
   ]);
   if (mine !== asked) return;
   const words = all.find((x) => x.words === q);
