@@ -51,7 +51,7 @@ setPackAsker((l, name, params) => askView(l, { kind: 'agent', name: 'kernel' }, 
 /** Answer a question by its name. */
 export async function askView(l: Archipelago, actor: Actor, name: string, params: Record<string, unknown> = {}): Promise<unknown> {
   const view = VIEWS[name];
-  if (view) return view.run(l, params);
+  if (view) return view.run(l, params, actor);
   const found = packView(l, name);
   if (!found && REPLACED[name]) throw new Error(`No view "${name}": attention answers it now. Ask query attention with params ${REPLACED[name]}.`);
   if (!found) throw new Error(`No view "${name}". Views: ${Object.keys(viewList(l)).join(', ')}`);

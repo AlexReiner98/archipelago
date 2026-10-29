@@ -87,7 +87,9 @@ export function added(lens, term) {
   if (term.exclude) f.exclude = [...new Set([...(f.exclude ?? ['system']), term.exclude])];
   // Only what is done finds nothing while Not leaves the closed out: it takes that away.
   if (term.only === 'done' && f.exclude?.includes('closed')) f.exclude = f.exclude.filter((x) => x !== 'closed');
-  return { ...lens, filter: f };
+  // A term added to a lens that names a view makes it a filter of the map again.
+  const { view: _view, ...rest } = lens;
+  return { ...rest, filter: f };
 }
 
 /** The lens with one of its filter's terms taken out: `field` and the value it holds. */
@@ -141,7 +143,8 @@ export function drawQuery(lens, view, go, lead) {
   last = [lens, view, go, lead];
   const f = lens.filter;
   const answer = view?.answer;
-  if (answer) lookAround(lens, answer);
+  // A lens that names a view draws what is not items of the map: nothing to look around.
+  if (answer && !lens.view) lookAround(lens, answer);
   const here = uses(answer?.items, answer?.links);
   const exclude = f.exclude ?? ['system'];
   const includes = [wordsOf(f).length, f.types?.length ?? 0, f.ids?.length ?? 0, f.links?.length ?? 0, f.in?.length ?? 0].reduce((a, b) => a + b, 0);
@@ -280,7 +283,8 @@ export function drawQuery(lens, view, go, lead) {
         h('input', { class: 'q-limit', inputmode: 'numeric', value: limit, size: String(limit).length || 1, 'aria-label': 'The most items drawn', title: 'The most items drawn', onchange: (ev) => Number(ev.target.value) >= 1 && go({ ...lens, limit: Math.round(Number(ev.target.value)) }) }),
         drawn && drawn.cloneNode(true))),
   );
-  bar.hidden = !filled;
+  // A lens that names a view has no terms, and its band still says which canvas it is.
+  bar.hidden = !filled && !lens.view;
   fitBar();
 }
 

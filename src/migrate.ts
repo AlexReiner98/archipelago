@@ -24,6 +24,7 @@ import { PARTITION } from './partitions.ts';
 import { SNAPSHOT } from './snapshot.ts';
 import { CLOSURE } from './closure.ts';
 import { MENTIONS } from './mentions.ts';
+import { ITEM_BYTES } from './bytes.ts';
 import { ACTIVE_HOLDS_BY_KEY, READ_INDEXES, ROW_POLICIES } from './read-indexes.ts';
 
 interface Migration {
@@ -65,6 +66,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 25, name: 'what is inside what, what names what, the indexes reads are bounded by, and visibility asked row by row', sql: CLOSURE + MENTIONS + READ_INDEXES + ROW_POLICIES + ACTIVE_HOLDS_BY_KEY },
   { version: 26, name: 'a document shared with another workspace may be published there', sql: SHARE_PUBLISHABLE },
   { version: 27, name: 'the activity from before the log began, gone', sql: PRE_LOG_ACTIVITY },
+  { version: 28, name: 'what each item adds to the log, in bytes', sql: ITEM_BYTES },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

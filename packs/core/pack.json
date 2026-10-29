@@ -186,6 +186,7 @@
         "filter": { "type": "json", "description": "What it finds: { text, types, ids, links, in, only, within, exclude }, as query flat's filter. It must include something." },
         "walk": { "type": "json", "description": "From what the filter finds, along these links: { over: a list of link types (each either way, or with > out along it, < in to it) or \"all\", steps }." },
         "limit": { "type": "number", "description": "The most items it draws." },
+        "view": { "type": "string", "description": "A view whose answer is items and links (such as usage), drawn in place of what a filter finds: then it needs no filter." },
         "style": { "type": "json", "description": "How it is drawn: { shape, lit, style } (a built-in drawing, what stays lit, a style kept on the map by its id)." },
         "pins": { "type": "json", "description": "Items kept on it by hand, as a list of ids: drawn with what the filter finds." },
         "pinned": { "type": "boolean", "description": "Kept in sight by the owner: first on Home." },

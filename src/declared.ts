@@ -329,7 +329,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
     const at = `${style.type ?? 'style'} "${style.id}"`;
     const styleFields = types.get(style.type ?? 'style')?.fields ?? {};
     if (style.type !== undefined && !['style', 'instruction', 'lens'].includes(style.type)) problems.push(`${at}: a preset is a style, an instruction or a canvas (lens)`);
-    if (style.type === 'lens' && (typeof style.props?.filter !== 'object' || !style.props.filter)) problems.push(`${at}: a canvas's props are a flat lens and a style: { filter, walk, limit, style }`);
+    if (style.type === 'lens' && typeof style.props?.view !== 'string' && (typeof style.props?.filter !== 'object' || !style.props.filter)) problems.push(`${at}: a canvas's props are a flat lens and a style: { filter, walk, limit, style }, or the view it draws and a style: { view, style }`);
     if (style.type === 'instruction' ? typeof style.body !== 'string' || !style.body.trim() : style.body !== undefined) problems.push(`${at}: an instruction says its words in body, and only an instruction has one`);
     if (!own(style.id)) problems.push(`${at} must be named "${pack.id}.<name>"`);
     if (!style.title || !style.props || typeof style.props !== 'object') problems.push(`${at} needs a title and its props`);

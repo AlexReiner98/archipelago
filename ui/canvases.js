@@ -37,7 +37,7 @@ export function canvasLens(item) {
   const filter = { ...(p.filter ?? {}) };
   const ids = [...new Set([...(filter.ids ?? []), ...(Array.isArray(p.pins) ? p.pins : [])])];
   if (ids.length) filter.ids = ids;
-  const lens = { filter, walk: p.walk ?? { over: [], steps: 0 }, ...(p.limit && { limit: p.limit }) };
+  const lens = { ...(p.view && { view: p.view }), filter, walk: p.walk ?? { over: [], steps: 0 }, ...(p.limit && { limit: p.limit }) };
   return { lens, style: { ...(p.style ?? {}), ...(!item.preset && { canvas: item.id }) } };
 }
 

@@ -13,7 +13,8 @@ option, optgroup { background: var(--panel); color: var(--text); }
    so they never cover it, and runs to the foot of the page, with find drawn over it: no room is kept for find. A drawing
    on the plane is fitted above find; one that scrolls (a list, a grid) keeps room for it after its end only, so its
    last row can be scrolled out from under it. Among several, each pane's strip holds the bar instead. */
-#canvas { --safe-top: calc(var(--strip) + var(--space-4)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
+/* Under the band too, where a style's emblem makes it taller than the strip. */
+#canvas { --safe-top: calc(max(var(--strip), var(--band)) + var(--space-4)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
 body[data-panes="1"] #canvas .pane-canvas .lens-view { padding: var(--safe-top) 0 var(--safe-bottom); }
 body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.lf-stage), body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.code-stage) { padding: var(--safe-top) 0 0; }
 /* A style's own code fills its pane, not the height a document gives its frame. */
@@ -25,6 +26,9 @@ body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.lf-stage), body[data-p
 /* Where the bars stand over a pane, nothing drawn in it is ever seen under them, whatever a drawing's own styling says:
    what scrolls is cut at the safe zone's top, and a drawing's fixed marks stay in its pane (contain). */
 body[data-panes="1"] #canvas .pane-canvas .lens-view, #canvas > .pane.pane-active > .pane-canvas .lens-view { clip-path: inset(var(--safe-top) 0 0 0); contain: paint; }
+/* A picture the page lays out (a grid, a time axis, meters) scrolls in the room between the bars alone: its scrollbar
+   and what scrolls never run under them. */
+body[data-panes="1"] #canvas .pane-canvas .lens-view.laid-out, #canvas > .pane.pane-active > .pane-canvas .lens-view.laid-out { position: absolute; inset: var(--safe-top) 0 var(--safe-bottom) 0; height: auto; padding: 0; clip-path: none; }
 body[data-panes="1"] #canvas .lf-legend { bottom: auto; pointer-events: auto; }
 #canvas .pane-canvas > .lens-wrap > .lens-bar { position: absolute; z-index: 2; top: calc(var(--box-9) + var(--space-5)); left: var(--space-9); right: var(--space-9); width: auto; pointer-events: none; }
 #canvas .pane-canvas > .lens-wrap > .lens-bar > * { pointer-events: auto; }
