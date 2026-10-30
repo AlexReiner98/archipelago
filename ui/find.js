@@ -125,7 +125,7 @@ async function look() {
   const { only, not } = lens.filter;
   const most = numberOf(state.style, 'find_choice_items');
   const [all, counted] = await Promise.all([
-    choicesFor(mode, q, { most, wide: numberOf(state.style, 'term_find_most'), lens }),
+    choicesFor(mode, q, { most, wide: numberOf(state.style, 'term_find_most'), lens, signs: numberOf(state.style, 'query_signs') === 1 }),
     finding ? api('view', { name: 'flat', params: { filter: { find: [`text ${q}`], ...(only && { only }), ...(not && { not }) }, limit: most } }).catch(() => null) : null,
   ]);
   if (mine !== asked) return;
@@ -142,25 +142,28 @@ async function look() {
  * asked in one read of the choices in sight. Pointing at a choice that leaves things out fades them.
  */
 async function countChoices(all, lens, mine) {
-  const part = mode.toLowerCase();
-  const offered = all.filter((c) => c.term?.[part]).slice(0, numberOf(state.style, 'find_count_most'));
   const answer = viewUp()?.answer;
-  if (!offered.length || !answer?.items || lens.view) return;
+  if (!answer?.items || lens.view) return;
   const drawn = answer.items.map((i) => i.id);
-  const told = await api('view', { name: 'flat', params: { filter: lens.filter, preview: { part, terms: offered.map((c) => c.term[part]), ids: drawn } } }).catch(() => null);
-  if (!told?.preview || mine !== asked) return;
   const here = new Set(drawn);
-  for (const c of offered) {
-    const ids = told.preview[c.term[part]] ?? [];
-    if (part === 'find') {
-      const shown = numberOf(state.style, 'find_count_shown');
-      c.count = ids.length > shown ? `+${shown}+` : `+${ids.filter((id) => !here.has(id)).length}`;
-    } else {
-      c.count = `−${ids.length}`;
-      const gone = new Set(ids);
-      c.leaves = drawn.filter((id) => !gone.has(id));
+  const most = numberOf(state.style, 'find_count_most');
+  // A choice is for one part, and find may hold those of two (the bar's signs): each part's asked in its own read.
+  const parts = ['find', 'only', 'not'].map((part) => [part, all.filter((c) => c.term?.[part]).slice(0, most)]).filter(([, offered]) => offered.length);
+  const told = await Promise.all(parts.map(([part, offered]) => api('view', { name: 'flat', params: { filter: lens.filter, preview: { part, terms: offered.map((c) => c.term[part]), ids: drawn } } }).catch(() => null)));
+  if (mine !== asked) return;
+  parts.forEach(([part, offered], n) => {
+    for (const c of offered) {
+      const ids = told[n]?.preview?.[c.term[part]] ?? [];
+      if (part === 'find') {
+        const shown = numberOf(state.style, 'find_count_shown');
+        c.count = ids.length > shown ? `+${shown}+` : `+${ids.filter((id) => !here.has(id)).length}`;
+      } else {
+        c.count = `−${ids.length}`;
+        const gone = new Set(ids);
+        c.leaves = drawn.filter((id) => !gone.has(id));
+      }
     }
-  }
+  });
   drawChoices();
 }
 

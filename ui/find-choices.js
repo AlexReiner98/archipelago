@@ -113,11 +113,14 @@ export async function choicesFor(mode, q, c) {
     const linked = linkList(q, c.most).map((r) => ({ kind: 'Link', label: `${r.title ?? r.id} → me`, note: '', title: `What has ${r.title ?? r.id} to me`, ...adds(`${r.id} me`) }));
     const mine = has('owner me', q) && !have.includes('owner me') ? [{ kind: 'Owner', label: 'me', note: '', title: 'What is mine', ...adds('owner me') }] : [];
     const people = (await found(q, c.most, 'actor')).map((e) => ({ kind: 'Owner', label: e.title, note: typeTitle(e.type), title: `What ${e.title} owns`, ...adds(`owner ${e.id}`) }));
-    if (mode === 'Find') return [wordsChoice(q), ...modeChoices(mode, q), ...kept, ...items, ...typed, ...linked, ...mine, ...people];
-    const words = offered(have).filter((w) => has(w.word, q)).map((w) => ({ kind: 'Word', label: w.word, note: '', title: w.title, ...adds(w.word) }));
-    const system = has('system', q) && !have.includes('kind system') ? [{ kind: 'Word', label: 'system', note: '', title: 'What the system keeps', ...adds('kind system') }] : [];
+    if (mode === 'Find' && !c.signs) return [wordsChoice(q), ...modeChoices(mode, q), ...kept, ...items, ...typed, ...linked, ...mine, ...people];
+    // What can only be checked of what is found goes to Only when find is not in a part of its own (the bar's signs).
+    const checks = part === 'find' ? { term: (t) => ({ term: { only: t } }), have: f.only ?? [] } : { term: adds, have };
+    const words = offered(checks.have).filter((w) => has(w.word, q)).map((w) => ({ kind: 'Word', label: w.word, note: '', title: w.title, ...checks.term(w.word) }));
+    const system = has('system', q) && !checks.have.includes('kind system') ? [{ kind: 'Word', label: 'system', note: '', title: 'What the system keeps', ...checks.term('kind system') }] : [];
     const statuses = [...new Set([...types.values()].flatMap((t) => [...(t.statuses?.open ?? []), ...(t.statuses?.closed ?? [])]))].filter((s) => (q ? has(s, q) : c.narrowed)).slice(0, c.most)
-      .map((s) => ({ kind: 'Status', label: s, note: '', title: `What is ${s}`, ...adds(`status ${s}`) }));
+      .map((s) => ({ kind: 'Status', label: s, note: '', title: `What is ${s}`, ...checks.term(`status ${s}`) }));
+    if (mode === 'Find') return [wordsChoice(q), ...modeChoices(mode, q), ...kept, ...items, ...typed, ...linked, ...mine, ...people, ...words, ...system, ...statuses];
     const text = q ? [{ kind: 'Words', label: `“${q}”`, note: '', title: `Words in titles and notes: “${q}”`, ...adds(`text ${q}`) }] : [];
     return [...modeChoices(mode, q), ...words, ...system, ...mine, ...statuses, ...typed, ...items, ...people, ...linked, ...text];
   }

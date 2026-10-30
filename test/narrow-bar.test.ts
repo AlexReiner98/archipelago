@@ -82,6 +82,13 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
     await pick('Only what is in this set, of what Find finds', 'Type', 'Task');
     assert.ok(await until(`location.hash.includes('only=type+task') && ${has('Gutters')} && !${has('Which tiles?')}`), `only narrows what is found: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
     assert.ok(await until(`${chips}.join('|') === 'Task|in Site works'`), `each narrowing a term of Only: ${await page.evaluate(`JSON.stringify(${chips})`)}`);
+    // A term's sign moves it between the parts, and round again; what the style turns off is the trial alone.
+    await page.evaluate(`[...document.querySelectorAll('#find .q-narrow')].find((c) => c.textContent.includes('Task')).querySelector('.q-sign').click()`);
+    assert.ok(await until(`location.hash.includes('not=type+task') && !location.hash.includes('only=type+task') && !${has('Gutters')}`), `Only's sign moves it to Not: ${await page.evaluate('location.hash')}`);
+    await page.evaluate(`[...document.querySelectorAll('#find .q-out')].find((c) => c.textContent.includes('Task')).querySelector('.q-sign').click()`);
+    assert.ok(await until(`!location.hash.includes('not=type+task') && location.hash.includes('find=type+task')`), `Not's moves it to Find: ${await page.evaluate('location.hash')}`);
+    await page.evaluate(`[...document.querySelectorAll('#find .q-type')].find((c) => c.textContent.includes('Task')).querySelector('.q-sign').click()`);
+    assert.ok(await until(`location.hash.includes('only=type+task')`), `Find's to Only: ${await page.evaluate('location.hash')}`);
     // Its × takes it out, and what it held back is drawn again.
     await page.evaluate(`[...document.querySelectorAll('#find .q-narrow')].find((c) => !c.textContent.includes('in Site')).querySelector('.q-x').click()`);
     assert.ok(await until(`location.hash.split('only=').length === 2 && ${has('Which tiles?')}`), 'taken out, it narrows no more');
