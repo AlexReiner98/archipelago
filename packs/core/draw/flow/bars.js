@@ -8,6 +8,7 @@ import { comb, peel } from './combs.js';
 import { flatten, ORDER } from './graph.js';
 import { numbered } from './numbering.js';
 import { stepsOf } from './plane.js';
+import { reroute } from './reroute.js';
 import { settle, square } from './settle.js';
 import { planarize } from './thread.js';
 import { embed } from './upward.js';
@@ -294,7 +295,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   }
   // Pull each box and wire tight, the topology kept: a box and what hangs on it move as one.
   const rigid = new Map(), moving = [];
-  let settled = null;
+  let settled = null, wired = null;
   for (const [id, c] of combs) {
     if (!x.has(id)) continue;
     const s = stepSize(id), b = block(id), left = x.get(id) - s.w / 2, top = y.get(id) - s.h / 2 - b.lead;
@@ -330,6 +331,8 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
       const b = rigid.get(holder(r.from));
       r.points = r.points.map(([p, q]) => [p + b.at[0] - b.was[0], q + b.at[1] - b.was[1]]);
     }
+    for (const [id, b] of rigid) b.pointed = nodes.get(id).shape === 'diamond';
+    wired = reroute(rigid, moving, [...routes.values()].filter((r) => r.to === undefined).map((r) => r.points), { track: z.turn });
   }
   const edge = (id, to) => {
     const s = stepSize(id), [px, py] = [x.get(id), y.get(id)], dx = to[0] - px, dy = to[1] - py, t = Math.min(dx ? s.w / 2 / Math.abs(dx) : Infinity, dy ? s.h / 2 / Math.abs(dy) : Infinity, 1);
@@ -344,6 +347,6 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   const width = Math.max(0, ...all.map((n) => x.get(n.id) + n.w / 2), ...drawnPoints.map((p) => p[0])) + margin;
   const height = Math.max(0, ...all.map((n) => y.get(n.id) + n.h / 2), ...drawnPoints.map((p) => p[1])) + margin;
   const up = chains.filter((c) => y.get(c.a) > y.get(c.b)).length;
-  last = { chains, ties, threaded, settled, up };
+  last = { chains, ties, threaded, settled, wired, up };
   return { nodes, all, chains, ties, breaks: [], potential, x, y, width, height };
 }

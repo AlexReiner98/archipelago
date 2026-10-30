@@ -248,6 +248,59 @@ test('upward: every stretch has two faces, every face one top and one foot, and 
   for (const [u, v, order] of links) if (order) assert.ok(g.number.get(u) < g.number.get(v));
 });
 
+test('bars: a comb reaches each kid by the side facing its holder', () => {
+  const leaves = Array.from({ length: 9 }, (_, k) => item(`l${k}`)), ring = ['p', 'q', 'o'].map((id) => item(id));
+  const g = drawnBars([...ring, ...leaves], [...leaves.map((l) => tie(l.id, 'p')), tie('p', 'q', 'serves'), tie('q', 'o', 'serves'), tie('o', 'p', 'serves')]);
+  for (const w of g.ties.filter((t: any) => t.a.startsWith('l'))) {
+    const n = g.nodes.get(w.a);
+    assert.ok(Math.abs(w.points[0][0] - (g.x.get(w.a) - n.w / 2)) < 0.01, `${w.a} is reached on its left`);
+  }
+  assert.ok(clear(g));
+  assert.equal(count(lines(g)).crossings, 0);
+});
+
+test('bars: one kid alone sits straight on from its box', () => {
+  const g = drawnBars(['p', 'q', 'o', 'k'].map((id) => item(id)), [tie('k', 'p'), tie('p', 'q', 'serves'), tie('q', 'o', 'serves'), tie('o', 'p', 'serves')]);
+  const w = g.ties.find((t: any) => t.a === 'k');
+  assert.equal(w.points.length, 2);
+  assert.equal(w.points[0][1], w.points[1][1]);
+  assert.ok(clear(g));
+});
+
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { reroute } from './draw/flow/reroute.js';
+
+test('reroute: a wire that wanders takes the straight way, and one bend where it must', () => {
+  const boxes = new Map([['a', box(100, 50)], ['b', box(100, 300)], ['c', box(400, 300)]]);
+  const straight = { a: 'a', b: 'b', points: [[100, 70], [100, 90], [300, 90], [300, 200], [100, 200], [100, 280]] };
+  const bent = { a: 'a', b: 'c', points: [[60, 30], [60, 10], [420, 10], [420, 280]] };
+  reroute(boxes, [straight, bent], [], { track: 8 });
+  assert.equal(straight.points.length, 2);
+  assert.equal(straight.points[0][0], straight.points[1][0]);
+  assert.equal(bent.points.length, 3);
+  assert.equal(count([straight.points, bent.points]).crossings, 0);
+});
+
+test('reroute: no way through a box or across a wire is taken', () => {
+  const boxes = new Map([['a', box(100, 50)], ['m', box(100, 200)], ['b', box(100, 350)]]);
+  const round = { a: 'a', b: 'b', points: [[120, 70], [120, 100], [300, 100], [300, 300], [120, 300], [120, 330]] };
+  reroute(boxes, [round], [], { track: 8 });
+  assert.ok(Math.max(...round.points.map((p) => p[0])) >= 150, 'it stays round the middle box');
+  const left = new Map([['a', box(100, 50)], ['b', box(100, 350)]]);
+  const fence = { a: 'c', b: 'd', points: [[0, 200], [400, 200]] }, wire = { a: 'a', b: 'b', points: [[120, 70], [120, 100], [500, 100], [500, 300], [120, 300], [120, 330]] };
+  reroute(left, [wire], [fence.points], { track: 8 });
+  assert.equal(count([wire.points, fence.points]).crossings, 0);
+});
+
+test('reroute: a short step in a wire is taken out, and a wire stays on its box', () => {
+  const boxes = new Map([['a', box(100, 50)], ['b', box(106, 300)], ['m', box(103, 170, 60, 40)]]);
+  const wire = { a: 'a', b: 'b', points: [[60, 70], [60, 170], [66, 170], [66, 280]] };
+  reroute(boxes, [wire], [], { track: 8 });
+  assert.equal(wire.points.length, 2);
+  assert.ok(wire.points[0][0] >= 50 && wire.points[0][0] <= 150);
+  assert.ok(wire.points[1][0] >= 56 && wire.points[1][0] <= 156);
+});
+
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { settle } from './draw/flow/settle.js';
 
