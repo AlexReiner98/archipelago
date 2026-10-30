@@ -12,6 +12,7 @@ export function picture(input, tools) {
   if (!g || !out.scene?.key) return out;
   const drawn = [...g.chains, ...g.ties].map((w) => w.points);
   const { crossings, seen, shared } = count(drawn);
-  out.scene.key.push({ glyph: m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, m('path', { d: 'M1 1L21 13M1 13L21 1', class: 'lf-wire' })), label: `${crossings} crossings, ${seen} seen, ${shared} shared, ${g.up} of ${g.chains.length} up` });
+  const glyph = () => m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, m('path', { d: 'M1 1L21 13M1 13L21 1', class: 'lf-wire' }));
+  out.scene.key.push(...[`${crossings} crossings`, `${seen} seen`, `${shared} shared`, `${g.up} of ${g.chains.length} up`].map((label) => ({ glyph: glyph(), label })));
   return out;
 }
