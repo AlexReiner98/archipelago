@@ -44,7 +44,7 @@ export const NOTE_START = 280;
 export const isLink = (id: string) => id.startsWith('r_');
 
 /** Entries the system writes when a pack moves a type or its kind: the items did not change, so their time does not move. */
-export const MOVED = ['type.moved', 'kind.moved'];
+export const MOVED = ['type.moved', 'kind.moved', 'owner.linked'];
 
 const COLUMN = new Map(ITEM_COLUMNS.map(([column, field, unsaid]) => [field, { column, unsaid }]));
 /** What the log says of an item beside its columns: they move its time only. */

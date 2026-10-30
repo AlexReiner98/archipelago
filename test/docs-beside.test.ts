@@ -34,7 +34,7 @@ test('in a browser, a document is written beside its draft, shared or not', { sk
       { op: 'create', ref: 'b', type: 'document', title: 'Next page', visibility: 'shared', status: 'draft', body: long('second'), props: { path: 'next', menu: 2 } },
     ],
   })).created as Record<string, string>;
-  const ids = [site.a, site.b, offer.id].join(',');
+  const ids = [site.a, site.b, offer.id].map((id) => `find=id+${id}`).join('&');
 
   const page = await open(`${base}/`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -51,7 +51,7 @@ test('in a browser, a document is written beside its draft, shared or not', { sk
   const scrollTo = (id: string) => page.evaluate(`(() => { const v = ${view}; const r = document.querySelector('.rd.draft[data-item="${id}"]').getBoundingClientRect(); v.scrollTop += r.top - v.getBoundingClientRect().top + 40; })()`);
   try {
     await page.evaluate(`(localStorage.setItem('pelago-token', ${JSON.stringify(theirs)}), localStorage.setItem('pelago-workspaces', ${JSON.stringify(JSON.stringify({ default: { name: 'Default', token: mine }, acme: { name: 'Acme', token: theirs } }))}))`);
-    await page.go(`${base}/#/e/${site.a}?ids=${ids}&shape=pages`);
+    await page.go(`${base}/#/e/${site.a}?${ids}&shape=pages`);
     assert.ok(await until(`Boolean(${view}) && ${reads(site.a, 'first paragraph 3')}`), `the draft is read: ${page.logs().join('\n')}`);
 
     // Beside the sheet: the words open to write, the scrollbar in sight, what is published out of the way.

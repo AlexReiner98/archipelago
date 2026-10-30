@@ -20,9 +20,9 @@ canvas as a flat graph", with its decisions.
   `depends_on` draws the order, every other link a quiet tie. Depth is never
   drawn (decision "Depth is never drawn"). The plane has no edge; zoom is
   scale and how much text shows.
-- **A lens says what is on it.** A filter (text, types, ids, links such as
-  `tagged e_x` or `waits_on me`, each adding seeds; terms that must all
-  hold of a seed, such as a type within an item; and what is left out), a walk along the
+- **A lens says what is on it.** A filter (three lists of the same terms,
+  such as a type, words, `tagged e_x` or `waits_on me`: Find adds what each
+  finds, Only keeps what is in each, Not takes it away), a walk along the
   link types named for some steps, and a limit. It is kept in the address
   (`#/v?<lens>`, or `#/e/<id>?<lens>` with an item's page over it) and
   always in sight in **find**, at the canvas's foot: one line at rest, a

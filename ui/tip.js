@@ -1,33 +1,65 @@
 // The page's one tooltip. What a control or a mark says of itself is its `title` (or an SVG `<title>`), as it always
 // was; this shows it in the page's own tip, in the top layer above every bar and pane, and never lets the browser
-// show its own. While the pointer is on it, the title is taken off the element, so the browser has nothing to say;
-// it is put back when the pointer leaves. A drawing's own tip (drawing-tip.js) quiets this one over its mark.
+// show its own. The browser falls back on any title above what the pointer is on, so while the pointer is on
+// something every title from there to the page's root is taken off, and put back only when it moves on: a click or
+// a key hides the tip and leaves them off. A drawing's own tip (drawing-tip.js) quiets this one over its mark.
 
 import { h } from './base.js';
 
 let box = null;
-/** The element whose title is shown: { el, said, title }, `title` an SVG <title> taken off it. */
+/** The element whose title is shown: { el, said }. */
 let at = null;
+/** The titles taken off, to put back: { el, said } of an attribute, { el, title } of an SVG <title>. */
+let taken = [];
 /** A mark a drawing's own tip speaks for: nothing is shown over it. */
 let quiet = null;
 
+/** The SVG <title> of an element, if it has one. */
+const svgTitle = (e) => (e instanceof SVGElement ? [...e.children].find((kid) => kid.tagName.toLowerCase() === 'title') : undefined);
+/** Each element at or above `el`, nearest first. */
+const upFrom = function* (el) {
+  for (let e = el; e && e.nodeType === 1; e = e.parentElement ?? e.parentNode) yield e;
+};
+
 /** The nearest element at or above `el` that says something of itself, and what: an empty title says nothing. */
 function titled(el) {
-  for (let e = el; e && e.nodeType === 1; e = e.parentElement ?? e.parentNode) {
+  for (const e of upFrom(el)) {
     if (e === box || e.classList?.contains('drawing-tip')) return null;
     if (e.hasAttribute('title')) return e.getAttribute('title') ? { el: e, said: e.getAttribute('title') } : null;
-    const title = e instanceof SVGElement && [...e.children].find((kid) => kid.tagName.toLowerCase() === 'title');
-    if (title) return title.textContent ? { el: e, said: title.textContent, title } : null;
+    const title = svgTitle(e);
+    if (title) return title.textContent ? { el: e, said: title.textContent } : null;
   }
   return null;
 }
 
+/** Take off every title at or above `el`, so the browser has none to fall back on. */
+function takeOff(el) {
+  for (const e of upFrom(el)) {
+    if (e.hasAttribute('title')) (taken.push({ el: e, said: e.getAttribute('title') }), e.removeAttribute('title'));
+    const title = svgTitle(e);
+    if (title) (taken.push({ el: e, title }), title.remove());
+  }
+}
+
 /** Put back what was taken: a title set anew meanwhile is kept. */
+function putBack() {
+  for (const { el, said, title } of taken) {
+    if (title) el.prepend(title);
+    else if (!el.hasAttribute('title')) el.setAttribute('title', said);
+  }
+  taken = [];
+}
+
+/** Hide the tip; the titles stay off while the pointer is there. */
 function hide() {
-  if (at?.title) at.el.prepend(at.title);
-  else if (at && !at.el.hasAttribute('title')) at.el.setAttribute('title', at.said);
-  at = null;
   if (box?.matches(':popover-open')) box.hidePopover();
+}
+
+/** The pointer has left the page: nothing to keep off. */
+function gone() {
+  hide();
+  putBack();
+  at = null;
 }
 
 /** Below the element, or above it where there is no room; kept inside the window. */
@@ -41,15 +73,15 @@ function place(el) {
 
 function over(ev) {
   if (ev.pointerType === 'touch') return;
-  const found = titled(ev.target);
-  if (found?.el === at?.el) return;
   const open = box.matches(':popover-open');
-  hide();
-  if (!found) return;
+  const was = at?.el;
+  putBack();
+  const found = titled(ev.target);
+  takeOff(ev.target);
   at = found;
-  if (found.title) found.title.remove();
-  else found.el.removeAttribute('title');
-  if (quiet?.contains(found.el)) return;
+  if (found?.el === was) return;
+  hide();
+  if (!found || quiet?.contains(found.el)) return;
   box.textContent = found.said;
   // Moving from one titled thing to the next, the tip stays up and follows; opened afresh, it waits a moment (CSS).
   box.classList.toggle('at-once', open);
@@ -63,9 +95,9 @@ export function startTips() {
   box = h('div', { class: 'tip', role: 'tooltip', popover: 'manual' });
   document.body.append(box);
   addEventListener('pointerover', over, true);
-  for (const name of ['pointerdown', 'keydown', 'wheel', 'blur']) addEventListener(name, hide, true);
-  addEventListener('scroll', hide, true);
-  document.documentElement.addEventListener('pointerleave', hide);
+  for (const name of ['pointerdown', 'keydown', 'wheel', 'scroll']) addEventListener(name, hide, true);
+  addEventListener('blur', (ev) => ev.target === window && gone());
+  document.documentElement.addEventListener('pointerleave', gone);
 }
 
 /** A drawing's tip is up over `el` (null when it is gone): this one says nothing there. */

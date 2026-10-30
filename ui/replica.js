@@ -40,7 +40,7 @@ export class Replica {
   hold(answer, pos) {
     this.items = new Map((answer.items ?? []).map((i) => [i.id, itemRow(i)]));
     // Why each was in the answer (the terms that found it, or the walk's step): the answer's, not the log's, so kept apart.
-    this.why = new Map((answer.items ?? []).filter((i) => i.found || i.step).map((i) => [i.id, i.found ? { found: i.found } : { step: i.step }]));
+    this.why = new Map((answer.items ?? []).filter((i) => i.found || i.step).map((i) => [i.id, i.found ? { found: i.found, terms: i.terms } : { step: i.step }]));
     // Where each falls on the lens's time axis, its lane and what it counts toward, worked out by the server: kept until the lens is read again.
     this.placed = new Map((answer.items ?? []).filter((i) => i.time).map((i) => [i.id, { time: i.time, ...(i.lane !== undefined && { lane: i.lane }), ...(i.stream !== undefined && { stream: i.stream }) }]));
     this.links = new Map((answer.links ?? []).map((r) => [r.id, linkRow(r)]));

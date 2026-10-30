@@ -11,13 +11,13 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
   assert.match((await call('/agent/show', undefined, {})).error, /needs "entity", "screen" or "lens"/);
 
   // What the canvas draws: a flat lens and the style go in the address, as the page reads them, and a lens that could not be drawn is refused here.
-  await call('/agent/show', undefined, { actor: 'robot', lens: { filter: { text: 'login', links: ['waits_on me'], exclude: ['closed'] }, walk: { over: ['depends_on'], steps: 2 } }, style: { lit: 'blocked' } });
-  assert.equal((await call('/api/tail')).result.focus.hash, 'v?text=login&link=waits_on+me&exclude=closed&over=depends_on&steps=2&lit=blocked');
+  await call('/agent/show', undefined, { actor: 'robot', lens: { filter: { find: ['waits_on me', 'text login'], not: ['done'] }, walk: { over: ['depends_on'], steps: 2 } }, style: { lit: 'blocked' } });
+  assert.equal((await call('/api/tail')).result.focus.hash, 'v?find=waits_on+me&find=text+login&not=done&over=depends_on&steps=2&lit=blocked');
   await call('/agent/show', undefined, { actor: 'robot', lens: {} });
   assert.equal((await call('/api/tail')).result.focus.hash, 'v', 'the canvas as it opens');
   assert.match((await call('/agent/show', undefined, { lens: { filter: {} } })).error, /includes something/);
-  assert.match((await call('/agent/show', undefined, { lens: { filter: { ids: ['e_nothing0'] } } })).error, /No item/);
-  assert.match((await call('/agent/show', undefined, { lens: { filter: { text: 'x' }, walk: { over: ['nope'] } } })).error, /unknown link type/);
+  assert.match((await call('/agent/show', undefined, { lens: { filter: { find: ['id e_nothing0'] } } })).error, /No item/);
+  assert.match((await call('/agent/show', undefined, { lens: { filter: { find: ['text x'] }, walk: { over: ['nope'] } } })).error, /unknown link type/);
 
   await call('/agent/show', undefined, { actor: 'robot', screen: 'workspace', note: 'Look here' });
   const shown = (await call('/api/tail')).result.focus;
@@ -45,7 +45,7 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
   const read = await last();
   assert.deepEqual([read.kind, read.did, read.hash], ['read', 'is reading this', `e/${note}`]);
   assert.ok(read.at > searched.at);
-  await call('/agent/view', undefined, { actor: 'robot', name: 'flat', params: { filter: { types: ['note'] } } });
+  await call('/agent/view', undefined, { actor: 'robot', name: 'flat', params: { filter: { find: ['type note'] } } });
   assert.deepEqual([(await last()).kind, (await last()).did, (await last()).hash], ['view', 'asked for flat', 'graph?lens']);
   await call('/agent/proposals', undefined, { actor: 'robot' });
   assert.deepEqual([(await last()).kind, (await last()).did], ['read', 'proposals']);

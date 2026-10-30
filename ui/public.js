@@ -2,6 +2,9 @@
 // and nothing drawn that the server did not say: every text is set as text, never as markup.
 
 import { applyTheme } from './theme.js';
+import { startTips } from './tip.js';
+
+startTips();
 
 const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');

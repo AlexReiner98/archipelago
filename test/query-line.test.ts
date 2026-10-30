@@ -26,7 +26,7 @@ test('in a browser, the query line says the lens in one line at both widths', { 
       { op: 'link', type: 'part_of', from: 'gutter', to: 'site' },
     ],
   })).result.created as Record<string, string>;
-  const page = await open(`${base}/#/v?text=roof&within=${made.site}&over=part_of&steps=1`);
+  const page = await open(`${base}/#/v?find=text+roof&only=in+${made.site}&over=part_of&steps=1`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const until = async (expression: string) => {
     for (const end = Date.now() + 20000; Date.now() < end; await wait(150)) if (await page.evaluate(expression)) return true;
@@ -57,7 +57,7 @@ test('in a browser, the query line says the lens in one line at both widths', { 
       // The line: one line, Find apart from Only and the walk.
       assert.ok(await until(`${parts}.join('|') === 'Find|Only|Walk'`), `Find, Only and Walk each a part of the line: ${await page.evaluate(`JSON.stringify(${parts})`)}`);
       const said = await page.evaluate<string>(lineSays);
-      assert.ok(said.includes('“roof”') && said.includes('within Site works'), `the words are Find's, within is Only's: ${said}`);
+      assert.ok(said.includes('“roof”') && said.includes('in Site works'), `the words are Find's, within is Only's: ${said}`);
       const tall = await page.evaluate<{ scroll: number; client: number; line: number }>(`(() => { const l = document.getElementById('find-lens'); const s = l.querySelector('.q-sum'); return { scroll: l.scrollHeight, client: l.clientHeight, line: Math.max(...[...s.querySelectorAll('.q-sum-part')].map((p) => p.getBoundingClientRect().height)) }; })()`);
       assert.ok(tall.scroll <= tall.client + 1, `one line at ${width} px (${tall.scroll} against ${tall.client})`);
       assert.ok(tall.line <= tall.client + 1, `no part of it wraps at ${width} px (${tall.line} against ${tall.client})`);

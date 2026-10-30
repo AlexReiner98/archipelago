@@ -5,7 +5,7 @@
 // The views kept before the flat lens were translated into such canvases when the workspace opened
 // (src/lens-saved.ts); a view kept about an item is listed on Home under the views of items, folded.
 
-import { api, ask, h, hooks, state, tell, wordsOf } from './base.js';
+import { api, ask, h, hooks, idsOf, state, tell, wordsOf, withIds } from './base.js';
 import { flatQuery, flatView } from './lens.js';
 import { filterSaid, fitBar } from './query-bar.js';
 import { canvasMenu } from './canvas-menu.js';
@@ -34,9 +34,7 @@ export function savedCanvases(fresh = false) {
 /** What a saved canvas draws: its filter with its pins, its walk and its limit; and its style, with its own id. */
 export function canvasLens(item) {
   const p = item.props ?? {};
-  const filter = { ...(p.filter ?? {}) };
-  const ids = [...new Set([...(filter.ids ?? []), ...(Array.isArray(p.pins) ? p.pins : [])])];
-  if (ids.length) filter.ids = ids;
+  const filter = withIds(p.filter ?? {}, Array.isArray(p.pins) ? p.pins : []);
   const lens = { ...(p.view && { view: p.view }), filter, walk: p.walk ?? { over: [], steps: 0 }, ...(p.limit && { limit: p.limit }), ...(p.time && { time: p.time }) };
   return { lens, style: { ...(p.style ?? {}), ...(!item.preset && { canvas: item.id }) } };
 }
@@ -67,10 +65,10 @@ export function keptView(id, { key = `kept:${id}`, style = {} } = {}) {
       // Its steps are played by a drawing that knows them, with what they name drawn too.
       const steps = Array.isArray(got.entity.props?.steps) ? got.entity.props.steps : undefined;
       const told = (steps ?? []).flatMap((s) => [...(s.add ?? []), ...(s.remove ?? []), ...Object.keys(s.titles ?? {}), ...Object.keys(s.fields ?? {}), ...Object.keys(s.flag ?? {})]);
-      if (told.length) kept.lens.filter.ids = [...new Set([...(kept.lens.filter.ids ?? []), ...told])];
+      if (told.length) kept.lens.filter = withIds(kept.lens.filter, told);
       // It starts from what it is about, where it draws that or what is in it (in it, within it, or the end of a link term); else from the one item it names.
-      const ids = kept.lens.filter.ids ?? [];
-      const ends = [...(kept.lens.filter.in ?? []), ...(kept.lens.filter.within ?? []), ...(kept.lens.filter.links ?? []).map((t) => (typeof t === 'string' ? t.split(/\s+/).slice(1).join(' ') : t.to))];
+      const ids = idsOf(kept.lens.filter);
+      const ends = [...(kept.lens.filter.find ?? []), ...(kept.lens.filter.only ?? [])].filter((t) => !/^(id|text|type|kind) /.test(t)).map((t) => t.split(/\s+/).slice(1).join(' '));
       const from = ids.includes(of) || ends.includes(of) ? of : ids.length === 1 ? ids[0] : true;
       const view = flatView({ lens: kept.lens, style: { ...kept.style, ...style }, of, key, nest: from, ...(steps && { extra: { steps } }) });
       Object.defineProperty(host, 'answer', { get: () => view.answer, configurable: true });
@@ -182,7 +180,7 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
 /** What a lens finds, in a few words: its terms, then its walk. */
 function lensWords(lens) {
   const f = lens.filter ?? {};
-  const said = [...wordsOf(f).map((w) => `“${w}”`), ...(f.types ?? []).map(typeTitle), f.ids?.length && `${f.ids.length} item${f.ids.length === 1 ? '' : 's'}`, ...(f.links ?? []), f.in?.length && `in ${f.in.length} item${f.in.length === 1 ? '' : 's'}`, ...(f.only ?? []).map((t) => `only ${typeTitle(t)}`), f.within?.length && `within ${f.within.length} item${f.within.length === 1 ? '' : 's'}`].filter(Boolean);
+  const said = [...(f.find ?? []), ...(f.only ?? []).map((t) => `only ${t}`)].map((t) => t.replace(/^text (.*)$/, '“$1”').replace(/^type (.*)$/, (_, x) => typeTitle(x)).replace(/^id .*$/, 'an item'));
   const over = lens.walk?.over;
   if (over === 'all' || over?.length) said.push(`${over === 'all' ? 'every link' : over.map((t) => ((w) => `${ARROW[w.way]} ${w.link}`)(wayOf(t))).join(', ').replaceAll('_', ' ')} × ${lens.walk.steps}`);
   return said.join(' · ');

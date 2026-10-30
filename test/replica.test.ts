@@ -132,7 +132,7 @@ test("an agent's change reaches a store holding a flat lens's answer, with no le
   ]);
   const { Replica } = (await pageModules()).replica;
   const kinds = { ...l.registry, isOpen: (t: string, s: string) => l.registry.isOpen(t, s), type: (t: string) => l.registry.type(t), relationFamily: (...r: string[]) => r, shown: (t: string, k: string) => Boolean(l.registry.type(t)?.fields?.[k]?.shown) };
-  const lens = { filter: { ids: [made.p] }, walk: { over: ['part_of'], steps: 1 } };
+  const lens = { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } };
   const read = () => callTool(l, human, 'view', { name: 'flat', params: lens }) as Promise<any>;
   const tail = (input: Record<string, unknown>) => callTool(l, human, 'tail', input) as Promise<any>;
 

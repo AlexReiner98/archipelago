@@ -24,11 +24,11 @@ test('in a browser, agents at work never move the reader’s pane; a show lands 
   const views = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'f', type: 'lens', title: 'The agent’s view', status: 'current', props: { filter: { ids: [made.b] }, walk: { over: [], steps: 0 } } },
-      { op: 'create', ref: 'g', type: 'lens', title: 'The other’s view', status: 'current', props: { filter: { ids: [made.c] }, walk: { over: [], steps: 0 } } },
+      { op: 'create', ref: 'f', type: 'lens', title: 'The agent’s view', status: 'current', props: { filter: { find: [`id ${made.b}`] }, walk: { over: [], steps: 0 } } },
+      { op: 'create', ref: 'g', type: 'lens', title: 'The other’s view', status: 'current', props: { filter: { find: [`id ${made.c}`] }, walk: { over: [], steps: 0 } } },
     ],
   })).result.created as Record<string, string>;
-  const page = await open(`${base}/#/v?ids=${made.a}`);
+  const page = await open(`${base}/#/v?find=id+${made.a}`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const until = async (expression: string) => {
     for (const end = Date.now() + 20000; Date.now() < end; await wait(150)) if (await page.evaluate(expression)) return true;
@@ -38,7 +38,7 @@ test('in a browser, agents at work never move the reader’s pane; a show lands 
   const change = (actor: string, ops: object[]) => call('/agent/change', undefined, { actor, reason: 'test', ops });
   /** The panes of the tab in sight: each one's name, and whether it is the one the bar acts on. */
   const panes = `JSON.stringify([...document.querySelectorAll('#canvas > .pane')].map((p) => [p.querySelector('.pane-name').textContent, p.classList.contains('pane-active')]))`;
-  const readers = `(() => { const p = document.querySelector('#canvas > .pane.pane-active'); return Boolean(p?.querySelector('svg a[href="#/e/${made.a}"]')) && !p.querySelector('svg a[href="#/e/${made.b}"]') && location.hash.includes('ids=${made.a}'); })()`;
+  const readers = `(() => { const p = document.querySelector('#canvas > .pane.pane-active'); return Boolean(p?.querySelector('svg a[href="#/e/${made.a}"]')) && !p.querySelector('svg a[href="#/e/${made.b}"]') && location.hash.includes('find=id+${made.a}'); })()`;
   try {
     assert.ok(await until(`Boolean(document.querySelector('#canvas .pane-canvas svg a[href="#/e/${made.a}"]'))`), `the reader's canvas is drawn: ${page.logs().join('\n')}`);
     const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = document.querySelector('#canvas .pane-canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.bottom - 20]; })())`));
@@ -71,8 +71,8 @@ test('in a browser, agents at work never move the reader’s pane; a show lands 
     // An address as a show answers it, without its slash, opens what it names.
     await page.evaluate(`location.hash = '#e/${made.c}'`);
     assert.ok(await until(`location.hash.startsWith('#/e/${made.c}') && document.body.dataset.sheet === 'open' && document.querySelector('#sheet h1, #sheet .page-head')?.textContent.includes('Other agent’s step')`), `the item's page: ${await page.evaluate('location.hash')}`);
-    await page.evaluate(`location.hash = '#v?ids=${made.b}'`);
-    assert.ok(await until(`location.hash === '#/v?ids=${made.b}' && document.body.dataset.sheet !== 'open'`), `the lens it names: ${await page.evaluate('location.hash')}`);
+    await page.evaluate(`location.hash = '#v?find=id+${made.b}'`);
+    assert.ok(await until(`location.hash === '#/v?find=id+${made.b}' && document.body.dataset.sheet !== 'open'`), `the lens it names: ${await page.evaluate('location.hash')}`);
   } finally {
     await page.close();
   }

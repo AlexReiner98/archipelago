@@ -375,7 +375,7 @@
       "id": "software.releases",
       "title": "Releases",
       "at": "home",
-      "pieces": [{ "piece": "picture", "lens": { "filter": { "types": ["release"], "exclude": ["closed", "system"] } }, "style": { "shape": "list" } }]
+      "pieces": [{ "piece": "picture", "lens": { "filter": { "find": ["type release"], "not": ["done", "kind system"] } }, "style": { "shape": "list" } }]
     },
     { "form": "screen", "id": "software.gate", "title": "Gate", "on": ["event"], "pieces": [{ "piece": "gate" }] },
     {

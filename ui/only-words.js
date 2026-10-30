@@ -1,16 +1,9 @@
-// Only's plain words (decision e_xe5dx55e), as the bar says and offers them: done, blocked, status <s>, owner me|<person>,
+// Only's plain words (decision e_xe5dx55e), as the bar says and offers them: done, blocked, status <s>,
 // no owner, over estimate, changed since <7d|date>, made since <7d|date>, by owner, by agent. The server reads them
-// (src/lens-only.ts); here they are told from a type, said with names for ids, and offered in Only's menu.
+// (src/lens-only.ts); here they are told from other terms, and offered in the menus of Only and Not.
 
 /** Whether an Only term is one of the words (else it is a type). */
-export const isWord = (term) => /^(done|blocked|no owner|over estimate|by owner|by agent)$|^(status|owner|changed since|made since)\s+\S/i.test(term.trim());
-
-/** An Only term in words: a word as it is written, a person it names by their name; a type by its title. */
-export const onlySaid = (term, typeTitle, nameOf) => {
-  if (!isWord(term)) return typeTitle(term);
-  const [, who] = /^owner\s+(e_[a-z0-9]{8})$/i.exec(term.trim()) ?? [];
-  return who ? `owner ${nameOf(who)}` : term;
-};
+export const isWord = (term) => /^(done|blocked|no owner|over estimate|by owner|by agent)$|^(status|changed since|made since)\s+\S/i.test(term.trim());
 
 /** What each word keeps, for its tooltip. */
 const MEANS = {

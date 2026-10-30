@@ -99,7 +99,7 @@ test('the hook counts what the reply did since the owner’s last message', asyn
     use('b4', 'mcp__pelago__report', { action: 'tell', params: { run: 'x', said: 'y' } }),
     use('b5', 'Bash', { command: 'cd x && git -C "a b" commit -m "Closes: e_readitem"' }),
     use('b6', 'Bash', { command: 'git log --grep commit; git commit-tree x' }),
-    use('b7', 'mcp__pelago__query', { name: 'flat', params: { filter: { text: 'open work' } } }),
+    use('b7', 'mcp__pelago__query', { name: 'flat', params: { filter: { find: ['text open work'] } } }),
     use('b8', 'mcp__pelago__query', { name: 'actions', params: { verb: 'report' } }),
     use('b9', 'Edit', { file_path: 'a.ts', old_string: 'a', new_string: 'b' }),
   ];

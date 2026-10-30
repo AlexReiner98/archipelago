@@ -107,7 +107,7 @@ test('a published document reads as it was published until it is published again
         { op: 'create', ref: 'a', type: 'task', title: 'A part', visibility: 'shared', body: 'Does the first thing. Then more ({b}).' },
         { op: 'create', ref: 'b', type: 'task', title: 'Another part', visibility: 'shared', body: 'Does the second.' },
         { op: 'create', ref: 'x', type: 'task', title: 'A private part', visibility: 'private', body: 'Never shown.' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'The system, drawn', visibility: 'shared', status: 'current', props: { filter: { types: ['task', 'feature'] } } },
+        { op: 'create', ref: 'l', type: 'lens', title: 'The system, drawn', visibility: 'shared', status: 'current', props: { filter: { find: ['type task', 'type feature'] } } },
         { op: 'link', type: 'about', from: 'l', to: 'f' },
         { op: 'link', type: 'part_of', from: 'a', to: 'f' },
         { op: 'link', type: 'part_of', from: 'b', to: 'f' },

@@ -34,8 +34,8 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
   const views = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'f', type: 'lens', title: 'The first', status: 'current', props: { filter: { ids: [made.a] }, walk: { over: [], steps: 0 } } },
-      { op: 'create', ref: 'g', type: 'lens', title: 'The second', status: 'current', props: { filter: { ids: [made.b] }, walk: { over: [], steps: 0 } } },
+      { op: 'create', ref: 'f', type: 'lens', title: 'The first', status: 'current', props: { filter: { find: [`id ${made.a}`] }, walk: { over: [], steps: 0 } } },
+      { op: 'create', ref: 'g', type: 'lens', title: 'The second', status: 'current', props: { filter: { find: [`id ${made.b}`] }, walk: { over: [], steps: 0 } } },
     ],
   })).result.created as Record<string, string>;
   const page = await open(`${base}/`);
@@ -114,7 +114,7 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     // A click on a node in either pane opens its page over it, that pane's lens as it was (e_jedng69e): the second
     // finds by its words, and the item clicked is not added to its ids.
     await page.evaluate(`${nth(1)}.querySelector('svg a[href="#/e/${made.b}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
-    await until('its page is open over the second', async () => (await page.evaluate<boolean>(`document.body.dataset.sheet === 'open' && location.hash.startsWith('#/e/${made.b}?') && location.hash.includes('text=Second') && !(new URLSearchParams(location.hash.split('?')[1]).get('ids') ?? '').includes('${made.b}')`)) && (await panes())[1][3]);
+    await until('its page is open over the second', async () => (await page.evaluate<boolean>(`document.body.dataset.sheet === 'open' && location.hash.startsWith('#/e/${made.b}?') && location.hash.includes('find=text+Second') && !(new URLSearchParams(location.hash.split('?')[1]).getAll('find').join() ?? '').includes('${made.b}')`)) && (await panes())[1][3]);
     await page.evaluate(`${nth(0)}.querySelector('svg a[href="#/e/${made.a}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
     await until('its page is open over the first', async () => (await page.evaluate<boolean>(`location.hash.startsWith('#/e/${made.a}?') && !location.hash.includes('Second')`)) && (await panes())[0][3]);
     await page.evaluate(`document.getElementById('sheet-close').click()`);

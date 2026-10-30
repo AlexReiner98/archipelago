@@ -135,7 +135,7 @@ export function flatAnswer(answer: any) {
     ...answer.links.map((l: any, k: number) => ({ id: `r_flat${String(k).padStart(4, '0')}`, type: l.kind, from: l.from, to: l.to, ...(l.says && { props: { says: l.says } }) })),
     ...answer.items.filter((i: any) => i.inside).map((i: any, k: number) => ({ id: `r_part${String(k).padStart(4, '0')}`, type: 'part_of', from: i.id, to: i.inside })),
   ];
-  return { lens: { filter: { ids: [answer.lens.from] }, walk: { over: ['part_of', 'depends_on'], steps: 2 }, limit: 500 }, items, links };
+  return { lens: { filter: { find: [`id ${answer.lens.from}`] }, walk: { over: ['part_of', 'depends_on'], steps: 2 }, limit: 500 }, items, links };
 }
 
 /** A big system: 12 places of 16 parts, each calling three in the next place. */

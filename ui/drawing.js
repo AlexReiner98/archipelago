@@ -172,6 +172,8 @@ export function drawWith(host, answer, style, keep) {
     for (const p of all.filter((p) => p && 'tip' in p)) p.tip ? tip.show(keys.get(String(p.tip.key)), build(p.tip.mark, keys, tell)) : tip.hide();
     patch(all.filter((p) => !(p && 'tip' in p)), keys, tell, moving);
   };
+  // A surface has no marks for the page to light: its drawing is told what is lit, and paints it.
+  host.lightSurface = (ids) => surface && port.postMessage({ type: 'event', event: { name: 'light', ids } });
   port.onmessage = (ev) => {
     const said = ev.data ?? {};
     // A picture taken off the page is ended: its worker forgets it.

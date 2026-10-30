@@ -77,7 +77,7 @@ test('in a browser, a show lands without a line at the foot: a note on its pane,
     // Through it all the session keeps its panes: its next show lands in one, and no pane or tab is opened for it.
     const before = await page.evaluate<string>(`[...document.querySelectorAll('.pane-follows')].filter((m) => m.textContent === 'Session ${name}').length + ''`);
     assert.ok(Number(before) >= 1, 'a pane still says it is the session’s');
-    await show({ lens: { filter: { text: 'Something' } }, note: 'Still here' });
+    await show({ lens: { filter: { find: ['text Something'] } }, note: 'Still here' });
     await until('it landed in its own pane', () => page.evaluate<boolean>(`[...document.querySelectorAll('.pane-follows')].some((m) => m.title === 'Still here')`));
     assert.deepEqual([await tabs(), await panes()], [1, 4]);
   } finally {
