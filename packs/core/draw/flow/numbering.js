@@ -11,6 +11,8 @@ const TOP = 'ghost top', FOOT = 'ghost foot';
 const ORDER_WEIGHT = 4;
 /** How many wires times items may be spent on trying tops and feet. */
 const WORK = 3e6;
+/** Past this many items, only what the order holds passes under a tie: on a big map of ties it brings crossings and takes long. */
+const UNDER_MOST = 300;
 /** An order wire running up counts for more than any wire's length. */
 const OVER = 1e6;
 
@@ -184,15 +186,18 @@ function ways(g, outerAt, x, y) {
   const edgesOf = (f) => f.map((a, k) => [a, f[(k + 1) % f.length]]);
   /** The nearest face that holds an item `fits`, and the ties passed under on the way there. */
   const route = (v, fits) => {
-    const seen = new Set(), queue = [];
-    faces.forEach((f, i) => { if (f.includes(v)) (seen.add(i), queue.push({ i, under: [] })); });
+    const seen = new Set(), queue = [], beside = new Map();
+    faces.forEach((f, i) => {
+      for (const [a, b] of edgesOf(f)) (beside.get(pair(a, b)) ?? beside.set(pair(a, b), []).get(pair(a, b))).push(i);
+      if (f.includes(v)) (seen.add(i), queue.push({ i, under: [] }));
+    });
     for (let k = 0; k < queue.length; k++) {
       const { i, under } = queue[k], f = faces[i], found = under.length ? f.filter((u) => u !== v && fits(u) && !under.some(([a, b]) => a === u || b === u)) : [];
       if (found.length) return { under, found };
       for (const [a, b] of edgesOf(f)) {
         if (a === v || b === v || fixed.has(pair(a, b)) || !g.owner.has(pair(a, b))) continue;
-        const o = faces.findIndex((h, n) => n !== i && edgesOf(h).some(([p, q]) => pair(p, q) === pair(a, b)));
-        if (o >= 0 && !seen.has(o)) (seen.add(o), queue.push({ i: o, under: [...under, [a, b]] }));
+        const o = beside.get(pair(a, b)).find((n) => n !== i);
+        if (o !== undefined && !seen.has(o)) (seen.add(o), queue.push({ i: o, under: [...under, [a, b]] }));
       }
     }
     return null;
@@ -212,7 +217,7 @@ function ways(g, outerAt, x, y) {
   };
   const under = () => {
     let moved = false;
-    for (const v of everyone) for (const [lacks, skip, sooner] of [[lacksIn, FOOT, true], [lacksOut, TOP, false]]) {
+    for (const v of near.size > UNDER_MOST ? everyone.filter((u) => ordered.has(u) || u.startsWith('ghost')) : everyone) for (const [lacks, skip, sooner] of [[lacksIn, FOOT, true], [lacksOut, TOP, false]]) {
       if (!lacks(v)) continue;
       const way = route(v, (u) => u !== skip && !near.get(v).has(u) && !(sooner ? reaches(v, u) : reaches(u, v)));
       if (!way) continue;

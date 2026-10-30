@@ -184,6 +184,14 @@ import { planarize } from './draw/flow/thread.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { numbered } from './draw/flow/numbering.js';
 
+test('join: an invisible edge goes from what lacks a wire out to what lacks a wire in', () => {
+  const links = [['p', 'q', true], ['r', 's', true], ['q', 'j', false], ['p', 'j', false], ['r', 'j', false], ['s', 'j', false]];
+  const hidden = planarize(links, ['p', 'q', 'j', 'r', 's']).wires.filter((w: any) => !w.visible);
+  assert.equal(hidden.length, 1);
+  assert.ok(hidden[0].leads);
+  assert.ok(['q r', 's p'].includes(hidden[0].path.join(' ')), hidden[0].path.join(' '));
+});
+
 test('numbering: every item has a neighbour before it and one after, whatever the order asks', () => {
   const edges: any[] = [], ids: string[] = [];
   for (let x = 0; x < 6; x++) for (let y = 0; y < 6; y++) {

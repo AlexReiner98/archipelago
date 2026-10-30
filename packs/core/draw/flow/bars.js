@@ -251,7 +251,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
       const both = down.items.length && up.items.length, ax = px - b.w / 2 + s.w + gap + (b.w - s.w - gap) / 2 + dx;
       for (const [hang, way] of [[down, 1], [up, -1]]) {
         // Each leaves the box at a port of its own when there are two.
-        const map = ([p, q]) => [ax + p, boxY + way * q], at = boxY + (both ? (way * s.h) / 4 : 0);
+        const map = ([p, q]) => [ax + p, boxY + way * q], at = boxY + (both ? way * Math.min(s.h / 4, zc.row / 2) : 0);
         for (const it of hang.items) (x.set(it.id, map([it.x, it.y])[0]), y.set(it.id, map([it.x, it.y])[1]));
         for (const [item, points] of hang.wires) {
           const from = parents.get(item), line = points.map(map);
