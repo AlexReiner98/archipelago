@@ -5,6 +5,13 @@
 
 import { count, touch } from './count.js';
 
+/** How far a port keeps from a corner. */
+const INSET = 2;
+/** A box's own edges from the middle of its block, on one axis. What hangs beside it takes no port. */
+const reachOf = (b, axis) => b.reach?.[axis] ?? [-b.size[axis] / 2, b.size[axis] / 2];
+const spanOf = (b, axis) => reachOf(b, axis).map((r, k) => b.at[axis] + r + (k ? -INSET : INSET));
+const edgeOf = (b, axis, side) => b.at[axis] + reachOf(b, axis)[side > 0 ? 1 : 0];
+
 const median = (list) => [...list].sort((p, q) => p - q)[list.length >> 1];
 
 /** A line with repeated points and points along a straight run taken out. */
@@ -28,7 +35,7 @@ function simplify(points) {
 function pass(axis, boxes, wires, { gap, track, sweeps }) {
   const other = 1 - axis, items = [], ofBox = new Map();
   for (const [id, b] of boxes) {
-    const hold = axis === 0 && b.hold ? b.hold : [-b.size[axis] / 2 + 2, b.size[axis] / 2 - 2];
+    const [low, high] = reachOf(b, axis), hold = [low + INSET, high - INSET];
     const it = { box: id, from: hold[0], to: hold[1], pos: b.at[axis], half: b.size[axis] / 2, lo: b.at[other] - b.size[other] / 2, hi: b.at[other] + b.size[other] / 2, joins: [] };
     ofBox.set(id, it);
     items.push(it);
@@ -101,6 +108,52 @@ function pass(axis, boxes, wires, { gap, track, sweeps }) {
   for (const it of items) if (it.w) (it.w.points[it.i - 1][axis] = it.pos, it.w.points[it.i][axis] = it.pos);
 }
 
+/** Whether this line is free to be drawn: through no box, and crossing and touching no wire it did not already. */
+function allowed(line, was, w, boxes, wires) {
+  for (let i = 1; i < line.length; i++) {
+    const [p, q] = [line[i - 1], line[i]], l = Math.min(p[0], q[0]), r = Math.max(p[0], q[0]), t = Math.min(p[1], q[1]), u = Math.max(p[1], q[1]);
+    for (const b of boxes.values()) {
+      const [bl, br] = [b.at[0] - b.size[0] / 2 + INSET, b.at[0] + b.size[0] / 2 - INSET], [bt, bu] = [b.at[1] - b.size[1] / 2 + INSET, b.at[1] + b.size[1] / 2 - INSET];
+      if (r > bl && l < br && u > bt && t < bu) return false;
+    }
+  }
+  for (const v of wires) {
+    if (v === w) continue;
+    if (count([line, v.points]).crossings > count([was, v.points]).crossings) return false;
+    if (touch(line, v.points) && !touch(was, v.points)) return false;
+  }
+  return true;
+}
+
+/**
+ * Slide a wire's ends round the boxes they rest on, corners and all, wherever that takes out a bend and the line stays
+ * free. A wire that reaches a box along the side it lands on comes straight into that side; one that passes a corner to
+ * get there stops at the side it meets first.
+ */
+function slidePorts(boxes, wires) {
+  let moved = 0;
+  for (const w of wires) for (const atEnd of [true, false]) {
+    const b = boxes.get(atEnd ? w.b : w.a), was = simplify(w.points), line = atEnd ? was : [...was].reverse(), n = line.length;
+    if (n < 3) continue;
+    const [C, B, A, P] = [line[n - 1], line[n - 2], line[n - 3], line[n - 4]], e = B[0] === C[0] ? 1 : 0, o = 1 - e;
+    const [lo, hi] = spanOf(b, e), [olo, ohi] = spanOf(b, o), side = Math.sign(A[o] - b.at[o]) || 1;
+    if (o === 0 && side > 0 && reachOf(b, 0)[1] < b.size[0] / 2) continue;
+    const landing = (at) => { const c = []; c[e] = at; c[o] = edgeOf(b, o, side); return c; };
+    const outside = A[o] < olo - INSET || A[o] > ohi + INSET;
+    if (!outside) continue;
+    let next = null;
+    if (A[e] >= lo && A[e] <= hi) next = [...line.slice(0, n - 2), landing(A[e])];
+    else if (n >= 4 && P[o] === A[o]) {
+      const mid = (lo + hi) / 2, corner = []; corner[o] = A[o]; corner[e] = mid;
+      next = [...line.slice(0, n - 3), corner, landing(mid)];
+    }
+    if (!next) continue;
+    const drawn = atEnd ? next : [...next].reverse();
+    if (allowed(drawn, was, w, new Map([...boxes].filter(([id]) => id !== w.a && id !== w.b)), wires)) ((w.points = drawn), moved++);
+  }
+  return moved;
+}
+
 /** Whether every stretch of these lines is across or down: the pull works on those alone. */
 export const square = (wires) => wires.every((w) => w.points.every((p, i) => !i || p[0] === w.points[i - 1][0] || p[1] === w.points[i - 1][1]));
 
@@ -109,14 +162,14 @@ export const square = (wires) => wires.every((w) => w.points.every((p, i) => !i 
  * crossings than it found is taken back, whatever the reason: the crossings kept are a promise, not a hope. Answers
  * with what was done, for `watch`.
  */
-export function settle(boxes, wires, { gap, track, rounds = 8, sweeps = 12, watch = null }) {
+export function settle(boxes, wires, { gap, track, rounds = 12, sweeps = 16, watch = null }) {
   const crossings = () => count(wires.map((w) => w.points)).crossings;
   const save = () => ({ at: new Map([...boxes].map(([id, b]) => [id, [...b.at]])), lines: wires.map((w) => w.points.map((q) => [...q])) });
   const restore = (kept) => {
     for (const [id, at] of kept.at) boxes.get(id).at = at;
     wires.forEach((w, k) => (w.points = kept.lines[k]));
   };
-  let done = 0, undone = 0;
+  let done = 0, undone = 0, slid = 0;
   for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) {
     const before = crossings(), kept = save();
     pass(axis, boxes, wires, { gap, track, sweeps });
@@ -127,6 +180,7 @@ export function settle(boxes, wires, { gap, track, rounds = 8, sweeps = 12, watc
     const made = after > before && wires.some((w, i) => wires.some((v, j) => j > i && count([w.points, v.points]).crossings > count([kept.lines[i], kept.lines[j]]).crossings && !touch(kept.lines[i], kept.lines[j])));
     if (made) (restore(kept), undone++);
     else done++;
+    if (axis) slid += slidePorts(boxes, wires);
   }
-  return { done, undone };
+  return { done, undone, slid };
 }

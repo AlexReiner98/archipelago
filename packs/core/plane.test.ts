@@ -199,3 +199,19 @@ test('settle: wires along one another keep their sides', () => {
   assert.equal(done.undone, 0);
   assert.ok(wires.every((w) => w.points.length <= 8));
 });
+
+test('settle: a port slides round a corner when that takes out bends', () => {
+  const boxes = new Map([['a', box(100, 200)], ['b', box(500, 200)]]);
+  const wires = [{ a: 'a', b: 'b', points: [[100, 220], [100, 300], [500, 300], [500, 220]] }];
+  settle(boxes, wires, { gap: 24, track: 8 });
+  assert.ok(wires[0].points.length <= 3, JSON.stringify(wires[0].points));
+});
+
+test('settle: a port does not slide through a wire or a box', () => {
+  const boxes = new Map([['a', box(100, 200)], ['b', box(500, 200)], ['m', box(300, 200)]]);
+  const wires = [{ a: 'a', b: 'b', points: [[100, 220], [100, 300], [500, 300], [500, 220]] }];
+  settle(boxes, wires, { gap: 24, track: 8 });
+  assert.equal(hits(boxes), 0);
+  const m = boxes.get('m')!, through = wires[0].points.some((p, i) => i > 0 && p[1] === wires[0].points[i - 1][1] && p[1] > m.at[1] - 20 && p[1] < m.at[1] + 20 && Math.min(p[0], wires[0].points[i - 1][0]) < m.at[0] && Math.max(p[0], wires[0].points[i - 1][0]) > m.at[0]);
+  assert.equal(through, false);
+});

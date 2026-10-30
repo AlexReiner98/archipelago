@@ -220,7 +220,9 @@ function drawPart(list, links, block, box, z) {
 let watching = null;
 export const watch = (fn) => (watching = fn);
 
-export function layout({ items: given, links: told = [], undrawn = [], placed = {}, measure, sizes, aspect = 1.6 }) {
+// Where a step was put by hand is not read here yet: places were kept against the flow's picture, and they would pull
+// wires out of the collision system.
+export function layout({ items: given, links: told = [], undrawn = [], measure, sizes, aspect = 1.6 }) {
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
   const margin = sizes.flow_margin, gap = sizes.flow_node_gap, z = { row: sizes.flow_layer_gap / 2, col: gap / 2, turn: gap / 3, gap };
@@ -300,11 +302,30 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
   for (const [id, c] of combs) {
     if (!x.has(id)) continue;
     const s = stepSize(id), b = block(id), left = x.get(id) - s.w / 2, top = y.get(id) - s.h / 2;
-    rigid.set(id, { at: [left + b.w / 2, top + b.h / 2], size: [b.w, b.h], hold: [-b.w / 2 + 2, -b.w / 2 + s.w - 2], was: [left + b.w / 2, top + b.h / 2], hangs: c.items.map((it) => it.id) });
+    rigid.set(id, { at: [left + b.w / 2, top + b.h / 2], size: [b.w, b.h], reach: [[-b.w / 2, -b.w / 2 + s.w], [-b.h / 2, -b.h / 2 + s.h]], was: [left + b.w / 2, top + b.h / 2], hangs: c.items.map((it) => it.id) });
   }
   for (const r of routes.values()) if (r.to !== undefined && rigid.has(r.from) && rigid.has(r.to)) moving.push(Object.assign(r, { a: r.from, b: r.to }));
   if (moving.length && square(moving)) {
     settled = settle(rigid, moving, { gap: z.col, track: z.turn, watch: watching });
+    // The parts have pulled in, so they are set again, closer.
+    const sets = shelves.map((c) => {
+      const ids = [...c.drawn.places.keys()].filter((id) => rigid.has(id)), rs = ids.map((id) => rigid.get(id));
+      const own = new Set(ids), lines = moving.filter((w) => own.has(w.a));
+      const xs = [...rs.flatMap((b) => [b.at[0] - b.size[0] / 2, b.at[0] + b.size[0] / 2]), ...lines.flatMap((w) => w.points.map((q) => q[0]))];
+      const ys = [...rs.flatMap((b) => [b.at[1] - b.size[1] / 2, b.at[1] + b.size[1] / 2]), ...lines.flatMap((w) => w.points.map((q) => q[1]))];
+      const [l, t] = [Math.min(...xs), Math.min(...ys)];
+      return { rs, lines, l, t, w: Math.max(...xs) - l, h: Math.max(...ys) - t };
+    }).filter((c) => c.rs.length).sort((p, q) => q.h - p.h || q.w - p.w);
+    const room = sets.reduce((sum, c) => sum + (c.w + gap) * (c.h + gap), 0), wide = Math.max(sets[0]?.w ?? 0, Math.sqrt(room * aspect));
+    let nx = margin, ny = margin, tall = 0;
+    for (const c of sets) {
+      if (nx > margin && nx + c.w > margin + wide) ((nx = margin), (ny += tall + gap), (tall = 0));
+      const dx = nx - c.l, dy = ny - c.t;
+      for (const b of c.rs) ((b.at[0] += dx), (b.at[1] += dy));
+      for (const w of c.lines) w.points = w.points.map(([p, q]) => [p + dx, q + dy]);
+      nx += c.w + gap;
+      tall = Math.max(tall, c.h);
+    }
     for (const [id, b] of rigid) {
       const dx = b.at[0] - b.was[0], dy = b.at[1] - b.was[1];
       for (const it of [id, ...b.hangs]) (x.set(it, x.get(it) + dx), y.set(it, y.get(it) + dy));
@@ -314,7 +335,6 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
       r.points = r.points.map(([p, q]) => [p + b.at[0] - b.was[0], q + b.at[1] - b.was[1]]);
     }
   }
-  for (const id of Object.keys(placed)) if (nodes.has(id) && Array.isArray(placed[id])) (x.set(id, Number(placed[id][0])), y.set(id, Number(placed[id][1])));
   const edge = (id, to) => {
     const s = stepSize(id), [px, py] = [x.get(id), y.get(id)], dx = to[0] - px, dy = to[1] - py, t = Math.min(dx ? s.w / 2 / Math.abs(dx) : Infinity, dy ? s.h / 2 / Math.abs(dy) : Infinity, 1);
     return [px + dx * t, py + dy * t];
