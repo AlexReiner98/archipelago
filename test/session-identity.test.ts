@@ -18,7 +18,7 @@ test('each session is named by a word its type gives, none another open one hold
   assert.equal(new Set(named.map((n) => names.indexOf(n) % hues)).size, hues, 'nor a hue, while there are hues to go round');
   for (const s of started) {
     const run = (await l.entity(s.run))!;
-    assert.deepEqual([run.title, run.props.name], [s.name, s.name], 'its name is its title');
+    assert.deepEqual([run.title, run.props.name], [`Session ${s.name}`, s.name], 'its title says it is a session, by its name');
   }
   // A launcher's own words for it are its note, not its name.
   const launched = await sessionStart(l, agent, { title: 'Headless (plan): Tune the solver' });
@@ -35,13 +35,13 @@ test('a change says the session it was made in, and the log and its events name 
   const { rows: pending } = await l.db.query<{ head: Record<string, unknown> }>(`select head from log_entry where id = $1`, [held.proposal]);
   assert.equal(pending[0].head.run, one.run, 'the session id resolves to its run, kept in the held entry');
   const queue = (await callTool(l, human, 'proposals', {})) as any[];
-  assert.equal(queue.find((p) => p.id === held.proposal).run_name, one.name, 'the review queue names the session too');
+  assert.equal(queue.find((p) => p.id === held.proposal).run_name, `Session ${one.name}`, 'the review queue names the session too');
   // Approved by the owner, it is still the session's: the run goes with it into the facts.
   const made = (await l.decide(human, { proposal: held.proposal, approve: true })) as any;
   const { rows } = await l.db.query<{ head: Record<string, unknown> }>(`select head from log_entry where id = $1`, [made.changeset]);
   assert.equal(rows[0].head.run, one.run);
   const events = (await callTool(l, human, 'events', { limit: 5 })) as any;
   const ev = (Array.isArray(events) ? events : events.events).find((e: any) => e.changeset === made.changeset && e.action === 'entity.create');
-  assert.equal(ev.detail.run_name, one.name, 'an event names the session by its name');
+  assert.equal(ev.detail.run_name, `Session ${one.name}`, 'an event names the session by its name');
   await assert.rejects(callTool(l, agent, 'change', { ops: [{ op: 'create', type: 'task', title: 'Nope', status: 'todo' }], reason: 'test', run: 'nobody' }), /no open session "nobody"/);
 });

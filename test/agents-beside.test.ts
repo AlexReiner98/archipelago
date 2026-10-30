@@ -41,8 +41,6 @@ test('in a browser, agents at work never move the reader’s pane; a show lands 
   const readers = `(() => { const p = document.querySelector('#canvas > .pane.pane-active'); return Boolean(p?.querySelector('svg a[href="#/e/${made.a}"]')) && !p.querySelector('svg a[href="#/e/${made.b}"]') && location.hash.includes('ids=${made.a}'); })()`;
   try {
     assert.ok(await until(`Boolean(document.querySelector('#canvas .pane-canvas svg a[href="#/e/${made.a}"]'))`), `the reader's canvas is drawn: ${page.logs().join('\n')}`);
-    // The reader works in their pane, following agents off.
-    await page.evaluate(`(localStorage.setItem('pelago-follow', 'off'), document.querySelector('#follow input').checked = false)`);
     const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = document.querySelector('#canvas .pane-canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.bottom - 20]; })())`));
     for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
     await wait(2500);

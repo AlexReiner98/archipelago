@@ -67,7 +67,8 @@ test('the hook reads from the transcript the items the session’s calls to the 
   ];
   const dir = mkdtempSync(join(tmpdir(), 'pelago-transcript-'));
   const transcript = join(dir, 'session.jsonl');
-  writeFileSync(transcript, lines.map((x) => JSON.stringify(x)).join('\n') + '\n{"type":"assist');
+  const titles = [{ type: 'custom-title', customTitle: 'First words' }, { type: 'custom-title', customTitle: 'Agent popup behaviour' }];
+  writeFileSync(transcript, [...lines, ...titles].map((x) => JSON.stringify(x)).join('\n') + '\n{"type":"assist');
   let got: any;
   const server = createServer((req, res) => {
     let body = '';
@@ -83,5 +84,6 @@ test('the hook reads from the transcript the items the session’s calls to the 
   });
   server.close();
   assert.equal(got.tokens, 20);
+  assert.equal(got.title, 'Agent popup behaviour', 'what Claude Code last called the session');
   assert.deepEqual(got.touched.sort(), ['e_changed1', 'e_madeitem', 'e_readitem', 'e_shownnow'], 'what it sent, and what a change made; not what an answer only mentioned');
 });

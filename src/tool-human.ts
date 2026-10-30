@@ -32,9 +32,9 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       seq: z.number().int().nonnegative().optional().describe('The `seq` of the last answer: what other events after it touched is said.'),
       ids: z.array(z.string()).max(HELD_MOST).optional().describe('The items and links the page holds. Facts are read only on these, the links made touching them, and what those bring.'),
       page: z
-        .object({ page: z.string().max(40), on: z.boolean(), muted: z.array(z.string().max(200)).max(50) })
+        .object({ page: z.string().max(40), on: z.boolean() })
         .optional()
-        .describe('The page asking, and what it follows: whether a show moves it, and whose steps it leaves out. An agent’s show says how many pages follow it.'),
+        .describe('The page asking, and whether a show can land in it. An agent’s show says how many pages can take it.'),
     },
     run: async (l, _actor, { after, seq, ids = [], page }) => {
       if (page) await looked((await wholeMap(l)).db, l, page);

@@ -57,7 +57,7 @@ test('a handoff is read off the map, and nobody writes it down: the open work an
   assert.ok(!stand.open.ready.some((i: any) => i.title === 'Write unit tests'), 'what is open is as the map has it now');
   // The next session is told how much has moved since the last session here to end began, and what is left, unseen or bites here.
   await make(l, [{ op: 'update', id: made.offline, props: { seen_working: false } }]);
-  assert.match(await hookSessionStart(l, { session_id: 'h1', cwd: String.raw`C:\code\Apex` }), /Where things stand: view "handoff" with repo e_\w+\. Since the last session here to end, \w+, began \(\d{4}-\d\d-\d\d \d\d:\d\d UTC\): 1 push, 1 item settled, 1 item opened, 1 session ended\. And 1 item nobody has seen working \(unseen\)\./);
+  assert.match(await hookSessionStart(l, { session_id: 'h1', cwd: String.raw`C:\code\Apex` }), /Where things stand: view "handoff" with repo e_\w+\. Since the last session here to end, Session \w+, began \(\d{4}-\d\d-\d\d \d\d:\d\d UTC\): 1 push, 1 item settled, 1 item opened, 1 session ended\. And 1 item nobody has seen working \(unseen\)\./);
   assert.equal(((await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo, since: new Date(Date.now() + 60_000).toISOString() } })) as any).since_then.settled.length, 0, 'counted from another moment when asked');
 
   // A note of a type held to a length (an old handoff) cannot be grown past it by an agent, only rewritten.
@@ -216,7 +216,7 @@ test('launching runs a headless session on a task, holding the lane and recordin
   const first = await launch(l, human, { task: made.live });
   assert.deepEqual([first.mode, first.claimed], ['plan', ['Live lane']]);
   // While it runs it holds the lane, so a second launch on the same task is refused.
-  await assert.rejects(launch(l, human, { task: made.live }), /Not launched\. "Live lane" is held by "[A-Z][a-z]+"/);
+  await assert.rejects(launch(l, human, { task: made.live }), /Not launched\. "Live lane" is held by "Session [A-Z][a-z]+"/);
 
   const done = await ended(first.run);
   assert.equal(done.status, 'finished');
@@ -316,7 +316,7 @@ test('a run in GitHub Actions reports what it used, once, and the repository add
   await recordUsage(l, 'local', 100_000);
   const usage = (await callTool(l, human, 'view', { name: 'agent_usage', params: { repo: 'Site repo' } })) as any;
   assert.deepEqual(usage.week, { 'claude-code': { runs: 1, tokens: 100_000, cost_usd: 0 }, 'github-actions': { runs: 2, tokens: 50_000, cost_usd: 0.3134 } });
-  assert.deepEqual(usage.runs.map((x: any) => [x.title, x.status, x.tokens]).sort(), [['Read the push to main (abc1234)', 'finished', 42_000], ['Scheduled re-check', 'failed', 8_000], [local.name!, 'running', 100_000]].sort());
+  assert.deepEqual(usage.runs.map((x: any) => [x.title, x.status, x.tokens]).sort(), [['Read the push to main (abc1234)', 'finished', 42_000], ['Scheduled re-check', 'failed', 8_000], [`Session ${local.name}`, 'running', 100_000]].sort());
   assert.equal((await l.proposals()).length, 0, 'a report is not a change to review');
 });
 

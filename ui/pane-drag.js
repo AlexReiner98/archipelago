@@ -1,6 +1,6 @@
 // Moving panes by hand (ui/panes.js): a pane's name pressed and dragged shows where it would dock, as a code editor
-// does: over a pane's side, docked on that side of it; over its middle, swapped with it. A pane stays in its tab: a
-// tab, not a pane, pops out (ui/tab-bar.js). The line between two panes is dragged to share the room between them.
+// does: over a pane's side, docked on that side of it; over its middle, swapped with it; over the tabs, into a tab of
+// its own (ui/tab-bar.js). The line between two panes is dragged to share the room between them.
 
 import { h } from './base.js';
 
@@ -33,11 +33,14 @@ export function dragPane(ev, id, el, { groups, drop }) {
     moved = true;
     document.body.dataset.dragging = 'pane';
     const out = e.clientX < 0 || e.clientY < 0 || e.clientX > innerWidth || e.clientY > innerHeight;
-    const over = out ? null : groups().find(([g, box]) => g !== id && inside(box.getBoundingClientRect(), e.clientX, e.clientY));
-    at = out ? [null, 'out'] : over ? [over[0], zoneOf(over[1].getBoundingClientRect(), e.clientX, e.clientY)] : null;
+    const tabs = document.getElementById('tabs');
+    const onTabs = !out && groups().length > 1 && inside(tabs.getBoundingClientRect(), e.clientX, e.clientY);
+    const over = out || onTabs ? null : groups().find(([g, box]) => g !== id && inside(box.getBoundingClientRect(), e.clientX, e.clientY));
+    at = out ? [null, 'out'] : onTabs ? [null, 'tabs'] : over ? [over[0], zoneOf(over[1].getBoundingClientRect(), e.clientX, e.clientY)] : null;
     const z = overlay();
     z.hidden = !at || out;
     z.dataset.zone = at?.[1] ?? '';
+    if (onTabs) Object.assign(z.style, Object.fromEntries(['left', 'top', 'width', 'height'].map((k) => [k, `${tabs.getBoundingClientRect()[k]}px`])));
     if (over) Object.assign(z.style, Object.fromEntries(Object.entries(zoneBox(over[1].getBoundingClientRect(), at[1])).map(([k, v]) => [k, `${v}px`])));
   };
   const up = () => {

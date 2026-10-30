@@ -13,7 +13,7 @@ import { canvasLens } from './canvases.js';
 import { flatQuery, readFlatLens } from './lens.js';
 import { numberOf } from './lens-base.js';
 import { dragPane, sashes } from './pane-drag.js';
-import { nameOf } from './pane-route.js';
+import { heard, nameOf } from './pane-route.js';
 import { filterSaid } from './query-bar.js';
 import { asPane, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId } from './tabs.js';
 import { titles } from './words.js';
@@ -65,7 +65,7 @@ function paneEl(id) {
   const button = (title, mark, onclick) => h('button', { type: 'button', class: 'pane-act', title, 'aria-label': title, onclick }, mark);
   // Its controls stand in its strip in focus or not: in focus, the query bar takes the name's place between them.
   const grip = h('span', { class: 'pane-act pane-grip', title: 'Drag to dock it elsewhere', 'aria-label': 'Move this pane' }, '⠿');
-  const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, grip, name, mark, button('Close this pane', '×', () => close(id))), body);
+  const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, grip, name, mark, button('Move this pane to a new tab', '⧉', () => hooks.paneToTab?.(id)), button('Close this pane', '×', () => close(id))), body);
   for (const handle of [grip, name]) handle.addEventListener('pointerdown', (ev) => dragPane(ev, id, el, { groups: groupEls, drop }));
   const canvas = canvasIn(body, {
     go: (lens) => goPane(id, lens ? `v?${flatQuery(lens, canvas.asked)}` : 'v'),
@@ -201,11 +201,16 @@ function frameActive() {
   for (const [g, e] of drawn) e.el.classList.toggle('pane-active', g === active);
   const box = frames.find(([g]) => g === active)?.[1] ?? frames[0]?.[1];
   for (const side of ['left', 'right', 'top', 'bottom']) document.body.style.setProperty(`--active-${side}`, edge(side, box?.[side] ?? 0));
-  // A pane named by a session, or held for one, says whose it is in its strip.
+  markPanes();
+}
+/** A pane named by a session, or held for one, says whose it is in its strip, and in the tooltip its session's name and what it last said of it. */
+export function markPanes() {
   for (const [g, e] of drawn) {
     const p = front().panes[g];
     e.mark.textContent = p?.slot ?? (p?.held ? nameOf(p.held) : '');
     e.mark.hidden = !e.mark.textContent;
+    const known = heard.get(p?.held);
+    e.mark.title = [known?.label && `Session ${known.name}`, p?.said].filter(Boolean).join(': ');
   }
 }
 
@@ -305,9 +310,10 @@ export function only(id, t = front()) {
   keep();
   if (t === front()) draw();
 }
-/** Let go of a pane dragged (ui/pane-drag.js): on a side of another, docked there; in the middle of one, the two swap places. A pane stays in its tab: a tab, not a pane, pops out. */
+/** Let go of a pane dragged (ui/pane-drag.js): on the tabs, into a tab of its own; on a side of another, docked there; in the middle of one, the two swap places. */
 function drop(id, target, zone) {
   if (zone === 'out') return;
+  if (zone === 'tabs') return hooks.paneToTab?.(id);
   if (zone !== 'center') return place(id, zone, target);
   const t = front();
   const [a, b] = [t.groups.indexOf(id), t.groups.indexOf(target)];
@@ -339,11 +345,10 @@ export const activeAt = () => hrefOf(front().panes[active]?.at);
 /** Light a pane an agent's step was just drawn in. */
 export function flash(id) {
   const entry = drawn.get(id);
-  if (!entry) return null;
+  if (!entry) return;
   entry.el.classList.remove('pane-shown');
   void entry.el.offsetWidth;
   entry.el.classList.add('pane-shown');
-  return entry.el.querySelector('.pane-canvas');
 }
 
 let started = false;

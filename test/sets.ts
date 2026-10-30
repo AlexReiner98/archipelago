@@ -28,6 +28,7 @@ export const SLOW: Record<string, string> = {
   'test/published-frames.test.ts': 'browser',
   'test/query-line.test.ts': 'browser',
   'test/saved-canvases.test.ts': 'browser',
+  'test/show-lands.test.ts': 'browser',
   'test/stable-page.test.ts': 'browser',
   'test/tabs.test.ts': 'browser',
   'test/walk-from.test.ts': 'browser',

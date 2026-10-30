@@ -42,7 +42,6 @@ await until(`document.querySelector('.part[data-part="item"] h1') && !document.q
 await wait(3000);
 // The reader: following agents left off, scrolled part way down, the history opened, and a mark that a reload would lose.
 const reader = await chrome.evaluate<{ y: number; history: boolean }>(`(() => {
-  localStorage.setItem('pelago-follow', 'off');
   window.stillMark = 1;
   window.redraws = 0;
   window.swapped = {};
