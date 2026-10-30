@@ -180,6 +180,16 @@ export function lay(ids, edges, ties, { nodes, x, y, potential, aspect, z }) {
         if (score(tried) < score(chosen)) chosen = tried;
       }
     }
+  return placeRows({ lines, chosen, flows, nodes, x, y, potential, z });
+}
+
+/**
+ * The rows `chosen` settled on made a picture: each step's place, each line's points. `chosen` holds `layers`, ids by
+ * row in their order, `layerOf`, the `waypoints`, who each is joined to above and below (`up`, `down`, `upOrder`,
+ * `downOrder`) and the `paths` of `lines`, in step. Answers as `lay` does.
+ */
+export function placeRows({ lines, chosen, flows, nodes, x, y, potential, z }) {
+  const { LAYER_GAP, NODE_GAP } = z;
   // The lines as the chosen arrangement runs them.
   chosen.paths.forEach(([from, to, path, bundle, flat], k) => Object.assign(lines[k], { from, to, path, bundle, flat }));
   for (const [id, k] of chosen.layerOf) nodes.get(id).layer = k;

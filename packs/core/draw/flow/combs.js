@@ -3,10 +3,10 @@
 // one block between those two, on two rails that interleave. Pure: lengths in, places and wires out, each wire the
 // points of one link from what holds it down to the item, in the comb's own frame.
 
-/** Peel what has one neighbour: `kids` of each item, and the core left. */
-export function peel(a) {
+/** Peel what has one neighbour: `kids` of each item, and the core left. What is in `stay` is never peeled. */
+export function peel(a, stay = new Set()) {
   const degree = new Map([...a].map(([k, s]) => [k, s.size])), kids = new Map(), gone = new Set();
-  const todo = [...a.keys()].filter((k) => degree.get(k) === 1);
+  const todo = [...a.keys()].filter((k) => degree.get(k) === 1 && !stay.has(k));
   while (todo.length) {
     const n = todo.pop();
     if (gone.has(n) || degree.get(n) !== 1) continue;
@@ -14,7 +14,7 @@ export function peel(a) {
     gone.add(n);
     (kids.get(p) ?? kids.set(p, []).get(p)).push(n);
     degree.set(p, degree.get(p) - 1);
-    if (degree.get(p) === 1) todo.push(p);
+    if (degree.get(p) === 1 && !stay.has(p)) todo.push(p);
   }
   return { kids, core: [...a.keys()].filter((k) => !gone.has(k)) };
 }

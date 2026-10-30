@@ -159,6 +159,13 @@ export function wire({ nodes, x, y, lines, layers, room, z }) {
     }
     row.splice(bestAt, 0, fan);
   }
+  // Where every line is its own fan, one order of the tracks crosses no two lines that keep their order between the rows:
+  // those going right with the furthest on first, then those going left with the furthest on first, so that what is
+  // left is only what the rows force. A line along its row goes first: it crosses what drops past it wherever it runs.
+  if (z.EXACT) for (const row of tracks) {
+    const way = (f) => (f.flat ? 0 : f.members[0].hx >= f.fx ? 1 : 2);
+    row.sort((p, q) => way(p) - way(q) || (way(p) === 1 ? q.fx - p.fx : p.fx - q.fx));
+  }
   // Fans that do not overlap across (a track's width apart) share a track: each takes the one under every fan before it
   // in that order that it overlaps, so the order stands wherever two meet, and a gap is only as tall as its busiest
   // stretch needs.
@@ -171,7 +178,8 @@ export function wire({ nodes, x, y, lines, layers, room, z }) {
   let top = 0;
   layers.forEach((row, k) => {
     const tall = highest([BOX_H, ...row.map((id) => nodes.get(id).h)]);
-    for (const id of row) y.set(id, top + tall / 2);
+    // Each step in the middle of its row, or, where a row holds something tall, at the head of it.
+    for (const id of row) y.set(id, top + (z.HEADS ? nodes.get(id).h / 2 : tall / 2));
     top += tall;
     // A line leaves its foot by LEAD_OUT at least and runs LEAD_IN at least before its head; the tracks sit between.
     const n = highest([1, ...[...levels[k].values()].map((l) => l + 1)]), gap = Math.max(LAYER_GAP / 2, LEAD_OUT + LEAD_IN + (n - 1) * TRACK);
