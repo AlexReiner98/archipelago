@@ -71,7 +71,7 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
     const spot = await page.evaluate<{ x: number; y: number }>(`(() => { const r = document.querySelector('#find .q-only .q-term .q-said').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
     await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...spot });
     assert.ok(await until(`document.querySelector('.tip')?.matches(':popover-open')`), 'the page says it in its own tip');
-    assert.deepEqual(await page.evaluate(titles), [], 'on a term, no title is left above it');
+    assert.ok(await until(`${titles}.length === 0`), `on a term, no title is left above it: ${JSON.stringify(await page.evaluate(titles))}`);
     for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, ...spot, button: 'left', clickCount: 1 });
     assert.ok(await until(`${titles}.length === 0`), `nor after a click on it: ${JSON.stringify(await page.evaluate(titles))}`);
     await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
