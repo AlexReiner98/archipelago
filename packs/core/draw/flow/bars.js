@@ -222,7 +222,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
   const margin = sizes.flow_margin, gap = sizes.flow_node_gap, zw = { room: sizes.plane_wire_room, join: sizes.plane_joined_room, run: sizes.plane_port_run };
-  const zs = { trials: sizes.plane_trials, trial_most: sizes.plane_trial_most, cost_up: sizes.plane_cost_up, cost_cross: sizes.plane_cost_crossing, cost_wrong: sizes.plane_cost_wrong_side, embed_most: sizes.plane_embed_most, embed_cost: sizes.plane_embed_crossings, slide_sweeps: sizes.plane_slide_sweeps };
+  const zs = { trials: sizes.plane_trials, trial_most: sizes.plane_trial_most, cost_up: sizes.plane_cost_up, cost_cross: sizes.plane_cost_crossing, cost_wrong: sizes.plane_cost_wrong_side, embed_most: sizes.plane_embed_most, embed_cost: sizes.plane_embed_crossings, slide_sweeps: sizes.plane_slide_sweeps, trial_total: sizes.plane_trial_total };
   const z = { row: sizes.flow_layer_gap / 2, col: Math.max(gap / 2, zw.room * 2), turn: gap / 3, gap, ...zw, ...zs };
   const zc = { row: gap / 4, col: gap, stub: z.run, join: z.join }, combGap = Math.max(gap, z.join);
   const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ a: l.from, b: l.to, type: l.type, ...(l.pending && { pending: l.pending }) }));
@@ -270,7 +270,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
     }
     let drawn;
     if (list.length >= 3 && part.length >= 3) {
-      for (const trial of list.length <= z.trial_most ? TRIALS.slice(0, z.trials) : TRIALS.slice(0, 1)) {
+      for (const trial of list.length <= z.trial_most && core.length <= z.trial_total ? TRIALS.slice(0, z.trials) : TRIALS.slice(0, 1)) {
         try {
           const made = drawPart(list, part, block, stepSize, z, trial), cost = costOf(made, stepSize, z);
           if (!drawn || cost < drawn.cost) drawn = { ...made, cost };
@@ -327,7 +327,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   }
   for (const r of routes.values()) if (r.to !== undefined && rigid.has(r.from) && rigid.has(r.to)) moving.push(Object.assign(r, { a: r.from, b: r.to, down: orderKey.has(pair(r.from, r.to)) }));
   if (moving.length && square(moving)) {
-    settled = settle(rigid, moving, { gap: gap / 2, track: z.turn, ...zw, blocks: moving.length > PULL_MOST ? sizes.plane_block_rounds_big : sizes.plane_block_rounds, watch: watching, ...(moving.length > PULL_MOST && { rounds: 4, sweeps: 6 }) });
+    settled = settle(rigid, moving, { gap: gap / 2, track: z.turn, ...zw, blocks: moving.length > PULL_MOST ? sizes.plane_block_rounds_big : sizes.plane_block_rounds, watch: watching, ...(moving.length > PULL_MOST && { rounds: sizes.plane_pull_rounds_big, sweeps: sizes.plane_pull_sweeps_big }) });
     // The parts have pulled in, so they are set again, closer.
     const sets = shelves.map((c) => {
       const ids = [...c.drawn.places.keys()].filter((id) => rigid.has(id)), rs = ids.map((id) => rigid.get(id));
@@ -356,7 +356,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
       r.points = r.points.map(([p, q]) => [p + b.at[0] - b.was[0], q + b.at[1] - b.was[1]]);
     }
     for (const [id, b] of rigid) b.pointed = nodes.get(id).shape === 'diamond';
-    wired = reroute(rigid, moving, [...routes.values()].filter((r) => r.to === undefined).map((r) => r.points), { track: z.turn, room: z.room, run: z.run, ports: sizes.plane_reroute_ports, shorter: sizes.plane_reroute_shorter, rounds: sizes.plane_reroute_rounds });
+    wired = reroute(rigid, moving, [...routes.values()].filter((r) => r.to === undefined).map((r) => r.points), { track: z.turn, room: z.room, run: z.run, ports: sizes.plane_reroute_ports, shorter: sizes.plane_reroute_shorter, rounds: moving.length > PULL_MOST ? 1 : sizes.plane_reroute_rounds });
   }
   const edge = (id, to) => {
     const s = stepSize(id), [px, py] = [x.get(id), y.get(id)], dx = to[0] - px, dy = to[1] - py, t = Math.min(dx ? s.w / 2 / Math.abs(dx) : Infinity, dy ? s.h / 2 / Math.abs(dy) : Infinity, 1);
