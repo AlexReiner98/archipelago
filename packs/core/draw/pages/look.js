@@ -14,7 +14,8 @@ export const css = `
 .rd { display: flex; flex-direction: column; gap: var(--ln-grid-card-gap); min-width: 0; }
 .rd-state { color: var(--ln-muted); font-size: var(--ln-small-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rd.changed .rd-state { color: var(--ln-warn); }
-.rd-slot { border: var(--ln-rule) solid var(--ln-line); border-radius: var(--ln-radius-size); overflow: hidden; background: var(--ln-land); min-height: var(--ln-pages-least); }
+.rd-slot { position: relative; border: var(--ln-rule) solid var(--ln-line); border-radius: var(--ln-radius-size); overflow: hidden; background: var(--ln-land); min-height: var(--ln-pages-least); }
 .rd.none .rd-slot { display: none; }
 .rd-slot iframe { display: block; width: 100%; height: var(--ln-pages-least); border: 0; }
+.rd-slot iframe.rd-next { position: absolute; top: 0; left: 0; visibility: hidden; }
 `;

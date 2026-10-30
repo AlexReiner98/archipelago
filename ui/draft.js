@@ -2,12 +2,16 @@
 // what they save reaches the map, as one change on their authority through `change`: the log keeps facts, not
 // keystrokes (the owner, 25 Oct 2026). A new item is a draft until it has a title and is saved; closed unsaved,
 // nothing is written. Saving asks first when someone changed the item since the sheet opened, so no one's words are
-// overwritten unseen. What applies is the rules' to say, never the page's.
+// overwritten unseen. What applies is the rules' to say, never the page's. A note whose words live on another map is
+// written there, by that map's `call`.
 
 import { api, ask, h, state, tell } from './base.js';
 import { renderBody } from './body.js';
 import { followLoose, refreshCanvas } from './canvas.js';
 import { ticked } from './text.js';
+
+/** Where the cursor was in the words saved last: the page is drawn again, and it stays there. */
+let left = null;
 
 /** Whether the sheet holds words not yet saved: the router asks before they are left behind. */
 export const unsaved = () => Boolean(document.querySelector('#sheet [data-draft="unsaved"]'));
@@ -19,12 +23,14 @@ export const mayLeave = async () => !unsaved() || Boolean(await ask({ title: 'Le
  * The title, the note and the bar that saves them. `base` is the item as the sheet opened it ({ id, type, title, body,
  * updated_at }), or a new item's type and any title it starts with. `note`: false where the note is not written here
  * (a document, read whole). `reading`: what the note reads as, where it is not the note itself (a document, with the
- * sections it brings in). `saved(id)` is told when the change is made.
+ * sections it brings in). `writing`: the note opens as words to write, not as it reads (read beside it already, the
+ * pages). `call`: the map it is written on, this one unless said. `saved(id)` is told when the change is made.
  */
-export function draftOf({ base, style, editable = true, note = true, reading, saved }) {
+export function draftOf({ base, style, editable = true, note = true, reading, writing = false, call = api, saved }) {
   const isNew = !base.id;
+  const here = call === api;
   const title = h('h1', { class: 'draft-title', contenteditable: editable ? 'plaintext-only' : 'false', 'data-placeholder': 'Title', spellcheck: 'true' }, base.title ?? '');
-  const area = h('textarea', { class: 'draft-body', placeholder: 'What is it, and how does it relate to other items?', rows: 4, hidden: !isNew && Boolean(base.body) });
+  const area = h('textarea', { class: 'draft-body', placeholder: 'What is it, and how does it relate to other items?', rows: 4, hidden: !isNew && !writing && Boolean(base.body) });
   area.value = base.body ?? '';
   // A checklist item ticked as the note reads is a change to that one line of it, on the person's word.
   const tick = async (line, done) => {
@@ -33,16 +39,16 @@ export function draftOf({ base, style, editable = true, note = true, reading, sa
     const once = base.body.split(t.was).length === 2;
     const whole = () => base.body.split('\n').map((l, i) => (i === line ? t.now : l)).join('\n');
     try {
-      const made = await api('change', { ops: [{ op: 'update', id: base.id, ...(once ? { replace: { find: t.was, with: t.now } } : { body: whole() }) }], reason: done ? 'Ticked in the note' : 'Unticked in the note' });
+      const made = await call('change', { ops: [{ op: 'update', id: base.id, ...(once ? { replace: { find: t.was, with: t.now } } : { body: whole() }) }], reason: done ? 'Ticked in the note' : 'Unticked in the note' });
       if (made.status && made.status !== 'applied') await tell('Saved as a proposal', 'A rule holds this change for a person to approve before it applies.');
-      state.selfDrawn = made.status === 'applied';
+      state.selfDrawn = here && made.status === 'applied';
       saved(base.id);
     } catch (err) {
       tell('It was not ticked', err.message);
     }
   };
   // The note as it reads, folded (renderBody), until it is clicked to be written.
-  const read = !isNew && base.body && h('div', { class: 'draft-read', title: editable ? 'Click to write' : '' }, reading ?? renderBody(base.body, { style, tick: editable ? tick : undefined }));
+  const read = !isNew && !writing && base.body && h('div', { class: 'draft-read', title: editable ? 'Click to write' : '' }, reading ?? renderBody(base.body, { style, tick: editable ? tick : undefined }));
   const said = h('span', { class: 'draft-said' });
   const save = h('button', { class: 'primary', type: 'button' }, isNew ? 'Create' : 'Save');
   const discard = h('button', { class: 'quiet-button', type: 'button' }, 'Discard');
@@ -98,19 +104,21 @@ export function draftOf({ base, style, editable = true, note = true, reading, sa
         return saved(made.created?.new);
       }
       // Someone else's words since the sheet opened are not written over unseen.
-      const live = (await api('get', { id: base.id })).entity;
+      const live = (await call('get', { id: base.id })).entity;
       const fresh = props();
       const moved = live.updated_at !== base.updated_at && (live.title !== base.title || (live.body ?? '') !== (base.body ?? '') || Object.keys(fresh).some((k) => !same(live.props[k], fields.get(k).was)));
       if (moved && !(await ask({ title: 'Changed since you opened it', message: 'Someone changed what you are writing while you were. Save yours over theirs?', action: 'Save mine', danger: true }))) return update();
       const ops = [{ op: 'update', id: base.id, ...(next.title !== (base.title ?? '').trim() && { title: next.title }), ...(next.body !== (base.body ?? '') && { body: next.body }), ...(Object.keys(fresh).length && { props: fresh }) }];
-      const done = await api('change', { ops, reason: 'Written in the sheet' });
+      left = { id: base.id, from: area.selectionStart, to: area.selectionEnd };
+      const done = await call('change', { ops, reason: 'Written in the sheet' });
       // Held for someone's word by a rule: it is on the map as a proposal, not yet applied.
       if (done.status && done.status !== 'applied') await tell('Saved as a proposal', 'A rule holds this change for a person to approve before it applies.');
       box.dataset.draft = '';
       fields.clear();
-      state.selfDrawn = done.status === 'applied';
+      state.selfDrawn = here && done.status === 'applied';
       saved(base.id);
     } catch (err) {
+      left = null;
       update();
       tell('It was not saved', err.message);
     }
@@ -118,12 +126,24 @@ export function draftOf({ base, style, editable = true, note = true, reading, sa
   update();
   // A new item opens with its title ready to be typed.
   if (isNew) requestAnimationFrame(() => title.focus());
+  // Words to write are as tall as they are, and saving leaves the cursor where it was.
+  if (writing) requestAnimationFrame(() => {
+    grow();
+    if (left?.id === base.id) area.setSelectionRange(left.from, left.to), area.focus({ preventScroll: true });
+    left = null;
+  });
   /** A field written in place: `keep(value, bad)` holds what it says now for Save; `bad` says why it cannot be saved yet. */
   const field = (name, was) => (value, why) => {
     fields.set(name, { was, now: value === undefined ? fields.get(name)?.now : value, bad: why });
     update();
   };
-  return { title, note: note ? [read, area].filter(Boolean) : [], bar: box, field, save: () => save.click(), unsaved: () => changed() };
+  /** Open the note as words to write, the cursor left where it is. */
+  const open = () => {
+    if (read) read.hidden = true;
+    area.hidden = false;
+    grow();
+  };
+  return { title, note: note ? [read, area].filter(Boolean) : [], bar: box, field, open, save: () => save.click(), unsaved: () => changed() };
 }
 
 /** A new item as a draft in the sheet: its type (a task unless chosen), a title to type and a note. Saved, it is a loose

@@ -3,8 +3,9 @@
 // itself (the page's `reader` mark, ui/reader-frame.js), so it reads and looks as the site does, figures and drawings
 // included, and says whether the draft differs from what is published. A line of a note holding only an item's id
 // brings that item in as a section (src/documents.ts): an item another page brings in is read there, not as a row of
-// its own. Each title leads to its item's page, where it is changed. It is laid out by the page, not drawn to a size:
-// the frame does not pan or zoom it. Its look is ./look.js.
+// its own. Each title leads to its item's page, where it is changed; with that page open the draft is read beside it
+// (`beside`: what is published gives way, and the page follows the document in sight, ui/sheet-follow.js). It is laid
+// out by the page, not drawn to a size: the frame does not pan or zoom it. Its look is ./look.js.
 
 import { css } from './look.js';
 import { m } from './marks.js';
@@ -83,8 +84,9 @@ export function picture({ answer, style }) {
   };
 
   return {
-    scene: { css, svg: m('div', { class: 'pg-stage' }, rows.map(row)), key: [], ...(rows.some((r) => r.id === style.here) && { focus: `p:${style.here}` }) },
+    scene: { css, svg: m('div', { class: 'pg-stage' }, rows.map(row)), key: [], beside: true, ...(rows.some((r) => r.id === style.here) && { focus: `p:${style.here}` }) },
     on: () => [],
-    restyle: () => [],
+    // The page open is lit as the sheet moves from one to another; nothing is drawn again.
+    restyle: (now) => rows.map((r) => ({ key: `p:${r.id}`, toggle: { here: r.id === now.here } })),
   };
 }

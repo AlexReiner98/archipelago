@@ -40,6 +40,12 @@ test('two notes that bring each other in are both rows; the page open is lit and
   assert.ok(draw([]).message);
 });
 
+test('it is read beside the sheet, and the page open is lit by a patch as the sheet moves on, nothing drawn again', () => {
+  const drawn = picture({ answer: { items: [{ id: 'e_aaaaaaaa', title: 'One', body: '' }, { id: 'e_bbbbbbbb', title: 'Two', body: '' }] }, style: {} });
+  assert.equal(drawn.scene.beside, true);
+  assert.deepEqual(drawn.restyle({ here: 'e_bbbbbbbb' }).map((p: any) => [p.key, p.toggle.here]), [['p:e_aaaaaaaa', false], ['p:e_bbbbbbbb', true]]);
+});
+
 test('only marks a drawing may send, and a stylesheet the page takes', () => {
   const allowed = new Set(['div', 'span', 'p', 'b', 'strong', 'em', 'i', 'small', 'ul', 'ol', 'li', 'br', 'a', 'button', 'reader']);
   const scene = draw([item('e_doc00000', 'Guide', 'Text.')]);
