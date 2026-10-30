@@ -9,7 +9,7 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-test('in a browser, a step dragged on the canvas is kept in the places stream and drawn there again', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+for (const shape of ['', 'plane', 'rows']) test(`in a browser, a step dragged on the canvas${shape && ` in the form ${shape}`} is kept in the places stream and drawn there again`, { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {
     reason: 'test',
@@ -23,7 +23,7 @@ test('in a browser, a step dragged on the canvas is kept in the places stream an
     ],
   })).result.created as Record<string, string>;
   const events = async () => (await call('/api/events', undefined, { limit: 100 })).result.length as number;
-  const page = await open(`${base}/#/v?from=${made.p}`);
+  const form = shape && `&shape=${shape}`, page = await open(`${base}/#/v?from=${made.p}${form}`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const until = async (expression: string) => {
     for (const end = Date.now() + 20000; Date.now() < end; await wait(200)) if (await page.evaluate(expression)) return true;
@@ -58,7 +58,7 @@ test('in a browser, a step dragged on the canvas is kept in the places stream an
     assert.equal(await events(), was, 'no change to the map: a place is not a fact about the work');
 
     // The canvas opened again, in a page of its own: the step is drawn where it was put.
-    await page.go(`${base}/#/v?from=${made.p}`);
+    await page.go(`${base}/#/v?from=${made.p}${form}`);
     assert.ok(await until(`Boolean(${step})`), 'drawn again');
     assert.ok(await until(`(() => { const m = ${middle}; return Math.abs(m[0] - ${placed[made.a][0]}) < 2 && Math.abs(m[1] - ${placed[made.a][1]}) < 2; })()`), `drawn where it was put: ${await page.evaluate(middle)} for ${placed[made.a]}`);
   } finally {

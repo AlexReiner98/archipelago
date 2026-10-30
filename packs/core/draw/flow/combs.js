@@ -1,6 +1,5 @@
 // What hangs off the knot. Peeling what has one neighbour leaves the knot and a tree on each of its items; a tree is drawn
-// as a comb, spines of rows either side, which cannot cross itself. Items joined to the same two and nothing else are
-// one block between those two, on two rails that interleave. Pure: lengths in, places and wires out, each wire the
+// as a comb, spines of rows either side, which cannot cross itself. Pure: lengths in, places and wires out, each wire the
 // points of one link from what holds it down to the item, in the comb's own frame.
 
 /** Peel what has one neighbour: `kids` of each item, and the core left. What is in `stay` is never peeled. */
@@ -92,45 +91,4 @@ export function comb(n, kids, size, z, sideOf = () => 1, way = 1, rest = way, { 
     }
   }
   return { items, wires, w: run - z.col - (drop ? z.col / 2 : 0), h: bottom, ...(first && { above: first.s.h / 2 }) };
-}
-
-/** Items of the core joined to the same two and nothing else, three or more: each such set one block, by the id it gets. */
-export function twins(a, kids, core, size, z) {
-  const inCore = new Set(core), sets = new Map(), blocks = new Map();
-  for (const id of core) {
-    if (kids.has(id)) continue;
-    const near = [...a.get(id)].filter((w) => inCore.has(w));
-    if (near.length !== 2) continue;
-    const key = near.sort().join(' ');
-    (sets.get(key) ?? sets.set(key, []).get(key)).push(id);
-  }
-  for (const [key, list] of sets) {
-    if (list.length < 3) continue;
-    const [u, v] = key.split(' '), n = list.length, k = Math.ceil(Math.sqrt(n / 3)), rows = Math.ceil(n / k);
-    const cw = Math.max(...list.map((id) => size(id).w)), ch = Math.max(...list.map((id) => size(id).h)) + z.row;
-    blocks.set(`block:${key}`, { u, v, list, k, cw, ch, w: k * cw + (k + 1) * z.col, h: rows * ch + 2 * z.col });
-  }
-  return blocks;
-}
-
-/**
- * A block's items around its middle (x, y): `places` by item, and each item's two wires, `first` from the rail along its
- * head, entered at its left corner, and `second` from the rail along its foot, entered at its right. Buses from the two
- * rails take turns between the columns, so no wire of it crosses another of it.
- */
-export function drawBlock(b, x, y, size, z) {
-  const left = x - b.w / 2, top = y - b.h / 2, railA = top + z.col / 2, railB = top + b.h - z.col / 2;
-  const busX = (j) => left + j * (b.cw + z.col) + z.col / 2;
-  const places = new Map(), first = new Map(), second = new Map();
-  const startA = [left, railA], startB = [left + b.w, railB];
-  b.list.forEach((id, n) => {
-    const col = n % b.k, row = Math.floor(n / b.k), s = size(id);
-    const cx = busX(col) + (b.cw + z.col) / 2, cy = top + z.col + row * b.ch + b.ch / 2;
-    places.set(id, [cx, cy]);
-    const [busA, busB] = col % 2 ? [col + 1, col] : [col, col + 1];
-    const end = (bus) => [busX(bus) < cx ? cx - s.w / 2 : cx + s.w / 2, cy];
-    first.set(id, [startA, [busX(busA), railA], [busX(busA), cy], end(busA)]);
-    second.set(id, [startB, [busX(busB), railB], [busX(busB), cy], end(busB)]);
-  });
-  return { places, first, second };
 }

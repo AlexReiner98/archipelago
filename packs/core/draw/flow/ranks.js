@@ -5,8 +5,9 @@
 
 import { comb, peel } from './combs.js';
 import { flatten, NEAR, ORDER } from './graph.js';
+import { putByHand } from './hand.js';
 import { placeRows } from './layers.js';
-import { stepsOf } from './plane.js';
+import { stepsOf } from './steps.js';
 import { orderRows, rowsOf, thread } from './rows.js';
 import { settle, square } from './settle.js';
 
@@ -89,7 +90,7 @@ let watching = null;
 export const watch = (fn) => (watching = fn);
 
 // As ./bars.js, where a step was put by hand is not read here yet.
-export function layout({ items: given, links: told = [], undrawn = [], measure, sizes, aspect = 1.6 }) {
+export function layout({ items: given, links: told = [], undrawn = [], placed = {}, measure, sizes, aspect = 1.6 }) {
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
   const margin = sizes.flow_margin, gap = sizes.flow_node_gap, zc = { row: gap / 4, col: gap };
@@ -196,6 +197,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
       r.points = r.points.map(([p, q]) => [p + b.at[0] - b.was[0], q + b.at[1] - b.was[1]]);
     }
   }
+  putByHand({ placed, nodes, x, y, every, routes, rigid, holder, lead: sizes.flow_lead_out });
   const edge = (id, to) => {
     const s = stepSize(id), [px, py] = [x.get(id), y.get(id)], dx = to[0] - px, dy = to[1] - py, t = Math.min(dx ? s.w / 2 / Math.abs(dx) : Infinity, dy ? s.h / 2 / Math.abs(dy) : Infinity, 1);
     return [px + dx * t, py + dy * t];

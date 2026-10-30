@@ -8,8 +8,9 @@ import { comb, peel } from './combs.js';
 import { count } from './count.js';
 import { wrongEnd } from './faults.js';
 import { flatten, ORDER } from './graph.js';
+import { putByHand } from './hand.js';
 import { numbered } from './numbering.js';
-import { stepsOf } from './plane.js';
+import { stepsOf } from './steps.js';
 import { reroute } from './reroute.js';
 import { settle, square } from './settle.js';
 import { planarize } from './thread.js';
@@ -221,8 +222,6 @@ function drawPart(list, links, block, box, z, trial) {
 let watching = null;
 export const watch = (fn) => (watching = fn);
 
-// Where a step was put by hand is not read here yet: places were kept against the flow's picture, and they would pull
-// wires out of the collision system.
 /** Pictures already worked out, the newest last: going back to a lens costs nothing. */
 const kept = new Map();
 
@@ -234,7 +233,7 @@ const copy = (g) => {
 
 /** The layout of an answer, from what it was drawn from if it has been worked out before. */
 export function layout(args) {
-  const { items, links, undrawn, sizes, aspect } = args, key = JSON.stringify([items, links, undrawn, sizes, aspect]);
+  const { items, links, undrawn, placed, sizes, aspect } = args, key = JSON.stringify([items, links, undrawn, placed, sizes, aspect]);
   const hit = kept.get(key);
   if (hit) {
     kept.delete(key);
@@ -249,7 +248,7 @@ export function layout(args) {
   return g;
 }
 
-function laidOut({ items: given, links: told = [], undrawn = [], measure, sizes, aspect = 1.6 }) {
+function laidOut({ items: given, links: told = [], undrawn = [], placed = {}, measure, sizes, aspect = 1.6 }) {
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
   const margin = sizes.flow_margin, gap = sizes.flow_node_gap, zw = { room: sizes.plane_wire_room, join: sizes.plane_joined_room, run: sizes.plane_port_run };
@@ -396,6 +395,10 @@ function laidOut({ items: given, links: told = [], undrawn = [], measure, sizes,
     for (const [id, b] of rigid) b.pointed = nodes.get(id).shape === 'diamond';
     wired = reroute(rigid, moving, [...routes.values()].filter((r) => r.to === undefined).map((r) => r.points), { track: z.turn, room: z.room, run: z.run, ports: sizes.plane_reroute_ports, shorter: sizes.plane_reroute_shorter, rounds: moving.length > PULL_MOST ? 1 : sizes.plane_reroute_rounds });
   }
+  // Where steps were put by hand, once all the rest stands; each wire so drawn takes the best way it has.
+  const lines = [...routes.values()];
+  const redrawn = putByHand({ placed, nodes, x, y, every, routes, rigid, holder, lead: sizes.flow_lead_out });
+  if (redrawn.length) reroute(rigid, redrawn, lines.filter((r) => !redrawn.includes(r)).map((r) => r.points), { track: z.turn, room: z.room, run: z.run, ports: sizes.plane_reroute_ports, shorter: sizes.plane_reroute_shorter, rounds: sizes.plane_reroute_rounds });
   const edge = (id, to) => {
     const s = stepSize(id), [px, py] = [x.get(id), y.get(id)], dx = to[0] - px, dy = to[1] - py, t = Math.min(dx ? s.w / 2 / Math.abs(dx) : Infinity, dy ? s.h / 2 / Math.abs(dy) : Infinity, 1);
     return [px + dx * t, py + dy * t];

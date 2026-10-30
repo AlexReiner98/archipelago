@@ -9,7 +9,7 @@ import { count } from './draw/flow/count.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { faces, isPlanar } from './draw/flow/planar.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { layout } from './draw/flow/plane.js';
+import { layout } from './draw/flow/bars.js';
 
 const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const measure = (t: string, px: number) => t.length * px * 0.5;
@@ -71,23 +71,7 @@ test('layout: an item with no links is placed', () => {
   assert.ok(g.width > 0 && g.height > 0);
 });
 
-test('layout: items of the same two share a block with no wire of it crossing', () => {
-  const twins = Array.from({ length: 6 }, (_, k) => item(`t${k}`));
-  const g = run([item('a'), item('b'), ...twins], twins.flatMap((t) => [tie(t.id, 'a'), tie(t.id, 'b', 'serves')]));
-  assert.equal(g.all.length, 8);
-  assert.equal(count(g.ties.map((t: any) => t.points)).crossings, 0);
-});
-
-test('layout: the order is a wire, and a step put by hand stays there', () => {
-  const g = layout({ items: [item('a'), item('b')], links: [{ type: 'depends_on', from: 'b', to: 'a' }], placed: { a: [500, 400] }, measure, sizes: house.sizes });
-  assert.equal(g.chains.length, 1);
-  assert.equal(g.x.get('a'), 500);
-  assert.equal(g.y.get('a'), 400);
-});
-
-// @ts-expect-error a drawing's modules are plain JavaScript
-import { layout as bars } from './draw/flow/bars.js';
-
+const bars = layout;
 const drawnBars = (items: any[], links: any[]) => bars({ items, links, measure, sizes: house.sizes });
 const lines = (g: any) => [...g.chains, ...g.ties].map((w: any) => w.points);
 const right = (g: any) => lines(g).every((w: any) => w.every((p: number[], i: number) => !i || p[0] === w[i - 1][0] || p[1] === w[i - 1][1]));
@@ -237,6 +221,38 @@ test('bars: a picture worked out before comes back as it was, and new: what is d
   assert.notEqual(again, first);
 });
 
+test('bars: a step put by hand stays there, nothing else moves, and its wires stay at right angles clear of the boxes', () => {
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => item(id)), links = [dep('b', 'a'), dep('c', 'b'), dep('d', 'c'), dep('e', 'a'), dep('d', 'e'), tie('f', 'c', 'calls'), tie('f', 'a', 'calls')];
+  const free = bars({ items: ids, links, measure, sizes: house.sizes }), to = [free.x.get('c') + 900, free.y.get('c') + 300];
+  const g = bars({ items: ids, links, placed: { c: to }, measure, sizes: house.sizes });
+  assert.deepEqual([g.x.get('c'), g.y.get('c')], to);
+  for (const id of ['a', 'b', 'd', 'e', 'f']) assert.deepEqual([g.x.get(id), g.y.get(id)], [free.x.get(id), free.y.get(id)], `${id} stays`);
+  assert.ok(right(g));
+  const through = lines(g).some((w: number[][]) => g.all.some((n: any) => w.slice(1).some((p, i) => {
+    const q = w[i], [l, r, t, u] = [g.x.get(n.id) - n.w / 2 + 1, g.x.get(n.id) + n.w / 2 - 1, g.y.get(n.id) - n.h / 2 + 1, g.y.get(n.id) + n.h / 2 - 1];
+    return Math.max(p[0], q[0]) > l && Math.min(p[0], q[0]) < r && Math.max(p[1], q[1]) > t && Math.min(p[1], q[1]) < u;
+  })));
+  assert.equal(through, false, 'no wire runs through a box');
+});
+
+test('bars: a holder put by hand takes what hangs on it along', () => {
+  const ring = ['p', 'q', 'o'].map((id) => item(id)), kids = [item('k0'), item('k1'), item('k2')], links = [tie('p', 'q', 'serves'), tie('q', 'o', 'serves'), tie('o', 'p', 'serves'), ...kids.map((k) => tie(k.id, 'p'))];
+  const free = bars({ items: [...ring, ...kids], links, measure, sizes: house.sizes }), [dx, dy] = [400, 250];
+  const g = bars({ items: [...ring, ...kids], links, placed: { p: [free.x.get('p') + dx, free.y.get('p') + dy] }, measure, sizes: house.sizes });
+  for (const k of kids) assert.deepEqual([g.x.get(k.id), g.y.get(k.id)], [free.x.get(k.id) + dx, free.y.get(k.id) + dy]);
+  assert.ok(right(g));
+});
+
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { layout as ranksOf } from './draw/flow/ranks.js';
+
+test('ranks: a step put by hand stays there too', () => {
+  const ids = ['a', 'b', 'c'].map((id) => item(id)), links = [dep('b', 'a'), dep('c', 'b')];
+  const g = ranksOf({ items: ids, links, placed: { b: [700, 500] }, measure, sizes: house.sizes });
+  assert.deepEqual([g.x.get('b'), g.y.get('b')], [700, 500]);
+  assert.ok(right(g));
+});
+
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { embed } from './draw/flow/upward.js';
 
@@ -303,90 +319,6 @@ test('faults: a wire with a way straight across is counted, and one that takes i
   assert.equal(faults(g([[120, 70], [120, 130]]), { join: 80 }).tightJoin, 1);
 });
 
-// @ts-expect-error a drawing's modules are plain JavaScript
-import { reroute } from './draw/flow/reroute.js';
-
-const limits = { ports: house.sizes.plane_reroute_ports, shorter: house.sizes.plane_reroute_shorter, rounds: house.sizes.plane_reroute_rounds };
-
-test('reroute: a wire that wanders takes the straight way, and one bend where it must', () => {
-  const boxes = new Map([['a', box(100, 50)], ['b', box(100, 300)], ['c', box(400, 300)]]);
-  const straight = { a: 'a', b: 'b', points: [[100, 70], [100, 90], [300, 90], [300, 200], [100, 200], [100, 280]] };
-  const bent = { a: 'a', b: 'c', points: [[60, 30], [60, 10], [420, 10], [420, 280]] };
-  reroute(boxes, [straight, bent], [], { ...limits, track: 8, room: 0, run: 0 });
-  assert.equal(straight.points.length, 2);
-  assert.equal(straight.points[0][0], straight.points[1][0]);
-  assert.equal(bent.points.length, 3);
-  assert.equal(count([straight.points, bent.points]).crossings, 0);
-});
-
-test('reroute: no way through a box or across a wire is taken', () => {
-  const boxes = new Map([['a', box(100, 50)], ['m', box(100, 200)], ['b', box(100, 350)]]);
-  const round = { a: 'a', b: 'b', points: [[120, 70], [120, 100], [300, 100], [300, 300], [120, 300], [120, 330]] };
-  reroute(boxes, [round], [], { ...limits, track: 8, room: 0, run: 0 });
-  assert.ok(Math.max(...round.points.map((p) => p[0])) >= 150, 'it stays round the middle box');
-  const left = new Map([['a', box(100, 50)], ['b', box(100, 350)]]);
-  const fence = { a: 'c', b: 'd', points: [[0, 200], [400, 200]] }, wire = { a: 'a', b: 'b', points: [[120, 70], [120, 100], [500, 100], [500, 300], [120, 300], [120, 330]] };
-  reroute(left, [wire], [fence.points], { ...limits, track: 8, room: 0, run: 0 });
-  assert.equal(count([wire.points, fence.points]).crossings, 0);
-});
-
-test('reroute: two boxes that barely overlap join by one straight stretch, and corners keep clear of ports', () => {
-  const boxes = new Map([['a', box(100, 50)], ['b', box(194, 150)]]);
-  const wire = { a: 'a', b: 'b', points: [[120, 70], [120, 80], [130, 80], [130, 150], [144, 150]] };
-  reroute(boxes, [wire], [], { ...limits, track: 8, room: 12, run: 18 });
-  assert.equal(wire.points.length, 2);
-  const far = new Map([['a', box(100, 50)], ['b', box(400, 300)]]);
-  const bent = { a: 'a', b: 'b', points: [[100, 70], [100, 74], [400, 74], [400, 280]] };
-  reroute(far, [bent], [], { ...limits, track: 8, room: 12, run: 18 });
-  assert.ok(bent.points.slice(1).every((p, i) => i === bent.points.length - 2 || Math.abs(p[0] - bent.points[0][0]) + Math.abs(p[1] - bent.points[0][1]) >= 18));
-});
-
-test('reroute: a short step in a wire is taken out, and a wire stays on its box', () => {
-  const boxes = new Map([['a', box(100, 50)], ['b', box(106, 300)], ['m', box(103, 170, 60, 40)]]);
-  const wire = { a: 'a', b: 'b', points: [[60, 70], [60, 170], [66, 170], [66, 280]] };
-  reroute(boxes, [wire], [], { ...limits, track: 8, room: 0, run: 0 });
-  assert.equal(wire.points.length, 2);
-  assert.ok(wire.points[0][0] >= 50 && wire.points[0][0] <= 150);
-  assert.ok(wire.points[1][0] >= 56 && wire.points[1][0] <= 156);
-});
-
-// @ts-expect-error a drawing's modules are plain JavaScript
-import { settle } from './draw/flow/settle.js';
-
-const box = (x: number, y: number, w = 100, h = 40) => ({ at: [x, y], size: [w, h] });
-const hits = (boxes: Map<string, any>) => { const b = [...boxes.values()]; let n = 0; for (let i = 0; i < b.length; i++) for (let j = i + 1; j < b.length; j++) if (Math.abs(b[i].at[0] - b[j].at[0]) < (b[i].size[0] + b[j].size[0]) / 2 && Math.abs(b[i].at[1] - b[j].at[1]) < (b[i].size[1] + b[j].size[1]) / 2) n++; return n; };
-
-test('settle: a wire that snakes between two boxes pulls straight', () => {
-  const boxes = new Map([['a', box(100, 50)], ['b', box(100, 300)]]);
-  const wires = [{ a: 'a', b: 'b', points: [[100, 70], [100, 90], [400, 90], [400, 250], [100, 250], [100, 280]] }];
-  settle(boxes, wires, { gap: 24, track: 8 });
-  assert.equal(wires[0].points.length, 2);
-  assert.equal(wires[0].points[0][0], wires[0].points[1][0]);
-});
-
-test('settle: a box between two others is not passed through', () => {
-  const boxes = new Map([['a', box(100, 50)], ['m', box(100, 200)], ['b', box(100, 350)]]);
-  const wires = [{ a: 'a', b: 'b', points: [[60, 70], [60, 100], [300, 100], [300, 300], [60, 300], [60, 330]] }];
-  settle(boxes, wires, { gap: 24, track: 8 });
-  assert.equal(hits(boxes), 0);
-  const across = Math.max(...wires[0].points.map((p) => p[0]));
-  assert.ok(across >= 150, `the wire stays round the middle box: ${across}`);
-  assert.ok(across < 300, `and pulls in: ${across}`);
-});
-
-test('settle: two wires that do not cross stay uncrossed, and one that does stays crossed', () => {
-  const boxes = new Map([['a', box(100, 50)], ['b', box(400, 50)], ['c', box(100, 300)], ['d', box(400, 300)]]);
-  const apart = [{ a: 'a', b: 'c', points: [[100, 70], [100, 280]] }, { a: 'b', b: 'd', points: [[400, 70], [400, 280]] }];
-  settle(boxes, apart, { gap: 24, track: 8 });
-  assert.equal(count(apart.map((w) => w.points)).crossings, 0);
-  const boxes2 = new Map([['a', box(100, 50)], ['b', box(400, 50)], ['c', box(100, 300)], ['d', box(400, 300)]]);
-  const crossed = [{ a: 'a', b: 'd', points: [[100, 70], [100, 170], [400, 170], [400, 280]] }, { a: 'b', b: 'c', points: [[420, 70], [420, 200], [120, 200], [120, 280]] }];
-  const before = count(crossed.map((w) => w.points)).crossings;
-  settle(boxes2, crossed, { gap: 24, track: 8 });
-  assert.equal(before, 1);
-  assert.equal(count(crossed.map((w) => w.points)).crossings, before);
-});
-
 test('bars: pulling tight adds no crossing and no collision', () => {
   const ids = Array.from({ length: 16 }, (_, k) => `n${k}`), links: any[] = [];
   for (let k = 0; k < 16; k++) { if (k % 4 < 3) links.push(tie(`n${k}`, `n${k + 1}`, 'serves')); if (k < 12) links.push(tie(`n${k}`, `n${k + 4}`, 'serves')); }
@@ -394,68 +326,6 @@ test('bars: pulling tight adds no crossing and no collision', () => {
   assert.equal(count(lines(g)).crossings, 0);
   assert.ok(clear(g));
   assert.ok(right(g));
-});
-
-test('settle: wires along one another keep their sides', () => {
-  const boxes = new Map([['a', box(100, 50)], ['b', box(500, 300)], ['c', box(100, 550)], ['d', box(500, 800)]]);
-  const wires = [
-    { a: 'a', b: 'b', points: [[100, 70], [100, 100], [300, 100], [300, 200], [500, 200], [500, 280]] },
-    { a: 'c', b: 'd', points: [[100, 570], [100, 590], [300, 590], [300, 190], [420, 190], [420, 700], [500, 700], [500, 780]] },
-  ];
-  const done = settle(boxes, wires, { gap: 24, track: 8 });
-  assert.equal(done.undone, 0);
-  assert.ok(wires.every((w) => w.points.length <= 8));
-});
-
-test('settle: a wire of the order keeps its box above the next', () => {
-  const boxes = new Map([['a', box(100, 300)], ['b', box(500, 400)]]);
-  const wires = [{ a: 'a', b: 'b', down: true, points: [[100, 320], [100, 340], [500, 340], [500, 380]] }];
-  settle(boxes, wires, { gap: 24, track: 8 });
-  assert.ok(boxes.get('a')!.at[1] < boxes.get('b')!.at[1]);
-});
-
-test('settle: the press keeps the room joined boxes and ports were given', () => {
-  const boxes = new Map([['a', box(100, 50)], ['b', box(400, 300)]]);
-  const wires = [{ a: 'a', b: 'b', down: true, points: [[100, 70], [100, 120], [400, 120], [400, 280]] }];
-  settle(boxes, wires, { gap: 8, track: 5, room: 12, join: 28, run: 18 });
-  const [a, b] = [boxes.get('a')!, boxes.get('b')!], p = wires[0].points;
-  assert.ok(b.at[1] - a.at[1] >= 40 + 28 - 0.01, `${b.at[1] - a.at[1]}`);
-  if (p.length > 2) assert.ok(Math.abs(p[1][1] - p[0][1]) >= 18 - 0.01 && Math.abs(p.at(-1)![1] - p.at(-2)![1]) >= 18 - 0.01, JSON.stringify(p));
-});
-
-test('settle: boxes stopped against each other slide as a block when that shortens their wires', () => {
-  const made = () => ({
-    boxes: new Map([['a', box(100, 200)], ['b', box(208, 200)], ['l', box(100, 40)], ['r', box(900, 40)], ['r2', box(900, 400)], ['r3', box(760, 400)]]),
-    wires: [
-      { a: 'l', b: 'b', points: [[100, 60], [100, 120], [208, 120], [208, 180]] },
-      { a: 'r', b: 'b', points: [[900, 60], [900, 130], [220, 130], [220, 180]] },
-      { a: 'r2', b: 'a', points: [[900, 380], [900, 280], [120, 280], [120, 220]] },
-      { a: 'r3', b: 'a', points: [[760, 380], [760, 300], [100, 300], [100, 220]] },
-    ],
-  });
-  const length = (w: any[]) => w.reduce((sum, v) => sum + v.points.reduce((n: number, p: number[], i: number) => n + (i ? Math.abs(p[0] - v.points[i - 1][0]) + Math.abs(p[1] - v.points[i - 1][1]) : 0), 0), 0);
-  const [plain, moved] = [made(), made()];
-  settle(plain.boxes, plain.wires, { gap: 8, track: 5 });
-  settle(moved.boxes, moved.wires, { gap: 8, track: 5, blocks: 12 });
-  assert.ok(length(moved.wires) <= length(plain.wires), `${length(moved.wires)} against ${length(plain.wires)}`);
-  assert.equal(hits(moved.boxes), 0);
-  assert.equal(count(moved.wires.map((w) => w.points)).crossings, count(plain.wires.map((w) => w.points)).crossings);
-});
-
-test('settle: a port slides round a corner when that takes out bends', () => {
-  const boxes = new Map([['a', box(100, 200)], ['b', box(500, 200)]]);
-  const wires = [{ a: 'a', b: 'b', points: [[100, 220], [100, 300], [500, 300], [500, 220]] }];
-  settle(boxes, wires, { gap: 24, track: 8 });
-  assert.ok(wires[0].points.length <= 3, JSON.stringify(wires[0].points));
-});
-
-test('settle: a port does not slide through a wire or a box', () => {
-  const boxes = new Map([['a', box(100, 200)], ['b', box(500, 200)], ['m', box(300, 200)]]);
-  const wires = [{ a: 'a', b: 'b', points: [[100, 220], [100, 300], [500, 300], [500, 220]] }];
-  settle(boxes, wires, { gap: 24, track: 8 });
-  assert.equal(hits(boxes), 0);
-  const m = boxes.get('m')!, through = wires[0].points.some((p, i) => i > 0 && p[1] === wires[0].points[i - 1][1] && p[1] > m.at[1] - 20 && p[1] < m.at[1] + 20 && Math.min(p[0], wires[0].points[i - 1][0]) < m.at[0] && Math.max(p[0], wires[0].points[i - 1][0]) > m.at[0]);
-  assert.equal(through, false);
 });
 
 // @ts-expect-error a drawing's modules are plain JavaScript
