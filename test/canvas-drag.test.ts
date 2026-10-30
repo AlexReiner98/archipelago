@@ -23,7 +23,7 @@ for (const shape of ['', 'plane', 'rows']) test(`in a browser, a step dragged on
     ],
   })).result.created as Record<string, string>;
   const events = async () => (await call('/api/events', undefined, { limit: 100 })).result.length as number;
-  const form = shape && `&shape=${shape}`, page = await open(`${base}/#/v?from=${made.p}${form}`);
+  const form = shape && `&shape=${shape}`, canvas = `${made.p}${shape && `@${shape}`}`, page = await open(`${base}/#/v?from=${made.p}${form}`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const until = async (expression: string) => {
     for (const end = Date.now() + 20000; Date.now() < end; await wait(200)) if (await page.evaluate(expression)) return true;
@@ -46,12 +46,12 @@ for (const shape of ['', 'plane', 'rows']) test(`in a browser, a step dragged on
     await wait(300);
     const dropped = await page.evaluate<[number, number]>(middle);
     assert.ok(Math.abs(dropped[0] - before[0] - 160 / scale) < 3 && Math.abs(dropped[1] - before[1] - 90 / scale) < 3, `moved with the pointer: ${before} to ${dropped}`);
-    assert.equal((await call('/api/places', undefined, { canvas: made.p })).result[made.a], undefined, 'kept on the page until the next thing it does');
+    assert.equal((await call('/api/places', undefined, { canvas })).result[made.a], undefined, 'kept on the page until the next thing it does');
 
     // Another canvas drawn: the batch is written first, in one call of its own.
     await page.evaluate(`location.hash = '#/'`);
     let placed: Record<string, [number, number]> = {};
-    for (const end = Date.now() + 10000; Date.now() < end && !placed[made.a]; await wait(200)) placed = (await call('/api/places', undefined, { canvas: made.p })).result;
+    for (const end = Date.now() + 10000; Date.now() < end && !placed[made.a]; await wait(200)) placed = (await call('/api/places', undefined, { canvas })).result;
     assert.ok(placed[made.a], 'written to the places stream');
     assert.ok(Math.abs(placed[made.a][0] - dropped[0]) <= 1 && Math.abs(placed[made.a][1] - dropped[1]) <= 1, `where it was let go: ${placed[made.a]} and ${dropped}`);
     assert.equal(placed[made.b], undefined, 'only what was moved');

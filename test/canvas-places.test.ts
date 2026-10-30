@@ -27,10 +27,14 @@ test('a batch of moves is written at once and read back by canvas, newest per it
   await putPlaces(l, human, { canvas: p, moves: { [a]: [50, 60] } });
   assert.deepEqual(await placesOn(l, p), { [a]: [50, 60], [b]: [30, 40] }, 'the newest of each, rounded');
   assert.deepEqual(await placesOn(l, undefined), { [a]: [1, 2] }, 'each canvas its own');
+  assert.deepEqual(await placesOn(l, `${p}@plane`), {}, 'a form that lays out otherwise keeps its own');
+  await putPlaces(l, human, { canvas: `${p}@plane`, moves: { [a]: [7, 8] } });
+  assert.deepEqual(await placesOn(l, `${p}@plane`), { [a]: [7, 8] });
+  await assert.rejects(putPlaces(l, human, { canvas: `${p}@Not a form`, moves: {} }));
   assert.equal(await counted(), before, 'never an item or a link');
 
   const entries = await opEntries(l.db, 'places');
-  assert.equal(entries.length, 4, 'each place an entry of its own, so a member reads those of what they may see');
+  assert.equal(entries.length, 5, 'each place an entry of its own, so a member reads those of what they may see');
   assert.ok(entries.every((e) => e.rule === 'places' && e.facts.length === 1));
   assert.notDeepEqual(entries[0].facts[0][3], [10, 21], 'sealed with the item’s key in the log');
   assert.deepEqual((await readOps(l.db, 'places'))[0].facts[0], ['+', a, placeField(p), [10, 21]]);

@@ -26,7 +26,8 @@ export const home = () => ({
 /** The canvas an item's address opens when no lens is asked: the item and what it holds, depends on and waits on. */
 export const focusOn = (id) => ({ filter: { find: [`id ${id}`] }, walk: { over: FOCUS, steps: 1 } });
 /** The canvas as places are kept for it: the saved canvas up (ui/canvases.js), else the first item its filter names, else the whole map (''). */
-const canvasOf = (lens, asked) => asked?.canvas ?? idsOf(lens.filter)[0] ?? '';
+/** What a picture's places are kept under: its canvas, and the form it was asked in if that lays out otherwise than the canvas's own. */
+const canvasOf = (lens, asked) => `${asked?.canvas ?? idsOf(lens.filter)[0] ?? ''}${asked?.shape && asked.shape !== 'flow' ? `@${asked.shape}` : ''}`;
 
 /** Every canvas drawn now, and the one the bar and find act on: the pane in focus (decision e_h2pqjy2q). */
 const all = new Set();
