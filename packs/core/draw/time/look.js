@@ -4,6 +4,7 @@
 // so weighs more than the page's colours by kind (.group-work .dot), as the kernel's inline colour did.
 
 export const css = `
+.timeline { display: block; max-width: 100%; }
 .t-rule { stroke: var(--ln-line); stroke-width: var(--ln-rule); }
 .t-head { fill: var(--ln-muted); font-size: var(--ln-time-head-text); }
 .t-hour { fill: var(--ln-muted); font-size: var(--ln-time-hour-text); }
