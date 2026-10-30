@@ -152,7 +152,7 @@ function slidePorts(boxes, wires) {
     const b = boxes.get(atEnd ? w.b : w.a), was = simplify(w.points), line = atEnd ? was : [...was].reverse(), n = line.length;
     if (n < 3) continue;
     const [C, B, A, P] = [line[n - 1], line[n - 2], line[n - 3], line[n - 4]], e = B[0] === C[0] ? 1 : 0, o = 1 - e;
-    const [lo, hi] = spanOf(b, e), [olo, ohi] = spanOf(b, o), side = Math.sign(A[o] - b.at[o]) || 1;
+    const [lo, hi] = spanOf(b, e), [olo, ohi] = spanOf(b, o), side = Math.sign(A[o] - (olo + ohi) / 2) || 1;
     if (o === 0 && side > 0 && reachOf(b, 0)[1] < b.size[0] / 2) continue;
     const landing = (at) => { const c = []; c[e] = at; c[o] = edgeOf(b, o, side); return c; };
     const outside = A[o] < olo - INSET || A[o] > ohi + INSET;
