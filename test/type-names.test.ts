@@ -25,7 +25,7 @@ test('an old name still reads as the new one, in a change, a search and a lens',
   assert.equal((await l.entity(made.r))!.type, 'repo');
   assert.deepEqual((await l.search({ type: 'work.task' })).map((e) => e.id), [made.t]);
   assert.ok(l.registry.isA('task', 'work.task'));
-  const answer = await flatLens(l, { filter: { types: ['work.task'] }, walk: { over: ['software.lives_in'], steps: 1 } });
+  const answer = await flatLens(l, { filter: { find: ['type work.task'] }, walk: { over: ['software.lives_in'], steps: 1 } });
   assert.deepEqual(answer.items.map((i) => i.id).sort(), [made.r, made.t].sort());
   assert.deepEqual(answer.links.map((k) => k.type), ['lives_in']);
 });

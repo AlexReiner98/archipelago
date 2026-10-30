@@ -27,6 +27,8 @@ export const UI_FILES: Record<string, string> = {
   '/doc.css': 'doc.css',
   '/doc-lens.css': 'doc-lens.css',
   '/packs.js': 'packs.js',
+  '/lens-light.js': 'lens-light.js',
+  '/lit-by.js': 'lit-by.js',
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
   '/draw.html': 'draw.html',
   '/draw.js': 'draw.js',

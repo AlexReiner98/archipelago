@@ -33,7 +33,7 @@ async function system(call: (path: string, token?: string, body?: unknown) => Pr
   const kept = await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', status: 'current', props: { filter: { ids: [made.p] }, walk: { over: ['part_of', 'calls'], steps: 3 } } },
+      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', status: 'current', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of', 'calls'], steps: 3 } } },
       { op: 'link', type: 'about', from: 'l', to: made.p },
       { op: 'create', ref: 's', type: 'style', title: 'As architecture', status: 'current', props: { shape: 'architecture' } },
       { op: 'link', type: 'about', from: 's', to: 'l' },
@@ -87,7 +87,7 @@ test('a picture with steps is sent them, and the finished parts they name, whate
     { op: 'link', type: 'calls', from: 'a', to: 'o' },
   ]);
   const steps = [{ chapter: { name: 'Then', when: '7 Oct', count: 1 }, add: [made.a, made.o], titles: { [made.a]: 'Old doors' }, lines: [{ by: 'Alex', text: 'Back it up.' }] }, { remove: [made.o], lines: [{ by: 'Agent', text: 'It is gone.' }] }];
-  Object.assign(made, await make(l, [{ op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', props: { filter: { links: [`part_of ${made.p}`], exclude: ['closed', 'system'] }, steps } }]));
+  Object.assign(made, await make(l, [{ op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', props: { filter: { find: [`part_of ${made.p}`], not: ['done', 'kind system'] }, steps } }]));
   const answer = await keptPicture(l, made.l);
   assert.deepEqual(answer.steps, steps);
   assert.ok(answer.items.some((i) => i.id === made.o && !i.open), 'the retired part is sent');

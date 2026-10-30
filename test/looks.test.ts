@@ -27,7 +27,7 @@ test('a look pass reads as its agent’s person, only through /api, and only wha
   const [mine, theirs] = [await make(sam, 'Sam’s own'), await make(kim, 'Kim’s own')];
   const pass = await passFor(db, { workspace: 'default', viewer: samId }, 'claude/look');
   // It reads the map as Sam does: their private item, not Kim's.
-  const flat = (await call('/api/view', pass, { name: 'flat', params: { filter: { ids: [mine, theirs] } } })).result;
+  const flat = (await call('/api/view', pass, { name: 'flat', params: { filter: { find: [`id ${mine}`, `id ${theirs}`] } } })).result;
   assert.deepEqual(flat.items.map((i: { id: string }) => i.id), [mine]);
   // It asks what a reader frame asks: whether a document is published (the pages, ui/reader-frame.js).
   assert.deepEqual((await call('/api/published', pass, { id: mine })).result, { published: false });
@@ -37,8 +37,8 @@ test('a look pass reads as its agent’s person, only through /api, and only wha
   assert.match(refused.error, /A look reads/);
   for (const path of ['/agent/query', '/mcp']) assert.equal((await call(path, pass, { name: 'search', params: {} })).status, 401, `${path} takes no look pass`);
   // One nobody made, or for another workspace, is no pass.
-  assert.equal((await call('/api/view', `look_default_${'0'.repeat(40)}`, { name: 'flat', params: { filter: { ids: [mine] } } })).status, 401);
-  assert.equal((await call('/api/view', pass.replace('look_default_', 'look_acme_'), { name: 'flat', params: { filter: { ids: [mine] } } })).status, 401);
+  assert.equal((await call('/api/view', `look_default_${'0'.repeat(40)}`, { name: 'flat', params: { filter: { find: [`id ${mine}`] } } })).status, 401);
+  assert.equal((await call('/api/view', pass.replace('look_default_', 'look_acme_'), { name: 'flat', params: { filter: { find: [`id ${mine}`] } } })).status, 401);
 });
 
 test('a picture in a tool’s answer goes to MCP as an image of its own, out of the text', () => {
@@ -62,7 +62,7 @@ test('in a browser, a look is the view as drawn: a flow, a style’s own code, a
       { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
     ],
   })).result.created as Record<string, string>;
-  const lens = { filter: { ids: [steps.a] }, walk: { over: ['depends_on'], steps: 1 } };
+  const lens = { filter: { find: [`id ${steps.a}`] }, walk: { over: ['depends_on'], steps: 1 } };
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
@@ -113,7 +113,7 @@ test('in a browser, a look is the view as drawn: a flow, a style’s own code, a
     assert.equal(painted.state, 'drawn', JSON.stringify({ ...painted, image: undefined }));
     assert.deepEqual((await colours(painted.image.data)).middle, [255, 0, 255], 'what the style’s code painted, once it had');
 
-    const none = await look({ lens: { filter: { text: 'nothing is called this zzqx' } } });
+    const none = await look({ lens: { filter: { find: ['text nothing is called this zzqx'] } } });
     assert.equal(none.state, 'empty', JSON.stringify({ ...none, image: undefined }));
     // A show with a look points the owner's screen and answers with the same kind of picture.
     const shown = (await call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { entity: made.f, look: true } })).result;

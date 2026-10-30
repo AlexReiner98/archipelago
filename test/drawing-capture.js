@@ -37,7 +37,7 @@ window.captureDrawings = async (shape, cases) => {
     // Where each element is, in whole pixels from the host's corner.
     const at = host.getBoundingClientRect();
     const boxes = els.map((el) => { const r = el.getBoundingClientRect(); return [r.left - at.left, r.top - at.top, r.width, r.height].map(Math.round).join(' '); });
-    const record = { html: host.innerHTML, boxes, classes: els.map((el) => el.getAttribute('class') ?? ''), styles: els.map((el) => { const cs = getComputedStyle(el); const look = PROPS.map((p) => cs.getPropertyValue(p)).join('|'); if (!looks.includes(look)) looks.push(look); return looks.indexOf(look); }), looks };
+    const record = { html: host.innerHTML.replace(/ data-item="[^"]*"/g, ''), boxes, classes: els.map((el) => el.getAttribute('class') ?? ''), styles: els.map((el) => { const cs = getComputedStyle(el); const look = PROPS.map((p) => cs.getPropertyValue(p)).join('|'); if (!looks.includes(look)) looks.push(look); return looks.indexOf(look); }), looks };
     // Hovering a part lights its wires; leaving puts them back.
     record.hover = [];
     for (const part of [...host.querySelectorAll('.ar-part, .lf-step')].slice(0, 4)) {
@@ -55,7 +55,7 @@ window.captureDrawings = async (shape, cases) => {
       hit.dispatchEvent(new MouseEvent('mouseleave'));
       await settle(host);
     }
-    record.after_hover = host.innerHTML === record.html;
+    record.after_hover = host.innerHTML.replace(/ data-item="[^"]*"/g, '') === record.html;
     // The lit switch dims what is not lit.
     record.dim = [];
     for (const label of ['Needs you', 'Blocked', 'All']) {

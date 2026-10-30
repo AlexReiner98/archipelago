@@ -133,7 +133,7 @@ test('a shared document is published where it is read only if its sender says so
         { op: 'create', ref: 'f', type: 'feature', title: 'The rule', visibility: 'shared', body: 'Holds a change.' },
         { op: 'create', ref: 't', type: 'task', title: 'A test of it', visibility: 'shared', body: 'Checks it.' },
         { op: 'create', ref: 'x', type: 'task', title: 'Not for them', visibility: 'private', body: 'Secret.' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What holds it', visibility: 'shared', status: 'current', props: { filter: { types: ['task', 'feature'] } } },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What holds it', visibility: 'shared', status: 'current', props: { filter: { find: ['type task', 'type feature'] } } },
         { op: 'link', type: 'part_of', from: 't', to: 'f' },
         { op: 'link', type: 'part_of', from: 'x', to: 'f' },
         { op: 'link', type: 'about', from: 'l', to: 'f' },

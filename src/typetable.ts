@@ -7,7 +7,9 @@
 import type { Archipelago } from './pelago.ts';
 import type { ResolvedRelation, ResolvedType } from './packs.ts';
 import { movePlaces } from './canvas-places.ts';
-import { moveLenses } from './lens-saved.ts';
+import { moveLenses, termLenses } from './lens-saved.ts';
+import { linkOwners } from './owner-link.ts';
+import { newId } from './db.ts';
 
 interface Row {
   id: string;
@@ -79,6 +81,7 @@ export async function syncTypes(l: Archipelago): Promise<{ activated: string[]; 
     if (dormant.length || activated.length || Object.keys(changed).length)
       await l.log(tx, { actor: 'system', action: 'types.sync', reason: 'The packs loaded differ from the types the workspace kept.', detail: { dormant, activated, changed } });
   });
+  await termLenses(l); // views kept in the filter's old words, said in its terms (a migration, run once)
   // A type a pack took over brings its items with it, once no pack defines the old one (a migration, run once).
   const moved: Record<string, number> = {};
   for (const t of reg.types.values()) for (const old of t.dormant ? [] : (t.movedFrom ?? [])) if (!now.has(old) && (moved[old] = await l.retype(old, t.id)) === 0) delete moved[old];
@@ -86,6 +89,7 @@ export async function syncTypes(l: Archipelago): Promise<{ activated: string[]; 
   await l.fillKinds(); // each item's kind in its row, now the type table is whole
   await movePlaces(l); // places a style kept, moved into their stream (a migration, run once)
   await moveLenses(l); // views kept before the flat lens, translated into flat lenses (a migration, run once)
+  await linkOwners(l, () => newId('r')); // each owner said as a link (a migration, run once)
   const asleep = rows.filter((r) => !now.has(r.id));
   reg.keep({
     types: asleep.filter((r) => r.what === 'type').map((r) => r.def as ResolvedType),

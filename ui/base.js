@@ -33,9 +33,15 @@ export function h(tag, attrs, ...kids) {
 }
 
 /** A lens's sets of words, each its own Find term: one or several (the find bar's Shift+Enter adds a set, e_e3k797d3). */
-export const wordsOf = (filter) => [].concat(filter?.text ?? []).filter(Boolean);
-/** The words as a filter keeps them: one set as itself, several as a list, none left out. */
-export const asWords = (sets) => { const w = [...new Set(sets.map((s) => s.trim()).filter(Boolean))]; return w.length > 1 ? { text: w } : w.length ? { text: w[0] } : {}; };
+export const wordsOf = (filter) => (filter?.find ?? []).filter((t) => t.startsWith('text ')).map((t) => t.slice(5));
+/** The filter with its words these sets, in the place words have among Find's terms. */
+export const withWords = (filter, sets) => ({ ...filter, find: [...new Set(sets.map((s) => s.trim()).filter(Boolean))].map((w) => `text ${w}`).concat((filter.find ?? []).filter((t) => !t.startsWith('text '))) });
+/** The items a filter names by id. */
+export const idsOf = (filter) => (filter?.find ?? []).filter((t) => t.startsWith('id ')).map((t) => t.slice(3));
+/** The filter with these items named too. */
+export const withIds = (filter, ids) => ({ ...filter, find: [...new Set([...(filter.find ?? []), ...ids.map((id) => `id ${id}`)])] });
+/** What Not leaves out unless the lens says otherwise. */
+export const notOf = (filter) => filter?.not ?? ['kind system'];
 
 // The sandbox of a frame drawing code runs in. Only a dev server started with PELAGO_UNSANDBOXED=1 marks the page to
 // drop it, for a browser that loads no sandboxed frame (the desktop app's pane); the worker inside is still a wall.

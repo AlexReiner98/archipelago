@@ -1,6 +1,7 @@
 // The flat lens (the decision "The lens is a filter, a walk and a limit", 25 Oct 2026): a filter, a walk and a limit,
-// and nothing else. What the filter includes picks the seeds; what it narrows by must all hold of every seed as well
-// (only these types, within these items); what it excludes applies to everything but an item named by id, what the walk reaches included; the walk follows the link types named, each out, in or either way, step by step; the limit is the most it sends.
+// and nothing else. The filter is three lists of one kind of term (src/lens-terms.ts): Find's sets are added to pick the
+// seeds, each of Only's must hold of every seed as well, and Not's are taken away from everything the walk reaches too.
+// The walk follows the link types named, each out, in or either way, step by step; the limit is the most it sends.
 // The answer is items and the links among them: no containment, no places, no views, no style. A lens may also name
 // a window of time (`time`, src/timeaxis.ts): it finds nothing more, and each item says where it falls in the window.
 //
@@ -9,28 +10,22 @@
 
 import { SYSTEM } from './head.ts';
 import type { Archipelago } from './pelago.ts';
-import { checkedAfter, holding, readWord, wordConditions, type Narrowing } from './lens-only.ts';
+import { checkedAfter, holding, wordConditions, type Narrowing, type Word } from './lens-only.ts';
+import { endsOf, readTerm, sayTerm, setOf, type Term } from './lens-terms.ts';
 import { rankSql, searchIds, slipsOf } from './search.ts';
 import { fileOnAxis } from './timelanes.ts';
 import { placeAll, readAxis, resolveAxis, windowOf, zoneOf, type TimeAxis } from './timeaxis.ts';
-
-/** One link term of a filter: the items that have a link of this type to `to` (or, with `from`, the items `from` links to). */
-export interface LinkTerm {
-  link: string;
-  to?: string;
-  from?: string;
-}
 
 /** Which term of the filter found an item: its words, a type, an id named, a link term. */
 export type Found = 'text' | 'type' | 'id' | 'link' | 'in';
 
 export interface FlatLens {
-  /** What picks the seeds: any item any of these finds. */
-  include: { text?: string[]; types?: string[]; ids?: string[]; links?: LinkTerm[]; in?: string[] };
-  /** What must all hold of a seed as well: one of these types (flavours too), part of each of these items, however far down, and each of Only's words (src/lens-only.ts). */
-  narrow: { only?: string[]; within?: string[]; words?: string[] };
-  /** What is left out of everything: closed, system, or a type (its flavours too). */
-  exclude: string[];
+  /** The terms whose sets are added to pick the seeds. */
+  find: string[];
+  /** The terms whose sets each seed must be in (types, one set: an item is of one type). */
+  only: string[];
+  /** The terms whose sets are taken away from everything, an item named by id too (e_ndcxf2bv). */
+  not: string[];
   /** The link types followed, each as named (`depends_on>` out, `depends_on<` in, `depends_on` either way), and how many steps. */
   walk: { over: string[] | 'all'; steps: number };
   /** The most items sent. */
@@ -40,11 +35,14 @@ export interface FlatLens {
 }
 
 /** What is left out unless the lens says otherwise: the app's own configuration. */
-const EXCLUDE_DEFAULT = [SYSTEM];
+const NOT_DEFAULT = [`kind ${SYSTEM}`];
 /** The most items one answer sends. */
 export const LENS_LIMIT = 2000;
 /** Items sent unless the lens says otherwise. */
 const FLAT_LIMIT = 500;
+/** The most choices one preview counts, and the most items it says of each: past that a choice reads as 200+. */
+export const PREVIEW_TERMS = 80;
+export const PREVIEW_MOST = 200;
 /** The most steps a walk takes. */
 const MAX_STEPS = 6;
 /** How much of an item's note travels with it: enough to show on hover. */
@@ -63,46 +61,35 @@ const names = (value: unknown, field: string): string[] => {
   return value as string[];
 };
 
-/** A link term written as words ("tagged e_x", "tagged Urgent", "waits_on me", "part_of e_y") or as { link, to } or { link, from }; the end an id or a name. */
-function readTerm(l: Archipelago, term: unknown): LinkTerm {
-  const parsed = typeof term === 'string' ? ((([, link, to]) => ({ link, to }))(/^(\S+)\s+(.+)$/.exec(term.trim()) ?? []) as LinkTerm) : (term as LinkTerm);
-  if (!parsed || typeof parsed.link !== 'string' || (typeof parsed.to === 'string') === (typeof parsed.from === 'string'))
-    throw new Error(`include.links: a link term is "<link type> <id or name>", or { link, to } or { link, from }; not ${JSON.stringify(term)}`);
-  if (!l.registry.relations.has(l.registry.canonical(parsed.link))) throw new Error(`include.links: unknown link type "${parsed.link}". Known: ${[...l.registry.relations.keys()].join(', ')}`);
-  return parsed.to !== undefined ? { link: parsed.link, to: parsed.to } : { link: parsed.link, from: parsed.from };
-}
+/** A view kept in the words before the three lists, in them: what the migration writes (src/lens-saved.ts). */
+export const fromBefore = (f: Record<string, unknown>) => {
+  const list = (x: unknown) => (x === undefined || x === null ? [] : Array.isArray(x) ? x : [x]) as string[];
+  const link = (t: unknown) => (typeof t === 'string' ? t : (t as { to?: string }).to !== undefined ? `${(t as { link: string }).link} ${(t as { to: string }).to}` : `${(t as { link: string }).link}< ${(t as { from: string }).from}`);
+  return {
+    find: [...list(f.ids).map((x) => `id ${x}`), ...list(f.links).map(link), ...list(f.in).map((x) => `in ${x}`), ...list(f.text).map(String).map((w) => w.trim()).filter(Boolean).map((w) => `text ${w}`), ...list(f.types).map((t) => `type ${t}`)],
+    only: [...list(f.only), ...list(f.within).map((x) => `in ${x}`)],
+    ...(f.exclude !== undefined && { not: list(f.exclude).map((x) => (x === 'closed' ? 'done' : x === SYSTEM ? `kind ${SYSTEM}` : `type ${x}`)) }),
+  };
+};
 
 /** The flat lens asked for, each field checked. A filter that includes nothing is refused: never the whole map. */
 export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLens {
-  const filter = (input.filter ?? {}) as Record<string, unknown>;
-  if (typeof filter !== 'object' || Array.isArray(filter)) throw new Error('filter must be an object: { text, types, ids, links, in, only, within, exclude }');
-  const include: FlatLens['include'] = {};
-  // Words: one set, or several (each its own term, as Shift+Enter in the find bar adds one, e_e3k797d3).
-  const words = [...new Set((Array.isArray(filter.text) ? filter.text : [filter.text]).filter((w) => w != null).map((w) => String(w).trim()).filter(Boolean))];
-  if (words.length) include.text = words;
-  if (filter.types !== undefined) include.types = names(filter.types, 'filter.types');
-  if (filter.ids !== undefined) include.ids = names(filter.ids, 'filter.ids');
-  if (filter.in !== undefined && (filter.in as unknown[]).length !== 0) include.in = names(filter.in, 'filter.in');
-  if (filter.links !== undefined) {
-    if (!Array.isArray(filter.links)) throw new Error('filter.links must be a list of link terms');
-    include.links = filter.links.map((t) => readTerm(l, t));
-  }
-  for (const type of include.types ?? []) if (!l.registry.types.has(l.registry.canonical(type))) throw new Error(`filter.types: unknown type "${type}"`);
-  const narrow: FlatLens['narrow'] = {};
-  // Only takes types and plain words (decision e_xe5dx55e): a term that reads as a word is one, else it is a type.
-  const onlyTerms = filter.only === undefined ? [] : names(filter.only, 'filter.only');
-  const onlyWords = onlyTerms.filter((t) => readWord(t) !== undefined);
-  const onlyTypes = onlyTerms.filter((t) => !onlyWords.includes(t));
-  if (onlyTypes.length) narrow.only = onlyTypes;
-  if (onlyWords.length) narrow.words = onlyWords;
-  if (filter.within !== undefined && (filter.within as unknown[]).length !== 0) narrow.within = names(filter.within, 'filter.within');
-  for (const type of narrow.only ?? []) if (!l.registry.types.has(l.registry.canonical(type))) throw new Error(`filter.only: unknown type "${type}": no type nor one of Only's words (done, blocked, status <s>, owner me|<person>, no owner, over estimate, changed since <7d|date>, made since <7d|date>, by owner, by agent)`);
-  if (!include.text?.length && !include.types?.length && !include.ids?.length && !include.links?.length && !include.in?.length)
-    throw new Error(narrow.only || narrow.within || narrow.words
-      ? 'A lens includes something (filter: text, types, ids, links or in) for only and within to narrow: they narrow what the filter includes, and alone would read the whole map.'
-      : 'A lens includes something (filter: text, types, ids, links or in): a filter that includes nothing would read the whole map.');
-  const exclude = filter.exclude === undefined ? EXCLUDE_DEFAULT : names(filter.exclude, 'filter.exclude');
-  for (const x of exclude) if (x !== 'closed' && x !== SYSTEM && !l.registry.types.has(l.registry.canonical(x))) throw new Error(`filter.exclude: "${x}" is not closed, system or a type`);
+  const asked = (input.filter ?? {}) as Record<string, unknown>;
+  if (typeof asked !== 'object' || Array.isArray(asked)) throw new Error('filter must be an object: { find, only, not }, each a list of terms');
+  const filter = asked as { find?: unknown; only?: unknown; not?: unknown };
+  const part = (name: 'find' | 'only' | 'not', value: unknown) => {
+    if (value !== undefined && !Array.isArray(value)) throw new Error(`filter.${name} must be a list of terms`);
+    // Words with nothing in them are no term: find sends what was typed.
+    return [...new Set(((value ?? []) as unknown[]).filter((t) => !/^\s*text\s*$/i.test(String(t))).map((t) => sayTerm(readTerm(l, t, name))))];
+  };
+  const find = part('find', filter.find);
+  const only = part('only', filter.only);
+  const not = filter.not === undefined ? NOT_DEFAULT : part('not', filter.not);
+  for (const t of find.map((x) => readTerm(l, x, 'find'))) if (t.sort === 'word' || t.sort === 'kind') throw new Error(`filter.find: "${sayTerm(t)}" can narrow what is found (only, not) but finds nothing itself: alone it would read the whole map`);
+  if (!find.length && !input.preview)
+    throw new Error(only.length
+      ? 'A lens includes something (filter.find) for only to narrow: alone, it would read the whole map.'
+      : 'A lens includes something (filter.find): a filter that includes nothing would read the whole map.');
   const walkIn = (input.walk ?? {}) as Record<string, unknown>;
   const over = walkIn.over === undefined ? [] : walkIn.over === 'all' ? 'all' : names(walkIn.over, 'walk.over');
   if (over !== 'all') for (const { link } of over.map(wayOf)) if (!l.registry.relations.has(l.registry.canonical(link))) throw new Error(`walk.over: unknown link type "${link}" (a link type, with > to go out along it or < to come in)`);
@@ -110,7 +97,7 @@ export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLe
   if (!Number.isInteger(steps) || (steps as number) < 0 || (steps as number) > MAX_STEPS) throw new Error(`walk.steps must be a whole number from 0 to ${MAX_STEPS}`);
   const limit = input.limit ?? FLAT_LIMIT;
   if (!Number.isInteger(limit) || (limit as number) < 1 || (limit as number) > LENS_LIMIT) throw new Error(`limit must be a whole number from 1 to ${LENS_LIMIT}`);
-  return { include, narrow, exclude, walk: { over, steps: steps as number }, limit: limit as number, ...(input.time !== undefined && { time: readAxis(input.time) }) };
+  return { find, only, not, walk: { over, steps: steps as number }, limit: limit as number, ...(input.time !== undefined && { time: readAxis(input.time) }) };
 }
 
 interface Row {
@@ -130,31 +117,29 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   const zone = lens.time && (await zoneOf(l));
   if (lens.time) lens.time = resolveAxis(lens.time, zone!);
   const inWindow = lens.time ? `(e.is_open or e.updated_at >= '${new Date(windowOf(lens.time, zone!)[0]).toISOString()}'::timestamptz)` : null;
-  // What is excluded, as one condition on an item (as e); its last parameter is the types left out, with their flavours.
-  const leftOut = lens.exclude.filter((x) => x !== 'closed' && x !== SYSTEM).flatMap((t) => l.registry.family(t));
-  const keep = (n: number) => ['e.archived_at is null', lens.exclude.includes('closed') && 'e.is_open', lens.exclude.includes(SYSTEM) && `(e.kind is null or e.kind <> '${SYSTEM}')`, `e.type <> all($${n}::text[])`].filter(Boolean).join(' and ');
-  // What a seed must also be, as conditions on it (as e) after what keep takes: one of the types it is narrowed to, and
-  // part of each item it is narrowed within (the part_of closure, src/closure.ts). Within what the viewer cannot see,
-  // nothing is: those items are read as the viewer first.
-  const only = lens.narrow.only?.flatMap((t) => l.registry.family(t));
-  const within = lens.narrow.within && (await l.db.query<{ id: string }>('select id from entity where id = any($1::text[]) and archived_at is null', [lens.narrow.within])).rows.map((r) => r.id);
-  const hidden = within !== undefined && within.length < new Set(lens.narrow.within).size;
   const me = l.viewer || (await l.setting<string>('me')) || null;
-  // Each narrowing term, numbered in order after what it follows: the types, within, then Only's words that are a
-  // condition on the row. The words checked on what a read found (blocked, by owner, by agent) are not among them.
-  const words = (lens.narrow.words ?? []).map((w) => readWord(w)!);
-  const terms: Narrowing[] = [
-    ...(only ? [{ cond: 'e.type = any($?::text[])', param: only }] : []),
-    ...(within ? [{ cond: '(select count(*) from part_closure c where c.descendant = e.id and c.ancestor = any($?::text[])) = cardinality($?::text[])', param: within }] : []),
-    ...(await wordConditions(l, words, me)),
-  ];
-  // An owner named by name is answered by its id, as a link's end is.
-  if (lens.narrow.words) lens.narrow.words = lens.narrow.words.map((said, i) => (words[i].word === 'owner' ? `owner ${(words[i] as { who: string }).who}` : said));
+  const finds = lens.find.map((t) => readTerm(l, t, 'find'));
+  const onlys = lens.only.map((t) => readTerm(l, t, 'only'));
+  const nots = lens.not.map((t) => readTerm(l, t, 'not'));
+  // What a seed must also be, and what nothing may be, as conditions on an item (as e), each with its parameter. An
+  // item is of one type, so Only's types are one set. Only within what the viewer cannot see, nothing is.
+  const isWord = (t: Term): t is Extract<Term, { sort: 'word' }> => t.sort === 'word';
+  const types = onlys.flatMap((t) => (t.sort === 'type' ? l.registry.family(t.type) : []));
+  const onlySets = await Promise.all(onlys.filter((t) => !isWord(t) && t.sort !== 'type').map((t) => setOf(l, t as Exclude<Term, { sort: 'word' }>, me)));
+  const words = onlys.filter(isWord).map((t) => t.word);
+  const terms: Narrowing[] = [...(types.length ? [{ cond: 'e.type = any($?::text[])', param: types }] : []), ...onlySets, ...(await wordConditions(l, words, me))];
+  const hidden = onlySets.some((t) => Array.isArray(t.param) && !t.param.length);
+  const notWords = nots.filter(isWord).map((t) => t.word);
+  const out: Narrowing[] = [...(await Promise.all(nots.filter((t) => !isWord(t)).map((t) => setOf(l, t as Exclude<Term, { sort: 'word' }>, me)))), ...(await wordConditions(l, notWords, me))].map((t) => ({ ...t, cond: `not coalesce((${t.cond}), false)` }));
+  const notChecked = notWords.filter((w) => checkedAfter([w]));
+  const numbered = (list: Narrowing[], n: number) => list.map((t) => (t.param === undefined ? t.cond : t.cond.replaceAll('$?', `$${n++}`)));
+  const leftOut = out.filter((t) => t.param !== undefined).map((t) => t.param);
   const narrowing = terms.filter((t) => t.param !== undefined).map((t) => t.param);
-  const narrows = (n: number) => terms.map((t) => (t.param === undefined ? t.cond : t.cond.replaceAll('$?', `$${n++}`)));
-  const narrowed = (n: number) => [keep(n), ...narrows(n + 1), inWindow].filter(Boolean).join(' and ');
+  const keep = (n: number) => ['e.archived_at is null', ...numbered(out, n)].join(' and ');
+  const narrows = (n: number) => numbered(terms, n + leftOut.length);
+  const narrowed = (n: number) => [keep(n), ...narrows(n), inWindow].filter(Boolean).join(' and ');
   // Each read finds ids only; what is sent of them is read once, at the end. A seed is found narrowed; a step of the walk is not.
-  const read = async (cond: string, sql: (keep: string) => string, own: unknown[], more: unknown[]) => (await l.db.query<{ id: string }>(sql(cond), [...own, leftOut, ...more])).rows.map((r) => r.id);
+  const read = async (cond: string, sql: (keep: string) => string, own: unknown[], more: unknown[]) => (await l.db.query<{ id: string }>(sql(cond), [...own, ...leftOut, ...more])).rows.map((r) => r.id);
   const find = (sql: (keep: string) => string, own: unknown[]) => read(keep(own.length + 1), sql, own, []);
   const seed = (sql: (keep: string) => string, own: unknown[]) => (hidden ? Promise.resolve([]) : read(narrowed(own.length + 1), sql, own, narrowing));
 
@@ -163,10 +148,15 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   // Why each item is there: the terms of the filter that found it (a seed may be found by more than one), or the step
   // of the walk that reached it. A person and an agent read the same reason (decision e_drt4g872: Find's terms).
   const foundBy = new Map<string, Found[]>();
+  // And by which of them, as the lens says it: what a term lights when it is hovered.
+  const termsBy = new Map<string, string[]>();
   const stepOf = new Map<string, number>();
-  const add = (ids: string[], by?: Found) => {
+  const add = (ids: string[], by?: Found, terms: Term[] = []) => {
     for (const id of ids) {
-      if (by && (sent.has(id) || room() > 0)) foundBy.set(id, [...new Set([...(foundBy.get(id) ?? []), by])]);
+      if (by && (sent.has(id) || room() > 0)) {
+        foundBy.set(id, [...new Set([...(foundBy.get(id) ?? []), by])]);
+        termsBy.set(id, [...new Set([...(termsBy.get(id) ?? []), ...terms.map(sayTerm)])]);
+      }
       if (room() > 0) sent.add(id);
     }
   };
@@ -174,39 +164,59 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   // to keep what they hold of.
   const checked = checkedAfter(words);
   const reach = () => (checked ? LENS_LIMIT : room());
-  const holds = async (found: string[]) => (checked ? holding(l, words, found) : found);
-  // A term's end is an item's id, or else its name: the one item so titled (any case) of the types that end of the
-  // link takes ("tagged Urgent" is the tag named Urgent), as the viewer may see it. Nothing is guessed (decision
-  // e_45sgrfqd): a name two items share is refused, and the lens answered says the end by its id.
-  const ends = async (term: LinkTerm, end: string) => {
-    if ((await l.db.query('select 1 from entity where id = $1', [end])).rows.length) return [end];
-    const def = l.registry.relations.get(term.link)!;
-    const takes = term.to !== undefined ? def.to : def.from;
-    const types = takes.includes('*') ? null : takes.flatMap((t) => l.registry.family(t));
-    const { rows } = await l.db.query<{ id: string; type: string }>(`select id, type from entity where lower(title) = lower($1) and archived_at is null${types ? ' and type = any($3::text[])' : ''} order by updated_at desc, id limit $2`, [end, 5, ...(types ? [types] : [])]);
-    if (rows.length > 1) throw new Error(`filter.links: "${term.link} ${end}": ${rows.length > 4 ? 'many items are' : `${rows.length} items are`} named "${end}" (${rows.map((r) => `${r.id}, a ${r.type}`).join('; ')}): name the one meant by its id`);
-    if (rows[0]) term.to !== undefined ? (term.to = rows[0].id) : (term.from = rows[0].id);
-    return rows.map((r) => r.id);
+  const unless = async (found: string[], ws: Word[]) => {
+    let kept = found;
+    for (const w of ws) if (kept.length) { const held = new Set(await holding(l, [w], kept)); kept = kept.filter((id) => !held.has(id)); }
+    return kept;
   };
+  const holds = async (found: string[]) => unless(checked ? await holding(l, words, found) : found, notChecked);
 
-  // The seeds, each narrowed: ids first, then what a link term finds, what is in an item, what the text finds, the
-  // newest of each type named.
-  const { ids, links, text, types } = lens.include;
-  // An item named by id is always drawn: Not leaves out only what other terms find and what the walk reaches
-  // (decision e_yasbwj45), and Only still narrows it.
-  if (ids?.length && !hidden) add(await holds((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${['e.archived_at is null', ...narrows(2)].join(' and ')}`, [ids, ...narrowing])).rows.map((r) => r.id)), 'id');
-  for (const term of links ?? []) {
-    if (room() <= 0) break;
-    const end = term.to ?? term.from!;
-    const at = end === 'me' ? (me ? [me] : []) : await ends(term, end);
-    if (!at.length) continue;
-    const [near, far] = term.to !== undefined ? ['from_id', 'to_id'] : ['to_id', 'from_id'];
-    add(await holds(await seed((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), reach()])), 'link');
+  // Not takes away what it says of an item named by id (e_ndcxf2bv); what nobody said, the default, hides nothing named.
+  const saidNot = (input.filter as { not?: unknown } | undefined)?.not !== undefined;
+  /** The items one term of Find finds, narrowed: every read bounded by the term's end, the type index or `most`. */
+  const seedOf = async (term: Term, most: number): Promise<string[]> => {
+    if (term.sort === 'id') return hidden ? [] : holds((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${[saidNot ? keep(2) : 'e.archived_at is null', ...numbered(terms, saidNot ? 2 + leftOut.length : 2)].join(' and ')}`, [[term.id], ...(saidNot ? leftOut : []), ...narrowing])).rows.map((r) => r.id));
+    if (term.sort === 'type') return holds(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [l.registry.family(term.type), most]));
+    if (term.sort !== 'link' && term.sort !== 'related' && term.sort !== 'in') return [];
+    const at = await endsOf(l, term, me);
+    if (!at.length) return [];
+    if (term.sort === 'in') return holds(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
+    if (term.sort === 'related') return holds(await seed((k) => `select e.id from relation r join entity e on e.id = case when r.from_id = any($1::text[]) then r.to_id else r.from_id end where (r.from_id = any($1::text[]) or r.to_id = any($1::text[])) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
+    const [near, far] = term.back ? ['to_id', 'from_id'] : ['from_id', 'to_id'];
+    return holds(await seed((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), most]));
+  };
+  // What a term offered in find would change, asked before it is added: what it would find, or which of the items drawn
+  // it would leave out. Nothing else of the lens is read.
+  if (input.preview) {
+    const asked = input.preview as { part?: string; terms?: unknown; ids?: unknown };
+    const part = asked.part;
+    if (part !== 'find' && part !== 'only' && part !== 'not') throw new Error('preview.part must be find, only or not');
+    if (!Array.isArray(asked.terms) || asked.terms.length > PREVIEW_TERMS) throw new Error(`preview.terms must be a list of at most ${PREVIEW_TERMS} terms`);
+    const drawn = Array.isArray(asked.ids) ? (asked.ids as string[]).slice(0, LENS_LIMIT) : [];
+    const said: Record<string, string[]> = {};
+    for (const raw of asked.terms) {
+      const term = readTerm(l, raw, part);
+      if (part === 'find') {
+        said[String(raw)] = (await seedOf(term, PREVIEW_MOST + 1)).slice(0, PREVIEW_MOST + 1);
+        continue;
+      }
+      let held: string[];
+      const [cond] = term.sort === 'word' ? await wordConditions(l, [term.word], me) : [await setOf(l, term, me)];
+      if (term.sort === 'word' && checkedAfter([term.word])) held = await holding(l, [term.word], drawn);
+      else held = (await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${cond.cond.replaceAll('$?', '$2')}`, [drawn, ...(cond.param === undefined ? [] : [cond.param])])).rows.map((r) => r.id);
+      const inSet = new Set(held);
+      said[String(raw)] = part === 'not' ? held : drawn.filter((id) => !inSet.has(id));
+    }
+    return { preview: said } as never;
   }
+
+  // The seeds, each narrowed: ids first, then what a link term finds, what is related, what is in an item, what the
+  // text finds, the newest of each type named.
+  for (const t of finds) if (t.sort === 'id') add(await seedOf(t, 1), 'id', [t]);
+  for (const t of finds) if ((t.sort === 'link' || t.sort === 'related') && room() > 0) add(await seedOf(t, reach()), 'link', [t]);
   // What is in an item, at any depth, read from the part_of closure (decision e_tvsdqjeq), the newest first; in an item
   // the viewer cannot see, nothing is.
-  const inside = lens.include.in && (await l.db.query<{ id: string }>('select id from entity where id = any($1::text[]) and archived_at is null', [lens.include.in])).rows.map((r) => r.id);
-  if (inside?.length && room() > 0) add(await holds(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [inside, reach()])), 'in');
+  for (const t of finds) if (t.sort === 'in' && room() > 0) add(await seedOf(t, reach()), 'in', [t]);
   // The text is the search read's own (src/search.ts): the words in any form in the title or note, or as typed anywhere
   // in the title, the best match first; only when that finds nothing, titles with a word close to what was typed.
   // How many it found in all is kept (`matched`), counted over what the viewer may see and the filter keeps; an item
@@ -214,11 +224,11 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   let matched: number | undefined;
   const asked: { said: string; near: boolean }[] = [];
   const matchedIds = new Set<string>();
-  for (const said of hidden ? [] : (text ?? [])) {
+  for (const said of hidden ? [] : finds.flatMap((t) => (t.sort === 'text' ? [t.said] : []))) {
     if (room() <= 0) break;
     const finding = async (near: boolean) => (await l.db.query<{ id: string; n: number }>(
       `select e.id, count(*) over ()::int as n from entity e where e.id in (${searchIds('$1', near)}) and ${narrowed(3)} order by ${rankSql('$1', 'e.')} desc, e.updated_at desc, e.id limit $2`,
-      [said, reach(), leftOut, ...narrowing])).rows;
+      [said, reach(), ...leftOut, ...narrowing])).rows;
     let near = false;
     let rows = await finding(false);
     if (!rows.length) rows = await finding((near = true));
@@ -226,16 +236,16 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
     asked.push({ said, near });
     for (const id of found) matchedIds.add(id);
     matched = (matched ?? 0) + (checked ? found.length : (rows[0]?.n ?? 0));
-    add(found, 'text');
+    add(found, 'text', [{ sort: 'text', said }]);
   }
   if (asked.length > 1 && matched) {
     matched = checked
       ? matchedIds.size
       : (await l.db.query<{ n: number }>(
           `select count(*)::int as n from entity e where e.id in (select pelago_search_ids(v, s.near) from unnest($1::text[], $2::boolean[]) s(q, near) cross join lateral ${slipsOf('s.q', 's.near')} slips(v)) and ${narrowed(3)}`,
-          [asked.map((a) => a.said), asked.map((a) => a.near), leftOut, ...narrowing])).rows[0].n;
+          [asked.map((a) => a.said), asked.map((a) => a.near), ...leftOut, ...narrowing])).rows[0].n;
   }
-  if (types?.length && room() > 0) add(await holds(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [types.flatMap((t) => l.registry.family(t)), reach()])), 'type');
+  for (const t of finds) if (t.sort === 'type' && room() > 0) add(await seedOf(t, reach()), 'type', [t]);
 
   // The walk: a step at a time along the links named, each the way it is named (out along it, in to it, or either), to
   // what the filter does not exclude. An excluded item is not walked through. Each step is bounded by the ids reached
@@ -246,7 +256,7 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   for (let level = [...sent], n = 0; level.length && n < lens.walk.steps && room() > 0 && ways.length; n++) {
     const typed = ways.flatMap(([, , types]) => (types ? [types] : []));
     const way = (k: string) => ways.map(([near, far, types], i) => `select e.id, e.updated_at from relation r join unnest($1::text[]) s(id) on s.id = r.${near} join entity e on e.id = r.${far} where r.valid_to is null${types ? ` and r.type = any($${4 + ways.slice(0, i).filter(([, , t]) => t).length}::text[])` : ''} and e.id <> all($2::text[]) and ${k}`).join(' union ');
-    level = await find((k) => `select id from (${way(k)}) w order by updated_at desc, id limit $3`, [level, [...sent], room(), ...typed]);
+    level = await unless(await find((k) => `select id from (${way(k)}) w order by updated_at desc, id limit $3`, [level, [...sent], room(), ...typed]), notChecked);
     for (const id of level) if (!sent.has(id)) stepOf.set(id, n + 1);
     add(level);
   }
@@ -266,6 +276,10 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
     `with s(id) as (select unnest($1::text[])) select r.id, r.type, r.from_id, r.to_id, r.props from relation r join s a on a.id = r.from_id join s b on b.id = r.to_id where r.valid_to is null order by r.id`,
     [items.map((e) => e.id)],
   );
+  // An end said by name goes back in the lens as its id.
+  lens.find = finds.map(sayTerm);
+  lens.only = onlys.map(sayTerm);
+  lens.not = nots.map(sayTerm);
   return {
     lens,
     items: items.map((e) => {
@@ -281,7 +295,7 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
         ...(spans && { time: filed!.filed.get(e.id) ?? spans.get(e.id) ?? [] }),
         ...(filed?.lane.has(e.id) && { lane: filed.lane.get(e.id) }),
         ...(filed?.stream.has(e.id) && { stream: filed.stream.get(e.id) }),
-        ...(foundBy.has(e.id) ? { found: foundBy.get(e.id) } : stepOf.has(e.id) && { step: stepOf.get(e.id) }),
+        ...(foundBy.has(e.id) ? { found: foundBy.get(e.id), terms: termsBy.get(e.id) } : stepOf.has(e.id) && { step: stepOf.get(e.id) }),
       };
     }),
     links: relations.map((r) => ({ id: r.id, type: r.type, from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),

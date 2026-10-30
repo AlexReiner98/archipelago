@@ -26,7 +26,7 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
       { op: 'link', type: 'part_of', from: 'gutter', to: 'roof' },
     ],
   })).result.created as Record<string, string>;
-  const page = await open(`${base}/#/v?types=question&within=${made.site}`);
+  const page = await open(`${base}/#/v?find=type+question&only=in+${made.site}`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const until = async (expression: string) => {
     for (const end = Date.now() + 20000; Date.now() < end; await wait(150)) if (await page.evaluate(expression)) return true;
@@ -42,7 +42,7 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
   try {
     assert.ok(await until(has('Which tiles?')), `the narrowed canvas is drawn: ${page.logs().join('\n')}`);
     assert.ok(!(await page.evaluate(has('Elsewhere?'))), 'a question outside the project is not');
-    assert.ok(await until(`${chips}.join('|') === 'within Site works'`), `within is in the Only row, by the item's name: ${await page.evaluate(`JSON.stringify(${chips})`)} ${page.logs().join('\n')}`);
+    assert.ok(await until(`${chips}.join('|') === 'in Site works'`), `within is in the Only row, by the item's name: ${await page.evaluate(`JSON.stringify(${chips})`)} ${page.logs().join('\n')}`);
     assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#find .q-type .q-said')].map((c) => c.textContent)`), ['Question'], 'what Find finds stays apart');
     for (const width of [1280, 560]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -52,17 +52,41 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
       if (shots) writeFileSync(`${shots}/narrow-bar-${width}.png`, await page.screenshot());
     }
     await page.send('Emulation.clearDeviceMetricsOverride');
+    // Pointing at a term of Find lights what it found: the rest of the picture fades, whatever drew it.
+    const faded = (title: string) => `Number(getComputedStyle([...document.querySelectorAll('#canvas [data-item]')].find((a) => a.textContent.includes(${JSON.stringify(title)}))).opacity) < 1`;
+    await page.evaluate(`document.getElementById('find-lens')?.click()`);
+    await pick('Find more', 'Type', 'Task');
+    assert.ok(await until(`${has('Gutters')} && ${has('Which tiles?')}`), 'two types found');
+    const point = await page.evaluate<{ x: number; y: number }>(`(() => { const r = document.querySelector('#find .q-filter .q-type .q-said').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    assert.ok(await until(faded('Gutters')), `the type not pointed at fades: ${page.logs().join('\n')}`);
+    assert.ok(!(await page.evaluate(faded('Which tiles?'))), 'what the term found stays lit');
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+    assert.ok(await until(`!(${faded('Gutters')})`), 'moved off, nothing is faded');
+    await page.evaluate(`document.querySelector('#find .q-filter .q-type:not(:first-child) .q-x, #find .q-filter .q-type + .q-type .q-x').click()`);
+    assert.ok(await until(`!${has('Gutters')}`), 'the second type taken out');
+    // The page's tip alone speaks: on a term, and after a click on it, no title is left from there up for the browser to show.
+    const titles = `(() => { const titled = []; for (let e = document.querySelector('#find .q-only .q-term .q-said'); e; e = e.parentElement) if (e.hasAttribute('title')) titled.push(e.className); return titled; })()`;
+    await page.evaluate(`document.getElementById('find-lens')?.click()`);
+    const spot = await page.evaluate<{ x: number; y: number }>(`(() => { const r = document.querySelector('#find .q-only .q-term .q-said').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...spot });
+    assert.ok(await until(`document.querySelector('.tip')?.matches(':popover-open')`), 'the page says it in its own tip');
+    assert.ok(await until(`${titles}.length === 0`), `on a term, no title is left above it: ${JSON.stringify(await page.evaluate(titles))}`);
+    for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, ...spot, button: 'left', clickCount: 1 });
+    assert.ok(await until(`${titles}.length === 0`), `nor after a click on it: ${JSON.stringify(await page.evaluate(titles))}`);
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+    assert.ok(await until(`document.querySelector('#find .q-only .q-term').hasAttribute('title')`), 'moved away, each title is back');
     // The box narrows: more types found, then only one of them.
     await pick('Find more', 'Type', 'Task');
     assert.ok(await until(`${has('Gutters')} && ${has('Which tiles?')}`), `a type more is found within it: ${page.logs().join('\n')}`);
-    await pick('Only what is so, of a type, or within an item', 'Type', 'Task');
-    assert.ok(await until(`location.hash.includes('only=task') && ${has('Gutters')} && !${has('Which tiles?')}`), `only narrows what is found: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
-    assert.ok(await until(`${chips}.join('|') === 'Task|within Site works'`), `each narrowing a term of Only: ${await page.evaluate(`JSON.stringify(${chips})`)}`);
+    await pick('Only what is in this set, of what Find finds', 'Type', 'Task');
+    assert.ok(await until(`location.hash.includes('only=type+task') && ${has('Gutters')} && !${has('Which tiles?')}`), `only narrows what is found: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
+    assert.ok(await until(`${chips}.join('|') === 'Task|in Site works'`), `each narrowing a term of Only: ${await page.evaluate(`JSON.stringify(${chips})`)}`);
     // Its × takes it out, and what it held back is drawn again.
-    await page.evaluate(`[...document.querySelectorAll('#find .q-narrow')].find((c) => !c.textContent.includes('within')).querySelector('.q-x').click()`);
-    assert.ok(await until(`!location.hash.includes('only=') && ${has('Which tiles?')}`), 'taken out, it narrows no more');
-    await page.evaluate(`[...document.querySelectorAll('#find .q-narrow')].find((c) => c.textContent.includes('within')).querySelector('.q-x').click()`);
-    assert.ok(await until(`!location.hash.includes('within=') && ${has('Elsewhere?')}`), 'nor within');
+    await page.evaluate(`[...document.querySelectorAll('#find .q-narrow')].find((c) => !c.textContent.includes('in Site')).querySelector('.q-x').click()`);
+    assert.ok(await until(`location.hash.split('only=').length === 2 && ${has('Which tiles?')}`), 'taken out, it narrows no more');
+    await page.evaluate(`[...document.querySelectorAll('#find .q-narrow')].find((c) => c.textContent.includes('in Site')).querySelector('.q-x').click()`);
+    assert.ok(await until(`!location.hash.includes('only=') && ${has('Elsewhere?')}`), 'nor within');
   } finally {
     await page.close();
   }

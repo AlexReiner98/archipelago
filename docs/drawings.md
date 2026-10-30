@@ -50,7 +50,7 @@ export function picture({ answer, style, reduced }, { measure, patch, open, fram
 
 ## Marks and patches
 
-A mark is `[tag, attributes, ...what is in it]`; a string is text. `key` names a mark for patches; `on` lists the events it is told of. The page makes only the SVG and HTML tags and the attributes listed in `ui/marks.js`; a link goes only to an item's page (`#/e/<id>`); there is no script, no event handler and no style attribute. Anything else stops the drawing, and the picture says so.
+A mark is `[tag, attributes, ...what is in it]`; a string is text. `key` names a mark for patches; `on` lists the events it is told of; `item` says the item it stands for, as a link to the item does, and the page lights marks by it when a term of the query is pointed at (`ui/lens-light.js`), every style alike: a drawing with a surface instead hears `on({ name: "light", ids })`, with `ids` null when it ends. The page makes only the SVG and HTML tags and the attributes listed in `ui/marks.js`; a link goes only to an item's page (`#/e/<id>`); there is no script, no event handler and no style attribute. Anything else stops the drawing, and the picture says so.
 
 A patch names a mark by its key: `toggle` classes, `set` attributes (with `over`, in milliseconds, numbers and paths move there), `text`, `mark` to replace it, `remove`, `append`.
 

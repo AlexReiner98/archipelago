@@ -71,7 +71,7 @@ test('a flat lens on a time axis places each item it sends, and says its window 
       { op: 'create', ref: 'meet', type: 'event', title: 'Board meeting', props: { at: '2026-10-14T14:00:00Z', ends: '2026-10-14T15:30:00Z' } },
     ],
   })) as { created: Record<string, string> };
-  const answer = (await flatLens(l, { filter: { types: ['routine', 'event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lens: { time: unknown }; items: Item[] };
+  const answer = (await flatLens(l, { filter: { find: ['type routine', 'type event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lens: { time: unknown }; items: Item[] };
   const of = (ref: string) => answer.items.find((i) => i.id === made.created[ref]);
   assert.deepEqual(answer.lens.time, { from: '2026-10-12', to: '2026-10-18', zone: 'America/Toronto' }, 'its days counted in the workspace’s zone');
   assert.equal(of('gym')!.time!.length, 3, 'a repeat on each of its days');
@@ -79,12 +79,12 @@ test('a flat lens on a time axis places each item it sends, and says its window 
 
 
   // Filed by who each is for: what no one holds is the workspace owner's, and the agents' sessions a lane of their own.
-  const lanes = (await flatLens(l, { filter: { types: ['routine', 'event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lanes: { key: string | null; title: string }[]; items: (Item & { lane?: string | null })[] };
+  const lanes = (await flatLens(l, { filter: { find: ['type routine', 'type event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lanes: { key: string | null; title: string }[]; items: (Item & { lane?: string | null })[] };
   assert.deepEqual(lanes.lanes, [{ key: null, title: 'No one' }], 'with no owner set, what no one holds is no one’s');
   assert.ok(lanes.items.every((i) => i.lane === null));
   const alex = ((await l.change(human, { reason: 'test', ops: [{ op: 'create', type: 'person', title: 'Alex' }] })) as { created: Record<string, string> }).created['#1'];
   await l.db.query(`insert into setting (key, value) values ('me', $1::jsonb)`, [JSON.stringify(alex)]);
-  const mine = (await flatLens(l, { filter: { types: ['routine'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lanes: unknown[]; items: { lane?: string }[] };
+  const mine = (await flatLens(l, { filter: { find: ['type routine'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lanes: unknown[]; items: { lane?: string }[] };
   assert.deepEqual([mine.lanes, mine.items[0].lane], [[{ key: alex, title: 'Alex' }], alex], 'the owner’s lane, by name');
 
   // Coloured by what it counts toward: the group it sits in just under the outermost item, named in streams.
@@ -95,12 +95,12 @@ test('a flat lens on a time axis places each item it sends, and says its window 
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
     { op: 'link', type: 'part_of', from: 'e', to: 't' },
   ] })) as { created: Record<string, string> }).created;
-  const coloured = (await flatLens(l, { filter: { types: ['event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { streams: { key: string; title: string }[]; items: { id: string; stream?: string | null }[] };
+  const coloured = (await flatLens(l, { filter: { find: ['type event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { streams: { key: string; title: string }[]; items: { id: string; stream?: string | null }[] };
   assert.deepEqual(coloured.streams, [{ key: set.t, title: 'Rehearse' }]);
   assert.deepEqual([coloured.items.find((i) => i.id === set.e)!.stream, coloured.items.find((i) => i.id === made.created.meet)!.stream], [set.t, null], 'what sits in nothing counts toward nothing');
 
-  const plain = (await flatLens(l, { filter: { types: ['routine'] } })) as unknown as { lens: { time?: unknown }; items: Item[] };
+  const plain = (await flatLens(l, { filter: { find: ['type routine'] } })) as unknown as { lens: { time?: unknown }; items: Item[] };
   assert.equal(plain.lens.time, undefined, 'no window, no axis');
   assert.equal(plain.items[0].time, undefined);
-  await assert.rejects(flatLens(l, { filter: { types: ['routine'] }, time: { from: 'soon', to: '7d' } }), /time is/);
+  await assert.rejects(flatLens(l, { filter: { find: ['type routine'] }, time: { from: 'soon', to: '7d' } }), /time is/);
 });

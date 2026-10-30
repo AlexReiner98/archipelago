@@ -1091,6 +1091,24 @@
   "graph focus all 3": {
    "edges": [
     {
+     "from": "<cert>",
+     "id": "<link>",
+     "to": "<me>",
+     "type": "owned_by"
+    },
+    {
+     "from": "<hover>",
+     "id": "<link>",
+     "to": "<bo>",
+     "type": "owned_by"
+    },
+    {
+     "from": "<pricing>",
+     "id": "<link>",
+     "to": "<me>",
+     "type": "owned_by"
+    },
+    {
      "from": "<app>",
      "id": "<link>",
      "to": "<repo>",
@@ -1349,6 +1367,17 @@
     {
      "blocked": false,
      "created": "<time>",
+     "id": "<bo>",
+     "kind": "actor",
+     "open": true,
+     "root": "person",
+     "status": "active",
+     "title": "Bo",
+     "type": "person"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
      "id": "<repo>",
      "kind": "place",
      "open": true,
@@ -1450,17 +1479,6 @@
     {
      "blocked": false,
      "created": "<time>",
-     "id": "<bo>",
-     "kind": "actor",
-     "open": true,
-     "root": "person",
-     "status": "active",
-     "title": "Bo",
-     "type": "person"
-    },
-    {
-     "blocked": false,
-     "created": "<time>",
      "id": "<pricing>",
      "kind": "question",
      "open": true,
@@ -1468,6 +1486,17 @@
      "status": "open",
      "title": "What does it cost?",
      "type": "decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<me>",
+     "kind": "actor",
+     "open": true,
+     "root": "person",
+     "status": "active",
+     "title": "Owner",
+     "type": "person"
     },
     {
      "blocked": false,
@@ -1671,6 +1700,18 @@
   },
   "graph focus all closed 2": {
    "edges": [
+    {
+     "from": "<cert>",
+     "id": "<link>",
+     "to": "<me>",
+     "type": "owned_by"
+    },
+    {
+     "from": "<pricing>",
+     "id": "<link>",
+     "to": "<me>",
+     "type": "owned_by"
+    },
     {
      "from": "<addin>",
      "id": "<link>",
@@ -1898,6 +1939,17 @@
     {
      "blocked": false,
      "created": "<time>",
+     "id": "<me>",
+     "kind": "actor",
+     "open": true,
+     "root": "person",
+     "status": "active",
+     "title": "Owner",
+     "type": "person"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
      "estimated": false,
      "id": "<app>",
      "kind": "work",
@@ -2010,6 +2062,12 @@
   },
   "graph focus blocking": {
    "edges": [
+    {
+     "from": "<cert>",
+     "id": "<link>",
+     "to": "<me>",
+     "type": "owned_by"
+    },
     {
      "from": "<installer>",
      "id": "<link>",
@@ -2135,6 +2193,17 @@
      "status": "open",
      "title": "Is the cert enough?",
      "type": "decision"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<me>",
+     "kind": "actor",
+     "open": true,
+     "root": "person",
+     "status": "active",
+     "title": "Owner",
+     "type": "person"
     },
     {
      "blocked": false,
@@ -2710,6 +2779,12 @@
      "type": "part_of"
     },
     {
+     "from": "<cert>",
+     "id": "<link>",
+     "to": "<me>",
+     "type": "owned_by"
+    },
+    {
      "from": "<docs>",
      "id": "<link>",
      "to": "<addin>",
@@ -2743,6 +2818,12 @@
      "from": "<hover>",
      "id": "<link>",
      "to": "<bo>",
+     "type": "owned_by"
+    },
+    {
+     "from": "<hover>",
+     "id": "<link>",
+     "to": "<bo>",
      "type": "waits_on"
     },
     {
@@ -2768,6 +2849,12 @@
      "id": "<link>",
      "to": "<business>",
      "type": "part_of"
+    },
+    {
+     "from": "<pricing>",
+     "id": "<link>",
+     "to": "<me>",
+     "type": "owned_by"
     },
     {
      "from": "<q>",
@@ -3059,6 +3146,17 @@
      "status": "available",
      "title": "Live lane",
      "type": "resource"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "id": "<me>",
+     "kind": "actor",
+     "open": true,
+     "root": "person",
+     "status": "active",
+     "title": "Owner",
+     "type": "person"
     },
     {
      "blocked": false,

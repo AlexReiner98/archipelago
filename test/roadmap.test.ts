@@ -76,7 +76,7 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
 
   // A view kept about an item: its own shape, and a style kept about the view, over the rest.
   const kept = await make(l, [
-    { op: 'create', ref: 'road', type: 'lens', title: 'Roadmap', props: { place: 1, filter: { ids: [made.p] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'grid' } } },
+    { op: 'create', ref: 'road', type: 'lens', title: 'Roadmap', props: { place: 1, filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'grid' } } },
     { op: 'link', type: 'about', from: 'road', to: made.p },
     { op: 'create', ref: 'rs', type: 'style', title: 'Road opened', props: { open: 4 } },
     { op: 'link', type: 'about', from: 'rs', to: 'road' },
@@ -271,7 +271,7 @@ test('a backup holds every row, and restores into an empty database that then ca
   const taken = await dump(l.db, { id: 'default', name: 'Default' }, { id: 'local', types: [] });
   const copy = new Archipelago(await openDb(), l.registry);
   const counts = await restore(copy.db, { ...JSON.parse(JSON.stringify(taken)), vault: await dumpVault(l.db) });
-  assert.deepEqual([counts.entity, counts.relation, counts.proposal], [3, 1, 1]);
+  assert.deepEqual([counts.entity, counts.relation, counts.proposal], [3, 2, 1]); // part_of, and the project's owner
   // What the change sets did is read from the restored log again, not restored as events.
   const logged = new Set(taken.tables.log_entry.map((e) => e.id));
   assert.equal(counts.event, taken.tables.event.filter((e) => !logged.has(e.changeset)).length);

@@ -6,7 +6,7 @@
 // are translated once, when a workspace opens (moveLenses): what a flat lens can say is kept, what it cannot is said
 // in the log and taken off; one with nothing a filter can include is retired.
 
-import { flatLens, LENS_LIMIT } from './lens-flat.ts';
+import { flatLens, fromBefore, LENS_LIMIT } from './lens-flat.ts';
 import { keptOf } from './lens-kept.ts';
 import { readSteps, stepIds } from './lens-steps.ts';
 import type { Fact } from './log.ts';
@@ -23,8 +23,8 @@ const list = (value: unknown): string[] => (Array.isArray(value) ? value.filter(
 /** The flat lens a kept view draws: its filter with its pins and what its steps name, its walk, its limit and its window of time. */
 export function keptLens(props: Props) {
   const filter = { ...((props.filter ?? {}) as Props) };
-  const ids = [...new Set([...list(filter.ids), ...list(props.pins), ...stepIds(props.steps)])];
-  if (ids.length) filter.ids = ids;
+  const ids = [...list(props.pins), ...stepIds(props.steps)].map((id) => `id ${id}`);
+  if (ids.length) filter.find = [...new Set([...list(filter.find), ...ids])];
   return { filter, walk: props.walk ?? { over: [], steps: 0 }, ...(typeof props.limit === 'number' && { limit: props.limit }), ...(props.time != null && { time: props.time }) };
 }
 
@@ -48,12 +48,12 @@ export async function keptPicture(l: Archipelago, id: string, have?: unknown) {
   const steps = item.props.steps === undefined ? undefined : readSteps(item.props.steps);
   const told = stepIds(item.props.steps).filter((id) => !answer.items.some((i) => i.id === id));
   // What a step names that was left out: read again with it, leaving nothing out but what was not sent, so the links among them all come too.
-  if (told.length) answer = { ...(await flatLens(l, { filter: { ids: [...answer.items.map((i) => i.id), ...told], exclude: [] }, limit: Math.min(answer.items.length + told.length, LENS_LIMIT) })), lens: answer.lens };
+  if (told.length) answer = { ...(await flatLens(l, { filter: { find: [...answer.items.map((i) => i.id), ...told].map((id) => `id ${id}`), not: [] }, limit: Math.min(answer.items.length + told.length, LENS_LIMIT) })), lens: answer.lens };
   // It starts from what it is about, where it draws that; else from the one item it names (as the lens's from was).
   const { rows } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'about' and from_id = $1 and valid_to is null order by id`, [id]);
   const ids = list((lens.filter as Props).ids);
   // Or what it draws what is in: the items it finds in or is narrowed within, and the ends of its link terms.
-  const ends = [...list((lens.filter as Props).in), ...list((lens.filter as Props).within), ...list((lens.filter as Props).links).map((t) => t.split(/\s+/).slice(1).join(' '))];
+  const ends = [...list((lens.filter as Props).find), ...list((lens.filter as Props).only)].filter((t) => !/^(id|text|type|kind) /.test(t)).map((t) => t.split(/\s+/).slice(1).join(' '));
   const from = rows.map((r) => r.to_id).find((x) => ids.includes(x) || ends.includes(x)) ?? (ids.length === 1 ? ids[0] : undefined);
   return { ...answer, lens: { ...answer.lens, ...(from && { from }) }, ...(steps && { steps }), style: await drawn(l, style, have ?? []) };
 }
@@ -156,7 +156,7 @@ export async function moveLenses(l: Archipelago): Promise<{ moved: number; retir
   const facts: Fact[] = [];
   for (const row of rows) {
     const { lens, lost } = oldLens(l, row.props, about.filter((a) => a.from_id === row.id).map((a) => a.to_id));
-    if (lens) (facts.push(['+', row.id, 'filter', lens.filter], ['+', row.id, 'walk', lens.walk]), out.moved++);
+    if (lens) (facts.push(['+', row.id, 'filter', fromBefore(lens.filter)], ['+', row.id, 'walk', lens.walk]), out.moved++);
     else (facts.push(['+', row.id, 'status', 'retired']), out.retired.push(row.id));
     const style = styles.find((s) => s.to_id === row.id);
     if (lens && style && row.props.style === undefined) facts.push(['+', row.id, 'style', { style: style.id }]);
@@ -169,4 +169,21 @@ export async function moveLenses(l: Archipelago): Promise<{ moved: number; retir
     await l.log(tx, { actor: 'system', action: 'lens.moved', reason, detail: { moved: out.moved, retired: out.retired, lost: out.lost } });
   });
   return out;
+}
+
+/** Each view kept in the filter's words before its one list of terms, said in them (the owner, 30 Oct 2026): a change like any other, so the log keeps what it said (a migration, run once). */
+export async function termLenses(l: Archipelago): Promise<number> {
+  const { rows } = await l.db.query<{ id: string; filter: Props }>(
+    `select id, props->'filter' as filter from entity where type = any($1::text[]) and archived_at is null and props ? 'filter' and not (props->'filter' ? 'find') -- index entity_type`,
+    [l.registry.family(KEPT)],
+  );
+  const facts = rows.map((r): Fact => ['+', r.id, 'filter', fromBefore(r.filter)]);
+  // A screen kept on the map may hold a picture of a lens of its own.
+  const { rows: screens } = await l.db.query<{ id: string; pieces: Props[] }>(`select id, props->'pieces' as pieces from entity where type = any($1::text[]) and archived_at is null and jsonb_typeof(props->'pieces') = 'array' -- index entity_type`, [l.registry.family('screen')]);
+  for (const { id, pieces } of screens) {
+    const old = (p: Props) => typeof p.lens === 'object' && p.lens !== null && 'filter' in p.lens && !('find' in ((p.lens as Props).filter as Props));
+    if (pieces.some(old)) facts.push(['+', id, 'pieces', pieces.map((p) => (old(p) ? { ...p, lens: { ...(p.lens as Props), filter: fromBefore((p.lens as Props).filter as Props) } } : p))]);
+  }
+  if (facts.length) await l.db.transaction((tx) => l.moved(tx, 'lens.moved', 'Views kept are said in the one list of terms', facts));
+  return facts.length;
 }

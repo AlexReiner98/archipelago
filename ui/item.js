@@ -116,9 +116,9 @@ export async function entity(id, here) {
   const along = [...new Set([...data.outgoing, ...data.incoming].map((r) => r.type).filter((t) => !t.startsWith('sys.')))];
   const walkFrom = (add) => {
     const now = lensNow();
-    if (!add || !now) return goLens({ filter: { ids: [id] }, walk: { over: along, steps: 1 } });
+    if (!add || !now) return goLens({ filter: { find: [`id ${id}`] }, walk: { over: along, steps: 1 } });
     const over = now.walk?.over === 'all' ? 'all' : [...new Set([...(now.walk?.over ?? []), ...along])];
-    goLens({ ...added(now, { id }), walk: { over, steps: Math.max(1, now.walk?.steps ?? 0) } });
+    goLens({ ...added(now, { find: `id ${id}` }), walk: { over, steps: Math.max(1, now.walk?.steps ?? 0) } });
   };
   const walkSaid = along.map((t) => relations.get(t)?.title ?? t).join(', ');
 

@@ -41,7 +41,7 @@ test('in a browser, a document’s kept view is drawn as a canvas, the packs’ 
   const kept = await change({
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', status: 'current', props: { filter: { ids: [made.p] }, walk: { over: ['part_of', 'calls'], steps: 3 }, style: { shape: 'architecture' } } },
+      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', status: 'current', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of', 'calls'], steps: 3 }, style: { shape: 'architecture' } } },
       { op: 'link', type: 'about', from: 'l', to: made.p },
       { op: 'create', ref: 'd', type: 'document', title: 'How it works', body: `Opening words.\n\n{l}\n\nClosing words.` },
       // Home is the owner's to fill: Releases put on it.
@@ -65,7 +65,7 @@ test('in a browser, a document’s kept view is drawn as a canvas, the packs’ 
     assert.ok(await until(`${linked('#canvas', made.a)} && ${linked('#canvas', made.b)} && ${linked('#canvas', made.e)}`), `the view is drawn as a canvas: ${page.logs().join('\n')}`);
 
     // Home: the software pack's Releases, the open ones.
-    await page.go(`${base}/#/v?ids=${made.p}`);
+    await page.go(`${base}/#/v?find=id+${made.p}`);
     await page.go(`${base}/#/you`);
     assert.ok(await until(linked('.lens-card', made.r)), `Releases drawn on Home: ${page.logs().join('\n')}`);
     assert.ok(!(await page.evaluate<boolean>(linked('.lens-card', made.old))), 'not what has happened');
