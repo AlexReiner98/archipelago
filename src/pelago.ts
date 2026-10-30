@@ -133,7 +133,7 @@ export interface ChangeInput {
 }
 
 export interface Entity {
-  id: string; /** Its kind, kept in its row (src/head.ts). */ kind: string | null;
+  id: string; /** Its kind, kept in its row (src/head.ts). */ kind: string | null; /** The row's own, which may not be the server's name for it (Archipelago.workspace). */ workspace: string;
   type: string;
   title: string;
   body: string;

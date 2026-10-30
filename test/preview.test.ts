@@ -94,6 +94,29 @@ test('a document shared only to be read is previewed nowhere, and its views are 
   assert.equal((await api(theirs, 'document', { id: offer.id, drawn: true })).lenses, undefined);
 });
 
+test('a draft keeps the sections it holds on a workspace other than default', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const operator = (await workspaces.ensureOperator())!;
+  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const made = (
+    await call('/api/change', theirs, {
+      reason: 'test',
+      ops: [
+        { op: 'create', ref: 'd', type: 'document', title: 'A page', visibility: 'shared', body: 'Opening words.\n\n{s}' },
+        { op: 'create', ref: 's', type: 'note', title: 'Costs', visibility: 'shared', body: 'Twenty an hour.' },
+        { op: 'link', type: 'part_of', from: 's', to: 'd' },
+      ],
+    })
+  ).result.created;
+  // The rows' own workspace, not the server's name for it, says what belongs to the document.
+  const { pelago } = await workspaces.get('acme');
+  assert.deepEqual((await pelago.db.query(`select workspace from entity where id = $1`, [made.d])).rows, [{ workspace: 'default' }]);
+  assert.equal(pelago.workspace, 'acme');
+  const own = (await call(`/preview/${made.d}/data`, theirs, {})).result;
+  assert.deepEqual(own.sections, [made.s]);
+  assert.ok(JSON.stringify(own).includes('Twenty an hour.'), 'its note with it');
+});
+
 test('a private document has no preview: it says so, by name', async () => {
   const l = await fresh();
   const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'document', title: 'Notes to self', visibility: 'private', body: 'Mine.' }]);
