@@ -30,6 +30,13 @@ test('an agent makes and changes a saved canvas through change, and report show 
   assert.ok(!drawn.items.some((i) => i.id === id), 'not drawn on a canvas of the work');
 });
 
+test('a drawing the page lays out says so before it is drawn, so the page gives it its box first', async () => {
+  const l = await fresh();
+  const read = async (shape: string) => ((await callTool(l, human, 'view', { name: 'style', params: { shape, have: [] } })) as { style: { drawing: { flat?: boolean } } }).style.drawing;
+  assert.equal((await read('time')).flat, true);
+  assert.equal((await read('flow')).flat, undefined, 'one the frame pans and zooms does not');
+});
+
 test("a pack ships canvases as presets: the schema offers each, its lens answers, and the owner keeps their version under its id", async () => {
   const l = await fresh();
   const { canvases, shapes } = (await callTool(l, human, 'schema', {})) as { canvases: { id: string; pack: string; title: string; props: { filter: Record<string, unknown>; walk: unknown } }[]; shapes: { shape: string }[] };

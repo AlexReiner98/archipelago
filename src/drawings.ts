@@ -59,7 +59,7 @@ export function drawingFor(
   const changed = mine?.props.modules && typeof mine.props.modules === 'object' ? Object.entries(mine.props.modules as Record<string, unknown>).filter(([name, text]) => NAME.test(name) && typeof text === 'string') : [];
   const modules = { ...modulesOf(packs.dir, d.pack, d), ...Object.fromEntries(changed) } as Record<string, string>;
   const hash = hashOf(modules);
-  return { id: d.id, title: d.title, shape: d.shape, hash, ...(d.notes === 'whole' && { notes: d.notes }), ...(!have.includes(hash) && { modules }) };
+  return { id: d.id, title: d.title, shape: d.shape, hash, ...(d.notes === 'whole' && { notes: d.notes }), ...(d.flat === true && { flat: true }), ...(!have.includes(hash) && { modules }) };
 }
 
 /**
