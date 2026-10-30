@@ -1,5 +1,5 @@
-// How the pages drawing looks (index.js): each document a row on the sea, its title over its draft and its published
-// page side by side (or one over the other where the pane is narrow), each in a frame as tall as the page it holds.
+// How the pages drawing looks (index.js): each document a row on the sea, its title over its draft, and with the
+// style's `published` its published page beside it (or under it where the pane is narrow), each in a frame as tall as the page it holds.
 // Every length and number here is the style's (sizes, read as --ln-*): the house style names them.
 
 export const css = `

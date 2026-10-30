@@ -57,7 +57,7 @@ test('in a browser, a document is written beside its draft, shared or not', { sk
     // Beside the sheet: the words open to write, the scrollbar in sight, what is published out of the way.
     assert.ok(await until(`Boolean(${area}) && !${area}.hidden`), 'the note opens as words to write');
     assert.ok(await page.evaluate(`${view}.getBoundingClientRect().right <= document.getElementById('sheet').getBoundingClientRect().left + 1`), 'the view stops where the sheet starts');
-    assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('.rd.published')).display`), 'none');
+    assert.equal(await page.evaluate(`document.querySelector('.rd.published')`), null);
 
     // Saving keeps the place and the other documents' frames, and reads the one changed.
     await page.evaluate(`(${view}.scrollTop = 500, window.other = ${frame(site.b)}, 0)`);
