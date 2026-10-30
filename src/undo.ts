@@ -4,6 +4,7 @@
 
 import type { Actor, Archipelago, Op, UpdateOp } from './pelago.ts';
 import { entry, factAt, type Fact } from './log.ts';
+import { OWNED_BY } from './owner-link.ts';
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 /** The head fields an update op sets by name; any other field of an item is a declared one, in props. */
@@ -41,6 +42,8 @@ export async function undo(l: Archipelago, actor: Actor, input: { changeset: str
     }
     if (field === 'link' && id.startsWith('r_')) {
       const was = await before(id, 'link');
+      // The owner's link follows the owner, which is undone below unless it has changed since.
+      if ((op === '+' ? (fact[3] as string[]) : (value(was) as string[] | undefined))?.[0] === OWNED_BY) continue;
       if (op === '+' && !was) {
         const { rows } = await l.db.query(`select 1 from relation where id = $1 and valid_to is null`, [id]);
         if (rows.length) ops.push({ op: 'unlink', relation: id });

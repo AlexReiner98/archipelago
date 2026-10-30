@@ -5,8 +5,7 @@ import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns
 import { AGENT_CHANGES, agentChanges, decide, DEFAULT_AGENT_POLICY, type Policy, type Ruled } from './rules.ts';
 import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.ts'; import { authorityOf } from './authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
-import { bodyAfter, dropExcepted } from './ops.ts'; import { mergeRefusals, once, overtaken } from './merge.ts';
-import { readEvents, type EventQuery } from './eventlog.ts';
+import { bodyAfter, dropExcepted } from './ops.ts'; import { mergeRefusals, once, overtaken } from './merge.ts'; import { readEvents, type EventQuery } from './eventlog.ts'; import { ownerFollows } from './owner-link.ts';
 import type { Registry, TypeDef } from './packs.ts'; import { currentNames, typesAfter, typesApplied } from './type-items.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
 import { KEPT_FIELDS } from './operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from './streams.ts';
@@ -523,6 +522,7 @@ export class Archipelago {
             await said([['+', op.type.id, 'type_def', op.type]]);
             break; // registered after the transaction
         }
+        await said(await ownerFollows(tx, op, resolve, resolve(op.op === 'create' ? (op.ref ?? `#${i + 1}`) : ''), () => mint(`owner#${at.get(op)}`, 'r')));
       }
       if (opts.dry) throw DRY;
       const rule: Decision = opts.rule ?? { outcome: 'apply', spared: [] };

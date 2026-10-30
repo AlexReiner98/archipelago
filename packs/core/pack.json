@@ -629,6 +629,15 @@
   ],
   "links": [
     {
+      "id": "owned_by",
+      "extends": "involves",
+      "title": "owned by",
+      "inverse": "owns",
+      "from": ["aim", "work", "question", "record", "occurrence"],
+      "to": ["person", "agent"],
+      "description": "Who is responsible for it: one person or agent, and a new link takes the place of the one before. Saying owner on an item makes this link; the row keeps its end as an index."
+    },
+    {
       "id": "depends_on",
       "root": true,
       "title": "depends on",
