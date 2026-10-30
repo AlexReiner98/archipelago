@@ -267,6 +267,13 @@ test('settle: wires along one another keep their sides', () => {
   assert.ok(wires.every((w) => w.points.length <= 8));
 });
 
+test('settle: a wire of the order keeps its box above the next', () => {
+  const boxes = new Map([['a', box(100, 300)], ['b', box(500, 400)]]);
+  const wires = [{ a: 'a', b: 'b', down: true, points: [[100, 320], [100, 340], [500, 340], [500, 380]] }];
+  settle(boxes, wires, { gap: 24, track: 8 });
+  assert.ok(boxes.get('a')!.at[1] < boxes.get('b')!.at[1]);
+});
+
 test('settle: a port slides round a corner when that takes out bends', () => {
   const boxes = new Map([['a', box(100, 200)], ['b', box(500, 200)]]);
   const wires = [{ a: 'a', b: 'b', points: [[100, 220], [100, 300], [500, 300], [500, 220]] }];

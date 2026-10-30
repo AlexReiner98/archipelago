@@ -271,7 +271,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
     const s = stepSize(id), b = block(id), left = x.get(id) - s.w / 2, top = y.get(id) - s.h / 2 - b.lead;
     rigid.set(id, { at: [left + b.w / 2, top + b.h / 2], size: [b.w, b.h], reach: [[-b.w / 2, -b.w / 2 + s.w], [-b.h / 2 + b.lead, -b.h / 2 + b.lead + s.h]], was: [left + b.w / 2, top + b.h / 2], hangs: [...c.down.items, ...c.up.items].map((it) => it.id) });
   }
-  for (const r of routes.values()) if (r.to !== undefined && rigid.has(r.from) && rigid.has(r.to)) moving.push(Object.assign(r, { a: r.from, b: r.to }));
+  for (const r of routes.values()) if (r.to !== undefined && rigid.has(r.from) && rigid.has(r.to)) moving.push(Object.assign(r, { a: r.from, b: r.to, down: orderKey.has(pair(r.from, r.to)) }));
   if (moving.length && square(moving)) {
     settled = settle(rigid, moving, { gap: z.col, track: z.turn, watch: watching, ...(moving.length > PULL_MOST && { rounds: 4, sweeps: 6 }) });
     // The parts have pulled in, so they are set again, closer.

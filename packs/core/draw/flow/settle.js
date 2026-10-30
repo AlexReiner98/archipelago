@@ -30,7 +30,7 @@ function simplify(points) {
 
 /**
  * One pass along `axis` (0 across, 1 down). `boxes` are { at: [x, y], size: [w, h] } by id, `wires` { a, b, points }: a
- * wire's ends rest on the boxes `a` and `b`. `gap` is the room between boxes, `track` between a wire and what is beside it.
+ * wire's ends rest on the boxes `a` and `b`, and `down` says `a` stays above `b`. `gap` is the room between boxes, `track` between a wire and what is beside it.
  */
 function pass(axis, boxes, wires, { gap, track, sweeps, press }) {
   const other = 1 - axis, items = [], ofBox = new Map();
@@ -82,6 +82,15 @@ function pass(axis, boxes, wires, { gap, track, sweeps, press }) {
     const want = p.box && q.box ? p.half + q.half + gap : p.half + q.half + track, sep = Math.min(want, q.pos - p.pos);
     p.right.push([q, sep]);
     q.left.push([p, sep]);
+  }
+  // Down the page, a wire of the order keeps its box above the one it leads to, however it could bend to let it pass.
+  if (axis === 1) for (const w of wires) if (w.down) {
+    const [p, q] = [ofBox.get(w.a), ofBox.get(w.b)];
+    if (p && q && p.pos < q.pos) {
+      const sep = Math.min(p.half + q.half, q.pos - p.pos);
+      p.right.push([q, sep]);
+      q.left.push([p, sep]);
+    }
   }
   const bounds = (it) => {
     let lo = -Infinity, hi = Infinity;
