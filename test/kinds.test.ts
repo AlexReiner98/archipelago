@@ -152,7 +152,7 @@ test('views of the work leave the system kind out by default', async () => {
   const types = ['task', 'lens'];
   const answer = (await ask(l, 'flat', { filter: { find: types.map((t: string) => `type ${t}`), not: [] } })) as { items: { id: string }[] };
   assert.ok(answer.items.some((x) => x.id === v), 'asked to, a view shows the system kind');
-  const folded = (await ask(l, 'flat', { filter: { types } })) as { items: { id: string }[] };
+  const folded = (await ask(l, 'flat', { filter: { find: types.map((t: string) => `type ${t}`) } })) as { items: { id: string }[] };
   assert.ok(folded.items.some((x) => x.id === t) && !folded.items.some((x) => x.id === v));
   const within = (await ask(l, 'flat', { filter: { find: [`id ${p}`] }, walk: { over: 'all', steps: 2 } })) as { items: { id: string }[] };
   assert.ok(within.items.some((x) => x.id === t) && !within.items.some((x) => x.id === v));
