@@ -42,7 +42,7 @@ export async function draftDocument(l: Archipelago, id: string, elsewhere?: Map<
             exists (select 1 from relation r where r.type = 'part_of' and r.valid_to is null and r.from_id = e.id and r.to_id = $2) as held,
             pelago_is_public(e.id) as public
      from entity e where e.id = any($1::text[]) and e.archived_at is null and e.private_to is null and e.visibility <> 'private' and e.workspace = $3`,
-    [sectionIds(doc.body), doc.id, l.workspace],
+    [sectionIds(doc.body), doc.id, doc.workspace],
   );
   const items = rows.filter((r) => r.held || r.public).map(({ held, public: _, ...r }) => ({ ...r, body: held ? r.body : '' }));
   return forReader(l, { id: doc.id, type: doc.type, title: doc.title, body: doc.body, status: doc.status, props: doc.props, updated_at: String(doc.updated_at), items }, undefined, elsewhere);
