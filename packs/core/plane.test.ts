@@ -84,3 +84,36 @@ test('layout: the order is a wire, and a step put by hand stays there', () => {
   assert.equal(g.x.get('a'), 500);
   assert.equal(g.y.get('a'), 400);
 });
+
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { layout as bars } from './draw/flow/bars.js';
+
+const drawnBars = (items: any[], links: any[]) => bars({ items, links, measure, sizes: house.sizes });
+const lines = (g: any) => [...g.chains, ...g.ties].map((w: any) => w.points);
+const right = (g: any) => lines(g).every((w: any) => w.every((p: number[], i: number) => !i || p[0] === w[i - 1][0] || p[1] === w[i - 1][1]));
+const clear = (g: any) => { const b = g.all; for (let i = 0; i < b.length; i++) for (let j = i + 1; j < b.length; j++) if (Math.abs(g.x.get(b[i].id) - g.x.get(b[j].id)) < (b[i].w + b[j].w) / 2 && Math.abs(g.y.get(b[i].id) - g.y.get(b[j].id)) < (b[i].h + b[j].h) / 2) return false; return true; };
+
+test('bars: a planar graph has no crossing, every wire at right angles, no box on another', () => {
+  const ids = Array.from({ length: 16 }, (_, k) => `n${k}`), links: any[] = [];
+  for (let k = 0; k < 16; k++) { if (k % 4 < 3) links.push(tie(`n${k}`, `n${k + 1}`, 'serves')); if (k < 12) links.push(tie(`n${k}`, `n${k + 4}`, 'serves')); }
+  const g = drawnBars(ids.map((id) => item(id)), links);
+  assert.equal(g.all.length, 16);
+  assert.equal(count(lines(g)).crossings, 0);
+  assert.ok(right(g));
+  assert.ok(clear(g));
+});
+
+test('bars: the five keep to the one crossing threaded', () => {
+  const ids = ['a', 'b', 'c', 'd', 'e'], links: any[] = [];
+  for (let i = 0; i < 5; i++) for (let j = i + 1; j < 5; j++) links.push(tie(ids[i], ids[j], 'serves'));
+  const g = drawnBars(ids.map((id) => item(id)), links);
+  assert.ok(right(g));
+  assert.ok(clear(g));
+  assert.ok(count(lines(g)).crossings <= 2, `${count(lines(g)).crossings} crossings`);
+});
+
+test('bars: trees, loose items and a ring all draw', () => {
+  const g = drawnBars(['r', 'l1', 'l2', 'x', 'p', 'q', 'o'].map((id) => item(id)), [tie('l1', 'r'), tie('l2', 'r'), tie('p', 'q', 'serves'), tie('q', 'o', 'serves'), tie('o', 'p', 'serves')]);
+  assert.equal(g.all.length, 7);
+  assert.ok(clear(g));
+});

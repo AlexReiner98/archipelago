@@ -29,7 +29,7 @@ const need = (set, name) => {
 const pairOf = (u, v) => (u < v ? `${u}|${v}` : `${v}|${u}`);
 
 /** Each item a step with its size, as the flow sizes them; a choice nothing follows yet is a step of its own. */
-function stepsOf({ items, links, measure, sizes }) {
+export function stepsOf({ items, links, measure, sizes }) {
   const [MAX_TEXT, TEXT, STUB_TEXT, DIAMOND_PAD, DIAMOND_H, END_PAD, END_H, BOX_PAD, BOX_H, SHEET_H] = ['flow_max_text', 'flow_text', 'flow_stub_text', 'flow_diamond_pad', 'flow_diamond_height', 'flow_end_pad', 'flow_end_height', 'flow_box_pad', 'flow_box_height', 'flow_sheet_height'].map((n) => need(sizes, n));
   const shapeOf = (i) => (i.kind === 'question' ? 'diamond' : i.kind === 'occurrence' ? 'pill' : i.kind === 'record' ? 'sheet' : 'box');
   const nodes = new Map();
