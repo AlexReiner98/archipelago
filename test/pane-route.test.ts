@@ -82,6 +82,13 @@ test("a side moves the session's pane in its tab; alone and a page that is not a
   assert.deepEqual(route(step('e_aaaaaaaa'), [tab('t0', 'e_aaaaaaaa', {}, [], { front: true })], { ...at, drawable: false }), { tab: 't0', pane: 'p0', front: true });
 });
 
+test('a pane of its own moved into a tab that follows another is found there, but not in a tab that follows nobody', () => {
+  const moved = [first(), tab('t1', 'e_bbbbbbbb', {}, [its('e_aaaaaaaa')])];
+  assert.deepEqual(route(step('e_aaaaaaaa'), moved, at), { tab: 't1', pane: 'p1', front: false });
+  const quiet = [first(), tab('t1', 'none', {}, [its('e_aaaaaaaa')])];
+  assert.deepEqual(route(step('e_aaaaaaaa'), quiet, at), { tab: 't0', split: { side: 'right' }, front: true });
+});
+
 test('within a tab, the pane drawing it already is lit, never the one in focus', () => {
   assert.deepEqual(route(step('e_aaaaaaaa'), [first({}, [{ id: 'p1', draws: true }])], at), { tab: 't0', pane: 'p1', front: true });
   assert.deepEqual(route(step('e_aaaaaaaa'), [first({ draws: true })], at), { tab: 't0', split: { side: 'right' }, front: true });

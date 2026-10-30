@@ -87,6 +87,9 @@ export function route(step, tabs, { now, recent, drawable = true }) {
   }
   const own = tabs.filter((t) => t.follows === session).sort((a, b) => (last(b)?.at ?? 0) - (last(a)?.at ?? 0))[0];
   if (own) return into(own);
+  // A pane of its own moved into a tab that follows someone else stays its own (ui/tab-bar.js); the reader's Nobody is kept.
+  const holding = tabs.find((t) => !['all', 'none'].includes(t.follows) && !t.popped && t.panes.some((p) => p.held === session));
+  if (holding) return into(holding);
   const heldByOther = (t) => !t.panes.some((p) => p.held === session) && lately(last(t), recent) && last(t).session !== session;
   const open = tabs.filter((t) => t.follows === 'all' && !t.popped && !heldByOther(t));
   const free = open.find((t) => t.panes.some((p) => p.held === session)) ?? open.find((t) => last(t)?.session === session) ?? open.find((t) => t.panes.some((p) => p.draws && !p.focus)) ?? open.find((t) => t.front) ?? open[0];
