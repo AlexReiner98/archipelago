@@ -115,18 +115,18 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     const text = String(i.body ?? i.gist ?? '').split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
     return text.length > NOTE ? `${text.slice(0, NOTE - 1).trimEnd()}…` : text;
   };
-  const head = (x, y, up = false) => {
-    const back = up ? y + z('head_length') : y - z('head_length');
-    return `M${x} ${y}L${x - z('head_half')} ${back}L${x + z('head_half')} ${back}Z`;
+  // A head points along the way its line comes in: from the last point before the tip that is not the tip.
+  const head = (points, tip = points.at(-1), rest = points.slice(0, -1).reverse()) => {
+    const from = rest.find((p) => p[0] !== tip[0] || p[1] !== tip[1]) ?? [tip[0], tip[1] - 1];
+    const dx = tip[0] - from[0], dy = tip[1] - from[1], l = Math.hypot(dx, dy), ux = dx / l, uy = dy / l;
+    const bx = tip[0] - ux * z('head_length'), by = tip[1] - uy * z('head_length'), [nx, ny] = dx ? [-uy, ux] : [-1, 0], half = z('head_half');
+    return `M${tip[0]} ${tip[1]}L${bx + nx * half} ${by + ny * half}L${bx - nx * half} ${by - ny * half}Z`;
   };
   // A tie runs from the higher of its ends down into the lower (./wires.js, ./free.js), or under its row from one to
   // the other: its head is on the end its link points to (`headAt`, the end or the start of its line), the way the
   // line comes into it: into a step's head from above, or into its foot from below.
   const headless = new Set(Array.isArray(style.headless) ? style.headless : []);
-  const tieHead = (t) => {
-    const [tip, from] = t.headAt === 'start' ? [t.points[0], t.points[1]] : [t.points.at(-1), t.points.at(-2)];
-    return head(tip[0], tip[1], from[1] > tip[1]);
-  };
+  const tieHead = (t) => head(t.headAt === 'start' ? [...t.points].reverse() : t.points);
   const line = (points) => `M${points.map((p) => p.join(' ')).join('L')}`;
   // A held change's badge: where the person decides it, on the step's corner or a wire's middle. One per mark.
   let badges = 0;
@@ -190,8 +190,7 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     return headless.has(t.type) ? path : [path, m('path', { key: `nh:${n}`, d: tieHead(t), class: `lf-head${cls}`, ...hidden })];
   });
   const wireLayer = g.chains.map((c, n) => {
-    const [ex, ey] = c.points.at(-1);
-    return [m('path', { key: `w:${n}`, d: line(c.points), class: `lf-wire${kind(ORDER_TYPE)}${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden }), m('path', { key: `h:${n}`, d: head(ex, ey), class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}`, ...hidden })];
+    return [m('path', { key: `w:${n}`, d: line(c.points), class: `lf-wire${kind(ORDER_TYPE)}${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden }), m('path', { key: `h:${n}`, d: head(c.points), class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}`, ...hidden })];
   });
   // The badges of held links, with the wire or tie each sits on, so a step moved takes them with its wires. A link of a
   // new item held in the same change is decided with it: the item's badge is the one.
@@ -297,8 +296,8 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     if (stepBadges.has(id)) patches.push({ key: stepBadges.get(id)[1].key, set: { transform: `translate(${x + was.w / 2} ${y - was.h / 2})` } });
     g.chains.forEach((c, n) => {
       if (c.a !== id && c.b !== id) return;
-      const [[ex, ey]] = solve(c).slice(-1);
-      patches.push({ key: `w:${n}`, set: { d: line(c.points) } }, { key: `h:${n}`, set: { d: head(ex, ey) } });
+      solve(c);
+      patches.push({ key: `w:${n}`, set: { d: line(c.points) } }, { key: `h:${n}`, set: { d: head(c.points) } });
     });
     g.ties.forEach((t, n) => {
       if (t.a !== id && t.b !== id) return;

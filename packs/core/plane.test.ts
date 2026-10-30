@@ -99,6 +99,7 @@ test('bars: a planar graph has no crossing, every wire at right angles, no box o
   const g = drawnBars(ids.map((id) => item(id)), links);
   assert.equal(g.all.length, 16);
   assert.equal(count(lines(g)).crossings, 0);
+  assert.equal(count(lines(g)).shared, 0, 'no wire runs along another');
   assert.ok(right(g));
   assert.ok(clear(g));
 });
@@ -116,4 +117,13 @@ test('bars: trees, loose items and a ring all draw', () => {
   const g = drawnBars(['r', 'l1', 'l2', 'x', 'p', 'q', 'o'].map((id) => item(id)), [tie('l1', 'r'), tie('l2', 'r'), tie('p', 'q', 'serves'), tie('q', 'o', 'serves'), tie('o', 'p', 'serves')]);
   assert.equal(g.all.length, 7);
   assert.ok(clear(g));
+});
+
+test('bars: many wires into one item each land apart', () => {
+  const ids = Array.from({ length: 8 }, (_, k) => `n${k}`);
+  const links = ids.flatMap((id) => [tie(id, 'top', 'serves'), tie(id, 'foot', 'serves')]);
+  const g = drawnBars([item('top'), item('foot'), ...ids.map((id) => item(id))], links);
+  assert.equal(count(lines(g)).crossings, 0);
+  assert.equal(count(lines(g)).shared, 0);
+  assert.ok(right(g));
 });

@@ -109,8 +109,8 @@ function longest(names, arcs) {
   return at;
 }
 
-/** One connected part: places by item, and each visible link's points. `block` is an item's size with what hangs on it. */
-function drawPart(list, links, block, z) {
+/** One connected part: places by item, and each visible link's points. `block` is an item's size with what hangs on it, `box` its own. */
+function drawPart(list, links, block, box, z) {
   const g = planarize(links, list), next = new Map();
   for (const k of g.owner.keys()) {
     const [a, b] = k.split('|');
@@ -127,12 +127,7 @@ function drawPart(list, links, block, z) {
   }
   const { s, t, number } = best, { left, right, LEFT, RIGHT } = sidesOf(g.faces, outerAt, number, s, t);
   const ghost = (v) => v.startsWith('ghost'), size = (v) => (ghost(v) ? { w: 0, h: z.turn } : block(v));
-  const rows = [...number.keys()], yArcs = [];
-  for (const k of g.owner.keys()) {
-    const [a, b] = k.split('|'), [u, v] = number.get(a) < number.get(b) ? [a, b] : [b, a];
-    yArcs.push([u, v, size(u).h + z.row]);
-  }
-  const y = longest(rows, yArcs);
+  const rows = [...number.keys()];
   // Each item's bar runs from the face that is only ever on the left of its wires to the one only ever on the right.
   const lefts = new Map(), rights = new Map();
   for (const k of g.owner.keys()) for (const v of k.split('|')) {
@@ -144,20 +139,53 @@ function drawPart(list, links, block, z) {
   for (const k of g.owner.keys()) xArcs.push([left.get(k), right.get(k), z.col]);
   for (const v of rows) if (!ghost(v)) xArcs.push([ends.get(v)[0], ends.get(v)[1], size(v).w + z.col]);
   const x = longest(names, xArcs);
-  const middle = (v) => (x.get(ends.get(v)[0]) + x.get(ends.get(v)[1]) + z.col) / 2 - (ghost(v) ? 0 : 0);
+  const middle = (v) => (x.get(ends.get(v)[0]) + x.get(ends.get(v)[1]) + z.col) / 2;
+  const column = (k) => x.get(left.get(k)) + z.col / 2;
+  // Every wire its own way into an item, so none runs along another. One under the box drops straight in; the rest come
+  // along tracks of their own, the outermost column on the track nearest the box, landing on the box in that order.
+  const landing = new Map(), tracks = new Map();
+  for (const v of rows) {
+    if (ghost(v)) continue;
+    const near = [...next.get(v)], l = middle(v) - size(v).w / 2, r = l + box(v).w, pad = Math.min(z.turn, box(v).w / 4);
+    for (const side of [-1, 1]) {
+      const wires = near.filter((w) => Math.sign(number.get(w) - number.get(v)) === side).map((w) => ({ k: pair(v, w), col: column(pair(v, w)) })).sort((p, q) => p.col - q.col);
+      const straight = wires.filter((w) => w.col > l + pad && w.col < r - pad);
+      const before = wires.filter((w) => w.col <= l + pad), past = wires.filter((w) => w.col >= r - pad).reverse();
+      const from = straight.length ? straight[0].col : (l + r) / 2, to = straight.length ? straight.at(-1).col : (l + r) / 2;
+      for (const w of straight) landing.set(`${v} ${w.k}`, { at: w.col, track: -1 });
+      before.forEach((w, i) => landing.set(`${v} ${w.k}`, { at: l + pad + ((from - l - pad) * (i + 0.5)) / before.length, track: i }));
+      past.forEach((w, i) => landing.set(`${v} ${w.k}`, { at: r - pad - ((r - pad - to) * (i + 0.5)) / past.length, track: i }));
+      tracks.set(`${v} ${side}`, Math.max(before.length, past.length));
+    }
+  }
+  const yArcs = [];
+  for (const k of g.owner.keys()) {
+    const [a, b] = k.split('|'), [u, v] = number.get(a) < number.get(b) ? [a, b] : [b, a];
+    yArcs.push([u, v, size(u).h + z.row + ((tracks.get(`${u} 1`) ?? 0) + (tracks.get(`${v} -1`) ?? 0)) * z.turn]);
+  }
+  const y = longest(rows, yArcs);
   const turned = new Map(), points = new Map();
+  /** A wire's way out of an item to a column: its landing, its track, and the column. */
+  const enter = (v, to, col) => {
+    const side = number.get(to) > number.get(v) ? 1 : -1, edgeAt = side > 0 ? y.get(v) + size(v).h : y.get(v), mark = landing.get(`${v} ${pair(v, to)}`);
+    if (mark.track < 0) return [[col, side > 0 ? y.get(v) + box(v).h : y.get(v)]];
+    const trackAt = edgeAt + side * (mark.track + 1) * z.turn;
+    return [[mark.at, side > 0 ? y.get(v) + box(v).h : y.get(v)], [mark.at, trackAt], [col, trackAt]];
+  };
   for (const w of g.wires) {
     if (!w.visible) continue;
     const out = [], { path } = w;
-    const face = (v, to) => (number.get(to) > number.get(v) ? y.get(v) + size(v).h : y.get(v));
     for (let i = 1; i < path.length; i++) {
-      const [a, b] = [path[i - 1], path[i]], col = x.get(left.get(pair(a, b))) + z.col / 2;
-      const ya = ghost(a) ? turned.get(`${a} ${w.link}`) : face(a, b);
-      if (!ghost(a)) out.push([middle(a), ya]);
-      out.push([col, ya]);
-      const yb = ghost(b) ? (turned.get(`${b} ${w.link}`) ?? (turned.set(b, (turned.get(b) ?? -1) + 1), turned.set(`${b} ${w.link}`, y.get(b) + turned.get(b) * z.turn), turned.get(`${b} ${w.link}`))) : face(b, a);
-      out.push([col, yb]);
-      if (!ghost(b)) out.push([middle(b), yb]);
+      const [a, b] = [path[i - 1], path[i]], col = column(pair(a, b));
+      if (ghost(a)) out.push([col, turned.get(`${a} ${w.link}`)]);
+      else out.push(...enter(a, b, col));
+      if (ghost(b)) {
+        if (!turned.has(`${b} ${w.link}`)) {
+          turned.set(b, (turned.get(b) ?? -1) + 1);
+          turned.set(`${b} ${w.link}`, y.get(b) + turned.get(b) * z.turn);
+        }
+        out.push([col, turned.get(`${b} ${w.link}`)]);
+      } else out.push(...enter(b, a, col).reverse());
     }
     points.set(pair(w.link[0], w.link[1]), { from: w.link[0], points: out });
   }
@@ -200,7 +228,7 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
     }
     let drawn;
     if (list.length >= 3 && part.length >= 3) {
-      try { drawn = drawPart(list, part, block, z); threaded += drawn.crossings; } catch (e) { console.warn?.(`The bars fell back: ${e.message}`); }
+      try { drawn = drawPart(list, part, block, stepSize, z); threaded += drawn.crossings; } catch (e) { console.warn?.(`The bars fell back: ${e.message}`); }
     }
     if (!drawn) {
       let run = 0;
