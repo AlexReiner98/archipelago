@@ -147,7 +147,7 @@ function drawPart(list, links, block, box, z) {
     }
   }
   const { s, t, number } = best, { left, right, LEFT, RIGHT } = sidesOf(g.faces, outerAt, number, s, t);
-  const ghost = (v) => v.startsWith('ghost'), size = (v) => (ghost(v) ? { w: 0, h: z.turn } : block(v));
+  const ghost = (v) => v.startsWith('ghost'), size = (v) => (ghost(v) ? { w: 0, h: z.turn, lead: 0 } : block(v));
   const rows = [...number.keys()];
   // Each item's bar runs from the face that is only ever on the left of its wires to the one only ever on the right.
   const lefts = new Map(), rights = new Map();
@@ -211,9 +211,10 @@ function drawPart(list, links, block, box, z) {
   /** A wire's way out of an item to a column: its landing, its track, and the column. */
   const enter = (v, to, col) => {
     const side = number.get(to) > number.get(v) ? 1 : -1, edgeAt = side > 0 ? y.get(v) + size(v).h : y.get(v), mark = landing.get(`${v} ${pair(v, to)}`);
-    if (mark.track < 0) return [[col, side > 0 ? y.get(v) + box(v).h : y.get(v)]];
+    const port = y.get(v) + size(v).lead + (side > 0 ? box(v).h : 0);
+    if (mark.track < 0) return [[col, port]];
     const trackAt = edgeAt + side * (mark.track + 1) * z.turn;
-    return [[mark.at, side > 0 ? y.get(v) + box(v).h : y.get(v)], [mark.at, trackAt], [col, trackAt]];
+    return [[mark.at, port], [mark.at, trackAt], [col, trackAt]];
   };
   for (const w of g.wires) {
     if (!w.visible) continue;
@@ -253,10 +254,15 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   const a = new Map([...nodes.keys()].map((id) => [id, new Set()]));
   for (const w of every) if (w.a !== w.b && a.has(w.a) && a.has(w.b)) (a.get(w.a).add(w.b), a.get(w.b).add(w.a));
   const { kids, core } = peel(a);
-  const combs = new Map(core.map((id) => [id, comb(id, kids, stepSize, zc)]));
+  // What the order has before an item hangs above it, and the rest below; `lead` is the room over the box.
+  const above = new Set(chains.map((c) => `${c.a} ${c.b}`));
+  const sideOf = (p, k) => (above.has(`${p} ${k}`) ? 1 : above.has(`${k} ${p}`) ? -1 : 0);
+  const combs = new Map(core.map((id) => [id, { down: comb(id, kids, stepSize, zc, sideOf, 1), up: comb(id, kids, stepSize, zc, sideOf, -1, 1) }]));
   const block = (id) => {
-    const s = stepSize(id), c = combs.get(id);
-    return c?.items.length ? { w: s.w + gap + c.w, h: Math.max(s.h, s.h / 2 + c.h) } : { w: s.w, h: s.h };
+    const s = stepSize(id), { down, up } = combs.get(id);
+    if (!down.items.length && !up.items.length) return { w: s.w, h: s.h, lead: 0 };
+    const lead = up.items.length ? Math.max(0, up.h - s.h / 2) : 0;
+    return { w: s.w + gap + Math.max(down.w, up.w), h: lead + Math.max(s.h, s.h / 2 + down.h), lead };
   };
   const inCore = new Set(core), seen = new Set(), parts = [];
   for (const s of core) {
@@ -299,16 +305,18 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
     if (sx > margin && sx + c.w > margin + most) ((sx = margin), (sy += row + gap), (row = 0));
     const dx = sx - c.l, dy = sy - c.t;
     for (const [id, [px, py]] of c.drawn.places) {
-      const s = stepSize(id), hang = combs.get(id), b = block(id), boxX = px - b.w / 2 + s.w / 2 + dx, boxY = py + s.h / 2 + dy;
+      const s = stepSize(id), { down, up } = combs.get(id), b = block(id), boxX = px - b.w / 2 + s.w / 2 + dx, boxY = py + b.lead + s.h / 2 + dy;
       x.set(id, boxX);
       y.set(id, boxY);
-      if (hang?.items.length) {
-        note(id);
-        const ax = px - b.w / 2 + s.w + gap + hang.w / 2 + dx, map = ([p, q]) => [ax + p, boxY + q];
+      note(id);
+      const both = down.items.length && up.items.length, ax = px - b.w / 2 + s.w + gap + (b.w - s.w - gap) / 2 + dx;
+      for (const [hang, way] of [[down, 1], [up, -1]]) {
+        // Each leaves the box at a port of its own when there are two.
+        const map = ([p, q]) => [ax + p, boxY + way * q], at = boxY + (both ? (way * s.h) / 4 : 0);
         for (const it of hang.items) (x.set(it.id, map([it.x, it.y])[0]), y.set(it.id, map([it.x, it.y])[1]));
         for (const [item, points] of hang.wires) {
           const from = parents.get(item), line = points.map(map);
-          routes.set(pair(from, item), { from, points: from === id ? [[boxX + s.w / 2, boxY], [ax, boxY], ...line.slice(1)] : line });
+          routes.set(pair(from, item), { from, points: from === id ? [[boxX + s.w / 2, at], [ax, at], ...line.slice(1)] : line });
         }
       }
     }
@@ -321,8 +329,8 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   let settled = null;
   for (const [id, c] of combs) {
     if (!x.has(id)) continue;
-    const s = stepSize(id), b = block(id), left = x.get(id) - s.w / 2, top = y.get(id) - s.h / 2;
-    rigid.set(id, { at: [left + b.w / 2, top + b.h / 2], size: [b.w, b.h], reach: [[-b.w / 2, -b.w / 2 + s.w], [-b.h / 2, -b.h / 2 + s.h]], was: [left + b.w / 2, top + b.h / 2], hangs: c.items.map((it) => it.id) });
+    const s = stepSize(id), b = block(id), left = x.get(id) - s.w / 2, top = y.get(id) - s.h / 2 - b.lead;
+    rigid.set(id, { at: [left + b.w / 2, top + b.h / 2], size: [b.w, b.h], reach: [[-b.w / 2, -b.w / 2 + s.w], [-b.h / 2 + b.lead, -b.h / 2 + b.lead + s.h]], was: [left + b.w / 2, top + b.h / 2], hangs: [...c.down.items, ...c.up.items].map((it) => it.id) });
   }
   for (const r of routes.values()) if (r.to !== undefined && rigid.has(r.from) && rigid.has(r.to)) moving.push(Object.assign(r, { a: r.from, b: r.to }));
   if (moving.length && square(moving)) {

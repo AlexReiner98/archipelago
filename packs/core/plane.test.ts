@@ -143,6 +143,24 @@ test('bars: a ring of three stays tight', () => {
   assert.ok(turns.reduce((a: number, b: number) => a + b, 0) <= 8);
 });
 
+const dep = (from: string, to: string) => ({ type: 'depends_on', from, to });
+const upward = (g: any) => g.chains.filter((c: any) => g.y.get(c.a) >= g.y.get(c.b)).map((c: any) => c.key);
+
+test('bars: what an item waits on hangs above it, what waits on it below', () => {
+  const ring = ['p', 'q', 'o'].map((id) => item(id)), leaves = ['before1', 'before2', 'after1', 'after2'].map((id) => item(id));
+  const g = drawnBars([...ring, ...leaves], [tie('p', 'q', 'serves'), tie('q', 'o', 'serves'), tie('o', 'p', 'serves'), dep('p', 'before1'), dep('p', 'before2'), dep('after1', 'p'), dep('after2', 'p')]);
+  assert.deepEqual(upward(g), []);
+  assert.ok(clear(g));
+  assert.ok(right(g));
+});
+
+test('bars: a tree keeps the order all the way down it', () => {
+  const ids = ['r', 'a', 'b', 'c', 'd', 'x', 'y'];
+  const g = drawnBars(ids.map((id) => item(id)), [tie('x', 'r', 'serves'), tie('y', 'x', 'serves'), tie('y', 'r', 'serves'), dep('r', 'a'), dep('a', 'b'), dep('c', 'a'), dep('d', 'r')]);
+  assert.deepEqual(upward(g), []);
+  assert.ok(clear(g));
+});
+
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { settle } from './draw/flow/settle.js';
 

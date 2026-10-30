@@ -20,13 +20,16 @@ export function peel(a) {
 }
 
 /**
- * The tree under `n` as a comb hanging from (0, 0): `items` with their middles, `wires` by item, each from the holder's
- * edge to the item's, and its width and height. `size(id)` is a box's size, `z` the row and column gaps.
+ * The tree on `n` as a comb hanging from (0, 0): `items` with their middles, `wires` by item, each from the holder's edge
+ * to the item's, and its width and height. `size(id)` is a box's size, `z` the row and column gaps. `sideOf(p, k)` is the
+ * way the order has `k` from its holder `p`, 1 below it, -1 above it, 0 no way of its own, and a comb hangs only what
+ * belongs on `way`, what has no way of its own going `rest`. A comb on -1 is drawn in a frame the caller turns over.
  */
-export function comb(n, kids, size, z) {
-  const under = (kids.get(n) ?? []).map((id) => {
-    const b = comb(id, kids, size, z), s = size(id);
-    return { id, b, s, w: Math.max(s.w, b.w), h: s.h + (b.items.length ? z.row + b.h : 0) + z.row };
+export function comb(n, kids, size, z, sideOf = () => 1, way = 1, rest = way) {
+  const under = (kids.get(n) ?? []).filter((id) => (sideOf(n, id) || rest) === way).map((id) => {
+    const b = comb(id, kids, size, z, sideOf, way), back = comb(id, kids, size, z, sideOf, -way, way), s = size(id);
+    const lead = back.items.length ? back.h + z.row : 0;
+    return { id, b, back, lead, s, w: Math.max(s.w, b.w, back.w), h: lead + s.h + (b.items.length ? z.row + b.h : 0) + z.row };
   }).sort((p, q) => q.h * q.w - p.h * p.w);
   if (!under.length) return { items: [], wires: new Map(), w: 0, h: 0 };
   const area = under.reduce((s, c) => s + (c.w + z.col) * c.h, 0), tall = Math.max(under[0].h, Math.sqrt(area * 0.8));
@@ -51,15 +54,17 @@ export function comb(n, kids, size, z) {
     for (const [list, sign] of [[p.left, -1], [p.right, 1]]) {
       let y = bus + z.row;
       for (const c of list) {
-        const cy = y + c.s.h / 2, cx = sx + sign * (z.col / 2 + c.s.w / 2);
+        const cy = y + c.lead + c.s.h / 2, cx = sx + sign * (z.col / 2 + c.s.w / 2);
         items.push({ id: c.id, x: cx, y: cy });
         wires.set(c.id, [[0, 0], [0, bus], [sx, bus], [sx, cy], [cx - (sign * c.s.w) / 2, cy]]);
-        if (c.b.items.length) {
-          const dx = sx + sign * (z.col / 2 + c.w / 2), top = y + c.s.h + z.row / 2, down = c.b;
-          const move = ([px, py]) => [px + dx, py + top];
-          for (const it of down.items) items.push({ id: it.id, x: it.x + dx, y: it.y + top });
-          for (const [id, points] of down.wires) wires.set(id, points[0][0] === 0 && points[0][1] === 0 ? [[cx, cy + c.s.h / 2], [cx, top], ...points.map(move)] : points.map(move));
-        }
+        const dx = sx + sign * (z.col / 2 + c.w / 2);
+        const hangs = (from, top, turn, tree) => {
+          const move = ([px, py]) => [px + dx, top + turn * py];
+          for (const it of tree.items) items.push({ id: it.id, x: it.x + dx, y: top + turn * it.y });
+          for (const [id, points] of tree.wires) wires.set(id, points[0][0] === 0 && points[0][1] === 0 ? [[cx, from], [cx, top], ...points.map(move)] : points.map(move));
+        };
+        if (c.b.items.length) hangs(cy + c.s.h / 2, y + c.lead + c.s.h + z.row / 2, 1, c.b);
+        if (c.back.items.length) hangs(cy - c.s.h / 2, y + c.lead - z.row / 2, -1, c.back);
         y += c.h;
       }
       bottom = Math.max(bottom, y);
