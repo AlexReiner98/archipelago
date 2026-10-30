@@ -3,13 +3,14 @@
 // points of one link from what holds it down to the item, in the comb's own frame.
 
 /** Peel what has one neighbour: `kids` of each item, and the core left. What is in `stay` is never peeled. */
-export function peel(a, stay = new Set()) {
+export function peel(a, stay = new Set(), holds = () => false) {
   const degree = new Map([...a].map(([k, s]) => [k, s.size])), kids = new Map(), gone = new Set();
   const todo = [...a.keys()].filter((k) => degree.get(k) === 1 && !stay.has(k));
   while (todo.length) {
     const n = todo.pop();
     if (gone.has(n) || degree.get(n) !== 1) continue;
     const p = [...a.get(n)].find((w) => !gone.has(w));
+    if (holds(n, p)) continue;
     gone.add(n);
     (kids.get(p) ?? kids.set(p, []).get(p)).push(n);
     degree.set(p, degree.get(p) - 1);

@@ -98,7 +98,7 @@ export function picture({ answer, style, reduced, width, height }, tools) {
   });
   const pane = width > 0 && height > 0 ? width / height : ASPECT;
   const aspect = ASPECT * (pane / ASPECT) ** FOLLOW;
-  const g = layout({ items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], placed, measure, sizes: style.sizes, aspect });
+  const g = layout({ items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], placed, measure, sizes: style.sizes, aspect });
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
   const boxOf = (id) => ({ x: g.x.get(id), y: g.y.get(id), w: g.nodes.get(id).w, h: g.nodes.get(id).h });

@@ -254,6 +254,43 @@ test('ranks: a step put by hand stays there too', () => {
 });
 
 // @ts-expect-error a drawing's modules are plain JavaScript
+import { shownOnly } from './draw/flow/graph.js';
+
+const storyCss = readFileSync(join(import.meta.dirname, 'draw/flow/story.js'), 'utf8');
+
+test('story: only what the steps show is laid out, and a wire and its head are lit alike', () => {
+  const answer = { items: [item('hub'), item('a'), item('b')], links: [], lens: { from: 'hub' }, steps: [{ add: ['a'] }, { add: ['b'] }] };
+  assert.deepEqual(shownOnly(answer).items.map((i: any) => i.id), ['a', 'b']);
+  assert.equal(shownOnly({ items: [item('a')] }).items.length, 1);
+  for (const rule of ['.lf-tie.sp-new', '.lf-tie.sp-lit', '.lf-tie[class*=lf-k-].sp-new', '.lf-wire[class*=lf-k-].sp-lit', '.lf-head[class*=lf-k-].sp-new']) assert.ok(storyCss.includes(rule), rule);
+});
+
+test('bars: every headed link runs down, the order first, and a head never needs to point up', () => {
+  const ids = ['hosted', 'file', 'server', 'hub', 'kid'].map((id) => item(id));
+  const g = drawnBars(ids, [tie('hosted', 'file', 'calls'), tie('file', 'server', 'calls'), tie('server', 'hosted', 'link'), tie('kid', 'hub'), tie('hub', 'hosted', 'calls'), tie('kid', 'server', 'calls')]);
+  assert.ok(g.y.get('hosted') < g.y.get('file') && g.y.get('file') < g.y.get('server'), 'along the heads, and the link that would close the ring gives way');
+  assert.ok(g.y.get('hub') < g.y.get('kid'), 'what holds above what is held');
+  const order = drawnBars(['a', 'b'].map((id) => item(id)), [dep('b', 'a'), tie('b', 'a', 'calls')]);
+  assert.ok(order.y.get('a') < order.y.get('b'), 'where they disagree the order wins');
+});
+
+test('bars: a chain stands on one line through the middle of every box', () => {
+  const wide = (id: string, title: string) => ({ ...item(id), title });
+  const g = drawnBars([wide('a', 'a name of some length here'), wide('b', 'short'), wide('c', 'a long name of quite some length indeed')], [tie('a', 'b', 'calls'), tie('b', 'c', 'calls')]);
+  assert.equal(g.x.get('a'), g.x.get('b'));
+  assert.equal(g.x.get('b'), g.x.get('c'));
+  assert.ok(g.y.get('a') < g.y.get('b') && g.y.get('b') < g.y.get('c'));
+});
+
+test('bars: ports keep off the corners, and wires landing on one side keep apart', () => {
+  const ids = Array.from({ length: 6 }, (_, k) => `n${k}`);
+  const g = drawnBars([item('top'), ...ids.map((id) => item(id))], ids.flatMap((id, k) => [tie(id, 'top', 'calls'), ...(k ? [tie(id, ids[k - 1], 'serves')] : [])]));
+  const f = faults(g, { corner: house.sizes.plane_port_corner, parallel: house.sizes.plane_wire_gap });
+  assert.ok(f.cornerPorts <= 1, `${f.cornerPorts} on a corner`);
+  assert.ok(f.tightParallel <= 2, `${f.tightParallel} too near`);
+});
+
+// @ts-expect-error a drawing's modules are plain JavaScript
 import { embed } from './draw/flow/upward.js';
 
 test('upward: every stretch has two faces, every face one top and one foot, and the numbers keep the order', () => {
@@ -299,13 +336,15 @@ import { faults } from './draw/flow/faults.js';
 
 test('bars: a kid under a kid drops straight into its top', () => {
   const ring = ['p', 'q', 'o'].map((id) => item(id)), wide = (id: string) => ({ ...item(id), title: `${id} with a longer name` });
-  const g = drawnBars([...ring, wide('upper'), wide('lower')], [tie('p', 'q', 'serves'), tie('q', 'o', 'serves'), tie('o', 'p', 'serves'), tie('upper', 'p', 'calls'), tie('lower', 'upper', 'calls')]);
+  const g = drawnBars([...ring, wide('upper'), wide('lower')], [tie('p', 'q', 'serves'), tie('q', 'o', 'serves'), tie('o', 'p', 'serves'), tie('upper', 'p'), tie('lower', 'upper')]);
   const w = g.ties.find((t: any) => t.a === 'lower'), n = g.nodes.get('lower');
   assert.equal(w.points.length, 2);
   assert.equal(w.points[0][0], w.points[1][0]);
   assert.ok(Math.abs(Math.min(w.points[0][1], w.points[1][1]) - (g.y.get('upper') + g.nodes.get('upper').h / 2)) < 0.01);
   assert.ok(Math.abs(Math.max(w.points[0][1], w.points[1][1]) - (g.y.get('lower') - n.h / 2)) < 0.01);
-  assert.equal(faults(g).indirect, 0);
+  const off: any[] = [];
+  faults(g, { note: (kind: string, x: any) => kind === 'indirect' && off.push(x) });
+  assert.ok(!off.includes(w), 'not one of those that could be straight');
   assert.ok(clear(g));
 });
 

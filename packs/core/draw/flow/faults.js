@@ -31,22 +31,35 @@ export function wrongEnd(r, o, port) {
   return s === 'left' ? o.l >= r.r : o.r <= r.l;
 }
 
+/** Whether a wire with its head at `b` points up: `b` stands wholly above `a`, or the wire comes up into it. */
+export const runsUp = (a, b, p) => b.u <= a.t || (b.t < a.u && p.at(-1)[1] < p.at(-2)[1] && a.t < b.t);
+
 /**
  * The counts for `g`, a layout's answer: `bends`; `kinks`, bends past the fewest two boxes need; `jogs`, a short step between
  * runs going the same way; `wrongOrder` and `wrongTie`, wires with an end facing away from the other box; `back`, wires that
  * double back; `indirect`, two boxes that overlap on an axis with nothing between them whose wire is not one stretch; and
  * by the style's room, `tightPort`, a corner nearer a port than `run`, and `tightBox`, a wire nearer a box it passes
- * than `clear`, and `tightJoin`, joined boxes nearer than `join`.
+ * than `clear`, and `tightJoin`, joined boxes nearer than `join`; `up`, headed links whose head points up, of `headed`;
+ * `cornerPorts`, wire ends nearer a box's corner than `corner` or a third of the side; and `tightParallel`, two wires running
+ * side by side nearer than `parallel`.
  */
-export function faults(g, { jog = 14, run = 0, clear = 0, join = 0, note = () => {} } = {}) {
+export function faults(g, { jog = 14, run = 0, clear = 0, join = 0, corner = 0, parallel = 0, headless = ['part_of'], note = () => {} } = {}) {
   const rectOf = (id) => { const n = g.nodes.get(id), x = g.x.get(id), y = g.y.get(id); return { id, l: x - n.w / 2, r: x + n.w / 2, t: y - n.h / 2, u: y + n.h / 2 }; };
   const boxes = g.all.map((n) => rectOf(n.id)), wires = [...g.chains, ...g.ties].filter((w) => w.points && g.x.has(w.a) && g.x.has(w.b));
   const stands = (l, r, t, u, skip) => boxes.some((b) => !skip.includes(b.id) && r > b.l && l < b.r && u > b.t && t < b.u);
-  const c = { wires: wires.length, bends: 0, kinks: 0, jogs: 0, wrongOrder: 0, wrongTie: 0, back: 0, indirect: 0, tightPort: 0, tightBox: 0, tightJoin: 0 };
+  const c = { wires: wires.length, headed: 0, up: 0, cornerPorts: 0, tightParallel: 0, bends: 0, kinks: 0, jogs: 0, wrongOrder: 0, wrongTie: 0, back: 0, indirect: 0, tightPort: 0, tightBox: 0, tightJoin: 0 };
   for (const w of wires) {
     const p = tidy(w.points), [ra, rb] = [rectOf(w.a), rectOf(w.b)], bends = p.length - 2;
     const overX = Math.min(ra.r, rb.r) - Math.max(ra.l, rb.l), overY = Math.min(ra.u, rb.u) - Math.max(ra.t, rb.t);
     c.bends += bends;
+    if (!headless.includes(w.type)) {
+      c.headed++;
+      if (runsUp(ra, rb, p)) (c.up++, note('up', w, p));
+    }
+    for (const [r, port] of [[ra, p[0]], [rb, p.at(-1)]]) {
+      const side = sideOf(r, port), ax = side === 'top' || side === 'foot' ? 0 : 1, [lo, hi] = ax ? [r.t, r.u] : [r.l, r.r], least = Math.min(corner, (hi - lo) / 3);
+      if (corner && Math.min(port[ax] - lo, hi - port[ax]) < least - 0.5) (c.cornerPorts++, note('corner', w, p));
+    }
     c.kinks += Math.max(0, bends - (overX > 4 || overY > 4 ? 0 : 1));
     for (let i = 2; i < p.length - 1; i++) {
       const len = Math.abs(p[i][0] - p[i - 1][0]) + Math.abs(p[i][1] - p[i - 1][1]), ax = p[i][0] === p[i - 1][0] ? 1 : 0;
@@ -69,6 +82,17 @@ export function faults(g, { jog = 14, run = 0, clear = 0, join = 0, note = () =>
     if (clear) for (let i = 1; i < p.length; i++) {
       const [a, b] = [p[i - 1], p[i]];
       if (stands(Math.min(a[0], b[0]) - clear + 0.5, Math.max(a[0], b[0]) + clear - 0.5, Math.min(a[1], b[1]) - clear + 0.5, Math.max(a[1], b[1]) + clear - 0.5, [w.a, w.b])) { c.tightBox++; note('box', w, p); break; }
+    }
+  }
+  if (parallel) {
+    const stretches = wires.flatMap((w) => tidy(w.points).slice(1).map((q, i, l) => [tidy(w.points)[i], q, w]));
+    for (const ax of [0, 1]) {
+      const along = stretches.filter(([a, b]) => a[ax] === b[ax]).sort((p, q) => p[0][ax] - q[0][ax]);
+      for (let i = 0; i < along.length; i++) for (let j = i + 1; j < along.length && along[j][0][ax] - along[i][0][ax] < parallel - 0.5; j++) {
+        const [p, q] = [along[i], along[j]], o = 1 - ax, gap = q[0][ax] - p[0][ax];
+        if (gap < 0.5 || p[2] === q[2]) continue;
+        if (Math.min(Math.max(p[0][o], p[1][o]), Math.max(q[0][o], q[1][o])) - Math.max(Math.min(p[0][o], p[1][o]), Math.min(q[0][o], q[1][o])) > 1) (c.tightParallel++, note('parallel', p[2], [p[0], p[1]]));
+      }
     }
   }
   return c;

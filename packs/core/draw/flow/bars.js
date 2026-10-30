@@ -4,9 +4,10 @@
 // path through each keeps both as tight as they can be. Trees hang in combs beside their item. Pure: an answer in,
 // geometry out, as the flow's layout answers.
 
+import { centre, spreadPorts } from './centre.js';
 import { comb, peel } from './combs.js';
 import { count } from './count.js';
-import { wrongEnd } from './faults.js';
+import { runsUp, wrongEnd } from './faults.js';
 import { flatten, ORDER } from './graph.js';
 import { putByHand } from './hand.js';
 import { numbered } from './numbering.js';
@@ -84,8 +85,34 @@ function longest(names, arcs) {
   return at;
 }
 
-/** How many order wires run against `number`. */
-const against = (g, number) => g.wires.filter((w) => w.link?.[2] && w.path.some((v, i) => i && number.get(w.path[i - 1]) > number.get(v))).length;
+/**
+ * Which way each joined two run down the page, as `${upper} ${lower}` to how firmly: the order first (3), what is depended
+ * on above what depends on it; then every headed link (2), its head pointing down; then a link with no head (1), what
+ * holds above what is held. A link that would close a ring against firmer ones has no way.
+ */
+function directions(chains, ties, headless) {
+  const after = new Map(), found = new Map();
+  const reaches = (a, b) => {
+    const seen = new Set([a]), todo = [a];
+    while (todo.length) for (const w of after.get(todo.pop()) ?? []) {
+      if (w === b) return true;
+      if (!seen.has(w)) (seen.add(w), todo.push(w));
+    }
+    return false;
+  };
+  const lead = (a, b, firm) => {
+    if (a === b || found.has(`${a} ${b}`) || found.has(`${b} ${a}`) || reaches(b, a)) return;
+    found.set(`${a} ${b}`, firm);
+    (after.get(a) ?? after.set(a, []).get(a)).push(b);
+  };
+  for (const c of chains) lead(c.a, c.b, 3);
+  for (const t of ties) if (!headless.includes(t.type)) lead(t.a, t.b, 2);
+  for (const t of ties) if (headless.includes(t.type)) lead(t.b, t.a, 1);
+  return found;
+}
+
+/** How many headed order wires run against `number`. */
+const against = (g, number) => g.wires.filter((w) => w.link?.[2] > 1 && w.path.some((v, i) => i && number.get(w.path[i - 1]) > number.get(v))).length;
 
 /**
  * The part's graph and numbering. The heaviest planar part, numbered as the order asks, is the picture with the fewest
@@ -138,7 +165,7 @@ function drawPart(list, links, block, box, z, trial) {
   for (const v of rows) if (!ghost(v)) xArcs.push([ends.get(v)[0], ends.get(v)[1], size(v).w + z.col / 2]);
   const x = longest(names, xArcs);
   // A box sits over its own wires, as near their middle as its bar lets it, so they drop straight in.
-  const inset = (v) => Math.min(z.room, box(v).w / 4) + 1;
+  const inset = (v) => Math.min(z.corner, box(v).w / 3) + 1;
   const facesOf = new Map(rows.map((v) => [v, wired(v).map((w) => left.get(pair(v, w)))]));
   const middle = (v) => {
     const [from, to] = ends.get(v);
@@ -169,7 +196,7 @@ function drawPart(list, links, block, box, z, trial) {
   const landing = new Map(), tracks = new Map();
   for (const v of rows) {
     if (ghost(v)) continue;
-    const near = wired(v), l = middle(v) - size(v).w / 2, r = l + box(v).w, pad = Math.min(z.turn, box(v).w / 4);
+    const near = wired(v), l = middle(v) - size(v).w / 2, r = l + box(v).w, pad = Math.min(z.corner, box(v).w / 3);
     for (const side of [-1, 1]) {
       const wires = near.filter((w) => Math.sign(number.get(w) - number.get(v)) === side).map((w) => ({ k: pair(v, w), col: column(pair(v, w)) })).sort((p, q) => p.col - q.col);
       const straight = wires.filter((w) => w.col > l + pad && w.col < r - pad);
@@ -233,7 +260,7 @@ const copy = (g) => {
 
 /** The layout of an answer, from what it was drawn from if it has been worked out before. */
 export function layout(args) {
-  const { items, links, undrawn, placed, sizes, aspect } = args, key = JSON.stringify([items, links, undrawn, placed, sizes, aspect]);
+  const { items, links, undrawn, headless, placed, sizes, aspect } = args, key = JSON.stringify([items, links, undrawn, headless, placed, sizes, aspect]);
   const hit = kept.get(key);
   if (hit) {
     kept.delete(key);
@@ -248,22 +275,23 @@ export function layout(args) {
   return g;
 }
 
-function laidOut({ items: given, links: told = [], undrawn = [], placed = {}, measure, sizes, aspect = 1.6 }) {
+function laidOut({ items: given, links: told = [], undrawn = [], headless = ['part_of'], placed = {}, measure, sizes, aspect = 1.6 }) {
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
-  const margin = sizes.flow_margin, gap = sizes.flow_node_gap, zw = { room: sizes.plane_wire_room, join: sizes.plane_joined_room, run: sizes.plane_port_run };
+  const margin = sizes.flow_margin, gap = sizes.flow_node_gap, zw = { room: sizes.plane_wire_room, join: sizes.plane_joined_room, run: sizes.plane_port_run, corner: sizes.plane_port_corner };
   const zs = { trials: sizes.plane_trials, trial_most: sizes.plane_trial_most, cost_up: sizes.plane_cost_up, cost_cross: sizes.plane_cost_crossing, cost_wrong: sizes.plane_cost_wrong_side, embed_most: sizes.plane_embed_most, embed_cost: sizes.plane_embed_crossings, slide_sweeps: sizes.plane_slide_sweeps, number_tries: sizes.plane_number_tries, trial_total: sizes.plane_trial_total };
-  const z = { row: sizes.flow_layer_gap / 2, col: Math.max(gap / 2, zw.room * 2), turn: gap / 3, gap, ...zw, ...zs };
+  const z = { row: sizes.flow_layer_gap / 2, col: Math.max(gap / 2, zw.room * 2), turn: Math.max(gap / 3, sizes.plane_wire_gap), gap, ...zw, ...zs };
   const zc = { row: gap / 4, col: gap, stub: z.run, join: z.join }, combGap = Math.max(gap, z.join);
   const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ a: l.from, b: l.to, type: l.type, ...(l.pending && { pending: l.pending }) }));
   const chains = edges.map((e) => ({ ...e, key: `${e.a} ${e.b}`, path: [e.a, e.b], dashed: potential.has(e.b) }));
   const every = [...chains, ...ties], stepSize = (id) => nodes.get(id);
   const a = new Map([...nodes.keys()].map((id) => [id, new Set()]));
   for (const w of every) if (w.a !== w.b && a.has(w.a) && a.has(w.b)) (a.get(w.a).add(w.b), a.get(w.b).add(w.a));
-  const { kids, core } = peel(a);
-  // What the order has before an item hangs above it, and the rest below; `lead` is the room over the box.
-  const above = new Set(chains.map((c) => `${c.a} ${c.b}`));
-  const sideOf = (p, k) => (above.has(`${p} ${k}`) ? 1 : above.has(`${k} ${p}`) ? -1 : 0);
+  const ways = directions(chains, ties, headless), firm = (p, q) => (ways.get(`${p} ${q}`) ?? ways.get(`${q} ${p}`) ?? 0) > 1;
+  // In a small picture a headed link is a wire in the rows, so a chain reads straight down; a big one needs the room combs save.
+  const { kids, core } = peel(a, new Set(), nodes.size <= sizes.plane_rows_most ? firm : undefined);
+  // What comes before an item hangs above it, and the rest below; `lead` is the room over the box.
+  const sideOf = (p, k) => (ways.has(`${p} ${k}`) ? 1 : ways.has(`${k} ${p}`) ? -1 : 0);
   const combs = new Map(core.map((id) => {
     const ways = (kids.get(id) ?? []).map((k) => sideOf(id, k) || 1), how = { level: true, near: true, alone: new Set(ways).size < 2 };
     return [id, { down: comb(id, kids, stepSize, zc, sideOf, 1, 1, how), up: comb(id, kids, stepSize, zc, sideOf, -1, 1, how) }];
@@ -289,14 +317,16 @@ function laidOut({ items: given, links: told = [], undrawn = [], placed = {}, me
     for (let k = 0; k < list.length; k++) for (const w of a.get(list[k])) if (inCore.has(w) && !seen.has(w)) (seen.add(w), list.push(w));
     parts.push(list);
   }
-  const orderKey = new Set(chains.map((c) => pair(c.a, c.b))), x = new Map(), y = new Map(), routes = new Map(), shelves = [];
+  const x = new Map(), y = new Map(), routes = new Map(), shelves = [];
   let threaded = 0;
   for (const list of parts) {
     const own = new Set(list), done = new Set(), part = [];
     // Links of this part, the order first, so it is what stays planar; each with whether it is the order.
     for (const w of [...every].sort((p, q) => Number(q.path !== undefined) - Number(p.path !== undefined))) {
       const k = pair(w.a, w.b);
-      if (w.a !== w.b && own.has(w.a) && own.has(w.b) && !done.has(k)) (done.add(k), part.push([w.path ? w.a : w.b, w.path ? w.b : w.a, orderKey.has(k)]));
+      if (w.a === w.b || !own.has(w.a) || !own.has(w.b) || done.has(k)) continue;
+      done.add(k);
+      part.push(ways.has(`${w.a} ${w.b}`) ? [w.a, w.b, ways.get(`${w.a} ${w.b}`)] : ways.has(`${w.b} ${w.a}`) ? [w.b, w.a, ways.get(`${w.b} ${w.a}`)] : [w.a, w.b, 0]);
     }
     let drawn;
     if (list.length >= 3 && part.length >= 3) {
@@ -317,7 +347,8 @@ function laidOut({ items: given, links: told = [], undrawn = [], placed = {}, me
     }
     if (!drawn) {
       let run = 0;
-      drawn = { places: new Map(list.map((id) => { const p = [0, run]; run += block(id).h + z.row; return [id, p]; })), points: new Map(), crossings: 0 };
+      const first = (p, q) => (ways.has(`${q} ${p}`) ? 1 : ways.has(`${p} ${q}`) ? -1 : 0);
+      drawn = { places: new Map([...list].sort(first).map((id) => { const p = [0, run]; run += block(id).h + z.row; return [id, p]; })), points: new Map(), crossings: 0 };
     }
     const xs = [...drawn.places].flatMap(([id, [px]]) => [px - block(id).w / 2, px + block(id).w / 2]), ys = [...drawn.places].flatMap(([id, [, py]]) => [py, py + block(id).h]);
     const wired = [...drawn.points.values()].flatMap((r) => r.points);
@@ -362,7 +393,7 @@ function laidOut({ items: given, links: told = [], undrawn = [], placed = {}, me
     const s = stepSize(id), b = block(id), left = x.get(id) - s.w / 2, top = y.get(id) - s.h / 2 - b.lead;
     rigid.set(id, { at: [left + b.w / 2, top + b.h / 2], size: [b.w, b.h], reach: [[-b.w / 2, -b.w / 2 + s.w], [-b.h / 2 + b.lead, -b.h / 2 + b.lead + s.h]], was: [left + b.w / 2, top + b.h / 2], hangs: [...c.down.items, ...c.up.items].map((it) => it.id) });
   }
-  for (const r of routes.values()) if (r.to !== undefined && rigid.has(r.from) && rigid.has(r.to)) moving.push(Object.assign(r, { a: r.from, b: r.to, down: orderKey.has(pair(r.from, r.to)) }));
+  for (const r of routes.values()) if (r.to !== undefined && rigid.has(r.from) && rigid.has(r.to)) moving.push(Object.assign(r, { a: r.from, b: r.to, down: ways.has(`${r.from} ${r.to}`) }));
   if (moving.length && square(moving)) {
     settled = settle(rigid, moving, { gap: gap / 2, track: z.turn, ...zw, blocks: moving.length > PULL_MOST ? sizes.plane_block_rounds_big : sizes.plane_block_rounds, watch: watching, ...(moving.length > PULL_MOST && { rounds: sizes.plane_pull_rounds_big, sweeps: sizes.plane_pull_sweeps_big }) });
     // The parts have pulled in, so they are set again, closer.
@@ -393,7 +424,19 @@ function laidOut({ items: given, links: told = [], undrawn = [], placed = {}, me
       r.points = r.points.map(([p, q]) => [p + b.at[0] - b.was[0], q + b.at[1] - b.was[1]]);
     }
     for (const [id, b] of rigid) b.pointed = nodes.get(id).shape === 'diamond';
-    wired = reroute(rigid, moving, [...routes.values()].filter((r) => r.to === undefined).map((r) => r.points), { track: z.turn, room: z.room, run: z.run, ports: sizes.plane_reroute_ports, shorter: sizes.plane_reroute_shorter, rounds: moving.length > PULL_MOST ? 1 : sizes.plane_reroute_rounds });
+    const combLines = () => [...routes.values()].filter((r) => r.to === undefined).map((r) => r.points);
+    const routing = { track: z.turn, room: z.room, run: z.run, gap: z.turn, corner: z.corner, ports: sizes.plane_reroute_ports, shorter: sizes.plane_reroute_shorter, rounds: moving.length > PULL_MOST ? 1 : sizes.plane_reroute_rounds };
+    wired = reroute(rigid, moving, combLines(), routing);
+    // Boxes joined by straight wires stand in line, and what lands on one side spreads about its middle.
+    const shift = (id, dx) => {
+      const b = rigid.get(id);
+      b.at[0] += dx;
+      for (const it of [id, ...b.hangs]) x.set(it, x.get(it) + dx);
+      for (const r of routes.values()) if (r.to === undefined && holder(r.from) === id) r.points = r.points.map(([p, q]) => [p + dx, q]);
+    };
+    const moved = centre(rigid, moving, combLines(), { track: z.turn, room: z.room, gap: z.turn, corner: z.corner, shift });
+    if (moved.length) reroute(rigid, moved, [...combLines(), ...moving.filter((w) => !moved.includes(w)).map((w) => w.points)], routing);
+    spreadPorts(rigid, moving, combLines(), { track: z.turn, gap: z.turn, corner: z.corner });
   }
   // Where steps were put by hand, once all the rest stands; each wire so drawn takes the best way it has.
   const lines = [...routes.values()];
@@ -411,7 +454,8 @@ function laidOut({ items: given, links: told = [], undrawn = [], placed = {}, me
   const all = [...nodes.values()].filter((n) => x.has(n.id)), drawnPoints = every.flatMap((w) => w.points);
   const width = Math.max(0, ...all.map((n) => x.get(n.id) + n.w / 2), ...drawnPoints.map((p) => p[0])) + margin;
   const height = Math.max(0, ...all.map((n) => y.get(n.id) + n.h / 2), ...drawnPoints.map((p) => p[1])) + margin;
-  const up = chains.filter((c) => y.get(c.a) > y.get(c.b)).length;
-  last = { chains, ties, threaded, settled, wired, up };
+  const rectOf = (id) => { const n = nodes.get(id); return { l: x.get(id) - n.w / 2, r: x.get(id) + n.w / 2, t: y.get(id) - n.h / 2, u: y.get(id) + n.h / 2 }; };
+  const headed = every.filter((w) => !headless.includes(w.type) && x.has(w.a) && x.has(w.b));
+  last = { chains, ties, threaded, settled, wired, headed: headed.length, up: headed.filter((w) => runsUp(rectOf(w.a), rectOf(w.b), w.points)).length };
   return { nodes, all, chains, ties, breaks: [], potential, x, y, width, height };
 }

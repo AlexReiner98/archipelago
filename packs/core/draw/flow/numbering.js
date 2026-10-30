@@ -9,6 +9,8 @@ const pair = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 const TOP = 'ghost top', FOOT = 'ghost foot';
 /** How much an order wire outweighs a wish of the numbering's own, when one of them has to go. */
 const ORDER_WEIGHT = 4;
+/** The strength of a wire of the order itself, which nothing passes under; what a weak link running up counts for, against a headed one. */
+const STRONG = 3, WEAK = 0.02;
 /** How many wires times items may be spent on trying tops and feet. */
 const WORK = 3e6;
 /** Past this many items and points in a part, only what the order holds passes under a tie: on a big map of ties it brings crossings and takes long. */
@@ -130,8 +132,8 @@ function ways(g, outerAt, x, y) {
     return lead(a, b);
   };
   const stretches = (path) => path.slice(1).map((v, i) => [path[i], v]);
-  const orderWires = g.wires.filter((w) => w.link?.[2]).sort((p, q) => p.path.length - q.path.length);
-  for (const w of orderWires) for (const [a, b] of stretches(w.path)) (wants.push([a, b, ORDER_WEIGHT]), lead(a, b));
+  const orderWires = g.wires.filter((w) => w.link?.[2]).sort((p, q) => q.link[2] - p.link[2] || p.path.length - q.path.length);
+  for (const w of orderWires) for (const [a, b] of stretches(w.path)) (wants.push([a, b, ORDER_WEIGHT * w.link[2]]), lead(a, b));
   const inOrder = [...new Set([...after.keys(), ...before.keys()])].filter((v) => !v.startsWith('ghost'));
   lead(TOP, x), lead(y, FOOT), lead(TOP, FOOT);
   for (const w of g.wires) if (w.leads) stretches(w.path).forEach(([a, b]) => lead(a, b));
@@ -182,7 +184,7 @@ function ways(g, outerAt, x, y) {
   };
   // An item shut in by what comes after it (or before it) has no such edge. An invisible edge may still pass under a tie,
   // or under another invisible edge: nothing is drawn there, and the tie bends round the item. An order wire it may not.
-  const fixed = new Set(orderWires.flatMap((w) => stretches(w.path).map(([a, b]) => pair(a, b))));
+  const fixed = new Set(orderWires.filter((w) => w.link[2] >= STRONG).flatMap((w) => stretches(w.path).map(([a, b]) => pair(a, b))));
   const edgesOf = (f) => f.map((a, k) => [a, f[(k + 1) % f.length]]);
   /** The nearest face that holds an item `fits`, and the ties passed under on the way there. */
   const route = (v, fits) => {
@@ -253,7 +255,7 @@ export function numbered(g, nth = 0, most = Infinity) {
   for (let k = 0; k < tries; k++) {
     const [x, y] = places[Math.floor((k * places.length) / tries)], laid = ways(g, outerAt, x, y);
     const number = walkDown(laid.near, TOP, FOOT, laid.wants, laid.deep);
-    const up = orders.filter((w) => w.path.some((v, i) => i && number.get(w.path[i - 1]) > number.get(v))).length;
+    const up = orders.filter((w) => w.path.some((v, i) => i && number.get(w.path[i - 1]) > number.get(v))).reduce((sum, w) => sum + (w.link[2] > 1 ? 1 : WEAK), 0);
     const score = up * OVER + reach(g, number, laid.near);
     if (score < least) ((least = score), (best = { ...laid, number }));
   }

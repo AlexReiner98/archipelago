@@ -39,14 +39,22 @@ test('reroute: no way through a box or across a wire is taken', () => {
 });
 
 test('reroute: two boxes that barely overlap join by one straight stretch, and corners keep clear of ports', () => {
-  const boxes = new Map([['a', box(100, 50)], ['b', box(194, 150)]]);
-  const wire = { a: 'a', b: 'b', points: [[120, 70], [120, 80], [130, 80], [130, 150], [144, 150]] };
+  const boxes = new Map([['a', box(100, 50)], ['b', box(170, 150)]]);
+  const wire = { a: 'a', b: 'b', points: [[120, 70], [120, 80], [110, 80], [110, 150], [120, 150]] };
   reroute(boxes, [wire], [], { ...limits, track: 8, room: 12, run: 18 });
   assert.equal(wire.points.length, 2);
   const far = new Map([['a', box(100, 50)], ['b', box(400, 300)]]);
   const bent = { a: 'a', b: 'b', points: [[100, 70], [100, 74], [400, 74], [400, 280]] };
   reroute(far, [bent], [], { ...limits, track: 8, room: 12, run: 18 });
   assert.ok(bent.points.slice(1).every((p, i) => i === bent.points.length - 2 || Math.abs(p[0] - bent.points[0][0]) + Math.abs(p[1] - bent.points[0][1]) >= 18));
+});
+
+test('reroute: a new way keeps off the corners of a box and from a wire beside it', () => {
+  const boxes = new Map([['a', box(100, 50)], ['b', box(100, 300)]]);
+  const wire = { a: 'a', b: 'b', points: [[52, 70], [52, 90], [300, 90], [300, 200], [52, 200], [52, 280]] };
+  reroute(boxes, [wire], [], { ...limits, track: 8, room: 0, run: 0, gap: 12, corner: 14 });
+  assert.equal(wire.points.length, 2);
+  assert.ok(wire.points[0][0] >= 64 && wire.points[0][0] <= 136, `${wire.points[0][0]}`);
 });
 
 test('reroute: a short step in a wire is taken out, and a wire stays on its box', () => {

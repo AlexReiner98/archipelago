@@ -29,6 +29,13 @@ export function flatten({ items, links = [], undrawn = [] }) {
   return { items: items.map((i) => ({ ...i, state: i.state ?? QUIET, choices: i.choices ?? i.fields?.choices })), links: out };
 }
 
+/** An answer with only what its steps show, if it has steps: a box never shown has no say in where the rest stand. */
+export const shownOnly = (answer) => {
+  if (!answer.steps?.length) return answer;
+  const named = new Set(answer.steps.flatMap((s) => s.add ?? []));
+  return { ...answer, items: answer.items.filter((i) => named.has(i.id)) };
+};
+
 /** A list for each key, of what `pick` gives. */
 export const grouped = (list, key, pick = (v) => v) => {
   const by = new Map();

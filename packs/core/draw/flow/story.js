@@ -23,10 +23,10 @@ export const everyNamed = (steps) => new Set(steps.flatMap((s) => s.add ?? []));
 
 /** How a story's marks look besides the flow's own: what comes in, and what a step lights. */
 export const css = `${storyLook}
-.lf-step .lf-shape, .lf-wire, .lf-head { transition: stroke 0.8s, stroke-width 0.8s, fill 0.8s; }
+.lf-step .lf-shape, .lf-wire, .lf-tie, .lf-head { transition: stroke 0.8s, stroke-width 0.8s, fill 0.8s; }
 .lf-step.sp-new .lf-shape { stroke: var(--accent); stroke-width: var(--border-3); }
-.lf-wire.sp-new, .lf-wire.sp-lit { stroke: var(--accent); stroke-width: var(--border-3); }
-.lf-head.sp-new, .lf-head.sp-lit { fill: var(--accent); }
+.lf-wire.sp-new, .lf-wire.sp-lit, .lf-tie.sp-new, .lf-tie.sp-lit, .lf-wire[class*=lf-k-].sp-new, .lf-wire[class*=lf-k-].sp-lit, .lf-tie[class*=lf-k-].sp-new, .lf-tie[class*=lf-k-].sp-lit { stroke: var(--accent); stroke-width: var(--border-3); }
+.lf-head.sp-new, .lf-head.sp-lit, .lf-head[class*=lf-k-].sp-new, .lf-head[class*=lf-k-].sp-lit { fill: var(--accent); }
 `;
 
 /**
