@@ -14,18 +14,39 @@ const DAY = 86_400_000;
 const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place'];
 const HEX = /^#[0-9a-f]{3,8}$/i;
 
-/** The start of a day in this browser's time, from a date or a date-time. */
+// Days and hours are counted in the zone the answer's window was worked out in (the workspace's), so every reader
+// sees the same calendar; with none said, in this browser's. Set by picture() before anything is laid out.
+let zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const clocks = new Map();
+/** The wall clock in the zone at an instant: year, month, day, hour, minute, second. */
+const wall = (t) => {
+  const f = clocks.get(zone) ?? clocks.set(zone, new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })).get(zone);
+  const p = Object.fromEntries(f.formatToParts(t).map((x) => [x.type, Number(x.value)]));
+  return [p.year, p.month, p.day, p.hour, p.minute, p.second];
+};
+/** Milliseconds the zone's clock is ahead of UTC at an instant. */
+const offset = (t) => {
+  const [y, mo, d, h, mi, s] = wall(t);
+  return Date.UTC(y, mo - 1, d, h, mi, s) - Math.floor(t / 1000) * 1000;
+};
+/** The instant a day begins in the zone, from its date (a day past the month's end runs on into the next). */
+const startOf = (y, m, d) => {
+  const guess = Date.UTC(y, m - 1, d);
+  return guess - offset(guess - offset(guess));
+};
+/** The start of a day, from a date or a date-time. */
 const dayOf = (value) => {
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(value);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const date = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const [y, m, d] = date ? date.slice(1).map(Number) : wall(new Date(value).getTime());
+  return startOf(y, m, d);
 };
 /** The start of the day so many days after another: a day is not always 24 hours (the clocks change). */
 const dayAt = (day, n) => {
-  const d = new Date(day);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n).getTime();
+  const [y, m, d] = wall(day);
+  return startOf(y, m, d + n);
 };
-const fmtDay = (t) => new Date(t).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-const fmtTime = (t) => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+const fmtDay = (t) => new Date(t).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: zone });
+const fmtTime = (t) => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: zone });
 /** As many letters as fit a width, at about `letter` pixels a letter (the style's time_letter). */
 const cutAt = (letter) => (text, width) => {
   const n = Math.max(0, Math.floor(width / letter));
@@ -261,6 +282,7 @@ function bars(answer, style, c) {
 /** Draw a lens's answer along its time axis, in the style's layout, as wide as the page gives it (`width`). */
 export function picture({ answer, style, width, height, reduced }, tools) {
   if (!answer.lens.time) return { scene: { message: 'This view has no time axis.' } };
+  zone = answer.lens.time.zone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   // A story lays out what its steps bring in, all of it, each block hidden until a step shows it.
   const story = Array.isArray(answer.steps) && answer.steps.length > 0;
   if (story) {
