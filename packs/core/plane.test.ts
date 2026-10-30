@@ -403,6 +403,15 @@ test('settle: a wire of the order keeps its box above the next', () => {
   assert.ok(boxes.get('a')!.at[1] < boxes.get('b')!.at[1]);
 });
 
+test('settle: the press keeps the room joined boxes and ports were given', () => {
+  const boxes = new Map([['a', box(100, 50)], ['b', box(400, 300)]]);
+  const wires = [{ a: 'a', b: 'b', down: true, points: [[100, 70], [100, 120], [400, 120], [400, 280]] }];
+  settle(boxes, wires, { gap: 8, track: 5, room: 12, join: 28, run: 18 });
+  const [a, b] = [boxes.get('a')!, boxes.get('b')!], p = wires[0].points;
+  assert.ok(b.at[1] - a.at[1] >= 40 + 28 - 0.01, `${b.at[1] - a.at[1]}`);
+  if (p.length > 2) assert.ok(Math.abs(p[1][1] - p[0][1]) >= 18 - 0.01 && Math.abs(p.at(-1)![1] - p.at(-2)![1]) >= 18 - 0.01, JSON.stringify(p));
+});
+
 test('settle: a port slides round a corner when that takes out bends', () => {
   const boxes = new Map([['a', box(100, 200)], ['b', box(500, 200)]]);
   const wires = [{ a: 'a', b: 'b', points: [[100, 220], [100, 300], [500, 300], [500, 220]] }];
