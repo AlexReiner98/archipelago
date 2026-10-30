@@ -137,8 +137,65 @@ test('bars: a tree of uneven widths stays off its item and its neighbours', () =
   assert.ok(clear(g));
 });
 
-test('bars: in a ring of three only the wire that goes round takes four turns', () => {
+test('bars: a ring of three stays tight', () => {
   const g = drawnBars(['a', 'b', 'c'].map((id) => item(id)), [tie('a', 'b', 'serves'), tie('b', 'c', 'serves'), tie('c', 'a', 'serves')]);
   const turns = lines(g).map((w: any) => w.length - 2).sort();
-  assert.deepEqual(turns, [2, 2, 4]);
+  assert.ok(turns.reduce((a: number, b: number) => a + b, 0) <= 8);
+});
+
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { settle } from './draw/flow/settle.js';
+
+const box = (x: number, y: number, w = 100, h = 40) => ({ at: [x, y], size: [w, h] });
+const hits = (boxes: Map<string, any>) => { const b = [...boxes.values()]; let n = 0; for (let i = 0; i < b.length; i++) for (let j = i + 1; j < b.length; j++) if (Math.abs(b[i].at[0] - b[j].at[0]) < (b[i].size[0] + b[j].size[0]) / 2 && Math.abs(b[i].at[1] - b[j].at[1]) < (b[i].size[1] + b[j].size[1]) / 2) n++; return n; };
+
+test('settle: a wire that snakes between two boxes pulls straight', () => {
+  const boxes = new Map([['a', box(100, 50)], ['b', box(100, 300)]]);
+  const wires = [{ a: 'a', b: 'b', points: [[100, 70], [100, 90], [400, 90], [400, 250], [100, 250], [100, 280]] }];
+  settle(boxes, wires, { gap: 24, track: 8 });
+  assert.equal(wires[0].points.length, 2);
+  assert.equal(wires[0].points[0][0], wires[0].points[1][0]);
+});
+
+test('settle: a box between two others is not passed through', () => {
+  const boxes = new Map([['a', box(100, 50)], ['m', box(100, 200)], ['b', box(100, 350)]]);
+  const wires = [{ a: 'a', b: 'b', points: [[60, 70], [60, 100], [300, 100], [300, 300], [60, 300], [60, 330]] }];
+  settle(boxes, wires, { gap: 24, track: 8 });
+  assert.equal(hits(boxes), 0);
+  const across = Math.max(...wires[0].points.map((p) => p[0]));
+  assert.ok(across >= 150, `the wire stays round the middle box: ${across}`);
+  assert.ok(across < 300, `and pulls in: ${across}`);
+});
+
+test('settle: two wires that do not cross stay uncrossed, and one that does stays crossed', () => {
+  const boxes = new Map([['a', box(100, 50)], ['b', box(400, 50)], ['c', box(100, 300)], ['d', box(400, 300)]]);
+  const apart = [{ a: 'a', b: 'c', points: [[100, 70], [100, 280]] }, { a: 'b', b: 'd', points: [[400, 70], [400, 280]] }];
+  settle(boxes, apart, { gap: 24, track: 8 });
+  assert.equal(count(apart.map((w) => w.points)).crossings, 0);
+  const boxes2 = new Map([['a', box(100, 50)], ['b', box(400, 50)], ['c', box(100, 300)], ['d', box(400, 300)]]);
+  const crossed = [{ a: 'a', b: 'd', points: [[100, 70], [100, 170], [400, 170], [400, 280]] }, { a: 'b', b: 'c', points: [[420, 70], [420, 200], [120, 200], [120, 280]] }];
+  const before = count(crossed.map((w) => w.points)).crossings;
+  settle(boxes2, crossed, { gap: 24, track: 8 });
+  assert.equal(before, 1);
+  assert.equal(count(crossed.map((w) => w.points)).crossings, before);
+});
+
+test('bars: pulling tight adds no crossing and no collision', () => {
+  const ids = Array.from({ length: 16 }, (_, k) => `n${k}`), links: any[] = [];
+  for (let k = 0; k < 16; k++) { if (k % 4 < 3) links.push(tie(`n${k}`, `n${k + 1}`, 'serves')); if (k < 12) links.push(tie(`n${k}`, `n${k + 4}`, 'serves')); }
+  const g = drawnBars(ids.map((id) => item(id)), links);
+  assert.equal(count(lines(g)).crossings, 0);
+  assert.ok(clear(g));
+  assert.ok(right(g));
+});
+
+test('settle: wires along one another keep their sides', () => {
+  const boxes = new Map([['a', box(100, 50)], ['b', box(500, 300)], ['c', box(100, 550)], ['d', box(500, 800)]]);
+  const wires = [
+    { a: 'a', b: 'b', points: [[100, 70], [100, 100], [300, 100], [300, 200], [500, 200], [500, 280]] },
+    { a: 'c', b: 'd', points: [[100, 570], [100, 590], [300, 590], [300, 190], [420, 190], [420, 700], [500, 700], [500, 780]] },
+  ];
+  const done = settle(boxes, wires, { gap: 24, track: 8 });
+  assert.equal(done.undone, 0);
+  assert.ok(wires.every((w) => w.points.length <= 8));
 });

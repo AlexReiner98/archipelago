@@ -7,6 +7,7 @@
 import { comb, peel } from './combs.js';
 import { flatten, ORDER } from './graph.js';
 import { stepsOf } from './plane.js';
+import { settle, square } from './settle.js';
 import { planarize } from './thread.js';
 
 let last = null;
@@ -209,11 +210,15 @@ function drawPart(list, links, block, box, z) {
         out.push([col, turned.get(`${b} ${w.link}`)]);
       } else out.push(...enter(b, a, col).reverse());
     }
-    points.set(pair(w.link[0], w.link[1]), { from: w.link[0], points: out });
+    points.set(pair(w.link[0], w.link[1]), { from: w.link[0], to: w.link[1], points: out });
   }
   const places = new Map(rows.filter((v) => !ghost(v)).map((v) => [v, [middle(v), y.get(v)]]));
   return { places, points, crossings: g.crossings };
 }
+
+/** For a test or a bench: told how each pass went. */
+let watching = null;
+export const watch = (fn) => (watching = fn);
 
 export function layout({ items: given, links: told = [], undrawn = [], placed = {}, measure, sizes, aspect = 1.6 }) {
   const { items, links } = flatten({ items: given, links: told, undrawn });
@@ -265,6 +270,8 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
   const area = shelves.reduce((s, c) => s + (c.w + gap) * (c.h + gap), 0), most = Math.max(shelves[0]?.w ?? 0, Math.sqrt(area * aspect));
   let sx = margin, sy = margin, row = 0;
   const parents = new Map();
+  /** The item of the core a tree hangs on. */
+  const holder = (id) => (parents.has(id) ? holder(parents.get(id)) : id);
   const note = (holder) => (kids.get(holder) ?? []).forEach((k) => (parents.set(k, holder), note(k)));
   for (const c of shelves) {
     if (sx > margin && sx + c.w > margin + most) ((sx = margin), (sy += row + gap), (row = 0));
@@ -283,9 +290,29 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
         }
       }
     }
-    for (const [k, r] of c.drawn.points) routes.set(k, { from: r.from, points: r.points.map(([p, q]) => [p + dx, q + dy]) });
+    for (const [k, r] of c.drawn.points) routes.set(k, { from: r.from, to: r.to, points: r.points.map(([p, q]) => [p + dx, q + dy]) });
     sx += c.w + gap;
     row = Math.max(row, c.h);
+  }
+  // Pull each box and wire tight, the topology kept: a box and what hangs on it move as one.
+  const rigid = new Map(), moving = [];
+  let settled = null;
+  for (const [id, c] of combs) {
+    if (!x.has(id)) continue;
+    const s = stepSize(id), b = block(id), left = x.get(id) - s.w / 2, top = y.get(id) - s.h / 2;
+    rigid.set(id, { at: [left + b.w / 2, top + b.h / 2], size: [b.w, b.h], hold: [-b.w / 2 + 2, -b.w / 2 + s.w - 2], was: [left + b.w / 2, top + b.h / 2], hangs: c.items.map((it) => it.id) });
+  }
+  for (const r of routes.values()) if (r.to !== undefined && rigid.has(r.from) && rigid.has(r.to)) moving.push(Object.assign(r, { a: r.from, b: r.to }));
+  if (moving.length && square(moving)) {
+    settled = settle(rigid, moving, { gap: z.col, track: z.turn, watch: watching });
+    for (const [id, b] of rigid) {
+      const dx = b.at[0] - b.was[0], dy = b.at[1] - b.was[1];
+      for (const it of [id, ...b.hangs]) (x.set(it, x.get(it) + dx), y.set(it, y.get(it) + dy));
+    }
+    for (const [k, r] of routes) if (r.to === undefined) {
+      const b = rigid.get(holder(r.from));
+      r.points = r.points.map(([p, q]) => [p + b.at[0] - b.was[0], q + b.at[1] - b.was[1]]);
+    }
   }
   for (const id of Object.keys(placed)) if (nodes.has(id) && Array.isArray(placed[id])) (x.set(id, Number(placed[id][0])), y.set(id, Number(placed[id][1])));
   const edge = (id, to) => {
@@ -300,6 +327,6 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
   const all = [...nodes.values()].filter((n) => x.has(n.id)), drawnPoints = every.flatMap((w) => w.points);
   const width = Math.max(0, ...all.map((n) => x.get(n.id) + n.w / 2), ...drawnPoints.map((p) => p[0])) + margin;
   const height = Math.max(0, ...all.map((n) => y.get(n.id) + n.h / 2), ...drawnPoints.map((p) => p[1])) + margin;
-  last = { chains, ties, threaded };
+  last = { chains, ties, threaded, settled };
   return { nodes, all, chains, ties, breaks: [], potential, x, y, width, height };
 }

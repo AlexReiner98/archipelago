@@ -1289,7 +1289,7 @@
       }
     },
     { "id": "core.plane", "title": "Plane", "shape": "plane",
-      "modules": { "index.js": "draw/flow/plane-index.js", "flow.js": "draw/flow/index.js", "layout.js": "draw/flow/bars.js", "plane.js": "draw/flow/plane.js", "thread.js": "draw/flow/thread.js", "combs.js": "draw/flow/combs.js", "knot.js": "draw/flow/knot.js", "planar.js": "draw/flow/planar.js", "count.js": "draw/flow/count.js", "lines.js": "draw/flow/lines.js", "graph.js": "draw/flow/graph.js", "free.js": "draw/flow/free.js", "look.js": "draw/flow/look.js", "story.js": "draw/flow/story.js", "places.js": "draw/flow/places.js", "marks.js": "draw/architecture/marks.js", "play.js": "draw/architecture/play.js", "story-look.js": "draw/architecture/story-look.js" } }
+      "modules": { "index.js": "draw/flow/plane-index.js", "flow.js": "draw/flow/index.js", "layout.js": "draw/flow/bars.js", "plane.js": "draw/flow/plane.js", "thread.js": "draw/flow/thread.js", "settle.js": "draw/flow/settle.js", "combs.js": "draw/flow/combs.js", "knot.js": "draw/flow/knot.js", "planar.js": "draw/flow/planar.js", "count.js": "draw/flow/count.js", "lines.js": "draw/flow/lines.js", "graph.js": "draw/flow/graph.js", "free.js": "draw/flow/free.js", "look.js": "draw/flow/look.js", "story.js": "draw/flow/story.js", "places.js": "draw/flow/places.js", "marks.js": "draw/architecture/marks.js", "play.js": "draw/architecture/play.js", "story-look.js": "draw/architecture/story-look.js" } }
   ],
   "styles": [
     {

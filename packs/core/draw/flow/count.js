@@ -32,3 +32,14 @@ export function count(wires) {
   }
   return { crossings, seen: seen.size, shared };
 }
+
+/** Whether two lines touch anywhere: cross, meet, or lie along one another. */
+export function touch(a, b) {
+  for (let i = 1; i < a.length; i++) for (let j = 1; j < b.length; j++) {
+    const [p, q, r, s] = [a[i - 1], a[i], b[j - 1], b[j]];
+    const d1 = side(p, q, r), d2 = side(p, q, s), d3 = side(r, s, p), d4 = side(r, s, q);
+    if (d1 * d2 < 0 && d3 * d4 < 0) return true;
+    if ((d1 === 0 && within(p, q, r)) || (d2 === 0 && within(p, q, s)) || (d3 === 0 && within(r, s, p)) || (d4 === 0 && within(r, s, q))) return true;
+  }
+  return false;
+}
