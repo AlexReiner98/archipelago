@@ -58,7 +58,7 @@ function canvas(answer, style, width, story, height) {
     const key = `b:${opens.size}`;
     opens.set(key, b.item.id);
     shown.push({ key, ids: [b.item.id] });
-    return m('g', { key, on: ['click'], class: group(b.item), role: 'link', ...(story && { opacity: 0 }) }, m('title', {}, rect.title), m('rect', { class: `dot${colour ? ` t-hued ${colour}` : ''}`, x: rect.x, y: rect.y, width: rect.width, height: rect.height, rx: 3 }));
+    return m('g', { key, item: b.item.id, on: ['click'], class: group(b.item), role: 'link', ...(story && { opacity: 0 }) }, m('title', {}, rect.title), m('rect', { class: `dot${colour ? ` t-hued ${colour}` : ''}`, x: rect.x, y: rect.y, width: rect.width, height: rect.height, rx: 3 }));
   };
   return { z, cut: cutAt(z('letter')), width: Math.max(width || 800, 320), height: height || 0, rules, opens, shown, hued, block };
 }

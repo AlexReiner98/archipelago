@@ -143,6 +143,7 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #find .q-term.q-narrow { color: var(--accent); }
 #find .q-term button, #find .q-term .q-said { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; max-width: var(--select-least); overflow: hidden; text-overflow: ellipsis; }
 #find .q-term .q-said { cursor: default; }
+#find .q-term[data-gone]::after { content: attr(data-gone); margin-inline-start: var(--space-3); }
 #find .q-term.q-walk .q-said { font-family: var(--type-water-family); font-weight: var(--type-water-weight); font-style: var(--type-water-style); text-transform: var(--type-water-case); letter-spacing: var(--type-water-track); }
 #find .q-term .q-x { color: var(--muted); }
 #find .q-term .q-x:hover { color: var(--text); }

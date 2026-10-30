@@ -144,10 +144,15 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   // Why each item is there: the terms of the filter that found it (a seed may be found by more than one), or the step
   // of the walk that reached it. A person and an agent read the same reason (decision e_drt4g872: Find's terms).
   const foundBy = new Map<string, Found[]>();
+  // And by which of them, as the lens says it: what a term lights when it is hovered.
+  const termsBy = new Map<string, string[]>();
   const stepOf = new Map<string, number>();
-  const add = (ids: string[], by?: Found) => {
+  const add = (ids: string[], by?: Found, terms: Term[] = []) => {
     for (const id of ids) {
-      if (by && (sent.has(id) || room() > 0)) foundBy.set(id, [...new Set([...(foundBy.get(id) ?? []), by])]);
+      if (by && (sent.has(id) || room() > 0)) {
+        foundBy.set(id, [...new Set([...(foundBy.get(id) ?? []), by])]);
+        termsBy.set(id, [...new Set([...(termsBy.get(id) ?? []), ...terms.map(sayTerm)])]);
+      }
       if (room() > 0) sent.add(id);
     }
   };
@@ -167,23 +172,29 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   const ids = finds.flatMap((t) => (t.sort === 'id' ? [t.id] : []));
   // Not takes away what it says of an item named by id (e_ndcxf2bv); what nobody said, the default, hides nothing named.
   const saidNot = (input.filter as { not?: unknown; exclude?: unknown } | undefined)?.not !== undefined || (input.filter as { exclude?: unknown } | undefined)?.exclude !== undefined;
-  if (ids.length && !hidden) add(await holds((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${[saidNot ? keep(2) : 'e.archived_at is null', ...numbered(terms, saidNot ? 2 + leftOut.length : 2)].join(' and ')}`, [ids, ...(saidNot ? leftOut : []), ...narrowing])).rows.map((r) => r.id)), 'id');
+  if (ids.length && !hidden) {
+    const kept = await holds((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${[saidNot ? keep(2) : 'e.archived_at is null', ...numbered(terms, saidNot ? 2 + leftOut.length : 2)].join(' and ')}`, [ids, ...(saidNot ? leftOut : []), ...narrowing])).rows.map((r) => r.id));
+    for (const t of finds) if (t.sort === 'id' && kept.includes(t.id)) add([t.id], 'id', [t]);
+  }
   for (const term of finds) {
     if (term.sort !== 'link' || room() <= 0) continue;
     const at = await endsOf(l, term, me);
     if (!at.length) continue;
     const [near, far] = term.back ? ['to_id', 'from_id'] : ['from_id', 'to_id'];
-    add(await holds(await seed((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), reach()])), 'link');
+    add(await holds(await seed((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), reach()])), 'link', [term]);
   }
   for (const term of finds) {
     if (term.sort !== 'related' || room() <= 0) continue;
     const at = await endsOf(l, term, me);
-    if (at.length) add(await holds(await seed((k) => `select e.id from relation r join entity e on e.id = case when r.from_id = any($1::text[]) then r.to_id else r.from_id end where (r.from_id = any($1::text[]) or r.to_id = any($1::text[])) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $2`, [at, reach()])), 'link');
+    if (at.length) add(await holds(await seed((k) => `select e.id from relation r join entity e on e.id = case when r.from_id = any($1::text[]) then r.to_id else r.from_id end where (r.from_id = any($1::text[]) or r.to_id = any($1::text[])) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $2`, [at, reach()])), 'link', [term]);
   }
   // What is in an item, at any depth, read from the part_of closure (decision e_tvsdqjeq), the newest first; in an item
   // the viewer cannot see, nothing is.
-  const inside = (await Promise.all(finds.map((t) => (t.sort === 'in' ? endsOf(l, t, me) : [])))).flat();
-  if (inside.length && room() > 0) add(await holds(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [inside, reach()])), 'in');
+  for (const term of finds) {
+    if (term.sort !== 'in' || room() <= 0) continue;
+    const inside = await endsOf(l, term, me);
+    if (inside.length) add(await holds(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [inside, reach()])), 'in', [term]);
+  }
   // The text is the search read's own (src/search.ts): the words in any form in the title or note, or as typed anywhere
   // in the title, the best match first; only when that finds nothing, titles with a word close to what was typed.
   // How many it found in all is kept (`matched`), counted over what the viewer may see and the filter keeps; an item
@@ -203,7 +214,7 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
     asked.push({ said, near });
     for (const id of found) matchedIds.add(id);
     matched = (matched ?? 0) + (checked ? found.length : (rows[0]?.n ?? 0));
-    add(found, 'text');
+    add(found, 'text', [{ sort: 'text', said }]);
   }
   if (asked.length > 1 && matched) {
     matched = checked
@@ -212,8 +223,10 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
           `select count(*)::int as n from entity e where e.id in (select pelago_search_ids(v, s.near) from unnest($1::text[], $2::boolean[]) s(q, near) cross join lateral ${slipsOf('s.q', 's.near')} slips(v)) and ${narrowed(3)}`,
           [asked.map((a) => a.said), asked.map((a) => a.near), leftOut, ...narrowing])).rows[0].n;
   }
-  const named = finds.flatMap((t) => (t.sort === 'type' ? l.registry.family(t.type) : []));
-  if (named.length && room() > 0) add(await holds(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [named, reach()])), 'type');
+  for (const term of finds) {
+    if (term.sort !== 'type' || room() <= 0) continue;
+    add(await holds(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [l.registry.family(term.type), reach()])), 'type', [term]);
+  }
 
   // The walk: a step at a time along the links named, each the way it is named (out along it, in to it, or either), to
   // what the filter does not exclude. An excluded item is not walked through. Each step is bounded by the ids reached
@@ -263,7 +276,7 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
         ...(spans && { time: filed!.filed.get(e.id) ?? spans.get(e.id) ?? [] }),
         ...(filed?.lane.has(e.id) && { lane: filed.lane.get(e.id) }),
         ...(filed?.stream.has(e.id) && { stream: filed.stream.get(e.id) }),
-        ...(foundBy.has(e.id) ? { found: foundBy.get(e.id) } : stepOf.has(e.id) && { step: stepOf.get(e.id) }),
+        ...(foundBy.has(e.id) ? { found: foundBy.get(e.id), terms: termsBy.get(e.id) } : stepOf.has(e.id) && { step: stepOf.get(e.id) }),
       };
     }),
     links: relations.map((r) => ({ id: r.id, type: r.type, from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),

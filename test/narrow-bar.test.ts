@@ -52,6 +52,19 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
       if (shots) writeFileSync(`${shots}/narrow-bar-${width}.png`, await page.screenshot());
     }
     await page.send('Emulation.clearDeviceMetricsOverride');
+    // Pointing at a term of Find lights what it found: the rest of the picture fades, whatever drew it.
+    const faded = (title: string) => `Number(getComputedStyle([...document.querySelectorAll('#canvas [data-item]')].find((a) => a.textContent.includes(${JSON.stringify(title)}))).opacity) < 1`;
+    await page.evaluate(`document.getElementById('find-lens')?.click()`);
+    await pick('Find more', 'Type', 'Task');
+    assert.ok(await until(`${has('Gutters')} && ${has('Which tiles?')}`), 'two types found');
+    const point = await page.evaluate<{ x: number; y: number }>(`(() => { const r = document.querySelector('#find .q-filter .q-type .q-said').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    assert.ok(await until(faded('Gutters')), `the type not pointed at fades: ${page.logs().join('\n')}`);
+    assert.ok(!(await page.evaluate(faded('Which tiles?'))), 'what the term found stays lit');
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+    assert.ok(await until(`!(${faded('Gutters')})`), 'moved off, nothing is faded');
+    await page.evaluate(`document.querySelector('#find .q-filter .q-type:not(:first-child) .q-x, #find .q-filter .q-type + .q-type .q-x').click()`);
+    assert.ok(await until(`!${has('Gutters')}`), 'the second type taken out');
     // The page's tip alone speaks: on a term, and after a click on it, no title is left from there up for the browser to show.
     const titles = `(() => { const titled = []; for (let e = document.querySelector('#find .q-only .q-term .q-said'); e; e = e.parentElement) if (e.hasAttribute('title')) titled.push(e.className); return titled; })()`;
     await page.evaluate(`document.getElementById('find-lens')?.click()`);

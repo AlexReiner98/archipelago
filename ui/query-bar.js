@@ -11,6 +11,7 @@
 
 import { api, h, notOf, state, wordsOf } from './base.js';
 import { numberOf } from './lens-base.js';
+import { lightTerm, removedBy } from './lens-light.js';
 import { ranked, around, uses } from './picker-rank.js';
 import { isWord } from './only-words.js';
 import { findKinds, onlyKinds } from './term-kinds.js';
@@ -157,6 +158,15 @@ export function drawQuery(lens, view, go, lead) {
   const not = notOf(f);
   const includes = f.find?.length ?? 0;
   const filled = includes > 0;
+  /** Pointing at a term lights what it found; at one of Only or Not, it says how many it holds back. */
+  const lighting = (part, value) => ({
+    onpointerenter: (ev) => {
+      const el = ev.currentTarget;
+      if (part === 'find') lightTerm(view, lens, value);
+      else if (answer) removedBy(lens, without(lens, part, value), answer).then((n) => { el.dataset.gone = n; });
+    },
+    onpointerleave: () => lightTerm(view, lens, null),
+  });
   /** A term: its words and an × to take it away. The last term Find has may go too: the canvas is then empty. */
   const term = (cls, said, title, part, value) => {
     const drop = () => go(without(lens, part, value));
@@ -164,7 +174,8 @@ export function drawQuery(lens, view, go, lead) {
       said,
       title,
       drop,
-      el: h('span', { class: `q-term ${cls}`, title },
+      term: value,
+      el: h('span', { class: `q-term ${cls}`, title, ...lighting(part, value) },
         h('span', { class: 'q-said' }, said),
         drop && h('button', { type: 'button', class: 'q-x', title: 'Take it out', 'aria-label': `Take out ${said}`, onclick: drop }, '×')),
     };
@@ -245,7 +256,7 @@ export function drawQuery(lens, view, go, lead) {
   const out = notTerms.map((t) => t.said).filter((x) => x !== 'system');
   const walkSaid = `${over === 'all' ? 'every link' : walked.map(waySaid).join(', ')} ×${steps}`;
   const parts = [
-    found.length > 0 && ['Find', or(found.map((x) => h('span', { class: 'q-kept' }, x)))],
+    found.length > 0 && ['Find', or(found.map((x, i) => h('span', { class: 'q-kept', ...lighting('find', findTerms[i].term) }, x)))],
     narrowed.length > 0 && ['Only', narrowed.join(', ')],
     out.length > 0 && ['Not', out.join(', ')],
     walking && ['Walk', walkSaid],
