@@ -8,16 +8,19 @@ import { grouped } from './graph.js';
 
 /** Passes over the steps for their rows, and over the rows for their order. */
 const ROW_PASSES = 8, SWEEPS = 16;
-/** How much worse a crossing of two wires that matter is than one of a quiet tie; a tie along a row's cost in rows. */
-const QUIET_WEIGHT = 1, WIRE_WEIGHT = 2, FLAT_COST = 2;
+/** How much worse a crossing of two wires that matter is than one of a quiet tie. */
+const QUIET_WEIGHT = 1, WIRE_WEIGHT = 2;
+/** How many rows past the order's a step no order holds may take. */
+const BEYOND = 2;
 /** Past this much work in a row's crossing table a row keeps the order the sweeps gave it. */
 const SIFT_MOST = 4e5;
 
 /**
  * Each step's row: `edges` are { a, b }, a leads to b, `ties` { a, b, type }; `wide(id)` is its width, `across` how wide a
- * row should grow. A step of the order sits below all it follows and above all that follows it, always.
+ * row should grow. A step of the order sits below all it follows and above all that follows it, always. `flat` is what a
+ * tie along a row costs, `crowd` a row over that width, both in rows of wire.
  */
-export function rowsOf(ids, edges, ties, { wide, across, quiet }) {
+export function rowsOf(ids, edges, ties, { wide, across, quiet, flat, crowd }) {
   const ins = grouped(edges, (e) => e.b, (e) => e.a), outs = grouped(edges, (e) => e.a, (e) => e.b);
   const row = new Map(), degree = new Map(ids.filter((id) => ins.has(id) || outs.has(id)).map((id) => [id, (ins.get(id) ?? []).length]));
   const queue = [...degree.keys()].filter((id) => !degree.get(id));
@@ -33,24 +36,26 @@ export function rowsOf(ids, edges, ties, { wide, across, quiet }) {
   const spread = (from) => { for (let k = 0; k < from.length; k++) for (const { id } of near.get(from[k])) if (!row.has(id)) (row.set(id, row.get(from[k]) + 1), from.push(id)); };
   spread([...row.keys()]);
   for (const id of [...ids].sort((p, q) => near.get(q).length - near.get(p).length)) if (!row.has(id)) (row.set(id, 0), spread([id]));
-  const bottom = Math.max(...row.values());
+  const bottom = Math.max(...row.values()), inOrder = (id) => degree.has(id);
   const taken = new Map();
   for (const id of ids) taken.set(row.get(id), (taken.get(row.get(id)) ?? 0) + wide(id));
   const order = [...queue, ...ids.filter((id) => !degree.has(id))];
   for (let pass = 0; pass < ROW_PASSES; pass++) for (const id of pass % 2 ? order : [...order].reverse()) {
     const before = (ins.get(id) ?? []).map((a) => row.get(a) + 1), after = (outs.get(id) ?? []).map((b) => row.get(b) - 1);
-    const lo = Math.max(0, ...before), hi = Math.min(bottom, ...after), was = row.get(id);
+    const lo = Math.max(inOrder(id) ? 0 : -BEYOND, ...before), hi = Math.min(inOrder(id) ? bottom : bottom + BEYOND, ...after), was = row.get(id);
     if (lo >= hi) continue;
     const cost = (r) => {
-      let c = (taken.get(r) ?? 0) - (r === was ? wide(id) : 0) + wide(id) > across ? ((taken.get(r) ?? 0) + wide(id)) / across : 0;
+      let c = (taken.get(r) ?? 0) - (r === was ? wide(id) : 0) + wide(id) > across ? (crowd * ((taken.get(r) ?? 0) + wide(id))) / across : 0;
       for (const w of [...(ins.get(id) ?? []), ...(outs.get(id) ?? [])]) c += WIRE_WEIGHT * Math.abs(r - row.get(w));
-      for (const { id: w, weight } of near.get(id)) c += weight * (Math.abs(r - row.get(w)) + (r === row.get(w) ? FLAT_COST : 0));
+      for (const { id: w, weight } of near.get(id)) c += weight * (Math.abs(r - row.get(w)) + (r === row.get(w) ? flat : 0));
       return c;
     };
     let best = was, least = cost(was);
     for (let r = lo; r <= hi; r++) if (cost(r) < least) ((best = r), (least = cost(r)));
     if (best !== was) (taken.set(was, taken.get(was) - wide(id)), taken.set(best, (taken.get(best) ?? 0) + wide(id)), row.set(id, best));
   }
+  const top = Math.min(...row.values());
+  for (const [id, r] of row) row.set(id, r - top);
   return row;
 }
 
@@ -83,7 +88,8 @@ export function thread(ids, lines, row) {
   const layers = [];
   for (const id of every) (layers[rowAt(id)] ??= []).push(id);
   for (let k = 0; k < layers.length; k++) layers[k] ??= [];
-  return { layerOf: row, waypoints, up, down, upOrder, downOrder, upBy, downBy, layers, paths: lines.map((l) => [l.from, l.to, l.path, l.bundle, l.flat]) };
+  const flats = lines.filter((l) => l.flat).map((l) => ({ from: l.from, to: l.to, weight: l.weight, row: row.get(l.from) }));
+  return { flats, layerOf: row, waypoints, up, down, upOrder, downOrder, upBy, downBy, layers, paths: lines.map((l) => [l.from, l.to, l.path, l.bundle, l.flat]) };
 }
 
 /** How many crossings, weighed, between each two rows: the wires as `pos` has them. */
@@ -96,7 +102,31 @@ export function weighed(t, pos) {
       if ((p[0] - q[0]) * (p[1] - q[1]) < 0) total += p[2] * q[2];
     }
   }
+  // A wire along a row, under it, crosses every wire leaving the row between its ends.
+  for (const f of t.flats) {
+    const [a, b] = [pos.get(f.from), pos.get(f.to)], list = t.layers[f.row];
+    for (let i = Math.min(a, b) + 1; i < Math.max(a, b); i++) total += f.weight * t.downBy.get(list[i]).reduce((s, w) => s + w, 0);
+  }
   return total;
+}
+
+/** Each wire along a row with one end moved beside the other, where that costs less. */
+function closeUp(t, pos, index, score) {
+  for (const f of t.flats) for (const [stay, move] of [[f.from, f.to], [f.to, f.from]]) {
+    const list = t.layers[f.row], was = [...list], at = list.indexOf(move), before = score();
+    list.splice(at, 1);
+    let best = null, least = before;
+    for (const k of [list.indexOf(stay), list.indexOf(stay) + 1]) {
+      list.splice(k, 0, move);
+      index();
+      const c = score();
+      if (c < least) ((least = c), (best = k));
+      list.splice(k, 1);
+    }
+    if (best === null) list.splice(0, list.length, ...was);
+    else list.splice(best, 0, move);
+    index();
+  }
 }
 
 /** What it costs to have each of `list` left of each other, by the rows either side, as `pos` has them. */
@@ -167,7 +197,9 @@ function search(t) {
     keep();
   }
   t.layers.splice(0, t.layers.length, ...best);
-  return fewest;
+  index();
+  closeUp(t, pos, index, () => weighed(t, pos));
+  return weighed(t, pos);
 }
 
 /**

@@ -215,3 +215,43 @@ test('settle: a port does not slide through a wire or a box', () => {
   const m = boxes.get('m')!, through = wires[0].points.some((p, i) => i > 0 && p[1] === wires[0].points[i - 1][1] && p[1] > m.at[1] - 20 && p[1] < m.at[1] + 20 && Math.min(p[0], wires[0].points[i - 1][0]) < m.at[0] && Math.max(p[0], wires[0].points[i - 1][0]) > m.at[0]);
   assert.equal(through, false);
 });
+
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { layout as ranks } from './draw/flow/ranks.js';
+
+const drawnRanks = (items: any[], links: any[]) => ranks({ items, links, measure, sizes: house.sizes });
+const lead = (a: string, b: string) => ({ type: 'depends_on', from: b, to: a });
+
+test('ranks: no wire of the order runs up, whatever the ties ask', () => {
+  const ids = Array.from({ length: 12 }, (_, k) => `n${k}`), links: any[] = [];
+  for (let k = 0; k + 3 < 12; k++) links.push(lead(`n${k}`, `n${k + 3}`));
+  for (let k = 0; k + 7 < 12; k++) links.push(tie(`n${k + 7}`, `n${k}`, 'serves'));
+  const g = drawnRanks(ids.map((id) => item(id)), links);
+  assert.equal(g.all.length, 12);
+  assert.ok(g.chains.every((c: any) => g.y.get(c.a) < g.y.get(c.b)));
+  assert.ok(right(g));
+  assert.ok(clear(g));
+});
+
+test('ranks: a ladder of the order draws with no crossing and no wire along another', () => {
+  const links = ['a', 'b', 'c', 'd'].flatMap((k, i, l) => [...(i ? [lead(`${l[i - 1]}0`, `${k}0`), lead(`${l[i - 1]}1`, `${k}1`)] : []), tie(`${k}0`, `${k}1`, 'serves')]);
+  const g = drawnRanks([...'abcd'].flatMap((k) => [item(`${k}0`), item(`${k}1`)]), links);
+  assert.equal(count(lines(g)).crossings, 0);
+  assert.equal(count(lines(g)).shared, 0);
+});
+
+test('ranks: a tree of ties hangs off its item, and a step of the order stays in the rows', () => {
+  const leaves = Array.from({ length: 6 }, (_, k) => item(`l${k}`));
+  const g = drawnRanks([item('r'), item('s'), item('o'), ...leaves], [...leaves.map((l) => tie(l.id, 'r')), lead('r', 's'), lead('s', 'o')]);
+  assert.equal(g.all.length, 9);
+  assert.ok(clear(g));
+  assert.ok(g.chains.every((c: any) => g.y.get(c.a) < g.y.get(c.b)));
+  assert.equal(count(lines(g)).crossings, 0);
+});
+
+test('ranks: loose items, a ring and many links of one pair all draw', () => {
+  const g = drawnRanks(['x', 'p', 'q', 'o'].map((id) => item(id)), [tie('p', 'q', 'serves'), tie('p', 'q', 'calls'), tie('q', 'o', 'serves'), tie('o', 'p', 'serves')]);
+  assert.equal(g.all.length, 4);
+  assert.ok(g.ties.every((t: any) => t.points.length >= 2));
+  assert.ok(clear(g));
+});
