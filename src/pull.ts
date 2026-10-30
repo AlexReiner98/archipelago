@@ -7,14 +7,15 @@
 // Backups): every item and link at the head of its log, with its keys wrapped again under this machine's sealing key so
 // it opens here as it did there, and no link to an item the copy does not hold. It acts on nothing outside: its
 // automations are paused and its secrets left behind (those in its settings were sealed with the hosted server's key,
-// so here they read as not set). What was in the data folder is kept beside it, as data-backup-<time>.
+// so here they read as not set). What was in the data folder is kept beside it, as data-backup-<time>, the newest
+// three of them.
 //
 // With the local server stopped, the copy goes in place at once. Under `npm run dev` the server is asked to
 // restart, and the copy goes in place while it is down. Under `npm start`, stop it first.
 
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { parseBackup, parseVault, readable, restore, type Dump } from './backup.ts';
 import { rewrap, type VaultDump } from './vault.ts';
@@ -32,7 +33,18 @@ export function takePulled(dataDir: string): string | undefined {
   const kept = `${dataDir}-backup-${new Date().toISOString().replaceAll(':', '-')}`;
   if (existsSync(dataDir)) renameSync(dataDir, kept);
   renameSync(pulled, dataDir);
+  pruneKept(dataDir);
   return kept;
+}
+
+/** How many data folders a pull keeps beside the data folder: enough to go back, not one for every pull. */
+const KEPT_PULLS = 3;
+
+/** Remove the data folders earlier pulls put aside, all but the newest. Their names sort by when they were put aside. */
+export function pruneKept(dataDir: string) {
+  const prefix = `${basename(dataDir)}-backup-`;
+  const kept = readdirSync(dirname(dataDir)).filter((name) => name.startsWith(prefix) && /^\d{4}-\d\d-\d\dT/.test(name.slice(prefix.length))).sort();
+  for (const name of kept.slice(0, -KEPT_PULLS)) rmSync(join(dirname(dataDir), name), { recursive: true, force: true });
 }
 
 /**
