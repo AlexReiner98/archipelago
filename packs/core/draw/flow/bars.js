@@ -86,9 +86,11 @@ const against = (g, number) => g.wires.filter((w) => w.link?.[2] && w.path.some(
  * crossings; where that leaves order wires up, the embedding made for the order (./upward.js) is tried in its place.
  */
 function downward(links, list) {
-  const g = planarize(links, list), found = { g, ...numbered(g) }, up = against(g, found.number);
+  // By name, so the picture does not change with the order the answer came in.
+  const ids = [...list].sort(), sorted = [...links].sort((p, q) => Number(q[2]) - Number(p[2]) || (pair(p[0], p[1]) < pair(q[0], q[1]) ? -1 : 1));
+  const g = planarize(sorted, ids), found = { g, ...numbered(g) }, up = against(g, found.number);
   if (!up || list.length > EMBED_MOST) return found;
-  const made = embed(links, list);
+  const made = embed(sorted, ids);
   return against(made, made.number) < up && made.crossings <= g.crossings + up * EMBED_COST ? { g: made, s: made.s, t: made.t, number: made.number, outerAt: made.outerAt } : found;
 }
 

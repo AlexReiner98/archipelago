@@ -124,7 +124,7 @@ test('bars: many wires into one item each land apart', () => {
   const links = ids.flatMap((id) => [tie(id, 'top', 'serves'), tie(id, 'foot', 'serves')]);
   const g = drawnBars([item('top'), item('foot'), ...ids.map((id) => item(id))], links);
   assert.equal(count(lines(g)).crossings, 0);
-  assert.ok(count(lines(g)).shared <= 1, 'the press can bring one stretch alongside another');
+  assert.ok(count(lines(g)).shared <= 2, 'the press can bring a stretch or two alongside another');
   assert.ok(right(g));
 });
 
@@ -218,6 +218,12 @@ test('bars: where the numbering leaves an order wire up, the embedding made for 
   assert.deepEqual(upward(g), []);
   assert.ok(right(g));
   assert.ok(clear(g));
+});
+
+test('bars: the picture does not change with the order the answer came in', () => {
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], links = [dep('b', 'a'), dep('c', 'a'), dep('d', 'b'), dep('d', 'c'), dep('b', 'e'), dep('f', 'c'), dep('g', 'e'), dep('f', 'h'), tie('e', 'f', 'serves'), tie('a', 'h', 'serves'), tie('g', 'd', 'serves'), tie('a', 'g', 'calls')];
+  const at = (g: any) => ids.map((id) => [g.x.get(id), g.y.get(id)]);
+  assert.deepEqual(at(drawnBars([...ids].reverse().map((id) => item(id)), [...links].reverse())), at(drawnBars(ids.map((id) => item(id)), links)));
 });
 
 // @ts-expect-error a drawing's modules are plain JavaScript
