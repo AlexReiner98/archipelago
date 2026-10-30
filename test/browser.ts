@@ -34,7 +34,7 @@ export async function open(url: string): Promise<Page> {
   // Chrome says on its error stream where it listens. On a busy runner (many test files each starting one) it can be
   // slow to: it is given 45 seconds, and started once more if it says nothing by then.
   const start = () => {
-    const proc: ChildProcess = spawn(binary, ['--headless=new', ...ci, '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update', '--disable-gpu', '--window-size=1280,900', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+    const proc: ChildProcess = spawn(binary, ['--headless=new', ...ci, '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--disable-background-networking', '--disable-component-update', '--disable-gpu', '--window-size=1280,900', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
     const address = new Promise<string>((resolve, reject) => {
       let said = '';
       const timer = setTimeout(() => (proc.kill(), reject(new Error(`Chrome did not start: ${said.slice(0, 300)}`))), 45000);
