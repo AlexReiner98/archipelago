@@ -136,11 +136,33 @@ function drawPart(list, links, block, box, z) {
   }
   const ends = new Map(rows.map((v) => [v, [[...lefts.get(v)].find((f) => !rights.get(v).has(f)) ?? LEFT, [...rights.get(v)].find((f) => !lefts.get(v).has(f)) ?? RIGHT]]));
   const names = [LEFT, RIGHT, ...g.faces.map((_, i) => i).filter((i) => i !== outerAt)], xArcs = [];
-  for (const k of g.owner.keys()) xArcs.push([left.get(k), right.get(k), z.col]);
-  for (const v of rows) if (!ghost(v)) xArcs.push([ends.get(v)[0], ends.get(v)[1], size(v).w + z.col]);
+  // An invisible edge draws nothing, so it needs next to no room.
+  for (const k of g.owner.keys()) xArcs.push([left.get(k), right.get(k), g.owner.get(k).visible ? z.col : z.col / 8]);
+  for (const v of rows) if (!ghost(v)) xArcs.push([ends.get(v)[0], ends.get(v)[1], size(v).w + z.col / 2]);
   const x = longest(names, xArcs);
-  const middle = (v) => (x.get(ends.get(v)[0]) + x.get(ends.get(v)[1]) + z.col) / 2;
+  // A box sits over its own wires, as near their middle as its bar lets it, so they drop straight in.
+  const inset = (v) => Math.min(z.turn, box(v).w / 4) + 1;
+  const middle = (v) => {
+    const [from, to] = ends.get(v);
+    if (ghost(v)) return (x.get(from) + x.get(to) + z.col) / 2;
+    const lo = x.get(from) + z.col / 2 - inset(v), hi = Math.max(lo, x.get(to) + z.col / 2 - inset(v) - size(v).w);
+    const cols = [...next.get(v)].map((w) => column(pair(v, w)));
+    return Math.min(hi, Math.max(lo, cols.reduce((sum, c) => sum + c, 0) / cols.length - box(v).w / 2)) + size(v).w / 2;
+  };
   const column = (k) => x.get(left.get(k)) + z.col / 2;
+  // Longest paths push every column as far left as it can go, so a wire can leave its box and come back the long way.
+  // Each column slides toward the boxes its wires join, as far as the columns either side let it: their order is the
+  // embedding, and it never changes.
+  const centre = (v) => (ghost(v) ? middle(v) : middle(v) - size(v).w / 2 + box(v).w / 2);
+  const earlier = new Map(names.map((n) => [n, []])), later = new Map(names.map((n) => [n, []])), wiresOf = new Map();
+  for (const [p, q, l] of xArcs) (later.get(p).push([q, l]), earlier.get(q).push([p, l]));
+  for (const [k, w] of g.owner) if (w.visible) (wiresOf.get(left.get(k)) ?? wiresOf.set(left.get(k), []).get(left.get(k))).push(k);
+  for (let sweep = 0; sweep < 60; sweep++) for (const f of sweep % 2 ? names : [...names].reverse()) {
+    if (!wiresOf.has(f)) continue;
+    const wants = wiresOf.get(f).flatMap((k) => k.split('|')).map(centre).sort((p, q) => p - q);
+    const lo = Math.max(...earlier.get(f).map(([p, l]) => x.get(p) + l)), hi = Math.min(...later.get(f).map(([q, l]) => x.get(q) - l));
+    if (lo <= hi) x.set(f, Math.min(hi, Math.max(lo, wants[wants.length >> 1] - z.col / 2)));
+  }
   // Every wire its own way into an item, so none runs along another. One under the box drops straight in; the rest come
   // along tracks of their own, the outermost column on the track nearest the box, landing on the box in that order.
   const landing = new Map(), tracks = new Map();

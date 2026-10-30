@@ -127,3 +127,18 @@ test('bars: many wires into one item each land apart', () => {
   assert.equal(count(lines(g)).shared, 0);
   assert.ok(right(g));
 });
+
+test('bars: a tree of uneven widths stays off its item and its neighbours', () => {
+  const wide = (id: string) => ({ ...item(id), title: 'a much longer title than the others have' });
+  const leaves = ['l0', 'l1', 'l2', 'l3', 'l4'].map((id, k) => (k % 2 ? item(id) : wide(id)));
+  const ring = ['p', 'q', 'o'].map((id) => item(id));
+  const g = drawnBars([...ring, ...leaves], [...leaves.map((l) => tie(l.id, 'p')), tie('p', 'q', 'serves'), tie('q', 'o', 'serves'), tie('o', 'p', 'serves')]);
+  assert.equal(g.all.length, 8);
+  assert.ok(clear(g));
+});
+
+test('bars: in a ring of three only the wire that goes round takes four turns', () => {
+  const g = drawnBars(['a', 'b', 'c'].map((id) => item(id)), [tie('a', 'b', 'serves'), tie('b', 'c', 'serves'), tie('c', 'a', 'serves')]);
+  const turns = lines(g).map((w: any) => w.length - 2).sort();
+  assert.deepEqual(turns, [2, 2, 4]);
+});

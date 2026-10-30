@@ -44,7 +44,7 @@ export function comb(n, kids, size, z) {
     p.x = run + lw + z.col / 2;
     run += lw + z.col + rw + z.col;
   }
-  const centre = (spines[0].x + spines.at(-1).x) / 2, bus = z.row + 6, items = [], wires = new Map();
+  const centre = (run - z.col) / 2, bus = z.row + 6, items = [], wires = new Map();
   let bottom = 0;
   for (const p of spines) {
     const sx = p.x - centre;
