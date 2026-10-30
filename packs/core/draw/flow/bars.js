@@ -5,6 +5,8 @@
 // geometry out, as the flow's layout answers.
 
 import { comb, peel } from './combs.js';
+import { count } from './count.js';
+import { wrongEnd } from './faults.js';
 import { flatten, ORDER } from './graph.js';
 import { numbered } from './numbering.js';
 import { stepsOf } from './plane.js';
@@ -13,8 +15,8 @@ import { settle, square } from './settle.js';
 import { planarize } from './thread.js';
 import { embed } from './upward.js';
 
-/** The embedding made for the order is tried on parts up to this size, and may add this many crossings for each wire it turns down. */
-const EMBED_MOST = 100, EMBED_COST = 2;
+/** The ways a part may be drawn, a fixed order of its ties and which face is outer, the likeliest first: the style says how many. */
+const TRIALS = [[0, 0], [1, 0], [2, 0], [3, 0], [0, 1], [1, 1], [2, 1], [3, 1], [0, 2], [1, 2]].map(([ties, nth]) => ({ ties, nth }));
 /** Past this many wires the pull takes fewer rounds: a drawing that takes too long is stopped by the page. */
 const PULL_MOST = 150;
 
@@ -86,18 +88,32 @@ const against = (g, number) => g.wires.filter((w) => w.link?.[2] && w.path.some(
  * The part's graph and numbering. The heaviest planar part, numbered as the order asks, is the picture with the fewest
  * crossings; where that leaves order wires up, the embedding made for the order (./upward.js) is tried in its place.
  */
-function downward(links, list) {
-  // By name, so the picture does not change with the order the answer came in.
-  const ids = [...list].sort(), sorted = [...links].sort((p, q) => Number(q[2]) - Number(p[2]) || (pair(p[0], p[1]) < pair(q[0], q[1]) ? -1 : 1));
-  const g = planarize(sorted, ids), found = { g, ...numbered(g) }, up = against(g, found.number);
-  if (!up || list.length > EMBED_MOST) return found;
+function downward(links, list, z, { ties = 0, nth = 0 } = {}) {
+  // By name, so the picture does not change with the order the answer came in. Ties in another fixed order keep another
+  // planar part, for the search in `best`.
+  const keyOf = (l) => { const k = pair(l[0], l[1]); return ties === 1 ? [...k].reverse().join('') : ties === 2 ? k.slice(k.indexOf('|')) + k : k; };
+  const name = (p, q) => (keyOf(p) < keyOf(q) ? -1 : 1);
+  const ids = [...list].sort(), sorted = [...links].sort((p, q) => Number(q[2]) - Number(p[2]) || name(p, q) * (ties === 3 ? -1 : 1));
+  const g = planarize(sorted, ids), found = { g, ...numbered(g, nth) }, up = against(g, found.number);
+  if (!up || list.length > z.embed_most || ties || nth) return found;
   const made = embed(sorted, ids);
-  return against(made, made.number) < up && made.crossings <= g.crossings + up * EMBED_COST ? { g: made, s: made.s, t: made.t, number: made.number, outerAt: made.outerAt } : found;
+  return against(made, made.number) < up && made.crossings <= g.crossings + up * z.embed_cost ? { g: made, s: made.s, t: made.t, number: made.number, outerAt: made.outerAt } : found;
+}
+
+/** What a part's picture costs before it is pulled tight: up wires first, then crossings, wires on the wrong side, and length. */
+function costOf(d, size, z) {
+  const lines = [...d.points.values()], rect = (id) => { const [x, y] = d.places.get(id), s = size(id); return { l: x - s.w / 2, r: x + s.w / 2, t: y, u: y + s.h }; };
+  let length = 0, wrong = 0;
+  for (const w of lines) {
+    for (let i = 1; i < w.points.length; i++) length += Math.abs(w.points[i][0] - w.points[i - 1][0]) + Math.abs(w.points[i][1] - w.points[i - 1][1]);
+    if (wrongEnd(rect(w.from), rect(w.to), w.points[0]) || wrongEnd(rect(w.to), rect(w.from), w.points.at(-1))) wrong++;
+  }
+  return d.up * z.cost_up + count(lines.map((w) => w.points)).crossings * z.cost_cross + wrong * z.cost_wrong + length;
 }
 
 /** One connected part: places by item, and each visible link's points. `block` is an item's size with what hangs on it, `box` its own. */
-function drawPart(list, links, block, box, z) {
-  const { g, s, t, number, outerAt } = downward(links, list), next = new Map();
+function drawPart(list, links, block, box, z, trial) {
+  const { g, s, t, number, outerAt } = downward(links, list, z, trial), next = new Map();
   for (const k of g.owner.keys()) {
     const [a, b] = k.split('|');
     (next.get(a) ?? next.set(a, new Set()).get(a)).add(b);
@@ -193,7 +209,7 @@ function drawPart(list, links, block, box, z) {
     points.set(pair(w.link[0], w.link[1]), { from: w.link[0], to: w.link[1], points: out });
   }
   const places = new Map(rows.filter((v) => !ghost(v)).map((v) => [v, [middle(v), y.get(v)]]));
-  return { places, points, crossings: g.crossings };
+  return { places, points, crossings: g.crossings, up: against(g, number) };
 }
 
 /** For a test or a bench: told how each pass went. */
@@ -206,7 +222,8 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
   const margin = sizes.flow_margin, gap = sizes.flow_node_gap, zw = { room: sizes.plane_wire_room, join: sizes.plane_joined_room, run: sizes.plane_port_run };
-  const z = { row: sizes.flow_layer_gap / 2, col: Math.max(gap / 2, zw.room * 2), turn: gap / 3, gap, ...zw };
+  const zs = { trials: sizes.plane_trials, trial_most: sizes.plane_trial_most, cost_up: sizes.plane_cost_up, cost_cross: sizes.plane_cost_crossing, cost_wrong: sizes.plane_cost_wrong_side, embed_most: sizes.plane_embed_most, embed_cost: sizes.plane_embed_crossings };
+  const z = { row: sizes.flow_layer_gap / 2, col: Math.max(gap / 2, zw.room * 2), turn: gap / 3, gap, ...zw, ...zs };
   const zc = { row: gap / 4, col: gap, stub: z.run, join: z.join }, combGap = Math.max(gap, z.join);
   const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ a: l.from, b: l.to, type: l.type, ...(l.pending && { pending: l.pending }) }));
   const chains = edges.map((e) => ({ ...e, key: `${e.a} ${e.b}`, path: [e.a, e.b], dashed: potential.has(e.b) }));
@@ -253,7 +270,13 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
     }
     let drawn;
     if (list.length >= 3 && part.length >= 3) {
-      try { drawn = drawPart(list, part, block, stepSize, z); threaded += drawn.crossings; } catch (e) { console.warn?.(`The bars fell back: ${e.message}`); }
+      for (const trial of list.length <= z.trial_most ? TRIALS.slice(0, z.trials) : TRIALS.slice(0, 1)) {
+        try {
+          const made = drawPart(list, part, block, stepSize, z, trial), cost = costOf(made, stepSize, z);
+          if (!drawn || cost < drawn.cost) drawn = { ...made, cost };
+        } catch (e) { console.warn?.(`The bars fell back: ${e.message}`); }
+      }
+      if (drawn) threaded += drawn.crossings;
     }
     if (!drawn) {
       let run = 0;
@@ -333,7 +356,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
       r.points = r.points.map(([p, q]) => [p + b.at[0] - b.was[0], q + b.at[1] - b.was[1]]);
     }
     for (const [id, b] of rigid) b.pointed = nodes.get(id).shape === 'diamond';
-    wired = reroute(rigid, moving, [...routes.values()].filter((r) => r.to === undefined).map((r) => r.points), { track: z.turn, room: z.room, run: z.run });
+    wired = reroute(rigid, moving, [...routes.values()].filter((r) => r.to === undefined).map((r) => r.points), { track: z.turn, room: z.room, run: z.run, ports: sizes.plane_reroute_ports, shorter: sizes.plane_reroute_shorter, rounds: sizes.plane_reroute_rounds });
   }
   const edge = (id, to) => {
     const s = stepSize(id), [px, py] = [x.get(id), y.get(id)], dx = to[0] - px, dy = to[1] - py, t = Math.min(dx ? s.w / 2 / Math.abs(dx) : Infinity, dy ? s.h / 2 / Math.abs(dy) : Infinity, 1);

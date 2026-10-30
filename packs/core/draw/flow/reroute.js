@@ -5,13 +5,6 @@
 
 import { count, touch } from './count.js';
 
-/** How many places along a side a port may stand. */
-const PORTS = 5;
-/** A way with as many bends as a wire has now must be this much shorter to be worth taking. */
-const SHORTER = 0.7;
-/** Twice over: a wire that moves can open a way for another. */
-const ROUNDS = 2;
-
 const lengthOf = (l) => l.reduce((sum, p, i) => sum + (i ? Math.abs(p[0] - l[i - 1][0]) + Math.abs(p[1] - l[i - 1][1]) : 0), 0);
 const spread = (lo, hi, n) => (hi < lo ? [] : n === 1 || hi === lo ? [(lo + hi) / 2] : [(lo + hi) / 2, ...Array.from({ length: n }, (_, k) => lo + ((hi - lo) * k) / (n - 1))]);
 const boundsOf = (l) => [Math.min(...l.map((p) => p[0])), Math.max(...l.map((p) => p[0])), Math.min(...l.map((p) => p[1])), Math.max(...l.map((p) => p[1]))];
@@ -31,10 +24,10 @@ function tidy(points) {
 }
 
 /** The places a port may stand along each side of a box: `ax` 0 for those along its top and foot, 1 for those down its sides. */
-const portsOf = (b, ax, pad) => (b.pointed ? [b.mid[ax]] : spread(b.lo[ax] + Math.min(pad, (b.hi[ax] - b.lo[ax]) / 4), b.hi[ax] - Math.min(pad, (b.hi[ax] - b.lo[ax]) / 4), PORTS));
+const portsOf = (b, ax, pad, n) => (b.pointed ? [b.mid[ax]] : spread(b.lo[ax] + Math.min(pad, (b.hi[ax] - b.lo[ax]) / 4), b.hi[ax] - Math.min(pad, (b.hi[ax] - b.lo[ax]) / 4), n));
 
 /** Every way from `a` to `b` of up to two bends that runs toward `b` the whole way, by side. */
-function ways(a, b, pad, was, run) {
+function ways(a, b, pad, was, run, n) {
   const out = [];
   for (const [across, along] of [[0, 1], [1, 0]]) {
     // Wires that run along axis `along`, leaving `a` at a place `across`.
@@ -42,12 +35,12 @@ function ways(a, b, pad, was, run) {
     const at = (u, v) => { const p = []; p[across] = u; p[along] = v; return p; };
     const blocked = (box, s) => along === 0 && s > 0 && box.noRight;
     if ((to - from) * sign > 0 && !blocked(a, sign) && !blocked(b, -sign)) {
-      const mine = portsOf(a, across, pad), yours = portsOf(b, across, pad);
+      const mine = portsOf(a, across, pad, n), yours = portsOf(b, across, pad, n);
       for (const u of mine.filter((u) => u >= b.lo[across] + 1 && u <= b.hi[across] - 1)) out.push([at(u, from), at(u, to)]);
       for (const u of yours.filter((u) => u >= a.lo[across] + 1 && u <= a.hi[across] - 1)) out.push([at(u, from), at(u, to)]);
       // However little two boxes overlap, the wire can drop straight between them.
       const over = [Math.max(a.lo[across], b.lo[across]), Math.min(a.hi[across], b.hi[across])];
-      if (!a.pointed && !b.pointed) for (const u of spread(over[0] + 1, over[1] - 1, PORTS)) out.push([at(u, from), at(u, to)]);
+      if (!a.pointed && !b.pointed) for (const u of spread(over[0] + 1, over[1] - 1, n)) out.push([at(u, from), at(u, to)]);
       const mids = [(from + to) / 2, from + sign * run, to - sign * run, ...was.map((p) => p[along]).filter((v) => (v - from) * sign >= run && (to - v) * sign >= run)];
       for (const u of mine) for (const v of yours) if (u !== v) for (const m of mids) out.push([at(u, from), at(u, m), at(v, m), at(v, to)]);
     }
@@ -55,7 +48,7 @@ function ways(a, b, pad, was, run) {
     const other = 1 - along, way = b.mid[other] >= a.mid[other] ? 1 : -1, into = way > 0 ? b.lo[other] : b.hi[other];
     if ((b.lo[along] - from) * sign < 0 && (b.hi[along] - from) * sign < 0) continue;
     if (blocked(a, sign) || blocked(b, -way) && other === 0) continue;
-    for (const u of portsOf(a, across, pad)) if ((into - u) * way >= run) for (const v of portsOf(b, along, pad)) if ((v - from) * sign >= run) out.push([at(u, from), at(u, v), at(into, v)]);
+    for (const u of portsOf(a, across, pad, n)) if ((into - u) * way >= run) for (const v of portsOf(b, along, pad, n)) if ((v - from) * sign >= run) out.push([at(u, from), at(u, v), at(into, v)]);
   }
   return out;
 }
@@ -104,9 +97,11 @@ function unjog(w, a, b, near, solids, others) {
 /**
  * `boxes` by id, as settle has them, with `pointed` where a wire can only meet the middle of a side; `wires` { a, b,
  * points } are those that may move, `still` lines they must keep off. `track` is the room a port keeps from a box's
- * corner, `room` what a wire keeps from a box it passes, and `run` the length from a port to the wire's first corner.
+ * corner, `room` what a wire keeps from a box it passes, `run` the length from a port to the wire's first corner, `ports`
+ * how many places along a side a port may stand, `shorter` how much of its length a way with as many bends as the wire
+ * has now may come to, to be worth taking, and `rounds` how many times over, since a wire that moves can open a way for another.
  */
-export function reroute(boxes, wires, still, { track, room = 0, run = 0, rounds = ROUNDS }) {
+export function reroute(boxes, wires, still, { track, room, run, ports, shorter, rounds }) {
   const shape = new Map(), solids = [];
   for (const [id, b] of boxes) {
     const [[l, r], [t, u]] = b.reach ?? [[-b.size[0] / 2, b.size[0] / 2], [-b.size[1] / 2, b.size[1] / 2]], [x, y] = b.at;
@@ -121,8 +116,8 @@ export function reroute(boxes, wires, still, { track, room = 0, run = 0, rounds 
     const was = tidy(w.points), bends = was.length - 2, long = lengthOf(was), a = shape.get(w.a), b = shape.get(w.b);
     // A wire too near a box or with a corner on its port takes any way as good that has the room.
     const tight = !clear(was, was, w, solids, [], room) || (bends > 0 && Math.min(lengthOf(was.slice(0, 2)), lengthOf(was.slice(-2))) < run);
-    const better = ways(a, b, track, was, run).map((l) => tidy(l)).map((l) => ({ l, bends: l.length - 2, long: lengthOf(l) }))
-      .filter((c) => c.bends < bends || (c.bends === bends && (tight || c.long < long * SHORTER))).sort((p, q) => p.bends - q.bends || p.long - q.long);
+    const better = ways(a, b, track, was, run, ports).map((l) => tidy(l)).map((l) => ({ l, bends: l.length - 2, long: lengthOf(l) }))
+      .filter((c) => c.bends < bends || (c.bends === bends && (tight || c.long < long * shorter))).sort((p, q) => p.bends - q.bends || p.long - q.long);
     const found = better.find((c) => clear(c.l, was, w, solids, others, room));
     if (found) ((w.points = found.l), (w.bounds = null), moved++);
     if (unjog(w, a, b, track * 2, solids, others)) jogs++;

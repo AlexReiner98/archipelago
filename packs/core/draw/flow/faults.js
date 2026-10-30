@@ -24,7 +24,7 @@ export const doublesBack = (p) => {
 const sideOf = (r, p) => [[Math.abs(p[1] - r.t), 'top'], [Math.abs(p[1] - r.u), 'foot'], [Math.abs(p[0] - r.l), 'left'], [Math.abs(p[0] - r.r), 'right']].sort((u, v) => u[0] - v[0])[0][1];
 
 /** Whether the end of a wire at `port` on box `r` faces away from the box `o` at its other end. */
-function wrongEnd(r, o, port) {
+export function wrongEnd(r, o, port) {
   const s = sideOf(r, port), over = o.l < r.r && o.r > r.l;
   if (s === 'top') return o.t >= r.t && (o.t >= r.u || over);
   if (s === 'foot') return o.u <= r.u && (o.u <= r.t || over);

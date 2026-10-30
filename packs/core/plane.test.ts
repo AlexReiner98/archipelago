@@ -295,11 +295,13 @@ test('faults: a wire with a way straight across is counted, and one that takes i
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { reroute } from './draw/flow/reroute.js';
 
+const limits = { ports: house.sizes.plane_reroute_ports, shorter: house.sizes.plane_reroute_shorter, rounds: house.sizes.plane_reroute_rounds };
+
 test('reroute: a wire that wanders takes the straight way, and one bend where it must', () => {
   const boxes = new Map([['a', box(100, 50)], ['b', box(100, 300)], ['c', box(400, 300)]]);
   const straight = { a: 'a', b: 'b', points: [[100, 70], [100, 90], [300, 90], [300, 200], [100, 200], [100, 280]] };
   const bent = { a: 'a', b: 'c', points: [[60, 30], [60, 10], [420, 10], [420, 280]] };
-  reroute(boxes, [straight, bent], [], { track: 8 });
+  reroute(boxes, [straight, bent], [], { ...limits, track: 8, room: 0, run: 0 });
   assert.equal(straight.points.length, 2);
   assert.equal(straight.points[0][0], straight.points[1][0]);
   assert.equal(bent.points.length, 3);
@@ -309,29 +311,29 @@ test('reroute: a wire that wanders takes the straight way, and one bend where it
 test('reroute: no way through a box or across a wire is taken', () => {
   const boxes = new Map([['a', box(100, 50)], ['m', box(100, 200)], ['b', box(100, 350)]]);
   const round = { a: 'a', b: 'b', points: [[120, 70], [120, 100], [300, 100], [300, 300], [120, 300], [120, 330]] };
-  reroute(boxes, [round], [], { track: 8 });
+  reroute(boxes, [round], [], { ...limits, track: 8, room: 0, run: 0 });
   assert.ok(Math.max(...round.points.map((p) => p[0])) >= 150, 'it stays round the middle box');
   const left = new Map([['a', box(100, 50)], ['b', box(100, 350)]]);
   const fence = { a: 'c', b: 'd', points: [[0, 200], [400, 200]] }, wire = { a: 'a', b: 'b', points: [[120, 70], [120, 100], [500, 100], [500, 300], [120, 300], [120, 330]] };
-  reroute(left, [wire], [fence.points], { track: 8 });
+  reroute(left, [wire], [fence.points], { ...limits, track: 8, room: 0, run: 0 });
   assert.equal(count([wire.points, fence.points]).crossings, 0);
 });
 
 test('reroute: two boxes that barely overlap join by one straight stretch, and corners keep clear of ports', () => {
   const boxes = new Map([['a', box(100, 50)], ['b', box(194, 150)]]);
   const wire = { a: 'a', b: 'b', points: [[120, 70], [120, 80], [130, 80], [130, 150], [144, 150]] };
-  reroute(boxes, [wire], [], { track: 8, room: 12, run: 18 });
+  reroute(boxes, [wire], [], { ...limits, track: 8, room: 12, run: 18 });
   assert.equal(wire.points.length, 2);
   const far = new Map([['a', box(100, 50)], ['b', box(400, 300)]]);
   const bent = { a: 'a', b: 'b', points: [[100, 70], [100, 74], [400, 74], [400, 280]] };
-  reroute(far, [bent], [], { track: 8, room: 12, run: 18 });
+  reroute(far, [bent], [], { ...limits, track: 8, room: 12, run: 18 });
   assert.ok(bent.points.slice(1).every((p, i) => i === bent.points.length - 2 || Math.abs(p[0] - bent.points[0][0]) + Math.abs(p[1] - bent.points[0][1]) >= 18));
 });
 
 test('reroute: a short step in a wire is taken out, and a wire stays on its box', () => {
   const boxes = new Map([['a', box(100, 50)], ['b', box(106, 300)], ['m', box(103, 170, 60, 40)]]);
   const wire = { a: 'a', b: 'b', points: [[60, 70], [60, 170], [66, 170], [66, 280]] };
-  reroute(boxes, [wire], [], { track: 8 });
+  reroute(boxes, [wire], [], { ...limits, track: 8, room: 0, run: 0 });
   assert.equal(wire.points.length, 2);
   assert.ok(wire.points[0][0] >= 50 && wire.points[0][0] <= 150);
   assert.ok(wire.points[1][0] >= 56 && wire.points[1][0] <= 156);
