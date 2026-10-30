@@ -155,3 +155,14 @@ test('a preview says what a term would change, reading nothing else', async () =
   assert.deepEqual((await (flatLens(l, { filter: {}, preview: { part: 'find', terms: ['type project'] } }) as unknown as Promise<{ preview: Record<string, string[]> }>)).preview['type project'], [made.p], 'an empty canvas may ask');
   await assert.rejects(flatLens(l, { filter: {}, preview: { part: 'nope', terms: [] } }), /preview\.part/);
 });
+
+test('words keep to Not, however many terms it has', async () => {
+  const { l } = await project();
+  await make(l, [{ op: 'create', type: 'lens', title: 'Find in a view', status: 'current', props: { filter: { find: ['type task'] } } }]);
+  const titled = async (not?: string[]) => titles(await flatLens(l, { filter: { find: ['text find'], ...(not && { not }) } }));
+  assert.ok(!(await titled()).includes('Find in a view'), 'the default Not leaves out what the system keeps');
+  assert.ok((await titled([])).includes('Find in a view'), 'with nothing left out, it is found');
+  assert.deepEqual(await titled(['kind system', 'status doing', 'done']), ['Find in'], 'three terms of Not, each a parameter of its own');
+  const two = await flatLens(l, { filter: { find: ['text find', 'text already'], not: ['kind system', 'status doing'] } });
+  assert.deepEqual(titles(two), ['Done already', 'Find in'], 'and with two sets of words');
+});

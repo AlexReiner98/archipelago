@@ -227,7 +227,7 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
     if (room() <= 0) break;
     const finding = async (near: boolean) => (await l.db.query<{ id: string; n: number }>(
       `select e.id, count(*) over ()::int as n from entity e where e.id in (${searchIds('$1', near)}) and ${narrowed(3)} order by ${rankSql('$1', 'e.')} desc, e.updated_at desc, e.id limit $2`,
-      [said, reach(), leftOut, ...narrowing])).rows;
+      [said, reach(), ...leftOut, ...narrowing])).rows;
     let near = false;
     let rows = await finding(false);
     if (!rows.length) rows = await finding((near = true));
@@ -242,7 +242,7 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
       ? matchedIds.size
       : (await l.db.query<{ n: number }>(
           `select count(*)::int as n from entity e where e.id in (select pelago_search_ids(v, s.near) from unnest($1::text[], $2::boolean[]) s(q, near) cross join lateral ${slipsOf('s.q', 's.near')} slips(v)) and ${narrowed(3)}`,
-          [asked.map((a) => a.said), asked.map((a) => a.near), leftOut, ...narrowing])).rows[0].n;
+          [asked.map((a) => a.said), asked.map((a) => a.near), ...leftOut, ...narrowing])).rows[0].n;
   }
   for (const t of finds) if (t.sort === 'type' && room() > 0) add(await seedOf(t, reach()), 'type', [t]);
 
