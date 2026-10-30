@@ -41,7 +41,7 @@ export const LENS_LIMIT = 2000;
 /** Items sent unless the lens says otherwise. */
 const FLAT_LIMIT = 500;
 /** The most choices one preview counts, and the most items it says of each: past that a choice reads as 200+. */
-export const PREVIEW_TERMS = 12;
+export const PREVIEW_TERMS = 80;
 export const PREVIEW_MOST = 200;
 /** The most steps a walk takes. */
 const MAX_STEPS = 6;

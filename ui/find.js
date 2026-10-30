@@ -11,6 +11,7 @@
 
 import { api, h, state, wordsOf, withWords } from './base.js';
 import { lightItems } from './lens-light.js';
+import { changes } from './lit-by.js';
 import { viewUp } from './query-bar.js';
 import { goLens, home, lensNow, openHere, styleNow } from './canvas.js';
 import { MODES, choicesFor, ledBy, wordsChoice } from './find-choices.js';
@@ -146,9 +147,9 @@ async function countChoices(all, lens, mine) {
   if (!answer?.items || lens.view) return;
   const drawn = answer.items.map((i) => i.id);
   const here = new Set(drawn);
-  const most = numberOf(state.style, 'find_count_most');
   // A choice is for one part, and find may hold those of two (the bar's signs): each part's asked in its own read.
-  const parts = ['find', 'only', 'not'].map((part) => [part, all.filter((c) => c.term?.[part]).slice(0, most)]).filter(([, offered]) => offered.length);
+  // Find's reads find their own items, so a few; Only's and Not's are over what is drawn, so all, to leave out what changes nothing.
+  const parts = ['find', 'only', 'not'].map((part) => [part, all.filter((c) => c.term?.[part]).slice(0, numberOf(state.style, part === 'find' ? 'find_count_most' : 'find_check_most'))]).filter(([, offered]) => offered.length);
   const told = await Promise.all(parts.map(([part, offered]) => api('view', { name: 'flat', params: { filter: lens.filter, preview: { part, terms: offered.map((c) => c.term[part]), ids: drawn } } }).catch(() => null)));
   if (mine !== asked) return;
   parts.forEach(([part, offered], n) => {
@@ -161,9 +162,14 @@ async function countChoices(all, lens, mine) {
         c.count = `−${ids.length}`;
         const gone = new Set(ids);
         c.leaves = drawn.filter((id) => !gone.has(id));
+        // What leaves out nothing or everything is no choice. A canvas cut by its limit holds only part of what it finds, so it cannot tell.
+        c.idle = !answer.cut && drawn.length > 0 && Boolean(told[n]?.preview) && !changes(ids.length, drawn.length);
       }
     }
   });
+  const held = choices[lit];
+  choices = choices.filter((c) => !c.idle);
+  lit = Math.max(0, choices.indexOf(held));
   drawChoices();
 }
 

@@ -11,3 +11,6 @@ export function litBy(answer, term) {
   }
   return lit;
 }
+
+/** Whether a term of Only or Not would change what is drawn: it leaves out something, and not everything. */
+export const changes = (left, drawn) => left > 0 && left < drawn;

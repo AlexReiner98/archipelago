@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error: a plain module of the page, with no types of its own.
-import { litBy } from '../ui/lit-by.js';
+import { changes, litBy } from '../ui/lit-by.js';
 
 const [a, b, c, d] = ['e_aaaaaaaa', 'e_bbbbbbbb', 'e_cccccccc', 'e_dddddddd'];
 const item = (id: string, extra: Record<string, unknown> = {}) => ({
@@ -31,3 +31,7 @@ for (const name of ['flow', 'grid', 'time', 'pages', 'architecture']) {
     assert.match(code, /href: `#\/e\/\$\{|\bitem: /, 'a link to the item, or item');
   });
 }
+
+test('a term of Only or Not is a choice when it leaves out something, and not everything', () => {
+  assert.deepEqual([changes(0, 30), changes(12, 30), changes(30, 30)], [false, true, false]);
+});
