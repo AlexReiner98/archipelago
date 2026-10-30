@@ -152,7 +152,7 @@ function drawPart(list, links, block, box, z, trial) {
   const earlier = new Map(names.map((n) => [n, []])), later = new Map(names.map((n) => [n, []])), wiresOf = new Map();
   for (const [p, q, l] of xArcs) (later.get(p).push([q, l]), earlier.get(q).push([p, l]));
   for (const [k, w] of g.owner) if (w.visible) (wiresOf.get(left.get(k)) ?? wiresOf.set(left.get(k), []).get(left.get(k))).push(k);
-  for (let sweep = 0; sweep < 60; sweep++) for (const f of sweep % 2 ? names : [...names].reverse()) {
+  for (let sweep = 0; sweep < z.slide_sweeps; sweep++) for (const f of sweep % 2 ? names : [...names].reverse()) {
     if (!wiresOf.has(f)) continue;
     const wants = wiresOf.get(f).flatMap((k) => k.split('|')).map(centre).sort((p, q) => p - q);
     const lo = Math.max(...earlier.get(f).map(([p, l]) => x.get(p) + l)), hi = Math.min(...later.get(f).map(([q, l]) => x.get(q) - l));
@@ -222,7 +222,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
   const margin = sizes.flow_margin, gap = sizes.flow_node_gap, zw = { room: sizes.plane_wire_room, join: sizes.plane_joined_room, run: sizes.plane_port_run };
-  const zs = { trials: sizes.plane_trials, trial_most: sizes.plane_trial_most, cost_up: sizes.plane_cost_up, cost_cross: sizes.plane_cost_crossing, cost_wrong: sizes.plane_cost_wrong_side, embed_most: sizes.plane_embed_most, embed_cost: sizes.plane_embed_crossings };
+  const zs = { trials: sizes.plane_trials, trial_most: sizes.plane_trial_most, cost_up: sizes.plane_cost_up, cost_cross: sizes.plane_cost_crossing, cost_wrong: sizes.plane_cost_wrong_side, embed_most: sizes.plane_embed_most, embed_cost: sizes.plane_embed_crossings, slide_sweeps: sizes.plane_slide_sweeps };
   const z = { row: sizes.flow_layer_gap / 2, col: Math.max(gap / 2, zw.room * 2), turn: gap / 3, gap, ...zw, ...zs };
   const zc = { row: gap / 4, col: gap, stub: z.run, join: z.join }, combGap = Math.max(gap, z.join);
   const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ a: l.from, b: l.to, type: l.type, ...(l.pending && { pending: l.pending }) }));
@@ -327,7 +327,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   }
   for (const r of routes.values()) if (r.to !== undefined && rigid.has(r.from) && rigid.has(r.to)) moving.push(Object.assign(r, { a: r.from, b: r.to, down: orderKey.has(pair(r.from, r.to)) }));
   if (moving.length && square(moving)) {
-    settled = settle(rigid, moving, { gap: gap / 2, track: z.turn, ...zw, blocks: sizes.plane_block_rounds, watch: watching, ...(moving.length > PULL_MOST && { rounds: 4, sweeps: 6 }) });
+    settled = settle(rigid, moving, { gap: gap / 2, track: z.turn, ...zw, blocks: moving.length > PULL_MOST ? sizes.plane_block_rounds_big : sizes.plane_block_rounds, watch: watching, ...(moving.length > PULL_MOST && { rounds: 4, sweeps: 6 }) });
     // The parts have pulled in, so they are set again, closer.
     const sets = shelves.map((c) => {
       const ids = [...c.drawn.places.keys()].filter((id) => rigid.has(id)), rs = ids.map((id) => rigid.get(id));

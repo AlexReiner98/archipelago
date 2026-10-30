@@ -126,7 +126,7 @@ function pass(axis, boxes, wires, { gap, track, room, join, run, sweeps, press, 
     const [lo, hi] = bounds(it);
     if (lo <= hi) it.pos = Math.min(hi, Math.max(lo, median(it.joins.map((j) => j.pos))));
   }
-  if (blocks) slideBlocks(items, bounds, blocks, sweeps);
+  if (blocks) slideBlocks(items, bounds, blocks);
   for (const it of items) if (it.box) {
     const b = boxes.get(it.box), move = it.pos - b.at[axis];
     b.at[axis] = it.pos;
@@ -147,7 +147,7 @@ const TIGHT = 0.5, SETTLED = 0.5;
  * take their own medians again, which is how a block comes apart when its members want different ways. Runs until
  * nothing moves, or for `limit` rounds.
  */
-function slideBlocks(items, bounds, limit, sweeps) {
+function slideBlocks(items, bounds, limit) {
   for (let round = 0; round < limit; round++) {
     const root = new Map(items.map((it) => [it, it])), find = (it) => (root.get(it) === it ? it : (root.set(it, find(root.get(it))), root.get(it)));
     for (const it of items) for (const [q, s] of it.right) if (q.pos - it.pos - s < TIGHT) root.set(find(it), find(q));
@@ -172,7 +172,7 @@ function slideBlocks(items, bounds, limit, sweeps) {
       moved++;
     }
     let single = 0;
-    for (let sweep = 0; sweep < sweeps; sweep++) for (const it of sweep % 2 ? [...items].reverse() : items) {
+    for (const it of round % 2 ? [...items].reverse() : items) {
       if (!it.joins.length) continue;
       const [lo, hi] = bounds(it);
       if (lo > hi) continue;
