@@ -88,13 +88,6 @@ export function added(lens, term) {
   return { ...rest, filter: f };
 }
 
-/** The part a term's sign moves it to: Find, Only, Not and round; what can only be checked of what is found skips Find. */
-const SIGN = { find: '+', only: 'only', not: '−' };
-function nextPart(part, term) {
-  const next = { find: 'only', only: 'not', not: 'find' }[part];
-  return next === 'find' && (isWord(term) || term.startsWith('kind ')) ? 'only' : next;
-}
-
 /** The lens with one of its filter's terms taken out. */
 function without(lens, part, value) {
   const f = { ...lens.filter };
@@ -176,9 +169,6 @@ export function drawQuery(lens, view, go, lead) {
     },
     onpointerleave: () => lightTerm(view, lens, null),
   });
-  // A trial (the owner, 30 Oct 2026): each term's sign moves it between the parts. The style's query_signs turns it off.
-  const signs = numberOf(state.style, 'query_signs') === 1;
-  const WORD = { find: 'Find', only: 'Only', not: 'Not' };
   /** A term: its words and an × to take it away. The last term Find has may go too: the canvas is then empty. */
   const term = (cls, said, title, part, value) => {
     const drop = () => go(without(lens, part, value));
@@ -188,7 +178,6 @@ export function drawQuery(lens, view, go, lead) {
       drop,
       term: value,
       el: h('span', { class: `q-term ${cls}`, title, ...lighting(part, value) },
-        signs && h('button', { type: 'button', class: 'q-sign', title: `Move it to ${WORD[nextPart(part, value)]}`, 'aria-label': `Move ${said} to ${WORD[nextPart(part, value)]}`, onclick: () => go(added(without(lens, part, value), { [nextPart(part, value)]: value })) }, SIGN[part]),
         h('span', { class: 'q-said' }, said),
         drop && h('button', { type: 'button', class: 'q-x', title: 'Take it out', 'aria-label': `Take out ${said}`, onclick: drop }, '×')),
     };

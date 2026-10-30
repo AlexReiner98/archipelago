@@ -146,8 +146,6 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #find .q-term[data-gone]::after { content: attr(data-gone); margin-inline-start: var(--space-3); }
 #find .q-term.q-walk .q-said { font-family: var(--type-water-family); font-weight: var(--type-water-weight); font-style: var(--type-water-style); text-transform: var(--type-water-case); letter-spacing: var(--type-water-track); }
 #find .q-term .q-x { color: var(--muted); }
-#find .q-term .q-sign { color: var(--muted); margin-inline-end: var(--space-2); }
-#find .q-term .q-sign:hover { color: var(--text); }
 #find .q-term .q-x:hover { color: var(--text); }
 #find .q-steps { gap: var(--space-3); }
 #find .q-steps button, #find .q-steps button.on { border: 0; background: none; padding: 0 var(--space-2); margin: 0; font: inherit; color: var(--muted); }
