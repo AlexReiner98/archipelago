@@ -26,18 +26,18 @@ export const sessionOf = (step) => step.run ?? step.actor;
 
 /** The sessions heard from while the page is open, by key: what to call each one, and when it last took a step. */
 export const heard = new Map();
-/** Hear a step: its session is among those a tab can follow, called by its name (the run's title), else by its agent's. */
+/** Hear a step: its session is among those a tab can follow, called by what its surface calls it, else by its name, else by its agent's. */
 export function hear(step) {
   const key = sessionOf(step);
   const name = step.name ?? step.actor.split(/[/:]/).at(-1);
-  heard.set(key, { name, at: Math.max(step.at, heard.get(key)?.at ?? 0), run: step.run });
+  heard.set(key, { name, label: step.label, called: step.label ?? (step.name ? `Session ${step.name}` : name), at: Math.max(step.at, heard.get(key)?.at ?? 0), run: step.run });
 }
-/** A session's name as a tab says it: its own, or the agent's, with its run when another session goes by the same. */
+/** A session as a tab or a pane says it: what it is called, with its run when another session goes by the same. */
 export function nameOf(key) {
   const one = heard.get(key);
   if (!one) return key.startsWith('e_') ? key : key.split(/[/:]/).at(-1);
-  const twin = [...heard].some(([k, o]) => k !== key && o.name === one.name);
-  return twin && one.run ? `${one.name} · ${one.run.slice(-4)}` : one.name;
+  const twin = [...heard].some(([k, o]) => k !== key && o.called === one.called);
+  return twin && one.run ? `${one.called} · ${one.run.slice(-4)}` : one.called;
 }
 
 /**

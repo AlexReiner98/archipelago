@@ -7,7 +7,7 @@
 import { livesIn, livesInFor, placeFor } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
-import { heldResources } from './blocking.ts'; import { mintName } from './session-name.ts';
+import { heldResources } from './blocking.ts'; import { mintName, sessionTitle } from './session-name.ts';
 import { toConfirm } from './confirm.ts'; import { commitRule } from './commit-rule.ts';
 import { sentCommits, unaccountedText } from './unaccounted.ts'; import { awakeSessions, roomForSession } from './plan.ts'; import { wholeMap } from './outbox.ts';
 import { STALE_DAYS } from './attention.ts'; import { instructionsFor } from './instructions.ts';
@@ -60,7 +60,7 @@ export async function sessionStart(
       await touch(l, existing.id);
       await nameIfUnnamed(l, actor, existing);
       // Its repository is said again: the hook tells a resumed session where things stand, as it told it at first.
-      return { run: existing.id, name: (await l.entity(existing.id))?.title, status: existing.status, resumed: true, repo: (await placeFor(l, input)) ?? undefined };
+      return { run: existing.id, name: ((await l.entity(existing.id))?.props.name as string | undefined) ?? existing.title, status: existing.status, resumed: true, repo: (await placeFor(l, input)) ?? undefined };
     }
   }
   const task = input.task ? await l.entity(input.task) : undefined;
@@ -73,7 +73,7 @@ export async function sessionStart(
   // Its name is its title, the one a person calls it by everywhere; what it was started for is its note.
   const name = await mintName(l);
   if (name) props.name = name;
-  const title = name ?? input.title ?? (task ? `Session: ${task.title}` : `Session in ${repo?.title ?? input.cwd ?? 'unknown folder'}`);
+  const title = name ? sessionTitle(name) : input.title ?? (task ? `Session: ${task.title}` : `Session in ${repo?.title ?? input.cwd ?? 'unknown folder'}`);
   const ops: Op[] = [{ op: 'create', ref: 'run', type: 'run', title, status: 'running', props, ...(name && input.title && { body: input.title }) }];
   if (task) ops.push({ op: 'link', type: 'works_on', from: 'run', to: task.id });
   if (repo) ops.push({ op: 'link', type: livesInFor(l, repo.type), from: 'run', to: repo.id });
@@ -119,7 +119,7 @@ export async function sessionStart(
 async function nameIfUnnamed(l: Archipelago, actor: Actor, run: Entity): Promise<void> {
   if (run.props.name) return;
   const name = await mintName(l);
-  if (name) await l.apply(actorId(actor), { ops: [{ op: 'update', id: run.id, title: name, props: { name } }], reason: 'Session named' });
+  if (name) await l.apply(actorId(actor), { ops: [{ op: 'update', id: run.id, title: sessionTitle(name), props: { name } }], reason: 'Session named' });
 }
 
 /** Two signs of a session at work this close together are one stretch of work; further apart, it was idle between. */

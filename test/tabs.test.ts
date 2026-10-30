@@ -11,7 +11,7 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-test('in a browser, a show lands without a line at the foot: a note on its pane, a screen in a tab, a question waited for', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, a show lands without a line at the foot: a note on its pane, a screen in a tab, a question waited for, a pane moved to a tab', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'work', title: 'Something shown' }] })).result.created as Record<string, string>;
   const agent = 'agent:claude-code/archipelago';
@@ -31,7 +31,7 @@ test('in a browser, a show lands without a line at the foot: a note on its pane,
     // The note is on the pane, in its mark's tooltip.
     await show({ entity: made.a, note: 'What the note says' });
     await until('its pane', () => page.evaluate<boolean>(`document.querySelectorAll('#canvas > .pane').length === 2`));
-    assert.deepEqual(JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const m = [...document.querySelectorAll('#canvas > .pane')][1].querySelector('.pane-follows'); return [m.textContent, m.title]; })())`)), [name, 'What the note says']);
+    assert.deepEqual(JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const m = [...document.querySelectorAll('#canvas > .pane')][1].querySelector('.pane-follows'); return [m.textContent, m.title]; })())`)), [`Session ${name}`, 'What the note says']);
     // A page that is no canvas takes no pane of the reader's: a tab of its own, marked, and it is open there.
     await show({ screen: 'workspace' });
     await until('a tab of its own', async () => (await tabs()) === 2);
@@ -47,6 +47,15 @@ test('in a browser, a show lands without a line at the foot: a note on its pane,
     assert.equal(await page.evaluate(`Boolean(document.querySelector('.pane-follows')?.textContent === 'after')`), false, 'nothing lands while it is open');
     await page.evaluate(`document.getElementById('held').close()`);
     await until('it lands', () => page.evaluate<boolean>(`[...document.querySelectorAll('.pane-follows')].some((m) => m.textContent === 'after')`));
+    // ⧉ moves a pane into a tab of its own, in sight beside the one it left; the session it was held for goes with it.
+    const [x1, y1] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = document.querySelector('#tabs .tab:nth-child(1) .tab-name').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })())`));
+    for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x: x1, y: y1, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
+    await until('the first tab in sight, its two panes drawn', () => page.evaluate<boolean>(`document.querySelectorAll('#canvas > .pane').length === 2 && document.querySelector('#tabs .tab:nth-child(1)').getAttribute('aria-selected') === 'true'`));
+    await page.evaluate(`[...document.querySelectorAll('#canvas > .pane')][1].querySelector('[aria-label="Move this pane to a new tab"]').click()`);
+    await until('a tab of its own, in sight', async () => (await tabs()) === 3 && (await page.evaluate<boolean>(`document.querySelectorAll('#canvas > .pane').length === 1 && document.querySelector('#tabs .tab:nth-child(2)').getAttribute('aria-selected') === 'true'`)));
+    assert.equal(await page.evaluate(`document.querySelector('#tabs .tab:nth-child(2) .tab-name').textContent`), `Session ${name}`);
+    assert.equal(await page.evaluate(`document.querySelector('#tabs .tab:nth-child(2)').title.includes('follows its session')`), true);
+    assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('[aria-label="Move this pane to a new tab"]')).display`), 'none', 'a pane alone has nothing to leave');
   } finally {
     await page.close();
   }
@@ -91,7 +100,7 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
     await show(2, 'i2');
     await until('the third keeps a tab', async () => (await strip()).length === 3);
     const names = (await strip()).map((t) => t[0]);
-    assert.deepEqual(names.slice(1), [sessions[1].name, sessions[2].name], 'a session’s tab is named by the session');
+    assert.deepEqual(names.slice(1), [`Session ${sessions[1].name}`, `Session ${sessions[2].name}`], 'a session’s tab is named by the session, and says it is one');
     assert.deepEqual((await strip()).map((t) => [t[1], t[2]]), [[true, false], [false, true], [false, true]], 'the tab in sight stays; the others are marked');
     assert.equal(await page.evaluate(`location.hash`), reader);
     // Each session comes back to its own tab: no fourth.
@@ -106,7 +115,7 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
     await show(1, 'i0');
     await until('a tab behind', async () => (await strip()).length === 4);
     assert.ok((await page.evaluate<string>(`location.hash`)).startsWith(`#/e/${made.i2}?`), 'the page the reader is in stays');
-    assert.deepEqual((await strip())[3].slice(0, 3), [sessions[1].name, false, true]);
+    assert.deepEqual((await strip())[3].slice(0, 3), [`Session ${sessions[1].name}`, false, true]);
     // The tab in sight pops out into a window of its own, and docks back whole.
     await page.send('Target.setDiscoverTargets', { discover: true });
     await press(`${tabOf(2)} [aria-label="This tab: whom it follows, pop it out"]`);
@@ -122,7 +131,7 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
     await inPopped(`document.querySelector('[aria-label="Dock back"]').click()`);
     await until('the tab docked back, in sight', async () => {
       const now = await strip();
-      return now.length === 4 && !now.some((t) => t[3]) && now.some((t) => t[0] === sessions[1].name && t[1]);
+      return now.length === 4 && !now.some((t) => t[3]) && now.some((t) => t[0] === `Session ${sessions[1].name}` && t[1]);
     });
   } finally {
     await page.close();

@@ -267,6 +267,11 @@ Brought into sight again, a tab's bar acts on the pane last touched in it
 follows. The tabs are the reader's, kept in this browser for each workspace
 like the canvas settings: never on the map, meaning nothing.
 
+A pane moves into a tab of its own by hand, with ⧉ in its strip or dragged
+onto the tabs, in sight beside the one it left; a pane held for a session
+takes the session with it, and the new tab follows it (e_c5stzz6z). An agent
+cannot ask for a tab: a tab is the reader's.
+
 Each tab follows everyone (the default), one session, or nobody (its name
 in italics): the reader picks it in ⋯. Where an agent's step lands is `pane-route.js`, worked
 out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):

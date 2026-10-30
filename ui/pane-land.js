@@ -6,7 +6,7 @@
 
 import { hooks } from './base.js';
 import { busy, windowOf } from './pane-busy.js';
-import { nameOf, route, sessionOf } from './pane-route.js';
+import { heard, nameOf, route, sessionOf } from './pane-route.js';
 import { activeId, flash, goPane, markPanes, only, openPane, paneAt, place } from './panes.js';
 import { arrived, drawStrip, openTab, toFront } from './tab-bar.js';
 import { drawable, focusOf, keep, landed, named, outTabs, poppedTab, tabOf, tabs } from './tabs.js';
@@ -50,7 +50,7 @@ hooks.land = (step) => {
     if (to.nowhere) return;
     if (to.open) {
       // A page that is no canvas opens over a tab's Home, as one of its own open over its pane does.
-      const id = openTab(drawable(at) ? `#/${at}` : '#/', { follows: to.open.follows, named: nameOf(to.open.follows), ...(to.open.slot && { slot: to.open.slot }) }, to.front);
+      const id = openTab(drawable(at) ? `#/${at}` : '#/', { follows: to.open.follows, named: nameOf(to.open.follows), word: heard.get(to.open.follows)?.name, ...(to.open.slot && { slot: to.open.slot }) }, to.front);
       const t = tabOf(id);
       if (itemOf(at) || !drawable(at)) ((t.sheet = itemOf(at) ? `e/${itemOf(at)}` : at.split('?')[0]), keep());
       lit(t, focusOf(t));

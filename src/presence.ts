@@ -39,8 +39,10 @@ export interface Step {
   pane?: string;
   /** The session it was taken in, as the agent said it or last said it: a pane can follow one session. */
   run?: string;
-  /** That session's name (its title), so every place that names it calls it alike. */
+  /** That session's name, so every place that names it calls it alike. */
   name?: string;
+  /** What its surface calls it (its title in Claude Code), when that is known. */
+  label?: string;
 }
 
 /** How many steps are kept for a page to catch up on between two looks. */
@@ -78,24 +80,21 @@ export async function took(db: Q, w: Whose, step: Omit<Step, 'at'>, now = false)
   const named = `${key}|${step.actor}`;
   if (step.run) runs.set(named, step.run);
   const run = step.run ?? runs.get(named);
-  const name = run && (await nameOf(db, run));
+  const called = run ? await namesOf(db, run) : {};
   const list = mine.get(key) ?? [];
   // Two steps in one millisecond are still two.
-  list.push({ at: Math.max(Date.now(), (list.at(-1)?.at ?? 0) + 1), ...step, ...(run && { run }), ...(name && { name }) });
+  list.push({ at: Math.max(Date.now(), (list.at(-1)?.at ?? 0) + 1), ...step, ...(run && { run }), ...called });
   mine.set(key, list.slice(-STEPS_KEPT));
   unkept.set(key, db);
   if (now) return flush(key);
   timer ??= setTimeout(() => void flushAll().catch(() => {}), FLUSH_MS).unref();
 }
 
-// A session's name, read once: it is kept for the session's life.
-const names = new Map<string, string>();
-async function nameOf(db: Q, run: string): Promise<string | undefined> {
-  if (names.has(run)) return names.get(run);
-  const { rows } = await db.query<{ name: string | null }>(`select props->>'name' as name from entity where id = $1`, [run]).catch(() => ({ rows: [] as { name: string | null }[] }));
-  const name = rows[0]?.name ?? undefined;
-  if (name) names.set(run, name);
-  return name;
+/** A session's name and what its surface calls it, which may change while it runs: read each time, by its id. */
+async function namesOf(db: Q, run: string): Promise<{ name?: string; label?: string }> {
+  const { rows } = await db.query<{ name: string | null; label: string | null }>(`select props->>'name' as name, props->>'label' as label from entity where id = $1`, [run]).catch(() => ({ rows: [] as { name: string | null; label: string | null }[] }));
+  const { name, label } = rows[0] ?? {};
+  return { ...(name && { name }), ...(label && { label }) };
 }
 
 async function flush(key: string): Promise<void> {

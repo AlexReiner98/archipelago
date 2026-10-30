@@ -356,6 +356,7 @@ body[data-dragging="pane"] { cursor: grabbing; }
 
 /* The pane the bar and find act on, among several: a line of the accent along its top; the names of the others quiet. */
 #canvas > .pane.pane-active > .pane-bar { box-shadow: inset 0 var(--border-2, var(--border-1)) 0 var(--accent); }
+body[data-panes="1"] .pane-bar .pane-act[aria-label="Move this pane to a new tab"] { display: none; }
 #canvas > .pane:not(.pane-active) .pane-name { color: var(--muted); font-weight: 400; }
 /* A pane not in focus takes the first press on a style's frame itself (a frame keeps its presses), and is then in focus. */
 #canvas > .pane:not(.pane-active) > .pane-canvas:has(iframe)::after { content: ''; position: absolute; inset: 0; z-index: 3; cursor: pointer; }
