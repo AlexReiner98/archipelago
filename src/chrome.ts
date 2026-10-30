@@ -5,7 +5,8 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { lookup } from 'node:dns/promises';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { isIP } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -45,10 +46,21 @@ async function plainHost(url: URL): Promise<URL> {
 
 /** Start the Chrome installed here; its DevTools address and how to stop it. */
 async function start(binary: string): Promise<{ ws: string; stop: () => void }> {
+  // A server stopped while its Chrome ran leaves that Chrome's folder: a later start removes those over a day old.
+  for (const old of readdirSync(tmpdir())) {
+    const at = join(tmpdir(), old);
+    try {
+      if (old.startsWith('pelago-look-') && Date.now() - statSync(at).mtimeMs > 86_400_000) rmSync(at, { recursive: true, force: true });
+    } catch {}
+  }
   const dir = mkdtempSync(join(tmpdir(), 'pelago-look-'));
+  // Chrome's own temp files (an extension the machine installs in every new profile is unpacked there) go in its
+  // folder too, so that removing the folder removes them.
+  const temp = join(dir, 'temp');
+  mkdirSync(temp);
   // In a container Chrome cannot make its own sandbox as a normal user: there the container is the wall.
   const bare = process.env.CI || process.env.PELAGO_CHROME_NO_SANDBOX ? ['--no-sandbox'] : [];
-  const proc: ChildProcess = spawn(binary, ['--headless=new', ...bare, '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--hide-scrollbars', '--mute-audio', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const proc: ChildProcess = spawn(binary, ['--headless=new', ...bare, '--remote-debugging-port=0', `--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--disable-background-networking', '--disable-component-update', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--hide-scrollbars', '--mute-audio', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, TEMP: temp, TMP: temp, TMPDIR: temp } });
   const ws = await new Promise<string>((resolve, reject) => {
     let said = '';
     const timer = setTimeout(() => (proc.kill(), reject(new Error(`Chrome did not start: ${said.slice(0, 300)}`))), 30000);
@@ -59,7 +71,10 @@ async function start(binary: string): Promise<{ ws: string; stop: () => void }> 
     });
     proc.once('exit', () => (clearTimeout(timer), reject(new Error(`Chrome stopped as it started: ${said.slice(0, 300)}`))));
   });
-  return { ws, stop: () => (proc.kill(), setTimeout(() => { try { rmSync(dir, { recursive: true, force: true }); } catch {} }, 1000)) };
+  // Chrome holds its folder until it has exited, and on Windows its helpers for some seconds after: removed once it
+  // has, tried again for a while without holding the server up.
+  const remove = () => void rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }).catch(() => {});
+  return { ws, stop: () => (proc.exitCode !== null || proc.signalCode !== null ? remove() : (proc.once('exit', remove), proc.kill())) };
 }
 
 /** A Chrome to draw in: PELAGO_CHROME's, else one started here. */
