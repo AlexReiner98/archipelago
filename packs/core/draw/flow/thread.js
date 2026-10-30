@@ -177,10 +177,14 @@ function join(kept, items, order) {
  * wire holds each stretch between two neighbours.
  */
 export function planarize(links, items) {
-  const kept = [], left = [];
+  const kept = [], left = [], root = new Map();
+  const find = (v) => { let r = v; while (root.has(r)) r = root.get(r); if (r !== v) root.set(v, r); return r; };
   for (const l of links) {
     kept.push(l);
-    if (!isPlanar(kept.map(([u, v]) => [u, v]))) (kept.pop(), left.push(l));
+    // A link between two parts not yet joined closes no ring, so only the others are tested.
+    const [a, b] = [find(l[0]), find(l[1])];
+    if (a !== b) root.set(a, b);
+    else if (!isPlanar(kept.map(([u, v]) => [u, v]))) (kept.pop(), left.push(l));
   }
   const edges = kept.map(([u, v]) => [u, v]), hidden = join(edges, items, links.filter((l) => l[2]));
   const wires = [], owner = new Map();

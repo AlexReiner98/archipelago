@@ -17,6 +17,8 @@ import { embed } from './upward.js';
 
 /** The ways a part may be drawn, a fixed order of its ties and which face is outer, the likeliest first: the style says how many. */
 const TRIALS = [[0, 0], [1, 0], [2, 0], [3, 0], [0, 1], [1, 1], [2, 1], [3, 1], [0, 2], [1, 2]].map(([ties, nth]) => ({ ties, nth }));
+/** How many finished pictures are kept. */
+const KEPT = 8;
 /** Past this many wires the pull takes fewer rounds: a drawing that takes too long is stopped by the page. */
 const PULL_MOST = 150;
 
@@ -88,14 +90,14 @@ const against = (g, number) => g.wires.filter((w) => w.link?.[2] && w.path.some(
  * The part's graph and numbering. The heaviest planar part, numbered as the order asks, is the picture with the fewest
  * crossings; where that leaves order wires up, the embedding made for the order (./upward.js) is tried in its place.
  */
-function downward(links, list, z, { ties = 0, nth = 0 } = {}) {
+function downward(links, list, z, { ties = 0, nth = 0, embedded = false } = {}) {
   // By name, so the picture does not change with the order the answer came in. Ties in another fixed order keep another
   // planar part, for the search in `best`.
   const keyOf = (l) => { const k = pair(l[0], l[1]); return ties === 1 ? [...k].reverse().join('') : ties === 2 ? k.slice(k.indexOf('|')) + k : k; };
   const name = (p, q) => (keyOf(p) < keyOf(q) ? -1 : 1);
   const ids = [...list].sort(), sorted = [...links].sort((p, q) => Number(q[2]) - Number(p[2]) || name(p, q) * (ties === 3 ? -1 : 1));
-  const g = planarize(sorted, ids), found = { g, ...numbered(g, nth) }, up = against(g, found.number);
-  if (!up || list.length > z.embed_most || ties || nth) return found;
+  const g = planarize(sorted, ids), found = { g, ...numbered(g, nth, list.length <= z.trial_most ? z.number_tries : Infinity) }, up = against(g, found.number);
+  if (!embedded || !up) return found;
   const made = embed(sorted, ids);
   return against(made, made.number) < up && made.crossings <= g.crossings + up * z.embed_cost ? { g: made, s: made.s, t: made.t, number: made.number, outerAt: made.outerAt } : found;
 }
@@ -121,7 +123,7 @@ function drawPart(list, links, block, box, z, trial) {
   }
   const { left, right, LEFT, RIGHT } = sidesOf(g.faces, outerAt, number, s, t);
   const ghost = (v) => v.startsWith('ghost'), size = (v) => (ghost(v) ? { w: 0, h: z.turn, lead: 0 } : block(v));
-  const rows = [...number.keys()], wired = (v) => [...next.get(v)].filter((w) => g.owner.get(pair(v, w)).visible);
+  const rows = [...number.keys()], wiredTo = new Map(rows.map((v) => [v, [...next.get(v)].filter((w) => g.owner.get(pair(v, w)).visible)])), wired = (v) => wiredTo.get(v);
   // Each item's bar runs from the face that is only ever on the left of its wires to the one only ever on the right.
   const lefts = new Map(), rights = new Map();
   for (const k of g.owner.keys()) for (const v of k.split('|')) {
@@ -136,13 +138,16 @@ function drawPart(list, links, block, box, z, trial) {
   const x = longest(names, xArcs);
   // A box sits over its own wires, as near their middle as its bar lets it, so they drop straight in.
   const inset = (v) => Math.min(z.room, box(v).w / 4) + 1;
+  const facesOf = new Map(rows.map((v) => [v, wired(v).map((w) => left.get(pair(v, w)))]));
   const middle = (v) => {
     const [from, to] = ends.get(v);
     if (ghost(v)) return (x.get(from) + x.get(to) + z.col) / 2;
     const lo = x.get(from) + z.col / 2 - inset(v), hi = Math.max(lo, x.get(to) + z.col / 2 - inset(v) - size(v).w);
-    const cols = wired(v).map((w) => column(pair(v, w)));
-    if (!cols.length) return lo + size(v).w / 2;
-    return Math.min(hi, Math.max(lo, cols.reduce((sum, c) => sum + c, 0) / cols.length - box(v).w / 2)) + size(v).w / 2;
+    const faces = facesOf.get(v);
+    if (!faces.length) return lo + size(v).w / 2;
+    let sum = 0;
+    for (const f of faces) sum += x.get(f);
+    return Math.min(hi, Math.max(lo, sum / faces.length + z.col / 2 - box(v).w / 2)) + size(v).w / 2;
   };
   const column = (k) => x.get(left.get(k)) + z.col / 2;
   // Longest paths push every column as far left as it can go, so a wire can leave its box and come back the long way.
@@ -218,11 +223,37 @@ export const watch = (fn) => (watching = fn);
 
 // Where a step was put by hand is not read here yet: places were kept against the flow's picture, and they would pull
 // wires out of the collision system.
-export function layout({ items: given, links: told = [], undrawn = [], measure, sizes, aspect = 1.6 }) {
+/** Pictures already worked out, the newest last: going back to a lens costs nothing. */
+const kept = new Map();
+
+/** A kept picture as new: what drags change is the caller's own. */
+const copy = (g) => {
+  const fresh = (w) => ({ ...w, points: w.points.map((p) => [...p]) }), chains = g.chains.map(fresh), ties = g.ties.map(fresh);
+  return { ...g, chains, ties, x: new Map(g.x), y: new Map(g.y) };
+};
+
+/** The layout of an answer, from what it was drawn from if it has been worked out before. */
+export function layout(args) {
+  const { items, links, undrawn, sizes, aspect } = args, key = JSON.stringify([items, links, undrawn, sizes, aspect]);
+  const hit = kept.get(key);
+  if (hit) {
+    kept.delete(key);
+    kept.set(key, hit);
+    const g = copy(hit.g);
+    last = { ...hit.last, chains: g.chains, ties: g.ties };
+    return g;
+  }
+  const g = laidOut(args);
+  kept.set(key, { g: copy(g), last });
+  if (kept.size > KEPT) kept.delete(kept.keys().next().value);
+  return g;
+}
+
+function laidOut({ items: given, links: told = [], undrawn = [], measure, sizes, aspect = 1.6 }) {
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
   const margin = sizes.flow_margin, gap = sizes.flow_node_gap, zw = { room: sizes.plane_wire_room, join: sizes.plane_joined_room, run: sizes.plane_port_run };
-  const zs = { trials: sizes.plane_trials, trial_most: sizes.plane_trial_most, cost_up: sizes.plane_cost_up, cost_cross: sizes.plane_cost_crossing, cost_wrong: sizes.plane_cost_wrong_side, embed_most: sizes.plane_embed_most, embed_cost: sizes.plane_embed_crossings, slide_sweeps: sizes.plane_slide_sweeps, trial_total: sizes.plane_trial_total };
+  const zs = { trials: sizes.plane_trials, trial_most: sizes.plane_trial_most, cost_up: sizes.plane_cost_up, cost_cross: sizes.plane_cost_crossing, cost_wrong: sizes.plane_cost_wrong_side, embed_most: sizes.plane_embed_most, embed_cost: sizes.plane_embed_crossings, slide_sweeps: sizes.plane_slide_sweeps, number_tries: sizes.plane_number_tries, trial_total: sizes.plane_trial_total };
   const z = { row: sizes.flow_layer_gap / 2, col: Math.max(gap / 2, zw.room * 2), turn: gap / 3, gap, ...zw, ...zs };
   const zc = { row: gap / 4, col: gap, stub: z.run, join: z.join }, combGap = Math.max(gap, z.join);
   const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ a: l.from, b: l.to, type: l.type, ...(l.pending && { pending: l.pending }) }));
@@ -274,6 +305,13 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
         try {
           const made = drawPart(list, part, block, stepSize, z, trial), cost = costOf(made, stepSize, z);
           if (!drawn || cost < drawn.cost) drawn = { ...made, cost };
+        } catch (e) { console.warn?.(`The bars fell back: ${e.message}`); }
+      }
+      // Only where every trial left order wires up is the slower embedding made for the order tried.
+      if (drawn?.up && list.length <= z.embed_most) {
+        try {
+          const made = drawPart(list, part, block, stepSize, z, { embedded: true }), cost = costOf(made, stepSize, z);
+          if (cost < drawn.cost) drawn = { ...made, cost };
         } catch (e) { console.warn?.(`The bars fell back: ${e.message}`); }
       }
       if (drawn) threaded += drawn.crossings;

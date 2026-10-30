@@ -226,6 +226,17 @@ test('bars: the picture does not change with the order the answer came in', () =
   assert.deepEqual(at(drawnBars([...ids].reverse().map((id) => item(id)), [...links].reverse())), at(drawnBars(ids.map((id) => item(id)), links)));
 });
 
+test('bars: a picture worked out before comes back as it was, and new: what is done to it stays out of the next', () => {
+  const ids = ['a', 'b', 'c', 'd'].map((id) => item(id)), links = [dep('b', 'a'), dep('c', 'b'), tie('c', 'd', 'calls'), tie('d', 'a', 'calls')];
+  const first = drawnBars(ids, links);
+  first.x.set('a', 9999);
+  first.chains[0].points[0][0] = 9999;
+  const again = drawnBars(ids, links);
+  assert.notEqual(again.x.get('a'), 9999);
+  assert.notEqual(again.chains[0].points[0][0], 9999);
+  assert.notEqual(again, first);
+});
+
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { embed } from './draw/flow/upward.js';
 

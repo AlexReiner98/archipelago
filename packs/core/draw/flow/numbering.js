@@ -241,13 +241,14 @@ function ways(g, outerAt, x, y) {
 /**
  * Give `g` of planarize a numbering: the top and foot to it, and the invisible edges it took. Answers with them, and which
  * face is the outer one. Each wire of the outer face is tried as the place for them, as many as there is time for, and
- * the one that leaves the fewest order wires running up is kept. `nth` says which face is outer, the longest first.
+ * the one that leaves the fewest order wires running up is kept. `nth` says which face is outer, the longest first, and
+ * `most` caps the places tried.
  */
-export function numbered(g, nth = 0) {
+export function numbered(g, nth = 0, most = Infinity) {
   const longest = g.faces.map((_, i) => i).sort((p, q) => g.faces[q].length - g.faces[p].length || p - q), outerAt = longest[Math.min(nth, longest.length - 1)], outer = g.faces[outerAt];
   const orders = g.wires.filter((w) => w.link?.[2]), size = g.owner.size * new Set([...g.owner.keys()].flatMap((k) => k.split('|'))).size;
   const places = outer.flatMap((v, i) => [[v, outer[(i + 1) % outer.length]], [outer[(i + 1) % outer.length], v]]);
-  const tries = orders.length ? Math.max(1, Math.min(places.length, Math.ceil(WORK / size))) : 1;
+  const tries = orders.length ? Math.max(1, Math.min(places.length, most, Math.ceil(WORK / size))) : 1;
   let best = null, least = Infinity;
   for (let k = 0; k < tries; k++) {
     const [x, y] = places[Math.floor((k * places.length) / tries)], laid = ways(g, outerAt, x, y);

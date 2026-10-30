@@ -5,6 +5,8 @@
 
 import { count, touch } from './count.js';
 
+/** A pass that moves no point further than this has moved nothing. */
+const STILL = 0.5;
 /** How far a port keeps from a corner. */
 const INSET = 2;
 /** A box's own edges from the middle of its block, on one axis. What hangs beside it takes no port. */
@@ -77,15 +79,22 @@ function pass(axis, boxes, wires, { gap, track, room, join, run, sweeps, press, 
   items.sort((p, q) => p.pos - q.pos || (p.tie ?? 0) - (q.tie ?? 0));
   items.forEach((it, k) => { it.k = k; it.left = []; it.right = []; });
   const margin = track / 2;
-  for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
-    const [p, q] = [items[i], items[j]];
-    if (p.hi + margin < q.lo || q.hi + margin < p.lo || (p.w && p.w === q.w)) continue;
+  // Only what overlaps across is compared: walked in order of where each starts across, the items still open.
+  const across = [...items].sort((p, q) => p.lo - q.lo);
+  let open = [];
+  for (const it of across) {
+    open = open.filter((o) => o.hi + margin >= it.lo);
+    for (const o of open) {
+      const [p, q] = o.k < it.k ? [o, it] : [it, o];
+      if (p.w && p.w === q.w) continue;
     // A rod that ends on a box stays on it, inside its edges; that is its bound, not the box's being beside it.
-    const onP = (p.own === q || p.own2 === q) && q.box, onQ = (q.own === p || q.own2 === p) && p.box;
-    if (onP || onQ) continue;
-    const want = p.box && q.box ? p.half + q.half + gap : p.half + q.half + (p.box || q.box ? room : track), sep = Math.min(want, q.pos - p.pos);
-    p.right.push([q, sep]);
-    q.left.push([p, sep]);
+      const onP = (p.own === q || p.own2 === q) && q.box, onQ = (q.own === p || q.own2 === p) && p.box;
+      if (onP || onQ) continue;
+      const want = p.box && q.box ? p.half + q.half + gap : p.half + q.half + (p.box || q.box ? room : track), sep = Math.min(want, q.pos - p.pos);
+      p.right.push([q, sep]);
+      q.left.push([p, sep]);
+    }
+    open.push(it);
   }
   const hold = (p, q, want) => {
     const sep = Math.min(want, q.pos - p.pos);
@@ -193,8 +202,9 @@ function allowed(line, was, w, boxes, wires) {
       if (r > bl && l < br && u > bt && t < bu) return false;
     }
   }
+  const xs = line.map((p) => p[0]), ys = line.map((p) => p[1]), [l, r, t, u] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   for (const v of wires) {
-    if (v === w) continue;
+    if (v === w || v.points.every((p) => p[0] < l) || v.points.every((p) => p[0] > r) || v.points.every((p) => p[1] < t) || v.points.every((p) => p[1] > u)) continue;
     if (count([line, v.points]).crossings > count([was, v.points]).crossings) return false;
     if (touch(line, v.points) && !touch(was, v.points)) return false;
   }
@@ -245,18 +255,24 @@ export function settle(boxes, wires, { gap, track, room = track, join = gap, run
     for (const [id, at] of kept.at) boxes.get(id).at = at;
     wires.forEach((w, k) => (w.points = kept.lines[k]));
   };
-  let done = 0, undone = 0, slid = 0;
-  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) {
-    const before = crossings(), kept = save();
+  let done = 0, undone = 0, slid = 0, still = 0, now = crossings();
+  for (let round = 0; round < rounds && still < 2; round++) for (const axis of [0, 1]) {
+    const before = now, kept = save();
     pass(axis, boxes, wires, { gap, track, room, join, run, sweeps, blocks, press: axis === 1 && round < rounds / 2 });
     const after = crossings();
+    now = after;
     watch?.({ round, axis, before, after, kept, wires, boxes });
     // In the first round, wires that only touched may come apart as the crossing they always were: a touch hides a crossing the count
     // cannot see. Any other pair that crosses now and did not before takes the pass back.
     const made = after > before && (round > 0 || wires.some((w, i) => wires.some((v, j) => j > i && count([w.points, v.points]).crossings > count([kept.lines[i], kept.lines[j]]).crossings && !touch(kept.lines[i], kept.lines[j]))));
-    if (made) (restore(kept), undone++);
+    if (made) (restore(kept), undone++, (now = before));
     else done++;
-    if (axis) slid += slidePorts(boxes, wires, run);
+    const slides = axis ? slidePorts(boxes, wires, run) : 0;
+    slid += slides;
+    if (slides) now = crossings();
+    // Two passes running that move nothing: it stands, and the rounds left would change nothing.
+    const moved = slides || wires.some((w, k) => w.points.length !== kept.lines[k].length || w.points.some((q, i) => Math.abs(q[0] - kept.lines[k][i][0]) + Math.abs(q[1] - kept.lines[k][i][1]) > STILL));
+    still = moved ? 0 : still + 1;
   }
   return { done, undone, slid };
 }

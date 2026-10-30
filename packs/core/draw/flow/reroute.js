@@ -58,7 +58,7 @@ function clear(line, was, w, solids, others, room) {
   const [l, r, t, u] = boundsOf(line);
   for (let i = 1; i < line.length; i++) {
     const [p, q] = [line[i - 1], line[i]], lo = Math.min(p[0], q[0]), hi = Math.max(p[0], q[0]), top = Math.min(p[1], q[1]), low = Math.max(p[1], q[1]);
-    for (const s of solids) {
+    for (const s of solids.near(lo - room, hi + room)) {
       // The stretch that lands on a box leaves it at once: only what it passes must be kept off.
       // One straight stretch between two facing boxes is as clear as they are of what stands beside.
       const off = (s.id === w.a && i === 1) || (s.id === w.b && i === line.length - 1) ? -1 : line.length === 2 ? 2 : room;
@@ -110,12 +110,23 @@ export function reroute(boxes, wires, still, { track, room, run, ports, shorter,
     solids.push({ id, l: x + l + 1, r: x + r - 1, t: y + t + 1, u: y + u - 1 });
     if (noRight) solids.push({ l: x + r + track, r: x + b.size[0] / 2, t: y - b.size[1] / 2, u: y + b.size[1] / 2 });
   }
+  // What stands across a span of the picture, by columns of the picture, so a stretch is only tried against what is near.
+  const CELL = Math.max(1, ...solids.map((s) => s.r - s.l)), columns = new Map();
+  for (const s of solids) for (let c = Math.floor(s.l / CELL); c <= Math.floor(s.r / CELL); c++) (columns.get(c) ?? columns.set(c, []).get(c)).push(s);
+  solids.near = (lo, hi) => {
+    const found = new Set();
+    for (let c = Math.floor(lo / CELL); c <= Math.floor(hi / CELL); c++) for (const s of columns.get(c) ?? []) found.add(s);
+    return found;
+  };
   const others = [...wires, ...still.map((points) => ({ points }))];
   let moved = 0, jogs = 0;
   for (let round = 0; round < rounds; round++) for (const w of wires) {
     const was = tidy(w.points), bends = was.length - 2, long = lengthOf(was), a = shape.get(w.a), b = shape.get(w.b);
     // A wire too near a box or with a corner on its port takes any way as good that has the room.
     const tight = !clear(was, was, w, solids, [], room) || (bends > 0 && Math.min(lengthOf(was.slice(0, 2)), lengthOf(was.slice(-2))) < run);
+    // Straight already, or one bend between boxes that face each other on neither axis: only a tight wire has better.
+    const facing = [0, 1].some((ax) => Math.min(a.hi[ax], b.hi[ax]) - Math.max(a.lo[ax], b.lo[ax]) >= 2);
+    if (!tight && (bends === 0 || (bends === 1 && !facing))) continue;
     const better = ways(a, b, track, was, run, ports).map((l) => tidy(l)).map((l) => ({ l, bends: l.length - 2, long: lengthOf(l) }))
       .filter((c) => c.bends < bends || (c.bends === bends && (tight || c.long < long * shorter))).sort((p, q) => p.bends - q.bends || p.long - q.long);
     const found = better.find((c) => clear(c.l, was, w, solids, others, room));
