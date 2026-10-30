@@ -61,6 +61,8 @@ async function sessions(l: Archipelago) {
       return {
         id: r.id,
         title: r.title,
+        name: r.props.name,
+        label: r.props.label,
         status: r.status,
         surface: r.props.surface,
         cwd: r.props.cwd,

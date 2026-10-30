@@ -59,6 +59,7 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 #tabs > .tab[aria-selected="true"] { color: var(--text); background: var(--panel); border-color: var(--line); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
 #tabs > .tab.tab-out { border-color: var(--line); border-style: dashed; }
 #tabs > .tab[data-unseen] { color: var(--text); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
+#tabs > .tab.tab-drop { background: var(--accent-soft); }
 #tabs > .tab.tab-shown { animation: tab-shown 1.2s ease 2; }
 @keyframes tab-shown { 50% { background: var(--accent-soft); } }
 #tabs .tab-name { min-width: 0; margin-right: var(--space-5); overflow: hidden; text-overflow: ellipsis; }

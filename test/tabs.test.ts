@@ -2,7 +2,7 @@
 // real browser (skipped where there is no Chrome), one session gets a pane of its own beside the reader's, several
 // sessions of one agent each keep a tab named by the session,
 // one showing just after another lands in the background and is marked, a press brings a tab into sight, a show while
-// the reader is at work goes to a tab behind, and a tab pops out into a window of its own and docks back whole.
+// the reader is at work goes to a tab behind, and a tab pops out into a window of its own and docks back whole (a tab merged is test/show-lands.test.ts).
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

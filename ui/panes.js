@@ -310,10 +310,10 @@ export function only(id, t = front()) {
   keep();
   if (t === front()) draw();
 }
-/** Let go of a pane dragged (ui/pane-drag.js): on the tabs, into a tab of its own; on a side of another, docked there; in the middle of one, the two swap places. */
+/** Let go of a pane dragged (ui/pane-drag.js): on a tab, into it; on the tabs, into a tab of its own; on a side of another, docked there; in the middle of one, the two swap places. */
 function drop(id, target, zone) {
   if (zone === 'out') return;
-  if (zone === 'tabs') return hooks.paneToTab?.(id);
+  if (zone === 'tabs') return hooks.paneToTab?.(id, target);
   if (zone !== 'center') return place(id, zone, target);
   const t = front();
   const [a, b] = [t.groups.indexOf(id), t.groups.indexOf(target)];

@@ -270,10 +270,17 @@ like the canvas settings: never on the map, meaning nothing.
 A pane moves into a tab of its own by hand, with ⧉ in its strip or dragged
 onto the tabs, in sight beside the one it left; a pane held for a session
 takes the session with it, and the new tab follows it (e_c5stzz6z). An agent
-cannot ask for a tab: a tab is the reader's.
+cannot ask for a tab: a tab is the reader's. The way back is the reader's too:
+Merge into in ⋯, or a tab dragged onto another, puts its panes beside that
+tab's, and a pane dragged onto a tab joins it, the pane in focus there staying
+so. A session keeps what is its own through all of it: a pane moved to a tab
+takes the session along, panes from a tab that followed a session are held
+for it again, and its next show finds them in any tab but one that follows
+nobody.
 
 Each tab follows everyone (the default), one session, or nobody (its name
-in italics): the reader picks it in ⋯. Where an agent's step lands is `pane-route.js`, worked
+in italics): the reader picks it in ⋯, which lists the sessions open now, and
+what the tab follows even once that session has ended. Where an agent's step lands is `pane-route.js`, worked
 out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
 - only a show lands: a change or a beat of a session's story moves nothing
   and is said nowhere on the canvas (the owner, 29 and 30 Oct 2026,
