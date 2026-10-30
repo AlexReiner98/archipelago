@@ -60,7 +60,7 @@ reply ending, commits accounted for) is `docs/agents.md`.
   refuses it, and `test/approvals.ts` keeps the table of what becomes of
   each change (checked a server policy per file, in the full run).
 - **Restart the local server yourself in dev mode.** After changing anything
-  under `src/` or `packs/`, run `npm test` (the fast set) and
+  under `src/` or `packs/`, run the tests it touches and
   `npm run typecheck`, then restart it and wait for `GET /health`: with `revise` action `restart` if your
   pelago tools are the local server's, otherwise
   `curl -X POST http://127.0.0.1:3100/agent/revise -H "content-type: application/json" -d "{\"action\":\"restart\"}"`. `/health` says which commit the
@@ -295,27 +295,37 @@ down, lower it in the test, in the same commit. Never raise one.
 
 ## Checks before committing
 
-While you work, after each change:
+While a change is being shaped, run only what it touches, and put it in
+front of the owner to try before any broad run (the owner, 30 Oct 2026: the
+point is to iterate):
 
 ```bash
-npm test
+npm test -- test/a.test.ts test/structure.test.ts
 npm run typecheck
 ```
 
-`npm test` is the fast set: every test file but the browser tests, the
-approvals table and the tests that move, back up, restore, migrate or pull
-a whole map (`SLOW` in `test/sets.ts`, each with why). The structure
-test is always in it. `npm run test:changed` runs only the files your
-branch's changes can reach (with the slow ones they reach); `npm test --
-test/a.test.ts` runs just those files.
+When it is ready to commit, run what your branch can reach:
 
-Before committing to main or opening a pull request, and after any change
-to the rules, a drawing, the canvas, a page the browser tests load, the
-schema, backups or the log's storage, run every file:
+```bash
+npm run test:changed
+```
+
+`npm test` with no files is the fast set: every test file but the browser
+tests, the approvals table and the tests that move, back up, restore, migrate
+or pull a whole map (`SLOW` in `test/sets.ts`, each with why). The structure
+test is always in it. `npm run test:changed` runs only the files your
+branch's changes can reach (with the slow ones they reach).
+
+Once, right before pushing to main or opening a pull request, and never
+between tries, run every file:
 
 ```bash
 npm run test:full
 ```
+
+That run is needed before a push of any change to the rules, a drawing, the
+canvas, a page the browser tests load, the schema, backups or the log's
+storage.
 
 CI runs every file on every pull request and push to main, as shards
 side by side (`shard` in `test/sets.ts`: the rest, and one per reason in

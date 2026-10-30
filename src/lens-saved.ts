@@ -178,6 +178,12 @@ export async function termLenses(l: Archipelago): Promise<number> {
     [l.registry.family(KEPT)],
   );
   const facts = rows.map((r): Fact => ['+', r.id, 'filter', fromBefore(r.filter)]);
+  // A screen kept on the map may hold a picture of a lens of its own.
+  const { rows: screens } = await l.db.query<{ id: string; pieces: Props[] }>(`select id, props->'pieces' as pieces from entity where type = any($1::text[]) and archived_at is null and jsonb_typeof(props->'pieces') = 'array' -- index entity_type`, [l.registry.family('screen')]);
+  for (const { id, pieces } of screens) {
+    const old = (p: Props) => typeof p.lens === 'object' && p.lens !== null && 'filter' in p.lens && !('find' in ((p.lens as Props).filter as Props));
+    if (pieces.some(old)) facts.push(['+', id, 'pieces', pieces.map((p) => (old(p) ? { ...p, lens: { ...(p.lens as Props), filter: fromBefore((p.lens as Props).filter as Props) } } : p))]);
+  }
   if (facts.length) await l.db.transaction((tx) => l.moved(tx, 'lens.moved', 'Views kept are said in the one list of terms', facts));
   return facts.length;
 }

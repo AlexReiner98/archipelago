@@ -270,13 +270,25 @@ Brought into sight again, a tab's bar acts on the pane last touched in it
 follows. The tabs are the reader's, kept in this browser for each workspace
 like the canvas settings: never on the map, meaning nothing.
 
+A pane moves into a tab of its own by hand, with ⧉ in its strip or dragged
+onto the tabs, in sight beside the one it left; a pane held for a session
+takes the session with it, and the new tab follows it (e_c5stzz6z). An agent
+cannot ask for a tab: a tab is the reader's. The way back is the reader's too:
+Merge into in ⋯, or a tab dragged onto another, puts its panes beside that
+tab's, and a pane dragged onto a tab joins it, the pane in focus there staying
+so. A session keeps what is its own through all of it: a pane moved to a tab
+takes the session along, panes from a tab that followed a session are held
+for it again, and its next show finds them in any tab but one that follows
+nobody.
+
 Each tab follows everyone (the default), one session, or nobody (its name
-in italics): the reader picks it in ⋯. Where an agent's step lands is `pane-route.js`, worked
+in italics): the reader picks it in ⋯, which lists the sessions open now, and
+what the tab follows even once that session has ended. Where an agent's step lands is `pane-route.js`, worked
 out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
-- only a show lands: a change or a beat of a session's story moves nothing,
-  and with Follow agents on it is only said in the line at the foot, with Go
-  there (the owner, 29 Oct 2026, e_e7yfp2yg). A show lands whether or not the
-  page follows agents (e_jk63uduv);
+- only a show lands: a change or a beat of a session's story moves nothing
+  and is said nowhere on the canvas (the owner, 29 and 30 Oct 2026,
+  e_e7yfp2yg). Whom a tab follows is the one control: there is no line at the
+  foot and no Follow agents;
 - a session's show goes to the tab that follows it;
 - else to a tab that follows everyone and no other session at work (a step
   within ten minutes) holds: the one where it holds a pane, the one it
@@ -290,10 +302,10 @@ out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
   for as long as it stands, so a long session finds it again), else one that
   draws what it shows, else one nobody holds, else one split for it. Never
   the pane the reader is in or touched last (the owner, 28 and 29 Oct 2026);
-  in a tab that follows the session alone every pane is its own;
+  in a tab that follows the session alone every pane is its own. A page that
+  is not a canvas opens over a pane only there, else in a tab of its own;
 - no tab is brought into sight: a show into a tab out of sight is drawn
-  there, its mark rings, and the line at the foot offers Open tab
-  (e_xjrpyysn);
+  there and its mark rings (e_xjrpyysn);
 - a pane the reader is busy in (`pane-busy.js`: a press, scroll or key there
   in the last twenty seconds, text selected there, or words typed in the
   sheet and not saved; moving the pointer or turning a dial is not busy) is

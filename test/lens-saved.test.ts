@@ -151,4 +151,7 @@ test('a view kept in the old words is said in terms once, and the log keeps what
   assert.equal(await termLenses(l), 0, 'it runs once');
   assert.deepEqual((await l.entity(v))!.props.filter, { find: ['type task'], only: ['in e_aaaaaaaa'], not: ['done'] });
   assert.deepEqual((await l.entity(q))!.props.filter, { find: ['type task'] });
+  const { sc } = await make(l, [{ op: 'create', ref: 'sc', type: 'screen', title: 'A page', props: { on: ['task'], pieces: [{ piece: 'picture', lens: { filter: { links: ['part_of {here}'], exclude: ['closed'] } } }, { piece: 'note', text: 'x' }] } }]);
+  assert.equal(await termLenses(l), 1, 'a screen with a lens of its own too');
+  assert.deepEqual((await l.entity(sc))!.props.pieces, [{ piece: 'picture', lens: { filter: { find: ['part_of {here}'], only: [], not: ['done'] } } }, { piece: 'note', text: 'x' }]);
 });

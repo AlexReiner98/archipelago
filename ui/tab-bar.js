@@ -3,6 +3,7 @@
 // (ui/words.js), so their work mirrors into the page without squeezing a pane or opening a window; where a step lands
 // is ui/pane-route.js. There is no most: many tabs shrink to their mark and first letters (e_q3amet26). A tab, not a
 // pane, pops out into a window of its own, from its strip or dragged out of the page, and docks back whole (e_ezb7s3a7).
+// Tabs merge: from ⋯, or a tab dragged onto another, and a pane dragged onto a tab joins it (e_c5stzz6z's way back).
 // What is the tab's own lives on the strip, never in the query bar, which shows the lens (decision e_j7ggggjr, asked):
 // every tab has ⋯ (whom it follows, pop out) and ×, the same in sight or not, and + ends the strip, which shows with one tab too.
 
@@ -11,8 +12,8 @@ import { readFlatLens } from './lens.js';
 import { lookMode } from './look.js';
 import { placeBy } from './menu-place.js';
 import { windowOf, windows } from './pane-busy.js';
-import { heard, nameOf } from './pane-route.js';
-import { activeAt, activeIs, draw, paneAt, paneButtons, startPanes } from './panes.js';
+import { followable, heard, hearOpen, nameOf } from './pane-route.js';
+import { activeAt, activeIs, close, draw, paneAt, paneButtons, startPanes } from './panes.js';
 import { filterSaid } from './query-bar.js';
 import { focusOf, front, freshTab, isOutKey, keep, landed, listKey, named, outKey, outTabs, poppedTab, read, save, tabHref, tabOf, tabs } from './tabs.js';
 import { sessionHue, titles } from './words.js';
@@ -45,6 +46,52 @@ export function openTab(at, own = {}, inSight = true) {
   if (inSight) toFront(t.id);
   else arrived(t.id);
   return t.id;
+}
+/**
+ * Move pane `id` of the tab in sight into a tab of its own, beside this one and in sight, with its history. A pane held
+ * for a session takes the session with it: the new tab follows it, so its next show goes there (decision e_c5stzz6z).
+ */
+hooks.paneToTab = (id, into) => {
+  const from = front();
+  const pane = from.panes[id];
+  const to = tabOf(into);
+  if (pane && to) return void (to !== from && joinTab(from, to, [id]));
+  if (!pane || from.groups.length < 2) return;
+  const { held, ...kept } = pane;
+  const went = landed.get(`${from.id}:${id}`);
+  // Whose it is: held for a session, in a tab that follows one, or named by the session that last drew there.
+  const session = held ?? sessionOfTab(from) ?? (pane.slot ? went?.session : undefined);
+  const t = { ...freshTab('#/'), ...(session && { follows: session, named: heard.has(session) ? nameOf(session) : undefined, word: heard.get(session)?.name }) };
+  t.groups = [id];
+  t.focus = id;
+  t.panes = { [id]: kept };
+  if (went) (landed.delete(`${from.id}:${id}`), landed.set(`${t.id}:${id}`, went));
+  close(id);
+  tabs.list.splice(tabs.list.indexOf(from) + 1, 0, t);
+  toFront(t.id);
+};
+/** The session a tab follows, if it follows one. */
+const sessionOfTab = (t) => (t.follows && !['all', 'none'].includes(t.follows) ? t.follows : null);
+/**
+ * The way back: move panes of tab `from`, all of them unless named, into tab `to`, beside its own, in sight, the pane in
+ * focus there staying so (the one in focus is the reader's: an agent's show never takes it). A tab left with no pane
+ * goes. Panes from a tab following a session are held for it again, so its next show finds them wherever they went.
+ */
+function joinTab(from, to, ids = from.groups) {
+  const session = from.follows === to.follows ? null : sessionOfTab(from);
+  for (const id of ids) {
+    to.panes[id] = { ...from.panes[id], ...(session && { held: session }) };
+    delete from.panes[id];
+    const went = landed.get(`${from.id}:${id}`);
+    if (went) (landed.delete(`${from.id}:${id}`), landed.set(`${to.id}:${id}`, went));
+  }
+  const share = (t) => t.groups.map(() => 1 / t.groups.length);
+  to.groups = [...to.groups, ...ids];
+  to.sizes = share(to);
+  from.groups = from.groups.filter((g) => !ids.includes(g));
+  from.sizes = share(from);
+  if (!from.groups.length) tabs.list = tabs.list.filter((t) => t !== from);
+  show(to);
 }
 /** Mark tab `id`, out of sight, as having something new: its mark rings until it is brought into sight. */
 export function arrived(id) {
@@ -84,8 +131,8 @@ function popOut(id) {
 
 /** What a tab is called: the session it follows, in its hue, else what its pane in focus draws (a saved canvas or an item by its name, a lens by what it finds). */
 function nameOfTab(t) {
-  const session = t.follows && !['all', 'none'].includes(t.follows) ? t.follows : null;
-  if (session) return { name: heard.has(session) ? nameOf(session) : (t.named ?? nameOf(session)), hue: sessionHue(heard.get(session)?.name ?? t.named), session };
+  const session = sessionOfTab(t);
+  if (session) return { name: heard.has(session) ? nameOf(session) : (t.named ?? nameOf(session)), hue: sessionHue(heard.get(session)?.name ?? t.word ?? t.named), session };
   const id = named(t.panes[focusOf(t)]?.at);
   if (/^e_[a-z0-9]{8}$/.test(id) && !titles.has(id) && !asked.has(id)) {
     asked.add(id);
@@ -106,13 +153,22 @@ function pressTab(ev, t, out) {
   if (ev.button !== 0 || ev.target.closest('.tab-act')) return;
   const el = ev.currentTarget;
   el.setPointerCapture(ev.pointerId);
+  // Over another tab, a tab let go merges into it.
+  const onto = (e) => (out ? null : [document.elementFromPoint(e.clientX, e.clientY)?.closest('#tabs > .tab:not(.tab-out)')].find((o) => o && o !== el));
+  const lit = () => strip.querySelector('.tab-drop')?.classList.remove('tab-drop');
+  const move = (e) => (lit(), onto(e)?.classList.add('tab-drop'));
   const up = (e) => {
+    el.removeEventListener('pointermove', move);
     el.removeEventListener('pointerup', up);
+    lit();
     const outside = e.clientX < 0 || e.clientY < 0 || e.clientX > innerWidth || e.clientY > innerHeight;
+    const other = onto(e);
     if (out) windowOf(t.id)?.focus();
     else if (outside) popOut(t.id);
+    else if (other) joinTab(t, tabOf(other.dataset.tab));
     else toFront(t.id);
   };
+  el.addEventListener('pointermove', move);
   el.addEventListener('pointerup', up);
 }
 function tabEl(t, out) {
@@ -130,7 +186,7 @@ function tabEl(t, out) {
       'data-tab': t.id,
       'data-unseen': t.unseen && !inSight ? 'true' : null,
       'data-follows': t.follows === 'none' ? 'none' : null,
-      title: [name, whom, out && 'in a window of its own: press to go to it', !out && !inSight && 'drag it out of the page to pop it out'].filter(Boolean).join(' · '),
+      title: [session && heard.get(session)?.label && `Session ${heard.get(session).name}`, name, whom, out && 'in a window of its own: press to go to it', !out && !inSight && 'drag it out of the page to pop it out'].filter(Boolean).join(' · '),
       style: hue ? `--session-hue: ${hue}` : null,
     },
     h('span', { class: `tab-name${session ? ' who-session' : ''}` }, name),
@@ -157,17 +213,30 @@ export function drawStrip() {
 
 /** The reader picks whom the tab in sight follows; a session it held lets go of it. */
 function setFollows(follows, t = front()) {
-  Object.assign(t, { follows, named: heard.has(follows) ? nameOf(follows) : undefined });
+  Object.assign(t, { follows, named: heard.has(follows) ? nameOf(follows) : undefined, word: heard.get(follows)?.name });
   for (const key of [...landed.keys()]) if (key.startsWith(`${t.id}:`)) landed.delete(key);
   keep();
   drawStrip();
 }
-/** A tab's menu, over everything (a popover: the strip clips what hangs below it): whom it follows (everyone, nobody, the sessions heard from lately, newest first), and pop out. */
+/** A tab's menu, over everything (a popover: the strip clips what hangs below it): whom it follows (everyone, nobody, the sessions open now, newest first), pop out, and merge. */
 const menuEl = h('div', { class: 'menu-items tab-menu', popover: 'auto', role: 'menu', 'aria-label': 'This tab' });
 document.body.append(menuEl);
+/** Ask which sessions are open: the menu is drawn at once from what is known, and again with the answer. */
+const readOpen = () => api('view', { name: 'sessions' }).then(({ open = [] }) => hearOpen(open), () => {});
 function tabMenu(anchor, t) {
+  drawMenu(t);
+  menuEl.showPopover();
+  placeBy(menuEl, anchor);
+  readOpen().then(() => {
+    if (!menuEl.matches(':popover-open')) return;
+    drawMenu(t);
+    placeBy(menuEl, anchor);
+  });
+}
+function drawMenu(t) {
   const now = t.follows ?? 'all';
-  const sessions = [...heard].sort(([, a], [, b]) => b.at - a.at).map(([key]) => key);
+  const sessions = followable({ now: Date.now(), recent: 600_000 });
+  // What the tab follows stays in sight, ended or not, so the reader can see it and change it.
   if (!['all', 'none', ...sessions].includes(now)) sessions.unshift(now);
   const pick = (key, said, title) => h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(key === now), title, onclick: () => (menuEl.hidePopover(), setFollows(key, t)) }, said);
   menuEl.replaceChildren(
@@ -178,10 +247,10 @@ function tabMenu(anchor, t) {
       ...sessions.map((key) => pick(key, key === now && !heard.has(key) ? (t.named ?? nameOf(key)) : nameOf(key), key)),
       tabs.list.length > 1 && h('hr'),
       tabs.list.length > 1 && h('button', { type: 'button', role: 'menuitem', title: 'Into a window of its own: ⇲ there docks it back', onclick: () => (menuEl.hidePopover(), popOut(t.id)) }, 'Pop out'),
+      tabs.list.length > 1 && h('div', { class: 'tab-menu-head', title: 'Put this tab’s panes beside those of another' }, 'Merge into'),
+      ...tabs.list.filter((o) => o !== t).map((o) => h('button', { type: 'button', role: 'menuitem', onclick: () => (menuEl.hidePopover(), joinTab(t, o)) }, nameOfTab(o).name)),
     ].filter(Boolean),
   );
-  menuEl.showPopover();
-  placeBy(menuEl, anchor);
 }
 
 /** The query bar's own: the pane's buttons (in a popped window, dock back). Whom the tab follows and a new tab are the strip's. */
@@ -251,4 +320,5 @@ export function startTabs() {
   keep();
   startPanes();
   drawStrip();
+  if (!poppedTab) readOpen();
 }

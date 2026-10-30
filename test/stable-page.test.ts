@@ -74,8 +74,8 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
       await wait(1000);
     }
     await wait(2500);
-    const still = await page.evaluate<{ mark: number; swaps: number; hash: string; following: boolean }>(`({ mark: window.stillMark, swaps: window.swaps, hash: location.hash, following: document.querySelector('#follow input').checked })`);
-    assert.deepEqual(still, { mark: 1, swaps: 0, hash: `#/e/${made.p}`, following: true }, 'not reloaded, not drawn again, not taken elsewhere: with three agents at work, a change moves no pane its session has not shown into (ui/pane-route.js)');
+    const still = await page.evaluate<{ mark: number; swaps: number; hash: string }>(`({ mark: window.stillMark, swaps: window.swaps, hash: location.hash })`);
+    assert.deepEqual(still, { mark: 1, swaps: 0, hash: `#/e/${made.p}` }, 'not reloaded, not drawn again, not taken elsewhere: with three agents at work, a change moves no pane its session has not shown into (ui/pane-route.js)');
     // A change to what is on the page shows on it, in place.
     await change('agent:a', [{ op: 'update', id: made.t, title: 'Renamed on the page' }]);
     assert.ok(await until(`document.querySelector('main').textContent.includes('Renamed on the page')`), 'the change shows');

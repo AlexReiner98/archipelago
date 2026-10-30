@@ -1,15 +1,31 @@
 // A session's name: a short word the run type declares among the values of its field `name`, minted when it starts,
 // none held by another open session. Where it stands among those values picks its mark among the style's hues
 // (ui/session.js), so the name is chosen to step past a hue another open session holds: two at work at once are told
-// apart by name and at a glance. The words are the pack's; the colours are the style's.
+// apart by name and at a glance. The words are the pack's; the colours are the style's. Its title says it is a session,
+// and what its surface calls it once that is known, so a person can tie the two together and find it by either.
 
-import type { Archipelago } from './pelago.ts';
+import { actorId, type Archipelago, type Entity } from './pelago.ts';
 import { pageStyle } from './styles.ts';
 
 /** The words a session may be named, in the order their marks take the style's hues. */
 export function sessionNames(l: Archipelago): string[] {
   const values = l.registry.type('run')?.fields.name?.values;
   return Array.isArray(values) ? values : [];
+}
+
+/** The most a run's title takes, as any item's name. */
+const TITLE_MOST = 60;
+/** A session's title: `Session Sark`, and `Session Sark · what Claude calls it`, cut to a name's length. */
+export function sessionTitle(name: string, label?: string): string {
+  const title = label ? `Session ${name} · ${label}` : `Session ${name}`;
+  return title.length > TITLE_MOST ? `${title.slice(0, TITLE_MOST - 1).trimEnd()}…` : title;
+}
+
+/** What the session's surface calls it, as its hook read it: kept beside its name, and in its title. Only a new one is written. */
+export async function sessionLabelled(l: Archipelago, run: Entity, label: unknown): Promise<void> {
+  const said = typeof label === 'string' ? label.trim().slice(0, 200) : '';
+  if (!said || said === run.props.label || typeof run.props.name !== 'string') return;
+  await l.apply(actorId({ kind: 'agent', name: 'claude-code' }), { ops: [{ op: 'update', id: run.id, title: sessionTitle(run.props.name, said), props: { label: said } }], reason: 'Session labelled' });
 }
 
 /** How many hues the workspace's style tells things apart by. */

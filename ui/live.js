@@ -1,8 +1,9 @@
 import { api, h, hooks, main, route, state } from './base.js';
 import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
 import { lookMode } from './look.js';
-import { hear, nameOf, sessionOf } from './pane-route.js';
-import { sessionWho, types } from './words.js';
+import { hear, sessionOf } from './pane-route.js';
+import { poppedTab, tabs } from './tabs.js';
+import { types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
 
@@ -21,135 +22,28 @@ main.addEventListener('input', (e) => {
   if (e.target.matches?.('textarea, [contenteditable], input:not([type=range], [type=checkbox], [type=radio], [type=color])')) state.dirty = true;
 });
 
-// Following: an agent shows this page what it is working on (the `show` tool), and it lands in a pane of that
-// session's own, beside the reader's, never the pane they are in or touched last (ui/pane-route.js); a line at the
-// bottom says who sent it and why. With "Follow agents" on, what else an agent does (its changes, its story) is said
-// in that line too, with the way there: it moves nothing (the owner, 29 Oct 2026, e_e7yfp2yg, e_jk63uduv).
-export const following = {
-  get on() {
-    // A window popped out of the main page (ui/tab-bar.js) draws one tab; the main page follows for it.
-    if (window.name.startsWith('pelago-tab:')) return false;
-    try {
-      const kept = localStorage.getItem('pelago-follow');
-      if (kept) return kept !== 'off';
-    } catch {
-      // Without storage, as if nothing was chosen.
-    }
-    return true;
-  },
-  set on(value) {
-    try {
-      localStorage.setItem('pelago-follow', value ? 'on' : 'off');
-    } catch {
-      // Without storage the choice lasts until the page is reloaded.
-    }
-  },
-  // Which kinds of step are followed (as it was before there was a choice: what is shown and what is changed), and whose are not.
-  list(key, otherwise) {
-    try {
-      const kept = JSON.parse(localStorage.getItem(`pelago-follow-${key}`));
-      return Array.isArray(kept) ? kept : otherwise;
-    } catch {
-      return otherwise;
-    }
-  },
-  keep(key, list) {
-    try {
-      localStorage.setItem(`pelago-follow-${key}`, JSON.stringify(list));
-    } catch {
-      // Without storage the choice lasts until the page is reloaded.
-    }
-  },
-};
-/** The kinds of step an agent takes, as the server names them and as a person reads them. */
-export const STEP_KINDS = [
-  ['show', 'What they show you'],
-  ['change', 'What they change'],
-  ['story', 'The story they tell'],
-  ['read', 'What they read'],
-  ['view', 'Views they ask for'],
-  ['search', 'What they search for'],
-  ['other', 'Sessions and the rest'],
-];
-export const followBox = document.querySelector('#follow input');
-followBox.checked = following.on;
-followBox.addEventListener('change', () => (following.on = followBox.checked));
-export const chosen = { kinds: new Set(following.list('kinds', ['show', 'change', 'story'])), muted: new Set(following.list('muted', [])) };
-/** The agents heard from while the page is open, with those left out before: each can be left out. */
-export const heardFrom = new Set(chosen.muted);
-export function followMenu() {
-  const tick = (label, title, on, set) => h('label', { title }, h('input', { type: 'checkbox', checked: on, onchange: (ev) => set(ev.target.checked) }), h('span', {}, label));
-  const flip = (key, value) => (yes) => (chosen[key][yes === (key === 'kinds') ? 'add' : 'delete'](value), following.keep(key, [...chosen[key]]));
-  document.querySelector('#follow-what > .menu-items').replaceChildren(
-    ...STEP_KINDS.map(([kind, label]) => tick(label, label, chosen.kinds.has(kind), flip('kinds', kind))),
-    ...(heardFrom.size ? [h('hr')] : []),
-    ...[...heardFrom].sort().map((actor) => tick(actor.split('/').at(-1), `Follow ${actor}`, !chosen.muted.has(actor), flip('muted', actor))),
-  );
-}
-followMenu();
-// An agent first heard from while the menu was open is in it the next time it opens.
-document.getElementById('follow-what').addEventListener('toggle', (ev) => ev.target.open && followMenu());
-export const followed = h('div', { id: 'followed', hidden: true });
-document.body.append(followed);
-export let seenStep;
-export let followedTimer;
-/** This page, among the owner's open pages: the server counts those that follow, so an agent's show says whether it landed. */
+// Agents on the page: what a session shows lands in a pane of its own, or a tab of its own, and the pane's strip or the
+// tab's mark says so; where is ui/pane-route.js. Nothing else an agent does is said here: a change reaches the page from
+// the log, a story is on its session's page (the owner, 30 Oct 2026).
+/** This page, among the owner's open pages: the server counts those a show can land in, so an agent's show says whether it did. */
 const pageId = Math.random().toString(36).slice(2, 14);
-// A page the server draws for an agent's look is no page of the owner's: it is not counted, and follows nobody.
-const thisPage = () => (lookMode ? undefined : { page: pageId, on: true, muted: [...chosen.muted] });
-/** Where each agent that tells a story tells it: following it goes there, not from item to item. */
-export const storyOf = new Map();
+// A page the server draws for an agent's look is no page of the owner's: it is not counted. Every tab following nobody takes no show.
+const thisPage = () => (lookMode ? undefined : { page: pageId, on: tabs.list.some((t) => t.follows !== 'none') });
+let seenStep;
+/** Each session's last show not yet landed: it waits while a question is open over the page. */
+const waiting = new Map();
 
 export function follow(steps = []) {
   // A look's page, and a popped-out tab, leave what agents show to the main page.
-  if (lookMode || window.name.startsWith('pelago-tab:')) return;
+  if (lookMode || poppedTab) return;
   // The first answer only says where things stand; an old step is not followed.
   const fresh = seenStep === undefined ? [] : steps.filter((s) => s.at > seenStep);
   seenStep = steps.at(-1)?.at ?? seenStep ?? 0;
-  for (const s of steps) {
-    heardFrom.add(s.actor);
-    hear(s);
-    if (s.kind === 'story') storyOf.set(s.run ?? s.actor, s.hash);
-  }
-  followBox.checked = following.on;
-  // What a session shows lands, in a pane of its own, whether or not the page follows agents (e_jk63uduv); what else it
-  // does (a change, a beat of its story) is only said in the line, with the way there, for a page that follows it: it
-  // never moves a pane (the owner, 29 Oct 2026, e_e7yfp2yg).
-  const wanted = fresh.filter((s) => (s.kind === 'show' || (following.on && chosen.kinds.has(s.kind))) && !chosen.muted.has(s.actor));
-  // The line says the last thing done; the page goes to the last show that has a place. A step may have none: then the page stays.
-  const to = wanted.at(-1);
-  if (!to) return;
-  const placeOf = (s) => (s.kind === 'story' ? storyOf.get(s.run ?? s.actor) : null) ?? s.hash;
-  const place = wanted.findLast((s) => s.kind === 'show' && s.hash);
-  const offeredAt = wanted.findLast((s) => placeOf(s));
-  const there = place ? `#/${place.hash}` : offeredAt && `#/${placeOf(offeredAt)}`;
-  // A pane being read or worked in is passed by, not taken (ui/pane-busy.js): only a question open over the page holds every pane.
-  const busy = Boolean(document.querySelector('dialog[open]'));
-  // Which tab and pane it lands in, by whose step it is (ui/pane-land.js): a frame or 'popped' is a pane that drew it,
-  // { open } a tab out of sight that drew it, null no tab that takes it: it is offered.
-  const landed = !busy && place && hooks.land ? hooks.land(place) : null;
-  const aside = landed?.open;
-  const offered = busy || !landed;
-  // Several sessions at once: each other session's last show lands too, in its own pane or tab.
-  if (!busy && place && hooks.land) {
-    const last = new Map();
-    for (const s of wanted) if (s !== place && s.kind === 'show' && s.hash && sessionOf(s) !== sessionOf(place)) last.set(sessionOf(s), s);
-    for (const s of last.values()) hooks.land(s);
-  }
-  followed.replaceChildren(
-    ...[
-      // One line: who, and the first few words of why. The whole reason is on the page it brought you to.
-      to.name ? sessionWho(to.name, to.actor) : h('strong', {}, to.actor.split('/').at(-1)),
-      h('span', { class: 'grow', title: to.did ?? '' }, to.did ? to.did.split(/(?<=[.:;])\s/)[0] : offered || aside ? 'is working somewhere else' : 'brought you here'),
-      aside && h('button', { title: `Bring ${nameOf(sessionOf(place))}’s tab into sight`, onclick: () => (aside(), (followed.hidden = true)) }, 'Open tab'),
-      (offered || !place) && there && location.hash !== there && h('button', { onclick: () => ((location.hash = there), (followed.hidden = true)) }, 'Go there'),
-      following.on && h('button', { title: 'Stop following agents', onclick: () => ((following.on = followBox.checked = false), (followed.hidden = true)) }, 'Stop following'),
-    ].filter(Boolean),
-  );
-  followed.hidden = false;
-  clearTimeout(followedTimer);
-  // A show offered to a page not following stays longer: it is the only way the reader hears of it.
-  followedTimer = setTimeout(() => (followed.hidden = true), following.on ? 12000 : 60000);
+  for (const s of steps) hear(s);
+  for (const s of fresh) if (s.kind === 'show' && s.hash) waiting.set(sessionOf(s), s);
+  if (!hooks.land || document.querySelector('dialog[open]')) return;
+  for (const s of waiting.values()) hooks.land(s);
+  waiting.clear();
 }
 
 /** The items the sheet shows: what it is the page of, what it names or links to, and what its views hold. */

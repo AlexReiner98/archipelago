@@ -2,7 +2,7 @@
 // real browser (skipped where there is no Chrome), one session gets a pane of its own beside the reader's, several
 // sessions of one agent each keep a tab named by the session,
 // one showing just after another lands in the background and is marked, a press brings a tab into sight, a show while
-// the reader is at work goes to a tab behind, and a tab pops out into a window of its own and docks back whole.
+// the reader is at work goes to a tab behind, and a tab pops out into a window of its own and docks back whole (a tab merged is test/show-lands.test.ts).
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -11,7 +11,7 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-test('in a browser, several sessions each keep a tab, which pops out and docks back', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, several sessions each keep a tab, which pops out and docks back',{ skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {
     reason: 'test',
@@ -36,7 +36,6 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
   };
   const tabOf = (n: number) => `#tabs .tab:nth-child(${n})`;
   try {
-    await page.evaluate(`localStorage.setItem('pelago-follow', 'on')`);
     await wait(3000);
     // One session alone gets a pane of its own in the one tab there is, beside the reader's, whose address stays.
     await show(0, 'i0');
@@ -51,7 +50,7 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
     await show(2, 'i2');
     await until('the third keeps a tab', async () => (await strip()).length === 3);
     const names = (await strip()).map((t) => t[0]);
-    assert.deepEqual(names.slice(1), [sessions[1].name, sessions[2].name], 'a session’s tab is named by the session');
+    assert.deepEqual(names.slice(1), [`Session ${sessions[1].name}`, `Session ${sessions[2].name}`], 'a session’s tab is named by the session, and says it is one');
     assert.deepEqual((await strip()).map((t) => [t[1], t[2]]), [[true, false], [false, true], [false, true]], 'the tab in sight stays; the others are marked');
     assert.equal(await page.evaluate(`location.hash`), reader);
     // Each session comes back to its own tab: no fourth.
@@ -66,7 +65,7 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
     await show(1, 'i0');
     await until('a tab behind', async () => (await strip()).length === 4);
     assert.ok((await page.evaluate<string>(`location.hash`)).startsWith(`#/e/${made.i2}?`), 'the page the reader is in stays');
-    assert.deepEqual((await strip())[3].slice(0, 3), [sessions[1].name, false, true]);
+    assert.deepEqual((await strip())[3].slice(0, 3), [`Session ${sessions[1].name}`, false, true]);
     // The tab in sight pops out into a window of its own, and docks back whole.
     await page.send('Target.setDiscoverTargets', { discover: true });
     await press(`${tabOf(2)} [aria-label="This tab: whom it follows, pop it out"]`);
@@ -82,7 +81,7 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
     await inPopped(`document.querySelector('[aria-label="Dock back"]').click()`);
     await until('the tab docked back, in sight', async () => {
       const now = await strip();
-      return now.length === 4 && !now.some((t) => t[3]) && now.some((t) => t[0] === sessions[1].name && t[1]);
+      return now.length === 4 && !now.some((t) => t[3]) && now.some((t) => t[0] === `Session ${sessions[1].name}` && t[1]);
     });
   } finally {
     await page.close();

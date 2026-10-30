@@ -10,6 +10,8 @@ import { dragOf } from './drag.js';
 import { HELD } from './ghosts.js';
 import { tipOf } from './drawing-tip.js';
 import { build, cssFor, patch, step } from './marks.js';
+import { stillReading } from './reader-frame.js';
+import { followSheet } from './sheet-follow.js';
 import { STYLE_COLORS, litSwitch, numberOf, sizeOf } from './lens-base.js';
 import { surfaceOf } from './surface.js';
 import { saidDrawn } from './look.js';
@@ -115,6 +117,8 @@ function colours(host, style) {
 export function drawWith(host, answer, style, keep) {
   host.endDrawing?.();
   const { drawing } = style;
+  // One that says it is laid out by the page has its box now, before it is measured: drawn once, at the size it will have.
+  if (drawing?.flat) host.classList.add('laid-out');
   const failed = (message) => (host.replaceChildren(h('div', { class: 'lens-error' }, `This drawing stopped: ${String(message).slice(0, 300)}`)), saidDrawn(host, 'error', message));
   // Its code: sent with the answer, kept by this browser, or fetched from this server by its hash (a published page's).
   const sent = drawing?.modules ?? drawings.get(drawing?.hash);
@@ -253,6 +257,9 @@ ${JSON.stringify(input)}`;
   // The marks, in the frame every picture has.
   function mount(scene) {
     if (scene.message) return host.replaceChildren(h('div', { class: 'empty' }, String(scene.message)));
+    const redraw = () => !ended && port.postMessage({ type: 'restyle', style: plain({ ...style, drawing: undefined, code: undefined }) });
+    host.redraw = redraw;
+    if (stillReading(host, scene, keys)) return redraw();
     adopt(id, scene.css);
     host.dataset.drawing = id;
     const picture = build(scene.svg, keys, tell);
@@ -267,24 +274,25 @@ ${JSON.stringify(input)}`;
     surface = scene.surface ? surfaceOf(picture, port, () => colours(host, style)) : null;
     if (surface) keys.set(String(scene.surface.key ?? 'surface'), surface.canvas);
     const over = surface?.canvas;
-    const redraw = () => !ended && port.postMessage({ type: 'restyle', style: plain({ ...style, drawing: undefined, code: undefined }) });
-    host.redraw = redraw;
     // A picture the page lays out (HTML, a grid of cards; or one drawn to the page's width, `flat`) is not panned or zoomed: it is as wide as it needs, scrolled
     // across where the page is narrower, its key below it, brought to what it was opened from (`focus`, a mark's key).
     // It scrolls in a box of its own between the bars (ui/shell.css), its scrollbar never under them.
     host.classList.toggle('laid-out', !(picture instanceof SVGElement) || Boolean(scene.flat));
+    host.classList.toggle('beside-sheet', Boolean(scene.beside));
     if (!(picture instanceof SVGElement) || scene.flat) {
       legend?.classList.add('still');
       host.replaceChildren(...[before, beside(picture), legend, after].filter(Boolean));
       followShape(scene);
       const focus = keys.get(String(scene.focus));
       // Brought into sight by what scrolls inside the view that holds it, and nothing around it (the pane, the page).
-      if (focus) requestAnimationFrame(() => {
+      const bring = () => {
         const around = [];
         for (let el = host.parentElement; el; el = el.parentElement) around.push([el, el.scrollTop, el.scrollLeft]);
-        focus.scrollIntoView({ block: 'center', inline: 'center' });
+        focus.scrollIntoView({ block: scene.beside ? 'start' : 'center', inline: 'center' });
         for (const [el, top, left] of around) if (el.scrollTop !== top || el.scrollLeft !== left) el.scrollTo(left, top);
-      });
+      };
+      if (focus) requestAnimationFrame(bring);
+      if (scene.beside) followSheet(host, picture, focus ? bring : null);
       return;
     }
     const { width, height } = scene.size ?? {};

@@ -399,15 +399,6 @@ svg.graph .dim { opacity: 0.18; }
 .legend .stroke { width: var(--box-6); border-top: var(--border-2) solid var(--edge); display: inline-block; }
 .legend .stroke.blocking { border-top: var(--border-3) solid var(--edge-strong); }
 
-#follow > label { flex: 1; display: flex; gap: var(--space-4); align-items: center; cursor: pointer; white-space: nowrap; }
-#follow-what > summary { padding: var(--space-1) var(--space-5); font-size: var(--text-2); }
-#follow:has(> label input:not(:checked)) #follow-what { opacity: 0.5; }
-#follow-what > .menu-items { cursor: default; }
-#follow-what > .menu-items > label > span { overflow: hidden; text-overflow: ellipsis; }
-#followed { position: fixed; left: 50%; transform: translateX(-50%); bottom: var(--space-9); z-index: 6; display: flex; gap: var(--space-6); align-items: center; max-width: min(var(--wide), calc(100vw - var(--box-8))); padding: var(--space-5) var(--space-5) var(--space-5) var(--space-8); background: var(--panel); border: var(--border-1) solid var(--warn); border-radius: var(--radius-4); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.18); }
-#followed[hidden] { display: none; }
-#followed > * { flex: none; white-space: nowrap; }
-#followed > .grow { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 
 .secret { margin: 0 0 var(--space-8); padding: var(--space-7) var(--space-8); border: var(--border-1) solid var(--warn); background: var(--warn-soft); border-radius: var(--radius-4); display: grid; gap: var(--space-5); }
 .secret code { font: var(--text-4)/1.4 var(--face-mono); overflow-wrap: anywhere; user-select: all; }

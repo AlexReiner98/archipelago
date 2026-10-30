@@ -69,6 +69,8 @@ export const ago = (ts) => {
   return h('span', { class: 'ago', title: when(ts) }, text);
 };
 
+/** A session's word among the names, however it is said: its name, or its title (`Session Sark · what Claude calls it`). */
+const wordOf = (said = '') => /^Session (\S+?)(?: · .*)?$/.exec(said)?.[1] ?? said;
 /**
  * A session's mark among the style's hues: where its name stands among the names the run type gives sessions. The
  * same name has the same hue on every page, and two open sessions are named so that their hues differ.
@@ -76,13 +78,14 @@ export const ago = (ts) => {
 export function sessionHue(name) {
   const names = types.get('run')?.fields?.name?.values ?? [];
   const hues = state.style?.hues ?? [];
-  const i = names.indexOf(name);
+  const i = names.indexOf(wordOf(name));
   return i >= 0 && hues.length ? hues[i % hues.length] : undefined;
 }
-/** A session as a person names it everywhere: its name, marked in its hue; `tip` (whose it is, what it does) is the tooltip. */
+/** A session as a person names it everywhere, `Session Sark`, marked in its hue; its whole title and `tip` (whose it is) are the tooltip. A run named otherwise is said as it is. */
 export function sessionWho(name, tip = '') {
   const hue = sessionHue(name);
-  return h('span', { class: 'who who-session', title: tip, style: hue ? `--session-hue: ${hue}` : null }, name);
+  const said = hue || wordOf(name) !== name ? `Session ${wordOf(name)}` : name;
+  return h('span', { class: 'who who-session', title: [name !== said && name, tip].filter(Boolean).join(' · '), style: hue ? `--session-hue: ${hue}` : null }, said);
 }
 
 /** An actor as a person would name it; what the log holds ("agent:claude-code/claude-code:pelago") is the tooltip. With the session it acted in, the session's name. */

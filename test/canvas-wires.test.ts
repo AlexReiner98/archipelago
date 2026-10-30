@@ -39,7 +39,6 @@ test('in a browser, opening a step keeps the canvas still and lights it, and a h
   const probe = () => page.evaluate<string>(`JSON.stringify({ wires: [...document.querySelectorAll('#canvas svg[role=img] .lf-wire, #canvas svg[role=img] .lf-tie')].map((p) => p.getAttribute('class')), ghosts: document.querySelectorAll('#canvas .lf-step.ghost').length, badges: document.querySelectorAll('#canvas .lf-held').length, dialog: document.querySelector('dialog.ask')?.textContent })`);
   try {
     assert.ok(await until(`Boolean(${step(made.a)}) && Boolean(${step(made.b)})`), `the steps are drawn: ${await page.evaluate("document.querySelector('#canvas')?.innerText.slice(0, 600)")} ${page.logs().join('\n')}`);
-    await page.evaluate(`(localStorage.setItem('pelago-follow', 'off'), (document.querySelector('#follow input').checked = false))`);
     await wait(800);
 
     // ---- A click on a step opens its page over the canvas: the canvas stays where it stands, as the reader moved and

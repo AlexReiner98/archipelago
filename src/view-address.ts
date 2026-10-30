@@ -44,7 +44,7 @@ export async function viewAddress(l: Archipelago, input: ViewAsked): Promise<str
       const [, id] = /^(?:id|in) (e_[a-z0-9]{8})$/.exec(term) ?? [];
       if (id && !(await l.entity(id))) throw new Error(`No item "${id}"`);
     }
-    // The address says the lens as the page reads it: each term of the filter, the walk, the limit.
+    // The address says the lens as the page reads it: each term of the filter, the walk, the limit, the window of time.
     const query = new URLSearchParams();
     if (lens) {
       const walked = lens.walk.over === 'all' || lens.walk.over.length > 0;
@@ -57,6 +57,8 @@ export async function viewAddress(l: Archipelago, input: ViewAsked): Promise<str
       if (walked) query.set('over', lens.walk.over === 'all' ? 'all' : (lens.walk.over as string[]).join(','));
       if (walked) query.set('steps', String(lens.walk.steps));
       if (asked.limit !== undefined) query.set('limit', String(lens.limit));
+      // A window of time as it was said (days from today stay so), as the page reads it back.
+      if (lens.time) query.set('time', `${lens.time.from},${lens.time.to}`);
     }
     if (input.style?.lit) query.set('lit', input.style.lit);
     if (input.style?.shape) query.set('shape', input.style.shape);

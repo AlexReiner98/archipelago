@@ -5,11 +5,12 @@
 //   npm test -- test/a.test.ts …   just those files; an argument starting -- goes to node (--test-name-pattern=…)
 //   node scripts/test.ts shard browser 1/2   one shard of the full run, as CI runs them side by side
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { blankImageFile } from '../src/db.ts';
 import { affected, allTests, fastTests, ROOT, shard } from '../test/sets.ts';
+import { sweepTemp } from '../test/sweep.ts';
 
 const flags = process.argv.slice(2).filter((a) => a.startsWith('--'));
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
@@ -38,15 +39,9 @@ process.env.PELAGO_START_PACKS ??= 'all';
 if (!process.env.PELAGO_TEST_DATABASE_URL) process.env.PELAGO_TEST_IMAGE ??= await blankImageFile();
 
 // Everything the tests put in a temp folder (each file's own folders, Chrome's profiles) goes in one folder for this
-// run, removed when it ends: left behind, they came to some 200 GB in two weeks. A run killed before it could remove
-// its folder leaves it to the next run, which removes those over a day old (a younger one may be another run's).
-const DAY = 86_400_000;
-for (const old of readdirSync(tmpdir())) {
-  const at = join(tmpdir(), old);
-  try {
-    if (old.startsWith('pelago-run-') && Date.now() - statSync(at).mtimeMs > DAY) rmSync(at, { recursive: true, force: true });
-  } catch {}
-}
+// run, removed when it ends: left behind, they came to some 300 GB in two weeks. What is left there all the same is
+// the next run's to sweep (test/sweep.ts).
+sweepTemp(tmpdir());
 const scratch = mkdtempSync(join(tmpdir(), 'pelago-run-'));
 process.on('SIGINT', () => {}); // Ctrl-C ends the tests; this process stays to remove their folder
 const run = spawnSync(process.execPath, ['--test', '--test-force-exit', '--test-global-setup=./test/global.ts', '--import', './test/each.ts', ...flags, ...files], {
@@ -54,9 +49,14 @@ const run = spawnSync(process.execPath, ['--test', '--test-force-exit', '--test-
   stdio: 'inherit',
   env: { ...process.env, TMPDIR: scratch, TEMP: scratch, TMP: scratch },
 });
-try {
-  rmSync(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
-} catch (err) {
-  console.warn(`Could not remove ${scratch}: ${(err as Error).message}`);
-}
+// One by one: a file a Chrome still holds keeps only what it is in, for the next run's sweep.
+const left = [...readdirSync(scratch), ''].filter((name) => {
+  try {
+    rmSync(join(scratch, name), { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+    return false;
+  } catch {
+    return Boolean(name);
+  }
+});
+if (left.length) console.warn(`Could not remove from ${scratch}: ${left.join(', ')}`);
 process.exit(run.status ?? 1);

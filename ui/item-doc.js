@@ -1,7 +1,7 @@
 // An item read whole, as its reader meets it (drawn by the reading page, ui/doc.js), and the links that let someone
 // read it with no login, and its shares with other workspaces.
 
-import { api, ask, h, tell } from './base.js';
+import { api, ask, h, known, tell } from './base.js';
 import { secretBox } from './workspace-cards.js';
 
 /** The item as a reader meets it, and the links to it that still work. */
@@ -9,6 +9,23 @@ export async function readDocument(id) {
   const doc = await api('document', { id, drawn: true }).catch(() => null);
   const links = doc ? (await api('share_list', { id }).catch(() => [])).filter((s) => !s.revoked_at) : [];
   return { doc, links };
+}
+
+/**
+ * The map a shared document's words live on, where this browser is signed in to it: that map's `call` and the item as
+ * it stands there. Nothing crosses between maps: it is the person, with their own sign-in there, under that map's rules.
+ */
+export async function homeOf(doc) {
+  const token = doc?.from && doc.source && known.all()[doc.from]?.token;
+  if (!token) return null;
+  const call = async (tool, input) => {
+    const res = await fetch(`/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(input) });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error);
+    return body.result;
+  };
+  const item = await call('get', { id: doc.source }).then((got) => got.entity, () => null);
+  return item && { call, item };
 }
 
 /** A figure kept for an item, fetched with the page's token: an image address cannot carry it. One read through a share, through it. */

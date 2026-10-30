@@ -5,8 +5,9 @@
 import { api, ask, h, part, state, tell } from './base.js';
 import { goLens, lensNow } from './canvas.js';
 import { draftOf } from './draft.js';
-import { documentMenu, figureOf, readDocument } from './item-doc.js';
+import { documentMenu, figureOf, homeOf, readDocument } from './item-doc.js';
 import { readingOf } from './item-read.js';
+import { readAgain } from './reader-frame.js';
 import { choicesOf } from './fields.js';
 import { choicesSection, fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
 import { relationEditor } from './item-links.js';
@@ -126,8 +127,15 @@ export async function entity(id, here) {
   // A document reads in its note's place as it will publish (ui/item-read.js); one shared from another workspace is
   // read there, not written here.
   const reading = doc && readingOf(doc, looks);
-  const draft = draftOf({ base: e, style: looks, editable: !e.archived_at, reading, saved: again });
-  const note = section('note', 'Note', 0, keepsFigure(e.type) && figureOf(e, 'figure'), h('div', { class: 'note' }, doc?.from ? reading : draft.note));
+  // Read beside its draft (the pages), a document opens as words to write: it reads on the left already.
+  const writing = Boolean(doc && document.querySelector('.lens-view.beside-sheet'));
+  const draft = draftOf({ base: e, style: looks, editable: !e.archived_at, reading, writing: writing && !doc.from, saved: again });
+  // Shared by a map this browser is signed in to, its words are written there, as the person they are there.
+  const home = await homeOf(doc);
+  const words = home && draftOf({ base: home.item, style: looks, reading, writing, call: home.call, saved: () => (readAgain(id), again()) });
+  // The sheet can open before the canvas under it has drawn: told when it has.
+  if (doc && !writing) document.getElementById('sheet').addEventListener('beside', () => (words ?? (doc.from ? null : draft))?.open(), { once: true });
+  const note = section('note', 'Note', 0, keepsFigure(e.type) && figureOf(e, 'figure'), h('div', { class: 'note' }, words ? [...words.note, words.bar] : doc?.from ? reading : draft.note));
   // A field picked is changed at once; words written in a field wait with the note for its Save. A pick made while
   // words wait leaves the page as it stands, so they are not lost: it is drawn again when they are saved.
   const fieldEdit = !e.archived_at && {

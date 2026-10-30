@@ -7,7 +7,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // A UI module, plain JavaScript with no types of its own.
-const { route } = (await import(`../ui/${'pane-route.js'}`)) as { route: (step: object, tabs: object[], at: object) => unknown };
+const { followable, hear, heard, hearOpen, nameOf, route } = (await import(`../ui/${'pane-route.js'}`)) as {
+  followable: (at: { now: number; recent: number }) => string[];
+  nameOf: (key: string) => string;
+  hear: (step: object) => void;
+  heard: Map<string, { called: string }>;
+  hearOpen: (open: object[]) => void;
+  route: (step: object, tabs: object[], at: object) => unknown;
+};
 
 const now = 1_000_000;
 const at = { now, recent: 600_000, settle: 30_000 };
@@ -15,7 +22,7 @@ type Pane = { id: string; slot?: string; held?: string; focus?: boolean; draws?:
 /** A tab: its pane in focus (with `more` on it) and the panes beside it. */
 const tab = (id: string, follows: string, more: Partial<Pane> = {}, beside: Pane[] = [], also = {}) => ({ id, follows, panes: [{ id: 'p0', focus: true, ...more }, ...beside], ...also });
 const first = (more: Partial<Pane> = {}, beside: Pane[] = []) => tab('t0', 'all', more, beside, { front: true });
-const step = (run: string, pane?: string, kind?: string) => ({ actor: 'agent:claude-code/archipelago', run, ...(pane && { pane }), ...(kind && { kind }) });
+const step = (run: string, pane?: string) => ({ actor: 'agent:claude-code/archipelago', run, ...(pane && { pane }) });
 /** A pane held for a session that landed there `ago`. */
 const held = (session: string, ago = 1000) => ({ held: session, landed: { session, at: now - ago } });
 /** A pane beside the one in focus, held for a session. */
@@ -54,9 +61,9 @@ test('no tab is brought into sight: a show into another is drawn there, out of s
 test('a tab that follows another or nobody never takes the step', () => {
   const tabs = [tab('t0', 'e_aaaaaaaa', {}, [], { front: true }), tab('t1', 'e_bbbbbbbb')];
   assert.deepEqual(route(step('e_bbbbbbbb'), tabs, at), { tab: 't1', pane: 'p0', front: false });
-  // No tab follows everyone: a third session is only offered.
-  assert.deepEqual(route(step('e_cccccccc'), tabs, at), { offer: true });
-  assert.deepEqual(route(step('e_aaaaaaaa'), [tab('t0', 'none', {}, [], { front: true })], at), { offer: true });
+  // No tab follows everyone: a third session lands nowhere.
+  assert.deepEqual(route(step('e_cccccccc'), tabs, at), { nowhere: true });
+  assert.deepEqual(route(step('e_aaaaaaaa'), [tab('t0', 'none', {}, [], { front: true })], at), { nowhere: true });
 });
 
 test('one session keeps two panes by name in its tab, each drawn in again when named', () => {
@@ -77,8 +84,40 @@ test("a side moves the session's pane in its tab; alone and a page that is not a
   assert.deepEqual(route(step('e_aaaaaaaa', 'alone'), [tab('t0', 'e_aaaaaaaa', {}, [{ id: 'p1' }], { front: true })], at), { tab: 't0', pane: 'p0', side: 'alone', front: true });
   // `main`, from before every pane was alike, is the session's own pane.
   assert.deepEqual(route(step('e_aaaaaaaa', 'main'), [first({}, [its('e_aaaaaaaa')])], at), { tab: 't0', pane: 'p1', front: true });
-  assert.deepEqual(route(step('e_aaaaaaaa'), [first({}, [its('e_aaaaaaaa')])], { ...at, drawable: false }), { offer: true });
+  // A page that is not a canvas opens over no pane of the reader's: a tab of its own.
+  assert.deepEqual(route(step('e_aaaaaaaa'), [first({}, [its('e_aaaaaaaa')])], { ...at, drawable: false }), { open: { follows: 'e_aaaaaaaa' }, front: false });
   assert.deepEqual(route(step('e_aaaaaaaa'), [tab('t0', 'e_aaaaaaaa', {}, [], { front: true })], { ...at, drawable: false }), { tab: 't0', pane: 'p0', front: true });
+});
+
+test('a pane of its own moved into a tab that follows another is found there, but not in a tab that follows nobody', () => {
+  const moved = [first(), tab('t1', 'e_bbbbbbbb', {}, [its('e_aaaaaaaa')])];
+  assert.deepEqual(route(step('e_aaaaaaaa'), moved, at), { tab: 't1', pane: 'p1', front: false });
+  const quiet = [first(), tab('t1', 'none', {}, [its('e_aaaaaaaa')])];
+  assert.deepEqual(route(step('e_aaaaaaaa'), quiet, at), { tab: 't0', split: { side: 'right' }, front: true });
+});
+
+test('a tab can follow the sessions open now, not one that has ended', () => {
+  heard.clear();
+  hear({ actor: 'agent:a', run: 'e_ended000', name: 'Kos', at: 300 });
+  hear({ actor: 'agent:a', run: 'e_working0', name: 'Mull', at: 200 });
+  hear({ actor: 'agent:none', at: now - 1000 });
+  hear({ actor: 'agent:long', at: now - 700_000 });
+  const say = { now, recent: 600_000 };
+  assert.deepEqual(followable(say), ['agent:none', 'e_ended000', 'e_working0'], 'not yet asked: every session heard, and an agent at work');
+  // A session open and quiet, which this page never heard from, can be followed too, by its name or its label.
+  const open = [{ id: 'e_working0' }, { id: 'e_quiet000', name: 'Hoy', last_seen: new Date(100).toISOString() }, { id: 'e_titled00', name: 'Sark', label: 'Popups', last_seen: new Date(50).toISOString() }];
+  hearOpen(open);
+  assert.deepEqual(followable(say), ['agent:none', 'e_working0', 'e_quiet000', 'e_titled00'], 'open, and an agent at work with no session');
+  // A step it took before it ended, given again, does not bring it back; being open again does.
+  hear({ actor: 'agent:a', run: 'e_ended000', name: 'Kos', at: 300 });
+  assert.ok(!followable(say).includes('e_ended000'));
+  // Its word is free once it has ended: a new session by the same word needs nothing after its name.
+  hear({ actor: 'agent:a', run: 'e_newkos00', name: 'Kos', at: 400 });
+  assert.equal(nameOf('e_newkos00'), 'Session Kos');
+  hearOpen([...open, { id: 'e_ended000' }]);
+  assert.ok(followable(say).includes('e_ended000'));
+  assert.deepEqual([heard.get('e_quiet000')!.called, heard.get('e_titled00')!.called], ['Session Hoy', 'Popups']);
+  heard.clear();
 });
 
 test('within a tab, the pane drawing it already is lit, never the one in focus', () => {
@@ -90,20 +129,9 @@ test('within a tab, the pane drawing it already is lit, never the one in focus',
   assert.deepEqual(route(step('e_aaaaaaaa'), [first(), tab('t1', 'all', {}, [{ id: 'p1', draws: true }])], at), { tab: 't1', pane: 'p1', front: false });
 });
 
-test('a change or a beat of the story moves nothing: it is only offered', () => {
-  for (const kind of ['change', 'story']) {
-    const of = (run: string) => step(run, undefined, kind);
-    assert.deepEqual(route(of('e_cccccccc'), [first()], at), { offer: true });
-    assert.deepEqual(route(of('e_cccccccc'), [first(), tab('t1', 'e_cccccccc')], at), { offer: true });
-    assert.deepEqual(route(of('e_aaaaaaaa'), [first({}, [its('e_aaaaaaaa')])], at), { offer: true });
-    assert.deepEqual(route({ ...of('e_aaaaaaaa'), pane: 'map' }, [first()], at), { offer: true });
-  }
-});
-
-test('a pane the reader is busy in is passed by: a show opens a tab of its own in the background, a change is offered', () => {
+test('a pane the reader is busy in is passed by: a show opens a tab of its own in the background', () => {
   const busy = [first({ busy: true })];
   assert.deepEqual(route(step('e_aaaaaaaa'), busy, at), { open: { follows: 'e_aaaaaaaa' }, front: false });
-  assert.deepEqual(route(step('e_aaaaaaaa', undefined, 'change'), busy, at), { offer: true });
   // No pane is split into a tab the reader is at work in.
   assert.deepEqual(route(step('e_aaaaaaaa', 'review'), busy, at), { open: { follows: 'e_aaaaaaaa', slot: 'review' }, front: false });
   // A session's own tab is drawn in the background while the reader works in another.

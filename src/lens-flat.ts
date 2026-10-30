@@ -61,7 +61,7 @@ const names = (value: unknown, field: string): string[] => {
   return value as string[];
 };
 
-/** A lens said in the words before the three lists, until what still says them is moved. */
+/** A view kept in the words before the three lists, in them: what the migration writes (src/lens-saved.ts). */
 export const fromBefore = (f: Record<string, unknown>) => {
   const list = (x: unknown) => (x === undefined || x === null ? [] : Array.isArray(x) ? x : [x]) as string[];
   const link = (t: unknown) => (typeof t === 'string' ? t : (t as { to?: string }).to !== undefined ? `${(t as { link: string }).link} ${(t as { to: string }).to}` : `${(t as { link: string }).link}< ${(t as { from: string }).from}`);
@@ -76,10 +76,11 @@ export const fromBefore = (f: Record<string, unknown>) => {
 export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLens {
   const asked = (input.filter ?? {}) as Record<string, unknown>;
   if (typeof asked !== 'object' || Array.isArray(asked)) throw new Error('filter must be an object: { find, only, not }, each a list of terms');
-  const filter = (asked.find === undefined && asked.not === undefined ? fromBefore(asked) : asked) as { find?: unknown; only?: unknown; not?: unknown };
+  const filter = asked as { find?: unknown; only?: unknown; not?: unknown };
   const part = (name: 'find' | 'only' | 'not', value: unknown) => {
     if (value !== undefined && !Array.isArray(value)) throw new Error(`filter.${name} must be a list of terms`);
-    return [...new Set(((value ?? []) as unknown[]).map((t) => sayTerm(readTerm(l, t, name))))];
+    // Words with nothing in them are no term: find sends what was typed.
+    return [...new Set(((value ?? []) as unknown[]).filter((t) => !/^\s*text\s*$/i.test(String(t))).map((t) => sayTerm(readTerm(l, t, name))))];
   };
   const find = part('find', filter.find);
   const only = part('only', filter.only);
@@ -171,7 +172,7 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   const holds = async (found: string[]) => unless(checked ? await holding(l, words, found) : found, notChecked);
 
   // Not takes away what it says of an item named by id (e_ndcxf2bv); what nobody said, the default, hides nothing named.
-  const saidNot = (input.filter as { not?: unknown; exclude?: unknown } | undefined)?.not !== undefined || (input.filter as { exclude?: unknown } | undefined)?.exclude !== undefined;
+  const saidNot = (input.filter as { not?: unknown } | undefined)?.not !== undefined;
   /** The items one term of Find finds, narrowed: every read bounded by the term's end, the type index or `most`. */
   const seedOf = async (term: Term, most: number): Promise<string[]> => {
     if (term.sort === 'id') return hidden ? [] : holds((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${[saidNot ? keep(2) : 'e.archived_at is null', ...numbered(terms, saidNot ? 2 + leftOut.length : 2)].join(' and ')}`, [[term.id], ...(saidNot ? leftOut : []), ...narrowing])).rows.map((r) => r.id));

@@ -23,7 +23,7 @@ test('a session registers, takes the lane its task needs, and gives it back when
   // A second session wanting the same lane is told who has it, and waits.
   const two = await sessionStart(l, agent, { task: made.live, session_id: 's2' });
   assert.equal(two.status, 'waiting');
-  assert.match(two.blocked![0].why, new RegExp(`held by "${one.name}"`), 'named by its name');
+  assert.match(two.blocked![0].why, new RegExp(`held by "Session ${one.name}"`), 'named by its name');
 
   await sessionUpdate(l, agent, { run: 's1', note: 'Probe captured; parity is off by 2 px' });
   let view = (await VIEWS.sessions.run(l, {})) as any;
@@ -122,9 +122,9 @@ test('a brief gathers a task\'s context, blockers, needs and rules', async () =>
 
   const brief = (await ask(l, 'brief', { task: made.live })) as any;
   assert.equal(brief.repo.path, 'C:\\code\\Apex');
-  assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', holder.name]]);
+  assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', `Session ${holder.name}`]]);
   assert.deepEqual(brief.ties.map((r: any) => [r.relation, r.title]), [['governed_by', 'One live lane.']]);
-  for (const part of ['# Capture probe', 'Part of: Apex', `held by ${holder.name}`, 'Only one session drives the CAD app.']) {
+  for (const part of ['# Capture probe', 'Part of: Apex', `held by Session ${holder.name}`, 'Only one session drives the CAD app.']) {
     assert.ok(brief.text.includes(part), `expected "${part}" in:\n${brief.text}`);
   }
   const gated = (await ask(l, 'brief', { task: made.gated })) as any;
@@ -148,7 +148,7 @@ test('the session-start hook registers the session and hands it the repo\'s work
 
   const other = await sessionStart(l, agent, { title: 'Lane holder' });
   await l.claim(agent, { resource: made.lane, holder: other.run, reason: 'busy' });
-  assert.match(await hookSessionStart(l, { session_id: 'def', cwd: 'C:\\elsewhere' }), new RegExp(`does not know a repository.*HELD by ${other.name}: do not use it`, 's'));
+  assert.match(await hookSessionStart(l, { session_id: 'def', cwd: 'C:\\elsewhere' }), new RegExp(`does not know a repository.*HELD by Session ${other.name}: do not use it`, 's'));
 
   // On another machine the folder is somewhere else: the repository is known by the address it was cloned from, however that is written.
   await make(l, [{ op: 'update', id: repoId!, props: { remote: 'https://github.com/Acme/Apex' } }]);
@@ -304,3 +304,20 @@ test('work that waits on a person is blocked by them, needs them, and is not ask
   assert.ok(((await callTool(l, human, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any).ready.some((i: any) => i.id === made.offline));
 });
 
+
+test('a session says it is one, and carries what Claude calls it, cut to a name', async () => {
+  const { sessionLabelled, sessionTitle } = await import('../src/session-name.ts');
+  assert.equal(sessionTitle('Sark'), 'Session Sark');
+  assert.equal(sessionTitle('Sark', 'Agent popup'), 'Session Sark · Agent popup');
+  assert.equal(sessionTitle('Sark', 'x'.repeat(80)).length, 60);
+  const l = await fresh();
+  const started = await sessionStart(l, { kind: 'agent', name: 'claude-code' }, { session_id: 'titled' });
+  assert.equal((await l.entity(started.run))!.title, `Session ${started.name}`);
+  await sessionLabelled(l, (await resolveRun(l, 'titled', true))!, '  Agent popup  ');
+  const run = (await l.entity(started.run))!;
+  assert.deepEqual([run.title, run.props.label, run.props.name], [`Session ${started.name} · Agent popup`, 'Agent popup', started.name], 'its name stays, for its hue');
+  const before = (await l.db.query<{ n: number }>('select count(*)::int as n from log_entry')).rows[0].n;
+  await sessionLabelled(l, run, 'Agent popup');
+  await sessionLabelled(l, run, 42);
+  assert.equal((await l.db.query<{ n: number }>('select count(*)::int as n from log_entry')).rows[0].n, before, 'the same title again writes nothing');
+});
