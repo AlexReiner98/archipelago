@@ -290,6 +290,21 @@ test('bars: ports keep off the corners, and wires landing on one side keep apart
   assert.ok(f.tightParallel <= 2, `${f.tightParallel} too near`);
 });
 
+test('bars: a small picture stands in even rows, a fan centred and on one bus, a skipped row its own column', () => {
+  const feeders = ['a', 'bb', 'ccc', 'dddd', 'ee', 'f'], g = drawnBars([item('map'), ...feeders.map((id) => item(id))], feeders.map((id) => tie(id, 'map', 'calls')));
+  assert.equal(new Set(feeders.map((id) => g.y.get(id))).size, 1, 'one row');
+  const xs = feeders.map((id) => g.x.get(id)).sort((p, q) => p - q), gaps = feeders.map((id) => id).sort((p, q) => g.x.get(p) - g.x.get(q)).slice(1).map((id, k, l) => g.x.get(id) - g.nodes.get(id).w / 2 - (g.x.get(k ? l[k - 1] : feeders.find((f) => g.x.get(f) === xs[0])!) + g.nodes.get(k ? l[k - 1] : feeders.find((f) => g.x.get(f) === xs[0])!).w / 2));
+  assert.ok(Math.max(...gaps) - Math.min(...gaps) < 1, `one gap: ${gaps}`);
+  assert.ok(Math.abs(g.x.get('map') - (xs[0] + xs.at(-1)!) / 2) < g.nodes.get('a').w, 'the map under the middle');
+  assert.equal(new Set(g.ties.map((t: any) => t.points.at(-1).join())).size, 1, 'one arrival');
+  const skip = drawnBars(['a', 'b', 'c', 'd', 'e'].map((id) => item(id)), [tie('a', 'b', 'calls'), tie('b', 'c', 'calls'), tie('c', 'd', 'calls'), tie('d', 'e', 'calls'), tie('b', 'e', 'calls')]);
+  assert.equal(skip.x.get('c'), skip.x.get('d'), 'a run stands on one line');
+  assert.equal(count(lines(skip)).crossings, 0);
+  assert.ok(right(skip) && clear(skip));
+  const wide = g.y.get('map') - g.y.get('a') - g.nodes.get('a').h / 2 - g.nodes.get('map').h / 2;
+  assert.ok(wide >= house.sizes.plane_row_space - 1);
+});
+
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { embed } from './draw/flow/upward.js';
 

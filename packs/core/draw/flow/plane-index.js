@@ -15,5 +15,11 @@ export function picture(input, tools) {
   const { crossings, seen, shared } = count(drawn);
   const glyph = () => m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, m('path', { d: 'M1 1L21 13M1 13L21 1', class: 'lf-wire' }));
   out.scene.key.push(...[`${crossings} crossings`, `${seen} seen`, `${shared} shared`, `${g.up} of ${g.headed ?? g.chains.length} up`].map((label) => ({ glyph: glyph(), label })));
+  // Still on a page, a picture stands at its own size in the middle of the frame it is given, which would stretch it.
+  const size = out.scene.size, frame = input.width;
+  if (input.style.still && frame > size?.width && Array.isArray(out.scene.svg)) {
+    out.scene.svg[1].viewBox = `${(size.width - frame) / 2} 0 ${frame} ${size.height}`;
+    out.scene.size = { width: frame, height: size.height };
+  }
   return out;
 }
