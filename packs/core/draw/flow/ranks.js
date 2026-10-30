@@ -66,7 +66,7 @@ function drawPart(list, edges, ties, { nodes, block, gap, z, aspect, starts }) {
   }
   const { row } = best, t = thread(list, lines, row), scores = [best.cost];
   t.layers.splice(0, t.layers.length, ...best.layers);
-  // A comb stands in its row just right of its item, as tall below the item's middle as it hangs.
+  // A comb stands in its row just right of its item, as tall as it hangs.
   const laid = new Map(), x = new Map(), y = new Map();
   for (const id of list) laid.set(id, { ...nodes.get(id), layer: row.get(id) });
   for (const [id, n] of t.waypoints) laid.set(id, n);
@@ -74,7 +74,7 @@ function drawPart(list, edges, ties, { nodes, block, gap, z, aspect, starts }) {
     const b = block(id), s = nodes.get(id);
     if (b.w === s.w) continue;
     const side = `${id}:comb`;
-    laid.set(side, { id: side, shape: 'box', w: b.w - s.w - gap, h: 2 * (b.h - s.h / 2), layer: row.get(id), lines: [] });
+    laid.set(side, { id: side, shape: 'box', w: b.w - s.w - gap, h: b.h, layer: row.get(id), lines: [] });
     for (const m of [t.up, t.down, t.upOrder, t.downOrder]) m.set(side, []);
     const k = t.layers[row.get(id)];
     k.splice(k.indexOf(id) + 1, 0, side);
@@ -93,7 +93,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
   const margin = sizes.flow_margin, gap = sizes.flow_node_gap, zc = { row: gap / 4, col: gap };
-  const z = { LAYER_GAP: sizes.flow_layer_gap, NODE_GAP: gap, BOX_H: sizes.flow_box_height, TRACK: sizes.flow_track, SLOT: sizes.flow_slot, LEAD_OUT: sizes.flow_lead_out, LEAD_IN: sizes.flow_lead_in, EXACT: true };
+  const z = { LAYER_GAP: sizes.flow_layer_gap, NODE_GAP: gap, BOX_H: sizes.flow_box_height, TRACK: sizes.flow_track, SLOT: sizes.flow_slot, LEAD_OUT: sizes.flow_lead_out, LEAD_IN: sizes.flow_lead_in, EXACT: true, HEADS: true };
   const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ a: l.from, b: l.to, type: l.type, ...(l.pending && { pending: l.pending }) }));
   const chains = edges.map((e) => ({ ...e, key: `${e.a} ${e.b}`, path: [e.a, e.b], dashed: potential.has(e.b) }));
   const every = [...chains, ...ties], stepSize = (id) => nodes.get(id);

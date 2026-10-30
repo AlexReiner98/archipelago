@@ -20,6 +20,13 @@ export function picture(input, tools) {
   const { crossings, seen, shared } = count(drawn);
   const flowShows = [...g.chains, ...g.ties.filter((t) => t.type !== 'part_of' && t.type !== 'owned_by')].map((w) => w.points);
   const shown = count(flowShows), up = g.chains.filter((w) => w.up).length;
-  out.scene.key.push({ glyph: m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, m('path', { d: 'M1 1L21 13M1 13L21 1', class: 'lf-wire' })), label: `${crossings} crossings, ${seen} seen, ${shared} shared, ${drawn.filter(doublesBack).length} double back; without part_of ${shown.crossings} crossings, ${shown.shared} shared, ${flowShows.filter(doublesBack).length} double back; ${up} up; ${Math.round(g.width)} by ${Math.round(g.height)}` });
+  const glyph = () => m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, m('path', { d: 'M1 1L21 13M1 13L21 1', class: 'lf-wire' }));
+  out.scene.key.push(
+    { glyph: glyph(), label: `${crossings} crossings, ${seen} seen, ${shared} shared` },
+    { glyph: glyph(), label: `${drawn.filter(doublesBack).length} double back, ${up} up` },
+    { glyph: glyph(), label: `Without part_of: ${shown.crossings} crossings` },
+    { glyph: glyph(), label: `${shown.shared} shared, ${flowShows.filter(doublesBack).length} double back` },
+    { glyph: glyph(), label: `${Math.round(g.width)} by ${Math.round(g.height)}` },
+  );
   return out;
 }

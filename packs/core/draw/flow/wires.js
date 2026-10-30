@@ -178,7 +178,8 @@ export function wire({ nodes, x, y, lines, layers, room, z }) {
   let top = 0;
   layers.forEach((row, k) => {
     const tall = highest([BOX_H, ...row.map((id) => nodes.get(id).h)]);
-    for (const id of row) y.set(id, top + tall / 2);
+    // Each step in the middle of its row, or, where a row holds something tall, at the head of it.
+    for (const id of row) y.set(id, top + (z.HEADS ? nodes.get(id).h / 2 : tall / 2));
     top += tall;
     // A line leaves its foot by LEAD_OUT at least and runs LEAD_IN at least before its head; the tracks sit between.
     const n = highest([1, ...[...levels[k].values()].map((l) => l + 1)]), gap = Math.max(LAYER_GAP / 2, LEAD_OUT + LEAD_IN + (n - 1) * TRACK);
