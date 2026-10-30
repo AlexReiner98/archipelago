@@ -15,18 +15,18 @@ const browser = chrome();
 test('an agent makes and changes a saved canvas through change, and report show opens it', async () => {
   const l = await fresh();
   const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'project', title: 'P' }]);
-  const asked = { reason: 'test: a canvas of P', ops: [{ op: 'create' as const, ref: 'c', type: 'lens', title: 'P and its parts', props: { filter: { ids: [p] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'flow' } } }] };
+  const asked = { reason: 'test: a canvas of P', ops: [{ op: 'create' as const, ref: 'c', type: 'lens', title: 'P and its parts', props: { filter: { find: [`id ${p}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'flow' } } }] };
   const made = (await callTool(l, agent, 'change', asked)) as { status: string; created?: Record<string, string>; proposal?: string };
   // Held for a person, as every agent's change is until the owner lets them apply: approved, it is made.
   const id = made.created?.c ?? ((await l.change(human, asked)) as { created: Record<string, string> }).created.c;
   const got = (await callTool(l, agent, 'query', { name: 'get', params: { id } })) as { entity: { kind: string; props: Record<string, unknown> } };
   assert.equal(got.entity.kind, 'system', 'of the system kind: views of the work leave it out');
-  assert.deepEqual(got.entity.props.filter, { ids: [p] });
+  assert.deepEqual(got.entity.props.filter, { find: [`id ${p}`] });
   await l.change(human, { reason: 'test', ops: [{ op: 'update', id, props: { limit: 50 } }] });
   await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id, props: { lens: 'x' } }] }), /lens/, 'only the fields it declares');
   const shown = (await callTool(l, agent, 'report', { action: 'show', params: { entity: id } })) as { hash: string };
   assert.equal(shown.hash, `v?canvas=${id}`, 'opened as their canvas, not as an item page');
-  const drawn = (await callTool(l, human, 'view', { name: 'flat', params: { filter: { types: ['project'] } } })) as { items: { id: string }[] };
+  const drawn = (await callTool(l, human, 'view', { name: 'flat', params: { filter: { find: ['type project'] } } })) as { items: { id: string }[] };
   assert.ok(!drawn.items.some((i) => i.id === id), 'not drawn on a canvas of the work');
 });
 
@@ -58,8 +58,8 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
       { op: 'create', ref: 'q', type: 'project', title: 'Another project' },
     ],
   })).result.created as Record<string, string>;
-  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'A view of it', props: { filter: { ids: [made.p] }, walk: { over: ['part_of'], steps: 2 } } }, { op: 'link', type: 'about', from: 'v', to: made.p }] });
-  const page = await open(`${base}/#/v?ids=${made.p}&over=part_of&steps=1`);
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'A view of it', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 2 } } }, { op: 'link', type: 'about', from: 'v', to: made.p }] });
+  const page = await open(`${base}/#/v?find=id+${made.p}&over=part_of&steps=1`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const until = async (expression: string, ms = 20000) => {
     for (const end = Date.now() + ms; Date.now() < end; await wait(150)) if (await page.evaluate(expression)) return true;
@@ -73,7 +73,7 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
     for (const width of [1280, 560]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
       const name = `Saved at ${width}`;
-      await page.go(`${base}/#/v?ids=${made.p}&over=part_of&steps=1`);
+      await page.go(`${base}/#/v?find=id+${made.p}&over=part_of&steps=1`);
       assert.ok(await until(drawn(made.a)), `drawn: ${page.logs().join('\n')}`);
       assert.ok(await until(`document.querySelector('#query .q-pick')?.title.startsWith('Not saved')`), 'the bar says what is up is not saved');
 
@@ -84,7 +84,7 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
       assert.ok(await until(`${picked} === ${JSON.stringify(name)}`), `the bar names it: ${await page.evaluate(picked)}`);
       const saved = (await canvases()).find((c) => c.title === name)!;
       assert.ok(saved, 'kept on the map');
-      assert.deepEqual([saved.props.filter.ids, saved.props.walk], [[made.p], { over: ['part_of'], steps: 1 }], 'its lens: the filter, the walk');
+      assert.deepEqual([saved.props.filter.find, saved.props.walk], [[`id ${made.p}`], { over: ['part_of'], steps: 1 }], 'its lens: the filter, the walk');
       assert.equal(await canvasUp(), saved.id, 'its id in the address');
 
       // Moved on it: written under its own id, not the item's canvas or the map's.
@@ -108,8 +108,8 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
     }
 
     // An agent's canvas of another project; switched between from the bar.
-    const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: 'The other one', props: { filter: { ids: [made.q] }, walk: { over: [], steps: 0 } } }] })).result.created.c as string;
-    await page.go(`${base}/#/v?ids=${made.q}`);
+    const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: 'The other one', props: { filter: { find: [`id ${made.q}`] }, walk: { over: [], steps: 0 } } }] })).result.created.c as string;
+    await page.go(`${base}/#/v?find=id+${made.q}`);
     await page.go(`${base}/#/you`);
     assert.ok(await until(`[...document.querySelectorAll('.canvases a')].some((a) => a.textContent === 'The other one')`), 'the new one is listed');
     await page.evaluate(`[...document.querySelectorAll('.canvases a')].find((a) => a.textContent === 'The other one').click()`);

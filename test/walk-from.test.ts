@@ -22,7 +22,7 @@ test('in a browser, an item page walks from the item, in place of the lens or ad
       { op: 'link', type: 'depends_on', from: 'c', to: 'd' },
     ],
   })).result.created as Record<string, string>;
-  const page = await open(`${base}/#/v?ids=${made.a},${made.c}`);
+  const page = await open(`${base}/#/v?find=id+${made.a}&find=id+${made.c}`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const until = async (expression: string) => {
     for (const end = Date.now() + 20000; Date.now() < end; await wait(150)) if (await page.evaluate(expression)) return true;
@@ -41,7 +41,7 @@ test('in a browser, an item page walks from the item, in place of the lens or ad
     // Walk from it: the item and a step along its links, in place of the lens; its page stays open.
     await page.evaluate(`document.querySelector('#sheet .walk-from').click()`);
     assert.ok(await until(`${drawn(made.a)} && ${drawn(made.b)} && !${drawn(made.c)}`), `the item and what it links to, in place of the lens: ${await page.evaluate('location.hash')}`);
-    assert.ok(await page.evaluate(`location.hash.startsWith('#/e/${made.a}?') && ${lens}.get('over') === 'depends_on' && ${lens}.get('ids') === '${made.a}'`), `the walk named by the link it has: ${await page.evaluate('location.hash')}`);
+    assert.ok(await page.evaluate(`location.hash.startsWith('#/e/${made.a}?') && ${lens}.get('over') === 'depends_on' && ${lens}.get('find') === 'id ${made.a}'`), `the walk named by the link it has: ${await page.evaluate('location.hash')}`);
     assert.ok(await until(`document.querySelector('#find-lens').textContent.includes('Walk')`), 'the query line says the walk');
     // Back to both, then from the other's page, added to the lens.
     await page.evaluate(`document.querySelector('#query [aria-label="Back"]').click()`);

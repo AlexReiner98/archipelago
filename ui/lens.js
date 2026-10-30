@@ -1,4 +1,4 @@
-import { api, asWords, h, wordsOf } from './base.js';
+import { api, h } from './base.js';
 import { replicate } from './live.js';
 import { unfollow } from './replica.js';
 import { drawWith, drawings, warmDrawings } from './drawing.js';
@@ -17,7 +17,7 @@ export function storyPart(data) {
   const found = data.beats.find((b) => b.n === data.finding);
   if (!found) return '';
   // What the finding is about, and nothing else: no walk.
-  const picture = found.about.length ? flatView({ lens: { filter: { ids: found.about, exclude: [] } }, style: { shape: 'list' }, key: `story:${data.run.id}` }) : h('div', { hidden: true });
+  const picture = found.about.length ? flatView({ lens: { filter: { find: found.about.map((id) => `id ${id}`), not: [] } }, style: { shape: 'list' }, key: `story:${data.run.id}` }) : h('div', { hidden: true });
   // The finding names items by their ids; they read as names once the picture has said what each is called.
   const said = h('p', { class: 'finding' }, idsAsLinks(found.said));
   picture.ready?.then(() => {
@@ -88,10 +88,9 @@ export const FOCUS = ['part_of', 'depends_on', 'waits_on'];
 const list = (value) => (value ?? '').split(',').filter(Boolean);
 
 /**
- * A flat lens and a style, as the end of an address says them: ?text=…&types=…&ids=…&link=tagged e_x&in=e_p&only=…&within=e_y
- * &exclude=closed&over=part_of&steps=1&limit=500&time=-6d,7d (a link term each `link`; only and within narrow what the rest finds;
- * time is a window each item is placed in, its ends dates or days from today;
- * exclude with nothing after it leaves nothing out). An
+ * A flat lens and a style, as the end of an address says them: ?find=type task&find=in e_p&only=done&not=kind system
+ * &over=part_of&steps=1&limit=500&time=-6d,7d (each term its own find, only or not; time is a window each item is placed in, its ends
+ * dates or days from today; not with nothing after it leaves nothing out). An
  * address from before the flat lens (?from=e_x) opens on that item. A lens that includes nothing is null, unless the
  * address says so (`nothing`: every Find term taken out, drawn as an empty canvas). `canvas` names
  * the saved canvas it is drawn on (ui/canvases.js): its places, its name in the bar.
@@ -99,15 +98,10 @@ const list = (value) => (value ?? '').split(',').filter(Boolean);
 export function readFlatLens(query) {
   const p = new URLSearchParams(query);
   const filter = {};
-  const ids = [...list(p.get('from')), ...list(p.get('ids'))];
-  Object.assign(filter, asWords(p.getAll('text')));
-  if (p.get('types')) filter.types = list(p.get('types'));
-  if (ids.length) filter.ids = [...new Set(ids)];
-  if (p.getAll('link').length) filter.links = p.getAll('link').filter(Boolean);
-  if (p.get('in')) filter.in = list(p.get('in'));
-  if (p.get('only')) filter.only = list(p.get('only'));
-  if (p.get('within')) filter.within = list(p.get('within'));
-  if (p.has('exclude')) filter.exclude = list(p.get('exclude'));
+  const named = list(p.get('from')).map((id) => `id ${id}`);
+  if (named.length || p.getAll('find').length) filter.find = [...new Set([...named, ...p.getAll('find').filter(Boolean)])];
+  if (p.getAll('only').length) filter.only = p.getAll('only').filter(Boolean);
+  if (p.has('not')) filter.not = p.getAll('not').filter(Boolean);
   const style = {};
   for (const key of ['lit', 'shape', 'style', 'canvas']) if (p.get(key)) style[key] = p.get(key);
   // A lens that names a view draws its answer in place of what a filter finds (the plan pack's usage).
@@ -122,22 +116,20 @@ export function readFlatLens(query) {
 }
 
 /** Whether a filter includes anything: one that does not is answered with nothing, here, never sent to be read. */
-export const includesAny = (f) => Boolean(wordsOf(f).length || f.types?.length || f.ids?.length || f.links?.length || f.in?.length);
+export const includesAny = (f) => Boolean(f.find?.length);
 
 /** The end of the address that says this flat lens (and the style asked of it): what readFlatLens reads back. */
 export function flatQuery(lens, style = {}) {
   const p = new URLSearchParams();
   if (lens.view) p.set('view', lens.view);
   else if (!includesAny(lens.filter)) p.set('nothing', '');
-  const { text, types, ids, links, in: inside, only, within, exclude } = lens.filter;
-  for (const words of wordsOf({ text })) p.append('text', words);
-  if (types?.length) p.set('types', types.join(','));
-  if (ids?.length) p.set('ids', ids.join(','));
-  for (const term of links ?? []) p.append('link', term);
-  if (inside?.length) p.set('in', inside.join(','));
-  if (only?.length) p.set('only', only.join(','));
-  if (within?.length) p.set('within', within.join(','));
-  if (exclude) p.set('exclude', exclude.join(','));
+  const { find, only, not } = lens.filter;
+  for (const term of find ?? []) p.append('find', term);
+  for (const term of only ?? []) p.append('only', term);
+  if (not) {
+    if (!not.length) p.set('not', '');
+    for (const term of not) p.append('not', term);
+  }
   const { over, steps } = lens.walk ?? { over: [], steps: 0 };
   if (over === 'all' || over.length) p.set('over', over === 'all' ? 'all' : over.join(','));
   if (steps || over === 'all' || over.length) p.set('steps', String(steps));

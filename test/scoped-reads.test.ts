@@ -22,9 +22,9 @@ test('a lens reads only what its filter includes: one that includes nothing is r
     { op: 'link', type: 'part_of', from: 'q', to: 't' },
   ]);
   await assert.rejects(view(l, human, 'flat'), /includes something/, 'never the whole map');
-  const top = await view(l, human, 'flat', { filter: { types: ['project'] } });
+  const top = await view(l, human, 'flat', { filter: { find: ['type project'] } });
   assert.deepEqual(top.items.map((i: any) => i.title).sort(), ['Garden', 'House'], 'the types it names');
-  const tasks = await view(l, human, 'flat', { filter: { types: ['task'] } });
+  const tasks = await view(l, human, 'flat', { filter: { find: ['type task'] } });
   assert.deepEqual(tasks.items.map((i: any) => i.title), ['Tiles']);
 });
 

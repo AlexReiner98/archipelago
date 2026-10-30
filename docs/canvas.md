@@ -31,17 +31,20 @@ never structure. Containment is a projection the server keeps (the
 
 ### 3. The lens is a filter, a walk and a limit, and the only bound
 Its parts have one name each, on the page and in an agent's answer: Find,
-Only, Not, Walk and Limit (e_drt4g872, `docs/glossary.md`). The filter has
-two kinds of term. Find's add seeds, each its own (words, types, ids, links
-such as `tagged e_x`, `in` an item: all that is part of it at any depth,
-from the part_of closure, e_tvsdqjeq; a union); Only's must all hold of a
-seed (an AND: types, and plain words,
-`done`, `blocked`, `status <s>`, `owner me`, `no owner`, `over estimate`,
-`changed since 7d`, `made since <date>`, `by owner`, `by agent`, read in
-`src/lens-only.ts`, e_xe5dx55e; `within`, items it is part of at any depth,
-read from the part_of closure). What Not
-leaves out applies to everything the walk reaches, never to an item named
-by id (e_yasbwj45); Walk
+Only, Not, Walk and Limit (e_drt4g872, `docs/glossary.md`). Find, Only and Not
+take one list of terms (`src/lens-terms.ts`, e_4y5x454z), each a set of items
+written as words: `text <words>`, `type <t>`, `kind <k>`, `id <item>`,
+`in <item>` (all that is part of it at any depth, from the part_of closure,
+e_tvsdqjeq), `related <item>` (any link to it, either way), `<link> <item>`
+(`tagged e_x`; `<link>< <item>` what it links to), `owner <person>`, and
+words that can only be checked of what is found: `done`, `blocked`,
+`status <s>`, `no owner`, `over estimate`, `changed since 7d`,
+`made since <date>`, `by owner`, `by agent` (`src/lens-only.ts`, e_xe5dx55e).
+The part says what is done with a set: Find adds it (a union; neither `kind`
+nor a word finds, since each would read the map), Only keeps what is in it
+(an AND; an item is of one type, so its types are one set), and Not takes it
+away from everything the walk reaches and every item named by id
+(e_ndcxf2bv); the default Not, which nobody said, hides nothing named. Walk
 follows the link types named, each out (→, `depends_on>`), in (←,
 `depends_on<`) or either way (↔, as a lens kept before ways were said), for
 some steps, a click on its arrow in the bar turning it (e_gue6cg6q); Limit

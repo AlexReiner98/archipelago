@@ -5,10 +5,10 @@
 // unless another is chosen; then, for the items the search read finds by name, all that is In each and the Item
 // itself (a tag as a Tag); a View kept on the map by its name, which opens in the pane, and a Style (one kept by name,
 // a shape a drawing draws, or the house's), which the canvas is then drawn in; the types and the links whose names
-// hold the words (a link to me). In Only: the plain words, a Type, Within an item, a Status, an Owner. In Not: closed, system, a Type. In Walk: a link, out, in or either way,
+// hold the words (a link to me). In Only and Not: the plain words, a Status, and all that Find takes. A word can only be checked of what is found, so Find offers none. In Walk: a link, out, in or either way,
 // or every link. In Limit: a number. Each choice says the change it makes, kept by id.
 
-import { api, state } from './base.js';
+import { api, notOf, state } from './base.js';
 import { canvasAt } from './canvases.js';
 import { offered } from './only-words.js';
 import { ARROW, isA, relations, titles, typeChoice, typeTitle, types, withWay } from './words.js';
@@ -71,12 +71,13 @@ const modeChoices = (mode, q) => (q.length < 2 ? [] : MODES.filter((m) => m !== 
   .map((m) => ({ kind: m, label: `${MEANS[m].toLowerCase()} ›`, note: '', title: `${m}: ${MEANS[m].toLowerCase()} (type “${m.toLowerCase()} ” to go there)`, mode: m }));
 
 /** The kinds of choice in each part: one's word first in what is typed ("within archipelago") offers that kind alone. */
-const KINDS = { Find: ['Words', 'View', 'Style', 'In', 'Item', 'Tag', 'Type', 'Link'], Only: ['Word', 'Owner', 'Status', 'Type', 'Within'], Not: ['Type'], Walk: [], Limit: [], View: [], Style: [] };
+const TERMS = ['Words', 'In', 'Item', 'Related', 'Tag', 'Type', 'Link', 'Owner'];
+const KINDS = { Find: ['View', 'Style', ...TERMS], Only: ['Word', 'Status', ...TERMS], Not: ['Word', 'Status', ...TERMS], Walk: [], Limit: [], View: [], Style: [] };
 
 /** The kind whose word leads what is typed in `mode`, and the rest; or nothing. */
 export function ledBy(mode, q) {
   const [, lead, rest] = /^(\S+)\s+(.*)$/.exec(q) ?? [];
-  const kind = lead && KINDS[mode].find((k) => k.toLowerCase() === lead.toLowerCase());
+  const kind = lead && KINDS[mode].find((k) => k.toLowerCase() === (lead.toLowerCase() === 'within' ? 'in' : lead.toLowerCase()));
   return kind ? { kind, rest: rest.trim() } : null;
 }
 
@@ -94,35 +95,31 @@ export async function choicesFor(mode, q, c) {
     return [...all, ...(mode === 'Find' && led.kind !== 'Words' ? [wordsChoice(q)] : [])];
   }
   const f = c.lens.filter;
-  if (mode === 'Find') {
-    const [hits, kept] = await Promise.all([found(q, c.most), keptFound(q, c.most)]);
+  if (mode === 'Find' || mode === 'Only' || mode === 'Not') {
+    const part = mode.toLowerCase();
+    const have = part === 'not' ? notOf(f) : (f[part] ?? []);
+    const adds = (term) => ({ term: { [part]: term } });
+    const [hits, kept] = await Promise.all([found(q, c.most), mode === 'Find' ? keptFound(q, c.most) : []]);
     const items = hits.filter((e) => !keptAs(e.type)).flatMap((e) => {
       const what = typeTitle(e.type);
-      if (e.type === 'tag') return [{ kind: 'Tag', label: `#${e.title}`, note: '', title: `Items tagged ${e.title}`, term: { link: `tagged ${e.id}` } }];
+      if (e.type === 'tag') return [{ kind: 'Tag', label: `#${e.title}`, note: '', title: `Items tagged ${e.title}`, ...adds(`tagged ${e.id}`) }];
       return [
-        { kind: 'In', label: e.title, note: what, title: `All that is in ${e.title} (${what}), at any depth`, term: { in: e.id } },
-        { kind: 'Item', label: e.title, note: what, title: `${e.title} (${what}) alone`, term: { id: e.id } },
+        { kind: 'In', label: e.title, note: what, title: `All that is in ${e.title} (${what}), at any depth`, ...adds(`in ${e.id}`) },
+        { kind: 'Item', label: e.title, note: what, title: `${e.title} (${what}) alone`, ...adds(`id ${e.id}`) },
+        { kind: 'Related', label: e.title, note: what, title: `What has any link to ${e.title} (${what}), either way`, ...adds(`related ${e.id}`) },
       ];
     });
-    const typed = typeList(q, c.most).map((t) => ({ kind: 'Type', label: typeChoice(t), note: '', title: `Items of the type ${t.title}, the newest first`, term: { type: t.id } }));
-    const linked = linkList(q, c.most).map((r) => ({ kind: 'Link', label: `${r.title ?? r.id} → me`, note: '', title: `What has ${r.title ?? r.id} to me`, term: { link: `${r.id} me` } }));
-    return [wordsChoice(q), ...modeChoices(mode, q), ...kept, ...items, ...typed, ...linked];
-  }
-  if (mode === 'Only') {
-    const words = offered(f.only ?? []).filter((w) => has(w.word, q)).map((w) => ({ kind: 'Word', label: w.word, note: '', title: w.title, term: { only: w.word } }));
-    const mine = has('owner me', q) && !(f.only ?? []).includes('owner me') ? [{ kind: 'Owner', label: 'me', note: '', title: 'What is mine', term: { only: 'owner me' } }] : [];
+    const typed = typeList(q, c.most).map((t) => ({ kind: 'Type', label: typeChoice(t), note: '', title: `Items of the type ${t.title}`, ...adds(`type ${t.id}`) }));
+    const linked = linkList(q, c.most).map((r) => ({ kind: 'Link', label: `${r.title ?? r.id} → me`, note: '', title: `What has ${r.title ?? r.id} to me`, ...adds(`${r.id} me`) }));
+    const mine = has('owner me', q) && !have.includes('owner me') ? [{ kind: 'Owner', label: 'me', note: '', title: 'What is mine', ...adds('owner me') }] : [];
+    const people = (await found(q, c.most, 'actor')).map((e) => ({ kind: 'Owner', label: e.title, note: typeTitle(e.type), title: `What ${e.title} owns`, ...adds(`owner ${e.id}`) }));
+    if (mode === 'Find') return [wordsChoice(q), ...modeChoices(mode, q), ...kept, ...items, ...typed, ...linked, ...mine, ...people];
+    const words = offered(have).filter((w) => has(w.word, q)).map((w) => ({ kind: 'Word', label: w.word, note: '', title: w.title, ...adds(w.word) }));
+    const system = has('system', q) && !have.includes('kind system') ? [{ kind: 'Word', label: 'system', note: '', title: 'What the system keeps', ...adds('kind system') }] : [];
     const statuses = [...new Set([...types.values()].flatMap((t) => [...(t.statuses?.open ?? []), ...(t.statuses?.closed ?? [])]))].filter((s) => (q ? has(s, q) : c.narrowed)).slice(0, c.most)
-      .map((s) => ({ kind: 'Status', label: s, note: '', title: `Only what is ${s}`, term: { only: `status ${s}` } }));
-    const typed = typeList(q, c.most).map((t) => ({ kind: 'Type', label: typeChoice(t), note: '', title: `Only what is of the type ${t.title}`, term: { only: t.id } }));
-    const within = (await found(q, c.most)).map((e) => ({ kind: 'Within', label: e.title, note: typeTitle(e.type), title: `Only what is within ${e.title}, at any depth`, term: { within: e.id } }));
-    const people = (await found(q, c.most, 'actor')).map((e) => ({ kind: 'Owner', label: e.title, note: typeTitle(e.type), title: `Only what ${e.title} owns`, term: { only: `owner ${e.id}` } }));
-    return [...modeChoices(mode, q), ...words, ...mine, ...statuses, ...typed, ...within, ...people];
-  }
-  if (mode === 'Not') {
-    const out = f.exclude ?? ['system'];
-    const kinds = ['closed', 'system'].filter((x) => !out.includes(x) && has(x, q)).map((x) => ({ kind: 'Not', label: x, note: '', title: x === 'closed' ? 'Leave out what is done or closed' : 'Leave out what the system keeps', term: { exclude: x } }));
-    const typed = typeList(q, c.most).filter((t) => !out.includes(t.id)).map((t) => ({ kind: 'Type', label: typeChoice(t), note: '', title: `Leave out items of the type ${t.title}`, term: { exclude: t.id } }));
-    return [...modeChoices(mode, q), ...kinds, ...typed];
+      .map((s) => ({ kind: 'Status', label: s, note: '', title: `What is ${s}`, ...adds(`status ${s}`) }));
+    const text = q ? [{ kind: 'Words', label: `“${q}”`, note: '', title: `Words in titles and notes: “${q}”`, ...adds(`text ${q}`) }] : [];
+    return [...modeChoices(mode, q), ...words, ...system, ...mine, ...statuses, ...typed, ...items, ...people, ...linked, ...text];
   }
   // View or Style: every one of that kind, narrowed by what is typed.
   if (mode === 'View' || mode === 'Style') return [...modeChoices(mode, q), ...(await keptFound(q, c.wide, [mode]))];

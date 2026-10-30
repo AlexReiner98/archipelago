@@ -9,7 +9,7 @@
 // box and the choices are that part's; Backspace in an empty box goes back to Find. Escape empties what was typed, then
 // leaves the part, then shuts find; so does a click away from it.
 
-import { api, asWords, h, state, wordsOf } from './base.js';
+import { api, h, state, wordsOf, withWords } from './base.js';
 import { goLens, home, lensNow, openHere, styleNow } from './canvas.js';
 import { MODES, choicesFor, ledBy, wordsChoice } from './find-choices.js';
 import { flatQuery } from './lens.js';
@@ -86,8 +86,7 @@ function take(choice, add = false) {
   }
   if (choice.limit) return goLens({ ...lens, limit: choice.limit });
   if (choice.words) {
-    const { text, ...rest } = lens.filter;
-    return goLens({ ...lens, filter: { ...rest, ...asWords(add ? [...wordsOf({ text }), choice.words] : [choice.words]) } });
+    return goLens({ ...lens, filter: withWords(lens.filter, add ? [...wordsOf(lens.filter), choice.words] : [choice.words]) });
   }
   goLens(added(lens, choice.term));
 }
@@ -120,11 +119,11 @@ async function look() {
   lit = 0;
   drawChoices();
   const lens = lensUp();
-  const { only, within, exclude } = lens.filter;
+  const { only, not } = lens.filter;
   const most = numberOf(state.style, 'find_choice_items');
   const [all, counted] = await Promise.all([
     choicesFor(mode, q, { most, wide: numberOf(state.style, 'term_find_most'), lens }),
-    finding ? api('view', { name: 'flat', params: { filter: { text: q, ...(only && { only }), ...(within && { within }), ...(exclude && { exclude }) }, limit: most } }).catch(() => null) : null,
+    finding ? api('view', { name: 'flat', params: { filter: { find: [`text ${q}`], ...(only && { only }), ...(not && { not }) }, limit: most } }).catch(() => null) : null,
   ]);
   if (mine !== asked) return;
   const words = all.find((x) => x.words === q);

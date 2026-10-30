@@ -12,7 +12,7 @@ test('saved views name each kept picture by its style, says what it is of, and p
     { op: 'create', ref: 'stack', type: 'component', title: 'Sovereign AI stack', status: 'wiring' },
     { op: 'link', type: 'part_of', from: 'stream', to: 'proj' },
     { op: 'link', type: 'part_of', from: 'stack', to: 'stream' },
-    { op: 'create', ref: 'wired', type: 'lens', title: 'The stack as wired', status: 'current', props: { filter: { types: ['component'] } } },
+    { op: 'create', ref: 'wired', type: 'lens', title: 'The stack as wired', status: 'current', props: { filter: { find: ['type component'] } } },
     { op: 'create', ref: 'arch', type: 'style', title: 'The stack as architecture', status: 'current', props: { shape: 'architecture' } },
     { op: 'link', type: 'about', from: 'wired', to: 'stack' },
     { op: 'link', type: 'about', from: 'arch', to: 'wired' },

@@ -111,7 +111,7 @@ test("in a browser, an agent's change reaches a store holding a flat lens's answ
     await page.evaluate(`(async () => {
       const at = (name) => document.querySelector('link[rel="modulepreload"][href^="/' + name + '.js"]').getAttribute('href');
       const [{ api }, live] = await Promise.all([import(at('base')), import(at('live'))]);
-      window.store = await live.replicate(() => api('view', { name: 'flat', params: { filter: { ids: ['${made.p}'] }, walk: { over: ['part_of'], steps: 1 } } }));
+      window.store = await live.replicate(() => api('view', { name: 'flat', params: { filter: { find: ['id ${made.p}'] }, walk: { over: ['part_of'], steps: 1 } } }));
       window.heard = [];
       window.store.on((changed) => window.heard.push(changed));
       // Every lens read from here on is counted.

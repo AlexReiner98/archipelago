@@ -6,7 +6,7 @@
 // which lens is up, lights the item whose page is open, and moves as the reader chose in the settings menu: fitted on
 // every change until they move it themselves (a page opened or shut then leaves it be), or left where they put it.
 
-import { api, hooks, state } from './base.js';
+import { api, hooks, idsOf, state } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { canvasSwitch } from './canvases.js';
 import { numberOf } from './lens-base.js';
@@ -20,13 +20,13 @@ const sheet = document.getElementById('sheet');
  * limit, so the first canvas answers one question (decision e_5stjvfvb). Growing it is a step taken from an item.
  */
 export const home = () => ({
-  filter: { types: (state.schema?.types ?? []).filter((t) => !t.dormant && t.altitude === 'project').map((t) => t.id), links: ['waits_on me'], exclude: ['closed', 'system'] },
+  filter: { find: ['waits_on me', ...(state.schema?.types ?? []).filter((t) => !t.dormant && t.altitude === 'project').map((t) => `type ${t.id}`)], not: ['done', 'kind system'] },
   limit: numberOf(state.style, 'home_limit'),
 });
 /** The canvas an item's address opens when no lens is asked: the item and what it holds, depends on and waits on. */
-export const focusOn = (id) => ({ filter: { ids: [id] }, walk: { over: FOCUS, steps: 1 } });
+export const focusOn = (id) => ({ filter: { find: [`id ${id}`] }, walk: { over: FOCUS, steps: 1 } });
 /** The canvas as places are kept for it: the saved canvas up (ui/canvases.js), else the first item its filter names, else the whole map (''). */
-const canvasOf = (lens, asked) => asked?.canvas ?? lens.filter.ids?.[0] ?? '';
+const canvasOf = (lens, asked) => asked?.canvas ?? idsOf(lens.filter)[0] ?? '';
 
 /** Every canvas drawn now, and the one the bar and find act on: the pane in focus (decision e_h2pqjy2q). */
 const all = new Set();
@@ -109,7 +109,7 @@ export function canvasIn(host, pane) {
     },
     /** Draw the lens up now anew, with the places it has now: a picture already drawn takes no new places in a restyle. */
     draw() {
-      const of = at.lens.filter.ids?.[0];
+      const of = idsOf(at.lens.filter)[0];
       const view = flatView({ lens: at.lens, style: at.style, of, key: `canvas:${canvasOf(at.lens, at.asked) || 'map'}` });
       // The picture it replaces stops being kept current from the log.
       if (at.view?.store) unfollow(at.view.store);

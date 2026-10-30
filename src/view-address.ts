@@ -12,7 +12,7 @@ export const VIEW_INPUT = {
   lens: z
     .record(z.string(), z.unknown())
     .optional()
-    .describe('What the canvas draws: a flat lens, as query flat takes it ({ filter: { text, types, ids, links, in, only, within, exclude }, walk: { over (depends_on> out, depends_on< in, depends_on either way), steps }, limit }), shown in the query bar as if written there. With entity, under that item\'s page. {} is the canvas as it opens.'),
+    .describe('What the canvas draws: a flat lens, as query flat takes it ({ filter: { find, only, not }, walk: { over (depends_on> out, depends_on< in, depends_on either way), steps }, limit }), shown in the query bar as if written there. With entity, under that item\'s page. {} is the canvas as it opens.'),
   style: z
     .object({
       lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.'),
@@ -38,23 +38,22 @@ export async function viewAddress(l: Archipelago, input: ViewAsked): Promise<str
   if (kept && !input.lens && !input.style && l.registry.isA(kept.type, 'lens')) return `v?canvas=${input.entity}`;
   if (input.lens || input.style) {
     // Read as the flat lens reads it, so a lens the canvas could not draw is refused here and not on a screen.
-    const asked = (input.lens ?? {}) as { filter?: { exclude?: unknown }; limit?: unknown };
+    const asked = (input.lens ?? {}) as { limit?: unknown };
     const lens = Object.keys(asked).length ? readFlat(l, asked) : undefined;
-    for (const id of [...(lens?.include.ids ?? []), ...(lens?.include.in ?? [])]) if (!(await l.entity(id))) throw new Error(`No item "${id}"`);
+    for (const term of lens?.find ?? []) {
+      const [, id] = /^(?:id|in) (e_[a-z0-9]{8})$/.exec(term) ?? [];
+      if (id && !(await l.entity(id))) throw new Error(`No item "${id}"`);
+    }
     // The address says the lens as the page reads it: each term of the filter, the walk, the limit.
     const query = new URLSearchParams();
     if (lens) {
-      const { text, types, ids, links, in: inside } = lens.include;
       const walked = lens.walk.over === 'all' || lens.walk.over.length > 0;
-      for (const words of text ?? []) query.append('text', words);
-      if (types?.length) query.set('types', types.join(','));
-      if (ids?.length) query.set('ids', ids.join(','));
-      if (inside?.length) query.set('in', inside.join(','));
-      const only = [...(lens.narrow.only ?? []), ...(lens.narrow.words ?? [])];
-      if (only.length) query.set('only', only.join(','));
-      if (lens.narrow.within?.length) query.set('within', lens.narrow.within.join(','));
-      for (const t of links ?? []) query.append('link', `${t.link} ${t.to ?? t.from}`);
-      if (asked.filter?.exclude !== undefined) query.set('exclude', lens.exclude.join(','));
+      for (const term of lens.find) query.append('find', term);
+      for (const term of lens.only) query.append('only', term);
+      if (lens.not.join() !== 'kind system') {
+        if (!lens.not.length) query.set('not', '');
+        for (const term of lens.not) query.append('not', term);
+      }
       if (walked) query.set('over', lens.walk.over === 'all' ? 'all' : (lens.walk.over as string[]).join(','));
       if (walked) query.set('steps', String(lens.walk.steps));
       if (asked.limit !== undefined) query.set('limit', String(lens.limit));

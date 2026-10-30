@@ -28,7 +28,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       { op: 'link', type: 'depends_on', from: 'gutter', to: 'roof' },
     ],
   })).result.created as Record<string, string>;
-  const page = await open(`${base}/#/v?ids=${made.other}&over=part_of,depends_on&steps=1`);
+  const page = await open(`${base}/#/v?find=id+${made.other}&over=part_of,depends_on&steps=1`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const until = async (expression: string) => {
     for (const end = Date.now() + 20000; Date.now() < end; await wait(150)) if (await page.evaluate(expression)) return true;
@@ -61,7 +61,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       if (shots) writeFileSync(`${shots}/find-choices-${width}.png`, await page.screenshot());
       // Enter sets the words, every other term and the walk kept.
       await enter();
-      assert.ok(await until(`location.hash.includes('text=roof') && ${has('Roof the shed')} && ${has('Site works')} && ${has('Gutters')}`), `Enter finds the words, the walk kept: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
+      assert.ok(await until(`location.hash.includes('find=text+roof') && ${has('Roof the shed')} && ${has('Site works')} && ${has('Gutters')}`), `Enter finds the words, the walk kept: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
       assert.ok(await page.evaluate(has('Elsewhere')), 'the rest of the lens stays');
       assert.ok(await until(`document.querySelector('#find .q-sum')?.textContent.startsWith('Find“roof”or')`), 'the query bar says the words as a Find term, joined by or');
       assert.ok(await until(`${list}.hidden && document.getElementById('find').classList.contains('open') && document.activeElement === document.querySelector('#find input[type=search]') && !document.querySelector('#find input[type=search]').value`), `find stays open and emptied, the cursor in it, to refine further: ${await page.evaluate(`JSON.stringify([${list}.hidden, document.getElementById('find').className, document.activeElement?.outerHTML.slice(0, 80)])`)}`);
@@ -69,27 +69,27 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       // Enter again puts new words in place of those the bar set, and nothing else.
       await type('walls');
       await enter();
-      assert.ok(await until(`location.hash.includes('text=walls') && !location.hash.includes('text=roof') && ${has('Walls')} && ${has('Elsewhere')} && !${has('Roof the shed')}`), `Enter replaces only the words: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
+      assert.ok(await until(`location.hash.includes('find=text+walls') && !location.hash.includes('find=text+roof') && ${has('Walls')} && ${has('Elsewhere')} && !${has('Roof the shed')}`), `Enter replaces only the words: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
       // Shift+Enter adds a set of words: both are found.
       await type('gutters');
       await enter(true);
-      assert.ok(await until(`location.hash.includes('text=walls') && location.hash.includes('text=gutters') && ${has('Walls')} && ${has('Gutters')} && ${has('Elsewhere')}`), `Shift+Enter keeps both sets: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
+      assert.ok(await until(`location.hash.includes('find=text+walls') && location.hash.includes('find=text+gutters') && ${has('Walls')} && ${has('Gutters')} && ${has('Elsewhere')}`), `Shift+Enter keeps both sets: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
       assert.ok(await until(`document.querySelector('#find .q-sum')?.textContent.includes('“walls”or“gutters”')`), 'each set its own Find term');
       // The words' × in find's rows takes them out, and back brings them again.
       await out('walls');
-      await until(`!location.hash.includes('text=walls')`);
+      await until(`!location.hash.includes('find=text+walls')`);
       await out('gutters');
-      assert.ok(await until(`!location.hash.includes('text=') && !${has('Walls')} && ${has('Elsewhere')}`), `cleared, the words are out and the rest is drawn: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
+      assert.ok(await until(`!location.hash.includes('find=text+') && !${has('Walls')} && ${has('Elsewhere')}`), `cleared, the words are out and the rest is drawn: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
       // Each × was a step of its own: back twice brings both.
       await page.evaluate(`document.querySelector('#query [aria-label="Back"]').click()`);
-      await until(`location.hash.includes('text=gutters')`);
+      await until(`location.hash.includes('find=text+gutters')`);
       await page.evaluate(`document.querySelector('#query [aria-label="Back"]').click()`);
-      assert.ok(await until(`location.hash.includes('text=walls') && location.hash.includes('text=gutters') && ${has('Walls')}`), `back draws the words again: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
+      assert.ok(await until(`location.hash.includes('find=text+walls') && location.hash.includes('find=text+gutters') && ${has('Walls')}`), `back draws the words again: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
       // Out again for the next width.
       await out('walls');
-      await until(`!location.hash.includes('text=walls')`);
+      await until(`!location.hash.includes('find=text+walls')`);
       await out('gutters');
-      assert.ok(await until(`!location.hash.includes('text=') && ${has('Elsewhere')} && !${has('Walls')}`), 'cleared for the next width');
+      assert.ok(await until(`!location.hash.includes('find=text+') && ${has('Elsewhere')} && !${has('Walls')}`), 'cleared for the next width');
     }
     // A part's word and a space put find in that part: "only " is no words to find, and Only's choices are offered.
     await type('only ');
@@ -98,14 +98,14 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
     assert.ok(await until(`${list}.dataset.for === 'done' && ${list}.querySelector('.find-choice.lit')?.textContent === 'Worddone'`), `Only's own choices, the first lit: ${await page.evaluate(`${list}.textContent`)}`);
     await enter();
     assert.ok(await until(`location.hash.includes('only=done') && document.querySelector('#find .find-mode').textContent === 'Find'`), `Enter takes it as an Only term: ${await page.evaluate('location.hash')}`);
-    // A kind's word leading what is typed offers that kind alone, found by the rest: "within site" is Within Site works.
+    // A kind's word leading what is typed offers that kind alone, found by the rest: "in site" is In Site works.
     await type('only ');
-    await type('within site');
-    assert.ok(await until(`${list}.dataset.for === 'within site' && ${list}.querySelector('.find-choice.lit')?.textContent.startsWith('WithinSite works') && [...${list}.querySelectorAll('.find-choice .q-label')].every((k) => k.textContent === 'Within')`), `Within's choices alone: ${await page.evaluate(`${list}.textContent`)}`);
+    await type('in site');
+    assert.ok(await until(`${list}.dataset.for === 'in site' && ${list}.querySelector('.find-choice.lit')?.textContent.startsWith('InSite works') && [...${list}.querySelectorAll('.find-choice .q-label')].every((k) => k.textContent === 'In')`), `In's choices alone: ${await page.evaluate(`${list}.textContent`)}`);
     await enter();
-    assert.ok(await until(`location.hash.includes('within=${made.site}')`), `Enter takes it as within: ${await page.evaluate('location.hash')}`);
+    assert.ok(await until(`location.hash.includes('only=in+${made.site}')`), `Enter takes it as within: ${await page.evaluate('location.hash')}`);
     // At rest find says, in its line, the lens an address carries.
-    await page.go(`${base}/#/v?ids=${made.other}&text=gutters`);
+    await page.go(`${base}/#/v?find=id+${made.other}&find=text+gutters`);
     assert.ok(await until(`document.querySelector('#find .q-sum')?.textContent.includes('“gutters”')`), 'find says the lens up');
   } finally {
     await page.close();

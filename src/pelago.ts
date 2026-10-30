@@ -464,7 +464,7 @@ export class Archipelago {
               title: named(op.title)?.trim() ?? before.title,
               body: bodyAfter(before.body, { ...op, body: named(op.body), append: named(op.append), replace: op.replace && { find: op.replace.find, with: named(op.replace.with) } }),
               status: op.status ?? before.status,
-              owner: op.owner === undefined ? before.owner : op.owner,
+              owner: op.owner === undefined ? before.owner : op.owner && resolve(op.owner),
               confidence: op.confidence ?? before.confidence,
               // Only an explicit change of visibility moves who it is private to.
               private_to: op.visibility !== undefined && op.visibility !== before.visibility ? this.privateTo(visibility) : before.private_to,

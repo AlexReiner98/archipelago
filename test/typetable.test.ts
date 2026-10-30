@@ -134,8 +134,8 @@ test('a relation a pack took over takes its links with it, and the work at risk 
   const synced = await syncTypes(now);
   assert.deepEqual([synced.moved['inquiry.hypothesis'], synced.moved['inquiry.assumes']], [1, 1]);
   assert.equal((await now.entity(made.created.h))!.type, 'hypothesis');
-  assert.deepEqual((await now.entity(made.created.lens))!.props, { filter: { types: ['decision', 'hypothesis'], links: ['assumes me'] }, walk: { over: ['assumes', 'depends_on'], steps: 1 } }, 'a view that named them names them still, in its order');
-  assert.deepEqual((await now.entity(made.created.quiet))!.props.filter, { types: ['task'], exclude: ['hypothesis'] });
+  assert.deepEqual((await now.entity(made.created.lens))!.props, { filter: { find: ['assumes me', 'type decision', 'type hypothesis'], only: [] }, walk: { over: ['assumes', 'depends_on'], steps: 1 } }, 'a view that named them names them still, in its order');
+  assert.deepEqual((await now.entity(made.created.quiet))!.props.filter, { find: ['type task'], only: [], not: ['type hypothesis'] });
   const { rows } = await db.query<{ type: string }>(`select type from relation where from_id = $1 and to_id = $2`, [made.created.t, made.created.h]);
   assert.deepEqual(rows.map((r) => r.type), ['assumes']);
   const risk = (await callTool(now, human, 'inquiry_undermined', {})) as { id: string }[];

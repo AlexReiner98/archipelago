@@ -40,14 +40,13 @@ test('Find in an item: all that is part of it at any depth, of any type, not the
   const capped = await flatLens(l, { filter: { in: [made.p] }, limit: 2 });
   assert.deepEqual([capped.items.length, capped.cut], [2, true], 'bounded by the limit');
   assert.deepEqual(titles(await flatLens(l, { filter: { in: ['e_nothing0'] } })), [], 'in nothing, nothing');
-  await assert.rejects(flatLens(l, { filter: { in: 'e_x' } }), /filter.in/);
-  assert.equal(await viewAddress(l, { lens: { filter: { in: [made.p] } } }), `v?in=${made.p}`, 'the address carries it');
+  assert.equal(await viewAddress(l, { lens: { filter: { in: [made.p] } } }), `v?find=in+${made.p}`, 'the address carries it');
   await assert.rejects(viewAddress(l, { lens: { filter: { in: ['e_nothing0'] } } }), /No item/);
 });
 
 test('the walk follows each link out, in or either way, as it is named', async () => {
   const { l, made } = await project();
-  const walk = async (from: string, over: string[] | 'all', steps = 1) => titles(await flatLens(l, { filter: { ids: [from] }, walk: { over, steps } }));
+  const walk = async (from: string, over: string[] | 'all', steps = 1) => titles(await flatLens(l, { filter: { find: [`id ${from}`] }, walk: { over, steps } }));
   assert.deepEqual(await walk(made.a, ['depends_on>']), ['Elsewhere', 'Find in'], 'out: what it depends on');
   assert.deepEqual(await walk(made.o, ['depends_on>']), ['Elsewhere'], 'nothing it depends on');
   assert.deepEqual(await walk(made.o, ['depends_on<']), ['Elsewhere', 'Find in'], 'in: what depends on it');
@@ -55,8 +54,8 @@ test('the walk follows each link out, in or either way, as it is named', async (
   assert.deepEqual(await walk(made.f, ['part_of<'], 6), ['Find in', 'The bar', 'Which words?'], 'what is in it, downward');
   assert.deepEqual(await walk(made.f, ['part_of']), ['Find in', 'Rework', 'The bar', 'Which words?'], 'either way, as a lens kept before ways were said');
   assert.deepEqual(await walk(made.a, ['part_of>', 'depends_on>'], 2), ['Elsewhere', 'Find in', 'Rework', 'The bar'], 'each link its own way');
-  await assert.rejects(flatLens(l, { filter: { ids: [made.a] }, walk: { over: ['nope>'] } }), /unknown link type "nope"/);
-  assert.equal(await viewAddress(l, { lens: { filter: { ids: [made.a] }, walk: { over: ['depends_on>', 'part_of<'], steps: 2 } } }), `v?ids=${made.a}&over=depends_on%3E%2Cpart_of%3C&steps=2`, 'the address carries the ways');
+  await assert.rejects(flatLens(l, { filter: { find: [`id ${made.a}`] }, walk: { over: ['nope>'] } }), /unknown link type "nope"/);
+  assert.equal(await viewAddress(l, { lens: { filter: { find: [`id ${made.a}`] }, walk: { over: ['depends_on>', 'part_of<'], steps: 2 } } }), `v?find=id+${made.a}&over=depends_on%3E%2Cpart_of%3C&steps=2`, 'the address carries the ways');
 });
 
 test("Only's plain words: each must hold of every seed, and the walk is not narrowed", async () => {
@@ -95,8 +94,8 @@ test("Only's plain words: each must hold of every seed, and the walk is not narr
   // Written wrong, a word is refused; the address carries it.
   await assert.rejects(flatLens(l, { filter: { in: [made.p], only: ['changed since then'] } }), /a time is/);
   await assert.rejects(flatLens(l, { filter: { in: [made.p], only: ['status'] } }), /needs what follows/);
-  await assert.rejects(flatLens(l, { filter: { in: [made.p], only: ['nope'] } }), /unknown type "nope": no type nor one of Only's words/);
-  assert.equal(await viewAddress(l, { lens: { filter: { in: [made.p], only: ['task', 'owner me'] } } }), `v?in=${made.p}&only=task%2Cowner+me`);
+  await assert.rejects(flatLens(l, { filter: { in: [made.p], only: ['nope'] } }), /"nope" is no term/);
+  assert.equal(await viewAddress(l, { lens: { filter: { in: [made.p], only: ['task', 'owner me'] } } }), `v?find=in+${made.p}&only=type+task&only=owner+me`);
 });
 
 test('a name is never guessed: one item so named is answered by its id, two are refused', async () => {
@@ -110,11 +109,34 @@ test('a name is never guessed: one item so named is answered by its id, two are 
   ]);
   await make(l, [{ op: 'update', id: made.o, owner: more.bo }]);
   const tagged = await flatLens(l, { filter: { links: ['tagged urgent'] } });
-  assert.deepEqual([titles(tagged), tagged.lens.include.links], [['Find in'], [{ link: 'tagged', to: more.u }]], 'the end named is said back by its id');
+  assert.deepEqual([titles(tagged), tagged.lens.find], [['Find in'], [`tagged ${more.u}`]], 'the end named is said back by its id');
   const owned = await flatLens(l, { filter: { ids: [made.o, made.a], only: ['owner Bo'] } });
-  assert.deepEqual([titles(owned), owned.lens.narrow.words], [['Elsewhere'], [`owner ${more.bo}`]]);
+  assert.deepEqual([titles(owned), owned.lens.only], [['Elsewhere'], [`owner ${more.bo}`]]);
   await make(l, [{ op: 'create', type: 'tag', title: 'URGENT' }]);
   await assert.rejects(flatLens(l, { filter: { links: ['tagged Urgent'] } }), /2 items are named "Urgent".*by its id/);
-  await assert.rejects(flatLens(l, { filter: { in: [made.p], only: ['owner Sam'] } }), /2 are named "Sam".*by its id/);
+  await assert.rejects(flatLens(l, { filter: { in: [made.p], only: ['owner Sam'] } }), /2 items are named "Sam".*by its id/);
   assert.deepEqual(titles(await flatLens(l, { filter: { in: [made.p], only: [`owner ${more.sam}`] } })), [], 'by its id, the one meant');
+});
+
+test('the same terms in every part: Find adds, Only keeps, Not takes away', async () => {
+  const { l, made } = await project();
+  const more = await make(l, [
+    { op: 'create', ref: 'ann', type: 'person', title: 'Ann' },
+    { op: 'create', ref: 't', type: 'tag', title: 'Urgent' },
+    { op: 'link', type: 'waits_on', from: made.a, to: 'ann' },
+    { op: 'link', type: 'tagged', from: made.o, to: 't' },
+    { op: 'update', id: made.o, owner: 'ann' },
+  ]);
+  const all = 'type task';
+  assert.deepEqual(titles(await flatLens(l, { filter: { find: ['related Ann'] } })), ['Elsewhere', 'Find in'], 'related in Find: any link, the owner\'s too');
+  assert.deepEqual(titles(await flatLens(l, { filter: { find: [all], only: ['related Ann'] } })), ['Elsewhere', 'Find in'], 'in Only');
+  assert.ok(!titles(await flatLens(l, { filter: { find: [all], not: ['related Ann'] } })).includes('Find in'), 'in Not');
+  assert.deepEqual(titles(await flatLens(l, { filter: { find: [all], only: ['tagged Urgent'] } })), ['Elsewhere'], 'a link in Only');
+  assert.deepEqual(titles(await flatLens(l, { filter: { find: [all], only: ['text elsewhere'] } })), ['Elsewhere'], 'words in Only');
+  assert.ok(!titles(await flatLens(l, { filter: { find: [all], not: ['text elsewhere'] } })).includes('Elsewhere'), 'words in Not');
+  assert.ok(!titles(await flatLens(l, { filter: { find: [all], not: ['owner Ann'] } })).includes('Elsewhere'), 'an owner in Not');
+  assert.deepEqual(titles(await flatLens(l, { filter: { find: [`id ${made.a}`, `id ${made.o}`], not: ['blocked'] } })), ['Elsewhere'], 'what can only be checked, in Not');
+  await assert.rejects(flatLens(l, { filter: { find: ['done'] } }), /finds nothing itself/);
+  await assert.rejects(flatLens(l, { filter: { find: ['kind work'] } }), /finds nothing itself/);
+  void more;
 });

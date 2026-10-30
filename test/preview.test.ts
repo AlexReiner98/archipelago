@@ -28,7 +28,7 @@ test('a document is previewed as publishing it would give it, before it is publi
         { op: 'create', ref: 't', type: 'task', title: 'Write it', visibility: 'shared' },
         { op: 'create', ref: 'x', type: 'note', title: 'Our margin', visibility: 'private', body: 'Secret.' },
         { op: 'create', ref: 'p', type: 'document', title: 'Notes to self', visibility: 'shared', body: 'Mine.' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What it holds', visibility: 'shared', status: 'current', props: { filter: { types: ['task'] } } },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What it holds', visibility: 'shared', status: 'current', props: { filter: { find: ['type task'] } } },
         { op: 'link', type: 'part_of', from: 's', to: 'd' },
         { op: 'link', type: 'part_of', from: 'l', to: 'd' },
         { op: 'link', type: 'part_of', from: 'x', to: 'd' },
@@ -81,7 +81,7 @@ test('a document shared only to be read is previewed nowhere, and its views are 
       reason: 'test',
       ops: [
         { op: 'create', ref: 'd', type: 'document', title: 'A page', visibility: 'shared', body: 'Words.\n\n{l}' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What it holds', visibility: 'shared', status: 'current', props: { filter: { types: ['document'] } } },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What it holds', visibility: 'shared', status: 'current', props: { filter: { find: ['type document'] } } },
         { op: 'link', type: 'part_of', from: 'l', to: 'd' },
       ],
     })

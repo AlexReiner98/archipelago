@@ -93,7 +93,7 @@ test('a session tells the story of its work, beat by beat, and can take a beat b
   await tell(l, agent, { run, said: 'A later note on the side.', about: [made.c] });
   assert.equal(((await VIEWS.story.run(l, { run })) as any).finding, found.beat, 'a later beat is history under the finding');
   // Its picture is a flat lens of what the finding is about (ui/lens.js, storyPart).
-  const alone = (await ask(l, 'flat', { filter: { ids: [made.a, made.b], exclude: [] } })) as any;
+  const alone = (await ask(l, 'flat', { filter: { find: [`id ${made.a}`, `id ${made.b}`], not: [] } })) as any;
   assert.deepEqual(alone.items.map((i: any) => i.title).sort(), ['Fix the halo', 'Labels clip']);
 
   await assert.rejects(tell(l, agent, { run, said: 'x'.repeat(281) }), /280 characters/);

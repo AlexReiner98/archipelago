@@ -14,7 +14,7 @@ test('a view kept on the map is drawn from its flat lens, with its pins, and can
     { op: 'link', type: 'part_of', from: 'irap', to: 'p' },
   ]);
   Object.assign(made, await make(l, [
-    { op: 'create', ref: 'v', type: 'lens', title: 'Funding map', props: { filter: { ids: [made.p] }, walk: { over: ['part_of'], steps: 1 }, pins: [made.other], style: { shape: 'list' } } },
+    { op: 'create', ref: 'v', type: 'lens', title: 'Funding map', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 }, pins: [made.other], style: { shape: 'list' } } },
     { op: 'link', type: 'about', from: 'v', to: made.p },
   ]));
   const { keptPicture } = await import('../src/lens-saved.ts');
@@ -68,7 +68,7 @@ test('an item knows the pictures it is drawn in, and the documents that show the
     { op: 'create', ref: 'p', type: 'project', title: 'Research project' },
     { op: 'create', ref: 'in', type: 'program', title: 'Mitacs Accelerate', status: 'open', props: { kind: 'wage_subsidy', phase: 'research' } },
     { op: 'create', ref: 'out', type: 'task', title: 'Call IRAP' },
-    { op: 'create', ref: 'map', type: 'lens', title: 'Funding map', props: { filter: { types: ['program'] } } },
+    { op: 'create', ref: 'map', type: 'lens', title: 'Funding map', props: { filter: { find: ['type program'] } } },
     { op: 'create', ref: 'd', type: 'document', title: 'Funding document', body: 'Intro\n{map}' },
     { op: 'link', type: 'part_of', from: 'in', to: 'p' },
     { op: 'link', type: 'part_of', from: 'out', to: 'p' },

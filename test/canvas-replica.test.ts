@@ -20,7 +20,7 @@ test("in a browser, an agent's change reaches an open canvas without a lens read
       { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
     ],
   })).result.created as Record<string, string>;
-  const page = await open(`${base}/#/v?ids=${made.a}&over=depends_on&steps=1`);
+  const page = await open(`${base}/#/v?find=id+${made.a}&over=depends_on&steps=1`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const until = async (expression: string) => {
     for (const end = Date.now() + 20000; Date.now() < end; await wait(200)) if (await page.evaluate(expression)) return true;
