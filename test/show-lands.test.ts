@@ -55,6 +55,64 @@ test('in a browser, a show lands without a line at the foot: a note on its pane,
     assert.equal(await page.evaluate(`document.querySelector('#tabs .tab:nth-child(2) .tab-name').textContent`), `Session ${name}`);
     assert.equal(await page.evaluate(`document.querySelector('#tabs .tab:nth-child(2)').title.includes('follows its session')`), true);
     assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('[aria-label="Move this pane to a new tab"]')).display`), 'none', 'a pane alone has nothing to leave');
+    // The way back: Merge into in ⋯ puts it beside the first tab's panes, in sight, and it is the session's pane again.
+    const panes = () => page.evaluate<number>(`document.querySelectorAll('#canvas > .pane').length`);
+    await page.evaluate(`document.querySelector('#tabs .tab:nth-child(2) [aria-label="This tab: whom it follows, pop it out"]').click()`);
+    await page.evaluate(`document.querySelectorAll('.tab-menu [role="menuitem"]')[1].click()`);
+    await until('merged back', async () => (await tabs()) === 2 && (await panes()) === 2 && (await page.evaluate<boolean>(`document.querySelector('#tabs .tab:nth-child(1)').getAttribute('aria-selected') === 'true'`)));
+    assert.equal(await page.evaluate(`[...document.querySelectorAll('#canvas > .pane')][1].querySelector('.pane-follows').textContent`), `Session ${name}`);
+    const middle = (selector: string) => page.evaluate<string>(`JSON.stringify((() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })())`).then(JSON.parse) as Promise<[number, number]>;
+    const drag = async (from: [number, number], to: [number, number]) => {
+      const mouse = (type: string, at: number[]) => page.send('Input.dispatchMouseEvent', { type, x: at[0], y: at[1], button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
+      await mouse('mousePressed', from);
+      for (let n = 1; n <= 8; n++) await mouse('mouseMoved', [from[0] + ((to[0] - from[0]) * n) / 8, from[1] + ((to[1] - from[1]) * n) / 8]);
+      await mouse('mouseReleased', to);
+    };
+    // A pane dragged onto another tab joins it, and that tab comes into sight.
+    await drag(await middle('#canvas > .pane:nth-of-type(2) .pane-grip'), await middle('#tabs .tab:nth-child(2) .tab-name'));
+    await until('the pane joined the second tab', async () => (await panes()) === 3 && (await page.evaluate<boolean>(`document.querySelector('#tabs .tab:nth-child(2)').getAttribute('aria-selected') === 'true'`)));
+    // A tab dragged onto another merges into it, and is gone.
+    await drag(await middle('#tabs .tab:nth-child(2) .tab-name'), await middle('#tabs .tab:nth-child(1) .tab-name'));
+    await until('one tab holds every pane', async () => (await tabs()) === 1 && (await panes()) === 4);
+    // Through it all the session keeps its panes: its next show lands in one, and no pane or tab is opened for it.
+    const before = await page.evaluate<string>(`[...document.querySelectorAll('.pane-follows')].filter((m) => m.textContent === 'Session ${name}').length + ''`);
+    assert.ok(Number(before) >= 1, 'a pane still says it is the session’s');
+    await show({ lens: { filter: { text: 'Something' } }, note: 'Still here' });
+    await until('it landed in its own pane', () => page.evaluate<boolean>(`[...document.querySelectorAll('.pane-follows')].some((m) => m.title === 'Still here')`));
+    assert.deepEqual([await tabs(), await panes()], [1, 4]);
+  } finally {
+    await page.close();
+  }
+});
+
+test('in a browser, the Follows menu lists the sessions open now', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base, call } = await serve('off');
+  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'work', title: 'Something shown' }] })).result.created as Record<string, string>;
+  const agent = 'agent:claude-code/archipelago';
+  const start = async (id: string) => (await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: id } })).result;
+  const ending = await start('will-end');
+  const quiet = await start('stays-quiet');
+  const page = await open(`${base}/`);
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const menu = () => page.evaluate<string>(`JSON.stringify([...document.querySelectorAll('.tab-menu [role="menuitemradio"]')].map((b) => b.textContent))`).then(JSON.parse) as Promise<string[]>;
+  const opened = async (ok: (names: string[]) => boolean) => {
+    for (let n = 0; n < 40; n++) {
+      await page.evaluate(`document.querySelector('[aria-label="This tab: whom it follows, pop it out"]').click()`);
+      await wait(300);
+      const names = await menu();
+      await page.evaluate(`document.querySelector('.tab-menu').hidePopover()`);
+      if (ok(names)) return names;
+      await wait(200);
+    }
+    assert.fail(`the menu: ${JSON.stringify(await menu())} ${page.logs().join('\n')}`);
+  };
+  try {
+    await wait(2500);
+    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a, run: ending.run } });
+    await opened((names) => names.includes(`Session ${ending.name}`) && names.includes(`Session ${quiet.name}`));
+    await call('/agent/report', undefined, { actor: agent, action: 'session_end', params: { run: ending.run, outcome: 'finished', summary: 'Done', cannot_tell_rest: true } });
+    const names = await opened((list) => !list.includes(`Session ${ending.name}`));
+    assert.deepEqual(names, ['Everyone', 'Nobody', `Session ${quiet.name}`], 'an ended session leaves it; a quiet one the page never heard from stays');
   } finally {
     await page.close();
   }

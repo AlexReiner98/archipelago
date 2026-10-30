@@ -30,13 +30,31 @@ export const heard = new Map();
 export function hear(step) {
   const key = sessionOf(step);
   const name = step.name ?? step.actor.split(/[/:]/).at(-1);
-  heard.set(key, { name, label: step.label, called: step.label ?? (step.name ? `Session ${step.name}` : name), at: Math.max(step.at, heard.get(key)?.at ?? 0), run: step.run });
+  heard.set(key, { name, label: step.label, called: step.label ?? (step.name ? `Session ${step.name}` : name), at: Math.max(step.at, heard.get(key)?.at ?? 0), run: step.run, ended: heard.get(key)?.ended });
+}
+/**
+ * Hear the sessions open now (the `sessions` view): one this page has heard nothing from can be followed too, and one
+ * not among them has ended. It stays heard, since a tab or a pane may still name it, but its word can be another's now.
+ */
+export function hearOpen(open) {
+  const now = new Set(open.map((s) => s.id));
+  for (const [key, one] of heard) if (key.startsWith('e_')) one.ended = !now.has(key);
+  for (const s of open) {
+    if (heard.has(s.id)) continue;
+    const called = s.label ?? (s.name ? `Session ${s.name}` : s.title);
+    heard.set(s.id, { name: s.name ?? s.title, label: s.label, called, at: Date.parse(s.last_seen), run: s.id });
+  }
+}
+/** Whom a tab can follow, newest first: the sessions not ended, and an agent at work with no session of its own, within `recent`. */
+export function followable({ now, recent }) {
+  const can = ([key, one]) => !one.ended && (key.startsWith('e_') || now - one.at < recent);
+  return [...heard].filter(can).sort(([, a], [, b]) => b.at - a.at).map(([key]) => key);
 }
 /** A session as a tab or a pane says it: what it is called, with its run when another session goes by the same. */
 export function nameOf(key) {
   const one = heard.get(key);
   if (!one) return key.startsWith('e_') ? key : key.split(/[/:]/).at(-1);
-  const twin = [...heard].some(([k, o]) => k !== key && o.called === one.called);
+  const twin = [...heard].some(([k, o]) => k !== key && !o.ended && o.called === one.called);
   return twin && one.run ? `${one.called} · ${one.run.slice(-4)}` : one.called;
 }
 
@@ -87,6 +105,9 @@ export function route(step, tabs, { now, recent, drawable = true }) {
   }
   const own = tabs.filter((t) => t.follows === session).sort((a, b) => (last(b)?.at ?? 0) - (last(a)?.at ?? 0))[0];
   if (own) return into(own);
+  // A pane of its own moved into a tab that follows someone else stays its own (ui/tab-bar.js); the reader's Nobody is kept.
+  const holding = tabs.find((t) => !['all', 'none'].includes(t.follows) && !t.popped && t.panes.some((p) => p.held === session));
+  if (holding) return into(holding);
   const heldByOther = (t) => !t.panes.some((p) => p.held === session) && lately(last(t), recent) && last(t).session !== session;
   const open = tabs.filter((t) => t.follows === 'all' && !t.popped && !heldByOther(t));
   const free = open.find((t) => t.panes.some((p) => p.held === session)) ?? open.find((t) => last(t)?.session === session) ?? open.find((t) => t.panes.some((p) => p.draws && !p.focus)) ?? open.find((t) => t.front) ?? open[0];

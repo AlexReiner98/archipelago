@@ -1,6 +1,6 @@
 // Moving panes by hand (ui/panes.js): a pane's name pressed and dragged shows where it would dock, as a code editor
 // does: over a pane's side, docked on that side of it; over its middle, swapped with it; over the tabs, into a tab of
-// its own (ui/tab-bar.js). The line between two panes is dragged to share the room between them.
+// its own, or over a tab, into that one (ui/tab-bar.js). The line between two panes is dragged to share the room between them.
 
 import { h } from './base.js';
 
@@ -34,13 +34,16 @@ export function dragPane(ev, id, el, { groups, drop }) {
     document.body.dataset.dragging = 'pane';
     const out = e.clientX < 0 || e.clientY < 0 || e.clientX > innerWidth || e.clientY > innerHeight;
     const tabs = document.getElementById('tabs');
-    const onTabs = !out && groups().length > 1 && inside(tabs.getBoundingClientRect(), e.clientX, e.clientY);
+    const onStrip = !out && inside(tabs.getBoundingClientRect(), e.clientX, e.clientY);
+    const tab = onStrip ? document.elementFromPoint(e.clientX, e.clientY)?.closest('.tab:not(.tab-out)') : null;
+    const into = tab?.getAttribute('aria-selected') === 'false' ? tab : null;
+    const onTabs = Boolean(into) || (onStrip && !tab && groups().length > 1);
     const over = out || onTabs ? null : groups().find(([g, box]) => g !== id && inside(box.getBoundingClientRect(), e.clientX, e.clientY));
-    at = out ? [null, 'out'] : onTabs ? [null, 'tabs'] : over ? [over[0], zoneOf(over[1].getBoundingClientRect(), e.clientX, e.clientY)] : null;
+    at = out ? [null, 'out'] : onTabs ? [into?.dataset.tab ?? null, 'tabs'] : over ? [over[0], zoneOf(over[1].getBoundingClientRect(), e.clientX, e.clientY)] : null;
     const z = overlay();
     z.hidden = !at || out;
     z.dataset.zone = at?.[1] ?? '';
-    if (onTabs) Object.assign(z.style, Object.fromEntries(['left', 'top', 'width', 'height'].map((k) => [k, `${tabs.getBoundingClientRect()[k]}px`])));
+    if (onTabs) Object.assign(z.style, Object.fromEntries(['left', 'top', 'width', 'height'].map((k) => [k, `${(into ?? tabs).getBoundingClientRect()[k]}px`])));
     if (over) Object.assign(z.style, Object.fromEntries(Object.entries(zoneBox(over[1].getBoundingClientRect(), at[1])).map(([k, v]) => [k, `${v}px`])));
   };
   const up = () => {
