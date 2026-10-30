@@ -84,3 +84,36 @@ test('in a browser, a show lands without a line at the foot: a note on its pane,
     await page.close();
   }
 });
+
+test('in a browser, the Follows menu lists the sessions open now', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base, call } = await serve('off');
+  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'work', title: 'Something shown' }] })).result.created as Record<string, string>;
+  const agent = 'agent:claude-code/archipelago';
+  const start = async (id: string) => (await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: id } })).result;
+  const ending = await start('will-end');
+  const quiet = await start('stays-quiet');
+  const page = await open(`${base}/`);
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const menu = () => page.evaluate<string>(`JSON.stringify([...document.querySelectorAll('.tab-menu [role="menuitemradio"]')].map((b) => b.textContent))`).then(JSON.parse) as Promise<string[]>;
+  const opened = async (ok: (names: string[]) => boolean) => {
+    for (let n = 0; n < 40; n++) {
+      await page.evaluate(`document.querySelector('[aria-label="This tab: whom it follows, pop it out"]').click()`);
+      await wait(300);
+      const names = await menu();
+      await page.evaluate(`document.querySelector('.tab-menu').hidePopover()`);
+      if (ok(names)) return names;
+      await wait(200);
+    }
+    assert.fail(`the menu: ${JSON.stringify(await menu())} ${page.logs().join('\n')}`);
+  };
+  try {
+    await wait(2500);
+    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a, run: ending.run } });
+    await opened((names) => names.includes(`Session ${ending.name}`) && names.includes(`Session ${quiet.name}`));
+    await call('/agent/report', undefined, { actor: agent, action: 'session_end', params: { run: ending.run, outcome: 'finished', summary: 'Done', cannot_tell_rest: true } });
+    const names = await opened((list) => !list.includes(`Session ${ending.name}`));
+    assert.deepEqual(names, ['Everyone', 'Nobody', `Session ${quiet.name}`], 'an ended session leaves it; a quiet one the page never heard from stays');
+  } finally {
+    await page.close();
+  }
+});

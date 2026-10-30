@@ -32,6 +32,22 @@ export function hear(step) {
   const name = step.name ?? step.actor.split(/[/:]/).at(-1);
   heard.set(key, { name, label: step.label, called: step.label ?? (step.name ? `Session ${step.name}` : name), at: Math.max(step.at, heard.get(key)?.at ?? 0), run: step.run });
 }
+/** Hear the sessions open now (the `sessions` view): one this page has heard nothing from can be followed too. */
+export function hearOpen(open) {
+  for (const s of open) {
+    if (heard.has(s.id)) continue;
+    const called = s.label ?? (s.name ? `Session ${s.name}` : s.title);
+    heard.set(s.id, { name: s.name ?? s.title, label: s.label, called, at: Date.parse(s.last_seen), run: s.id });
+  }
+}
+/**
+ * Whom a tab can follow, newest first: the sessions in `open` (ids; null when that could not be read: everyone heard)
+ * and an agent at work with no session of its own, within `recent`. A session that has ended is left out.
+ */
+export function followable(open, { now, recent }) {
+  const can = ([key, one]) => !open || open.has(key) || (!key.startsWith('e_') && now - one.at < recent);
+  return [...heard].filter(can).sort(([, a], [, b]) => b.at - a.at).map(([key]) => key);
+}
 /** A session as a tab or a pane says it: what it is called, with its run when another session goes by the same. */
 export function nameOf(key) {
   const one = heard.get(key);

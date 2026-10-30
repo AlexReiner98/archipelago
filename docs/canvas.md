@@ -279,7 +279,8 @@ for it again, and its next show finds them in any tab but one that follows
 nobody.
 
 Each tab follows everyone (the default), one session, or nobody (its name
-in italics): the reader picks it in ⋯. Where an agent's step lands is `pane-route.js`, worked
+in italics): the reader picks it in ⋯, which lists the sessions open now, and
+what the tab follows even once that session has ended. Where an agent's step lands is `pane-route.js`, worked
 out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
 - only a show lands: a change or a beat of a session's story moves nothing
   and is said nowhere on the canvas (the owner, 29 and 30 Oct 2026,

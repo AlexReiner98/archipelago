@@ -12,7 +12,7 @@ import { readFlatLens } from './lens.js';
 import { lookMode } from './look.js';
 import { placeBy } from './menu-place.js';
 import { windowOf, windows } from './pane-busy.js';
-import { heard, nameOf } from './pane-route.js';
+import { followable, heard, hearOpen, nameOf } from './pane-route.js';
 import { activeAt, activeIs, close, draw, paneAt, paneButtons, startPanes } from './panes.js';
 import { filterSaid } from './query-bar.js';
 import { focusOf, front, freshTab, isOutKey, keep, landed, listKey, named, outKey, outTabs, poppedTab, read, save, tabHref, tabOf, tabs } from './tabs.js';
@@ -218,12 +218,30 @@ function setFollows(follows, t = front()) {
   keep();
   drawStrip();
 }
-/** A tab's menu, over everything (a popover: the strip clips what hangs below it): whom it follows (everyone, nobody, the sessions heard from lately, newest first), and pop out. */
+/** A tab's menu, over everything (a popover: the strip clips what hangs below it): whom it follows (everyone, nobody, the sessions open now, newest first), pop out, and merge. */
 const menuEl = h('div', { class: 'menu-items tab-menu', popover: 'auto', role: 'menu', 'aria-label': 'This tab' });
 document.body.append(menuEl);
+/** The sessions open when last asked, or null before that: the menu is drawn at once, and again if the answer changes it. */
+let openNow = null;
+const readOpen = () =>
+  api('view', { name: 'sessions' }).then(
+    ({ open = [] }) => (hearOpen(open), (openNow = new Set(open.map((s) => s.id)))),
+    () => {},
+  );
 function tabMenu(anchor, t) {
+  drawMenu(t);
+  menuEl.showPopover();
+  placeBy(menuEl, anchor);
+  readOpen().then(() => {
+    if (!menuEl.matches(':popover-open')) return;
+    drawMenu(t);
+    placeBy(menuEl, anchor);
+  });
+}
+function drawMenu(t) {
   const now = t.follows ?? 'all';
-  const sessions = [...heard].sort(([, a], [, b]) => b.at - a.at).map(([key]) => key);
+  const sessions = followable(openNow, { now: Date.now(), recent: 600_000 });
+  // What the tab follows stays in sight, ended or not, so the reader can see it and change it.
   if (!['all', 'none', ...sessions].includes(now)) sessions.unshift(now);
   const pick = (key, said, title) => h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(key === now), title, onclick: () => (menuEl.hidePopover(), setFollows(key, t)) }, said);
   menuEl.replaceChildren(
@@ -238,8 +256,6 @@ function tabMenu(anchor, t) {
       ...tabs.list.filter((o) => o !== t).map((o) => h('button', { type: 'button', role: 'menuitem', onclick: () => (menuEl.hidePopover(), joinTab(t, o)) }, nameOfTab(o).name)),
     ].filter(Boolean),
   );
-  menuEl.showPopover();
-  placeBy(menuEl, anchor);
 }
 
 /** The query bar's own: the pane's buttons (in a popped window, dock back). Whom the tab follows and a new tab are the strip's. */
@@ -309,4 +325,5 @@ export function startTabs() {
   keep();
   startPanes();
   drawStrip();
+  if (!poppedTab) readOpen();
 }

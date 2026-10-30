@@ -7,7 +7,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // A UI module, plain JavaScript with no types of its own.
-const { route } = (await import(`../ui/${'pane-route.js'}`)) as { route: (step: object, tabs: object[], at: object) => unknown };
+const { followable, hear, heard, hearOpen, route } = (await import(`../ui/${'pane-route.js'}`)) as {
+  followable: (open: Set<string> | null, at: { now: number; recent: number }) => string[];
+  hear: (step: object) => void;
+  heard: Map<string, { called: string }>;
+  hearOpen: (open: object[]) => void;
+  route: (step: object, tabs: object[], at: object) => unknown;
+};
 
 const now = 1_000_000;
 const at = { now, recent: 600_000, settle: 30_000 };
@@ -87,6 +93,21 @@ test('a pane of its own moved into a tab that follows another is found there, bu
   assert.deepEqual(route(step('e_aaaaaaaa'), moved, at), { tab: 't1', pane: 'p1', front: false });
   const quiet = [first(), tab('t1', 'none', {}, [its('e_aaaaaaaa')])];
   assert.deepEqual(route(step('e_aaaaaaaa'), quiet, at), { tab: 't0', split: { side: 'right' }, front: true });
+});
+
+test('a tab can follow the sessions open now, not one that has ended', () => {
+  heard.clear();
+  hear({ actor: 'agent:a', run: 'e_ended000', name: 'Kos', at: 300 });
+  hear({ actor: 'agent:a', run: 'e_working0', name: 'Mull', at: 200 });
+  hear({ actor: 'agent:none', at: now - 1000 });
+  hear({ actor: 'agent:long', at: now - 700_000 });
+  const say = { now, recent: 600_000 };
+  assert.deepEqual(followable(null, say), ['agent:none', 'agent:long', 'e_ended000', 'e_working0'], 'not yet asked: everyone heard');
+  // A session open and quiet, which this page never heard from, can be followed too, by its name or its label.
+  hearOpen([{ id: 'e_quiet000', name: 'Hoy', last_seen: new Date(100).toISOString() }, { id: 'e_titled00', name: 'Sark', label: 'Popups', last_seen: new Date(50).toISOString() }]);
+  assert.deepEqual(followable(new Set(['e_working0', 'e_quiet000', 'e_titled00']), say), ['agent:none', 'e_working0', 'e_quiet000', 'e_titled00'], 'open, and an agent at work with no session');
+  assert.deepEqual([heard.get('e_quiet000')!.called, heard.get('e_titled00')!.called], ['Session Hoy', 'Popups']);
+  heard.clear();
 });
 
 test('within a tab, the pane drawing it already is lit, never the one in focus', () => {
