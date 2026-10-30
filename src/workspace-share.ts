@@ -79,7 +79,8 @@ export async function readAny(l: Archipelago, id: string) {
   if (!at) throw new Error(item.status === 'offered' ? `"${item.title}" is offered by "${item.props.from_workspace}": accept it to read it here.` : `"${item.title}" is no longer shared with this workspace.`);
   const { rows } = await at.from.forAnyone().db.query<{ doc: Given | null }>(`select pelago_workspace_document($1, $2) as doc`, [at.share, l.workspace]);
   if (!rows[0]?.doc) throw new Error(`"${item.title}" is no longer shared with this workspace: "${item.props.from_workspace}" revoked it.`);
-  return { ...forReader(at.from, rows[0].doc, item.id), id: item.id, from: item.props.from_workspace };
+  // `source`: its id on the map it lives on, so someone signed in there too can write it there.
+  return { ...forReader(at.from, rows[0].doc, item.id), id: item.id, from: item.props.from_workspace, source: rows[0].doc.id };
 }
 
 /**

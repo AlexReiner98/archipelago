@@ -16,6 +16,7 @@ export const SLOW: Record<string, string> = {
   'test/canvas-replica.test.ts': 'browser',
   'test/canvas-wires.test.ts': 'browser',
   'test/canvas-zoom.test.ts': 'browser',
+  'test/docs-beside.test.ts': 'browser',
   'test/drawings-moved.test.ts': 'browser',
   'test/drawing-asks.test.ts': 'browser',
   'test/drawings.test.ts': 'browser',
