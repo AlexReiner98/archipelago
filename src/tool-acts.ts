@@ -41,7 +41,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     input: {
       ...VIEW_INPUT,
       screen: z.enum(['workspace', 'you']).optional().describe('The workspace sheet, or what waits for them.'),
-      note: z.string().max(200).optional().describe('One line shown beside the page.'),
+      note: z.string().max(200).optional().describe('One line, kept on your pane as its tooltip.'),
       look: z.boolean().optional().describe('Also answer with a picture of it, drawn by the server (as query look draws it).'),
       width: z.number().int().min(320).max(1920).optional().describe('With look: the picture’s width in pixels (1200).'),
       height: z.number().int().min(240).max(1600).optional().describe('With look: its height (750).'),
@@ -62,7 +62,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       const hash = await viewAddress(l, input);
       const { db } = await wholeMap(l);
       const at = await point(l, actor, 'show', hash, input.note, input.pane, input.run);
-      const pages = await watching(db, l, actor.name);
+      const pages = await watching(db, l);
       return { ...at, pages, ...(input.look && (await takeLook(db, l.db, l, actor.name, hash, input))) };
     },
   },

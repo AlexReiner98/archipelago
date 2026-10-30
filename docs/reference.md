@@ -89,11 +89,11 @@ declared in the software pack (a view of `form: "tree"` in
 branches and work, which field orders them, and which statuses mean "now". A
 pack can declare another tree the same way, with no code.
 
-**Following agents.** An agent's `show` opens what it names, with a
-one-line note, in a pane of its session's own beside yours, or in a tab of its
-own out of sight; it never takes the pane you are in or touched last. With
-"Follow agents" ticked (in the menu), what agents change and the story they
-tell are said in that line too, with the way there: nothing moves until you go.
+**Following agents.** An agent's `show` opens what it names in a pane of its
+session's own beside yours, its strip saying whose it is and its tooltip the
+agent's note, or in a tab of its own out of sight, its mark ringing; it never
+takes the pane you are in or touched last. Whom each tab follows (everyone,
+nobody or one session) is in the tab's ⋯ menu.
 A change redraws a page, in place, only when it touches an item on it.
 
 **Agents hear you.** What you do in the UI reaches the agents working with
