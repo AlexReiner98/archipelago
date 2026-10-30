@@ -24,20 +24,27 @@ export function peel(a, stay = new Set()) {
  * to the item's, and its width and height. `size(id)` is a box's size, `z` the row and column gaps. `sideOf(p, k)` is the
  * way the order has `k` from its holder `p`, 1 below it, -1 above it, 0 no way of its own, and a comb hangs only what
  * belongs on `way`, what has no way of its own going `rest`. A comb on -1 is drawn in a frame the caller turns over.
+ * With `level` its bus runs level with (0, 0), for a comb that hangs beside its holder and not under it: a wire leaves the
+ * holder straight along the bus. With `near`, every kid has a spine down the side that faces the holder, so a wire reaches
+ * it by its near side. With `alone`, one kid with nothing under it sits straight on from the holder.
  */
-export function comb(n, kids, size, z, sideOf = () => 1, way = 1, rest = way) {
+export function comb(n, kids, size, z, sideOf = () => 1, way = 1, rest = way, { level = false, near = false, alone = false } = {}) {
   const under = (kids.get(n) ?? []).filter((id) => (sideOf(n, id) || rest) === way).map((id) => {
-    const b = comb(id, kids, size, z, sideOf, way), back = comb(id, kids, size, z, sideOf, -way, way), s = size(id);
+    const b = comb(id, kids, size, z, sideOf, way, way, { near }), back = comb(id, kids, size, z, sideOf, -way, way, { near }), s = size(id);
     const lead = back.items.length ? back.h + z.row : 0;
     return { id, b, back, lead, s, w: Math.max(s.w, b.w, back.w), h: lead + s.h + (b.items.length ? z.row + b.h : 0) + z.row };
   }).sort((p, q) => q.h * q.w - p.h * p.w);
   if (!under.length) return { items: [], wires: new Map(), w: 0, h: 0 };
+  if (alone && under.length === 1 && !under[0].b.items.length && !under[0].back.items.length) {
+    const [c] = under;
+    return { items: [{ id: c.id, x: 0, y: 0 }], wires: new Map([[c.id, [[-c.s.w / 2, 0]]]]), w: c.s.w, h: c.s.h / 2 };
+  }
   const area = under.reduce((s, c) => s + (c.w + z.col) * c.h, 0), tall = Math.max(under[0].h, Math.sqrt(area * 0.8));
   const spines = [];
   for (const c of under) {
-    let at = spines.find((p) => Math.min(p.lh, p.rh) + c.h <= tall);
+    let at = spines.find((p) => (near ? p.rh : Math.min(p.lh, p.rh)) + c.h <= tall);
     if (!at) spines.push((at = { left: [], right: [], lh: 0, rh: 0 }));
-    const left = at.lh <= at.rh;
+    const left = !near && at.lh <= at.rh;
     at[left ? 'left' : 'right'].push(c);
     at[left ? 'lh' : 'rh'] += c.h;
   }
@@ -47,7 +54,7 @@ export function comb(n, kids, size, z, sideOf = () => 1, way = 1, rest = way) {
     p.x = run + lw + z.col / 2;
     run += lw + z.col + rw + z.col;
   }
-  const centre = (run - z.col) / 2, bus = z.row + 6, items = [], wires = new Map();
+  const centre = (run - z.col) / 2, bus = level ? 0 : z.row + 6, items = [], wires = new Map();
   let bottom = 0;
   for (const p of spines) {
     const sx = p.x - centre;
@@ -56,7 +63,7 @@ export function comb(n, kids, size, z, sideOf = () => 1, way = 1, rest = way) {
       for (const c of list) {
         const cy = y + c.lead + c.s.h / 2, cx = sx + sign * (z.col / 2 + c.s.w / 2);
         items.push({ id: c.id, x: cx, y: cy });
-        wires.set(c.id, [[0, 0], [0, bus], [sx, bus], [sx, cy], [cx - (sign * c.s.w) / 2, cy]]);
+        wires.set(c.id, [...(level ? [[0, 0]] : [[0, 0], [0, bus]]), [sx, bus], [sx, cy], [cx - (sign * c.s.w) / 2, cy]]);
         const dx = sx + sign * (z.col / 2 + c.w / 2);
         const hangs = (from, top, turn, tree) => {
           const move = ([px, py]) => [px + dx, top + turn * py];

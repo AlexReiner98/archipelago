@@ -215,12 +215,22 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   // What the order has before an item hangs above it, and the rest below; `lead` is the room over the box.
   const above = new Set(chains.map((c) => `${c.a} ${c.b}`));
   const sideOf = (p, k) => (above.has(`${p} ${k}`) ? 1 : above.has(`${k} ${p}`) ? -1 : 0);
-  const combs = new Map(core.map((id) => [id, { down: comb(id, kids, stepSize, zc, sideOf, 1), up: comb(id, kids, stepSize, zc, sideOf, -1, 1) }]));
+  const combs = new Map(core.map((id) => {
+    const ways = (kids.get(id) ?? []).map((k) => sideOf(id, k) || 1), how = { level: true, near: true, alone: new Set(ways).size < 2 };
+    return [id, { down: comb(id, kids, stepSize, zc, sideOf, 1, 1, how), up: comb(id, kids, stepSize, zc, sideOf, -1, 1, how) }];
+  }));
+  /** How far each comb's level sits from the middle of the box, where there are two. */
+  const portOff = (id) => {
+    const { down, up } = combs.get(id);
+    return down.items.length && up.items.length ? Math.min(stepSize(id).h / 4, zc.row / 2) : 0;
+  };
   const block = (id) => {
     const s = stepSize(id), { down, up } = combs.get(id);
     if (!down.items.length && !up.items.length) return { w: s.w, h: s.h, lead: 0 };
-    const lead = up.items.length ? Math.max(0, up.h - s.h / 2) : 0;
-    return { w: s.w + gap + Math.max(down.w, up.w), h: lead + Math.max(s.h, s.h / 2 + down.h), lead };
+    // A kid alone sits level with the box, half of it either side; a comb hangs clear of it on its own side.
+    const off = portOff(id), over = ([hang, other]) => Math.max(s.h / 2, hang.items.length ? hang.h + off : 0, other.items.length === 1 && other.items[0].y === 0 ? other.h : 0);
+    const top = over([up, down]), foot = over([down, up]);
+    return { w: s.w + gap + Math.max(down.w, up.w), h: top + foot, lead: top - s.h / 2 };
   };
   const inCore = new Set(core), seen = new Set(), parts = [];
   for (const s of core) {
@@ -267,14 +277,14 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
       x.set(id, boxX);
       y.set(id, boxY);
       note(id);
-      const both = down.items.length && up.items.length, ax = px - b.w / 2 + s.w + gap + (b.w - s.w - gap) / 2 + dx;
+      const ax = px - b.w / 2 + s.w + gap + (b.w - s.w - gap) / 2 + dx, off = portOff(id);
       for (const [hang, way] of [[down, 1], [up, -1]]) {
         // Each leaves the box at a port of its own when there are two.
-        const map = ([p, q]) => [ax + p, boxY + way * q], at = boxY + (both ? way * Math.min(s.h / 4, zc.row / 2) : 0);
+        const at = boxY + way * off, map = ([p, q]) => [ax + p, at + way * q];
         for (const it of hang.items) (x.set(it.id, map([it.x, it.y])[0]), y.set(it.id, map([it.x, it.y])[1]));
         for (const [item, points] of hang.wires) {
           const from = parents.get(item), line = points.map(map);
-          routes.set(pair(from, item), { from, points: from === id ? [[boxX + s.w / 2, at], [ax, at], ...line.slice(1)] : line });
+          routes.set(pair(from, item), { from, points: from === id ? [[boxX + s.w / 2, at], ...line.slice(line[0][0] === ax && line[0][1] === at ? 1 : 0)] : line });
         }
       }
     }
