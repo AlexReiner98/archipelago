@@ -11,8 +11,8 @@ const TOP = 'ghost top', FOOT = 'ghost foot';
 const ORDER_WEIGHT = 4;
 /** How many wires times items may be spent on trying tops and feet. */
 const WORK = 3e6;
-/** Past this many items, only what the order holds passes under a tie: on a big map of ties it brings crossings and takes long. */
-const UNDER_MOST = 300;
+/** Past this many items and points in a part, only what the order holds passes under a tie: on a big map of ties it brings crossings and takes long. */
+const UNDER_MOST = 120;
 /** An order wire running up counts for more than any wire's length. */
 const OVER = 1e6;
 

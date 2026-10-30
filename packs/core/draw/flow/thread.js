@@ -1,10 +1,140 @@
-// A graph made planar, ready to draw. The heaviest planar part is kept; invisible edges join it into one biconnected
-// piece; each link left out is threaded through the faces, its crossings becoming points of the graph. What comes back
-// has no crossing left in it but those points. Pure: edges in, a graph of wires and faces out.
+// A graph made planar, ready to draw: links threaded through the faces, each crossing a point of the graph, so what is left
+// has no crossing in it but those points. Each point is numbered between the ends of the stretch it splits, where the graph
+// has numbers. Pure: a graph in, changed in place, or edges in and a graph of wires and faces out.
 
 import { blocks, faces, isPlanar } from './planar.js';
 
 const pair = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+
+/** What it costs to cross a hidden link: nothing to see, but it is a turn. */
+const HIDDEN = 0.1;
+/** Spreads the points' numbers, so no two are ever alike. */
+const GOLD = 0.618034;
+
+/** Take the nearest off `open`, then the least far on. */
+const nextOf = (open, dist, reach) => {
+  let k = 0;
+  for (let n = 1; n < open.length; n++) if (dist.get(open[n]) < dist.get(open[k]) || (reach && dist.get(open[n]) === dist.get(open[k]) && reach.get(open[n]) < reach.get(open[k]))) k = n;
+  return open.splice(k, 1)[0];
+};
+
+/** Each stretch's faces. */
+const facesBy = (list) => {
+  const byEdge = new Map();
+  list.forEach((f, i) => f.forEach((a, k) => {
+    const e = pair(a, f[(k + 1) % f.length]);
+    (byEdge.get(e) ?? byEdge.set(e, []).get(e)).push(i);
+  }));
+  return byEdge;
+};
+
+/**
+ * The face nearest all of `near`, by what it costs to reach each from it, leaving out those `barred` says. A new item
+ * goes in there, by `put` in `thread`.
+ */
+export function nearest(near, list, owner, keep, barred) {
+  const byEdge = facesBy(list), total = list.map(() => 0);
+  for (const v of near) {
+    const dist = new Map(), open = [];
+    list.forEach((f, i) => { if (f.includes(v)) (dist.set(i, 0), open.push(i)); });
+    while (open.length) {
+      const i = nextOf(open, dist);
+      list[i].forEach((a, k) => {
+        const e = pair(a, list[i][(k + 1) % list[i].length]), cost = dist.get(i) + (owner.get(e)?.visible ? 1 : HIDDEN);
+        if (e === keep) return;
+        for (const n of byEdge.get(e) ?? []) if (n !== i && (!dist.has(n) || cost < dist.get(n))) (dist.set(n, cost), open.push(n));
+      });
+    }
+    list.forEach((_, i) => (total[i] += dist.get(i) ?? list.length));
+  }
+  let best = -1;
+  list.forEach((_, i) => { if (!barred(i) && (best < 0 || total[i] < total[best])) best = i; });
+  return best;
+}
+
+/** Item `v` into face `i`, numbered as near `want` as it can be, on hidden wires from the face's top to its foot. */
+export function put(v, i, want, list, number, add) {
+  const f = list[i], low = f.reduce((m, a, k) => (number.get(a) < number.get(f[m]) ? k : m), 0), high = f.reduce((m, a, k) => (number.get(a) > number.get(f[m]) ? k : m), 0);
+  const [lo, hi] = [number.get(f[low]), number.get(f[high])], [m, n] = [low, high].sort((p, q) => p - q);
+  number.set(v, Math.min(lo + (hi - lo) * 0.9, Math.max(lo + (hi - lo) * 0.1, want)) + (hi - lo) * 1e-3 * ((number.size * GOLD) % 1));
+  add([f[low], v], false, null);
+  add([v, f[high]], false, null);
+  list.splice(i, 1, [...f.slice(m, n + 1), v], [...f.slice(n), ...f.slice(0, m + 1), v]);
+}
+
+/**
+ * A threader over `list`, the faces: thread each of `links`, a list of [u, v], through them. `owner` says which wire
+ * holds each stretch and `add(path, visible, link)` makes a wire. With `onward(link)`, that link only ever goes on through
+ * `number`, so it runs from u to v the way the numbers do. The stretch `keep` is never crossed. It keeps count in
+ * `tally`: { ghosts, crossings, unthreaded }.
+ */
+export function threader(list, owner, add, { number, keep, onward = () => false }) {
+  const tally = { ghosts: [], crossings: 0, unthreaded: 0 }, at = (v) => number.get(v);
+  let made = 0;
+  const through = (links) => { for (const l of links) {
+    const [u, v] = l, hidden = owner.get(pair(u, v));
+    // A hidden wire between the two already: it just shows.
+    if (hidden) { Object.assign(hidden, { visible: true, link: l, path: [u, v] }); continue; }
+    const byEdge = facesBy(list), strict = onward(l);
+    // How far on through the numbers a wire must already be to cross this stretch, or null when it cannot.
+    const past = (e, h) => {
+      if (e === keep) return null;
+      if (!strict) return h;
+      const [a, b] = e.split('|'), hi = Math.max(at(a), at(b)), lo = Math.max(h, Math.min(at(a), at(b)));
+      return a !== u && b !== u && a !== v && b !== v && lo < hi && lo < at(v) ? lo : null;
+    };
+    const dist = new Map(), reach = new Map(), prev = new Map(), open = [];
+    list.forEach((f, i) => { if (f.includes(u)) (dist.set(i, 0), reach.set(i, strict ? at(u) : 0), open.push(i)); });
+    const nearer = (i, d, h) => !dist.has(i) || d < dist.get(i) || (d === dist.get(i) && h < reach.get(i));
+    let end = -1;
+    while (open.length) {
+      const i = nextOf(open, dist, reach);
+      if (list[i].includes(v)) { end = i; break; }
+      list[i].forEach((a, k) => {
+        const e = pair(a, list[i][(k + 1) % list[i].length]), cost = dist.get(i) + (owner.get(e)?.visible ? 1 : HIDDEN), h = past(e, reach.get(i));
+        if (h === null) return;
+        for (const n of byEdge.get(e) ?? []) if (n !== i && nearer(n, cost, h)) (dist.set(n, cost), reach.set(n, h), prev.set(n, [i, e]), open.push(n));
+      });
+    }
+    if (end < 0) { tally.unthreaded++; continue; }
+    const steps = [];
+    for (let i = end; prev.has(i); i = prev.get(i)[0]) steps.unshift(prev.get(i)[1]);
+    // Each point between what is before it and what it must leave room for.
+    const under = steps.map(() => Infinity), points = [];
+    if (strict) for (let k = steps.length - 1, top = at(v); k >= 0; k--) {
+      const [a, b] = steps[k].split('|');
+      top = under[k] = Math.min(top, Math.max(at(a), at(b)));
+    }
+    let run = strict ? at(u) : -Infinity;
+    for (let k = 0; k < steps.length; k++) {
+      const e = steps[k], [a, b] = e.split('|'), d = `ghost${made++}`, w = owner.get(e), lo = Math.max(run, Math.min(at(a), at(b)));
+      // Never on a number something already has: a face tells its top from its foot by them.
+      number.set(d, lo + (Math.min(under[k], Math.max(at(a), at(b))) - lo) * (0.4 + 0.2 * ((made * GOLD) % 1)));
+      run = strict ? at(d) : run;
+      tally.ghosts.push(d);
+      if (w.visible) tally.crossings++;
+      for (const f of list) for (let n = 0; n < f.length; n++) {
+        const p = f[n], q = f[(n + 1) % f.length];
+        if ((p === a && q === b) || (p === b && q === a)) { f.splice(n + 1, 0, d); break; }
+      }
+      const pos = w.path.findIndex((x, i) => i && pair(w.path[i - 1], x) === e);
+      w.path.splice(pos, 0, d);
+      owner.delete(e);
+      owner.set(pair(a, d), w);
+      owner.set(pair(d, b), w);
+      points.push(d);
+    }
+    const path = [u, ...points, v];
+    add(path, true, l);
+    for (let i = 1; i < path.length; i++) {
+      const [p, q] = [path[i - 1], path[i]], hold = list.findIndex((f) => f.includes(p) && f.includes(q));
+      if (hold < 0) throw new Error('A threaded wire left its faces');
+      const f = list[hold], [m, n] = [f.indexOf(p), f.indexOf(q)].sort((x, y) => x - y);
+      list.splice(hold, 1, f.slice(m, n + 1), [...f.slice(n), ...f.slice(0, m + 1)]);
+    }
+  } };
+  return { through, tally };
+}
 
 /**
  * Invisible edges until `kept` over `items` is one biconnected piece, each kept only if it stays planar, and each as far
@@ -41,9 +171,10 @@ function join(kept, items, order) {
 }
 
 /**
- * `links` is a list of [u, v], heaviest first: the graph as { faces, wires, owner, ghosts, crossings }. A wire is
- * { path, visible, link }, its path from u to v through the points where it crosses; `owner` says which wire holds each
- * stretch between two neighbours.
+ * `links` is a list of [u, v], heaviest first: the graph as { faces, wires, owner, ghosts, crossings }. The heaviest planar
+ * part is kept, invisible edges join it into one biconnected piece and the links left out are threaded through its
+ * faces. A wire is { path, visible, link }, its path from u to v through the points where it crosses; `owner` says which
+ * wire holds each stretch between two neighbours.
  */
 export function planarize(links, items) {
   const kept = [], left = [];
@@ -62,53 +193,7 @@ export function planarize(links, items) {
   for (const [u, v, leads] of hidden) if (!owner.has(pair(u, v))) (add([u, v], false, null), (wires.at(-1).leads = leads));
   const list = faces([...owner.keys()].map((k) => k.split('|')));
   if (!list) throw new Error('The kept part is not planar');
-  let crossings = 0, unthreaded = 0, made = 0;
-  const ghosts = [];
-  for (const l of left) {
-    const [u, v] = l, byEdge = new Map();
-    list.forEach((f, i) => f.forEach((a, k) => {
-      const e = pair(a, f[(k + 1) % f.length]);
-      (byEdge.get(e) ?? byEdge.set(e, []).get(e)).push(i);
-    }));
-    const dist = new Map(), prev = new Map(), open = [];
-    list.forEach((f, i) => { if (f.includes(u)) (dist.set(i, 0), open.push(i)); });
-    let end = -1;
-    while (open.length) {
-      open.sort((p, q) => dist.get(q) - dist.get(p));
-      const i = open.pop();
-      if (list[i].includes(v)) { end = i; break; }
-      list[i].forEach((a, k) => {
-        const e = pair(a, list[i][(k + 1) % list[i].length]), cost = dist.get(i) + (owner.get(e)?.visible ? 1 : 0);
-        for (const n of byEdge.get(e) ?? []) if (n !== i && (!dist.has(n) || cost < dist.get(n))) (dist.set(n, cost), prev.set(n, [i, e]), open.push(n));
-      });
-    }
-    if (end < 0) { unthreaded++; continue; }
-    const steps = [];
-    for (let i = end; prev.has(i); i = prev.get(i)[0]) steps.unshift(prev.get(i)[1]);
-    const points = [];
-    for (const e of steps) {
-      const [a, b] = e.split('|'), d = `ghost${made++}`, w = owner.get(e);
-      ghosts.push(d);
-      if (w.visible) crossings++;
-      for (const f of list) for (let k = 0; k < f.length; k++) {
-        const p = f[k], q = f[(k + 1) % f.length];
-        if ((p === a && q === b) || (p === b && q === a)) { f.splice(k + 1, 0, d); break; }
-      }
-      const at = w.path.findIndex((x, i) => i && pair(w.path[i - 1], x) === e);
-      w.path.splice(at, 0, d);
-      owner.delete(e);
-      owner.set(pair(a, d), w);
-      owner.set(pair(d, b), w);
-      points.push(d);
-    }
-    const path = [u, ...points, v];
-    add(path, true, l);
-    for (let i = 1; i < path.length; i++) {
-      const [p, q] = [path[i - 1], path[i]], hold = list.findIndex((f) => f.includes(p) && f.includes(q));
-      if (hold < 0) throw new Error('A threaded wire left its faces');
-      const f = list[hold], [m, n] = [f.indexOf(p), f.indexOf(q)].sort((x, y) => x - y);
-      list.splice(hold, 1, f.slice(m, n + 1), [...f.slice(n), ...f.slice(0, m + 1)]);
-    }
-  }
-  return { faces: list, wires, owner, ghosts, crossings, unthreaded };
+  const { through, tally } = threader(list, owner, add, { number: new Map() });
+  through(left);
+  return { faces: list, wires, owner, ...tally };
 }

@@ -10,7 +10,10 @@ import { numbered } from './numbering.js';
 import { stepsOf } from './plane.js';
 import { settle, square } from './settle.js';
 import { planarize } from './thread.js';
+import { embed } from './upward.js';
 
+/** The embedding made for the order is tried on parts up to this size, and may add this many crossings for each wire it turns down. */
+const EMBED_MOST = 100, EMBED_COST = 2;
 /** Past this many wires the pull takes fewer rounds: a drawing that takes too long is stopped by the page. */
 const PULL_MOST = 150;
 
@@ -75,9 +78,23 @@ function longest(names, arcs) {
   return at;
 }
 
+/** How many order wires run against `number`. */
+const against = (g, number) => g.wires.filter((w) => w.link?.[2] && w.path.some((v, i) => i && number.get(w.path[i - 1]) > number.get(v))).length;
+
+/**
+ * The part's graph and numbering. The heaviest planar part, numbered as the order asks, is the picture with the fewest
+ * crossings; where that leaves order wires up, the embedding made for the order (./upward.js) is tried in its place.
+ */
+function downward(links, list) {
+  const g = planarize(links, list), found = { g, ...numbered(g) }, up = against(g, found.number);
+  if (!up || list.length > EMBED_MOST) return found;
+  const made = embed(links, list);
+  return against(made, made.number) < up && made.crossings <= g.crossings + up * EMBED_COST ? { g: made, s: made.s, t: made.t, number: made.number, outerAt: made.outerAt } : found;
+}
+
 /** One connected part: places by item, and each visible link's points. `block` is an item's size with what hangs on it, `box` its own. */
 function drawPart(list, links, block, box, z) {
-  const g = planarize(links, list), { s, t, number, outerAt } = numbered(g), next = new Map();
+  const { g, s, t, number, outerAt } = downward(links, list), next = new Map();
   for (const k of g.owner.keys()) {
     const [a, b] = k.split('|');
     (next.get(a) ?? next.set(a, new Set()).get(a)).add(b);

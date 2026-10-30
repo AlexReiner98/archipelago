@@ -210,6 +210,38 @@ test('numbering: every item has a neighbour before it and one after, whatever th
   }
 });
 
+test('bars: where the numbering leaves an order wire up, the embedding made for the order takes over', () => {
+  const ids = Array.from({ length: 9 }, (_, k) => `n${k}`), links: any[] = [];
+  for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) links.push(dep(`n${6 + b}`, `n${a}`), dep(`n${3 + a}`, `n${a}`), dep(`n${6 + b}`, `n${3 + a}`));
+  links.push(tie('n0', 'n8', 'calls'), tie('n7', 'n1', 'calls'), tie('n2', 'n3', 'link'));
+  const g = drawnBars(ids.map((id) => item(id)), links);
+  assert.deepEqual(upward(g), []);
+  assert.ok(right(g));
+  assert.ok(clear(g));
+});
+
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { embed } from './draw/flow/upward.js';
+
+test('upward: every stretch has two faces, every face one top and one foot, and the numbers keep the order', () => {
+  const links: any[] = [['a', 'b', true], ['a', 'c', true], ['b', 'd', true], ['c', 'd', true], ['a', 'd', true], ['b', 'c', false], ['e', 'a', false], ['e', 'd', false]];
+  const g = embed(links, ['a', 'b', 'c', 'd', 'e']), key = (p: string, q: string) => [p, q].sort().join('|');
+  assert.equal(g.number.size - g.owner.size + g.faces.length, 2);
+  const seen = new Map<string, number>();
+  for (const f of g.faces) {
+    let turns = 0;
+    f.forEach((v: string, k: number) => {
+      const [p, q] = [f[(k + 1) % f.length], f[(k + 2) % f.length]];
+      seen.set(key(v, p), (seen.get(key(v, p)) ?? 0) + 1);
+      if ((g.number.get(p) > g.number.get(v)) !== (g.number.get(q) > g.number.get(p))) turns++;
+    });
+    assert.equal(turns, 2);
+  }
+  assert.ok([...seen.values()].every((n) => n === 2));
+  assert.equal(new Set(g.number.values()).size, g.number.size);
+  for (const [u, v, order] of links) if (order) assert.ok(g.number.get(u) < g.number.get(v));
+});
+
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { settle } from './draw/flow/settle.js';
 
