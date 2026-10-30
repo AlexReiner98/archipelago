@@ -202,6 +202,8 @@ export interface DrawingDef {
   modules: Record<string, string>;
   /** "whole": the drawing reads each item's note whole, so the page asks the lens for them so (the flat read's `notes`). */
   notes?: 'whole';
+  /** Laid out by the page, drawn to the size it gives (a scene that says `flat`): the page gives it that box before it measures, so one draw is enough. */
+  flat?: boolean;
 }
 
 /** What a pack shows on the page of every item of the kinds or types it is on: one column of pieces. */
