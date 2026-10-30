@@ -221,13 +221,8 @@ function setFollows(follows, t = front()) {
 /** A tab's menu, over everything (a popover: the strip clips what hangs below it): whom it follows (everyone, nobody, the sessions open now, newest first), pop out, and merge. */
 const menuEl = h('div', { class: 'menu-items tab-menu', popover: 'auto', role: 'menu', 'aria-label': 'This tab' });
 document.body.append(menuEl);
-/** The sessions open when last asked, or null before that: the menu is drawn at once, and again if the answer changes it. */
-let openNow = null;
-const readOpen = () =>
-  api('view', { name: 'sessions' }).then(
-    ({ open = [] }) => (hearOpen(open), (openNow = new Set(open.map((s) => s.id)))),
-    () => {},
-  );
+/** Ask which sessions are open: the menu is drawn at once from what is known, and again with the answer. */
+const readOpen = () => api('view', { name: 'sessions' }).then(({ open = [] }) => hearOpen(open), () => {});
 function tabMenu(anchor, t) {
   drawMenu(t);
   menuEl.showPopover();
@@ -240,7 +235,7 @@ function tabMenu(anchor, t) {
 }
 function drawMenu(t) {
   const now = t.follows ?? 'all';
-  const sessions = followable(openNow, { now: Date.now(), recent: 600_000 });
+  const sessions = followable({ now: Date.now(), recent: 600_000 });
   // What the tab follows stays in sight, ended or not, so the reader can see it and change it.
   if (!['all', 'none', ...sessions].includes(now)) sessions.unshift(now);
   const pick = (key, said, title) => h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(key === now), title, onclick: () => (menuEl.hidePopover(), setFollows(key, t)) }, said);

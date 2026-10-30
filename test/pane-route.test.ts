@@ -7,8 +7,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // A UI module, plain JavaScript with no types of its own.
-const { followable, hear, heard, hearOpen, route } = (await import(`../ui/${'pane-route.js'}`)) as {
-  followable: (open: Set<string> | null, at: { now: number; recent: number }) => string[];
+const { followable, hear, heard, hearOpen, nameOf, route } = (await import(`../ui/${'pane-route.js'}`)) as {
+  followable: (at: { now: number; recent: number }) => string[];
+  nameOf: (key: string) => string;
   hear: (step: object) => void;
   heard: Map<string, { called: string }>;
   hearOpen: (open: object[]) => void;
@@ -102,10 +103,19 @@ test('a tab can follow the sessions open now, not one that has ended', () => {
   hear({ actor: 'agent:none', at: now - 1000 });
   hear({ actor: 'agent:long', at: now - 700_000 });
   const say = { now, recent: 600_000 };
-  assert.deepEqual(followable(null, say), ['agent:none', 'agent:long', 'e_ended000', 'e_working0'], 'not yet asked: everyone heard');
+  assert.deepEqual(followable(say), ['agent:none', 'e_ended000', 'e_working0'], 'not yet asked: every session heard, and an agent at work');
   // A session open and quiet, which this page never heard from, can be followed too, by its name or its label.
-  hearOpen([{ id: 'e_quiet000', name: 'Hoy', last_seen: new Date(100).toISOString() }, { id: 'e_titled00', name: 'Sark', label: 'Popups', last_seen: new Date(50).toISOString() }]);
-  assert.deepEqual(followable(new Set(['e_working0', 'e_quiet000', 'e_titled00']), say), ['agent:none', 'e_working0', 'e_quiet000', 'e_titled00'], 'open, and an agent at work with no session');
+  const open = [{ id: 'e_working0' }, { id: 'e_quiet000', name: 'Hoy', last_seen: new Date(100).toISOString() }, { id: 'e_titled00', name: 'Sark', label: 'Popups', last_seen: new Date(50).toISOString() }];
+  hearOpen(open);
+  assert.deepEqual(followable(say), ['agent:none', 'e_working0', 'e_quiet000', 'e_titled00'], 'open, and an agent at work with no session');
+  // A step it took before it ended, given again, does not bring it back; being open again does.
+  hear({ actor: 'agent:a', run: 'e_ended000', name: 'Kos', at: 300 });
+  assert.ok(!followable(say).includes('e_ended000'));
+  // Its word is free once it has ended: a new session by the same word needs nothing after its name.
+  hear({ actor: 'agent:a', run: 'e_newkos00', name: 'Kos', at: 400 });
+  assert.equal(nameOf('e_newkos00'), 'Session Kos');
+  hearOpen([...open, { id: 'e_ended000' }]);
+  assert.ok(followable(say).includes('e_ended000'));
   assert.deepEqual([heard.get('e_quiet000')!.called, heard.get('e_titled00')!.called], ['Session Hoy', 'Popups']);
   heard.clear();
 });
