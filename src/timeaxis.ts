@@ -12,6 +12,8 @@ export interface TimeAxis {
   to: string;
   /** when, bound, or both (the default). */
   by?: ('when' | 'bound')[];
+  /** In an answer: the zone its days are counted in, so a drawing counts them so too. */
+  zone?: string;
 }
 
 export interface Span {
@@ -61,7 +63,7 @@ function dayFrom(value: string, zone: string, now: number): string {
 
 /** A time axis with its ends said from today worked out, in the workspace's zone. */
 export function resolveAxis(axis: TimeAxis, zone: string, now = Date.now()): TimeAxis {
-  const resolved = { ...axis, from: dayFrom(axis.from, zone, now), to: dayFrom(axis.to, zone, now) };
+  const resolved = { ...axis, from: dayFrom(axis.from, zone, now), to: dayFrom(axis.to, zone, now), zone };
   if (Date.parse(resolved.to) < Date.parse(resolved.from)) throw new Error('time.to comes after time.from');
   return resolved;
 }
