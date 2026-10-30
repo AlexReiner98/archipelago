@@ -412,6 +412,25 @@ test('settle: the press keeps the room joined boxes and ports were given', () =>
   if (p.length > 2) assert.ok(Math.abs(p[1][1] - p[0][1]) >= 18 - 0.01 && Math.abs(p.at(-1)![1] - p.at(-2)![1]) >= 18 - 0.01, JSON.stringify(p));
 });
 
+test('settle: boxes stopped against each other slide as a block when that shortens their wires', () => {
+  const made = () => ({
+    boxes: new Map([['a', box(100, 200)], ['b', box(208, 200)], ['l', box(100, 40)], ['r', box(900, 40)], ['r2', box(900, 400)], ['r3', box(760, 400)]]),
+    wires: [
+      { a: 'l', b: 'b', points: [[100, 60], [100, 120], [208, 120], [208, 180]] },
+      { a: 'r', b: 'b', points: [[900, 60], [900, 130], [220, 130], [220, 180]] },
+      { a: 'r2', b: 'a', points: [[900, 380], [900, 280], [120, 280], [120, 220]] },
+      { a: 'r3', b: 'a', points: [[760, 380], [760, 300], [100, 300], [100, 220]] },
+    ],
+  });
+  const length = (w: any[]) => w.reduce((sum, v) => sum + v.points.reduce((n: number, p: number[], i: number) => n + (i ? Math.abs(p[0] - v.points[i - 1][0]) + Math.abs(p[1] - v.points[i - 1][1]) : 0), 0), 0);
+  const [plain, moved] = [made(), made()];
+  settle(plain.boxes, plain.wires, { gap: 8, track: 5 });
+  settle(moved.boxes, moved.wires, { gap: 8, track: 5, blocks: 12 });
+  assert.ok(length(moved.wires) <= length(plain.wires), `${length(moved.wires)} against ${length(plain.wires)}`);
+  assert.equal(hits(moved.boxes), 0);
+  assert.equal(count(moved.wires.map((w) => w.points)).crossings, count(plain.wires.map((w) => w.points)).crossings);
+});
+
 test('settle: a port slides round a corner when that takes out bends', () => {
   const boxes = new Map([['a', box(100, 200)], ['b', box(500, 200)]]);
   const wires = [{ a: 'a', b: 'b', points: [[100, 220], [100, 300], [500, 300], [500, 220]] }];

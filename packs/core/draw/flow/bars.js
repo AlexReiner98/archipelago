@@ -327,7 +327,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   }
   for (const r of routes.values()) if (r.to !== undefined && rigid.has(r.from) && rigid.has(r.to)) moving.push(Object.assign(r, { a: r.from, b: r.to, down: orderKey.has(pair(r.from, r.to)) }));
   if (moving.length && square(moving)) {
-    settled = settle(rigid, moving, { gap: gap / 2, track: z.turn, ...zw, watch: watching, ...(moving.length > PULL_MOST && { rounds: 4, sweeps: 6 }) });
+    settled = settle(rigid, moving, { gap: gap / 2, track: z.turn, ...zw, blocks: sizes.plane_block_rounds, watch: watching, ...(moving.length > PULL_MOST && { rounds: 4, sweeps: 6 }) });
     // The parts have pulled in, so they are set again, closer.
     const sets = shelves.map((c) => {
       const ids = [...c.drawn.places.keys()].filter((id) => rigid.has(id)), rs = ids.map((id) => rigid.get(id));

@@ -33,7 +33,7 @@ function simplify(points) {
  * wire's ends rest on the boxes `a` and `b`, and `down` says `a` stays above `b`. `gap` is the room between boxes, `track` between two wires,
  * `room` between a wire and a box it passes, `join` between two boxes a wire joins, and `run` from a port to the wire's first corner.
  */
-function pass(axis, boxes, wires, { gap, track, room, join, run, sweeps, press }) {
+function pass(axis, boxes, wires, { gap, track, room, join, run, sweeps, press, blocks }) {
   const other = 1 - axis, items = [], ofBox = new Map(), landed = [];
   for (const [id, b] of boxes) {
     const [low, high] = reachOf(b, axis), hold = [low + INSET, high - INSET];
@@ -126,6 +126,7 @@ function pass(axis, boxes, wires, { gap, track, room, join, run, sweeps, press }
     const [lo, hi] = bounds(it);
     if (lo <= hi) it.pos = Math.min(hi, Math.max(lo, median(it.joins.map((j) => j.pos))));
   }
+  if (blocks) slideBlocks(items, bounds, blocks, sweeps);
   for (const it of items) if (it.box) {
     const b = boxes.get(it.box), move = it.pos - b.at[axis];
     b.at[axis] = it.pos;
@@ -135,6 +136,52 @@ function pass(axis, boxes, wires, { gap, track, room, join, run, sweeps, press }
     }
   }
   for (const it of items) if (it.w) (it.w.points[it.i - 1][axis] = it.pos, it.w.points[it.i][axis] = it.pos);
+}
+
+/** How near its bound an item stands to be stopped by it, and how far a move must go to count. */
+const TIGHT = 0.5, SETTLED = 0.5;
+
+/**
+ * Move what stands stopped against each other as one: items held tight by a separation are a block, which goes to the
+ * median of all that its members join outside it, as far as what stands beside the block lets it. Single items then
+ * take their own medians again, which is how a block comes apart when its members want different ways. Runs until
+ * nothing moves, or for `limit` rounds.
+ */
+function slideBlocks(items, bounds, limit, sweeps) {
+  for (let round = 0; round < limit; round++) {
+    const root = new Map(items.map((it) => [it, it])), find = (it) => (root.get(it) === it ? it : (root.set(it, find(root.get(it))), root.get(it)));
+    for (const it of items) for (const [q, s] of it.right) if (q.pos - it.pos - s < TIGHT) root.set(find(it), find(q));
+    const groups = new Map();
+    for (const it of items) (groups.get(find(it)) ?? groups.set(find(it), []).get(find(it))).push(it);
+    let moved = 0;
+    for (const members of groups.values()) {
+      if (members.length < 2) continue;
+      const inside = new Set(members), pulls = [];
+      let lo = -Infinity, hi = Infinity;
+      for (const m of members) {
+        for (const j of m.joins) if (!inside.has(j)) pulls.push(j.pos - m.pos);
+        for (const [p, s] of m.left) if (!inside.has(p)) lo = Math.max(lo, p.pos + s - m.pos);
+        for (const [q, s] of m.right) if (!inside.has(q)) hi = Math.min(hi, q.pos - s - m.pos);
+        for (const box of [m.own, m.own2]) if (box && !inside.has(box)) ((lo = Math.max(lo, box.pos + box.from - m.pos)), (hi = Math.min(hi, box.pos + box.to - m.pos)));
+        if (m.box) for (const rod of m.joins) if ((rod.own === m || rod.own2 === m) && !inside.has(rod)) ((lo = Math.max(lo, rod.pos - m.to - m.pos)), (hi = Math.min(hi, rod.pos - m.from - m.pos)));
+      }
+      if (!pulls.length || lo > hi) continue;
+      const shift = Math.min(hi, Math.max(lo, median(pulls)));
+      if (Math.abs(shift) < SETTLED) continue;
+      for (const m of members) m.pos += shift;
+      moved++;
+    }
+    let single = 0;
+    for (let sweep = 0; sweep < sweeps; sweep++) for (const it of sweep % 2 ? [...items].reverse() : items) {
+      if (!it.joins.length) continue;
+      const [lo, hi] = bounds(it);
+      if (lo > hi) continue;
+      const to = Math.min(hi, Math.max(lo, median(it.joins.map((j) => j.pos))));
+      if (Math.abs(to - it.pos) >= SETTLED) single++;
+      it.pos = to;
+    }
+    if (!moved && !single) return;
+  }
 }
 
 /** Whether this line is free to be drawn: through no box, and crossing and touching no wire it did not already. */
@@ -191,7 +238,7 @@ export const square = (wires) => wires.every((w) => w.points.every((p, i) => !i 
  * crossings than it found is taken back, whatever the reason: the crossings kept are a promise, not a hope. Answers
  * with what was done, for `watch`.
  */
-export function settle(boxes, wires, { gap, track, room = track, join = gap, run = 0, rounds = 12, sweeps = 16, watch = null }) {
+export function settle(boxes, wires, { gap, track, room = track, join = gap, run = 0, rounds = 12, sweeps = 16, blocks = 0, watch = null }) {
   const crossings = () => count(wires.map((w) => w.points)).crossings;
   const save = () => ({ at: new Map([...boxes].map(([id, b]) => [id, [...b.at]])), lines: wires.map((w) => w.points.map((q) => [...q])) });
   const restore = (kept) => {
@@ -201,7 +248,7 @@ export function settle(boxes, wires, { gap, track, room = track, join = gap, run
   let done = 0, undone = 0, slid = 0;
   for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) {
     const before = crossings(), kept = save();
-    pass(axis, boxes, wires, { gap, track, room, join, run, sweeps, press: axis === 1 && round < rounds / 2 });
+    pass(axis, boxes, wires, { gap, track, room, join, run, sweeps, blocks, press: axis === 1 && round < rounds / 2 });
     const after = crossings();
     watch?.({ round, axis, before, after, kept, wires, boxes });
     // In the first round, wires that only touched may come apart as the crossing they always were: a touch hides a crossing the count
