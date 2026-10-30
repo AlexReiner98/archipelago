@@ -267,7 +267,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // (src/published-preview.ts), its site's other pages each led to by their own preview.
       if (req.method === 'GET' && /^\/preview\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
         res.writeHead(200, { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PREVIEW_POLICY });
-        return res.end(await uiPage('doc.html'));
+        return res.end((await uiPage('doc.html')).replace('<html', options.unsandboxed ? '<html data-draw-sandbox="off"' : '<html'));
       }
       const preview = req.method === 'POST' ? /^\/preview\/(e_[a-z0-9]{8})\/data$/.exec(url.pathname) : null;
       if (preview) {
