@@ -11,6 +11,8 @@ const TOP = 'ghost top', FOOT = 'ghost foot';
 const ORDER_WEIGHT = 4;
 /** How many wires times items may be spent on trying tops and feet. */
 const WORK = 3e6;
+/** An order wire running up counts for more than any wire's length. */
+const OVER = 1e6;
 
 /** The items of what is `left` that would part it if taken, walked from `root` (Tarjan). */
 function cuts(near, left, root) {
@@ -58,6 +60,15 @@ function walkDown(near, s, t, wants, deep) {
   }
   number.set(t, number.size);
   return number;
+}
+
+/** How far the wires run down, in rows: of numberings as true to the order, the shortest is kept. */
+function reach(g, number, near) {
+  const level = new Map();
+  for (const v of [...number.keys()].sort((p, q) => number.get(p) - number.get(q))) level.set(v, 1 + Math.max(-1, ...[...near.get(v)].filter((w) => level.has(w)).map((w) => level.get(w))));
+  let sum = 0;
+  for (const w of g.wires) if (w.visible) sum += Math.abs(level.get(w.path[0]) - level.get(w.path.at(-1)));
+  return sum;
 }
 
 /** The graph with a top and foot beside the wire x to y of the outer face, its ways chosen as far as they can be. */
@@ -121,6 +132,7 @@ function ways(g, outerAt, x, y) {
   for (const w of orderWires) for (const [a, b] of stretches(w.path)) (wants.push([a, b, ORDER_WEIGHT]), lead(a, b));
   const inOrder = [...new Set([...after.keys(), ...before.keys()])].filter((v) => !v.startsWith('ghost'));
   lead(TOP, x), lead(y, FOOT), lead(TOP, FOOT);
+  for (const w of g.wires) if (w.leads) stretches(w.path).forEach(([a, b]) => lead(a, b));
   // A wire that crosses another runs one way through it, so that it does not double back at the crossing.
   for (const w of g.wires) {
     if (w.path.length < 3 || w.link?.[2] || !w.visible) continue;
@@ -232,11 +244,12 @@ export function numbered(g) {
   const places = outer.flatMap((v, i) => [[v, outer[(i + 1) % outer.length]], [outer[(i + 1) % outer.length], v]]);
   const tries = orders.length ? Math.max(1, Math.min(places.length, Math.ceil(WORK / size))) : 1;
   let best = null, least = Infinity;
-  for (let k = 0; k < tries && least > 0; k++) {
+  for (let k = 0; k < tries; k++) {
     const [x, y] = places[Math.floor((k * places.length) / tries)], laid = ways(g, outerAt, x, y);
     const number = walkDown(laid.near, TOP, FOOT, laid.wants, laid.deep);
     const up = orders.filter((w) => w.path.some((v, i) => i && number.get(w.path[i - 1]) > number.get(v))).length;
-    if (up < least) ((least = up), (best = { ...laid, number }));
+    const score = up * OVER + reach(g, number, laid.near);
+    if (score < least) ((least = score), (best = { ...laid, number }));
   }
   g.faces = best.faces;
   for (const [a, b, d] of best.splits) {

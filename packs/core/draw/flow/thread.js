@@ -6,22 +6,27 @@ import { blocks, faces, isPlanar } from './planar.js';
 
 const pair = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
-/** Invisible edges until `kept` over `items` is one biconnected piece, each kept only if it stays planar. */
-function join(kept, items) {
-  const hidden = [], all = () => [...kept, ...hidden];
+/**
+ * Invisible edges until `kept` over `items` is one biconnected piece, each kept only if it stays planar, and each as far
+ * as it can be from what the order leaves without a wire out to what it leaves without a wire in, so that it lends both.
+ */
+function join(kept, items, order) {
+  const hidden = [], all = () => [...kept, ...hidden], from = new Set(order.map(([u]) => u)), into = new Set(order.map(([, v]) => v));
+  const ends = new Set([...into].filter((v) => !from.has(v))), starts = new Set([...from].filter((v) => !into.has(v)));
+  const worth = (a, b) => Number(ends.has(a)) + Number(starts.has(b));
   for (const k of items) if (!all().some(([u, v]) => u === k || v === k)) hidden.push([k, items.find((x) => x !== k)]);
   for (let round = 0; round < 2000; round++) {
     const parts = blocks(all());
     if (parts.length === 1) return hidden;
     const sets = parts.map((p) => new Set(p.flat())), together = (x, y) => sets.some((s) => s.has(x) && s.has(y));
     const bridge = (i, j, c) => {
+      const ways = [];
       for (const a of sets[i]) {
         if (a === c || sets[j].has(a)) continue;
-        for (const b of sets[j]) {
-          if (b === c || sets[i].has(b) || together(a, b)) continue;
-          if (isPlanar([...all(), [a, b]])) return void hidden.push([a, b]), true;
-        }
+        for (const b of sets[j]) if (b !== c && !sets[i].has(b) && !together(a, b)) ways.push(worth(a, b) >= worth(b, a) ? [a, b, worth(a, b)] : [b, a, worth(b, a)]);
       }
+      // The sort keeps the order they were found in among equals.
+      for (const [a, b, w] of ways.sort((p, q) => q[2] - p[2])) if (isPlanar([...all(), [a, b]])) return void hidden.push(w ? [a, b, true] : [a, b]), true;
       return false;
     };
     let done = false;
@@ -46,7 +51,7 @@ export function planarize(links, items) {
     kept.push(l);
     if (!isPlanar(kept.map(([u, v]) => [u, v]))) (kept.pop(), left.push(l));
   }
-  const edges = kept.map(([u, v]) => [u, v]), hidden = join(edges, items);
+  const edges = kept.map(([u, v]) => [u, v]), hidden = join(edges, items, links.filter((l) => l[2]));
   const wires = [], owner = new Map();
   const add = (path, visible, link) => {
     const w = { path, visible, link };
@@ -54,7 +59,7 @@ export function planarize(links, items) {
     for (let i = 1; i < path.length; i++) owner.set(pair(path[i - 1], path[i]), w);
   };
   kept.forEach((l) => add([l[0], l[1]], true, l));
-  for (const [u, v] of hidden) if (!owner.has(pair(u, v))) add([u, v], false, null);
+  for (const [u, v, leads] of hidden) if (!owner.has(pair(u, v))) (add([u, v], false, null), (wires.at(-1).leads = leads));
   const list = faces([...owner.keys()].map((k) => k.split('|')));
   if (!list) throw new Error('The kept part is not planar');
   let crossings = 0, unthreaded = 0, made = 0;
