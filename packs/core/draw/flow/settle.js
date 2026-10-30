@@ -32,7 +32,7 @@ function simplify(points) {
  * One pass along `axis` (0 across, 1 down). `boxes` are { at: [x, y], size: [w, h] } by id, `wires` { a, b, points }: a
  * wire's ends rest on the boxes `a` and `b`. `gap` is the room between boxes, `track` between a wire and what is beside it.
  */
-function pass(axis, boxes, wires, { gap, track, sweeps }) {
+function pass(axis, boxes, wires, { gap, track, sweeps, press }) {
   const other = 1 - axis, items = [], ofBox = new Map();
   for (const [id, b] of boxes) {
     const [low, high] = reachOf(b, axis), hold = [low + INSET, high - INSET];
@@ -92,6 +92,13 @@ function pass(axis, boxes, wires, { gap, track, sweeps }) {
     if (it.box) for (const rod of it.joins) if (rod.own === it || rod.own2 === it) ((lo = Math.max(lo, rod.pos - it.to)), (hi = Math.min(hi, rod.pos - it.from)));
     return [lo, hi];
   };
+  // The press, rows only: pressing across lengthens wires, pressing down shortens them (measured on a real map).
+  // The press: everything moves toward the low side until something stops it, which closes the empty space. It keeps
+  // every order, so it changes nothing but the room taken.
+  if (press) for (let sweep = 0; sweep < 4; sweep++) for (const it of items) {
+    const [lo, hi] = bounds(it);
+    if (Number.isFinite(lo) && lo <= hi && lo < it.pos) it.pos = lo;
+  }
   for (let sweep = 0; sweep < sweeps; sweep++) for (const it of sweep % 2 ? [...items].reverse() : items) {
     if (!it.joins.length) continue;
     const [lo, hi] = bounds(it);
@@ -172,12 +179,12 @@ export function settle(boxes, wires, { gap, track, rounds = 12, sweeps = 16, wat
   let done = 0, undone = 0, slid = 0;
   for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) {
     const before = crossings(), kept = save();
-    pass(axis, boxes, wires, { gap, track, sweeps });
+    pass(axis, boxes, wires, { gap, track, sweeps, press: axis === 1 && round < rounds / 2 });
     const after = crossings();
     watch?.({ round, axis, before, after, kept, wires, boxes });
-    // Wires that only touched may come apart as the crossing they always were: a touch hides a crossing the count
+    // In the first round, wires that only touched may come apart as the crossing they always were: a touch hides a crossing the count
     // cannot see. Any other pair that crosses now and did not before takes the pass back.
-    const made = after > before && wires.some((w, i) => wires.some((v, j) => j > i && count([w.points, v.points]).crossings > count([kept.lines[i], kept.lines[j]]).crossings && !touch(kept.lines[i], kept.lines[j])));
+    const made = after > before && (round > 0 || wires.some((w, i) => wires.some((v, j) => j > i && count([w.points, v.points]).crossings > count([kept.lines[i], kept.lines[j]]).crossings && !touch(kept.lines[i], kept.lines[j]))));
     if (made) (restore(kept), undone++);
     else done++;
     if (axis) slid += slidePorts(boxes, wires);

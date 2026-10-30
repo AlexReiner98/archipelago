@@ -58,7 +58,7 @@ export function comb(n, kids, size, z) {
           const dx = sx + sign * (z.col / 2 + c.w / 2), top = y + c.s.h + z.row / 2, down = c.b;
           const move = ([px, py]) => [px + dx, py + top];
           for (const it of down.items) items.push({ id: it.id, x: it.x + dx, y: it.y + top });
-          for (const [id, points] of down.wires) wires.set(id, [[cx, cy + c.s.h / 2], ...points.map(move)]);
+          for (const [id, points] of down.wires) wires.set(id, points[0][0] === 0 && points[0][1] === 0 ? [[cx, cy + c.s.h / 2], [cx, top], ...points.map(move)] : points.map(move));
         }
         y += c.h;
       }

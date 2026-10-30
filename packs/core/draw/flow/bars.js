@@ -10,19 +10,25 @@ import { stepsOf } from './plane.js';
 import { settle, square } from './settle.js';
 import { planarize } from './thread.js';
 
+/** How many numberings are tried for the order to run down. */
+const TRIES = 120, WORK = 8000;
+/** Past this many wires the pull takes fewer rounds: a drawing that takes too long is stopped by the page. */
+const PULL_MOST = 150;
+
 let last = null;
 /** What the last layout drew, for the count in the key. */
 export const latest = () => last;
 const pair = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
 /** The items of a biconnected graph in an order where each but `s` and `t` has a neighbour before it and one after (Tarjan). */
-function stNumber(next, s, t) {
+function stNumber(next, s, t, rank = null) {
   const order = [], parent = new Map(), pre = new Map(), low = new Map();
   const walk = (v, from) => {
     pre.set(v, order.length);
     low.set(v, v);
     order.push(v);
-    for (const w of next.get(v)) {
+    const around = rank ? [...next.get(v)].sort((p, q) => rank(v, p) - rank(v, q)) : next.get(v);
+    for (const w of around) {
       if (!pre.has(w)) {
         parent.set(w, v);
         walk(w, v);
@@ -120,11 +126,25 @@ function drawPart(list, links, block, box, z) {
   }
   const outerAt = g.faces.reduce((m, f, i) => (f.length > g.faces[m].length ? i : m), 0), outer = g.faces[outerAt];
   // The top and foot on the outer face that leave the order running down most.
+  // Many numberings fit one embedding, and each sets which way every wire runs. Try them, walking the graph in differing
+  // orders that lean along the order's own direction, and keep the one where the order runs down most.
   const order = links.filter((l) => l[2]);
-  let best = null, least = Infinity;
-  for (let i = 0; i < outer.length; i++) for (const [s, t] of [[outer[i], outer[(i + 1) % outer.length]], [outer[(i + 1) % outer.length], outer[i]]]) {
-    const number = stNumber(next, s, t), up = order.filter(([u, v]) => number.get(u) > number.get(v)).length;
-    if (up < least) ((least = up), (best = { s, t, number }));
+  const follows = new Set(order.map(([u, v]) => `${u} ${v}`)), leads = new Set(order.map(([u, v]) => `${v} ${u}`));
+  let seed = 11, best = null, least = Infinity;
+  const random = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+  const tries = order.length ? Math.max(4, Math.min(TRIES, Math.ceil(WORK / g.owner.size))) : 1;
+  for (let k = 0; k < tries && least > 0; k++) {
+    const noise = new Map(), lean = k % 4;
+    const rank = (v, w) => {
+      const key = `${v} ${w}`;
+      if (!noise.has(key)) noise.set(key, random());
+      return noise.get(key) + (lean === 0 ? 0 : (follows.has(key) ? lean : 0) - (leads.has(key) ? lean : 0));
+    };
+    for (let i = 0; i < outer.length; i++) for (const [s, t] of [[outer[i], outer[(i + 1) % outer.length]], [outer[(i + 1) % outer.length], outer[i]]]) {
+      if (k && i % Math.max(1, Math.ceil(outer.length / 6))) continue;
+      const number = stNumber(next, s, t, k ? rank : null), up = order.filter(([u, v]) => number.get(u) > number.get(v)).length;
+      if (up < least) ((least = up), (best = { s, t, number }));
+    }
   }
   const { s, t, number } = best, { left, right, LEFT, RIGHT } = sidesOf(g.faces, outerAt, number, s, t);
   const ghost = (v) => v.startsWith('ghost'), size = (v) => (ghost(v) ? { w: 0, h: z.turn } : block(v));
@@ -306,7 +326,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   }
   for (const r of routes.values()) if (r.to !== undefined && rigid.has(r.from) && rigid.has(r.to)) moving.push(Object.assign(r, { a: r.from, b: r.to }));
   if (moving.length && square(moving)) {
-    settled = settle(rigid, moving, { gap: z.col, track: z.turn, watch: watching });
+    settled = settle(rigid, moving, { gap: z.col, track: z.turn, watch: watching, ...(moving.length > PULL_MOST && { rounds: 4, sweeps: 6 }) });
     // The parts have pulled in, so they are set again, closer.
     const sets = shelves.map((c) => {
       const ids = [...c.drawn.places.keys()].filter((id) => rigid.has(id)), rs = ids.map((id) => rigid.get(id));
