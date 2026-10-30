@@ -201,11 +201,15 @@ function frameActive() {
   for (const [g, e] of drawn) e.el.classList.toggle('pane-active', g === active);
   const box = frames.find(([g]) => g === active)?.[1] ?? frames[0]?.[1];
   for (const side of ['left', 'right', 'top', 'bottom']) document.body.style.setProperty(`--active-${side}`, edge(side, box?.[side] ?? 0));
-  // A pane named by a session, or held for one, says whose it is in its strip.
+  markPanes();
+}
+/** A pane named by a session, or held for one, says whose it is in its strip, and in the tooltip what its session last said of it. */
+export function markPanes() {
   for (const [g, e] of drawn) {
     const p = front().panes[g];
     e.mark.textContent = p?.slot ?? (p?.held ? nameOf(p.held) : '');
     e.mark.hidden = !e.mark.textContent;
+    e.mark.title = p?.said ?? '';
   }
 }
 
@@ -339,11 +343,10 @@ export const activeAt = () => hrefOf(front().panes[active]?.at);
 /** Light a pane an agent's step was just drawn in. */
 export function flash(id) {
   const entry = drawn.get(id);
-  if (!entry) return null;
+  if (!entry) return;
   entry.el.classList.remove('pane-shown');
   void entry.el.offsetWidth;
   entry.el.classList.add('pane-shown');
-  return entry.el.querySelector('.pane-canvas');
 }
 
 let started = false;

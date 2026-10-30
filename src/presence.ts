@@ -4,7 +4,7 @@
 // are gathered in this process and kept at most once a FLUSH_MS, so reading the map costs no write per call. A page
 // asking this process sees its own steps as they are taken, and another server's within FLUSH_MS. The agents waiting in
 // watch are counted per process, kept for LISTEN_MS and kept again while they wait, and summed: a server that stops
-// stops counting within LISTEN_MS. The pages open on a screen, and whether each follows, are kept the same way, so a
+// stops counting within LISTEN_MS. The pages open on a screen, and whether each takes shows, are kept the same way, so a
 // show can say whether it landed.
 
 import { randomBytes } from 'node:crypto';
@@ -23,8 +23,7 @@ export interface Focus {
 
 /**
  * One thing an agent did through a tool, whatever it was. The page is given
- * the last few and follows those the person has chosen to: by what kind of
- * step it is, and by whose it is.
+ * the last few: a show lands on it, and the rest say which sessions are at work.
  */
 export interface Step {
   /** Counts up: a higher number is how the page knows a step is new. */
@@ -139,11 +138,10 @@ export async function tellStamp(db: Q, workspace: string): Promise<void> {
 
 /** How long a page counts as open after it last looked: it looks every two seconds while it is in sight. */
 export const PAGE_MS = 10_000;
-/** An open page and what it follows: whether a show moves it (`on`: following is on and shows are among what it follows), and whose steps it leaves out. */
+/** An open page, and whether a show can land in it (`on`: a tab of it follows someone). */
 export interface Page {
   page: string;
   on: boolean;
-  muted: string[];
   at: number;
 }
 // The pages that looked at this process, per screen, and when they were last kept for the other servers.
@@ -151,7 +149,7 @@ const pages = new Map<string, Map<string, Page>>();
 const pagesKept = new Map<string, { value: string; at: number }>();
 const openNow = (key: string) => [...(pages.get(key)?.values() ?? [])].filter((p) => Date.now() - p.at < PAGE_MS);
 
-/** A page looked: kept for the other servers only when what it follows changed, or before the last keeping runs out. */
+/** A page looked: kept for the other servers only when whether it takes shows changed, or before the last keeping runs out. */
 export async function looked(db: Q, w: Whose, page: Omit<Page, 'at'>): Promise<void> {
   const key = whose(w);
   const list = pages.get(key) ?? new Map<string, Page>();
@@ -159,20 +157,20 @@ export async function looked(db: Q, w: Whose, page: Omit<Page, 'at'>): Promise<v
   pages.set(key, list);
   const open = openNow(key);
   for (const id of list.keys()) if (!open.some((p) => p.page === id)) list.delete(id);
-  const value = JSON.stringify(open.map(({ page, on, muted }) => [page, on, muted]));
+  const value = JSON.stringify(open.map(({ page, on }) => [page, on]));
   const last = pagesKept.get(key);
   if (last?.value === value && Date.now() - last.at < PAGE_MS / 2) return;
   pagesKept.set(key, { value, at: Date.now() });
   await keep(db, `pages:${key}:${PROCESS}`, open, PAGE_MS);
 }
 
-/** The pages open on this screen, on any server, and how many of them a show by `actor` moves. */
-export async function watching(db: Q, w: Whose, actor: string): Promise<{ open: number; following: number }> {
+/** The pages open on this screen, on any server, and how many of them take a show. */
+export async function watching(db: Q, w: Whose): Promise<{ open: number; following: number }> {
   const key = whose(w);
   const { rows } = await db.query<{ value: Page[] }>(`select value from transient where until >= now() and starts_with(key, $1) and key <> $2`, [`pages:${key}:`, `pages:${key}:${PROCESS}`]);
   // Another server's pages are as it last kept them, for as long as that keeping lasts.
   const open = [...rows.flatMap((r) => r.value), ...openNow(key)];
-  return { open: open.length, following: open.filter((p) => p.on && !p.muted.includes(actor)).length };
+  return { open: open.length, following: open.filter((p) => p.on).length };
 }
 
 /** What a page polling for this screen is given: where it was pointed, the last steps on any server, the tell stamp and how many agents are listening. */

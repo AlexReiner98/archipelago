@@ -185,7 +185,6 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #canvas-settings > label { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-4) var(--space-6); border-radius: var(--radius-2); color: var(--text); font-size: var(--text-4); cursor: pointer; }
 #canvas-settings > label:hover { background: var(--accent-soft); }
 #canvas-settings > button { margin: var(--space-3) var(--space-6); justify-self: start; }
-#follow { padding: var(--space-5) var(--space-6); display: flex; gap: var(--space-4); align-items: center; color: var(--muted); font-size: var(--text-3); border-top: var(--border-1) solid var(--line); }
 #whoami { padding: var(--space-6); border-top: var(--border-1) solid var(--line); display: grid; gap: var(--space-2); }
 #whoami:empty { display: none; }
 #whoami select { width: 100%; padding: var(--space-3) var(--space-4); margin: var(--space-2) 0; }

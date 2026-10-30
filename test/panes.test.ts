@@ -11,7 +11,7 @@ import { serve } from './serve.ts';
 test('a show names the pane it goes to, and the page is told it with the step', async () => {
   const { call } = await serve('off');
   const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'work.task', title: 'Something to see' }] })).result.created as Record<string, string>;
-  const page = { page: 'p1', on: true, muted: [] };
+  const page = { page: 'p1', on: true };
   await call('/api/tail', undefined, { page });
   await call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { entity: made.t, pane: 'right' } });
   const steps = (await call('/api/tail', undefined, { page })).result.steps;
@@ -60,7 +60,6 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
   };
   const find = (words: string) => page.evaluate(`(() => { const input = document.querySelector('#find input[type=search]'); input.value = ${JSON.stringify(words)}; input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); document.getElementById('find').requestSubmit(); })()`);
   try {
-    await page.evaluate(`localStorage.setItem('pelago-follow', 'on')`);
     await wait(3000);
     // A session's show opens a pane of its own beside the reader's, which keeps what it drew and the address.
     await show({ entity: views.f });

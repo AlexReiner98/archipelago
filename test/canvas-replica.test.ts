@@ -35,8 +35,6 @@ test("in a browser, an agent's change reaches an open canvas without a lens read
   const drawn = (title: string) => `[...document.querySelectorAll('#canvas svg a')].some((a) => a.textContent.includes(${JSON.stringify(title)}))`;
   try {
     assert.ok(await until(drawn('Second step')), `the canvas is drawn: ${page.logs().join('\n')}`);
-    // Agents' steps are not followed here: the page stays on this canvas.
-    await page.evaluate(`(localStorage.setItem('pelago-follow', 'off'), (document.querySelector('#follow input').checked = false))`);
     // Count the lens reads the page makes from here on.
     await page.evaluate(`(() => { window.flatReads = 0; const was = window.fetch; window.fetch = (url, init) => { if (String(init?.body ?? '').includes('"name":"flat"')) window.flatReads++; return was(url, init); }; })()`);
     await agentChange([{ op: 'update', id: made.b, title: 'Renamed step' }]);

@@ -11,7 +11,48 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-test('in a browser, several sessions each keep a tab, which pops out and docks back', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, a show lands without a line at the foot: a note on its pane, a screen in a tab, a question waited for', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base, call } = await serve('off');
+  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'work', title: 'Something shown' }] })).result.created as Record<string, string>;
+  const agent = 'agent:claude-code/archipelago';
+  const { run, name } = (await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: 'no-line' } })).result;
+  const page = await open(`${base}/`);
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const until = async (what: string, ok: () => Promise<boolean>) => {
+    for (let n = 0; n < 60; n++) if (await ok()) return;
+    else await wait(250);
+    assert.fail(`${what}: ${page.logs().join('\n')}`);
+  };
+  const show = (params: Record<string, unknown>) => call('/agent/report', undefined, { actor: agent, action: 'show', params: { ...params, run } });
+  const tabs = () => page.evaluate<number>(`document.querySelectorAll('#tabs .tab').length`);
+  try {
+    await wait(3000);
+    assert.equal(await page.evaluate(`Boolean(document.querySelector('#followed, #follow'))`), false, 'no line, and nothing in the menu to turn it on');
+    // The note is on the pane, in its mark's tooltip.
+    await show({ entity: made.a, note: 'What the note says' });
+    await until('its pane', () => page.evaluate<boolean>(`document.querySelectorAll('#canvas > .pane').length === 2`));
+    assert.deepEqual(JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const m = [...document.querySelectorAll('#canvas > .pane')][1].querySelector('.pane-follows'); return [m.textContent, m.title]; })())`)), [name, 'What the note says']);
+    // A page that is no canvas takes no pane of the reader's: a tab of its own, marked, and it is open there.
+    await show({ screen: 'workspace' });
+    await until('a tab of its own', async () => (await tabs()) === 2);
+    assert.equal(await page.evaluate(`document.querySelectorAll('#canvas > .pane').length`), 2, 'the tab in sight stays as it was');
+    assert.equal(await page.evaluate(`document.querySelector('#tabs .tab:nth-child(2)').dataset.unseen`), 'true');
+    const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = document.querySelector('#tabs .tab:nth-child(2) .tab-name').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })())`));
+    for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
+    await until('the workspace is open in it', () => page.evaluate<boolean>(`location.hash.startsWith('#/workspace')`));
+    // A question open over the page holds a show: it lands once the question is answered.
+    await page.evaluate(`(() => { const d = document.createElement('dialog'); d.id = 'held'; document.body.append(d); d.showModal(); })()`);
+    await show({ entity: made.a, pane: 'after' });
+    await wait(3000);
+    assert.equal(await page.evaluate(`Boolean(document.querySelector('.pane-follows')?.textContent === 'after')`), false, 'nothing lands while it is open');
+    await page.evaluate(`document.getElementById('held').close()`);
+    await until('it lands', () => page.evaluate<boolean>(`[...document.querySelectorAll('.pane-follows')].some((m) => m.textContent === 'after')`));
+  } finally {
+    await page.close();
+  }
+});
+
+test('in a browser, several sessions each keep a tab, which pops out and docks back',{ skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {
     reason: 'test',
@@ -36,7 +77,6 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
   };
   const tabOf = (n: number) => `#tabs .tab:nth-child(${n})`;
   try {
-    await page.evaluate(`localStorage.setItem('pelago-follow', 'on')`);
     await wait(3000);
     // One session alone gets a pane of its own in the one tab there is, beside the reader's, whose address stays.
     await show(0, 'i0');
