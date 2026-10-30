@@ -161,6 +161,47 @@ test('bars: a tree keeps the order all the way down it', () => {
   assert.ok(clear(g));
 });
 
+test('bars: many starts and ends all run down, each lent the side it lacks', () => {
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+  const g = drawnBars(ids.map((id) => item(id)), [dep('b', 'a'), dep('c', 'a'), dep('d', 'b'), dep('d', 'c'), dep('b', 'e'), dep('f', 'c'), dep('g', 'e'), dep('f', 'h'), tie('e', 'f', 'serves'), tie('a', 'h', 'serves'), tie('g', 'd', 'serves')]);
+  assert.deepEqual(upward(g), []);
+  assert.ok(clear(g));
+  assert.ok(right(g));
+});
+
+test('bars: a start shut in by ties is reached under one of them', () => {
+  const rim = Array.from({ length: 6 }, (_, k) => `r${k}`), links: any[] = rim.map((id, k) => tie(id, rim[(k + 1) % 6], 'serves'));
+  for (const k of [0, 2, 4]) links.push(dep(rim[k], 'v'));
+  for (const k of [1, 3, 5]) links.push(dep(rim[k], rim[k - 1]));
+  const g = drawnBars(['v', ...rim].map((id) => item(id)), links);
+  assert.deepEqual(upward(g), []);
+  assert.equal(count(lines(g)).crossings, 0);
+  assert.ok(right(g));
+});
+
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { planarize } from './draw/flow/thread.js';
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { numbered } from './draw/flow/numbering.js';
+
+test('numbering: every item has a neighbour before it and one after, whatever the order asks', () => {
+  const edges: any[] = [], ids: string[] = [];
+  for (let x = 0; x < 6; x++) for (let y = 0; y < 6; y++) {
+    ids.push(`${x},${y}`);
+    if (x < 5) edges.push([`${x},${y}`, `${x + 1},${y}`, (x * 7 + y * 3) % 4 === 0]);
+    if (y < 5) edges.push([`${x},${y}`, `${x},${y + 1}`, (x * 5 + y) % 3 === 0]);
+  }
+  edges.push(['0,0', '5,5', false], ['5,0', '0,5', false]);
+  const g = planarize(edges, ids), { s, t, number } = numbered(g), near = new Map<string, string[]>();
+  for (const k of g.owner.keys()) { const [a, b] = k.split('|'); (near.get(a) ?? near.set(a, []).get(a)!).push(b); (near.get(b) ?? near.set(b, []).get(b)!).push(a); }
+  assert.equal(number.get(s), 0);
+  assert.equal(number.get(t), number.size - 1);
+  for (const [v, n] of number) {
+    if (v !== s) assert.ok(near.get(v)!.some((w) => number.get(w) < n), `${v} has one before it`);
+    if (v !== t) assert.ok(near.get(v)!.some((w) => number.get(w) > n), `${v} has one after it`);
+  }
+});
+
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { settle } from './draw/flow/settle.js';
 

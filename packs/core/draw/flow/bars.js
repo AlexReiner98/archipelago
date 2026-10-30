@@ -6,12 +6,11 @@
 
 import { comb, peel } from './combs.js';
 import { flatten, ORDER } from './graph.js';
+import { numbered } from './numbering.js';
 import { stepsOf } from './plane.js';
 import { settle, square } from './settle.js';
 import { planarize } from './thread.js';
 
-/** How many numberings are tried for the order to run down. */
-const TRIES = 120, WORK = 8000;
 /** Past this many wires the pull takes fewer rounds: a drawing that takes too long is stopped by the page. */
 const PULL_MOST = 150;
 
@@ -19,46 +18,6 @@ let last = null;
 /** What the last layout drew, for the count in the key. */
 export const latest = () => last;
 const pair = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
-
-/** The items of a biconnected graph in an order where each but `s` and `t` has a neighbour before it and one after (Tarjan). */
-function stNumber(next, s, t, rank = null) {
-  const order = [], parent = new Map(), pre = new Map(), low = new Map();
-  const walk = (v, from) => {
-    pre.set(v, order.length);
-    low.set(v, v);
-    order.push(v);
-    const around = rank ? [...next.get(v)].sort((p, q) => rank(v, p) - rank(v, q)) : next.get(v);
-    for (const w of around) {
-      if (!pre.has(w)) {
-        parent.set(w, v);
-        walk(w, v);
-        if (pre.get(low.get(w)) < pre.get(low.get(v))) low.set(v, low.get(w));
-      } else if (w !== from && pre.get(w) < pre.get(low.get(v))) low.set(v, w);
-    }
-  };
-  pre.set(t, 0);
-  low.set(t, t);
-  order.push(t);
-  parent.set(s, t);
-  walk(s, t);
-  for (const w of next.get(t)) if (!pre.has(w)) throw new Error('The graph is not connected');
-  const before = new Map([[t, s]]), after = new Map([[s, t]]), sign = new Map([[s, -1]]);
-  const put = (v, l, r) => {
-    if (l !== undefined) after.set(l, v);
-    if (r !== undefined) before.set(r, v);
-    if (l !== undefined) before.set(v, l); else before.delete(v);
-    if (r !== undefined) after.set(v, r); else after.delete(v);
-  };
-  for (const v of order.slice(2)) {
-    const p = parent.get(v);
-    if (sign.get(low.get(v)) === -1) (put(v, before.get(p), p), sign.set(p, 1));
-    else (put(v, p, after.get(p)), sign.set(p, -1));
-  }
-  const number = new Map();
-  let at = s, k = 0;
-  while (at !== undefined) (number.set(at, k++), (at = after.get(at)));
-  return number;
-}
 
 /** Each stretch's face to its left and right, walking out from the outer face; each face's two sides. */
 function sidesOf(list, outerAt, number, s, t) {
@@ -118,37 +77,15 @@ function longest(names, arcs) {
 
 /** One connected part: places by item, and each visible link's points. `block` is an item's size with what hangs on it, `box` its own. */
 function drawPart(list, links, block, box, z) {
-  const g = planarize(links, list), next = new Map();
+  const g = planarize(links, list), { s, t, number, outerAt } = numbered(g), next = new Map();
   for (const k of g.owner.keys()) {
     const [a, b] = k.split('|');
     (next.get(a) ?? next.set(a, new Set()).get(a)).add(b);
     (next.get(b) ?? next.set(b, new Set()).get(b)).add(a);
   }
-  const outerAt = g.faces.reduce((m, f, i) => (f.length > g.faces[m].length ? i : m), 0), outer = g.faces[outerAt];
-  // The top and foot on the outer face that leave the order running down most.
-  // Many numberings fit one embedding, and each sets which way every wire runs. Try them, walking the graph in differing
-  // orders that lean along the order's own direction, and keep the one where the order runs down most.
-  const order = links.filter((l) => l[2]);
-  const follows = new Set(order.map(([u, v]) => `${u} ${v}`)), leads = new Set(order.map(([u, v]) => `${v} ${u}`));
-  let seed = 11, best = null, least = Infinity;
-  const random = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
-  const tries = order.length ? Math.max(4, Math.min(TRIES, Math.ceil(WORK / g.owner.size))) : 1;
-  for (let k = 0; k < tries && least > 0; k++) {
-    const noise = new Map(), lean = k % 4;
-    const rank = (v, w) => {
-      const key = `${v} ${w}`;
-      if (!noise.has(key)) noise.set(key, random());
-      return noise.get(key) + (lean === 0 ? 0 : (follows.has(key) ? lean : 0) - (leads.has(key) ? lean : 0));
-    };
-    for (let i = 0; i < outer.length; i++) for (const [s, t] of [[outer[i], outer[(i + 1) % outer.length]], [outer[(i + 1) % outer.length], outer[i]]]) {
-      if (k && i % Math.max(1, Math.ceil(outer.length / 6))) continue;
-      const number = stNumber(next, s, t, k ? rank : null), up = order.filter(([u, v]) => number.get(u) > number.get(v)).length;
-      if (up < least) ((least = up), (best = { s, t, number }));
-    }
-  }
-  const { s, t, number } = best, { left, right, LEFT, RIGHT } = sidesOf(g.faces, outerAt, number, s, t);
+  const { left, right, LEFT, RIGHT } = sidesOf(g.faces, outerAt, number, s, t);
   const ghost = (v) => v.startsWith('ghost'), size = (v) => (ghost(v) ? { w: 0, h: z.turn, lead: 0 } : block(v));
-  const rows = [...number.keys()];
+  const rows = [...number.keys()], wired = (v) => [...next.get(v)].filter((w) => g.owner.get(pair(v, w)).visible);
   // Each item's bar runs from the face that is only ever on the left of its wires to the one only ever on the right.
   const lefts = new Map(), rights = new Map();
   for (const k of g.owner.keys()) for (const v of k.split('|')) {
@@ -167,7 +104,8 @@ function drawPart(list, links, block, box, z) {
     const [from, to] = ends.get(v);
     if (ghost(v)) return (x.get(from) + x.get(to) + z.col) / 2;
     const lo = x.get(from) + z.col / 2 - inset(v), hi = Math.max(lo, x.get(to) + z.col / 2 - inset(v) - size(v).w);
-    const cols = [...next.get(v)].map((w) => column(pair(v, w)));
+    const cols = wired(v).map((w) => column(pair(v, w)));
+    if (!cols.length) return lo + size(v).w / 2;
     return Math.min(hi, Math.max(lo, cols.reduce((sum, c) => sum + c, 0) / cols.length - box(v).w / 2)) + size(v).w / 2;
   };
   const column = (k) => x.get(left.get(k)) + z.col / 2;
@@ -189,7 +127,7 @@ function drawPart(list, links, block, box, z) {
   const landing = new Map(), tracks = new Map();
   for (const v of rows) {
     if (ghost(v)) continue;
-    const near = [...next.get(v)], l = middle(v) - size(v).w / 2, r = l + box(v).w, pad = Math.min(z.turn, box(v).w / 4);
+    const near = wired(v), l = middle(v) - size(v).w / 2, r = l + box(v).w, pad = Math.min(z.turn, box(v).w / 4);
     for (const side of [-1, 1]) {
       const wires = near.filter((w) => Math.sign(number.get(w) - number.get(v)) === side).map((w) => ({ k: pair(v, w), col: column(pair(v, w)) })).sort((p, q) => p.col - q.col);
       const straight = wires.filter((w) => w.col > l + pad && w.col < r - pad);
@@ -204,7 +142,8 @@ function drawPart(list, links, block, box, z) {
   const yArcs = [];
   for (const k of g.owner.keys()) {
     const [a, b] = k.split('|'), [u, v] = number.get(a) < number.get(b) ? [a, b] : [b, a];
-    yArcs.push([u, v, size(u).h + z.row + ((tracks.get(`${u} 1`) ?? 0) + (tracks.get(`${v} -1`) ?? 0)) * z.turn]);
+    // An invisible edge only keeps the two in order.
+    yArcs.push([u, v, size(u).h + (g.owner.get(k).visible ? z.row + ((tracks.get(`${u} 1`) ?? 0) + (tracks.get(`${v} -1`) ?? 0)) * z.turn : z.turn)]);
   }
   const y = longest(rows, yArcs);
   const turned = new Map(), points = new Map();
@@ -375,6 +314,7 @@ export function layout({ items: given, links: told = [], undrawn = [], measure, 
   const all = [...nodes.values()].filter((n) => x.has(n.id)), drawnPoints = every.flatMap((w) => w.points);
   const width = Math.max(0, ...all.map((n) => x.get(n.id) + n.w / 2), ...drawnPoints.map((p) => p[0])) + margin;
   const height = Math.max(0, ...all.map((n) => y.get(n.id) + n.h / 2), ...drawnPoints.map((p) => p[1])) + margin;
-  last = { chains, ties, threaded, settled };
+  const up = chains.filter((c) => y.get(c.a) > y.get(c.b)).length;
+  last = { chains, ties, threaded, settled, up };
   return { nodes, all, chains, ties, breaks: [], potential, x, y, width, height };
 }
