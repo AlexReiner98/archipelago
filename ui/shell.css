@@ -210,6 +210,7 @@ body[data-sheet="open"] #find { left: calc(var(--active-left, 0%) + (100% - var(
 #find .find-choice > .q-label { width: var(--box-10); }
 #find .find-choice > .find-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 #find .find-choice > .find-note { flex: none; color: var(--muted); font-size: var(--text-2); }
+#find .find-choice > .find-count { flex: none; color: var(--muted); font-size: var(--text-2); font-variant-numeric: tabular-nums; }
 
 /* The sheet: one thing read as a document, over the canvas's right side, never more than half the screen. On a phone
    (the phone-width block of ui/style.css) it is the whole screen; the bar and find keep a narrow screen's room there too. */

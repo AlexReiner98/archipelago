@@ -10,6 +10,8 @@
 // leaves the part, then shuts find; so does a click away from it.
 
 import { api, h, state, wordsOf, withWords } from './base.js';
+import { lightItems } from './lens-light.js';
+import { viewUp } from './query-bar.js';
 import { goLens, home, lensNow, openHere, styleNow } from './canvas.js';
 import { MODES, choicesFor, ledBy, wordsChoice } from './find-choices.js';
 import { flatQuery } from './lens.js';
@@ -93,10 +95,11 @@ function take(choice, add = false) {
 
 /** Draw the choices, the lit one marked. */
 function drawChoices() {
-  list.replaceChildren(...choices.map((c, i) => h('button', { type: 'button', role: 'option', class: `term-pick-item find-choice${i === lit ? ' lit' : ''}`, 'aria-selected': String(i === lit), title: c.title, onclick: (ev) => take(c, ev.shiftKey) },
+  list.replaceChildren(...choices.map((c, i) => h('button', { type: 'button', role: 'option', class: `term-pick-item find-choice${i === lit ? ' lit' : ''}`, 'aria-selected': String(i === lit), title: c.title, onpointerenter: () => c.leaves && lightItems(viewUp(), c.leaves), onpointerleave: () => lightItems(viewUp(), null), onclick: (ev) => take(c, ev.shiftKey) },
     h('span', { class: 'q-label' }, c.kind),
     h('span', { class: 'find-name' }, c.label),
-    c.note && h('span', { class: 'find-note' }, c.note))));
+    c.note && h('span', { class: 'find-note' }, c.note),
+    c.count && h('span', { class: 'find-count' }, c.count))));
   list.hidden = !choices.length;
   // What was typed when they were drawn: Enter takes only choices drawn for what is typed now.
   list.dataset.for = shownFor;
@@ -130,6 +133,34 @@ async function look() {
   if (words && counted) words.note = `${counted.matched ?? counted.items.length} found`;
   shownFor = q;
   choices = all;
+  drawChoices();
+  countChoices(all, lens, mine);
+}
+
+/**
+ * What each choice would change, once they are drawn: +12 found that is not drawn yet, or −34 of what is drawn left out,
+ * asked in one read of the choices in sight. Pointing at a choice that leaves things out fades them.
+ */
+async function countChoices(all, lens, mine) {
+  const part = mode.toLowerCase();
+  const offered = all.filter((c) => c.term?.[part]).slice(0, numberOf(state.style, 'find_count_most'));
+  const answer = viewUp()?.answer;
+  if (!offered.length || !answer?.items || lens.view) return;
+  const drawn = answer.items.map((i) => i.id);
+  const told = await api('view', { name: 'flat', params: { filter: lens.filter, preview: { part, terms: offered.map((c) => c.term[part]), ids: drawn } } }).catch(() => null);
+  if (!told?.preview || mine !== asked) return;
+  const here = new Set(drawn);
+  for (const c of offered) {
+    const ids = told.preview[c.term[part]] ?? [];
+    if (part === 'find') {
+      const shown = numberOf(state.style, 'find_count_shown');
+      c.count = ids.length > shown ? `+${shown}+` : `+${ids.filter((id) => !here.has(id)).length}`;
+    } else {
+      c.count = `−${ids.length}`;
+      const gone = new Set(ids);
+      c.leaves = drawn.filter((id) => !gone.has(id));
+    }
+  }
   drawChoices();
 }
 

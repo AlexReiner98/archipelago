@@ -9,24 +9,27 @@ import { litBy } from './lit-by.js';
 
 let sheet = null;
 
-/** Light what `term` of Find brought in this view, or, with none, take the lighting off. */
-export function lightTerm(view, lens, term) {
+/** Keep these items lit in the view and fade the rest; with none, take the lighting off. */
+export function lightItems(view, ids) {
   if (!sheet) {
     sheet = new CSSStyleSheet();
     document.adoptedStyleSheets.push(sheet);
   }
-  const answer = view?.answer;
-  if (!term || !answer?.items) {
-    delete view?.dataset?.lighting;
+  if (!ids) {
+    if (view?.dataset) delete view.dataset.lighting;
     sheet.replaceSync('');
     view?.lightSurface?.(null);
     return;
   }
-  const lit = litBy(answer, term);
   view.dataset.lighting = '';
-  const kept = [...lit].map((id) => `[data-item="${id}"]`).join(',');
+  const kept = [...ids].map((id) => `[data-item="${id}"]`).join(',');
   sheet.replaceSync(`[data-lighting] [data-item]${kept ? `:not(${kept})` : ''} { opacity: ${numberOf(state.style, 'dim')}; }`);
-  view.lightSurface?.([...lit]);
+  view.lightSurface?.([...ids]);
+}
+
+/** Light what `term` of Find brought in this view, or, with none, take the lighting off. */
+export function lightTerm(view, lens, term) {
+  lightItems(view, term && view?.answer?.items ? litBy(view.answer, term) : null);
 }
 
 const asked = new Map();

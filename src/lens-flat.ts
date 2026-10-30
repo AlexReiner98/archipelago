@@ -40,6 +40,9 @@ const NOT_DEFAULT = [`kind ${SYSTEM}`];
 export const LENS_LIMIT = 2000;
 /** Items sent unless the lens says otherwise. */
 const FLAT_LIMIT = 500;
+/** The most choices one preview counts, and the most items it says of each: past that a choice reads as 200+. */
+export const PREVIEW_TERMS = 12;
+export const PREVIEW_MOST = 200;
 /** The most steps a walk takes. */
 const MAX_STEPS = 6;
 /** How much of an item's note travels with it: enough to show on hover. */
@@ -82,7 +85,7 @@ export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLe
   const only = part('only', filter.only);
   const not = filter.not === undefined ? NOT_DEFAULT : part('not', filter.not);
   for (const t of find.map((x) => readTerm(l, x, 'find'))) if (t.sort === 'word' || t.sort === 'kind') throw new Error(`filter.find: "${sayTerm(t)}" can narrow what is found (only, not) but finds nothing itself: alone it would read the whole map`);
-  if (!find.length)
+  if (!find.length && !input.preview)
     throw new Error(only.length
       ? 'A lens includes something (filter.find) for only to narrow: alone, it would read the whole map.'
       : 'A lens includes something (filter.find): a filter that includes nothing would read the whole map.');
@@ -167,34 +170,52 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
   };
   const holds = async (found: string[]) => unless(checked ? await holding(l, words, found) : found, notChecked);
 
-  // The seeds, each narrowed: ids first, then what a link term finds, what is related, what is in an item, what the
-  // text finds, the newest of each type named.
-  const ids = finds.flatMap((t) => (t.sort === 'id' ? [t.id] : []));
   // Not takes away what it says of an item named by id (e_ndcxf2bv); what nobody said, the default, hides nothing named.
   const saidNot = (input.filter as { not?: unknown; exclude?: unknown } | undefined)?.not !== undefined || (input.filter as { exclude?: unknown } | undefined)?.exclude !== undefined;
-  if (ids.length && !hidden) {
-    const kept = await holds((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${[saidNot ? keep(2) : 'e.archived_at is null', ...numbered(terms, saidNot ? 2 + leftOut.length : 2)].join(' and ')}`, [ids, ...(saidNot ? leftOut : []), ...narrowing])).rows.map((r) => r.id));
-    for (const t of finds) if (t.sort === 'id' && kept.includes(t.id)) add([t.id], 'id', [t]);
-  }
-  for (const term of finds) {
-    if (term.sort !== 'link' || room() <= 0) continue;
+  /** The items one term of Find finds, narrowed: every read bounded by the term's end, the type index or `most`. */
+  const seedOf = async (term: Term, most: number): Promise<string[]> => {
+    if (term.sort === 'id') return hidden ? [] : holds((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${[saidNot ? keep(2) : 'e.archived_at is null', ...numbered(terms, saidNot ? 2 + leftOut.length : 2)].join(' and ')}`, [[term.id], ...(saidNot ? leftOut : []), ...narrowing])).rows.map((r) => r.id));
+    if (term.sort === 'type') return holds(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [l.registry.family(term.type), most]));
+    if (term.sort !== 'link' && term.sort !== 'related' && term.sort !== 'in') return [];
     const at = await endsOf(l, term, me);
-    if (!at.length) continue;
+    if (!at.length) return [];
+    if (term.sort === 'in') return holds(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
+    if (term.sort === 'related') return holds(await seed((k) => `select e.id from relation r join entity e on e.id = case when r.from_id = any($1::text[]) then r.to_id else r.from_id end where (r.from_id = any($1::text[]) or r.to_id = any($1::text[])) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
     const [near, far] = term.back ? ['to_id', 'from_id'] : ['from_id', 'to_id'];
-    add(await holds(await seed((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), reach()])), 'link', [term]);
+    return holds(await seed((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), most]));
+  };
+  // What a term offered in find would change, asked before it is added: what it would find, or which of the items drawn
+  // it would leave out. Nothing else of the lens is read.
+  if (input.preview) {
+    const asked = input.preview as { part?: string; terms?: unknown; ids?: unknown };
+    const part = asked.part;
+    if (part !== 'find' && part !== 'only' && part !== 'not') throw new Error('preview.part must be find, only or not');
+    if (!Array.isArray(asked.terms) || asked.terms.length > PREVIEW_TERMS) throw new Error(`preview.terms must be a list of at most ${PREVIEW_TERMS} terms`);
+    const drawn = Array.isArray(asked.ids) ? (asked.ids as string[]).slice(0, LENS_LIMIT) : [];
+    const said: Record<string, string[]> = {};
+    for (const raw of asked.terms) {
+      const term = readTerm(l, raw, part);
+      if (part === 'find') {
+        said[String(raw)] = (await seedOf(term, PREVIEW_MOST + 1)).slice(0, PREVIEW_MOST + 1);
+        continue;
+      }
+      let held: string[];
+      const [cond] = term.sort === 'word' ? await wordConditions(l, [term.word], me) : [await setOf(l, term, me)];
+      if (term.sort === 'word' && checkedAfter([term.word])) held = await holding(l, [term.word], drawn);
+      else held = (await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${cond.cond.replaceAll('$?', '$2')}`, [drawn, ...(cond.param === undefined ? [] : [cond.param])])).rows.map((r) => r.id);
+      const inSet = new Set(held);
+      said[String(raw)] = part === 'not' ? held : drawn.filter((id) => !inSet.has(id));
+    }
+    return { preview: said } as never;
   }
-  for (const term of finds) {
-    if (term.sort !== 'related' || room() <= 0) continue;
-    const at = await endsOf(l, term, me);
-    if (at.length) add(await holds(await seed((k) => `select e.id from relation r join entity e on e.id = case when r.from_id = any($1::text[]) then r.to_id else r.from_id end where (r.from_id = any($1::text[]) or r.to_id = any($1::text[])) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $2`, [at, reach()])), 'link', [term]);
-  }
+
+  // The seeds, each narrowed: ids first, then what a link term finds, what is related, what is in an item, what the
+  // text finds, the newest of each type named.
+  for (const t of finds) if (t.sort === 'id') add(await seedOf(t, 1), 'id', [t]);
+  for (const t of finds) if ((t.sort === 'link' || t.sort === 'related') && room() > 0) add(await seedOf(t, reach()), 'link', [t]);
   // What is in an item, at any depth, read from the part_of closure (decision e_tvsdqjeq), the newest first; in an item
   // the viewer cannot see, nothing is.
-  for (const term of finds) {
-    if (term.sort !== 'in' || room() <= 0) continue;
-    const inside = await endsOf(l, term, me);
-    if (inside.length) add(await holds(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [inside, reach()])), 'in', [term]);
-  }
+  for (const t of finds) if (t.sort === 'in' && room() > 0) add(await seedOf(t, reach()), 'in', [t]);
   // The text is the search read's own (src/search.ts): the words in any form in the title or note, or as typed anywhere
   // in the title, the best match first; only when that finds nothing, titles with a word close to what was typed.
   // How many it found in all is kept (`matched`), counted over what the viewer may see and the filter keeps; an item
@@ -223,10 +244,7 @@ export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
           `select count(*)::int as n from entity e where e.id in (select pelago_search_ids(v, s.near) from unnest($1::text[], $2::boolean[]) s(q, near) cross join lateral ${slipsOf('s.q', 's.near')} slips(v)) and ${narrowed(3)}`,
           [asked.map((a) => a.said), asked.map((a) => a.near), leftOut, ...narrowing])).rows[0].n;
   }
-  for (const term of finds) {
-    if (term.sort !== 'type' || room() <= 0) continue;
-    add(await holds(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [l.registry.family(term.type), reach()])), 'type', [term]);
-  }
+  for (const t of finds) if (t.sort === 'type' && room() > 0) add(await seedOf(t, reach()), 'type', [t]);
 
   // The walk: a step at a time along the links named, each the way it is named (out along it, in to it, or either), to
   // what the filter does not exclude. An excluded item is not walked through. Each step is bounded by the ids reached

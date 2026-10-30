@@ -55,6 +55,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       assert.equal(seen.first, '“roof”', 'the words come first');
       assert.ok(seen.lit, 'and are lit: Enter takes them, nothing guessed');
       assert.equal(seen.count, '2 found', 'how many the words find');
+      assert.ok(await until(`[...${list}.querySelectorAll('.find-count')].some((c) => c.textContent.startsWith('+'))`), `each choice says how many it would add: ${await page.evaluate(`${list}.textContent`)}`);
       assert.ok(seen.kinds.includes('In') && seen.kinds.includes('Item'), `each item found offers In and Item, by kind: ${seen.kinds}`);
       assert.ok(seen.tall <= seen.row, `each choice one line at ${width} px (${seen.tall} against the bar's ${seen.row})`);
       assert.ok(seen.wide, `inside the page at ${width} px`);
@@ -95,7 +96,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
     await type('only ');
     assert.ok(await until(`document.querySelector('#find .find-mode')?.textContent === 'Only' && !document.querySelector('#find .find-mode').hidden && document.querySelector('#find input[type=search]').value === ''`), 'find is in Only, its mark before the box');
     await type('done');
-    assert.ok(await until(`${list}.dataset.for === 'done' && ${list}.querySelector('.find-choice.lit')?.textContent === 'Worddone'`), `Only's own choices, the first lit: ${await page.evaluate(`${list}.textContent`)}`);
+    assert.ok(await until(`${list}.dataset.for === 'done' && ${list}.querySelector('.find-choice.lit')?.textContent.startsWith('Worddone')`), `Only's own choices, the first lit: ${await page.evaluate(`${list}.textContent`)}`);
     await enter();
     assert.ok(await until(`location.hash.includes('only=done') && document.querySelector('#find .find-mode').textContent === 'Find'`), `Enter takes it as an Only term: ${await page.evaluate('location.hash')}`);
     // A kind's word leading what is typed offers that kind alone, found by the rest: "in site" is In Site works.

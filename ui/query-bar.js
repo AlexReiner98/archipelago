@@ -30,6 +30,8 @@ const asking = new Map();
 /** What is used one step around the canvas, asked once for each lens (`key`), and the bar drawn last. */
 let near = { key: '', uses: null };
 let last = null;
+/** The view the bar is over. */
+export const viewUp = () => last?.[1];
 
 /**
  * Ask what is used one step around what the canvas draws, and draw the bar again with it: once for each lens, so what

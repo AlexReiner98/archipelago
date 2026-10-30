@@ -140,3 +140,18 @@ test('the same terms in every part: Find adds, Only keeps, Not takes away', asyn
   await assert.rejects(flatLens(l, { filter: { find: ['kind work'] } }), /finds nothing itself/);
   void more;
 });
+
+test('a preview says what a term would change, reading nothing else', async () => {
+  const { l, made } = await project();
+  const drawn = (await flatLens(l, { filter: { find: ['type task'] } })).items.map((i) => i.id);
+  const ask = (part: string, terms: string[]) => flatLens(l, { filter: { find: ['type task'] }, preview: { part, terms, ids: drawn } }) as unknown as Promise<{ preview: Record<string, string[]> }>;
+  const { preview: found } = await ask('find', ['type project', `id ${made.p}`]);
+  assert.deepEqual([found['type project'], found[`id ${made.p}`]], [[made.p], [made.p]], 'what it would find');
+  const { preview: only } = await ask('only', ['done']);
+  assert.ok(!only.done.some((id) => id === made.x) && only.done.length === drawn.length - 1, 'only says which it would leave out');
+  const { preview: not } = await ask('not', ['done', 'blocked']);
+  assert.deepEqual(not.done, [made.x], 'not says which it would take away');
+  assert.ok(not.blocked.includes(made.a), 'one that can only be checked, too');
+  assert.deepEqual((await (flatLens(l, { filter: {}, preview: { part: 'find', terms: ['type project'] } }) as unknown as Promise<{ preview: Record<string, string[]> }>)).preview['type project'], [made.p], 'an empty canvas may ask');
+  await assert.rejects(flatLens(l, { filter: {}, preview: { part: 'nope', terms: [] } }), /preview\.part/);
+});
