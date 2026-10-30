@@ -30,10 +30,11 @@ function simplify(points) {
 
 /**
  * One pass along `axis` (0 across, 1 down). `boxes` are { at: [x, y], size: [w, h] } by id, `wires` { a, b, points }: a
- * wire's ends rest on the boxes `a` and `b`, and `down` says `a` stays above `b`. `gap` is the room between boxes, `track` between a wire and what is beside it.
+ * wire's ends rest on the boxes `a` and `b`, and `down` says `a` stays above `b`. `gap` is the room between boxes, `track` between two wires,
+ * `room` between a wire and a box it passes, `join` between two boxes a wire joins, and `run` from a port to the wire's first corner.
  */
-function pass(axis, boxes, wires, { gap, track, sweeps, press }) {
-  const other = 1 - axis, items = [], ofBox = new Map();
+function pass(axis, boxes, wires, { gap, track, room, join, run, sweeps, press }) {
+  const other = 1 - axis, items = [], ofBox = new Map(), landed = [];
   for (const [id, b] of boxes) {
     const [low, high] = reachOf(b, axis), hold = [low + INSET, high - INSET];
     const it = { box: id, from: hold[0], to: hold[1], pos: b.at[axis], half: b.size[axis] / 2, lo: b.at[other] - b.size[other] / 2, hi: b.at[other] + b.size[other] / 2, joins: [] };
@@ -55,6 +56,9 @@ function pass(axis, boxes, wires, { gap, track, sweeps, press }) {
       if (i === 1) rod.own = ofBox.get(w.a);
       if (i === w.points.length - 1) rod.own2 = ofBox.get(w.b);
       for (const near of [before, after]) if (near) (rod.joins.push(near), near.box && near.joins.push(rod));
+      // The first corner stays clear of a port, for the head that lands there.
+      if (i === 2) landed.push([rod, ofBox.get(w.a), w.points[0][axis]]);
+      if (i === w.points.length - 2) landed.push([rod, ofBox.get(w.b), w.points.at(-1)[axis]]);
     }
   }
   // Two rods at one place, along one another: which side each is on is told by how it turns where it stops beside the
@@ -79,18 +83,27 @@ function pass(axis, boxes, wires, { gap, track, sweeps, press }) {
     // A rod that ends on a box stays on it, inside its edges; that is its bound, not the box's being beside it.
     const onP = (p.own === q || p.own2 === q) && q.box, onQ = (q.own === p || q.own2 === p) && p.box;
     if (onP || onQ) continue;
-    const want = p.box && q.box ? p.half + q.half + gap : p.half + q.half + track, sep = Math.min(want, q.pos - p.pos);
+    const want = p.box && q.box ? p.half + q.half + gap : p.half + q.half + (p.box || q.box ? room : track), sep = Math.min(want, q.pos - p.pos);
     p.right.push([q, sep]);
     q.left.push([p, sep]);
   }
-  // Down the page, a wire of the order keeps its box above the one it leads to, however it could bend to let it pass.
-  if (axis === 1) for (const w of wires) if (w.down) {
+  const hold = (p, q, want) => {
+    const sep = Math.min(want, q.pos - p.pos);
+    p.right.push([q, sep]);
+    q.left.push([p, sep]);
+  };
+  // Boxes a wire joins keep room for it, and down the page a wire of the order keeps its box above the one it leads to,
+  // however it could bend to let it pass.
+  for (const w of wires) {
     const [p, q] = [ofBox.get(w.a), ofBox.get(w.b)];
-    if (p && q && p.pos < q.pos) {
-      const sep = Math.min(p.half + q.half, q.pos - p.pos);
-      p.right.push([q, sep]);
-      q.left.push([p, sep]);
-    }
+    if (!p || !q) continue;
+    const [lo, hi] = p.pos <= q.pos ? [p, q] : [q, p], reach = lo.to - hi.from + 2 * INSET;
+    if (hi.pos - lo.pos >= reach && (axis === 1 || (lo.lo < hi.hi && hi.lo < lo.hi))) hold(lo, hi, reach + join);
+    else if (axis === 1 && w.down && p.pos < q.pos) hold(p, q, p.half + q.half);
+  }
+  for (const [rod, box, port] of landed) if (box) {
+    const edge = port - box.pos;
+    if (rod.pos >= port) hold(box, rod, edge + run); else hold(rod, box, -edge + run);
   }
   const bounds = (it) => {
     let lo = -Infinity, hi = Infinity;
@@ -146,7 +159,7 @@ function allowed(line, was, w, boxes, wires) {
  * free. A wire that reaches a box along the side it lands on comes straight into that side; one that passes a corner to
  * get there stops at the side it meets first.
  */
-function slidePorts(boxes, wires) {
+function slidePorts(boxes, wires, run) {
   let moved = 0;
   for (const w of wires) for (const atEnd of [true, false]) {
     const b = boxes.get(atEnd ? w.b : w.a), was = simplify(w.points), line = atEnd ? was : [...was].reverse(), n = line.length;
@@ -163,7 +176,7 @@ function slidePorts(boxes, wires) {
       const mid = (lo + hi) / 2, corner = []; corner[o] = A[o]; corner[e] = mid;
       next = [...line.slice(0, n - 3), corner, landing(mid)];
     }
-    if (!next) continue;
+    if (!next || Math.abs(next.at(-1)[o] - next.at(-2)[o]) + Math.abs(next.at(-1)[e] - next.at(-2)[e]) < run) continue;
     const drawn = atEnd ? next : [...next].reverse();
     if (allowed(drawn, was, w, new Map([...boxes].filter(([id]) => id !== w.a && id !== w.b)), wires)) ((w.points = drawn), moved++);
   }
@@ -178,7 +191,7 @@ export const square = (wires) => wires.every((w) => w.points.every((p, i) => !i 
  * crossings than it found is taken back, whatever the reason: the crossings kept are a promise, not a hope. Answers
  * with what was done, for `watch`.
  */
-export function settle(boxes, wires, { gap, track, rounds = 12, sweeps = 16, watch = null }) {
+export function settle(boxes, wires, { gap, track, room = track, join = gap, run = 0, rounds = 12, sweeps = 16, watch = null }) {
   const crossings = () => count(wires.map((w) => w.points)).crossings;
   const save = () => ({ at: new Map([...boxes].map(([id, b]) => [id, [...b.at]])), lines: wires.map((w) => w.points.map((q) => [...q])) });
   const restore = (kept) => {
@@ -188,7 +201,7 @@ export function settle(boxes, wires, { gap, track, rounds = 12, sweeps = 16, wat
   let done = 0, undone = 0, slid = 0;
   for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) {
     const before = crossings(), kept = save();
-    pass(axis, boxes, wires, { gap, track, sweeps, press: axis === 1 && round < rounds / 2 });
+    pass(axis, boxes, wires, { gap, track, room, join, run, sweeps, press: axis === 1 && round < rounds / 2 });
     const after = crossings();
     watch?.({ round, axis, before, after, kept, wires, boxes });
     // In the first round, wires that only touched may come apart as the crossing they always were: a touch hides a crossing the count
@@ -196,7 +209,7 @@ export function settle(boxes, wires, { gap, track, rounds = 12, sweeps = 16, wat
     const made = after > before && (round > 0 || wires.some((w, i) => wires.some((v, j) => j > i && count([w.points, v.points]).crossings > count([kept.lines[i], kept.lines[j]]).crossings && !touch(kept.lines[i], kept.lines[j]))));
     if (made) (restore(kept), undone++);
     else done++;
-    if (axis) slid += slidePorts(boxes, wires);
+    if (axis) slid += slidePorts(boxes, wires, run);
   }
   return { done, undone, slid };
 }

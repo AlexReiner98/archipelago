@@ -268,6 +268,31 @@ test('bars: one kid alone sits straight on from its box', () => {
 });
 
 // @ts-expect-error a drawing's modules are plain JavaScript
+import { faults } from './draw/flow/faults.js';
+
+test('bars: a kid under a kid drops straight into its top', () => {
+  const ring = ['p', 'q', 'o'].map((id) => item(id)), wide = (id: string) => ({ ...item(id), title: `${id} with a longer name` });
+  const g = drawnBars([...ring, wide('upper'), wide('lower')], [tie('p', 'q', 'serves'), tie('q', 'o', 'serves'), tie('o', 'p', 'serves'), tie('upper', 'p', 'calls'), tie('lower', 'upper', 'calls')]);
+  const w = g.ties.find((t: any) => t.a === 'lower'), n = g.nodes.get('lower');
+  assert.equal(w.points.length, 2);
+  assert.equal(w.points[0][0], w.points[1][0]);
+  assert.ok(Math.abs(Math.min(w.points[0][1], w.points[1][1]) - (g.y.get('upper') + g.nodes.get('upper').h / 2)) < 0.01);
+  assert.ok(Math.abs(Math.max(w.points[0][1], w.points[1][1]) - (g.y.get('lower') - n.h / 2)) < 0.01);
+  assert.equal(faults(g).indirect, 0);
+  assert.ok(clear(g));
+});
+
+test('faults: a wire with a way straight across is counted, and one that takes it is not', () => {
+  const nodes = new Map([['a', { id: 'a', w: 100, h: 40 }], ['b', { id: 'b', w: 100, h: 40 }]]), x = new Map([['a', 100], ['b', 140]]), y = new Map([['a', 50], ['b', 150]]);
+  const g = (points: number[][]) => ({ nodes, all: [...nodes.values()], x, y, chains: [{ a: 'a', b: 'b', points }], ties: [] });
+  assert.equal(faults(g([[120, 70], [120, 130]])).indirect, 0);
+  assert.equal(faults(g([[120, 70], [120, 100], [60, 100], [60, 150], [90, 150]])).indirect, 1);
+  assert.equal(faults(g([[120, 70], [120, 100], [60, 100], [60, 150], [90, 150]]), { run: 18 }).tightPort, 0);
+  assert.equal(faults(g([[120, 70], [120, 80], [150, 80], [150, 130]]), { run: 18 }).tightPort, 1);
+  assert.equal(faults(g([[120, 70], [120, 130]]), { join: 80 }).tightJoin, 1);
+});
+
+// @ts-expect-error a drawing's modules are plain JavaScript
 import { reroute } from './draw/flow/reroute.js';
 
 test('reroute: a wire that wanders takes the straight way, and one bend where it must', () => {
@@ -290,6 +315,17 @@ test('reroute: no way through a box or across a wire is taken', () => {
   const fence = { a: 'c', b: 'd', points: [[0, 200], [400, 200]] }, wire = { a: 'a', b: 'b', points: [[120, 70], [120, 100], [500, 100], [500, 300], [120, 300], [120, 330]] };
   reroute(left, [wire], [fence.points], { track: 8 });
   assert.equal(count([wire.points, fence.points]).crossings, 0);
+});
+
+test('reroute: two boxes that barely overlap join by one straight stretch, and corners keep clear of ports', () => {
+  const boxes = new Map([['a', box(100, 50)], ['b', box(194, 150)]]);
+  const wire = { a: 'a', b: 'b', points: [[120, 70], [120, 80], [130, 80], [130, 150], [144, 150]] };
+  reroute(boxes, [wire], [], { track: 8, room: 12, run: 18 });
+  assert.equal(wire.points.length, 2);
+  const far = new Map([['a', box(100, 50)], ['b', box(400, 300)]]);
+  const bent = { a: 'a', b: 'b', points: [[100, 70], [100, 74], [400, 74], [400, 280]] };
+  reroute(far, [bent], [], { track: 8, room: 12, run: 18 });
+  assert.ok(bent.points.slice(1).every((p, i) => i === bent.points.length - 2 || Math.abs(p[0] - bent.points[0][0]) + Math.abs(p[1] - bent.points[0][1]) >= 18));
 });
 
 test('reroute: a short step in a wire is taken out, and a wire stays on its box', () => {
