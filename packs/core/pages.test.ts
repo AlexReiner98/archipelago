@@ -1,6 +1,6 @@
 // The pages drawing (draw/pages/): a lens answer in, rows out. Each item that nothing in the answer brings in is a
-// row: its title leading to its page, and a reader of its draft beside one of what is published, which the page
-// makes from the item's id alone (ui/reader-frame.js). An item a note brings in as a section is read there.
+// row: its title leading to its page, and a reader of its draft, with one of what is published where the style asks,
+// which the page makes from the item's id alone (ui/reader-frame.js). An item a note brings in as a section is read there.
 
 import assert from 'node:assert/strict';
 import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -16,11 +16,11 @@ for (const [name, file] of Object.entries(core.drawings.find((d: any) => d.id ==
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 
 const item = (id: string, title: string, body = '') => ({ id, kind: 'record', type: 'document', title, body, open: true, status: 'draft' });
-const draw = (items: any[], here?: string, order?: string) => picture({ answer: { items, links: [] }, style: { here, order } }, {}).scene;
+const draw = (items: any[], here?: string, order?: string, published?: boolean) => picture({ answer: { items, links: [] }, style: { here, order, published } }, {}).scene;
 /** Every mark of a scene, flattened. */
 const marks = (mark: any): any[] => (Array.isArray(mark) && typeof mark[0] === 'string' ? [mark, ...mark.slice(2).flatMap(marks)] : []);
 
-test('each item nothing brings in is a row: its title, and a reader of its draft beside one of what is published', () => {
+test('each item nothing brings in is a row: its title, and a reader of its draft alone', () => {
   // The section's line is far down the note: the notes come whole, so it is found.
   const doc = item('e_doc00000', 'Guide', `${'Words. '.repeat(60)}\n\ne_sec00000\n\nAfter.`);
   const scene = draw([doc, item('e_sec00000', 'Install', 'Steps.'), item('e_lone0000', 'Loose note', 'Alone.')]);
@@ -28,8 +28,13 @@ test('each item nothing brings in is a row: its title, and a reader of its draft
   assert.deepEqual(rows.map((r: any) => r[1].key), ['p:e_doc00000', 'p:e_lone0000'], 'the section is read in its document, not as a row');
   const all = marks(rows[0]);
   assert.ok(all.some((x) => x[0] === 'a' && x[1].href === '#/e/e_doc00000'), 'the title leads to its page');
-  assert.deepEqual(all.filter((x) => x[0] === 'reader').map((x) => [x[1].item, x[1].as]), [['e_doc00000', 'draft'], ['e_doc00000', 'published']]);
+  assert.deepEqual(all.filter((x) => x[0] === 'reader').map((x) => [x[1].item, x[1].as]), [['e_doc00000', 'draft']]);
   assert.match(String(all.find((x) => x[1].class === 'pg-meta')[2]), /1 section/);
+});
+
+test('what is published is drawn beside the draft only where the style asks', () => {
+  const readers = marks(draw([item('e_doc00000', 'Guide', 'Text.')], undefined, undefined, true).svg).filter((x) => x[0] === 'reader').map((x) => x[1].as);
+  assert.deepEqual(readers, ['draft', 'published']);
 });
 
 test('two notes that bring each other in are both rows; the page open is lit and brought into sight; nothing says so', () => {
