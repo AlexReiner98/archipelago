@@ -44,16 +44,34 @@ async function plainHost(url: URL): Promise<URL> {
   return out;
 }
 
-/** Start the Chrome installed here; its DevTools address and how to stop it. */
-async function start(binary: string): Promise<{ ws: string; stop: () => void }> {
-  // A server stopped while its Chrome ran leaves that Chrome's folder: a later start removes those over a day old.
-  for (const old of readdirSync(tmpdir())) {
-    const at = join(tmpdir(), old);
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
+};
+
+/**
+ * Remove what servers that have gone left: a server killed with its Chrome open (each restart of `npm run dev`) cannot
+ * clean up, so a Chrome's folder is named for its server, and the next look removes it. A folder named before that goes
+ * once it is a day old.
+ */
+export function sweepLooks(temp: string, now = Date.now()) {
+  for (const name of readdirSync(temp)) {
+    if (!name.startsWith('pelago-look-')) continue;
+    const at = join(temp, name), owner = /^pelago-look-(\d+)-/.exec(name)?.[1];
     try {
-      if (old.startsWith('pelago-look-') && Date.now() - statSync(at).mtimeMs > 86_400_000) rmSync(at, { recursive: true, force: true });
+      if (owner ? !alive(Number(owner)) : now - statSync(at).mtimeMs > 86_400_000) rmSync(at, { recursive: true, force: true });
     } catch {}
   }
-  const dir = mkdtempSync(join(tmpdir(), 'pelago-look-'));
+}
+
+/** Start the Chrome installed here; its DevTools address and how to stop it. */
+async function start(binary: string): Promise<{ ws: string; stop: () => void }> {
+  sweepLooks(tmpdir());
+  const dir = mkdtempSync(join(tmpdir(), `pelago-look-${process.pid}-`));
   // Chrome's own temp files (an extension the machine installs in every new profile is unpacked there) go in its
   // folder too, so that removing the folder removes them.
   const temp = join(dir, 'temp');
@@ -71,10 +89,15 @@ async function start(binary: string): Promise<{ ws: string; stop: () => void }> 
     });
     proc.once('exit', () => (clearTimeout(timer), reject(new Error(`Chrome stopped as it started: ${said.slice(0, 300)}`))));
   });
-  // Chrome holds its folder until it has exited, and on Windows its helpers for some seconds after: removed once it
-  // has, tried again for a while without holding the server up.
-  const remove = () => void rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }).catch(() => {});
-  return { ws, stop: () => (proc.exitCode !== null || proc.signalCode !== null ? remove() : (proc.once('exit', remove), proc.kill())) };
+  // Chrome holds its folder until it has exited, and on Windows its helpers for some seconds after: removed then,
+  // however it ended, tried again for a while without holding the server up.
+  const endWithServer = () => proc.kill();
+  process.once('exit', endWithServer);
+  proc.once('exit', () => {
+    process.off('exit', endWithServer);
+    void rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }).catch(() => {});
+  });
+  return { ws, stop: () => void proc.kill() };
 }
 
 /** A Chrome to draw in: PELAGO_CHROME's, else one started here. */

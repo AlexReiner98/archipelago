@@ -117,6 +117,8 @@ function colours(host, style) {
 export function drawWith(host, answer, style, keep) {
   host.endDrawing?.();
   const { drawing } = style;
+  // One that says it is laid out by the page has its box now, before it is measured: drawn once, at the size it will have.
+  if (drawing?.flat) host.classList.add('laid-out');
   const failed = (message) => (host.replaceChildren(h('div', { class: 'lens-error' }, `This drawing stopped: ${String(message).slice(0, 300)}`)), saidDrawn(host, 'error', message));
   // Its code: sent with the answer, kept by this browser, or fetched from this server by its hash (a published page's).
   const sent = drawing?.modules ?? drawings.get(drawing?.hash);
