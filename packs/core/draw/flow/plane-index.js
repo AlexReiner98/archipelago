@@ -19,7 +19,7 @@ export function picture(input, tools) {
   const drawn = [...g.chains, ...g.ties].map((w) => w.points);
   const { crossings, seen, shared } = count(drawn);
   const flowShows = [...g.chains, ...g.ties.filter((t) => t.type !== 'part_of' && t.type !== 'owned_by')].map((w) => w.points);
-  const shown = count(flowShows), up = g.chains.filter((w) => w.points[0][1] > w.points.at(-1)[1]).length;
+  const shown = count(flowShows), up = g.chains.filter((w) => w.up).length;
   out.scene.key.push({ glyph: m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, m('path', { d: 'M1 1L21 13M1 13L21 1', class: 'lf-wire' })), label: `${crossings} crossings, ${seen} seen, ${shared} shared, ${drawn.filter(doublesBack).length} double back; without part_of ${shown.crossings} crossings, ${shown.shared} shared, ${flowShows.filter(doublesBack).length} double back; ${up} up; ${Math.round(g.width)} by ${Math.round(g.height)}` });
   return out;
 }
