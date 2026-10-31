@@ -1,20 +1,19 @@
-// A ridges picture that moves: one field carried from a start to an end by turning the pattern and scale dials while
-// it grows (diffusion.js), written as one animated SVG, light enough to keep as a figure on the site.
+// A ridges picture that moves: from one saved setup to another, written as one animated SVG, light enough to keep as a
+// figure on the site. The first key is the start's land and the last the end's, grown as those setups grow them.
 //
 // A picture of its own for each moment would weigh megabytes and shimmer. Here every row is cut into tiles that never
 // move: a tile keeps its colour for good, and only the height of its land changes, in the SVG itself, between a few
 // key moments. So colours cannot flicker: they belong to the place, not to whichever island happens to stand on it.
 // Dials in, an SVG out; no page.
 
-import { archipelagos, growing } from './diffusion.js';
+import { archipelagos, grow, growing, sample } from './diffusion.js';
 import { landOf, waterOf } from './palettes.js';
 import { colourOf, swell } from './paint.js';
-import { random, ridges } from './ridges.js';
+import { DEFAULTS, random, ridges } from './ridges.js';
 
 export const MORPH = {
-  fromPattern: 0, toPattern: 1.3,  // spots to coral
-  fromScale: 1.2, toScale: 0.1,  // fine to large
-  fromLand: 0.2, toLand: 0.9,    // scattered islands to one mass
+  start: 'Hero Start', // the setup it starts from
+  end: 'Hero End',     // the setup it ends on
   keys: 6,        // key moments: more is smoother between them, and heavier
   seconds: 8,     // how long it takes
   wait: 1,        // how long the start holds first
@@ -30,42 +29,51 @@ export const MORPH = {
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const ease = (t) => t * t * (3 - 2 * t);
-/** Cells across the width at a scale, as the still picture has them. */
-const cellsAt = (scale, W) => Math.max(16, (40 + scale * 70) * (W / 800));
+/** The grid a setup grows its field on, as the still picture has it. */
+const gridOf = ({ scale, width: W, height: H }) => {
+  const nx = Math.max(16, Math.round((40 + scale * 70) * (W / DEFAULTS.width)));
+  return { nx, ny: Math.round((nx * H) / W) };
+};
 
 /**
- * The field at each key moment, one run of growth with the dials turning, and the places: fixed for the whole run,
- * each cell in the place nearest it, so no island changes palette as it joins another. The grid is the coarsest
- * scale's; a finer scale is the chemicals spreading slower, forms shrinking by the square root.
+ * The field at each key moment. It starts as the start setup grows it and runs on with the dials turning toward the
+ * end's, so islands really grow and join, drawing into the field the end setup grows, which it is at the last key.
+ * A finer scale is the chemicals spreading slower. The places are the end's, and fixed for the whole run, each cell
+ * in the place nearest it, so no island changes palette as it joins another.
  */
-export function fieldsOf({ morph: m, width: W, height: H, variety, seed, chains }) {
-  const coarse = cellsAt(Math.min(m.fromScale, m.toScale), W);
-  const nx = Math.round(coarse), ny = Math.round((nx * H) / W);
-  const diffuse = (scale) => Math.min(1, (coarse / cellsAt(scale, W)) ** 2);
-  const grower = growing({ nx, ny, variety, seed });
-  grower.run(3000, m.fromPattern, diffuse(m.fromScale));
+export function fieldsOf({ from, to, morph: m }) {
+  const { nx, ny } = gridOf(from), far = gridOf(to);
+  const grown = grow({ ...far, pattern: to.pattern, variety: to.variety, seed: to.seed });
+  const end = Float32Array.from({ length: nx * ny }, (_, i) => sample(grown, ((i % nx) * far.nx) / nx, (Math.floor(i / nx) * far.ny) / ny));
+  const diffuse = (scale) => Math.min(1, (gridOf(from).nx / gridOf({ ...from, scale }).nx) ** 2);
+  const grower = growing({ nx, ny, variety: from.variety, seed: from.seed });
+  grower.run(4000, from.pattern);
   const fields = [grower.field()], parts = 4;
   for (let k = 1; k < m.keys; k++) {
     for (let p = 1; p <= parts; p++) {
       const t = ease((k - 1 + p / parts) / (m.keys - 1));
-      grower.run(Math.round(m.grow / parts), lerp(m.fromPattern, m.toPattern, t), diffuse(lerp(m.fromScale, m.toScale, t)));
+      grower.run(Math.round(m.grow / parts), lerp(from.pattern, to.pattern, t), diffuse(lerp(from.scale, to.scale, t)));
     }
-    fields.push(grower.field());
+    const on = ease(k / (m.keys - 1)) ** 2, { v } = grower.field();
+    fields.push({ nx, ny, v: v.map((c, i) => lerp(c, end[i], on)) });
   }
-  const found = archipelagos(fields.at(-1), 0.62 - m.toLand * 0.5, Math.max(1, chains), seed);
-  const far = (x, y, c) => Math.hypot(Math.min(Math.abs(x - c.x), nx - Math.abs(x - c.x)), Math.min(Math.abs(y - c.y), ny - Math.abs(y - c.y)));
+  const found = archipelagos(fields.at(-1), 0.62 - to.land * 0.5, Math.max(1, to.chains), to.seed);
+  const gap = (x, y, c) => Math.hypot(Math.min(Math.abs(x - c.x), nx - Math.abs(x - c.x)), Math.min(Math.abs(y - c.y), ny - Math.abs(y - c.y)));
   const group = Int32Array.from({ length: nx * ny }, (_, i) => {
     const x = i % nx, y = (i - x) / nx;
-    return found.centres.reduce((best, c, g) => (far(x, y, c) < far(x, y, found.centres[best]) ? g : best), 0);
+    return found.centres.reduce((best, c, g) => (gap(x, y, c) < gap(x, y, found.centres[best]) ? g : best), 0);
   });
   return { fields, arch: { ...found, group, island: new Int32Array(nx * ny).fill(-1), rank: new Float32Array(1).fill(1) } };
 }
 
+/** Every dial that is a number, part way from one setup to the other. */
+const between = (from, to, t) => Object.fromEntries(Object.entries(from).map(([k, v]) => [k, typeof v === 'number' && typeof to[k] === 'number' ? lerp(v, to[k], t) : v]));
+
 /** Each row at each key, from the picture's own land, with nothing on it that does not hold still. */
-export function keysOf({ dials, morph: m }) {
-  const { fields, arch } = fieldsOf({ morph: m, width: dials.width, height: dials.height, variety: dials.variety, seed: dials.seed, chains: dials.chains });
+export function keysOf({ from, to, morph: m }) {
+  const { fields, arch } = fieldsOf({ from, to, morph: m });
   const key = `morph ${Math.random()}`;
-  return fields.map((field, k) => ridges({ ...dials, source: 'diffusion', rows: m.rows, foothills: 0, clouds: 0, hierarchy: 0, land: lerp(m.fromLand, m.toLand, ease(k / (m.keys - 1))), pinned: { key, field, arch } }));
+  return fields.map((field, k) => ridges({ ...between(from, to, ease(k / (m.keys - 1))), source: 'diffusion', rows: m.rows, foothills: 0, clouds: 0, hierarchy: 0, seed: from.seed, pinned: { key, field, arch } }));
 }
 
 const hex = (i) => Math.imul(i, 2654435761) >>> 0;

@@ -163,12 +163,8 @@
   <label>Line <small>hair · bold</small><input id="line" type="range" min="0" max="8" step="0.05"></label>
   <label class="check"><input id="wrap" type="checkbox"> Repeat left to right</label>
   <h2>Animate</h2>
-  <label title="Where the pattern starts">Start pattern <small>spots · coral</small><input id="mFromPattern" type="range" min="-0.3" max="1.5" step="0.05"></label>
-  <label title="Where the pattern ends">End pattern <small>spots · coral</small><input id="mToPattern" type="range" min="-0.3" max="1.5" step="0.05"></label>
-  <label title="How fine the forms are at the start">Start scale <small>large · fine</small><input id="mFromScale" type="range" min="-0.3" max="1.6" step="0.05"></label>
-  <label title="How fine the forms are at the end">End scale <small>large · fine</small><input id="mToScale" type="range" min="-0.3" max="1.6" step="0.05"></label>
-  <label title="How much is land at the start">Start land <small>sea · land</small><input id="mFromLand" type="range" min="0" max="1" step="0.01"></label>
-  <label title="How much is land at the end">End land <small>sea · land</small><input id="mToLand" type="range" min="0" max="1" step="0.01"></label>
+  <label title="The saved setup it starts from">Start <select id="mStart"></select></label>
+  <label title="The saved setup it ends on">End <select id="mEnd"></select></label>
   <label title="How long the change takes">Seconds <output id="mSecondsOut"></output><input id="mSeconds" type="range" min="2" max="30" step="0.5"></label>
   <label title="How long the start holds first">Hold <output id="mWaitOut"></output><input id="mWait" type="range" min="0" max="5" step="0.25"></label>
   <label title="Key moments: more follows the field closer, and weighs more">Keys <output id="mKeysOut"></output><input id="mKeys" type="range" min="2" max="12" step="1"></label>
@@ -482,16 +478,22 @@
   };
 
   // Animate: the Animate dials, and the SVG they make (morph.js), shown over the still picture until a dial moves it.
-  const MORPH_NUMBERS = { mFromPattern: 'fromPattern', mToPattern: 'toPattern', mFromScale: 'fromScale', mToScale: 'toScale', mFromLand: 'fromLand', mToLand: 'toLand', mSeconds: 'seconds', mWait: 'wait', mKeys: 'keys', mGrow: 'grow', mRows: 'rows', mTiles: 'tiles', mPoints: 'points', mBands: 'bands' };
+  const MORPH_NUMBERS = { mSeconds: 'seconds', mWait: 'wait', mKeys: 'keys', mGrow: 'grow', mRows: 'rows', mTiles: 'tiles', mPoints: 'points', mBands: 'bands' };
   const MORPH_CHECKS = { mShallows: 'shallows', mOutline: 'outline', mLoop: 'loop' };
-  const morphDials = () => ({ ...Object.fromEntries(Object.entries(MORPH_NUMBERS).map(([id, k]) => [k, +$(id).value])), ...Object.fromEntries(Object.entries(MORPH_CHECKS).map(([id, k]) => [k, $(id).checked])) });
+  const morphDials = () => ({ start: $('mStart').value, end: $('mEnd').value, ...Object.fromEntries(Object.entries(MORPH_NUMBERS).map(([id, k]) => [k, +$(id).value])), ...Object.fromEntries(Object.entries(MORPH_CHECKS).map(([id, k]) => [k, $(id).checked])) });
   const morphOuts = () => { for (const id of Object.keys(MORPH_NUMBERS)) if ($(`${id}Out`)) $(`${id}Out`).textContent = $(id).value; };
   function setMorph(saved) {
     const m = { ...MORPH, ...saved };
     for (const [id, k] of Object.entries(MORPH_NUMBERS)) $(id).value = m[k];
     for (const [id, k] of Object.entries(MORPH_CHECKS)) $(id).checked = m[k];
     morphOuts();
+    for (const [id, name] of [['mStart', m.start], ['mEnd', m.end]]) $(id).value = name;
   }
+  /** A saved setup as the land reads it: its own dials and seed, on this frame. */
+  const setupOf = (name) => {
+    const s = presets.all()[name];
+    return s && { ...dials(), ...s.dials, seed: s.seed, source: s.source };
+  };
   let moving = null;
   const showMoving = () => {
     $('moving').src = URL.createObjectURL(new Blob([moving], { type: 'image/svg+xml' }));
@@ -503,8 +505,9 @@
   $('mBuild').onclick = () => {
     $('mNote').textContent = 'Growing…';
     setTimeout(async () => {
-      const t0 = performance.now(), p = richOf(pal()), morph = morphDials();
-      const pics = keysOf({ dials: dials(), morph });
+      const t0 = performance.now(), p = richOf(pal()), morph = morphDials(), from = setupOf(morph.start), to = setupOf(morph.end);
+      if (!from || !to) return void ($('mNote').textContent = 'Choose a start and an end: save each as a preset first.');
+      const pics = keysOf({ from, to, morph });
       const { svg, shapes } = svgOf({ pics, morph, palOf, base: p, background: background(p), weighted: $('weighted').checked });
       moving = svg;
       showMoving();
@@ -516,7 +519,6 @@
   $('mReplay').onclick = showMoving;
   $('mSave').onclick = () => save(`archipelago-morph-${seed}.svg`, new Blob([moving], { type: 'image/svg+xml' }));
   for (const id of Object.keys(MORPH_NUMBERS)) $(id).addEventListener('input', morphOuts);
-  setMorph();
 
   // Presets: everything that makes this picture, so it can be had again.
   const paletteOf = (p) => ({ title: p.title, paper: p.paper, ink: p.ink, colours: [...p.colours], weights: p.weights ? [...p.weights] : undefined });
@@ -565,6 +567,11 @@
   }
   function listPresets(chosen = '') {
     const names = Object.keys(presets.all()).sort((a, b) => a.localeCompare(b));
+    for (const id of ['mStart', 'mEnd']) {
+      const was = $(id).value;
+      $(id).innerHTML = names.map((n) => `<option>${n.replace(/</g, '&lt;')}</option>`).join('');
+      if (names.includes(was)) $(id).value = was;
+    }
     $('preset').innerHTML = `<option value="">${names.length ? 'Load a preset…' : 'No presets yet'}</option>` + names.map((n) => `<option>${n.replace(/</g, '&lt;')}</option>`).join('');
     $('preset').value = chosen;
   }
@@ -600,6 +607,7 @@
   };
 
   listPresets();
+  setMorph();
   swatches();
   draw();
 </script>
