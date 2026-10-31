@@ -5,6 +5,7 @@
 
 import { tidy } from './polyline.js';
 import { shelve } from './shelves.js';
+import { wrap } from './wrap.js';
 
 /** How far apart two things must be across, to count as beside one another. */
 const TOUCH = 0.5;
@@ -203,6 +204,7 @@ export function solveSections({ nodes, x, y, routes, section, gap, margin, aspec
     const own = new Set(ids), lines = new Map([...routes].filter(([k]) => own.has(k.split('|')[0]))), at = (m) => new Map(ids.map((id) => [id, m.get(id)])), [lx, ly] = [at(x), at(y)];
     told.freed += solve({ nodes, x: lx, y: ly, routes: lines, ...lengths }).freed;
     for (const id of ids) (x.set(id, lx.get(id)), y.set(id, ly.get(id)));
+    wrap({ ids, lines: [...lines.values()], x, y, nodes, extent: extent(ids, [...lines.values()], x, y, nodes), aspect, track: lengths.wire });
     whole.push(extent(ids, [...lines.values()], x, y, nodes));
   }
   const move = (c, dx, dy) => {
