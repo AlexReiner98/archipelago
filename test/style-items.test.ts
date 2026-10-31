@@ -82,9 +82,20 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
         { op: 'link', type: 'about', from: 'o', to: made.t },
       ],
     })).result.created as Record<string, string>;
+    // One about an archived view belongs to nothing any more, so it is a choice again.
+    const gone = (await call('/api/change', undefined, {
+      reason: 'test',
+      ops: [
+        { op: 'create', ref: 'v', type: 'lens', title: 'An old view', props: { filter: { find: [`id ${made.t}`] } } },
+        { op: 'create', ref: 's', type: 'style', title: 'Freed board', props: { shape: 'list' } },
+        { op: 'link', type: 'about', from: 's', to: 'v' },
+      ],
+    })).result.created as Record<string, string>;
+    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'archive', id: gone.v }] });
     await page.evaluate(`location.reload()`);
     const options = `[...document.querySelectorAll('#query .q-look option')].map((o) => o.textContent)`;
     assert.ok(await until(`${options}.includes('Harbour blueprint')`), 'the switch offers a style about nothing');
+    assert.ok(await page.evaluate(`${options}.includes('Freed board')`), 'and one about an archived view');
     assert.ok(!(await page.evaluate(`${options}.includes('Slab section look')`)), 'and not one about an item');
     await type('style slab');
     assert.ok(await until(`Boolean(${choice('Style', 'Slab section look')})`), `find still lists it: ${await page.evaluate(`${list}.textContent`)}`);
@@ -93,6 +104,8 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     assert.ok(await until(`${button}?.textContent === 'Apply'`), 'with Apply');
     await page.evaluate(`${button}.click()`);
     assert.ok(await until(`document.querySelector('#query .q-look')?.value === 'style:${own.o}'`), 'and the switch says what is drawn');
+    await page.evaluate(`location.reload()`);
+    assert.ok(await until(`document.querySelector('#query .q-look')?.selectedOptions[0]?.textContent === 'Slab section look'`), 'by its name, after a reload too');
     await shut();
 
     // The word "style " lists styles too, each opening its page; a drawing is no item, so only it draws at once.

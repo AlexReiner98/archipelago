@@ -15,13 +15,22 @@ const namedStyles = () =>
     .then((rows) => rows.filter((s) => !s.props?.preset && !s.props?.on?.length).sort((a, b) => a.title.localeCompare(b.title)))
     .catch(() => []));
 
+/** A style's name, read when no page has named it yet: one about an item is not among those listed. */
+const titled = async (id) => {
+  if (!titles.has(id)) {
+    const got = await api('get', { id }).catch(() => null);
+    if (got) titles.set(id, got.entity.title);
+  }
+  return titles.get(id);
+};
+
 /** Delete, in the band's menu while the pane is drawn with a style kept on the map: the style is archived (it leaves
  *  the switch and stays in the history), and the pane is drawn as the house's. None for a shape or the house's. */
 export function styleDelete(lens, style, open) {
   if (!style.style) return null;
   const act = async () => {
     const kept = (await namedStyles()).find((s) => s.id === style.style);
-    const title = kept?.title ?? titles.get(style.style) ?? 'this style';
+    const title = kept?.title ?? (await titled(style.style)) ?? 'this style';
     if (!(await ask({ title: `Delete "${title}"?`, message: 'It leaves the styles to choose from but stays in the history.', action: 'Delete', danger: true }))) return;
     try {
       await api('change', { ops: [{ op: 'archive', id: style.style }], reason: `${title}: style deleted from the view band` });
@@ -55,7 +64,10 @@ export function lookSwitch(lens, style, open) {
     );
   };
   fill([]);
-  namedStyles().then(fill);
+  namedStyles().then(async (listed) => {
+    if (style.style && !listed.some((s) => s.id === style.style)) await titled(style.style);
+    fill(listed);
+  });
   pick.addEventListener('change', () => {
     const [kind, value] = pick.value ? [pick.value.slice(0, pick.value.indexOf(':')), pick.value.slice(pick.value.indexOf(':') + 1)] : [];
     const { shape: _s, style: _k, ...rest } = style;
