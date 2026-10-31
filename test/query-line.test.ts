@@ -85,3 +85,63 @@ test('in a browser, the query line says the lens in one line at both widths', { 
     await page.close();
   }
 });
+
+test('in a browser, a lens of many long terms stays in the line, and each term can still be taken out', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base, call } = await serve('off');
+  const names = Array.from({ length: 9 }, (_, i) => `Term ${i} with a title long enough to take the whole line`);
+  const made = (await call('/api/change', undefined, { reason: 'test', ops: names.map((title, i) => ({ op: 'create', ref: `t${i}`, type: 'task', title })) })).result.created as Record<string, string>;
+  const finds = names.slice(0, 6).map((_, i) => `find=id+${made[`t${i}`]}`).join('&');
+  const nots = names.slice(6).map((_, i) => `not=id+${made[`t${i + 6}`]}`).join('&');
+  const page = await open(`${base}/#/v?${finds}&${nots}&not=done&only=type+task&over=depends_on&steps=0&limit=60`);
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const until = async (expression: string) => {
+    for (const end = Date.now() + 20000; Date.now() < end; await wait(150)) if (await page.evaluate(expression)) return true;
+    return false;
+  };
+  const lineSays = `document.getElementById('find-lens').textContent`;
+  const labels = `[...document.querySelectorAll('#find-lens .q-sum-part > .q-label')].map((l) => l.textContent).join('|')`;
+  // Nothing of the line past the bar's edges, either way, and every part one line high.
+  const staysIn = async (where: string) => {
+    const box = await page.evaluate<{ out: string[]; cut: boolean; more: number }>(`(() => {
+      const b = document.getElementById('find').getBoundingClientRect();
+      const l = document.getElementById('find-lens');
+      const out = [...l.querySelectorAll('.q-sum-part, .q-sum-terms, .q-sum-more:not([hidden]), .q-sum-tail, .q-count')].map((e) => [e, e.getBoundingClientRect()]).filter(([e, r]) => r.top < b.top || r.bottom > b.bottom || r.left < b.left || r.right > b.right).map(([e]) => e.className);
+      return { out, cut: l.scrollHeight > l.clientHeight + 1, more: l.querySelectorAll('.q-sum-more:not([hidden])').length };
+    })()`);
+    assert.deepEqual(box.out, [], `nothing leaves the bar ${where}`);
+    assert.ok(!box.cut, `the line is one line ${where}`);
+    assert.ok(box.more >= 1, `a part says how many more it holds ${where}`);
+  };
+  try {
+    assert.ok(await until(`${lineSays}.includes('Term 0') && !${lineSays}.includes('…')`), `the terms are named: ${page.logs().join('\n')}`);
+    // A walk of no steps reaches nothing: the line says nothing of it.
+    assert.equal(await page.evaluate<string>(labels), 'Find|Only|Not', 'no Walk on the line');
+    assert.ok(!(await page.evaluate<string>(lineSays)).includes('×0'), 'nor ×0');
+    assert.ok(await page.evaluate<boolean>(`document.querySelector('#find-rows .q-walk-part .q-said')?.textContent === 'depends on'`), 'its link is still in the row, to take out');
+    await page.evaluate(`location.hash = location.hash.replace('steps=0', 'steps=2')`);
+    assert.ok(await until(`${labels} === 'Find|Only|Not|Walk'`), 'with steps it is on the line');
+    for (const width of [1280, 560]) {
+      await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+      await wait(300);
+      await staysIn(`at ${width} px`);
+      assert.ok(await page.evaluate<boolean>(`document.querySelector('#find-lens .q-sum-tail').textContent === '×2' && document.querySelector('#find-lens .q-sum-tail').getBoundingClientRect().width > 0`), `the walk's steps are in sight at ${width} px`);
+      const title = await page.evaluate<string>(`document.querySelector('#find-lens .q-sum').title`);
+      for (const name of names) assert.ok(title.includes(name), `the tooltip has the whole: ${name}`);
+    }
+    await page.send('Emulation.clearDeviceMetricsOverride');
+    await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
+    assert.ok(await until(`document.querySelectorAll('#canvas > .pane').length === 2`), 'split');
+    await wait(300);
+    await staysIn('in a split pane');
+    // A click opens the rows; a term out of sight there is in the row's "more", with its ×.
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 560, height: 900, deviceScaleFactor: 1, mobile: false });
+    await page.evaluate(`document.querySelector('#find-lens .q-sum').click()`);
+    assert.ok(await until(`Boolean(document.querySelector('#find .q-filter .q-more:not([hidden])'))`), 'the Find row holds more than fit');
+    await page.evaluate(`document.querySelector('#find .q-filter .q-more').click()`);
+    assert.ok(await until(`Boolean(document.querySelector('.term-pick .term-pick-x'))`), 'its menu lists them');
+    await page.evaluate(`document.querySelector('.term-pick .term-pick-x').click()`);
+    assert.ok(await until(`location.hash.split('find=').length === 6`), `one term is taken out: ${await page.evaluate('location.hash')}`);
+  } finally {
+    await page.close();
+  }
+});
