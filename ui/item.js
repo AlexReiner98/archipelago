@@ -3,7 +3,7 @@
 // behind draws that, with this item lit. Rare actions are in one menu; the page names no pack's type.
 
 import { api, ask, h, part, state, tell } from './base.js';
-import { drawIn, goLens, lensNow } from './canvas.js';
+import { drawIn, goQuery, queryNow } from './canvas.js';
 import { draftOf } from './draft.js';
 import { documentMenu, figureOf, homeOf, readDocument } from './item-doc.js';
 import { readingOf } from './item-read.js';
@@ -115,10 +115,10 @@ export async function entity(id, here) {
   // along the links it has, in place of the canvas's lens or added to it.
   const along = [...new Set([...data.outgoing, ...data.incoming].map((r) => r.type).filter((t) => !t.startsWith('sys.')))];
   const walkFrom = (add) => {
-    const now = lensNow();
-    if (!add || !now) return goLens({ filter: { find: [`id ${id}`] }, walk: { over: along, steps: 1 } });
+    const now = queryNow();
+    if (!add || !now) return goQuery({ filter: { find: [`id ${id}`] }, walk: { over: along, steps: 1 } });
     const over = now.walk?.over === 'all' ? 'all' : [...new Set([...(now.walk?.over ?? []), ...along])];
-    goLens({ ...added(now, { find: `id ${id}` }), walk: { over, steps: Math.max(1, now.walk?.steps ?? 0) } });
+    goQuery({ ...added(now, { find: `id ${id}` }), walk: { over, steps: Math.max(1, now.walk?.steps ?? 0) } });
   };
   const walkSaid = along.map((t) => relations.get(t)?.title ?? t).join(', ');
   // What its type's screens give it to do: the first in sight, beside Walk from it, any more in the menu.

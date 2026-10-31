@@ -29,8 +29,7 @@ body[data-panes="1"] #canvas .pane-canvas .lens-view, #canvas > .pane.pane-activ
 /* A picture the page lays out (a grid, a time axis, meters) scrolls in the room between the bars alone: its scrollbar
    and what scrolls never run under them. */
 body[data-panes="1"] #canvas .pane-canvas .lens-view.laid-out, #canvas > .pane.pane-active > .pane-canvas .lens-view.laid-out { position: absolute; inset: var(--safe-top) 0 var(--safe-bottom) 0; height: auto; padding: 0; clip-path: none; }
-/* A picture read beside the sheet stops where the sheet starts, its scrollbar in sight, and what is published gives way to the draft. */
-body #canvas > .pane > .pane-canvas .lens-view.laid-out.sheet-over { right: var(--sheet-over); }
+/* A picture read beside the sheet: what is published gives way to the draft. */
 .lens-view.sheet-over .rd.published { display: none; }
 body[data-panes="1"] #canvas .lf-legend { bottom: auto; pointer-events: auto; }
 #canvas .pane-canvas > .lens-wrap > .lens-bar { position: absolute; z-index: 2; top: calc(var(--box-9) + var(--space-5)); left: var(--space-9); right: var(--space-9); width: auto; pointer-events: none; }

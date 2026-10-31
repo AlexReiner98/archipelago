@@ -1,12 +1,12 @@
 // Saved canvases (task e_uq77ps44): a flat lens and a style kept on the map as an item of core's `lens` type, so a
-// person opens it anywhere and it draws the same. Its id travels in the address beside the lens (`canvas=`, ui/lens.js),
+// person opens it anywhere and it draws the same. Its id travels in the address beside the lens (`canvas=`, ui/query.js),
 // so what is moved on it goes to its own places (the places stream, under its id, apart from the map's) and the bar
 // names it. The bar switches between them and keeps what is up as one; Home lists them, one line each.
 // The views kept before the flat lens were translated into such canvases when the workspace opened
-// (src/lens-saved.ts); a view kept about an item is listed on Home under the views of items, folded.
+// (src/query-saved.ts); a view kept about an item is listed on Home under the views of items, folded.
 
 import { api, ask, h, hooks, idsOf, state, tell, wordsOf, withIds } from './base.js';
-import { flatQuery, flatView } from './lens.js';
+import { addressOf, flatView } from './query.js';
 import { filterSaid, fitBar } from './query-bar.js';
 import { canvasMenu } from './canvas-menu.js';
 import { lookSwitch, styleDelete } from './look-switch.js';
@@ -32,7 +32,7 @@ export function savedCanvases(fresh = false) {
 }
 
 /** What a saved canvas draws: its filter with its pins, its walk and its limit; and its style, with its own id. */
-export function canvasLens(item) {
+export function viewParts(item) {
   const p = item.props ?? {};
   const filter = withIds(p.filter ?? {}, Array.isArray(p.pins) ? p.pins : []);
   const lens = { ...(p.view && { view: p.view }), filter, walk: p.walk ?? { over: [], steps: 0 }, ...(p.limit && { limit: p.limit }), ...(p.time && { time: p.time }) };
@@ -40,16 +40,16 @@ export function canvasLens(item) {
 }
 
 /** Where a saved canvas opens: the address names it, and its lens is read from the map when it is opened; a pack's, by its lens. */
-export const canvasAt = (c) => (c.preset ? `#/v?${flatQuery(canvasLens(c).lens, canvasLens(c).style)}` : `#/v?canvas=${c.id}`);
+export const canvasAt = (c) => (c.preset ? `#/v?${addressOf(viewParts(c).lens, viewParts(c).style)}` : `#/v?canvas=${c.id}`);
 /** The saved canvas up: the one the address names, else a pack's whose lens is the one up (its style changed, it is marked so). */
-const upOf = (all, lens, style) => (style.canvas ? all.find((c) => c.id === style.canvas) : all.find((c) => c.preset && flatQuery(canvasLens(c).lens) === flatQuery(lens)));
+const upOf = (all, lens, style) => (style.canvas ? all.find((c) => c.id === style.canvas) : all.find((c) => c.preset && addressOf(viewParts(c).lens) === addressOf(lens)));
 
 /** Open a saved canvas named with no lens beside it: its lens and style put in the address, in place of the one asked. */
 export async function openCanvas(id) {
   const got = await api('get', { id }).catch(() => null);
   if (!got || !isA(got.entity.type, TYPE)) return void location.replace('#/');
-  const { lens, style } = canvasLens(got.entity);
-  location.replace(`#/v?${flatQuery(lens, style)}`);
+  const { lens, style } = viewParts(got.entity);
+  location.replace(`#/v?${addressOf(lens, style)}`);
 }
 
 /**
@@ -60,7 +60,7 @@ export function keptView(id, { key = `kept:${id}`, style = {} } = {}) {
   const host = h('div', { class: 'lens-wrap' }, h('div', { class: 'empty' }, 'Loading…'));
   host.ready = api('get', { id })
     .then((got) => {
-      const kept = canvasLens(got.entity);
+      const kept = viewParts(got.entity);
       const of = got.outgoing.find((o) => o.type === 'about')?.id;
       // Its steps are played by a drawing that knows them, with what they name drawn too.
       const steps = Array.isArray(got.entity.props?.steps) ? got.entity.props.steps : undefined;
@@ -84,28 +84,33 @@ export function keptView(id, { key = `kept:${id}`, style = {} } = {}) {
 const keptStyle = (style) => Object.fromEntries(['shape', 'lit', 'style'].filter((k) => style?.[k]).map((k) => [k, style[k]]));
 /** Whether what is up differs from what the canvas keeps. */
 const edited = (item, lens, style) => {
-  const kept = canvasLens(item);
-  return flatQuery(kept.lens, keptStyle(kept.style)) !== flatQuery(lens, keptStyle(style));
+  const kept = viewParts(item);
+  return addressOf(kept.lens, keptStyle(kept.style)) !== addressOf(lens, keptStyle(style));
 };
 
-/** Keep what is up as a saved canvas: a name asked in the page; the name of one kept already updates it. */
-async function save(lens, style, current, open) {
+/** A view's own settings: what it holds beyond the layout and style the bar switches, kept through a Save. */
+const settingsOf = (item) => {
+  const { shape: _s, lit: _l, style: _k, ...settings } = item?.props?.style ?? {};
+  return settings;
+};
+
+/** Keep what is up: into the view up, at once; else, or with `fresh` (Save as new view), under a name asked in the page. */
+async function save(lens, style, current, open, fresh = false) {
   const all = await savedCanvases();
-  const name = await ask({ title: 'Save this canvas', message: current ? `Its name: left empty, “${current.title}” is updated.` : 'Its name.', input: { placeholder: current?.title ?? 'A name, a few words' }, action: 'Save' });
-  if (name === null) return;
-  const title = name || current?.title;
-  if (!title) return tell('Not saved', 'A canvas needs a name.');
+  const title = current && !fresh ? current.title : await ask({ title: 'Save this view', message: 'Its name.', input: { placeholder: 'A name, a few words' }, action: 'Save' });
+  if (title === null) return;
+  if (!title) return tell('Not saved', 'A view needs a name.');
   if (title.length > 60) return tell('Not saved', 'A name is a few words: 60 characters at most.');
   const { filter, walk, limit, time } = lens;
-  // A pack's canvas saved under its own name is the owner's version of it, standing in its place.
-  const props = { filter, walk, limit: limit ?? null, time: time ?? null, style: keptStyle(style), ...(current?.preset && title === current.title && { preset: current.id }) };
+  // A pack's view saved under its own name is the owner's version of it, standing in its place.
+  const props = { filter, walk, limit: limit ?? null, time: time ?? null, style: { ...settingsOf(current), ...keptStyle(style) }, ...(current?.preset && title === current.title && { preset: current.id }) };
   const same = all.find((c) => !c.preset && c.title.toLowerCase() === title.toLowerCase());
   const made = same
     ? await api('change', { ops: [{ op: 'update', id: same.id, props: { ...props, pins: null } }], reason: 'Saved from the query bar' })
     : await api('change', { ops: [{ op: 'create', ref: 'canvas', type: TYPE, title, props }], reason: 'Saved from the query bar' });
   const id = same?.id ?? made.created?.canvas;
   savedCanvases(true);
-  if (id) open(`#/v?${flatQuery(lens, { ...style, canvas: id })}`);
+  if (id) open(`#/v?${addressOf(lens, { ...style, canvas: id })}`);
 }
 
 /** Delete a saved canvas, after asking: it is retired (a lens's closed status), so it leaves the bar and Home and can
@@ -119,7 +124,7 @@ async function drop(lens, style, current, open) {
   }
   savedCanvases(true);
   const { canvas: _c, ...rest } = style;
-  open(`#/v?${flatQuery(lens, rest)}`);
+  open(`#/v?${addressOf(lens, rest)}`);
 }
 
 /** A mark drawn in the colour of what holds it, at the size of its text, from its strokes. */
@@ -152,15 +157,15 @@ let up = null;
 /** The canvas up, in the bar: a switch to every saved one (the current named, marked when changed since), and Save. `open` goes to an address (a pane's own, ui/panes.js). */
 export function canvasSwitch(lens, style, isHome, open = (href) => (location.hash = href)) {
   up = style.canvas ?? null;
-  const part = h('span', { class: 'q-part q-canvas', title: 'The saved canvas up: switch to another, or save this one' });
+  const part = h('span', { class: 'q-part q-canvas', title: 'The view up: switch to another, or save this one' });
   savedCanvases().then((all) => {
     const current = upOf(all, lens, style);
     const changed = current && edited(current, lens, style);
     const pick = h(
       'select',
-      { class: 'q-pick', 'aria-label': 'Saved canvases', title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not saved: Save keeps it', onchange: (ev) => ev.target.value && open(ev.target.value) },
+      { class: 'q-pick', 'aria-label': 'Saved views', title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not saved: Save keeps it', onchange: (ev) => ev.target.value && open(ev.target.value) },
       // Not saved, it is named as its tab and its pane are: by what its filter finds.
-      !current && !isHome && h('option', { value: '', selected: true }, filterSaid(lens.filter, () => {}) || 'Canvas'),
+      !current && !isHome && h('option', { value: '', selected: true }, filterSaid(lens.filter, () => {}) || 'View'),
       h('option', { value: '#/', selected: isHome && !current }, 'Home'),
       all.map((c) => h('option', { value: canvasAt(c), selected: c === current }, `${c.title}${c === current && changed ? ' •' : ''}`)),
     );
@@ -169,7 +174,7 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const travel = own.filter((b) => b.classList.contains('q-travel'));
     // Each picker marked before it, its tooltip saying what it is.
     const named = (mark, title) => h('span', { class: 'q-label q-pick-label', title, 'aria-hidden': 'true' }, mark);
-    part.replaceChildren(...travel, named(canvasMark(), 'Canvas: the saved canvas up'), pick, named(styleMark(), 'Style: how this canvas is drawn'), lookSwitch(lens, style, open), h('button', { type: 'button', class: 'q-save q-word', title: current ? `Save: update “${current.title}”, or keep it as a new one` : 'Save this canvas', 'aria-label': 'Save this canvas', onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, 'Save')), ...(current && !current.preset ? [h('button', { type: 'button', class: 'q-save q-delete', title: `Delete “${current.title}”`, 'aria-label': 'Delete this saved canvas', onclick: () => drop(lens, style, current, open) }, binMark())] : []), ...own.filter((b) => !travel.includes(b)), canvasMenu([styleDelete(lens, style, open)]));
+    part.replaceChildren(...travel, named(canvasMark(), 'View: the saved view up'), pick, named(styleMark(), 'Layout: how this view is arranged'), lookSwitch(lens, style, open), h('button', { type: 'button', class: 'q-save q-word', title: current ? (changed ? `Save the changes to “${current.title}”` : `“${current.title}” is saved`) : 'Save this view', 'aria-label': 'Save this view', ...(current && !changed && !current.preset && { disabled: true }), onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, changed ? 'Save •' : 'Save')), ...(current && !current.preset ? [h('button', { type: 'button', class: 'q-save q-delete', title: `Delete “${current.title}”`, 'aria-label': 'Delete this saved view', onclick: () => drop(lens, style, current, open) }, binMark())] : []), ...own.filter((b) => !travel.includes(b)), canvasMenu([current && { text: 'Save as new view', title: 'Keep what is up as a view of its own', act: () => save(lens, style, current, open, true) }, styleDelete(lens, style, open)]));
     fitBar();
   });
   return part;
@@ -191,9 +196,9 @@ const row = (c, now) =>
     'li',
     { class: 'row-top nowrap-row' },
     h('a', { class: 'gist', href: canvasAt(c), title: c.title }, c.title),
-    h('span', { class: 'muted small gist', title: lensWords(canvasLens(c).lens) }, lensWords(canvasLens(c).lens)),
+    h('span', { class: 'muted small gist', title: lensWords(viewParts(c).lens) }, lensWords(viewParts(c).lens)),
     c.props?.pinned === true && h('span', { class: 'pill', title: 'Pinned' }, 'pinned'),
-    c.id === now && h('span', { class: 'pill ok', title: 'The canvas up now' }, 'up'),
+    c.id === now && h('span', { class: 'pill ok', title: 'The view up now' }, 'up'),
   );
 
 /** Home's list: every saved canvas of the workspace, then, folded, those kept as views of an item. */
@@ -208,8 +213,8 @@ export async function canvasesPiece(host, title) {
       'section',
       { class: 'card wide canvases', style: 'margin-bottom: var(--space-8); min-width: 0' },
       h('header', {}, h('h2', {}, title)),
-      own.length ? h('ul', { class: 'rows' }, own.map((c) => row(c, now))) : h('div', { class: 'empty', title: 'Save in the bar keeps what is up as one' }, 'None saved yet.'),
-      items.length > 0 && h('details', { class: 'old-views' }, h('summary', { class: 'muted small', title: 'Canvases kept as views of one item' }, `Views of items (${items.length})`), h('ul', { class: 'rows' }, items.map((c) => row(c, now)))),
+      own.length ? h('ul', { class: 'rows' }, own.map((c) => row(c, now))) : h('div', { class: 'empty', title: 'Save in the bar keeps what is up as a view' }, 'None saved yet.'),
+      items.length > 0 && h('details', { class: 'old-views' }, h('summary', { class: 'muted small', title: 'Views kept about one item' }, `Views of items (${items.length})`), h('ul', { class: 'rows' }, items.map((c) => row(c, now)))),
     ),
   );
 }

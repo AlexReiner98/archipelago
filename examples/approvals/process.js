@@ -41,7 +41,7 @@ export default function draw({ canvas, answer, theme, size, tree, on, open, tip,
     numbers: answer.style.numbers,
   });
 
-  // ---- Drawing.
+  // ---- Layout.
   const done = (i) => !i.open;
   const yours = (i) => me && i.state.waits_on.includes(me);
   const dotColor = (i) => (done(i) ? theme.done : yours(i) ? theme.you : i.state.blocked ? theme.blocked : i.state.sessions ? theme.session : null);

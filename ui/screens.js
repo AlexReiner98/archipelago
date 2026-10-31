@@ -12,7 +12,7 @@ import { heldPiece } from './held.js';
 import { startPiece } from './start.js';
 import { gate } from './gate.js';
 import { proofPart } from './proof.js';
-import { flatView } from './lens.js';
+import { flatView } from './query.js';
 import { keptView } from './canvases.js';
 import { roadmap } from './roadmap.js';
 import { time } from './time.js';

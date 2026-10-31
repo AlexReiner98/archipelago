@@ -3,7 +3,7 @@
 // those entries is known as one. It is ‹ or › on the pane in focus, whichever pane took the step; an entry that only
 // opens or shuts a page over the canvas does just that.
 
-import { readFlatLens } from './lens.js';
+import { readAddress } from './query.js';
 import { activeId, hrefNow, travel } from './panes.js';
 import { front } from './tabs.js';
 
@@ -13,7 +13,7 @@ export function atOf(hash) {
   const [, name = '', arg] = where.split('/');
   if (name === '') return 'v';
   if (name === 'v') return query ? `v?${query}` : 'v';
-  if (name === 'e' && arg && readFlatLens(query).lens) return `v?${query}`;
+  if (name === 'e' && arg && readAddress(query).lens) return `v?${query}`;
   return undefined;
 }
 

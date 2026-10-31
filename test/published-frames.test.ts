@@ -24,11 +24,9 @@ async function published(call: (path: string, token?: string, body?: unknown) =>
         { op: 'link', type: 'part_of', from: 'a', to: 'e' },
         { op: 'link', type: 'part_of', from: 'b', to: 'e' },
         { op: 'link', type: 'calls', from: 'a', to: 'b' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', visibility: 'shared', status: 'current', props: { filter: { find: ['type project', 'type environment', 'type component'] } } },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', visibility: 'shared', status: 'current', props: { filter: { find: ['type project', 'type environment', 'type component'] }, style: { shape: 'architecture' } } },
         { op: 'link', type: 'about', from: 'l', to: 'p' },
         { op: 'link', type: 'part_of', from: 'l', to: 'd' },
-        { op: 'create', ref: 's', type: 'style', title: 'As architecture', status: 'current', props: { shape: 'architecture' } },
-        { op: 'link', type: 'about', from: 's', to: 'l' },
         ...extra,
       ],
     })
@@ -61,7 +59,7 @@ test('a published picture keeps its first frame, its page carries its data, and 
   assert.ok(inPage, 'the data is in the page');
   assert.deepEqual(JSON.parse(inPage[1]), data);
   assert.equal(html.match(/<script/g)?.length, 2, 'no script but its own and its data');
-  for (const file of ['/doc-lens.js', '/drawing.js', '/marks.js', '/base.js']) assert.match(html, new RegExp(`<link rel="modulepreload" href="${file}[?]v=`), file);
+  for (const file of ['/doc-lens.js', '/layout.js', '/marks.js', '/base.js']) assert.match(html, new RegExp(`<link rel="modulepreload" href="${file}[?]v=`), file);
   assert.ok(html.indexOf('src="/doc.js') < html.indexOf('id="page-data"'), 'its script is asked for before its data is read');
   assert.ok(!html.includes('Loading'));
   assert.ok(!html.includes('noindex'), 'what the text says is not read as a replacement pattern');
@@ -99,7 +97,7 @@ test('in a browser, the text and the first frame are on the page together, and t
 
     // A first frame that says what a drawing may not is not drawn: the drawing draws the picture.
     const said = await page.evaluate(`(async () => {
-      const { drawWith } = await import('/drawing.js');
+      const { drawWith } = await import('/layout.js');
       const answer = JSON.parse(document.getElementById('page-data').textContent).lenses[${JSON.stringify(l)}];
       const host = document.createElement('div');
       document.body.append(host);
@@ -131,11 +129,11 @@ test('a page opened with ?live is told when its document is published again', as
 
 test('in a browser, a page opened with ?live draws itself anew when published again, with no reload', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { call, base } = await serve('off');
-  const { d, s } = await published(call);
+  const { d, l } = await published(call);
   const page = await open(`${base}/p/default/${d}?live`);
   try {
     await page.evaluate(`(async () => { for (let n = 0; n < 200 && !document.querySelector('main h1'); n++) await new Promise((r) => setTimeout(r, 25)); window.stayed = true; })()`);
-    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: d, title: 'The system, renamed' }, { op: 'update', id: s, props: { lit: 'all' } }] });
+    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: d, title: 'The system, renamed' }, { op: 'update', id: l, props: { style: { shape: 'architecture', lit: 'all' } } }] });
     await call('/api/publish', undefined, { id: d });
     const title = await page.evaluate(`(async () => { for (let n = 0; n < 200 && document.querySelector('main h1')?.textContent !== 'The system, renamed'; n++) await new Promise((r) => setTimeout(r, 25)); return document.querySelector('main h1').textContent; })()`);
     assert.equal(title, 'The system, renamed');

@@ -1,4 +1,4 @@
-// The flow drawing's layout (draw/flow/layout.js): a lens answer in, a flat graph out, checked for what a reader of the
+// The flow drawing's layout (layouts/flow/layout.js): a lens answer in, a flat graph out, checked for what a reader of the
 // drawing relies on: every item a step and none inside another, no two steps overlap, every wire turns only at right
 // angles and comes straight into its head, no two share a line, wires cross only where they must, part_of keeps its ends
 // near, a step put by hand stays where it was put, and a huge map is drawn in a few seconds at about the page's shape.
@@ -8,9 +8,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
-import { count } from './draw/flow/count.js';
+import { count } from './layouts/flow/count.js';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
-import { layout } from './draw/flow/layout.js';
+import { layout } from './layouts/flow/layout.js';
 
 const state = { blocked: false, waits_on: [], sessions: 0 };
 const item = (id: string, kind = 'work', extra: Record<string, unknown> = {}) => ({ id, kind, inside: 'r', title: `Step ${id}`, place: 0, open: true, status: 'todo', state, ...extra });

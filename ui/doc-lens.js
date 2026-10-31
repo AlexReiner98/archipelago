@@ -1,10 +1,10 @@
 // A picture in a published document (/p/...): the lens's answer as it was frozen when the document was published,
 // drawn by its drawing, read by anyone with no login (and a draft's, read now, on /read/<id>). Nothing is asked of the map: the
-// answer is all there is. A part opens nowhere: what it says of itself, its drawing says (in a tip, ui/drawing-tip.js).
+// answer is all there is. A part opens nowhere: what it says of itself, its drawing says (in a tip, ui/layout-tip.js).
 
 import { h } from './base.js';
-import { drawWith } from './drawing.js';
-import { dress } from './lens-base.js';
+import { drawWith } from './layout.js';
+import { dress } from './query-base.js';
 import { types } from './words.js';
 
 const ITEM = /^#\/e\/(e_[a-z0-9]{8})$/;

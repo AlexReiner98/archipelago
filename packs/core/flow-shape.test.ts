@@ -2,8 +2,8 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { shape } from './draw/flow/shape.js';
-import { tidy } from './draw/flow/polyline.js';
+import { shape } from './layouts/flow/shape.js';
+import { tidy } from './layouts/flow/polyline.js';
 
 const SIZES = { room: 12, run: 18, corner: 14, wire: 12, ports: 5, rounds: 2, cost_cross: 100000, cost_bend: 200, cost_side: 300 };
 const box = (x: number, y: number, w = 120, h = 40, pointed = false) => ({ x, y, w, h, pointed });

@@ -1,6 +1,6 @@
 // The kernel's own views that are not lenses: each reads what is kept to run the map (runs, notifications, the log,
 // the styles and views kept) rather than a picture of the work, and src/operational.ts names each with its rule.
-// Every picture of the work is a lens: a lens preset a pack declares (src/lens-presets.ts), asked by the same name.
+// Every picture of the work is a lens: a lens preset a pack declares (src/query-presets.ts), asked by the same name.
 
 import { type Actor, type Entity, type Archipelago } from './pelago.ts';
 import { spent } from './spent.ts';
@@ -108,7 +108,7 @@ export const VIEWS: Record<string, View> = {
     run: spent,
   },
   usage: {
-    description: 'How much of each limit of its plan the workspace uses, and what that use is made of, answered as a lens is (items and links), so the plan pack’s Usage canvas draws it. Each limit (storage, agent sessions at once, requests this minute, looks this hour; members for an admin) is an item whose use says used, shown, of and of_shown (what the plan allows, where it limits it), share, near and over; each part of it is an item part_of it: storage by what it is made of (facts, change sets, streams, images), then by type and the largest items (the bytes each has added to the log); sessions by name; requests and looks by who asked. A part that is an item names it (use.item). What you cannot see is summed with no title. Where no plan limits it, of is left out. Params: none.',
+    description: 'How much of each limit of its plan the workspace uses, and what that use is made of, answered as a query is (items and links), so the plan pack’s Usage canvas draws it. Each limit (storage, agent sessions at once, requests this minute, looks this hour; members for an admin) is an item whose use says used, shown, of and of_shown (what the plan allows, where it limits it), share, near and over; each part of it is an item part_of it: storage by what it is made of (facts, change sets, streams, images), then by type and the largest items (the bytes each has added to the log); sessions by name; requests and looks by who asked. A part that is an item names it (use.item). What you cannot see is summed with no title. Where no plan limits it, of is left out. Params: none.',
     run: usage,
   },
   notifications: {
@@ -120,11 +120,11 @@ export const VIEWS: Record<string, View> = {
     run: sessions,
   },
   saved_views: {
-    description: 'Every view kept on the map (a lens, named by the style that draws it), with what it is a view of: pinned first, then the newest. Params: limit (100).',
+    description: 'Every view kept on the map (a query, named by the style that draws it), with what it is a view of: pinned first, then the newest. Params: limit (100).',
     run: (l, input) => savedViews(l, input as { limit?: number }),
   },
   style: {
-    description: 'How a page looks: the style of one item (the presets the packs ship, the workspace’s, its kind’s, its own, nearest last, a named set merged name by name), or with no item the workspace’s; and which styles went in (used). What an item page, the pages that are not views and the canvas are drawn by. Params: of (an item id), style (the id of one kept on the map, used outright), view (a view kept on the map: the styles kept about it too), have (the hashes of the drawings the page holds: then the style carries the drawing it names, its code left out when the page has it), try (a theme preset’s id: drawn as if the owner kept it, for this read only, nothing kept), `shape` (the form the reader chose for this view, as the view band’s switch names it: drawn in it, with its drawing, over every style).',
+    description: 'How a page looks: the style of one item (the presets the packs ship, the workspace’s, its kind’s, its own, nearest last, a named set merged name by name), or with no item the workspace’s; and which styles went in (used). What an item page, the pages that are not views and the canvas are drawn by. Params: of (an item id), style (the id of one kept on the map, used outright), view (a view kept on the map: the styles kept about it too), have (the hashes of the layouts the page holds: then the style carries the layout it names, its code left out when the page has it), try (a theme preset’s id: drawn as if the owner kept it, for this read only, nothing kept), `shape` (the form the reader chose for this view, as the view band’s switch names it: drawn in it, with its layout, over every style).',
     run: (l, input) => pageStyle(l, input),
   },
   instructions: {

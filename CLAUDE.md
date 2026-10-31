@@ -17,7 +17,7 @@ where, and how that server is run.
   files, and the open work. Say what you take on with `report` action
   `session_update`, and keep the map true as you go: there is no handoff
   note to write.
-- **The pelago tools are nine.** `query` reads (a view, a lens, or a read
+- **The pelago tools are nine.** `query` reads (a view, a query, or a read
   such as `get`, `search`, `schema`, `events`), `change` writes, `undo` takes
   a change set back, and every other action is called under its verb
   (`capture`, `assign`, `report`, `ask`, `settle`, `revise`) by name, with its
@@ -156,7 +156,7 @@ reply ending, commits accounted for) is `docs/agents.md`.
   that code a page to touch, a way to the network, or anything typed. After
   changing `ui/draw.js`, `ui/draw.html`, `ui/marks.js`, `ui/surface.js` or the frame's policy in
   `src/server.ts`, run a hostile style against it in a real browser (the
-  browser pane will not load a sandboxed frame; to see drawings there, start a dev server with `PELAGO_UNSANDBOXED=1`, which drops that wall and keeps the worker); `test/drawings.test.ts`
+  browser pane will not load a sandboxed frame; to see drawings there, start a dev server with `PELAGO_UNSANDBOXED=1`, which drops that wall and keeps the worker); `test/layouts.test.ts`
   does, in headless Chrome.
 
 ## UI rules
@@ -172,15 +172,15 @@ The canvas keeps to these (the flat canvas, 25 Oct 2026: document
 - **Depth is never drawn.** Every item is a node on one plane and every
   link a wire; `part_of` is a quiet tie, never a box inside a box. Zoom is
   scale and how much text shows, never structure.
-- **Lens and style are the whole surface.** What a canvas shows is a flat
-  lens (a filter of terms that add seeds and terms that must all hold of
+- **Query and layout are the whole surface.** What a canvas shows is a
+  query (a filter of terms that add seeds and terms that must all hold of
   them, a walk, a limit), always in sight in find at the canvas's foot; how it
   looks is a style. A click adds to the filter and a search sets its text:
-  growing a canvas is editing its lens. A person and an agent read the same
-  lens (`query` name `flat`), and the page calls no tool an agent lacks for
+  growing a canvas is editing its query. A person and an agent read the same
+  query (`query` name `flat`), and the page calls no tool an agent lacks for
   it; `npm test` freezes the names the page calls through `/api`.
-- **Home is the saved canvases.** A canvas kept on the map is a lens and a
-  style (core's `lens` type); Home lists them, and the bar switches between
+- **Home is the saved views.** A view kept on the map is a query and a layout
+  with its settings (core's `lens` type); Home lists them, and the bar switches between
   them. There is no other list of views.
 - **Places never carry meaning.** Where a person puts a node is kept in the
   places stream, one place per canvas and item, read only to draw it there.
@@ -189,7 +189,7 @@ The canvas keeps to these (the flat canvas, 25 Oct 2026: document
   each is `change` on the person's authority, through the one write path, and
   a held change is drawn as a ghost where it would land. Moves are the one
   batch that is not, written to the places stream before the next action.
-- **The page is a replica of the log.** It holds a lens's answer as items
+- **The page is a replica of the log.** It holds a query's answer as items
   and links by id and keeps it current from the facts after its position
   (`tail`), with the projector the server runs; it never polls for a picture.
 
@@ -223,8 +223,8 @@ spatial where it can be):
 - **Names, not identifiers.** Actors through `who`, events through `verb`,
   times through `ago`, authority through `authorityMark`. An id is something
   to copy, never something to read.
-- **One word for each idea.** Item, link, kind, type, field, view,
-  drawing, pack, change, rule, the map, as `docs/glossary.md` defines them;
+- **One word for each idea.** Item, link, kind, type, field, query, view,
+  layout, style, pack, change, rule, the map, as `docs/glossary.md` defines them;
   `npm test` refuses the retired words in the UI and the tool text.
 - **A mark for a state.** Status, age, authority and counts are marks and
   numbers, not sentences.
@@ -282,16 +282,16 @@ else a pack"). These rules keep it composable while that happens, and
   no values: a colour, a length or a number constant in `ui/` is counted,
   and the count only goes down.
 
-- **Every view is drawn by a drawing a pack ships** (the owner, 22 Oct 2026):
-  code for one form (list, flow, grid...), in `pack.json` `drawings`, changed by the owner on
+- **Every view is drawn by a layout a pack ships** (the owner, 22 Oct 2026):
+  code for one form (list, flow, grid...), in `pack.json` `layouts`, changed by the owner on
   the map, run in the sandbox, answering with marks the page checks
-  (`docs/drawings.md`). The kernel keeps the frame every view has. A
+  (`docs/layouts.md`). The kernel keeps the frame every view has. A
   drawing moved out of the kernel must draw what the kernel drew: the same
   marks, looks and behaviour, checked in a real browser.
 - **A wired drawing is layers and one solver** (the owner, 30 Oct 2026). Each
   module names its layer, imports run one way, only Metrics sets a place, a
   length is a size on the style, and no two wires share a stretch. The rules,
-  and how to add one, are in `docs/drawings.md`.
+  and how to add one, are in `docs/layouts.md`.
 
 Each rule keeps a list of what already broke it on 16 Oct 2026. An entry may
 only shrink and goes once the rule is met: when your change brings a number
@@ -327,7 +327,7 @@ between tries, run every file:
 npm run test:full
 ```
 
-That run is needed before a push of any change to the rules, a drawing, the
+That run is needed before a push of any change to the rules, a layout, the
 canvas, a page the browser tests load, the schema, backups or the log's
 storage.
 

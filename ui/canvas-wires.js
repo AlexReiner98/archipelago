@@ -1,5 +1,5 @@
 // Changes held for the owner, decided where they are drawn (the owner, 25 Oct 2026). Wires are no longer drawn by
-// hand on the canvas (the owner, 28 Oct 2026: never used). A click on a held change's badge (ui/drawing.js: `drawing-held`) puts that change to the person, in the page's words
+// hand on the canvas (the owner, 28 Oct 2026: never used). A click on a held change's badge (ui/layout.js: `drawing-held`) puts that change to the person, in the page's words
 // (ui/held.js), and applies or declines it through `decide`, the page's own path.
 
 import { api, ask, tell } from './base.js';

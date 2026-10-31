@@ -1,4 +1,4 @@
-// A process told as it happens (draw/flow/story.js over draw/flow/index.js): every mark is drawn hidden, a step shows
+// A process told as it happens (layouts/flow/story.js over layouts/flow/index.js): every mark is drawn hidden, a step shows
 // what it brings in, a wire comes in once both its ends have, and the last step leaves what the steps leave in.
 
 import assert from 'node:assert/strict';
@@ -12,7 +12,7 @@ const pack = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'ut
 const house = { ...pack.styles.find((s: any) => s.id === 'core.house').props, shape: 'flow' };
 // The drawing shares modules with the architecture's: laid out by name in one folder, as the sandbox has them.
 const laid = mkdtempSync(join(tmpdir(), 'flow-story-'));
-for (const [name, file] of Object.entries(pack.drawings.find((d: any) => d.id === 'core.flow').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
+for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.flow').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 const measure = (t: string, px: number) => t.length * px * 0.55;
 const state = { blocked: false, waits_on: [], sessions: 0, needs_you: false };

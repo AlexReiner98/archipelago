@@ -9,12 +9,11 @@
 import { api, hooks, idsOf, state } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { canvasSwitch } from './canvases.js';
-import { numberOf } from './lens-base.js';
-import { FOCUS, flatQuery, flatView } from './lens.js';
+import { numberOf } from './query-base.js';
+import { FOCUS, addressOf, flatView } from './query.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
 
-const sheet = document.getElementById('sheet');
 /**
  * Home: open projects (what stands at a project's altitude) and whatever waits on the viewer, with no walk and a short
  * limit, so the first canvas answers one question (decision e_5stjvfvb). Growing it is a step taken from an item.
@@ -48,9 +47,9 @@ function barNow() {
   if (c?.view) drawQuery(c.lens, c.view, c.pane.go, canvasSwitch(c.lens, c.asked, c.home, c.pane.open));
 }
 /** The lens the canvas in focus draws now. */
-export const lensNow = () => current?.lens ?? null;
+export const queryNow = () => current?.lens ?? null;
 /** Draw this lens in the canvas in focus. */
-export const goLens = (lens) => current?.pane.go(lens);
+export const goQuery = (lens) => current?.pane.go(lens);
 /** Open an address in the canvas in focus: a saved canvas, or a lens in a style, as the bar's switches do. */
 export const openHere = (href) => current?.pane.open(href);
 /** The style the canvas in focus was asked for (a shape, a style kept by id, the saved canvas up). */
@@ -58,10 +57,10 @@ export const styleNow = () => current?.asked ?? {};
 /** Draw the lens up in a style, as the style switch does: a shape, a style kept by its id, or neither for the house's. */
 export const drawIn = (style) => {
   const { shape: _s, style: _k, ...rest } = styleNow();
-  openHere(`#/v?${flatQuery(lensNow() ?? home(), { ...rest, ...style })}`);
+  openHere(`#/v?${addressOf(queryNow() ?? home(), { ...rest, ...style })}`);
 };
 /** Open an item's page over the canvas in focus, the lens as it is. */
-export const openOver = (id) => current?.pane.opened(id, lensNow() ?? home());
+export const openOver = (id) => current?.pane.opened(id, queryNow() ?? home());
 /** Draw Home in the canvas in focus. */
 export const goHome = () => current?.pane.go(null);
 /** Whether the canvas in focus draws this item now. */
@@ -158,7 +157,7 @@ export function canvasIn(host, pane) {
     fit(force = false) {
       if (!settings.fit || (!force && at?.kept)) return;
       if (at) at.kept = null;
-      c.moves()?.fit(covered(host), ...bars(host));
+      c.moves()?.fit(0, ...bars(host));
     },
     snap() {
       if (at?.style) at.style.snap = Boolean(settings.snap);
@@ -284,11 +283,6 @@ try {
 } catch {
   // Without storage, as it comes.
 }
-/** What the sheet covers on the right of a canvas; a sheet as wide as the page leaves nothing beside it. */
-const covered = (host) => {
-  if (document.body.dataset.sheet !== 'open' || sheet.offsetWidth >= innerWidth * 0.8) return 0;
-  return Math.max(0, host.getBoundingClientRect().right - sheet.getBoundingClientRect().left);
-};
 /** What the bars cover of a canvas above and below: the query bar's foot, and the find bar's top, in the canvas's own frame. */
 const bars = (host) => {
   const edge = (id, side) => { const el = document.getElementById(id); return el && !el.hidden ? el.getBoundingClientRect()[side] : undefined; };
@@ -310,6 +304,5 @@ function toggle(name) {
 }
 // What the band's menu (ui/canvas-menu.js) acts on: Arrange the pane in focus, and the reader's toggles.
 hooks.canvasNow = { arrange: () => current?.arrange(), settings, toggle };
-// The sheet opening or shutting, and the window resized, change the room each is fitted to.
-new MutationObserver(fitAll).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
+// The window resized, or the panes drawn again as the sheet opens or shuts (ui/panes.js), change the room each is fitted to.
 addEventListener('resize', fitAll);

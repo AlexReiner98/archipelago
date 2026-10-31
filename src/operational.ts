@@ -60,7 +60,7 @@ export const STORES: Record<string, string> = {
 
 /**
  * The kernel's views that are not lenses (Rule 6 of the model: one way to read), each with what it reads instead of
- * a picture of the work. Every other view is a lens preset a pack declares (src/lens-presets.ts) or a pack's own;
+ * a picture of the work. Every other view is a lens preset a pack declares (src/query-presets.ts) or a pack's own;
  * test/structure.test.ts refuses a kernel view named in neither place.
  */
 export const VIEWS_OPERATIONAL: Record<string, string> = {

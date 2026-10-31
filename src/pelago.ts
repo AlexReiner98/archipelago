@@ -1,7 +1,7 @@
 // The map and its single write path. Every change to items and links goes through change(): it is validated, judged
 // by the rules (src/rules.ts), then either applied or stored as a proposal for a human, and always logged.
 
-import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts'; import { renamedLens } from './lens-names.ts';
+import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts'; import { renamedQuery } from './query-names.ts';
 import { AGENT_CHANGES, agentChanges, decide, DEFAULT_AGENT_POLICY, type Policy, type Ruled } from './rules.ts';
 import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.ts'; import { authorityOf } from './authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
@@ -9,7 +9,7 @@ import { bodyAfter, dropExcepted } from './ops.ts'; import { mergeRefusals, once
 import type { Registry, TypeDef } from './packs.ts'; import { currentNames, typesAfter, typesApplied } from './type-items.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
 import { KEPT_FIELDS } from './operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from './streams.ts';
-import { search, type SearchInput } from './search.ts'; import { drawingOf } from './drawing-changes.ts';
+import { search, type SearchInput } from './search.ts'; import { layoutOf } from './layout-changes.ts';
 import { append, headOf, type Decision, type Fact } from './log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
 import { privateDependencies } from './private-deps.ts'; import { decideProposal, supersede } from './proposals.ts'; import { asOwner, forgetIn, type ForgetOp } from './forget.ts'; import { guardedFetch } from './outbound.ts';
 
@@ -127,7 +127,7 @@ export interface ChangeInput {
   /** From an agent: have this change wait for a human even where agents' changes are applied as made. */
   hold?: boolean;
   /** The pack action that made it, named on every event it logs ("time.log made this"). */
-  action?: string; /** The pack whose action or handler made it: what it writes is kept to the pack's reach (core's pack_reach). */ pack?: string; /** From the page: the style whose code asked for it (src/drawing-changes.ts). */ drawing?: string;
+  action?: string; /** The pack whose action or handler made it: what it writes is kept to the pack's reach (core's pack_reach). */ pack?: string; /** From the page: the style whose code asked for it (src/layout-changes.ts). */ drawing?: string;
   /** The change set this one reverses: undo's own. */
   undoes?: string; /** The session it was made in (a run's id), kept in the log's entry: where it came from, never on whose authority. */ run?: string;
 }
@@ -252,7 +252,7 @@ export class Archipelago {
     const claimed = input.authority;
     const authority = authorityOf(actor.kind === 'human', me, claimed);
     // Whether it applies, waits or is refused is the rules' to say (src/rules.ts), and the answer names the rule.
-    const who = { human: actor.kind === 'human', reading: measured, may: actor.may, asked: input.hold, said: Boolean(claimed), pack: input.pack, ...(await drawingOf(this, actor, input)) };
+    const who = { human: actor.kind === 'human', reading: measured, may: actor.may, asked: input.hold, said: Boolean(claimed), pack: input.pack, ...(await layoutOf(this, actor, input)) };
     const verdict = await decide(this.db, this.registry, who, input.ops, this.policy);
     if (verdict.outcome === 'refuse') throw new Error(`Change rejected:\n${verdict.refused.map((r) => `- ${r}`).join('\n')}`);
     // A question an agent settled, where the owner lets it, is put to them by the next session they talk to.
@@ -582,10 +582,10 @@ export class Archipelago {
         what === 'entity' ? `select id from entity where type = $1 -- index entity_type` : `select id, from_id, to_id from relation where type = $1`,
         [from],
       );
-      // What names it in its settings: a screen in on, a view kept on the map in its lens (src/lens-names.ts).
+      // What names it in its settings: a screen in on, a view kept on the map in its lens (src/query-names.ts).
       const { rows: held } = await tx.query<{ id: string; type: string; props: Props }>(`select id, type, props from entity where type = any($1::text[]) -- index entity_type`, [[...this.registry.family('screen'), ...this.registry.family('lens')]]);
       const on = (p: Props) => (what === 'entity' && Array.isArray(p.on) && p.on.includes(from) ? { on: p.on.map((t) => (t === from ? to : t)) } : {});
-      const named = held.map((r) => ({ id: r.id, props: this.registry.isA(r.type, 'lens') ? renamedLens(r.props, from, to, what) : on(r.props) })).filter((r) => Object.keys(r.props).length);
+      const named = held.map((r) => ({ id: r.id, props: this.registry.isA(r.type, 'lens') ? renamedQuery(r.props, from, to, what) : on(r.props) })).filter((r) => Object.keys(r.props).length);
       const settings = named.length ? { settings: named.map((r) => r.id) } : {};
       const reason = `Every ${from} is a ${to} now: its pack took the ${what === 'entity' ? 'type' : 'relation'} over.`;
       const facts = rows.flatMap((r): Fact[] => (what === 'entity' ? [['+', r.id, 'type', to]] : [['+', r.id, 'link', [to, r.from_id, r.to_id]]]));

@@ -5,10 +5,10 @@
 // Taking a document down stays the human's.
 //
 // What is frozen is what the public read gives (src/public-document.ts), and for each view kept on the map it brings
-// in, the picture's data (src/lens-saved.ts) with nothing private in it and nothing that names a person or a session.
+// in, the picture's data (src/query-saved.ts) with nothing private in it and nothing that names a person or a session.
 
 import { authorityOf } from './authority.ts';
-import { drawingFor } from './drawings.ts';
+import { layoutFor } from './layouts.ts';
 import { headOf } from './log.ts';
 import { notify } from './notify.ts';
 import { actorId, type Actor, type Archipelago, type Authority } from './pelago.ts';
@@ -159,7 +159,7 @@ function withDrawings(l: Archipelago, doc: Record<string, unknown> | null) {
       if (style.drawing) return [id, frozen];
       // A picture on a time axis was drawn along it, unless it was a grid or a flow.
       const shape = frozen.lens?.time && !['grid', 'flow'].includes(String(style.shape)) ? 'time' : String(style.shape);
-      const drawing = drawingFor(l.registry, { shape }, []) ?? drawingFor(l.registry, { shape: 'flow' }, []);
+      const drawing = layoutFor(l.registry, { shape }, []) ?? layoutFor(l.registry, { shape: 'flow' }, []);
       return [id, drawing ? { ...frozen, style: { ...style, drawing } } : frozen];
     }),
   );

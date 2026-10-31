@@ -8,7 +8,7 @@
 // changed is read again in a frame that takes the old one's place once it has drawn, so nothing around it moves.
 
 import { api, authHeaders, h, state } from './base.js';
-import { numberOf } from './lens-base.js';
+import { numberOf } from './query-base.js';
 
 const ID = /^e_[a-z0-9]{8}$/;
 export const AS = ['draft', 'published', 'own'];

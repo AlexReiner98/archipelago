@@ -334,16 +334,16 @@ There are more (`hubs`, `proof`, `changelog`, `recheck`, `agent_usage`,
 `notifications`, `graph`).
 
 The lens is the flat lens (`flat`): a filter, a walk and a limit, answered as
-items and the links among them (`src/lens-flat.ts`). Its filter's text is
+items and the links among them (`src/query-flat.ts`). Its filter's text is
 the `search` read's own search, ranked the same, and the find bar on the page
 sets it. A pack declares its views
 in its pack file (`views`): one with `lens` is answered by a read of the
-kernel's that its `answer` names (`src/lens-presets.ts`), in the form that view
+kernel's that its `answer` names (`src/query-presets.ts`), in the form that view
 has always had; any other is answered by the pack's own code. The core pack's
 are `flat`, `attention`, `brief`, `graph` (`src/view-graph.ts`), `tree`
 (`src/view-tree.ts`) and `hubs`, each read on its own. A view kept on the map
 (an item of type `lens`, a saved canvas on the page) is a flat lens and a
-style (`src/lens-saved.ts`): a document draws it where a line names it, and
+style (`src/query-saved.ts`): a document draws it where a line names it, and
 publishing freezes its picture. `gate` is the software pack's, and reads around its event (the pack
 read `around`). No view reads the whole map: a read around an item reads only
 what is around it (`src/region.ts`), so what it costs follows what it answers;
