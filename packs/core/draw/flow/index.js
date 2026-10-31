@@ -4,17 +4,20 @@
 // where one passes under another, and every other link (part_of first) a quiet tie between the two it ties, with a
 // head where it points unless the style draws its type headless (core's house style: part_of).
 // What follows an open question is dashed, as a scenario. Hovering a step lights its wires and ties and shows a tip:
-// its title and the start of its note. Drawn from the flat lens's answer (items and links); the older lens's still
-// draws, what each item is `inside` read as part_of. The layout is ./layout.js; this answers with the marks to draw
-// (SVG and HTML as data), which the page checks and mounts, so every name is in the page and every step a link. Its
+// its title and the start of its note. Every wire is drawn all the time: the layout places them all, so a wire left out of
+// the picture hides what placed it, and the key says how they cross, counted from those wires (./count.js). Drawn from the
+// flat lens's answer (items and links); the older lens's still draws, what each item is `inside` read as part_of. The
+// layout is ./layout.js, its model; this turns a model into the marks to draw (SVG and HTML as data), which the page checks
+// and mounts, so every name is in the page and every step a link, and two models into the patches between them. Its
 // look is ./look.js, in the lens's colours. A lens with steps tells the process as it happens (./story.js), the
 // conversation beside it. A place that holds parts may be a colour on them instead of a step (./places.js), as the
 // style says (place_hues). What is `pending` is a ghost: a change held for the owner, drawn where it would land (an
 // item faint, a link dashed, an edit marked on its step), each with a badge keyed `held:<proposal>` that the page
 // answers a click on by putting the change to the person; a link the person just drew (`mine`) is dashed until it is.
 
-import { placesOf, route, tieRoute } from './free.js';
-import { layout } from './layout.js';
+import { count } from './count.js';
+import { shownOnly } from './graph.js';
+import { latest, layout } from './layout.js';
 import { css } from './look.js';
 import { addClass, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
@@ -53,7 +56,8 @@ function outline(shape, x, y, w, hgt, rx) {
  * The graph: its steps, the wires and ties between them and what each choice is. `input` is what the page gives every
  * drawing (the answer, the style); `tools.measure(text, px, font, role)` is how wide a text is drawn, as one of the style's text roles when one is given.
  */
-export function picture({ answer, style, reduced, width, height }, tools) {
+export function picture({ answer: given, style, reduced, width, height }, tools) {
+  let answer = shownOnly(given);
   // A story lays out what its steps bring in, all of it, each mark hidden until a step shows it.
   const story = Array.isArray(answer.steps) && answer.steps.length > 0;
   if (story) {
@@ -86,9 +90,9 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     while (t.length > 1 && measure(`${t}…`, px, role) > width) t = t.slice(0, -1);
     return `${t}…`;
   };
-  // Steps put where a person put them stay there, and the rest is laid out round them (./layout.js, ./free.js). The
-  // link types the style draws no wire for (undrawn: core's house style, tagged) tie nothing here either.
-  const placed = story ? {} : placesOf(answer, style);
+  // Steps put where a person put them are pins (./pins.js). The link types the style draws no wire for (undrawn: core's
+  // house style, tagged) tie nothing here either.
+  const placed = story ? {} : { ...style.placed, ...style.moved };
   // The shape it is laid out toward: the pane's, as far as the style says to follow it (flow_aspect_follow, 0 not at
   // all, 1 wholly, more to lean further), from the shape it takes when the pane's is not known (flow_aspect).
   const [ASPECT, FOLLOW] = ['flow_aspect', 'flow_aspect_follow'].map((name) => {
@@ -98,14 +102,10 @@ export function picture({ answer, style, reduced, width, height }, tools) {
   });
   const pane = width > 0 && height > 0 ? width / height : ASPECT;
   const aspect = ASPECT * (pane / ASPECT) ** FOLLOW;
-  const laid = { items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect };
-  const g = layout({ ...laid, placed });
+  const g = layout({ items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, placed });
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
-  const boxOf = (id) => ({ x: g.x.get(id), y: g.y.get(id), w: g.nodes.get(id).w, h: g.nodes.get(id).h });
-  // Round the other steps where it can: the wire takes the track through the fewest of them.
-  const solve = (c) => (c.points = route(boxOf(c.a), boxOf(c.b), z('lead_out'), steps.filter((n) => n.id !== c.a && n.id !== c.b).map((n) => boxOf(n.id))));
-  const size = { width: g.width, height: g.height };
+  const told = latest(), size = { width: g.width, height: g.height };
 
   const yours = (i) => Boolean(i.state.needs_you);
   // What a step's dot says first: that it waits on you, is blocked or is under way; else its status, in its colour.
@@ -123,9 +123,7 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     const bx = tip[0] - ux * z('head_length'), by = tip[1] - uy * z('head_length'), [nx, ny] = dx ? [-uy, ux] : [-1, 0], half = z('head_half');
     return `M${tip[0]} ${tip[1]}L${bx + nx * half} ${by + ny * half}L${bx - nx * half} ${by - ny * half}Z`;
   };
-  // A tie runs from the higher of its ends down into the lower (./wires.js, ./free.js), or under its row from one to
-  // the other: its head is on the end its link points to (`headAt`, the end or the start of its line), the way the
-  // line comes into it: into a step's head from above, or into its foot from below.
+  // A tie's head is on the end its link points to (`headAt`, the end or the start of its line), the way the line comes into it.
   const headless = new Set(Array.isArray(style.headless) ? style.headless : []);
   const tieHead = (t) => head(t.headAt === 'start' ? [...t.points].reverse() : t.points);
   const line = (points) => `M${points.map((p) => p.join(' ')).join('L')}`;
@@ -144,9 +142,6 @@ export function picture({ answer, style, reduced, width, height }, tools) {
   // Ties under everything, then wires, then the breaks cut across them, then the steps over all, then what each choice is.
   const drawIn = story ? { pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 } : {};
   const pend = (p) => (p ? ` held${p.mine ? ' mine' : ''}` : '');
-  // A tie of a link type the style draws only on hover (hover_only: the canvas pack's, part_of) shows while one of its
-  // ends is hovered, lit as every tie is; one held for a person shows always.
-  const onHover = new Set(Array.isArray(style.hover_only) ? style.hover_only : []);
   // Each link type its colour: the one the style names for it (link_colours), else one of link_hues, the same for the
   // same type every time unless another type in this picture has it. A colour is a class with a rule of its own: a drawing sets no style on a mark.
   const named = style.link_colours && typeof style.link_colours === 'object' ? style.link_colours : {};
@@ -186,7 +181,7 @@ export function picture({ answer, style, reduced, width, height }, tools) {
   };
   const partOf = (id) => (hexOf.has(shownAs.of.get(id)) ? placeClass(hexOf.get(shownAs.of.get(id))) : '');
   const tieLayer = g.ties.map((t, n) => {
-    const cls = `${kind(t.type)}${onHover.has(t.type) && !t.pending ? ' on-hover' : ''}${pend(t.pending)}`;
+    const cls = `${kind(t.type)}${pend(t.pending)}`;
     const path = m('path', { key: `n:${n}`, d: line(t.points), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${headless.has(t.type) ? '' : ' headed'}${cls}`, ...drawIn, ...hidden });
     return headless.has(t.type) ? path : [path, m('path', { key: `nh:${n}`, d: tieHead(t), class: `lf-head${cls}`, ...hidden })];
   });
@@ -196,7 +191,8 @@ export function picture({ answer, style, reduced, width, height }, tools) {
   // The badges of held links, with the wire or tie each sits on, so a step moved takes them with its wires. A link of a
   // new item held in the same change is decided with it: the item's badge is the one.
   const madeBy = (id, p) => g.nodes.get(id)?.item?.pending?.op === 'create' && g.nodes.get(id).item.pending.proposal === p.proposal;
-  const linkBadges = [...g.chains, ...g.ties].filter((l) => held(l.pending) && !madeBy(l.a, l.pending) && !madeBy(l.b, l.pending)).map((l) => ({ l, mark: badge(l.pending, middleOf(l.points)) }));
+  const wiresIn = (model) => [...model.chains, ...model.ties];
+  const linkBadges = wiresIn(g).map((l, n) => [l, n]).filter(([l]) => held(l.pending) && !madeBy(l.a, l.pending) && !madeBy(l.b, l.pending)).map(([l, n]) => ({ n, mark: badge(l.pending, middleOf(l.points)) }));
   const breakLayer = g.breaks.map(([bx, by]) => m('g', { class: 'lf-break' }, m('rect', { x: bx - z('break_half'), y: by - z('break_reach'), width: 2 * z('break_half'), height: 2 * z('break_reach') }), m('path', { d: `M${bx - z('break_track')} ${by}H${bx + z('break_track')}` })));
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
@@ -226,9 +222,14 @@ export function picture({ answer, style, reduced, width, height }, tools) {
   // What each choice is, written once beside the question's drop, halfway to its track; a pill already says it.
   const said = new Map();
   for (const c of g.chains) if (c.says && !g.nodes.get(c.b).stub) said.set(`${c.a} ${c.says}`, c);
+  const saysText = (c) => fit(c.says, z('says_most'), z('says_text'), 'water'), saysWide = (c) => measure(saysText(c), z('says_text'), 'water') + 2 * z('says_pad');
+  /** Where a choice's words stand in a model: beside the drop of its chain. */
+  const saysAt = (model, c) => {
+    const d = g.nodes.get(c.a);
+    return [model.x.get(d.id) + saysWide(c) / 2 + z('says_aside'), (model.y.get(d.id) + d.h / 2 + model.chains[g.chains.indexOf(c)].points[1][1]) / 2];
+  };
   const saysLayer = [...said.values()].map((c) => {
-    const d = g.nodes.get(c.a), text = fit(c.says, z('says_most'), z('says_text'), 'water'), w = measure(text, z('says_text'), 'water') + 2 * z('says_pad');
-    const lx = g.x.get(d.id) + w / 2 + z('says_aside'), ly = (g.y.get(d.id) + d.h / 2 + c.points[1][1]) / 2, sh = z('says_height');
+    const text = saysText(c), w = saysWide(c), [lx, ly] = saysAt(g, c), sh = z('says_height');
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
   const svg = m('svg', { viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, breakLayer, stepLayer, saysLayer, [...stepBadges.values()], linkBadges.map((b) => b.mark));
@@ -280,59 +281,54 @@ export function picture({ answer, style, reduced, width, height }, tools) {
     const frames = statesOf(answer.steps);
     player = play({ answer, style, reduced, tools, shape: { frames, stage: (ctx) => reveal({ frames, marks, ...ctx }) } });
   }
-  // A step moved by hand (the page follows the drag: ui/drag.js): it goes where it is put, and its wires are solved
-  // again at right angles as it moves, its ties too. Let go, that is where it is, for the next drag.
-  const drawnAt = new Map(steps.map((n) => [n.id, [g.x.get(n.id), g.y.get(n.id)]]));
-  const at = new Map(drawnAt), dropped = new Map();
+  // A step moved by hand (the page follows the drag: ui/drag.js) is a pin: each frame is the model with it there, and what
+  // is drawn takes the difference. Let go, it stays a pin, for the next drag; the page keeps it.
+  const pins = { ...placed }, at = new Map(steps.map((n) => [n.id, [g.x.get(n.id), g.y.get(n.id)]]));
+  let now = g;
+  /** What changes on the page from one model to another. */
+  const between = (was, next) => {
+    const patches = [];
+    for (const [key, id] of keyed) {
+      if (next.x.get(id) === was.x.get(id) && next.y.get(id) === was.y.get(id)) continue;
+      const [x, y] = [next.x.get(id), next.y.get(id)], n = g.nodes.get(id);
+      patches.push({ key, set: { transform: `translate(${x - g.x.get(id)} ${y - g.y.get(id)})` } });
+      if (stepBadges.has(id)) patches.push({ key: stepBadges.get(id)[1].key, set: { transform: `translate(${x + n.w / 2} ${y - n.h / 2})` } });
+    }
+    next.chains.forEach((c, n) => c.points !== was.chains[n].points && patches.push({ key: `w:${n}`, set: { d: line(c.points) } }, { key: `h:${n}`, set: { d: head(c.points) } }));
+    next.ties.forEach((t, n) => {
+      if (t.points === was.ties[n].points) return;
+      patches.push({ key: `n:${n}`, set: { d: line(t.points) } });
+      if (!headless.has(t.type)) patches.push({ key: `nh:${n}`, set: { d: tieHead(t) } });
+    });
+    const wires = wiresIn(next), before = wiresIn(was);
+    for (const b of linkBadges) if (wires[b.n].points !== before[b.n].points) patches.push({ key: b.mark[1].key, set: { transform: `translate(${middleOf(wires[b.n].points).join(' ')})` } });
+    for (const c of said.values()) {
+      const [x, y] = saysAt(next, c), [x0, y0] = saysAt(g, c);
+      patches.push({ key: `t:${g.chains.indexOf(c)}`, set: { transform: `translate(${x - x0} ${y - y0})` } });
+    }
+    return patches;
+  };
   const move = (key, { dx = 0, dy = 0 }, done) => {
     const id = keyed.get(key);
     if (!id || !at.has(id)) return [];
-    const [x0, y0] = at.get(id), [x, y] = [x0 + Number(dx), y0 + Number(dy)];
-    g.x.set(id, x);
-    g.y.set(id, y);
-    if (done) (at.set(id, [x, y]), dropped.set(id, [Math.round(x), Math.round(y)]));
-    const [ox, oy] = drawnAt.get(id);
-    const patches = [{ key, set: { transform: `translate(${x - ox} ${y - oy})` } }, { tip: null }];
-    const was = g.nodes.get(id);
-    if (stepBadges.has(id)) patches.push({ key: stepBadges.get(id)[1].key, set: { transform: `translate(${x + was.w / 2} ${y - was.h / 2})` } });
-    g.chains.forEach((c, n) => {
-      if (c.a !== id && c.b !== id) return;
-      solve(c);
-      patches.push({ key: `w:${n}`, set: { d: line(c.points) } }, { key: `h:${n}`, set: { d: head(c.points) } });
-    });
-    g.ties.forEach((t, n) => {
-      if (t.a !== id && t.b !== id) return;
-      t.headAt = g.y.get(t.a) <= g.y.get(t.b) ? 'end' : 'start';
-      patches.push({ key: `n:${n}`, set: { d: line((t.points = tieRoute(boxOf(t.a), boxOf(t.b), z('lead_out'), steps.filter((s) => s.id !== t.a && s.id !== t.b).map((s) => boxOf(s.id))))) } });
-      if (!headless.has(t.type)) patches.push({ key: `nh:${n}`, set: { d: tieHead(t) } });
-    });
-    for (const b of linkBadges) if (b.l.a === id || b.l.b === id) patches.push({ key: b.mark[1].key, set: { transform: `translate(${middleOf(b.l.points).join(' ')})` } });
+    const [x0, y0] = at.get(id), put = done ? [Math.round(x0 + Number(dx)), Math.round(y0 + Number(dy))] : [x0 + Number(dx), y0 + Number(dy)];
+    const next = g.place({ ...pins, [id]: put }), patches = [{ tip: null }, ...between(now, next)];
+    now = next;
+    if (done) (at.set(id, put), (pins[id] = put));
     return patches;
   };
+  // The key says how the wires cross as they stand when drawn.
+  const { crossings, seen, shared } = count(wiresIn(g).map((w) => w.points));
+  const crossed = () => m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, m('path', { d: 'M1 1L21 13M1 13L21 1', class: 'lf-wire' }));
+  key.push(...[`${crossings} crossings`, `${seen} seen`, `${shared} shared`, `${told.up} of ${told.headed ?? g.chains.length} up`].map((label) => ({ glyph: crossed(), label })));
+  // Still on a page, a picture stands at its own size in the middle of the frame it is given, which would stretch it.
+  if (style.still && width > size.width && Array.isArray(svg)) {
+    svg[1].viewBox = `${(size.width - width) / 2} 0 ${width} ${size.height}`;
+    size.width = width;
+  }
   return {
     scene: { css: [css, ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: player?.end,
-    /** Lay out again with what was dropped, for a layout that wires a dropped step by its own logic: what moved, as patches. */
-    settled() {
-      const next = layout({ ...laid, placed: { ...placed, ...Object.fromEntries(dropped) } }), patches = [];
-      for (const [key, id] of keyed) {
-        if (!next.x.has(id) || (next.x.get(id) === g.x.get(id) && next.y.get(id) === g.y.get(id))) continue;
-        const [ox, oy] = drawnAt.get(id);
-        (g.x.set(id, next.x.get(id)), g.y.set(id, next.y.get(id)), at.set(id, [next.x.get(id), next.y.get(id)]));
-        patches.push({ key, set: { transform: `translate(${next.x.get(id) - ox} ${next.y.get(id) - oy})` } });
-      }
-      g.chains.forEach((c, n) => {
-        c.points = next.chains[n].points;
-        patches.push({ key: `w:${n}`, set: { d: line(c.points) } }, { key: `h:${n}`, set: { d: head(c.points) } });
-      });
-      g.ties.forEach((t, n) => {
-        t.points = next.ties[n].points;
-        t.headAt = next.ties[n].headAt;
-        patches.push({ key: `n:${n}`, set: { d: line(t.points) } });
-        if (!headless.has(t.type)) patches.push({ key: `nh:${n}`, set: { d: tieHead(t) } });
-      });
-      return patches;
-    },
     on(event) {
       const { name, key } = event;
       if (player && (key === 'play' || key === 'chat' || key.startsWith('c:'))) return player.on(event);

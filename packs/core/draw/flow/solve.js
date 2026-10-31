@@ -1,7 +1,8 @@
 // Every box edge and wire stretch placed by one solve, axis by axis: each is a number, and each pair that stands beside one
 // another keeps a least distance, by what the two are. The distance is asked for, not kept as found, so wires too near are
 // moved apart and no two wires share a line. Order on an axis is read off the drawing as given, so nothing crossed is undone
-// and nothing new is crossed. Layer: metrics. Pure: places and lines in, changed in place.
+// and nothing new is crossed. What is held stays where it stands and the rest keeps its distances from it, so a first draw
+// and a step put by hand are the same pass with different things held. Layer: metrics. Pure: places and lines in, changed in place.
 
 import { tidy } from './polyline.js';
 import { shelve } from './shelves.js';
@@ -11,6 +12,9 @@ const TOUCH = 0.5;
 
 /** How many times the arcs are gone over, at most: past it they ask for more than can be. */
 const PASSES = 400;
+
+/** How far each distance gives way, in turn, where what is held leaves too little room. */
+const SQUEEZE = [1, 0.5, 0.25];
 
 /** The numbers in an order every arc runs forward in, with what leaves each; null where they go in a ring. */
 function ordered(n, arcs) {
@@ -45,6 +49,68 @@ function reach({ queue, out }, spot, low, high) {
   return far.get(high);
 }
 
+/** Each number that is not `held`, as near where it stands as arcs a `scale` of their length let it; null if there is no room. */
+function fitted(places, held, arcs, { queue, out }, scale) {
+  const floor = places.map((v, k) => (held.has(k) ? v : -Infinity)), roof = places.map((v, k) => (held.has(k) ? v : Infinity));
+  for (const [p, q, l] of arcs) {
+    if (held.has(p) && !held.has(q)) floor[q] = Math.max(floor[q], places[p] + l * scale);
+    if (held.has(q) && !held.has(p)) roof[p] = Math.min(roof[p], places[q] - l * scale);
+  }
+  for (const v of queue) for (const [q, l] of out[v]) floor[q] = Math.max(floor[q], floor[v] + l * scale);
+  for (const v of [...queue].reverse()) for (const [q, l] of out[v]) roof[v] = Math.min(roof[v], roof[q] - l * scale);
+  const at = [...places];
+  for (const v of queue) {
+    if (held.has(v)) continue;
+    if (floor[v] > roof[v]) return null;
+    at[v] = Math.min(roof[v], Math.max(floor[v], places[v]));
+    for (const [q, l] of out[v]) floor[q] = Math.max(floor[q], at[v] + l * scale);
+  }
+  return at;
+}
+
+/**
+ * Each number that is not `held`, as near where it stands as every arc lets it. Between what is held there may not be room
+ * for all that asks for it: then every distance gives way alike, in `SQUEEZE` steps, so nothing changes order or runs into a
+ * box; `told.squeezed` counts those passes. With no room at any of them, what is free stays where it stands.
+ */
+function within(places, held, arcs, told) {
+  const order = ordered(places.length, arcs.filter(([p, q]) => !held.has(p) && !held.has(q)));
+  if (!order) throw new Error('The solve went in a ring');
+  for (const scale of SQUEEZE) {
+    const at = fitted(places, held, arcs, order, scale);
+    if (at) return at;
+    told.squeezed++;
+  }
+  return places;
+}
+
+/** Every number free: the least that keeps every arc, boxes rigid where they can be, leaning neither way. */
+function freely(places, arcs, boxes, told) {
+  const order = ordered(places.length, arcs);
+  if (!order) throw new Error('The solve went in a ring');
+  // A box is as big as its name and what lands on it need, and no bigger: that much and it stands rigid, so what stands
+  // beside its ports moves the box and never stretches it.
+  const spot = [];
+  order.queue.forEach((v, k) => (spot[v] = k));
+  const rigid = new Map(boxes.map((b) => [b, [b.high, b.low, -reach(order, spot, b.low, b.high)]]));
+  // Gone over in the order they run, a pass carries a number as far as it goes.
+  arcs.sort((p, q) => spot[p[0]] - spot[q[0]]);
+  let first;
+  for (;;) {
+    const tried = least(places.length, [...arcs, ...rigid.values()]);
+    if (tried.at) { first = tried.at; break; }
+    // What cannot stand rigid gives way: a box whose ports are held further apart than it measures.
+    let freed = 0;
+    for (const [b] of rigid) if (tried.moved.has(b.low) || tried.moved.has(b.high)) (rigid.delete(b), freed++);
+    if (!freed) throw new Error('The solve cannot keep every distance');
+    told.freed += freed;
+  }
+  const all = [...arcs, ...rigid.values()];
+  // As far toward the low side as can be, and as far toward the high: halfway keeps every distance, and leans neither way.
+  const end = Math.max(...first), back = least(places.length, all.map(([p, q, l]) => [q, p, l]).sort((p, q) => spot[q[0]] - spot[p[0]])).at;
+  return back ? first.map((v, k) => (v + end - back[k]) / 2) : first;
+}
+
 /** Stretches on one place that lie along one another, each told which side it belongs on by how it leaves the rest. */
 function sides(group, axis) {
   const least = Math.min(...group.map((s) => s.lo)), most = Math.max(...group.map((s) => s.hi));
@@ -56,7 +122,7 @@ function sides(group, axis) {
 }
 
 /** One pass along `axis`, 0 across and 1 down. */
-function pass(axis, { lines, boxes, wire, room, run, corner, apart, told }) {
+function pass(axis, { lines, boxes, wire, room, run, corner, apart, told, still }) {
   const other = 1 - axis, stretches = [], places = [];
   const number = (value) => (places.push(value), places.length - 1);
   for (const b of boxes) ((b.low = number(b.at[axis] - b.size[axis] / 2)), (b.high = number(b.at[axis] + b.size[axis] / 2)));
@@ -110,32 +176,19 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, told }) {
     const left = from < to && seen[from].lo < it.lo ? [{ lo: seen[from].lo, hi: it.lo, it: seen[from].it }] : [], right = from < to && seen[to - 1].hi > it.hi ? [{ lo: it.hi, hi: seen[to - 1].hi, it: seen[to - 1].it }] : [];
     seen.splice(from, to - from, ...left, { lo: it.lo, hi: it.hi, it }, ...right);
   }
-  const order = ordered(places.length, arcs);
-  if (!order) throw new Error('The solve went in a ring');
-  // A box is as big as its name and what lands on it need, and no bigger: that much and it stands rigid, so what stands
-  // beside its ports moves the box and never stretches it.
-  const spot = [];
-  order.queue.forEach((v, k) => (spot[v] = k));
-  const rigid = new Map(boxes.map((b) => [b, [b.high, b.low, -reach(order, spot, b.low, b.high)]]));
-  // Gone over in the order they run, a pass carries a number as far as it goes.
-  arcs.sort((p, q) => spot[p[0]] - spot[q[0]]);
-  let first;
-  for (;;) {
-    const tried = least(places.length, [...arcs, ...rigid.values()]);
-    if (tried.at) { first = tried.at; break; }
-    // What cannot stand rigid gives way: a box whose ports are held further apart than it measures.
-    let freed = 0;
-    for (const [b] of rigid) if (tried.moved.has(b.low) || tried.moved.has(b.high)) (rigid.delete(b), freed++);
-    if (!freed) throw new Error('The solve cannot keep every distance');
-    told.freed += freed;
-  }
-  const all = [...arcs, ...rigid.values()];
-  // As far toward the low side as can be, and as far toward the high: halfway keeps every distance, and leans neither way.
-  const end = Math.max(...first), back = least(places.length, all.map(([p, q, l]) => [q, p, l]).sort((p, q) => spot[q[0]] - spot[p[0]])).at, at = back ? first.map((v, k) => (v + end - back[k]) / 2) : first;
-  for (const b of boxes) {
-    const [low, high] = [at[b.low], at[b.high]];
-    b.at[axis] = (low + high) / 2;
-    b.size[axis] = high - low;
+  let at;
+  if (still) {
+    // A stretch stays with a box that does not move: only what lands on what moved goes with it.
+    const held = new Set(boxes.flatMap((b) => [b.low, b.high]));
+    for (const s of stretches) if (!s.line.free || s.own.some((id) => !s.line.free.has(id))) held.add(s.n);
+    at = within(places, held, arcs, told);
+  } else {
+    at = freely(places, arcs, boxes, told);
+    for (const b of boxes) {
+      const [low, high] = [at[b.low], at[b.high]];
+      b.at[axis] = (low + high) / 2;
+      b.size[axis] = high - low;
+    }
   }
   for (const s of stretches) {
     const p = s.line.points;
@@ -144,6 +197,7 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, told }) {
   }
   // An end that comes across the box's side, not onto it, stands on that side.
   for (const line of lines) {
+    if (still && !line.free) continue;
     const p = line.points;
     for (const [end_, next, id] of [[p[0], p[1], line.a], [p.at(-1), p.at(-2), line.b]]) {
       if (!next || end_[axis] === next[axis]) continue;
@@ -169,6 +223,18 @@ export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, rou
   }
   // A wire whose boxes now touch is one point: it stays a line of two, as every line is.
   for (const l of lines) l.route.points = (l.points.length > 1 ? l.points : [l.points[0], l.points[0]]).map(([p, q]) => [p - margin + apart, q - top + apart]);
+  return told;
+}
+
+/**
+ * Wires set again round what stands: every box stays, every line stays but those with `free`, the items that moved, and of
+ * those what lands on anything else stays too. `boxes` are { id, at, size, named } and `lines` { a, b, points, free }, whose
+ * points are changed. Says how many distances could not be kept.
+ */
+export function settle({ boxes, lines, wire, room, run, corner, apart, rounds = 2 }) {
+  const told = { freed: 0, squeezed: 0 };
+  lines.box = new Map(boxes.map((b) => [b.id, b]));
+  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, told, still: true });
   return told;
 }
 

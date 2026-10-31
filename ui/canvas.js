@@ -26,8 +26,14 @@ export const home = () => ({
 /** The canvas an item's address opens when no lens is asked: the item and what it holds, depends on and waits on. */
 export const focusOn = (id) => ({ filter: { find: [`id ${id}`] }, walk: { over: FOCUS, steps: 1 } });
 /** The canvas as places are kept for it: the saved canvas up (ui/canvases.js), else the first item its filter names, else the whole map (''). */
-/** What a picture's places are kept under: its canvas, and the form it was asked in if that lays out otherwise than the canvas's own. */
-const canvasOf = (lens, asked) => `${asked?.canvas ?? idsOf(lens.filter)[0] ?? ''}${asked?.shape && asked.shape !== 'flow' ? `@${asked.shape}` : ''}`;
+/** The item a lens is drawn from: the first it names by id, else what `in` an item it draws. */
+const drawnFrom = (filter) => idsOf(filter)[0] ?? (filter?.find ?? []).map((t) => /^in (e_[a-z0-9]{8})$/.exec(t)?.[1]).find(Boolean);
+/**
+ * What a picture's places are kept under: its canvas, and the form it is laid out in. A place means something only in the
+ * picture it was put on, so the flow's are kept apart from the older layout's, whose places stay in the stream unread:
+ * `flow` here names no pack, only that the form asked for is the canvas's own.
+ */
+const canvasOf = (lens, asked) => `${asked?.canvas ?? drawnFrom(lens.filter) ?? ''}@${asked?.shape && asked.shape !== 'flow' ? asked.shape : 'solved'}`;
 
 /** Every canvas drawn now, and the one the bar and find act on: the pane in focus (decision e_h2pqjy2q). */
 const all = new Set();
