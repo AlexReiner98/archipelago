@@ -39,7 +39,8 @@ export function mixed(a, b, t) {
 
 /**
  * keys: [{ pic, fill(shape) }] in order. Each after the first is a group that fades in over what is under it, and what
- * it has covered goes, so only two are ever drawn at once. `tol` is how far an outline may stray, in page units.
+ * it has covered leaves the drawing, as a hidden group is still painted: only two are ever drawn at once, and playing
+ * holds its frame rate however many keys there are. `tol` is how far an outline may stray, in page units.
  */
 export function svgOf({ keys, ink, swell, background, cloudOpacity, seconds, hold, units = 2, tol = 0.5 }) {
   const { width: W, height: H, line } = keys[0].pic;
@@ -51,9 +52,10 @@ export function svgOf({ keys, ink, swell, background, cloudOpacity, seconds, hol
     return `<path fill="${fill(s)}"${s.cloud ? ` fill-opacity="${cloudOpacity}"` : ''}${thin ? ` stroke-width="${(thin * line * units).toFixed(2)}"` : ''} d="${written(s.points, units, tol, true)}"/>`;
   };
   const layers = keys.map(({ pic, fill }, k) => {
-    const comes = k ? `<animate attributeName="opacity" begin="${(hold + (k - 1) * each).toFixed(2)}s" dur="${each.toFixed(2)}s" fill="freeze" values="0;1"/>` : '';
-    const goes = k < keys.length - 1 ? `<animate attributeName="opacity" begin="${(hold + (k + 1) * each).toFixed(2)}s" dur="0.01s" fill="freeze" values="1;0"/>` : '';
-    return `<g${k ? ' opacity="0"' : ''}>${comes}${goes}${pic.shapes.map((s) => shapeOf(s, fill)).join('')}</g>`;
+    const show = (at, value) => `<animate attributeName="display" begin="${at.toFixed(2)}s" dur="0.01s" fill="freeze" calcMode="discrete" values="${value};${value}"/>`;
+    const comes = k ? `<animate attributeName="opacity" begin="${(hold + (k - 1) * each).toFixed(2)}s" dur="${each.toFixed(2)}s" fill="freeze" values="0;1"/>${show(hold + (k - 1) * each, 'inline')}` : '';
+    const goes = k < keys.length - 1 ? show(hold + (k + 1) * each, 'none') : '';
+    return `<g${k ? ' opacity="0" display="none"' : ''}>${comes}${goes}${pic.shapes.map((s) => shapeOf(s, fill)).join('')}</g>`;
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W * units} ${H * units}"><rect width="${W * units}" height="${H * units}" fill="${background}"/><g stroke="${ink}" stroke-width="${(line * units).toFixed(2)}" stroke-linejoin="round" stroke-linecap="round">${layers.join('')}</g></svg>`;
 }

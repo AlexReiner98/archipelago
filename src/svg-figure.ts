@@ -1,20 +1,22 @@
 // A figure kept as SVG: a drawing baked from its shapes, sharp at any width. It is read only as an image (an <img>,
 // served with nothing allowed), and kept only when it is drawing alone: shapes, fills, strokes and text, with no
 // script, no style sheet, no link and nothing it would fetch. Anything else is refused, never cleaned. It may move:
-// an <animate> fades a part in or out, on a clock, and nothing else (no event starts it, and it reaches no address).
+// an <animate> fades a part in or out, or takes it in or out of the drawing, on a clock, and nothing else (no event
+// starts it, and it reaches no address).
 
 const TIME = /^\d+(\.\d+)?m?s$/;
 /** What <animate> may say, each checked by its value. */
 const ANIMATE: Record<string, (value: string) => boolean> = {
-  attributeName: (v) => v === 'opacity',
+  attributeName: (v) => v === 'opacity' || v === 'display',
+  calcMode: (v) => v === 'discrete',
   begin: (v) => TIME.test(v),
   dur: (v) => TIME.test(v),
   fill: (v) => v === 'freeze',
-  values: (v) => /^[\d.;]*$/.test(v),
+  values: (v) => /^([\d.]+|inline|none)(;([\d.]+|inline|none))*$/.test(v),
 };
 const ELEMENTS = new Set(['animate', 'svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'title', 'desc', 'defs', 'clipPath', 'linearGradient', 'radialGradient', 'stop']);
 const ATTRIBUTES = new Set([
-  'xmlns', 'version', 'viewBox', 'preserveAspectRatio', 'width', 'height', 'id', 'transform', 'opacity', 'clip-path', 'clipPathUnits',
+  'xmlns', 'version', 'viewBox', 'preserveAspectRatio', 'width', 'height', 'id', 'transform', 'opacity', 'display', 'clip-path', 'clipPathUnits',
   'd', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'fx', 'fy', 'points', 'dx', 'dy',
   'fill', 'fill-opacity', 'fill-rule', 'clip-rule', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-linejoin', 'stroke-linecap', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-miterlimit',
   'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'dominant-baseline', 'letter-spacing',
