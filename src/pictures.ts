@@ -7,7 +7,7 @@ import { roomToStore } from './plan.ts';
 import { svgRefused } from './svg-figure.ts';
 
 /** The most a kept picture may weigh. A capture of a view at screen size is well under it; a figure that moves, a set of whole drawings, comes near. */
-export const PICTURE_MAX = 5_000_000;
+export const PICTURE_MAX = 10_000_000;
 /** An SVG is a figure baked from a drawing's shapes, kept only when it is drawing alone (src/svg-figure.ts). */
 export const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'] as const;
 

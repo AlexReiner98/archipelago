@@ -40,7 +40,7 @@ test('a picture is kept for a result only when sent, travels in a backup, and go
   // Sent again it replaces what was kept: one picture for one result.
   await put(Buffer.concat([png, png]));
   assert.equal((await l.db.query<{ n: number; size: number }>(`select count(*)::int as n, max(size)::int as size from picture`)).rows[0].size, png.length * 2);
-  await assert.rejects(put(Buffer.alloc(5_000_001)), /the most kept is/);
+  await assert.rejects(put(Buffer.alloc(10_000_001)), /the most kept is/);
   await assert.rejects(callTool(l, human, 'picture_put', { result: first.id, data: png.toString('base64'), content_type: 'image/svg+xml' }), /drawing alone/);
   await assert.rejects(put(png, 'image/png', made.noaa), /not a test result/);
 
