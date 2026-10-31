@@ -23,6 +23,8 @@ const seen = (el, fn) => {
   const sight = new IntersectionObserver((all) => all.some((e) => e.isIntersecting) && (sight.disconnect(), fn()), { threshold: 0.5 });
   sight.observe(el);
 };
+/** The marks a drawing is told the pointer entered: it answers for them, so the page's tip waits for it (ui/tip.js). */
+export const toldOfEnter = new WeakSet();
 /** The one address a drawing may link to: an item's page. */
 const ITEM = /^#\/e\/e_[a-z0-9]{8}$/;
 /** The most marks one drawing may make: past it, the drawing is stopped. */
@@ -60,7 +62,7 @@ export function build(mark, keys, tell, svg = false, count = { n: 0 }) {
   const el = inSvg ? document.createElementNS(SVG, tag) : document.createElement(tag);
   for (const [name, value] of Object.entries(attrs ?? {})) {
     if (name === 'key') keys.set(String(value), el);
-    else if (name === 'on') for (const e of Array.isArray(value) ? value : []) !EVENTS[e] ? fail(`the event "${e}"`) : e === 'seen' ? seen(el, () => tell(String(attrs.key), e)) : el.addEventListener(EVENTS[e], (ev) => tell(String(attrs.key), e, ev));
+    else if (name === 'on') for (const e of Array.isArray(value) ? value : []) !EVENTS[e] ? fail(`the event "${e}"`) : e === 'seen' ? seen(el, () => tell(String(attrs.key), e)) : (e === 'enter' && toldOfEnter.add(el), el.addEventListener(EVENTS[e], (ev) => tell(String(attrs.key), e, ev)));
     else attribute(el, name, value);
   }
   if (attrs?.on && attrs.key === undefined) fail('an event on a mark with no key');

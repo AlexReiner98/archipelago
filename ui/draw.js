@@ -339,7 +339,7 @@ say({ type: 'ready' });
               drawn = await made.picture(said.input, tools);
               // How long the drawing took, for the page to tell whoever measures it.
               send({ type: 'scene', scene: drawn?.scene ?? {}, took: performance.now() - t0 });
-            } else if (said.type === 'event' && drawn?.on) send({ type: 'patch', list: (await drawn.on(said.event)) ?? [] });
+            } else if (said.type === 'event' && drawn?.on) send({ type: 'patch', list: (await drawn.on(said.event)) ?? [], answers: said.event });
             else if (said.type === 'restyle' && drawn?.restyle) send({ type: 'patch', list: (await drawn.restyle(said.style)) ?? [] });
             else if (said.type === 'viewport') {
               const now = view;
