@@ -1,5 +1,6 @@
 // Planarity in time that grows with the size of the graph: the left-right test (de Fraysseix and Rosenstiehl, as Brandes
-// sets it out), which also answers how the graph lies, as the neighbours round each item. Pure: edges in, an answer out.
+// sets it out), which also answers how the graph lies, as the neighbours round each item. Layer: topology. Pure: edges in,
+// an answer out.
 
 /** No item or edge. */
 const NONE = -1;

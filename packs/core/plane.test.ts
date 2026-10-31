@@ -7,7 +7,9 @@ import test from 'node:test';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { count } from './draw/flow/count.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { faces, isPlanar } from './draw/flow/planar.js';
+import { faces, isPlanar, keptPlanar } from './draw/flow/planar.js';
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { peel } from './draw/flow/combs.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { layout } from './draw/flow/layout.js';
 
@@ -50,6 +52,38 @@ test('planar: the five and the three by three are not, a grid is', () => {
   assert.equal(isPlanar(K33), false);
   assert.equal(isPlanar(grid), true);
   assert.equal(faces(grid).length, 17, 'sixteen squares and the outside');
+});
+
+test('planar: a big graph has its faces as quickly: every edge on two, each face a ring', () => {
+  const grid: string[][] = [], side = 20;
+  for (let x = 0; x < side; x++) for (let y = 0; y < side; y++) {
+    if (x < side - 1) grid.push([`${x},${y}`, `${x + 1},${y}`]);
+    if (y < side - 1) grid.push([`${x},${y}`, `${x},${y + 1}`]);
+  }
+  const list = faces(grid), seen = new Map<string, number>();
+  assert.ok(grid.length > 600, 'past where the left-right test takes over');
+  assert.equal(list.length, (side - 1) ** 2 + 1, 'each square and the outside');
+  for (const f of list) {
+    assert.equal(new Set(f).size, f.length, 'a ring');
+    f.forEach((v: string, k: number) => { const key = [v, f[(k + 1) % f.length]].sort().join('|'); seen.set(key, (seen.get(key) ?? 0) + 1); });
+  }
+  assert.ok(seen.size === grid.length && [...seen.values()].every((n) => n === 2));
+});
+
+test('planar: the kept part is what trying each link in turn keeps', () => {
+  const links: string[][] = [];
+  for (let i = 0; i < 7; i++) for (let j = i + 1; j < 7; j++) links.push([`v${i}`, `v${j}`]);
+  const kept: string[][] = [], left: string[][] = [];
+  for (const l of links) (isPlanar([...kept, l]) ? kept : left).push(l);
+  assert.deepEqual(keptPlanar(links), { kept, left });
+  assert.equal(left.length, links.length - (3 * 7 - 6), 'all that seven items can hold');
+});
+
+test('peel: of the last two, what holds more stays, and a tree hangs only so deep', () => {
+  const near = (edges: string[][]) => { const a = new Map<string, Set<string>>(); for (const [p, q] of edges) { (a.get(p) ?? a.set(p, new Set()).get(p)!).add(q); (a.get(q) ?? a.set(q, new Set()).get(q)!).add(p); } return a; };
+  assert.deepEqual(peel(near(['a', 'b', 'c', 'd'].map((k) => [k, 'hub']))).core, ['hub'], 'a star comes down to its middle');
+  const chain = near(Array.from({ length: 200 }, (_, k) => [`s${k}`, `s${k + 1}`]));
+  assert.ok(peel(chain).core.length > 150, 'a long chain stays in the rows');
 });
 
 test('layout: nothing is an empty picture', () => {
