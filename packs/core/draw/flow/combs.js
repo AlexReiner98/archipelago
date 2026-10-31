@@ -69,7 +69,7 @@ export function comb(n, kids, size, z, sideOf = () => 1, way = 1, rest = way, { 
     p.x = run + lw + z.col / 2;
     run += lw + z.col / 2 + stub + rw + z.col;
   }
-  const centre = drop ? spines[0].x : (run - z.col) / 2, bus = level ? 0 : z.row + 6, items = [], wires = new Map();
+  const centre = drop ? spines[0].x : (run - z.col) / 2, bus = level ? 0 : z.row + z.bus, items = [], wires = new Map();
   const nested = spines.flatMap((p) => [...p.left, ...p.right].reverse()), hair = (c) => nested.indexOf(c) / (nested.length + 1), lift = (c) => 1 - (nested.indexOf(c) + 2) / (nested.length + 1);
   // One column alone: its first kid stands level with the holder, and the wire runs straight to it.
   const first = alone && spines.length === 1 && !under[0].lead ? under[0] : null;

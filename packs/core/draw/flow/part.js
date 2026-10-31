@@ -6,8 +6,6 @@ import { wrongEnd } from './faults.js';
 import { pair } from './polyline.js';
 import { against, downward, sidesOf } from './topology.js';
 
-/** How many wires make an item a hub. */
-const HUB = 32;
 
 /** The longest path to each of `count` nodes (with extra names), over arcs [from, to, length]. */
 function longest(names, arcs) {
@@ -61,7 +59,7 @@ export function drawPart(list, links, block, box, z, trial) {
   const inset = (v) => Math.min(z.corner, box(v).w / 3) + 1;
   const facesOf = new Map(rows.map((v) => [v, wired(v).map((w) => left.get(pair(v, w)))]));
   // A hub's faces are added up as they move, as it has too many to go over for every wire.
-  const hubs = new Map([...facesOf].filter(([, f]) => f.length > HUB).map(([v, f]) => [v, f.reduce((sum, c) => sum + x.get(c), 0)])), hubsOn = new Map();
+  const hubs = new Map([...facesOf].filter(([, f]) => f.length > z.hub_most).map(([v, f]) => [v, f.reduce((sum, c) => sum + x.get(c), 0)])), hubsOn = new Map();
   for (const v of hubs.keys()) for (const f of facesOf.get(v)) (hubsOn.get(f) ?? hubsOn.set(f, []).get(f)).push(v);
   const middle = (v) => {
     const [from, to] = ends.get(v);

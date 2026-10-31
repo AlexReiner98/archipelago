@@ -46,7 +46,7 @@ export function layout(args) {
 function shapeWires({ nodes, x, y, routes, z }) {
   const boxes = new Map([...x.keys()].map((id) => [id, { x: x.get(id), y: y.get(id), w: nodes.get(id).w, h: nodes.get(id).h, pointed: nodes.get(id).shape === 'diamond' }]));
   const wires = [...routes].map(([k, r]) => { const [p, q] = k.split('|'); return { r, a: r.from, b: r.from === p ? q : p, points: r.points, kept: r.set }; });
-  shape(boxes, wires, { room: z.room, run: z.run, corner: z.corner, wire: z.turn, ports: z.ports, rounds: z.rounds, cost_cross: z.shape_cross, cost_bend: z.cost_bend, cost_side: z.cost_side });
+  shape(boxes, wires, { room: z.room, run: z.run, corner: z.corner, wire: z.turn, ports: z.ports, rounds: z.rounds, cost_cross: z.shape_cross, cost_bend: z.cost_bend, cost_side: z.cost_side, work: z.shape_work });
   for (const w of wires) w.r.points = w.points;
 }
 
@@ -56,7 +56,7 @@ function lengthsOf(sizes) {
   return {
     row: sizes.flow_layer_gap / 2, col: sizes.plane_wire_column, turn: Math.max(gap / 3, sizes.plane_wire_gap), gap,
     room: sizes.plane_wire_room, join: sizes.plane_joined_room, run: sizes.plane_port_run, corner: sizes.plane_port_corner,
-    trials: sizes.plane_trials, trial_most: sizes.plane_trial_most, cost_up: sizes.plane_cost_up, cost_cross: sizes.plane_cost_crossing, shape_cross: sizes.plane_shape_crossing, shape_most: sizes.plane_shape_most, cost_bend: sizes.plane_cost_bend, cost_side: sizes.plane_cost_side, ports: sizes.plane_reroute_ports, rounds: sizes.plane_reroute_rounds, cost_wrong: sizes.plane_cost_wrong_side, embed_most: sizes.plane_embed_most, embed_cost: sizes.plane_embed_crossings, slide_sweeps: sizes.plane_slide_sweeps, number_tries: sizes.plane_number_tries, trial_total: sizes.plane_trial_total,
+    trials: sizes.plane_trials, trial_most: sizes.plane_trial_most, cost_up: sizes.plane_cost_up, cost_cross: sizes.plane_cost_crossing, shape_cross: sizes.plane_shape_crossing, shape_most: sizes.plane_shape_most, shape_work: sizes.plane_shape_work, cost_bend: sizes.plane_cost_bend, cost_side: sizes.plane_cost_side, ports: sizes.plane_reroute_ports, rounds: sizes.plane_reroute_rounds, cost_wrong: sizes.plane_cost_wrong_side, embed_most: sizes.plane_embed_most, embed_big: sizes.plane_embed_big, hub_most: sizes.plane_hub_most, embed_cost: sizes.plane_embed_crossings, slide_sweeps: sizes.plane_slide_sweeps, number_tries: sizes.plane_number_tries, trial_total: sizes.plane_trial_total,
     row_gap: sizes.plane_row_gap, row_space: sizes.plane_row_space,
   };
 }

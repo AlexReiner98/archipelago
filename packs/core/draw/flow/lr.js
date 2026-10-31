@@ -29,7 +29,7 @@ export function leftRight(edges, lie = false) {
     to.push(q);
   }
   const n = names.length, m = from.length;
-  if (n > 2 && m > 3 * n - 6) return null;
+  if (n > 2 && m > 3 * (n - 2)) return null;
   const height = new Array(n).fill(NONE), parent = new Array(n).fill(NONE), oriented = new Uint8Array(m), roots = [];
   const lowpt = new Array(m).fill(0), lowpt2 = new Array(m).fill(0), nesting = new Array(m).fill(0), out = Array.from({ length: n }, () => []);
   const orient = (v) => {

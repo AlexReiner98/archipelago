@@ -415,8 +415,8 @@ test("a drawing's list holds every module it reaches", () => {
 const LENGTHS_IN_DRAWINGS: Record<string, number> = {
   'architecture/boats.js': 3, 'architecture/deep.js': 32, 'architecture/index.js': 28, 'architecture/islands.js': 18, 'architecture/layout.js': 9, 'architecture/moves.js': 6,
   'architecture/route.js': 8, 'architecture/says.js': 3, 'architecture/sides.js': 1, 'architecture/story.js': 3, 'flow/combs.js': 1, 'flow/direction.js': 1, 'flow/faults.js': 4,
-  'flow/free.js': 30, 'flow/index.js': 24, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/plane-index.js': 2, 'flow/ports.js': 1, 'flow/search.js': 2,
-  'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 1, 'flow/tidy.js': 2, 'flow/topology.js': 1, 'flow/upward.js': 6, 'grid/index.js': 8, 'grid/look.js': 1,
+  'flow/index.js': 22, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/search.js': 2,
+  'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 3, 'flow/tidy.js': 2, 'flow/topology.js': 1, 'flow/upward.js': 6, 'flow/ways.js': 9, 'flow/wrap.js': 2, 'grid/index.js': 8, 'grid/look.js': 1,
   'pages/index.js': 5, 'time/index.js': 31, 'packs/plan/draw/meters/index.js': 10,
 };
 const BARE = /(?<![\w.$#])\d+(?:\.\d+)?(?![\w.])/g;
@@ -439,7 +439,7 @@ test('a length in a drawing is named on the style', () => {
 // LAYERS_MIXED are modules that are more than one layer. Each list here may only shrink, LAYERS_OWED too.
 const LAYERS_MIXED: Record<string, number> = { 'architecture/layout.js': 1, 'architecture/route.js': 1, 'flow/part.js': 1 };
 const LAYER_IMPORTS: Record<string, number> = { 'flow/search.js -> flow/tidy.js': 1 };
-const WRITERS: Record<string, number> = { 'architecture/boards.js': 4, 'architecture/boats.js': 1, 'architecture/deep.js': 1, 'architecture/islands.js': 8, 'architecture/sides.js': 1, 'flow/combs.js': 1, 'flow/index.js': 8, 'flow/reroute.js': 1 };
+const WRITERS: Record<string, number> = { 'architecture/boards.js': 4, 'architecture/boats.js': 1, 'architecture/deep.js': 1, 'architecture/islands.js': 8, 'architecture/sides.js': 1, 'flow/combs.js': 1, 'flow/shape.js': 1 };
 const wired = drawings.filter((d) => d.id in WIRED);
 const wiredFiles = [...new Set(wired.flatMap((d) => Object.keys(d.modules).map((name) => pathOf(d, name))))];
 
@@ -478,11 +478,10 @@ test('a wired drawing keeps its wires apart', async () => {
   assert.deepEqual(ratchet(counted, NOT_SEALED), [], 'Wires take room in the solve: each stretch keeps its distance from every other (docs/drawings.md).');
 });
 
-// 22. One call: drawn, moved, let go and reloaded run one function with different pins, so every wire must match. The flow
-// stays listed until its one solve for drag lands (session flow-drag): a drag frame still wires by the quick router
-// (free.js). Architecture cannot be moved by hand. Each entry is 1, broken or not: how many wires differ follows every
+// 22. One call: drawn, moved, let go and reloaded run one function with different pins, so every wire must match.
+// Architecture cannot be moved by hand. Each entry is 1, broken or not: how many wires differ follows every
 // change to the solve, so it is no count to hold a change to.
-const NOT_ONE_CALL: Record<string, number> = { 'core.architecture': 1, 'core.flow': 1 };
+const NOT_ONE_CALL: Record<string, number> = { 'core.architecture': 1 };
 
 test('a wired drawing draws the same wires moved as reloaded', async () => {
   const counted: Record<string, number> = {};

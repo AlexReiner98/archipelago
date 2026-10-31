@@ -41,7 +41,7 @@ function shorn(line, a, b) {
   for (let i = 1; i + 2 < line.length; i++) {
     const [p, q, r, s] = [line[i - 1], line[i], line[i + 1], line[i + 2]], ax = q[0] === r[0] ? 1 : 0, off = 1 - ax;
     if (Math.sign(q[off] - p[off]) !== Math.sign(s[off] - r[off])) continue;
-    for (const [move, to, box] of [[[i - 1, i], r[ax], i === 1 && a], [[i + 1, i + 2], q[ax], i + 3 === line.length && b]]) {
+    for (const [move, to, box] of [[[i - 1, i], r[ax], i === 1 && a], [[i + 1, i + 2], q[ax], i + 2 === line.length - 1 && b]]) {
       if (box && (box.pointed || to < box.lo[ax] + 1 || to > box.hi[ax] - 1)) continue;
       const next = line.map((c) => [...c]);
       for (const k of move) next[k][ax] = to;
@@ -86,10 +86,11 @@ const roomOn = (b, side, wire, corner) => {
 /**
  * `boxes` by id are { x, y, w, h, pointed }, `wires` { a, b, points }, those with `kept` not looked at. `room` is what a wire
  * keeps from a box it passes, `run` from a port to its first corner, `corner` from a box's corner, `wire` from a wire beside it;
- * `ports` how many places along a side are tried, `rounds` how many times the wires are gone over, and the costs what a
- * crossing, a bend and an end too many on a side are worth in length.
+ * `ports` how many places along a side are tried, `rounds` how many times the wires are gone over, the costs what a
+ * crossing, a bend and an end too many on a side are worth in length, and `work` how many meetings of two wires may be tried.
  */
-export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, cost_cross, cost_bend, cost_side }) {
+export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, cost_cross, cost_bend, cost_side, work: budget = Infinity }) {
+  let work = 0;
   const rects = new Map([...boxes].map(([id, b]) => [id, { id, lo: [b.x - b.w / 2, b.y - b.h / 2], hi: [b.x + b.w / 2, b.y + b.h / 2], mid: [b.x, b.y], pointed: b.pointed }]));
   const CELL = Math.max(1, ...[...rects.values()].map((b) => b.hi[0] - b.lo[0])), columns = new Map(), lines = wires.filter((w) => w.points.length > 1).map((w) => Object.assign(w, { points: tidy(w.points) }));
   for (const r of rects.values()) for (let c = Math.floor(r.lo[0] / CELL); c <= Math.floor(r.hi[0] / CELL); c++) (columns.get(c) ?? columns.set(c, []).get(c)).push(r);
@@ -108,7 +109,7 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
     return out;
   };
   const file = (w, by) => { for (const c of cellsOf(w.points)) { if (by > 0) (cells.get(c) ?? cells.set(c, new Set()).get(c)).add(w); else cells.get(c).delete(w); } };
-  const beside = (l) => { const found = new Set(); for (const c of cellsOf(l)) for (const v of cells.get(c) ?? []) found.add(v); return found; };
+  const beside = (l) => { const found = new Set(); for (const c of cellsOf(l)) for (const v of cells.get(c) ?? []) found.add(v); work += found.size; return found; };
   lines.forEach((w) => (bump(w, 1), file(w, 1)));
   /** Whether each stretch keeps off every box; the stretch that lands on one leaves it at once. */
   const clear = (l, w, keep = room) => {
@@ -182,6 +183,8 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
   for (let round = 0; round < rounds; round++) {
     for (const w of [...lines].sort((p, q) => q.points.length - p.points.length || lengthOf(q.points) - lengthOf(p.points))) {
       if (w.kept) continue;
+      // Past what a picture can take on a page, the rest keep the lines they came with: the solve parts those as well.
+      if (work > budget) return work;
       const a = rects.get(w.a), b = rects.get(w.b);
       bump(w, -1);
       file(w, -1);
@@ -203,4 +206,5 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
       file(w, 1);
     }
   }
+  return work;
 }

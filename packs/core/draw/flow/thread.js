@@ -227,7 +227,7 @@ export function threader(list, owner, add, { number, keep, onward = () => false,
     for (let round = 0; round < rounds; round++) {
       const before = tally.crossings;
       for (const w of wires.filter((x) => x.visible && x.path.length > 2).sort((p, q) => q.path.length - p.path.length)) {
-        if (w.path.length < 3 || !spare(w, w) || !free(w)) continue;
+        if (w.path.length <= 2 || !spare(w, w) || !free(w)) continue;
         take(w);
         wires.splice(wires.indexOf(w), 1);
         through([w.link]);

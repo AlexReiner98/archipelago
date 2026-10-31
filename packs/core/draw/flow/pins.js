@@ -149,6 +149,7 @@ export function pinner({ nodes, x, y, routes, rigid, lengths }) {
     }
     if (!shift.size) return { x: X, y: Y, moved: shift, lines: changed };
     for (const [id, [dx, dy]] of shift) (X.set(id, x.get(id) + dx), Y.set(id, y.get(id) + dy));
+    for (const id of hand) if (shift.has(id)) (X.set(id, Number(placed[id][0])), Y.set(id, Number(placed[id][1])));
     const free = new Set();
     for (const w of wires) {
       const [da, db] = [shift.get(w.a), shift.get(w.b)];

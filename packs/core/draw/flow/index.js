@@ -241,7 +241,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const statusWords = (status) => ((w) => w.charAt(0).toUpperCase() + w.slice(1))(status.replaceAll('_', ' '));
   const statusRows = () => [...new Map(steps.filter((n) => !n.stub && !dotOf(n.item)).map((n) => [statusOf(n.item), n.item])).entries()]
     .sort(([a], [b]) => a.localeCompare(b)).map(([status, i]) => [dotClass(i), statusWords(status)]);
-  const mark = (inner, label) => ({ glyph: m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, inner), label });
+  const mark = (inner, label) => ({ glyph: m('svg', { width: z('key_width'), height: z('key_height'), viewBox: '0 0 22 14' }, inner), label });
   const uses = (test) => steps.some(test);
   const key = [
     [['box', 'Work'], ['diamond', 'Question'], ['pill', 'Event'], ['sheet', 'Record'], ['end', 'Possible end']].filter(([shape]) => uses((n) => n.shape === shape)).map(([shape, label]) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, 11, 7, 20, shape === 'diamond' ? 12 : 11, CORNER)), label)),
@@ -322,7 +322,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   };
   // The key says how the wires cross as they stand when drawn.
   const { crossings, seen, shared } = count(wiresIn(g).map((w) => w.points));
-  const crossed = () => m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, m('path', { d: 'M1 1L21 13M1 13L21 1', class: 'lf-wire' }));
+  const crossed = () => m('svg', { width: z('key_width'), height: z('key_height'), viewBox: '0 0 22 14' }, m('path', { d: 'M1 1L21 13M1 13L21 1', class: 'lf-wire' }));
   key.push(...[`${crossings} crossings`, `${seen} seen`, `${shared} shared`, `${told.up} of ${told.headed ?? g.chains.length} up`].map((label) => ({ glyph: crossed(), label })));
   // Still on a page, a picture stands at its own size in the middle of the frame it is given, which would stretch it.
   if (style.still && width > size.width && Array.isArray(svg)) {

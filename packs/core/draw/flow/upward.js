@@ -106,7 +106,7 @@ function facesOf(line, sides) {
 /** One order of the items, tried through to the graph it makes. Only what the order touches goes on the line. */
 function attempt(links, items, lean, noise) {
   const inOrder = new Set(links.filter((l) => l[2]).flatMap((l) => [l[0], l[1]]));
-  const here = inOrder.size >= 3 ? new Set(items.filter((v) => inOrder.has(v))) : new Set(items);
+  const here = inOrder.size > 2 ? new Set(items.filter((v) => inOrder.has(v))) : new Set(items);
   const onLine = links.filter(([u, v]) => here.has(u) && here.has(v)), later = links.filter(([u, v]) => !here.has(u) || !here.has(v));
   const line = lineUp([...here], onLine, lean), { sides, at, left } = pages(line, onLine, noise), last = line.length - 1, number = new Map(at);
   const lost = left.filter((l) => l[2]).length, reach = sides.flat().reduce((sum, a) => sum + a.q - a.p, 0), { hidden, stHere } = close(line, sides);

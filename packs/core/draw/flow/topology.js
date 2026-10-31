@@ -64,14 +64,14 @@ export function downward(links, list, z, { ties = 0, nth = 0, embedded = false }
   const ids = [...list].sort(), sorted = [...links].sort((p, q) => Number(q[2]) - Number(p[2]) || name(p, q) * (ties === 3 ? -1 : 1));
   const asFound = (made) => ({ g: made, s: made.s, t: made.t, number: made.number, outerAt: made.outerAt });
   // A part past the trials has one way to be drawn, and numbering it takes longer than the rest of the picture.
-  const big = list.length > z.trial_most, order = sorted.some((l) => l[2] > 1);
-  if (big && order) {
+  const big = list.length > z.trial_most, order = sorted.some((l) => l[2] > 1), fits = list.length <= z.embed_big;
+  if (big && order && fits) {
     const made = embed(sorted, ids);
     if (!made.unthreaded && !against(made, made.number)) return asFound(made);
   }
   const g = planarize(sorted, ids), found = { g, ...numbered(g, nth, big ? Infinity : z.number_tries) }, up = against(g, found.number);
   // The search gives only small parts a trial of the embedding: the first trial of a larger one tries it here.
-  if (!up || !(embedded || (list.length > z.embed_most && !ties && !nth))) return found;
+  if (!up || !(embedded || (fits && list.length > z.embed_most && !ties && !nth))) return found;
   const made = embed(sorted, ids);
   return against(made, made.number) < up && made.crossings <= g.crossings + up * z.embed_cost ? asFound(made) : found;
 }
