@@ -66,3 +66,10 @@ test('what was set by rows is left as it stands', () => {
   shape(boxes({ p: box(100, 0), q: box(140, 200) }), [w], SIZES);
   assert.equal(bends(w), 2);
 });
+
+test('a line through a box gives way, but not for a way that crosses more', () => {
+  const still = { a: 'r', b: 's', kept: true, points: [[200, -100], [200, 300]] };
+  const w = { a: 'p', b: 'q', points: [[100, 20], [100, 180]] };
+  shape(boxes({ p: box(100, 0), q: box(100, 200), m: box(100, 100, 300, 20), r: box(200, -120), s: box(200, 320) }), [still, w], SIZES);
+  assert.ok(w.points.every((c) => c[0] < 200), 'it does not go round across the wire beside it');
+});

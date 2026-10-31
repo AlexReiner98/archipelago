@@ -186,11 +186,11 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
       bump(w, -1);
       file(w, -1);
       const was = w.points, tried = [...shorn(was, a, b), ...shorn(was, a, b).flatMap((l) => shorn(tidy(l), a, b)), ...ways(a, b, { corner, run, ports })].map((l) => { const line = tidy(l); return { l: line, plain: plain(line) }; }).sort((p, q) => p.plain - q.plain);
-      // A line through a box cannot stand: the solve cannot part what it does not see as apart.
+      // A line through a box cannot stand, the solve cannot part what it does not see as apart: it gives way for any line that crosses no more.
       const standing = clear(was, w, 0), slid = standing ? [] : aside(was, w).map((l) => { const line = tidy(l); return { l: line, plain: plain(line) }; });
       const beyond = round < rounds - 1 || (standing && met(was, w, cost_cross) < cost_cross) ? [] : past(was, w).map((l) => { const line = tidy(l); return { l: line, plain: plain(line) }; });
       if (slid.length || beyond.length) tried.push(...slid, ...beyond), tried.sort((p, q) => p.plain - q.plain);
-      let best = was, least = plain(was) + met(was, w, Infinity) + over(was, w) + (standing ? 0 : cost_cross * 2);
+      let best = was, least = plain(was) + met(was, w, Infinity) + over(was, w) + (standing ? 0 : cost_cross / 2);
       for (const { l, plain: alone } of tried) {
         if (alone >= least) break;
         const cost = alone + over(l, w);
