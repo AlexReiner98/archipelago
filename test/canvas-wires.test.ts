@@ -101,7 +101,7 @@ test('in a browser, opening a step keeps the canvas still and lights it, and a h
     assert.ok(await until(`!document.body.dataset.sheet`, 5000), 'the sheet is shut again');
     await call('/agent/change', undefined, { actor: 'robot', reason: 'held item test', ops: [{ op: 'create', ref: 'e', type: 'task', title: 'Proposed step' }, { op: 'link', type: 'part_of', from: 'e', to: made.p }] });
     assert.ok(await until(`[...document.querySelectorAll('#canvas .lf-step.ghost')].some((g) => g.textContent.includes('Proposed step')) && Boolean(${badge('held item test')})`), `a faint step: ${await probe()}`);
-    const ghostAt = await rect(badge('held item test'));
+    const ghostAt = await rect(`[...document.querySelectorAll('#canvas .lf-step.ghost')].find((g) => g.textContent.includes('Proposed step'))`);
     await click([ghostAt.x + ghostAt.w / 2, ghostAt.y + ghostAt.h / 2]);
     assert.ok(await until(`Boolean(document.querySelector('#sheet .held-band'))`, 5000), `its sheet holds the band: ${await page.evaluate<string>(`location.hash + ' | ' + document.querySelector('#sheet')?.innerText.slice(0, 200)`)}`);
     assert.ok(await page.evaluate<boolean>(`(() => { const b = [...document.querySelectorAll('#sheet .held-band button')].find((b) => b.textContent === 'Decline'); b?.click(); return Boolean(b); })()`));

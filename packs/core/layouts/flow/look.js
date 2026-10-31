@@ -39,7 +39,7 @@ export const css = `
 /* A tie the style draws only on hover: out of sight until one of its ends is hovered and lights it. */
 /* A change held for the owner, where it would land: a new step faint, an edit marked on its step, a link dashed in the
    colour of what waits on you; a link just drawn here dashed until it is; the badge where it is decided. */
-.lf-step.ghost { opacity: var(--ln-flow-ghost); cursor: default; }
+.lf-step.ghost { opacity: var(--ln-flow-ghost); cursor: pointer; }
 .lf-step.ghost .lf-shape, .lf-step.held .lf-shape { stroke: var(--ln-you); stroke-dasharray: var(--ln-flow-dash-held); }
 .lf-wire.held, .lf-tie.held { stroke: var(--ln-you); stroke-width: var(--ln-flow-stroke); stroke-dasharray: var(--ln-flow-dash-held); }
 .lf-wire.held.mine, .lf-tie.held.mine { stroke: var(--ln-text); }
