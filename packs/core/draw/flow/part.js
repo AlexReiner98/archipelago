@@ -6,6 +6,9 @@ import { wrongEnd } from './faults.js';
 import { pair } from './polyline.js';
 import { against, downward, sidesOf } from './topology.js';
 
+/** How many wires make an item a hub. */
+const HUB = 32;
+
 /** The longest path to each of `count` nodes (with extra names), over arcs [from, to, length]. */
 function longest(names, arcs) {
   const out = new Map(names.map((n) => [n, []])), degree = new Map(names.map((n) => [n, 0])), at = new Map(names.map((n) => [n, 0]));
@@ -57,14 +60,17 @@ export function drawPart(list, links, block, box, z, trial) {
   // A box sits over its own wires, as near their middle as its bar lets it, so they drop straight in.
   const inset = (v) => Math.min(z.corner, box(v).w / 3) + 1;
   const facesOf = new Map(rows.map((v) => [v, wired(v).map((w) => left.get(pair(v, w)))]));
+  // A hub's faces are added up as they move, as it has too many to go over for every wire.
+  const hubs = new Map([...facesOf].filter(([, f]) => f.length > HUB).map(([v, f]) => [v, f.reduce((sum, c) => sum + x.get(c), 0)])), hubsOn = new Map();
+  for (const v of hubs.keys()) for (const f of facesOf.get(v)) (hubsOn.get(f) ?? hubsOn.set(f, []).get(f)).push(v);
   const middle = (v) => {
     const [from, to] = ends.get(v);
     if (ghost(v)) return (x.get(from) + x.get(to) + z.col) / 2;
     const lo = x.get(from) + z.col / 2 - inset(v), hi = Math.max(lo, x.get(to) + z.col / 2 - inset(v) - size(v).w);
     const faces = facesOf.get(v);
     if (!faces.length) return lo + size(v).w / 2;
-    let sum = 0;
-    for (const f of faces) sum += x.get(f);
+    let sum = hubs.get(v) ?? 0;
+    if (!hubs.has(v)) for (const f of faces) sum += x.get(f);
     return Math.min(hi, Math.max(lo, sum / faces.length + z.col / 2 - box(v).w / 2)) + size(v).w / 2;
   };
   const column = (k) => x.get(left.get(k)) + z.col / 2;
@@ -79,7 +85,10 @@ export function drawPart(list, links, block, box, z, trial) {
     if (!wiresOf.has(f)) continue;
     const wants = wiresOf.get(f).flatMap((k) => k.split('|')).map(centre).sort((p, q) => p - q);
     const lo = Math.max(...earlier.get(f).map(([p, l]) => x.get(p) + l)), hi = Math.min(...later.get(f).map(([q, l]) => x.get(q) - l));
-    if (lo <= hi) x.set(f, Math.min(hi, Math.max(lo, wants[wants.length >> 1] - z.col / 2)));
+    if (lo > hi) continue;
+    const was = x.get(f);
+    x.set(f, Math.min(hi, Math.max(lo, wants[wants.length >> 1] - z.col / 2)));
+    for (const v of hubsOn.get(f) ?? []) hubs.set(v, hubs.get(v) + x.get(f) - was);
   }
   // Every wire its own way into an item, so none runs along another. One under the box drops straight in; the rest come
   // along tracks of their own, the outermost column on the track nearest the box, landing on the box in that order.

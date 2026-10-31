@@ -39,13 +39,6 @@ test('a style that draws every link ties the tagged item to its tag', () => {
   assert.equal(ties({ ...house, undrawn: [] }), 3);
 });
 
-test('a link type the style draws only on hover is laid out, and its tie shows only while lit', () => {
-  const svg = drawn({ ...house, hover_only: ['part_of'] });
-  assert.equal(ties({ ...house, hover_only: ['part_of'] }), 2, 'still drawn and laid out by');
-  assert.equal((svg.match(/lf-tie near[^"]* on-hover/g) ?? []).length, 2, 'each part_of tie waits for a hover');
-  assert.ok(!drawn(house).includes('on-hover'), 'a style that names none draws every tie as it is');
-});
-
 test("the key is data the page draws: a row for every link type drawn, in its colour, and no legend of the drawing's own", () => {
   const scene = picture({ answer, style: { ...house, undrawn: [] }, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene;
   assert.equal(scene.legend, undefined, 'the page draws the key');

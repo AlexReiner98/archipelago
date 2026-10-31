@@ -32,7 +32,7 @@ export function assemble(shelves, { kids, combs, combGap, portOff, block, stepSi
         for (const it of hang.items) (x.set(it.id, map([it.x, it.y])[0]), y.set(it.id, map([it.x, it.y])[1]));
         for (const [item, points] of hang.wires) {
           const from = parents.get(item), line = points.map(map);
-          routes.set(pair(from, item), { from, points: from === id ? [[boxX + s.w / 2, at], ...line.slice(line[0][0] === ax && line[0][1] === at ? 1 : 0)] : line });
+          routes.set(pair(from, item), { from, points: from === id ? [[boxX + s.w / 2, line[0][1]], ...line.slice(line[0][0] === ax ? 1 : 0)] : line });
         }
       }
     }

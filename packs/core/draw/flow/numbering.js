@@ -19,26 +19,25 @@ const UNDER_MOST = 120;
 /** An order wire running up counts for more than any wire's length. */
 const OVER = 1e6;
 
-/** The items of what is `left` that would part it if taken, walked from `root` (Tarjan). */
-function cuts(near, left, root) {
-  const at = new Map(), low = new Map(), out = new Set();
+/** Marks in `parting` the items of what is `left` that would part it if taken, walked from `root` (Tarjan). Items are numbers here. */
+function cuts(near, left, root, parting, at, low) {
+  at.fill(-1);
+  parting.fill(0);
   let clock = 0;
   const walk = (v, from) => {
-    at.set(v, clock);
-    low.set(v, clock++);
+    at[v] = low[v] = clock++;
     let kids = 0;
-    for (const w of near.get(v)) {
-      if (w === from || !left.has(w)) continue;
-      if (at.has(w)) { low.set(v, Math.min(low.get(v), at.get(w))); continue; }
+    for (const w of near[v]) {
+      if (w === from || !left[w]) continue;
+      if (at[w] >= 0) { if (at[w] < low[v]) low[v] = at[w]; continue; }
       kids++;
       walk(w, v);
-      low.set(v, Math.min(low.get(v), low.get(w)));
-      if (v !== root && low.get(w) >= at.get(v)) out.add(v);
+      if (low[w] < low[v]) low[v] = low[w];
+      if (v !== root && low[w] >= at[v]) parting[v] = 1;
     }
-    if (v === root && kids > 1) out.add(v);
+    if (v === root && kids > 1) parting[v] = 1;
   };
-  walk(root, null);
-  return out;
+  walk(root, -1);
 }
 
 /**
@@ -46,22 +45,28 @@ function cuts(near, left, root) {
  * that leaves least of what it wants before it undone (`wants`, [a, b, weight]), then the highest by `level`.
  */
 function walkDown(near, s, t, wants, deep) {
-  const before = new Map(), done = new Set([s]), left = new Set([...near.keys()].filter((v) => v !== s)), number = new Map([[s, 0]]), level = new Map([[s, -1]]);
-  for (const [a, b, weight] of wants) (before.get(b) ?? before.set(b, []).get(b)).push([a, weight]);
-  const rise = (v) => deep.get(v) ?? 1 + Math.max(...[...near.get(v)].filter((w) => done.has(w)).map((w) => level.get(w)));
-  while (left.size > 1) {
-    const parting = cuts(near, left, t);
-    let best = null, least = Infinity, high = Infinity;
-    for (const v of left) {
-      if (v === t || parting.has(v) || ![...near.get(v)].some((w) => done.has(w))) continue;
-      const cost = (before.get(v) ?? []).reduce((sum, [a, weight]) => sum + (done.has(a) ? 0 : weight), 0), l = rise(v);
+  const names = [...near.keys()], n = names.length, index = new Map(names.map((v, k) => [v, k])), around = names.map((v) => [...near.get(v)].map((w) => index.get(w)));
+  const before = names.map(() => []), left = new Uint8Array(n).fill(1), touched = new Uint8Array(n), parting = new Uint8Array(n), at = new Int32Array(n), low = new Int32Array(n);
+  const level = new Array(n).fill(-Infinity), rank = names.map((v) => deep.get(v)), number = new Map([[s, 0]]), [start, foot] = [index.get(s), index.get(t)];
+  for (const [a, b, weight] of wants) before[index.get(b)].push([index.get(a), weight]);
+  const take = (v) => { left[v] = 0; for (const w of around[v]) touched[w] = 1; };
+  take(start);
+  level[start] = -1;
+  const rise = (v) => rank[v] ?? 1 + around[v].reduce((m, w) => (left[w] ? m : Math.max(m, level[w])), -Infinity);
+  for (let more = n - 2; more > 0; more--) {
+    cuts(around, left, foot, parting, at, low);
+    let best = -1, least = Infinity, high = Infinity;
+    for (let v = 0; v < n; v++) {
+      if (!left[v] || !touched[v] || v === foot || parting[v]) continue;
+      let cost = 0;
+      for (const [a, weight] of before[v]) if (left[a]) cost += weight;
+      const l = rise(v);
       if (cost < least || (cost === least && l < high)) ((best = v), (least = cost), (high = l));
     }
-    if (best === null) throw new Error('No item can come next');
-    level.set(best, high);
-    number.set(best, number.size);
-    done.add(best);
-    left.delete(best);
+    if (best < 0) throw new Error('No item can come next');
+    level[best] = high;
+    number.set(names[best], number.size);
+    take(best);
   }
   number.set(t, number.size);
   return number;
