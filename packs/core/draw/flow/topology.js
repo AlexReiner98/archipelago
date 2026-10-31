@@ -53,7 +53,8 @@ export const against = (g, number) => g.wires.filter((w) => w.link?.[2] > 1 && w
 
 /**
  * The part's graph and numbering. The heaviest planar part, numbered as the order asks, is the picture with the fewest
- * crossings; where that leaves order wires up, the embedding made for the order (./upward.js) is tried in its place.
+ * crossings; where that leaves order wires up, the embedding made for the order (./upward.js) is tried in its place. A
+ * part too large for the search's trials starts from that embedding, and is numbered only if the embedding fails.
  */
 export function downward(links, list, z, { ties = 0, nth = 0, embedded = false } = {}) {
   // By name, so the picture does not change with the order the answer came in. Ties in another fixed order keep another
@@ -61,8 +62,16 @@ export function downward(links, list, z, { ties = 0, nth = 0, embedded = false }
   const keyOf = (l) => { const k = pair(l[0], l[1]); return ties === 1 ? [...k].reverse().join('') : ties === 2 ? k.slice(k.indexOf('|')) + k : k; };
   const name = (p, q) => (keyOf(p) < keyOf(q) ? -1 : 1);
   const ids = [...list].sort(), sorted = [...links].sort((p, q) => Number(q[2]) - Number(p[2]) || name(p, q) * (ties === 3 ? -1 : 1));
-  const g = planarize(sorted, ids), found = { g, ...numbered(g, nth, list.length <= z.trial_most ? z.number_tries : Infinity) }, up = against(g, found.number);
-  if (!embedded || !up) return found;
+  const asFound = (made) => ({ g: made, s: made.s, t: made.t, number: made.number, outerAt: made.outerAt });
+  // A part past the trials has one way to be drawn, and numbering it takes longer than the rest of the picture.
+  const big = list.length > z.trial_most, order = sorted.some((l) => l[2] > 1);
+  if (big && order) {
+    const made = embed(sorted, ids);
+    if (!made.unthreaded && !against(made, made.number)) return asFound(made);
+  }
+  const g = planarize(sorted, ids), found = { g, ...numbered(g, nth, big ? Infinity : z.number_tries) }, up = against(g, found.number);
+  // The search gives only small parts a trial of the embedding: the first trial of a larger one tries it here.
+  if (!up || !(embedded || (list.length > z.embed_most && !ties && !nth))) return found;
   const made = embed(sorted, ids);
-  return against(made, made.number) < up && made.crossings <= g.crossings + up * z.embed_cost ? { g: made, s: made.s, t: made.t, number: made.number, outerAt: made.outerAt } : found;
+  return against(made, made.number) < up && made.crossings <= g.crossings + up * z.embed_cost ? asFound(made) : found;
 }
