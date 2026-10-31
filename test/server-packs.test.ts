@@ -72,8 +72,19 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
   assert.deepEqual((await call('/api/workspace_info', token)).result.member_limit, { members: 2, plan: 'Duo', manage: 'https://seller.example/billing' });
   assert.equal((await call('/api/member_add', token, { email: 'sam@acme.example' })).result.email, 'sam@acme.example');
   assert.match((await call('/api/member_add', token, { email: 'kim@acme.example' })).error, /room for 2 members\.$/);
+  // A plan with an end: its days left, and a link to a page on this server saying what it does.
+  const until = new Date(Date.now() + 2.5 * 86_400_000).toISOString();
+  await post('/x/demo/limit', { workspace: 'acme', members: 2, plan: 'Trial', until, manage: '/x/demo/signup', manage_says: 'Subscribe' });
+  assert.deepEqual((await call('/api/workspace_info', token)).result.member_limit, { members: 2, plan: 'Trial', until, manage: '/x/demo/signup', manage_says: 'Subscribe', days_left: 3 });
+  assert.match((await post('/x/demo/limit', { workspace: 'acme', members: 2, manage: '//elsewhere.example' })).error, /https address/);
   await post('/x/demo/limit', { workspace: 'acme', members: null });
   assert.equal((await call('/api/member_add', token, { email: 'kim@acme.example' })).result.email, 'kim@acme.example', 'lifted');
+
+  // What a pack keeps under a prefix, in order, as many as it asks for; another prefix's and what ran out are not.
+  await post('/x/demo/start', { request: 'r2', email: 'kim@acme.example', name: 'Second' });
+  assert.deepEqual((await post('/x/demo/listed', { prefix: 'request:r', most: 1 })).result, [{ key: 'request:r1', value: { email: 'Rosa@Acme.example', name: 'Acme' } }]);
+  assert.deepEqual(((await post('/x/demo/listed', { prefix: 'request:' })).result as any[]).map((e) => e.key), ['request:r1', 'request:r2']);
+  assert.match((await post('/x/demo/listed', { prefix: '' })).error, /A prefix is/);
 
   // What it did not declare, a workspace it did not make, and the map: refused.
   assert.match((await post('/x/demo/sneak', {})).error, /did not declare the act "mail.send"/);
@@ -99,6 +110,7 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
     ['server.workspace.create', 'pack:demo'],
     ['server.workspace.admit', 'pack:demo'],
     ['server.signin.link', 'pack:demo'],
+    ['server.workspace.limit', 'pack:demo'],
     ['server.workspace.limit', 'pack:demo'],
     ['server.workspace.limit', 'pack:demo'],
     ['server.workspace.limit', 'pack:demo'],

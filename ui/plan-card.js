@@ -13,6 +13,7 @@ const usageCanvas = () => (state.schema?.canvases ?? []).find((c) => c.props?.vi
 export function planCard(limit, use, ended) {
   if (!limit && !ended) return null;
   const manage = ended?.manage ?? limit?.manage;
+  const says = ended?.manage_says ?? limit?.manage_says;
   const near = (use ?? []).filter((u) => u.near);
   const drawn = usageCanvas();
   return h(
@@ -28,10 +29,10 @@ export function planCard(limit, use, ended) {
         ended ? h('span', { class: 'pill bad', title: `Ended ${ended.since.slice(0, 10)}` }, 'ended') : h('span', { class: 'pill ok' }, limit.plan ?? 'plan'),
         ended
           ? h('span', { class: 'grow gist', title: `Read-only until it is deleted from the server on ${ended.delete_at.slice(0, 10)}.${ended.note ? ` ${ended.note}` : ''}` }, `read-only · deleted ${ended.delete_at.slice(0, 10)}`)
-          : h('span', { class: `grow gist${near.length ? '' : ' muted'}`, title: near.length ? `${near.map((u) => u.name).join(', ')}: ${limit.note ?? 'change the plan for more room'}` : 'Within every limit of the plan' }, near.length ? `near the limit: ${near.map((u) => u.name).join(', ')}` : 'within its limits'),
+          : h('span', { class: `grow gist${near.length ? '' : ' muted'}`, title: near.length ? `${near.map((u) => u.name).join(', ')}: ${limit.note ?? 'change the plan for more room'}` : limit.until ? `Runs until ${limit.until.slice(0, 10)}` : 'Within every limit of the plan' }, near.length ? `near the limit: ${near.map((u) => u.name).join(', ')}` : limit.until ? `${limit.days_left} ${limit.days_left === 1 ? 'day' : 'days'} left` : 'within its limits'),
         ended && h('a', { href: '#/workspace?at=backup', title: 'Everything in it, as a file another server can import' }, 'Download backup'),
         !ended && drawn && h('a', { href: canvasAt({ ...drawn, preset: true }), title: 'How much of each limit is used, and what it is made of' }, 'Usage'),
-        manage && h('a', { href: manage, target: '_blank', rel: 'noopener noreferrer', title: 'Change the plan, the seats or the card, or cancel, with the seller' }, ended ? 'Subscribe again' : 'Manage subscription'),
+        manage && h('a', { href: manage, target: '_blank', rel: 'noopener noreferrer', title: says ?? 'Change the plan, the seats or the card, or cancel, with the seller' }, says ?? (ended ? 'Subscribe again' : 'Manage subscription')),
       ),
       ...(ended || drawn ? [] : (use ?? []).map((u) =>
         h(

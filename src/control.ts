@@ -152,6 +152,12 @@ export async function storePut(db: Q, pack: string, key: string, value: unknown,
   );
 }
 
+/** What a pack keeps under a prefix, in the order of its keys, up to `most` of them. */
+export async function storeList<T>(db: Q, pack: string, prefix: string, most: number): Promise<{ key: string; value: T }[]> {
+  const { rows } = await db.query<{ key: string; value: T }>(`select key, value from pack_store where pack = $1 and starts_with(key, $2) and (until is null or until >= now()) order by key collate "C" limit $3`, [pack, prefix, most]);
+  return rows;
+}
+
 /** A value given once: taken away as it is read, by whichever call asks first. */
 export async function storeTake<T>(db: Q, pack: string, key: string): Promise<T | undefined> {
   const { rows } = await db.query<{ value: T; live: boolean }>(`delete from pack_store where pack = $1 and key = $2 returning value, (until is null or until >= now()) as live`, [pack, key]);

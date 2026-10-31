@@ -6,7 +6,7 @@ import { endedOf } from './ended.ts';
 import { limitOf } from './members.ts';
 import { looksThisHour } from './looks.ts';
 import { sessionsAwake } from './sessions.ts';
-import { requestsThisMinute, storageOf, useOf, type Limits } from './plan.ts';
+import { daysLeft, requestsThisMinute, storageOf, useOf, type Limits } from './plan.ts';
 import { acceptedSenders, wholeMap } from './outbox.ts';
 import { actorId, type Archipelago } from './pelago.ts';
 import { askedLately } from './replies.ts';
@@ -49,7 +49,7 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
     run: async (l) => {
       const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on e.id = s.value #>> '{}' where s.key = 'me'`);
       const limits = await limitOf(l.workspace);
-      return { ...(await settings(l)), owner: rows[0] ?? null, member_limit: limits ?? null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
+      return { ...(await settings(l)), owner: rows[0] ?? null, member_limit: limits ? { ...limits, ...(limits.until && { days_left: daysLeft(limits.until) }) } : null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
     },
   },
   workspace_set: {
