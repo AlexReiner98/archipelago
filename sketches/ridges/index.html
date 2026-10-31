@@ -142,6 +142,7 @@
   <h2>Rows</h2>
   <label>Rows <output id="rowsOut"></output><input id="rows" type="range" min="6" max="400" step="1"></label>
   <label class="check" title="The faint lines along each row, on the water"><input id="swell" type="checkbox" checked> Swell lines</label>
+  <label title="How far the swell lines reach past the land, bending round its outline: none runs them straight from edge to edge of the frame">Swell reach <small>frame · close · wide</small><input id="swellReach" type="range" min="0" max="0.3" step="0.005"></label>
   <h2>Sky</h2>
   <label title="Cloud cover: none, to overcast">Clouds <small>none · overcast</small><input id="clouds" type="range" min="0" max="1" step="0.01" value="0"></label>
   <label class="only-clouds" title="Small, many cloud banks or large, few">Cloud size <small>small · large</small><input id="cloudSize" type="range" min="0.2" max="3" step="0.01" value="1"></label>
@@ -190,7 +191,7 @@
   import { paint, fillOf as fillWith, swell, isLight } from './paint.js';
 
   const $ = (id) => document.getElementById(id);
-  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate', 'clouds', 'cloudSize', 'cloudPuff', 'cloudTip', 'cloudShadow', 'cloudPeaks', 'cloudSpread', 'wind', 'windDir'];
+  const DIALS = ['swellReach', 'pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate', 'clouds', 'cloudSize', 'cloudPuff', 'cloudTip', 'cloudShadow', 'cloudPeaks', 'cloudSpread', 'wind', 'windDir'];
   for (const k of DIALS) $(k).value = DEFAULTS[k];
   // Palettes are kept as photographed (a palette shipped enriched is taken back to its raw colours); Richness enriches
   // them as they are drawn, so the swatches always show and edit the colours the photos gave.

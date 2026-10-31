@@ -91,6 +91,7 @@ export const DEFAULTS = {
   line: 1.2,       // outline weight
   seed: 1,
   wrap: false,     // repeat seamlessly left to right
+  swellReach: 0,   // how far the swell lines reach past the land, as a share of the height: 0 runs them frame to frame
   field: null,     // a field grown elsewhere, { nx, ny, v }, to stand in for the one these dials would grow
 };
 
@@ -452,14 +453,40 @@ export function ridges(dials) {
       i = j;
     }
     // The row's floor: a line across the water.
-    shapes.push({ line: true, points: [[xs[0], y], [xs[xs.length - 1], y]] });
-    sky.push({ y, yc, h, at: shapes.length });
+    const floor = { line: true, points: [[xs[0], y], [xs[xs.length - 1], y]] };
+    shapes.push(floor);
+    sky.push({ y, yc, h, shelf, floor, at: shapes.length });
+  }
+  // The swell keeps to the islands: each row's line ends a reach past the outermost land near it, in any row within
+  // the reach, a disc rolled round the whole of the land, so the sea's edge bends round its outline, wobbling with noise.
+  if (d.swellReach > 0 && !d.wrap) {
+    const reach = d.swellReach * H, last = xs.length - 1;
+    const ends = sky.map(({ h, shelf }) => {
+      const on = (i) => h[i] >= 0.5 || shelf[i] > 0.02;
+      let a = 0, b = last;
+      while (a <= last && !on(a)) a++;
+      if (a > last) return null;
+      while (!on(b)) b--;
+      return [xs[a], xs[b]];
+    });
+    sky.forEach(({ y, yc, floor }, r) => {
+      let lo = Infinity, hi = -Infinity;
+      ends.forEach((e, q) => {
+        const off = Math.abs(q - r) * gap;
+        if (!e || off >= reach) return;
+        const side = Math.sqrt(reach * reach - off * off);
+        (lo = Math.min(lo, e[0] - side)), (hi = Math.max(hi, e[1] + side));
+      });
+      if (lo === Infinity) return void (floor.gone = true);
+      const wobble = (k) => (land(k, yc * 2.2) - 0.5) * reach * 0.9;
+      floor.points = [[Math.max(xs[0], lo + wobble(31)), y], [Math.min(xs[last], hi + wobble(57)), y]];
+    });
   }
   // Clouds, from the mountains and spread on the wind (clouds.js): each row's go in just after its land, so nearer land passes
   // in front of farther cloud. Last row first, so the earlier places stay where they were.
   const made = clouds({ d, rows: sky, xs, dx, gap, puff, seam, shore, smooth });
   for (let r = sky.length - 1; r >= 0; r--) shapes.splice(sky[r].at, 0, ...made[r]);
-  return { width: W, height: H, shapes, line: d.line, chains: groups };
+  return { width: W, height: H, shapes: shapes.filter((s) => !s.gone), line: d.line, chains: groups };
 }
 
 /** k places over the page, 0 to 1 each way, well apart, from the seed alone: each the farthest of a few tries from the rest. */
