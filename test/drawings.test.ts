@@ -33,10 +33,10 @@ async function system(call: (path: string, token?: string, body?: unknown) => Pr
   const kept = await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', status: 'current', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of', 'calls'], steps: 3 } } },
+      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', status: 'current', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of', 'calls'], steps: 3 }, style: { shape: 'architecture' } } },
       { op: 'link', type: 'about', from: 'l', to: made.p },
       { op: 'create', ref: 's', type: 'style', title: 'As architecture', status: 'current', props: { shape: 'architecture' } },
-      { op: 'link', type: 'about', from: 's', to: 'l' },
+      { op: 'link', type: 'about', from: 's', to: made.p },
     ],
   });
   return { ...made, ...kept.result.created } as Record<string, string>;

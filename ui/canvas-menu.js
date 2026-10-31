@@ -29,7 +29,7 @@ function open(anchor, more) {
 
 /** The ⋯ and its menu; `more` are what the band adds for what is up (Delete style, ui/look-switch.js). */
 export function canvasMenu(more = []) {
-  const button = h('button', { type: 'button', class: 'q-save q-band-menu', title: ['Arrange', 'Fit', 'Snap', ...more.filter(Boolean).map((m) => m.text)].join(', '), 'aria-label': 'More for this view', 'aria-haspopup': 'menu' }, '⋯');
+  const button = h('button', { type: 'button', class: 'q-save q-band-menu', title: 'More for this view', 'aria-label': 'More for this view', 'aria-haspopup': 'menu' }, '⋯');
   button.addEventListener('click', () => (list.matches(':popover-open') ? list.hidePopover() : open(button, more)));
   return button;
 }

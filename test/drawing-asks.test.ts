@@ -31,9 +31,9 @@ test('in a browser, a drawing gets a text field and asks for changes, which the 
       { op: 'create', ref: 'a', type: 'work.task', title: 'Seed' },
       { op: 'create', ref: 'c', type: 'lens', title: 'Asked', status: 'current', props: { filter: { find: ['type work.task'] } } },
       { op: 'create', ref: 's', type: 'style', title: 'Asking', status: 'current', props: { code: CODE, writes: ['work.task'] } },
-      { op: 'link', type: 'about', from: 's', to: 'c' },
     ],
   })).result.created as Record<string, string>;
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.c, props: { style: { style: made.s } } }] });
   const page = await open(`${base}/#/v?canvas=${made.c}`);
   try {
     // The sandboxed frame runs in a process of its own (Chrome isolates them): reached through a session of its own.

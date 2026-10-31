@@ -41,7 +41,7 @@ export async function keptPicture(l: Archipelago, id: string, have?: unknown) {
   if (!item || !isKept(l, item.type)) throw new Error(`"${id}" is not a view kept on the map`);
   const own = (item.props.style ?? {}) as Props;
   const named = typeof own.style === 'string' ? own.style : undefined;
-  const { style } = await styleFor(l, await keptOf(l, 'style', named), { view: id, own: ownStyle(own), ...(named && { named }) });
+  const { style } = await styleFor(l, await keptOf(l, 'style', named), { own: ownStyle(own), ...(named && { named }) });
   const lens = keptLens(item.props);
   let answer = await flatLens(l, lens);
   const steps = item.props.steps === undefined ? undefined : readSteps(item.props.steps);

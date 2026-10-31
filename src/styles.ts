@@ -32,8 +32,6 @@ interface Version {
 /** What a picture or page is drawn for: the item it is of (and its type), the view drawn, a style named outright. */
 export interface StyleAsk {
   hub?: { id: string; type: string };
-  /** The view drawn: a style made about it since the move into views still draws it, until such styles are refused. */
-  view?: string;
   /** What a view holds of how it is drawn (ownStyle): over everything but a style named outright. */
   own?: Record<string, unknown>;
   named?: unknown;
@@ -84,7 +82,7 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, give
     if (one.props.preset != null) continue;
     const on = listed(one.props.on);
     // A style with code of its own is a layout: it draws only where it is named, never as the workspace's.
-    const weight = one.id === ask.named ? 6 : ask.view !== undefined && one.about.includes(ask.view) ? 4.5 : ask.hub !== undefined && one.about.includes(ask.hub.id) ? 4 : on.length ? (onIt(on) ? 3 : -1) : one.about.length || typeof one.props.code === 'string' ? -1 : 1;
+    const weight = one.id === ask.named ? 6 : ask.hub !== undefined && one.about.includes(ask.hub.id) ? 4 : on.length ? (onIt(on) ? 3 : -1) : one.about.length || typeof one.props.code === 'string' ? -1 : 1;
     if (weight >= 0) layers.push({ weight, id: one.id, title: one.title, props: one.props });
     if (ask.person !== undefined && one.about.includes(ask.person) && one.props.theme != null) layers.push({ weight: 7, id: one.id, title: one.title, props: { theme: one.props.theme } });
   }
@@ -132,7 +130,7 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: u
   const tried = typeof input.try === 'string' ? input.try : undefined;
   // A view kept on the map holds its own layout and settings, over every style but one named outright.
   const own = view === undefined ? undefined : ownStyle((await l.entity(view))?.props.style);
-  const read = await styleFor(l, await keptOf(l, 'style', named), { ...(item && { hub: item }), ...(view && { view }), ...(own && { own }), ...(named && { named }), ...(person && { person }), ...(tried && { try: tried }) });
+  const read = await styleFor(l, await keptOf(l, 'style', named), { ...(item && { hub: item }), ...(own && { own }), ...(named && { named }), ...(person && { person }), ...(tried && { try: tried }) });
   // The shape the reader chose for this view (the view band's switch) over that, so its drawing comes with it.
   if (typeof input.shape === 'string' && input.shape) read.style.shape = input.shape;
   return input.have === undefined ? read : { ...read, style: await drawn(l, read.style, input.have) };

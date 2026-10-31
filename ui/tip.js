@@ -67,10 +67,16 @@ function gone() {
   at = null;
 }
 
-/** Below the element, or above it where there is no room; kept inside the window. */
+/** Below the element, or above it where there is no room; beside a menu it is in, so as not to cover the next choice; kept inside the window. */
 function place(el) {
   const r = el.getBoundingClientRect();
   const w = box.offsetWidth, ht = box.offsetHeight, gap = parseFloat(getComputedStyle(box).getPropertyValue('--tip-gap')) || 0;
+  const menu = el.closest?.('[role=menu]')?.getBoundingClientRect();
+  if (menu) {
+    box.style.left = `${menu.left - gap - w >= 0 ? menu.left - gap - w : Math.min(menu.right + gap, innerWidth - w - gap)}px`;
+    box.style.top = `${Math.min(Math.max(r.top, gap), innerHeight - ht - gap)}px`;
+    return;
+  }
   const below = r.bottom + gap + ht <= innerHeight || r.top - gap - ht < 0;
   box.style.left = `${Math.min(Math.max(r.left + r.width / 2 - w / 2, gap), innerWidth - w - gap)}px`;
   box.style.top = `${below ? r.bottom + gap : r.top - gap - ht}px`;
