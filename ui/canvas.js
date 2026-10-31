@@ -81,6 +81,11 @@ export const refreshCanvas = (tail = false) => all.forEach((c) => c.refresh(tail
 export function canvasIn(host, pane) {
   /** What is up: the lens asked for, the view drawing it, the item lit in it, the style as asked, where it was left. */
   let at = null;
+  /** Where it stands, if the reader has moved it from where it was fitted. */
+  const moved = () => {
+    const now = c.moves()?.state();
+    return now && !['s', 'x', 'y'].every((k) => now[k] === at?.fitted?.[k]) ? now : null;
+  };
   const c = {
     pane,
     host,
@@ -113,10 +118,10 @@ export function canvasIn(host, pane) {
       writeMoves();
       // Where things were put here is read beside the lens, into `placed`: one object the picture keeps, filled in place.
       const style = { ...asked, ...(here && { here }), snap: Boolean(settings.snap), placed: {} };
-      // The same lens drawn again (an item's page opened over it says it anew) stays where it stands: opening an item
-      // does not move the canvas.
+      // The same lens drawn again (an item's page opened over it says it anew) stays where the reader moved it, and one
+      // they have not moved fits the room beside the page.
       const same = at && JSON.stringify(at.lens) === JSON.stringify(lens);
-      at = { key, view: null, lens, home: isHome, here, kept: same ? (c.moves()?.state() ?? at.kept) : null, style, asked };
+      at = { key, view: null, lens, home: isHome, here, kept: same ? (c.moves() ? moved() : at.kept) : null, fitted: same ? at.fitted : null, style, asked };
       c.draw();
       readPlaces(c, canvasOf(lens, asked), style.placed);
     },
@@ -158,6 +163,7 @@ export function canvasIn(host, pane) {
       if (!settings.fit || (!force && at?.kept)) return;
       if (at) at.kept = null;
       c.moves()?.fit(0, ...bars(host));
+      if (at) at.fitted = c.moves()?.state();
     },
     snap() {
       if (at?.style) at.style.snap = Boolean(settings.snap);
@@ -170,8 +176,9 @@ export function canvasIn(host, pane) {
     },
   };
   all.add(c);
-  // Where the reader left it, each time they move it: a drawing drawn again (the map changed) is put back there.
-  const keepIt = () => at && c.moves() && (at.kept = c.moves().state());
+  // Where the reader left it, each time they move it: a drawing drawn again (the map changed) is put back there. A click
+  // that moved nothing leaves it where it was fitted, so it is fitted again.
+  const keepIt = () => at && c.moves() && (at.kept = moved() ?? at.kept);
   for (const name of ['pointerup', 'wheel']) host.addEventListener(name, () => setTimeout(keepIt, 0), { passive: true });
   // A drawing mounted anew (a new view, the map changed under it): back where the reader left it, else fitted.
   new MutationObserver((list) => {

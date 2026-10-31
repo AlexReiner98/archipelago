@@ -41,6 +41,19 @@ test('in a browser, opening a step keeps the canvas still and lights it, and a h
     assert.ok(await until(`Boolean(${step(made.a)}) && Boolean(${step(made.b)})`), `the steps are drawn: ${await page.evaluate("document.querySelector('#canvas')?.innerText.slice(0, 600)")} ${page.logs().join('\n')}`);
     await wait(800);
 
+    // ---- A click on a step of a picture nobody moved fits it to the room beside the sheet; shut, to the whole page.
+    const fitted = await rect(step(made.a));
+    await click([fitted.x + fitted.w / 2, fitted.y + fitted.h / 2]);
+    assert.ok(await until(`document.body.dataset.sheet === 'open'`, 5000), 'its page is open');
+    await wait(600);
+    const beside = await rect(step(made.a));
+    assert.ok(beside.x < fitted.x - 100, `the click moved nothing, so it fits again beside the sheet: ${JSON.stringify([fitted, beside])}`);
+    await page.evaluate(`document.getElementById('sheet-close').click()`);
+    assert.ok(await until(`!document.body.dataset.sheet`, 5000), 'shut');
+    await wait(600);
+    const whole = await rect(step(made.a));
+    assert.ok(Math.abs(whole.x - fitted.x) < 1, `shut, it fits the page again: ${JSON.stringify([fitted, whole])}`);
+
     // ---- A click on a step opens its page over the canvas: the canvas stays where it stands, as the reader moved and
     // zoomed it, the step lit; shut, it is still there.
     const box = await rect(`document.querySelector('#canvas .pane-canvas')`);
