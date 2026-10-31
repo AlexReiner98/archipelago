@@ -20,7 +20,7 @@ function fewer(p, tol) {
 }
 
 /** A shape's outline as a path's numbers, whole units apart and relative, so it packs small. */
-function written(points, units, tol, closed) {
+export function written(points, units, tol, closed) {
   let d = '', px = 0, py = 0;
   fewer(points, tol).forEach(([x, y], i) => {
     const X = Math.round(x * units), Y = Math.round(y * units);
