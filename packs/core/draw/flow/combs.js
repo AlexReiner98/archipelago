@@ -10,9 +10,11 @@ export function peel(a, stay = new Set(), holds = () => false) {
   const degree = new Map([...a].map(([k, s]) => [k, s.size])), kids = new Map(), gone = new Set(), levels = new Map();
   const todo = [...a.keys()].filter((k) => degree.get(k) === 1 && !stay.has(k));
   while (todo.length) {
-    const n = todo.pop();
+    let n = todo.pop();
     if (gone.has(n) || degree.get(n) !== 1) continue;
-    const p = [...a.get(n)].find((w) => !gone.has(w));
+    let p = [...a.get(n)].find((w) => !gone.has(w));
+    // Of the last two, what holds more stays.
+    if (degree.get(p) === 1 && !stay.has(p) && (kids.get(n)?.length ?? 0) > (kids.get(p)?.length ?? 0)) [n, p] = [p, n];
     if (holds(n, p) || (levels.get(n) ?? 0) >= DEEPEST) continue;
     gone.add(n);
     levels.set(p, Math.max(levels.get(p) ?? 0, (levels.get(n) ?? 0) + 1));
@@ -38,7 +40,7 @@ export function peel(a, stay = new Set(), holds = () => false) {
  */
 export function comb(n, kids, size, z, sideOf = () => 1, way = 1, rest = way, { level = false, near = false, alone = false, drop = false, pad = 0, wide = 0, aspect = 1.25 } = {}) {
   const under = (kids.get(n) ?? []).filter((id) => (sideOf(n, id) || rest) === way).map((id) => {
-    const s = size(id), port = near ? Math.min(s.w / 4, z.stub ?? z.col / 2) : 0, how = { near, drop: near, pad: port, wide: s.w - port };
+    const s = size(id), port = near ? Math.min(s.w / 4, z.stub ?? z.col / 2) : 0, how = { near, drop: near, pad: port, wide: s.w - port, aspect };
     const b = comb(id, kids, size, z, sideOf, way, way, how), back = comb(id, kids, size, z, sideOf, -way, way, how);
     const lead = back.items.length ? back.h + z.row : 0;
     return { id, b, back, lead, s, port, w: Math.max(s.w, port + b.w, port + back.w), h: lead + s.h + (b.items.length ? z.row + b.h : 0) + z.row };
