@@ -257,7 +257,9 @@ the pane in focus. A click on a node in any pane puts that pane in focus,
 adds the node to its filter and opens its page in the sheet over it. Find shuts when
 another pane or tab comes into focus, and what was typed goes. On a page taller than wide a row is
 drawn as a column. The top bar runs across the page over the sheet, one pane
-or several: the sheet opens under it.
+or several: the sheet opens under it. The sheet takes its room from the panes
+(`panes.js`), one alone too, so every canvas resizes to stand beside it,
+whatever draws it, and no view does this itself.
 
 A tab (`tab-bar.js`, `tabs.js`; decision e_mzer5m4t) is a set of panes,
 which stay together in it. The tabs stand in the

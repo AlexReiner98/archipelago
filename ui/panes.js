@@ -15,6 +15,7 @@ import { numberOf } from './lens-base.js';
 import { dragPane, sashes } from './pane-drag.js';
 import { heard, nameOf } from './pane-route.js';
 import { filterSaid } from './query-bar.js';
+import { sheetAside } from './sheet-follow.js';
 import { asPane, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId } from './tabs.js';
 import { titles } from './words.js';
 
@@ -228,9 +229,9 @@ export function draw() {
   for (const [id, entry] of drawn) if (layout.panes[id]?.at !== entry.at) load(id, layout.panes[id].at);
   const dir = dirNow();
   host.dataset.dir = dir;
-  // Several panes share the room left of an open sheet, so none is behind it; one alone stays under it, as it was.
-  const sheet = document.getElementById('sheet');
-  const aside = layout.groups.length > 1 && document.body.dataset.sheet === 'open' && sheet.offsetWidth < innerWidth * 0.8 ? sheet.offsetWidth / innerWidth : 0;
+  // The panes share the room left of an open sheet, one alone too, so whatever a pane draws stands beside the sheet and
+  // none of it behind: this is the one place a canvas gives way to it.
+  const aside = sheetAside();
   const room = 1 - aside;
   let from = 0;
   frames = layout.groups.map((g, n) => {
@@ -241,7 +242,8 @@ export function draw() {
   });
   for (const [g, box] of frames) {
     const el = drawn.get(g)?.el ?? paneEl(g);
-    for (const side of ['left', 'right', 'top', 'bottom']) el.style[side] = layout.groups.length > 1 ? edge(side, box[side]) : '';
+    // One alone fills the page under the bars, but for the sheet's room.
+    for (const side of ['left', 'right', 'top', 'bottom']) el.style[side] = layout.groups.length > 1 || (side === 'right' && aside) ? edge(side, box[side]) : '';
     if (el.parentNode !== host) host.append(el);
   }
   // In the order they stand, so a reader's tab order and a test's first pane are the leftmost; moved only when out of
@@ -327,7 +329,7 @@ addEventListener('resize', () => {
   if (started && host.dataset.dir !== dir) ((host.dataset.dir = dir), draw());
 });
 // The sheet opening or shutting changes the room the panes share.
-new MutationObserver(() => started && front().groups.length > 1 && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
+new MutationObserver(() => started && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
 
 /** The query bar's own for the pane it acts on, the same in every pane: back and forth (dimmed with nowhere to go) and split. Each pane's move and close stay in its strip. */
 export function paneButtons() {

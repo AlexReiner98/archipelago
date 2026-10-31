@@ -12,7 +12,7 @@ import { tipOf } from './drawing-tip.js';
 import { answered } from './tip.js';
 import { build, cssFor, patch, step } from './marks.js';
 import { stillReading } from './reader-frame.js';
-import { followSheet } from './sheet-follow.js';
+import { followSheet, sheetAside } from './sheet-follow.js';
 import { STYLE_COLORS, litSwitch, numberOf, sizeOf } from './lens-base.js';
 import { surfaceOf } from './surface.js';
 import { saidDrawn } from './look.js';
@@ -215,7 +215,9 @@ export function drawWith(host, answer, style, keep) {
   const { drawing: _code, code: _canvas, ...fields } = style;
   // The titles of the types the picture holds, as this page knows them: a drawing has no registry of its own.
   const types = Object.fromEntries([...new Set((shown.items ?? []).flatMap((i) => [i.type, i.root]).filter(Boolean))].map((t) => [t, typeTitle(t)]));
-  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: Number(host.dataset.room) || host.clientWidth, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
+  // A picture that is panned is laid out for its pane with the sheet shut, so the sheet opening never changes its shape; one drawn to the page's width takes the room there is.
+  const across = drawing?.flat ? host.clientWidth : host.clientWidth / (1 - sheetAside());
+  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: Number(host.dataset.room) || across, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
   const seen = `${drawing.hash}
 ${JSON.stringify(input)}`;
   const kept = scenes.get(seen);

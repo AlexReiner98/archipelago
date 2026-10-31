@@ -14,7 +14,6 @@ import { FOCUS, flatQuery, flatView } from './lens.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
 
-const sheet = document.getElementById('sheet');
 /**
  * Home: open projects (what stands at a project's altitude) and whatever waits on the viewer, with no walk and a short
  * limit, so the first canvas answers one question (decision e_5stjvfvb). Growing it is a step taken from an item.
@@ -158,7 +157,7 @@ export function canvasIn(host, pane) {
     fit(force = false) {
       if (!settings.fit || (!force && at?.kept)) return;
       if (at) at.kept = null;
-      c.moves()?.fit(covered(host), ...bars(host));
+      c.moves()?.fit(0, ...bars(host));
     },
     snap() {
       if (at?.style) at.style.snap = Boolean(settings.snap);
@@ -284,11 +283,6 @@ try {
 } catch {
   // Without storage, as it comes.
 }
-/** What the sheet covers on the right of a canvas; a sheet as wide as the page leaves nothing beside it. */
-const covered = (host) => {
-  if (document.body.dataset.sheet !== 'open' || sheet.offsetWidth >= innerWidth * 0.8) return 0;
-  return Math.max(0, host.getBoundingClientRect().right - sheet.getBoundingClientRect().left);
-};
 /** What the bars cover of a canvas above and below: the query bar's foot, and the find bar's top, in the canvas's own frame. */
 const bars = (host) => {
   const edge = (id, side) => { const el = document.getElementById(id); return el && !el.hidden ? el.getBoundingClientRect()[side] : undefined; };
@@ -310,6 +304,5 @@ function toggle(name) {
 }
 // What the band's menu (ui/canvas-menu.js) acts on: Arrange the pane in focus, and the reader's toggles.
 hooks.canvasNow = { arrange: () => current?.arrange(), settings, toggle };
-// The sheet opening or shutting, and the window resized, change the room each is fitted to.
-new MutationObserver(fitAll).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
+// The window resized, or the panes drawn again as the sheet opens or shuts (ui/panes.js), change the room each is fitted to.
 addEventListener('resize', fitAll);
