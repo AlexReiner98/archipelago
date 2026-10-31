@@ -1,155 +1,101 @@
-// A flow's layout, apart from its drawing (the core pack's flow drawing, index.js): a flat graph on one plane, where
-// depth is never drawn (e_ktdensts). Every item is a step. depends_on is the order: a step leads to another when the
-// other depends on it, read from the top down. Every other link (part_of first) is a quiet tie that pulls its two
-// ends near; nothing is grouped, boxed or nested. What is tied together is one cluster, laid out by Sugiyama's method
-// with every link a line through its rows (./layers.js) and every line wired by one rule (./wires.js): the order's and
-// the ties alike, at right angles, each on a track of its own or on its bus. A step put by hand (`placed`) stays
-// exactly where it was put; the clusters are set round it, and the lines to it are solved round the steps (./free.js).
-// What follows an open question is a scenario, and a choice nothing follows yet ends in a step of its own. Pure: an
-// answer in, geometry out; `measure(text, px)` gives a title's width at a size.
+// A graph drawn from its planar embedding as a visibility representation (Tamassia and Tollis): each item a bar across a
+// run of columns, each wire straight down a column from one bar to another, so the planar part cannot cross and every
+// wire is at right angles. An st-numbering sets the rows, the faces between the wires set the columns, and the longest
+// path through each keeps both as tight as they can be. Trees hang in combs beside their item. Each layer is its own
+// module, read in the order this one calls them: graph (./steps.js, ./direction.js, ./hangs.js), topology (./topology.js),
+// shape and metrics (./part.js, ./search.js), shape (./shape.js), then metrics alone (./assemble.js, ./solve.js, ./finish.js). Pure: an answer
+// in, geometry out, as the flow's layout answers.
 
-import { route, routeTies } from './free.js';
-import { lines } from './lines.js';
-import { acyclic, flatten, grouped, highest, ORDER, QUIET, reduced } from './graph.js';
-import { lay as layCluster } from './layers.js';
+import { assemble, rigidOf, shelfOf } from './assemble.js';
+import { directions } from './direction.js';
+import { finisher } from './finish.js';
+import { flatten, ORDER } from './graph.js';
+import { hangsOf, partsOf } from './hangs.js';
+import { drawnPart, linksOf } from './search.js';
+import { shape } from './shape.js';
+import { solveSections } from './solve.js';
+import { stepsOf } from './steps.js';
 
-export { LARGE } from './layers.js';
-/** The shape a picture is wrapped toward when none is asked for, as wide as tall times this: about a page's. */
-export const ASPECT = 1.6;
+/** How many finished pictures are kept. */
+const KEPT = 8;
 
-/**
- * The steps (each with its place x, y and size w, h), the wires of the order (`chains`, each with its points), the
- * ties (each with its two points), the breaks and the whole size. Every length and count it lays out by is the
- * style's (`sizes` and `numbers`, flow_*): the house style in packs/core/pack.json names each, and a nearer style may
- * change any. `placed` is where steps were put by hand, their middles by item. `aspect` is the shape to wrap toward,
- * as wide as tall times it: the drawing gives the pane's, so a narrow pane is filled down and a wide one across.
- */
-export function layout({ items: given, links: told = [], undrawn = [], placed = {}, measure, sizes, aspect = ASPECT }) {
-  const need = (set, name) => {
-    if (typeof set?.[name] !== 'number') throw new Error(`The style names no "${name}": the house style names every one the flow lays out by`);
-    return set[name];
+let last = null;
+/** What the last layout drew, for the count in the key. */
+export const latest = () => last;
+
+/** For a bench: told each stage's lines as it ends, by link. */
+let staging = null;
+export const stages = (fn) => (staging = fn);
+
+/** Pictures already pulled tight, the newest last: going back to a lens, or dropping a step, costs next to nothing. */
+const kept = new Map();
+
+/** The layout of an answer: what it was drawn from worked out once, and what was put by hand set on top of that. */
+export function layout(args) {
+  const { items, links, undrawn, headless, sizes, aspect } = args, key = JSON.stringify([items, links, undrawn, headless, sizes, aspect]);
+  const hit = kept.get(key) ?? laidOut(args);
+  kept.delete(key);
+  kept.set(key, hit);
+  if (kept.size > KEPT) kept.delete(kept.keys().next().value);
+  const { laid, seen } = hit(args.placed ?? {});
+  last = seen;
+  return laid;
+}
+
+/** Each wire's way chosen, the boxes where the first drawing has them. */
+function shapeWires({ nodes, x, y, routes, z }) {
+  const boxes = new Map([...x.keys()].map((id) => [id, { x: x.get(id), y: y.get(id), w: nodes.get(id).w, h: nodes.get(id).h, pointed: nodes.get(id).shape === 'diamond' }]));
+  const wires = [...routes].map(([k, r]) => { const [p, q] = k.split('|'); return { r, a: r.from, b: r.from === p ? q : p, points: r.points, kept: r.set }; });
+  shape(boxes, wires, { room: z.room, run: z.run, corner: z.corner, wire: z.turn, ports: z.ports, rounds: z.rounds, cost_cross: z.shape_cross, cost_bend: z.cost_bend, cost_side: z.cost_side, work: z.shape_work });
+  for (const w of wires) w.r.points = w.points;
+}
+
+/** Every length and limit the layout works by, from the style. */
+function lengthsOf(sizes) {
+  const gap = sizes.flow_node_gap;
+  return {
+    row: sizes.flow_layer_gap / 2, col: sizes.flow_wire_column, turn: Math.max(gap / 3, sizes.flow_wire_gap), gap,
+    room: sizes.flow_wire_room, join: sizes.flow_joined_room, run: sizes.flow_port_run, corner: sizes.flow_port_corner,
+    trials: sizes.flow_trials, trial_most: sizes.flow_trial_most, cost_up: sizes.flow_cost_up, cost_cross: sizes.flow_cost_crossing, shape_cross: sizes.flow_shape_crossing, shape_most: sizes.flow_shape_most, shape_work: sizes.flow_shape_work, cost_bend: sizes.flow_cost_bend, cost_side: sizes.flow_cost_side, ports: sizes.flow_reroute_ports, rounds: sizes.flow_reroute_rounds, cost_wrong: sizes.flow_cost_wrong_side, embed_most: sizes.flow_embed_most, embed_big: sizes.flow_embed_big, hub_most: sizes.flow_hub_most, embed_cost: sizes.flow_embed_crossings, slide_sweeps: sizes.flow_slide_sweeps, number_tries: sizes.flow_number_tries, trial_total: sizes.flow_trial_total,
+    row_gap: sizes.flow_row_gap, row_space: sizes.flow_row_space,
   };
-  const [LAYER_GAP, NODE_GAP, MARGIN, MAX_TEXT, TRACK, SLOT, LEAD_OUT, LEAD_IN] = ['flow_layer_gap', 'flow_node_gap', 'flow_margin', 'flow_max_text', 'flow_track', 'flow_slot', 'flow_lead_out', 'flow_lead_in'].map((n) => need(sizes, n));
-  const [TEXT, STUB_TEXT] = ['flow_text', 'flow_stub_text'].map((n) => need(sizes, n));
-  const [DIAMOND_PAD, DIAMOND_H, END_PAD, END_H, BOX_PAD, BOX_H, SHEET_H] = ['flow_diamond_pad', 'flow_diamond_height', 'flow_end_pad', 'flow_end_height', 'flow_box_pad', 'flow_box_height', 'flow_sheet_height'].map((n) => need(sizes, n));
+}
+
+function laidOut({ items: given, links: told = [], undrawn = [], headless = ['part_of'], measure, sizes, aspect = 1.6 }) {
   const { items, links } = flatten({ items: given, links: told, undrawn });
-  const shapeOf = (i) => (i.kind === 'question' ? 'diamond' : i.kind === 'occurrence' ? 'pill' : i.kind === 'record' ? 'sheet' : 'box');
-  const nodes = new Map();
-  for (const i of [...items].sort((a, b) => (a.place ?? 0) - (b.place ?? 0))) nodes.set(i.id, { id: i.id, item: i, shape: shapeOf(i) });
-  if (!nodes.size) return { nodes, all: [], chains: [], ties: [], breaks: [], potential: new Set(), x: new Map(), y: new Map(), width: 0, height: 0 };
-
-  // ---- The order (a leads to b when b depends on a; a line that says something says which option it follows), and
-  // the ties: every other link, from what is part of to what it is part of.
-  const seen = new Set();
-  let edges = [];
-  for (const l of links) if (l.type === ORDER && !seen.has(`${l.to} ${l.from}`)) (seen.add(`${l.to} ${l.from}`), edges.push({ a: l.to, b: l.from, ...(l.says && { says: l.says }), ...(l.pending && { pending: l.pending }) }));
-  edges = reduced(acyclic(edges, [...nodes.keys()]));
+  const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
+  const z = lengthsOf(sizes), { gap } = z, margin = sizes.flow_margin, stepSize = (id) => nodes.get(id);
   const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ a: l.from, b: l.to, type: l.type, ...(l.pending && { pending: l.pending }) }));
-
-  // An open question's choices: each one no wire follows yet ends in a pill of its own.
-  const decisions = [...nodes.values()].filter((n) => n.shape === 'diamond' && n.item.open);
-  for (const d of decisions) {
-    const taken = new Set(edges.filter((e) => e.a === d.id).map((e) => e.says));
-    (Array.isArray(d.item.choices) ? d.item.choices : []).forEach((option, k) => {
-      if (taken.has(option)) return;
-      const id = `${d.id}:${k}`;
-      nodes.set(id, { id, stub: true, shape: 'end', item: { id: d.id, title: option, open: true, status: 'a scenario', state: QUIET } });
-      edges.push({ a: d.id, b: id, says: option });
-    });
-  }
-  // What follows an open decision happens only if that option is chosen.
-  const after = grouped(edges, (e) => e.a, (e) => e.b), potential = new Set();
-  const markOn = (id) => (after.get(id) ?? []).forEach((v) => potential.has(v) || (potential.add(v), markOn(v)));
-  decisions.forEach((d) => markOn(d.id));
-
-  // ---- Sizes: a step is as wide as its name, in two lines where one is too few (./lines.js), and a line taller for
-  // the second. A choice's end keeps to one line. The gap between lines is the style's (flow_line_height), or the
-  // text's own size and a quarter where a style names none.
-  const LINE = sizes.flow_line_height ?? TEXT * 1.25;
-  for (const n of nodes.values()) {
-    const px = n.stub ? STUB_TEXT : TEXT;
-    n.lines = n.shape === 'end' ? [n.item.title] : lines(n.item.title, MAX_TEXT, (t) => measure(t, px));
-    n.line = LINE;
-    const text = Math.min(highest(n.lines.map((t) => measure(t, px))), MAX_TEXT);
-    const more = (n.lines.length - 1) * LINE;
-    if (n.shape === 'diamond') [n.w, n.h] = [text + DIAMOND_PAD, DIAMOND_H + more];
-    else if (n.shape === 'end') [n.w, n.h] = [text + END_PAD, END_H];
-    else [n.w, n.h] = [text + BOX_PAD, (n.shape === 'sheet' ? SHEET_H : BOX_H) + more];
-  }
-
-  // ---- Clusters: what the order and the ties join, apart from the steps put by hand.
-  const fixed = new Set(Object.keys(placed).filter((id) => nodes.has(id) && Array.isArray(placed[id])));
-  const root = new Map([...nodes.keys()].map((id) => [id, id]));
-  const find = (id) => {
-    while (root.get(id) !== id) (root.set(id, root.get(root.get(id))), (id = root.get(id)));
-    return id;
-  };
-  for (const { a, b } of [...edges, ...ties]) if (!fixed.has(a) && !fixed.has(b)) root.set(find(b), find(a));
-  const clusters = grouped([...nodes.keys()].filter((id) => !fixed.has(id)), find);
-  const x = new Map(), y = new Map();
-  const z = { LAYER_GAP, NODE_GAP, BOX_H, TRACK, SLOT, LEAD_OUT, LEAD_IN };
-  const lay = (ids, edges, ties) => layCluster(ids, edges, ties, { nodes, x, y, potential, aspect, z });
-
-  // ---- The plane: the steps put by hand where they were put, each cluster set by them when it is tied to them
-  // (under what leads into it, over what it leads into, else beside), and the rest in rows under all of that, the
-  // largest first. A cluster set by others slides down until it is clear of all of them.
-  const GAP = LAYER_GAP / 2;
-  const boxes = [];
-  for (const id of fixed) {
-    const n = nodes.get(id);
-    x.set(id, Number(placed[id][0]));
-    y.set(id, Number(placed[id][1]));
-    boxes.push({ l: x.get(id) - n.w / 2, t: y.get(id) - n.h / 2, r: x.get(id) + n.w / 2, b: y.get(id) + n.h / 2 });
-  }
-  const owned = new Map([...clusters].flatMap(([key, ids]) => ids.map((id) => [id, key])));
-  const byCluster = (list) => grouped(list.filter((e) => owned.has(e.a) && owned.get(e.a) === owned.get(e.b)), (e) => owned.get(e.a));
-  const [edgesOf, tiesOf] = [byCluster(edges), byCluster(ties)];
-  const laid = [...clusters].map(([key, ids]) => ({ key, ties: tiesOf.get(key) ?? [], ...lay(ids, edgesOf.get(key) ?? [], tiesOf.get(key) ?? []) }));
-  const chains = laid.flatMap((c) => c.chains), breaks = [];
-  const shift = (c, l, t) => {
-    for (const id of c.ids) (x.set(id, x.get(id) + l), y.set(id, y.get(id) + t));
-    for (const w of [...c.chains, ...c.ties]) w.points = w.points.map(([px, py]) => [px + l, py + t]);
-    for (const [px, py] of c.breaks) breaks.push([px + l, py + t]);
-  };
-  const box = (id) => ({ x: x.get(id), y: y.get(id), w: nodes.get(id).w, h: nodes.get(id).h });
-  const lone = laid.sort((p, q) => q.ids.length - p.ids.length).filter((c) => {
-    const own = new Set(c.ids);
-    const into = edges.filter((e) => fixed.has(e.a) && own.has(e.b)).map((e) => box(e.a)), onto = edges.filter((e) => own.has(e.a) && fixed.has(e.b)).map((e) => box(e.b));
-    const beside = [...edges, ...ties].filter((e) => (fixed.has(e.a) && own.has(e.b)) || (own.has(e.a) && fixed.has(e.b))).map((e) => box(fixed.has(e.a) ? e.a : e.b));
-    if (!beside.length) return true;
-    const mid = (list) => list.reduce((s, b) => s + b.x, 0) / list.length;
-    let [l, t] = [mid(beside) - c.width / 2, 0];
-    if (into.length) t = Math.max(...into.map((b) => b.y + b.h / 2)) + LAYER_GAP;
-    else if (onto.length) t = Math.min(...onto.map((b) => b.y - b.h / 2)) - LAYER_GAP - c.height;
-    else [l, t] = [Math.max(...beside.map((b) => b.x + b.w / 2)) + GAP, beside.reduce((s, b) => s + b.y, 0) / beside.length - c.height / 2];
-    [l, t] = [Math.max(MARGIN, l), Math.max(MARGIN, t)];
-    for (let hit; (hit = boxes.find((b) => l < b.r + GAP && l + c.width + GAP > b.l && t < b.b + GAP && t + c.height + GAP > b.t)); ) t = hit.b + GAP;
-    shift(c, l, t);
-    boxes.push({ l, t, r: l + c.width, b: t + c.height });
-    return false;
+  const chains = edges.map((e) => ({ ...e, key: `${e.a} ${e.b}`, path: [e.a, e.b], dashed: potential.has(e.b) }));
+  const every = [...chains, ...ties];
+  const a = new Map([...nodes.keys()].map((id) => [id, new Set()]));
+  for (const w of every) if (w.a !== w.b && a.has(w.a) && a.has(w.b)) (a.get(w.a).add(w.b), a.get(w.b).add(w.a));
+  const ways = directions(chains, ties, headless), hangs = hangsOf({ a, ways, nodes, sizes, gap, z, aspect }), { core, block } = hangs;
+  const how = { block, stepSize, ways, z, even: nodes.size <= sizes.flow_rows_most, rowsLinks: sizes.flow_rows_links, total: core.length };
+  let threaded = 0;
+  const shelves = partsOf(core, a).map((list) => {
+    const made = drawnPart(list, linksOf(list, every, ways), how);
+    threaded += made.threaded;
+    return shelfOf(made.drawn, block);
   });
-  // The rest in rows, as wide as the widest of it or of what is placed, and about the shape asked for.
-  const area = lone.reduce((s, c) => s + (c.width + GAP) * (c.height + GAP), 0);
-  const most = highest([...lone.map((c) => c.width), ...boxes.map((b) => b.r - MARGIN), Math.sqrt(area * aspect)]);
-  const shelf = { x: MARGIN, y: boxes.length ? highest(boxes.map((b) => b.b)) + LAYER_GAP : MARGIN, row: 0 };
-  for (const c of lone) {
-    if (shelf.x > MARGIN && shelf.x + c.width > MARGIN + most) Object.assign(shelf, { x: MARGIN, y: shelf.y + shelf.row + GAP, row: 0 });
-    shift(c, shelf.x, shelf.y);
-    Object.assign(shelf, { x: shelf.x + c.width + GAP, row: Math.max(shelf.row, c.height) });
+  const { x, y, routes, holder } = assemble(shelves, { ...hangs, stepSize, gap, margin, aspect });
+  const rigid = rigidOf({ combs: hangs.combs, x, y, stepSize, block });
+  staging?.('bars and combs', routes);
+  const lengths = { nodes, x, y, routes, section: sizes.flow_section_gap, gap, margin, aspect, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: gap / 2, join: z.join }, firstWires = new Map([...routes].map(([k, r]) => [k, r.points]));
+  const before = { x: new Map(x), y: new Map(y), sizes: new Map([...nodes].map(([id, n]) => [id, [n.w, n.h]])) };
+  if (routes.size <= z.shape_most) shapeWires({ nodes, x, y, routes, z });
+  staging?.('shape', routes);
+  try {
+    solveSections(lengths);
+  } catch (e) {
+    // A sketch the solve cannot order is drawn from the first wires, which it always can.
+    console.warn?.(`The shape fell back: ${e.message}`);
+    for (const [id, at] of before.x) (x.set(id, at), y.set(id, before.y.get(id)), Object.assign(nodes.get(id), { w: before.sizes.get(id)[0], h: before.sizes.get(id)[1] }));
+    for (const [k, r] of routes) r.points = firstWires.get(k);
+    solveSections(lengths);
   }
-
-  // ---- Lines to and from the steps put by hand, solved round the others: the order's, then the ties, from the
-  // higher of their two ends to the lower.
-  const all = [...nodes.values()].filter((n) => x.has(n.id));
-  const steps = all.filter((n) => !n.dummy);
-  for (const e of edges)
-    if (fixed.has(e.a) || fixed.has(e.b)) {
-      const others = steps.filter((n) => n.id !== e.a && n.id !== e.b).map((n) => box(n.id));
-      chains.push({ ...e, key: `${e.a} ${e.b}`, path: [e.a, e.b], dashed: potential.has(e.b), points: route(box(e.a), box(e.b), LEAD_OUT, others) });
-    }
-  routeTies(ties.filter((t) => fixed.has(t.a) || fixed.has(t.b)), steps.map((n) => ({ id: n.id, ...box(n.id) })), [...chains, ...ties.filter((t) => t.points)], { lead: LEAD_OUT, cell: LAYER_GAP, track: TRACK });
-  const drawn = [...chains, ...ties].flatMap((c) => c.points);
-  const reachX = [...steps.map((n) => x.get(n.id) + n.w / 2), ...drawn.map((p) => p[0])];
-  const reachY = [...steps.map((n) => y.get(n.id) + n.h / 2), ...drawn.map((p) => p[1])];
-  return { nodes, all, chains, ties, breaks, potential, x, y, width: highest(reachX) + MARGIN, height: highest(reachY) + MARGIN };
+  staging?.('solve', routes);
+  // What a step put by hand starts from: each box where the solve left it, with what hangs on it.
+  for (const id of x.keys()) rigid.set(id, { at: [x.get(id), y.get(id)], size: [nodes.get(id).w, nodes.get(id).h], hangs: rigid.get(id)?.hangs ?? [], pointed: nodes.get(id).shape === 'diamond' });
+  return finisher({ nodes, potential, chains, ties, x, y, routes, rigid, holder, headless, sizes, z, margin, stepSize, tally: { threaded } });
 }

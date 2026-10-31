@@ -97,6 +97,13 @@ test('screens are declared in pack files, checked when the pack loads, and liste
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'tree' }] }]), /a tree piece names its tree/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'view', view: 'demo.none' }] }]), /declares no view "demo.none" of rows/);
   assert.throws(bad([{ id: 's', title: 'S', on: ['task'], pieces: [{ piece: 'gate' }] }]), /must be named "demo.<name>"/);
+  // A button says its word, its tooltip and one thing it does, by a pack's action or how it draws the canvas.
+  assert.deepEqual(schema.screens.find((s) => s.id === 'core.style_apply')!.on, ['style']);
+  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', tip: 'T', draw: { shape: 'list' } }] }]), /a button piece names its label/);
+  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', label: 'L', draw: { shape: 'list' } }] }]), /a button piece names its tip/);
+  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', label: 'L', tip: 'T' }] }]), /a button does one thing/);
+  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', label: 'L', tip: 'T', draw: { lens: 'x' } }] }]), /a button's draw says "style" or "shape"/);
+  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', label: 'L', tip: 'T', action: 'demo.none' }] }]), /declares no action "demo.none"/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', nav: true, pieces: [{ piece: 'page', page: 'nowhere' }] }]), /draws no page "nowhere"/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'picture', lens: {}, style: { code: 'x' } }] }]), /a view's style has no code/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', pieces: [{ piece: 'note', text: 'Hi' }] }]), /the kinds or types it is on or a place offered in the nav/);

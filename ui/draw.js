@@ -226,9 +226,10 @@ addEventListener('message', (ev) => {
     );
   }
   addEventListener('resize', () => tell('resize', room()));
-  // Code that stops answering is ended: it cannot hold the page, and it is not left to burn.
+  // Code that stops answering is ended: it cannot hold the page, and it is not left to burn. A hidden page is not asked:
+  // the browser slows what runs there, so long work is not to be told from code that has stopped.
   const watch = setInterval(() => {
-    if (!started) return void (unanswered = 0);
+    if (!started || document.hidden) return void (unanswered = 0);
     if (unanswered++ < 6) return void worker.postMessage({ type: 'ping' });
     clearInterval(watch);
     worker.terminate();
@@ -339,7 +340,7 @@ say({ type: 'ready' });
               drawn = await made.picture(said.input, tools);
               // How long the drawing took, for the page to tell whoever measures it.
               send({ type: 'scene', scene: drawn?.scene ?? {}, took: performance.now() - t0 });
-            } else if (said.type === 'event' && drawn?.on) send({ type: 'patch', list: (await drawn.on(said.event)) ?? [] });
+            } else if (said.type === 'event' && drawn?.on) send({ type: 'patch', list: (await drawn.on(said.event)) ?? [], answers: said.event });
             else if (said.type === 'restyle' && drawn?.restyle) send({ type: 'patch', list: (await drawn.restyle(said.style)) ?? [] });
             else if (said.type === 'viewport') {
               const now = view;
@@ -448,9 +449,14 @@ say({ type: 'ready' });
   });
   // Code that stops answering is ended: it cannot hold the page, and it is not left to burn. Pings unanswered are
   // counted, not timed: a page the browser has slowed in the background is asked less often, and is not stopped for it.
+  // A hidden page is not asked at all, for the browser slows the worker too, and the count starts again when it is seen.
   setInterval(() => {
     for (const [hash, w] of workers) {
       if (!w.worker) continue;
+      if (document.hidden) {
+        w.unanswered = 0;
+        continue;
+      }
       if (w.unanswered++ < 6) {
         w.worker.postMessage({ type: 'ping' });
         continue;

@@ -7,8 +7,6 @@ It lies over the workspace's own style (`over: "workspace"`), so a
 workspace style kept from before the canvas that says `shape: list` does not
 turn the canvas back into lists (the owner, 26 Oct 2026: the flow is the
 default for now). A style on a kind, a type, an item or a view still wins.
-Its part_of wires show only while one of their ends is hovered
-(`hover_only`, the owner, 26 Oct 2026), to keep a large map clean.
 Take the pack out and views are drawn as before.
 
 ## Why a pack

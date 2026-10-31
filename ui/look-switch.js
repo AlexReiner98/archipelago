@@ -1,10 +1,12 @@
 // The style up, in the view band beside the canvas up (decision e_tqr9cxdc): a style is the pane's, kept as its lens
 // changes, so it is switched here on its own. Its choices are the shapes the drawings draw and the styles kept on the
 // map by name (not a version of a pack's, not on a kind or type); the house's is what is drawn with neither. A saved
-// canvas brings its own when it is opened, and Save keeps it with the lens.
+// canvas brings its own when it is opened, and Save keeps it with the lens. Any other style drawn here, by Apply on its
+// page, is one more choice while it is.
 
 import { api, ask, h, state, tell } from './base.js';
 import { flatQuery } from './lens.js';
+import { titles } from './words.js';
 
 /** The styles kept on the map by name, read once. */
 let named = null;
@@ -40,8 +42,9 @@ const chosenOf = (style) => (style.style ? `style:${style.style}` : style.shape 
 export function lookSwitch(lens, style, open) {
   const pick = h('select', { class: 'q-pick q-look', 'aria-label': 'Style' });
   const shapes = [{ shape: 'list', title: 'List' }, ...(state.schema?.shapes ?? [])];
-  const fill = (kept) => {
+  const fill = (listed) => {
     const now = chosenOf(style);
+    const kept = style.style && !listed.some((s) => s.id === style.style) ? [...listed, { id: style.style, title: titles.get(style.style) ?? 'Style' }] : listed;
     // Cut short in a narrow pane, the style chosen is still named in its tooltip.
     const said = [...shapes.map((s) => [`shape:${s.shape}`, s.title]), ...kept.map((s) => [`style:${s.id}`, s.title])].find(([value]) => value === now)?.[1] ?? 'House';
     pick.title = `Style: ${said}`;

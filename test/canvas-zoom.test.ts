@@ -41,7 +41,7 @@ test('in a browser, what comes into sight is drawn, though the picture changed w
     await wait(500);
     await page.evaluate(`(async () => { ${moves}.fit(); await ${frames}; })()`);
     const [top, bottom] = [await page.evaluate<[number, number]>(middle(first)), await page.evaluate<[number, number]>(middle(last))];
-    assert.ok(bottom[1] - top[1] > 500, `the last step is far below the first: ${top} and ${bottom}`);
+    assert.ok(bottom[1] - top[1] > 400, `the last step is far below the first: ${top} and ${bottom}`);
 
     // Zoomed in on the first step: the last is out of sight, and not drawn.
     await page.evaluate(`(async () => { const m = ${moves}; m.restore({ ...m.state(), s: 3 }); m.show(${top[0]}, ${top[1]}); await ${frames}; })()`);

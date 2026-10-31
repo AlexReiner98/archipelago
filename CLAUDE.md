@@ -288,6 +288,10 @@ else a pack"). These rules keep it composable while that happens, and
   (`docs/drawings.md`). The kernel keeps the frame every view has. A
   drawing moved out of the kernel must draw what the kernel drew: the same
   marks, looks and behaviour, checked in a real browser.
+- **A wired drawing is layers and one solver** (the owner, 30 Oct 2026). Each
+  module names its layer, imports run one way, only Metrics sets a place, a
+  length is a size on the style, and no two wires share a stretch. The rules,
+  and how to add one, are in `docs/drawings.md`.
 
 Each rule keeps a list of what already broke it on 16 Oct 2026. An entry may
 only shrink and goes once the rule is met: when your change brings a number

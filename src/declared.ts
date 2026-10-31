@@ -150,8 +150,13 @@ export interface PieceDef {
   view?: string;
   /** For rows from a view: the input the item's id goes in. */
   item?: string;
-  /** For an action's form: the pack's action. */
+  /** For an action's form, or what a button opens: the pack's action. */
   action?: string;
+  /** For a button: its word, and its tooltip. */
+  label?: string;
+  tip?: string;
+  /** For a button: how it draws the canvas up, as the style switch says it: { style } or { shape }, where "{here}" is the item the page is of. */
+  draw?: Record<string, string>;
   /** For a short note: what it says. */
   text?: string;
   /** For a picture: a kept view's id, or a flat lens ({ filter, walk, limit }, as query flat takes it), where "{here}" in its terms or within is the item the page is of. */
@@ -222,8 +227,9 @@ export interface ScreenDef {
 /**
  * The pieces the kernel draws, each with what it must be told. A tree, a gate, proof, usage and a document draw the
  * kernel's views of the item; a figure is the picture it keeps; a diagram, the boxes and wires its props.diagram holds; rows and a form are the pack's own view and action.
+ * A button stands in the page's head, not its column: it opens the pack's action's form, or draws the canvas up as it says.
  */
-export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [] } as const;
+export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [], button: ['label', 'tip'] } as const;
 
 /** The pages the kernel still draws itself, which a screen can hold as a piece until a pack draws them from pieces. */
 export const PAGES = ['time'];
@@ -320,6 +326,8 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       if (piece.tree && !parts(pack).trees.some((tree) => tree.id === piece.tree)) problems.push(`${at}: the pack declares no tree "${piece.tree}"`);
       if (piece.view && !parts(pack).views.some((v) => v.id === piece.view && v.shape === 'rows')) problems.push(`${at}: the pack declares no view "${piece.view}" of rows`);
       if (piece.action && !parts(pack).actions.some((a) => a.id === piece.action)) problems.push(`${at}: the pack declares no action "${piece.action}"`);
+      if (piece.piece === 'button' && !piece.action === !piece.draw) problems.push(`${at}: a button does one thing: its pack's action, or draw`);
+      if (piece.draw && !Object.keys(piece.draw).every((k) => ['style', 'shape'].includes(k))) problems.push(`${at}: a button's draw says "style" or "shape"`);
       if (piece.page && !PAGES.includes(piece.page)) problems.push(`${at}: the kernel draws no page "${piece.page}": one of ${PAGES.join(', ')}`);
       for (const r of piece.reasons ?? []) if (!(REASONS as readonly string[]).includes(r)) problems.push(`${at}: "${r}" is not a reason attention gives: one of ${REASONS.join(', ')}`);
       if (piece.lens && typeof piece.lens === 'object' && (typeof piece.lens.filter !== 'object' || !piece.lens.filter)) problems.push(`${at}: a view piece's lens is a flat lens: { filter, walk, limit }`);

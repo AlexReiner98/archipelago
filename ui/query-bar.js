@@ -250,26 +250,34 @@ export function drawQuery(lens, view, go, lead) {
   const drawn = answer && h('span', { class: `q-count${answer.cut ? ' cut' : ''}`, title: answer.cut ? 'The limit cut what the lens finds' : 'Items drawn, of the limit' }, `${answer.items.length}${answer.cut ? '+' : ''}${limit ? ` of ${limit}` : ''}`);
   const failed = view?.failed && h('span', { class: 'q-count cut', title: view.failed }, '!');
   // The lens in one line, each part by the word its row in the editor has: Find, its terms joined by "or" (any of them
-  // adds); Only, what must all hold; Not, what is left out beyond the system's own; Walk, the links and ×steps. The
-  // whole of it, in words, is the line's tooltip.
-  const or = (list) => list.flatMap((x, i) => (i ? [h('span', { class: 'q-or' }, 'or'), x] : [x]));
+  // adds); Only, what must all hold; Not, what is left out beyond the system's own; Walk, the links and ×steps, and
+  // nothing of a walk of no steps, which reaches nothing. As many terms as fit, and how many more (fitLine); the
+  // whole of it, in words, is the line's tooltip, and a click opens the rows, where each has its ×.
+  const or = (list) => list.map((x, i) => [i > 0 && h('span', { class: 'q-or' }, 'or'), x]);
+  const comma = (list) => list.map((x, i) => [i > 0 && ', ', x]);
   const found = findTerms.map((t) => t.said);
   const narrowed = onlyTerms.map((t) => t.said);
   const out = notTerms.map((t) => t.said).filter((x) => x !== 'system');
-  const walkSaid = `${over === 'all' ? 'every link' : walked.map(waySaid).join(', ')} ×${steps}`;
+  const followed = over === 'all' ? ['every link'] : walked.map(waySaid);
+  const stepsSaid = `×${steps}`;
   const parts = [
-    found.length > 0 && ['Find', or(found.map((x, i) => h('span', { class: 'q-kept', ...lighting('find', findTerms[i].term) }, x)))],
-    narrowed.length > 0 && ['Only', narrowed.join(', ')],
-    out.length > 0 && ['Not', out.join(', ')],
-    walking && ['Walk', walkSaid],
+    found.length > 0 && ['Find', found, or(found), (i) => lighting('find', findTerms[i].term)],
+    narrowed.length > 0 && ['Only', narrowed, comma(narrowed)],
+    out.length > 0 && ['Not', out, comma(out)],
+    walking && steps > 0 && ['Walk', followed, comma(followed), null, stepsSaid],
   ].filter(Boolean);
-  const said = parts.map(([word]) => `${word} ${{ Find: found.join(' or '), Only: narrowed.join(', '), Not: out.join(', '), Walk: walkSaid }[word]}`).join(' · ');
+  const said = parts.map(([word, list, , , tail]) => `${word} ${list.join(word === 'Find' ? ' or ' : ', ')}${tail ? ` ${tail}` : ''}`).join(' · ');
+  const sumPart = ([word, list, joined, light, tail]) => h('span', { class: 'q-sum-part' },
+    h('span', { class: 'q-label' }, word),
+    h('span', { class: 'q-sum-terms' }, joined.map((bits, i) => h('span', { class: 'q-kept', 'data-said': list[i], ...light?.(i) }, bits))),
+    h('span', { class: 'q-sum-more', hidden: true }),
+    tail && h('span', { class: 'q-sum-tail' }, tail));
   // The view's band at the top, joined to its tab or its pane's strip; the lens in one line in find, and a row for each
   // part of it above find while find is open.
   bar.replaceChildren(h('div', { class: 'q-view', role: 'group', 'aria-label': 'The view' }, lead ?? ''));
   line?.replaceChildren(...[
     h('button', { type: 'button', class: 'q-sum', title: filled ? `${said}: change it` : 'Find on the map' },
-      filled ? parts.map(([word, what]) => h('span', { class: 'q-sum-part' }, h('span', { class: 'q-label' }, word), what)) : h('span', { class: 'q-hint' }, 'Find on the map')),
+      filled ? parts.map(sumPart) : h('span', { class: 'q-hint' }, 'Find on the map')),
     drawn, failed,
   ].filter(Boolean));
   rows?.replaceChildren(
@@ -310,10 +318,33 @@ function fitRows() {
     }
   }
 }
+/** Every term of the line back in sight, its counts gone, to be measured whole. */
+function showLine() {
+  for (const t of line.querySelectorAll('.q-sum-terms > [hidden]')) t.hidden = false;
+  for (const more of line.querySelectorAll('.q-sum-more')) more.hidden = true;
+}
+/**
+ * The line's parts share its width. While a part's terms run past what it is given, the part furthest over gives up its
+ * last term, and says how many it has given up: the terms left are whole, and one alone is cut with an ellipsis.
+ */
+function fitLine() {
+  const shown = (box) => [...box.children].filter((t) => !t.hidden);
+  const excess = (box) => box.scrollWidth - box.clientWidth;
+  const boxes = [...line.querySelectorAll('.q-sum-terms')];
+  for (;;) {
+    const box = boxes.filter((b) => excess(b) > 1 && shown(b).length > 1).sort((a, b) => excess(b) - excess(a))[0];
+    if (!box) return;
+    shown(box).at(-1).hidden = true;
+    const rest = [...box.children].filter((t) => t.hidden);
+    const more = box.nextElementSibling;
+    Object.assign(more, { hidden: false, textContent: `+${rest.length}`, title: rest.map((t) => t.dataset.said).join(' · ') });
+  }
+}
+
 /**
  * Fit the bar to its width: the view's band drops its buttons' words, then back and forward, then Split as the canvas's
- * name shrinks; the query's line drops how many are drawn once its words have little room; each row of the editor shows what it has
- * room for. Drawn again as the width changes.
+ * name shrinks; the query's line drops how many are drawn once its words have little room, and each of its parts shows what
+ * it has room for; each row of the editor shows what it has room for. Drawn again as the width changes.
  */
 export function fitBar() {
   if (!bar) return;
@@ -328,9 +359,16 @@ export function fitBar() {
   }
   if (line) {
     line.classList.remove('tight');
+    showLine();
     const sum = line.querySelector('.q-sum');
     // How many are drawn goes when the query's words have less than a third of the line.
     if (over(line) || (sum && over(sum) && sum.clientWidth * 3 < line.clientWidth)) line.classList.add('tight');
+    fitLine();
+    // With each part down to what it keeps and the line still over, the count goes too, and the parts give up their least.
+    if (over(sum)) {
+      line.classList.add('tight');
+      fitLine();
+    }
   }
   fitRows();
   keepClear();

@@ -1,0 +1,132 @@
+// How well a picture is wired, counted from what is drawn. Each number is one fault, so a pass on the wires can be judged.
+// Pure: a layout's answer in, numbers out.
+
+import { tidy } from './polyline.js';
+import { onOutline } from './shapes.js';
+
+/** Whether a wire runs against the way it has to go overall, for a stretch. */
+export const doublesBack = (p) => {
+  const dy = p.at(-1)[1] - p[0][1], dx = p.at(-1)[0] - p[0][0];
+  return p.some((q, i) => i && ((q[1] - p[i - 1][1]) * Math.sign(dy) < -1 || (q[0] - p[i - 1][0]) * Math.sign(dx) < -1));
+};
+
+const sideOf = (r, p) => [[Math.abs(p[1] - r.t), 'top'], [Math.abs(p[1] - r.u), 'foot'], [Math.abs(p[0] - r.l), 'left'], [Math.abs(p[0] - r.r), 'right']].sort((u, v) => u[0] - v[0])[0][1];
+
+/** Whether the end of a wire at `port` on box `r` faces away from the box `o` at its other end. */
+export function wrongEnd(r, o, port) {
+  const s = sideOf(r, port), over = o.l < r.r && o.r > r.l;
+  if (s === 'top') return o.t >= r.t && (o.t >= r.u || over);
+  if (s === 'foot') return o.u <= r.u && (o.u <= r.t || over);
+  return s === 'left' ? o.l >= r.r : o.r <= r.l;
+}
+
+/** Whether a wire with its head at `b` points up: `b` stands wholly above `a`, or the wire comes up into it. */
+export const runsUp = (a, b, p) => b.u <= a.t || (b.t < a.u && p.at(-1)[1] < p.at(-2)[1] && a.t < b.t);
+
+/**
+ * The counts for `g`, a layout's answer: `bends`; `kinks`, bends past the fewest two boxes need; `jogs`, a short step between
+ * runs going the same way; `wrongOrder` and `wrongTie`, wires with an end facing away from the other box; `back`, wires that
+ * double back; `indirect`, two boxes that overlap on an axis with nothing between them whose wire is not one stretch; and
+ * by the style's room, `tightPort`, a corner nearer a port than `run`, and `tightBox`, a wire nearer a box it passes
+ * than `clear`, and `tightJoin`, joined boxes nearer than `join`; `up`, headed links whose head points up, of `headed`;
+ * `cornerPorts`, wire ends nearer a box's corner than `corner` or a third of the side; and `tightParallel`, two wires running
+ * side by side nearer than `parallel`; `trunks`, stretches two wires of one box share by design, a comb's spine or a bus;
+ * `overlaps`, stretches two wires of different boxes lie along; and `loose`, wire ends off the outline of their step.
+ */
+export function faults(g, { jog = 14, run = 0, clear = 0, join = 0, corner = 0, parallel = 0, headless = ['part_of'], note = () => {} } = {}) {
+  const rectOf = (id) => { const n = g.nodes.get(id), x = g.x.get(id), y = g.y.get(id); return { id, l: x - n.w / 2, r: x + n.w / 2, t: y - n.h / 2, u: y + n.h / 2 }; };
+  const boxes = g.all.map((n) => rectOf(n.id)), wires = [...g.chains, ...g.ties].filter((w) => w.points && g.x.has(w.a) && g.x.has(w.b));
+  const stands = (l, r, t, u, skip) => boxes.some((b) => !skip.includes(b.id) && r > b.l && l < b.r && u > b.t && t < b.u);
+  const c = { wires: wires.length, headed: 0, up: 0, cornerPorts: 0, tightParallel: 0, trunks: 0, overlaps: 0, loose: 0, bends: 0, kinks: 0, jogs: 0, wrongOrder: 0, wrongTie: 0, back: 0, indirect: 0, tightPort: 0, tightBox: 0, tightJoin: 0 };
+  for (const w of wires) {
+    const p = tidy(w.points), [ra, rb] = [rectOf(w.a), rectOf(w.b)], bends = p.length - 2;
+    const overX = Math.min(ra.r, rb.r) - Math.max(ra.l, rb.l), overY = Math.min(ra.u, rb.u) - Math.max(ra.t, rb.t);
+    c.bends += bends;
+    for (const [id, point] of [[w.a, p[0]], [w.b, p.at(-1)]]) if (!onOutline(g.nodes.get(id), g.x.get(id), g.y.get(id), point)) (c.loose++, note('loose', w, p));
+    if (!headless.includes(w.type)) {
+      c.headed++;
+      if (runsUp(ra, rb, p)) (c.up++, note('up', w, p));
+    }
+    for (const [r, port] of [[ra, p[0]], [rb, p.at(-1)]]) {
+      const side = sideOf(r, port), ax = side === 'top' || side === 'foot' ? 0 : 1, [lo, hi] = ax ? [r.t, r.u] : [r.l, r.r], least = Math.min(corner, (hi - lo) / 3);
+      if (corner && Math.min(port[ax] - lo, hi - port[ax]) < least - 0.5) (c.cornerPorts++, note('corner', w, p));
+    }
+    c.kinks += Math.max(0, bends - (overX > 4 || overY > 4 ? 0 : 1));
+    for (let i = 2; i < p.length - 1; i++) {
+      const len = Math.abs(p[i][0] - p[i - 1][0]) + Math.abs(p[i][1] - p[i - 1][1]), ax = p[i][0] === p[i - 1][0] ? 1 : 0;
+      if (len < jog && Math.sign(p[i - 1][1 - ax] - p[i - 2][1 - ax]) === Math.sign(p[i + 1][1 - ax] - p[i][1 - ax])) c.jogs++;
+    }
+    if (wrongEnd(ra, rb, p[0]) || wrongEnd(rb, ra, p.at(-1))) c[w.type ? 'wrongTie' : 'wrongOrder']++;
+    if (doublesBack(w.points)) c.back++;
+    const mx = (Math.max(ra.l, rb.l) + Math.min(ra.r, rb.r)) / 2, my = (Math.max(ra.t, rb.t) + Math.min(ra.u, rb.u)) / 2;
+    const openX = overX >= 2 && !stands(mx, mx, Math.min(ra.u, rb.u), Math.max(ra.t, rb.t), [w.a, w.b]), openY = overY >= 2 && !stands(Math.min(ra.r, rb.r), Math.max(ra.l, rb.l), my, my, [w.a, w.b]);
+    if ((openX || openY) && bends) (c.indirect++, note('indirect', w, p));
+    if (join) {
+      const gap = Math.max(ra.t - rb.u, rb.t - ra.u, ra.l - rb.r, rb.l - ra.r);
+      if (gap >= 0 && gap < join - 0.5) (c.tightJoin++, note('join', w, p));
+    }
+    if (bends > 0 && run) {
+      const first = Math.abs(p[1][0] - p[0][0]) + Math.abs(p[1][1] - p[0][1]), lastRun = Math.abs(p.at(-1)[0] - p.at(-2)[0]) + Math.abs(p.at(-1)[1] - p.at(-2)[1]);
+      c.tightPort += Number(first < run - 0.5) + Number(lastRun < run - 0.5);
+      if (first < run - 0.5 || lastRun < run - 0.5) note('port', w, p);
+    }
+    if (clear) for (let i = 1; i < p.length; i++) {
+      const [a, b] = [p[i - 1], p[i]];
+      if (stands(Math.min(a[0], b[0]) - clear + 0.5, Math.max(a[0], b[0]) + clear - 0.5, Math.min(a[1], b[1]) - clear + 0.5, Math.max(a[1], b[1]) + clear - 0.5, [w.a, w.b])) { c.tightBox++; note('box', w, p); break; }
+    }
+  }
+  const stretches = wires.flatMap((w) => tidy(w.points).slice(1).map((q, i) => [tidy(w.points)[i], q, w]));
+  for (const ax of [0, 1]) {
+    const along = stretches.filter(([a, b]) => a[ax] === b[ax]).sort((p, q) => p[0][ax] - q[0][ax]);
+    for (let i = 0; i < along.length; i++) for (let j = i + 1; j < along.length && along[j][0][ax] === along[i][0][ax]; j++) {
+      const [p, q] = [along[i], along[j]], o = 1 - ax;
+      if (p[2] === q[2] || Math.min(Math.max(p[0][o], p[1][o]), Math.max(q[0][o], q[1][o])) - Math.max(Math.min(p[0][o], p[1][o]), Math.min(q[0][o], q[1][o])) <= 1) continue;
+      const one = [p[2].a, p[2].b].some((id) => id === q[2].a || id === q[2].b);
+      if (one) c.trunks++;
+      else (c.overlaps++, note('overlap', p[2], [p[0], p[1]]));
+    }
+  }
+  if (parallel) {
+    for (const ax of [0, 1]) {
+      const along = stretches.filter(([a, b]) => a[ax] === b[ax]).sort((p, q) => p[0][ax] - q[0][ax]);
+      for (let i = 0; i < along.length; i++) for (let j = i + 1; j < along.length && along[j][0][ax] - along[i][0][ax] < parallel - 0.5; j++) {
+        const [p, q] = [along[i], along[j]], o = 1 - ax, gap = q[0][ax] - p[0][ax];
+        if (gap < 0.5 || p[2] === q[2]) continue;
+        if (Math.min(Math.max(p[0][o], p[1][o]), Math.max(q[0][o], q[1][o])) - Math.max(Math.min(p[0][o], p[1][o]), Math.min(q[0][o], q[1][o])) > 1) (c.tightParallel++, note('parallel', p[2], [p[0], p[1]]));
+      }
+    }
+  }
+  return c;
+}
+
+/**
+ * How wires stand beside one another, for wires running `down` and those running `across`. `lines` are { ends, points }.
+ * `overlaps` and `overlapLength` are stretches of wires of different boxes on one line, `shared` those of wires of one box;
+ * of neighbours with no wire between them, `under` stand nearer than `gap`, `at` at it, `between` past it and under
+ * twice it, and `wide` from twice it to three times it, past which they are not neighbours.
+ */
+export function spacing(lines, gap) {
+  const empty = () => ({ overlaps: 0, overlapLength: 0, shared: 0, under: 0, at: 0, between: 0, wide: 0 }), out = [empty(), empty()], SLACK = 0.5, BESIDE = 8;
+  const runs = lines.flatMap((l) => {
+    const p = tidy(l.points);
+    return p.slice(1).flatMap((q, i) => {
+      const a = p[i], ax = a[0] === q[0] ? 0 : a[1] === q[1] ? 1 : -1;
+      return ax < 0 ? [] : [{ l, ax, at: a[ax], lo: Math.min(a[1 - ax], q[1 - ax]), hi: Math.max(a[1 - ax], q[1 - ax]) }];
+    });
+  });
+  for (const ax of [0, 1]) {
+    const on = runs.filter((r) => r.ax === ax).sort((p, q) => p.at - q.at), c = out[ax];
+    for (let i = 0; i < on.length; i++) for (let j = i + 1; j < on.length && on[j].at - on[i].at < gap * 3; j++) {
+      const [p, q] = [on[i], on[j]], along = Math.min(p.hi, q.hi) - Math.max(p.lo, q.lo), apart = q.at - p.at;
+      if (p.l === q.l || along <= 1) continue;
+      if (apart < SLACK) {
+        if (p.l.ends.some((e) => q.l.ends.includes(e))) c.shared++;
+        else (c.overlaps++, (c.overlapLength += along));
+        continue;
+      }
+      if (along < BESIDE || on.slice(i + 1, j).some((m) => m.l !== p.l && m.l !== q.l && m.at > p.at + SLACK && m.at < q.at - SLACK && Math.min(m.hi, p.hi, q.hi) - Math.max(m.lo, p.lo, q.lo) > 1)) continue;
+      c[apart < gap - SLACK ? 'under' : apart <= gap + SLACK ? 'at' : apart < gap * 2 ? 'between' : 'wide']++;
+    }
+  }
+  return { down: out[0], across: out[1] };
+}

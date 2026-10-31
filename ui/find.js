@@ -5,7 +5,7 @@
 // light; Enter takes it and find stays open, emptied, to refine further: words in place of the words find set before,
 // every other term and the walk kept, or another term added; Shift+Enter adds the words as another set, found as
 // well (e_e3k797d3). Typing a part's word and a space
-// ("only ", "not ", "walk ", "limit ", and "view " or "style " to choose the canvas's), or a click on a row's word, puts find in that part: its mark stands before the
+// ("only ", "not ", "walk ", "limit ", and "view " or "style " for those kept on the map), or a click on a row's word, puts find in that part: its mark stands before the
 // box and the choices are that part's; Backspace in an empty box goes back to Find. Escape empties what was typed, then
 // leaves the part, then shuts find; so does a click away from it.
 
@@ -13,9 +13,8 @@ import { api, h, state, wordsOf, withWords } from './base.js';
 import { lightItems } from './lens-light.js';
 import { changes } from './lit-by.js';
 import { viewUp } from './query-bar.js';
-import { goLens, home, lensNow, openHere, styleNow } from './canvas.js';
+import { drawIn, goLens, home, lensNow, openHere, openOver } from './canvas.js';
 import { MODES, choicesFor, ledBy, wordsChoice } from './find-choices.js';
-import { flatQuery } from './lens.js';
 import { numberOf } from './lens-base.js';
 import { added, fitBar } from './query-bar.js';
 
@@ -68,7 +67,7 @@ function toMode(m, looking = true) {
 }
 
 /**
- * Take a choice: a part to go into; a view to open; a style to draw the canvas in; words in place of those find set before, or (`add`) as one more set; a link to
+ * Take a choice: a part to go into; a view to open; an item the lens cannot draw, whose page opens over it; a shape to draw the canvas in; words in place of those find set before, or (`add`) as one more set; a link to
  * walk along; a limit; any other term added to the lens. Find stays open with the cursor in it, to refine further.
  */
 function take(choice, add = false) {
@@ -76,13 +75,11 @@ function take(choice, add = false) {
   if (choice.mode) return void ((input.value = ''), toMode(choice.mode));
   again();
   input.focus();
-  // A view is opened in the pane, and a style draws the lens up in it, the saved canvas kept: find stays open to go on.
+  // A view is opened in the pane, and a shape draws the lens up in it, the saved canvas kept: find stays open to go on.
   if (choice.href) return void openHere(choice.href);
+  if (choice.page) return void openOver(choice.page);
+  if (choice.style) return void drawIn(choice.style);
   const lens = lensUp();
-  if (choice.style) {
-    const { shape: _s, style: _k, ...rest } = styleNow();
-    return void openHere(`#/v?${flatQuery(lens, { ...rest, ...choice.style })}`);
-  }
   if (choice.walk) {
     const { over = [], steps = 0 } = lens.walk ?? {};
     return goLens({ ...lens, walk: { over: choice.walk === 'all' ? 'all' : [...(over === 'all' ? [] : over), choice.walk], steps: steps || 1 } });

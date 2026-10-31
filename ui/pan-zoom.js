@@ -6,6 +6,7 @@
 // all of it in sight when that can be read, else at a size that reads, brought to where it starts.
 
 import { numberOf } from './lens-base.js';
+import { panLock } from './pan-lock.js';
 
 /** What a frame of `n` units' text is shown as, on screen at `px` a unit: none, its names, or all of it. */
 export const tierOf = (px, { text_least, more_from }) => (px < text_least ? 'none' : px < more_from ? 'names' : 'all');
@@ -132,17 +133,24 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     (e) => {
       e.preventDefault();
       const r = frame.getBoundingClientRect();
-      zoomBy(Math.exp(-e.deltaY * plane.wheel), e.clientX - r.left, e.clientY - r.top);
+      // With the pointer locked its place stands still: the one drawn is where the reader is looking.
+      const [x, y] = drag?.lock?.at() ?? [e.clientX - r.left, e.clientY - r.top];
+      zoomBy(Math.exp(-e.deltaY * plane.wheel), x, y);
     },
     { passive: false },
   );
   frame.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
-    dragged = false;
     drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false, id: e.pointerId };
   });
   frame.addEventListener('pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return;
+    if (drag.lock?.held()) {
+      const [mx, my] = drag.lock.move(e);
+      view.x -= mx / view.s;
+      view.y -= my / view.s;
+      return apply();
+    }
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.abs(dx) + Math.abs(dy) <= plane.drag_from) return;
     if (!drag.moved) {
@@ -152,6 +160,8 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
       try {
         frame.setPointerCapture(e.pointerId);
       } catch {}
+      // Locked too, where the browser allows it, so the pan has no edge: a real drag only, so a click stays a click.
+      if (e.pointerType === 'mouse') drag.lock = panLock(frame, e, end);
     }
     view.x = drag.vx - dx / view.s;
     view.y = drag.vy - dy / view.s;
@@ -159,10 +169,15 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   });
   // The click that ends a drag is not a click on what it ended over.
   let dragged = false;
+  // Any press starts afresh, on a mark that keeps its press to itself too: seen on its way down.
+  frame.addEventListener('pointerdown', () => (dragged = false), { capture: true });
   frame.addEventListener('click', (e) => dragged && (e.preventDefault(), e.stopPropagation()), { capture: true });
   const end = () => {
+    // A lock lost mid-press has ended it already, and the release that follows is still the end of a drag.
+    if (!drag) return;
     frame.classList.remove('moving');
-    dragged = Boolean(drag?.moved);
+    dragged = drag.moved;
+    drag.lock?.end();
     drag = null;
   };
   frame.addEventListener('pointerup', end);

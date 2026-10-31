@@ -14,14 +14,20 @@ export type Place = [number, number];
 /** The field a canvas's places are kept under, on each item placed. */
 export const placeField = (canvas: string) => `place:${canvas}`;
 
-const ITEM = /^e_[a-z0-9]{8}$/;
+const ITEM = /^e_[a-z0-9]{8}$/, FORM = /^[a-z]+$/;
 const isPlace = (v: unknown): v is Place => Array.isArray(v) && v.length === 2 && v.every((n) => typeof n === 'number' && Number.isFinite(n));
 
-/** A canvas this workspace has: the workspace itself (the whole map, also when none is named), or an item the reader may see. */
+/**
+ * A canvas this workspace has: the workspace itself (the whole map, also when none is named), or an item the reader may
+ * see. After an @, the form it is drawn in: a place means something only in the picture it was put on, and a form that
+ * lays out another way keeps its own.
+ */
 async function canvasOf(l: Archipelago, canvas: string | undefined): Promise<string> {
-  if (canvas === undefined || canvas === l.workspace) return l.workspace;
-  if (!ITEM.test(canvas) || !(await l.entity(canvas))) throw new Error(`No canvas "${canvas}": a canvas is an item's id, or "${l.workspace}" for the whole map.`);
-  return canvas;
+  const [named, form] = (canvas ?? '').split('@'), kept = form && FORM.test(form) ? `@${form}` : '';
+  if (form !== undefined && !kept) throw new Error(`No form "${form}" on a canvas.`);
+  if (!named || named === l.workspace) return `${l.workspace}${kept}`;
+  if (!ITEM.test(named) || !(await l.entity(named))) throw new Error(`No canvas "${canvas}": a canvas is an item's id, or "${l.workspace}" for the whole map.`);
+  return `${named}${kept}`;
 }
 
 /** Where each item stands on a canvas, by item: the newest place of each, as the reader may see them. */

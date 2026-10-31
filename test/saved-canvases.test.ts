@@ -98,7 +98,7 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
       await page.evaluate(`document.querySelector('#canvas .pane-canvas').dispatchEvent(new CustomEvent('drawing-drop', { detail: { id: '${made.a}', x: ${width}, y: 77 } }))`);
       await page.evaluate(`location.hash = '#/'`);
       let mine: Record<string, [number, number]> = {};
-      for (const end = Date.now() + 10000; Date.now() < end && !mine[made.a]; await wait(200)) mine = (await call('/api/places', undefined, { canvas: saved.id })).result;
+      for (const end = Date.now() + 10000; Date.now() < end && !mine[made.a]; await wait(200)) mine = (await call('/api/places', undefined, { canvas: `${saved.id}@solved` })).result;
       assert.deepEqual(mine[made.a], [width, 77], 'kept in its places');
       assert.equal((await call('/api/places', undefined, { canvas: made.p })).result[made.a], undefined, 'not in the places of the item it is drawn from');
       assert.equal((await call('/api/places', undefined, {})).result[made.a], undefined, 'not in the map’s');
