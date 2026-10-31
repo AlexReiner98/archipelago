@@ -11,7 +11,8 @@ import { ago, idsAsLinks, isA, titles } from './words.js';
 /** On a map with nothing on it yet, a person is pointed at what puts something there. */
 async function firstStep(body) {
   const info = await api('workspace_info').catch(() => null);
-  if (info && !info.started) body.replaceChildren(h('div', { class: 'empty' }, 'Your map is empty. ', h('a', { href: '#/workspace?at=agent' }, 'Connect an agent')));
+  // Asked after the fact: only while nothing has been drawn here since.
+  if (info && !info.started && (!body.firstChild || body.firstChild.matches?.('.empty'))) body.replaceChildren(h('div', { class: 'empty' }, 'Your map is empty. ', h('a', { href: '#/workspace?at=agent' }, 'Connect an agent')));
 }
 
 // ---- A session's story -----------------------------------------------------
