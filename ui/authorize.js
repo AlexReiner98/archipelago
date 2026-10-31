@@ -28,10 +28,12 @@ export async function authorizePage(given) {
     keepWaiting(null);
     return page('This client cannot connect', h('div', { class: 'empty' }, asked.body.error ?? 'Start again from the client.'));
   }
-  const { client, returns_to } = asked.body;
+  const { client, returns_to, workspace } = asked.body;
   const whoami = store.token ? await fetch('/whoami', { headers: authHeaders() }) : null;
   const me = whoami?.ok ? await whoami.json() : null;
   if (me?.actor.kind !== 'human') return signIn('', `Sign in to connect ${client}`);
+  // This address is one workspace's own: a person signed in to another is asked to sign in to it.
+  if (workspace && me.workspace.id !== workspace) return signIn('', `Sign in to ${workspace} to connect ${client}`);
   const error = h('div', { class: 'error', style: 'padding: 0 var(--space-8) var(--space-8)' });
   const answer = (allow) => async (e) => {
     e.target.disabled = true;

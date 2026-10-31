@@ -112,6 +112,40 @@ test('a client with no token is not counted against the address it shares, on /m
   assert.equal((await post('/mcp')).status, 429, 'a wrong token is counted, there as anywhere');
 });
 
+test('a workspace’s own address takes only that workspace: its documents, its sign-in and its tokens', async () => {
+  const { base, workspaces, owner } = await signedIn();
+  const acme = await workspaces.create('acme', 'Acme');
+  const me = (await acme.pelago.init({ kind: 'human', name: 'rosa' }, { name: 'Rosa' }), await acme.pelago.setting<string>('me'));
+  const rosa = (await createToken(acme.pelago.db, 'acme', { kind: 'human', name: 'rosa', admin: true, entity: me })).token;
+  const denied = await fetch(`${base}/mcp/acme`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  assert.equal(denied.status, 401);
+  assert.match(denied.headers.get('www-authenticate')!, /oauth-protected-resource\/mcp\/acme"/);
+  const meta = await (await fetch(`${base}/.well-known/oauth-protected-resource/mcp/acme`)).json();
+  assert.equal(meta.resource, `${base}/mcp/acme`);
+  assert.equal((await fetch(`${base}/.well-known/oauth-protected-resource/mcp/acme/more`)).status, 404);
+  assert.equal((await fetch(`${base}/.well-known/oauth-authorization-server/mcp/acme`)).status, 200);
+
+  // A client sent there is asked for that workspace; a person signed in to another cannot say Allow for it.
+  const { client_id } = await (await fetch(`${base}/oauth/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'Claude', redirect_uris: [CALLBACK] }) })).json();
+  const at = new URL(`${base}/oauth/authorize`);
+  for (const [k, v] of Object.entries({ client_id, redirect_uri: CALLBACK, response_type: 'code', code_challenge: 'a'.repeat(43), code_challenge_method: 'S256', resource: `${base}/mcp/acme` })) at.searchParams.set(k, v);
+  const wrong = await browser(base, at, owner);
+  assert.equal(wrong.described.workspace, 'acme');
+  assert.equal(wrong.status, 403);
+  assert.match(wrong.body.error, /for the workspace "acme"/);
+  const right = await browser(base, at, rosa);
+  assert.equal([right.status, right.body.workspace].join(), '200,acme');
+
+  // Another workspace's token is told to sign in again; its own goes through.
+  const asDefault = await fetch(`${base}/mcp/acme`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${owner}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }) });
+  assert.equal(asDefault.status, 401);
+  assert.match(asDefault.headers.get('www-authenticate')!, /\/mcp\/acme"/);
+  const client = new McpClient({ name: 'test', version: '1' });
+  await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp/acme`), { requestInit: { headers: { authorization: `Bearer ${rosa}` } } }));
+  assert.ok((await client.listTools()).tools.length);
+  await client.close();
+});
+
 test('with auth off there is nothing to sign in to', async () => {
   const { base } = await serve('off');
   assert.equal((await fetch(`${base}/.well-known/oauth-authorization-server`)).status, 404);
