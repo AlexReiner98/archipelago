@@ -69,7 +69,7 @@ export function pinner({ nodes, x, y, routes, rigid, lengths }) {
   const hangs = (id) => rigid.get(id)?.hangs ?? [];
   const boxes = [...x.keys()].map((id) => rectAt(id, x, y, nodes));
   /** The stretches of what stands, leaving out the wires of `id`. */
-  const standing = (id) => wires.filter((w) => w.a !== id && w.b !== id).map((w) => w.points);
+  const stands = new Map(), standing = (id) => stands.get(id) ?? stands.set(id, wires.filter((w) => w.a !== id && w.b !== id).map((w) => w.points)).get(id);
   /** How many of those a line crosses. */
   const crossings = (line, id) => {
     let n = 0;
@@ -82,32 +82,37 @@ export function pinner({ nodes, x, y, routes, rigid, lengths }) {
   };
   const fields = new Map(), trees = new Map(), lines = new Map();
 
+  /** The field round `id`, as far as `tips` and how `close` it is ask for it. */
+  const fieldFor = (id, tips, close) => {
+    const key = `${id} ${close}`, sign = JSON.stringify(tips), out = new Set([id, ...hangs(id)]);
+    if (fields.get(key)?.sign !== sign) fields.set(key, { sign, field: fieldOf({ boxes: boxes.filter((b) => !out.has(b.id)), wires: standing(id), tips, room, step, near: close ? room / 2 : room, close }) });
+    return fields.get(key).field;
+  };
+
   /** The ways from step `id` moved by `d` to the far end of each of its wires, those moved too by `shift`. */
   const treeOf = (id, d, shift) => {
-    const far = wiresOf.get(id).map((w) => {
-      const line = w.a === id ? w.points : turned(w.points), other = w.a === id ? w.b : w.a, by = shift.get(other);
-      return { w, line: by ? turned(carry(turned(line), by)) : line };
+    const others = wiresOf.get(id).map((w) => shift.get(w.a === id ? w.b : w.a) ?? 0), key = JSON.stringify([d, others]);
+    if (trees.get(id)?.key === key) return trees.get(id).by;
+    const far = wiresOf.get(id).map((w, k) => {
+      const line = w.a === id ? w.points : turned(w.points);
+      return { w, line: others[k] ? turned(carry(turned(line), others[k])) : line };
     });
-    const tips = far.map((f) => tipOf(f.line, run)), sign = JSON.stringify(tips);
-    if (fields.get(id)?.sign !== sign) {
-      const out = new Set([id, ...hangs(id)]);
-      fields.set(id, { sign, field: fieldOf({ boxes: boxes.filter((b) => !out.has(b.id)), wires: standing(id), tips, room, step, near: room / 2 }) });
-    }
-    const key = JSON.stringify([d, sign]);
-    if (trees.get(id)?.key !== key) {
-      const box = rectAt(id, x, y, nodes);
-      for (const side of ['l', 'r']) box[side] += d[0];
-      for (const side of ['t', 'u']) box[side] += d[1];
-      const ways = waysFrom(fields.get(id).field, box, hangs(id).length ? ['top', 'foot', 'left'] : ['top', 'foot', 'left', 'right'], tips, { turn: lengths.turn, cross, run, inset: Math.min(corner, Math.min(box.r - box.l, box.u - box.t) / 3) });
-      trees.set(id, { key, by: new Map(far.map((f, k) => [f.w.k, { way: ways[k], tip: tips[k], line: f.line }])) });
-    }
+    const tips = far.map((f) => tipOf(f.line, run)), box = rectAt(id, x, y, nodes);
+    for (const side of ['l', 'r']) box[side] += d[0];
+    for (const side of ['t', 'u']) box[side] += d[1];
+    const sides = hangs(id).length ? ['top', 'foot', 'left'] : ['top', 'foot', 'left', 'right'], how = { turn: lengths.turn, cross, run, inset: Math.min(corner, Math.min(box.r - box.l, box.u - box.t) / 3) };
+    const coarse = waysFrom(fieldFor(id, tips, false), box, sides, tips, how);
+    // Most ways go by the wider lines; those that do not are looked for close beside the boxes.
+    const missing = tips.filter((_, k) => !coarse[k]), close = missing.length ? waysFrom(fieldFor(id, tips, true), box, sides, missing, how) : [];
+    const ways = coarse.map((way) => way ?? close.shift());
+    trees.set(id, { key, by: new Map(far.map((f, k) => [f.w.k, { way: ways[k], tip: tips[k], line: f.line }])) });
     return trees.get(id).by;
   };
 
   /** A wire that stood where a pin now stands, threaded from one of its ends to the other past `stood`; null if none goes. */
   const past = (w, stood) => {
     const tips = [tipOf(turned(w.points), run), tipOf(w.points, run)], sign = JSON.stringify(tips);
-    if (fields.get(w.k)?.sign !== sign) fields.set(w.k, { sign, field: fieldOf({ boxes, wires: wires.filter((v) => v !== w).map((v) => v.points), tips, room, step, near: room / 2 }) });
+    if (fields.get(w.k)?.sign !== sign) fields.set(w.k, { sign, field: fieldOf({ boxes, wires: wires.filter((v) => v !== w).map((v) => v.points), tips, room, step, near: room / 2, close: true }) });
     const [way] = waysFrom(fields.get(w.k).field, { l: tips[0][0], r: tips[0][0], t: tips[0][1], u: tips[0][1] }, ['top', 'foot', 'left', 'right'], [tips[1]], { turn: lengths.turn, cross, run: 0, inset: 0, avoid: stood });
     return way && kept([w.points[0], ...way, tips[1], w.points.at(-1)]);
   };

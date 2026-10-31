@@ -32,11 +32,11 @@ function linesOf(must, could, step, near) {
 /**
  * The lines round `boxes` ({ l, r, t, u }, which no way passes) and how many stretches of `wires` (each a list of points)
  * each piece of them crosses. `tips` are points every way must be able to end on. `room` is how far off a box its lines go,
- * `step` the widest gap between lines and `near` the narrowest.
+ * `step` the widest gap between lines and `near` the narrowest. A field with lines `close` to the boxes finds more ways and takes longer.
  */
-export function fieldOf({ boxes, wires, tips, room, step, near }) {
-  // Off each box by `room`, and close beside it, so a channel narrower than two rooms has a line too: the solve then centres what goes down it.
-  const off = [room, near / 2];
+export function fieldOf({ boxes, wires, tips, room, step, near, close = false }) {
+  // Off each box by `room`; `close` beside it too, so a channel narrower than two rooms has a line: the solve centres what goes down it.
+  const off = close ? [room, near / 2] : [room];
   const xs = linesOf(tips.map((p) => p[0]), boxes.flatMap((b) => off.flatMap((by) => [b.l - by, b.r + by])), step, near);
   const ys = linesOf(tips.map((p) => p[1]), boxes.flatMap((b) => off.flatMap((by) => [b.t - by, b.u + by])), step, near);
   const [nx, ny] = [xs.length, ys.length], across = new Uint16Array(nx * ny), down = new Uint16Array(nx * ny);
@@ -138,21 +138,24 @@ export function waysFrom(field, box, sides, goals, { turn, cross, run, inset, av
   const { xs, ys, nx, across, down, dist, prev } = field, open = queue(), ports = new Map();
   dist.fill(Infinity);
   prev.fill(-1);
-  const wanted = new Set(goals.map(([gx, gy]) => bound(xs, gx) + bound(ys, gy) * nx));
-  const walls = [box, ...avoid], inside = (i, j) => walls.some((b) => xs[i] > b.l && xs[i] < b.r && ys[j] > b.t && ys[j] < b.u);
+  const wanted = new Map(goals.map(([gx, gy]) => [bound(xs, gx) + bound(ys, gy) * nx, false]));
+  const walls = [box, ...avoid].map((b) => [bound(xs, b.l + 1e-6), bound(xs, b.r), bound(ys, b.t + 1e-6), bound(ys, b.u)]);
+  const inside = (i, j) => {
+    for (let k = 0; k < walls.length; k++) if (i >= walls[k][0] && i < walls[k][1] && j >= walls[k][2] && j < walls[k][3]) return true;
+    return false;
+  };
   for (const s of seedsOf(field, box, sides, inset, run)) if (s.cost < dist[s.state]) ((dist[s.state] = s.cost), ports.set(s.state, s.line), open.push(s.cost, s.state));
   const reach = (state, cost, from) => {
     if (cost >= dist[state]) return;
     ((dist[state] = cost), (prev[state] = from), open.push(cost, state));
   };
   let left = wanted.size;
-  const done = new Set();
   while (open.size && left) {
     open.pop();
     const { cost, state } = open;
     if (cost > dist[state]) continue;
     const dir = state & 1, node = state >> 1, i = node % nx, j = (node - i) / nx;
-    if (wanted.has(node) && !done.has(node)) (done.add(node), left--);
+    if (wanted.get(node) === false) (wanted.set(node, true), left--);
     reach(state ^ 1, cost + turn, state);
     if (dir === 0) {
       if (i + 1 < nx && across[node] !== BLOCKED && !inside(i + 1, j)) reach(state + 2, cost + xs[i + 1] - xs[i] + across[node] * cross, state);

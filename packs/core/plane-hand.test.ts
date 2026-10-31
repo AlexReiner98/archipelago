@@ -1,4 +1,4 @@
-// A step put by hand on Plane: wires by the same logic as every other wire. Places in, wires out.
+// A step put by hand is a pin: wires by the same logic as every other wire. Places in, wires out.
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -8,6 +8,8 @@ import test from 'node:test';
 import { layout as bars } from './draw/flow/layout.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { faults } from './draw/flow/faults.js';
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { count } from './draw/flow/count.js';
 
 const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const measure = (t: string, px: number) => t.length * px * 0.5;
@@ -87,4 +89,44 @@ test('hand: the same places give the same picture, and what one drawing does sta
   assert.notEqual(again.x.get('n1'), 9999);
   assert.notEqual(again.chains[0].points[0][0], 9999);
   assert.deepEqual(lines(again), lines(free));
+});
+
+test('pins: a drag frame, the release and a reload are one call', () => {
+  const to = [free.x.get('n30') + 300, free.y.get('n30') - 200];
+  const frame = free.place({ n10: to }), reload = drawnWith({ n10: to });
+  assert.deepEqual(lines(frame), lines(reload));
+  assert.deepEqual(lines(free.place({})), lines(free), 'no pins: the picture as it was first drawn');
+  for (let k = 1; k <= 8; k++) free.place({ n10: [to[0] - 40 * k, to[1] + 30 * k] });
+  assert.deepEqual(lines(free.place({ n10: to })), lines(reload), 'whatever was dragged through on the way');
+});
+
+test('pins: the order of the pins and how they came say nothing', () => {
+  const a = [free.x.get('n30') + 300, free.y.get('n30') - 200], b = [free.x.get('n12') - 150, free.y.get('n12') + 90];
+  assert.deepEqual(lines(free.place({ n10: a, n12: b })), lines(free.place({ n12: b, n10: a })));
+});
+
+test('pins: a comb goes with its holder, its wires as they stood', () => {
+  const [dx, dy] = [170, 130], g = free.place({ hub: [free.x.get('hub') + dx, free.y.get('hub') + dy] });
+  for (const k of kids) assert.deepEqual([g.x.get(k), g.y.get(k)], [free.x.get(k) + dx, free.y.get(k) + dy], `${k} moved with it`);
+  const comb = (m: any) => m.ties.filter((t: any) => kids.includes(t.a) || kids.includes(t.b));
+  comb(g).forEach((w: any, n: number) => assert.deepEqual(w.points, comb(free)[n].points.map(([p, q]: number[]) => [p + dx, q + dy])));
+});
+
+test('pins: every wire stays its own, wherever a step is dropped', () => {
+  for (const id of ['n10', 'n30', 'hub', 'n3']) for (const [dx, dy] of [[90, 60], [-140, 120], [300, -220]]) {
+    const g = free.place({ [id]: [free.x.get(id) + dx, free.y.get(id) + dy] });
+    assert.equal(count(lines(g)).shared, 0, `${id} by ${dx}, ${dy}`);
+    assert.ok(square(g), `${id} by ${dx}, ${dy}`);
+  }
+});
+
+test('pins: a drop across a wire threads the wires of what was dropped', () => {
+  // A wall of a wire across the picture, with the step on one side of it and what it depends on the other.
+  const wall = ['w0', 'w1'], row = ['a', 'b'], made = [...wall, ...row, 'c'].map((id) => item(id));
+  const tied = [dep('w1', 'w0'), dep('b', 'a'), dep('c', 'a')];
+  const g = bars({ items: [...items, ...made], links: [...links, ...tied], measure, sizes: house.sizes });
+  const way = g.chains.find((c: any) => c.a === 'n3' || c.b === 'n3'), [x, y] = [g.x.get('n10'), g.y.get('n10')];
+  const moved = g.place({ n10: [x + 400, y + 250] });
+  assert.equal(hits(moved, 'n10').length, 0, 'no wire of it runs through a box');
+  assert.ok(square(moved) && way);
 });

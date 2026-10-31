@@ -1,6 +1,6 @@
 // A step moved by hand on the canvas, in a real browser (skipped where there is no Chrome): dragged, it is written to
 // the places stream in one call before the next thing the page does (here, going to another canvas), never as a change
-// to the map, and the canvas opened again draws it where it was put.
+// to the map, and the canvas opened again draws it where it was put, its wires as they were on the last frame of the drag.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -31,6 +31,7 @@ for (const shape of ['']) test(`in a browser, a step dragged on the canvas${shap
   };
   const step = `document.querySelector('#canvas svg a[href="#/e/${made.a}"]')`;
   // Where the step's middle is in the picture's own units, as the page measures it to drop it (ui/drag.js).
+  const wires = `[...document.querySelectorAll('#canvas svg path.lf-wire, #canvas svg path.lf-tie')].map((p) => p.getAttribute('d'))`;
   const middle = `(() => { const el = ${step}; const b = el.getBBox(); const m = el.transform?.baseVal?.consolidate?.()?.matrix; return [b.x + b.width / 2 + (m?.e ?? 0), b.y + b.height / 2 + (m?.f ?? 0)]; })()`;
   try {
     assert.ok(await until(`Boolean(${step})`), `the step is drawn: ${page.logs().join('\n')}`);
@@ -42,8 +43,11 @@ for (const shape of ['']) test(`in a browser, a step dragged on the canvas${shap
     await mouse('mouseMoved', [x, y], 0);
     await mouse('mousePressed', [x, y]);
     for (let k = 1; k <= 10; k++) (await mouse('mouseMoved', [x + 16 * k, y + 9 * k]), await wait(30));
+    await wait(200);
+    const lastFrame = await page.evaluate<string[]>(wires);
     await mouse('mouseReleased', [x + 160, y + 90], 0);
     await wait(300);
+    assert.deepEqual(await page.evaluate<string[]>(wires), lastFrame, 'let go, every wire is as it was on the last frame');
     const dropped = await page.evaluate<[number, number]>(middle);
     assert.ok(Math.abs(dropped[0] - before[0] - 160 / scale) < 3 && Math.abs(dropped[1] - before[1] - 90 / scale) < 3, `moved with the pointer: ${before} to ${dropped}`);
     assert.equal((await call('/api/places', undefined, { canvas })).result[made.a], undefined, 'kept on the page until the next thing it does');
@@ -61,6 +65,7 @@ for (const shape of ['']) test(`in a browser, a step dragged on the canvas${shap
     await page.go(`${base}/#/v?from=${made.p}${form}`);
     assert.ok(await until(`Boolean(${step})`), 'drawn again');
     assert.ok(await until(`(() => { const m = ${middle}; return Math.abs(m[0] - ${placed[made.a][0]}) < 2 && Math.abs(m[1] - ${placed[made.a][1]}) < 2; })()`), `drawn where it was put: ${await page.evaluate(middle)} for ${placed[made.a]}`);
+    assert.deepEqual(await page.evaluate<string[]>(wires), lastFrame, 'read back, every wire is as it was on the last frame');
   } finally {
     await page.close();
   }

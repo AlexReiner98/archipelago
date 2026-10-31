@@ -49,8 +49,8 @@ function reach({ queue, out }, spot, low, high) {
   return far.get(high);
 }
 
-/** Each number that is not `held`, as near where it stands as arcs a `scale` of their length let it; null if there is no room. */
-function fitted(places, held, arcs, { queue, out }, scale) {
+/** Each number not `held`, as near where it stands as arcs a `scale` of their length let it; with no room, null, or if `anyway` it keeps its order. */
+function fitted(places, held, arcs, { queue, out }, scale, anyway = false) {
   const floor = places.map((v, k) => (held.has(k) ? v : -Infinity)), roof = places.map((v, k) => (held.has(k) ? v : Infinity));
   for (const [p, q, l] of arcs) {
     if (held.has(p) && !held.has(q)) floor[q] = Math.max(floor[q], places[p] + l * scale);
@@ -61,8 +61,8 @@ function fitted(places, held, arcs, { queue, out }, scale) {
   const at = [...places];
   for (const v of queue) {
     if (held.has(v)) continue;
-    if (floor[v] > roof[v]) return null;
-    at[v] = Math.min(roof[v], Math.max(floor[v], places[v]));
+    if (floor[v] > roof[v] && !anyway) return null;
+    at[v] = floor[v] > roof[v] ? floor[v] : Math.min(roof[v], Math.max(floor[v], places[v]));
     for (const [q, l] of out[v]) floor[q] = Math.max(floor[q], at[v] + l * scale);
   }
   return at;
@@ -71,7 +71,7 @@ function fitted(places, held, arcs, { queue, out }, scale) {
 /**
  * Each number that is not `held`, as near where it stands as every arc lets it. Between what is held there may not be room
  * for all that asks for it: then every distance gives way alike, in `SQUEEZE` steps, so nothing changes order or runs into a
- * box; `told.squeezed` counts those passes. With no room at any of them, what is free stays where it stands.
+ * box; `told.squeezed` counts those passes. With no room at any of them, what has none keeps its order past what is held.
  */
 function within(places, held, arcs, told) {
   const order = ordered(places.length, arcs.filter(([p, q]) => !held.has(p) && !held.has(q)));
@@ -81,7 +81,7 @@ function within(places, held, arcs, told) {
     if (at) return at;
     told.squeezed++;
   }
-  return places;
+  return fitted(places, held, arcs, order, SQUEEZE.at(-1), true);
 }
 
 /** Every number free: the least that keeps every arc, boxes rigid where they can be, leaning neither way. */

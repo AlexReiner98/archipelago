@@ -202,6 +202,8 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held'].filter(Boolean).join(' ');
     const body = [
       outline(n.shape, X, Y, n.w, n.h, CORNER),
+      // A sheet's wave stops short of its box: this says where the box is, so the page reads its middle (ui/drag.js) as drawn here.
+      n.shape === 'sheet' && m('rect', { x: X - n.w / 2, y: Y - n.h / 2, width: n.w, height: n.h, class: 'lf-room' }),
       !n.stub && m('circle', { cx: left - z('dot_gap'), cy: Y, r: z('dot'), class: `lf-dot ${dotClass(i)}` }),
       // Its name in the lines the layout gave it (./lines.js): a second line under the first, the two about the middle.
       n.lines?.length > 1
@@ -311,7 +313,8 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const move = (key, { dx = 0, dy = 0 }, done) => {
     const id = keyed.get(key);
     if (!id || !at.has(id)) return [];
-    const [x0, y0] = at.get(id), put = done ? [Math.round(x0 + Number(dx)), Math.round(y0 + Number(dy))] : [x0 + Number(dx), y0 + Number(dy)];
+    // On whole units, as the page keeps it, so the last frame is what is let go and what comes back.
+    const [x0, y0] = at.get(id), put = [Math.round(x0 + Number(dx)), Math.round(y0 + Number(dy))];
     const next = g.place({ ...pins, [id]: put }), patches = [{ tip: null }, ...between(now, next)];
     now = next;
     if (done) (at.set(id, put), (pins[id] = put));
