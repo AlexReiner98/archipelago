@@ -17,12 +17,6 @@ export function drawFrozen(host, answer, typeTitles = {}, { inApp = false } = {}
   const body = h('div', { class: 'lens-view' });
   host.replaceChildren(body);
   dress(body, style);
-  // Beside the hero, a picture is as wide as the text, whatever its box reaches past it for a story's conversation.
-  const main = host.closest('main');
-  if (main && !host.classList.contains('wide')) {
-    const cs = getComputedStyle(main);
-    body.dataset.room = String(Math.round(main.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)));
-  }
   // Every picture has a drawing: src/published.ts gives one to a picture frozen without.
   if (style.drawing) drawWith(body, answer, style, () => {});
   else body.replaceChildren(h('div', { class: 'empty' }, 'This view cannot be drawn here.'));

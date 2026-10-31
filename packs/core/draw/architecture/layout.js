@@ -216,6 +216,22 @@ export function layout({ items, links, rootId, measure, sizes, prior, steady = B
     const pick = [pushDown(new Map(start)), pushDown(liftUp(new Map(start)))].map(closeUp).reduce((a, b) => (rows(b) < rows(a) || (rows(b) === rows(a) && moves(b) < moves(a)) ? b : a));
     for (const [id, k] of pick) layerOf.set(id, k);
   }
+  // A style that names arch_row_most folds a longer row into several, so a picture stands taller than it is wide. What
+  // a row held before stays at its foot, nearest what it calls, and what is new goes above: no wire changes direction.
+  const rowMost = sizes.arch_row_most;
+  if (rowMost > 0) {
+    const folded = new Map();
+    let next = 0;
+    for (const k of [...new Set(layerOf.values())].sort((p, q) => p - q)) {
+      const row = [...layerOf.keys()].filter((id) => layerOf.get(id) === k);
+      const held = (id) => (prior?.layerOf.has(id) ? 1 : 0);
+      row.sort((p, q) => held(p) - held(q));
+      const count = Math.ceil(row.length / rowMost);
+      row.forEach((id, at) => folded.set(id, next + count - 1 - Math.floor((row.length - 1 - at) / rowMost)));
+      next += count;
+    }
+    for (const [id, k] of folded) layerOf.set(id, k);
+  }
   for (const [id, k] of layerOf) nodes.get(id).layer = k;
   // A wire that passes a layer has a waypoint there, in the column it is going to, so it falls inside that place.
   const chains = edges.map((e) => {

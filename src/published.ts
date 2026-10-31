@@ -58,7 +58,23 @@ export async function wouldPublish(l: Archipelago, id: string) {
   const doc = ID.test(id) ? await l.entity(id) : null;
   if (!doc || !readable(l).includes(doc.type)) throw new Error(`"${id}" is not a document that can be public.`);
   if (doc.private_to) throw new Error(`"${doc.title}" is private: share it, and its preview shows it as it would be published.`);
-  return freeze(l, id, doc.visibility !== 'public');
+  const given = await freeze(l, id, doc.visibility !== 'public');
+  if (doc.type === SHARED) return given;
+  // A draft at an address takes it from what is published there: it is what publishing would put there.
+  const drafts = await draftPaths(l, given.parts), taken = new Set(Object.values(drafts));
+  const published = ('paths' in given ? given.paths : {}) as Record<string, string>;
+  return { ...given, paths: { ...Object.fromEntries(Object.entries(published).filter(([, path]) => !taken.has(path))), ...drafts } };
+}
+
+/** The drafts a document links to by address ([Quickstart](/quickstart), [home](/) for the front page): in its preview each leads to its own, as it will once published. */
+async function draftPaths(l: Archipelago, parts: unknown) {
+  const words = [...new Set([...JSON.stringify(parts).matchAll(/\]\(\/([a-z0-9-]*)\)/g)].map((m) => m[1] || 'home'))];
+  if (!words.length) return {};
+  const { rows } = await l.db.query<{ id: string; path: string }>(
+    `select id, props->>'path' as path from entity where type = any($1::text[]) and archived_at is null and is_open and private_to is null and props->>'path' = any($2::text[]) -- index entity_type_created`,
+    [readable(l), words],
+  );
+  return Object.fromEntries(rows.map((r) => [r.id, r.path]));
 }
 
 /** An address word: lowercase letters and digits, words joined by single dashes. */

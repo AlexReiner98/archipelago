@@ -161,7 +161,7 @@ figure img {
 }
 /* A front page that opens on a figure (ui/doc.js) runs it from edge to edge of the window, with no card round it:
    its ground is the page's own. */
-body:has(section.lead) {
+html:has(section.lead) {
   overflow-x: clip;
 }
 section.lead figure {

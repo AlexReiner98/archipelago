@@ -145,7 +145,7 @@ export function drawWith(host, answer, style, keep) {
     reshape = new ResizeObserver(() => {
       clearTimeout(wait);
       wait = setTimeout(() => {
-        const [w, hgt] = [Number(host.dataset.room) || host.clientWidth, host.clientHeight];
+        const [w, hgt] = [host.clientWidth, host.clientHeight];
         const apart = input.height > 0 ? Math.abs(Math.log((w / hgt) / (input.width / input.height))) : Infinity;
         if (!ended && w > 0 && hgt > 0 && apart > Math.log(numberOf(style, 'plane_reshape_ratio'))) drawWith(host, answer, style, keep);
       }, numberOf(style, 'plane_reshape_after'));
@@ -215,7 +215,7 @@ export function drawWith(host, answer, style, keep) {
   const { drawing: _code, code: _canvas, ...fields } = style;
   // The titles of the types the picture holds, as this page knows them: a drawing has no registry of its own.
   const types = Object.fromEntries([...new Set((shown.items ?? []).flatMap((i) => [i.type, i.root]).filter(Boolean))].map((t) => [t, typeTitle(t)]));
-  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: Number(host.dataset.room) || host.clientWidth, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
+  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: host.clientWidth, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
   const seen = `${drawing.hash}
 ${JSON.stringify(input)}`;
   const kept = scenes.get(seen);

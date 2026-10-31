@@ -119,7 +119,7 @@ export function nameLeft(from, width, end, top, bottom, wires, clear) {
 const pathOf = (pts) => `M${pts.map((p) => p.map((v) => Math.round(v * 100) / 100).join(' ')).join('L')}`;
 
 /** The story: its first scene, and what plays it. */
-export function story({ answer, style, reduced }, tools) {
+export function story({ answer, style, reduced, width }, tools) {
   const z = (name) => {
     const v = style.sizes?.[`arch_${name}`];
     if (typeof v !== 'number') throw new Error(`The style names no size "arch_${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
@@ -194,16 +194,11 @@ export function story({ answer, style, reduced }, tools) {
   // One frame of reference for all of them: from the leftmost step to the widest, the tallest.
   const left = Math.min(...frames.map((f) => f.g.left)), right = Math.max(...frames.map((f) => f.g.width)), tall = Math.max(...frames.map((f) => f.g.height));
   const shift = -left;
-  // A published picture is framed step by step, as compact as each step, in one shape throughout.
+  // A published picture is one frame from its first step to its last, as wide as its widest and as tall as its
+  // tallest, each step in the middle of it: one scale throughout, no room it does not use, and tighter in a narrow column.
   const span = (g) => g.width - g.left;
-  const aspect = Math.max(style.numbers?.arch_story_aspect ?? 1.6, Math.min(...frames.map((f) => span(f.g) / f.g.height)));
-  const least = z('story_least');
-  // Islands sit in the middle of their frame, top to bottom too.
-  const view = (g) => {
-    const w = Math.max(span(g), least, g.height * aspect);
-    return `${g.left + shift + (span(g) - w) / 2} ${g.radii ? (g.height - w / aspect) / 2 : 0} ${w} ${w / aspect}`;
-  };
-  const widest = Math.max(...frames.map((f) => Math.max(span(f.g), least, f.g.height * aspect)));
+  const widest = Math.max(Math.min(z('story_least'), width || Infinity), ...frames.map((f) => span(f.g))), tallest = Math.max(...frames.map((f) => f.g.height));
+  const view = (g) => `${g.left + shift + (span(g) - widest) / 2} ${(g.height - tallest) / 2} ${widest} ${tallest}`;
 
   // What a part, a place, a wire looks like in a frame: the attributes of each of its marks.
   const markOf = (n, f) => (valueOf(n, f.look) === null ? n.health : `k-${valueOf(n, f.look)}`);
@@ -309,7 +304,7 @@ export function story({ answer, style, reduced }, tools) {
     return shown && m('div', { class: 'sp-tip' }, m('b', {}, shown.title), byId.get(id)?.gist && m('span', {}, byId.get(id).gist));
   };
   return {
-    scene: { css, svg, before: player.before, aside: player.after, ...(sea && { surface: { key: 'deep' } }), size: style.still ? { width: widest, height: widest / aspect } : { width: right - left, height: tall } },
+    scene: { css, svg, before: player.before, aside: player.after, ...(sea && { surface: { key: 'deep' } }), size: style.still ? { width: widest, height: tallest } : { width: right - left, height: tall } },
     on(event) {
       if (!/^[pb]:e_[a-z0-9]{8}$/.test(event.key)) return player.on(event);
       if (event.name === 'leave') return [{ tip: null }];

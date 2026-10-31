@@ -57,9 +57,9 @@ function outline(shape, x, y, w, hgt, rx, lid) {
  * The system: its parts, the places they run and the wires between them, with how each is. `input` is what the page
  * gives every drawing (the answer, the style); `tools.measure(text, px, font, role)` is how wide a text is drawn, as one of the style's text roles when one is given.
  */
-export function picture({ answer, style, reduced }, tools) {
+export function picture({ answer, style, reduced, width }, tools) {
   // A picture with steps plays how it came to be, and ends on the map as it is.
-  if (Array.isArray(answer.steps) && answer.steps.length) return story({ answer, style, reduced }, tools);
+  if (Array.isArray(answer.steps) && answer.steps.length) return story({ answer, style, reduced, width }, tools);
   const byId = lensTree(answer);
   // Every length is the style's (sizes, arch_*), named by the house style; so is the typeface.
   const z = (name) => {

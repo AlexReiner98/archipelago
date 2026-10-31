@@ -143,15 +143,6 @@ function invoiceHead(d) {
 
 /** The address word of a site's front page (src/site.ts). */
 const FRONT = 'home';
-/** Whether the window has room right of the text for a story's conversation: its least width, the gap, and the page's side. */
-function roomy() {
-  const main = document.querySelector('main');
-  if (!main) return;
-  const css = getComputedStyle(document.documentElement), px = (name) => parseFloat(css.getPropertyValue(name)) || 0;
-  const text = main.getBoundingClientRect().right - parseFloat(getComputedStyle(main).paddingRight);
-  document.body.classList.toggle('roomy', document.documentElement.clientWidth - text >= px('--space-8') + px('--side-least') + px('--reader-side'));
-}
-addEventListener('resize', roomy);
 
 // How the workspace's style says a published page looks (page_css): read after the page's own rules, only in it.
 const pageSheet = new CSSStyleSheet();
@@ -175,13 +166,9 @@ function draw(d) {
   onSite = Boolean(d.site?.host);
   // The section the style names for a link's picture (page.share) is shown where a link is posted, not on the page.
   const sections = d.parts.filter((p) => p.section && p.section.id !== d.share);
-  // The front page's first picture is the site's own, and may be as wide as the window allows: a whole system opens in
-  // sight. One that plays how it came to be fills that width. Every other picture is as wide as the text, and what a
-  // story says goes in a column of its own to the right of the text, where the window has room (roomy).
-  const first = d.path === FRONT ? sections.find((p) => d.lenses?.[p.section.id])?.section.id : null;
-  // A front page that opens on a figure leads with it: from edge to edge, with no title over it (its title is its words).
-  const lead = d.path === FRONT && d.parts[0]?.section?.picture && !d.lenses?.[d.parts[0].section.id] ? d.parts[0].section.id : null;
-  const lensClass = (id) => ['doc-lens', id === first && 'wide', d.lenses[id].steps && 'plays'].filter(Boolean).join(' ');
+  // A page is one column (ui/doc-lens.css). Only a front page whose first section is a figure leaves it: that figure runs from edge to edge, with no title over it (its title is its words).
+  const hero = d.parts.find((p) => p.section)?.section;
+  const lead = d.path === FRONT && hero?.picture && !d.lenses?.[hero.id] ? hero.id : null;
   const part = (p) =>
     p.section
       ? h(
@@ -190,7 +177,7 @@ function draw(d) {
           p.section.id !== lead && h('h2', {}, p.section.title),
           // A lens is its picture, drawn from what was frozen when it was published (or, for a draft read with a sign-in, now); otherwise a section shows its figure.
           d.lenses?.[p.section.id]
-            ? h('div', { class: lensClass(p.section.id), 'data-lens': p.section.id })
+            ? h('div', { class: 'doc-lens', 'data-lens': p.section.id })
             : p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id, 'data-via': p.section.via })),
           blocks(p.section.body, titles, 3),
         )
@@ -207,7 +194,6 @@ function draw(d) {
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
   document.body.classList.toggle('invoice', d.head === 'invoice');
-  roomy();
   // Its pictures, with the text: a drawing's first frame is kept with the picture, and the drawing takes it over once started.
   for (const el of main.querySelectorAll('[data-lens]')) drawFrozen(el, d.lenses[el.dataset.lens], d.types);
   // Read with the reader's sign-in, a figure is fetched the same way.
