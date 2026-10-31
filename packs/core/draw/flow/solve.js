@@ -79,19 +79,36 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, told }) {
     const b = lines.box.get(line), inset = Math.min(corner, b.size[axis] / 3);
     arcs.push([b.low, s.n, inset], [s.n, b.high, inset]);
   }
-  for (let i = 0; i < stretches.length; i++) for (let j = i + 1; j < stretches.length; j++) {
-    const [p, q] = [stretches[i], stretches[j]];
-    if (p.lo > q.hi + TOUCH || q.lo > p.hi + TOUCH) continue;
-    arcs.push([p.n, q.n, p.line === q.line ? 0 : wire]);
-  }
-  for (const s of stretches) for (const b of boxes) {
-    if (s.lo > b.at[other] + b.size[other] / 2 || s.hi < b.at[other] - b.size[other] / 2 || s.own.includes(b.id)) continue;
-    const far = s.line.a === b.id || s.line.b === b.id ? run : room;
-    arcs.push(s.at < b.at[axis] ? [s.n, b.low, far] : [b.high, s.n, far]);
-  }
-  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
-    const [p, q] = boxes[i].at[axis] <= boxes[j].at[axis] ? [boxes[i], boxes[j]] : [boxes[j], boxes[i]];
-    if (Math.abs(p.at[other] - q.at[other]) < (p.size[other] + q.size[other]) / 2 + TOUCH) arcs.push([p.high, q.low, apart]);
+  // Each thing keeps its distance from what it can see on the low side: what stands behind that is kept off by the chain.
+  const facing = (p, q) => {
+    if (p.line && q.line) return [p.n, q.n, p.line === q.line ? 0 : wire];
+    if (p.line) return p.own.includes(q.id) ? null : [p.n, q.low, p.line.a === q.id || p.line.b === q.id ? run : room];
+    if (q.line) return q.own.includes(p.id) ? null : [p.high, q.n, q.line.a === p.id || q.line.b === p.id ? run : room];
+    // Two boxes that overlap are parted on the axis that takes least: on the other they stand side by side, in no order.
+    const on = (ax) => (p.size[ax] + q.size[ax]) / 2 - Math.abs(p.at[ax] - q.at[ax]);
+    return on(axis) > on(other) ? null : [p.high, q.low, apart];
+  };
+  const placed = [...stretches, ...boxes.map((b) => Object.assign(b, { key: b.at[axis], lo: b.at[other] - b.size[other] / 2, hi: b.at[other] + b.size[other] / 2 }))];
+  for (const s of stretches) s.key = s.at;
+  const seen = [];
+  for (const it of placed.sort((p, q) => p.key - q.key || (p.tie ?? 0) - (q.tie ?? 0))) {
+    const [lo, hi] = [it.lo - TOUCH, it.hi + TOUCH], first = seen.findIndex((v) => v.hi >= lo);
+    const from = first < 0 ? seen.length : first, met = new Set();
+    let to = from;
+    for (; to < seen.length && seen[to].lo <= hi; to++) met.add(seen[to].it);
+    // A wire's own box and what stands behind it are looked past that wire: it hides neither.
+    const looked = new Set(), look = (p) => {
+      if (looked.has(p) || p.lo > hi || p.hi < lo) return;
+      looked.add(p);
+      const arc = facing(p, it);
+      if (arc) arcs.push(arc);
+      if (p.line) for (const id of p.own) if (id !== it.id) look(lines.box.get(id));
+      if (!arc) p.behind?.forEach(look);
+    };
+    met.forEach(look);
+    if (it.line && it.own.length) it.behind = [...met];
+    const left = from < to && seen[from].lo < it.lo ? [{ lo: seen[from].lo, hi: it.lo, it: seen[from].it }] : [], right = from < to && seen[to - 1].hi > it.hi ? [{ lo: it.hi, hi: seen[to - 1].hi, it: seen[to - 1].it }] : [];
+    seen.splice(from, to - from, ...left, { lo: it.lo, hi: it.hi, it }, ...right);
   }
   const order = ordered(places.length, arcs);
   if (!order) throw new Error('The solve went in a ring');
@@ -100,6 +117,8 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, told }) {
   const spot = [];
   order.queue.forEach((v, k) => (spot[v] = k));
   const rigid = new Map(boxes.map((b) => [b, [b.high, b.low, -reach(order, spot, b.low, b.high)]]));
+  // Gone over in the order they run, a pass carries a number as far as it goes.
+  arcs.sort((p, q) => spot[p[0]] - spot[q[0]]);
   let first;
   for (;;) {
     const tried = least(places.length, [...arcs, ...rigid.values()]);
@@ -112,7 +131,7 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, told }) {
   }
   const all = [...arcs, ...rigid.values()];
   // As far toward the low side as can be, and as far toward the high: halfway keeps every distance, and leans neither way.
-  const end = Math.max(...first), last = least(places.length, all.map(([p, q, l]) => [q, p, l])).at.map((v) => end - v), at = first.map((v, k) => (v + last[k]) / 2);
+  const end = Math.max(...first), back = least(places.length, all.map(([p, q, l]) => [q, p, l]).sort((p, q) => spot[q[0]] - spot[p[0]])).at, at = back ? first.map((v, k) => (v + end - back[k]) / 2) : first;
   for (const b of boxes) {
     const [low, high] = [at[b.low], at[b.high]];
     b.at[axis] = (low + high) / 2;
