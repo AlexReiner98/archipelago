@@ -180,8 +180,8 @@
     {
       "id": "lens",
       "extends": "system",
-      "title": "Canvas",
-      "description": "A view kept on the map: a flat lens (a filter, a walk and a limit, as query flat takes them) and a style, so a person opens it anywhere and it draws the same. About a project or item (an about link), it is a view of that thing; about nothing, the workspace's. Its pins are drawn with what its filter finds; where things sit on it is kept in the places stream under its id, apart from the map's. Home lists them; a document line holding its id draws it there; report show with its id opens one.",
+      "title": "View",
+      "description": "A view kept on the map: a flat lens (a filter, a walk and a limit, as query flat takes them) and how it is drawn, its layout with its settings, so a person opens it anywhere and it draws the same. About a project or item (an about link), it is a view of that thing; about nothing, the workspace's. Its pins are drawn with what its filter finds; where things sit on it is kept in the places stream under its id, apart from the map's. Home lists them; a document line holding its id draws it there; report show with its id opens one.",
       "moved_from": ["canvas"],
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
@@ -190,7 +190,7 @@
         "limit": { "type": "number", "description": "The most items it draws." },
         "time": { "type": "json", "description": "A window each item is placed in, for a drawing along a time axis: { from, to }, as query flat's time (dates, today, or days from today as -6d or 7d)." },
         "view": { "type": "string", "description": "A view whose answer is items and links (such as usage), drawn in place of what a filter finds: then it needs no filter." },
-        "style": { "type": "json", "description": "How it is drawn: { shape, lit, style } (a built-in drawing, what stays lit, a style kept on the map by its id)." },
+        "style": { "type": "json", "description": "How it is drawn, held in the view: { shape, lit, style } (a built-in layout, what stays lit, a style or layout kept on the map by its id) and any style field that holds for this view alone, such as a grid's rows and labels. No code: that is a layout kept on the map." },
         "pins": { "type": "json", "description": "Items kept on it by hand, as a list of ids: drawn with what the filter finds." },
         "pinned": { "type": "boolean", "description": "Kept in sight by the owner: first on Home." },
         "preset": { "type": "string", "description": "The id of the pack's canvas this is the owner's version of.", "system": true },
@@ -1169,7 +1169,7 @@
       "id": "core.style_apply",
       "title": "Apply",
       "on": ["style"],
-      "pieces": [{ "piece": "button", "label": "Apply", "tip": "Draw this canvas in this style; Save keeps it", "draw": { "style": "{here}" } }]
+      "pieces": [{ "piece": "button", "label": "Use here", "tip": "Draw this view with this; Save keeps it", "draw": { "style": "{here}" } }]
     },
     {
       "form": "screen",

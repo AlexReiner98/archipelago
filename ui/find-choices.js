@@ -6,7 +6,7 @@
 // itself (a tag as a Tag; what a lens leaves out, a style say, as the Item alone, whose page opens over the canvas and
 // changes nothing); a View kept on the map by its name, which opens in the pane; the types and the links whose names
 // hold the words (a link to me). In Only and Not: the plain words, a Status, and all that Find takes. A word can only be checked of what is found, so Find offers none. In Walk: a link, out, in or either way,
-// or every link. In Limit: a number. In Style: a style kept, whose page opens (Apply is on it), and the shapes a drawing draws and the house's, which are no item and
+// or every link. In Limit: a number. In Style: a style or layout kept, whose page opens (Use here is on it), and the layouts the packs ship and the default, which are no item and
 // draw the canvas at once. Each choice says the change it makes, kept by id.
 
 import { api, notOf, state } from './base.js';
@@ -16,7 +16,7 @@ import { ARROW, isA, relations, titles, typeChoice, typeTitle, types, withWay } 
 
 /** The parts find can be in, by the word that puts it there. */
 export const MODES = ['Find', 'Only', 'Not', 'Walk', 'Limit', 'View', 'Style'];
-const MEANS = { Find: 'What adds to the canvas', Only: 'What must all hold of what Find finds', Not: 'What is left out of everything', Walk: 'The links followed from what Find finds', Limit: 'The most items drawn', View: 'A saved view to open', Style: 'A style on the map, or a drawing for the canvas' };
+const MEANS = { Find: 'What adds to the view', Only: 'What must all hold of what Find finds', Not: 'What is left out of everything', Walk: 'The links followed from what Find finds', Limit: 'The most items drawn', View: 'A saved view to open', Style: 'A layout for this view, or a style on the map' };
 
 const has = (name, q) => String(name ?? '').toLowerCase().includes(q.toLowerCase());
 const typeList = (q, most) => [...types.values()].filter((t) => !t.system && t.kind !== 'system' && has(t.title, q)).slice(0, most);
@@ -53,15 +53,15 @@ const viewsFound = async (q, most) => {
   return [...views, ...presets].slice(0, most).map((v) => ({ kind: 'View', label: v.title, note: '', title: `Open the view ${v.title}`, href: canvasAt(v) }));
 };
 /**
- * The styles kept, by name, each opening its own page, where Apply draws the canvas in it; and what draws without being
- * an item: the shapes the drawings draw (ui/look-switch.js offers them too) and the house's.
+ * The styles and layouts kept, by name, each opening its own page, where Use here draws this view in it; and what draws
+ * without being an item: the layouts the packs ship (ui/look-switch.js offers them too) and the default.
  */
 const stylesFound = async (q, most) => {
   const kept = await api('search', { ...(q && { q }), type: 'style', open: true, limit: most }).catch(() => []);
   const shapes = [{ shape: 'list', title: 'List' }, ...(state.schema?.shapes ?? [])].filter((s) => has(s.title, q)).map((s) => ({ title: s.title, style: { shape: s.shape } }));
   return [
-    ...kept.map((s) => ({ kind: 'Style', label: s.title, note: '', title: `Open the style ${s.title}`, page: s.id })),
-    ...[...shapes, ...(has('House', q) ? [{ title: 'House', style: {} }] : [])].map((s) => ({ kind: 'Drawing', label: s.title, note: '', title: `Draw this canvas in ${s.title}`, style: s.style })),
+    ...kept.map((s) => ({ kind: typeof s.props?.code === 'string' ? 'Layout' : 'Style', label: s.title, note: '', title: `Open ${s.title}`, page: s.id })),
+    ...[...shapes, ...(has('Default', q) ? [{ title: 'Default', style: {} }] : [])].map((s) => ({ kind: 'Layout', label: s.title, note: '', title: `Draw this view in ${s.title}`, style: s.style })),
   ].slice(0, most);
 };
 

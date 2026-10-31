@@ -11,7 +11,7 @@ import { keptOf } from './lens-kept.ts';
 import { readSteps, stepIds } from './lens-steps.ts';
 import type { Fact } from './log.ts';
 import type { Archipelago } from './pelago.ts';
-import { drawn, styleFor } from './styles.ts';
+import { drawn, ownStyle, styleFor } from './styles.ts';
 
 const ITEM = /^e_[a-z0-9]{8}$/;
 /** The type a view is kept as. */
@@ -32,8 +32,8 @@ export function keptLens(props: Props) {
 export const isKept = (l: Archipelago, type: string) => l.registry.isA(type, KEPT);
 
 /**
- * The picture of a kept view: the flat lens's answer, and the style it is drawn in (the presets, the workspace's, a
- * style about this view, the one it names, with its own shape and lit over them), with the drawing that style names;
+ * The picture of a kept view: the flat lens's answer, and the style it is drawn in (the presets, the workspace's, its
+ * own layout and settings, the style it names), with the drawing that style names;
  * and its steps, with what they name sent even where the filter leaves it out (a part that is gone is told of).
  */
 export async function keptPicture(l: Archipelago, id: string, have?: unknown) {
@@ -41,8 +41,7 @@ export async function keptPicture(l: Archipelago, id: string, have?: unknown) {
   if (!item || !isKept(l, item.type)) throw new Error(`"${id}" is not a view kept on the map`);
   const own = (item.props.style ?? {}) as Props;
   const named = typeof own.style === 'string' ? own.style : undefined;
-  const { style } = await styleFor(l, await keptOf(l, 'style', named), { view: id, ...(named && { named }) });
-  for (const key of ['shape', 'lit']) if (typeof own[key] === 'string') style[key] = own[key];
+  const { style } = await styleFor(l, await keptOf(l, 'style', named), { view: id, own: ownStyle(own), ...(named && { named }) });
   const lens = keptLens(item.props);
   let answer = await flatLens(l, lens);
   const steps = item.props.steps === undefined ? undefined : readSteps(item.props.steps);

@@ -18,7 +18,8 @@ export async function keptOf(l: Archipelago, type: 'lens' | 'style', named: unkn
     `select id, title, ${l.props} from entity where type = any($1::text[]) and archived_at is null and (is_open or id = $2) order by updated_at, id`,
     [l.registry.family(type), typeof named === 'string' ? named : null],
   );
-  if (typeof named === 'string' && !rows.some((r) => r.id === named)) throw new Error(`No ${type} "${named}"`);
+  // One archived is left out, and what named it falls back; only a name never kept is refused.
+  if (typeof named === 'string' && !rows.some((r) => r.id === named) && !(await l.entity(named))) throw new Error(`No ${type} "${named}"`);
   const { rows: links } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'about' and valid_to is null and from_id = any($1::text[])`, [rows.map((r) => r.id)]);
   return rows.map((r) => ({ ...r, about: links.filter((link) => link.from_id === r.id).map((link) => link.to_id) }));
 }

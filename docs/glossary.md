@@ -72,11 +72,14 @@ has no owner, a view no confidence. A value longer than 4000 characters is
 refused unless its field is declared `"large": true`, which only a type of the
 system kind may do: a drawing's code, a story's steps, a stylesheet.
 
-**view.** A named way of looking at part of the map: a **lens** (what is in
-it: a filter, of terms that add seeds and terms that must all hold of them,
-a walk along links and a limit; `src/lens-flat.ts`)
-drawn in a **style** (how it looks; `src/styles.ts`). Both are items, so a
-view is kept on the map and changed like anything else. Replaces *picture*
+**view.** A named way of looking at part of the map: a **query** (what is on
+it, called the lens in the code: a filter, of terms that add seeds and terms
+that must all hold of them, a walk along links and a limit;
+`src/lens-flat.ts`) and a **layout** (how it is arranged, called a drawing in
+the code), with the settings of that layout, all held in the view. A **style**
+says how things look (`src/styles.ts`) and is about nothing; a style with code
+of its own is a layout kept on the map. A view is an item, so it is kept on
+the map and changed like anything else. Replaces *picture*
 where a picture meant this (an *image* is a picture file, such as a test's
 screenshot). The read tools a pack declares (`views` in a pack file) are
 also called views; one declared with a `lens` is answered by a read of the

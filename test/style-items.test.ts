@@ -59,8 +59,8 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
       assert.equal(await page.evaluate(`document.querySelector('#query .q-look').value`), '', 'the switch still says the house’s');
 
       // Apply stands in the page's head, says what it does, and draws the canvas in the style as the switch does.
-      assert.ok(await until(`${button}?.textContent === 'Apply'`), 'the style’s page offers Apply');
-      assert.match(await page.evaluate<string>(`${button}.title`), /Draw this canvas in this style/);
+      assert.ok(await until(`${button}?.textContent === 'Use here'`), 'the style’s page offers Apply');
+      assert.match(await page.evaluate<string>(`${button}.title`), /Draw this view with this/);
       assert.ok(await page.evaluate(`${button}.nextElementSibling === document.querySelector('#sheet .walk-from') || !document.querySelector('#sheet .walk-from')`), 'beside Walk from it');
       await page.evaluate(`${button}.click()`);
       assert.ok(await until(applied(made.s)), `Apply draws the canvas in it: ${await page.evaluate('location.hash')}`);
@@ -73,35 +73,25 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     }
     await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 
-    // A style about one item is that item's: the switch does not offer it, find still does, and Apply puts it in the
+    // The switch lists layouts: a style with code is one, and any other style is reached by find; Use here puts it in the
     // switch while it is drawn.
     const own = (await call('/api/change', undefined, {
       reason: 'test',
       ops: [
         { op: 'create', ref: 'o', type: 'style', title: 'Slab section look', props: { shape: 'list' } },
-        { op: 'link', type: 'about', from: 'o', to: made.t },
+        { op: 'create', ref: 'k', type: 'style', title: 'Board layout', props: { code: 'export default function draw() {}' } },
       ],
     })).result.created as Record<string, string>;
-    // One about an archived view belongs to nothing any more, so it is a choice again.
-    const gone = (await call('/api/change', undefined, {
-      reason: 'test',
-      ops: [
-        { op: 'create', ref: 'v', type: 'lens', title: 'An old view', props: { filter: { find: [`id ${made.t}`] } } },
-        { op: 'create', ref: 's', type: 'style', title: 'Freed board', props: { shape: 'list' } },
-        { op: 'link', type: 'about', from: 's', to: 'v' },
-      ],
-    })).result.created as Record<string, string>;
-    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'archive', id: gone.v }] });
     await page.evaluate(`location.reload()`);
     const options = `[...document.querySelectorAll('#query .q-look option')].map((o) => o.textContent)`;
-    assert.ok(await until(`${options}.includes('Harbour blueprint')`), 'the switch offers a style about nothing');
-    assert.ok(await page.evaluate(`${options}.includes('Freed board')`), 'and one about an archived view');
-    assert.ok(!(await page.evaluate(`${options}.includes('Slab section look')`)), 'and not one about an item');
+    assert.ok(await until(`${options}.includes('Board layout')`), 'the switch offers a layout kept on the map');
+    assert.ok(!(await page.evaluate(`${options}.includes('Slab section look')`)), 'and no style');
+    assert.equal(await page.evaluate(`document.querySelector('#query .q-look').selectedOptions[0].textContent`), 'Default', 'and a layout draws only where it is chosen');
     await type('style slab');
     assert.ok(await until(`Boolean(${choice('Style', 'Slab section look')})`), `find still lists it: ${await page.evaluate(`${list}.textContent`)}`);
     await take('Style', 'Slab section look');
     assert.ok(await until(onPage(own.o)), 'its page opens');
-    assert.ok(await until(`${button}?.textContent === 'Apply'`), 'with Apply');
+    assert.ok(await until(`${button}?.textContent === 'Use here'`), 'with Use here');
     await page.evaluate(`${button}.click()`);
     assert.ok(await until(`document.querySelector('#query .q-look')?.value === 'style:${own.o}'`), 'and the switch says what is drawn');
     await page.evaluate(`location.reload()`);
@@ -116,8 +106,8 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     assert.ok(!(await page.evaluate(applied(made.s))), 'nothing applied');
     await shut();
     await type('style list');
-    assert.ok(await until(`Boolean(${choice('Drawing', 'List')})`), 'a drawing is offered under Style');
-    await take('Drawing', 'List');
+    assert.ok(await until(`Boolean(${choice('Layout', 'List')})`), 'a drawing is offered under Style');
+    await take('Layout', 'List');
     assert.ok(await until(`${hash}.get('shape') === 'list'`), `a drawing draws: ${await page.evaluate('location.hash')}`);
     await shut();
     assert.ok(await until(`!${hash}.has('shape')`), 'back to the house’s');

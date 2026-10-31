@@ -103,13 +103,22 @@ carries meaning; a grouping that matters is made as a link.
 A pack ships saved canvases as presets (a `styles` entry of `type: "lens"`,
 decision e_x8bghuce): the picker and Home list each until the owner saves
 their own version, which names it (`preset`) and stands in its place.
-A style is the pane's (decision e_tqr9cxdc): editing the lens keeps it,
-opening a saved canvas brings its own, and Save keeps both. The view band
-switches it beside the canvas (`ui/look-switch.js`); the band's ⋯ holds
+Four things make a view (decision e_47pjkbxb): a query says what is on it (the
+lens above), a layout how it is arranged (a drawing a pack ships, or a style
+with code kept on the map), a style how it looks, and the view is a name for
+a query and a layout with its settings, which it holds itself (`style` on the
+item): nothing reaches into it by a link, and a style is about nothing. Looks
+stack in one line: the packs', the workspace's, the view's, then a person's own
+colours. What moved from the styles made for one view is `src/style-move.ts`.
+A layout is the pane's: editing the query keeps it, opening a saved view
+brings its own. The view band switches it (`ui/look-switch.js`), which lists
+layouts and nothing else. A change in a pane is a draft: Save is marked and
+writes it to the view, and Save as new view makes another. The band's ⋯ holds
 Arrange, Fit and Snap for the main canvas (decision e_yxp78scv). Find never
-draws in a style it names: it finds the style as an item, whose page opens
-over the canvas, and Apply there, a button its type declares on a screen
-(`docs/packs.md`), does what the switch does (task e_q3yfvnz7).
+draws in a style it names: it finds it as an item, whose page opens over the
+canvas, and Use here there, a button its type declares on a screen
+(`docs/packs.md`), does what the switch does (task e_q3yfvnz7). Deleting a
+layout or style says which views use it; they go to the default.
 - `test/saved-canvases.test.ts`: "in a browser, a canvas is saved from the
   bar, listed on Home, opened and switched to, its places its own".
 - `test/style-items.test.ts`: "in a browser, find opens a style’s page and

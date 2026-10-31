@@ -32,7 +32,10 @@ interface Version {
 /** What a picture or page is drawn for: the item it is of (and its type), the view drawn, a style named outright. */
 export interface StyleAsk {
   hub?: { id: string; type: string };
+  /** The view drawn: a style made about it since the move into views still draws it, until such styles are refused. */
   view?: string;
+  /** What a view holds of how it is drawn (ownStyle): over everything but a style named outright. */
+  own?: Record<string, unknown>;
   named?: unknown;
   /** The person the page is drawn for: their own style's colours lie over everything. */
   person?: string;
@@ -48,6 +51,12 @@ async function versionsOf(l: Archipelago): Promise<Version[]> {
 
 const fields = (props: Record<string, unknown>) => Object.fromEntries(Object.entries(props).filter(([key, value]) => value != null && key !== 'preset' && key !== 'on'));
 const listed = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
+
+/** What a view holds of how it is drawn: its layout and settings. A style it names is said apart, and code runs only from a style kept on the map. */
+export const ownStyle = (own: unknown): Record<string, unknown> => {
+  const { style: _named, canvas: _canvas, code: _code, modules: _modules, writes: _writes, preset: _preset, on: _on, ...settings } = (own ?? {}) as Record<string, unknown>;
+  return settings;
+};
 
 /** The style a picture or page is drawn in, and what went into it, the nearest last. `kept` is every open style on the map, with what each is about. */
 export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, given?: Version[]): Promise<{ style: Record<string, unknown>; used: { id: string; title: string; preset?: string }[]; coder?: string }> {
@@ -74,10 +83,12 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, give
   for (const one of kept) {
     if (one.props.preset != null) continue;
     const on = listed(one.props.on);
-    const weight = one.id === ask.named ? 6 : ask.view !== undefined && one.about.includes(ask.view) ? 5 : ask.hub !== undefined && one.about.includes(ask.hub.id) ? 4 : on.length ? (onIt(on) ? 3 : -1) : one.about.length ? -1 : 1;
+    // A style with code of its own is a layout: it draws only where it is named, never as the workspace's.
+    const weight = one.id === ask.named ? 6 : ask.view !== undefined && one.about.includes(ask.view) ? 4.5 : ask.hub !== undefined && one.about.includes(ask.hub.id) ? 4 : on.length ? (onIt(on) ? 3 : -1) : one.about.length || typeof one.props.code === 'string' ? -1 : 1;
     if (weight >= 0) layers.push({ weight, id: one.id, title: one.title, props: one.props });
     if (ask.person !== undefined && one.about.includes(ask.person) && one.props.theme != null) layers.push({ weight: 7, id: one.id, title: one.title, props: { theme: one.props.theme } });
   }
+  if (ask.own) layers.push({ weight: 5, id: 'view', title: 'This view', props: ask.own });
   layers.sort((a, b) => a.weight - b.weight);
   let style: Record<string, unknown> = {};
   for (const layer of layers) style = over(style, fields(layer.props));
@@ -107,7 +118,7 @@ export async function withStyles<T extends { styles: Preset[] }>(l: Archipelago,
 
 /**
  * The style a page is drawn in: of one item (its kind's, then its own), or the workspace's, under a style kept on the
- * map when one is named (`style`), and a style kept about a view kept on the map when it is drawn (`view`). What the item page, the pages that are not pictures and the canvas read; asked
+ * map when one is named (`style`), and what a view kept on the map holds when it is drawn (`view`). What the item page, the pages that are not pictures and the canvas read; asked
  * with `have` (the drawings' hashes the page holds), with the drawing it names, as a lens answer's style is.
  */
 export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: unknown; view?: unknown; have?: unknown; try?: unknown; shape?: unknown }, forPerson = true) {
@@ -119,10 +130,9 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: u
   // The person it is drawn for: the one signed in, or on a map nobody signs in to, its owner.
   const person = !forPerson ? undefined : l.viewer === undefined ? await l.setting<string>('me') : l.viewer || undefined;
   const tried = typeof input.try === 'string' ? input.try : undefined;
-  const read = await styleFor(l, await keptOf(l, 'style', named), { ...(item && { hub: item }), ...(view && { view }), ...(named && { named }), ...(person && { person }), ...(tried && { try: tried }) });
-  // A view kept on the map draws in the shape it keeps, lights what it says and orders its rows as it says, over every style.
-  const own = view === undefined ? undefined : ((await l.entity(view))?.props.style as Record<string, unknown> | undefined);
-  for (const key of ['shape', 'lit', 'order']) if (typeof own?.[key] === 'string') read.style[key] = own[key];
+  // A view kept on the map holds its own layout and settings, over every style but one named outright.
+  const own = view === undefined ? undefined : ownStyle((await l.entity(view))?.props.style);
+  const read = await styleFor(l, await keptOf(l, 'style', named), { ...(item && { hub: item }), ...(view && { view }), ...(own && { own }), ...(named && { named }), ...(person && { person }), ...(tried && { try: tried }) });
   // The shape the reader chose for this view (the view band's switch) over that, so its drawing comes with it.
   if (typeof input.shape === 'string' && input.shape) read.style.shape = input.shape;
   return input.have === undefined ? read : { ...read, style: await drawn(l, read.style, input.have) };

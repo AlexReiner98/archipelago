@@ -51,7 +51,6 @@ export interface SearchInput {
   status?: string;
   owner?: string;
   open?: boolean;
-  about?: boolean;
   include_archived?: boolean;
   limit?: number;
 }
@@ -82,7 +81,6 @@ export async function search(db: Q, family: (type: string) => string[], input: S
     if (input.status) add(`status = ?`, input.status);
     if (input.owner) add(`owner = ?`, input.owner);
     if (input.open !== undefined) add(`is_open = ?`, input.open);
-    if (input.about !== undefined) where.push(`${input.about ? '' : 'not '}exists (select 1 from relation r join entity t on t.id = r.to_id where r.from_id = entity.id and r.type = 'about' and r.valid_to is null and t.archived_at is null)`);
     if (!input.include_archived) where.push(`archived_at is null`);
     params.push(Math.min(input.limit ?? 25, 200));
     const { rows } = await db.query<Entity>(

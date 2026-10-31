@@ -207,7 +207,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     host.dispatchEvent(new CustomEvent('lens-answer'));
     if (quiet) (host.closest('.lens-card') ?? host).hidden = !answer.items.length;
     if (!answer.items.length && quiet) return;
-    if (!answer.items.length) return (body.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw with this lens.')), saidDrawn(body, 'empty'));
+    if (!answer.items.length) return (body.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw with this query.')), saidDrawn(body, 'empty'));
     for (const name of Object.keys(chosen)) delete chosen[name];
     Object.assign(chosen, look.style, keptStyle(key), style, { noLit: true });
     dress(body, chosen);
