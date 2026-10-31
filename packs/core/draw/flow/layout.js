@@ -61,7 +61,7 @@ function laidOut({ items: given, links: told = [], undrawn = [], headless = ['pa
   const every = [...chains, ...ties];
   const a = new Map([...nodes.keys()].map((id) => [id, new Set()]));
   for (const w of every) if (w.a !== w.b && a.has(w.a) && a.has(w.b)) (a.get(w.a).add(w.b), a.get(w.b).add(w.a));
-  const ways = directions(chains, ties, headless), hangs = hangsOf({ a, ways, nodes, sizes, gap, z }), { core, block } = hangs;
+  const ways = directions(chains, ties, headless), hangs = hangsOf({ a, ways, nodes, sizes, gap, z, aspect }), { core, block } = hangs;
   const how = { block, stepSize, ways, z, even: nodes.size <= sizes.plane_rows_most, rowsLinks: sizes.plane_rows_links, total: core.length };
   let threaded = 0;
   const shelves = partsOf(core, a).map((list) => {

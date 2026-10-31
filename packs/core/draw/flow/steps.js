@@ -1,7 +1,7 @@
 // The steps of a picture: each item a box of its size, as the flow sizes them, the order's wires between them, and a choice
 // nothing follows yet as a step of its own. Pure: an answer in, steps and wires out.
 
-import { acyclic, ORDER, QUIET } from './graph.js';
+import { acyclic, ORDER, QUIET, reduced } from './graph.js';
 import { lines } from './lines.js';
 
 const need = (set, name) => {
@@ -18,7 +18,7 @@ export function stepsOf({ items, links, measure, sizes }) {
   const seen = new Set();
   let edges = [];
   for (const l of links) if (l.type === ORDER && !seen.has(`${l.to} ${l.from}`)) (seen.add(`${l.to} ${l.from}`), edges.push({ a: l.to, b: l.from, ...(l.says && { says: l.says }), ...(l.pending && { pending: l.pending }) }));
-  edges = acyclic(edges, [...nodes.keys()]);
+  edges = reduced(acyclic(edges, [...nodes.keys()]));
   const open = [...nodes.values()].filter((n) => n.shape === 'diamond' && n.item.open);
   for (const d of open) {
     const taken = new Set(edges.filter((e) => e.a === d.id).map((e) => e.says));
