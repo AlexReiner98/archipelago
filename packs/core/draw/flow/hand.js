@@ -38,7 +38,9 @@ export function putByHand({ placed, nodes, x, y, every, routes, rigid, holder, l
     const carried = had && had.to === undefined && !hand.has(holder(w.a) === w.a ? w.b : w.a) && hand.has(holder(w.a));
     if (hand.has(w.a) || hand.has(w.b) ? carried : !had || had.to === undefined || ![...hand].some((id) => through(had.points, boxOf(id)))) continue;
     const from = had?.from ?? w.a, to = from === w.a ? w.b : w.a, others = boxes.filter((b) => b.id !== w.a && b.id !== w.b);
-    const r = { ...had, from, to, a: from, b: to, points: (w.path ? route : tieRoute)(boxOf(from), boxOf(to), lead, others) };
+    const line = (w.path ? route : tieRoute)(boxOf(from), boxOf(to), lead, others), near = (p, id) => Math.abs(p[0] - x.get(id)) + Math.abs(p[1] - y.get(id));
+    // A tie is drawn from whichever end stands higher: the line here runs from the one it is kept from.
+    const r = { ...had, from, to, a: from, b: to, points: near(line[0], from) > near(line[0], to) ? [...line].reverse() : line };
     routes.set(k, r);
     stand(from);
     stand(to);
