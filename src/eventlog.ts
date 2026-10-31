@@ -108,7 +108,9 @@ async function expand(db: Q, found: Group[]): Promise<Omit<LoggedEvent, 'target_
     { id: h.id, field: 'reason', value: h.head.reason, i, basis: false },
     ...(h.head.authority?.basis !== undefined ? [{ id: h.id, field: 'basis', value: h.head.authority.basis, i, basis: true }] : []),
   ]));
-  for (const w of words) if (w.basis) heads[w.i].head.authority = { ...heads[w.i].head.authority, basis: w.value }; else heads[w.i].head.reason = w.value;
+  // Words that stay a digest are gone, or not this reader's: an event says nothing there, never the digest.
+  const text = (v: unknown) => (typeof v === 'string' ? v : undefined);
+  for (const w of words) if (w.basis) heads[w.i].head.authority = { ...heads[w.i].head.authority, basis: text(w.value) }; else heads[w.i].head.reason = text(w.value);
   const entries = new Map(heads.map((h) => [h.pos, h]));
   const said = new Map<string, FactRow[]>();
   for (const f of facts) said.set(`${f.pos} ${f.id}`, [...(said.get(`${f.pos} ${f.id}`) ?? []), f]);
