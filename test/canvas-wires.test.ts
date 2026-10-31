@@ -113,3 +113,22 @@ test('in a browser, opening a step keeps the canvas still and lights it, and a h
     await page.close();
   }
 });
+
+test('in a browser, a change that only makes an item is drawn when it is all that is held, and its row opens its sheet', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base, call } = await serve('off');
+  await call('/agent/change', undefined, { actor: 'robot', reason: 'held alone', ops: [{ op: 'create', type: 'task', title: 'Nothing else held' }] });
+  const page = await open(`${base}/#/v?find=held&shape=list`);
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const until = async (expression: string, ms = 20000) => {
+    for (const end = Date.now() + ms; Date.now() < end; await wait(50)) if (await page.evaluate(expression)) return true;
+    return false;
+  };
+  try {
+    const row = `[...document.querySelectorAll('#canvas a')].find((a) => a.textContent.includes('Nothing else held'))`;
+    assert.ok(await until(`Boolean(${row})`), `drawn, though the query finds nothing yet: ${await page.evaluate("document.querySelector('#canvas')?.innerText")}`);
+    await page.evaluate(`${row}.click()`);
+    assert.ok(await until(`Boolean(document.querySelector('#sheet .held-band'))`, 5000), `its sheet holds the band: ${await page.evaluate('location.hash')}`);
+  } finally {
+    await page.close();
+  }
+});

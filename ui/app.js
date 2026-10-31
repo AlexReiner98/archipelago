@@ -22,6 +22,8 @@ import { startTips } from './tip.js';
 import { workspace } from './workspace.js';
 
 /** The pages the sheet holds, by the name in their address. */
+/** The address of an item a held change would make, as a drawing links it (ui/ghosts.js). */
+const GHOST = /^p_[a-z0-9]+:/;
 const SHEET = { e: 'item', held: 'item', new: 'item', s: 'screen', workspace: 'workspace', you: 'you' };
 const sheet = document.getElementById('sheet');
 startTips();
@@ -72,8 +74,8 @@ async function route(pulse = false) {
   if (main.firstElementChild?.dataset.part !== page) main.replaceChildren(h('div', { class: 'part', 'data-part': page }));
   const draw = {
     item: () =>
-      name === 'held'
-        ? heldPage(arg)
+      name === 'held' || GHOST.test(arg)
+        ? heldPage(arg.split(':')[0])
         : name === 'e'
         ? entity(arg, params.get('here') ?? undefined)
         : newItem(part('item'), { type: arg ?? workType(), title: params.get('title') ?? '', types, choices: [types.get(workType()), ...state.schema.types.filter((t) => t.id !== workType())].filter((t) => t && !t.dormant && !t.retired && !t.system && t.kind !== 'system' && !t.id.startsWith('sys.')).map((t) => ({ id: t.id, label: typeChoice(t) })) }),
