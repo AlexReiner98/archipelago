@@ -8,7 +8,7 @@
 // whose fonts differ sees names fit a little otherwise until the drawing lays them out with their own.
 
 import { pathToFileURL } from 'node:url';
-import { packDrawing } from './drawings.ts';
+import { packLayout } from './layouts.ts';
 import type { Archipelago } from './pelago.ts';
 import { OTHER, WIDTHS } from './text-widths.ts';
 
@@ -20,7 +20,7 @@ const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value ?? null));
 
 /** The scene a drawing opens on, given what the page would give it; null when it cannot be had here. */
 export async function openingScene(entry: string, frozen: Frozen, types: Record<string, string> = {}, words: { fields?: Record<string, Record<string, string[]>>; relations?: Record<string, string> } = {}) {
-  // What the page gives a drawing on a published page (ui/doc-lens.js, ui/drawing.js): the answer without its style,
+  // What the page gives a drawing on a published page (ui/doc-lens.js, ui/layout.js): the answer without its style,
   // and the style held still, without its code.
   const { style = {}, first: _first, ...answer } = frozen;
   const { drawing: _drawing, code: _code, ...fields } = { ...style, noLit: true, still: true } as Record<string, unknown>;
@@ -35,12 +35,12 @@ export async function openingScene(entry: string, frozen: Frozen, types: Record<
 export async function framesFor(l: Pick<Archipelago, 'registry'>, lenses: Record<string, Frozen>) {
   for (const frozen of Object.values(lenses)) {
     const sent = frozen.style?.drawing as { id?: string; hash?: string } | undefined;
-    const own = sent?.id ? packDrawing(l.registry, sent.id) : undefined;
+    const own = sent?.id ? packLayout(l.registry, sent.id) : undefined;
     if (!own?.entry || own.hash !== sent?.hash) continue;
     // The titles of the types it holds, as the page would give them.
     const held = new Set(((frozen.items as { type?: string; root?: string }[] | undefined) ?? []).flatMap((i) => [i.type, i.root]).filter((t): t is string => Boolean(t)));
     const types = Object.fromEntries([...held].map((t) => [t, l.registry.type(t)?.title ?? t]));
-    // The values each type's fields may take, and each link's title, as the page would give them (ui/drawing.js).
+    // The values each type's fields may take, and each link's title, as the page would give them (ui/layout.js).
     const items = (frozen.items as { type?: string }[] | undefined) ?? [];
     const fields = Object.fromEntries(
       [...new Set(items.map((i) => i.type).filter((t): t is string => Boolean(t)))]

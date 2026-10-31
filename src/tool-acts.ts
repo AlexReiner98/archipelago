@@ -34,7 +34,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
   },
   show: {
     description:
-      'Answer the human with a drawing on their canvas: a kept view (entity: a lens item, a saved canvas) or a lens and style of your own, or open an item\'s page or the workspace. ' +
+      'Answer the human with a view on their canvas: a kept view (entity: a view (type lens), a saved canvas) or a query and layout of your own, or open an item\'s page or the workspace. ' +
       'It lands within a couple of seconds in a pane of your session’s own on each page of theirs that is open, beside the pane they are in, which it never takes. The answer says how many of their pages are open and how many take your shows (pages). Add a short note saying what they are looking at. ' +
       'A change moves nothing on their page: show what is worth watching. ' +
       'With look: true, the answer also carries the picture of it, as an image: drawn by the server as you see the map, whether or not a page of theirs is open (query look takes one without moving their page).',
@@ -87,7 +87,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => l.release(actor, input),
   },
   places_put: {
-    description: 'Put things where they stand on one canvas, a batch of moves in one call: each item’s middle as [x, y] in the picture’s own units, or null to let the drawing lay it again; clear: true forgets every place on the canvas first. Never a fact about the work: kept in the places stream, newest per canvas and item. Takes effect at once.',
+    description: 'Put things where they stand on one canvas, a batch of moves in one call: each item’s middle as [x, y] in the picture’s own units, or null to let the layout lay it again; clear: true forgets every place on the canvas first. Never a fact about the work: kept in the places stream, newest per canvas and item. Takes effect at once.',
     input: {
       canvas: z.string().optional().describe("The canvas: the id of the item it is drawn from; the workspace's (or nothing) for the whole map."),
       moves: z.record(z.string(), z.tuple([z.number(), z.number()]).nullable()).optional().describe('By item id: where its middle now is, or null.'),
@@ -158,7 +158,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
   },
   picture_put: {
     description:
-      'Keep an image for one item: the screenshot a test drew, for its test result, or a figure for a note or file, which a document that brings the note in shows above its text, or a still of a lens, which a link to a document shows where the app draws the lens live. A test result\u2019s only when the result is shown in public: until then the image stays in the repository it was made in, and the result says where (its `picture` field). One image per item, PNG, JPEG or WebP, 1 MB at most; sent again it replaces what was kept, and when a test is run again (test_report) what was kept for its result is removed. Takes effect at once.',
+      'Keep an image for one item: the screenshot a test drew, for its test result, or a figure for a note or file, which a document that brings the note in shows above its text, or a still of a query, which a link to a document shows where the app draws the query live. A test result\u2019s only when the result is shown in public: until then the image stays in the repository it was made in, and the result says where (its `picture` field). One image per item, PNG, JPEG or WebP, 1 MB at most; sent again it replaces what was kept, and when a test is run again (test_report) what was kept for its result is removed. Takes effect at once.',
     input: {
       result: z.string().describe('The id of the test result, or of the note or file the figure belongs to.'),
       data: z.string().min(1).describe('The file, as base64.'),

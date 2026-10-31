@@ -9,12 +9,13 @@
 
 import { api, h, hooks, state } from './base.js';
 import { activate, canvasIn, focusOn } from './canvas.js';
-import { canvasLens } from './canvases.js';
-import { flatQuery, readFlatLens } from './lens.js';
-import { numberOf } from './lens-base.js';
+import { viewParts } from './canvases.js';
+import { addressOf, readAddress } from './query.js';
+import { numberOf } from './query-base.js';
 import { dragPane, sashes } from './pane-drag.js';
 import { heard, nameOf } from './pane-route.js';
 import { filterSaid } from './query-bar.js';
+import { sheetAside } from './sheet-follow.js';
 import { asPane, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId } from './tabs.js';
 import { titles } from './words.js';
 
@@ -34,14 +35,14 @@ const dirNow = () => (front().dir === 'row' && innerWidth < innerHeight ? 'colum
 /** The lens and style a pane's address names (no lens for Home): a saved canvas named alone is read from the map. */
 async function lensOf(at) {
   const [where, query = ''] = at.split('?');
-  const asked = readFlatLens(query);
+  const asked = readAddress(query);
   // A saved canvas is named by its title, read from the map when the page does not know it yet.
   if (asked.style.canvas && !titles.has(asked.style.canvas) && asked.lens) await api('get', { id: asked.style.canvas }).then((got) => titles.set(got.entity.id, got.entity.title), () => {});
   if (asked.lens) return asked;
   if (asked.style.canvas) {
     const got = await api('get', { id: asked.style.canvas });
     titles.set(got.entity.id, got.entity.title);
-    return canvasLens(got.entity);
+    return viewParts(got.entity);
   }
   const id = /^e\/(e_[a-z0-9]{8})/.exec(where)?.[1];
   return id ? { lens: focusOn(id), style: {}, here: id } : { lens: null, style: {} };
@@ -52,7 +53,7 @@ export function paneAt(at) {
   const [where, query = ''] = bare.split('?');
   const item = /^e\/(e_[a-z0-9]{8})$/.exec(where)?.[1];
   if (!item) return bare;
-  return `v?${readFlatLens(query).lens ? query : flatQuery(focusOn(item), {})}`;
+  return `v?${readAddress(query).lens ? query : addressOf(focusOn(item), {})}`;
 }
 
 /** The panes drawn now, by id: { el, body, name, mark, canvas, at, here }. */
@@ -68,12 +69,12 @@ function paneEl(id) {
   const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, grip, name, mark, button('Move this pane to a new tab', '⧉', () => hooks.paneToTab?.(id)), button('Close this pane', '×', () => close(id))), body);
   for (const handle of [grip, name]) handle.addEventListener('pointerdown', (ev) => dragPane(ev, id, el, { groups: groupEls, drop }));
   const canvas = canvasIn(body, {
-    go: (lens) => goPane(id, lens ? `v?${flatQuery(lens, canvas.asked)}` : 'v'),
+    go: (lens) => goPane(id, lens ? `v?${addressOf(lens, canvas.asked)}` : 'v'),
     open: (href) => goPane(id, paneAt(href)),
     // A click on an item: this pane is the one in focus, its lens as it was, the item's page open over it.
     opened: (item, lens) => {
       activeIs(id);
-      location.hash = `#/e/${item}?${flatQuery(lens, canvas.asked)}`;
+      location.hash = `#/e/${item}?${addressOf(lens, canvas.asked)}`;
     },
   });
   const entry = { el, body, name, mark, canvas, at: null, here: undefined };
@@ -217,7 +218,7 @@ export function markPanes() {
 /** The history of the pane the bar acts on. */
 const historyNow = () => front().panes[active] ?? freshPane('#/');
 
-// ---- Drawing the tab in sight: each pane put in its frame by its share.
+// ---- Layout the tab in sight: each pane put in its frame by its share.
 
 const host = document.getElementById('canvas');
 const groupEls = () => front().groups.map((g) => [g, drawn.get(g)?.el]).filter(([, el]) => el);
@@ -228,9 +229,9 @@ export function draw() {
   for (const [id, entry] of drawn) if (layout.panes[id]?.at !== entry.at) load(id, layout.panes[id].at);
   const dir = dirNow();
   host.dataset.dir = dir;
-  // Several panes share the room left of an open sheet, so none is behind it; one alone stays under it, as it was.
-  const sheet = document.getElementById('sheet');
-  const aside = layout.groups.length > 1 && document.body.dataset.sheet === 'open' && sheet.offsetWidth < innerWidth * 0.8 ? sheet.offsetWidth / innerWidth : 0;
+  // The panes share the room left of an open sheet, one alone too, so whatever a pane draws stands beside the sheet and
+  // none of it behind: this is the one place a canvas gives way to it.
+  const aside = sheetAside();
   const room = 1 - aside;
   let from = 0;
   frames = layout.groups.map((g, n) => {
@@ -241,7 +242,8 @@ export function draw() {
   });
   for (const [g, box] of frames) {
     const el = drawn.get(g)?.el ?? paneEl(g);
-    for (const side of ['left', 'right', 'top', 'bottom']) el.style[side] = layout.groups.length > 1 ? edge(side, box[side]) : '';
+    // One alone fills the page under the bars, but for the sheet's room.
+    for (const side of ['left', 'right', 'top', 'bottom']) el.style[side] = layout.groups.length > 1 || (side === 'right' && aside) ? edge(side, box[side]) : '';
     if (el.parentNode !== host) host.append(el);
   }
   // In the order they stand, so a reader's tab order and a test's first pane are the leftmost; moved only when out of
@@ -327,7 +329,7 @@ addEventListener('resize', () => {
   if (started && host.dataset.dir !== dir) ((host.dataset.dir = dir), draw());
 });
 // The sheet opening or shutting changes the room the panes share.
-new MutationObserver(() => started && front().groups.length > 1 && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
+new MutationObserver(() => started && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
 
 /** The query bar's own for the pane it acts on, the same in every pane: back and forth (dimmed with nowhere to go) and split. Each pane's move and close stay in its strip. */
 export function paneButtons() {

@@ -21,8 +21,8 @@ kernel's page (`ui/canvas.js`, `ui/app.js`) holds no look of its own.
 ## Using it as a template
 
 A pack that changes how the map looks has a `pack.json` that `requires`
-core, and its `styles`. One that draws a new form adds `drawings` (its
+core, and its `styles`. One that draws a new form adds `layouts` (its
 modules, entered at `index.js`, with tests run with no page), as
-`packs/core/draw/flow/` is: see `docs/drawings.md`. Check a drawing in a real
+`packs/core/layouts/flow/` is: see `docs/layouts.md`. Check a drawing in a real
 browser before you push. The browser pane will not load the sandbox, so use
 headless Chrome (`test/browser.ts`).

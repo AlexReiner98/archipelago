@@ -6,7 +6,7 @@ import { readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const DAY = 86_400_000;
-/** What is kept there on purpose, for later runs and for servers (src/db.ts, src/drawings.ts), and a server's Chrome (src/chrome.ts sweeps those). */
+/** What is kept there on purpose, for later runs and for servers (src/db.ts, src/layouts.ts), and a server's Chrome (src/chrome.ts sweeps those). */
 const KEPT = /^pelago-(blank-|drawings$|look-)/;
 /** A drawing laid out by its hash is laid out again when it is next asked for, so an old one costs nothing to lose. */
 const DRAWING_DAYS = 30;

@@ -7,7 +7,7 @@ import type { ServerResponse } from 'node:http';
 import type { Part } from './documents.ts';
 import { GUARD, POLICY, READER_POLICY } from './public-document.ts';
 import { listen } from './published-live.ts';
-import { drawingCode, pageData, pictureAt, publishedPage, shareOf } from './published-page.ts';
+import { layoutCode, pageData, pictureAt, publishedPage, shareOf } from './published-page.ts';
 import { publishedDocument, publishedPicture } from './published.ts';
 import { publicPage, publicPicture } from './public.ts';
 import { siteHref, siteNav } from './site.ts';
@@ -55,7 +55,7 @@ export async function servePublic(res: ServerResponse, match: { workspace: strin
   if (what === 'live') return doc ? listen(res, workspace, id, GUARD, at.from) : none();
   // A drawing its pictures are drawn by, by its hash: the same for as long as anything is kept.
   if (what === 'drawing') {
-    const code = doc && extra ? drawingCode(doc, extra) : null;
+    const code = doc && extra ? layoutCode(doc, extra) : null;
     return code ? res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'public, max-age=31536000, immutable' }).end(JSON.stringify(code)) : none();
   }
   // A section of a public document shows its figure; anything public in its own right, its own.

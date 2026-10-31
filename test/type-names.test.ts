@@ -2,7 +2,7 @@
 // task, not work.task. A name it had before still reads as the one it has now, in a change, a lens and a search.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { flatLens } from '../src/lens-flat.ts';
+import { flatRead } from '../src/query-flat.ts';
 import { fresh, make } from './map.ts';
 
 test('a type and a link type are named by what they are, whichever pack ships them', async () => {
@@ -25,7 +25,7 @@ test('an old name still reads as the new one, in a change, a search and a lens',
   assert.equal((await l.entity(made.r))!.type, 'repo');
   assert.deepEqual((await l.search({ type: 'work.task' })).map((e) => e.id), [made.t]);
   assert.ok(l.registry.isA('task', 'work.task'));
-  const answer = await flatLens(l, { filter: { find: ['type work.task'] }, walk: { over: ['software.lives_in'], steps: 1 } });
+  const answer = await flatRead(l, { filter: { find: ['type work.task'] }, walk: { over: ['software.lives_in'], steps: 1 } });
   assert.deepEqual(answer.items.map((i) => i.id).sort(), [made.r, made.t].sort());
   assert.deepEqual(answer.links.map((k) => k.type), ['lives_in']);
 });

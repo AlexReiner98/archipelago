@@ -8,13 +8,13 @@ import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 import { createToken } from '../src/auth.ts';
 import { chromeBinary } from '../src/chrome.ts';
-import { stopDrawing } from '../src/look-draw.ts';
+import { stopLayout } from '../src/look-draw.ts';
 import { passFor } from '../src/looks.ts';
 import { contentOf } from '../src/mcp.ts';
 import { open } from './browser.ts';
 import { serve } from './serve.ts';
 
-after(stopDrawing);
+after(stopLayout);
 
 test('a look pass reads as its agent’s person, only through /api, and only what the canvas reads', async () => {
   const { workspaces, call, member } = await serve('tokens');
@@ -70,9 +70,9 @@ test('in a browser, a look is the view as drawn: a flow, a style’s own code, a
       { op: 'create', ref: 'c', type: 'lens', title: 'The steps, painted', status: 'current', props: lens },
       // It paints only after a wait, as code that loads or lays out first does: the look waits for it.
       { op: 'create', ref: 's', type: 'style', title: 'Painted', status: 'current', props: { code: "export default async function draw({ canvas }) { await new Promise((r) => setTimeout(r, 1500)); const c = canvas.getContext('2d'); c.fillStyle = '#ff00ff'; c.fillRect(0, 0, canvas.width, canvas.height); }" } },
-      { op: 'link', type: 'about', from: 's', to: 'c' },
     ],
   })).result.created as Record<string, string>;
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.c, props: { style: { style: made.s } } }] });
   const look = (params: Record<string, unknown>) => call('/agent/query', undefined, { actor: 'robot', name: 'look', params }).then((r) => r.result ?? r);
   // A page to read the pictures with: not the owner's (none is open), only a browser to decode them in.
   const reader = await open('about:blank');

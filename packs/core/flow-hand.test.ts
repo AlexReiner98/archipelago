@@ -5,11 +5,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { layout as bars } from './draw/flow/layout.js';
+import { layout as bars } from './layouts/flow/layout.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { faults } from './draw/flow/faults.js';
+import { faults } from './layouts/flow/faults.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { count } from './draw/flow/count.js';
+import { count } from './layouts/flow/count.js';
 
 const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const measure = (t: string, px: number) => t.length * px * 0.5;

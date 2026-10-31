@@ -9,7 +9,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ActionDef, DrawingDef, HearDef, HostDef, ReasonDef, ScheduleDef, ScreenDef, StyleDef, TreeDef, VerbDef, ViaDef, ViewDef, WebhookDef } from './declared.ts';
+import type { ActionDef, LayoutDef, HearDef, HostDef, ReasonDef, ScheduleDef, ScreenDef, StyleDef, TreeDef, VerbDef, ViaDef, ViewDef, WebhookDef } from './declared.ts';
 import type { FieldDef, RelationDef, TypeDef } from './packs.ts';
 import type { RuleDef } from './rules.ts';
 import type { ServerHost, ServerReach } from './server-packs.ts';
@@ -60,13 +60,13 @@ export interface Manifest {
   views?: ViewEntry[];
   actions?: ActionEntry[];
   handlers?: HandlerDef[];
-  drawings?: DrawingDef[];
+  layouts?: LayoutDef[];
   styles?: StyleDef[];
   reach?: ReachDef;
 }
 
 /** The keys of a manifest, and of its reach. */
-export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'drawings', 'styles', 'reach'] as const;
+export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'styles', 'reach'] as const;
 export const REACH_KEYS = ['hosts', 'secrets', 'webhooks', 'via', 'runs', 'server'] as const;
 export const SERVER_KEYS = ['acts', 'entries', 'pages', 'connect', 'aliases', 'agreements'] as const;
 

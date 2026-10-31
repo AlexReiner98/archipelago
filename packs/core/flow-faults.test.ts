@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { spacing } from './draw/flow/faults.js';
+import { spacing } from './layouts/flow/faults.js';
 
 const down = (x: number, ends = ['a', 'b']) => ({ ends, points: [[x, 0], [x, 100]] });
 const across = (y: number, ends = ['a', 'b']) => ({ ends, points: [[0, y], [100, y]] });

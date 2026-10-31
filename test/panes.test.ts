@@ -82,6 +82,11 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     for (const name of ['Home', 'The second']) await page.evaluate(`[...document.querySelectorAll('#canvas > .pane')].find((p) => p.querySelector('.pane-name').textContent === ${JSON.stringify(name)}).querySelector('[aria-label="Close this pane"]').click()`);
     await until('only its pane', async () => (await panes()).length === 1 && (await draws(0, 'First step, renamed')));
     assert.ok(await page.evaluate(`${nth(0)}.getBoundingClientRect().width > 1200`), 'the one pane has the page');
+    // The sheet takes its room from the pane, one alone too, so whatever it draws stands beside the sheet; shut, it has the page again.
+    await page.evaluate(`${nth(0)}.querySelector('svg a[href="#/e/${made.a}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
+    await until('the pane stops at the sheet', () => page.evaluate<boolean>(`document.body.dataset.sheet === 'open' && Math.abs(${nth(0)}.querySelector('.pane-canvas').getBoundingClientRect().right - (innerWidth - document.getElementById('sheet').offsetWidth)) < 2`));
+    await page.evaluate(`document.getElementById('sheet-close').click()`);
+    await until('the pane has the page again', () => page.evaluate<boolean>(`document.body.dataset.sheet !== 'open' && ${nth(0)}.getBoundingClientRect().width > 1200`));
 
     // By hand: split, and each pane is its own. A press in the second makes it the one the bar, find and the address act on.
     await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
