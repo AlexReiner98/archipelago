@@ -2,7 +2,8 @@
 // relations go through one path; a pack reaches the kernel only through what it is handed; a pack's
 // code is tested without a database; kernel modules import one way; the UI loads as modules; and
 // there are four dependencies; every picture is a drawing a pack ships; every view the kernel answers is a
-// lens preset or named as operational; the page calls no more tools than it did; and the canvas draws no depth.
+// lens preset or named as operational; the page calls no more tools than it did; the canvas draws no depth; and a
+// drawing's modules are all in its list, a length in one is named, and a wired one keeps its layers and its wires apart.
 //
 // Each rule keeps a list of what already broke it when the rule was made (16 Oct 2026). An entry
 // may only shrink, and goes once the rule is met: when you bring a number down, lower it here.
@@ -13,6 +14,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../src/operational.ts';
+import { drawings, differsFromReload, faultsOf, imported, LAYERS, MOVED, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const MAX_LINES = 500;
@@ -256,13 +258,14 @@ const RETIRED_WORDS: Record<string, number> = {};
 const RETIRED = /\b(?:entit(?:y|ies)|relations?|knowledge graphs?|type packs?|pictures?|shapes?)\b/gi;
 
 /** The string literals of a file, comments skipped. A template's `${...}` is kept in its string, to be blanked. */
-function literals(text: string): string[] {
+function scanned(text: string) {
   const out: string[] = [];
+  let code = '';
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if (c === '/' && text[i + 1] === '/') { i = text.indexOf('\n', i); if (i < 0) break; continue; }
     if (c === '/' && text[i + 1] === '*') { i = text.indexOf('*/', i + 2) + 1; if (i < 1) break; continue; }
-    if (c !== "'" && c !== '"' && c !== '`') continue;
+    if (c !== "'" && c !== '"' && c !== '`') { code += c; continue; }
     let j = i + 1, depth = 0;
     for (; j < text.length; j++) {
       if (text[j] === '\\') { j++; continue; }
@@ -271,10 +274,12 @@ function literals(text: string): string[] {
       if (!depth && (text[j] === c || (c !== '`' && text[j] === '\n'))) break;
     }
     out.push(text.slice(i + 1, j));
+    code += ` ${(out.at(-1)!.match(/\$\{[^}]*\}/g) ?? []).join(' ').replace(/[${}]/g, ' ')} `;
     i = j;
   }
-  return out;
+  return { strings: out, code };
 }
+const literals = (text: string) => scanned(text).strings;
 const prose = (s: string) =>
   s.replace(/\$\{[^}]*\}/g, ' ').replace(/\\?`[^`]*\\?`/g, ' ').replace(/"[a-z_]+"/g, ' ').replace(/<[^>]*>/g, ' ');
 const isProse = (s: string) => (/[a-z] [a-z]/i.test(s) || /^[A-Z][a-z]/.test(s)) && !/\b(?:select|insert|update|delete)\b[\s\S]*\b(?:from|into|set|where)\b/i.test(s);
@@ -385,4 +390,106 @@ test('the canvas draws no depth, and places are read only to draw', () => {
   assert.doesNotMatch(read('src/lens-flat.ts').replace(/\/\/.*$/gm, ''), /\b(?:depth|places?)\b|\binside\s*:/, 'The flat lens answers items and links: no containment and no places.');
   const readers = walk('src').filter((f) => f.endsWith('.ts') && /readOps\([^)]*'places'/.test(read(f)));
   assert.deepEqual(readers, ['src/canvas-places.ts'], 'Where a person put a thing is read only to draw it there (src/canvas-places.ts); grouping that matters is a link.');
+});
+
+// 18. A drawing's modules (docs/drawings.md): what it imports is in its list in pack.json, the only files the page is sent.
+// A test imports files directly, so a module left off passes every test and stops the drawing on the page.
+
+test("a drawing's list holds every module it reaches", () => {
+  const missing: string[] = [];
+  for (const d of drawings) {
+    const seen = new Set<string>(), go = (name: string, from: string) => {
+      if (seen.has(name)) return;
+      seen.add(name);
+      if (!d.modules[name] || !existsSync(join(ROOT, pathOf(d, name)))) return void missing.push(`${d.id}: ${name}, from ${from}`);
+      for (const next of imported(read(pathOf(d, name)))) go(next, name);
+    };
+    go('index.js', 'pack.json');
+  }
+  assert.deepEqual(missing, [], "Add the module to the drawing's modules in pack.json: the page is sent only what is listed.");
+});
+
+// 19. A number in a drawing is a length until shown otherwise, and a length is a size on the style, named, used on both
+// axes (design e_49yk2trw). Counted, as of 30 Oct 2026: a bare number of 3 or more that does not multiply or divide
+// (under 3 is arithmetic), and every px in a string. It catches more than lengths, and only ever goes down.
+const LENGTHS_IN_DRAWINGS: Record<string, number> = {
+  'architecture/boats.js': 3, 'architecture/deep.js': 32, 'architecture/index.js': 28, 'architecture/islands.js': 18, 'architecture/layout.js': 9, 'architecture/moves.js': 6,
+  'architecture/route.js': 8, 'architecture/says.js': 3, 'architecture/sides.js': 1, 'architecture/story.js': 3, 'flow/combs.js': 1, 'flow/direction.js': 1, 'flow/faults.js': 4,
+  'flow/free.js': 30, 'flow/index.js': 24, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/plane-index.js': 2, 'flow/ports.js': 1, 'flow/search.js': 2,
+  'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 1, 'flow/tidy.js': 2, 'flow/topology.js': 1, 'flow/upward.js': 6, 'grid/index.js': 8, 'grid/look.js': 1,
+  'pages/index.js': 5, 'time/index.js': 31, 'packs/plan/draw/meters/index.js': 10,
+};
+const BARE = /(?<![\w.$#])\d+(?:\.\d+)?(?![\w.])/g;
+
+function lengthsIn(text: string) {
+  const { strings, code } = scanned(text);
+  const bare = [...code.matchAll(BARE)].filter((m) => Number(m[0]) >= 3 && !/(?:[*/%[]|>>)\s*$/.test(code.slice(Math.max(0, m.index - 3), m.index)) && !/^\s*[*/%]/.test(code.slice(m.index + m[0].length, m.index + m[0].length + 3)));
+  return bare.length + strings.join(' ').split(/\b\d+(?:\.\d+)?px\b/).length - 1;
+}
+
+test('a length in a drawing is named on the style', () => {
+  const files = packIds.flatMap((p) => walk(`packs/${p}/draw`)).filter((f) => f.endsWith('.js'));
+  const counted = Object.fromEntries(files.map((f) => [short(f), lengthsIn(read(f))]).filter(([, n]) => (n as number) > 0));
+  assert.deepEqual(ratchet(counted, LENGTHS_IN_DRAWINGS), [], 'Name it: a size in the style (packs/core/pack.json), read from there, as the flow reads plane_wire_gap.');
+});
+
+// 20. A wired drawing is layers, each reading those before it (docs/drawings.md; design e_49yk2trw, 30 Oct 2026). A module
+// says its layer in its first comment ("Layer: metrics."); LAYERS_OWED (test/wired.ts) is what those that do not yet say so
+// will say, read as if they did, so the rules hold of them today, and a name goes from it as its module says it.
+// LAYERS_MIXED are modules that are more than one layer. Each list here may only shrink, LAYERS_OWED too.
+const LAYERS_MIXED: Record<string, number> = { 'architecture/layout.js': 1, 'architecture/route.js': 1, 'flow/part.js': 1 };
+const LAYER_IMPORTS: Record<string, number> = { 'flow/search.js -> flow/tidy.js': 1 };
+const WRITERS: Record<string, number> = { 'architecture/boards.js': 4, 'architecture/boats.js': 1, 'architecture/deep.js': 1, 'architecture/islands.js': 8, 'architecture/sides.js': 1, 'flow/combs.js': 1, 'flow/index.js': 8, 'flow/reroute.js': 1 };
+const wired = drawings.filter((d) => d.id in WIRED);
+const wiredFiles = [...new Set(wired.flatMap((d) => Object.keys(d.modules).map((name) => pathOf(d, name))))];
+
+test('each module of a wired drawing names its layer', () => {
+  assert.deepEqual(wiredFiles.filter((f) => !saysLayer(f) && !owedLayer(f)).map(short), [], 'Say its layer in its first comment: "Layer: graph.", topology, shape, metrics or marks (docs/drawings.md).');
+  assert.deepEqual(wiredFiles.filter((f) => saysLayer(f) && owedLayer(f)).map(short), [], 'It says its layer now: take it off LAYERS_OWED.');
+  const mixed = Object.fromEntries(wiredFiles.filter((f) => ranks(f).length > 1).map((f) => [short(f), 1]));
+  assert.deepEqual(ratchet(mixed, LAYERS_MIXED), [], 'A module is one layer: split it, and each part says its own.');
+});
+
+test('a layer of a wired drawing reads only those before it', () => {
+  const against: Record<string, number> = {};
+  for (const d of wired) for (const name of Object.keys(d.modules)) for (const next of imported(read(pathOf(d, name)))) {
+    if (Math.min(...ranks(pathOf(d, next))) > Math.max(...ranks(pathOf(d, name)))) against[`${short(pathOf(d, name))} -> ${short(pathOf(d, next))}`] = 1;
+  }
+  assert.deepEqual(ratchet(against, LAYER_IMPORTS), [], 'Hand the later layer what it needs, or move what both read to the earlier one.');
+});
+
+test("only Metrics sets a place or a wire's points", () => {
+  const others = wiredFiles.filter((f) => !ranks(f).includes(LAYERS.indexOf('metrics')));
+  const counted = Object.fromEntries(others.map((f) => [short(f), scanned(read(f)).code.match(WRITES)?.length ?? 0]).filter(([, n]) => (n as number) > 0));
+  assert.deepEqual(ratchet(counted, WRITERS), [], 'Coordinates are output: Metrics sets them, from what this layer says.');
+});
+
+// 21. Sealed: each wired drawing runs on small sketches (test/wired.ts), and no two wires of it lie on one line, none stands
+// under the spacing, no box stands on a box, none runs through a box. The spacing is counted by the flow's own `spacing`.
+const NOT_SEALED: Record<string, number> = { 'core.architecture comb: under': 12, 'core.architecture crossed: overlaps': 3, 'core.architecture fan: under': 2, 'core.architecture knot: overlaps': 1 };
+
+test('a wired drawing keeps its wires apart', async () => {
+  // @ts-expect-error a drawing's modules are plain JavaScript
+  const counted: Record<string, number> = {}, { spacing } = await import('../packs/core/draw/flow/faults.js');
+  for (const d of wired) {
+    const found = await setOut(d, async (url) => faultsOf(WIRED[d.id], (await import(url('layout.js'))).layout, spacing));
+    for (const [what, n] of Object.entries(found)) counted[`${d.id} ${what}`] = n;
+  }
+  assert.deepEqual(ratchet(counted, NOT_SEALED), [], 'Wires take room in the solve: each stretch keeps its distance from every other (docs/drawings.md).');
+});
+
+// 22. One call: drawn, moved, let go and reloaded run one function with different pins, so every wire must match. The flow
+// stays listed until its one solve for drag lands (session flow-drag): a drag frame still wires by the quick router
+// (free.js). Architecture cannot be moved by hand. Each entry is 1, broken or not: how many wires differ follows every
+// change to the solve, so it is no count to hold a change to.
+const NOT_ONE_CALL: Record<string, number> = { 'core.architecture': 1, 'core.flow': 1 };
+
+test('a wired drawing draws the same wires moved as reloaded', async () => {
+  const counted: Record<string, number> = {};
+  for (const d of wired) {
+    if (!Object.keys(d.modules).some((name) => /['"]drag['"]/.test(read(pathOf(d, name))))) { counted[d.id] = 1; continue; }
+    const { picture } = await setOut(d, (url) => import(url('index.js')));
+    if (MOVED.some(([sketch, id, by]) => differsFromReload(picture, sketch, id, by))) counted[d.id] = 1;
+  }
+  assert.deepEqual(ratchet(counted, NOT_ONE_CALL), [], 'A drag frame, a drop and a reload are one solve with different pins.');
 });
