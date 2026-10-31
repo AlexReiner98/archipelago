@@ -13,8 +13,8 @@
 
 import { stylesOf, type StyleDef } from './declared.ts';
 import { finishTheme, mergeTheme } from './colours.ts';
-import { drawingFor } from './drawings.ts';
-import { keptOf, type Kept } from './lens-kept.ts';
+import { layoutFor } from './layouts.ts';
+import { keptOf, type Kept } from './query-kept.ts';
 import { asOf } from './rebuild.ts';
 import type { Archipelago } from './pelago.ts';
 
@@ -91,14 +91,14 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, give
   let style: Record<string, unknown> = {};
   for (const layer of layers) style = over(style, fields(layer.props));
   if (style.theme != null) style.theme = finishTheme(style.theme);
-  // The style whose code draws, when one has code: what a change its drawing asks for names (src/drawing-changes.ts).
+  // The style whose code draws, when one has code: what a change its drawing asks for names (src/layout-changes.ts).
   const coder = [...layers].reverse().find((layer) => typeof layer.props.code === 'string' && layer.id !== layer.preset)?.id;
   return { style, used: layers.map(({ id, title, preset }) => ({ id, title, ...(preset && { preset }) })), ...(coder && { coder }) };
 }
 
 /** A picture's style with the drawing it is drawn by, if a pack draws its shape: its modules left out when the page has them (`have`, hashes). */
 export async function drawn(l: Archipelago, style: Record<string, unknown>, have: unknown): Promise<Record<string, unknown>> {
-  const drawing = drawingFor(l.registry, style, await versionsOf(l), Array.isArray(have) ? have.map(String) : []);
+  const drawing = layoutFor(l.registry, style, await versionsOf(l), Array.isArray(have) ? have.map(String) : []);
   return drawing ? { ...style, drawing } : style;
 }
 

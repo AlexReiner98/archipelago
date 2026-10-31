@@ -1,5 +1,5 @@
 // How fast a picture drawn by a drawing is, in a real browser, against a running server:
-//   node scripts/drawing-bench.ts [http://127.0.0.1:3100]
+//   node scripts/layout-bench.ts [http://127.0.0.1:3100]
 // For each picture: the first on a page that has started nothing, the first on a page whose frame was started while
 // the answer was on its way (as the lens view does), and one more by the same drawing; how long the page's own thread
 // was held; and how long a hover takes to come back. The drawing is the core pack's architecture, as the server sends it.
@@ -7,20 +7,20 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { open } from '../test/browser.ts';
-import { architectureCases, bigSystem, house } from '../test/drawing-cases.ts';
-import { drawingFor } from '../src/drawings.ts';
+import { architectureCases, bigSystem, house } from '../test/layout-cases.ts';
+import { layoutFor } from '../src/layouts.ts';
 
 const base = process.argv[2] ?? 'http://127.0.0.1:3100';
 const root = join(import.meta.dirname, '..');
-const drawing = drawingFor({ dir: join(root, 'packs'), packs: [JSON.parse(readFileSync(join(root, 'packs', 'core', 'pack.json'), 'utf8'))] }, { shape: 'architecture' }, []);
+const drawing = layoutFor({ dir: join(root, 'packs'), packs: [JSON.parse(readFileSync(join(root, 'packs', 'core', 'pack.json'), 'utf8'))] }, { shape: 'architecture' }, []);
 
 const pictures = { hero: architectureCases()[0].answer, system: architectureCases()[3].answer, big: bigSystem() };
 const style = { ...house('architecture'), noLit: true, drawing };
 
 /** In the page: draw one picture and say how long until it was on the page, and the longest the page's thread was held. */
 const once = `async (answer, style, warm) => {
-  const { drawWith, warmDrawings } = await import('/drawing.js');
-  if (warm) (warmDrawings(), await new Promise((r) => setTimeout(r, 150)));
+  const { drawWith, warmLayouts } = await import('/layout.js');
+  if (warm) (warmLayouts(), await new Promise((r) => setTimeout(r, 150)));
   let held = 0;
   const watch = new PerformanceObserver((list) => list.getEntries().forEach((e) => (held = Math.max(held, e.duration))));
   watch.observe({ type: 'longtask' });

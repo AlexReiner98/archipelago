@@ -5,13 +5,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { count } from './draw/flow/count.js';
+import { count } from './layouts/flow/count.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { faces, isPlanar, keptPlanar } from './draw/flow/planar.js';
+import { faces, isPlanar, keptPlanar } from './layouts/flow/planar.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { peel } from './draw/flow/combs.js';
+import { peel } from './layouts/flow/combs.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { layout } from './draw/flow/layout.js';
+import { layout } from './layouts/flow/layout.js';
 
 const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const measure = (t: string, px: number) => t.length * px * 0.5;
@@ -198,9 +198,9 @@ test('bars: a start shut in by ties is reached under one of them', () => {
 });
 
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { planarize } from './draw/flow/thread.js';
+import { planarize } from './layouts/flow/thread.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { numbered } from './draw/flow/numbering.js';
+import { numbered } from './layouts/flow/numbering.js';
 
 test('join: an invisible edge goes from what lacks a wire out to what lacks a wire in', () => {
   const links = [['p', 'q', true], ['r', 's', true], ['q', 'j', false], ['p', 'j', false], ['r', 'j', false], ['s', 'j', false]];
@@ -267,7 +267,7 @@ test('bars: a holder put by hand takes what hangs on it along', () => {
 });
 
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { shownOnly } from './draw/flow/graph.js';
+import { shownOnly } from './layouts/flow/graph.js';
 
 const storyCss = readFileSync(join(import.meta.dirname, 'draw/flow/story.js'), 'utf8');
 
@@ -325,7 +325,7 @@ test('bars: a small picture stands in rows, a fan centred, each wire landing apa
 });
 
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { embed } from './draw/flow/upward.js';
+import { embed } from './layouts/flow/upward.js';
 
 test('upward: every stretch has two faces, every face one top and one foot, and the numbers keep the order', () => {
   const links: any[] = [['a', 'b', true], ['a', 'c', true], ['b', 'd', true], ['c', 'd', true], ['a', 'd', true], ['b', 'c', false], ['e', 'a', false], ['e', 'd', false]];
@@ -366,7 +366,7 @@ test('bars: one kid alone sits straight on from its box', () => {
 });
 
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { faults } from './draw/flow/faults.js';
+import { faults } from './layouts/flow/faults.js';
 
 test('bars: a kid under a kid drops straight into its top', () => {
   const ring = ['p', 'q', 'o'].map((id) => item(id)), wide = (id: string) => ({ ...item(id), title: `${id} with a longer name` });

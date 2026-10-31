@@ -8,12 +8,12 @@
 import { frameSandbox, h } from './base.js';
 import { dragOf } from './drag.js';
 import { HELD } from './ghosts.js';
-import { tipOf } from './drawing-tip.js';
+import { tipOf } from './layout-tip.js';
 import { answered } from './tip.js';
 import { build, cssFor, patch, step } from './marks.js';
 import { stillReading } from './reader-frame.js';
 import { followSheet, sheetAside } from './sheet-follow.js';
-import { STYLE_COLORS, litSwitch, numberOf, sizeOf } from './lens-base.js';
+import { STYLE_COLORS, litSwitch, numberOf, sizeOf } from './query-base.js';
 import { surfaceOf } from './surface.js';
 import { saidDrawn } from './look.js';
 import { relations, types as registry, typeTitle } from './words.js';
@@ -24,18 +24,18 @@ import { panZoom } from './pan-zoom.js';
  * are kept in this browser, so a page opened again has them at once: loaded while its first answer is on its way,
  * and not sent again. Kept by hash, a drawing kept is the drawing sent.
  */
-export const drawings = new Map();
+export const layouts = new Map();
 const KEPT = 'pelago-drawings';
 try {
-  for (const [hash, modules] of JSON.parse(localStorage.getItem(KEPT) ?? '[]')) drawings.set(hash, modules);
+  for (const [hash, modules] of JSON.parse(localStorage.getItem(KEPT) ?? '[]')) layouts.set(hash, modules);
 } catch {
   // Without storage, each page is sent its drawings.
 }
 function keepDrawing(hash, modules) {
-  drawings.delete(hash);
-  drawings.set(hash, modules);
+  layouts.delete(hash);
+  layouts.set(hash, modules);
   try {
-    localStorage.setItem(KEPT, JSON.stringify([...drawings].slice(-3)));
+    localStorage.setItem(KEPT, JSON.stringify([...layouts].slice(-3)));
   } catch {
     // Kept for this page only.
   }
@@ -46,7 +46,7 @@ const scenes = new Map();
 let sandbox;
 
 /** The frame every drawing runs in, started once: before a picture asks, wherever one may be drawn. */
-export function warmDrawings() {
+export function warmLayouts() {
   // A frame taken off the page (a page that draws its body anew) is started again: its workers went with it.
   if (sandbox?.frame.isConnected) return sandbox;
   // Not hidden: a frame that is not drawn has its worker slowed many times over. It is drawn with no size instead (flow.css).
@@ -68,13 +68,13 @@ export function warmDrawings() {
   // Beside the body, not in it, so a page that draws its body anew does not take it away.
   document.documentElement.append(frame);
   // What this browser drew last is loaded now, before an answer asks for it.
-  for (const [hash, modules] of drawings) loaded(hash, modules).catch(() => {});
+  for (const [hash, modules] of layouts) loaded(hash, modules).catch(() => {});
   return sandbox;
 }
 
 /** The drawing with this hash, loaded in the frame. */
 async function loaded(hash, modules) {
-  const box = warmDrawings();
+  const box = warmLayouts();
   await box.ready;
   if (!box.loads.has(hash)) {
     const load = {};
@@ -122,7 +122,7 @@ export function drawWith(host, answer, style, keep) {
   if (drawing?.flat) host.classList.add('laid-out');
   const failed = (message) => (host.replaceChildren(h('div', { class: 'lens-error' }, `This drawing stopped: ${String(message).slice(0, 300)}`)), saidDrawn(host, 'error', message));
   // Its code: sent with the answer, kept by this browser, or fetched from this server by its hash (a published page's).
-  const sent = drawing?.modules ?? drawings.get(drawing?.hash);
+  const sent = drawing?.modules ?? layouts.get(drawing?.hash);
   const code = sent ? Promise.resolve(sent) : /^\/[^/]/.test(drawing?.src ?? '') ? fetch(drawing.src).then((res) => (res.ok ? res.json() : Promise.reject(new Error('its code could not be fetched')))) : null;
   if (!code) return failed('its code was not sent');
   const id = drawing.hash.slice(0, 16);
@@ -166,7 +166,7 @@ export function drawWith(host, answer, style, keep) {
     send({ key, name });
   };
   const run = (now) => step(moving, now) && requestAnimationFrame(run);
-  // What a drawing patches: its marks, and its tip (drawing-tip.js), whose marks are checked as every mark is.
+  // What a drawing patches: its marks, and its tip (layout-tip.js), whose marks are checked as every mark is.
   const tip = tipOf(host);
   const apply = (list) => {
     const all = Array.isArray(list) ? list : [];
@@ -236,7 +236,7 @@ ${JSON.stringify(input)}`;
     }
   }
   code.then((modules) => {
-    if (drawings.get(drawing.hash) !== modules || [...drawings.keys()].at(-1) !== drawing.hash) keepDrawing(drawing.hash, modules);
+    if (layouts.get(drawing.hash) !== modules || [...layouts.keys()].at(-1) !== drawing.hash) keepDrawing(drawing.hash, modules);
     return loaded(drawing.hash, modules);
   }).then(
     () => {

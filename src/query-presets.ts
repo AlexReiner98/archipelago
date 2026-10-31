@@ -1,19 +1,19 @@
 // Standing views a pack declares as data (a view with `lens` in its pack.json), each answered by its own read, in
-// the form it has always had: the flat lens (src/lens-flat.ts), the graph (src/view-graph.ts), the tree
+// the form it has always had: the flat lens (src/query-flat.ts), the graph (src/view-graph.ts), the tree
 // (src/view-tree.ts), the hubs, attention and the brief.
 
 import { attention, type Input } from './attention.ts';
 import { brief, briefRead } from './brief.ts';
 import type { LENS_ANSWERS, ViewDef } from './declared.ts';
-import { HUB_AT, hubs } from './lens-kept.ts';
-import { flatLens } from './lens-flat.ts';
+import { HUB_AT, hubs } from './query-kept.ts';
+import { flatRead } from './query-flat.ts';
 import type { Archipelago } from './pelago.ts';
 import { graph } from './view-graph.ts';
 import { tree } from './view-tree.ts';
 
 type Reading = (l: Archipelago, def: ViewDef, params: Record<string, unknown>) => Promise<unknown>;
 
-/** The hubs (src/lens-kept.ts), with the size at which an item counts as one where its project does not say. */
+/** The hubs (src/query-kept.ts), with the size at which an item counts as one where its project does not say. */
 const hubsOf: Reading = async (l, _def, params) => ({ at: HUB_AT, within: params.within ?? null, hubs: await hubs(l, params.within === undefined ? undefined : String(params.within)) });
 
 /**
@@ -30,7 +30,7 @@ const briefOf: Reading = async (l, def, params) => {
 };
 
 const READINGS: Record<(typeof LENS_ANSWERS)[number], Reading> = {
-  flat: (l, _def, params) => flatLens(l, params),
+  flat: (l, _def, params) => flatRead(l, params),
   graph,
   tree: (l, _def, params) => tree(l, params),
   hubs: hubsOf,

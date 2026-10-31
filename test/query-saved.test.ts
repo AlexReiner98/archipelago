@@ -3,8 +3,8 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { moveLenses, oldLens, termLenses } from '../src/lens-saved.ts';
-import { renamedLens } from '../src/lens-names.ts';
+import { moveQueries, oldQuery, termQueries } from '../src/query-saved.ts';
+import { renamedQuery } from '../src/query-names.ts';
 import { fresh, make } from './map.ts';
 
 test('a view kept before the flat lens is translated once into the flat lens its fields say', async () => {
@@ -39,7 +39,7 @@ test('a view kept before the flat lens is translated once into the flat lens its
       ['+', made.none, 'far', 2],
     ]),
   );
-  const moved = await moveLenses(l);
+  const moved = await moveQueries(l);
   assert.deepEqual([moved.moved, moved.retired], [3, [made.none]]);
   const props = async (id: string) => (await l.entity(id))!.props;
   // About P, keeping tasks: the tasks within P, at any depth, not walked; closed and system left out, as it left them.
@@ -53,27 +53,27 @@ test('a view kept before the flat lens is translated once into the flat lens its
   assert.equal((await l.entity(made.none))!.status, 'retired', 'nothing a filter can include: retired');
   assert.deepEqual(await props(made.none), {});
   // What it draws now: the open task within P, two steps down, in P as its frame; not what is finished.
-  const { keptPicture } = await import('../src/lens-saved.ts');
+  const { keptPicture } = await import('../src/query-saved.ts');
   const about = await keptPicture(l, made.about);
   assert.deepEqual([about.items.map((i) => i.title), about.lens.from], [['T'], made.p]);
   // Once: nothing is left to move, and the log says what did not translate.
-  assert.deepEqual((await moveLenses(l)).moved, 0);
+  assert.deepEqual((await moveQueries(l)).moved, 0);
   const said = (await l.events({ action: 'lens.moved' })) as unknown as { detail: { lost: Record<string, string[]> } }[];
   assert.deepEqual(said[0].detail.lost[made.whole], ['kinds nothing.like_it', 'leaving out what is linked to nothing']);
 });
 
 test('a translation keeps the start a view names, and a type it renames follows a pack that took it over', () => {
   const l = { registry: { types: new Map([['task', {}]]), relations: new Map([['part_of', {}], ['depends_on', {}], ['waits_on', {}]]) } } as never;
-  assert.equal(oldLens(l, { from: '{env}' }, []).lens, null, 'a start that is no id, and nothing it is about');
-  assert.deepEqual(renamedLens({ filter: { find: ['type hypothesis', 'assumes me', 'assumes< e_x'] }, walk: { over: ['assumes'], steps: 1 } }, 'assumes', 'presumes', 'relation'), {
+  assert.equal(oldQuery(l, { from: '{env}' }, []).lens, null, 'a start that is no id, and nothing it is about');
+  assert.deepEqual(renamedQuery({ filter: { find: ['type hypothesis', 'assumes me', 'assumes< e_x'] }, walk: { over: ['assumes'], steps: 1 } }, 'assumes', 'presumes', 'relation'), {
     walk: { over: ['presumes'], steps: 1 },
     filter: { find: ['type hypothesis', 'presumes me', 'presumes< e_x'] },
   });
-  assert.deepEqual(renamedLens({ walk: { over: ['part_of'] } }, 'hypothesis', 'hypothesis', 'entity'), {});
-  assert.deepEqual(renamedLens({ walk: { over: ['assumes>', 'part_of<'], steps: 2 } }, 'assumes', 'presumes', 'relation'), { walk: { over: ['presumes>', 'part_of<'], steps: 2 } }, 'a way said is kept');
+  assert.deepEqual(renamedQuery({ walk: { over: ['part_of'] } }, 'hypothesis', 'hypothesis', 'entity'), {});
+  assert.deepEqual(renamedQuery({ walk: { over: ['assumes>', 'part_of<'], steps: 2 } }, 'assumes', 'presumes', 'relation'), { walk: { over: ['presumes>', 'part_of<'], steps: 2 } }, 'a way said is kept');
 });
 
-// What the old lens drew of each, read on this fixture from the old lens itself (src/lens.ts at 84433ae, the last
+// What the old lens drew of each, read on this fixture from the old lens itself (src/query.ts at 84433ae, the last
 // commit that had it): the start as the frame, the types kept within it, and what its links reach of those types.
 test('views that kept types inside an item draw only what they drew under the old lens', async () => {
   const l = await fresh();
@@ -118,8 +118,8 @@ test('views that kept types inside an item draw only what they drew under the ol
       ['+', m.td, 'kinds', ['task', 'issue']], ['+', m.td, 'over', ['depends_on']],
     ]),
   );
-  const moved = await moveLenses(l);
-  const { keptPicture } = await import('../src/lens-saved.ts');
+  const moved = await moveQueries(l);
+  const { keptPicture } = await import('../src/query-saved.ts');
   const old: Record<string, string[]> = {
     oq: ['D open', 'H deep', 'P'],
     fe: ['F1', 'F3 outside', 'P'],
@@ -147,11 +147,11 @@ test('a view kept in the old words is said in terms once, and the log keeps what
     { op: 'create', ref: 'q', type: 'lens', title: 'Already', props: { filter: { find: ['type task'] } } },
   ]);
   assert.ok(p);
-  assert.equal(await termLenses(l), 1);
-  assert.equal(await termLenses(l), 0, 'it runs once');
+  assert.equal(await termQueries(l), 1);
+  assert.equal(await termQueries(l), 0, 'it runs once');
   assert.deepEqual((await l.entity(v))!.props.filter, { find: ['type task'], only: ['in e_aaaaaaaa'], not: ['done'] });
   assert.deepEqual((await l.entity(q))!.props.filter, { find: ['type task'] });
   const { sc } = await make(l, [{ op: 'create', ref: 'sc', type: 'screen', title: 'A page', props: { on: ['task'], pieces: [{ piece: 'picture', lens: { filter: { links: ['part_of {here}'], exclude: ['closed'] } } }, { piece: 'note', text: 'x' }] } }]);
-  assert.equal(await termLenses(l), 1, 'a screen with a lens of its own too');
+  assert.equal(await termQueries(l), 1, 'a screen with a lens of its own too');
   assert.deepEqual((await l.entity(sc))!.props.pieces, [{ piece: 'picture', lens: { filter: { find: ['part_of {here}'], only: [], not: ['done'] } } }, { piece: 'note', text: 'x' }]);
 });

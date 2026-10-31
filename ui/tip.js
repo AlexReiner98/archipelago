@@ -2,7 +2,7 @@
 // was; this shows it in the page's own tip, in the top layer above every bar and pane, and never lets the browser
 // show its own. The browser falls back on any title above what the pointer is on, so while the pointer is on
 // something every title from there to the page's root is taken off, and put back only when it moves on: a click or
-// a key hides the tip and leaves them off. A drawing's own tip (drawing-tip.js) quiets this one over its mark, and
+// a key hides the tip and leaves them off. A drawing's own tip (layout-tip.js) quiets this one over its mark, and
 // over a mark a drawing is told the pointer entered, this one waits for the drawing's answer before it says anything.
 
 import { h } from './base.js';

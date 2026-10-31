@@ -27,7 +27,7 @@ test('a Find term lights what it found and what the walk reached from it, not wh
 // A drawing runs only in its sandbox, so what each says is read from its code; a drawing in the browser tests is seen doing it.
 for (const name of ['flow', 'grid', 'time', 'pages', 'architecture']) {
   test(`the ${name} drawing says the item its marks stand for`, () => {
-    const code = readFileSync(join(import.meta.dirname, '..', 'packs', 'core', 'draw', name, 'index.js'), 'utf8');
+    const code = readFileSync(join(import.meta.dirname, '..', 'packs', 'core', 'layouts', name, 'index.js'), 'utf8');
     assert.match(code, /href: `#\/e\/\$\{|\bitem: /, 'a link to the item, or item');
   });
 }

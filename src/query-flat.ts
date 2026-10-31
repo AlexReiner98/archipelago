@@ -1,5 +1,5 @@
 // The flat lens (the decision "The lens is a filter, a walk and a limit", 25 Oct 2026): a filter, a walk and a limit,
-// and nothing else. The filter is three lists of one kind of term (src/lens-terms.ts): Find's sets are added to pick the
+// and nothing else. The filter is three lists of one kind of term (src/query-terms.ts): Find's sets are added to pick the
 // seeds, each of Only's must hold of every seed as well, and Not's are taken away from everything the walk reaches too.
 // The walk follows the link types named, each out, in or either way, step by step; the limit is the most it sends.
 // The answer is items and the links among them: no containment, no places, no views, no style. A lens may also name
@@ -10,8 +10,8 @@
 
 import { SYSTEM } from './head.ts';
 import type { Archipelago } from './pelago.ts';
-import { checkedAfter, holding, wordConditions, type Narrowing, type Word } from './lens-only.ts';
-import { endsOf, readTerm, sayTerm, setOf, type Term } from './lens-terms.ts';
+import { checkedAfter, holding, wordConditions, type Narrowing, type Word } from './query-only.ts';
+import { endsOf, readTerm, sayTerm, setOf, type Term } from './query-terms.ts';
 import { rankSql, searchIds, slipsOf } from './search.ts';
 import { fileOnAxis } from './timelanes.ts';
 import { placeAll, readAxis, resolveAxis, windowOf, zoneOf, type TimeAxis } from './timeaxis.ts';
@@ -61,7 +61,7 @@ const names = (value: unknown, field: string): string[] => {
   return value as string[];
 };
 
-/** A view kept in the words before the three lists, in them: what the migration writes (src/lens-saved.ts). */
+/** A view kept in the words before the three lists, in them: what the migration writes (src/query-saved.ts). */
 export const fromBefore = (f: Record<string, unknown>) => {
   const list = (x: unknown) => (x === undefined || x === null ? [] : Array.isArray(x) ? x : [x]) as string[];
   const link = (t: unknown) => (typeof t === 'string' ? t : (t as { to?: string }).to !== undefined ? `${(t as { link: string }).link} ${(t as { to: string }).to}` : `${(t as { link: string }).link}< ${(t as { from: string }).from}`);
@@ -107,7 +107,7 @@ interface Row {
 }
 
 /** The flat lens answered: the lens as read, the items (head and shown fields), the links among them, and whether the limit cut it. */
-export async function flatLens(l: Archipelago, input: Record<string, unknown>) {
+export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   const lens = readFlat(l, input);
   // How much of each note is sent is not the lens: the same items, their notes whole for a drawing that reads them.
   if (input.notes !== undefined && input.notes !== 'whole') throw new Error('notes must be "whole", or left out for the start of each note');

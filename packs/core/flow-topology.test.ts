@@ -3,9 +3,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { against, downward, sidesOf } from './draw/flow/topology.js';
+import { against, downward, sidesOf } from './layouts/flow/topology.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { embed } from './draw/flow/upward.js';
+import { embed } from './layouts/flow/upward.js';
 
 const Z = { trial_most: 100, number_tries: 3, embed_most: 30, embed_big: 300, embed_cost: 2 };
 

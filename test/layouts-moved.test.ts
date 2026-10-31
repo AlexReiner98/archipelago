@@ -1,6 +1,6 @@
 // Shapes the kernel drew until a pack's drawing took them over: in a real browser (skipped where there is no Chrome),
 // the core pack's grid and time drawings draw what the kernel's own code drew (ui/grid.js and ui/timeline.js, until
-// 23 Oct 2026), kept in test/fixtures/drawings/: the same marks, every element in the same place, the same looks. A
+// 23 Oct 2026), kept in test/fixtures/layouts/: the same marks, every element in the same place, the same looks. A
 // drawing sets no style on a mark, so what the kernel set as a style is a class of the drawing's own; those classes
 // and the kernel's style attributes are left out of the comparison, and what they drew is compared as looks.
 
@@ -9,11 +9,11 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
-import { gridCases, timeCases, type DrawingCase } from './drawing-cases.ts';
+import { gridCases, timeCases, type DrawingCase } from './layout-cases.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
-const fixture = (name: string) => join(import.meta.dirname, 'fixtures', 'drawings', `${name}.kernel.${process.platform}.json`);
+const fixture = (name: string) => join(import.meta.dirname, 'fixtures', 'layouts', `${name}.kernel.${process.platform}.json`);
 
 /** The drawing a picture kept in this shape is sent, and what it draws of each case, captured in the page. */
 async function drawn(shape: string, cases: DrawingCase[]) {
@@ -23,11 +23,11 @@ async function drawn(shape: string, cases: DrawingCase[]) {
   assert.equal(drawing.id, `core.${shape}`);
   const page = await open(`${base}/`);
   try {
-    await page.evaluate(readFileSync(join(import.meta.dirname, 'drawing-capture.js'), 'utf8'));
+    await page.evaluate(readFileSync(join(import.meta.dirname, 'layout-capture.js'), 'utf8'));
     // The page's registry is loaded, so a card's colour follows the order its type declares.
     await page.evaluate(`new Promise((r) => setTimeout(r, 1500))`);
     const sent = cases.map((c) => ({ ...c, style: { ...c.style, drawing } }));
-    return (await page.evaluate(`(async () => { const { drawWith } = await import('/drawing.js'); return captureDrawings(drawWith, ${JSON.stringify(sent)}); })()`)) as Record<string, any>;
+    return (await page.evaluate(`(async () => { const { drawWith } = await import('/layout.js'); return captureDrawings(drawWith, ${JSON.stringify(sent)}); })()`)) as Record<string, any>;
   } finally {
     await page.close();
   }
@@ -40,7 +40,7 @@ function same(now: Record<string, any>, kernel: string, own: RegExp, extra: stri
 `);
   if (!existsSync(kernel)) return;
   const was = JSON.parse(readFileSync(kernel, 'utf8'));
-  // The key is the page's now, drawn from the scene's key (docs/drawings.md), not the drawing's own marks: what is
+  // The key is the page's now, drawn from the scene's key (docs/layouts.md), not the drawing's own marks: what is
   // compared is the picture, so each record is cut where its key starts (the last thing in a picture the page lays out).
   const keyless = (r: any) => {
     // A key the kernel drew bare (the time axis's: a div with no class) is what follows the picture's svg.

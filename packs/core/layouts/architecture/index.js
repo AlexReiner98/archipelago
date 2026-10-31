@@ -20,7 +20,7 @@ const PILL = { ok: 'ok', warn: 'warn', down: 'bad', building: '', standby: 'clos
 const said = (list, key) => list.find(([k]) => k === key)?.[1] ?? key;
 
 /** A lens answer as a tree, each thing with what it says of itself and of all that is inside it. */
-function lensTree(answer) {
+function queryTree(answer) {
   const byId = new Map(answer.items.map((item) => [item.id, { ...item, kids: [] }]));
   const root = { kids: [] };
   for (const n of byId.values()) (byId.get(n.inside) ?? root).kids.push(n);
@@ -60,7 +60,7 @@ function outline(shape, x, y, w, hgt, rx, lid) {
 export function picture({ answer, style, reduced }, tools) {
   // A picture with steps plays how it came to be, and ends on the map as it is.
   if (Array.isArray(answer.steps) && answer.steps.length) return story({ answer, style, reduced }, tools);
-  const byId = lensTree(answer);
+  const byId = queryTree(answer);
   // Every length is the style's (sizes, arch_*), named by the house style; so is the typeface.
   const z = (name) => {
     const v = style.sizes?.[`arch_${name}`];
@@ -142,7 +142,7 @@ export function picture({ answer, style, reduced }, tools) {
   });
   const svg = m('svg', { viewBox: `0 0 ${g.width} ${g.height}`, role: 'img', 'aria-label': `A system of ${parts.length} parts in ${g.boxes.length} places` }, boxLayer, wireLayer, breakLayer, labelLayer, nameLayer, partLayer);
 
-  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/drawings.md).
+  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/layouts.md).
   const key = (inner, label) => ({ glyph: m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, inner), label });
   const healths = new Set([...parts, ...g.boxes].map((n) => n.health)), states = new Set(g.chains.map((c) => c.state));
   const entries = [

@@ -4,7 +4,7 @@
 // stylesheet, so a mark drawn while the pointer is there (what comes into sight) fades with the rest.
 
 import { api, state } from './base.js';
-import { numberOf } from './lens-base.js';
+import { numberOf } from './query-base.js';
 import { litBy } from './lit-by.js';
 
 let sheet = null;

@@ -1,6 +1,6 @@
 // A lens answer as a flat graph (the flow's layout, ./layout.js, lays it out): items, and links each with its type, and
 // what the order is without its loops and without the wires another path implies. An item or link may be `pending`:
-// a change held for the owner (or a link just drawn, `mine`), drawn as a ghost (docs/drawings.md). Pure.
+// a change held for the owner (or a link just drawn, `mine`), drawn as a ghost (docs/layouts.md). Pure.
 
 export const ORDER = 'depends_on', NEAR = 'part_of';
 /** What an item says of its state when the answer says nothing (the flat lens's does not). */

@@ -82,7 +82,7 @@ test('the kernel names no pack', () => {
 // verb's action): no new one may be added.
 const NAMES_PACK_TYPES: Record<string, number> = {
   'src/agent-run.ts': 1, 'src/altitude.ts': 1, 'src/attention.ts': 1, 'src/brief.ts': 1, 'src/capabilities.ts': 2, 'src/confirm.ts': 1, 'src/declared.ts': 3,
-  'src/diagram-types.ts': 1, 'src/documents.ts': 2, 'src/eventlog.ts': 1, 'src/launcher.ts': 1, 'src/lens-presets.ts': 1, 'src/lens-saved.ts': 1, 'src/looks.ts': 1,
+  'src/diagram-types.ts': 1, 'src/documents.ts': 2, 'src/eventlog.ts': 1, 'src/launcher.ts': 1, 'src/query-presets.ts': 1, 'src/query-saved.ts': 1, 'src/looks.ts': 1,
   'src/manifest.ts': 1, 'src/outside.ts': 1, 'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2, 'src/pg.ts': 1,
   'src/public-document.ts': 1, 'src/public.ts': 2, 'src/replay.ts': 1, 'src/rules.ts': 1, 'src/saved-views.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2,
   'src/sessions.ts': 4, 'src/surface.ts': 2, 'src/tail.ts': 1, 'src/tool-ops.ts': 2, 'src/tool-reads.ts': 2, 'src/ui-files.ts': 2, 'src/workspace-share.ts': 1,
@@ -238,17 +238,17 @@ test('how things look lives in style presets, not in the kernel', () => {
 });
 
 // 11. Every picture is drawn by a drawing: code a pack ships, which the owner changes on the map and which runs in
-// the sandbox (src/drawings.ts, ui/drawing.js), never a shape the kernel draws itself (the owner, 22 Oct 2026). The
+// the sandbox (src/layouts.ts, ui/layout.js), never a shape the kernel draws itself (the owner, 22 Oct 2026). The
 // kernel keeps the frame every picture has. Counted here as the shapes the page still draws itself, as of 22 Oct
 // 2026; a shape moved into a pack's drawing comes off its list, with its modules in ui/.
 const KERNEL_SHAPES: Record<string, number> = {
-  'ui/lens.js': 1, // list
+  'ui/query.js': 1, // list
 };
 const SHAPES = /(?:LENS_SHAPES|SHAPES) = \{([^}]*)\}/;
 
 test('the kernel draws no shape of its own: each is a drawing a pack ships', () => {
-  const counted = Object.fromEntries(['ui/lens.js', 'ui/doc-lens.js'].map((f) => [f, (SHAPES.exec(read(f))?.[1] ?? '').split(',').filter((s) => s.trim()).length]));
-  assert.deepEqual(ratchet(counted, KERNEL_SHAPES), [], "Make the shape a drawing in a pack (pack.json drawings: its modules, entered at index.js, answering with marks), as packs/core/draw/architecture is.");
+  const counted = Object.fromEntries(['ui/query.js', 'ui/doc-lens.js'].map((f) => [f, (SHAPES.exec(read(f))?.[1] ?? '').split(',').filter((s) => s.trim()).length]));
+  assert.deepEqual(ratchet(counted, KERNEL_SHAPES), [], "Make the shape a drawing in a pack (pack.json drawings: its modules, entered at index.js, answering with marks), as packs/core/layouts/architecture is.");
 });
 
 // 12. One name for each idea (docs/glossary.md; Rule 9 of the rework's target model, the owner, 23 Oct 2026). The
@@ -300,7 +300,7 @@ test('the UI and the tools use one name for each idea', () => {
 // 13. One way to read (Rule 6 of the rework's target model, the owner, 23 Oct 2026): every picture, view and agent
 // read is a lens. A view the kernel answers with its own code is one src/operational.ts names, with what it reads
 // instead of the work; every other is a view a pack declares, and the core pack's are lens presets, answered by the
-// lens query (src/lens-presets.ts). A kernel view that is neither is refused.
+// lens query (src/query-presets.ts). A kernel view that is neither is refused.
 test('every kernel view is a lens preset or named as operational', async () => {
   await import('../src/tools.ts'); // every module that adds a view of its own (src/sessions.ts adds story) is loaded
   const { VIEWS } = await import('../src/views.ts');
@@ -387,12 +387,12 @@ test('the page calls no more tools through /api than it did', () => {
 // to hand a drawing where things were put, and no lens, rule or view reads it.
 test('the canvas draws no depth, and places are read only to draw', () => {
   assert.doesNotMatch(read('ui/canvas.js'), /\bnest\s*:/, 'The canvas draws a flat lens flat: part_of is a tie, never a box inside a box.');
-  assert.doesNotMatch(read('src/lens-flat.ts').replace(/\/\/.*$/gm, ''), /\b(?:depth|places?)\b|\binside\s*:/, 'The flat lens answers items and links: no containment and no places.');
+  assert.doesNotMatch(read('src/query-flat.ts').replace(/\/\/.*$/gm, ''), /\b(?:depth|places?)\b|\binside\s*:/, 'The flat lens answers items and links: no containment and no places.');
   const readers = walk('src').filter((f) => f.endsWith('.ts') && /readOps\([^)]*'places'/.test(read(f)));
   assert.deepEqual(readers, ['src/canvas-places.ts'], 'Where a person put a thing is read only to draw it there (src/canvas-places.ts); grouping that matters is a link.');
 });
 
-// 18. A drawing's modules (docs/drawings.md): what it imports is in its list in pack.json, the only files the page is sent.
+// 18. A drawing's modules (docs/layouts.md): what it imports is in its list in pack.json, the only files the page is sent.
 // A test imports files directly, so a module left off passes every test and stops the drawing on the page.
 
 test("a drawing's list holds every module it reaches", () => {
@@ -417,7 +417,7 @@ const LENGTHS_IN_DRAWINGS: Record<string, number> = {
   'architecture/route.js': 8, 'architecture/says.js': 3, 'architecture/sides.js': 1, 'architecture/story.js': 3, 'flow/combs.js': 1, 'flow/direction.js': 1, 'flow/faults.js': 4,
   'flow/index.js': 22, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/search.js': 2,
   'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 3, 'flow/tidy.js': 2, 'flow/topology.js': 1, 'flow/upward.js': 6, 'flow/ways.js': 9, 'flow/wrap.js': 2, 'grid/index.js': 8, 'grid/look.js': 1,
-  'pages/index.js': 5, 'time/index.js': 31, 'packs/plan/draw/meters/index.js': 10,
+  'pages/index.js': 5, 'time/index.js': 31, 'packs/plan/layouts/meters/index.js': 10,
 };
 const BARE = /(?<![\w.$#])\d+(?:\.\d+)?(?![\w.])/g;
 
@@ -428,12 +428,12 @@ function lengthsIn(text: string) {
 }
 
 test('a length in a drawing is named on the style', () => {
-  const files = packIds.flatMap((p) => walk(`packs/${p}/draw`)).filter((f) => f.endsWith('.js'));
+  const files = packIds.flatMap((p) => walk(`packs/${p}/layouts`)).filter((f) => f.endsWith('.js'));
   const counted = Object.fromEntries(files.map((f) => [short(f), lengthsIn(read(f))]).filter(([, n]) => (n as number) > 0));
   assert.deepEqual(ratchet(counted, LENGTHS_IN_DRAWINGS), [], 'Name it: a size in the style (packs/core/pack.json), read from there, as the flow reads flow_wire_gap.');
 });
 
-// 20. A wired drawing is layers, each reading those before it (docs/drawings.md; design e_49yk2trw, 30 Oct 2026). A module
+// 20. A wired drawing is layers, each reading those before it (docs/layouts.md; design e_49yk2trw, 30 Oct 2026). A module
 // says its layer in its first comment ("Layer: metrics."); LAYERS_OWED (test/wired.ts) is what those that do not yet say so
 // will say, read as if they did, so the rules hold of them today, and a name goes from it as its module says it.
 // LAYERS_MIXED are modules that are more than one layer. Each list here may only shrink, LAYERS_OWED too.
@@ -444,7 +444,7 @@ const wired = drawings.filter((d) => d.id in WIRED);
 const wiredFiles = [...new Set(wired.flatMap((d) => Object.keys(d.modules).map((name) => pathOf(d, name))))];
 
 test('each module of a wired drawing names its layer', () => {
-  assert.deepEqual(wiredFiles.filter((f) => !saysLayer(f) && !owedLayer(f)).map(short), [], 'Say its layer in its first comment: "Layer: graph.", topology, shape, metrics or marks (docs/drawings.md).');
+  assert.deepEqual(wiredFiles.filter((f) => !saysLayer(f) && !owedLayer(f)).map(short), [], 'Say its layer in its first comment: "Layer: graph.", topology, shape, metrics or marks (docs/layouts.md).');
   assert.deepEqual(wiredFiles.filter((f) => saysLayer(f) && owedLayer(f)).map(short), [], 'It says its layer now: take it off LAYERS_OWED.');
   const mixed = Object.fromEntries(wiredFiles.filter((f) => ranks(f).length > 1).map((f) => [short(f), 1]));
   assert.deepEqual(ratchet(mixed, LAYERS_MIXED), [], 'A module is one layer: split it, and each part says its own.');
@@ -470,12 +470,12 @@ const NOT_SEALED: Record<string, number> = { 'core.architecture comb: under': 12
 
 test('a wired drawing keeps its wires apart', async () => {
   // @ts-expect-error a drawing's modules are plain JavaScript
-  const counted: Record<string, number> = {}, { spacing } = await import('../packs/core/draw/flow/faults.js');
+  const counted: Record<string, number> = {}, { spacing } = await import('../packs/core/layouts/flow/faults.js');
   for (const d of wired) {
     const found = await setOut(d, async (url) => faultsOf(WIRED[d.id], (await import(url('layout.js'))).layout, spacing));
     for (const [what, n] of Object.entries(found)) counted[`${d.id} ${what}`] = n;
   }
-  assert.deepEqual(ratchet(counted, NOT_SEALED), [], 'Wires take room in the solve: each stretch keeps its distance from every other (docs/drawings.md).');
+  assert.deepEqual(ratchet(counted, NOT_SEALED), [], 'Wires take room in the solve: each stretch keeps its distance from every other (docs/layouts.md).');
 });
 
 // 22. One call: drawn, moved, let go and reloaded run one function with different pins, so every wire must match.

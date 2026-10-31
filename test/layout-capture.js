@@ -4,7 +4,7 @@
 
 /* global window, document, getComputedStyle, MouseEvent */
 window.captureDrawings = async (shape, cases) => {
-  const { dress } = await import('/lens-base.js');
+  const { dress } = await import('/query-base.js');
   const PROPS = ['display', 'visibility', 'position', 'opacity', 'fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-opacity', 'color', 'background-color', 'border-top-color', 'border-top-width', 'font-family', 'font-size', 'font-weight', 'text-anchor', 'dominant-baseline', 'cursor', 'width', 'height', 'top', 'left', 'flex-direction', 'gap', 'padding-top', 'padding-left', 'white-space', 'pointer-events'];
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   // Settled: nothing in the host has changed for a while.

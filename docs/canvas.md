@@ -12,7 +12,7 @@ is for is `docs/ui-strategy.md`; the words are `docs/glossary.md`.
 ### 1. Three things on screen
 What is drawn is items and links; which ones is a lens; how they look is a
 style. The page keeps no other state of the map and no look of its own.
-- `test/lens-flat.test.ts`: "the answer is items and links, and nothing of
+- `test/query-flat.test.ts`: "the answer is items and links, and nothing of
   the old lens".
 - `test/page-style.test.ts`: "a page is drawn by its style: the house style,
   a kind's preset over it, the owner's version over that".
@@ -32,14 +32,14 @@ never structure. Containment is a projection the server keeps (the
 ### 3. The lens is a filter, a walk and a limit, and the only bound
 Its parts have one name each, on the page and in an agent's answer: Find,
 Only, Not, Walk and Limit (e_drt4g872, `docs/glossary.md`). Find, Only and Not
-take one list of terms (`src/lens-terms.ts`, e_4y5x454z), each a set of items
+take one list of terms (`src/query-terms.ts`, e_4y5x454z), each a set of items
 written as words: `text <words>`, `type <t>`, `kind <k>`, `id <item>`,
 `in <item>` (all that is part of it at any depth, from the part_of closure,
 e_tvsdqjeq), `related <item>` (any link to it, either way), `<link> <item>`
 (`tagged e_x`; `<link>< <item>` what it links to), `owner <person>`, and
 words that can only be checked of what is found: `done`, `blocked`,
 `status <s>`, `no owner`, `over estimate`, `changed since 7d`,
-`made since <date>`, `by owner`, `by agent` (`src/lens-only.ts`, e_xe5dx55e).
+`made since <date>`, `by owner`, `by agent` (`src/query-only.ts`, e_xe5dx55e).
 The part says what is done with a set: Find adds it (a union; neither `kind`
 nor a word finds, since each would read the map), Only keeps what is in it
 (an AND; an item is of one type, so its types are one set), and Not takes it
@@ -57,17 +57,17 @@ finds: the plan pack's Usage canvas draws core's `usage` view, asked by the
 page as an agent asks it (the owner, 29 Oct 2026, e_7frmyj2q). It is not a
 replica of the log: it is asked again when the canvas is drawn again, and a
 term added in find makes it a filter of the map.
-- `test/lens-flat.test.ts`: "a filter that includes nothing is refused";
+- `test/query-flat.test.ts`: "a filter that includes nothing is refused";
   "what is excluded is left out of everything the walk reaches, and is not
   walked through"; "the limit caps what is sent, seeds first, and says it
   cut"; "the text is the search read"; "narrowing: only and within must all
   hold of every seed, not of what the walk reaches"; "an item named by id is
   drawn whatever Not says, and the walk from it still keeps Not".
-- `test/lens-terms.test.ts`: "Find in an item: all that is part of it at any
+- `test/query-terms.test.ts`: "Find in an item: all that is part of it at any
   depth, of any type, not the item itself"; "the walk follows each link out,
   in or either way, as it is named"; "Only's plain words: each must hold of
   every seed, and the walk is not narrowed".
-- `test/find-lens.test.ts`: "in a browser, the find bar sets the text of the
+- `test/find-query.test.ts`: "in a browser, the find bar sets the text of the
   canvas lens".
 
 ### 4. Lens and style are the whole surface, for people and agents
@@ -89,7 +89,7 @@ once), then the rest; a retired or dormant type or link type is never
 offered (`ui/picker-rank.js`, task e_css8swr9).
 - `test/structure.test.ts`: "the page calls no more tools through /api than
   it did" (the names it calls, frozen on 25 Oct 2026; the list only shrinks).
-- `test/lens-flat.test.ts`: "an agent asks it by name, and sees only what
+- `test/query-flat.test.ts`: "an agent asks it by name, and sees only what
   the viewer may".
 - `test/saved-canvases.test.ts`: "an agent makes and changes a saved canvas
   through change, and report show opens it".
@@ -180,13 +180,13 @@ measure it reads at), shipped by the house style and a pack's presets.
 | --- | --- |
 | `app.js` | routes the address to the canvas and the sheet |
 | `canvas.js` | a pane's canvas: its lens, Home's lens, clicks, moves batched, Arrange |
-| `lens.js` | the address codec (`readFlatLens`, `flatQuery`); `flatView` reads, holds and draws a lens |
+| `query.js` | the address codec (`readAddress`, `addressOf`); `flatView` reads, holds and draws a lens |
 | `query-bar.js` | the lens said in one line at rest, and as the rows Find, Only, Not, Walk and Limit, changed in place |
 | `find.js` | the bar at the canvas's foot: opened, its rows; typed, what the words could be; Enter takes the lit choice, Shift+Enter adds the words (e_e3k797d3) |
 | `find-choices.js` | what typed words could be in each part, each said by its kind, Words first |
 | `term-kinds.js`, `term-pick.js` | a row's +: its kinds, then the things of that kind, picked, never guessed |
 | `canvases.js` | saved canvases: the bar's switch, Save, Home's list |
-| `drawing.js`, `draw.html`, `draw.js`, `marks.js` | a drawing run in the sandbox; its marks checked and mounted |
+| `layout.js`, `draw.html`, `draw.js`, `marks.js` | a drawing run in the sandbox; its marks checked and mounted |
 | `reader-frame.js` | the one mark the page makes itself: a document's draft or published page, read in a frame on the canvas |
 | `pan-zoom.js` | the infinite plane |
 | `drag.js`, `canvas-wires.js` | moving a node; drawing a wire and making its link |
@@ -200,18 +200,18 @@ measure it reads at), shipped by the house style and a pack's presets.
 ### In `src/` and `packs/`
 | Module | What it is |
 | --- | --- |
-| `src/lens-flat.ts` | the flat lens (core view `flat`) |
-| `src/lens-saved.ts` | saved canvases: their picture, `shown_in`, the move from old views |
+| `src/query-flat.ts` | the flat lens (core view `flat`) |
+| `src/query-saved.ts` | saved canvases: their picture, `shown_in`, the move from old views |
 | `src/styles.ts` | the style a page or view is drawn in (core view `style`) |
-| `src/drawings.ts` | which drawing a style names, and the owner's version of it |
+| `src/layouts.ts` | which drawing a style names, and the owner's version of it |
 | `src/canvas-places.ts` | the places stream: `places`, `places_put` |
 | `src/tail.ts`, `src/project.ts` | facts after a position; the pure projector (served as `/project.js`) |
 | `src/pelago.ts`, `src/rules.ts` | the one write path, and what decides it |
-| `packs/core/draw/flow/` | the flow drawing: `graph.js` flattens, `layout.js` orders, `free.js` keeps places, `index.js` answers marks |
+| `packs/core/layouts/flow/` | the flow drawing: `graph.js` flattens, `layout.js` orders, `free.js` keeps places, `index.js` answers marks |
 
 ## How a canvas is read
 1. The address holds the lens (`#/v?…` or `#/e/<id>?…`); `app.js` reads it
-   with `readFlatLens` and `canvas.js` `showCanvas` puts it up (Home's lens
+   with `readAddress` and `canvas.js` `showCanvas` puts it up (Home's lens
    when there is none).
 2. `flatView` asks `view` `flat` with the lens and `view` `style` beside it,
    and `canvas.js` asks `places` for the canvas (the saved canvas, else the
@@ -220,7 +220,7 @@ measure it reads at), shipped by the house style and a pack's presets.
    read before the lens and the changes held for the owner.
 
 ## How it is drawn
-1. The style names a drawing; `drawing.js` sends it the store's `drawn()`
+1. The style names a drawing; `layout.js` sends it the store's `drawn()`
    (the answer with ghosts and the person's pending wires) in the sandbox.
 2. The flow lays out what has no place round what has one, and answers with
    marks; the page checks them and mounts them in the plane.

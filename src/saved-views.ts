@@ -2,7 +2,7 @@
 // knowing which item it hangs on (docs/ui-strategy.md). A picture is a kept lens; a style kept about that lens
 // names it, as the way it is drawn is what a person remembers. Pinned ones first, then the newest.
 
-import { keptOf } from './lens-kept.ts';
+import { keptOf } from './query-kept.ts';
 import type { Archipelago } from './pelago.ts';
 
 export interface Picture {

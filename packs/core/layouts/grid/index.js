@@ -15,7 +15,7 @@ const inWords = (value) => (value == null ? 'Unfiled' : String(value).charAt(0).
 const HEX = /^#[0-9a-f]{3,8}$/i;
 
 /** A lens answer as a tree, each thing with what it says of itself and of all that is inside it. */
-function lensTree(answer) {
+function queryTree(answer) {
   const byId = new Map(answer.items.map((item) => [item.id, { ...item, kids: [] }]));
   const root = { kids: [], title: 'Everything' };
   for (const n of byId.values()) (byId.get(n.inside) ?? root).kids.push(n);
@@ -55,7 +55,7 @@ export function picture({ answer, style, fields = {}, relations = {}, reduced },
     if (typeof v !== 'number') throw new Error(`The style names no size "${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
     return v;
   };
-  const { byId, root } = lensTree(answer);
+  const { byId, root } = queryTree(answer);
   const start = byId.get(answer.lens.from) ?? root;
   const labels = style.labels && typeof style.labels === 'object' ? style.labels : {};
   // Lanes by person come with names: the value is an id, never something to read.
@@ -153,7 +153,7 @@ export function picture({ answer, style, fields = {}, relations = {}, reduced },
     lanes.forEach((value, k) => cells.push(m('div', { ...(story && { key: `x:${r}:${k}` }), class: `lg-cell${off}` }, row.cards.filter((n) => (n.lane ?? null) === value).sort((a, b) => a.place - b.place || a.title.localeCompare(b.title)).map((n) => card(n, row.head, r)))));
   });
   const grid = m('div', { class: 'lg-stage' }, m('div', { class: `lg-grid ${columnsClass(lanes.length, head, lane, gap)}` }, cells));
-  // The key: what each colour is, one to a row (the page draws it, docs/drawings.md).
+  // The key: what each colour is, one to a row (the page draws it, docs/layouts.md).
   const key = field ? declared.map((value) => ({ glyph: m('svg', { width: 12, height: 12, viewBox: '0 0 12 12', class: 'lg-key-chip' }, m('rect', { x: 1, y: 1, width: 10, height: 10, rx: 3, class: hueOf(value) })), label: name(value) })) : [];
 
   // Told as a story: each card, row and lane shown as the story's steps bring what it is of, on the stage of story.js.

@@ -2,8 +2,8 @@
 // a person or a session (src/published.ts, and src/published-share.ts for a document another workspace shares).
 
 import type { Archipelago } from './pelago.ts';
-import { isKept, keptPicture } from './lens-saved.ts';
-import { stepsShown } from './lens-steps.ts';
+import { isKept, keptPicture } from './query-saved.ts';
+import { stepsShown } from './query-steps.ts';
 import { framesFor } from './published-frames.ts';
 
 const IDS = /[ \t]*\(?\b(e_[a-z0-9]{8})\b\)?/g;
@@ -21,7 +21,7 @@ type Answer = Awaited<ReturnType<typeof keptPicture>>;
  * A view's picture as a reader may have it: its items and the links among them, each item with its first line and
  * the counts a drawing reads all nothing, each link's type as its kind; nothing about who or which session.
  */
-export function freezeLens(answer: Answer, bodies: Map<string, string>, partOf: string[] = ['part_of']) {
+export function freezeQuery(answer: Answer, bodies: Map<string, string>, partOf: string[] = ['part_of']) {
   const { code: _code, ...style } = (answer.style ?? {}) as Record<string, unknown>;
   // What each is inside, for the drawings that nest: what it is part of, where that is drawn too, said by inside and not by a link as well.
   const ids = new Set(answer.items.map((i) => i.id));
@@ -44,7 +44,7 @@ export function freezeLens(answer: Answer, bodies: Map<string, string>, partOf: 
  * the one asking may see, for a draft read before it is published.
  */
 export async function picturesOf(l: Archipelago, sections: { id: string; type: string }[], shared: boolean) {
-  const lenses: Record<string, ReturnType<typeof freezeLens>> = {};
+  const lenses: Record<string, ReturnType<typeof freezeQuery>> = {};
   const types: Record<string, string> = {};
   for (const section of sections.filter((s) => isKept(l, s.type))) {
     const answer = await keptPicture(l, section.id).catch(() => null);
@@ -55,7 +55,7 @@ export async function picturesOf(l: Archipelago, sections: { id: string; type: s
     );
     const shown = new Map(rows.map((r) => [r.id, r.body]));
     const kept = { ...answer, items: answer.items.filter((i) => shown.has(i.id)), links: answer.links.filter((k) => shown.has(k.from) && shown.has(k.to)) };
-    lenses[section.id] = freezeLens(kept, shown, l.registry.relationFamily('part_of'));
+    lenses[section.id] = freezeQuery(kept, shown, l.registry.relationFamily('part_of'));
     for (const i of kept.items) types[i.type] = l.registry.type(i.type)?.title ?? i.type;
   }
   // Each picture's first frame, so a reader's page has it on screen with the text.

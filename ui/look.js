@@ -2,8 +2,8 @@
 // a person. It follows no agent and counts as no page of the owner's (ui/live.js). It says on its root when the
 // canvas has drawn, so the server takes the picture then and not before: `data-look` is drawing, then drawn, empty
 // (the lens found nothing) or error, with `data-look-why`. A view says so with a `view-drawn` event, raised where its
-// drawing is done: the lens found nothing or failed (ui/lens.js), a drawing mounted its scene and a surface painted its
-// first frame (ui/drawing.js), a style's own code returned and its worker painted (ui/style-code.js).
+// drawing is done: the lens found nothing or failed (ui/query.js), a drawing mounted its scene and a surface painted its
+// first frame (ui/layout.js), a style's own code returned and its worker painted (ui/style-code.js).
 
 export const lookMode = new URLSearchParams(location.search).has('look');
 

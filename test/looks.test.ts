@@ -8,13 +8,13 @@ import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 import { createToken } from '../src/auth.ts';
 import { chromeBinary } from '../src/chrome.ts';
-import { stopDrawing } from '../src/look-draw.ts';
+import { stopLayout } from '../src/look-draw.ts';
 import { passFor } from '../src/looks.ts';
 import { contentOf } from '../src/mcp.ts';
 import { open } from './browser.ts';
 import { serve } from './serve.ts';
 
-after(stopDrawing);
+after(stopLayout);
 
 test('a look pass reads as its agent’s person, only through /api, and only what the canvas reads', async () => {
   const { workspaces, call, member } = await serve('tokens');

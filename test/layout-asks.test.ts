@@ -1,4 +1,4 @@
-// A drawing asks in data; the page acts as the person (decision e_h7he5guk, src/drawing-changes.ts). In a real
+// A drawing asks in data; the page acts as the person (decision e_h7he5guk, src/layout-changes.ts). In a real
 // browser: a style's code puts a text field over its canvas, the person fills it in, the code hears only the value,
 // and the change it asks for is sent as the person, applied for a type its style writes and held for one it does not.
 

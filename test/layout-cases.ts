@@ -54,7 +54,7 @@ export interface DrawingCase {
 
 /** The architecture shape's cases. */
 export function architectureCases(): DrawingCase[] {
-  const fixture = (name: string) => JSON.parse(readFileSync(here('fixtures', 'drawings', `architecture-${name}.json`), 'utf8'));
+  const fixture = (name: string) => JSON.parse(readFileSync(here('fixtures', 'layouts', `architecture-${name}.json`), 'utf8'));
   const style = house('architecture');
   const answers = { hero: fixture('hero'), system: fixture('system'), variety: variety() };
   const cases: DrawingCase[] = [];
@@ -100,7 +100,7 @@ function flowVariety() {
 
 /** The flow shape's cases: three real answers (pages of the public site, 23 Oct 2026) and one with every mark. */
 export function flowCases(): DrawingCase[] {
-  const fixture = (name: string) => JSON.parse(readFileSync(here('fixtures', 'drawings', `flow-${name}.json`), 'utf8'));
+  const fixture = (name: string) => JSON.parse(readFileSync(here('fixtures', 'layouts', `flow-${name}.json`), 'utf8'));
   const style = house('flow');
   const answers = { onemap: fixture('onemap'), session: fixture('session'), inherits: fixture('inherits'), variety: flowVariety() };
   const cases: DrawingCase[] = [];
@@ -109,7 +109,7 @@ export function flowCases(): DrawingCase[] {
     cases.push({ name: `${name}, narrow`, answer, style: { ...style, noLit: true }, width: 560 });
     cases.push({ name: `${name}, still`, answer, style: { ...style, noLit: true, still: true }, width: 900 });
   }
-  // The same answers as the flat lens sends them (src/lens-flat.ts), as the canvas draws them, at 1280 and 560 px.
+  // The same answers as the flat lens sends them (src/query-flat.ts), as the canvas draws them, at 1280 and 560 px.
   for (const [name, answer] of Object.entries(answers)) {
     const flat = flatAnswer(answer);
     cases.push({ name: `${name}, flat, wide`, answer: flat, style: { ...style, noLit: true }, width: 1280 });
@@ -119,7 +119,7 @@ export function flowCases(): DrawingCase[] {
 }
 
 /**
- * An older lens's answer as the flat lens sends the same items (src/lens-flat.ts): each item its head, the start of
+ * An older lens's answer as the flat lens sends the same items (src/query-flat.ts): each item its head, the start of
  * its note and its shown fields, with no inside, place, state or within; each link with its type, what an item was
  * inside a part_of link.
  */
@@ -178,7 +178,7 @@ function gridVariety(byLink: boolean) {
 
 /** The grid shape's cases: two real answers (pages of the public site, 23 Oct 2026) and two with every mark. */
 export function gridCases(): DrawingCase[] {
-  const fixture = (name: string) => JSON.parse(readFileSync(here('fixtures', 'drawings', `grid-${name}.json`), 'utf8'));
+  const fixture = (name: string) => JSON.parse(readFileSync(here('fixtures', 'layouts', `grid-${name}.json`), 'utf8'));
   const style = house('grid');
   const cases: DrawingCase[] = [];
   const answers: [string, unknown, Record<string, unknown>][] = [
@@ -212,7 +212,7 @@ function timeVariety() {
 
 /** The time shape's cases: the public site's plan as bars (23 Oct 2026), and a week with every mark as a calendar and as bars. */
 export function timeCases(): DrawingCase[] {
-  const launch = JSON.parse(readFileSync(here('fixtures', 'drawings', 'time-launch.json'), 'utf8'));
+  const launch = JSON.parse(readFileSync(here('fixtures', 'layouts', 'time-launch.json'), 'utf8'));
   const style = house('time');
   const cases: DrawingCase[] = [];
   const answers: [string, unknown, Record<string, unknown>][] = [

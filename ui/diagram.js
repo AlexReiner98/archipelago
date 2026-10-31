@@ -4,7 +4,7 @@
 // box is.
 
 import { h, state } from './base.js';
-import { dress, numberOf } from './lens-base.js';
+import { dress, numberOf } from './query-base.js';
 import { panZoom } from './pan-zoom.js';
 
 const NS = 'http://www.w3.org/2000/svg';

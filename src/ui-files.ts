@@ -6,7 +6,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { join } from 'node:path';
 
 /** The app's own modules, each a part of the page (ui/app.js imports them), served at /<name>.js. */
-const APP_MODULES = ['base', 'words', 'body', 'forms', 'home', 'held', 'canvas', 'pan-lock', 'query-bar', 'find', 'find-choices', 'menu-place', 'draft', 'item', 'item-doc', 'item-read', 'item-links', 'item-sections', 'screens', 'attention', 'nav', 'graph', 'graph-draw', 'lens', 'lens-base', 'list', 'style-code', 'pan-zoom', 'gate', 'proof', 'roadmap', 'live', 'settle', 'week', 'time', 'workspace', 'workspace-cards', 'model-card', 'connections-card', 'members-card', 'styles-card', 'themes-card', 'agents-card', 'plates', 'theme', 'token-piece', 'token-ask', 'canvases', 'diagram', 'start', 'plan-card', 'doc-lens', 'marks', 'reader-frame', 'sheet-follow', 'drawing', 'drag', 'drawing-tip', 'tip', 'surface', 'replica', 'ghosts', 'canvas-wires', 'signup', 'text', 'fields', 'field-edit', 'look', 'panes', 'pane-drag', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'pane-land', 'picker-rank', 'term-pick', 'look-switch', 'canvas-menu', 'only-words', 'term-kinds'];
+const APP_MODULES = ['base', 'words', 'body', 'forms', 'home', 'held', 'canvas', 'pan-lock', 'query-bar', 'find', 'find-choices', 'menu-place', 'draft', 'item', 'item-doc', 'item-read', 'item-links', 'item-sections', 'screens', 'attention', 'nav', 'graph', 'graph-draw', 'query', 'query-base', 'list', 'style-code', 'pan-zoom', 'gate', 'proof', 'roadmap', 'live', 'settle', 'week', 'time', 'workspace', 'workspace-cards', 'model-card', 'connections-card', 'members-card', 'styles-card', 'themes-card', 'agents-card', 'plates', 'theme', 'token-piece', 'token-ask', 'canvases', 'diagram', 'start', 'plan-card', 'doc-lens', 'marks', 'reader-frame', 'sheet-follow', 'layout', 'drag', 'layout-tip', 'tip', 'surface', 'replica', 'ghosts', 'canvas-wires', 'signup', 'text', 'fields', 'field-edit', 'look', 'panes', 'pane-drag', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'pane-land', 'picker-rank', 'term-pick', 'look-switch', 'canvas-menu', 'only-words', 'term-kinds'];
 
 export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
@@ -27,7 +27,7 @@ export const UI_FILES: Record<string, string> = {
   '/doc.css': 'doc.css',
   '/doc-lens.css': 'doc-lens.css',
   '/packs.js': 'packs.js',
-  '/lens-light.js': 'lens-light.js',
+  '/query-light.js': 'query-light.js',
   '/lit-by.js': 'lit-by.js',
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
   '/draw.html': 'draw.html',

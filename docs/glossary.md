@@ -75,7 +75,7 @@ system kind may do: a drawing's code, a story's steps, a stylesheet.
 **view.** A named way of looking at part of the map: a **query** (what is on
 it, called the lens in the code: a filter, of terms that add seeds and terms
 that must all hold of them, a walk along links and a limit;
-`src/lens-flat.ts`) and a **layout** (how it is arranged, called a drawing in
+`src/query-flat.ts`) and a **layout** (how it is arranged, called a drawing in
 the code), with the settings of that layout, all held in the view. A **style**
 says how things look (`src/styles.ts`) and is about nothing; a style with code
 of its own is a layout kept on the map. A view is an item, so it is kept on
@@ -93,9 +93,9 @@ person's own is a style kept about their person item, read last on the pages
 they see. A published page keeps the colours it was published with.
 
 **drawing.** The code that draws one form of view (list, flow, grid, time,
-architecture): shipped by a pack (`drawings` in its pack file), run in the
+architecture): shipped by a pack (`layouts` in its pack file), run in the
 sandbox (`ui/draw.html`), answering with marks the page checks
-(`docs/drawings.md`). Replaces *shape* where a shape meant this; the field
+(`docs/layouts.md`). Replaces *shape* where a shape meant this; the field
 that names it is still `shape`.
 
 **Find, Only, Not, Walk, Limit.** The parts of a lens, by the words the
@@ -110,7 +110,7 @@ system, or a type. **Walk** is the links followed from what Find finds, each
 out (→), in (←) or either way (↔), ×steps. **Limit** is the most items
 drawn, said as how many of it. In the code: the filter's `text`, `types`,
 `ids`, `links`, `in`; `only`, `within`; `exclude`; `walk`; `limit`
-(`src/lens-flat.ts`). Each term is made by choosing its kind, then the
+(`src/query-flat.ts`). Each term is made by choosing its kind, then the
 thing, never guessed from words (e_45sgrfqd). Replaces *search*, *nodes*,
 *edges*, *steps* and *alone* where the bar meant these.
 
@@ -118,7 +118,7 @@ thing, never guessed from words (e_45sgrfqd). Replaces *search*, *nodes*,
 node and every link a wire; depth is never drawn (`docs/canvas.md`). A
 **saved canvas** is a lens and a style kept on the map, listed on Home. In
 the code: `ui/canvas.js`; a saved canvas is an item of core's system type
-`lens` (`src/lens-saved.ts`, `ui/canvases.js`).
+`lens` (`src/query-saved.ts`, `ui/canvases.js`).
 
 **sheet.** The panel that opens over the canvas from the side, holding one
 item's page (or a new item, the Workspace page, a screen, For you). In the

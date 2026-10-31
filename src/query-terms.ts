@@ -3,12 +3,12 @@
 // what is done with that set: Find adds it, Only keeps what is in it, Not takes it away.
 //
 //   text <words> · type <t> (or the type alone) · kind <k> · id <item> · in <item> · related <item> · <link> <item> ·
-//   <link>< <item> (what the item links to) · owner me|<person> · and Only's words (src/lens-only.ts)
+//   <link>< <item> (what the item links to) · owner me|<person> · and Only's words (src/query-only.ts)
 //
 // An end is an id or a name. A word's set can only be checked of items in hand, so a word is no term of Find.
 
 import type { Archipelago } from './pelago.ts';
-import { readWord, type Narrowing, type Word } from './lens-only.ts';
+import { readWord, type Narrowing, type Word } from './query-only.ts';
 import { searchIds } from './search.ts';
 import { OWNED_BY } from './owner-link.ts';
 

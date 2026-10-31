@@ -3,7 +3,7 @@
 // printed: the one place in Archipelago where a page is meant to be read through.
 
 import { drawFrozen } from './doc-lens.js';
-import { warmDrawings } from './drawing.js';
+import { warmLayouts } from './layout.js';
 import { checkedCss } from './marks.js';
 import { readSpans, readText } from './text.js';
 import { applyTheme } from './theme.js';
@@ -215,9 +215,9 @@ function draw(d) {
 }
 
 // A published page carries its data (src/published-page.ts); a link's and a signed-in reader's page fetch it, and
-// start the frame drawings run in while it is on its way (ui/drawing.js).
+// start the frame drawings run in while it is on its way (ui/layout.js).
 const given = document.getElementById('page-data');
-if (!given) warmDrawings();
+if (!given) warmLayouts();
 (given
   ? Promise.resolve(JSON.parse(given.textContent))
   : preview

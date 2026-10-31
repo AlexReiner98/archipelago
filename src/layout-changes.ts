@@ -9,7 +9,7 @@ import type { Actor, Archipelago, ChangeInput } from './pelago.ts';
 export const DRAWING_OPS = ['create', 'update', 'link', 'unlink', 'archive', 'restore'];
 
 /** The drawing a change was asked by, as the rules read it (`Who.drawing`); nothing when no drawing asked. */
-export async function drawingOf(l: Archipelago, actor: Actor, input: ChangeInput): Promise<{ drawing?: { style: string; writes: string[] } }> {
+export async function layoutOf(l: Archipelago, actor: Actor, input: ChangeInput): Promise<{ drawing?: { style: string; writes: string[] } }> {
   if (input.drawing === undefined) return {};
   const no = (why: string) => new Error(`Change rejected:\n- ${why}`);
   if (actor.kind !== 'human') throw no('A change a drawing asked for is sent by the page, as the person looking at it.');

@@ -59,7 +59,7 @@ test('a published picture keeps its first frame, its page carries its data, and 
   assert.ok(inPage, 'the data is in the page');
   assert.deepEqual(JSON.parse(inPage[1]), data);
   assert.equal(html.match(/<script/g)?.length, 2, 'no script but its own and its data');
-  for (const file of ['/doc-lens.js', '/drawing.js', '/marks.js', '/base.js']) assert.match(html, new RegExp(`<link rel="modulepreload" href="${file}[?]v=`), file);
+  for (const file of ['/doc-lens.js', '/layout.js', '/marks.js', '/base.js']) assert.match(html, new RegExp(`<link rel="modulepreload" href="${file}[?]v=`), file);
   assert.ok(html.indexOf('src="/doc.js') < html.indexOf('id="page-data"'), 'its script is asked for before its data is read');
   assert.ok(!html.includes('Loading'));
   assert.ok(!html.includes('noindex'), 'what the text says is not read as a replacement pattern');
@@ -97,7 +97,7 @@ test('in a browser, the text and the first frame are on the page together, and t
 
     // A first frame that says what a drawing may not is not drawn: the drawing draws the picture.
     const said = await page.evaluate(`(async () => {
-      const { drawWith } = await import('/drawing.js');
+      const { drawWith } = await import('/layout.js');
       const answer = JSON.parse(document.getElementById('page-data').textContent).lenses[${JSON.stringify(l)}];
       const host = document.createElement('div');
       document.body.append(host);

@@ -9,8 +9,8 @@
 import { api, hooks, idsOf, state } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { canvasSwitch } from './canvases.js';
-import { numberOf } from './lens-base.js';
-import { FOCUS, flatQuery, flatView } from './lens.js';
+import { numberOf } from './query-base.js';
+import { FOCUS, addressOf, flatView } from './query.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
 
@@ -47,9 +47,9 @@ function barNow() {
   if (c?.view) drawQuery(c.lens, c.view, c.pane.go, canvasSwitch(c.lens, c.asked, c.home, c.pane.open));
 }
 /** The lens the canvas in focus draws now. */
-export const lensNow = () => current?.lens ?? null;
+export const queryNow = () => current?.lens ?? null;
 /** Draw this lens in the canvas in focus. */
-export const goLens = (lens) => current?.pane.go(lens);
+export const goQuery = (lens) => current?.pane.go(lens);
 /** Open an address in the canvas in focus: a saved canvas, or a lens in a style, as the bar's switches do. */
 export const openHere = (href) => current?.pane.open(href);
 /** The style the canvas in focus was asked for (a shape, a style kept by id, the saved canvas up). */
@@ -57,10 +57,10 @@ export const styleNow = () => current?.asked ?? {};
 /** Draw the lens up in a style, as the style switch does: a shape, a style kept by its id, or neither for the house's. */
 export const drawIn = (style) => {
   const { shape: _s, style: _k, ...rest } = styleNow();
-  openHere(`#/v?${flatQuery(lensNow() ?? home(), { ...rest, ...style })}`);
+  openHere(`#/v?${addressOf(queryNow() ?? home(), { ...rest, ...style })}`);
 };
 /** Open an item's page over the canvas in focus, the lens as it is. */
-export const openOver = (id) => current?.pane.opened(id, lensNow() ?? home());
+export const openOver = (id) => current?.pane.opened(id, queryNow() ?? home());
 /** Draw Home in the canvas in focus. */
 export const goHome = () => current?.pane.go(null);
 /** Whether the canvas in focus draws this item now. */

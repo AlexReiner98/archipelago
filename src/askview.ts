@@ -1,7 +1,7 @@
 // Asking a standing question by its name: the kernel's operational views, and the views packs declare, by their
 // short names (a pack's software.handoff answers as handoff, core's core.attention as attention), so what agents and
 // hooks ask for does not change as views move into packs. A view a pack declares is answered by a read of the
-// kernel's that it names (src/lens-presets.ts), or by its own code. A kernel view's name wins; among packs, the first to load.
+// kernel's that it names (src/query-presets.ts), or by its own code. A kernel view's name wins; among packs, the first to load.
 
 import type { ViewDef } from './declared.ts';
 import { parts } from './manifest.ts';
@@ -9,7 +9,7 @@ import { hostFor } from './packtools.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import type { Registry } from './packs.ts';
 import { REPLACED } from './attention.ts';
-import { answerPreset } from './lens-presets.ts';
+import { answerPreset } from './query-presets.ts';
 import { setPackAsker, VIEWS } from './views.ts';
 
 const short = (id: string) => id.slice(id.indexOf('.') + 1);

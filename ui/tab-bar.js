@@ -8,7 +8,7 @@
 // every tab has ⋯ (whom it follows, pop out) and ×, the same in sight or not, and + ends the strip, which shows with one tab too.
 
 import { api, h, hooks, state } from './base.js';
-import { readFlatLens } from './lens.js';
+import { readAddress } from './query.js';
 import { lookMode } from './look.js';
 import { placeBy } from './menu-place.js';
 import { windowOf, windows } from './pane-busy.js';
@@ -139,7 +139,7 @@ function nameOfTab(t) {
     api('get', { id }).then((got) => (titles.set(id, got.entity.title), drawStrip()), () => {});
   }
   if (/^e_[a-z0-9]{8}$/.test(id)) return { name: titles.get(id) ?? '…' };
-  const lens = id ? readFlatLens(id.split('?')[1] ?? '').lens : null;
+  const lens = id ? readAddress(id.split('?')[1] ?? '').lens : null;
   // A lens that names a view, by the canvas a pack ships for it, else by the view's name.
   if (lens?.view) return { name: (state.schema?.canvases ?? []).find((c) => c.props?.view === lens.view)?.title ?? lens.view };
   // Named by what it finds but its types, which say little of a tab; by its types only when it has nothing else.

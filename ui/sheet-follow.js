@@ -3,7 +3,7 @@
 // address is replaced), and never leaves unsaved words behind: while there are any, the sheet stays.
 
 import { state } from './base.js';
-import { numberOf } from './lens-base.js';
+import { numberOf } from './query-base.js';
 
 const HERE = /^#\/e\/(e_[a-z0-9]{8})/;
 

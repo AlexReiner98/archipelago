@@ -4,7 +4,7 @@
 // more choice while it is.
 
 import { api, ask, h, state, tell } from './base.js';
-import { flatQuery } from './lens.js';
+import { addressOf } from './query.js';
 import { titles } from './words.js';
 
 /** The layouts kept on the map (a style with code of its own), read once. */
@@ -40,7 +40,7 @@ export function styleDelete(lens, style, open) {
     }
     named = null;
     const { style: _k, ...rest } = style;
-    open(`#/v?${flatQuery(lens, rest)}`);
+    open(`#/v?${addressOf(lens, rest)}`);
   };
   return { text: 'Delete layout', title: 'Delete the layout or style this view is drawn with', act, danger: true };
 }
@@ -72,7 +72,7 @@ export function lookSwitch(lens, style, open) {
   pick.addEventListener('change', () => {
     const [kind, value] = pick.value ? [pick.value.slice(0, pick.value.indexOf(':')), pick.value.slice(pick.value.indexOf(':') + 1)] : [];
     const { shape: _s, style: _k, ...rest } = style;
-    open(`#/v?${flatQuery(lens, { ...rest, ...(kind && { [kind]: value }) })}`);
+    open(`#/v?${addressOf(lens, { ...rest, ...(kind && { [kind]: value }) })}`);
   });
   return pick;
 }

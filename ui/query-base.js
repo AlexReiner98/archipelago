@@ -1,5 +1,5 @@
 // What every drawing of a lens shares: the answer as a tree, what stays lit and the switch for it, and the
-// colours and sizes a style may set. The drawings (flow, list, a style's own code) import this; lens.js picks one.
+// colours and sizes a style may set. The drawings (flow, list, a style's own code) import this; query.js picks one.
 
 import { h } from './base.js';
 import { typeVars } from './theme.js';
@@ -50,7 +50,7 @@ export const numberOf = (style, name) => {
 };
 
 /** A lens answer as a tree, each thing with what it says of itself and of all that is inside it: the same numbers at every depth. */
-export function lensTree(answer) {
+export function queryTree(answer) {
   const me = answer.viewer;
   const byId = new Map(answer.items.map((item) => [item.id, { ...item, kids: [] }]));
   const root = { kids: [], depth: -1, x: 0, y: 0, title: 'Everything' };

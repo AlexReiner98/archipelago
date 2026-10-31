@@ -10,11 +10,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromeBinary } from '../src/chrome.ts';
-import { layout, stages } from '../packs/core/draw/flow/layout.js';
-import { count } from '../packs/core/draw/flow/count.js';
-import { faults, spacing } from '../packs/core/draw/flow/faults.js';
-import { shownOnly } from '../packs/core/draw/flow/graph.js';
-import { placesAsColours } from '../packs/core/draw/flow/places.js';
+import { layout, stages } from '../packs/core/layouts/flow/layout.js';
+import { count } from '../packs/core/layouts/flow/count.js';
+import { faults, spacing } from '../packs/core/layouts/flow/faults.js';
+import { shownOnly } from '../packs/core/layouts/flow/graph.js';
+import { placesAsColours } from '../packs/core/layouts/flow/places.js';
 
 const args = process.argv.slice(2), fresh = args.includes('--fresh');
 const base = args.find((a) => a.startsWith('http')) ?? 'http://127.0.0.1:3100';

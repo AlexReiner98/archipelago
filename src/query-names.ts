@@ -5,7 +5,7 @@
 type Props = Record<string, unknown>;
 
 /** The fields of a kept view that name `from`, renamed to `to`; empty when it names nothing. */
-export function renamedLens(props: Props, from: string, to: string, what: 'entity' | 'relation'): Props {
+export function renamedQuery(props: Props, from: string, to: string, what: 'entity' | 'relation'): Props {
   const out: Props = {};
   const filter = (props.filter ?? {}) as Props;
   const walk = (props.walk ?? {}) as Props;

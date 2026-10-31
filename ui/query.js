@@ -1,8 +1,8 @@
 import { api, h } from './base.js';
 import { replicate } from './live.js';
 import { unfollow } from './replica.js';
-import { drawWith, drawings, warmDrawings } from './drawing.js';
-import { dress } from './lens-base.js';
+import { drawWith, layouts, warmLayouts } from './layout.js';
+import { dress } from './query-base.js';
 import { drawList } from './list.js';
 import { drawCode } from './style-code.js';
 import { saidDrawn } from './look.js';
@@ -95,7 +95,7 @@ const list = (value) => (value ?? '').split(',').filter(Boolean);
  * address says so (`nothing`: every Find term taken out, drawn as an empty canvas). `canvas` names
  * the saved canvas it is drawn on (ui/canvases.js): its places, its name in the bar.
  */
-export function readFlatLens(query) {
+export function readAddress(query) {
   const p = new URLSearchParams(query);
   const filter = {};
   const named = list(p.get('from')).map((id) => `id ${id}`);
@@ -118,8 +118,8 @@ export function readFlatLens(query) {
 /** Whether a filter includes anything: one that does not is answered with nothing, here, never sent to be read. */
 export const includesAny = (f) => Boolean(f.find?.length);
 
-/** The end of the address that says this flat lens (and the style asked of it): what readFlatLens reads back. */
-export function flatQuery(lens, style = {}) {
+/** The end of the address that says this flat lens (and the style asked of it): what readAddress reads back. */
+export function addressOf(lens, style = {}) {
   const p = new URLSearchParams();
   if (lens.view) p.set('view', lens.view);
   else if (!includesAny(lens.filter)) p.set('nothing', '');
@@ -231,7 +231,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     try {
       [store, look] = await Promise.all([
         replicate(async () => (raw = await api('view', { name: 'flat', params: { ...lens, ...(whole.has(asked) && { notes: 'whole' }) } }))),
-        api('view', { name: 'style', params: { ...(of && { of }), ...(style.style && { style: style.style }), ...(style.canvas && { view: style.canvas }), ...(style.shape && { shape: style.shape }), have: [...drawings.keys()] } }),
+        api('view', { name: 'style', params: { ...(of && { of }), ...(style.style && { style: style.style }), ...(style.canvas && { view: style.canvas }), ...(style.shape && { shape: style.shape }), have: [...layouts.keys()] } }),
       ]);
     } catch (err) {
       host.failed = err.message;
@@ -262,7 +262,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     try {
       [raw, look] = await Promise.all([
         api('view', { name: lens.view }),
-        api('view', { name: 'style', params: { ...(of && { of }), ...(style.style && { style: style.style }), ...(style.canvas && { view: style.canvas }), ...(style.shape && { shape: style.shape }), have: [...drawings.keys()] } }),
+        api('view', { name: 'style', params: { ...(of && { of }), ...(style.style && { style: style.style }), ...(style.canvas && { view: style.canvas }), ...(style.shape && { shape: style.shape }), have: [...layouts.keys()] } }),
       ]);
     } catch (err) {
       host.failed = err.message;
@@ -272,7 +272,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     }
     draw(raw, raw, refreshing);
   };
-  warmDrawings();
+  warmLayouts();
   host.ready = load();
   host.refresh = () => load(true);
   // A drawing that made something asks for the lens again: a new item is not among those the store follows.

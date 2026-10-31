@@ -3,7 +3,7 @@ import { dumpVault } from '../src/vault.ts';
 import { test } from 'node:test';
 import { dump, restore } from '../src/backup.ts';
 import { openDb } from '../src/db.ts';
-import { pictureOf } from '../src/lens-kept.ts';
+import { pictureOf } from '../src/query-kept.ts';
 import { Archipelago, type Op } from '../src/pelago.ts';
 import { sessionStart } from '../src/sessions.ts';
 import { askView } from '../src/askview.ts';
@@ -81,7 +81,7 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
     { op: 'create', ref: 'rs', type: 'style', title: 'Road opened', props: { open: 9 } },
     { op: 'link', type: 'about', from: 'rs', to: 'road' },
   ]);
-  const { keptPicture } = await import('../src/lens-saved.ts');
+  const { keptPicture } = await import('../src/query-saved.ts');
   const road = await keptPicture(l, kept.road);
   assert.deepEqual([road.items.map((i) => i.title).sort(), road.style.shape, road.style.open], [['C', 'Early', 'Late', 'P'], 'grid', 4]);
 

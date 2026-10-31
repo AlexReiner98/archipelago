@@ -37,7 +37,7 @@ export const ITEM_COLUMNS: [column: string, field: string, unsaid: unknown][] = 
   ['source_id', 'source', null],
 ];
 
-/** How much of a note a lens answer sends (src/lens-flat.ts), and so how much a page that holds one shows. */
+/** How much of a note a lens answer sends (src/query-flat.ts), and so how much a page that holds one shows. */
 export const NOTE_START = 280;
 
 /** Whether an id is a link's (r_…), whose `link` field is its ends; an item's id is e_…. */

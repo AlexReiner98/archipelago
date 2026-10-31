@@ -1,9 +1,9 @@
 // The page's address for what an agent asks to show or to look at: a kept view (a lens item, a saved canvas), a
-// lens and style of its own, an item's page or a screen. The page reads the same address (ui/lens.js, readFlatLens),
+// lens and style of its own, an item's page or a screen. The page reads the same address (ui/query.js, readAddress),
 // so what an agent names is drawn as the owner would draw it. A lens the canvas could not draw is refused here.
 
 import { z } from 'zod';
-import { readFlat } from './lens-flat.ts';
+import { readFlat } from './query-flat.ts';
 import type { Archipelago } from './pelago.ts';
 
 /** What names a view, as show and query look take it. */

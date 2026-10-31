@@ -236,7 +236,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   });
   const svg = m('svg', { viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, breakLayer, stepLayer, saysLayer, [...stepBadges.values()], linkBadges.map((b) => b.mark));
 
-  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/drawings.md). A step with no
+  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/layouts.md). A step with no
   // other mark is said by its own status ("Todo", "Decided"), one row for each its steps have, in its colour.
   const statusWords = (status) => ((w) => w.charAt(0).toUpperCase() + w.slice(1))(status.replaceAll('_', ' '));
   const statusRows = () => [...new Map(steps.filter((n) => !n.stub && !dotOf(n.item)).map((n) => [statusOf(n.item), n.item])).entries()]

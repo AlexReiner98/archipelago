@@ -1,4 +1,4 @@
-// What a term of Find brought into a lens's answer, read off the answer alone (ui/lens-light.js lights it).
+// What a term of Find brought into a lens's answer, read off the answer alone (ui/query-light.js lights it).
 
 /** The items a term of Find brought: those it found, and what the walk reached from them, a step at a time. */
 export function litBy(answer, term) {

@@ -156,7 +156,7 @@ reply ending, commits accounted for) is `docs/agents.md`.
   that code a page to touch, a way to the network, or anything typed. After
   changing `ui/draw.js`, `ui/draw.html`, `ui/marks.js`, `ui/surface.js` or the frame's policy in
   `src/server.ts`, run a hostile style against it in a real browser (the
-  browser pane will not load a sandboxed frame; to see drawings there, start a dev server with `PELAGO_UNSANDBOXED=1`, which drops that wall and keeps the worker); `test/drawings.test.ts`
+  browser pane will not load a sandboxed frame; to see drawings there, start a dev server with `PELAGO_UNSANDBOXED=1`, which drops that wall and keeps the worker); `test/layouts.test.ts`
   does, in headless Chrome.
 
 ## UI rules
@@ -283,15 +283,15 @@ else a pack"). These rules keep it composable while that happens, and
   and the count only goes down.
 
 - **Every view is drawn by a drawing a pack ships** (the owner, 22 Oct 2026):
-  code for one form (list, flow, grid...), in `pack.json` `drawings`, changed by the owner on
+  code for one form (list, flow, grid...), in `pack.json` `layouts`, changed by the owner on
   the map, run in the sandbox, answering with marks the page checks
-  (`docs/drawings.md`). The kernel keeps the frame every view has. A
+  (`docs/layouts.md`). The kernel keeps the frame every view has. A
   drawing moved out of the kernel must draw what the kernel drew: the same
   marks, looks and behaviour, checked in a real browser.
 - **A wired drawing is layers and one solver** (the owner, 30 Oct 2026). Each
   module names its layer, imports run one way, only Metrics sets a place, a
   length is a size on the style, and no two wires share a stretch. The rules,
-  and how to add one, are in `docs/drawings.md`.
+  and how to add one, are in `docs/layouts.md`.
 
 Each rule keeps a list of what already broke it on 16 Oct 2026. An entry may
 only shrink and goes once the rule is met: when your change brings a number

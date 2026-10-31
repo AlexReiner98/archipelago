@@ -17,7 +17,7 @@ test('a view kept on the map is drawn from its flat lens, with its pins, and can
     { op: 'create', ref: 'v', type: 'lens', title: 'Funding map', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 }, pins: [made.other], style: { shape: 'list' } } },
     { op: 'link', type: 'about', from: 'v', to: made.p },
   ]));
-  const { keptPicture } = await import('../src/lens-saved.ts');
+  const { keptPicture } = await import('../src/query-saved.ts');
   const answer = await keptPicture(l, made.v);
   assert.deepEqual(answer.items.map((i) => i.id).sort(), [made.p, made.irap, made.other].sort());
   assert.equal(answer.style.shape, 'list', 'drawn in the shape it keeps');

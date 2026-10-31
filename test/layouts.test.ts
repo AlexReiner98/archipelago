@@ -1,4 +1,4 @@
-// Pictures drawn by drawings (src/drawings.ts, ui/drawing.js): code a pack ships, changed on the map, run in the
+// Pictures drawn by drawings (src/layouts.ts, ui/layout.js): code a pack ships, changed on the map, run in the
 // sandbox and answering with marks the page checks. The server sends a drawing once; the owner's version stands in
 // for the pack's module by module. In a real browser (skipped where there is no Chrome): the architecture drawing
 // draws what the kernel drew before it, mark for mark, look for look; and a drawing that tries what a drawing may not
@@ -9,10 +9,10 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
-import { architectureCases, flowCases, house } from './drawing-cases.ts';
-import { readSteps, stepsShown } from '../src/lens-steps.ts';
+import { architectureCases, flowCases, house } from './layout-cases.ts';
+import { readSteps, stepsShown } from '../src/query-steps.ts';
 import { serve } from './serve.ts';
-import { keptPicture } from '../src/lens-saved.ts';
+import { keptPicture } from '../src/query-saved.ts';
 import { fresh, make } from './map.ts';
 
 /** A small system on the map, its picture kept as a view drawn as architecture. */
@@ -117,8 +117,8 @@ test('a card is what a story ends on: a name of a few words and a line, sent to 
 });
 
 const browser = chrome();
-const GOLDEN = join(import.meta.dirname, 'fixtures', 'drawings', `architecture.golden.${process.platform}.json`);
-const FLOW_GOLDEN = join(import.meta.dirname, 'fixtures', 'drawings', `flow.golden.${process.platform}.json`);
+const GOLDEN = join(import.meta.dirname, 'fixtures', 'layouts', `architecture.golden.${process.platform}.json`);
+const FLOW_GOLDEN = join(import.meta.dirname, 'fixtures', 'layouts', `flow.golden.${process.platform}.json`);
 
 test('in a browser, the flow drawing draws what the kernel drew: the same marks, looks, hovering, lighting and key', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { call, base } = await serve('off');
@@ -126,9 +126,9 @@ test('in a browser, the flow drawing draws what the kernel drew: the same marks,
   const { drawing } = (await call('/api/view', undefined, { name: 'style', params: { have: [] } })).result.style;
   const page = await open(`${base}/`);
   try {
-    await page.evaluate(readFileSync(join(import.meta.dirname, 'drawing-capture.js'), 'utf8'));
+    await page.evaluate(readFileSync(join(import.meta.dirname, 'layout-capture.js'), 'utf8'));
     const cases = flowCases().map((c) => ({ ...c, style: { ...c.style, drawing } }));
-    const now: any = await page.evaluate(`(async () => { const { drawWith } = await import('/drawing.js'); return captureDrawings(drawWith, ${JSON.stringify(cases)}); })()`);
+    const now: any = await page.evaluate(`(async () => { const { drawWith } = await import('/layout.js'); return captureDrawings(drawWith, ${JSON.stringify(cases)}); })()`);
     for (const c of cases) assert.ok(now[c.name].html.includes('lf-step'), `${c.name} is drawn: ${now[c.name].html.slice(0, 200)}`);
     // What the kernel's own flow drew (ui/flow.js, until 23 Oct 2026), on a machine like this one. A change meant to
     // draw otherwise keeps what it now draws, with GOLDEN_WRITE=1.
@@ -153,9 +153,9 @@ test('in a browser, the architecture drawing draws what the kernel drew: the sam
   const { drawing } = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [] } })).result.style;
   const page = await open(`${base}/`);
   try {
-    await page.evaluate(readFileSync(join(import.meta.dirname, 'drawing-capture.js'), 'utf8'));
+    await page.evaluate(readFileSync(join(import.meta.dirname, 'layout-capture.js'), 'utf8'));
     const cases = architectureCases().map((c) => ({ ...c, style: { ...c.style, drawing } }));
-    const now: any = await page.evaluate(`(async () => { const { drawWith } = await import('/drawing.js'); return captureDrawings(drawWith, ${JSON.stringify(cases)}); })()`);
+    const now: any = await page.evaluate(`(async () => { const { drawWith } = await import('/layout.js'); return captureDrawings(drawWith, ${JSON.stringify(cases)}); })()`);
     for (const c of cases) assert.ok(now[c.name].html.includes('ar-part'), `${c.name} is drawn: ${now[c.name].html.slice(0, 200)}`);
     // Text is measured by the fonts of the machine: compared with what was drawn on one like it. A change meant to
     // draw otherwise keeps what it now draws, with GOLDEN_WRITE=1.
@@ -181,7 +181,7 @@ test('in a browser, the architecture drawing draws what the kernel drew: the sam
     assert.equal(parts, 2);
     // A page that draws its body anew keeps the frame drawings run in: the next picture still draws.
     const after = await page.evaluate(`(async () => {
-      const { drawWith } = await import('/drawing.js');
+      const { drawWith } = await import('/layout.js');
       const host = document.createElement('div');
       document.body.replaceChildren(host);
       drawWith(host, ${JSON.stringify(cases[0].answer)}, ${JSON.stringify(cases[0].style)}, () => {});
@@ -218,7 +218,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
     };
     const body = await page.evaluate('getComputedStyle(document.body).display');
     const got: Record<string, string> = await page.evaluate(`(async () => {
-      const { drawWith } = await import('/drawing.js');
+      const { drawWith } = await import('/layout.js');
       const out = {};
       for (const [name, code] of Object.entries(${JSON.stringify(tries)})) {
         const host = document.createElement('div');
@@ -239,7 +239,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
       `let reached = 'blocked'; try { await fetch(${JSON.stringify(`${base}/api/view`)}, { method: 'POST' }); reached = 'reached'; } catch {}`,
     );
     const said = await page.evaluate(`(async () => {
-      const { drawWith } = await import('/drawing.js');
+      const { drawWith } = await import('/layout.js');
       const host = document.createElement('div');
       document.body.append(host);
       drawWith(host, { items: [], links: [], lens: {} }, { numbers: ${numbers}, drawing: { hash: 'reach'.padEnd(64, '0'), modules: { 'index.js': ${JSON.stringify(reach)} } } }, () => {});
@@ -251,7 +251,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
     // Code that never answers is stopped, and says so.
     const stuck = hostile(`{}`, 'for (;;) {}');
     const stopped = await page.evaluate(`(async () => {
-      const { drawWith } = await import('/drawing.js');
+      const { drawWith } = await import('/layout.js');
       const host = document.createElement('div');
       document.body.append(host);
       drawWith(host, { items: [], links: [], lens: {} }, { numbers: ${numbers}, drawing: { hash: 'stuck'.padEnd(64, '0'), modules: { 'index.js': ${JSON.stringify(stuck)} } } }, () => {});
@@ -281,7 +281,7 @@ test('in a browser, a drawing that asks for a surface paints pixels over its pic
     }`;
     const plain = `export async function picture(input, tools) { setTimeout(async () => { const s = await tools.surface(); tools.patch([{ key: 'svg', toggle: { ['none-' + (s === null)]: true } }]); }, 10); return { scene: { svg: ['svg', { key: 'svg' }] } }; }`;
     const got: any = await page.evaluate(`(async () => {
-      const { drawWith } = await import('/drawing.js');
+      const { drawWith } = await import('/layout.js');
       const draw = async (name, code, done) => {
         const host = document.createElement('div');
         document.body.append(host);

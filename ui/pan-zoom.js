@@ -5,7 +5,7 @@
 // of sight is not drawn at all. Whoever drew it is told what is in view (`told`), once a frame at most. It opens with
 // all of it in sight when that can be read, else at a size that reads, brought to where it starts.
 
-import { numberOf } from './lens-base.js';
+import { numberOf } from './query-base.js';
 import { panLock } from './pan-lock.js';
 
 /** What a frame of `n` units' text is shown as, on screen at `px` a unit: none, its names, or all of it. */

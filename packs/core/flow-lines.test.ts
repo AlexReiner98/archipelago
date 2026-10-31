@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { lines } from './draw/flow/lines.js';
+import { lines } from './layouts/flow/lines.js';
 
 // One unit a letter: a line of 10 holds ten letters.
 const measure = (t: string) => t.length;

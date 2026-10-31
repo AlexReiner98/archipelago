@@ -1,4 +1,4 @@
-// The flow's routing conventions (docs/drawings.md, e_k78mxqxt), each held on pictures dense enough to break them.
+// The flow's routing conventions (docs/layouts.md, e_k78mxqxt), each held on pictures dense enough to break them.
 // The order runs from the foot of what is depended on down into the head of what depends on it, every other link is a tie
 // between the outlines of its two steps, and each is a line of its own: at right angles, round the steps, never along
 // another; a head where the link points unless the style draws its type headless. Input in, marks out: no database.
@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url';
 const pack = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
 const house = { ...pack.styles.find((s: any) => s.id === 'core.house').props, shape: 'flow' };
 const laid = mkdtempSync(join(tmpdir(), 'flow-routing-'));
-for (const [name, file] of Object.entries(pack.drawings.find((d: any) => d.id === 'core.flow').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
+for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.flow').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
 const { layout } = await import(pathToFileURL(join(laid, 'layout.js')).href);
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 const measure = (t: string, px: number) => t.length * px * 0.55;

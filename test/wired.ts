@@ -9,14 +9,14 @@ import { pathToFileURL } from 'node:url';
 
 const ROOT = join(import.meta.dirname, '..');
 
-type Drawing = { id: string; pack: string; modules: Record<string, string> };
+type Layout = { id: string; pack: string; modules: Record<string, string> };
 /** Every drawing of every pack. */
-export const drawings: Drawing[] = readdirSync(join(ROOT, 'packs')).filter((p) => existsSync(join(ROOT, 'packs', p, 'pack.json'))).flatMap((pack) =>
-  ((JSON.parse(readFileSync(join(ROOT, 'packs', pack, 'pack.json'), 'utf8')) as { drawings?: Drawing[] }).drawings ?? []).map((d) => ({ ...d, pack })));
+export const drawings: Layout[] = readdirSync(join(ROOT, 'packs')).filter((p) => existsSync(join(ROOT, 'packs', p, 'pack.json'))).flatMap((pack) =>
+  ((JSON.parse(readFileSync(join(ROOT, 'packs', pack, 'pack.json'), 'utf8')) as { layouts?: Layout[] }).layouts ?? []).map((d) => ({ ...d, pack })));
 /** What a module imports of its drawing, by name. */
 export const imported = (text: string) => [...text.matchAll(/(?:from\s+|import\s*\(\s*)['"]\.\/([^'"]+)['"]/g)].map((m) => m[1]);
-export const pathOf = (d: Drawing, name: string) => `packs/${d.pack}/${d.modules[name]}`;
-export const short = (file: string) => file.replace('packs/core/draw/', '');
+export const pathOf = (d: Layout, name: string) => `packs/${d.pack}/${d.modules[name]}`;
+export const short = (file: string) => file.replace('packs/core/layouts/', '');
 
 export type Sketch = { items: any[]; links: { type: string; from: string; to: string }[] };
 type Line = { ends: string[]; points: number[][] };
@@ -107,7 +107,7 @@ export function faultsOf(wired: (typeof WIRED)[string], layout: any, spacing: (l
   return found;
 }
 
-/** The layers of a wired drawing, in the order each may read those before it (docs/drawings.md). */
+/** The layers of a wired drawing, in the order each may read those before it (docs/layouts.md). */
 export const LAYERS = ['graph', 'topology', 'shape', 'metrics', 'marks'];
 /** What each module that does not yet say its layer will say, by folder then layer. Architecture's are a first reading. */
 const LAYERS_OWED: Record<string, Record<string, string>> = {
@@ -130,7 +130,7 @@ export const saysLayer = (file: string) => said.exec(/^(?:\/\/.*\r?\n)+/.exec(re
 export const ranks = (file: string) => (saysLayer(file) ?? owedLayer(file) ?? '').split(/, | and /).map((l) => LAYERS.indexOf(l));
 
 /** `use` run with a drawing's modules set out as the page loads them, by the names in `modules`: `url(name)` is how to import one. */
-export async function setOut<T>({ pack, modules }: Drawing, use: (url: (name: string) => string) => T | Promise<T>): Promise<T> {
+export async function setOut<T>({ pack, modules }: Layout, use: (url: (name: string) => string) => T | Promise<T>): Promise<T> {
   const dir = mkdtempSync(join(tmpdir(), 'wired-'));
   try {
     writeFileSync(join(dir, 'package.json'), '{"type":"module"}');

@@ -92,7 +92,7 @@ async function drawNow(address: string, pass: string, width: number, height: num
 }
 
 /** Stop the Chrome this process started, if any: for a server closing, and for tests. */
-export async function stopDrawing() {
+export async function stopLayout() {
   clearTimeout(idle);
   const b = await browser?.catch(() => null);
   browser = null;
