@@ -2,13 +2,16 @@
 // line in an order that keeps the order's own, each link to the left or the right of it where it fits (Goldschmidt and
 // Takvorian), and hidden links until one item starts it all and one ends it. Every link then runs from earlier to later
 // in that numbering, so a drawing that follows the numbers runs every one of them down. Links that do not fit are
-// threaded through the faces: the order's wires only ever onward, the others any way. Pure: links in, a graph out.
+// threaded through the faces, each one way through the numbers: the order's wires onward, the others from whichever end
+// comes first. What holds nothing then goes, and what crosses is threaded again the shortest way. Pure: links in, a graph out.
 
-import { nearest, put, threader } from './thread.js';
+import { threader } from './thread.js';
 import { pair } from './polyline.js';
 
 /** How many orders are tried, and how much work they may take in all, in pairs of links compared. */
-const TRIES = 60, WORK = 2e6;
+const TRIES = 24, WORK = 3e5;
+/** How many times what is threaded is threaded again. */
+const TIGHTEN = 3;
 
 const ties = (p, q, r, s) => (p < r && r < q && q < s) || (r < p && p < s && s < q);
 
@@ -117,9 +120,9 @@ function attempt(links, items, lean, noise) {
   for (const arcs of sides) for (const a of arcs) if (a.l) add([a.l[0], a.l[1]], true, a.l);
   for (const a of hidden) add([line[a.p], line[a.q]], false, null);
   const list = facesOf(line, sides), run = stHere ? [s, t] : [t, s], keep = pair(s, t);
-  const isOuter = (f) => f.some((v, k) => v === run[0] && f[(k + 1) % f.length] === run[1]);
+  const isOuter = (f) => f.some((v, k) => (v === run[0] && f[(k + 1) % f.length] === run[1]) || (v === run[1] && f[(k + 1) % f.length] === run[0]));
   // The order's wires first: one left for later must still find a way.
-  const { through, tally } = threader(list, owner, add, { number, keep, onward: (l) => l[2] });
+  const { through, tally, nearest, put, again, prune } = threader(list, owner, add, { number, keep, onward: (l) => l[2] > 0, oneWay: true });
   through([...left].sort((a, b) => Number(b[2]) - Number(a[2])));
   // Then what only has ties, each in the face nearest what it is tied to, the most tied first.
   const waiting = new Set(items.filter((v) => !here.has(v))), placed = (v) => !waiting.has(v);
@@ -131,25 +134,26 @@ function attempt(links, items, lean, noise) {
     }
     const mine = later.filter(([p, q]) => (p === v && placed(q)) || (q === v && placed(p))), near = mine.map(([p, q]) => (p === v ? q : p));
     const at = near.map((w) => number.get(w)).sort((p, q) => p - q);
-    put(v, nearest(near, list, owner, keep, (i) => isOuter(list[i])), at[at.length >> 1] ?? 0, list, number, add);
+    put(v, nearest(near, isOuter), at[at.length >> 1] ?? 0);
     waiting.delete(v);
     through(mine);
   }
-  return { faces: list, wires, owner, number, s, t, outerAt: list.findIndex(isOuter), lost, reach, ...tally };
+  return { faces: list, wires, owner, number, s, t, lost, reach, tally, tighten: () => { prune(wires); again(wires, TIGHTEN); }, outer: () => list.findIndex(isOuter) };
 }
 
 /**
  * `links` is a list of [u, v, order]: for the order, u comes first. The graph as thread's { faces, wires, owner, ghosts,
  * crossings }, with `number` for each item and point, its first and last `s` and `t`, and `outerAt`, the outer face.
- * Each order tried is judged by the crossings it comes to, not by how many links it keeps.
+ * Each order tried is judged by the crossings it comes to, not by how many links it keeps, and the best is tightened.
  */
 export function embed(links, items) {
   let seed = 7, best = null;
   const noise = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
   const tries = Math.max(4, Math.min(TRIES, Math.ceil(WORK / Math.max(1, links.length * links.length))));
   for (let k = 0; k < tries && (!best || best.cost > 0); k++) {
-    const made = attempt(links, items, k ? noise : () => 0, noise), cost = made.crossings + made.ghosts.length / 10;
+    const made = attempt(links, items, k ? noise : () => 0, noise), cost = made.tally.crossings + made.tally.ghosts.length / 10;
     if (!best || cost < best.cost) best = { ...made, cost };
   }
-  return best;
+  best.tighten();
+  return { ...best, ...best.tally, outerAt: best.outer() };
 }
