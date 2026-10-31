@@ -26,3 +26,18 @@ test('an SVG of shapes alone is kept as a figure; one that scripts, styles, link
   ] as const)
     assert.match(svgRefused(bad) ?? 'kept', why, bad);
 });
+
+test('a figure may move its outlines on a clock, and an animation may do nothing else', () => {
+  const moves = (attrs: string) => `<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0l1 1"><animate ${attrs}/></path></svg>`;
+  assert.equal(svgRefused(moves('attributeName="d" begin="1s" dur="8s" fill="freeze" values="M0 0l1 1;M0 0l2-3"')), null);
+  assert.equal(svgRefused(moves('attributeName="opacity" dur="500ms" repeatCount="indefinite" values="0;1"')), null);
+  for (const [attrs, why] of [
+    ['attributeName="href" values="https://x.test"', /attributeName/],
+    ['attributeName="d" begin="click" values="M0 0"', /begin/],
+    ['attributeName="d" to="M0 0"', /to on/],
+    ['attributeName="d" values="url(https://x.test)"', /values/],
+    ['dur="1s"', /no attribute/],
+  ] as const)
+    assert.match(svgRefused(moves(attrs)) ?? 'kept', why, attrs);
+  assert.match(svgRefused('<svg><set attributeName="href" to="x"/></svg>') ?? 'kept', /<set>/);
+});

@@ -85,6 +85,8 @@ export const DEFAULTS = {
   line: 1.2,       // outline weight
   seed: 1,
   wrap: false,     // repeat seamlessly left to right
+  pinned: null,    // a field and its places given from outside (morph.js): nothing is grown, and what stands at a point
+                   // depends on that point alone, so pictures of a field as it changes change only where it does
 };
 
 /**
@@ -344,10 +346,19 @@ export function ridges(dials) {
       // The walk follows the land as it goes (never above it, so after a dip it climbs again from the dip, as the
       // plain cap does), and the first section off a coast always climbs, so no coast is eaten away.
       const walk = (order) => {
-        let height = 0, left = 0, climb = lim, fresh = true;
+        let height = 0, left = 0, climb = lim, fresh = true, place = -1;
         for (const i of order) {
-          if (raws[i] <= 0) { (height = 0), (left = 0), (fresh = true); continue; }
-          if (left-- <= 0) {
+          if (raws[i] <= 0) { (height = 0), (left = 0), (fresh = true), (place = -1); continue; }
+          if (d.pinned) {
+            // Sections stand at fixed places along the row, each with its own check, whatever the coast does.
+            const section = Math.floor(i / 7);
+            if (section !== place) {
+              place = section;
+              const here = random(d.seed * 7177 + r * 131 + section * 31);
+              climb = fresh || here() < 1 - 0.6 * v ? lim * (1 - 0.7 * v * here()) : 0;
+              fresh = false;
+            }
+          } else if (left-- <= 0) {
             left = 2 + Math.floor(rr() * (4 + 10 * d.undulate));
             climb = fresh || rr() < 1 - 0.6 * v ? lim * (1 - 0.7 * v * rr()) : 0;
             fresh = false;
@@ -440,18 +451,23 @@ export function ridges(dials) {
     }
     // The row's floor: a line across the water.
     shapes.push({ line: true, points: [[xs[0], y], [xs[xs.length - 1], y]] });
-    sky.push({ y, yc, h, at: shapes.length });
+    sky.push({ y, yc, h, at: shapes.length, shelf, steps, groups: gs });
   }
   // Clouds, from the mountains and spread on the wind (clouds.js): each row's go in just after its land, so nearer land passes
   // in front of farther cloud. Last row first, so the earlier places stay where they were.
   const made = clouds({ d, rows: sky, xs, dx, gap, puff, seam, shore, smooth });
   for (let r = sky.length - 1; r >= 0; r--) shapes.splice(sky[r].at, 0, ...made[r]);
-  return { width: W, height: H, shapes, line: d.line, chains: groups };
+  return { width: W, height: H, shapes, line: d.line, chains: groups, rows: sky, xs, gap };
 }
 
 /** The field and its archipelagos for these dials, grown once and kept while the dials that shape it hold. */
 let grown = {};
 function diffusionFor(d, W, H) {
+  if (d.pinned) {
+    const { key, field, arch } = d.pinned;
+    grown = { key, akey: key, field, arch };
+    return { field, arch, level: 0.62 - d.land * 0.5 };
+  }
   const nx = Math.max(16, Math.round((40 + d.scale * 70) * (W / DEFAULTS.width))), ny = Math.round((nx * H) / W), level = 0.62 - d.land * 0.5;
   const key = `${nx}|${ny}|${d.pattern}|${d.variety}|${d.seed}`;
   if (grown.key !== key) grown = { key, field: grow({ nx, ny, pattern: d.pattern, variety: d.variety, seed: d.seed }) };

@@ -26,7 +26,8 @@
   #drop.over { background: #0001; }
   #photo { display: none; max-width: 100%; border-radius: 4px; margin-top: 6px; }
   main { display: grid; place-items: center; overflow: auto; padding: 20px; }
-  canvas { box-shadow: 0 2px 18px #0003; max-width: 100%; max-height: calc(100vh - 40px); }
+  canvas, #moving { box-shadow: 0 2px 18px #0003; max-width: 100%; max-height: calc(100vh - 40px); }
+  #moving[hidden], canvas[hidden] { display: none; }
   body.emblem canvas#view { max-height: calc(100vh - 340px); }
   canvas.at { image-rendering: pixelated; }
   body.emblem #sizes { display: grid; gap: 8px; margin-top: 14px; }
@@ -161,6 +162,26 @@
   <label title="Pale shallow water round the land">Shallows <small>none · wide</small><input id="shallows" type="range" min="0" max="3" step="0.01"></label>
   <label>Line <small>hair · bold</small><input id="line" type="range" min="0" max="8" step="0.05"></label>
   <label class="check"><input id="wrap" type="checkbox"> Repeat left to right</label>
+  <h2>Animate</h2>
+  <label title="Where the pattern starts">Start pattern <small>spots · coral</small><input id="mFromPattern" type="range" min="-0.3" max="1.5" step="0.05"></label>
+  <label title="Where the pattern ends">End pattern <small>spots · coral</small><input id="mToPattern" type="range" min="-0.3" max="1.5" step="0.05"></label>
+  <label title="How fine the forms are at the start">Start scale <small>large · fine</small><input id="mFromScale" type="range" min="-0.3" max="1.6" step="0.05"></label>
+  <label title="How fine the forms are at the end">End scale <small>large · fine</small><input id="mToScale" type="range" min="-0.3" max="1.6" step="0.05"></label>
+  <label title="How much is land at the start">Start land <small>sea · land</small><input id="mFromLand" type="range" min="0" max="1" step="0.01"></label>
+  <label title="How much is land at the end">End land <small>sea · land</small><input id="mToLand" type="range" min="0" max="1" step="0.01"></label>
+  <label title="How long the change takes">Seconds <output id="mSecondsOut"></output><input id="mSeconds" type="range" min="2" max="30" step="0.5"></label>
+  <label title="How long the start holds first">Hold <output id="mWaitOut"></output><input id="mWait" type="range" min="0" max="5" step="0.25"></label>
+  <label title="Key moments: more follows the field closer, and weighs more">Keys <output id="mKeysOut"></output><input id="mKeys" type="range" min="2" max="12" step="1"></label>
+  <label title="How far the field grows between keys: more lets its forms settle into each new setting">Growth <output id="mGrowOut"></output><input id="mGrow" type="range" min="200" max="6000" step="100"></label>
+  <label title="Rows of land: more is finer, and weighs more">Rows <output id="mRowsOut"></output><input id="mRows" type="range" min="20" max="165" step="1"></label>
+  <label title="Tiles across a row, each keeping its colour: more colour, more weight">Tiles <output id="mTilesOut"></output><input id="mTiles" type="range" min="2" max="40" step="1"></label>
+  <label title="Points along a tile: finer ridges, more weight">Points <output id="mPointsOut"></output><input id="mPoints" type="range" min="2" max="30" step="1"></label>
+  <label title="Colour bands up each ridge: each is a layer of weight">Bands <output id="mBandsOut"></output><input id="mBands" type="range" min="1" max="4" step="1"></label>
+  <label class="check" title="Pale water round the land: a layer of weight"><input id="mShallows" type="checkbox"> Shallows</label>
+  <label class="check" title="An ink line along each ridge: a layer of weight"><input id="mOutline" type="checkbox"> Outline</label>
+  <label class="check" title="Back and forth for ever, twice the weight; else once, ending on the last key"><input id="mLoop" type="checkbox"> Loop</label>
+  <div class="row"><button id="mBuild" title="Grow it and play it here">Build</button><button id="mReplay" title="Play it again" disabled>Replay</button><button id="mSave" title="Download the animated SVG" disabled>Save SVG</button></div>
+  <div id="mNote" title="What it weighs as a figure: the site keeps 1 MB at most, and sends it gzipped"></div>
   <div class="row">
     <button id="reseed" title="Same dials, another map">Reseed</button>
     <button id="svg" title="Download as SVG">SVG</button>
@@ -168,12 +189,13 @@
   </div>
   <div id="note"></div>
 </aside>
-<main><canvas id="view"></canvas><div id="sizes" class="only-emblem" title="The drawing at 16, 24, 32, 48, 64 and 128 px"></div></main>
+<main><canvas id="view"></canvas><img id="moving" alt="The ridges, moving" hidden><div id="sizes" class="only-emblem" title="The drawing at 16, 24, 32, 48, 64 and 128 px"></div></main>
 <script type="module">
   import { ridges, DEFAULTS } from './ridges.js';
   import { PLACES, fromPixels, signature, waterOf, landOf, layout, enrich } from './palettes.js';
   import * as presets from './presets.js';
   import { paint, fillOf as fillWith, swell, isLight } from './paint.js';
+  import { MORPH, keysOf, svgOf } from './morph.js';
 
   const $ = (id) => document.getElementById(id);
   const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate', 'clouds', 'cloudSize', 'cloudPuff', 'cloudTip', 'cloudShadow', 'cloudPeaks', 'cloudSpread', 'wind', 'windDir'];
@@ -321,6 +343,8 @@
   const background = (p) => bgPicked ?? waterOf(p).deep;
 
   function draw() {
+    $('moving').hidden = true;
+    $('view').hidden = false;
     const t0 = performance.now(), p = richOf(pal());
     const pic = ridges(dials());
     const cv = $('view'), dpr = devicePixelRatio || 1;
@@ -457,6 +481,43 @@
     save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${background(p)}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g>${text(pic, p)}</svg>`], { type: 'image/svg+xml' }));
   };
 
+  // Animate: the Animate dials, and the SVG they make (morph.js), shown over the still picture until a dial moves it.
+  const MORPH_NUMBERS = { mFromPattern: 'fromPattern', mToPattern: 'toPattern', mFromScale: 'fromScale', mToScale: 'toScale', mFromLand: 'fromLand', mToLand: 'toLand', mSeconds: 'seconds', mWait: 'wait', mKeys: 'keys', mGrow: 'grow', mRows: 'rows', mTiles: 'tiles', mPoints: 'points', mBands: 'bands' };
+  const MORPH_CHECKS = { mShallows: 'shallows', mOutline: 'outline', mLoop: 'loop' };
+  const morphDials = () => ({ ...Object.fromEntries(Object.entries(MORPH_NUMBERS).map(([id, k]) => [k, +$(id).value])), ...Object.fromEntries(Object.entries(MORPH_CHECKS).map(([id, k]) => [k, $(id).checked])) });
+  const morphOuts = () => { for (const id of Object.keys(MORPH_NUMBERS)) if ($(`${id}Out`)) $(`${id}Out`).textContent = $(id).value; };
+  function setMorph(saved) {
+    const m = { ...MORPH, ...saved };
+    for (const [id, k] of Object.entries(MORPH_NUMBERS)) $(id).value = m[k];
+    for (const [id, k] of Object.entries(MORPH_CHECKS)) $(id).checked = m[k];
+    morphOuts();
+  }
+  let moving = null;
+  const showMoving = () => {
+    $('moving').src = URL.createObjectURL(new Blob([moving], { type: 'image/svg+xml' }));
+    $('moving').hidden = false;
+    $('view').hidden = true;
+  };
+  const kB = (bytes) => `${Math.round(bytes / 1000)} kB`;
+  const gzipped = async (text) => (await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()).byteLength;
+  $('mBuild').onclick = () => {
+    $('mNote').textContent = 'Growing…';
+    setTimeout(async () => {
+      const t0 = performance.now(), p = richOf(pal()), morph = morphDials();
+      const pics = keysOf({ dials: dials(), morph });
+      const { svg, shapes } = svgOf({ pics, morph, palOf, base: p, background: background(p), weighted: $('weighted').checked });
+      moving = svg;
+      showMoving();
+      $('mReplay').disabled = $('mSave').disabled = false;
+      const over = new Blob([svg]).size > 1e6;
+      $('mNote').textContent = `${kB(new Blob([svg]).size)}, ${kB(await gzipped(svg))} gzipped · ${shapes} shapes · ${((performance.now() - t0) / 1000).toFixed(1)} s${over ? ' · over the 1 MB a figure may be' : ''}`;
+    }, 30);
+  };
+  $('mReplay').onclick = showMoving;
+  $('mSave').onclick = () => save(`archipelago-morph-${seed}.svg`, new Blob([moving], { type: 'image/svg+xml' }));
+  for (const id of Object.keys(MORPH_NUMBERS)) $(id).addEventListener('input', morphOuts);
+  setMorph();
+
   // Presets: everything that makes this picture, so it can be had again.
   const paletteOf = (p) => ({ title: p.title, paper: p.paper, ink: p.ink, colours: [...p.colours], weights: p.weights ? [...p.weights] : undefined });
   const changed = (k, p) => !PLACES[k] || JSON.stringify(paletteOf(p)) !== JSON.stringify(paletteOf(baseOf(PLACES[k])));
@@ -470,7 +531,7 @@
     seed, bg: bgPicked, richness: +$('richness').value, cloudOpacity: +$('cloudOpacity').value,
     face: { font: $('face').value, weight: +$('faceWeight').value },
     letter: { on: $('letter').checked, text: $('letterText').value, size: +$('letterSize').value, strength: +$('letterStrength').value },
-    emblem: { on: emblem(), at: +$('emAt').value }, swell: $('swell').checked, frame: $('frame').value,
+    emblem: { on: emblem(), at: +$('emAt').value }, swell: $('swell').checked, frame: $('frame').value, morph: morphDials(),
     name: { on: $('name').checked, text: $('nameText').value, size: +$('nameSize').value, place: $('namePlace').value, clear: +$('nameClear').value, caps: $('nameCaps').checked, italic: $('nameItalic').checked, spacing: +$('nameSpacing').value },
     // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
     palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
@@ -498,6 +559,7 @@
     $('emblem').checked = !!e.on; $('emAt').value = e.at ?? 0; $('swell').checked = s.swell ?? true; $('frame').value = s.frame ?? '800x1000';
     const n = s.name ?? {};
     $('name').checked = !!n.on; $('nameText').value = n.text ?? 'Archipelago'; $('nameSize').value = n.size ?? 0.1; $('namePlace').value = n.place ?? 'low-left'; $('nameClear').value = n.clear ?? 1; $('nameCaps').checked = !!n.caps; $('nameItalic').checked = !!n.italic; $('nameSpacing').value = n.spacing ?? 0; showName();
+    setMorph(s.morph);
     showLetter(); showClouds(); showEmblem();
     showSource(); swatches(); draw();
   }
