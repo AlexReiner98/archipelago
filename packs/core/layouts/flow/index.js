@@ -213,10 +213,10 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     const key = `s:${n.id}`;
     keyed.set(key, i.id);
     if (n.stub) return titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nA choice nothing follows yet`);
-    // Held for the owner: a new item is a faint step that opens nothing; an edit is marked on its step. Either way a badge on its corner.
+    // Held for the owner: a new item is a faint step that opens its change; an edit is marked on its step. Either way a badge on its corner.
     if (held(i.pending)) stepBadges.set(n.id, badge(i.pending, [X + n.w / 2, Y - n.h / 2]));
     tipped.add(key);
-    if (ghost) return titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nHeld for you`);
+    if (ghost) return m('g', { key: `held:${i.pending.proposal}:${n.id}`, on: ['click'] }, titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nHeld for you`));
     const el = titled(m('a', { key, on: story ? ['enter', 'leave'] : ['enter', 'leave', 'drag'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), i.title);
     dims.set(n.id, el);
     return el;
