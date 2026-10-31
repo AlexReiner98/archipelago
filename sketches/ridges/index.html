@@ -541,7 +541,7 @@
   $('mPlay').onclick = () => {
     const t0 = performance.now(), ms = +$('mSeconds').value * 1000;
     const tick = (now) => {
-      const t = Math.min(1, (now - t0) / ms);
+      const t = Math.max(0, Math.min(1, (now - t0) / ms));
       $('mSlide').value = t;
       showStep(t);
       if (t < 1) requestAnimationFrame(tick);
