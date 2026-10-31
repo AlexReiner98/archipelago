@@ -125,8 +125,10 @@ export function spreadPorts(boxes, wires, still, { track, gap, corner }) {
   const others = [...wires, ...still.map((points) => ({ points }))];
   for (const { id, ax, ends } of sides.values()) {
     const b = shape.get(id), [lo, hi] = [b.lo[ax], b.hi[ax]], pad = Math.min(corner, (hi - lo) / 3);
-    if (b.pointed && ends.length > 1) continue;
-    const step = ends.length > 1 ? Math.min(gap, (hi - lo - 2 * pad) / (ends.length - 1)) : 0, mid = (lo + hi) / 2;
+    // What comes to a point shares one arrival there.
+    // And so does more than a side can hold apart: one bus into one arrival, not a squeeze.
+    const packed = b.pointed || (ends.length - 1) * gap > hi - lo - 2 * pad;
+    const step = ends.length > 1 && !packed ? gap : 0, mid = (lo + hi) / 2, mates = new Set(ends.map((e) => e.w));
     ends.sort((p, q) => p.at - q.at);
     ends.forEach((end, n) => {
       const want = mid + (n - (ends.length - 1) / 2) * step, was = tidy(end.w.points), k = end.k === 0 ? 0 : was.length - 1, near = end.k === 0 ? 1 : was.length - 2, line = was.map((p) => [...p]);
@@ -134,7 +136,61 @@ export function spreadPorts(boxes, wires, still, { track, gap, corner }) {
       line[k][ax] = want;
       line[near][ax] = want;
       const done = tidy(line);
-      if (clear(done, was, end.w, shape.solids, others, 0, 0)) ((end.w.points = done), (end.w.bounds = null));
+      if (clear(done, was, end.w, shape.solids, others, 0, 0, packed ? mates : null)) ((end.w.points = done), (end.w.bounds = null));
+    });
+  }
+}
+
+/**
+ * Every run of wires side by side at one spacing: stretches that lie along one another or nearer than `gap` move out from
+ * their middle, `gap` apart, the outermost first, each only if it crosses and touches nothing new. A stretch that lands on
+ * a box moves along that box or not at all.
+ */
+export function evenRuns(boxes, wires, still, { track, gap, corner }) {
+  const shape = shapesOf(boxes, track), others = [...wires, ...still.map((points) => ({ points }))];
+  for (const ax of [0, 1]) for (let pass = 0; pass < 2; pass++) {
+    const runs = wires.flatMap((w) => {
+      const line = tidy(w.points);
+      return line.slice(1).map((q, i) => ({ w, i, ends: i === 0 ? w.a : i === line.length - 2 ? w.b : null, both: line.length === 2, at: line[i][ax], lo: Math.min(line[i][1 - ax], q[1 - ax]), hi: Math.max(line[i][1 - ax], q[1 - ax]), along: line[i][ax] === q[ax] })).filter((r) => r.along);
+    }).sort((p, q) => p.at - q.at || p.lo - q.lo);
+    const root = new Map(runs.map((r) => [r, r])), find = (r) => (root.get(r) === r ? r : (root.set(r, find(root.get(r))), root.get(r)));
+    for (let i = 0; i < runs.length; i++) for (let j = i + 1; j < runs.length && runs[j].at - runs[i].at < gap - 0.5; j++) {
+      const [p, q] = [runs[i], runs[j]];
+      const trunk = [p.w.a, p.w.b].some((id) => id === q.w.a || id === q.w.b) && p.at === q.at;
+      if (p.w !== q.w && !trunk && Math.min(p.hi, q.hi) - Math.max(p.lo, q.lo) > 1) root.set(find(p), find(q));
+    }
+    const sets = new Map();
+    for (const r of runs) (sets.get(find(r)) ?? sets.set(find(r), []).get(find(r))).push(r);
+    for (const set of sets.values()) {
+      if (set.length < 2) continue;
+      const middle = set.reduce((sum, r) => sum + r.at, 0) / set.length, placed = set.map((r, k) => ({ r, to: middle + (k - (set.length - 1) / 2) * gap }));
+      for (const { r, to } of placed.sort((p, q) => Math.abs(q.to - middle) - Math.abs(p.to - middle))) {
+        if (Math.abs(r.at - to) < 0.5 || r.both) continue;
+        if (r.ends) { const b = shape.get(r.ends), pad = Math.min(corner, (b.hi[ax] - b.lo[ax]) / 3); if (b.pointed || to < b.lo[ax] + pad || to > b.hi[ax] - pad) continue; }
+        const was = tidy(r.w.points), line = was.map((p) => [...p]);
+        if (!line[r.i + 1]) continue;
+        line[r.i][ax] = to;
+        line[r.i + 1][ax] = to;
+        if (clear(line, was, r.w, shape.solids, others, 0, 0)) ((r.w.points = line), (r.w.bounds = null));
+      }
+    }
+  }
+  // Two wires of different boxes still along one line: one steps aside to the nearest place free.
+  for (const ax of [0, 1]) for (const w of wires) {
+    const line = tidy(w.points);
+    line.slice(1).forEach((q, i) => {
+      const p = line[i], lo = Math.min(p[1 - ax], q[1 - ax]), hi = Math.max(p[1 - ax], q[1 - ax]);
+      if (p[ax] !== q[ax]) return;
+      const stays = (to) => [i === 0 && w.a, i === line.length - 2 && w.b].every((id) => { if (!id) return true; const b = shape.get(id), pad = Math.min(corner, (b.hi[ax] - b.lo[ax]) / 3); return !b.pointed && to >= b.lo[ax] + pad && to <= b.hi[ax] - pad; });
+      const lying = wires.some((v) => v !== w && ![v.a, v.b].some((id) => id === w.a || id === w.b) && tidy(v.points).slice(1).some((b, j, l) => { const a = tidy(v.points)[j]; return a[ax] === p[ax] && b[ax] === p[ax] && Math.min(hi, Math.max(a[1 - ax], b[1 - ax])) - Math.max(lo, Math.min(a[1 - ax], b[1 - ax])) > 1; }));
+      if (!lying) return;
+      for (const by of [1, -1, 2, -2, 3, -3, 4, -4, 5, -5].map((k) => k * gap)) {
+        if (!stays(p[ax] + by)) continue;
+        const next = line.map((c) => [...c]);
+        next[i][ax] += by;
+        next[i + 1][ax] += by;
+        if (clear(next, line, w, shape.solids, others, 0, 0)) { w.points = next; w.bounds = null; return; }
+      }
     });
   }
 }

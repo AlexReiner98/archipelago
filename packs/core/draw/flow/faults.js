@@ -1,6 +1,8 @@
 // How well a picture is wired, counted from what is drawn. Each number is one fault, so a pass on the wires can be judged.
 // Pure: a layout's answer in, numbers out.
 
+import { onOutline } from './shapes.js';
+
 /** A line with repeated points and points along a straight run taken out. */
 function tidy(points) {
   const out = [];
@@ -41,17 +43,19 @@ export const runsUp = (a, b, p) => b.u <= a.t || (b.t < a.u && p.at(-1)[1] < p.a
  * by the style's room, `tightPort`, a corner nearer a port than `run`, and `tightBox`, a wire nearer a box it passes
  * than `clear`, and `tightJoin`, joined boxes nearer than `join`; `up`, headed links whose head points up, of `headed`;
  * `cornerPorts`, wire ends nearer a box's corner than `corner` or a third of the side; and `tightParallel`, two wires running
- * side by side nearer than `parallel`.
+ * side by side nearer than `parallel`; `trunks`, stretches two wires of one box share by design, a comb's spine or a bus;
+ * `overlaps`, stretches two wires of different boxes lie along; and `loose`, wire ends off the outline of their step.
  */
 export function faults(g, { jog = 14, run = 0, clear = 0, join = 0, corner = 0, parallel = 0, headless = ['part_of'], note = () => {} } = {}) {
   const rectOf = (id) => { const n = g.nodes.get(id), x = g.x.get(id), y = g.y.get(id); return { id, l: x - n.w / 2, r: x + n.w / 2, t: y - n.h / 2, u: y + n.h / 2 }; };
   const boxes = g.all.map((n) => rectOf(n.id)), wires = [...g.chains, ...g.ties].filter((w) => w.points && g.x.has(w.a) && g.x.has(w.b));
   const stands = (l, r, t, u, skip) => boxes.some((b) => !skip.includes(b.id) && r > b.l && l < b.r && u > b.t && t < b.u);
-  const c = { wires: wires.length, headed: 0, up: 0, cornerPorts: 0, tightParallel: 0, bends: 0, kinks: 0, jogs: 0, wrongOrder: 0, wrongTie: 0, back: 0, indirect: 0, tightPort: 0, tightBox: 0, tightJoin: 0 };
+  const c = { wires: wires.length, headed: 0, up: 0, cornerPorts: 0, tightParallel: 0, trunks: 0, overlaps: 0, loose: 0, bends: 0, kinks: 0, jogs: 0, wrongOrder: 0, wrongTie: 0, back: 0, indirect: 0, tightPort: 0, tightBox: 0, tightJoin: 0 };
   for (const w of wires) {
     const p = tidy(w.points), [ra, rb] = [rectOf(w.a), rectOf(w.b)], bends = p.length - 2;
     const overX = Math.min(ra.r, rb.r) - Math.max(ra.l, rb.l), overY = Math.min(ra.u, rb.u) - Math.max(ra.t, rb.t);
     c.bends += bends;
+    for (const [id, point] of [[w.a, p[0]], [w.b, p.at(-1)]]) if (!onOutline(g.nodes.get(id), g.x.get(id), g.y.get(id), point)) (c.loose++, note('loose', w, p));
     if (!headless.includes(w.type)) {
       c.headed++;
       if (runsUp(ra, rb, p)) (c.up++, note('up', w, p));
@@ -84,8 +88,18 @@ export function faults(g, { jog = 14, run = 0, clear = 0, join = 0, corner = 0, 
       if (stands(Math.min(a[0], b[0]) - clear + 0.5, Math.max(a[0], b[0]) + clear - 0.5, Math.min(a[1], b[1]) - clear + 0.5, Math.max(a[1], b[1]) + clear - 0.5, [w.a, w.b])) { c.tightBox++; note('box', w, p); break; }
     }
   }
+  const stretches = wires.flatMap((w) => tidy(w.points).slice(1).map((q, i) => [tidy(w.points)[i], q, w]));
+  for (const ax of [0, 1]) {
+    const along = stretches.filter(([a, b]) => a[ax] === b[ax]).sort((p, q) => p[0][ax] - q[0][ax]);
+    for (let i = 0; i < along.length; i++) for (let j = i + 1; j < along.length && along[j][0][ax] === along[i][0][ax]; j++) {
+      const [p, q] = [along[i], along[j]], o = 1 - ax;
+      if (p[2] === q[2] || Math.min(Math.max(p[0][o], p[1][o]), Math.max(q[0][o], q[1][o])) - Math.max(Math.min(p[0][o], p[1][o]), Math.min(q[0][o], q[1][o])) <= 1) continue;
+      const one = [p[2].a, p[2].b].some((id) => id === q[2].a || id === q[2].b);
+      if (one) c.trunks++;
+      else (c.overlaps++, note('overlap', p[2], [p[0], p[1]]));
+    }
+  }
   if (parallel) {
-    const stretches = wires.flatMap((w) => tidy(w.points).slice(1).map((q, i, l) => [tidy(w.points)[i], q, w]));
     for (const ax of [0, 1]) {
       const along = stretches.filter(([a, b]) => a[ax] === b[ax]).sort((p, q) => p[0][ax] - q[0][ax]);
       for (let i = 0; i < along.length; i++) for (let j = i + 1; j < along.length && along[j][0][ax] - along[i][0][ax] < parallel - 0.5; j++) {

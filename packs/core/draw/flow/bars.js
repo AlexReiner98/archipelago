@@ -4,7 +4,7 @@
 // path through each keeps both as tight as they can be. Trees hang in combs beside their item. Pure: an answer in,
 // geometry out, as the flow's layout answers.
 
-import { centre, spreadPorts } from './centre.js';
+import { centre, evenRuns, spreadPorts } from './centre.js';
 import { comb, peel } from './combs.js';
 import { count } from './count.js';
 import { runsUp, wrongEnd } from './faults.js';
@@ -15,6 +15,7 @@ import { stepsOf } from './steps.js';
 import { tidy } from './tidy.js';
 import { reroute } from './reroute.js';
 import { settle, square } from './settle.js';
+import { landOn } from './shapes.js';
 import { planarize } from './thread.js';
 import { embed } from './upward.js';
 
@@ -449,6 +450,7 @@ function laidOut({ items: given, links: told = [], undrawn = [], headless = ['pa
     const moved = centre(pulled, moving, combLines(), { track: z.turn, room: z.room, gap: z.turn, corner: z.corner, shift });
     if (moved.length) reroute(pulled, moved, [...combLines(), ...moving.filter((w) => !moved.includes(w)).map((w) => w.points)], routing);
     spreadPorts(pulled, moving, combLines(), { track: z.turn, gap: z.turn, corner: z.corner });
+    evenRuns(pulled, moving, combLines(), { track: z.turn, gap: z.turn, corner: z.corner });
   }
   // Where steps were put by hand, once all the rest stands; each wire so drawn takes the best way it has.
   const lines = [...routes.values()];
@@ -462,6 +464,11 @@ function laidOut({ items: given, links: told = [], undrawn = [], headless = ['pa
     const r = routes.get(pair(w.a, w.b));
     w.points = r ? (r.from === w.a ? r.points : [...r.points].reverse()) : [edge(w.a, [x.get(w.b), y.get(w.b)]), edge(w.b, [x.get(w.a), y.get(w.a)])];
     w.headAt = 'end';
+    // Each end on the outline that is drawn, not on the box round it.
+    if (x.has(w.a) && x.has(w.b)) {
+      const p = w.points, first = landOn(nodes.get(w.a), x.get(w.a), y.get(w.a), p[0], p[1]), final = landOn(nodes.get(w.b), x.get(w.b), y.get(w.b), p.at(-1), p.at(-2));
+      w.points = p.map((q, i) => (i === 0 ? first : i === p.length - 1 ? final : q));
+    }
   }
   const all = [...nodes.values()].filter((n) => x.has(n.id)), drawnPoints = every.flatMap((w) => w.points);
   const width = Math.max(0, ...all.map((n) => x.get(n.id) + n.w / 2), ...drawnPoints.map((p) => p[0])) + margin;

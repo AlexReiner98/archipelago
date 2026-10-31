@@ -56,7 +56,7 @@ function ways(a, b, pad, was, run, n) {
 }
 
 /** Each stretch of `line` clear of the solid parts, and nothing crossed or touched that was not. */
-export function clear(line, was, w, solids, others, room, gap) {
+export function clear(line, was, w, solids, others, room, gap, mates = null) {
   const [l, r, t, u] = boundsOf(line);
   for (let i = 1; i < line.length; i++) {
     const [p, q] = [line[i - 1], line[i]], lo = Math.min(p[0], q[0]), hi = Math.max(p[0], q[0]), top = Math.min(p[1], q[1]), low = Math.max(p[1], q[1]);
@@ -72,6 +72,7 @@ export function clear(line, was, w, solids, others, room, gap) {
     const [vl, vr, vt, vu] = v.bounds ?? (v.bounds = boundsOf(v.points));
     if (vr < l || vl > r || vu < t || vt > u) continue;
     if (count([line, v.points]).crossings > count([was, v.points]).crossings) return false;
+    if (mates?.has(v)) continue;
     if (touch(line, v.points) && !touch(was, v.points)) return false;
     if (gap && beside(line, v.points, gap) > beside(was, v.points, gap)) return false;
   }
