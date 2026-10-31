@@ -13,6 +13,7 @@ export const SLOW: Record<string, string> = {
   // A headless Chrome each, and the page loaded and driven in it: seconds per test, most of a core under load.
   'test/agents-beside.test.ts': 'browser',
   'test/canvas-drag.test.ts': 'browser',
+  'test/canvas-pan.test.ts': 'browser',
   'test/canvas-replica.test.ts': 'browser',
   'test/canvas-wires.test.ts': 'browser',
   'test/canvas-zoom.test.ts': 'browser',

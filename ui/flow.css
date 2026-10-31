@@ -1,6 +1,8 @@
 /* The frame every drawing's picture is drawn in. A frame the picture moves in, like a map: the wheel zooms, a drag moves it. */
 .lf-stage { position: relative; height: clamp(var(--ln-stage-least), var(--ln-stage), var(--ln-stage-most)); overflow: hidden; background: var(--ln-sea); cursor: grab; touch-action: none; user-select: none; }
 .lf-stage.moving { cursor: grabbing; }
+/* The cursor a pan draws while the pointer is locked (ui/pan-lock.js), in the top layer so no bar covers it. */
+.pan-cursor { position: fixed; inset: auto; width: var(--ln-pan-cursor); height: var(--ln-pan-cursor); margin: calc(var(--ln-pan-cursor) / -2); padding: 0; background: none; border: var(--border-3) solid var(--text); border-radius: 50%; box-shadow: 0 0 0 var(--border-1) var(--panel); overflow: visible; pointer-events: none; }
 /* Text too small on screen to read is not drawn (ui/pan-zoom.js); a drawing says what more than a name is, under [data-text=names]. */
 .lf-stage[data-text="none"] > svg text { display: none; }
 .lf-stage > svg { display: block; width: 100%; height: 100%; }
