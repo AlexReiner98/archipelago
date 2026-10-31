@@ -5,6 +5,7 @@ import { centre, evenRuns, spreadPorts } from './centre.js';
 import { reroute } from './reroute.js';
 import { settle, square } from './settle.js';
 import { shelve } from './shelves.js';
+import { solve } from './solve.js';
 
 /** Past this many wires the pull takes fewer rounds: a drawing that takes too long is stopped by the page. */
 const PULL_MOST = 150;
@@ -18,6 +19,12 @@ export function pullTight({ shelves, routes, rigid, x, y, nodes, ways, holder, g
     if (!r.set) moving.push(r);
   }
   stage?.('bars and combs', routes);
+  // A trial: one solve in place of every stage below.
+  if (sizes.plane_solve) {
+    solve({ nodes, x, y, routes, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: gap / 2 });
+    stage?.('solve', routes);
+    return { settled: null, wired: null };
+  }
   if (!moving.length || !square(moving)) return { settled: null, wired: null };
   const big = moving.length > PULL_MOST;
   const settled = settle(pulled, moving, { gap: gap / 2, track: z.turn, ...zw, blocks: big ? sizes.plane_block_rounds_big : sizes.plane_block_rounds, watch, ...(big && { rounds: sizes.plane_pull_rounds_big, sweeps: sizes.plane_pull_sweeps_big }) });
