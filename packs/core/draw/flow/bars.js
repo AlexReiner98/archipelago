@@ -269,7 +269,7 @@ function laidOut({ items: given, links: told = [], undrawn = [], headless = ['pa
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
   const even = nodes.size <= sizes.plane_rows_most, margin = sizes.flow_margin, gap = sizes.flow_node_gap, zw = { room: sizes.plane_wire_room, join: sizes.plane_joined_room, run: sizes.plane_port_run, corner: sizes.plane_port_corner };
   const zs = { trials: sizes.plane_trials, trial_most: sizes.plane_trial_most, cost_up: sizes.plane_cost_up, cost_cross: sizes.plane_cost_crossing, cost_wrong: sizes.plane_cost_wrong_side, embed_most: sizes.plane_embed_most, embed_cost: sizes.plane_embed_crossings, slide_sweeps: sizes.plane_slide_sweeps, number_tries: sizes.plane_number_tries, trial_total: sizes.plane_trial_total };
-  const z = { row: sizes.flow_layer_gap / 2, col: Math.max(gap / 2, zw.room * 2), turn: Math.max(gap / 3, sizes.plane_wire_gap), gap, ...zw, ...zs, row_gap: sizes.plane_row_gap, row_space: sizes.plane_row_space };
+  const z = { row: sizes.flow_layer_gap / 2, col: sizes.plane_wire_column, turn: Math.max(gap / 3, sizes.plane_wire_gap), gap, ...zw, ...zs, row_gap: sizes.plane_row_gap, row_space: sizes.plane_row_space };
   const zc = { row: gap / 4, col: gap, stub: z.run, join: z.join }, combGap = Math.max(gap, z.join);
   const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ a: l.from, b: l.to, type: l.type, ...(l.pending && { pending: l.pending }) }));
   const chains = edges.map((e) => ({ ...e, key: `${e.a} ${e.b}`, path: [e.a, e.b], dashed: potential.has(e.b) }));
