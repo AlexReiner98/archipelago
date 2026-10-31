@@ -18,19 +18,16 @@
 .doc-lens .group-actor .dot { fill: var(--g-actor); } .doc-lens .group-aim .dot { fill: var(--g-aim); } .doc-lens .group-work .dot { fill: var(--g-work); }
 .doc-lens .group-record .dot { fill: var(--g-record); } .doc-lens .group-question .dot { fill: var(--g-question); } .doc-lens .group-occurrence .dot { fill: var(--g-occurrence); }
 .doc-lens .group-place .dot { fill: var(--g-place); } .doc-lens .group-system .dot { fill: var(--g-system); }
-/* The page's first picture (ui/doc.js) is wider than its text: up to the style's reader_wide, and never past the
-   window less the page's sides, centred on the text column, so a whole system opens in sight.
-   Its section's title is as wide, so it starts over the picture's left edge. */
-section:has(> .doc-lens.wide) { --doc-wide: min(var(--reader-wide), calc(var(--reader-window) - 2 * var(--reader-side))); }
-.doc-lens.wide, section:has(> .doc-lens.wide) > h2 {
-  width: var(--doc-wide);
-  margin-left: calc((100% - var(--doc-wide)) / 2);
-}
-/* One that plays how it came to be is framed step by step, each step as compact as it is: it fills that width. */
-.doc-lens.wide.plays .lf-stage.still > svg { width: 100%; }
-/* Any other that plays is as wide as the text, centred at its own size, and what it says is in a column of its own to
-   the right of the text, where the window has room: the picture's box reaches past the text by that column. */
-.roomy .doc-lens.plays:not(.wide) { width: calc(100% + var(--space-8) + var(--side-least)); }
-.roomy .doc-lens.plays:not(.wide) .lf-beside { display: grid; grid-template-columns: minmax(0, 1fr) var(--side-least); column-gap: var(--space-8); align-items: stretch; }
-.roomy .doc-lens.plays:not(.wide) .lens-view > :not(.lf-beside) { margin-right: calc(var(--space-8) + var(--side-least)); }
-.roomy .doc-lens.plays:not(.wide) .lf-beside > * { min-width: 0; }
+/* A page is one column, and a picture is as wide as it. One that plays stands beside its words in a band (ui/doc.js):
+   the page is as wide as the style's reader_band, its other text centred at the column's width, and a band stacks
+   by itself where the window cannot hold two sides at reader_band_least. */
+main:has(.doc-band) { max-width: var(--reader-band); }
+main:has(.doc-band) > :is(section, .doc-band) + div.text { max-width: calc(var(--reader-measure) - 2 * var(--reader-side)); margin-inline: auto; }
+.doc-band { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rhythm-7) var(--space-13); margin-top: var(--rhythm-9); padding-top: var(--rhythm-7); border-top: var(--border-1) solid var(--reader-line); }
+.band-words { flex: 5 1 var(--reader-band-least); min-width: 0; }
+.band-words h3 { margin-top: 0; }
+.band-pictures { flex: 6 1 var(--reader-band-least); min-width: 0; }
+.doc-lens { margin-block: var(--rhythm-6); }
+.doc-lens .lf-beside { display: block; }
+.doc-lens .lf-stage.still > svg { width: 100%; }
+.doc-lens .sp-chat { margin-top: var(--space-8); }

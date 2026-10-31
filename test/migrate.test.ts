@@ -3,6 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { createToken, verifyToken } from '../src/auth.ts';
 import { openDb, type Database } from '../src/db.ts';
 import { LATEST, MIGRATIONS, versionOf } from '../src/migrate.ts';
 
@@ -13,6 +14,18 @@ test('a new database has every step, each recorded once', async () => {
   const db = await openDb(folder());
   assert.deepEqual((await steps(db)).map((s) => s.version), MIGRATIONS.map((m) => m.version));
   assert.equal(await versionOf(db), LATEST);
+  await db.close();
+});
+
+test('a database from before browser sign-in gets its column on opening, and its tokens still work', async () => {
+  const dir = folder();
+  const made = await openDb(dir);
+  await made.exec(`alter table token drop column granted; delete from schema_version where version >= 29;`);
+  await made.close();
+  const db = await openDb(dir);
+  assert.equal(await versionOf(db), LATEST);
+  const made2 = await createToken(db, 'default', { kind: 'agent', name: 'old' });
+  assert.equal((await verifyToken(db, made2.token))?.actor.name, 'old');
   await db.close();
 });
 

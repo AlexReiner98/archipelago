@@ -1,4 +1,4 @@
-// The architecture drawing's layout (draw/architecture/layout.js): a lens answer in, geometry out, checked for what a reader of
+// The architecture drawing's layout (layouts/architecture/layout.js): a lens answer in, geometry out, checked for what a reader of
 // the drawing relies on: a caller above what it calls, no two parts overlap, no part sits in another place's box,
 // every wire turns only at right angles, and health and wire states are read from statuses and links alone.
 
@@ -7,10 +7,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error: a plain module of the UI, with no types of its own.
-import { health, layout, wireState } from './draw/architecture/layout.js';
+import { health, layout, wireState } from './layouts/architecture/layout.js';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
-import { picture } from './draw/architecture/index.js';
-import { partBoxes, saysSpots } from './draw/architecture/says.js';
+import { picture } from './layouts/architecture/index.js';
+import { partBoxes, saysSpots } from './layouts/architecture/says.js';
 
 const state = { blocked: false, waits_on: [], sessions: 0 };
 const item = (id: string, inside = 'r', status = 'up', extra: Record<string, unknown> = {}) => ({ id, kind: 'place', inside, title: `Part ${id}`, place: 0, open: status !== 'retired', status, state, ...extra });
@@ -167,7 +167,7 @@ test('a larger system lays out with nothing overlapping', () => {
   checks(run(items, links));
 });
 
-// The drawing itself (draw/architecture/index.js): an answer in, marks out, as the page is sent them.
+// The drawing itself (layouts/architecture/index.js): an answer in, marks out, as the page is sent them.
 
 const answerOf = (items: any[], links: any[]) => ({ lens: { from: 'r' }, items: [{ ...item('r'), inside: null }, ...items].map((i) => ({ ...i, within: { items: 0, blocked: 0, needs_you: 0 } })), links });
 const drawn = (answer: any, extra: Record<string, unknown> = {}) => picture({ answer, style: { ...house, shape: 'architecture', ...extra } }, { measure });
@@ -202,13 +202,28 @@ test('hovering a part lights its wires, leaving puts them out, and the lit switc
   assert.deepEqual(dimmed.sort(), ['p:a', 'p:b']);
 });
 
+test('a style that limits a row folds it, each caller still above what it calls, narrower and taller', () => {
+  const callers = ['a', 'b', 'c', 'd', 'e', 'f'];
+  const items = [...callers.map((id) => item(id)), item('m')], links = callers.map((id) => call(id, 'm'));
+  const flat = layout({ items: [{ ...item('r'), inside: null }, ...items], links, rootId: 'r', measure, sizes: house.sizes });
+  const folded = layout({ items: [{ ...item('r'), inside: null }, ...items], links, rootId: 'r', measure, sizes: { ...house.sizes, arch_row_most: 3 } });
+  checks(folded);
+  assert.equal(new Set(callers.map((id) => folded.y.get(id))).size, 2);
+  for (const id of callers) assert.ok(folded.y.get(id) < folded.y.get('m'), `${id} above what it calls`);
+  assert.ok(folded.width < flat.width && folded.height > flat.height);
+  // What a row held stays at its foot when a step adds to it.
+  const first = layout({ items: [{ ...item('r'), inside: null }, ...items.slice(0, 3), item('m')], links: links.slice(0, 3), rootId: 'r', measure, sizes: { ...house.sizes, arch_row_most: 3 } });
+  const next = layout({ items: [{ ...item('r'), inside: null }, ...items], links, rootId: 'r', measure, sizes: { ...house.sizes, arch_row_most: 3 }, prior: first.memo, steady: true });
+  assert.ok(next.y.get('d') < next.y.get('a'), 'the new row above the old');
+});
+
 test('a system with no parts says so instead of drawing', () => {
   assert.deepEqual(drawn(answerOf([], [])).scene, { message: 'Nothing here is part of a system.' });
 });
 
 test('the drawing imports only its own modules, and nothing of the kernel', () => {
   const pack = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
-  const d = pack.drawings.find((one: any) => one.id === 'core.architecture');
+  const d = pack.layouts.find((one: any) => one.id === 'core.architecture');
   for (const file of Object.values(d.modules) as string[]) {
     const code = readFileSync(join(import.meta.dirname, file), 'utf8');
     for (const [, spec] of code.matchAll(/\bfrom\s*['"]([^'"]+)['"]/g)) assert.ok(Object.keys(d.modules).includes(spec.replace(/^\.\//, '')), `${file} imports ${spec}`);

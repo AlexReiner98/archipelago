@@ -6,7 +6,7 @@
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { newId, type Db, type Q } from './db.ts';
-import { indexToken } from './control-index.ts';
+import { indexToken, unindexed } from './control-index.ts';
 import { record } from './streams.ts';
 import type { Actor, May } from './pelago.ts';
 
@@ -34,6 +34,8 @@ export interface TokenInfo {
   may: May;
   /** The addresses it has been used from, each cut to its network. */
   seen: string[] | null;
+  /** The client a person allowed, for a token made by signing in through the browser (src/oauth.ts). */
+  client: string | null;
 }
 
 /**
@@ -47,6 +49,11 @@ export function network(address: string | undefined): string | undefined {
   if (/^\d+\.\d+\.\d+\.\d+$/.test(a)) return `${a.split('.').slice(0, 3).join('.')}.x`;
   return a.includes(':') ? `${a.split(':').slice(0, 3).join(':')}::` : a;
 }
+
+/** How long a browser-connected client's token lasts before it is rotated, how long a connection left unused lasts, and how long a used refresh token is forgiven. */
+export const ACCESS_MINUTES = 60;
+const GRANT_DAYS = 90;
+const REPLAY_MS = 60_000;
 
 const WORKSPACE_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 export const validWorkspaceId = (id: string) => WORKSPACE_ID.test(id);
@@ -64,7 +71,7 @@ export function bearer(header: string | undefined): string | undefined {
 }
 
 /** Make a token. The secret is returned once and cannot be recovered. */
-export async function createToken(db: Q, workspace: string, input: { kind: 'human' | 'agent'; name: string; entity?: string; expires_days?: number; admin?: boolean; within?: string[]; may?: May }) {
+export async function createToken(db: Q, workspace: string, input: { kind: 'human' | 'agent'; name: string; entity?: string; expires_days?: number; expires_minutes?: number; admin?: boolean; within?: string[]; may?: May; granted?: Grant }) {
   if (!validWorkspaceId(workspace)) throw new Error(`Invalid workspace id "${workspace}"`);
   if (!input.name.trim()) throw new Error('A token needs a name: who or what will use it.');
   const token = `pel_${workspace}_${randomBytes(20).toString('hex')}`;
@@ -73,13 +80,65 @@ export async function createToken(db: Q, workspace: string, input: { kind: 'huma
   const within = agent && input.within?.length ? JSON.stringify(input.within) : null;
   // repos is written beside within for the commit before this one, which reads only repos, while both run.
   await db.query(
-    `insert into token (id, hash, hint, kind, name, entity_id, admin, expires_at, within, repos, may)
-     values ($1, $2, $3, $4, $5, $6, $7, case when $8::int is null then null else now() + ($8::int || ' days')::interval end, $9::jsonb, $9::jsonb, $10)`,
-    [id, hash(token), `…${token.slice(-6)}`, input.kind, input.name.trim(), input.entity ?? null, Boolean(input.admin) && !agent, input.expires_days ?? null, within, agent ? (input.may ?? 'change') : 'change'],
+    `insert into token (id, hash, hint, kind, name, entity_id, admin, expires_at, within, repos, may, granted)
+     values ($1, $2, $3, $4, $5, $6, $7, case when $8::int is null then null else now() + ($8::int || ' minutes')::interval end, $9::jsonb, $9::jsonb, $10, $11::jsonb)`,
+    [id, hash(token), `…${token.slice(-6)}`, input.kind, input.name.trim(), input.entity ?? null, Boolean(input.admin) && !agent, input.expires_minutes ?? (input.expires_days === undefined ? null : input.expires_days * 1440), within, agent ? (input.may ?? 'change') : 'change', input.granted ? JSON.stringify(input.granted) : null],
   );
   // Noted beside the workspaces, so a token nobody made is refused before its workspace is opened (src/control-index.ts).
   await indexToken(hash(token), workspace);
   return { id, token, kind: input.kind, name: input.name.trim(), note: 'Keep this token now: it is not stored and cannot be shown again.' };
+}
+
+/** A browser-connected client's connection, kept on its token: which client, and the hash of the refresh token it holds. */
+interface Grant {
+  client: string;
+  refresh: string;
+  /** The one it held before, until a replay of it is no longer forgiven. */
+  previous?: string;
+  rotated?: string;
+  until: string;
+}
+
+const newRefresh = (workspace: string) => `per_${workspace}_${randomBytes(20).toString('hex')}`;
+const grantUntil = () => new Date(Date.now() + GRANT_DAYS * 86_400_000).toISOString();
+
+/** Which workspace a code or a refresh token is for (src/oauth.ts). Says nothing about whether it is good. */
+export const workspaceOfGrant = (secret: string) => /^(?:oac|per)_([a-z0-9][a-z0-9-]{0,39})_[a-f0-9]{40}$/.exec(secret)?.[1];
+
+/** The token a person's Allow makes: an agent's acting for them, short-lived, with a refresh token to rotate it by. */
+export async function grantToken(db: Q, workspace: string, input: { name: string; entity?: string; client: string }) {
+  const refresh = newRefresh(workspace);
+  const made = await createToken(db, workspace, { kind: 'agent', name: input.name, entity: input.entity, expires_minutes: ACCESS_MINUTES, granted: { client: input.client, refresh: hash(refresh), until: grantUntil() } });
+  return { access: made.token, refresh };
+}
+
+/**
+ * A new access token and refresh token for a connection, in the same row, so a connection stays one row with one
+ * Revoke. A refresh token used twice was copied, or the answer was lost: within a minute it is only refused, and after
+ * that the connection ends.
+ */
+export async function rotateGrant(db: Q, workspace: string, refresh: string, client?: string): Promise<{ access: string; refresh: string } | undefined> {
+  const given = hash(refresh);
+  const { rows } = await db.query<{ id: string; hash: string; granted: Grant }>(`select id, hash, granted from token where revoked_at is null and (granted->>'refresh' = $1 or granted->>'previous' = $1)`, [given]);
+  const row = rows[0];
+  if (!row || (client !== undefined && client !== row.granted.client)) return undefined;
+  if (row.granted.refresh !== given) {
+    if (Date.now() - Date.parse(row.granted.rotated ?? '') > REPLAY_MS) await revokeToken(db, row.id);
+    return undefined;
+  }
+  if (Date.parse(row.granted.until) < Date.now()) return undefined;
+  const access = `pel_${workspace}_${randomBytes(20).toString('hex')}`;
+  const next = newRefresh(workspace);
+  const granted: Grant = { client: row.granted.client, refresh: hash(next), previous: given, rotated: new Date().toISOString(), until: grantUntil() };
+  // Of two at once, one finds the refresh token it read still there.
+  const { rows: moved } = await db.query(
+    `update token set hash = $2, hint = $3, expires_at = now() + ($4::int || ' minutes')::interval, granted = $5::jsonb where id = $1 and revoked_at is null and granted->>'refresh' = $6 returning id`,
+    [row.id, hash(access), `…${access.slice(-6)}`, ACCESS_MINUTES, JSON.stringify(granted), given],
+  );
+  if (!moved.length) return undefined;
+  await indexToken(hash(access), workspace);
+  await unindexed(row.hash);
+  return { access, refresh: next };
 }
 
 /**
@@ -89,8 +148,8 @@ export async function createToken(db: Q, workspace: string, input: { kind: 'huma
  * The first place a token is used is not news.
  */
 export async function verifyToken(db: Db, token: string, from?: string, ws = 'default'): Promise<Identity | undefined> {
-  const { rows } = await db.query<{ id: string; hash: string; kind: 'human' | 'agent'; name: string; entity_id: string | null; admin: boolean; within: string[] | null; may: May; seen: string[] | null; last_used: Date | null }>(
-    `select id, hash, kind, name, entity_id, admin, within, coalesce(may, 'change') as may, seen, last_used from token where hash = $1 and revoked_at is null and (expires_at is null or expires_at > now())`,
+  const { rows } = await db.query<{ id: string; hash: string; kind: 'human' | 'agent'; name: string; entity_id: string | null; admin: boolean; within: string[] | null; may: May; seen: string[] | null; last_used: Date | null; hosted: boolean }>(
+    `select id, hash, kind, name, entity_id, admin, within, coalesce(may, 'change') as may, seen, last_used, granted is not null as hosted from token where hash = $1 and revoked_at is null and (expires_at is null or expires_at > now())`,
     [hash(token)],
   );
   const row = rows[0];
@@ -104,14 +163,15 @@ export async function verifyToken(db: Db, token: string, from?: string, ws = 'de
   if (!row.last_used || Date.now() - new Date(row.last_used).getTime() >= 3600_000) await db.transaction((tx) => record(tx, ws, 'access', row.id, [['+', row.id, 'last_used', new Date().toISOString()]]));
   return {
     actor: { kind: row.kind, name: row.name, person: row.entity_id ?? undefined, admin: row.admin, token: row.id, ...(row.within?.length && { within: row.within }), ...(row.may !== 'change' && { may: row.may }) },
-    ...(fresh && seen.length > 0 && { newPlace: place }),
+    // A client a person allowed may call from many addresses of its host's: a new one says nothing.
+    ...(fresh && seen.length > 0 && !row.hosted && { newPlace: place }),
   };
 }
 
 /** Every token, or only those belonging to one person. */
 export async function listTokens(db: Q, person?: string): Promise<TokenInfo[]> {
   const { rows } = await db.query<TokenInfo>(
-    `select id, kind, name, entity_id, hint, admin, created_at, last_used, expires_at, revoked_at, within, coalesce(may, 'change') as may, seen from token where $1::text is null or entity_id = $1 order by created_at`,
+    `select id, kind, name, entity_id, hint, admin, created_at, last_used, expires_at, revoked_at, within, coalesce(may, 'change') as may, seen, granted->>'client' as client from token where $1::text is null or entity_id = $1 order by created_at`,
     [person ?? null],
   );
   return rows;

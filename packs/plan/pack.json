@@ -4,12 +4,12 @@
   "title": "Plan",
   "description": "What a workspace's plan allows, and how much of it is used, drawn as one canvas: Usage, a bar for each limit with what it is made of. It reads core's usage view, which members and their agents ask alike. Take the pack out and the canvas goes; the view stays.",
   "requires": ["core"],
-  "drawings": [
+  "layouts": [
     {
       "id": "plan.meters",
       "title": "Meters",
       "shape": "meters",
-      "modules": { "index.js": "draw/meters/index.js", "look.js": "draw/meters/look.js", "marks.js": "draw/meters/marks.js" }
+      "modules": { "index.js": "layouts/meters/index.js", "look.js": "layouts/meters/look.js", "marks.js": "layouts/meters/marks.js" }
     }
   ],
   "styles": [

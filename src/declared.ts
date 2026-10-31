@@ -89,7 +89,7 @@ export interface ViewDef {
   /** rows: one-line rows the kernel draws, each with an item; data: for agents only. */
   shape: 'rows' | 'data';
   limit_ms?: number;
-  /** A view the kernel answers, never the pack's code: by the read its answer names (src/lens-presets.ts), with these fields (the brief's links, over). */
+  /** A view the kernel answers, never the pack's code: by the read its answer names (src/query-presets.ts), with these fields (the brief's links, over). */
   lens?: Record<string, unknown>;
   /** With lens: which read answers it (one of LENS_ANSWERS); the flat lens when left out. */
   answer?: string;
@@ -97,7 +97,7 @@ export interface ViewDef {
   choices?: Record<string, Record<string, Record<string, unknown>>>;
 }
 
-/** The reads a view the kernel answers may name, each kept to the form its view had (src/lens-presets.ts). */
+/** The reads a view the kernel answers may name, each kept to the form its view had (src/query-presets.ts). */
 export const LENS_ANSWERS = ['flat', 'graph', 'tree', 'hubs', 'attention', 'brief'] as const;
 
 /**
@@ -198,9 +198,9 @@ export interface StyleDef {
 
 /**
  * The code a picture of one shape is drawn by, as a pack ships it: its modules by name, each a file in the pack's
- * folder, entered at index.js (src/drawings.ts). The owner changes it by keeping their own version on the map.
+ * folder, entered at index.js (src/layouts.ts). The owner changes it by keeping their own version on the map.
  */
-export interface DrawingDef {
+export interface LayoutDef {
   id: string;
   title: string;
   shape: string;
@@ -346,7 +346,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
     for (const t of style.on ?? []) if (!types.has(t)) problems.push(`${at} is on unknown type "${t}"`);
     for (const key of Object.keys(style.props ?? {})) if (!styleFields[key] || styleFields[key].system || ['code', 'on'].includes(key)) problems.push(`${at}: "${key}" is not a field a preset sets`);
   }
-  for (const d of pack.drawings ?? []) {
+  for (const d of pack.layouts ?? []) {
     const at = `drawing "${d.id}"`;
     if (!own(d.id) || !d.title || !/^[a-z][a-z0-9_]*$/.test(d.shape ?? '')) problems.push(`${at} must be named "${pack.id}.<name>", with a title and the \`shape\` it draws`);
     if (typeof d.modules?.['index.js'] !== 'string') problems.push(`${at} needs its modules, entered at index.js`);

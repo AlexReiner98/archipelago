@@ -3,6 +3,7 @@
 // which opens from the side over it to read and act on one thing: an item read as a document, a new item, the
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
+import { authorizePage } from './authorize.js';
 import { SignInNeeded, h, hooks, join, main, part, showIdentity, signIn, state, store } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { mayLeave, newItem } from './draft.js';
@@ -37,6 +38,8 @@ async function route(pulse = false) {
   const [, name = '', arg] = where.split('/');
   // Addresses from before the canvas still lead somewhere.
   if (name === 'join' && arg) return join(arg);
+  // A client asking to connect: before anything is read of a map, as whoever may not be signed in yet.
+  if (name === 'authorize') return void ((document.body.dataset.sheet = 'open'), authorizePage(query));
   // Buying a workspace, and the page a buyer comes back to: in the sheet, before anything is read of a map.
   if (name === 'signup' || name === 'welcome') return void ((document.body.dataset.sheet = 'open'), name === 'signup' ? signupPage() : welcome());
   if (['home', 'activity', 'review', 'projects', 'today', 'map', 'automations'].includes(name)) return void (location.hash = '#/');

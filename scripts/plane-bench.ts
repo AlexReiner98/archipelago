@@ -8,14 +8,14 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { open } from '../test/browser.ts';
-import { house } from '../test/drawing-cases.ts';
-import { drawingFor } from '../src/drawings.ts';
+import { house } from '../test/layout-cases.ts';
+import { layoutFor } from '../src/layouts.ts';
 
 const args = process.argv.slice(2);
 const base = args.find((a) => a.startsWith('http')) ?? 'http://127.0.0.1:3100';
 const count = Number(args.includes('--items') ? args[args.indexOf('--items') + 1] : 2000);
 const root = join(import.meta.dirname, '..');
-const drawing = drawingFor({ dir: join(root, 'packs'), packs: [JSON.parse(readFileSync(join(root, 'packs', 'core', 'pack.json'), 'utf8'))] }, { shape: 'flow' }, []);
+const drawing = layoutFor({ dir: join(root, 'packs'), packs: [JSON.parse(readFileSync(join(root, 'packs', 'core', 'pack.json'), 'utf8'))] }, { shape: 'flow' }, []);
 
 const quiet = { blocked: false, waits_on: [] as string[], sessions: 0, needs_you: false };
 const within = { items: 0, work: 0, blocked: 0, waiting: 0, sessions: 0, tokens: { estimated: 0, used: 0 }, waits_on: {}, needs_you: 0, not_sent: 0 };
@@ -33,7 +33,7 @@ const answer = { lens: { from: id(0), by: 'part_of', over: ['depends_on'], fold:
 const style = { ...house('flow'), noLit: true, drawing };
 
 const bench = `async (answer, style) => {
-  const { drawWith } = await import('/drawing.js');
+  const { drawWith } = await import('/layout.js');
   const host = document.createElement('div');
   host.className = 'lens-view';
   host.style.cssText = 'width:1280px;height:860px';

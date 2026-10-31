@@ -5,7 +5,7 @@
 //
 // A mark is [tag, attributes, ...what is in it], a string being text. Two attributes are not drawn: `key`, the name
 // a patch uses for it, and `on`, the events the drawing is told of (enter, leave, click). A mark says the item it
-// stands for with `item` (an id), which a link to the item says too: the page lights marks by it (ui/lens-light.js),
+// stands for with `item` (an id), which a link to the item says too: the page lights marks by it (ui/query-light.js),
 // whatever drew them. One tag is the page's own:
 // `reader`, a document as its reader meets it, which the page makes from an item's id alone (ui/reader-frame.js).
 
@@ -17,7 +17,7 @@ const HTML_TAGS = new Set(['div', 'span', 'p', 'b', 'strong', 'em', 'i', 'small'
 const ITEM_ID = /^e_[a-z0-9]{8}$/;
 const ATTRS = new Set(['class', 'd', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'dx', 'dy', 'width', 'height', 'viewBox', 'points', 'transform', 'text-anchor', 'dominant-baseline', 'pathLength', 'offset', 'preserveAspectRatio', 'role', 'aria-label', 'aria-hidden', 'title', 'hidden', 'href', 'stroke-dasharray', 'stroke-dashoffset', 'aria-live', 'opacity', 'fill-opacity', 'stroke-opacity', 'gradientUnits']);
 /** The events a drawing may be told of, by the page's name for each; `seen` is told once, when the mark is first scrolled into sight;
- * `drag` hands the page the press that starts a drag, which the page follows and tells the drawing of (ui/drawing.js). */
+ * `drag` hands the page the press that starts a drag, which the page follows and tells the drawing of (ui/layout.js). */
 const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click', seen: 'seen', drag: 'pointerdown' };
 const seen = (el, fn) => {
   const sight = new IntersectionObserver((all) => all.some((e) => e.isIntersecting) && (sight.disconnect(), fn()), { threshold: 0.5 });

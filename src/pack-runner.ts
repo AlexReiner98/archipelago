@@ -45,6 +45,7 @@ async function run(call: Line) {
       get: (key: string) => ask(call.id, { store: 'get', key }),
       put: (key: string, value: unknown, ms?: number) => ask(call.id, { store: 'put', key, value, ms }),
       take: (key: string) => ask(call.id, { store: 'take', key }),
+      list: (prefix: string, most?: number) => ask(call.id, { store: 'list', prefix, most }),
     },
   };
   try {

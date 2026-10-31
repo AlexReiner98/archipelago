@@ -44,6 +44,14 @@ test('a document is previewed as publishing it would give it, before it is publi
   assert.ok(!JSON.stringify(own).includes('Secret.') && !JSON.stringify(own).includes(made.x), 'nothing private');
   assert.equal(own.site.name, 'Default');
   assert.ok(own.theme, "the workspace's look");
+  // A page it links to by address leads to that page's preview, though neither is published yet.
+  const pages = (await api(mine, 'change', { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'document', title: 'Links out', visibility: 'shared', body: 'See [the guide](/guide), [home](/) and [nothing](/missing).' }, { op: 'create', ref: 'g', type: 'document', title: 'Guide', visibility: 'shared', props: { path: 'guide' } }, { op: 'create', ref: 'h', type: 'document', title: 'Front', visibility: 'shared', props: { path: 'home' } }] })).created;
+  assert.deepEqual((await preview(mine, pages.a)).result.paths, { [pages.g]: 'guide', [pages.h]: 'home' });
+  // A draft takes its address from an old page still published there, as publishing it will have to.
+  await api(mine, 'change', { reason: 'test', ops: [{ op: 'update', id: pages.g, props: { path: 'guide-old' } }] });
+  await api(mine, 'publish', { id: pages.g });
+  const again = (await api(mine, 'change', { reason: 'test', ops: [{ op: 'update', id: pages.g, props: { path: 'guide' } }, { op: 'create', ref: 'n', type: 'document', title: 'New guide', visibility: 'shared', props: { path: 'guide-old' } }, { op: 'create', ref: 'b', type: 'document', title: 'Back', visibility: 'shared', body: 'See [it](/guide-old).' }] })).created;
+  assert.deepEqual((await preview(mine, again.b)).result.paths, { [again.n]: 'guide-old' });
   // Reading a preview publishes nothing and makes nothing public.
   assert.equal((await api(mine, 'published', { id: made.d })).published, false);
   assert.equal((await api(mine, 'get', { id: made.d })).entity.visibility, 'shared');

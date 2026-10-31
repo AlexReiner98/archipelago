@@ -4,7 +4,7 @@
 // to it from outside. Which is open is kept in the address (#/workspace?at=map); a step of Start here (ui/start.js)
 // names a card, and lands on its section with that card in view.
 
-import { api, authHeaders, h, part, state } from './base.js';
+import { api, ask, authHeaders, h, part, state } from './base.js';
 import { screenRows } from './nav.js';
 import { themesCard } from './themes-card.js';
 import { packsCard } from './packs.js';
@@ -13,6 +13,7 @@ import { planCard } from './plan-card.js';
 import { modelCard } from './model-card.js';
 import { connectionsCard } from './connections-card.js';
 import { agentsMayCard, tokenRow, tokensCard } from './agents-card.js';
+import { connectCard } from './connect-agent.js';
 import { backupCard, card, githubRow, notificationsRow, ownerRow, serverPacksCard, visibilityRow } from './workspace-cards.js';
 
 const SECTIONS = [
@@ -63,6 +64,11 @@ export async function workspace() {
   };
   const live = tokens.filter((t) => !t.revoked_at);
   const row = (t) => tokenRow(t, { me, personName: (id) => people.find((p) => p.id === id)?.title, then: workspace, fail });
+  const rename = async (e) => {
+    e.preventDefault();
+    const name = await ask({ title: 'Rename this workspace', input: { placeholder: me.workspace.name }, action: 'Rename' });
+    if (name?.trim()) api('workspace_set', { name: name.trim() }).then(() => location.reload(), (err) => fail(err.message));
+  };
   const go = (key) => {
     open = key;
     history.replaceState(null, '', `#/workspace?at=${key}`);
@@ -79,7 +85,7 @@ export async function workspace() {
       // A workspace for one person (its limit is one, and it has no more) has no members to manage.
       tokensOn && me.actor.admin && !(info.member_limit?.members === 1 && members.length <= 1) && at('team', membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow: row, then: workspace, fail, say })),
     ],
-    agents: () => [tokensOn && at('agent', tokensCard({ tokens: live.filter((t) => t.kind === 'agent'), row, then: workspace, fail, say })), admin && agentsMayCard(info, workspace, fail), admin && at('model', modelCard())],
+    agents: () => [tokensOn && at('agent', connectCard({ tokens: live.filter((t) => t.kind === 'agent'), then: workspace, workspace: me.workspace.id })), tokensOn && tokensCard({ tokens: live.filter((t) => t.kind === 'agent'), row, then: workspace, fail, say }), admin && agentsMayCard(info, workspace, fail), admin && at('model', modelCard())],
     map: () => [themesCard(workspace), at('backup', backupCard(workspace, visibilityRow(info, workspace, fail)))],
     packs: () => [packsCard({ info, then: workspace, goTo: go }), own.length > 0 && card('Your screens', 'Screens you made, which no pack offers', h('ul', { class: 'rows' }, screenRows(own, workspace))), me.workspace.id === 'default' && serverPacksCard()],
     connections: () => [at('connections', connectionsCard(...githubRow(), notificationsRow(info, workspace, fail)))],
@@ -88,7 +94,7 @@ export async function workspace() {
   const shown = SECTIONS.filter(([key]) => admin || (key === 'agents' && tokensOn) || (key === 'people' && !info.owner));
   if (!shown.some(([key]) => key === open)) open = shown[0]?.[0] ?? 'agents';
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name)),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name, ' ', me.actor.admin && me.workspace.id !== 'default' && h('a', { href: '#/workspace', title: 'Give this workspace another name', onclick: rename }, 'Rename'))),
     shown.length > 1 && h('div', { class: 'switch ws-sections', role: 'tablist' }, shown.map(([key, label, tip]) => h('button', { class: key === open ? 'on' : '', role: 'tab', title: tip, onclick: () => go(key) }, label))),
     h('div', { class: 'ws-notice' }, notice),
     h('div', { class: 'grid' }, sections[open]()),

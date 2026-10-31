@@ -65,7 +65,7 @@ export interface RuleDef {
     held?: boolean;
     /** Whether a pack's action or handler makes the change. */
     pack?: boolean;
-    /** Whether a drawing asked for the change, which the page sends as the person (src/drawing-changes.ts). */
+    /** Whether a drawing asked for the change, which the page sends as the person (src/layout-changes.ts). */
     drawing?: boolean;
     /** "outside": it writes a type, a link type or a field outside the reach of the pack that makes it (src/manifest.ts), or of a drawing, the types its style declares (writes). */
     reach?: 'outside';
@@ -194,7 +194,7 @@ function applies(rule: RuleDef, reg: Registry, who: Who, w: Written, targets: Ta
   if (when.held !== undefined && held !== when.held) return false;
   if (when.pack !== undefined && Boolean(who.pack) !== when.pack) return false;
   if (when.drawing !== undefined && Boolean(who.drawing) !== when.drawing) return false;
-  if (when.reach === 'outside' && !(who.pack ? outsideReach(reg, who.pack, w, targets) : who.drawing && outsideDrawing(reg, who.drawing.writes, w, targets))) return false;
+  if (when.reach === 'outside' && !(who.pack ? outsideReach(reg, who.pack, w, targets) : who.drawing && outsideLayout(reg, who.drawing.writes, w, targets))) return false;
   if (when.dormant !== undefined) {
     const asleep = [w.op === 'create' || w.op === 'link' ? w.type : undefined, ...targets.map((t) => t.type)].some((t) => t && (reg.types.get(t)?.dormant || reg.relations.get(t)?.dormant));
     if (asleep !== when.dormant) return false;
@@ -237,7 +237,7 @@ export function outsideReach(reg: Registry, pack: string, w: Written, targets: T
 }
 
 /** What an op a drawing asked for writes outside the types its style declares (flavours included), if anything: a link is always outside. */
-export function outsideDrawing(reg: Registry, writes: string[], w: Written, targets: Target[]): string | undefined {
+export function outsideLayout(reg: Registry, writes: string[], w: Written, targets: Target[]): string | undefined {
   if (w.op === 'link' || w.op === 'unlink') return w.type ?? 'a link';
   const types = w.op === 'create' ? (w.type ? [w.type] : []) : targets.map((t) => t.type);
   if (!types.length) return w.type ?? 'an item it cannot find';
@@ -254,7 +254,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   const refused: string[] = [];
   const title = targets[0]?.title ?? String((w as { title?: string }).title ?? '');
   const said = (rule: Rule, fallback: string) =>
-    (rule.say ?? fallback).replaceAll('{title}', title).replaceAll('{pack}', who.pack ?? '').replaceAll('{type}', () => (who.pack && outsideReach(reg, who.pack, w, targets)) || (who.drawing && outsideDrawing(reg, who.drawing.writes, w, targets)) || w.type || targets[0]?.type || '');
+    (rule.say ?? fallback).replaceAll('{title}', title).replaceAll('{pack}', who.pack ?? '').replaceAll('{type}', () => (who.pack && outsideReach(reg, who.pack, w, targets)) || (who.drawing && outsideLayout(reg, who.drawing.writes, w, targets)) || w.type || targets[0]?.type || '');
   const ruled = (rule: Rule): Ruled => ({ rule: rule.id ?? '', pack: rule.pack, say: said(rule, `${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`) });
   // What is checked only of an op that takes effect at once comes after what holds it.
   const order = [...rules.filter((r) => r.when?.held === undefined), ...rules.filter((r) => r.when?.held !== undefined)];

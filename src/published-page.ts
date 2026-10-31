@@ -33,7 +33,7 @@ export function pageData(doc: Doc, here: string) {
 }
 
 /** The code of a drawing a published document's pictures are drawn by, by its hash, or null. */
-export function drawingCode(doc: Doc, hash: string) {
+export function layoutCode(doc: Doc, hash: string) {
   if (!HASH.test(hash)) return null;
   return Object.values(doc.lenses ?? {}).find((lens) => lens.style?.drawing?.hash === hash && lens.style.drawing.modules)?.style?.drawing?.modules ?? null;
 }

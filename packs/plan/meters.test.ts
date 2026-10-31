@@ -1,4 +1,4 @@
-// The meters drawing (draw/meters/): the usage view's answer in, marks out. A band for each limit with its number
+// The meters drawing (layouts/meters/): the usage view's answer in, marks out. A band for each limit with its number
 // and a bar filled to its share; storage's shares in the bar and listed under it in their colours; every other part a row in a list
 // under its bar, leading to its item's page where it stands for one, and what the reader cannot see untitled.
 
@@ -11,7 +11,7 @@ import test from 'node:test';
 
 const pack = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
 const laid = mkdtempSync(join(tmpdir(), 'meters-'));
-for (const [name, file] of Object.entries(pack.drawings.find((d: any) => d.id === 'plan.meters').modules as Record<string, string>)) copyFileSync(join(import.meta.dirname, file), join(laid, name));
+for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'plan.meters').modules as Record<string, string>)) copyFileSync(join(import.meta.dirname, file), join(laid, name));
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 
 const marks = (mark: any): any[] => (Array.isArray(mark) && typeof mark[0] === 'string' ? [mark, ...mark.slice(2).flatMap(marks)] : []);

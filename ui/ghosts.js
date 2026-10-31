@@ -2,10 +2,10 @@
 // kept beside a store's answer (ui/replica.js). A proposed item that a link in the same change ties to something
 // drawn is a faint node; a proposed link between what is drawn (or such a node) is a dashed wire; a proposed edit,
 // archive or unlink is marked on what it changes. Each carries `pending`: which change it is and what of it, the flag
-// a drawing draws a ghost by (docs/drawings.md). A link the person has just drawn and the server has not yet answered
+// a drawing draws a ghost by (docs/layouts.md). A link the person has just drawn and the server has not yet answered
 // for is pending too (`mine`). Pure: proposals and what is held in, ghosts out.
 
-/** A held change's id, as a drawing names it in the key of the mark that decides it: `held:<id>` (ui/drawing.js). */
+/** A held change's id, as a drawing names it in the key of the mark that decides it: `held:<id>` (ui/layout.js). */
 export const HELD = /^held:(p_[a-z0-9]+)/;
 
 /**

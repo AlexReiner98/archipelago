@@ -21,7 +21,7 @@ test('a change runs the tests that import it or name it, the structure test, and
   assert.deepEqual(affected(['test/kinds.test.ts']).files, ['test/kinds.test.ts', 'test/sets.test.ts', 'test/structure.test.ts'], 'a test alone, with the structure test (and this one, which names it)');
 
   const page = affected(['ui/canvas.js']).files;
-  assert.ok(fastTests().every((f) => page.includes(f)) && page.includes('test/drawings.test.ts'), 'a page: the fast set and the browser tests');
+  assert.ok(fastTests().every((f) => page.includes(f)) && page.includes('test/layouts.test.ts'), 'a page: the fast set and the browser tests');
 
   const manifest = affected(['packs/core/pack.json']).files;
   assert.ok(fastTests().every((f) => manifest.includes(f)), 'a pack’s manifest is read by every map: the fast set');

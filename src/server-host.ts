@@ -3,7 +3,7 @@
 // to a host it declared (ctx.request), which the kernel makes with the secret it holds: nothing else. It reads no map.
 
 import { agreementsFrom, type Agreement } from './agreements.ts';
-import { storeGet, storePut, storeTake } from './control.ts';
+import { storeGet, storeList, storePut, storeTake } from './control.ts';
 import type { Q } from './db.ts';
 import { Sandbox, type Answerer } from './packhost.ts';
 import { runAct, type ActPlaces } from './server-acts.ts';
@@ -16,6 +16,8 @@ import { hostBase, hostRequest, type HostRequest } from './server-requests.ts';
 const CALL_MS = 10_000;
 const MOST_MS = 30_000;
 const KEY = /^[A-Za-z0-9_.:-]{1,200}$/;
+/** The most keys one list of a pack's store answers. */
+const LIST_MOST = 1000;
 /** How long the documents in force are taken as they were last answered. */
 const AGREEMENTS_MS = 60_000;
 /** The acts done in src/server-connect.ts, on a workspace that connected the pack. */
@@ -107,6 +109,11 @@ export class ServerPacks {
         return runAct(this.at, pack.file, q.act, input, () => this.agreements());
       }
       if (q.request && typeof q.request === 'object') return this.request(id, q.request as HostRequest);
+      if (q.store === 'list') {
+        const prefix = String(q.prefix ?? '');
+        if (!KEY.test(prefix)) throw new Error('A prefix is 1 to 200 letters, digits and _.:-');
+        return storeList(await this.control(), id, prefix, Math.min(Math.max(Number(q.most) || LIST_MOST, 1), LIST_MOST));
+      }
       if (typeof q.store === 'string') {
         const key = String(q.key ?? '');
         if (!KEY.test(key)) throw new Error('A key is 1 to 200 letters, digits and _.:-');
@@ -125,7 +132,7 @@ export class ServerPacks {
     const timers: NodeJS.Timeout[] = [];
     for (const { file } of this.packs)
       for (const s of parts(file).schedules) {
-        const run = () => void this.call(file.id, 'schedule', s.id, {}).catch((err) => console.error(`server pack ${file.id} schedule ${s.id}: ${(err as Error).message}`));
+        const run = () => void this.call(file.id, 'schedule', s.id, {}, s.limit_ms).catch((err) => console.error(`server pack ${file.id} schedule ${s.id}: ${(err as Error).message}`));
         run();
         timers.push(setInterval(run, (s.every_minutes ?? 60) * 60_000).unref());
       }

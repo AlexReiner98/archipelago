@@ -5,7 +5,7 @@
 
 import { h } from './base.js';
 import { BLOCKING, isOf } from './graph.js';
-import { lensTree, litCount, litSwitch, sizeOf } from './lens-base.js';
+import { queryTree, litCount, litSwitch, sizeOf } from './query-base.js';
 import { isClosed, relations, titles, typeTitle } from './words.js';
 
 /** The columns a row may have, in the order they are drawn; a style's `show` picks among them. */
@@ -13,7 +13,7 @@ const COLUMNS = ['type', 'status', 'waits', 'sessions'];
 
 /** The list: a table of one-line rows, grouped by what holds what. Reads only what a lens answers with. */
 export function drawList(host, answer, style, keep, kept) {
-  const { me, byId, root } = lensTree(answer);
+  const { me, byId, root } = queryTree(answer);
   // `show` names columns; the older words for marks (you, blocked, count) mean the waits column.
   // Which columns and how far it opens are the style's: the house style says, and a nearer one may say otherwise.
   const asked = (Array.isArray(style.show) ? style.show : []).map((s) => (['you', 'blocked'].includes(s) ? 'waits' : s));

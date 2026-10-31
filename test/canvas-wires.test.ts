@@ -52,11 +52,14 @@ test('in a browser, opening a step keeps the canvas still and lights it, and a h
     await page.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: near.x + near.w / 2, y: near.y + near.h / 2, deltaX: 0, deltaY: -120 });
     await wait(600);
     const before = await rect(step(made.a));
+    // Where the plane stands and its scale: the pane narrows beside the sheet, and a step past its edge is put out of the picture until it is back in view.
+    const plane = () => page.evaluate<number[]>(`(() => { const svg = document.querySelector('#canvas svg[role=img]'), [x, y, w] = svg.getAttribute('viewBox').split(' ').map(Number); return [x, y, svg.clientWidth / w]; })()`);
+    const stood = await plane();
     await click([before.x + before.w / 2, before.y + before.h / 2]);
     assert.ok(await until(`document.body.dataset.sheet === 'open' && Boolean(document.querySelector('#canvas .lf-step.here'))`, 5000), `its page is open, the step lit: ${await page.evaluate(`JSON.stringify([document.body.dataset.sheet, location.hash, document.querySelectorAll('#canvas .lf-step.here').length, document.querySelectorAll('.lf-step.here').length])`)} ${await probe()}`);
     await wait(600);
-    const after = await rect(step(made.a));
-    assert.ok(Math.abs(after.x - before.x) < 1 && Math.abs(after.y - before.y) < 1 && Math.abs(after.w - before.w) < 1, `the canvas does not move: ${JSON.stringify([before, after])}`);
+    const after = await plane();
+    assert.ok(after.every((n, i) => Math.abs(n - stood[i]) < 0.01), `the canvas does not move: ${JSON.stringify([stood, after])}`);
     await page.evaluate(`document.getElementById('sheet-close').click()`);
     assert.ok(await until(`!document.body.dataset.sheet && !document.querySelector('#canvas .lf-step.here')`, 5000), 'shut, nothing lit');
     await wait(600);

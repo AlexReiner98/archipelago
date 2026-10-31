@@ -1,4 +1,4 @@
-// A system as it came to be (draw/architecture/story.js, play.js): the lens's steps, each laid out with the one
+// A system as it came to be (layouts/architecture/story.js, play.js): the lens's steps, each laid out with the one
 // before it as its prior. Checked on the landing page's story (14 steps, as the prototype told it on 22 Oct 2026)
 // for what a reader follows it by: no two wires run as one, few cross and few turn, a corner stays square in every
 // frame of a move, what a step leaves alone does not move, and the last step is the map as it is.
@@ -8,14 +8,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
-import { picture } from './draw/architecture/index.js';
+import { picture } from './layouts/architecture/index.js';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
-import { layout } from './draw/architecture/layout.js';
+import { layout } from './layouts/architecture/layout.js';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
-import { nameLeft, squareMorph, statesOf } from './draw/architecture/story.js';
+import { nameLeft, squareMorph, statesOf } from './layouts/architecture/story.js';
 
 const house = { ...JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props, shape: 'architecture' };
-const answer = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'drawings', 'architecture-story.json'), 'utf8'));
+const answer = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'layouts', 'architecture-story.json'), 'utf8'));
 const measure = (t: string, px: number) => t.length * px * 0.56;
 const run = (steady = true) => {
   let prior: any;

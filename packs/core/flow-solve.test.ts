@@ -5,11 +5,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { faults, spacing } from './draw/flow/faults.js';
+import { faults, spacing } from './layouts/flow/faults.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { layout } from './draw/flow/layout.js';
+import { layout } from './layouts/flow/layout.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { settle, solve, solveSections } from './draw/flow/solve.js';
+import { settle, solve, solveSections } from './layouts/flow/solve.js';
 
 const sizes = { wire: 12, room: 12, run: 18, corner: 14, apart: 8 };
 const picture = (boxes: Record<string, [number, number, number, number]>, wires: [string, string, number[][]][]) => {

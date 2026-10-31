@@ -1,5 +1,5 @@
 // Changes held for the owner, decided where they land (the owner, 25 Oct 2026; 31 Oct 2026). Wires are no longer drawn
-// by hand on the canvas (the owner, 28 Oct 2026: never used). A click on a held change's badge (ui/drawing.js:
+// by hand on the canvas (the owner, 28 Oct 2026: never used). A click on a held change's badge (ui/layout.js:
 // `drawing-held`) opens the sheet of the item it touches, or its own sheet when it only makes new ones, where it is
 // applied or declined (ui/item-held.js).
 

@@ -105,7 +105,7 @@ export function who(actor, session) {
 }
 
 /** The first clause of a reason. Agents explain at length; a row has room for the point. */
-export const gist = (text) => (text ?? '').split(/(?<=[.:;])\s|\n/)[0].replace(/[.:;]$/, '');
+export const gist = (text) => (typeof text === 'string' ? text : '').split(/(?<=[.:;])\s|\n/)[0].replace(/[.:;]$/, '');
 
 /** On whose authority, as a mark. The sentence is the tooltip. */
 export function authorityMark(a) {

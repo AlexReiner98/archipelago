@@ -3,23 +3,21 @@
 // address is replaced), and never leaves unsaved words behind: while there are any, the sheet stays.
 
 import { state } from './base.js';
-import { numberOf } from './lens-base.js';
+import { numberOf } from './query-base.js';
 
 const HERE = /^#\/e\/(e_[a-z0-9]{8})/;
 
-/**
- * Keep `host` clear of the sheet, in whichever pane it stands: it stops where the sheet starts, with its scrollbar in
- * sight, and what is published gives way to the draft. A pane the sheet would cover whole stays as it is.
- */
-function roomBeside(host) {
+/** The share of the page's width an open sheet takes from the panes (ui/panes.js); one as wide as the page leaves nothing beside it, and takes none. */
+export function sheetAside() {
+  const sheet = document.getElementById('sheet');
+  return document.body.dataset.sheet === 'open' && sheet.offsetWidth < innerWidth * 0.8 ? sheet.offsetWidth / innerWidth : 0;
+}
+
+/** While the sheet stands beside `host`, what is published gives way to the draft. */
+function draftBeside(host) {
   const fit = () => {
     if (!host.isConnected) return stop();
-    const sheet = document.getElementById('sheet');
-    const pane = host.parentElement.getBoundingClientRect();
-    const over = document.body.dataset.sheet ? Math.max(0, pane.right - (innerWidth - sheet.offsetWidth)) : 0;
-    const room = over > 0 && over < pane.width && host.classList.contains('beside-sheet');
-    host.classList.toggle('sheet-over', room);
-    host.style.setProperty('--sheet-over', `${room ? over : 0}px`);
+    host.classList.toggle('sheet-over', sheetAside() > 0 && host.classList.contains('beside-sheet'));
   };
   const bars = new MutationObserver(fit);
   const stop = () => (bars.disconnect(), removeEventListener('resize', fit));
@@ -46,7 +44,7 @@ export function followSheet(host, picture, bring) {
   }
   if (host.following) return;
   host.following = true;
-  roomBeside(host);
+  draftBeside(host);
   document.getElementById('sheet').dispatchEvent(new Event('beside'));
   const follow = () => {
     const open = HERE.exec(location.hash);
