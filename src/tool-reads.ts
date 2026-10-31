@@ -149,6 +149,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       status: z.string().optional(),
       owner: z.string().optional(),
       open: z.boolean().optional().describe('true for unfinished only, false for finished only.'),
+      about: z.boolean().optional().describe('true for what is kept about an item, false for what is about nothing.'),
       include_archived: z.boolean().optional(),
       limit: z.number().int().positive().optional(),
     },

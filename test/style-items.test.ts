@@ -73,6 +73,28 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     }
     await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 
+    // A style about one item is that item's: the switch does not offer it, find still does, and Apply puts it in the
+    // switch while it is drawn.
+    const own = (await call('/api/change', undefined, {
+      reason: 'test',
+      ops: [
+        { op: 'create', ref: 'o', type: 'style', title: 'Slab section look', props: { shape: 'list' } },
+        { op: 'link', type: 'about', from: 'o', to: made.t },
+      ],
+    })).result.created as Record<string, string>;
+    await page.evaluate(`location.reload()`);
+    const options = `[...document.querySelectorAll('#query .q-look option')].map((o) => o.textContent)`;
+    assert.ok(await until(`${options}.includes('Harbour blueprint')`), 'the switch offers a style about nothing');
+    assert.ok(!(await page.evaluate(`${options}.includes('Slab section look')`)), 'and not one about an item');
+    await type('style slab');
+    assert.ok(await until(`Boolean(${choice('Style', 'Slab section look')})`), `find still lists it: ${await page.evaluate(`${list}.textContent`)}`);
+    await take('Style', 'Slab section look');
+    assert.ok(await until(onPage(own.o)), 'its page opens');
+    assert.ok(await until(`${button}?.textContent === 'Apply'`), 'with Apply');
+    await page.evaluate(`${button}.click()`);
+    assert.ok(await until(`document.querySelector('#query .q-look')?.value === 'style:${own.o}'`), 'and the switch says what is drawn');
+    await shut();
+
     // The word "style " lists styles too, each opening its page; a drawing is no item, so only it draws at once.
     await type('style harbour');
     assert.ok(await until(`Boolean(${choice('Style', 'Harbour blueprint')})`), `Style lists it: ${await page.evaluate(`${list}.textContent`)}`);
