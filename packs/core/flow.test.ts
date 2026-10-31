@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
-import { layout, LARGE } from './draw/flow/layout.js';
+import { layout } from './draw/flow/layout.js';
 
 const state = { blocked: false, waits_on: [], sessions: 0 };
 const item = (id: string, kind = 'work', extra: Record<string, unknown> = {}) => ({ id, kind, inside: 'r', title: `Step ${id}`, place: 0, open: true, status: 'todo', state, ...extra });
@@ -107,7 +107,7 @@ test('a loop in the order is cut where it closes, and the rest still reads from 
 });
 
 test('a large answer is laid out within the budget', () => {
-  const n = LARGE * 2;
+  const n = 60 * 2;
   const items = Array.from({ length: n }, (_, k) => item(`s${k}`));
   const links = items.slice(1).flatMap((_, k) => [dep(`s${k + 1}`, `s${k}`), ...(k > 2 ? [dep(`s${k + 1}`, `s${k - 3}`)] : [])]);
   const [g, took] = timed(() => run(items, links));
@@ -233,7 +233,7 @@ test('a large map wraps its wide layers into rows: it comes out about the page\'
     links.push(link('part_of', `p${p}`, 'top'));
     for (let k = 0; k < 9; k++) (items.push(flat(`p${p}.${k}`)), links.push(link('part_of', `p${p}.${k}`, `p${p}`)));
   }
-  assert.ok(items.length > LARGE);
+  assert.ok(items.length > 60);
   const g = layout({ items, links, measure, sizes: house.sizes });
   assert.ok(g.width / g.height < 4, `${Math.round(g.width)} wide by ${Math.round(g.height)} tall`);
   assert.ok(g.y.get('p0.0') > g.y.get('p0') && g.y.get('p0') > g.y.get('top'), 'what is part of something still sits under it');

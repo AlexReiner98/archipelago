@@ -77,26 +77,3 @@ export function reduced(edges) {
   };
   return edges.filter((e) => !implied(e.a, e.b));
 }
-
-/**
- * Many leaves of one (part of it, tied to nothing else, in no order) wrapped under it in a block, each column filled
- * down before the next. The blocks under one row take one number of rows together: the one that brings them, side
- * by side, nearest `aspect` times as wide as tall, so in a narrow pane they stack down it and in a wide one they
- * spread across. The ties to them are wired as every line is (./wires.js), each block's
- * down one bus beside it. `near` is each step's ties ({ id, rel }), `asap` each step's layer, changed here; `wide` and
- * `tall` a step's room across and down; `bus` the room a bus takes. Answers with the blocks: { parent, leaves, rows }.
- */
-export function wrapLeaves({ ids, near, asap, flows, wide, tall, bus, aspect }) {
-  const leafy = new Set(ids.filter((id) => !flows(id) && (near.get(id) ?? []).length === 1 && near.get(id)[0].rel === 'parent'));
-  const blocks = ids.map((id) => ({ parent: id, leaves: (near.get(id) ?? []).filter((t) => t.rel === 'child' && leafy.has(t.id) && asap.get(t.id) === asap.get(id) + 1).map((t) => t.id) })).filter((b) => b.leaves.length >= 2);
-  const out = [];
-  for (const [layer, under] of grouped(blocks, (b) => asap.get(b.parent) + 1)) {
-    const each = (b) => b.leaves.reduce((s, l) => s + wide(l), 0) / b.leaves.length + bus, row = highest(under.flatMap((b) => b.leaves.map(tall)));
-    const off = (r) => Math.abs(Math.log(under.reduce((s, b) => s + Math.ceil(b.leaves.length / r) * each(b), 0) / (r * row) / aspect));
-    let rows = 1;
-    for (let r = 2; r <= highest(under.map((b) => b.leaves.length)); r++) if (off(r) < off(rows)) rows = r;
-    if (rows < 2) continue;
-    for (const b of under) (b.leaves.forEach((l, k) => asap.set(l, layer + (k % rows))), out.push({ ...b, rows }));
-  }
-  return out;
-}

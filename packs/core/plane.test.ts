@@ -9,7 +9,7 @@ import { count } from './draw/flow/count.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { faces, isPlanar } from './draw/flow/planar.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { layout } from './draw/flow/bars.js';
+import { layout } from './draw/flow/layout.js';
 
 const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const measure = (t: string, px: number) => t.length * px * 0.5;
@@ -233,16 +233,6 @@ test('bars: a holder put by hand takes what hangs on it along', () => {
 });
 
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { layout as ranksOf } from './draw/flow/ranks.js';
-
-test('ranks: a step put by hand stays there too', () => {
-  const ids = ['a', 'b', 'c'].map((id) => item(id)), links = [dep('b', 'a'), dep('c', 'b')];
-  const g = ranksOf({ items: ids, links, placed: { b: [700, 500] }, measure, sizes: house.sizes });
-  assert.deepEqual([g.x.get('b'), g.y.get('b')], [700, 500]);
-  assert.ok(right(g));
-});
-
-// @ts-expect-error a drawing's modules are plain JavaScript
 import { shownOnly } from './draw/flow/graph.js';
 
 const storyCss = readFileSync(join(import.meta.dirname, 'draw/flow/story.js'), 'utf8');
@@ -369,44 +359,4 @@ test('bars: pulling tight adds no crossing and no collision', () => {
   assert.equal(count(lines(g)).crossings, 0);
   assert.ok(clear(g));
   assert.ok(right(g));
-});
-
-// @ts-expect-error a drawing's modules are plain JavaScript
-import { layout as ranks } from './draw/flow/ranks.js';
-
-const drawnRanks = (items: any[], links: any[]) => ranks({ items, links, measure, sizes: house.sizes });
-const lead = (a: string, b: string) => ({ type: 'depends_on', from: b, to: a });
-
-test('ranks: no wire of the order runs up, whatever the ties ask', () => {
-  const ids = Array.from({ length: 12 }, (_, k) => `n${k}`), links: any[] = [];
-  for (let k = 0; k + 3 < 12; k++) links.push(lead(`n${k}`, `n${k + 3}`));
-  for (let k = 0; k + 7 < 12; k++) links.push(tie(`n${k + 7}`, `n${k}`, 'serves'));
-  const g = drawnRanks(ids.map((id) => item(id)), links);
-  assert.equal(g.all.length, 12);
-  assert.ok(g.chains.every((c: any) => g.y.get(c.a) < g.y.get(c.b)));
-  assert.ok(right(g));
-  assert.ok(clear(g));
-});
-
-test('ranks: a ladder of the order draws with no crossing and no wire along another', () => {
-  const links = ['a', 'b', 'c', 'd'].flatMap((k, i, l) => [...(i ? [lead(`${l[i - 1]}0`, `${k}0`), lead(`${l[i - 1]}1`, `${k}1`)] : []), tie(`${k}0`, `${k}1`, 'serves')]);
-  const g = drawnRanks([...'abcd'].flatMap((k) => [item(`${k}0`), item(`${k}1`)]), links);
-  assert.equal(count(lines(g)).crossings, 0);
-  assert.equal(count(lines(g)).shared, 0);
-});
-
-test('ranks: a tree of ties hangs off its item, and a step of the order stays in the rows', () => {
-  const leaves = Array.from({ length: 6 }, (_, k) => item(`l${k}`));
-  const g = drawnRanks([item('r'), item('s'), item('o'), ...leaves], [...leaves.map((l) => tie(l.id, 'r')), lead('r', 's'), lead('s', 'o')]);
-  assert.equal(g.all.length, 9);
-  assert.ok(clear(g));
-  assert.ok(g.chains.every((c: any) => g.y.get(c.a) < g.y.get(c.b)));
-  assert.equal(count(lines(g)).crossings, 0);
-});
-
-test('ranks: loose items, a ring and many links of one pair all draw', () => {
-  const g = drawnRanks(['x', 'p', 'q', 'o'].map((id) => item(id)), [tie('p', 'q', 'serves'), tie('p', 'q', 'calls'), tie('q', 'o', 'serves'), tie('o', 'p', 'serves')]);
-  assert.equal(g.all.length, 4);
-  assert.ok(g.ties.every((t: any) => t.points.length >= 2));
-  assert.ok(clear(g));
 });

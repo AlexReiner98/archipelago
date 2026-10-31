@@ -3,7 +3,7 @@
 // they go, with the same spacing, round every box. Pure: places and wires in, changed in place.
 
 import { pair } from './polyline.js';
-import { spreadPorts } from './centre.js';
+import { spreadPorts } from './ports.js';
 import { route, tieRoute } from './free.js';
 import { rewire } from './reroute.js';
 

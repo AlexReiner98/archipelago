@@ -9,7 +9,7 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-for (const shape of ['', 'plane', 'rows']) test(`in a browser, a step dragged on the canvas${shape && ` in the form ${shape}`} is kept in the places stream and drawn there again`, { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+for (const shape of ['']) test(`in a browser, a step dragged on the canvas${shape && ` in the form ${shape}`} is kept in the places stream and drawn there again`, { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {
     reason: 'test',

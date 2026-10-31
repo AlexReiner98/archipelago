@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { layout as bars } from './draw/flow/bars.js';
+import { layout as bars } from './draw/flow/layout.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { faults } from './draw/flow/faults.js';
 

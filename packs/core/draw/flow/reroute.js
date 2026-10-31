@@ -1,13 +1,9 @@
-// Each wire looked at once more, when every box stands where it will stay. The tracks were chosen before the pull moved
-// anything, so a direct way may be open now: straight across a gap, one bend from a side that faces where it goes, or two
-// through the gap between. A wire takes the way with the fewest bends that crosses and touches nothing it did not, and
-// passes through no box. A wire with no such way loses what jogs it can. Pure: boxes and lines in, lines changed in place.
+// The ways a wire may go between two boxes of up to two bends, and the best of them for a wire with no old way to keep to.
+// It serves a step put by hand, until the solve does. Pure: boxes and lines in, lines changed in place.
 
 import { count, touch } from './count.js';
 import { tidy } from './polyline.js';
 
-/** How far a line's ends stand from the middles of the sides they land on: of two ways, the one nearer the middles. */
-const offCentre = (l, a, b) => [[l[0], l[1], a], [l.at(-1), l.at(-2), b]].reduce((sum, [p, q, box]) => sum + Math.abs(p[0] === q[0] ? p[0] - box.mid[0] : p[1] - box.mid[1]), 0) / 4;
 const lengthOf = (l) => l.reduce((sum, p, i) => sum + (i ? Math.abs(p[0] - l[i - 1][0]) + Math.abs(p[1] - l[i - 1][1]) : 0), 0);
 const spread = (lo, hi, n) => (hi < lo ? [] : n === 1 || hi === lo ? [(lo + hi) / 2] : [(lo + hi) / 2, ...Array.from({ length: n }, (_, k) => lo + ((hi - lo) * k) / (n - 1))]);
 const boundsOf = (l) => [Math.min(...l.map((p) => p[0])), Math.max(...l.map((p) => p[0])), Math.min(...l.map((p) => p[1])), Math.max(...l.map((p) => p[1]))];
@@ -98,52 +94,6 @@ export function shapesOf(boxes, track) {
   };
   shape.solids = solids;
   return shape;
-}
-
-/** Take out a short step between two runs that go the same way, by bringing one run level with the other. */
-function unjog(w, a, b, near, solids, others) {
-  let line = tidy(w.points), moved = false;
-  for (let i = 1; i + 2 < line.length; i++) {
-    const [p, q, r, s] = [line[i - 1], line[i], line[i + 1], line[i + 2]], ax = q[0] === r[0] ? 1 : 0, off = 1 - ax;
-    if (Math.abs(r[ax] - q[ax]) > near || Math.sign(q[off] - p[off]) !== Math.sign(s[off] - r[off])) continue;
-    for (const [move, to, box] of [[[i - 1, i], r[ax], i === 1 && a], [[i + 1, i + 2], q[ax], i + 3 === line.length && b]]) {
-      // The run that lands on a box may move only along that box.
-      if (box && (box.pointed || to < box.lo[ax] + 1 || to > box.hi[ax] - 1)) continue;
-      const next = line.map((c) => [...c]);
-      for (const k of move) next[k][ax] = to;
-      const done = tidy(next);
-      if (clear(done, line, w, solids, others, 0, 0)) { line = done; moved = true; i = 0; break; }
-    }
-  }
-  if (moved) (w.points = line), (w.bounds = null);
-  return moved;
-}
-
-/**
- * `boxes` by id, as settle has them, with `pointed` where a wire can only meet the middle of a side; `wires` { a, b,
- * points } are those that may move, `still` lines they must keep off. `track` is the room a port keeps from a box's
- * corner, `corner` the same for a new way, `gap` what it keeps from a wire beside it, `room` what a wire keeps from a box it passes, `run` the length from a port to the wire's first corner, `ports`
- * how many places along a side a port may stand, `shorter` how much of its length a way with as many bends as the wire
- * has now may come to, to be worth taking, and `rounds` how many times over, since a wire that moves can open a way for another.
- */
-export function reroute(boxes, wires, still, { track, room, run, gap = 0, corner = track, ports, shorter, rounds }) {
-  const shape = shapesOf(boxes, track), { solids } = shape;
-  const others = [...wires, ...still.map((points) => ({ points }))];
-  let moved = 0, jogs = 0;
-  for (let round = 0; round < rounds; round++) for (const w of wires) {
-    const was = tidy(w.points), bends = was.length - 2, long = lengthOf(was), a = shape.get(w.a), b = shape.get(w.b);
-    // A wire too near a box or with a corner on its port takes any way as good that has the room.
-    const tight = !clear(was, was, w, solids, [], room, 0) || (bends > 0 && Math.min(lengthOf(was.slice(0, 2)), lengthOf(was.slice(-2))) < run);
-    // Straight already, or one bend between boxes that face each other on neither axis: only a tight wire has better.
-    const facing = [0, 1].some((ax) => Math.min(a.hi[ax], b.hi[ax]) - Math.max(a.lo[ax], b.lo[ax]) >= 2);
-    if (!tight && (bends === 0 || (bends === 1 && !facing))) continue;
-    const better = ways(a, b, corner, was, run, ports).map((l) => tidy(l)).map((l) => ({ l, bends: l.length - 2, long: lengthOf(l) + offCentre(l, a, b) }))
-      .filter((c) => c.bends < bends || (c.bends === bends && (tight || c.long < long * shorter))).sort((p, q) => p.bends - q.bends || p.long - q.long);
-    const found = better.find((c) => clear(c.l, was, w, solids, others, room, gap));
-    if (found) ((w.points = found.l), (w.bounds = null), moved++);
-    if (unjog(w, a, b, track * 2, solids, others)) jogs++;
-  }
-  return { moved, jogs };
 }
 
 /**

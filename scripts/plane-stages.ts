@@ -10,13 +10,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromeBinary } from '../src/chrome.ts';
-import { layout, stages } from '../packs/core/draw/flow/bars.js';
+import { layout, stages } from '../packs/core/draw/flow/layout.js';
 import { count } from '../packs/core/draw/flow/count.js';
 import { faults, spacing } from '../packs/core/draw/flow/faults.js';
 import { shownOnly } from '../packs/core/draw/flow/graph.js';
 import { placesAsColours } from '../packs/core/draw/flow/places.js';
 
-const args = process.argv.slice(2), fresh = args.includes('--fresh'), solved = args.includes('--solved');
+const args = process.argv.slice(2), fresh = args.includes('--fresh');
 const base = args.find((a) => a.startsWith('http')) ?? 'http://127.0.0.1:3100';
 const home = join(import.meta.dirname, '..', 'runs', 'plane-stages');
 mkdirSync(home, { recursive: true });
@@ -56,7 +56,7 @@ for (const [name, find, limit] of VIEWS) {
   const shown = shownOnly(answer), hues = (style.place_hues ?? []).filter((h: unknown) => /^#[0-9a-f]{3,8}$/i.test(String(h)));
   const items = placesAsColours(shown, hues, new Set([style.here, answer.lens?.from].filter(Boolean))).items;
   const [ASPECT, FOLLOW] = [style.numbers.flow_aspect, style.numbers.flow_aspect_follow];
-  const input = { items, links: shown.links ?? [], undrawn: style.undrawn ?? [], headless: style.headless ?? [], sizes: { ...style.sizes, ...(solved && { plane_solve: 1 }) }, aspect: ASPECT * ((WIDTH / HEIGHT) / ASPECT) ** FOLLOW };
+  const input = { items, links: shown.links ?? [], undrawn: style.undrawn ?? [], headless: style.headless ?? [], sizes: { ...style.sizes }, aspect: ASPECT * ((WIDTH / HEIGHT) / ASPECT) ** FOLLOW };
   for (let round = 0; ; round++) {
     const missing = new Set<string>();
     const measure = (text: string, px: number) => {
