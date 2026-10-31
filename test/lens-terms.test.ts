@@ -167,3 +167,14 @@ test('words keep to Not, however many terms it has', async () => {
   const two = await flatLens(l, { filter: { find: ['text find', 'text already'], not: ['kind system', 'status doing'] } });
   assert.deepEqual(titles(two), ['Done already', 'Find in'], 'and with two sets of words');
 });
+
+test('Find held: the items a change held for the viewer would touch, and one step of what they are tied to', async () => {
+  const { l, made } = await project();
+  assert.deepEqual(titles(await flatLens(l, { filter: { find: ['held'] } })), [], 'nothing is held');
+  await l.change(agent, { reason: 'Finish it', hold: true, ops: [{ op: 'update', id: made.a, status: 'done' }, { op: 'create', ref: 'n', type: 'task', title: 'Loose new' }] });
+  const held = await flatLens(l, { filter: { find: ['held'] } });
+  assert.deepEqual(titles(held), ['Find in'], 'the item it edits; what it would make is no item yet');
+  assert.ok(held.items.every((i) => 'found' in i), 'found, so the page can say why it is there');
+  assert.deepEqual(titles(await flatLens(l, { filter: { find: ['held'] }, walk: { over: 'all', steps: 1 } })), ['Elsewhere', 'Find in', 'The bar']);
+  assert.deepEqual(titles(await flatLens(l, { filter: { find: [`in ${made.p}`], only: ['held'] } })), ['Find in'], 'and Only takes it as a set');
+});

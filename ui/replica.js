@@ -123,7 +123,7 @@ export class Replica {
   /** The answer with what is held for the owner drawn where it would land, and the links drawn here and not yet answered for. */
   drawn() {
     const holds = (id) => Boolean(this.items.get(id) && !this.items.get(id).archived_at);
-    return withGhosts(this.answer(), ghostsOf(this.held, holds, (type) => this.kinds.type?.(type)?.kind ?? null), [...this.mine.values()]);
+    return withGhosts(this.answer(), ghostsOf(this.held, holds, (type) => this.kinds.type?.(type)?.kind ?? null, Boolean(this.lens?.find?.includes('held'))), [...this.mine.values()]);
   }
 
   /** Keep these held changes (the pending proposals) beside the answer; listeners are told when what is held moved. */

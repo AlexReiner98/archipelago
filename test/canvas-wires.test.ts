@@ -74,19 +74,21 @@ test('in a browser, opening a step keeps the canvas still and lights it, and a h
     assert.ok(!(await links(made.d)).some((l) => l.startsWith('depends_on')), 'not yet on the map');
     const at = await rect(badge('held link test'));
     await click([at.x + at.w / 2, at.y + at.h / 2]);
-    assert.ok(await until(`/Apply/.test(document.querySelector('dialog.ask')?.textContent ?? '')`, 5000), `the change is put to the person: ${await probe()}`);
-    assert.ok(await choose(/^Apply$/));
+    assert.ok(await until(`Boolean(document.querySelector('#sheet .held-band'))`, 5000), `the change is put to the person on the sheet of what it touches: ${await probe()}`);
+    assert.ok(await page.evaluate<boolean>(`(() => { const b = [...document.querySelectorAll('#sheet .held-band button')].find((b) => b.textContent === 'Apply'); b?.click(); return Boolean(b); })()`));
     assert.ok(await until(`!document.querySelector('#canvas svg[role=img] .held') && document.querySelectorAll('#canvas svg[role=img] .lf-wire').length === 1`), `applied in place, drawn as it is: ${await probe()}`);
     assert.ok((await links(made.d)).includes(`depends_on ${made.b}`), 'on the map');
     assert.ok((await call('/api/proposals', undefined, { status: 'approved' })).result.some((p: { id: string }) => p.id === held.proposal), 'approved through decide');
 
     // ---- An agent's held item, a faint step where it would land, declined there.
+    await page.evaluate(`document.getElementById('sheet-close').click()`);
+    assert.ok(await until(`!document.body.dataset.sheet`, 5000), 'the sheet is shut again');
     await call('/agent/change', undefined, { actor: 'robot', reason: 'held item test', ops: [{ op: 'create', ref: 'e', type: 'task', title: 'Proposed step' }, { op: 'link', type: 'part_of', from: 'e', to: made.p }] });
     assert.ok(await until(`[...document.querySelectorAll('#canvas .lf-step.ghost')].some((g) => g.textContent.includes('Proposed step')) && Boolean(${badge('held item test')})`), `a faint step: ${await probe()}`);
     const ghostAt = await rect(badge('held item test'));
     await click([ghostAt.x + ghostAt.w / 2, ghostAt.y + ghostAt.h / 2]);
-    assert.ok(await until(`/Decline/.test(document.querySelector('dialog.ask')?.textContent ?? '')`, 5000));
-    assert.ok(await choose(/^Decline$/));
+    assert.ok(await until(`Boolean(document.querySelector('#sheet .held-band'))`, 5000), `its sheet holds the band: ${await page.evaluate<string>(`location.hash + ' | ' + document.querySelector('#sheet')?.innerText.slice(0, 200)`)}`);
+    assert.ok(await page.evaluate<boolean>(`(() => { const b = [...document.querySelectorAll('#sheet .held-band button')].find((b) => b.textContent === 'Decline'); b?.click(); return Boolean(b); })()`));
     assert.ok(await until(`Boolean(document.querySelector('dialog.ask textarea'))`, 5000), 'asked why, as Home asks');
     await page.evaluate(`[...document.querySelectorAll('dialog.ask button')].find((b) => b.textContent === 'Decline').click()`);
     assert.ok(await until(`!document.querySelector('#canvas .lf-step.ghost') && !document.querySelector('#canvas .lf-held')`), `declined, gone: ${await probe()}`);
