@@ -2,9 +2,11 @@
 // was; this shows it in the page's own tip, in the top layer above every bar and pane, and never lets the browser
 // show its own. The browser falls back on any title above what the pointer is on, so while the pointer is on
 // something every title from there to the page's root is taken off, and put back only when it moves on: a click or
-// a key hides the tip and leaves them off. A drawing's own tip (drawing-tip.js) quiets this one over its mark.
+// a key hides the tip and leaves them off. A drawing's own tip (drawing-tip.js) quiets this one over its mark, and
+// over a mark a drawing is told the pointer entered, this one waits for the drawing's answer before it says anything.
 
 import { h } from './base.js';
+import { toldOfEnter } from './marks.js';
 
 let box = null;
 /** The element whose title is shown: { el, said }. */
@@ -13,6 +15,8 @@ let at = null;
 let taken = [];
 /** A mark a drawing's own tip speaks for: nothing is shown over it. */
 let quiet = null;
+/** What to say once the drawing has answered for the mark just entered: { mark, found, open }. */
+let awaited = null;
 
 /** The SVG <title> of an element, if it has one. */
 const svgTitle = (e) => (e instanceof SVGElement ? [...e.children].find((kid) => kid.tagName.toLowerCase() === 'title') : undefined);
@@ -52,6 +56,7 @@ function putBack() {
 
 /** Hide the tip; the titles stay off while the pointer is there. */
 function hide() {
+  awaited = null;
   if (box?.matches(':popover-open')) box.hidePopover();
 }
 
@@ -71,6 +76,20 @@ function place(el) {
   box.style.top = `${below ? r.bottom + gap : r.top - gap - ht}px`;
 }
 
+/** Show what `found` says: at once when a tip was up, and followed from there; opened afresh, it waits a moment (CSS). */
+function say(found, open) {
+  box.textContent = found.said;
+  box.classList.toggle('at-once', open);
+  box.showPopover();
+  place(found.el);
+}
+
+/** The mark at or above `el`, just entered from outside it, that a drawing is told of: it will answer. */
+function entered(el, from) {
+  const mark = [...upFrom(el)].find((e) => toldOfEnter.has(e));
+  return mark && !mark.contains(from) ? mark : null;
+}
+
 function over(ev) {
   if (ev.pointerType === 'touch') return;
   const open = box.matches(':popover-open');
@@ -82,11 +101,9 @@ function over(ev) {
   if (found?.el === was) return;
   hide();
   if (!found || quiet?.contains(found.el)) return;
-  box.textContent = found.said;
-  // Moving from one titled thing to the next, the tip stays up and follows; opened afresh, it waits a moment (CSS).
-  box.classList.toggle('at-once', open);
-  box.showPopover();
-  place(found.el);
+  const mark = entered(ev.target, ev.relatedTarget);
+  if (mark) awaited = { mark, found, open };
+  else say(found, open);
 }
 
 /** Start the tip on this page, once. */
@@ -103,6 +120,15 @@ export function startTips() {
 /** A drawing's tip is up over `el` (null when it is gone): this one says nothing there. */
 export function quietTip(el) {
   quiet = el;
+  if (el && awaited && el.contains(awaited.found.el)) awaited = null;
   // The title stays off while the drawing's tip says it, and is put back when the pointer leaves, as ever.
   if (el && at && el.contains(at.el) && box?.matches(':popover-open')) box.hidePopover();
+}
+
+/** The drawing has answered for `mark`: if it said nothing there, what the title says is shown after all. */
+export function answered(mark) {
+  if (awaited?.mark !== mark) return;
+  const { found, open } = awaited;
+  awaited = null;
+  say(found, open);
 }

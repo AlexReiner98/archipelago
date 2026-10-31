@@ -180,10 +180,13 @@ test('in a browser, a part hovered says what it is in a tip its drawing makes, b
       let part;
       await until(() => (part = document.querySelector('[data-lens] svg a[href="#/e/${a}"][opacity="1"]')));
       const tip = () => document.querySelector('[data-lens] .drawing-tip');
+      // As a pointer does: its title is taken off by the page's tip (ui/tip.js), so the browser shows none beside this one.
+      part.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
       part.dispatchEvent(new MouseEvent('mouseenter'));
       await until(() => tip() && !tip().hidden);
       const shown = { text: tip().textContent, styled: getComputedStyle(tip().firstChild).borderTopStyle, title: part.querySelector('title') === null, said: document.querySelector('.lens-said') === null };
       part.dispatchEvent(new MouseEvent('mouseleave'));
+      part.parentElement.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
       await until(() => tip().hidden);
       const left = { after: tip().hidden, back: part.querySelector('title') !== null };
       // A place says what it is from its name only: its box, around its parts, says nothing.

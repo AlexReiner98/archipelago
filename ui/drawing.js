@@ -9,6 +9,7 @@ import { frameSandbox, h } from './base.js';
 import { dragOf } from './drag.js';
 import { HELD } from './ghosts.js';
 import { tipOf } from './drawing-tip.js';
+import { answered } from './tip.js';
 import { build, cssFor, patch, step } from './marks.js';
 import { stillReading } from './reader-frame.js';
 import { followSheet } from './sheet-follow.js';
@@ -195,7 +196,11 @@ export function drawWith(host, answer, style, keep) {
         performance.measure(`drawing ${drawing.id}`, { start: began, detail: { drawing: Math.round(said.took ?? 0), mount: Math.round(performance.now() - got) } });
       }
       else if (said.type === 'patch' && !mounted) early.push(said.list);
-      else if (said.type === 'patch') (apply(said.list), moving.size && requestAnimationFrame(run));
+      else if (said.type === 'patch') {
+        apply(said.list);
+        if (said.answers?.name === 'enter') answered(keys.get(String(said.answers.key)));
+        if (moving.size) requestAnimationFrame(run);
+      }
       else if (said.type === 'frame?') requestAnimationFrame((t) => !ended && port.postMessage({ type: 'frame', t }));
       else if (said.type === 'surface?') surface ? surface.give() : port.postMessage({ type: 'surface', none: true });
       else if (said.type === 'surface-frame') surface?.paint(said.image);
