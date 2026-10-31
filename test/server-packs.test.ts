@@ -86,6 +86,13 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
   assert.deepEqual(((await post('/x/demo/listed', { prefix: 'request:' })).result as any[]).map((e) => e.key), ['request:r1', 'request:r2']);
   assert.match((await post('/x/demo/listed', { prefix: '' })).error, /A prefix is/);
 
+  // A new workspace says nothing has been put in it; its admin can rename it, its id staying as it is; the default keeps its name.
+  assert.equal((await call('/api/workspace_info', token)).result.started, false);
+  assert.ok((await call('/api/workspace_set', token, { name: 'Acme Studio' })).result);
+  assert.equal((await call('/whoami', token, undefined, 'GET')).workspace.name, 'Acme Studio');
+  assert.deepEqual((await workspaces.list()).find((w) => w.id === 'acme'), { id: 'acme', name: 'Acme Studio' });
+  await assert.rejects(workspaces.rename('default', 'Mine'), /keeps its name/);
+
   // What it did not declare, a workspace it did not make, and the map: refused.
   assert.match((await post('/x/demo/sneak', {})).error, /did not declare the act "mail.send"/);
   assert.match((await post('/x/demo/elsewhere', {})).error, /"default" is not a workspace this pack made/);

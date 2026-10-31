@@ -56,6 +56,10 @@ export async function addWorkspace(db: Q, row: { id: string; name: string }): Pr
   return rows.length > 0;
 }
 
+export async function nameWorkspace(db: Q, id: string, name: string): Promise<void> {
+  await db.query(`update control_workspace set name = $2 where id = $1`, [id, name]);
+}
+
 export async function removeWorkspace(db: Q, id: string): Promise<void> {
   await db.query(`delete from control_workspace where id = $1`, [id]);
 }

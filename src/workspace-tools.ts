@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { endedOf } from './ended.ts';
-import { limitOf } from './members.ts';
+import { limitOf, renameWorkspace } from './members.ts';
 import { looksThisHour } from './looks.ts';
 import { sessionsAwake } from './sessions.ts';
 import { daysLeft, requestsThisMinute, storageOf, useOf, type Limits } from './plan.ts';
@@ -49,7 +49,9 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
     run: async (l) => {
       const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on e.id = s.value #>> '{}' where s.key = 'me'`);
       const limits = await limitOf(l.workspace);
-      return { ...(await settings(l)), owner: rows[0] ?? null, member_limit: limits ? { ...limits, ...(limits.until && { days_left: daysLeft(limits.until) }) } : null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
+      // Whether anything has been put here yet beyond who is in it and how the app is set up.
+      const started = (await l.db.query(`select 1 from entity where kind <> all($1::text[]) and archived_at is null limit 1`, [['actor', 'system']])).rows.length > 0;
+      return { ...(await settings(l)), started, owner: rows[0] ?? null, member_limit: limits ? { ...limits, ...(limits.until && { days_left: daysLeft(limits.until) }) } : null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
     },
   },
   workspace_set: {
@@ -62,11 +64,16 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       agent_backups: z.boolean().optional().describe('Whether agents may download the whole workspace as a backup file (backup_download), private items included.'),
       agent_publish: z.boolean().optional().describe('Whether agents may publish documents here (publish, publish_all), each publish logged with its authority. Taking one down stays a human’s.'),
       agent_code: z.boolean().optional().describe('Whether agents’ changes to the code a drawing or a style runs (modules, code) take effect as they make them, instead of waiting for a human. That code runs only in the sandbox; each change is logged and undoable.'),
+      name: z.string().trim().min(1).max(60).optional().describe('What this workspace is called. Its id and addresses stay as they are.'),
       lifted: z.record(z.string(), z.boolean()).optional().describe('Turn a rule on a session’s reply ending off (true) or on again (false), by the setting it names (its lifted, such as reply_draw): workspace_info lists them.'),
     },
     run: async (l, actor, input) => {
       if (!actor.admin) throw new Error('Only a workspace admin can change workspace settings.');
-      const { lifted, ...rest } = input as Record<string, unknown> & { lifted?: Record<string, boolean> };
+      const { lifted, name, ...rest } = input as Record<string, unknown> & { lifted?: Record<string, boolean>; name?: string };
+      if (name) {
+        await renameWorkspace(l.workspace, name);
+        await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `The workspace is called "${name}" now` });
+      }
       const known = replyLifts(l);
       for (const name of Object.keys(lifted ?? {})) if (!known.includes(name)) throw new Error(`No rule here is turned off by "${name}": ${known.length ? `these are, ${known.join(', ')}` : 'no pack here declares a rule on a reply ending'}.`);
       for (const [key, value] of [...Object.entries(rest), ...Object.entries(lifted ?? {})]) {
