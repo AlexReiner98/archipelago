@@ -39,3 +39,10 @@ test('held changes are drawn where they would land, and only there', () => {
   assert.equal(HELD.exec('held:p_abc123:4')?.[1], 'p_abc123');
   assert.equal(HELD.exec('s:held:p_abc'), null);
 });
+
+test('on a canvas of what is held, a new item tied to nothing drawn is drawn too', () => {
+  const p = [{ id: 'p_loose', ops: [{ op: 'create', ref: 'x', type: 'task', title: 'X' }, { op: 'create', type: 'task', title: 'No ref' }] }];
+  assert.deepEqual(ghostsOf(p, holds).items, []);
+  const g = ghostsOf(p, holds, () => 'work', true);
+  assert.deepEqual(g.items.map((i: { id: string }) => i.id), ['p_loose:x', 'p_loose:#1']);
+});

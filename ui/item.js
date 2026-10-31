@@ -6,6 +6,7 @@ import { api, ask, h, part, state, tell } from './base.js';
 import { drawIn, goQuery, queryNow } from './canvas.js';
 import { draftOf } from './draft.js';
 import { documentMenu, figureOf, homeOf, readDocument } from './item-doc.js';
+import { heldBand, heldOn } from './item-held.js';
 import { readingOf } from './item-read.js';
 import { readAgain } from './reader-frame.js';
 import { choicesOf } from './fields.js';
@@ -56,6 +57,9 @@ export async function entity(id, here) {
   const plan = !e.archived_at && data.incoming.some((r) => rootOf(r.type) === 'part_of' && readWhole(r.entity_type)) ? await api('publish_plan', { within: id }).catch(() => null) : null;
   // How its page looks is its style: the house style's, its kind's (a document reads through), its own.
   const looks = (await api('view', { name: 'style', params: { of: id } })).style;
+
+  // What waits for the person's word on it: each held change that touches it, as a band under its title.
+  const bands = await Promise.all((await heldOn(id)).map((p) => heldBand(p, again)));
 
   const live = !e.archived_at && e.is_open && !e.type.startsWith('sys.');
   // What can be shown to anyone is what its pack says can be; public work (a product) has a page of its own.
@@ -212,6 +216,7 @@ export async function entity(id, here) {
       ]),
       ),
     ),
+    ...bands,
     ties.editor,
     acting,
     headSection(e, owner, (st) => change([{ op: 'update', id, status: st }], `Status set to ${st} in the UI`), (v) => change([{ op: 'update', id, visibility: v }], `Visibility set to ${v} in the UI`)),

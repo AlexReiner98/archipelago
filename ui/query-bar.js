@@ -107,19 +107,21 @@ function termWords(term, redraw) {
 function sortOf(t) {
   const [head] = /^\S+/.exec(t) ?? [''];
   if (isWord(t)) return 'word';
+  if (t === 'held') return 'held';
   if (['text', 'type', 'kind', 'id', 'in', 'related', 'owner'].includes(head)) return head;
   return /^tagged /.test(t) ? 'marked' : 'link';
 }
-const ORDER = ['text', 'type', 'kind', 'marked', 'link', 'owner', 'related', 'id', 'in', 'word'];
+const ORDER = ['held', 'text', 'type', 'kind', 'marked', 'link', 'owner', 'related', 'id', 'in', 'word'];
 const inOrder = (list) => [...list].sort((a, b) => ORDER.indexOf(sortOf(a)) - ORDER.indexOf(sortOf(b)));
-const MARK = { text: 'q-text', type: 'q-type', kind: 'q-type', marked: 'q-tag', link: 'q-link', owner: 'q-link', related: 'q-link', id: 'q-id', in: 'q-in', word: 'q-narrow' };
-const MEANT = { text: 'Words in titles and notes', type: 'Items of this type', kind: 'Items of this kind', marked: 'Items with this tag', link: 'Items with this link', owner: 'What this person owns', related: 'What has any link to this item, either way', id: 'This item', in: 'All that is in this item, at any depth', word: 'What is so' };
+const MARK = { held: 'q-narrow', text: 'q-text', type: 'q-type', kind: 'q-type', marked: 'q-tag', link: 'q-link', owner: 'q-link', related: 'q-link', id: 'q-id', in: 'q-in', word: 'q-narrow' };
+const MEANT = { held: 'What changes held for you would touch', text: 'Words in titles and notes', type: 'Items of this type', kind: 'Items of this kind', marked: 'Items with this tag', link: 'Items with this link', owner: 'What this person owns', related: 'What has any link to this item, either way', id: 'This item', in: 'All that is in this item, at any depth', word: 'What is so' };
 
 /** A term in words: an item by its name, a type by its title, a tag with a #. */
 function termSaid(t, redraw) {
   const sort = sortOf(t);
   const rest = t.slice(t.indexOf(' ') + 1);
   const end = rest === 'me' ? 'me' : isId(rest) ? nameOf(rest, redraw) : rest;
+  if (sort === 'held') return 'held for you';
   if (sort === 'text') return `“${rest}”`;
   if (sort === 'type') return typeTitle(rest);
   if (sort === 'kind') return rest;

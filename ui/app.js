@@ -11,6 +11,7 @@ import { drawFind } from './find.js';
 import { signupPage, welcome } from './signup.js';
 import { home } from './home.js';
 import { entity } from './item.js';
+import { heldPage } from './item-held.js';
 import { stale } from './live.js';
 import { drawNav, screenOfPage, screenPage } from './nav.js';
 import { loadSchema, typeChoice, types, workType } from './words.js';
@@ -21,7 +22,7 @@ import { startTips } from './tip.js';
 import { workspace } from './workspace.js';
 
 /** The pages the sheet holds, by the name in their address. */
-const SHEET = { e: 'item', new: 'item', s: 'screen', workspace: 'workspace', you: 'you' };
+const SHEET = { e: 'item', held: 'item', new: 'item', s: 'screen', workspace: 'workspace', you: 'you' };
 const sheet = document.getElementById('sheet');
 startTips();
 const close = () => (location.hash = hrefNow());
@@ -71,7 +72,9 @@ async function route(pulse = false) {
   if (main.firstElementChild?.dataset.part !== page) main.replaceChildren(h('div', { class: 'part', 'data-part': page }));
   const draw = {
     item: () =>
-      name === 'e'
+      name === 'held'
+        ? heldPage(arg)
+        : name === 'e'
         ? entity(arg, params.get('here') ?? undefined)
         : newItem(part('item'), { type: arg ?? workType(), title: params.get('title') ?? '', types, choices: [types.get(workType()), ...state.schema.types.filter((t) => t.id !== workType())].filter((t) => t && !t.dormant && !t.retired && !t.system && t.kind !== 'system' && !t.id.startsWith('sys.')).map((t) => ({ id: t.id, label: typeChoice(t) })) }),
     screen: () => screenPage(decodeURIComponent(arg ?? '')),

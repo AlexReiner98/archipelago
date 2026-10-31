@@ -11,6 +11,7 @@
 import { SYSTEM } from './head.ts';
 import type { Archipelago } from './pelago.ts';
 import { checkedAfter, holding, wordConditions, type Narrowing, type Word } from './query-only.ts';
+import { heldIds } from './query-held.ts';
 import { endsOf, readTerm, sayTerm, setOf, type Term } from './query-terms.ts';
 import { rankSql, searchIds, slipsOf } from './search.ts';
 import { fileOnAxis } from './timelanes.ts';
@@ -177,6 +178,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   const seedOf = async (term: Term, most: number): Promise<string[]> => {
     if (term.sort === 'id') return hidden ? [] : holds((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${[saidNot ? keep(2) : 'e.archived_at is null', ...numbered(terms, saidNot ? 2 + leftOut.length : 2)].join(' and ')}`, [[term.id], ...(saidNot ? leftOut : []), ...narrowing])).rows.map((r) => r.id));
     if (term.sort === 'type') return holds(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [l.registry.family(term.type), most]));
+    if (term.sort === 'held') return holds(await seed((k) => `select e.id from entity e where e.id = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [await heldIds(l), most]));
     if (term.sort !== 'link' && term.sort !== 'related' && term.sort !== 'in') return [];
     const at = await endsOf(l, term, me);
     if (!at.length) return [];
@@ -213,6 +215,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   // The seeds, each narrowed: ids first, then what a link term finds, what is related, what is in an item, what the
   // text finds, the newest of each type named.
   for (const t of finds) if (t.sort === 'id') add(await seedOf(t, 1), 'id', [t]);
+  for (const t of finds) if (t.sort === 'held') add(await seedOf(t, reach()), 'id', [t]);
   for (const t of finds) if ((t.sort === 'link' || t.sort === 'related') && room() > 0) add(await seedOf(t, reach()), 'link', [t]);
   // What is in an item, at any depth, read from the part_of closure (decision e_tvsdqjeq), the newest first; in an item
   // the viewer cannot see, nothing is.
