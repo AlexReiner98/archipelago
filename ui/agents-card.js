@@ -14,7 +14,7 @@ export function tokenRow(t, { me, personName, then, fail }) {
     t.hint,
     t.last_used ? `Last used ${when(t.last_used)}` : 'Never used',
     t.seen?.length && `from ${t.seen.join(', ')}`,
-    t.expires_at ? `Expires ${when(t.expires_at)}` : t.kind === 'agent' && 'Never expires',
+    t.client ? 'Connected by signing in, until you revoke it' : t.expires_at ? `Expires ${when(t.expires_at)}` : t.kind === 'agent' && 'Never expires',
   ];
   const revoke = async () => (await ask({ title: `Revoke the token "${t.name}"?`, message: 'Whoever uses it is signed out at once.', action: 'Revoke', danger: true })) && api('token_revoke', { id: t.id }).then(then, fail);
   return line(
@@ -23,6 +23,15 @@ export function tokenRow(t, { me, personName, then, fail }) {
     mine && h('span', { class: 'pill ok' }, 'this session'),
     scopePills(t),
     mine ? h('span', { class: 'menu-room' }) : menu('⋯', [['Revoke', revoke, 'danger']]),
+  );
+}
+
+/** The address any client that signs in through the browser is pointed at: no token, no command. */
+function addressRow() {
+  const address = `${location.origin}/mcp`;
+  return line(
+    h('span', { class: 'grow', style: 'min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis', title: 'Paste this into any MCP client, such as claude.ai, Claude Desktop, ChatGPT, Cursor or VS Code. It opens this site to sign in, and the connection is listed here with Revoke.' }, h('strong', {}, 'Address for any client'), ' ', h('code', { class: 'muted small' }, address)),
+    h('button', { onclick: (e) => navigator.clipboard.writeText(address).then(() => (e.target.textContent = 'Copied')) }, 'Copy'),
   );
 }
 
@@ -36,7 +45,7 @@ export function tokensCard({ tokens, row, then, fail, say }) {
   return card(
     'Agent tokens',
     'An agent with one of these acts for you: it sees what you see and proposes to you.',
-    h('ul', { class: 'rows' }, tokens.map(row)),
+    h('ul', { class: 'rows' }, addressRow(), tokens.map(row)),
     h(
       'div',
       { class: 'toolbar', style: 'padding: var(--space-6) 0; flex-wrap: nowrap' },
