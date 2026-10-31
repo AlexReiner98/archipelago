@@ -3,7 +3,7 @@
 // behind draws that, with this item lit. Rare actions are in one menu; the page names no pack's type.
 
 import { api, ask, h, part, state, tell } from './base.js';
-import { goLens, lensNow } from './canvas.js';
+import { drawIn, goLens, lensNow } from './canvas.js';
 import { draftOf } from './draft.js';
 import { documentMenu, figureOf, homeOf, readDocument } from './item-doc.js';
 import { readingOf } from './item-read.js';
@@ -13,7 +13,7 @@ import { choicesSection, fieldsSection, headSection, historySection, section, so
 import { relationEditor } from './item-links.js';
 import { added } from './query-bar.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
-import { actionForm, actionsFor, keepsFigure, readWhole } from './screens.js';
+import { actionForm, actionsFor, buttonsOn, drawnBy, keepsFigure, readWhole, toolOf } from './screens.js';
 import { idsIn, isA, label, menu, relations, titles, types } from './words.js';
 
 /** The root relation a relation extends: what the page reads, whichever pack's flavour of it was used. */
@@ -121,6 +121,9 @@ export async function entity(id, here) {
     goLens({ ...added(now, { find: `id ${id}` }), walk: { over, steps: Math.max(1, now.walk?.steps ?? 0) } });
   };
   const walkSaid = along.map((t) => relations.get(t)?.title ?? t).join(', ');
+  // What its type's screens give it to do: the first in sight, beside Walk from it, any more in the menu.
+  const buttons = e.archived_at ? [] : buttonsOn(data);
+  const press = (b) => (b.draw ? drawIn(drawnBy(b.draw, id)) : act(toolOf(b.action)));
 
   redraw.inPlace = inPlace;
   // Its title and note, written in place and saved as one change (ui/draft.js).
@@ -164,13 +167,15 @@ export async function entity(id, here) {
         { class: 'sheet-marks' },
         h('span', { class: 'grow' }),
         session && h('button', { class: 'quiet-button', title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
+        buttons[0] && h('button', { class: 'quiet-button item-button', title: buttons[0].tip, onclick: () => press(buttons[0]) }, buttons[0].label),
         !e.archived_at && along.length > 0 && h('button', { class: 'quiet-button walk-from', title: `Draw it and what it links to, along ${walkSaid}, in place of the canvas's lens`, onclick: () => walkFrom(false) }, 'Walk from it'),
       menu('⋯', [
+        ...buttons.slice(1).map((b) => [b.label, () => press(b)]),
         !e.archived_at && ties.any && ['Edit links', ties.open],
         !e.archived_at && along.length > 0 && ['Walk from it, added to the lens', () => walkFrom(true)],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
         // What packs offer to do with this kind of item.
-        ...(e.archived_at ? [] : actionsFor(e.type).map((tool) => [tool.title ?? tool.tool, () => act(tool)])),
+        ...(e.archived_at ? [] : actionsFor(e.type).filter((tool) => !buttons.some((b) => b.action === tool.action)).map((tool) => [tool.title ?? tool.tool, () => act(tool)])),
         // Only an address on the web: what an agent wrote there is opened by the owner's click.
         /^https?:[/][/]/i.test(e.props.link ?? '') && ['Open where it ran', () => window.open(e.props.link, '_blank', 'noopener')],
         workish && ['Copy session brief', copyBrief],

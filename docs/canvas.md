@@ -106,9 +106,14 @@ their own version, which names it (`preset`) and stands in its place.
 A style is the pane's (decision e_tqr9cxdc): editing the lens keeps it,
 opening a saved canvas brings its own, and Save keeps both. The view band
 switches it beside the canvas (`ui/look-switch.js`); the band's ⋯ holds
-Arrange, Fit and Snap for the main canvas (decision e_yxp78scv).
+Arrange, Fit and Snap for the main canvas (decision e_yxp78scv). Find never
+draws in a style it names: it finds the style as an item, whose page opens
+over the canvas, and Apply there, a button its type declares on a screen
+(`docs/packs.md`), does what the switch does (task e_q3yfvnz7).
 - `test/saved-canvases.test.ts`: "in a browser, a canvas is saved from the
   bar, listed on Home, opened and switched to, its places its own".
+- `test/style-items.test.ts`: "in a browser, find opens a style’s page and
+  Apply draws the canvas in it".
 - `test/canvas-places.test.ts`: "a move names a canvas and items the map
   has"; "compaction leaves the newest place of each item on each canvas".
 - `test/structure.test.ts`: "every store is named, with its rule"; "the

@@ -1167,6 +1167,13 @@
     },
     {
       "form": "screen",
+      "id": "core.style_apply",
+      "title": "Apply",
+      "on": ["style"],
+      "pieces": [{ "piece": "button", "label": "Apply", "tip": "Draw this canvas in this style; Save keeps it", "draw": { "style": "{here}" } }]
+    },
+    {
+      "form": "screen",
       "id": "core.shared_reading",
       "title": "Reading",
       "on": [
