@@ -164,6 +164,7 @@
   <h2>Animate</h2>
   <label title="The saved setup it starts from">Start <select id="mStart"></select></label>
   <label title="The saved setup it ends on">End <select id="mEnd"></select></label>
+  <label title="A seed has no in-between: the whole slide grows from the one chosen here">Seed <select id="mSeed"><option value="end">End's</option><option value="start">Start's</option></select></label>
   <label title="How many steps between them: more is smoother, and takes longer to build">Frames <output id="mFramesOut"></output><input id="mFrames" type="range" min="4" max="240" step="1" value="80"></label>
   <label title="How long a play takes">Seconds <output id="mSecondsOut"></output><input id="mSeconds" type="range" min="1" max="30" step="0.5" value="8"></label>
   <div class="row"><button id="mBuild" title="Draw every step, each dial part way from the start to the end">Build</button><button id="mPlay" title="Play from the start to the end" disabled>Play</button></div>
@@ -477,7 +478,7 @@
     const [width, height] = frame(), M = DEFAULTS.margin;
     return { ...dials(), ...s.dials, seed: s.seed, source: s.source, rows: Math.max(1, Math.round((s.dials.rows * (height - 2 * M)) / (DEFAULTS.height - 2 * M))) };
   };
-  // A seed has no in-between, so the start's holds throughout; every dial that is a number moves.
+  // A seed has no in-between, so the one chosen holds throughout; every dial that is a number moves.
   const between = (from, to, t) => Object.fromEntries(Object.entries(from).map(([k, v]) => [k, k !== 'seed' && typeof v === 'number' && typeof to[k] === 'number' ? v + (to[k] - v) * t : v]));
   let steps = [];
   const showStep = (t) => {
@@ -495,14 +496,15 @@
   };
   $('mSlide').addEventListener('input', () => showStep(+$('mSlide').value));
   $('mBuild').onclick = () => {
-    const names = [$('mStart').value, $('mEnd').value], kept = { frames: $('mFrames').value, seconds: $('mSeconds').value };
+    const names = [$('mStart').value, $('mEnd').value], kept = { frames: $('mFrames').value, seconds: $('mSeconds').value, seed: $('mSeed').value };
     if (!presets.all()[names[0]] || !presets.all()[names[1]]) return void ($('mNote').textContent = 'Save a start and an end as presets first.');
     $('mNote').textContent = 'Drawing…';
     apply(presets.all()[names[0]]);
-    [$('mStart').value, $('mEnd').value, $('mFrames').value, $('mSeconds').value] = [...names, kept.frames, kept.seconds];
+    [$('mStart').value, $('mEnd').value, $('mFrames').value, $('mSeconds').value, $('mSeed').value] = [...names, kept.frames, kept.seconds, kept.seed];
     animateOuts();
     setTimeout(async () => {
-      const t0 = performance.now(), p = richOf(pal()), from = setupOf(names[0]), to = setupOf(names[1]), n = +kept.frames, made = [];
+      const t0 = performance.now(), p = richOf(pal()), chosen = presets.all()[names[kept.seed === 'end' ? 1 : 0]].seed, n = +kept.frames, made = [];
+      const from = { ...setupOf(names[0]), seed: chosen }, to = { ...setupOf(names[1]), seed: chosen };
       const opts = { base: p, background: background(p), weighted: $('weighted').checked, cloudOpacity: +$('cloudOpacity').value };
       const fields = carried({ from, to, count: n, grid: (d) => gridAt(d.scale, d.width, d.height) });
       // The same land throughout takes the start's places and landforms; its colours turn into the end's places'.
@@ -561,7 +563,7 @@
     face: { font: $('face').value, weight: +$('faceWeight').value },
     letter: { on: $('letter').checked, text: $('letterText').value, size: +$('letterSize').value, strength: +$('letterStrength').value },
     emblem: { on: emblem(), at: +$('emAt').value }, swell: $('swell').checked, frame: $('frame').value,
-    animate: { start: $('mStart').value, end: $('mEnd').value, frames: +$('mFrames').value, seconds: +$('mSeconds').value },
+    animate: { start: $('mStart').value, end: $('mEnd').value, seed: $('mSeed').value, frames: +$('mFrames').value, seconds: +$('mSeconds').value },
     name: { on: $('name').checked, text: $('nameText').value, size: +$('nameSize').value, place: $('namePlace').value, clear: +$('nameClear').value, caps: $('nameCaps').checked, italic: $('nameItalic').checked, spacing: +$('nameSpacing').value },
     // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
     palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
@@ -592,6 +594,7 @@
     const m = s.animate ?? {};
     if (m.start) $('mStart').value = m.start;
     if (m.end) $('mEnd').value = m.end;
+    $('mSeed').value = m.seed ?? 'end';
     $('mFrames').value = m.frames ?? 80; $('mSeconds').value = m.seconds ?? 8;
     animateOuts();
     showLetter(); showClouds(); showEmblem();
