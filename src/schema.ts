@@ -395,10 +395,11 @@ create or replace function pelago_hold_lock(resource text) returns void language
 export const TOKEN_SCOPE = `
 alter table token add column if not exists within jsonb;
 alter table token add column if not exists may text default 'change';
--- A client a person allowed by signing in through the browser, and the hash of its refresh token (src/auth.ts).
-alter table token add column if not exists granted jsonb;
 update token set within = repos where repos is not null and within is null;
 `;
+
+/** A client a person allowed by signing in through the browser, and the hash of its refresh token (src/auth.ts). */
+export const TOKEN_GRANT = `alter table token add column if not exists granted jsonb;`;
 
 /** Members, each by an email address (src/members.ts): step 6. Only the whole database reads it. */
 export const MEMBER = `
