@@ -158,7 +158,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
   },
   picture_put: {
     description:
-      'Keep an image for one item: the screenshot a test drew, for its test result, or a figure for a note or file, which a document that brings the note in shows above its text, or a still of a lens, which a link to a document shows where the app draws the lens live. A test result\u2019s only when the result is shown in public: until then the image stays in the repository it was made in, and the result says where (its `picture` field). One image per item, PNG, JPEG or WebP, 1 MB at most; sent again it replaces what was kept, and when a test is run again (test_report) what was kept for its result is removed. Takes effect at once.',
+      'Keep an image for one item: the screenshot a test drew, for its test result, or a figure for a note or file, which a document that brings the note in shows above its text, or a still of a lens, which a link to a document shows where the app draws the lens live. A test result\u2019s only when the result is shown in public: until then the image stays in the repository it was made in, and the result says where (its `picture` field). One image per item, PNG, JPEG, WebP or SVG, 5 MB at most; sent again it replaces what was kept, and when a test is run again (test_report) what was kept for its result is removed. Takes effect at once.',
     input: {
       result: z.string().describe('The id of the test result, or of the note or file the figure belongs to.'),
       data: z.string().min(1).describe('The file, as base64.'),
