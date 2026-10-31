@@ -41,6 +41,12 @@ const smooth = (a, b, t) => {
 /** A landform that changes nothing: the dials as they are. */
 const BASE_FORM = { rise: 1, rugged: 0, step: 1, soft: 0, top: 0, cliff: 0, atoll: false };
 
+/** The grid a scale dial grows its field on, for a picture this wide and tall. */
+export const gridAt = (scale, W, H) => {
+  const nx = Math.max(16, Math.round((40 + scale * 70) * (W / DEFAULTS.width)));
+  return { nx, ny: Math.round((nx * H) / W) };
+};
+
 export const DEFAULTS = {
   width: 800, height: 1000, margin: 60,
   rows: 90,        // how many rows
@@ -85,6 +91,7 @@ export const DEFAULTS = {
   line: 1.2,       // outline weight
   seed: 1,
   wrap: false,     // repeat seamlessly left to right
+  field: null,     // a field grown elsewhere, { nx, ny, v }, to stand in for the one these dials would grow
 };
 
 /**
@@ -181,7 +188,7 @@ export function ridges(dials) {
   const KEYS = Object.keys(BASE_FORM), numbers = new Map();
   const asNumbers = (g) => numbers.get(g) ?? numbers.set(g, KEYS.map((k) => +formOf(g)[k])).get(g);
   // The blurred grid is kept while the field, its archipelagos and their landforms hold: building it is the slow part.
-  const formKey = rd && !chains.length ? `${grown.key}|${grown.akey}|${JSON.stringify(groups.map((_, g) => asNumbers(g)))}` : null;
+  const formKey = rd && !chains.length ? `${rd.field.nx}|${d.pattern}|${grown.akey}|${JSON.stringify(groups.map((_, g) => asNumbers(g)))}` : null;
   if (formKey && blurred.key !== formKey) blurred = { key: formKey, field: blurredForms(rd, asNumbers, KEYS.length) };
   const formField = formKey ? blurred.field : null;
   const formAt = (x, y, L) => {
@@ -466,9 +473,9 @@ function placesOf(k, seed) {
 /** The field and its archipelagos for these dials, grown once and kept while the dials that shape it hold. */
 let grown = {};
 function diffusionFor(d, W, H) {
-  const nx = Math.max(16, Math.round((40 + d.scale * 70) * (W / DEFAULTS.width))), ny = Math.round((nx * H) / W), level = 0.62 - d.land * 0.5;
-  const key = `${nx}|${ny}|${d.pattern}|${d.variety}|${d.seed}`;
-  if (grown.key !== key) grown = { key, field: grow({ nx, ny, pattern: d.pattern, variety: d.variety, seed: d.seed }) };
+  const { nx, ny } = d.field ?? gridAt(d.scale, W, H), level = 0.62 - d.land * 0.5;
+  const key = d.field ? d.field : `${nx}|${ny}|${d.pattern}|${d.variety}|${d.seed}`;
+  if (grown.key !== key) grown = { key, field: d.field ?? grow({ nx, ny, pattern: d.pattern, variety: d.variety, seed: d.seed }) };
   // Anchors (page units) start the grouping where the places are, so each archipelago gathers the islands near it.
   // Without them, the places stand where the seed puts them, whatever the land does, so no dial moves a palette.
   const starts = d.anchors?.map(([x, y]) => ({ x: (x / W) * nx, y: (y / H) * ny })) ?? placesOf(Math.max(1, d.chains), d.seed).map(([x, y]) => ({ x: x * nx, y: y * ny }));

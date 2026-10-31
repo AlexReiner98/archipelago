@@ -22,14 +22,29 @@ function torusNoise(nx, ny, cells, rnd) {
   };
 }
 
-/** A Gray-Scott grid on an nx × ny torus, seeded, that grows on from where it stands by `run(steps, pattern)`. */
+/**
+ * A Gray-Scott grid on an nx × ny torus, seeded, that grows on from where it stands by `run(steps, pattern)`.
+ * `resize` carries what has grown onto a grid of another size: forms keep their width in cells, so on a coarser grid
+ * they are wider on the page, and the chemistry merges or thins them as it runs on. That is what the scale dial is.
+ */
 function growing({ nx, ny, variety, seed }) {
   const rnd = random(seed * 104729 + 7);
-  const size = nx * ny;
-  const drift = torusNoise(nx, ny, 3, random(seed * 7 + 11));
-  const drifts = Float32Array.from({ length: size }, (_, i) => variety * 1.6 * (drift(i % nx, Math.floor(i / nx)) - 0.5));
-  const feedAt = new Float32Array(size), killAt = new Float32Array(size);
+  let size = nx * ny, drifts, feedAt, killAt, nb;
   let u = new Float32Array(size).fill(1), v = new Float32Array(size), u2 = new Float32Array(size), v2 = new Float32Array(size);
+  const driftAt = torusNoise(1000, 1000, 3, random(seed * 7 + 11));
+  // What belongs to the grid: where the pattern drifts, by place on the page, and each cell's eight neighbours, wrapped.
+  const lay = () => {
+    size = nx * ny;
+    drifts = Float32Array.from({ length: size }, (_, i) => variety * 1.6 * (driftAt(((i % nx) / nx) * 1000, (Math.floor(i / nx) / ny) * 1000) - 0.5));
+    feedAt = new Float32Array(size);
+    killAt = new Float32Array(size);
+    nb = new Int32Array(size * 8);
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      const i = (y * nx + x) * 8;
+      [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([dx, dy], k) => (nb[i + k] = ((y + dy + ny) % ny) * nx + ((x + dx + nx) % nx)));
+    }
+  };
+  lay();
   // Seeds: small squares of the second chemical, enough that the field fills fast.
   for (let s = 0; s < 6 + Math.round(size / 300); s++) {
     const cx = Math.floor(rnd() * nx), cy = Math.floor(rnd() * ny), r = 1 + Math.floor(rnd() * 3);
@@ -38,12 +53,13 @@ function growing({ nx, ny, variety, seed }) {
       (u[i] = 0.5), (v[i] = 0.25 + rnd() * 0.1);
     }
   }
-  // Each cell's eight neighbours, wrapped.
-  const nb = new Int32Array(size * 8);
-  for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
-    const i = (y * nx + x) * 8;
-    [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([dx, dy], k) => (nb[i + k] = ((y + dy + ny) % ny) * nx + ((x + dx + nx) % nx)));
-  }
+  const resize = (nx2, ny2) => {
+    const carried = (w) => Float32Array.from({ length: nx2 * ny2 }, (_, i) => sample({ nx, ny, v: w }, ((i % nx2) * nx) / nx2, (Math.floor(i / nx2) * ny) / ny2));
+    [u, v] = [carried(u), carried(v)];
+    [nx, ny] = [nx2, ny2];
+    [u2, v2] = [new Float32Array(nx * ny), new Float32Array(nx * ny)];
+    lay();
+  };
   const run = (steps, pattern) => {
     for (let i = 0; i < size; i++) {
       const t = Math.max(-0.6, Math.min(2.2, pattern + drifts[i]));
@@ -68,7 +84,7 @@ function growing({ nx, ny, variety, seed }) {
     for (let i = 0; i < size; i++) max = Math.max(max, v[i]);
     return Float32Array.from(v, (c) => c / max);
   };
-  return { run, field };
+  return { run, resize, field, grid: () => ({ nx, ny }) };
 }
 
 // The pattern dial is read along one run of growth, not grown anew at each setting: the field settles at the middle of
@@ -94,6 +110,25 @@ export function grow({ nx, ny, pattern = 0.3, variety = 0, seed = 1 }) {
   const rungs = rungsFor(`${nx}|${ny}|${variety}|${seed}`, () => growing({ nx, ny, variety, seed }), pattern < 0 ? -1 : 1, k + 1);
   const [a, b] = [rungs[k], rungs[k + 1]];
   return { nx, ny, v: a.map((c, i) => c + (b[i] - c) * t) };
+}
+
+/**
+ * The field at each of `count` moments of one run from a start to an end, each { nx, ny, v }: the start as grow() has
+ * it, then the same growth going on while the pattern dial and the grid turn toward the end's. Nothing is grown anew,
+ * so each moment comes out of the last, and `grid` says the grid a setting's scale has.
+ */
+export function carried({ from, to, count, grid, steps = 200 }) {
+  const start = grid(from), end = grid(to), g = growing({ ...start, variety: from.variety, seed: from.seed });
+  g.run(SETTLE, 0);
+  for (let k = 1, last = Math.round(Math.abs(from.pattern) / RUNG); k <= last; k++) g.run(RUNG_STEPS, Math.sign(from.pattern) * k * RUNG);
+  const fields = [{ ...start, v: g.field() }];
+  for (let k = 1; k < count; k++) {
+    const t = k / (count - 1), nx = Math.round(start.nx + (end.nx - start.nx) * t), ny = Math.round(start.ny + (end.ny - start.ny) * t), { nx: was, ny: wasY } = g.grid();
+    if (nx !== was || ny !== wasY) g.resize(nx, ny);
+    g.run(steps, from.pattern + (to.pattern - from.pattern) * t);
+    fields.push({ nx, ny, v: g.field() });
+  }
+  return fields;
 }
 
 /** v, 0 to 1, grown from its seeds with one pattern held, for a field no dial moves. */

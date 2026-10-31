@@ -178,7 +178,8 @@
 </aside>
 <main><canvas id="view"></canvas><div id="sizes" class="only-emblem" title="The drawing at 16, 24, 32, 48, 64 and 128 px"></div></main>
 <script type="module">
-  import { ridges, DEFAULTS } from './ridges.js';
+  import { ridges, DEFAULTS, gridAt } from './ridges.js';
+  import { carried } from './diffusion.js';
   import { PLACES, fromPixels, signature, waterOf, landOf, layout, enrich } from './palettes.js';
   import * as presets from './presets.js';
   import { paint, fillOf as fillWith, swell, isLight } from './paint.js';
@@ -476,7 +477,8 @@
     const [width, height] = frame(), M = DEFAULTS.margin;
     return { ...dials(), ...s.dials, seed: s.seed, source: s.source, rows: Math.max(1, Math.round((s.dials.rows * (height - 2 * M)) / (DEFAULTS.height - 2 * M))) };
   };
-  const between = (from, to, t) => Object.fromEntries(Object.entries(from).map(([k, v]) => [k, typeof v === 'number' && typeof to[k] === 'number' ? v + (to[k] - v) * t : v]));
+  // A seed has no in-between, so the start's holds throughout; every dial that is a number moves.
+  const between = (from, to, t) => Object.fromEntries(Object.entries(from).map(([k, v]) => [k, k !== 'seed' && typeof v === 'number' && typeof to[k] === 'number' ? v + (to[k] - v) * t : v]));
   let steps = [];
   const showStep = (t) => {
     if (!steps.length) return;
@@ -501,14 +503,32 @@
     animateOuts();
     setTimeout(async () => {
       const t0 = performance.now(), p = richOf(pal()), from = setupOf(names[0]), to = setupOf(names[1]), n = +kept.frames, made = [];
-      const opts = { base: p, palOf, background: background(p), weighted: $('weighted').checked, cloudOpacity: +$('cloudOpacity').value };
+      const opts = { base: p, background: background(p), weighted: $('weighted').checked, cloudOpacity: +$('cloudOpacity').value };
+      const fields = carried({ from, to, count: n, grid: (d) => gridAt(d.scale, d.width, d.height) });
+      // The same land throughout takes the start's places and landforms; its colours turn into the end's places'.
+      const first = ridges({ ...from, field: fields[0] }), startPlaces = [...given], kept2 = [...$('mix').querySelectorAll('input')].map((c) => c.checked);
+      const landforms = startPlaces.map((k) => palettes[k].form), endMix = presets.all()[names[1]].mix ?? [];
+      for (const c of $('mix').querySelectorAll('input')) c.checked = endMix.includes(c.value);
+      assign(first.chains, 800);
+      const endPlaces = [...given];
+      $('mix').querySelectorAll('input').forEach((c, i) => (c.checked = kept2[i]));
+      const painted = (pic, places) => {
+        given = places;
+        const c = new OffscreenCanvas(pic.width, pic.height);
+        paint(c.getContext('2d'), shown(pic), { ...opts, palOf });
+        return c;
+      };
       for (let k = 0; k < n; k++) {
-        const pic = ridges(between(from, to, k / (n - 1))), c = new OffscreenCanvas(pic.width, pic.height);
-        paint(c.getContext('2d'), shown(pic), opts);
+        const t = k / (n - 1), pic = ridges({ ...between(from, to, t), forms: () => landforms, field: fields[k] });
+        const c = painted(pic, startPlaces), g = c.getContext('2d');
+        g.globalAlpha = t;
+        g.drawImage(painted(pic, endPlaces), 0, 0);
+        g.globalAlpha = 1;
         made.push(c.transferToImageBitmap());
         $('mNote').textContent = `Drawing ${k + 1} of ${n}…`;
         await new Promise((r) => setTimeout(r));
       }
+      given = startPlaces;
       steps = made;
       $('mSlide').disabled = $('mPlay').disabled = false;
       $('mSlide').value = 0;
