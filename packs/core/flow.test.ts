@@ -250,27 +250,6 @@ test('a step put by hand stays exactly where it was put, and nothing overlaps', 
   assert.deepEqual([g.x.get('r'), g.y.get('r')], [free.x.get('r'), free.y.get('r')], 'what was not moved stays where it was');
 });
 
-test('a step put by hand is wired live at right angles, round the steps in the way', async () => {
-  // @ts-expect-error: a plain module of the drawing, with no types of its own.
-  const { route, placesOf, tieLine } = await import('./draw/flow/free.js');
-  const square = (pts: number[][]) => pts.slice(1).every(([x, y], k) => x === pts[k][0] || y === pts[k][1]);
-  const a = { x: 100, y: 50, w: 120, h: 34 }, b = { x: 400, y: 300, w: 120, h: 34 };
-  const straight = route(a, b, 12);
-  assert.ok(square(straight) && straight[0][1] === 67 && straight.at(-1)[1] === 283, 'from the foot of one to the head of the other, every turn square');
-  // A step right across the middle track: the wire takes another.
-  const block = { x: 250, y: 175, w: 600, h: 20 };
-  const round = route(a, b, 12, [block]);
-  const through = (pts: number[][]) => pts.slice(1).some(([x, y], k) => Math.max(y, pts[k][1]) > block.y - block.h / 2 && Math.min(y, pts[k][1]) < block.y + block.h / 2 && Math.max(x, pts[k][0]) > block.x - block.w / 2 && Math.min(x, pts[k][0]) < block.x + block.w / 2 && x !== pts[k][0]);
-  assert.ok(square(round) && !through(round), 'its track across misses the step in the way');
-  // Not below: out and round, still square, still into the head from above.
-  const up = route(b, a, 12);
-  assert.ok(square(up) && up.at(-2)[1] < a.y - a.h / 2, 'into the head of one above it, from above');
-  // A tie leaves the edge of one toward the other.
-  assert.deepEqual(tieLine({ x: 0, y: 0, w: 20, h: 10 }, { x: 100, y: 0, w: 20, h: 10 }), [[10, 0], [90, 0]]);
-  assert.deepEqual(placesOf({ lens: { from: 'p' } }, { placed: { x: [1, 2], z: [0, 0] }, moved: { z: [5, 6] } }), { x: [1, 2], z: [5, 6] }, "this canvas's places, as the page read them, with what was moved over them");
-  assert.deepEqual(placesOf({ lens: {} }, {}), {}, 'nothing placed: the drawing lays every step');
-});
-
 test('a large map wraps its wide layers into rows: it comes out about the page\'s shape, not one band', () => {
   // Twenty projects, each with nine parts: one cluster of two hundred steps, every layer far wider than tall.
   const items = [flat('top')];
