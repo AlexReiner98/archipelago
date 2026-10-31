@@ -4,6 +4,7 @@
 // and nothing new is crossed. Layer: metrics. Pure: places and lines in, changed in place.
 
 import { tidy } from './polyline.js';
+import { shelve } from './shelves.js';
 
 /** How far apart two things must be across, to count as beside one another. */
 const TOUCH = 0.5;
@@ -149,5 +150,51 @@ export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, rou
   }
   // A wire whose boxes now touch is one point: it stays a line of two, as every line is.
   for (const l of lines) l.route.points = (l.points.length > 1 ? l.points : [l.points[0], l.points[0]]).map(([p, q]) => [p - margin + apart, q - top + apart]);
+  return told;
+}
+
+/** What is joined, by links: each a list of items. */
+function sectionsOf(ids, routes) {
+  const root = new Map(ids.map((id) => [id, id])), find = (id) => (root.get(id) === id ? id : (root.set(id, find(root.get(id))), root.get(id)));
+  for (const k of routes.keys()) {
+    const [p, q] = k.split('|');
+    if (root.has(p) && root.has(q)) root.set(find(p), find(q));
+  }
+  const sets = new Map();
+  for (const id of ids) (sets.get(find(id)) ?? sets.set(find(id), []).get(find(id))).push(id);
+  return [...sets.values()];
+}
+
+/** What a set of boxes and lines takes up. */
+function extent(ids, lines, x, y, nodes) {
+  const xs = [...ids.flatMap((id) => [x.get(id) - nodes.get(id).w / 2, x.get(id) + nodes.get(id).w / 2]), ...lines.flatMap((l) => l.points.map((p) => p[0]))];
+  const ys = [...ids.flatMap((id) => [y.get(id) - nodes.get(id).h / 2, y.get(id) + nodes.get(id).h / 2]), ...lines.flatMap((l) => l.points.map((p) => p[1]))];
+  const [l, t] = [Math.min(...xs), Math.min(...ys)];
+  return { ids, lines, l, t, w: Math.max(...xs) - l, h: Math.max(...ys) - t };
+}
+
+/**
+ * Each joined section solved alone, then set out a `section` apart, so what is not joined does not look it. Items joined to
+ * nothing stand together, `gap` apart, as one section. Sets out as wide as `aspect` asks, from `margin`.
+ */
+export function solveSections({ nodes, x, y, routes, section, gap, margin, aspect, ...lengths }) {
+  const told = { freed: 0 }, whole = [], loose = [];
+  for (const ids of sectionsOf([...x.keys()], routes)) {
+    if (ids.length < 2) { loose.push(extent(ids, [], x, y, nodes)); continue; }
+    const own = new Set(ids), lines = new Map([...routes].filter(([k]) => own.has(k.split('|')[0]))), at = (m) => new Map(ids.map((id) => [id, m.get(id)])), [lx, ly] = [at(x), at(y)];
+    told.freed += solve({ nodes, x: lx, y: ly, routes: lines, ...lengths }).freed;
+    for (const id of ids) (x.set(id, lx.get(id)), y.set(id, ly.get(id)));
+    whole.push(extent(ids, [...lines.values()], x, y, nodes));
+  }
+  const move = (c, dx, dy) => {
+    for (const id of c.ids) (x.set(id, x.get(id) + dx), y.set(id, y.get(id) + dy));
+    for (const l of c.lines) l.points = l.points.map(([p, q]) => [p + dx, q + dy]);
+  };
+  const bySize = (p, q) => q.h - p.h || q.w - p.w;
+  if (loose.length) {
+    shelve(loose.sort(bySize), { gap, margin: 0, aspect }, move);
+    whole.push(extent(loose.flatMap((c) => c.ids), [], x, y, nodes));
+  }
+  shelve(whole.sort(bySize), { gap: section, margin, aspect }, move);
   return told;
 }

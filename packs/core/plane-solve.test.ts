@@ -5,7 +5,7 @@ import test from 'node:test';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { spacing } from './draw/flow/faults.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { solve } from './draw/flow/solve.js';
+import { solve, solveSections } from './draw/flow/solve.js';
 
 const sizes = { wire: 12, room: 12, run: 18, corner: 14, apart: 8 };
 const picture = (boxes: Record<string, [number, number, number, number]>, wires: [string, string, number[][]][]) => {
@@ -35,4 +35,13 @@ test('solve: boxes keep their order and stay apart', () => {
   const g = picture({ a: [50, 20, 60, 40], b: [60, 20, 60, 40], c: [50, 200, 60, 40] }, [['a', 'c', [[50, 40], [50, 180]]]]);
   solve({ ...g, ...sizes });
   assert.ok(g.x.get('b')! - g.x.get('a')! >= 60 + sizes.apart - 1e-6);
+});
+
+test('sections: what is not joined stands a section apart, and what is joined to nothing stands close', () => {
+  const g = picture({ a: [50, 20, 60, 40], b: [50, 120, 60, 40], c: [120, 20, 60, 40], d: [120, 120, 60, 40], e: [190, 20, 60, 40], f: [260, 20, 60, 40] }, [['a', 'b', [[50, 40], [50, 100]]], ['c', 'd', [[120, 40], [120, 100]]]]);
+  solveSections({ ...g, ...sizes, section: 96, gap: 16, margin: 24, aspect: 100 });
+  const edges = (id: string) => [g.x.get(id)! - 30, g.x.get(id)! + 30];
+  const [al, ar] = edges('a'), [cl, cr] = edges('c');
+  assert.ok(Math.max(al, cl) - Math.min(ar, cr) >= 96 - 1e-6, 'two sections keep the section gap');
+  assert.equal(Math.abs(g.x.get('e')! - g.x.get('f')!), 60 + 16, 'loose items stand close');
 });
