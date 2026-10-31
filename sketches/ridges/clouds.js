@@ -8,7 +8,7 @@
 // The rows are the page's depth: a wind across the page drifts cloud along a row, a wind into or out of the page
 // carries it to the rows in front or behind.
 
-import { grow, sample } from './diffusion.js';
+import { sample, settled } from './diffusion.js';
 
 /**
  * The cloud shapes of each row, to draw just after that row's land. rows: [{ y, yc, h }] with h the row's land
@@ -184,7 +184,7 @@ export function clouds({ d, rows, xs, dx, gap, puff, seam, shore, smooth }) {
 /** The cloud's reaction-diffusion field (diffusion.js: spots and worms side by side), grown once a seed and kept. */
 let cloudField = {};
 function fieldFor(seed) {
-  if (cloudField.seed !== seed) cloudField = { seed, f: grow({ nx: 64, ny: 64, pattern: 0.35, variety: 0.5, steps: 2500, seed: seed * 13 + 5 }) };
+  if (cloudField.seed !== seed) cloudField = { seed, f: settled({ nx: 64, ny: 64, pattern: 0.35, variety: 0.5, steps: 2500, seed: seed * 13 + 5 }) };
   return cloudField.f;
 }
 

@@ -41,6 +41,12 @@ const smooth = (a, b, t) => {
 /** A landform that changes nothing: the dials as they are. */
 const BASE_FORM = { rise: 1, rugged: 0, step: 1, soft: 0, top: 0, cliff: 0, atoll: false };
 
+/** The grid a scale dial grows its field on, for a picture this wide and tall. */
+export const gridAt = (scale, W, H) => {
+  const nx = Math.max(16, Math.round((40 + scale * 70) * (W / DEFAULTS.width)));
+  return { nx, ny: Math.round((nx * H) / W) };
+};
+
 export const DEFAULTS = {
   width: 800, height: 1000, margin: 60,
   rows: 90,        // how many rows
@@ -85,6 +91,8 @@ export const DEFAULTS = {
   line: 1.2,       // outline weight
   seed: 1,
   wrap: false,     // repeat seamlessly left to right
+  swellReach: 0,   // how far the swell lines reach past the land, as a share of the height: 0 runs them frame to frame
+  field: null,     // a field grown elsewhere, { nx, ny, v }, to stand in for the one these dials would grow
 };
 
 /**
@@ -111,6 +119,10 @@ export function ridges(dials) {
     return v * (1 - t) + fn(toCell(x - W) * k + off, b) * t;
   };
   const rise = d.rise * 16 * gap, step = Math.max(1, d.step * gap * 1.6), dx = 2;
+  // What is chosen at random is chosen by place, a row and a stretch of the page, never in the order things are met:
+  // so moving a dial changes what stands where it changes, and every other colour holds still.
+  const stretch = W / 8;
+  const atPlace = (r, x, k) => random(d.seed * 7919 + r * 8191 + Math.floor(x / stretch) * 127 + k);
   const xs = Array.from({ length: Math.floor((W - (d.wrap ? 0 : 2 * M)) / dx) + 1 }, (_, i) => (d.wrap ? 0 : M) + i * dx);
   const shapes = [], sky = [];
 
@@ -177,7 +189,7 @@ export function ridges(dials) {
   const KEYS = Object.keys(BASE_FORM), numbers = new Map();
   const asNumbers = (g) => numbers.get(g) ?? numbers.set(g, KEYS.map((k) => +formOf(g)[k])).get(g);
   // The blurred grid is kept while the field, its archipelagos and their landforms hold: building it is the slow part.
-  const formKey = rd && !chains.length ? `${grown.key}|${grown.akey}|${JSON.stringify(groups.map((_, g) => asNumbers(g)))}` : null;
+  const formKey = rd && !chains.length ? `${rd.field.nx}|${d.pattern}|${grown.akey}|${JSON.stringify(groups.map((_, g) => asNumbers(g)))}` : null;
   if (formKey && blurred.key !== formKey) blurred = { key: formKey, field: blurredForms(rd, asNumbers, KEYS.length) };
   const formField = formKey ? blurred.field : null;
   const formAt = (x, y, L) => {
@@ -340,16 +352,17 @@ export function ridges(dials) {
       // random check decides whether it climbs (at a random share of the max slope, never more) or stays level. The
       // walks from the two coasts meet and the lower holds, so ramps alternate with benches and plateaus. With no
       // variety every section climbs at the max: the plain cap.
-      const lim = d.slope * dx, v = Math.min(1, d.undulate), rr = random(d.seed * 7177 + r * 131);
+      const lim = d.slope * dx, v = Math.min(1, d.undulate);
       // The walk follows the land as it goes (never above it, so after a dip it climbs again from the dip, as the
       // plain cap does), and the first section off a coast always climbs, so no coast is eaten away.
       const walk = (order) => {
-        let height = 0, left = 0, climb = lim, fresh = true;
+        let height = 0, section = -1, climb = lim, fresh = true;
         for (const i of order) {
-          if (raws[i] <= 0) { (height = 0), (left = 0), (fresh = true); continue; }
-          if (left-- <= 0) {
-            left = 2 + Math.floor(rr() * (4 + 10 * d.undulate));
-            climb = fresh || rr() < 1 - 0.6 * v ? lim * (1 - 0.7 * v * rr()) : 0;
+          if (raws[i] <= 0) { (height = 0), (section = -1), (fresh = true); continue; }
+          if (Math.floor(i / 7) !== section) {
+            section = Math.floor(i / 7);
+            const here = random(d.seed * 7177 + r * 131 + section * 31);
+            climb = fresh || here() < 1 - 0.6 * v ? lim * (1 - 0.7 * v * here()) : 0;
             fresh = false;
           }
           raws[i] = height = Math.min(raws[i], height + climb);
@@ -397,7 +410,8 @@ export function ridges(dials) {
       let j = i;
       while (j < xs.length && h[j] >= 0.5) j++;
       const mid = (i + j) >> 1, group = gs[mid], stp = steps[mid];
-      let start = Math.floor(rnd() * 1000), hills = 0;
+      const picks = atPlace(r, xs[mid], 1);
+      let start = Math.floor(picks() * 1000), hills = 0;
       // With repeat on, an island's two halves either side of the seam take the same colours.
       if (d.wrap && i === 0) seamStart = start;
       if (d.wrap && j === xs.length && seamStart !== null) start = seamStart;
@@ -424,10 +438,10 @@ export function ridges(dials) {
       // and cut them into smaller regions. Terraced like the range; never taller than the land they stand on.
       const soft = Math.max(0.02, Math.min(1, d.soft + formAt(xs[mid], y, at(xs[mid], y, yc)).soft));
       const terrace = (raw) => { const q = raw / stp, n = Math.floor(q); return stp * (n + smooth(1 - soft, 1, q - n)); };
-      const count = Math.round(d.foothills * ((j - i) * dx) / (gap * 7) + rnd() * d.foothills);
+      const count = Math.round(d.foothills * ((j - i) * dx) / (gap * 7) + picks() * d.foothills);
       for (let n = 0; n < count; n++) {
-        const c = i + Math.floor(rnd() * (j - i)), half = Math.max(3, Math.round(((1.2 + 3 * rnd()) * gap) / dx));
-        const top = h[c] * (0.3 + 0.4 * rnd());
+        const c = i + Math.floor(picks() * (j - i)), half = Math.max(3, Math.round(((1.2 + 3 * picks()) * gap) / dx));
+        const top = h[c] * (0.3 + 0.4 * picks());
         if (top < stp * 0.8) continue;
         const pts = [];
         for (let q = Math.max(i, c - half); q <= Math.min(j - 1, c + half); q++) {
@@ -439,26 +453,61 @@ export function ridges(dials) {
       i = j;
     }
     // The row's floor: a line across the water.
-    shapes.push({ line: true, points: [[xs[0], y], [xs[xs.length - 1], y]] });
-    sky.push({ y, yc, h, at: shapes.length });
+    const floor = { line: true, points: [[xs[0], y], [xs[xs.length - 1], y]] };
+    shapes.push(floor);
+    sky.push({ y, yc, h, shelf, floor, at: shapes.length });
+  }
+  // The swell keeps to the islands: each row's line ends a reach past the outermost land near it, in any row within
+  // the reach, a disc rolled round the whole of the land, so the sea's edge bends round its outline, wobbling with noise.
+  if (d.swellReach > 0 && !d.wrap) {
+    const reach = d.swellReach * H, last = xs.length - 1;
+    const ends = sky.map(({ h, shelf }) => {
+      const on = (i) => h[i] >= 0.5 || shelf[i] > 0.02;
+      let a = 0, b = last;
+      while (a <= last && !on(a)) a++;
+      if (a > last) return null;
+      while (!on(b)) b--;
+      return [xs[a], xs[b]];
+    });
+    sky.forEach(({ y, yc, floor }, r) => {
+      let lo = Infinity, hi = -Infinity;
+      ends.forEach((e, q) => {
+        const off = Math.abs(q - r) * gap;
+        if (!e || off >= reach) return;
+        const side = Math.sqrt(reach * reach - off * off);
+        (lo = Math.min(lo, e[0] - side)), (hi = Math.max(hi, e[1] + side));
+      });
+      if (lo === Infinity) return void (floor.gone = true);
+      const wobble = (k) => (land(k, yc * 2.2) - 0.5) * reach * 0.9;
+      floor.points = [[Math.max(xs[0], lo + wobble(31)), y], [Math.min(xs[last], hi + wobble(57)), y]];
+    });
   }
   // Clouds, from the mountains and spread on the wind (clouds.js): each row's go in just after its land, so nearer land passes
   // in front of farther cloud. Last row first, so the earlier places stay where they were.
   const made = clouds({ d, rows: sky, xs, dx, gap, puff, seam, shore, smooth });
   for (let r = sky.length - 1; r >= 0; r--) shapes.splice(sky[r].at, 0, ...made[r]);
-  return { width: W, height: H, shapes, line: d.line, chains: groups };
+  return { width: W, height: H, shapes: shapes.filter((s) => !s.gone), line: d.line, chains: groups };
+}
+
+/** k places over the page, 0 to 1 each way, well apart, from the seed alone: each the farthest of a few tries from the rest. */
+function placesOf(k, seed) {
+  const rnd = random(seed * 31 + 3), places = [[rnd(), rnd()]];
+  const apart = (p) => Math.min(...places.map((q) => Math.hypot(p[0] - q[0], p[1] - q[1])));
+  while (places.length < k) places.push(Array.from({ length: 12 }, () => [rnd(), rnd()]).reduce((a, b) => (apart(b) > apart(a) ? b : a)));
+  return places;
 }
 
 /** The field and its archipelagos for these dials, grown once and kept while the dials that shape it hold. */
 let grown = {};
 function diffusionFor(d, W, H) {
-  const nx = Math.max(16, Math.round((40 + d.scale * 70) * (W / DEFAULTS.width))), ny = Math.round((nx * H) / W), level = 0.62 - d.land * 0.5;
-  const key = `${nx}|${ny}|${d.pattern}|${d.variety}|${d.seed}`;
-  if (grown.key !== key) grown = { key, field: grow({ nx, ny, pattern: d.pattern, variety: d.variety, seed: d.seed }) };
+  const { nx, ny } = d.field ?? gridAt(d.scale, W, H), level = 0.62 - d.land * 0.5;
+  const key = d.field ? d.field : `${nx}|${ny}|${d.pattern}|${d.variety}|${d.seed}`;
+  if (grown.key !== key) grown = { key, field: d.field ?? grow({ nx, ny, pattern: d.pattern, variety: d.variety, seed: d.seed }) };
   // Anchors (page units) start the grouping where the places are, so each archipelago gathers the islands near it.
-  const starts = d.anchors?.map(([x, y]) => ({ x: (x / W) * nx, y: (y / H) * ny }));
+  // Without them, the places stand where the seed puts them, whatever the land does, so no dial moves a palette.
+  const starts = d.anchors?.map(([x, y]) => ({ x: (x / W) * nx, y: (y / H) * ny })) ?? placesOf(Math.max(1, d.chains), d.seed).map(([x, y]) => ({ x: x * nx, y: y * ny }));
   const akey = `${level}|${d.chains}|${JSON.stringify(starts)}`;
-  if (grown.akey !== akey) Object.assign(grown, { akey, arch: archipelagos(grown.field, level, starts?.length ?? Math.max(1, d.chains), d.seed, starts) });
+  if (grown.akey !== akey) Object.assign(grown, { akey, arch: archipelagos(grown.field, level, starts.length, d.seed, starts, !d.anchors) });
   return { field: grown.field, arch: grown.arch, level };
 }
 

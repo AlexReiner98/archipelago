@@ -23,19 +23,28 @@ function torusNoise(nx, ny, cells, rnd) {
 }
 
 /**
- * v, 0 to 1, on an nx × ny torus. With variety, the pattern is not one setting but drifts across the page with a
- * slow noise: spots in one place, worms or coral in another, grown as one field.
+ * A Gray-Scott grid on an nx × ny torus, seeded, that grows on from where it stands by `run(steps, pattern)`.
+ * `resize` carries what has grown onto a grid of another size: forms keep their width in cells, so on a coarser grid
+ * they are wider on the page, and the chemistry merges or thins them as it runs on. That is what the scale dial is.
  */
-export function grow({ nx, ny, pattern = 0.3, variety = 0, steps = 4000, seed = 1 }) {
+function growing({ nx, ny, variety, seed }) {
   const rnd = random(seed * 104729 + 7);
-  const size = nx * ny;
-  const drift = torusNoise(nx, ny, 3, random(seed * 7 + 11));
-  const feedAt = new Float32Array(size), killAt = new Float32Array(size);
-  for (let i = 0; i < size; i++) {
-    const t = Math.max(-0.6, Math.min(2.2, pattern + variety * 1.6 * (drift(i % nx, Math.floor(i / nx)) - 0.5)));
-    ({ feed: feedAt[i], kill: killAt[i] } = rates(t));
-  }
+  let size = nx * ny, drifts, feedAt, killAt, nb;
   let u = new Float32Array(size).fill(1), v = new Float32Array(size), u2 = new Float32Array(size), v2 = new Float32Array(size);
+  const driftAt = torusNoise(1000, 1000, 3, random(seed * 7 + 11));
+  // What belongs to the grid: where the pattern drifts, by place on the page, and each cell's eight neighbours, wrapped.
+  const lay = () => {
+    size = nx * ny;
+    drifts = Float32Array.from({ length: size }, (_, i) => variety * 1.6 * (driftAt(((i % nx) / nx) * 1000, (Math.floor(i / nx) / ny) * 1000) - 0.5));
+    feedAt = new Float32Array(size);
+    killAt = new Float32Array(size);
+    nb = new Int32Array(size * 8);
+    for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      const i = (y * nx + x) * 8;
+      [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([dx, dy], k) => (nb[i + k] = ((y + dy + ny) % ny) * nx + ((x + dx + nx) % nx)));
+    }
+  };
+  lay();
   // Seeds: small squares of the second chemical, enough that the field fills fast.
   for (let s = 0; s < 6 + Math.round(size / 300); s++) {
     const cx = Math.floor(rnd() * nx), cy = Math.floor(rnd() * ny), r = 1 + Math.floor(rnd() * 3);
@@ -44,28 +53,89 @@ export function grow({ nx, ny, pattern = 0.3, variety = 0, steps = 4000, seed = 
       (u[i] = 0.5), (v[i] = 0.25 + rnd() * 0.1);
     }
   }
-  // Each cell's eight neighbours, wrapped.
-  const nb = new Int32Array(size * 8);
-  for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
-    const i = (y * nx + x) * 8;
-    [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([dx, dy], k) => (nb[i + k] = ((y + dy + ny) % ny) * nx + ((x + dx + nx) % nx)));
-  }
-  for (let s = 0; s < steps; s++) {
+  const resize = (nx2, ny2) => {
+    const carried = (w) => Float32Array.from({ length: nx2 * ny2 }, (_, i) => sample({ nx, ny, v: w }, ((i % nx2) * nx) / nx2, (Math.floor(i / nx2) * ny) / ny2));
+    [u, v] = [carried(u), carried(v)];
+    [nx, ny] = [nx2, ny2];
+    [u2, v2] = [new Float32Array(nx * ny), new Float32Array(nx * ny)];
+    lay();
+  };
+  const run = (steps, pattern) => {
     for (let i = 0; i < size; i++) {
-      const j = i * 8, ui = u[i], vi = v[i];
-      const lu = 0.2 * (u[nb[j]] + u[nb[j + 1]] + u[nb[j + 2]] + u[nb[j + 3]]) + 0.05 * (u[nb[j + 4]] + u[nb[j + 5]] + u[nb[j + 6]] + u[nb[j + 7]]) - ui;
-      const lv = 0.2 * (v[nb[j]] + v[nb[j + 1]] + v[nb[j + 2]] + v[nb[j + 3]]) + 0.05 * (v[nb[j + 4]] + v[nb[j + 5]] + v[nb[j + 6]] + v[nb[j + 7]]) - vi;
-      const uvv = ui * vi * vi;
-      u2[i] = ui + lu - uvv + feedAt[i] * (1 - ui);
-      v2[i] = vi + 0.5 * lv + uvv - (feedAt[i] + killAt[i]) * vi;
+      const t = Math.max(-0.6, Math.min(2.2, pattern + drifts[i]));
+      ({ feed: feedAt[i], kill: killAt[i] } = rates(t));
     }
-    [u, u2] = [u2, u];
-    [v, v2] = [v2, v];
+    for (let s = 0; s < steps; s++) {
+      for (let i = 0; i < size; i++) {
+        const j = i * 8, ui = u[i], vi = v[i];
+        const lu = 0.2 * (u[nb[j]] + u[nb[j + 1]] + u[nb[j + 2]] + u[nb[j + 3]]) + 0.05 * (u[nb[j + 4]] + u[nb[j + 5]] + u[nb[j + 6]] + u[nb[j + 7]]) - ui;
+        const lv = 0.2 * (v[nb[j]] + v[nb[j + 1]] + v[nb[j + 2]] + v[nb[j + 3]]) + 0.05 * (v[nb[j + 4]] + v[nb[j + 5]] + v[nb[j + 6]] + v[nb[j + 7]]) - vi;
+        const uvv = ui * vi * vi;
+        u2[i] = ui + lu - uvv + feedAt[i] * (1 - ui);
+        v2[i] = vi + 0.5 * lv + uvv - (feedAt[i] + killAt[i]) * vi;
+      }
+      [u, u2] = [u2, u];
+      [v, v2] = [v2, v];
+    }
+  };
+  /** The field as it stands, 0 to 1. */
+  const field = () => {
+    let max = 1e-6;
+    for (let i = 0; i < size; i++) max = Math.max(max, v[i]);
+    return Float32Array.from(v, (c) => c / max);
+  };
+  return { run, resize, field, grid: () => ({ nx, ny }) };
+}
+
+// The pattern dial is read along one run of growth, not grown anew at each setting: the field settles at the middle of
+// the dial's low end, then the dial is turned slowly, the field growing all the while, and it is kept at every rung.
+// So two settings near each other share their history and their land nearly agrees, and the dial moves the forms the
+// way the chemistry moves them. A run goes only as far as has been asked for, and is kept while the page lasts.
+const RUNG = 0.01, RUNG_STEPS = 92, SETTLE = 4000, KEPT_RUNS = 6;
+const runs = new Map();
+function rungsFor(key, make, sign, wanted) {
+  const name = `${key}|${sign}`;
+  const kept = runs.get(name) ?? { grower: make(), rungs: [] };
+  runs.delete(name);
+  runs.set(name, kept);
+  if (runs.size > KEPT_RUNS * 2) runs.delete(runs.keys().next().value);
+  if (!kept.rungs.length) (kept.grower.run(SETTLE, 0), kept.rungs.push(kept.grower.field()));
+  while (kept.rungs.length <= wanted) (kept.grower.run(RUNG_STEPS, sign * kept.rungs.length * RUNG), kept.rungs.push(kept.grower.field()));
+  return kept.rungs;
+}
+
+/** v, 0 to 1, on an nx × ny torus, where the run of growth for this grid, variety and seed stands at the pattern dial. */
+export function grow({ nx, ny, pattern = 0.3, variety = 0, seed = 1 }) {
+  const at = Math.abs(pattern) / RUNG, k = Math.floor(at), t = at - k;
+  const rungs = rungsFor(`${nx}|${ny}|${variety}|${seed}`, () => growing({ nx, ny, variety, seed }), pattern < 0 ? -1 : 1, k + 1);
+  const [a, b] = [rungs[k], rungs[k + 1]];
+  return { nx, ny, v: a.map((c, i) => c + (b[i] - c) * t) };
+}
+
+/**
+ * The field at each of `count` moments of one run from a start to an end, each { nx, ny, v }: the start as grow() has
+ * it, then the same growth going on while the pattern dial and the grid turn toward the end's. Nothing is grown anew,
+ * so each moment comes out of the last, and `grid` says the grid a setting's scale has.
+ */
+export function carried({ from, to, count, grid, steps = 200 }) {
+  const start = grid(from), end = grid(to), g = growing({ ...start, variety: from.variety, seed: from.seed });
+  g.run(SETTLE, 0);
+  for (let k = 1, last = Math.round(Math.abs(from.pattern) / RUNG); k <= last; k++) g.run(RUNG_STEPS, Math.sign(from.pattern) * k * RUNG);
+  const fields = [{ ...start, v: g.field() }];
+  for (let k = 1; k < count; k++) {
+    const t = k / (count - 1), nx = Math.round(start.nx + (end.nx - start.nx) * t), ny = Math.round(start.ny + (end.ny - start.ny) * t), { nx: was, ny: wasY } = g.grid();
+    if (nx !== was || ny !== wasY) g.resize(nx, ny);
+    g.run(steps, from.pattern + (to.pattern - from.pattern) * t);
+    fields.push({ nx, ny, v: g.field() });
   }
-  let max = 1e-6;
-  for (let i = 0; i < size; i++) max = Math.max(max, v[i]);
-  for (let i = 0; i < size; i++) v[i] /= max;
-  return { nx, ny, v };
+  return fields;
+}
+
+/** v, 0 to 1, grown from its seeds with one pattern held, for a field no dial moves. */
+export function settled({ nx, ny, pattern, variety = 0, steps, seed = 1 }) {
+  const g = growing({ nx, ny, variety, seed });
+  g.run(steps, pattern);
+  return { nx, ny, v: g.field() };
 }
 
 /** The field at any point in cell units, smoothly, wrapping. */
@@ -80,7 +150,7 @@ export function sample({ nx, ny, v }, x, y) {
  * The islands the field makes above level t, gathered into k archipelagos by where they lie (k-means on their
  * middles, across the seams). Answers each cell's archipelago (-1 for sea) and each archipelago's island middles.
  */
-export function archipelagos({ nx, ny, v }, t, k, seed = 1, starts = null) {
+export function archipelagos({ nx, ny, v }, t, k, seed = 1, starts = null, fixed = false) {
   const size = nx * ny, island = new Int32Array(size).fill(-1), middles = [];
   for (let start = 0; start < size; start++) {
     if (v[start] < t || island[start] >= 0) continue;
@@ -97,7 +167,8 @@ export function archipelagos({ nx, ny, v }, t, k, seed = 1, starts = null) {
     middles.push({ x: ang(sx, cx, nx), y: ang(sy, cy, ny), n });
   }
   // A labyrinth is one island, or a few: then the land itself is split by where it lies, a piece per archipelago.
-  const byIsland = middles.length >= k;
+  // Places fixed from outside split land the same way, so no island's joining another changes whose it is.
+  const byIsland = !fixed && middles.length >= k;
   const points = byIsland ? middles : [];
   if (!byIsland) for (let i = 0; i < size; i += 3) if (island[i] >= 0) points.push({ x: i % nx, y: Math.floor(i / nx), n: 1 });
   const { of, centres, nearest } = byPlace(points, k, nx, ny, seed, starts);
@@ -110,7 +181,7 @@ export function archipelagos({ nx, ny, v }, t, k, seed = 1, starts = null) {
     (byGroup.get(g) ?? byGroup.set(g, []).get(g)).push(i);
   });
   for (const ids of byGroup.values()) ids.sort((a, b) => middles[b].n - middles[a].n).forEach((id, r) => (rank[id] = (r + 1) ** -0.6));
-  return { group, island, rank, centres, members: centres.map((_, i) => points.filter((_, j) => of[j] === i)) };
+  return { group, island, rank, centres, members: centres.map((c, i) => (fixed ? [c] : points.filter((_, j) => of[j] === i))) };
 }
 
 /** k-means over points on the torus: k centres started far apart, biggest first, settled across the seams. */

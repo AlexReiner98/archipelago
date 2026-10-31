@@ -37,7 +37,7 @@
   .mix label { margin: 0; display: flex; gap: 5px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #sources { font-size: 11px; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #sources a { color: inherit; }
-  #nameText { flex: 1; min-width: 0; font: inherit; padding: 3px 6px; }
+  #nameText, #nameSub { flex: 1; min-width: 0; font: inherit; padding: 3px 6px; }
   body:not(.named) .only-name { display: none; }
   #letterText { width: 4.5em; font: inherit; padding: 3px 6px; }
   #face { width: 100%; }
@@ -93,10 +93,12 @@
     <option value="1200x630">Share image, 1200 × 630</option>
   </select>
   <div class="row"><label class="check" title="Set a name over the picture, in the app's typeface"><input id="name" type="checkbox"> Name</label><input id="nameText" value="Archipelago" aria-label="Name" title="The name to set"></div>
+  <div class="row only-name"><input id="nameSub" placeholder="Subheader" aria-label="Subheader" title="The line under the name, set as the landing page sets its own"></div>
+  <label class="only-name" title="How large the subheader is, against the name">Subheader size <small>small · large</small><input id="nameSubSize" type="range" min="0.2" max="0.7" step="0.01" value="0.34"></label>
   <label class="only-name" title="How large the name is, against the frame's height">Name size <small>small · large</small><input id="nameSize" type="range" min="0.04" max="0.3" step="0.005" value="0.1"></label>
   <label class="only-name" title="Open water round the name, the islands parting round it: none, a little, or a wide bay">Clearing <small>none · wide</small><input id="nameClear" type="range" min="0" max="2" step="0.01" value="1"></label>
   <div class="row only-name" title="Set as a chart labels a sea or a group of islands: capitals spaced wide, often in italic"><label class="check"><input id="nameCaps" type="checkbox"> Capitals</label><label class="check"><input id="nameItalic" type="checkbox"> Italic</label></div>
-  <label class="only-name" title="Space between the letters, as a share of the type size">Spacing <small>none · wide</small><input id="nameSpacing" type="range" min="0" max="0.8" step="0.01" value="0"></label>
+  <label class="only-name" title="Space between the letters, as a share of the type size">Spacing <small>none · wide</small><input id="nameSpacing" type="range" min="-0.05" max="0.8" step="0.01" value="0"></label>
   <select id="namePlace" class="only-name" aria-label="Where the name goes" title="Where the name goes">
     <option value="low-left">Lower left</option>
     <option value="low">Lower centre</option>
@@ -140,6 +142,7 @@
   <h2>Rows</h2>
   <label>Rows <output id="rowsOut"></output><input id="rows" type="range" min="6" max="400" step="1"></label>
   <label class="check" title="The faint lines along each row, on the water"><input id="swell" type="checkbox" checked> Swell lines</label>
+  <label title="How far the swell lines reach past the land, bending round its outline: none runs them straight from edge to edge of the frame">Swell reach <small>frame · close · wide</small><input id="swellReach" type="range" min="0" max="0.3" step="0.005"></label>
   <h2>Sky</h2>
   <label title="Cloud cover: none, to overcast">Clouds <small>none · overcast</small><input id="clouds" type="range" min="0" max="1" step="0.01" value="0"></label>
   <label class="only-clouds" title="Small, many cloud banks or large, few">Cloud size <small>small · large</small><input id="cloudSize" type="range" min="0.2" max="3" step="0.01" value="1"></label>
@@ -161,6 +164,16 @@
   <label title="Pale shallow water round the land">Shallows <small>none · wide</small><input id="shallows" type="range" min="0" max="3" step="0.01"></label>
   <label>Line <small>hair · bold</small><input id="line" type="range" min="0" max="8" step="0.05"></label>
   <label class="check"><input id="wrap" type="checkbox"> Repeat left to right</label>
+  <h2>Animate</h2>
+  <label title="The saved setup it starts from">Start <select id="mStart"></select></label>
+  <label title="The saved setup it ends on">End <select id="mEnd"></select></label>
+  <label title="A seed has no in-between: the whole slide grows from the one chosen here">Seed <select id="mSeed"><option value="end">End's</option><option value="start">Start's</option></select></label>
+  <label title="How many steps between them: more is smoother, and takes longer to build">Frames <output id="mFramesOut"></output><input id="mFrames" type="range" min="4" max="240" step="1" value="80"></label>
+  <label title="How long a play takes">Seconds <output id="mSecondsOut"></output><input id="mSeconds" type="range" min="1" max="30" step="0.5" value="8"></label>
+  <div class="row"><button id="mBuild" title="Draw every step, each dial part way from the start to the end">Build</button><button id="mPlay" title="Play from the start to the end" disabled>Play</button><button id="mSave" title="Save as one animated SVG: the keys below, whole, each fading in over the last" disabled>Save SVG</button></div>
+  <label title="How many of the steps the SVG holds: more moves better, and weighs more">Keys <output id="mKeysOut"></output><input id="mKeys" type="range" min="2" max="80" step="1" value="32"></label>
+  <label title="Slide from the start to the end">Slide <small>start · end</small><input id="mSlide" type="range" min="0" max="1" step="0.001" value="0" disabled></label>
+  <div id="mNote"></div>
   <div class="row">
     <button id="reseed" title="Same dials, another map">Reseed</button>
     <button id="svg" title="Download as SVG">SVG</button>
@@ -170,13 +183,15 @@
 </aside>
 <main><canvas id="view"></canvas><div id="sizes" class="only-emblem" title="The drawing at 16, 24, 32, 48, 64 and 128 px"></div></main>
 <script type="module">
-  import { ridges, DEFAULTS } from './ridges.js';
+  import { ridges, DEFAULTS, gridAt } from './ridges.js';
+  import { carried } from './diffusion.js';
+  import { mixed, svgOf, written } from './moving.js';
   import { PLACES, fromPixels, signature, waterOf, landOf, layout, enrich } from './palettes.js';
   import * as presets from './presets.js';
   import { paint, fillOf as fillWith, swell, isLight } from './paint.js';
 
   const $ = (id) => document.getElementById(id);
-  const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate', 'clouds', 'cloudSize', 'cloudPuff', 'cloudTip', 'cloudShadow', 'cloudPeaks', 'cloudSpread', 'wind', 'windDir'];
+  const DIALS = ['swellReach', 'pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate', 'clouds', 'cloudSize', 'cloudPuff', 'cloudTip', 'cloudShadow', 'cloudPeaks', 'cloudSpread', 'wind', 'windDir'];
   for (const k of DIALS) $(k).value = DEFAULTS[k];
   // Palettes are kept as photographed (a palette shipped enriched is taken back to its raw colours); Richness enriches
   // them as they are drawn, so the swatches always show and edit the colours the photos gave.
@@ -262,12 +277,34 @@
   const emblem = () => $('emblem').checked;
   // The name set over the picture: the app's typeface, in the palette's paper on a dark ground and its ink on a light one.
   const named = () => $('name').checked && $('nameText').value.trim();
+  // The subheader, as the landing page sets the line under its title: Georgia in a muted tone, balanced over lines no
+  // wider than its measure, a third of the way under the name.
+  const SUB_FACE = "Georgia, 'Iowan Old Style', 'Times New Roman', serif", SUB_MUTED = '#a09d94', SUB_MEASURE = 31.6, SUB_LINE = 1.5, SUB_GAP = 0.34;
+  const measuring = document.createElement('canvas').getContext('2d');
+  /** Words over as few lines as fit the width, each as near the same length as they can be. */
+  function balanced(text, font, most) {
+    measuring.font = font;
+    const words = text.split(/\s+/), wide = (line) => measuring.measureText(line.join(' ')).width;
+    const fill = (limit) => {
+      const lines = [[]];
+      for (const w of words) (wide([...lines.at(-1), w]) <= limit || !lines.at(-1).length ? lines.at(-1) : lines[lines.push([]) - 1]).push(w);
+      return lines;
+    };
+    const count = fill(most).length;
+    let low = 0, high = most;
+    for (let n = 0; n < 16; n++) { const mid = (low + high) / 2; fill(mid).length > count ? (low = mid) : (high = mid); }
+    return fill(high).map((line) => line.join(' '));
+  }
   function nameOf(pic, p) {
     const px = Math.round(+$('nameSize').value * pic.height), at = $('namePlace').value, M = DEFAULTS.margin;
+    const subPx = Math.round(+$('nameSubSize').value * px), subFont = `400 ${subPx}px ${SUB_FACE}`, subText = $('nameSub').value.trim();
+    const subLines = subText ? balanced(subText, subFont, Math.min(SUB_MEASURE * subPx, pic.width - 2 * M)) : [];
+    const under = subLines.length ? px * SUB_GAP + subPx + (subLines.length - 1) * subPx * SUB_LINE : 0;
     // Letter spacing is added after every letter, the last too: centred, the name is moved by half of it to stay centred.
     const spacing = Math.round(+$('nameSpacing').value * px * 10) / 10, text = $('nameText').value.trim();
-    const x = at === 'low-left' ? M : pic.width / 2 + spacing / 2, y = at === 'centre' ? pic.height / 2 + px * 0.35 : pic.height - M;
-    return { text: $('nameCaps').checked ? text.toUpperCase() : text, px, x, y, spacing, italic: $('nameItalic').checked, align: at === 'low-left' ? 'left' : 'center', colour: p && (isLight(background(p)) ? p.ink : p.paper), font: `${$('nameItalic').checked ? 'italic ' : ''}${$('faceWeight').value} ${px}px ${$('face').value}` };
+    const x = at === 'low-left' ? M : pic.width / 2 + spacing / 2, y = (at === 'centre' ? pic.height / 2 + px * 0.35 - under / 2 : pic.height - M - under);
+    const sub = { lines: subLines, px: subPx, font: subFont, x: at === 'low-left' ? M : pic.width / 2, y: y + px * SUB_GAP + subPx, line: subPx * SUB_LINE, colour: p && (isLight(background(p)) ? p.ink : SUB_MUTED) };
+    return { sub, text: $('nameCaps').checked ? text.toUpperCase() : text, px, x, y, spacing, italic: $('nameItalic').checked, align: at === 'low-left' ? 'left' : 'center', colour: p && (isLight(background(p)) ? p.ink : p.paper), font: `${$('nameItalic').checked ? 'italic ' : ''}${$('faceWeight').value} ${px}px ${$('face').value}` };
   }
   // The clearing round the name: the name drawn on a small canvas the frame's shape, thickened and blurred by the
   // Clearing dial, so the land keeps off it with room to spare. Drawn again only when it changes.
@@ -275,7 +312,7 @@
   function clearOf() {
     const pad = +$('nameClear').value;
     if (!named() || !pad) return null;
-    const [width, height] = frame(), n = nameOf({ width, height }, null), key = [n.text, n.font, n.x, n.y, n.align, n.spacing, pad].join('|');
+    const [width, height] = frame(), n = nameOf({ width, height }, null), key = [n.text, n.font, n.x, n.y, n.align, n.spacing, pad, n.sub.font, ...n.sub.lines].join('|');
     if (clearing.key === key) return clearing.grid;
     const nx = 240, ny = Math.round((nx * height) / width), k = nx / width, c = document.createElement('canvas');
     [c.width, c.height] = [nx, ny];
@@ -284,6 +321,9 @@
     Object.assign(g, { font: n.font, letterSpacing: `${n.spacing}px`, textAlign: n.align, fillStyle: '#000', strokeStyle: '#000', lineJoin: 'round', lineWidth: n.px * pad * 0.9, filter: `blur(${n.px * pad * 0.35 * k}px)` });
     g.fillText(n.text, n.x, n.y);
     g.strokeText(n.text, n.x, n.y);
+    // The subheader keeps the land off too, its letters thickened as far as the name's, its own size being smaller.
+    Object.assign(g, { font: n.sub.font, letterSpacing: '0px' });
+    n.sub.lines.forEach((line, i) => (g.fillText(line, n.sub.x, n.sub.y + i * n.sub.line), g.strokeText(line, n.sub.x, n.sub.y + i * n.sub.line)));
     const data = g.getImageData(0, 0, nx, ny).data, v = new Float32Array(nx * ny);
     for (let i = 0; i < v.length; i++) v[i] = data[i * 4 + 3] / 255;
     clearing = { key, grid: { nx, ny, v } };
@@ -293,7 +333,9 @@
     const n = nameOf(pic, p);
     Object.assign(g, { font: n.font, letterSpacing: `${n.spacing}px`, textAlign: n.align, textBaseline: 'alphabetic', fillStyle: n.colour, shadowColor: background(p), shadowBlur: n.px * 0.4 });
     g.fillText(n.text, n.x, n.y);
-    Object.assign(g, { shadowBlur: 0, letterSpacing: '0px' });
+    Object.assign(g, { font: n.sub.font, letterSpacing: '0px', fillStyle: n.sub.colour, shadowBlur: n.sub.px * 0.4 });
+    n.sub.lines.forEach((line, i) => g.fillText(line, n.sub.x, n.sub.y + i * n.sub.line));
+    Object.assign(g, { shadowBlur: 0 });
   }
   // The drawing as it is shown: with or without the swell lines on the water.
   const shown = (pic) => ($('swell').checked ? pic : { ...pic, shapes: pic.shapes.filter((s) => !s.line) });
@@ -414,7 +456,7 @@
   for (const b of document.querySelectorAll('[data-ground]')) b.onclick = () => ((bgPicked = b.dataset.ground), draw());
   const showEmblem = () => document.body.classList.toggle('emblem', emblem());
   $('emblem').addEventListener('input', () => (showEmblem(), draw()));
-  for (const k of ['emAt', 'swell', 'frame', 'nameText', 'nameSize', 'namePlace', 'nameClear', 'nameCaps', 'nameSpacing']) $(k).addEventListener('input', draw);
+  for (const k of ['emAt', 'swell', 'frame', 'nameText', 'nameSub', 'nameSubSize', 'nameSize', 'namePlace', 'nameClear', 'nameCaps', 'nameSpacing']) $(k).addEventListener('input', draw);
   const showName = () => document.body.classList.toggle('named', $('name').checked);
   $('name').addEventListener('input', () => (showName(), draw()));
   // Growing the diffusion field takes a moment, so its dials redraw when let go, not while dragged.
@@ -448,13 +490,109 @@
   const text = (pic, p) => {
     if (!named()) return '';
     const n = nameOf(pic, p), esc = n.text.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-    return `<text x="${n.x}" y="${n.y}" text-anchor="${n.align === 'left' ? 'start' : 'middle'}" fill="${n.colour}" font-family="${$('face').value.replace(/"/g, "'")}" font-weight="${$('faceWeight').value}"${n.italic ? ' font-style="italic"' : ''} letter-spacing="${n.spacing}" font-size="${n.px}">${esc}</text>`;
+    return `<text x="${n.x}" y="${n.y}" text-anchor="${n.align === 'left' ? 'start' : 'middle'}" fill="${n.colour}" font-family="${$('face').value.replace(/"/g, "'")}" font-weight="${$('faceWeight').value}"${n.italic ? ' font-style="italic"' : ''} letter-spacing="${n.spacing}" font-size="${n.px}">${esc}</text>${n.sub.lines.map((line, i) => `<text x="${n.sub.x}" y="${n.sub.y + i * n.sub.line}" text-anchor="${n.align === 'left' ? 'start' : 'middle'}" fill="${n.sub.colour}" font-family="${SUB_FACE.replace(/"/g, "'")}" font-size="${n.sub.px}">${line.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`).join('')}`;
   };
   $('svg').onclick = () => {
-    const p = richOf(pal()), pic = shown(ridges(dials())), f = (v) => +v.toFixed(1);
-    const d = (s) => 'M' + s.points.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + (s.line ? '' : 'Z');
-    const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none" stroke="${swell(p, background(p))}"/>` : s.shadow ? `<path d="${d(s)}" fill="#000" fill-opacity="${(0.35 * s.shadow).toFixed(3)}" stroke="none"/>` : s.cloud ? `<path d="${d(s)}" fill="${p.paper}" fill-opacity="${$('cloudOpacity').value}" stroke-width="${pic.line * 0.6}"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"/>`)).join('');
-    save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${background(p)}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g>${text(pic, p)}</svg>`], { type: 'image/svg+xml' }));
+    // Outlines in quarter units, relative, with what a quarter of a unit cannot show left out: sharp, and light enough to keep as a figure.
+    const p = richOf(pal()), pic = shown(ridges(dials())), Q = 4, d = (s) => written(s.points, Q, s.line ? 0 : 0.25, !s.line);
+    const body = pic.shapes.map((s) => (s.line ? `<path d="${d(s)}" fill="none" stroke="${swell(p, background(p))}"/>` : s.shadow ? `<path d="${d(s)}" fill="#000" fill-opacity="${(0.35 * s.shadow).toFixed(3)}" stroke="none"/>` : s.cloud ? `<path d="${d(s)}" fill="${p.paper}" fill-opacity="${$('cloudOpacity').value}" stroke-width="${pic.line * 0.6 * Q}"/>` : `<path d="${d(s)}" fill="${fillOf(s)}"${'sea' in s ? ` stroke-width="${pic.line * 0.5 * Q}"` : ''}/>`)).join('');
+    save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="${pic.width}" height="${pic.height}" fill="${background(p)}"/><g transform="scale(${1 / Q})" stroke="${p.ink}" stroke-width="${pic.line * Q}" stroke-linejoin="round" stroke-linecap="round">${body}</g>${text(pic, p)}</svg>`], { type: 'image/svg+xml' }));
+  };
+
+  // Animate: every dial part way from one saved setup to the other, each step drawn by ridges() as if the sliders stood
+  // there, kept as a picture so the slide needs no drawing.
+  const animateOuts = () => { for (const id of ['mFrames', 'mSeconds', 'mKeys']) $(`${id}Out`).textContent = $(id).value; };
+  for (const id of ['mFrames', 'mSeconds', 'mKeys']) $(id).addEventListener('input', animateOuts);
+  /** A saved setup as ridges() draws it here: its own dials and seed on this frame, its rows as far apart as ever. */
+  const setupOf = (name) => {
+    const s = presets.all()[name];
+    if (!s) return null;
+    const [width, height] = frame(), M = DEFAULTS.margin;
+    return { ...dials(), ...s.dials, seed: s.seed, source: s.source, rows: Math.max(1, Math.round((s.dials.rows * (height - 2 * M)) / (DEFAULTS.height - 2 * M))) };
+  };
+  // A seed has no in-between, so the one chosen holds throughout; every dial that is a number moves.
+  const between = (from, to, t) => Object.fromEntries(Object.entries(from).map(([k, v]) => [k, k !== 'seed' && typeof v === 'number' && typeof to[k] === 'number' ? v + (to[k] - v) * t : v]));
+  let steps = [], keysKept = [];
+  $('mSave').onclick = async () => {
+    const p = richOf(pal()), svg = svgOf({ keys: keysKept, ink: p.ink, swell: swell(p, background(p)), background: background(p), cloudOpacity: +$('cloudOpacity').value, seconds: +$('mSeconds').value, hold: 1 });
+    const blob = new Blob([svg], { type: 'image/svg+xml' }), gz = await new Response(blob.stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+    $('mNote').textContent = `${keysKept.length} keys: ${Math.round(blob.size / 1000)} kB, ${Math.round(gz.byteLength / 1000)} kB gzipped`;
+    $('mNote').dataset.svg = URL.createObjectURL(blob);
+    save('archipelago-slide.svg', blob);
+  };
+  const showStep = (t) => {
+    if (!steps.length) return;
+    // Between two steps, the one dissolving into the next: every step itself is what ridges() drew.
+    const cv = $('view'), g = cv.getContext('2d'), at = t * (steps.length - 1), k = Math.floor(at);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalAlpha = 1;
+    g.drawImage(steps[k], 0, 0, cv.width, cv.height);
+    if (k + 1 < steps.length) {
+      g.globalAlpha = at - k;
+      g.drawImage(steps[k + 1], 0, 0, cv.width, cv.height);
+      g.globalAlpha = 1;
+    }
+  };
+  $('mSlide').addEventListener('input', () => showStep(+$('mSlide').value));
+  $('mBuild').onclick = () => {
+    const names = [$('mStart').value, $('mEnd').value], kept = { frames: $('mFrames').value, seconds: $('mSeconds').value, seed: $('mSeed').value };
+    if (!presets.all()[names[0]] || !presets.all()[names[1]]) return void ($('mNote').textContent = 'Save a start and an end as presets first.');
+    $('mNote').textContent = 'Drawing…';
+    apply(presets.all()[names[0]]);
+    [$('mStart').value, $('mEnd').value, $('mFrames').value, $('mSeconds').value, $('mSeed').value] = [...names, kept.frames, kept.seconds, kept.seed];
+    animateOuts();
+    setTimeout(async () => {
+      const t0 = performance.now(), p = richOf(pal()), chosen = presets.all()[names[kept.seed === 'end' ? 1 : 0]].seed, n = +kept.frames, made = [];
+      const from = { ...setupOf(names[0]), seed: chosen }, to = { ...setupOf(names[1]), seed: chosen };
+      const opts = { base: p, background: background(p), weighted: $('weighted').checked, cloudOpacity: +$('cloudOpacity').value };
+      const fields = carried({ from, to, count: n, grid: (d) => gridAt(d.scale, d.width, d.height) });
+      // The same land throughout takes the start's places and landforms; its colours turn into the end's places'.
+      const first = ridges({ ...from, field: fields[0] }), startPlaces = [...given], kept2 = [...$('mix').querySelectorAll('input')].map((c) => c.checked);
+      const landforms = startPlaces.map((k) => palettes[k].form), endMix = presets.all()[names[1]].mix ?? [];
+      for (const c of $('mix').querySelectorAll('input')) c.checked = endMix.includes(c.value);
+      assign(first.chains, 800);
+      const endPlaces = [...given];
+      $('mix').querySelectorAll('input').forEach((c, i) => (c.checked = kept2[i]));
+      const painted = (pic, places) => {
+        given = places;
+        const c = new OffscreenCanvas(pic.width, pic.height);
+        paint(c.getContext('2d'), shown(pic), { ...opts, palOf });
+        return c;
+      };
+      const wanted = new Set(Array.from({ length: +$('mKeys').value }, (_, k) => Math.round((k * (n - 1)) / (+$('mKeys').value - 1))));
+      keysKept = [];
+      for (let k = 0; k < n; k++) {
+        const t = k / (n - 1), pic = ridges({ ...between(from, to, t), forms: () => landforms, field: fields[k] });
+        if (wanted.has(k)) {
+          const coloured = (places) => ((given = places), pic.shapes.map((s) => (s.line || s.shadow ? '' : s.cloud ? p.paper : fillOf(s))));
+          const [a, b] = [coloured(startPlaces), coloured(endPlaces)], at = new Map(pic.shapes.map((s, i) => [s, i]));
+          keysKept.push({ pic, fill: (s) => mixed(a[at.get(s)], b[at.get(s)], t) });
+        }
+        const c = painted(pic, startPlaces), g = c.getContext('2d');
+        g.globalAlpha = t;
+        g.drawImage(painted(pic, endPlaces), 0, 0);
+        g.globalAlpha = 1;
+        made.push(c.transferToImageBitmap());
+        $('mNote').textContent = `Drawing ${k + 1} of ${n}…`;
+        await new Promise((r) => setTimeout(r));
+      }
+      given = startPlaces;
+      steps = made;
+      $('mSlide').disabled = $('mPlay').disabled = $('mSave').disabled = false;
+      $('mSlide').value = 0;
+      showStep(0);
+      $('mNote').textContent = `${n} steps, ${((performance.now() - t0) / 1000).toFixed(0)} s to draw`;
+    }, 3500);
+  };
+  $('mPlay').onclick = () => {
+    const t0 = performance.now(), ms = +$('mSeconds').value * 1000;
+    const tick = (now) => {
+      const t = Math.max(0, Math.min(1, (now - t0) / ms));
+      $('mSlide').value = t;
+      showStep(t);
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   };
 
   // Presets: everything that makes this picture, so it can be had again.
@@ -471,7 +609,8 @@
     face: { font: $('face').value, weight: +$('faceWeight').value },
     letter: { on: $('letter').checked, text: $('letterText').value, size: +$('letterSize').value, strength: +$('letterStrength').value },
     emblem: { on: emblem(), at: +$('emAt').value }, swell: $('swell').checked, frame: $('frame').value,
-    name: { on: $('name').checked, text: $('nameText').value, size: +$('nameSize').value, place: $('namePlace').value, clear: +$('nameClear').value, caps: $('nameCaps').checked, italic: $('nameItalic').checked, spacing: +$('nameSpacing').value },
+    animate: { start: $('mStart').value, end: $('mEnd').value, seed: $('mSeed').value, frames: +$('mFrames').value, seconds: +$('mSeconds').value },
+    name: { on: $('name').checked, text: $('nameText').value, size: +$('nameSize').value, place: $('namePlace').value, clear: +$('nameClear').value, caps: $('nameCaps').checked, italic: $('nameItalic').checked, spacing: +$('nameSpacing').value, sub: $('nameSub').value, subSize: +$('nameSubSize').value },
     // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
     palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
   });
@@ -497,12 +636,23 @@
     const e = s.emblem ?? {};
     $('emblem').checked = !!e.on; $('emAt').value = e.at ?? 0; $('swell').checked = s.swell ?? true; $('frame').value = s.frame ?? '800x1000';
     const n = s.name ?? {};
-    $('name').checked = !!n.on; $('nameText').value = n.text ?? 'Archipelago'; $('nameSize').value = n.size ?? 0.1; $('namePlace').value = n.place ?? 'low-left'; $('nameClear').value = n.clear ?? 1; $('nameCaps').checked = !!n.caps; $('nameItalic').checked = !!n.italic; $('nameSpacing').value = n.spacing ?? 0; showName();
+    $('name').checked = !!n.on; $('nameText').value = n.text ?? 'Archipelago'; $('nameSize').value = n.size ?? 0.1; $('namePlace').value = n.place ?? 'low-left'; $('nameClear').value = n.clear ?? 1; $('nameCaps').checked = !!n.caps; $('nameItalic').checked = !!n.italic; $('nameSpacing').value = n.spacing ?? 0; $('nameSub').value = n.sub ?? ''; $('nameSubSize').value = n.subSize ?? 0.34; showName();
+    const m = s.animate ?? {};
+    if (m.start) $('mStart').value = m.start;
+    if (m.end) $('mEnd').value = m.end;
+    $('mSeed').value = m.seed ?? 'end';
+    $('mFrames').value = m.frames ?? 80; $('mSeconds').value = m.seconds ?? 8;
+    animateOuts();
     showLetter(); showClouds(); showEmblem();
     showSource(); swatches(); draw();
   }
   function listPresets(chosen = '') {
     const names = Object.keys(presets.all()).sort((a, b) => a.localeCompare(b));
+    for (const [id, wanted] of [['mStart', 'Hero Start'], ['mEnd', 'Hero End']]) {
+      const was = $(id).value;
+      $(id).innerHTML = names.map((n) => `<option>${n.replace(/</g, '&lt;')}</option>`).join('');
+      if (names.includes(was || wanted)) $(id).value = was || wanted;
+    }
     $('preset').innerHTML = `<option value="">${names.length ? 'Load a preset…' : 'No presets yet'}</option>` + names.map((n) => `<option>${n.replace(/</g, '&lt;')}</option>`).join('');
     $('preset').value = chosen;
   }

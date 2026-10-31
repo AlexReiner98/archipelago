@@ -202,6 +202,21 @@ test('hovering a part lights its wires, leaving puts them out, and the lit switc
   assert.deepEqual(dimmed.sort(), ['p:a', 'p:b']);
 });
 
+test('a style that limits a row folds it, each caller still above what it calls, narrower and taller', () => {
+  const callers = ['a', 'b', 'c', 'd', 'e', 'f'];
+  const items = [...callers.map((id) => item(id)), item('m')], links = callers.map((id) => call(id, 'm'));
+  const flat = layout({ items: [{ ...item('r'), inside: null }, ...items], links, rootId: 'r', measure, sizes: house.sizes });
+  const folded = layout({ items: [{ ...item('r'), inside: null }, ...items], links, rootId: 'r', measure, sizes: { ...house.sizes, arch_row_most: 3 } });
+  checks(folded);
+  assert.equal(new Set(callers.map((id) => folded.y.get(id))).size, 2);
+  for (const id of callers) assert.ok(folded.y.get(id) < folded.y.get('m'), `${id} above what it calls`);
+  assert.ok(folded.width < flat.width && folded.height > flat.height);
+  // What a row held stays at its foot when a step adds to it.
+  const first = layout({ items: [{ ...item('r'), inside: null }, ...items.slice(0, 3), item('m')], links: links.slice(0, 3), rootId: 'r', measure, sizes: { ...house.sizes, arch_row_most: 3 } });
+  const next = layout({ items: [{ ...item('r'), inside: null }, ...items], links, rootId: 'r', measure, sizes: { ...house.sizes, arch_row_most: 3 }, prior: first.memo, steady: true });
+  assert.ok(next.y.get('d') < next.y.get('a'), 'the new row above the old');
+});
+
 test('a system with no parts says so instead of drawing', () => {
   assert.deepEqual(drawn(answerOf([], [])).scene, { message: 'Nothing here is part of a system.' });
 });

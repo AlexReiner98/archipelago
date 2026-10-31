@@ -145,7 +145,7 @@ export function drawWith(host, answer, style, keep) {
     reshape = new ResizeObserver(() => {
       clearTimeout(wait);
       wait = setTimeout(() => {
-        const [w, hgt] = [Number(host.dataset.room) || host.clientWidth, host.clientHeight];
+        const [w, hgt] = [host.clientWidth, host.clientHeight];
         const apart = input.height > 0 ? Math.abs(Math.log((w / hgt) / (input.width / input.height))) : Infinity;
         if (!ended && w > 0 && hgt > 0 && apart > Math.log(numberOf(style, 'plane_reshape_ratio'))) drawWith(host, answer, style, keep);
       }, numberOf(style, 'plane_reshape_after'));
@@ -217,7 +217,7 @@ export function drawWith(host, answer, style, keep) {
   const types = Object.fromEntries([...new Set((shown.items ?? []).flatMap((i) => [i.type, i.root]).filter(Boolean))].map((t) => [t, typeTitle(t)]));
   // A picture that is panned is laid out for its pane with the sheet shut, so the sheet opening never changes its shape; one drawn to the page's width takes the room there is.
   const across = drawing?.flat ? host.clientWidth : host.clientWidth / (1 - sheetAside());
-  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: Number(host.dataset.room) || across, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
+  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: across, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
   const seen = `${drawing.hash}
 ${JSON.stringify(input)}`;
   const kept = scenes.get(seen);
