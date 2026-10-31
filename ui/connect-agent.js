@@ -5,7 +5,9 @@
 import { api, h } from './base.js';
 import { card, line } from './workspace-cards.js';
 
-const address = () => `${location.origin}/mcp`;
+// A workspace's own address, so that one Claude account can hold two maps: a connector is kept by its address.
+let workspace = 'default';
+const address = () => `${location.origin}/mcp${workspace === 'default' ? '' : `/${workspace}`}`;
 /** A client run by its maker, not on this machine, cannot reach a server on this machine. */
 const onThisMachine = () => /^(localhost|127\.|\[::1\])/.test(location.hostname);
 const FIRST_ASK = 'Put this project in Archipelago, with the three things I am working on as tasks, and tell me what you would do first.';
@@ -114,7 +116,7 @@ function watchFor(status, client, known, landed) {
     const tokens = await api('token_list').catch(() => null);
     const fresh = tokens?.find((t) => t.client && !t.revoked_at && !known.has(t.id));
     if (fresh) return landed(fresh);
-    if (++asked === 60) status.replaceChildren(h('span', { class: 'muted gist', title: `If ${client.name} says it cannot connect, check the address ends in /mcp, remove the connector and add it again.` }, `Nothing from ${client.name} yet. Check the address ends in /mcp.`));
+    if (++asked === 60) status.replaceChildren(h('span', { class: 'muted gist', title: `If ${client.name} says it cannot connect, check the address is the one above, remove the connector and add it again.` }, `Nothing from ${client.name} yet. Check the address ends in /mcp.`));
     setTimeout(tick, 3000);
   };
   setTimeout(tick, 3000);
@@ -128,7 +130,8 @@ function connectedRows(name) {
 }
 
 /** The card: which client, its steps, and whether it has landed yet. */
-export function connectCard({ tokens, then }) {
+export function connectCard({ tokens, then, workspace: id }) {
+  workspace = id ?? workspace;
   const known = new Set(tokens.map((t) => t.id));
   const client = CLIENTS.find((c) => c.id === chosen.client) ?? CLIENTS[0];
   const status = h('span', { class: 'grow' }, h('span', { class: 'muted gist' }, `Waiting for ${client.name}…`));

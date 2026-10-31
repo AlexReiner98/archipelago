@@ -36,7 +36,7 @@ import { notify } from './notify.ts';
 import { backupAll, parseBackup, parseVault } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts'; import { askedAs, configurePlan, requestWait, slowTokensAt, storageBytes, tooManyRequests } from './plan.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { env } from './env.ts';
-import { serveConnect } from './connect.ts'; import { challenge } from './oauth.ts';
+import { serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import { serveHook } from './hooks.ts';
 import { serveMcp } from './mcp.ts';
@@ -165,11 +165,11 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     const wait = refusedTokens.full(address);
     if (wait) throw new Refused(429, `Too many requests from here were refused for their token. Try again in ${wait} seconds.`);
     const deny = () => {
-      const toMcp = req.url?.split('?')[0] === '/mcp'; // a client with no token yet starts here, from an address many hosted clients share
-      if (token || !toMcp) refusedTokens.take(address); if (toMcp) res.setHeader('www-authenticate', challenge(req.headers.host ?? '', named));
+      const toMcp = mcpAddress(req.url?.split('?')[0] ?? ''); // a client with no token yet starts here, from an address many hosted clients share
+      if (token || !toMcp) refusedTokens.take(address); if (toMcp) res.setHeader('www-authenticate', challenge(req.headers.host ?? '', named, toMcp.workspace));
       return new Refused(401, 'A valid token is required. Send it as: Authorization: Bearer <token>');
     };
-    if (!token || !id || !(await workspaces.has(id))) throw deny();
+    if (!token || !id || !(await workspaces.has(id)) || (mcpAddress(req.url?.split('?')[0] ?? '')?.workspace ?? id) !== id) throw deny();
     // A token nobody made for that workspace is refused before its database is opened (src/control-index.ts).
     const control = await workspaces.control(), every = async () => (await workspaces.list()).map((w) => ({ id: w.id, db: async () => (await workspaces.get(w.id)).pelago.db }));
     if (!(await tokenKnown(control, hashSecret(token), id, every))) throw deny();
@@ -314,7 +314,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (hook && tooOften(req, res, deliveries)) return;
       if (hook) return (await workspaces.has(hook[1] ?? DEFAULT_WORKSPACE)) ? await serveHook(req, res, (await workspaces.get(hook[1] ?? DEFAULT_WORKSPACE)).pelago, hook[2], hook[3]) : send(res, 410, { error: 'No such workspace.' });
 
-      if (url.pathname === '/mcp') {
+      if (mcpAddress(url.pathname)) {
         const { ws, pelago, actor } = await resolve(req, res, 'agent');
         return await serveMcp(req, res, { workspace: ws.id, pelago, actor }, hosts, req.method === 'POST' ? await readJson(req) : undefined);
       }

@@ -2,7 +2,9 @@
 // the authorization server and the resource, on the sign-in it already has. /mcp answers 401 with where to look; the
 // client reads that, opens /oauth/authorize, and the page (ui/authorize.js) has a signed-in person say Allow or Deny.
 // Allow is a code, traded once with PKCE for an agent token acting for that person, as Connect an agent makes one
-// (grantToken in src/auth.ts). Which workspace is whichever that person signed in to, so one address serves everyone.
+// (grantToken in src/auth.ts). At /mcp, which workspace is whichever that person signed in to, so one address serves
+// everyone. A client that keeps one connection to an address (Claude's connectors do) cannot hold two workspaces at it,
+// so each also has an address of its own, /mcp/<workspace>, which takes only that workspace's sign-ins and tokens.
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -21,10 +23,17 @@ const KEY = 'oauth-code:';
 const hash = (secret: string) => createHash('sha256').update(secret).digest('hex');
 const originOf = (host: string, named: string[]) => `${named.includes(host) ? 'https' : 'http'}://${host}`;
 
-/** What /mcp says to a caller with no good token: where to read how to get one. */
-export const challenge = (host: string, named: string[]) => `Bearer resource_metadata="${originOf(host, named)}/.well-known/oauth-protected-resource/mcp", scope="${SCOPE}"`;
+const MCP = /^\/mcp(?:\/([a-z0-9][a-z0-9-]{0,39}))?$/;
+/** Whether a path is where MCP is answered, and the workspace it is the address of, if it is one's own. */
+export function mcpAddress(path: string): { workspace?: string } | undefined {
+  const m = MCP.exec(path);
+  return m ? { ...(m[1] && { workspace: m[1] }) } : undefined;
+}
 
-const resourceMeta = (origin: string) => ({ resource: `${origin}/mcp`, authorization_servers: [origin], scopes_supported: [SCOPE], bearer_methods_supported: ['header'], resource_name: 'Archipelago' });
+/** What /mcp says to a caller with no good token: where to read how to get one. */
+export const challenge = (host: string, named: string[], workspace?: string) => `Bearer resource_metadata="${originOf(host, named)}/.well-known/oauth-protected-resource/mcp${workspace ? `/${workspace}` : ''}", scope="${SCOPE}"`;
+
+const resourceMeta = (origin: string, workspace?: string) => ({ resource: `${origin}/mcp${workspace ? `/${workspace}` : ''}`, authorization_servers: [origin], scopes_supported: [SCOPE], bearer_methods_supported: ['header'], resource_name: 'Archipelago' });
 const serverMeta = (origin: string) => ({
   issuer: origin,
   authorization_endpoint: `${origin}/oauth/authorize`,
@@ -40,11 +49,15 @@ const serverMeta = (origin: string) => ({
   authorization_response_iss_parameter_supported: true,
 });
 
-/** The resource a client names, in the forms clients write it: this server's /mcp, or left out. */
+/** The resource a client names, in the forms clients write it: this server's /mcp or a workspace's, or left out. */
 function ourResource(resource: string | null, origin: string): boolean {
   if (!resource) return true;
-  return [origin, `${origin}/mcp`].includes(resource.toLowerCase().replace(/\/$/, ''));
+  const said = resource.toLowerCase().replace(/\/$/, '');
+  return said === origin || (said.startsWith(`${origin}/`) && Boolean(mcpAddress(said.slice(origin.length))));
 }
+
+/** The workspace a resource is the address of, if it is one's own. */
+const workspaceNamed = (resource: string | null, origin: string) => (resource?.toLowerCase().startsWith(`${origin}/`) ? mcpAddress(resource.slice(origin.length).toLowerCase().replace(/\/$/, ''))?.workspace : undefined);
 
 class Unsendable extends Error {}
 
@@ -95,6 +108,8 @@ async function answerAsked(res: ServerResponse, origin: string, at: ConnectRoute
   const { ws, actor } = await at.person();
   const who = actor();
   if (who.kind !== 'human') return json(res, 403, { error: 'A person says Allow, not an agent.' });
+  const named = workspaceNamed(query.get('resource'), origin);
+  if (named && named !== ws.id) return json(res, 403, { error: `This address is for the workspace "${named}": sign in to that one.` });
   if (body.allow !== true) return json(res, 200, { redirect: back(asked, origin, { error: 'access_denied' }) });
   const code = `oac_${ws.id}_${randomBytes(20).toString('hex')}`;
   await keep(ws.pelago.db, KEY + hash(code), { client: asked.client.id, name: asked.client.name, redirect: asked.redirect, challenge: asked.challenge, person: who.person ?? null, resource: query.get('resource') }, CODE_MINUTES * 60_000);
@@ -155,8 +170,8 @@ export async function serveOAuth(req: IncomingMessage, res: ServerResponse, path
   if (at.tooOften()) return;
   const origin = originOf(host, at.named);
   if (req.method === 'OPTIONS') return res.writeHead(204, { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type, authorization, mcp-protocol-version', 'access-control-allow-methods': 'GET, POST, OPTIONS' }).end();
-  if (req.method === 'GET' && /^\/\.well-known\/oauth-protected-resource(\/mcp)?$/.test(path)) return json(res, 200, resourceMeta(origin));
-  if (req.method === 'GET' && /^\/\.well-known\/oauth-authorization-server(\/mcp)?$/.test(path)) return json(res, 200, serverMeta(origin));
+  const about = /^\/\.well-known\/oauth-(protected-resource|authorization-server)(\/.*)?$/.exec(path);
+  if (req.method === 'GET' && about && (!about[2] || mcpAddress(about[2]))) return json(res, 200, about[1] === 'protected-resource' ? resourceMeta(origin, about[2] ? mcpAddress(about[2])!.workspace : undefined) : serverMeta(origin));
   if (req.method === 'POST' && path === '/oauth/register') {
     try {
       return json(res, 201, registerClient(await at.body()));
@@ -171,7 +186,7 @@ export async function serveOAuth(req: IncomingMessage, res: ServerResponse, path
     const query = new URLSearchParams(String((((await at.body()) ?? {}) as { query?: unknown }).query ?? ''));
     try {
       const asked = await askedBy(query, origin);
-      return asked.problem ? json(res, 400, { error: asked.problem[1] }) : json(res, 200, { client: asked.client.name, returns_to: returnsTo(asked.redirect) });
+      return asked.problem ? json(res, 400, { error: asked.problem[1] }) : json(res, 200, { client: asked.client.name, returns_to: returnsTo(asked.redirect), ...(workspaceNamed(query.get('resource'), origin) && { workspace: workspaceNamed(query.get('resource'), origin) }) });
     } catch (err) {
       if (err instanceof Unsendable) return json(res, 400, { error: err.message });
       throw err;
