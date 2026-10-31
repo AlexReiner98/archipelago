@@ -67,12 +67,12 @@ Each module says its layer in its first comment (`Layer: metrics.`). A layer rea
 | Layer | Holds | Flow's modules |
 | --- | --- | --- |
 | Graph | Steps, links and which way each runs, combs, and the small things every layer says of lines | `graph`, `steps`, `lines`, `direction`, `combs`, `hangs`, `places`, `polyline`, `shapes` |
-| Topology | Who crosses whom, the faces, the order of wires round each box | `topology`, `planar`, `thread`, `numbering`, `upward`, `count` |
-| Shape | Each wire's turns, and which drawing of a part is kept | `search`, `reroute`, `faults` |
-| Metrics | Every coordinate | `solve`, `shelves`, `assemble`, `finish`, `hand`, `ports`, `free`, `tidy`, `layout` |
-| Marks | What is drawn | `plane-index`, `index`, `look`, `story` |
+| Topology | Who crosses whom, the faces, the order of wires round each box | `topology`, `planar`, `lr`, `thread`, `numbering`, `upward`, `count` |
+| Shape | Each wire's turns, and which drawing of a part is kept | `search`, `shape`, `faults` |
+| Metrics | Every coordinate | `solve`, `shelves`, `wrap`, `assemble`, `pins`, `ways`, `finish`, `tidy`, `layout` |
+| Marks | What is drawn | `index`, `look`, `story` |
 
-`flow/part.js` is still Shape and Metrics together. The page runs `plane-index.js` as the drawing's `index.js`, and `index.js` under the name `flow.js`.
+`flow/part.js` is still Shape and Metrics together, and `flow/shape.js` still works on a sketch of coordinates that the solve then replaces.
 
 Only Metrics sets a place or a wire's points. What still does so elsewhere is listed by module.
 
@@ -82,12 +82,12 @@ Only Metrics sets a place or a wire's points. What still does so elsewhere is li
 
 | Distance | Between | Size |
 | --- | --- | --- |
-| `wire` | Two wires | `plane_wire_gap`, or a third of `flow_node_gap` if that is more |
-| `room` | A wire and a box it passes | `plane_wire_room` |
-| `run` | A wire and a box it goes to | `plane_port_run` |
-| `corner` | A wire's end and the corner of its box | `plane_port_corner` |
+| `wire` | Two wires | `flow_wire_gap`, or a third of `flow_node_gap` if that is more |
+| `room` | A wire and a box it passes | `flow_wire_room` |
+| `run` | A wire and a box it goes to | `flow_port_run` |
+| `corner` | A wire's end and the corner of its box | `flow_port_corner` |
 | `apart` | Two boxes | half of `flow_node_gap` |
-| `section` | Sections that are not joined | `plane_section_gap` |
+| `section` | Sections that are not joined | `flow_section_gap` |
 
 Order on an axis is read off the drawing as given, so nothing crossed is undone and nothing new is crossed. A box is as big as its name and what lands on it need, and past that it stands rigid. One that cannot, because its ports are held further apart than it measures, gives way and is counted (`freed`).
 

@@ -8,7 +8,7 @@ export function hangsOf({ a, ways, nodes, sizes, gap, z, aspect }) {
   const stepSize = (id) => nodes.get(id), firm = (p, q) => (ways.get(`${p} ${q}`) ?? ways.get(`${q} ${p}`) ?? 0) > 1;
   const zc = { row: gap / 4, col: gap, stub: z.run, join: z.join, bus: sizes.flow_comb_bus }, combGap = Math.max(gap, z.join);
   // In a small picture a headed link is a wire in the rows, so a chain reads straight down; a big one needs the room combs save.
-  const { kids, core } = peel(a, new Set(), nodes.size <= sizes.plane_rows_most ? firm : undefined);
+  const { kids, core } = peel(a, new Set(), nodes.size <= sizes.flow_rows_most ? firm : undefined);
   // What comes before an item hangs above it, and the rest below; `lead` is the room over the box.
   const sideOf = (p, k) => (ways.has(`${p} ${k}`) ? 1 : ways.has(`${k} ${p}`) ? -1 : 0);
   const combs = new Map(core.map((id) => {

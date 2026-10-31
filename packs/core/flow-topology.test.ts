@@ -7,7 +7,7 @@ import { against, downward, sidesOf } from './draw/flow/topology.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { embed } from './draw/flow/upward.js';
 
-const Z = { trial_most: 100, number_tries: 3, embed_most: 30, embed_cost: 2 };
+const Z = { trial_most: 100, number_tries: 3, embed_most: 30, embed_big: 300, embed_cost: 2 };
 
 /** A graph of `n` items in layers, every link down them, with ties across: what a repository's map looks like. */
 function layered(n: number, seed: number) {

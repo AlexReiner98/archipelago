@@ -54,10 +54,10 @@ function shapeWires({ nodes, x, y, routes, z }) {
 function lengthsOf(sizes) {
   const gap = sizes.flow_node_gap;
   return {
-    row: sizes.flow_layer_gap / 2, col: sizes.plane_wire_column, turn: Math.max(gap / 3, sizes.plane_wire_gap), gap,
-    room: sizes.plane_wire_room, join: sizes.plane_joined_room, run: sizes.plane_port_run, corner: sizes.plane_port_corner,
-    trials: sizes.plane_trials, trial_most: sizes.plane_trial_most, cost_up: sizes.plane_cost_up, cost_cross: sizes.plane_cost_crossing, shape_cross: sizes.plane_shape_crossing, shape_most: sizes.plane_shape_most, shape_work: sizes.plane_shape_work, cost_bend: sizes.plane_cost_bend, cost_side: sizes.plane_cost_side, ports: sizes.plane_reroute_ports, rounds: sizes.plane_reroute_rounds, cost_wrong: sizes.plane_cost_wrong_side, embed_most: sizes.plane_embed_most, embed_big: sizes.plane_embed_big, hub_most: sizes.plane_hub_most, embed_cost: sizes.plane_embed_crossings, slide_sweeps: sizes.plane_slide_sweeps, number_tries: sizes.plane_number_tries, trial_total: sizes.plane_trial_total,
-    row_gap: sizes.plane_row_gap, row_space: sizes.plane_row_space,
+    row: sizes.flow_layer_gap / 2, col: sizes.flow_wire_column, turn: Math.max(gap / 3, sizes.flow_wire_gap), gap,
+    room: sizes.flow_wire_room, join: sizes.flow_joined_room, run: sizes.flow_port_run, corner: sizes.flow_port_corner,
+    trials: sizes.flow_trials, trial_most: sizes.flow_trial_most, cost_up: sizes.flow_cost_up, cost_cross: sizes.flow_cost_crossing, shape_cross: sizes.flow_shape_crossing, shape_most: sizes.flow_shape_most, shape_work: sizes.flow_shape_work, cost_bend: sizes.flow_cost_bend, cost_side: sizes.flow_cost_side, ports: sizes.flow_reroute_ports, rounds: sizes.flow_reroute_rounds, cost_wrong: sizes.flow_cost_wrong_side, embed_most: sizes.flow_embed_most, embed_big: sizes.flow_embed_big, hub_most: sizes.flow_hub_most, embed_cost: sizes.flow_embed_crossings, slide_sweeps: sizes.flow_slide_sweeps, number_tries: sizes.flow_number_tries, trial_total: sizes.flow_trial_total,
+    row_gap: sizes.flow_row_gap, row_space: sizes.flow_row_space,
   };
 }
 
@@ -71,7 +71,7 @@ function laidOut({ items: given, links: told = [], undrawn = [], headless = ['pa
   const a = new Map([...nodes.keys()].map((id) => [id, new Set()]));
   for (const w of every) if (w.a !== w.b && a.has(w.a) && a.has(w.b)) (a.get(w.a).add(w.b), a.get(w.b).add(w.a));
   const ways = directions(chains, ties, headless), hangs = hangsOf({ a, ways, nodes, sizes, gap, z, aspect }), { core, block } = hangs;
-  const how = { block, stepSize, ways, z, even: nodes.size <= sizes.plane_rows_most, rowsLinks: sizes.plane_rows_links, total: core.length };
+  const how = { block, stepSize, ways, z, even: nodes.size <= sizes.flow_rows_most, rowsLinks: sizes.flow_rows_links, total: core.length };
   let threaded = 0;
   const shelves = partsOf(core, a).map((list) => {
     const made = drawnPart(list, linksOf(list, every, ways), how);
@@ -81,7 +81,7 @@ function laidOut({ items: given, links: told = [], undrawn = [], headless = ['pa
   const { x, y, routes, holder } = assemble(shelves, { ...hangs, stepSize, gap, margin, aspect });
   const rigid = rigidOf({ combs: hangs.combs, x, y, stepSize, block });
   staging?.('bars and combs', routes);
-  const lengths = { nodes, x, y, routes, section: sizes.plane_section_gap, gap, margin, aspect, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: gap / 2, join: z.join }, firstWires = new Map([...routes].map(([k, r]) => [k, r.points]));
+  const lengths = { nodes, x, y, routes, section: sizes.flow_section_gap, gap, margin, aspect, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: gap / 2, join: z.join }, firstWires = new Map([...routes].map(([k, r]) => [k, r.points]));
   const before = { x: new Map(x), y: new Map(y), sizes: new Map([...nodes].map(([id, n]) => [id, [n.w, n.h]])) };
   if (routes.size <= z.shape_most) shapeWires({ nodes, x, y, routes, z });
   staging?.('shape', routes);

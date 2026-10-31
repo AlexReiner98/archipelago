@@ -232,7 +232,7 @@ test('bars: where the numbering leaves an order wire up, the embedding made for 
   const ids = Array.from({ length: 9 }, (_, k) => `n${k}`), links: any[] = [];
   for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) links.push(dep(`n${6 + b}`, `n${a}`), dep(`n${3 + a}`, `n${a}`), dep(`n${6 + b}`, `n${3 + a}`));
   links.push(tie('n0', 'n8', 'calls'), tie('n7', 'n1', 'calls'), tie('n2', 'n3', 'link'));
-  const g = bars({ items: ids.map((id) => item(id)), links, measure, sizes: { ...house.sizes, plane_embed_most: 100 } });
+  const g = bars({ items: ids.map((id) => item(id)), links, measure, sizes: { ...house.sizes, flow_embed_most: 100 } });
   assert.deepEqual(upward(g), []);
   assert.ok(right(g));
   assert.ok(clear(g));
@@ -298,15 +298,15 @@ test('bars: a chain stands on one line through the middle of every box', () => {
 test('bars: ports keep off the corners, and wires landing on one side keep apart', () => {
   const ids = Array.from({ length: 6 }, (_, k) => `n${k}`);
   const g = drawnBars([item('top'), ...ids.map((id) => item(id))], ids.flatMap((id, k) => [tie(id, 'top', 'calls'), ...(k ? [tie(id, ids[k - 1], 'serves')] : [])]));
-  const f = faults(g, { corner: house.sizes.plane_port_corner, parallel: house.sizes.plane_wire_gap });
+  const f = faults(g, { corner: house.sizes.flow_port_corner, parallel: house.sizes.flow_wire_gap });
   assert.ok(f.cornerPorts <= 2, `${f.cornerPorts} on a corner`);
   assert.ok(f.tightParallel <= 2, `${f.tightParallel} too near`);
 });
 
-test('bars: a small fan stands in one row, its rows the style\'s distance apart', { todo: 'solve.js shares out its slack, so the outer boxes of a fan sit 12 px under the inner ones, and it closes plane_row_space from 56 to 48' }, () => {
+test('bars: a small fan stands in one row, its rows the style\'s distance apart', { todo: 'solve.js shares out its slack, so the outer boxes of a fan sit 12 px under the inner ones, and it closes flow_row_space from 56 to 48' }, () => {
   const feeders = ['a', 'bb', 'ccc', 'dddd', 'ee', 'f'], g = drawnBars([item('map'), ...feeders.map((id) => item(id))], feeders.map((id) => tie(id, 'map', 'calls')));
   assert.equal(new Set(feeders.map((id) => g.y.get(id))).size, 1, 'one row');
-  assert.ok(g.y.get('map') - g.y.get('a') - g.nodes.get('a').h / 2 - g.nodes.get('map').h / 2 >= house.sizes.plane_row_space - 1);
+  assert.ok(g.y.get('map') - g.y.get('a') - g.nodes.get('a').h / 2 - g.nodes.get('map').h / 2 >= house.sizes.flow_row_space - 1);
 });
 
 test('bars: a small picture stands in rows, a fan centred, each wire landing apart, a skipped row its own column', () => {

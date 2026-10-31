@@ -76,7 +76,7 @@ const linesOf = (wires: any[]): Line[] => wires.filter((w) => w.points?.length >
 /** What every wired drawing draws of a sketch, with its layout, and the spacing it keeps its wires at. A new wired drawing is added here. */
 export const WIRED: Record<string, { gap: (sizes: Record<string, number>) => number; draw: (layout: any, s: Sketch) => { boxes: Box[]; lines: Line[] } }> = {
   'core.flow': {
-    gap: (sizes) => sizes.plane_wire_gap,
+    gap: (sizes) => sizes.flow_wire_gap,
     draw(layout, { items, links }) {
       const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn });
       return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
@@ -112,8 +112,8 @@ export const LAYERS = ['graph', 'topology', 'shape', 'metrics', 'marks'];
 /** What each module that does not yet say its layer will say, by folder then layer. Architecture's are a first reading. */
 const LAYERS_OWED: Record<string, Record<string, string>> = {
   flow: {
-    graph: 'combs graph lines places polyline shapes steps', topology: 'count numbering planar thread upward', shape: 'faults reroute',
-    metrics: 'free hand layout ports tidy', marks: 'index look plane-index story',
+    graph: 'combs graph lines places polyline shapes steps', topology: 'count numbering planar thread upward', shape: 'faults',
+    metrics: 'layout tidy', marks: 'index look story',
   },
   architecture: {
     shape: 'sides', 'shape and metrics': 'route', 'graph and metrics': 'layout',

@@ -430,7 +430,7 @@ function lengthsIn(text: string) {
 test('a length in a drawing is named on the style', () => {
   const files = packIds.flatMap((p) => walk(`packs/${p}/draw`)).filter((f) => f.endsWith('.js'));
   const counted = Object.fromEntries(files.map((f) => [short(f), lengthsIn(read(f))]).filter(([, n]) => (n as number) > 0));
-  assert.deepEqual(ratchet(counted, LENGTHS_IN_DRAWINGS), [], 'Name it: a size in the style (packs/core/pack.json), read from there, as the flow reads plane_wire_gap.');
+  assert.deepEqual(ratchet(counted, LENGTHS_IN_DRAWINGS), [], 'Name it: a size in the style (packs/core/pack.json), read from there, as the flow reads flow_wire_gap.');
 });
 
 // 20. A wired drawing is layers, each reading those before it (docs/drawings.md; design e_49yk2trw, 30 Oct 2026). A module

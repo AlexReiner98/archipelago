@@ -1,6 +1,6 @@
 // What each stage of Plane's layout does to its wires, and a fingerprint of what it draws, on real views of a map:
-//   node scripts/plane-stages.ts [http://127.0.0.1:3100] [--fresh]
-// Each view is read once from the server and kept under runs/plane-stages, with its text widths from Chrome, so two runs
+//   node scripts/flow-stages.ts [http://127.0.0.1:3100] [--fresh]
+// Each view is read once from the server and kept under runs/flow-stages, with its text widths from Chrome, so two runs
 // compare like with like: a change that should alter no picture leaves every fingerprint as it was. --fresh reads them
 // again. Wires are told apart by the way they run, since a fault on one axis says little of the other.
 
@@ -70,15 +70,15 @@ for (const [name, find, limit] of VIEWS) {
     measureAll([...missing]);
   }
   const shots: [string, any][] = [];
-  stages((stage: string, routes: Map<string, any>) => shots.push([`${stage} ${count([...routes.values()].map((r) => r.points)).crossings}x`, spacing([...routes].map(([k, r]) => ({ ends: k.split('|'), points: r.points })), style.sizes.plane_wire_gap)]));
+  stages((stage: string, routes: Map<string, any>) => shots.push([`${stage} ${count([...routes.values()].map((r) => r.points)).crossings}x`, spacing([...routes].map(([k, r]) => ({ ends: k.split('|'), points: r.points })), style.sizes.flow_wire_gap)]));
   const began = performance.now();
   const g: any = layout({ ...input, measure: (text: string, px: number) => widths[`400 ${px}px ${style.font}|${text}`] ?? text.length * px * 0.52 });
   const took = Math.round(performance.now() - began);
   stages(null);
   const wires = [...g.chains, ...g.ties].filter((w: any) => w.points);
-  shots.push(['final', spacing(wires.map((w: any) => ({ ends: [w.a, w.b], points: w.points })), style.sizes.plane_wire_gap)]);
+  shots.push(['final', spacing(wires.map((w: any) => ({ ends: [w.a, w.b], points: w.points })), style.sizes.flow_wire_gap)]);
   const drawn = JSON.stringify([[...g.x].sort(), [...g.y].sort(), wires.map((w: any) => [w.a, w.b, w.points]), g.width, g.height]);
-  const f: any = faults(g, { run: style.sizes.plane_port_run, clear: style.sizes.plane_wire_room, join: style.sizes.plane_joined_room, corner: style.sizes.plane_port_corner, parallel: style.sizes.plane_wire_gap, headless: style.headless });
+  const f: any = faults(g, { run: style.sizes.flow_port_run, clear: style.sizes.flow_wire_room, join: style.sizes.flow_joined_room, corner: style.sizes.flow_port_corner, parallel: style.sizes.flow_wire_gap, headless: style.headless });
   console.log(`\n${name}: ${g.all.length} steps, ${wires.length} wires, ${Math.round(g.width)} by ${Math.round(g.height)}, ${took} ms, fingerprint ${createHash('sha256').update(drawn).digest('hex').slice(0, 16)}`);
   console.log(`  ${count(wires.map((w: any) => w.points)).crossings} crossings, ${f.bends} bends, ${f.up} of ${f.headed} up, ${f.back} double back, ${f.tightBox} tight to a box`);
   console.log(`  running down${HEAD.slice(14)}`);
