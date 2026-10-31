@@ -10,8 +10,8 @@
 // and its neighbourhood use (ui/picker-rank.js). No term or part is a box inside a box (rule e_vgs9vt5j).
 
 import { api, h, notOf, state, wordsOf } from './base.js';
-import { numberOf } from './lens-base.js';
-import { lightTerm, removedBy } from './lens-light.js';
+import { numberOf } from './query-base.js';
+import { lightTerm, removedBy } from './query-light.js';
 import { ranked, around, uses } from './picker-rank.js';
 import { isWord } from './only-words.js';
 import { findKinds, onlyKinds } from './term-kinds.js';

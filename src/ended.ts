@@ -13,9 +13,10 @@ export interface Ended {
   /** When it ended, and when it is deleted. */
   since: string;
   delete_at: string;
-  /** What the pack says to do about it ("Pay again at …"), and where. */
+  /** What the pack says to do about it ("Pay again at …"), where, and what that link says when not the usual. */
   note?: string;
   manage?: string;
+  manage_says?: string;
 }
 
 const KEY = 'ended:';

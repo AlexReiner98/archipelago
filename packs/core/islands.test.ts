@@ -1,4 +1,4 @@
-// The islands look of a story (draw/architecture/islands.js) and the steps that bring it in: a step's look holds from
+// The islands look of a story (layouts/architecture/islands.js) and the steps that bring it in: a step's look holds from
 // that step on, a step's fields may give the status work had then, a quick step goes by at a fast-forward pace, and
 // the last step shows the work the map has finished. Checked on a small build plan, as the landing page tells it.
 
@@ -7,13 +7,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
-import { picture } from './draw/architecture/index.js';
+import { picture } from './layouts/architecture/index.js';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
-import { along, boxPath, islandPath, islands, routeSpots } from './draw/architecture/islands.js';
+import { along, boxPath, islandPath, islands, routeSpots } from './layouts/architecture/islands.js';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
-import { layout } from './draw/architecture/layout.js';
+import { layout } from './layouts/architecture/layout.js';
 // @ts-expect-error: a plain module of the drawing, with no types of its own.
-import { statesOf } from './draw/architecture/story.js';
+import { statesOf } from './layouts/architecture/story.js';
 
 const house = { ...JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props, shape: 'architecture', still: true };
 const measure = (t: string, px: number) => t.length * px * 0.56;
@@ -179,7 +179,7 @@ test('in relief, the islands are still islands: the scene asks for a surface, an
 
 test('a boat moors off the shore facing the harbour, and keeps off the land on its way', async () => {
   // @ts-expect-error: a plain module of the drawing, with no types of its own.
-  const { along3, berth, course } = await import('./draw/architecture/boats.js');
+  const { along3, berth, course } = await import('./layouts/architecture/boats.js');
   const isle = { cx: 0, cy: 0, rx: 60, ry: 30 }, toward = [0, 200];
   const [x, y] = berth(isle, 0, 1, toward, 10);
   assert.ok(y > 30 && Math.abs(x) < 1, `moored below the island, at ${x}, ${y}`);
@@ -213,7 +213,7 @@ test('whoever a step names as the owner of work is a boat, never an island of it
 
 test('as a plan, each part is a row and its work runs done, under way, to do; as a board, each piece sits in its status column', async () => {
   // @ts-expect-error: a plain module of the drawing, with no types of its own.
-  const { board } = await import('./draw/architecture/boards.js');
+  const { board } = await import('./layouts/architecture/boards.js');
   const PROJECT = 'e_projectz', [A, B, C] = ['e_taskaaaa', 'e_taskbbbb', 'e_taskcccc'];
   const work = { ...answer, items: [item(ROOT, 'Root', { open: true, status: 'active', inside: undefined }), item(PROJECT, 'Website', { type: 'project', open: true, status: 'active' }), ...[A, B, C].map((id, k) => item(id, `Task ${k}`, { inside: PROJECT, place: k }))], links: [] };
   const statuses = { [A]: 'todo', [B]: 'done', [C]: 'doing' };

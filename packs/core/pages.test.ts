@@ -1,4 +1,4 @@
-// The pages drawing (draw/pages/): a lens answer in, rows out. Each item that nothing in the answer brings in is a
+// The pages drawing (layouts/pages/): a lens answer in, rows out. Each item that nothing in the answer brings in is a
 // row: its title leading to its page, and a reader of its draft, with one of what is published where the style asks,
 // which the page makes from the item's id alone (ui/reader-frame.js). An item a note brings in as a section is read there.
 
@@ -12,7 +12,7 @@ import test from 'node:test';
 // The drawing's modules laid out by the names it imports them by, as the sandbox serves them (pack.json, drawings).
 const core = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
 const laid = mkdtempSync(join(tmpdir(), 'pages-'));
-for (const [name, file] of Object.entries(core.drawings.find((d: any) => d.id === 'core.pages').modules as Record<string, string>)) copyFileSync(join(import.meta.dirname, file), join(laid, name));
+for (const [name, file] of Object.entries(core.layouts.find((d: any) => d.id === 'core.pages').modules as Record<string, string>)) copyFileSync(join(import.meta.dirname, file), join(laid, name));
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 
 const item = (id: string, title: string, body = '') => ({ id, kind: 'record', type: 'document', title, body, open: true, status: 'draft' });

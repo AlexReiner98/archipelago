@@ -26,6 +26,10 @@ export interface Limits {
   note?: string;
   plan?: string;
   manage?: string;
+  /** What the link to manage it says, when not the usual. */
+  manage_says?: string;
+  /** The day a plan with an end runs out (a trial's): the pack that sold it ends the workspace then. */
+  until?: string;
 }
 
 /** The limits a plan can set, each with how much of it is one: what workspace.limit takes and the Plan card shows. */
@@ -77,8 +81,11 @@ export function limitsFrom(input: Record<string, unknown>, said: Omit<Limits, Li
     limits[name] = n;
   }
   if (!LIMITS.some((name) => limits[name] !== undefined)) return null;
-  return { ...limits, ...(said.note && { note: said.note }), ...(said.plan && { plan: said.plan }), ...(said.manage && { manage: said.manage }) };
+  return { ...limits, ...Object.fromEntries(Object.entries(said).filter(([, v]) => v)) };
 }
+
+/** Days until a plan's end, counting the day it is in: what its Plan card shows. */
+export const daysLeft = (until: string, now = Date.now()) => Math.max(0, Math.ceil((Date.parse(until) - now) / 86_400_000));
 
 const UNIT: Record<LimitName, (n: number) => string> = {
   members: (n) => `${n} member${n === 1 ? '' : 's'}`,

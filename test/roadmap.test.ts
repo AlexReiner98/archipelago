@@ -3,7 +3,7 @@ import { dumpVault } from '../src/vault.ts';
 import { test } from 'node:test';
 import { dump, restore } from '../src/backup.ts';
 import { openDb } from '../src/db.ts';
-import { pictureOf } from '../src/lens-kept.ts';
+import { pictureOf } from '../src/query-kept.ts';
 import { Archipelago, type Op } from '../src/pelago.ts';
 import { sessionStart } from '../src/sessions.ts';
 import { askView } from '../src/askview.ts';
@@ -74,14 +74,14 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
   assert.equal((await run({ style: drawn.spare })).style.shape, 'flow', 'a style named outright is used, retired or not');
   await assert.rejects(run({ style: 'e_nothing0' }), /No style/);
 
-  // A view kept about an item: its own shape, and a style kept about the view, over the rest.
+  // A view kept about an item: what it holds of how it is drawn lies over the rest, and a style about it says nothing.
   const kept = await make(l, [
-    { op: 'create', ref: 'road', type: 'lens', title: 'Roadmap', props: { place: 1, filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'grid' } } },
+    { op: 'create', ref: 'road', type: 'lens', title: 'Roadmap', props: { place: 1, filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'grid', open: 4 } } },
     { op: 'link', type: 'about', from: 'road', to: made.p },
-    { op: 'create', ref: 'rs', type: 'style', title: 'Road opened', props: { open: 4 } },
+    { op: 'create', ref: 'rs', type: 'style', title: 'Road opened', props: { open: 9 } },
     { op: 'link', type: 'about', from: 'rs', to: 'road' },
   ]);
-  const { keptPicture } = await import('../src/lens-saved.ts');
+  const { keptPicture } = await import('../src/query-saved.ts');
   const road = await keptPicture(l, kept.road);
   assert.deepEqual([road.items.map((i) => i.title).sort(), road.style.shape, road.style.open], [['C', 'Early', 'Late', 'P'], 'grid', 4]);
 

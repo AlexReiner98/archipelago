@@ -334,16 +334,16 @@ There are more (`hubs`, `proof`, `changelog`, `recheck`, `agent_usage`,
 `notifications`, `graph`).
 
 The lens is the flat lens (`flat`): a filter, a walk and a limit, answered as
-items and the links among them (`src/lens-flat.ts`). Its filter's text is
+items and the links among them (`src/query-flat.ts`). Its filter's text is
 the `search` read's own search, ranked the same, and the find bar on the page
 sets it. A pack declares its views
 in its pack file (`views`): one with `lens` is answered by a read of the
-kernel's that its `answer` names (`src/lens-presets.ts`), in the form that view
+kernel's that its `answer` names (`src/query-presets.ts`), in the form that view
 has always had; any other is answered by the pack's own code. The core pack's
 are `flat`, `attention`, `brief`, `graph` (`src/view-graph.ts`), `tree`
 (`src/view-tree.ts`) and `hubs`, each read on its own. A view kept on the map
 (an item of type `lens`, a saved canvas on the page) is a flat lens and a
-style (`src/lens-saved.ts`): a document draws it where a line names it, and
+style (`src/query-saved.ts`): a document draws it where a line names it, and
 publishing freezes its picture. `gate` is the software pack's, and reads around its event (the pack
 read `around`). No view reads the whole map: a read around an item reads only
 what is around it (`src/region.ts`), so what it costs follows what it answers;
@@ -753,6 +753,18 @@ change that:
   token says which workspace it belongs to and whether it is a human's or an
   agent's. A human token can approve, launch and manage tokens; an agent token
   cannot, on any endpoint.
+- **A client can sign in through the browser** (OAuth for MCP,
+  `src/oauth.ts`). Point any client at `<server>/mcp`: it reads where to sign
+  in from the 401, a person signs in and says Allow, and it is given an agent
+  token acting for them. Tokens last an hour and rotate by a refresh token in
+  the same row, so a connection is one row under Workspace → Agents with one
+  Revoke; a connection left unused ends after 90 days. A client registers
+  itself (`/oauth/register`, which keeps nothing) or by a published metadata
+  document; neither proves who it is, so every connection is asked for, and
+  the page shows where the client returns. Redirects are https, this machine,
+  or an application's own scheme. It needs `PELAGO_PUBLIC_HOST` for an https
+  address, and a server with `auth` off offers none of it. A token pasted by
+  hand works as ever, for a client that cannot sign in.
 - **First start gives two secrets, once:** your human token for the default
   workspace, and the operator secret. At a terminal they are printed; with
   nobody at one (a container, a service) they are written to

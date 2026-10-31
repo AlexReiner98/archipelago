@@ -5,7 +5,8 @@
 // of sight is not drawn at all. Whoever drew it is told what is in view (`told`), once a frame at most. It opens with
 // all of it in sight when that can be read, else at a size that reads, brought to where it starts.
 
-import { numberOf } from './lens-base.js';
+import { numberOf } from './query-base.js';
+import { sheetAside } from './sheet-follow.js';
 import { panLock } from './pan-lock.js';
 
 /** What a frame of `n` units' text is shown as, on screen at `px` a unit: none, its names, or all of it. */
@@ -183,16 +184,19 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   frame.addEventListener('pointerup', end);
   frame.addEventListener('pointercancel', end);
   // A frame that changes size keeps what was in the middle of it in the middle (a pane whose edge is dragged does not
-  // carry the picture with that edge); one first given a size opens.
-  let opened = Boolean(frame.clientWidth), was = size();
+  // carry the picture with that edge), but the sheet coming or going leaves it where the reader put it: only the room
+  // beside it changes. One first given a size opens.
+  let opened = Boolean(frame.clientWidth), was = size(), beside = sheetAside();
   if (opened) open();
   new ResizeObserver(() => {
     if (!frame.clientWidth) return;
     const now = size();
     if (!opened) return void ((opened = true), (was = now), open());
-    view.x += (was[0] - now[0]) / 2 / view.s;
+    const stays = sheetAside() !== beside;
+    if (!stays) view.x += (was[0] - now[0]) / 2 / view.s;
     view.y += (was[1] - now[1]) / 2 / view.s;
     was = now;
+    beside = sheetAside();
     apply();
   }).observe(frame);
   /** Where it stands now, and put back where it stood (a picture drawn again, kept where the reader left it). */

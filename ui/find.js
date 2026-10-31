@@ -10,12 +10,12 @@
 // leaves the part, then shuts find; so does a click away from it.
 
 import { api, h, state, wordsOf, withWords } from './base.js';
-import { lightItems } from './lens-light.js';
+import { lightItems } from './query-light.js';
 import { changes } from './lit-by.js';
 import { viewUp } from './query-bar.js';
-import { drawIn, goLens, home, lensNow, openHere, openOver } from './canvas.js';
+import { drawIn, goQuery, home, queryNow, openHere, openOver } from './canvas.js';
 import { MODES, choicesFor, ledBy, wordsChoice } from './find-choices.js';
-import { numberOf } from './lens-base.js';
+import { numberOf } from './query-base.js';
 import { added, fitBar } from './query-bar.js';
 
 const bar = document.getElementById('find');
@@ -34,7 +34,7 @@ let choices = [];
 let shownFor = '';
 let lit = 0;
 
-const lensUp = () => lensNow() ?? home();
+const lensUp = () => queryNow() ?? home();
 
 /** Open find to type in: the lens's rows rise above it. */
 function open() {
@@ -82,13 +82,13 @@ function take(choice, add = false) {
   const lens = lensUp();
   if (choice.walk) {
     const { over = [], steps = 0 } = lens.walk ?? {};
-    return goLens({ ...lens, walk: { over: choice.walk === 'all' ? 'all' : [...(over === 'all' ? [] : over), choice.walk], steps: steps || 1 } });
+    return goQuery({ ...lens, walk: { over: choice.walk === 'all' ? 'all' : [...(over === 'all' ? [] : over), choice.walk], steps: steps || 1 } });
   }
-  if (choice.limit) return goLens({ ...lens, limit: choice.limit });
+  if (choice.limit) return goQuery({ ...lens, limit: choice.limit });
   if (choice.words) {
-    return goLens({ ...lens, filter: withWords(lens.filter, add ? [...wordsOf(lens.filter), choice.words] : [choice.words]) });
+    return goQuery({ ...lens, filter: withWords(lens.filter, add ? [...wordsOf(lens.filter), choice.words] : [choice.words]) });
   }
-  goLens(added(lens, choice.term));
+  goQuery(added(lens, choice.term));
 }
 
 /** Draw the choices, the lit one marked. */

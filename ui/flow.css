@@ -19,9 +19,9 @@
 .lf-stage.still { height: auto; overflow: visible; background: none; cursor: auto; touch-action: auto; user-select: auto; }
 .lf-stage.still > svg { width: auto; max-width: 100%; height: auto; margin: 0 auto; }
 .lf-legend.still { position: static; max-width: none; flex-direction: row; flex-wrap: wrap; column-gap: var(--ln-legend-pad-x); padding: 0 0 var(--ln-legend-pad-y); background: none; border: none; }
-/* A picture a drawing's code draws (ui/drawing.js): what it draws stays inside it, however its stylesheet places it. */
+/* A picture a drawing's code draws (ui/layout.js): what it draws stays inside it, however its stylesheet places it. */
 [data-drawing] { contain: paint; position: relative; }
-/* Where a drawing's tip goes (ui/drawing-tip.js): beside its mark, out of the pointer's way, in the top layer above
+/* Where a drawing's tip goes (ui/layout-tip.js): beside its mark, out of the pointer's way, in the top layer above
    every bar. How it looks is the drawing's: the browser's own look for a popover is taken off. */
 .drawing-tip { position: fixed; inset: auto; margin: 0; padding: 0; border: 0; background: none; color: inherit; overflow: visible; pointer-events: none; transform: translate(-50%, calc(-100% - var(--space-4))); }
 .drawing-tip.below { transform: translate(-50%, var(--space-4)); }

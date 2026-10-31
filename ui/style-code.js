@@ -1,7 +1,7 @@
 // A style that carries its own code: the drawing a person or an agent wrote for their own project.
 
 import { api, frameSandbox, h } from './base.js';
-import { STYLE_COLORS, litSwitch } from './lens-base.js';
+import { STYLE_COLORS, litSwitch } from './query-base.js';
 import { saidDrawn } from './look.js';
 
 /** The most ops one ask of a drawing may carry. */
@@ -13,7 +13,7 @@ const mostOps = 50;
  * nothing sent anywhere), hands it the lens answer, the style's fields and the
  * page's colours, and listens for three things: open this item, change the map
  * (sent here as the person, naming the style whose code asked, `coder`, for the
- * rules to judge: src/drawing-changes.ts), and what went wrong. A new frame for
+ * rules to judge: src/layout-changes.ts), and what went wrong. A new frame for
  * each picture, so nothing of the last is left running; a new answer for the same
  * code and fields goes to the frame already running, when its code listens for one.
  */

@@ -7,7 +7,7 @@
     "webhooks": [{ "id": "paid", "secret": "hook", "header": "x-signature", "format": "hex" }],
     "server": {
       "acts": ["workspace.create", "workspace.admit", "workspace.limit", "workspace.end", "signin.link"],
-      "entries": [{ "id": "start" }, { "id": "poll" }, { "id": "sneak" }, { "id": "peek" }, { "id": "elsewhere" }, { "id": "limit" }, { "id": "end" }],
+      "entries": [{ "id": "start" }, { "id": "poll" }, { "id": "sneak" }, { "id": "peek" }, { "id": "elsewhere" }, { "id": "limit" }, { "id": "end" }, { "id": "listed" }],
       "pages": [{ "id": "signup", "file": "signup.html" }]
     }
   }

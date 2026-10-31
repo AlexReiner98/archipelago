@@ -10,7 +10,7 @@ import { readEvents } from './eventlog.ts';
 import { askPackView, VIEWS } from './views.ts';
 import { scanAround } from './region.ts';
 import { placeAll, readAxis, zoneOf } from './timeaxis.ts';
-import { LENS_LIMIT } from './lens-flat.ts';
+import { LENS_LIMIT } from './query-flat.ts';
 
 /** The most items one read gives back. */
 const READ_LIMIT = 500;

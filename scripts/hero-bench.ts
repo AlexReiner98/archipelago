@@ -40,8 +40,8 @@ async function local(file: string) {
   const { theme: _t, lengths: _l, site: _s, published_at: _p, ...given } = live;
   const pelago = (await workspaces.get('default')).pelago;
   // Drawn by this checkout's drawings, as a page published here now would be.
-  const { drawingFor } = await import('../src/drawings.ts');
-  for (const lens of Object.values(given.lenses ?? {}) as { style: Record<string, unknown> }[]) if (lens.style.drawing) lens.style.drawing = drawingFor(pelago.registry, { shape: lens.style.shape }, []);
+  const { layoutFor } = await import('../src/layouts.ts');
+  for (const lens of Object.values(given.lenses ?? {}) as { style: Record<string, unknown> }[]) if (lens.style.drawing) lens.style.drawing = layoutFor(pelago.registry, { shape: lens.style.shape }, []);
   const atPublish = await import('../src/published-frames.ts').catch(() => null);
   if (atPublish) await atPublish.framesFor(pelago, given.lenses);
   await pelago.db.query(`update published set given = $1::jsonb where entity_id = $2`, [JSON.stringify({ ...given, id }), id]);

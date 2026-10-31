@@ -1,6 +1,6 @@
 // Pictures of the flow drawing, in a real browser, against a running server, to look at:
 //   node scripts/flow-shots.ts [http://127.0.0.1:3100] [out folder] [--packs <a packs folder>]
-// Each flow case (test/drawing-cases.ts) drawn as the canvas draws it, at its width, and kept as a PNG; then two
+// Each flow case (test/layout-cases.ts) drawn as the canvas draws it, at its width, and kept as a PNG; then two
 // thousand steps (chains of 100, and of 20 in wide layers, as scripts/plane-bench.ts makes them). For each, what a
 // reader meets: the steps, the wires and ties, where wires cross, their turns, where a wire passes through a step that
 // is not its own, and how long until it was on the page. --packs draws with another copy of the packs (an older flow,
@@ -9,15 +9,15 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { open } from '../test/browser.ts';
-import { flowCases } from '../test/drawing-cases.ts';
-import { drawingFor } from '../src/drawings.ts';
+import { flowCases } from '../test/layout-cases.ts';
+import { layoutFor } from '../src/layouts.ts';
 
 const args = process.argv.slice(2);
 const packs = args.includes('--packs') ? args.splice(args.indexOf('--packs'), 2)[1] : join(import.meta.dirname, '..', 'packs');
 const base = args[0] ?? 'http://127.0.0.1:3100';
 const out = args[1] ?? join(import.meta.dirname, '..', 'runs', 'flow-shots');
 mkdirSync(out, { recursive: true });
-const drawing = drawingFor({ dir: packs, packs: [JSON.parse(readFileSync(join(packs, 'core', 'pack.json'), 'utf8'))] }, { shape: 'flow' }, []);
+const drawing = layoutFor({ dir: packs, packs: [JSON.parse(readFileSync(join(packs, 'core', 'pack.json'), 'utf8'))] }, { shape: 'flow' }, []);
 
 /** Two thousand steps of work, part of one project, in chains each depending on the one before, some across. */
 function big(chain: number) {
@@ -35,8 +35,8 @@ function big(chain: number) {
 }
 
 const shot = `async (answer, style, width) => {
-  const { drawWith } = await import('/drawing.js');
-  const { dress } = await import('/lens-base.js');
+  const { drawWith } = await import('/layout.js');
+  const { dress } = await import('/query-base.js');
   document.body.replaceChildren();
   const host = document.createElement('div');
   host.className = 'lens-view';

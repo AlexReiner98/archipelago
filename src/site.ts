@@ -7,7 +7,7 @@ import type { ServerResponse } from 'node:http';
 import type { Part } from './documents.ts';
 import { GUARD, POLICY } from './public-document.ts';
 import { listen } from './published-live.ts';
-import { drawingCode, pageData, pictureAt, publishedPage, shareOf } from './published-page.ts';
+import { layoutCode, pageData, pictureAt, publishedPage, shareOf } from './published-page.ts';
 import { publishedAt, publishedPicture, sitePages } from './published.ts';
 import { pageLook } from './styles.ts';
 import type { Workspaces } from './workspaces.ts';
@@ -77,7 +77,7 @@ export async function serveSite(res: ServerResponse, pathname: string, at: { hos
   }
   if (what === 'live') return (listen(res, at.workspace, doc.id, GUARD), true);
   if (what === 'drawing') {
-    const code = drawingCode(doc, extra);
+    const code = layoutCode(doc, extra);
     return code ? send(200, 'application/json', JSON.stringify(code), { 'cache-control': 'public, max-age=31536000, immutable' }) : send(404, 'application/json', JSON.stringify({ error: 'Not found' }));
   }
   const site = { ...(await siteNav(at.workspaces, at.workspace, (page) => (page.path ? siteHref(page.path) : null))), host: at.host };
