@@ -74,11 +74,11 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
   assert.equal((await run({ style: drawn.spare })).style.shape, 'flow', 'a style named outright is used, retired or not');
   await assert.rejects(run({ style: 'e_nothing0' }), /No style/);
 
-  // A view kept about an item: its own shape, and a style kept about the view, over the rest.
+  // A view kept about an item: what it holds of how it is drawn lies over the rest, and a style about it says nothing.
   const kept = await make(l, [
-    { op: 'create', ref: 'road', type: 'lens', title: 'Roadmap', props: { place: 1, filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'grid' } } },
+    { op: 'create', ref: 'road', type: 'lens', title: 'Roadmap', props: { place: 1, filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'grid', open: 4 } } },
     { op: 'link', type: 'about', from: 'road', to: made.p },
-    { op: 'create', ref: 'rs', type: 'style', title: 'Road opened', props: { open: 4 } },
+    { op: 'create', ref: 'rs', type: 'style', title: 'Road opened', props: { open: 9 } },
     { op: 'link', type: 'about', from: 'rs', to: 'road' },
   ]);
   const { keptPicture } = await import('../src/lens-saved.ts');
