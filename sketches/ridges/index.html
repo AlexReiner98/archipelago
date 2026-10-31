@@ -167,7 +167,8 @@
   <label title="A seed has no in-between: the whole slide grows from the one chosen here">Seed <select id="mSeed"><option value="end">End's</option><option value="start">Start's</option></select></label>
   <label title="How many steps between them: more is smoother, and takes longer to build">Frames <output id="mFramesOut"></output><input id="mFrames" type="range" min="4" max="240" step="1" value="80"></label>
   <label title="How long a play takes">Seconds <output id="mSecondsOut"></output><input id="mSeconds" type="range" min="1" max="30" step="0.5" value="8"></label>
-  <div class="row"><button id="mBuild" title="Draw every step, each dial part way from the start to the end">Build</button><button id="mPlay" title="Play from the start to the end" disabled>Play</button></div>
+  <div class="row"><button id="mBuild" title="Draw every step, each dial part way from the start to the end">Build</button><button id="mPlay" title="Play from the start to the end" disabled>Play</button><button id="mSave" title="Save as one animated SVG: the keys below, whole, each fading in over the last" disabled>Save SVG</button></div>
+  <label title="How many of the steps the SVG holds: more moves better, and weighs more">Keys <output id="mKeysOut"></output><input id="mKeys" type="range" min="2" max="16" step="1" value="6"></label>
   <label title="Slide from the start to the end">Slide <small>start · end</small><input id="mSlide" type="range" min="0" max="1" step="0.001" value="0" disabled></label>
   <div id="mNote"></div>
   <div class="row">
@@ -181,6 +182,7 @@
 <script type="module">
   import { ridges, DEFAULTS, gridAt } from './ridges.js';
   import { carried } from './diffusion.js';
+  import { mixed, svgOf } from './moving.js';
   import { PLACES, fromPixels, signature, waterOf, landOf, layout, enrich } from './palettes.js';
   import * as presets from './presets.js';
   import { paint, fillOf as fillWith, swell, isLight } from './paint.js';
@@ -469,8 +471,8 @@
 
   // Animate: every dial part way from one saved setup to the other, each step drawn by ridges() as if the sliders stood
   // there, kept as a picture so the slide needs no drawing.
-  const animateOuts = () => { $('mFramesOut').textContent = $('mFrames').value; $('mSecondsOut').textContent = $('mSeconds').value; };
-  for (const id of ['mFrames', 'mSeconds']) $(id).addEventListener('input', animateOuts);
+  const animateOuts = () => { for (const id of ['mFrames', 'mSeconds', 'mKeys']) $(`${id}Out`).textContent = $(id).value; };
+  for (const id of ['mFrames', 'mSeconds', 'mKeys']) $(id).addEventListener('input', animateOuts);
   /** A saved setup as ridges() draws it here: its own dials and seed on this frame, its rows as far apart as ever. */
   const setupOf = (name) => {
     const s = presets.all()[name];
@@ -480,7 +482,14 @@
   };
   // A seed has no in-between, so the one chosen holds throughout; every dial that is a number moves.
   const between = (from, to, t) => Object.fromEntries(Object.entries(from).map(([k, v]) => [k, k !== 'seed' && typeof v === 'number' && typeof to[k] === 'number' ? v + (to[k] - v) * t : v]));
-  let steps = [];
+  let steps = [], keysKept = [];
+  $('mSave').onclick = async () => {
+    const p = richOf(pal()), svg = svgOf({ keys: keysKept, ink: p.ink, swell: swell(p, background(p)), background: background(p), cloudOpacity: +$('cloudOpacity').value, seconds: +$('mSeconds').value, hold: 1 });
+    const blob = new Blob([svg], { type: 'image/svg+xml' }), gz = await new Response(blob.stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+    $('mNote').textContent = `${keysKept.length} keys: ${Math.round(blob.size / 1000)} kB, ${Math.round(gz.byteLength / 1000)} kB gzipped`;
+    $('mNote').dataset.svg = URL.createObjectURL(blob);
+    save('archipelago-slide.svg', blob);
+  };
   const showStep = (t) => {
     if (!steps.length) return;
     // Between two steps, the one dissolving into the next: every step itself is what ridges() drew.
@@ -520,8 +529,15 @@
         paint(c.getContext('2d'), shown(pic), { ...opts, palOf });
         return c;
       };
+      const wanted = new Set(Array.from({ length: +$('mKeys').value }, (_, k) => Math.round((k * (n - 1)) / (+$('mKeys').value - 1))));
+      keysKept = [];
       for (let k = 0; k < n; k++) {
         const t = k / (n - 1), pic = ridges({ ...between(from, to, t), forms: () => landforms, field: fields[k] });
+        if (wanted.has(k)) {
+          const coloured = (places) => ((given = places), pic.shapes.map((s) => (s.line || s.shadow ? '' : s.cloud ? p.paper : fillOf(s))));
+          const [a, b] = [coloured(startPlaces), coloured(endPlaces)], at = new Map(pic.shapes.map((s, i) => [s, i]));
+          keysKept.push({ pic, fill: (s) => mixed(a[at.get(s)], b[at.get(s)], t) });
+        }
         const c = painted(pic, startPlaces), g = c.getContext('2d');
         g.globalAlpha = t;
         g.drawImage(painted(pic, endPlaces), 0, 0);
@@ -532,7 +548,7 @@
       }
       given = startPlaces;
       steps = made;
-      $('mSlide').disabled = $('mPlay').disabled = false;
+      $('mSlide').disabled = $('mPlay').disabled = $('mSave').disabled = false;
       $('mSlide').value = 0;
       showStep(0);
       $('mNote').textContent = `${n} steps, ${((performance.now() - t0) / 1000).toFixed(0)} s to draw`;
