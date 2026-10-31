@@ -13,6 +13,7 @@ import { planCard } from './plan-card.js';
 import { modelCard } from './model-card.js';
 import { connectionsCard } from './connections-card.js';
 import { agentsMayCard, tokenRow, tokensCard } from './agents-card.js';
+import { connectCard } from './connect-agent.js';
 import { backupCard, card, githubRow, notificationsRow, ownerRow, serverPacksCard, visibilityRow } from './workspace-cards.js';
 
 const SECTIONS = [
@@ -79,7 +80,7 @@ export async function workspace() {
       // A workspace for one person (its limit is one, and it has no more) has no members to manage.
       tokensOn && me.actor.admin && !(info.member_limit?.members === 1 && members.length <= 1) && at('team', membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow: row, then: workspace, fail, say })),
     ],
-    agents: () => [tokensOn && at('agent', tokensCard({ tokens: live.filter((t) => t.kind === 'agent'), row, then: workspace, fail, say })), admin && agentsMayCard(info, workspace, fail), admin && at('model', modelCard())],
+    agents: () => [tokensOn && at('agent', connectCard({ tokens: live.filter((t) => t.kind === 'agent'), then: workspace })), tokensOn && tokensCard({ tokens: live.filter((t) => t.kind === 'agent'), row, then: workspace, fail, say }), admin && agentsMayCard(info, workspace, fail), admin && at('model', modelCard())],
     map: () => [themesCard(workspace), at('backup', backupCard(workspace, visibilityRow(info, workspace, fail)))],
     packs: () => [packsCard({ info, then: workspace, goTo: go }), own.length > 0 && card('Your screens', 'Screens you made, which no pack offers', h('ul', { class: 'rows' }, screenRows(own, workspace))), me.workspace.id === 'default' && serverPacksCard()],
     connections: () => [at('connections', connectionsCard(...githubRow(), notificationsRow(info, workspace, fail)))],

@@ -26,16 +26,7 @@ export function tokenRow(t, { me, personName, then, fail }) {
   );
 }
 
-/** The address any client that signs in through the browser is pointed at: no token, no command. */
-function addressRow() {
-  const address = `${location.origin}/mcp`;
-  return line(
-    h('span', { class: 'grow', style: 'min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis', title: 'Paste this into any MCP client, such as claude.ai, Claude Desktop, ChatGPT, Cursor or VS Code. It opens this site to sign in, and the connection is listed here with Revoke.' }, h('strong', {}, 'Address for any client'), ' ', h('code', { class: 'muted small' }, address)),
-    h('button', { onclick: (e) => navigator.clipboard.writeText(address).then(() => (e.target.textContent = 'Copied')) }, 'Copy'),
-  );
-}
-
-/** The agent tokens, and connecting another: a name, how long it lasts, Connect; the bare token in the menu. */
+/** What is connected, and the older way in, folded: a token, for Claude Code's hooks or a client that cannot sign in. */
 export function tokensCard({ tokens, row, then, fail, say }) {
   const name = h('input', { type: 'text', placeholder: 'Name (claude-code)', style: 'flex: 1; min-width: 0' });
   // A new agent token ends by itself unless it is said not to. One within an item is made on that item's page.
@@ -43,16 +34,21 @@ export function tokensCard({ tokens, row, then, fail, say }) {
   const token = (fallback) => ({ kind: 'agent', name: name.value.trim() || fallback, ...(Number(life.value) > 0 && { expires_days: Number(life.value) }) });
   const make = (fallback, show) => api('token_create', token(fallback)).then((made) => then().then(() => say(show(made))), fail);
   return card(
-    'Agent tokens',
-    'An agent with one of these acts for you: it sees what you see and proposes to you.',
-    h('ul', { class: 'rows' }, addressRow(), tokens.map(row)),
+    'Connected agents',
+    'Each acts for you: it sees what you see and proposes to you.',
+    h('ul', { class: 'rows' }, tokens.map(row)),
     h(
-      'div',
-      { class: 'toolbar', style: 'padding: var(--space-6) 0; flex-wrap: nowrap' },
-      name,
-      life,
-      h('button', { class: 'primary', style: 'white-space: nowrap', onclick: () => make('claude-code', connectBox) }, 'Connect an agent'),
-      menu('⋯', [['Token only', () => make('agent', (made) => secretBox(`Token for ${made.name}`, made.token))]]),
+      'details',
+      { class: 'fold-bar' },
+      h('summary', { class: 'muted small', title: 'For Claude Code’s sessions and hooks, or a client that cannot sign in through the browser' }, 'With a token'),
+      h(
+        'div',
+        { class: 'toolbar', style: 'padding: var(--space-6) 0; flex-wrap: nowrap' },
+        name,
+        life,
+        h('button', { style: 'white-space: nowrap', title: 'A command that sets up Claude Code in a project, with sessions on the map', onclick: () => make('claude-code', connectBox) }, 'Claude Code setup'),
+        menu('⋯', [['Token only', () => make('agent', (made) => secretBox(`Token for ${made.name}`, made.token))]]),
+      ),
     ),
   );
 }
