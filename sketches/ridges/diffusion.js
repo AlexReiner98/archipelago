@@ -22,19 +22,13 @@ function torusNoise(nx, ny, cells, rnd) {
   };
 }
 
-/**
- * v, 0 to 1, on an nx × ny torus. With variety, the pattern is not one setting but drifts across the page with a
- * slow noise: spots in one place, worms or coral in another, grown as one field.
- */
-export function grow({ nx, ny, pattern = 0.3, variety = 0, steps = 4000, seed = 1 }) {
+/** A Gray-Scott grid on an nx × ny torus, seeded, that grows on from where it stands by `run(steps, pattern)`. */
+function growing({ nx, ny, variety, seed }) {
   const rnd = random(seed * 104729 + 7);
   const size = nx * ny;
   const drift = torusNoise(nx, ny, 3, random(seed * 7 + 11));
+  const drifts = Float32Array.from({ length: size }, (_, i) => variety * 1.6 * (drift(i % nx, Math.floor(i / nx)) - 0.5));
   const feedAt = new Float32Array(size), killAt = new Float32Array(size);
-  for (let i = 0; i < size; i++) {
-    const t = Math.max(-0.6, Math.min(2.2, pattern + variety * 1.6 * (drift(i % nx, Math.floor(i / nx)) - 0.5)));
-    ({ feed: feedAt[i], kill: killAt[i] } = rates(t));
-  }
   let u = new Float32Array(size).fill(1), v = new Float32Array(size), u2 = new Float32Array(size), v2 = new Float32Array(size);
   // Seeds: small squares of the second chemical, enough that the field fills fast.
   for (let s = 0; s < 6 + Math.round(size / 300); s++) {
@@ -50,22 +44,63 @@ export function grow({ nx, ny, pattern = 0.3, variety = 0, steps = 4000, seed = 
     const i = (y * nx + x) * 8;
     [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([dx, dy], k) => (nb[i + k] = ((y + dy + ny) % ny) * nx + ((x + dx + nx) % nx)));
   }
-  for (let s = 0; s < steps; s++) {
+  const run = (steps, pattern) => {
     for (let i = 0; i < size; i++) {
-      const j = i * 8, ui = u[i], vi = v[i];
-      const lu = 0.2 * (u[nb[j]] + u[nb[j + 1]] + u[nb[j + 2]] + u[nb[j + 3]]) + 0.05 * (u[nb[j + 4]] + u[nb[j + 5]] + u[nb[j + 6]] + u[nb[j + 7]]) - ui;
-      const lv = 0.2 * (v[nb[j]] + v[nb[j + 1]] + v[nb[j + 2]] + v[nb[j + 3]]) + 0.05 * (v[nb[j + 4]] + v[nb[j + 5]] + v[nb[j + 6]] + v[nb[j + 7]]) - vi;
-      const uvv = ui * vi * vi;
-      u2[i] = ui + lu - uvv + feedAt[i] * (1 - ui);
-      v2[i] = vi + 0.5 * lv + uvv - (feedAt[i] + killAt[i]) * vi;
+      const t = Math.max(-0.6, Math.min(2.2, pattern + drifts[i]));
+      ({ feed: feedAt[i], kill: killAt[i] } = rates(t));
     }
-    [u, u2] = [u2, u];
-    [v, v2] = [v2, v];
-  }
-  let max = 1e-6;
-  for (let i = 0; i < size; i++) max = Math.max(max, v[i]);
-  for (let i = 0; i < size; i++) v[i] /= max;
-  return { nx, ny, v };
+    for (let s = 0; s < steps; s++) {
+      for (let i = 0; i < size; i++) {
+        const j = i * 8, ui = u[i], vi = v[i];
+        const lu = 0.2 * (u[nb[j]] + u[nb[j + 1]] + u[nb[j + 2]] + u[nb[j + 3]]) + 0.05 * (u[nb[j + 4]] + u[nb[j + 5]] + u[nb[j + 6]] + u[nb[j + 7]]) - ui;
+        const lv = 0.2 * (v[nb[j]] + v[nb[j + 1]] + v[nb[j + 2]] + v[nb[j + 3]]) + 0.05 * (v[nb[j + 4]] + v[nb[j + 5]] + v[nb[j + 6]] + v[nb[j + 7]]) - vi;
+        const uvv = ui * vi * vi;
+        u2[i] = ui + lu - uvv + feedAt[i] * (1 - ui);
+        v2[i] = vi + 0.5 * lv + uvv - (feedAt[i] + killAt[i]) * vi;
+      }
+      [u, u2] = [u2, u];
+      [v, v2] = [v2, v];
+    }
+  };
+  /** The field as it stands, 0 to 1. */
+  const field = () => {
+    let max = 1e-6;
+    for (let i = 0; i < size; i++) max = Math.max(max, v[i]);
+    return Float32Array.from(v, (c) => c / max);
+  };
+  return { run, field };
+}
+
+// The pattern dial is read along one run of growth, not grown anew at each setting: the field settles at the middle of
+// the dial's low end, then the dial is turned slowly, the field growing all the while, and it is kept at every rung.
+// So two settings near each other share their history and their land nearly agrees, and the dial moves the forms the
+// way the chemistry moves them. A run goes only as far as has been asked for, and is kept while the page lasts.
+const RUNG = 0.01, RUNG_STEPS = 92, SETTLE = 4000, KEPT_RUNS = 6;
+const runs = new Map();
+function rungsFor(key, make, sign, wanted) {
+  const name = `${key}|${sign}`;
+  const kept = runs.get(name) ?? { grower: make(), rungs: [] };
+  runs.delete(name);
+  runs.set(name, kept);
+  if (runs.size > KEPT_RUNS * 2) runs.delete(runs.keys().next().value);
+  if (!kept.rungs.length) (kept.grower.run(SETTLE, 0), kept.rungs.push(kept.grower.field()));
+  while (kept.rungs.length <= wanted) (kept.grower.run(RUNG_STEPS, sign * kept.rungs.length * RUNG), kept.rungs.push(kept.grower.field()));
+  return kept.rungs;
+}
+
+/** v, 0 to 1, on an nx × ny torus, where the run of growth for this grid, variety and seed stands at the pattern dial. */
+export function grow({ nx, ny, pattern = 0.3, variety = 0, seed = 1 }) {
+  const at = Math.abs(pattern) / RUNG, k = Math.floor(at), t = at - k;
+  const rungs = rungsFor(`${nx}|${ny}|${variety}|${seed}`, () => growing({ nx, ny, variety, seed }), pattern < 0 ? -1 : 1, k + 1);
+  const [a, b] = [rungs[k], rungs[k + 1]];
+  return { nx, ny, v: a.map((c, i) => c + (b[i] - c) * t) };
+}
+
+/** v, 0 to 1, grown from its seeds with one pattern held, for a field no dial moves. */
+export function settled({ nx, ny, pattern, variety = 0, steps, seed = 1 }) {
+  const g = growing({ nx, ny, variety, seed });
+  g.run(steps, pattern);
+  return { nx, ny, v: g.field() };
 }
 
 /** The field at any point in cell units, smoothly, wrapping. */
