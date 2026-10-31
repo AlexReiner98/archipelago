@@ -70,7 +70,7 @@ for (const [name, find, limit] of VIEWS) {
     measureAll([...missing]);
   }
   const shots: [string, any][] = [];
-  stages((stage: string, routes: Map<string, any>) => shots.push([stage, spacing([...routes].map(([k, r]) => ({ ends: k.split('|'), points: r.points })), style.sizes.plane_wire_gap)]));
+  stages((stage: string, routes: Map<string, any>) => shots.push([`${stage} ${count([...routes.values()].map((r) => r.points)).crossings}x`, spacing([...routes].map(([k, r]) => ({ ends: k.split('|'), points: r.points })), style.sizes.plane_wire_gap)]));
   const began = performance.now();
   const g: any = layout({ ...input, measure: (text: string, px: number) => widths[`400 ${px}px ${style.font}|${text}`] ?? text.length * px * 0.52 });
   const took = Math.round(performance.now() - began);
