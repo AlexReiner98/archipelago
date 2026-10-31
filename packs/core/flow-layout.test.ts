@@ -309,6 +309,16 @@ test('bars: a small fan stands in one row, its rows the style\'s distance apart'
   assert.ok(g.y.get('map') - g.y.get('a') - g.nodes.get('a').h / 2 - g.nodes.get('map').h / 2 >= house.sizes.flow_row_space - 1);
 });
 
+test('bars: a fan crosses nothing, its wires landing in the order they come from', () => {
+  const feeders = ['Other agents', 'Your teammate', 'Automations', 'You', 'Their AI agents', 'Your AI agent'];
+  const into = drawnBars([item('The map'), ...feeders.map((id) => item(id))], feeders.map((id) => tie(id, 'The map', 'calls')));
+  assert.equal(count(lines(into)).crossings, 0, 'many into one');
+  const outOf = drawnBars([item('The map'), ...feeders.map((id) => item(id))], feeders.map((id) => tie('The map', id, 'calls')));
+  assert.equal(count(lines(outOf)).crossings, 0, 'one out to many');
+  const order = (g: any) => [...g.ties].sort((p: any, q: any) => p.points.at(-1)[0] - q.points.at(-1)[0]).map((t: any) => t.points[0][0]);
+  assert.deepEqual(order(into), [...order(into)].sort((p, q) => p - q), 'each lands in the order it leaves');
+});
+
 test('bars: a small picture stands in rows, a fan centred, each wire landing apart, a skipped row its own column', () => {
   const feeders = ['a', 'bb', 'ccc', 'dddd', 'ee', 'f'], g = drawnBars([item('map'), ...feeders.map((id) => item(id))], feeders.map((id) => tie(id, 'map', 'calls')));
   const tops = feeders.map((id) => g.y.get(id));

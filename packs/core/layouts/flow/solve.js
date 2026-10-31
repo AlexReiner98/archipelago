@@ -142,8 +142,14 @@ function sides(group, axis) {
     const p = s.line.points, before = p[s.i - 2], after = p[s.i + 1], [from, to] = [p[s.i - 1], p[s.i]];
     const turn = (next, near) => (next ? Math.sign(next[axis] - near[axis]) : 0), [low, high] = from[1 - axis] <= to[1 - axis] ? [turn(before, from), turn(after, to)] : [turn(after, to), turn(before, from)];
     s.tie = low * (s.lo - least + 1) + high * (most - s.hi + 1);
+    // Wires of a fan part the same way at the same place: the one that goes furthest stands outermost, so none crosses.
+    const far = (next, near) => (next ? next[axis] - near[axis] : 0);
+    s.far = far(before, from) + far(after, to);
   }
 }
+
+/** Which of two things on one place stands first: read off how they leave it. */
+const byTie = (p, q) => (p.tie ?? 0) - (q.tie ?? 0) || (p.far ?? 0) - (q.far ?? 0);
 
 /** One pass along `axis`, 0 across and 1 down. */
 function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart, told, still }) {
@@ -162,7 +168,7 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
   const byPlace = new Map();
   for (const s of stretches) (byPlace.get(s.at) ?? byPlace.set(s.at, []).get(s.at)).push(s);
   for (const group of byPlace.values()) if (group.length > 1) sides(group, axis);
-  stretches.sort((p, q) => p.at - q.at || p.tie - q.tie);
+  stretches.sort((p, q) => p.at - q.at || byTie(p, q));
   for (const s of stretches) s.n = number(s.at);
   const arcs = [];
   for (const b of boxes) arcs.push([b.low, b.high, b.named[axis]]);
@@ -183,7 +189,7 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
   const placed = [...stretches, ...boxes.map((b) => Object.assign(b, { key: b.at[axis], lo: b.at[other] - b.size[other] / 2, hi: b.at[other] + b.size[other] / 2 }))];
   for (const s of stretches) s.key = s.at;
   const seen = [];
-  for (const it of placed.sort((p, q) => p.key - q.key || (p.tie ?? 0) - (q.tie ?? 0))) {
+  for (const it of placed.sort((p, q) => p.key - q.key || byTie(p, q))) {
     const [lo, hi] = [it.lo - TOUCH, it.hi + TOUCH], first = seen.findIndex((v) => v.hi >= lo);
     const from = first < 0 ? seen.length : first, met = new Set();
     let to = from;
