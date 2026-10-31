@@ -182,11 +182,31 @@ function draw(d) {
           blocks(p.section.body, titles, 3),
         )
       : h('div', { class: 'text' }, blocks(p.text, titles, 2));
+  // A picture that plays stands beside its words, in a band of the page: the words are what the text before it says
+  // under its last title, or all of it. Everything else keeps to the column.
+  const plays = (p) => Boolean(p?.section && d.lenses?.[p.section.id]?.steps);
+  const parts = () => {
+    const list = d.parts.filter((p) => !p.section || p.section.id !== d.share), out = [];
+    for (let k = 0; k < list.length; k++) {
+      const el = part(list[k]);
+      if (list[k].section || !plays(list[k + 1])) {
+        out.push(el);
+        continue;
+      }
+      const lines = [...el.children], from = Math.max(lines.findLastIndex((line) => line.tagName === 'H3'), 0);
+      const words = h('div', { class: 'text band-words' }, lines.slice(from));
+      const pictures = [];
+      while (plays(list[k + 1])) pictures.push(part(list[++k]));
+      if (from) out.push(el);
+      out.push(h('div', { class: 'doc-band' }, words, h('div', { class: 'band-pictures' }, pictures)));
+    }
+    return out;
+  };
   // The page's parts, lists and all, laid out in one flat row as the page takes them.
   const kids = [
     d.site && siteHead(d.site),
     d.head === 'invoice' ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at)}` : `Updated ${day(d.updated_at)}`)),
-    d.parts.filter((p) => !p.section || p.section.id !== d.share).map(part),
+    parts(),
     // A site's pages each end with what its footer page says (src/site.ts).
     d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, titles, 3)),
     // A published page is read on the web: only a link's or an invoice's has a way to print it.

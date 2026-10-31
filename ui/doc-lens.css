@@ -18,7 +18,15 @@
 .doc-lens .group-actor .dot { fill: var(--g-actor); } .doc-lens .group-aim .dot { fill: var(--g-aim); } .doc-lens .group-work .dot { fill: var(--g-work); }
 .doc-lens .group-record .dot { fill: var(--g-record); } .doc-lens .group-question .dot { fill: var(--g-question); } .doc-lens .group-occurrence .dot { fill: var(--g-occurrence); }
 .doc-lens .group-place .dot { fill: var(--g-place); } .doc-lens .group-system .dot { fill: var(--g-system); }
-/* A page is one column: a picture is as wide as its text, and what a story says stands under it, at any window. */
+/* A page is one column, and a picture is as wide as it. One that plays stands beside its words in a band (ui/doc.js):
+   the page is as wide as the style's reader_band, its other text centred at the column's width, and a band stacks
+   by itself where the window cannot hold two sides at reader_band_least. */
+main:has(.doc-band) { max-width: var(--reader-band); }
+main:has(.doc-band) > :is(section, .doc-band) + div.text { max-width: calc(var(--reader-measure) - 2 * var(--reader-side)); margin-inline: auto; }
+.doc-band { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rhythm-7) var(--space-13); margin-top: var(--rhythm-9); padding-top: var(--rhythm-7); border-top: var(--border-1) solid var(--reader-line); }
+.band-words { flex: 5 1 var(--reader-band-least); min-width: 0; }
+.band-words h3 { margin-top: 0; }
+.band-pictures { flex: 6 1 var(--reader-band-least); min-width: 0; }
 .doc-lens { margin-block: var(--rhythm-6); }
 .doc-lens .lf-beside { display: block; }
 .doc-lens .lf-stage.still > svg { width: 100%; }
