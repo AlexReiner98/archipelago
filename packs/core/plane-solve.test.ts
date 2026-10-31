@@ -1,9 +1,13 @@
 // One solve over boxes and wires: places and lines in, places and lines out, every distance asked for and kept.
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { spacing } from './draw/flow/faults.js';
+import { faults, spacing } from './draw/flow/faults.js';
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { layout } from './draw/flow/layout.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { settle, solve, solveSections } from './draw/flow/solve.js';
 
@@ -72,4 +76,36 @@ test('settle: with too little room every distance gives way alike, and no two wi
   assert.ok(told.squeezed > 0);
   assert.equal(new Set(three.map((l) => l.points[0][0])).size, 3);
   assert.ok(three.every((l) => l.points[0][0] > 40 && l.points[0][0] < 80), 'all between the boxes');
+});
+
+test('solve: an end stays on its box when box and wire move as one', () => {
+  // The box and the stretch after its end move up alike, so the point beside the end comes level with where the end was.
+  const g = picture({ a: [100, 60, 80, 40], b: [100, 300, 80, 40], c: [30, 300, 40, 40] }, [['a', 'b', [[100, 80], [100, 110], [40, 110], [40, 150], [100, 150], [100, 280]]], ['a', 'c', [[80, 60], [30, 60], [30, 280]]]]);
+  solve({ ...g, ...sizes });
+  const [r] = lines(g.routes).filter((l) => l.ends.join() === 'a,b'), foot = g.y.get('a')! + g.nodes.get('a')!.h / 2;
+  assert.ok(Math.abs(r.points[0][1] - foot) < 1e-6, 'it leaves the foot of the box');
+  assert.ok(r.points.every((p: number[], i: number) => !i || p[0] === r.points[i - 1][0] || p[1] === r.points[i - 1][1]), 'every wire at right angles');
+});
+
+test('solve: boxes joined by a straight wire stand the larger gap apart', () => {
+  const g = picture({ a: [50, 20, 60, 40], b: [130, 20, 60, 40], c: [50, 200, 60, 40], d: [130, 200, 60, 40] }, [['a', 'b', [[80, 20], [100, 20]]]]);
+  solve({ ...g, ...sizes, join: 40 });
+  assert.ok(g.x.get('b')! - g.x.get('a')! >= 60 + 40 - 1e-6, 'joined, the larger gap');
+  assert.ok(Math.abs(g.x.get('d')! - g.x.get('c')!) <= 60 + sizes.apart + 1e-6 || Math.abs(g.y.get('c')! - g.y.get('a')!) >= 40, 'not joined, the plain one');
+});
+
+test('solve: a graph that once went in a ring draws, every wire at right angles and on its boxes', () => {
+  const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
+  const items = Array.from({ length: 37 }, (_, k) => ({ id: `n${k}`, title: `step ${k}`, kind: 'work', open: true }));
+  const links = '26>18 19>13 30>2 16>0 31>9 29>28 22>21 30>1 25>14 19>0 28>25 35>3 7>1 25>17 30>18 21>3 35>33 11>6 26>5 35>5 15>2 34>8 8>0 25>19 20>11 33>26 25>4 33>26 31>12 26>11 23>19 9>0 32>12 17>13 9>0 19>3 26>5 12>1 23>3 28>10 27>2 32>3 23>17 19>15 18>15 21>18 12>11 26>21 28>20 8>4'.split(' ').map((l) => { const [from, to] = l.split(/[->]/); return { type: l.includes('>') ? 'depends_on' : 'calls', from: `n${from}`, to: `n${to}` }; });
+  const g = layout({ items, links, measure: (t: string, px: number) => t.length * px * 0.55, sizes: house.sizes }), wires = [...g.chains, ...g.ties];
+  assert.ok(wires.every((w: any) => w.points.every((p: number[], i: number) => !i || p[0] === w.points[i - 1][0] || p[1] === w.points[i - 1][1])));
+  assert.equal(faults(g).loose, 0);
+});
+
+test('solve: a stretch out by a hair is along its axis', () => {
+  const g = picture({ a: [100, 20, 80, 40], b: [100.2, 200, 80, 40] }, [['a', 'b', [[100, 40], [100.2, 180]]]]);
+  solve({ ...g, ...sizes });
+  const [r] = lines(g.routes);
+  assert.equal(r.points[0][0], r.points.at(-1)[0]);
 });

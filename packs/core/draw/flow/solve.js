@@ -4,7 +4,7 @@
 // and nothing new is crossed. What is held stays where it stands and the rest keeps its distances from it, so a first draw
 // and a step put by hand are the same pass with different things held. Layer: metrics. Pure: places and lines in, changed in place.
 
-import { tidy } from './polyline.js';
+import { pair, tidy } from './polyline.js';
 import { shelve } from './shelves.js';
 
 /** How far apart two things must be across, to count as beside one another. */
@@ -24,6 +24,30 @@ function ordered(n, arcs) {
   for (let k = 0; k < n; k++) if (!degree[k]) queue.push(k);
   for (let k = 0; k < queue.length; k++) for (const [q] of out[queue[k]]) if (!--degree[q]) queue.push(q);
   return queue.length === n ? { queue, out } : null;
+}
+
+/**
+ * `arcs` with those that close a ring left out, as few as can be found: where nothing is free to go next, what has least
+ * still waiting goes, and its waiting arcs with it. `told.rings` counts them. An order read off a drawing can fail when a
+ * line has come apart, and a drawing must still draw.
+ */
+function unringed(n, arcs, told) {
+  const into = Array.from({ length: n }, () => []), out = Array.from({ length: n }, () => []), degree = new Array(n).fill(0), gone = new Set(), done = new Array(n).fill(false);
+  arcs.forEach((a, k) => (out[a[0]].push(k), into[a[1]].push(k), degree[a[1]]++));
+  const queue = [];
+  for (let v = 0; v < n; v++) if (!degree[v]) queue.push(v);
+  for (let k = 0; k < n; k++) {
+    if (k === queue.length) {
+      let v = -1;
+      for (let u = 0; u < n; u++) if (!done[u] && !queue.includes(u) && (v < 0 || degree[u] < degree[v])) v = u;
+      for (const a of into[v]) if (!done[arcs[a][0]]) (gone.add(a), told.rings++);
+      degree[v] = 0;
+      queue.push(v);
+    }
+    done[queue[k]] = true;
+    for (const a of out[queue[k]]) if (!gone.has(a) && !--degree[arcs[a][1]]) queue.push(arcs[a][1]);
+  }
+  return arcs.filter((_, k) => !gone.has(k));
 }
 
 /** The least numbers that keep every arc [from, to, length], which may be negative; with those still moving, if they cannot all be kept. */
@@ -73,9 +97,9 @@ function fitted(places, held, arcs, { queue, out }, scale, anyway = false) {
  * for all that asks for it: then every distance gives way alike, in `SQUEEZE` steps, so nothing changes order or runs into a
  * box; `told.squeezed` counts those passes. With no room at any of them, what has none keeps its order past what is held.
  */
-function within(places, held, arcs, told) {
-  const order = ordered(places.length, arcs.filter(([p, q]) => !held.has(p) && !held.has(q)));
-  if (!order) throw new Error('The solve went in a ring');
+function within(places, held, given, told) {
+  const among = given.filter(([p, q]) => !held.has(p) && !held.has(q)), free = ordered(places.length, among) ? given : [...given.filter(([p, q]) => held.has(p) || held.has(q)), ...unringed(places.length, among, told)];
+  const arcs = free, order = ordered(places.length, arcs.filter(([p, q]) => !held.has(p) && !held.has(q)));
   for (const scale of SQUEEZE) {
     const at = fitted(places, held, arcs, order, scale);
     if (at) return at;
@@ -85,9 +109,8 @@ function within(places, held, arcs, told) {
 }
 
 /** Every number free: the least that keeps every arc, boxes rigid where they can be, leaning neither way. */
-function freely(places, arcs, boxes, told) {
-  const order = ordered(places.length, arcs);
-  if (!order) throw new Error('The solve went in a ring');
+function freely(places, given, boxes, told) {
+  const arcs = ordered(places.length, given) ? given : unringed(places.length, given, told), order = ordered(places.length, arcs);
   // A box is as big as its name and what lands on it need, and no bigger: that much and it stands rigid, so what stands
   // beside its ports moves the box and never stretches it.
   const spot = [];
@@ -122,12 +145,14 @@ function sides(group, axis) {
 }
 
 /** One pass along `axis`, 0 across and 1 down. */
-function pass(axis, { lines, boxes, wire, room, run, corner, apart, told, still }) {
+function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart, told, still }) {
   const other = 1 - axis, stretches = [], places = [];
   const number = (value) => (places.push(value), places.length - 1);
   for (const b of boxes) ((b.low = number(b.at[axis] - b.size[axis] / 2)), (b.high = number(b.at[axis] + b.size[axis] / 2)));
   for (const line of lines) {
-    const p = (line.points = tidy(line.points));
+    const p = (line.points = tidy(bent(line.points)));
+    // Which ends come across a box's side is read now: the points beside them move below.
+    line.across = [p.length > 1 && p[0][axis] !== p[1][axis], p.length > 1 && p.at(-1)[axis] !== p.at(-2)[axis]];
     for (let i = 1; i < p.length; i++) if (p[i - 1][axis] === p[i][axis]) {
       const s = { line, i, at: p[i][axis], lo: Math.min(p[i - 1][other], p[i][other]), hi: Math.max(p[i - 1][other], p[i][other]), tie: 0, own: [i === 1 && line.a, i === p.length - 1 && line.b].filter(Boolean) };
       stretches.push(s);
@@ -152,7 +177,7 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, told, still 
     if (q.line) return q.own.includes(p.id) ? null : [p.high, q.n, q.line.a === p.id || q.line.b === p.id ? run : room];
     // Two boxes that overlap are parted on the axis that takes least: on the other they stand side by side, in no order.
     const on = (ax) => (p.size[ax] + q.size[ax]) / 2 - Math.abs(p.at[ax] - q.at[ax]);
-    return on(axis) > on(other) ? null : [p.high, q.low, apart];
+    return on(axis) > on(other) ? null : [p.high, q.low, lines.joined?.has(pair(p.id, q.id)) ? join : apart];
   };
   const placed = [...stretches, ...boxes.map((b) => Object.assign(b, { key: b.at[axis], lo: b.at[other] - b.size[other] / 2, hi: b.at[other] + b.size[other] / 2 }))];
   for (const s of stretches) s.key = s.at;
@@ -199,21 +224,34 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, told, still 
   for (const line of lines) {
     if (still && !line.free) continue;
     const p = line.points;
-    for (const [end_, next, id] of [[p[0], p[1], line.a], [p.at(-1), p.at(-2), line.b]]) {
-      if (!next || end_[axis] === next[axis]) continue;
+    for (const [end_, next, id, across] of [[p[0], p[1], line.a, line.across[0]], [p.at(-1), p.at(-2), line.b, line.across[1]]]) {
+      if (!next || !across) continue;
       const b = lines.box.get(id);
       end_[axis] = b.at[axis] + Math.sign(next[axis] - b.at[axis]) * b.size[axis] / 2;
     }
   }
 }
 
+/** A line with a bend put in any stretch that runs along neither axis: every wire turns at right angles. */
+function bent(points) {
+  return points.flatMap((p, i) => (i && p[0] !== points[i - 1][0] && p[1] !== points[i - 1][1] ? [[points[i - 1][0], p[1]], p] : [p]));
+}
+
+/** A line as a list of its own, each stretch exactly along an axis: what is worked out from sums can be out by less than `TOUCH`, and would run along neither. */
+function squared(points) {
+  const out = points.map((c) => [...c]);
+  for (let i = 1; i < out.length; i++) for (const axis of [0, 1]) if (Math.abs(out[i][axis] - out[i - 1][axis]) < TOUCH) out[i][axis] = out[i - 1][axis];
+  return out;
+}
+
 /** Every box and line placed, `rounds` passes each way. `routes` by link, `nodes` by item, with `x` and `y` their middles, are changed in place. */
-export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, rounds = 2 }) {
+export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, join, rounds = 2 }) {
   const boxes = [...x.keys()].map((id) => ({ id, at: [x.get(id), y.get(id)], size: [nodes.get(id).w, nodes.get(id).h], named: [nodes.get(id).w, nodes.get(id).h] }));
-  const lines = [...routes].map(([k, r]) => { const [p, q] = k.split('|'); return { route: r, a: r.from, b: r.from === p ? q : p, points: r.points.map((c) => [...c]) }; }).filter((l) => l.points.length > 1);
+  const lines = [...routes].map(([k, r]) => { const [p, q] = k.split('|'); return { route: r, a: r.from, b: r.from === p ? q : p, points: squared(r.points) }; }).filter((l) => l.points.length > 1);
   lines.box = new Map(boxes.map((b) => [b.id, b]));
-  const told = { freed: 0 };
-  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, told });
+  lines.joined = new Set(routes.keys());
+  const told = { freed: 0, rings: 0 };
+  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, join, told });
   const margin = Math.min(...boxes.map((b) => b.at[0] - b.size[0] / 2), ...lines.flatMap((l) => l.points.map((c) => c[0]))), top = Math.min(...boxes.map((b) => b.at[1] - b.size[1] / 2), ...lines.flatMap((l) => l.points.map((c) => c[1])));
   for (const b of boxes) {
     x.set(b.id, b.at[0] - margin + apart);
@@ -222,7 +260,7 @@ export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, rou
     nodes.get(b.id).h = b.size[1];
   }
   // A wire whose boxes now touch is one point: it stays a line of two, as every line is.
-  for (const l of lines) l.route.points = (l.points.length > 1 ? l.points : [l.points[0], l.points[0]]).map(([p, q]) => [p - margin + apart, q - top + apart]);
+  for (const l of lines) l.route.points = bent(l.points.length > 1 ? l.points : [l.points[0], l.points[0]]).map(([p, q]) => [p - margin + apart, q - top + apart]);
   return told;
 }
 
@@ -232,7 +270,7 @@ export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, rou
  * points are changed. Says how many distances could not be kept.
  */
 export function settle({ boxes, lines, wire, room, run, corner, apart, rounds = 2 }) {
-  const told = { freed: 0, squeezed: 0 };
+  const told = { freed: 0, squeezed: 0, rings: 0 };
   lines.box = new Map(boxes.map((b) => [b.id, b]));
   for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, told, still: true });
   return told;
@@ -263,11 +301,12 @@ function extent(ids, lines, x, y, nodes) {
  * nothing stand together, `gap` apart, as one section. Sets out as wide as `aspect` asks, from `margin`.
  */
 export function solveSections({ nodes, x, y, routes, section, gap, margin, aspect, ...lengths }) {
-  const told = { freed: 0 }, whole = [], loose = [];
+  const told = { freed: 0, rings: 0 }, whole = [], loose = [];
   for (const ids of sectionsOf([...x.keys()], routes)) {
     if (ids.length < 2) { loose.push(extent(ids, [], x, y, nodes)); continue; }
     const own = new Set(ids), lines = new Map([...routes].filter(([k]) => own.has(k.split('|')[0]))), at = (m) => new Map(ids.map((id) => [id, m.get(id)])), [lx, ly] = [at(x), at(y)];
-    told.freed += solve({ nodes, x: lx, y: ly, routes: lines, ...lengths }).freed;
+    const one = solve({ nodes, x: lx, y: ly, routes: lines, ...lengths });
+    (told.freed += one.freed), (told.rings += one.rings);
     for (const id of ids) (x.set(id, lx.get(id)), y.set(id, ly.get(id)));
     whole.push(extent(ids, [...lines.values()], x, y, nodes));
   }
