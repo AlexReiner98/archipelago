@@ -8,6 +8,13 @@ import { drawCode } from './style-code.js';
 import { saidDrawn } from './look.js';
 import { ago, idsAsLinks, isA, titles } from './words.js';
 
+/** On a map with nothing on it yet, a person is pointed at what puts something there. */
+async function firstStep(body) {
+  const info = await api('workspace_info').catch(() => null);
+  // Asked after the fact: only while nothing has been drawn here since.
+  if (info && !info.started && (!body.firstChild || body.firstChild.matches?.('.empty'))) body.replaceChildren(h('div', { class: 'empty' }, 'Your map is empty. ', h('a', { href: '#/workspace?at=agent' }, 'Connect an agent')));
+}
+
 // ---- A session's story -----------------------------------------------------
 
 // What a session has found, said whole, over a picture of only what that is
@@ -207,7 +214,11 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     host.dispatchEvent(new CustomEvent('lens-answer'));
     if (quiet) (host.closest('.lens-card') ?? host).hidden = !answer.items.length;
     if (!answer.items.length && quiet) return;
-    if (!answer.items.length) return (body.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw with this lens.')), saidDrawn(body, 'empty'));
+    if (!answer.items.length) {
+      body.replaceChildren(h('div', { class: 'empty' }, 'Nothing to draw with this lens.'));
+      firstStep(body);
+      return saidDrawn(body, 'empty');
+    }
     for (const name of Object.keys(chosen)) delete chosen[name];
     Object.assign(chosen, look.style, keptStyle(key), style, { noLit: true });
     dress(body, chosen);
@@ -225,6 +236,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
       host.failed = null;
       host.dispatchEvent(new CustomEvent('lens-answer'));
       body.replaceChildren();
+      firstStep(body);
       return saidDrawn(body, 'empty');
     }
     let store;

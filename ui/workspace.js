@@ -4,7 +4,7 @@
 // to it from outside. Which is open is kept in the address (#/workspace?at=map); a step of Start here (ui/start.js)
 // names a card, and lands on its section with that card in view.
 
-import { api, authHeaders, h, part, state } from './base.js';
+import { api, ask, authHeaders, h, part, state } from './base.js';
 import { screenRows } from './nav.js';
 import { themesCard } from './themes-card.js';
 import { packsCard } from './packs.js';
@@ -64,6 +64,11 @@ export async function workspace() {
   };
   const live = tokens.filter((t) => !t.revoked_at);
   const row = (t) => tokenRow(t, { me, personName: (id) => people.find((p) => p.id === id)?.title, then: workspace, fail });
+  const rename = async (e) => {
+    e.preventDefault();
+    const name = await ask({ title: 'Rename this workspace', input: { placeholder: me.workspace.name }, action: 'Rename' });
+    if (name?.trim()) api('workspace_set', { name: name.trim() }).then(() => location.reload(), (err) => fail(err.message));
+  };
   const go = (key) => {
     open = key;
     history.replaceState(null, '', `#/workspace?at=${key}`);
@@ -89,7 +94,7 @@ export async function workspace() {
   const shown = SECTIONS.filter(([key]) => admin || (key === 'agents' && tokensOn) || (key === 'people' && !info.owner));
   if (!shown.some(([key]) => key === open)) open = shown[0]?.[0] ?? 'agents';
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name)),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name, ' ', me.actor.admin && me.workspace.id !== 'default' && h('a', { href: '#/workspace', title: 'Give this workspace another name', onclick: rename }, 'Rename'))),
     shown.length > 1 && h('div', { class: 'switch ws-sections', role: 'tablist' }, shown.map(([key, label, tip]) => h('button', { class: key === open ? 'on' : '', role: 'tab', title: tip, onclick: () => go(key) }, label))),
     h('div', { class: 'ws-notice' }, notice),
     h('div', { class: 'grid' }, sections[open]()),

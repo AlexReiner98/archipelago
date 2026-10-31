@@ -56,6 +56,10 @@ export async function addWorkspace(db: Q, row: { id: string; name: string }): Pr
   return rows.length > 0;
 }
 
+export async function nameWorkspace(db: Q, id: string, name: string): Promise<void> {
+  await db.query(`update control_workspace set name = $2 where id = $1`, [id, name]);
+}
+
 export async function removeWorkspace(db: Q, id: string): Promise<void> {
   await db.query(`delete from control_workspace where id = $1`, [id]);
 }
@@ -150,6 +154,12 @@ export async function storePut(db: Q, pack: string, key: string, value: unknown,
      on conflict (pack, key) do update set value = excluded.value, until = excluded.until`,
     [pack, key, JSON.stringify(value ?? null), ms === undefined ? null : ms / 1000],
   );
+}
+
+/** What a pack keeps under a prefix, in the order of its keys, up to `most` of them. */
+export async function storeList<T>(db: Q, pack: string, prefix: string, most: number): Promise<{ key: string; value: T }[]> {
+  const { rows } = await db.query<{ key: string; value: T }>(`select key, value from pack_store where pack = $1 and starts_with(key, $2) and (until is null or until >= now()) order by key collate "C" limit $3`, [pack, prefix, most]);
+  return rows;
 }
 
 /** A value given once: taken away as it is read, by whichever call asks first. */

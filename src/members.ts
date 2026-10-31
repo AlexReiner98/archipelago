@@ -35,13 +35,15 @@ export interface Member {
 /** A workspace's limits (src/plan.ts), members among them: the name it had when members were all a plan limited. */
 export type MemberLimit = Limits;
 
-let site = { origin: 'http://127.0.0.1:3100', nameOf: async (id: string) => id };
-/** Where the links in the mail lead, a workspace's name to put in it, and its limits: the server says, when it starts. */
+let site = { origin: 'http://127.0.0.1:3100', nameOf: async (id: string) => id, rename: async (_id: string, _name: string): Promise<void> => {} };
+/** Where the links in the mail lead, a workspace's name to put in it, how to change it, and its limits: the server says, when it starts. */
 export function configureMembers(given: Partial<typeof site> & { limitOf?: (id: string) => Promise<Limits | undefined> }) {
   const { limitOf: limits, ...rest } = given;
   site = { ...site, ...rest };
   configurePlan({ ...(limits && { limitOf: limits }), ...(rest.nameOf && { nameOf: rest.nameOf }) });
 }
+/** Give a workspace another name, where the server keeps them. */
+export const renameWorkspace = (workspace: string, name: string) => site.rename(workspace, name);
 /** Which workspaces each address belongs to is kept beside the workspaces too, so a sign-in opens only those (src/control-index.ts). */
 const noted = indexMember;
 

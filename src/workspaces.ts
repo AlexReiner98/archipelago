@@ -10,7 +10,7 @@ import { hashSecret, newSecret, OPERATOR_RESET_FILE, sameSecret, validWorkspaceI
 import { Automations } from './automations.ts';
 import { restore, type Dump } from './backup.ts';
 import { indexWorkspace } from './control-index.ts';
-import { addLocalType, addWorkspace, claimControlValue, controlValue, importControlFiles, importLocalPack, listWorkspaces, localTypes, OPERATOR, OPERATOR_RESET, removeWorkspace, setControlValue, takeControlValue } from './control.ts';
+import { addLocalType, addWorkspace, claimControlValue, controlValue, importControlFiles, importLocalPack, listWorkspaces, localTypes, nameWorkspace, OPERATOR, OPERATOR_RESET, removeWorkspace, setControlValue, takeControlValue } from './control.ts';
 import { startSchedules, stopSchedules } from './hooks.ts';
 import { openDb, type Database } from './db.ts';
 import { databaseFor, dropDatabaseFor } from './pg.ts';
@@ -143,6 +143,15 @@ export class Workspaces {
   async list(): Promise<{ id: string; name: string }[]> {
     await this.refresh(await this.control());
     return [{ id: DEFAULT_WORKSPACE, name: 'Default' }, ...[...this.known].map(([id, name]) => ({ id, name }))];
+  }
+
+  /** Give a workspace another name. Its id, and every address that holds it, stay as they are. */
+  async rename(id: string, name: string): Promise<void> {
+    if (id === DEFAULT_WORKSPACE) throw new Error('The default workspace keeps its name.');
+    await nameWorkspace(await this.control(), id, name);
+    this.known.set(id, name);
+    const open = this.open.get(id);
+    if (open) (await open).name = name;
   }
 
   /** Whether there is a workspace by this id: asked of the database when this server has not heard of it. */

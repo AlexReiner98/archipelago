@@ -3,6 +3,7 @@
 // printed: the one place in Archipelago where a page is meant to be read through.
 
 import { drawFrozen } from './doc-lens.js';
+import { carried } from './doc-ref.js';
 import { warmDrawings } from './drawing.js';
 import { checkedCss } from './marks.js';
 import { readSpans, readText } from './text.js';
@@ -152,6 +153,13 @@ function roomy() {
   document.body.classList.toggle('roomy', document.documentElement.clientWidth - text >= px('--space-8') + px('--side-least') + px('--reader-side'));
 }
 addEventListener('resize', roomy);
+// A link followed takes where the reader came from with it (?ref=), set as it is followed so every link drawn has it.
+const carry = (e) => {
+  const link = e.target.closest?.('a[href]');
+  if (link) link.href = carried(link.href, location.href);
+};
+addEventListener('click', carry, true);
+addEventListener('auxclick', carry, true);
 
 // How the workspace's style says a published page looks (page_css): read after the page's own rules, only in it.
 const pageSheet = new CSSStyleSheet();
