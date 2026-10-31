@@ -142,7 +142,7 @@ export const READ_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => input.type ? schemaOf(l.registry.describe(), input.type) : actor.kind === 'human' || input.full ? withStyles(l, await withScreens(l, l.registry.describe())) : schemaBrief(l.registry),
   },
   search: {
-    description: 'Find items by text, type (flavours included), status or owner. Text matches words in any form in titles and notes, and titles that are nearly what you typed; the best match comes first. The flat lens (query flat) takes the same search as its filter’s text, so what is found can be read with what it is tied to. Always search before creating, to avoid duplicates.',
+    description: 'Find items by text, type (flavours included), status or owner. Text matches words in any form in titles and notes, and titles that are nearly what you typed; the best match comes first. The query (query flat) takes the same search as its filter’s text, so what is found can be read with what it is tied to. Always search before creating, to avoid duplicates.',
     input: {
       q: z.string().optional().describe('Matches title and body.'),
       type: z.string().optional(),
@@ -258,7 +258,7 @@ export const READ_TOOLS: Record<string, Tool> = {
   },
   look: {
     description:
-      'See what a view looks like: the server draws it in its own browser, from the same page, drawings and sandbox the owner’s screen uses, as you see the map (private items as query shows them to you), and answers with the picture as an image, once the view says it has drawn: state (drawn, empty: the lens found nothing, error, late), settled (false for a drawing still moving), why. ' +
+      'See what a view looks like: the server draws it in its own browser, from the same page, layouts and sandbox the owner’s screen uses, as you see the map (private items as query shows them to you), and answers with the picture as an image, once the view says it has drawn: state (drawn, empty: the query found nothing, error, late), settled (false for a layout still moving), why. ' +
       'It never moves the owner’s page (show with look: true does both). The same view at the same size, the map unchanged, answers with the picture already taken (again: true) unless fresh. At most 60 an hour per workspace.',
     input: {
       ...VIEW_INPUT,
@@ -270,7 +270,7 @@ export const READ_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => takeLook((await wholeMap(l)).db, l.db, l, actor.name, await viewAddress(l, input), input),
   },
   places: {
-    description: 'Where each thing stands on one canvas, as a person put it there: by item, the middle of each as [x, y] in the picture’s own units. Read beside the lens of that canvas; what is not here is where the drawing lays it.',
+    description: 'Where each thing stands on one canvas, as a person put it there: by item, the middle of each as [x, y] in the picture’s own units. Read beside the query of that canvas; what is not here is where the layout lays it.',
     input: { canvas: z.string().optional().describe("The canvas: the id of the item it is drawn from; the workspace's (or nothing) for the whole map.") },
     run: async (l, _actor, input) => placesOn(l, input.canvas),
   },

@@ -57,6 +57,7 @@ test('the walk follows each link out, in or either way, as it is named', async (
   await assert.rejects(flatRead(l, { filter: { find: [`id ${made.a}`] }, walk: { over: ['nope>'] } }), /unknown link type "nope"/);
   assert.equal(await viewAddress(l, { lens: { filter: { find: [`id ${made.a}`] }, walk: { over: ['depends_on>', 'part_of<'], steps: 2 } } }), `v?find=id+${made.a}&over=depends_on%3E%2Cpart_of%3C&steps=2`, 'the address carries the ways');
   assert.equal(await viewAddress(l, { lens: { filter: { find: [`id ${made.a}`] }, time: { from: '-5d', to: '1d' } }, style: { shape: 'time' } }), `v?find=id+${made.a}&time=-5d%2C1d&shape=time`, 'and its window of time, as it was said');
+  assert.equal(await viewAddress(l, { query: { filter: { find: [`id ${made.a}`] } }, style: { layout: 'grid' } }), await viewAddress(l, { lens: { filter: { find: [`id ${made.a}`] } }, style: { shape: 'grid' } }), 'query and layout are the words, the old ones still taken');
 });
 
 test("Only's plain words: each must hold of every seed, and the walk is not narrowed", async () => {

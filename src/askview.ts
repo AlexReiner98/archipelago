@@ -33,8 +33,8 @@ export function viewList(l: Archipelago): Record<string, string> {
 /** What the view tool says it answers: the views the core pack declares (none without a registry), the flat lens first, then the kernel's own views, then the packs'. */
 export function viewsSaid(reg?: Registry): string {
   const core = reg ? parts(reg.packs.find((p) => p.id === 'core')!).views : [];
-  const lenses = core.map((v): [string, string] => [short(v.id), v.description]).sort(([a], [b]) => Number(b === 'flat') - Number(a === 'flat'));
-  const views = [...lenses, ...Object.entries(VIEWS).map(([name, v]): [string, string] => [name, v.description])];
+  const queries = core.map((v): [string, string] => [short(v.id), v.description]).sort(([a], [b]) => Number(b === 'flat') - Number(a === 'flat'));
+  const views = [...queries, ...Object.entries(VIEWS).map(([name, v]): [string, string] => [name, v.description])];
   return (
     'Answer one of the standing questions. Call with no name to list them. An agent is given each answer without its empty fields and with long lists cut to what is read (params.full: true for all of it). ' +
     views.map(([name, said]) => `${name}: ${said}`).join(' ') +

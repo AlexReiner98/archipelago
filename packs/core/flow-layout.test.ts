@@ -269,7 +269,7 @@ test('bars: a holder put by hand takes what hangs on it along', () => {
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { shownOnly } from './layouts/flow/graph.js';
 
-const storyCss = readFileSync(join(import.meta.dirname, 'draw/flow/story.js'), 'utf8');
+const storyCss = readFileSync(join(import.meta.dirname, 'layouts/flow/story.js'), 'utf8');
 
 test('story: only what the steps show is laid out, and a wire and its head are lit alike', () => {
   const answer = { items: [item('hub'), item('a'), item('b')], links: [], lens: { from: 'hub' }, steps: [{ add: ['a'] }, { add: ['b'] }] };
