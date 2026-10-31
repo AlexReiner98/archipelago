@@ -3,7 +3,8 @@
 // about its middle. A box moves only if nothing stands in its way, with what hangs on it; a wire's other ends move with
 // it. Pure: boxes and lines in, changed in place.
 
-import { clear, shapesOf, tidy } from './reroute.js';
+import { tidy } from './polyline.js';
+import { clear, shapesOf } from './reroute.js';
 
 const LEVEL = 0.5;
 

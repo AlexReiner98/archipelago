@@ -4,7 +4,8 @@
 // edge across one of its faces. What is left to do is walk the items, order first, keeping every step a true numbering:
 // what is done so far stays joined, and so does what is left. Pure: a graph in, its numbering out.
 
-const pair = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+import { pair } from './polyline.js';
+
 
 const TOP = 'ghost top', FOOT = 'ghost foot';
 /** How much an order wire outweighs a wish of the numbering's own, when one of them has to go. */

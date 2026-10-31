@@ -3,8 +3,8 @@
 // has numbers. Pure: a graph in, changed in place, or edges in and a graph of wires and faces out.
 
 import { blocks, faces, isPlanar } from './planar.js';
+import { pair } from './polyline.js';
 
-const pair = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
 /** What it costs to cross a hidden link: nothing to see, but it is a turn. */
 const HIDDEN = 0.1;

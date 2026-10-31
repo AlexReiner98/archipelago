@@ -3,7 +3,8 @@
 // into the middle of a box's head, straight down where they line up, else across on a bus it shares with the others of
 // its fan. The order along each row comes from the picture it is given. Pure: boxes and links in, places and lines out.
 
-const pair = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+import { pair } from './polyline.js';
+
 const mean = (list) => list.reduce((sum, v) => sum + v, 0) / list.length;
 
 /** Each box's step: as low as what comes before it says, and what starts nothing is drawn down to what it feeds. */

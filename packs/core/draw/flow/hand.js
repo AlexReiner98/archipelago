@@ -2,11 +2,11 @@
 // step. Its wires, and any wire it now stands on, are drawn again by the same logic as the rest: from the side facing where
 // they go, with the same spacing, round every box. Pure: places and wires in, changed in place.
 
+import { pair } from './polyline.js';
 import { spreadPorts } from './centre.js';
 import { route, tieRoute } from './free.js';
 import { rewire } from './reroute.js';
 
-const pair = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
 /** Whether a line runs through a box. */
 const through = (points, { x, y, w, h }) => points.some((p, i) => {

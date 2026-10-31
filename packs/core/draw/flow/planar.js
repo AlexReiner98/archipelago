@@ -1,6 +1,8 @@
 // Planarity for a knot of a graph: its biconnected parts, the faces of a part (Demoucron, Malgrange and Pertuiset), and
 // whether edges can be drawn with none crossing. Pure: edges in, answers out.
 
+import { pair } from './polyline.js';
+
 const adjacency = (edges) => {
   const a = new Map();
   for (const [x, y] of edges) {
@@ -9,7 +11,6 @@ const adjacency = (edges) => {
   }
   return a;
 };
-const pair = (x, y) => (x < y ? `${x}|${y}` : `${y}|${x}`);
 
 /** The biconnected parts, each a list of edges. */
 export function blocks(edges) {

@@ -4,26 +4,13 @@
 // passes through no box. A wire with no such way loses what jogs it can. Pure: boxes and lines in, lines changed in place.
 
 import { count, touch } from './count.js';
+import { tidy } from './polyline.js';
 
 /** How far a line's ends stand from the middles of the sides they land on: of two ways, the one nearer the middles. */
 const offCentre = (l, a, b) => [[l[0], l[1], a], [l.at(-1), l.at(-2), b]].reduce((sum, [p, q, box]) => sum + Math.abs(p[0] === q[0] ? p[0] - box.mid[0] : p[1] - box.mid[1]), 0) / 4;
 const lengthOf = (l) => l.reduce((sum, p, i) => sum + (i ? Math.abs(p[0] - l[i - 1][0]) + Math.abs(p[1] - l[i - 1][1]) : 0), 0);
 const spread = (lo, hi, n) => (hi < lo ? [] : n === 1 || hi === lo ? [(lo + hi) / 2] : [(lo + hi) / 2, ...Array.from({ length: n }, (_, k) => lo + ((hi - lo) * k) / (n - 1))]);
 const boundsOf = (l) => [Math.min(...l.map((p) => p[0])), Math.max(...l.map((p) => p[0])), Math.min(...l.map((p) => p[1])), Math.max(...l.map((p) => p[1]))];
-
-/** A line with repeated points and points along a straight run taken out. */
-export function tidy(points) {
-  const out = [];
-  for (const p of points) {
-    if (out.length && out.at(-1)[0] === p[0] && out.at(-1)[1] === p[1]) continue;
-    if (out.length > 1) {
-      const [a, b] = [out.at(-2), out.at(-1)];
-      if ((a[0] === b[0] && b[0] === p[0]) || (a[1] === b[1] && b[1] === p[1])) out.pop();
-    }
-    out.push(p);
-  }
-  return out;
-}
 
 /** The places a port may stand along each side of a box: `ax` 0 for those along its top and foot, 1 for those down its sides. */
 const portsOf = (b, ax, pad, n) => (b.pointed ? [b.mid[ax]] : spread(b.lo[ax] + Math.min(pad, (b.hi[ax] - b.lo[ax]) / 3), b.hi[ax] - Math.min(pad, (b.hi[ax] - b.lo[ax]) / 3), n));

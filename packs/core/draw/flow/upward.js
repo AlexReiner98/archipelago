@@ -5,11 +5,11 @@
 // threaded through the faces: the order's wires only ever onward, the others any way. Pure: links in, a graph out.
 
 import { nearest, put, threader } from './thread.js';
+import { pair } from './polyline.js';
 
 /** How many orders are tried, and how much work they may take in all, in pairs of links compared. */
 const TRIES = 60, WORK = 2e6;
 
-const pair = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 const ties = (p, q, r, s) => (p < r && r < q && q < s) || (r < p && p < s && s < q);
 
 /** Items in an order where all the order's links run forward, each as near as it can be to what it is joined to. */

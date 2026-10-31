@@ -9,6 +9,7 @@ import { putByHand } from './hand.js';
 import { placeRows } from './layers.js';
 import { stepsOf } from './steps.js';
 import { orderRows, rowsOf, thread } from './rows.js';
+import { pair } from './polyline.js';
 import { settle, square } from './settle.js';
 
 /** Past this many wires the pull takes fewer rounds: a drawing that takes too long is stopped by the page. */
@@ -21,7 +22,6 @@ const SHUFFLES = 6;
 let last = null;
 /** What the last layout drew, for the count in the key. */
 export const latest = () => last;
-const pair = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 const QUIET = new Set([NEAR, 'owned_by']);
 
 /** Where each stands walking the order and its ties from the top: what is joined starts out side by side. */

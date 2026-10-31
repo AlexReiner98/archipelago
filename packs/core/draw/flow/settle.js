@@ -4,6 +4,7 @@
 // snakes pulls straight. One pass moves along one axis; the passes take turns. Pure: boxes and lines in, moved in place.
 
 import { count, touch } from './count.js';
+import { tidy } from './polyline.js';
 
 /** A pass that moves no point further than this has moved nothing. */
 const STILL = 0.5;
@@ -16,20 +17,6 @@ const spanOf = (b, axis, corner = INSET) => reachOf(b, axis).map((r, k) => b.at[
 const edgeOf = (b, axis, side) => b.at[axis] + reachOf(b, axis)[side > 0 ? 1 : 0];
 
 const median = (list) => [...list].sort((p, q) => p - q)[list.length >> 1];
-
-/** A line with repeated points and points along a straight run taken out. */
-function simplify(points) {
-  const out = [];
-  for (const p of points) {
-    if (out.length && out.at(-1)[0] === p[0] && out.at(-1)[1] === p[1]) continue;
-    if (out.length > 1) {
-      const [a, b] = [out.at(-2), out.at(-1)];
-      if ((a[0] === b[0] && b[0] === p[0]) || (a[1] === b[1] && b[1] === p[1])) out.pop();
-    }
-    out.push([...p]);
-  }
-  return out;
-}
 
 /**
  * One pass along `axis` (0 across, 1 down). `boxes` are { at: [x, y], size: [w, h] } by id, `wires` { a, b, points }: a
@@ -45,7 +32,7 @@ function pass(axis, boxes, wires, { gap, track, room, join, run, corner, sweeps,
     items.push(it);
   }
   for (const w of wires) {
-    w.points = simplify(w.points);
+    w.points = tidy(w.points);
     const rods = new Map();
     for (let i = 1; i < w.points.length; i++) {
       const [p, q] = [w.points[i - 1], w.points[i]];
@@ -220,7 +207,7 @@ function allowed(line, was, w, boxes, wires) {
 function slidePorts(boxes, wires, run, corner) {
   let moved = 0;
   for (const w of wires) for (const atEnd of [true, false]) {
-    const b = boxes.get(atEnd ? w.b : w.a), was = simplify(w.points), line = atEnd ? was : [...was].reverse(), n = line.length;
+    const b = boxes.get(atEnd ? w.b : w.a), was = tidy(w.points), line = atEnd ? was : [...was].reverse(), n = line.length;
     if (n < 3) continue;
     const [C, B, A, P] = [line[n - 1], line[n - 2], line[n - 3], line[n - 4]], e = B[0] === C[0] ? 1 : 0, o = 1 - e;
     const [lo, hi] = spanOf(b, e, corner), [olo, ohi] = spanOf(b, o), side = Math.sign(A[o] - (olo + ohi) / 2) || 1;
