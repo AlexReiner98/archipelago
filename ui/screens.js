@@ -33,6 +33,11 @@ export const keepsFigure = (typeId) => piecesFor(typeId).some((p) => p.piece ===
 /** The actions packs offer on an item of this type, as the schema lists them. */
 export const actionsFor = (typeId) => (state.schema?.pack_tools ?? []).filter((t) => t.action && t.on?.some((on) => isA(typeId, on)));
 
+/** The tool a button opens the form of. */
+export const toolOf = (action) => (state.schema?.pack_tools ?? []).find((t) => t.action === action);
+/** How a button draws the canvas on this item's page: what it says, "{here}" being the item. */
+export const drawnBy = (draw, id) => Object.fromEntries(Object.entries(draw).map(([key, value]) => [key, value === '{here}' ? id : value]));
+
 /** A section that is not the point of the page: one line until it is asked for, and kept open or shut while the page is open. */
 export const fold = (id, key, title, n, open, content) =>
   h(
@@ -255,7 +260,7 @@ const draw = (ctx, p) => (Object.hasOwn(PIECES, p.piece) ? PIECES[p.piece](ctx, 
 const PAGES = { time };
 
 /** A piece that draws something of an item has nothing to draw on a screen of its own. */
-const OF_ITEM = ['tree', 'gate', 'proof', 'usage', 'fields', 'token'];
+const OF_ITEM = ['tree', 'gate', 'proof', 'usage', 'fields', 'token', 'button'];
 
 /** The column a screen of its own draws: its pieces, with no item. */
 export function drawScreen(screen, redraw) {
@@ -292,10 +297,16 @@ function packsUsed(data) {
 }
 
 /** A pack's pieces show on an item only once the item uses that pack; the core's and the owner's own always do. */
+const piecesOn = (data) => {
+  const used = packsUsed(data);
+  return piecesFor(data.entity.type).filter((p) => !p.screen.pack || p.screen.pack === 'core' || used.has(p.screen.pack));
+};
+/** The buttons the screens on this item declare: they stand in its page's head (ui/item.js), not in the column. */
+export const buttonsOn = (data) => piecesOn(data).filter((p) => p.piece === 'button');
+
 export function drawScreens(ctx) {
-  const used = packsUsed(ctx.data);
-  const drawn = piecesFor(ctx.e.type)
-    .filter((p) => !p.screen.pack || p.screen.pack === 'core' || used.has(p.screen.pack))
+  const drawn = piecesOn(ctx.data)
+    .filter((p) => p.piece !== 'button')
     .map((p) => draw(ctx, p))
     .filter(Boolean);
   return settle(drawn);

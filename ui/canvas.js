@@ -10,7 +10,7 @@ import { api, hooks, idsOf, state } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { canvasSwitch } from './canvases.js';
 import { numberOf } from './lens-base.js';
-import { FOCUS, flatView } from './lens.js';
+import { FOCUS, flatQuery, flatView } from './lens.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
 
@@ -48,6 +48,13 @@ export const goLens = (lens) => current?.pane.go(lens);
 export const openHere = (href) => current?.pane.open(href);
 /** The style the canvas in focus was asked for (a shape, a style kept by id, the saved canvas up). */
 export const styleNow = () => current?.asked ?? {};
+/** Draw the lens up in a style, as the style switch does: a shape, a style kept by its id, or neither for the house's. */
+export const drawIn = (style) => {
+  const { shape: _s, style: _k, ...rest } = styleNow();
+  openHere(`#/v?${flatQuery(lensNow() ?? home(), { ...rest, ...style })}`);
+};
+/** Open an item's page over the canvas in focus, the lens as it is. */
+export const openOver = (id) => current?.pane.opened(id, lensNow() ?? home());
 /** Draw Home in the canvas in focus. */
 export const goHome = () => current?.pane.go(null);
 /** Whether the canvas in focus draws this item now. */
