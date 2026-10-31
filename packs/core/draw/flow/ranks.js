@@ -197,7 +197,7 @@ export function layout({ items: given, links: told = [], undrawn = [], placed = 
       r.points = r.points.map(([p, q]) => [p + b.at[0] - b.was[0], q + b.at[1] - b.was[1]]);
     }
   }
-  putByHand({ placed, nodes, x, y, every, routes, rigid, holder, lead: sizes.flow_lead_out });
+  putByHand({ placed, nodes, x, y, every, routes, rigid, holder, lead: sizes.flow_lead_out, wiring: { track: sizes.plane_wire_gap, room: sizes.plane_wire_room, run: sizes.plane_port_run, gap: sizes.plane_wire_gap, corner: sizes.plane_port_corner, ports: sizes.plane_reroute_ports } });
   const edge = (id, to) => {
     const s = stepSize(id), [px, py] = [x.get(id), y.get(id)], dx = to[0] - px, dy = to[1] - py, t = Math.min(dx ? s.w / 2 / Math.abs(dx) : Infinity, dy ? s.h / 2 / Math.abs(dy) : Infinity, 1);
     return [px + dx * t, py + dy * t];

@@ -251,33 +251,20 @@ function drawPart(list, links, block, box, z, trial) {
 let watching = null;
 export const watch = (fn) => (watching = fn);
 
-/** Pictures already worked out, the newest last: going back to a lens costs nothing. */
+/** Pictures already pulled tight, the newest last: going back to a lens, or dropping a step, costs next to nothing. */
 const kept = new Map();
 
-/** A kept picture as new: what drags change is the caller's own. */
-const copy = (g) => {
-  const fresh = (w) => ({ ...w, points: w.points.map((p) => [...p]) }), chains = g.chains.map(fresh), ties = g.ties.map(fresh);
-  return { ...g, chains, ties, x: new Map(g.x), y: new Map(g.y) };
-};
-
-/** The layout of an answer, from what it was drawn from if it has been worked out before. */
+/** The layout of an answer: what it was drawn from worked out once, and what was put by hand set on top of that. */
 export function layout(args) {
-  const { items, links, undrawn, headless, placed, sizes, aspect } = args, key = JSON.stringify([items, links, undrawn, headless, placed, sizes, aspect]);
-  const hit = kept.get(key);
-  if (hit) {
-    kept.delete(key);
-    kept.set(key, hit);
-    const g = copy(hit.g);
-    last = { ...hit.last, chains: g.chains, ties: g.ties };
-    return g;
-  }
-  const g = laidOut(args);
-  kept.set(key, { g: copy(g), last });
+  const { items, links, undrawn, headless, sizes, aspect } = args, key = JSON.stringify([items, links, undrawn, headless, sizes, aspect]);
+  const hit = kept.get(key) ?? laidOut(args);
+  kept.delete(key);
+  kept.set(key, hit);
   if (kept.size > KEPT) kept.delete(kept.keys().next().value);
-  return g;
+  return hit(args.placed ?? {});
 }
 
-function laidOut({ items: given, links: told = [], undrawn = [], headless = ['part_of'], placed = {}, measure, sizes, aspect = 1.6 }) {
+function laidOut({ items: given, links: told = [], undrawn = [], headless = ['part_of'], measure, sizes, aspect = 1.6 }) {
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
   const even = nodes.size <= sizes.plane_rows_most, margin = sizes.flow_margin, gap = sizes.flow_node_gap, zw = { room: sizes.plane_wire_room, join: sizes.plane_joined_room, run: sizes.plane_port_run, corner: sizes.plane_port_corner };
@@ -452,10 +439,13 @@ function laidOut({ items: given, links: told = [], undrawn = [], headless = ['pa
     spreadPorts(pulled, moving, combLines(), { track: z.turn, gap: z.turn, corner: z.corner });
     evenRuns(pulled, moving, combLines(), { track: z.turn, gap: z.turn, corner: z.corner });
   }
-  // Where steps were put by hand, once all the rest stands; each wire so drawn takes the best way it has.
-  const lines = [...routes.values()];
-  const redrawn = putByHand({ placed, nodes, x, y, every, routes, rigid, holder, lead: sizes.flow_lead_out });
-  if (redrawn.length) reroute(rigid, redrawn, lines.filter((r) => !redrawn.includes(r)).map((r) => r.points), { track: z.turn, room: z.room, run: z.run, ports: sizes.plane_reroute_ports, shorter: sizes.plane_reroute_shorter, rounds: sizes.plane_reroute_rounds });
+  // What stands so far is kept: each drawing of it starts from its own copy, and sets what was put by hand on that.
+  const pulledX = x, pulledY = y, pulledRoutes = routes, pulledRigid = rigid, pulledChains = chains, pulledTies = ties;
+  return (placed) => {
+    const x = new Map(pulledX), y = new Map(pulledY), routes = new Map([...pulledRoutes].map(([k, r]) => [k, { ...r, points: r.points.map((p) => [...p]) }]));
+    const rigid = new Map([...pulledRigid].map(([id, b]) => [id, { ...b, at: [...b.at] }])), fresh = (w) => ({ ...w });
+    const chains = pulledChains.map(fresh), ties = pulledTies.map(fresh), every = [...chains, ...ties];
+    putByHand({ placed, nodes, x, y, every, routes, rigid, holder, lead: sizes.flow_lead_out, wiring: { track: z.turn, room: z.room, run: z.run, gap: z.turn, corner: z.corner, ports: sizes.plane_reroute_ports } });
   const edge = (id, to) => {
     const s = stepSize(id), [px, py] = [x.get(id), y.get(id)], dx = to[0] - px, dy = to[1] - py, t = Math.min(dx ? s.w / 2 / Math.abs(dx) : Infinity, dy ? s.h / 2 / Math.abs(dy) : Infinity, 1);
     return [px + dx * t, py + dy * t];
@@ -477,4 +467,5 @@ function laidOut({ items: given, links: told = [], undrawn = [], headless = ['pa
   const headed = every.filter((w) => !headless.includes(w.type) && x.has(w.a) && x.has(w.b));
   last = { chains, ties, threaded, settled, wired, headed: headed.length, up: headed.filter((w) => runsUp(rectOf(w.a), rectOf(w.b), w.points)).length };
   return { nodes, all, chains, ties, breaks: [], potential, x, y, width, height };
+  };
 }

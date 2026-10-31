@@ -11,6 +11,9 @@ import { m } from './marks.js';
 export function picture(input, tools) {
   const out = flow({ ...input, answer: shownOnly(input.answer), style: { ...input.style, hover_only: [] } }, tools), g = latest();
   if (!g || !out.scene?.key) return out;
+  // While a step moves its wires follow it the quick way; let go, they are wired as every other wire is.
+  const on = out.on;
+  out.on = (event) => (event.name === 'drop' ? [...on(event), ...out.settled()] : on(event));
   const drawn = [...g.chains, ...g.ties].map((w) => w.points);
   const { crossings, seen, shared } = count(drawn);
   const glyph = () => m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, m('path', { d: 'M1 1L21 13M1 13L21 1', class: 'lf-wire' }));

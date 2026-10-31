@@ -98,7 +98,8 @@ export function picture({ answer, style, reduced, width, height }, tools) {
   });
   const pane = width > 0 && height > 0 ? width / height : ASPECT;
   const aspect = ASPECT * (pane / ASPECT) ** FOLLOW;
-  const g = layout({ items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], placed, measure, sizes: style.sizes, aspect });
+  const laid = { items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect };
+  const g = layout({ ...laid, placed });
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
   const boxOf = (id) => ({ x: g.x.get(id), y: g.y.get(id), w: g.nodes.get(id).w, h: g.nodes.get(id).h });
@@ -282,14 +283,14 @@ export function picture({ answer, style, reduced, width, height }, tools) {
   // A step moved by hand (the page follows the drag: ui/drag.js): it goes where it is put, and its wires are solved
   // again at right angles as it moves, its ties too. Let go, that is where it is, for the next drag.
   const drawnAt = new Map(steps.map((n) => [n.id, [g.x.get(n.id), g.y.get(n.id)]]));
-  const at = new Map(drawnAt);
+  const at = new Map(drawnAt), dropped = new Map();
   const move = (key, { dx = 0, dy = 0 }, done) => {
     const id = keyed.get(key);
     if (!id || !at.has(id)) return [];
     const [x0, y0] = at.get(id), [x, y] = [x0 + Number(dx), y0 + Number(dy)];
     g.x.set(id, x);
     g.y.set(id, y);
-    if (done) at.set(id, [x, y]);
+    if (done) (at.set(id, [x, y]), dropped.set(id, [Math.round(x), Math.round(y)]));
     const [ox, oy] = drawnAt.get(id);
     const patches = [{ key, set: { transform: `translate(${x - ox} ${y - oy})` } }, { tip: null }];
     const was = g.nodes.get(id);
@@ -311,6 +312,27 @@ export function picture({ answer, style, reduced, width, height }, tools) {
   return {
     scene: { css: [css, ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: player?.end,
+    /** Lay out again with what was dropped, for a layout that wires a dropped step by its own logic: what moved, as patches. */
+    settled() {
+      const next = layout({ ...laid, placed: { ...placed, ...Object.fromEntries(dropped) } }), patches = [];
+      for (const [key, id] of keyed) {
+        if (!next.x.has(id) || (next.x.get(id) === g.x.get(id) && next.y.get(id) === g.y.get(id))) continue;
+        const [ox, oy] = drawnAt.get(id);
+        (g.x.set(id, next.x.get(id)), g.y.set(id, next.y.get(id)), at.set(id, [next.x.get(id), next.y.get(id)]));
+        patches.push({ key, set: { transform: `translate(${next.x.get(id) - ox} ${next.y.get(id) - oy})` } });
+      }
+      g.chains.forEach((c, n) => {
+        c.points = next.chains[n].points;
+        patches.push({ key: `w:${n}`, set: { d: line(c.points) } }, { key: `h:${n}`, set: { d: head(c.points) } });
+      });
+      g.ties.forEach((t, n) => {
+        t.points = next.ties[n].points;
+        t.headAt = next.ties[n].headAt;
+        patches.push({ key: `n:${n}`, set: { d: line(t.points) } });
+        if (!headless.has(t.type)) patches.push({ key: `nh:${n}`, set: { d: tieHead(t) } });
+      });
+      return patches;
+    },
     on(event) {
       const { name, key } = event;
       if (player && (key === 'play' || key === 'chat' || key.startsWith('c:'))) return player.on(event);

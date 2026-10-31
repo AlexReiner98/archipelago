@@ -158,3 +158,22 @@ export function reroute(boxes, wires, still, { track, room, run, gap = 0, corner
   }
   return { moved, jogs };
 }
+
+/**
+ * Give each wire the best way it has, where it has no old way to keep to: clear of every box, crossing least, then with the
+ * fewest bends, then shortest. A wire with no such way keeps the line it came with, which goes round the boxes.
+ */
+export function rewire(boxes, wires, still, { track, room, run, corner, ports }) {
+  const shape = shapesOf(boxes, track), { solids } = shape, others = [...wires, ...still.map((points) => ({ points }))];
+  for (const w of wires) {
+    const a = shape.get(w.a), b = shape.get(w.b), ways_ = ways(a, b, corner, [], run, ports).map((l) => tidy(l)).sort((p, q) => p.length - q.length || lengthOf(p) - lengthOf(q));
+    let best = null, least = Infinity;
+    for (const l of ways_) {
+      if (l.length > (best?.length ?? Infinity) && !least) break;
+      if (!clear(l, l, w, solids, [], room, 0)) continue;
+      const crossed = others.reduce((sum, v) => sum + (v === w ? 0 : count([l, v.points]).crossings + (touch(l, v.points) ? 0.5 : 0)), 0);
+      if (crossed < least) ((least = crossed), (best = l));
+    }
+    if (best) ((w.points = best), (w.bounds = null));
+  }
+}

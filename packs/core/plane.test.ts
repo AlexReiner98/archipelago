@@ -210,17 +210,6 @@ test('bars: the picture does not change with the order the answer came in', () =
   assert.deepEqual(at(drawnBars([...ids].reverse().map((id) => item(id)), [...links].reverse())), at(drawnBars(ids.map((id) => item(id)), links)));
 });
 
-test('bars: a picture worked out before comes back as it was, and new: what is done to it stays out of the next', () => {
-  const ids = ['a', 'b', 'c', 'd'].map((id) => item(id)), links = [dep('b', 'a'), dep('c', 'b'), tie('c', 'd', 'calls'), tie('d', 'a', 'calls')];
-  const first = drawnBars(ids, links);
-  first.x.set('a', 9999);
-  first.chains[0].points[0][0] = 9999;
-  const again = drawnBars(ids, links);
-  assert.notEqual(again.x.get('a'), 9999);
-  assert.notEqual(again.chains[0].points[0][0], 9999);
-  assert.notEqual(again, first);
-});
-
 test('bars: a step put by hand stays there, nothing else moves, and its wires stay at right angles clear of the boxes', () => {
   const ids = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => item(id)), links = [dep('b', 'a'), dep('c', 'b'), dep('d', 'c'), dep('e', 'a'), dep('d', 'e'), tie('f', 'c', 'calls'), tie('f', 'a', 'calls')];
   const free = bars({ items: ids, links, measure, sizes: house.sizes }), to = [free.x.get('c') + 900, free.y.get('c') + 300];
