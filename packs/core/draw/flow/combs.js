@@ -2,16 +2,20 @@
 // as a comb, spines of rows either side, which cannot cross itself. Pure: lengths in, places and wires out, each wire the
 // points of one link from what holds it down to the item, in the comb's own frame.
 
+/** How many levels a tree may hang: a chain longer than this reads better down the rows than folded into a comb. */
+const DEEPEST = 12;
+
 /** Peel what has one neighbour: `kids` of each item, and the core left. What is in `stay` is never peeled. */
 export function peel(a, stay = new Set(), holds = () => false) {
-  const degree = new Map([...a].map(([k, s]) => [k, s.size])), kids = new Map(), gone = new Set();
+  const degree = new Map([...a].map(([k, s]) => [k, s.size])), kids = new Map(), gone = new Set(), levels = new Map();
   const todo = [...a.keys()].filter((k) => degree.get(k) === 1 && !stay.has(k));
   while (todo.length) {
     const n = todo.pop();
     if (gone.has(n) || degree.get(n) !== 1) continue;
     const p = [...a.get(n)].find((w) => !gone.has(w));
-    if (holds(n, p)) continue;
+    if (holds(n, p) || (levels.get(n) ?? 0) >= DEEPEST) continue;
     gone.add(n);
+    levels.set(p, Math.max(levels.get(p) ?? 0, (levels.get(n) ?? 0) + 1));
     (kids.get(p) ?? kids.set(p, []).get(p)).push(n);
     degree.set(p, degree.get(p) - 1);
     if (degree.get(p) === 1 && !stay.has(p)) todo.push(p);

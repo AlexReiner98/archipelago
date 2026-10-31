@@ -1,7 +1,11 @@
 // Planarity for a knot of a graph: its biconnected parts, the faces of a part (Demoucron, Malgrange and Pertuiset), and
 // whether edges can be drawn with none crossing. Pure: edges in, answers out.
 
+import { facesOf, leftRight } from './lr.js';
 import { pair } from './polyline.js';
+
+/** Past this many edges the faces come from the left-right test, which is far quicker and lies them out another way. */
+const QUICK_FACES = 600;
 
 const adjacency = (edges) => {
   const a = new Map();
@@ -43,6 +47,7 @@ export function blocks(edges) {
 
 /** The faces of a biconnected graph, each a cycle of its items, or null when it is not planar. */
 export function faces(edges) {
+  if (edges.length > QUICK_FACES) return facesOf(edges);
   const a = adjacency(edges), all = new Map(edges.map(([x, y]) => [pair(x, y), [x, y]]));
   const path = [[...a.keys()][0]];
   let cycle = null;
@@ -100,5 +105,22 @@ export function faces(edges) {
   return list;
 }
 
-/** Whether these edges can be drawn with none crossing. Fewer than nine edges in a part always can. */
-export const isPlanar = (edges) => blocks(edges).every((b) => b.length < 9 || faces(b) !== null);
+/** Whether these edges can be drawn with none crossing. */
+export const isPlanar = (edges) => leftRight(edges) !== null;
+
+/**
+ * The heaviest planar part of `links`, a list of [u, v], heaviest first: each kept if it stays planar with those before it,
+ * the rest left. Whole runs are tried at once, as what holds of a run holds of each of its links, so the answer is the
+ * same as trying them one by one and the test runs about as often as links are left.
+ */
+export function keptPlanar(links) {
+  const kept = [], left = [];
+  let size = 1;
+  for (let at = 0; at < links.length; ) {
+    const run = links.slice(at, at + size);
+    if (isPlanar([...kept, ...run])) (kept.push(...run), (at += run.length), (size *= 2));
+    else if (run.length > 1) size = run.length >> 1;
+    else (left.push(run[0]), at++);
+  }
+  return { kept, left };
+}

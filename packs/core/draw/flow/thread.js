@@ -2,7 +2,7 @@
 // has no crossing in it but those points. Each point is numbered between the ends of the stretch it splits, where the graph
 // has numbers. Pure: a graph in, changed in place, or edges in and a graph of wires and faces out.
 
-import { blocks, faces, isPlanar } from './planar.js';
+import { blocks, faces, isPlanar, keptPlanar } from './planar.js';
 import { pair } from './polyline.js';
 
 
@@ -10,6 +10,8 @@ import { pair } from './polyline.js';
 const HIDDEN = 0.1;
 /** Spreads the points' numbers, so no two are ever alike. */
 const GOLD = 0.618034;
+/** Past this many biconnected pieces, they are joined many at a time. */
+const MANY_PIECES = 64;
 
 /** Take the nearest off `open`, then the least far on. */
 const nextOf = (open, dist, reach) => {
@@ -136,6 +138,22 @@ export function threader(list, owner, add, { number, keep, onward = () => false 
   return { through, tally };
 }
 
+/** Invisible edges that each join two of `sets` round an item they share, no set twice, as many of them as stay planar. */
+function manyAtOnce(sets, edges, worth) {
+  const holders = new Map(), used = new Set(), tries = [];
+  sets.forEach((s, i) => { for (const v of s) (holders.get(v) ?? holders.set(v, []).get(v)).push(i); });
+  for (const [c, list] of holders) {
+    const free = list.filter((i) => !used.has(i));
+    for (let k = 1; k < free.length; k += 2) {
+      const [i, j] = [free[k - 1], free[k]], a = [...sets[i]].find((v) => v !== c), b = [...sets[j]].find((v) => v !== c);
+      if (a === undefined || b === undefined || a === b) continue;
+      used.add(i).add(j);
+      tries.push(worth(a, b) >= worth(b, a) ? [a, b, Boolean(worth(a, b))] : [b, a, Boolean(worth(b, a))]);
+    }
+  }
+  return keptPlanar([...edges, ...tries]).kept.slice(edges.length).map(([a, b, leads]) => (leads ? [a, b, true] : [a, b]));
+}
+
 /**
  * Invisible edges until `kept` over `items` is one biconnected piece, each kept only if it stays planar, and each as far
  * as it can be from what the order leaves without a wire out to what it leaves without a wire in, so that it lends both.
@@ -149,6 +167,10 @@ function join(kept, items, order) {
     const parts = blocks(all());
     if (parts.length === 1) return hidden;
     const sets = parts.map((p) => new Set(p.flat())), together = (x, y) => sets.some((s) => s.has(x) && s.has(y));
+    if (parts.length > MANY_PIECES) {
+      const joined = manyAtOnce(sets, all(), worth);
+      if (joined.length) { hidden.push(...joined); continue; }
+    }
     const bridge = (i, j, c) => {
       const ways = [];
       for (const a of sets[i]) {
@@ -177,15 +199,7 @@ function join(kept, items, order) {
  * wire holds each stretch between two neighbours.
  */
 export function planarize(links, items) {
-  const kept = [], left = [], root = new Map();
-  const find = (v) => { let r = v; while (root.has(r)) r = root.get(r); if (r !== v) root.set(v, r); return r; };
-  for (const l of links) {
-    kept.push(l);
-    // A link between two parts not yet joined closes no ring, so only the others are tested.
-    const [a, b] = [find(l[0]), find(l[1])];
-    if (a !== b) root.set(a, b);
-    else if (!isPlanar(kept.map(([u, v]) => [u, v]))) (kept.pop(), left.push(l));
-  }
+  const { kept, left } = keptPlanar(links);
   const edges = kept.map(([u, v]) => [u, v]), hidden = join(edges, items, links.filter((l) => l[2]));
   const wires = [], owner = new Map();
   const add = (path, visible, link) => {
