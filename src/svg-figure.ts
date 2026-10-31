@@ -1,10 +1,11 @@
 // A figure kept as SVG: a drawing baked from its shapes, sharp at any width. It is read only as an image (an <img>,
 // served with nothing allowed), and kept only when it is drawing alone: shapes, fills, strokes and text, with no
 // script, no style sheet, no link and nothing it would fetch. Anything else is refused, never cleaned. It may move:
-// an <animate> changes a shape's outline or opacity, on a clock, and nothing else (no event starts it, and it cannot
-// reach an address, which is why it may not name any other attribute).
+// an <animate> changes a shape's outline or opacity, and an <animateTransform> scales it, on a clock, and nothing else
+// (no event starts either, and neither can reach an address, which is why they may not name any other attribute).
 
-const ELEMENTS = new Set(['animate', 'svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'title', 'desc', 'defs', 'clipPath', 'linearGradient', 'radialGradient', 'stop']);
+const MOVING = new Set(['animate', 'animateTransform']);
+const ELEMENTS = new Set([...MOVING, 'svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'title', 'desc', 'defs', 'clipPath', 'linearGradient', 'radialGradient', 'stop']);
 const ATTRIBUTES = new Set([
   'xmlns', 'version', 'viewBox', 'preserveAspectRatio', 'width', 'height', 'id', 'transform', 'opacity', 'clip-path', 'clipPathUnits',
   'd', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'fx', 'fy', 'points', 'dx', 'dy',
@@ -12,7 +13,7 @@ const ATTRIBUTES = new Set([
   'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'dominant-baseline', 'letter-spacing',
   'offset', 'stop-color', 'stop-opacity', 'gradientUnits', 'gradientTransform', 'spreadMethod',
 ]);
-const MOVES = new Set(['d', 'opacity', 'fill-opacity']);
+const MOVES = new Set(['d', 'opacity', 'fill-opacity', 'transform']);
 const TIME = /^\d+(\.\d+)?m?s$/;
 /** What <animate> may say, each checked by its own value: only the attribute's name and its clock are free. */
 const ANIMATE: Record<string, (value: string) => boolean> = {
@@ -22,6 +23,9 @@ const ANIMATE: Record<string, (value: string) => boolean> = {
   fill: (v) => v === 'freeze' || v === 'remove',
   repeatCount: (v) => v === 'indefinite' || /^\d+$/.test(v),
   keyTimes: (v) => /^[\d.;\s]*$/.test(v),
+  keySplines: (v) => /^[\d.;\s]*$/.test(v),
+  calcMode: (v) => v === 'linear' || v === 'spline',
+  type: (v) => v === 'scale',
   values: (v) => /^[-\d.\sMmLlHhVvCcSsQqTtAaZz,;]*$/.test(v),
 };
 
@@ -37,11 +41,11 @@ export function svgRefused(text: string): string | null {
     const m = tag.exec(body);
     if (!m) return `a tag it cannot read at ${at}`;
     if (!ELEMENTS.has(m[2])) return `<${m[2]}> is not drawing`;
-    if (m[2] === 'animate' && !m[1] && !/\sattributeName\s*=/.test(m[3])) return '<animate> names no attribute';
+    if (MOVING.has(m[2]) && !m[1] && !/\sattributeName\s*=/.test(m[3])) return `<${m[2]}> names no attribute`;
     for (const [, name, double, single] of m[3].matchAll(attribute)) {
       const value = double ?? single;
-      if (m[2] === 'animate') {
-        if (!ANIMATE[name]?.(value)) return `${name} on <animate> may not say that`;
+      if (MOVING.has(m[2])) {
+        if (!ANIMATE[name]?.(value)) return `${name} on <${m[2]}> may not say that`;
         continue;
       }
       if (!ATTRIBUTES.has(name)) return `${name} on <${m[2]}> is not drawing`;

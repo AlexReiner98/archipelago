@@ -167,17 +167,11 @@
   <label title="The saved setup it ends on">End <select id="mEnd"></select></label>
   <label title="How long the change takes">Seconds <output id="mSecondsOut"></output><input id="mSeconds" type="range" min="2" max="30" step="0.5"></label>
   <label title="How long the start holds first">Hold <output id="mWaitOut"></output><input id="mWait" type="range" min="0" max="5" step="0.25"></label>
-  <label title="Key moments: more follows the field closer, and weighs more">Keys <output id="mKeysOut"></output><input id="mKeys" type="range" min="2" max="12" step="1"></label>
-  <label title="How far the field grows between keys: more lets its forms settle into each new setting">Growth <output id="mGrowOut"></output><input id="mGrow" type="range" min="200" max="6000" step="100"></label>
-  <label title="Rows of land: more is finer, and weighs more">Rows <output id="mRowsOut"></output><input id="mRows" type="range" min="20" max="165" step="1"></label>
-  <label title="Tiles across a row, each keeping its colour: more colour, more weight">Tiles <output id="mTilesOut"></output><input id="mTiles" type="range" min="2" max="40" step="1"></label>
-  <label title="Points along a tile: finer ridges, more weight">Points <output id="mPointsOut"></output><input id="mPoints" type="range" min="2" max="30" step="1"></label>
-  <label title="Colour bands up each ridge: each is a layer of weight">Bands <output id="mBandsOut"></output><input id="mBands" type="range" min="1" max="4" step="1"></label>
-  <label class="check" title="Pale water round the land: a layer of weight"><input id="mShallows" type="checkbox"> Shallows</label>
-  <label class="check" title="An ink line along each ridge: a layer of weight"><input id="mOutline" type="checkbox"> Outline</label>
-  <label class="check" title="Back and forth for ever, twice the weight; else once, ending on the last key"><input id="mLoop" type="checkbox"> Loop</label>
+  <label title="How long one run of land takes to rise">Rise <output id="mRiseOut"></output><input id="mRise" type="range" min="0.4" max="6" step="0.1"></label>
+  <label title="Moments land may start rising: more is smoother, and weighs more">Steps <output id="mStepsOut"></output><input id="mSteps" type="range" min="4" max="40" step="1"></label>
+  <label title="How far a shape's outline may stray, in units of the page: more is lighter, and less exact">Detail <output id="mDetailOut"></output><input id="mDetail" type="range" min="0" max="2" step="0.05"></label>
   <div class="row"><button id="mBuild" title="Grow it and play it here">Build</button><button id="mReplay" title="Play it again" disabled>Replay</button><button id="mSave" title="Download the animated SVG" disabled>Save SVG</button></div>
-  <div id="mNote" title="What it weighs as a figure: the site keeps 1 MB at most, and sends it gzipped"></div>
+  <div id="mNote" title="What it weighs as a figure: the site keeps 2 MB at most"></div>
   <div class="row">
     <button id="reseed" title="Same dials, another map">Reseed</button>
     <button id="svg" title="Download as SVG">SVG</button>
@@ -478,21 +472,21 @@
   };
 
   // Animate: the Animate dials, and the SVG they make (morph.js), shown over the still picture until a dial moves it.
-  const MORPH_NUMBERS = { mSeconds: 'seconds', mWait: 'wait', mKeys: 'keys', mGrow: 'grow', mRows: 'rows', mTiles: 'tiles', mPoints: 'points', mBands: 'bands' };
-  const MORPH_CHECKS = { mShallows: 'shallows', mOutline: 'outline', mLoop: 'loop' };
-  const morphDials = () => ({ start: $('mStart').value, end: $('mEnd').value, ...Object.fromEntries(Object.entries(MORPH_NUMBERS).map(([id, k]) => [k, +$(id).value])), ...Object.fromEntries(Object.entries(MORPH_CHECKS).map(([id, k]) => [k, $(id).checked])) });
+  const MORPH_NUMBERS = { mSeconds: 'seconds', mWait: 'wait', mRise: 'rise', mSteps: 'steps', mDetail: 'detail' };
+  const morphDials = () => ({ ...MORPH, start: $('mStart').value, end: $('mEnd').value, ...Object.fromEntries(Object.entries(MORPH_NUMBERS).map(([id, k]) => [k, +$(id).value])) });
   const morphOuts = () => { for (const id of Object.keys(MORPH_NUMBERS)) if ($(`${id}Out`)) $(`${id}Out`).textContent = $(id).value; };
   function setMorph(saved) {
     const m = { ...MORPH, ...saved };
     for (const [id, k] of Object.entries(MORPH_NUMBERS)) $(id).value = m[k];
-    for (const [id, k] of Object.entries(MORPH_CHECKS)) $(id).checked = m[k];
     morphOuts();
     for (const [id, name] of [['mStart', m.start], ['mEnd', m.end]]) $(id).value = name;
   }
-  /** A saved setup as the land reads it: its own dials and seed, on this frame. */
+  /** A saved setup as ridges() draws it here: its own dials and seed on this frame, its rows as far apart as ever. */
   const setupOf = (name) => {
     const s = presets.all()[name];
-    return s && { ...dials(), ...s.dials, seed: s.seed, source: s.source };
+    if (!s) return null;
+    const [width, height] = frame(), M = DEFAULTS.margin;
+    return { ...dials(), ...s.dials, seed: s.seed, source: s.source, rows: Math.max(1, Math.round((s.dials.rows * (height - 2 * M)) / (DEFAULTS.height - 2 * M))) };
   };
   let moving = null;
   const showMoving = () => {
@@ -503,18 +497,28 @@
   const kB = (bytes) => `${Math.round(bytes / 1000)} kB`;
   const gzipped = async (text) => (await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()).byteLength;
   $('mBuild').onclick = () => {
+    const morph = morphDials();
+    if (!presets.all()[morph.start] || !presets.all()[morph.end]) return void ($('mNote').textContent = 'Choose a start and an end: save each as a preset first.');
     $('mNote').textContent = 'Growing…';
+    // The start's palettes, background and frame, so the page holds what the presets say; the panel as it was.
+    apply(presets.all()[morph.start]);
+    setMorph(morph);
     setTimeout(async () => {
-      const t0 = performance.now(), p = richOf(pal()), morph = morphDials(), from = setupOf(morph.start), to = setupOf(morph.end);
-      if (!from || !to) return void ($('mNote').textContent = 'Choose a start and an end: save each as a preset first.');
-      const pics = keysOf({ from, to, morph });
-      const { svg, shapes } = svgOf({ pics, morph, palOf, base: p, background: background(p), weighted: $('weighted').checked });
+      const t0 = performance.now(), p = richOf(pal()), from = setupOf(morph.start), to = setupOf(morph.end);
+      const keys = keysOf({ from, to, morph });
+      // Each picture as ridges() draws it, coloured at once: its archipelagos' palettes are given as it is laid out.
+      const baked = (dials) => {
+        const pic = ridges(dials), fills = new Map(pic.shapes.map((s) => [s, s.line || s.shadow ? null : s.cloud ? p.paper : fillOf(s)]));
+        return { pic, fill: (s) => fills.get(s) };
+      };
+      const a = baked(from), b = baked(to);
+      const svg = svgOf({ a, b, keys, morph, ink: p.ink, swellColour: swell(p, background(p)), background: background(p), cloudOpacity: +$('cloudOpacity').value });
       moving = svg;
       showMoving();
       $('mReplay').disabled = $('mSave').disabled = false;
-      const over = new Blob([svg]).size > 1e6;
-      $('mNote').textContent = `${kB(new Blob([svg]).size)}, ${kB(await gzipped(svg))} gzipped · ${shapes} shapes · ${((performance.now() - t0) / 1000).toFixed(1)} s${over ? ' · over the 1 MB a figure may be' : ''}`;
-    }, 30);
+      const size = new Blob([svg]).size;
+      $('mNote').textContent = `${kB(size)}, ${kB(await gzipped(svg))} gzipped · ${((performance.now() - t0) / 1000).toFixed(1)} s${size > 2e6 ? " · over the 2 MB a figure may be" : ""}`;
+    }, 3500);
   };
   $('mReplay').onclick = showMoving;
   $('mSave').onclick = () => save(`archipelago-morph-${seed}.svg`, new Blob([moving], { type: 'image/svg+xml' }));

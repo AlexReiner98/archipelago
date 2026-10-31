@@ -6,8 +6,8 @@ import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { roomToStore } from './plan.ts';
 import { svgRefused } from './svg-figure.ts';
 
-/** The most a kept picture may weigh. A capture of a view at screen size is well under it. */
-export const PICTURE_MAX = 1_000_000;
+/** The most a kept picture may weigh. A capture of a view at screen size is well under it; a moving figure, two whole drawings, comes near. */
+export const PICTURE_MAX = 2_000_000;
 /** An SVG is a figure baked from a drawing's shapes, kept only when it is drawing alone (src/svg-figure.ts). */
 export const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'] as const;
 
