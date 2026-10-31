@@ -146,6 +146,23 @@ export const known = {
   },
 };
 
+/** A client's request to connect, kept across a sign-in, whose mail's link may open in another tab: for half an hour. */
+const WAITING = 'pelago-authorize';
+export function keepWaiting(query) {
+  try {
+    if (query) localStorage.setItem(WAITING, JSON.stringify({ query, at: Date.now() }));
+    else localStorage.removeItem(WAITING);
+  } catch {}
+}
+export function waitingOnSignIn() {
+  try {
+    const kept = JSON.parse(localStorage.getItem(WAITING) ?? 'null');
+    return kept && Date.now() - kept.at < 30 * 60_000 ? kept.query : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Become whoever a token says, starting from Home: nothing on the page belongs to the new workspace. */
 export function enter(token) {
   store.token = token;
@@ -153,7 +170,8 @@ export function enter(token) {
   // Where the page stood in the log was the other workspace's.
   state.stamp = state.pos = state.seq = undefined;
   // A sign-in opens on Home, as the app does: a new workspace's first steps are there.
-  if (location.hash && location.hash !== '#/home') location.hash = '#/home';
+  const next = waitingOnSignIn() ? '#/authorize' : '#/home';
+  if (location.hash && location.hash !== next) location.hash = next;
   else route();
 }
 
@@ -175,7 +193,7 @@ export async function api(tool, input = {}) {
 // Signed out, the style is not read with the rest: its colours are asked for on their own.
 const themeSignedOut = () => fetch('/connect/theme').then((r) => r.json()).then(applyTheme, () => undefined);
 
-export function signIn(message) {
+export function signIn(message, title = 'Sign in') {
   themeSignedOut();
   const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', style: 'flex: 1; min-width: var(--input-wide)', autocomplete: 'email' });
   const input = h('input', { type: 'text', placeholder: 'pel_…', style: 'flex: 1; min-width: var(--input-wide)', autocomplete: 'off' });
@@ -216,7 +234,7 @@ export function signIn(message) {
   document.querySelector('#nav .brand').replaceChildren('Archipelago');
   document.title = 'Archipelago';
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Sign in')),
+    h('div', { class: 'page-head' }, h('h1', {}, title)),
     h(
       'section',
       { class: 'card', style: 'max-width: var(--card-most)' },

@@ -36,6 +36,13 @@ const text = (v: unknown, most: number, what: string) => {
   if (!s || s.length > most) throw new Error(`${what}: up to ${most} characters.`);
   return s;
 };
+/** Where its admin manages a plan: an https address, or a page on this server. Left out, nothing. */
+function manageLink(v: unknown): string | undefined {
+  if (v == null || v === '') return undefined;
+  const link = text(v, 500, 'The manage link');
+  if (!/^(https:\/\/|\/(?![/\\]))[^\s"<>]+$/.test(link)) throw new Error('The manage link is an https address or a path on this server.');
+  return link;
+}
 
 /** A workspace this pack made, or a refusal: a pack acts on no other. */
 async function itsOwn(at: ActPlaces, pack: string, workspace: unknown) {
@@ -71,9 +78,10 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       const ws = await itsOwn(at, pack.id, input.workspace);
       const note = input.note == null || input.note === '' ? undefined : text(input.note, 300, 'The note');
       const plan = input.plan == null || input.plan === '' ? undefined : text(input.plan, 40, 'The plan');
-      const manage = input.manage == null || input.manage === '' ? undefined : text(input.manage, 500, 'The manage link');
-      if (manage && !/^https:\/\/[^\s"<>]+$/.test(manage)) throw new Error('The manage link is an https address.');
-      const limits = limitsFrom(input, { note, plan, manage });
+      const manage = manageLink(input.manage);
+      const manage_says = input.manage_says == null || input.manage_says === '' ? undefined : text(input.manage_says, 40, 'What the manage link says');
+      const until = input.until == null || input.until === '' ? undefined : new Date(text(input.until, 40, 'The end of the plan')).toISOString();
+      const limits = limitsFrom(input, { note, plan, manage, manage_says, until });
       await setMemberLimit(owner.db, ws.id, limits);
       const set = Object.fromEntries(LIMITS.filter((name) => limits?.[name]).map((name) => [name, limits![name]]));
       await log(limits ? `Set the limits of "${ws.name}"${plan ? ` to the ${plan} plan` : ''}: ${Object.entries(set).map(([n, v]) => `${n} ${v}`).join(', ')}` : `Lifted the limits of "${ws.name}"`, { workspace: ws.id, ...set });
@@ -90,10 +98,10 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       const days = Number(input.days ?? 30);
       if (!(Number.isInteger(days) && days >= 1 && days <= 365)) throw new Error('days: a whole number from 1 to 365.');
       const note = input.note == null || input.note === '' ? undefined : text(input.note, 300, 'The note');
-      const manage = input.manage == null || input.manage === '' ? undefined : text(input.manage, 500, 'The manage link');
-      if (manage && !/^https:\/\/[^\s"<>]+$/.test(manage)) throw new Error('The manage link is an https address.');
+      const manage = manageLink(input.manage);
+      const manage_says = input.manage_says == null || input.manage_says === '' ? undefined : text(input.manage_says, 40, 'What the manage link says');
       const since = new Date();
-      const ended = { since: since.toISOString(), delete_at: new Date(since.getTime() + days * 86_400_000).toISOString(), ...(note && { note }), ...(manage && { manage }) };
+      const ended = { since: since.toISOString(), delete_at: new Date(since.getTime() + days * 86_400_000).toISOString(), ...(note && { note }), ...(manage && { manage }), ...(manage_says && { manage_says }) };
       await setEnded(owner.db, ws.id, ended);
       await log(`"${ws.name}" ended: read-only, deleted on ${ended.delete_at.slice(0, 10)}`, { workspace: ws.id, delete_at: ended.delete_at });
       return { workspace: ws.id, ended: true, delete_at: ended.delete_at };

@@ -14,13 +14,15 @@ import { normalEmail } from './mail.ts';
 import { recordAgreement } from './agreements.ts';
 import { workspacesOf } from './control-index.ts';
 import { emailOfLink, LINK_MINUTES, redeem, redeemTyped, requestSignIn, triesSpent, typedWorks, workspaceOfCode } from './members.ts';
+import { serveOAuth } from './oauth.ts';
+import type { Actor } from './pelago.ts';
 import { serverPacksOf } from './server-host.ts';
 import { serveServerPack } from './server-routes.ts';
 import { pollSignup, receiveLemon, signedByLemon, signupOffer, startSignup } from './signup.ts';
 import { pageStyle } from './styles.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
 import { workingRules } from './working-rules.ts';
-import type { Workspaces } from './workspaces.ts';
+import type { Workspace, Workspaces } from './workspaces.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
@@ -67,6 +69,8 @@ export interface ConnectRoutes {
   body: () => Promise<unknown>;
   /** The body as it came, for what is signed over its bytes. Read it or body, not both. */
   raw: () => Promise<Buffer>;
+  /** Who is signed in, as any request with a token says; refused if nobody is. */
+  person: () => Promise<{ ws: Workspace; actor: () => Actor }>;
 }
 
 /** One sign-in mail a minute to an address, whoever asks: the form cannot be used to flood someone's inbox. */
@@ -91,6 +95,8 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
   if (!at.hosts.includes(host)) return reply(res, 404, { error: 'Not found' });
   // What a server pack offers anyone: its pages, entries and webhooks (src/server-routes.ts).
   if (path.startsWith('/x/')) return serveServerPack(req, res, path, at);
+  // A client signing in through the browser (src/oauth.ts).
+  if (/^\/(oauth|\.well-known)\//.test(path)) return serveOAuth(req, res, path, at);
   const origin = `${at.named.includes(host) ? 'https' : 'http'}://${host}`;
   if (req.method === 'GET' && path === '/connect/setup.mjs') {
     if (at.tooOften()) return;

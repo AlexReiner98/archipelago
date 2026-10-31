@@ -753,6 +753,18 @@ change that:
   token says which workspace it belongs to and whether it is a human's or an
   agent's. A human token can approve, launch and manage tokens; an agent token
   cannot, on any endpoint.
+- **A client can sign in through the browser** (OAuth for MCP,
+  `src/oauth.ts`). Point any client at `<server>/mcp`: it reads where to sign
+  in from the 401, a person signs in and says Allow, and it is given an agent
+  token acting for them. Tokens last an hour and rotate by a refresh token in
+  the same row, so a connection is one row under Workspace → Agents with one
+  Revoke; a connection left unused ends after 90 days. A client registers
+  itself (`/oauth/register`, which keeps nothing) or by a published metadata
+  document; neither proves who it is, so every connection is asked for, and
+  the page shows where the client returns. Redirects are https, this machine,
+  or an application's own scheme. It needs `PELAGO_PUBLIC_HOST` for an https
+  address, and a server with `auth` off offers none of it. A token pasted by
+  hand works as ever, for a client that cannot sign in.
 - **First start gives two secrets, once:** your human token for the default
   workspace, and the operator secret. At a terminal they are printed; with
   nobody at one (a container, a service) they are written to

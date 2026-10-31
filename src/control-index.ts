@@ -44,6 +44,12 @@ export async function indexToken(hash: string, workspace: string): Promise<void>
   if (c) await addToken(c, hash, workspace);
 }
 
+/** A token's old hash leaves the index when its secret is rotated. */
+export async function unindexed(hash: string): Promise<void> {
+  const c = await control?.();
+  if (c) await unindexToken(c, hash);
+}
+
 /** Every member and live token a workspace's database holds, noted: after a restore, or when the index is first made. */
 export async function indexWorkspace(c: Q, workspace: string, db: Q): Promise<void> {
   for (const { email } of (await db.query<{ email: string }>(`select email from member where removed_at is null`)).rows) await addMember(c, email, workspace);
