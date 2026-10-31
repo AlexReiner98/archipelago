@@ -3,7 +3,7 @@
 //   node scripts/ridges-svg.ts <style code .js> <setup .json> <out .svg> [tolerance px, 0.05]
 // The style's code is its `code` field (query get of the Ridges style), the setup a local.ridges_setup's `setup`.
 // Each path keeps the points that stand more than the tolerance off a straight line, written relative, a tenth of a
-// unit apart: the Hero at 1600 × 800 is some 700 kB, 110 kB gzipped, under the 2 MB a figure may be.
+// unit apart: the Hero at 1600 × 800 is some 700 kB, 110 kB gzipped, under the 1 MB a figure may be.
 
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';

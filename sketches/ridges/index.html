@@ -26,8 +26,7 @@
   #drop.over { background: #0001; }
   #photo { display: none; max-width: 100%; border-radius: 4px; margin-top: 6px; }
   main { display: grid; place-items: center; overflow: auto; padding: 20px; }
-  canvas, #moving { box-shadow: 0 2px 18px #0003; max-width: 100%; max-height: calc(100vh - 40px); }
-  #moving[hidden], canvas[hidden] { display: none; }
+  canvas { box-shadow: 0 2px 18px #0003; max-width: 100%; max-height: calc(100vh - 40px); }
   body.emblem canvas#view { max-height: calc(100vh - 340px); }
   canvas.at { image-rendering: pixelated; }
   body.emblem #sizes { display: grid; gap: 8px; margin-top: 14px; }
@@ -165,13 +164,11 @@
   <h2>Animate</h2>
   <label title="The saved setup it starts from">Start <select id="mStart"></select></label>
   <label title="The saved setup it ends on">End <select id="mEnd"></select></label>
-  <label title="How long the change takes">Seconds <output id="mSecondsOut"></output><input id="mSeconds" type="range" min="2" max="30" step="0.5"></label>
-  <label title="How long the start holds first">Hold <output id="mWaitOut"></output><input id="mWait" type="range" min="0" max="5" step="0.25"></label>
-  <label title="How long one run of land takes to rise">Rise <output id="mRiseOut"></output><input id="mRise" type="range" min="0.4" max="6" step="0.1"></label>
-  <label title="Moments land may start rising: more is smoother, and weighs more">Steps <output id="mStepsOut"></output><input id="mSteps" type="range" min="4" max="40" step="1"></label>
-  <label title="How far a shape's outline may stray, in units of the page: more is lighter, and less exact">Detail <output id="mDetailOut"></output><input id="mDetail" type="range" min="0" max="2" step="0.05"></label>
-  <div class="row"><button id="mBuild" title="Grow it and play it here">Build</button><button id="mReplay" title="Play it again" disabled>Replay</button><button id="mSave" title="Download the animated SVG" disabled>Save SVG</button></div>
-  <div id="mNote" title="What it weighs as a figure: the site keeps 2 MB at most"></div>
+  <label title="How many steps between them: more is smoother, and takes longer to build">Frames <output id="mFramesOut"></output><input id="mFrames" type="range" min="4" max="120" step="1" value="40"></label>
+  <label title="How long a play takes">Seconds <output id="mSecondsOut"></output><input id="mSeconds" type="range" min="1" max="30" step="0.5" value="8"></label>
+  <div class="row"><button id="mBuild" title="Draw every step, each dial part way from the start to the end">Build</button><button id="mPlay" title="Play from the start to the end" disabled>Play</button></div>
+  <label title="Slide from the start to the end">Slide <small>start · end</small><input id="mSlide" type="range" min="0" max="1" step="0.001" value="0" disabled></label>
+  <div id="mNote"></div>
   <div class="row">
     <button id="reseed" title="Same dials, another map">Reseed</button>
     <button id="svg" title="Download as SVG">SVG</button>
@@ -179,13 +176,12 @@
   </div>
   <div id="note"></div>
 </aside>
-<main><canvas id="view"></canvas><img id="moving" alt="The ridges, moving" hidden><div id="sizes" class="only-emblem" title="The drawing at 16, 24, 32, 48, 64 and 128 px"></div></main>
+<main><canvas id="view"></canvas><div id="sizes" class="only-emblem" title="The drawing at 16, 24, 32, 48, 64 and 128 px"></div></main>
 <script type="module">
   import { ridges, DEFAULTS } from './ridges.js';
   import { PLACES, fromPixels, signature, waterOf, landOf, layout, enrich } from './palettes.js';
   import * as presets from './presets.js';
   import { paint, fillOf as fillWith, swell, isLight } from './paint.js';
-  import { MORPH, keysOf, svgOf } from './morph.js';
 
   const $ = (id) => document.getElementById(id);
   const DIALS = ['pattern', 'scale', 'variety', 'warp', 'mix', 'chains', 'land', 'islands', 'rise', 'rugged', 'step', 'soft', 'bands', 'rows', 'line', 'hierarchy', 'age', 'shallows', 'relief', 'edges', 'foothills', 'peaks', 'slope', 'undulate', 'clouds', 'cloudSize', 'cloudPuff', 'cloudTip', 'cloudShadow', 'cloudPeaks', 'cloudSpread', 'wind', 'windDir'];
@@ -333,8 +329,6 @@
   const background = (p) => bgPicked ?? waterOf(p).deep;
 
   function draw() {
-    $('moving').hidden = true;
-    $('view').hidden = false;
     const t0 = performance.now(), p = richOf(pal());
     const pic = ridges(dials());
     const cv = $('view'), dpr = devicePixelRatio || 1;
@@ -471,16 +465,10 @@
     save(`archipelago-${$('place').value}-${seed}.svg`, new Blob([`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pic.width} ${pic.height}"><rect width="100%" height="100%" fill="${background(p)}"/><g stroke="${p.ink}" stroke-width="${pic.line}" stroke-linejoin="round" stroke-linecap="round">${body}</g>${text(pic, p)}</svg>`], { type: 'image/svg+xml' }));
   };
 
-  // Animate: the Animate dials, and the SVG they make (morph.js), shown over the still picture until a dial moves it.
-  const MORPH_NUMBERS = { mSeconds: 'seconds', mWait: 'wait', mRise: 'rise', mSteps: 'steps', mDetail: 'detail' };
-  const morphDials = () => ({ ...MORPH, start: $('mStart').value, end: $('mEnd').value, ...Object.fromEntries(Object.entries(MORPH_NUMBERS).map(([id, k]) => [k, +$(id).value])) });
-  const morphOuts = () => { for (const id of Object.keys(MORPH_NUMBERS)) if ($(`${id}Out`)) $(`${id}Out`).textContent = $(id).value; };
-  function setMorph(saved) {
-    const m = { ...MORPH, ...saved };
-    for (const [id, k] of Object.entries(MORPH_NUMBERS)) $(id).value = m[k];
-    morphOuts();
-    for (const [id, name] of [['mStart', m.start], ['mEnd', m.end]]) $(id).value = name;
-  }
+  // Animate: every dial part way from one saved setup to the other, each step drawn by ridges() as if the sliders stood
+  // there, kept as a picture so the slide needs no drawing.
+  const animateOuts = () => { $('mFramesOut').textContent = $('mFrames').value; $('mSecondsOut').textContent = $('mSeconds').value; };
+  for (const id of ['mFrames', 'mSeconds']) $(id).addEventListener('input', animateOuts);
   /** A saved setup as ridges() draws it here: its own dials and seed on this frame, its rows as far apart as ever. */
   const setupOf = (name) => {
     const s = presets.all()[name];
@@ -488,41 +476,56 @@
     const [width, height] = frame(), M = DEFAULTS.margin;
     return { ...dials(), ...s.dials, seed: s.seed, source: s.source, rows: Math.max(1, Math.round((s.dials.rows * (height - 2 * M)) / (DEFAULTS.height - 2 * M))) };
   };
-  let moving = null;
-  const showMoving = () => {
-    $('moving').src = URL.createObjectURL(new Blob([moving], { type: 'image/svg+xml' }));
-    $('moving').hidden = false;
-    $('view').hidden = true;
+  const between = (from, to, t) => Object.fromEntries(Object.entries(from).map(([k, v]) => [k, typeof v === 'number' && typeof to[k] === 'number' ? v + (to[k] - v) * t : v]));
+  let steps = [];
+  const showStep = (t) => {
+    if (!steps.length) return;
+    // Between two steps, the one dissolving into the next: every step itself is what ridges() drew.
+    const cv = $('view'), g = cv.getContext('2d'), at = t * (steps.length - 1), k = Math.floor(at);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalAlpha = 1;
+    g.drawImage(steps[k], 0, 0, cv.width, cv.height);
+    if (k + 1 < steps.length) {
+      g.globalAlpha = at - k;
+      g.drawImage(steps[k + 1], 0, 0, cv.width, cv.height);
+      g.globalAlpha = 1;
+    }
   };
-  const kB = (bytes) => `${Math.round(bytes / 1000)} kB`;
-  const gzipped = async (text) => (await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()).byteLength;
+  $('mSlide').addEventListener('input', () => showStep(+$('mSlide').value));
   $('mBuild').onclick = () => {
-    const morph = morphDials();
-    if (!presets.all()[morph.start] || !presets.all()[morph.end]) return void ($('mNote').textContent = 'Choose a start and an end: save each as a preset first.');
-    $('mNote').textContent = 'Growing…';
-    // The start's palettes, background and frame, so the page holds what the presets say; the panel as it was.
-    apply(presets.all()[morph.start]);
-    setMorph(morph);
+    const names = [$('mStart').value, $('mEnd').value], kept = { frames: $('mFrames').value, seconds: $('mSeconds').value };
+    if (!presets.all()[names[0]] || !presets.all()[names[1]]) return void ($('mNote').textContent = 'Save a start and an end as presets first.');
+    $('mNote').textContent = 'Drawing…';
+    apply(presets.all()[names[0]]);
+    [$('mStart').value, $('mEnd').value, $('mFrames').value, $('mSeconds').value] = [...names, kept.frames, kept.seconds];
+    animateOuts();
     setTimeout(async () => {
-      const t0 = performance.now(), p = richOf(pal()), from = setupOf(morph.start), to = setupOf(morph.end);
-      const keys = keysOf({ from, to, morph });
-      // Each picture as ridges() draws it, coloured at once: its archipelagos' palettes are given as it is laid out.
-      const baked = (dials) => {
-        const pic = ridges(dials), fills = new Map(pic.shapes.map((s) => [s, s.line || s.shadow ? null : s.cloud ? p.paper : fillOf(s)]));
-        return { pic, fill: (s) => fills.get(s) };
-      };
-      const a = baked(from), b = baked(to);
-      const svg = svgOf({ a, b, keys, morph, ink: p.ink, swellColour: swell(p, background(p)), background: background(p), cloudOpacity: +$('cloudOpacity').value });
-      moving = svg;
-      showMoving();
-      $('mReplay').disabled = $('mSave').disabled = false;
-      const size = new Blob([svg]).size;
-      $('mNote').textContent = `${kB(size)}, ${kB(await gzipped(svg))} gzipped · ${((performance.now() - t0) / 1000).toFixed(1)} s${size > 2e6 ? " · over the 2 MB a figure may be" : ""}`;
+      const t0 = performance.now(), p = richOf(pal()), from = setupOf(names[0]), to = setupOf(names[1]), n = +kept.frames, made = [];
+      const opts = { base: p, palOf, background: background(p), weighted: $('weighted').checked, cloudOpacity: +$('cloudOpacity').value };
+      for (let k = 0; k < n; k++) {
+        const pic = ridges(between(from, to, k / (n - 1))), c = new OffscreenCanvas(pic.width, pic.height);
+        paint(c.getContext('2d'), shown(pic), opts);
+        made.push(c.transferToImageBitmap());
+        $('mNote').textContent = `Drawing ${k + 1} of ${n}…`;
+        await new Promise((r) => setTimeout(r));
+      }
+      steps = made;
+      $('mSlide').disabled = $('mPlay').disabled = false;
+      $('mSlide').value = 0;
+      showStep(0);
+      $('mNote').textContent = `${n} steps, ${((performance.now() - t0) / 1000).toFixed(0)} s to draw`;
     }, 3500);
   };
-  $('mReplay').onclick = showMoving;
-  $('mSave').onclick = () => save(`archipelago-morph-${seed}.svg`, new Blob([moving], { type: 'image/svg+xml' }));
-  for (const id of Object.keys(MORPH_NUMBERS)) $(id).addEventListener('input', morphOuts);
+  $('mPlay').onclick = () => {
+    const t0 = performance.now(), ms = +$('mSeconds').value * 1000;
+    const tick = (now) => {
+      const t = Math.min(1, (now - t0) / ms);
+      $('mSlide').value = t;
+      showStep(t);
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
 
   // Presets: everything that makes this picture, so it can be had again.
   const paletteOf = (p) => ({ title: p.title, paper: p.paper, ink: p.ink, colours: [...p.colours], weights: p.weights ? [...p.weights] : undefined });
@@ -537,7 +540,8 @@
     seed, bg: bgPicked, richness: +$('richness').value, cloudOpacity: +$('cloudOpacity').value,
     face: { font: $('face').value, weight: +$('faceWeight').value },
     letter: { on: $('letter').checked, text: $('letterText').value, size: +$('letterSize').value, strength: +$('letterStrength').value },
-    emblem: { on: emblem(), at: +$('emAt').value }, swell: $('swell').checked, frame: $('frame').value, morph: morphDials(),
+    emblem: { on: emblem(), at: +$('emAt').value }, swell: $('swell').checked, frame: $('frame').value,
+    animate: { start: $('mStart').value, end: $('mEnd').value, frames: +$('mFrames').value, seconds: +$('mSeconds').value },
     name: { on: $('name').checked, text: $('nameText').value, size: +$('nameSize').value, place: $('namePlace').value, clear: +$('nameClear').value, caps: $('nameCaps').checked, italic: $('nameItalic').checked, spacing: +$('nameSpacing').value },
     // Only palettes that differ from the places as shipped: edited, shuffled, or drawn from a photo.
     palettes: Object.fromEntries(Object.entries(palettes).filter(([k, p]) => changed(k, p)).map(([k, p]) => [k, paletteOf(p)])),
@@ -565,16 +569,20 @@
     $('emblem').checked = !!e.on; $('emAt').value = e.at ?? 0; $('swell').checked = s.swell ?? true; $('frame').value = s.frame ?? '800x1000';
     const n = s.name ?? {};
     $('name').checked = !!n.on; $('nameText').value = n.text ?? 'Archipelago'; $('nameSize').value = n.size ?? 0.1; $('namePlace').value = n.place ?? 'low-left'; $('nameClear').value = n.clear ?? 1; $('nameCaps').checked = !!n.caps; $('nameItalic').checked = !!n.italic; $('nameSpacing').value = n.spacing ?? 0; showName();
-    setMorph(s.morph);
+    const m = s.animate ?? {};
+    if (m.start) $('mStart').value = m.start;
+    if (m.end) $('mEnd').value = m.end;
+    $('mFrames').value = m.frames ?? 40; $('mSeconds').value = m.seconds ?? 8;
+    animateOuts();
     showLetter(); showClouds(); showEmblem();
     showSource(); swatches(); draw();
   }
   function listPresets(chosen = '') {
     const names = Object.keys(presets.all()).sort((a, b) => a.localeCompare(b));
-    for (const id of ['mStart', 'mEnd']) {
+    for (const [id, wanted] of [['mStart', 'Hero Start'], ['mEnd', 'Hero End']]) {
       const was = $(id).value;
       $(id).innerHTML = names.map((n) => `<option>${n.replace(/</g, '&lt;')}</option>`).join('');
-      if (names.includes(was)) $(id).value = was;
+      if (names.includes(was || wanted)) $(id).value = was || wanted;
     }
     $('preset').innerHTML = `<option value="">${names.length ? 'Load a preset…' : 'No presets yet'}</option>` + names.map((n) => `<option>${n.replace(/</g, '&lt;')}</option>`).join('');
     $('preset').value = chosen;
@@ -611,7 +619,6 @@
   };
 
   listPresets();
-  setMorph();
   swatches();
   draw();
 </script>

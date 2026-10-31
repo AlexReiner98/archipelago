@@ -85,8 +85,6 @@ export const DEFAULTS = {
   line: 1.2,       // outline weight
   seed: 1,
   wrap: false,     // repeat seamlessly left to right
-  pinned: null,    // a field and its places given from outside (morph.js): nothing is grown, and what stands at a point
-                   // depends on that point alone, so pictures of a field as it changes change only where it does
 };
 
 /**
@@ -113,6 +111,10 @@ export function ridges(dials) {
     return v * (1 - t) + fn(toCell(x - W) * k + off, b) * t;
   };
   const rise = d.rise * 16 * gap, step = Math.max(1, d.step * gap * 1.6), dx = 2;
+  // What is chosen at random is chosen by place, a row and a stretch of the page, never in the order things are met:
+  // so moving a dial changes what stands where it changes, and every other colour holds still.
+  const stretch = W / 8;
+  const atPlace = (r, x, k) => random(d.seed * 7919 + r * 8191 + Math.floor(x / stretch) * 127 + k);
   const xs = Array.from({ length: Math.floor((W - (d.wrap ? 0 : 2 * M)) / dx) + 1 }, (_, i) => (d.wrap ? 0 : M) + i * dx);
   const shapes = [], sky = [];
 
@@ -342,25 +344,17 @@ export function ridges(dials) {
       // random check decides whether it climbs (at a random share of the max slope, never more) or stays level. The
       // walks from the two coasts meet and the lower holds, so ramps alternate with benches and plateaus. With no
       // variety every section climbs at the max: the plain cap.
-      const lim = d.slope * dx, v = Math.min(1, d.undulate), rr = random(d.seed * 7177 + r * 131);
+      const lim = d.slope * dx, v = Math.min(1, d.undulate);
       // The walk follows the land as it goes (never above it, so after a dip it climbs again from the dip, as the
       // plain cap does), and the first section off a coast always climbs, so no coast is eaten away.
       const walk = (order) => {
-        let height = 0, left = 0, climb = lim, fresh = true, place = -1;
+        let height = 0, section = -1, climb = lim, fresh = true;
         for (const i of order) {
-          if (raws[i] <= 0) { (height = 0), (left = 0), (fresh = true), (place = -1); continue; }
-          if (d.pinned) {
-            // Sections stand at fixed places along the row, each with its own check, whatever the coast does.
-            const section = Math.floor(i / 7);
-            if (section !== place) {
-              place = section;
-              const here = random(d.seed * 7177 + r * 131 + section * 31);
-              climb = fresh || here() < 1 - 0.6 * v ? lim * (1 - 0.7 * v * here()) : 0;
-              fresh = false;
-            }
-          } else if (left-- <= 0) {
-            left = 2 + Math.floor(rr() * (4 + 10 * d.undulate));
-            climb = fresh || rr() < 1 - 0.6 * v ? lim * (1 - 0.7 * v * rr()) : 0;
+          if (raws[i] <= 0) { (height = 0), (section = -1), (fresh = true); continue; }
+          if (Math.floor(i / 7) !== section) {
+            section = Math.floor(i / 7);
+            const here = random(d.seed * 7177 + r * 131 + section * 31);
+            climb = fresh || here() < 1 - 0.6 * v ? lim * (1 - 0.7 * v * here()) : 0;
             fresh = false;
           }
           raws[i] = height = Math.min(raws[i], height + climb);
@@ -408,7 +402,8 @@ export function ridges(dials) {
       let j = i;
       while (j < xs.length && h[j] >= 0.5) j++;
       const mid = (i + j) >> 1, group = gs[mid], stp = steps[mid];
-      let start = Math.floor(rnd() * 1000), hills = 0;
+      const picks = atPlace(r, xs[mid], 1);
+      let start = Math.floor(picks() * 1000), hills = 0;
       // With repeat on, an island's two halves either side of the seam take the same colours.
       if (d.wrap && i === 0) seamStart = start;
       if (d.wrap && j === xs.length && seamStart !== null) start = seamStart;
@@ -435,10 +430,10 @@ export function ridges(dials) {
       // and cut them into smaller regions. Terraced like the range; never taller than the land they stand on.
       const soft = Math.max(0.02, Math.min(1, d.soft + formAt(xs[mid], y, at(xs[mid], y, yc)).soft));
       const terrace = (raw) => { const q = raw / stp, n = Math.floor(q); return stp * (n + smooth(1 - soft, 1, q - n)); };
-      const count = Math.round(d.foothills * ((j - i) * dx) / (gap * 7) + rnd() * d.foothills);
+      const count = Math.round(d.foothills * ((j - i) * dx) / (gap * 7) + picks() * d.foothills);
       for (let n = 0; n < count; n++) {
-        const c = i + Math.floor(rnd() * (j - i)), half = Math.max(3, Math.round(((1.2 + 3 * rnd()) * gap) / dx));
-        const top = h[c] * (0.3 + 0.4 * rnd());
+        const c = i + Math.floor(picks() * (j - i)), half = Math.max(3, Math.round(((1.2 + 3 * picks()) * gap) / dx));
+        const top = h[c] * (0.3 + 0.4 * picks());
         if (top < stp * 0.8) continue;
         const pts = [];
         for (let q = Math.max(i, c - half); q <= Math.min(j - 1, c + half); q++) {
@@ -451,30 +446,34 @@ export function ridges(dials) {
     }
     // The row's floor: a line across the water.
     shapes.push({ line: true, points: [[xs[0], y], [xs[xs.length - 1], y]] });
-    sky.push({ y, yc, h, at: shapes.length, shelf, steps, groups: gs });
+    sky.push({ y, yc, h, at: shapes.length });
   }
   // Clouds, from the mountains and spread on the wind (clouds.js): each row's go in just after its land, so nearer land passes
   // in front of farther cloud. Last row first, so the earlier places stay where they were.
   const made = clouds({ d, rows: sky, xs, dx, gap, puff, seam, shore, smooth });
   for (let r = sky.length - 1; r >= 0; r--) shapes.splice(sky[r].at, 0, ...made[r]);
-  return { width: W, height: H, shapes, line: d.line, chains: groups, rows: sky, xs, gap };
+  return { width: W, height: H, shapes, line: d.line, chains: groups };
+}
+
+/** k places over the page, 0 to 1 each way, well apart, from the seed alone: each the farthest of a few tries from the rest. */
+function placesOf(k, seed) {
+  const rnd = random(seed * 31 + 3), places = [[rnd(), rnd()]];
+  const apart = (p) => Math.min(...places.map((q) => Math.hypot(p[0] - q[0], p[1] - q[1])));
+  while (places.length < k) places.push(Array.from({ length: 12 }, () => [rnd(), rnd()]).reduce((a, b) => (apart(b) > apart(a) ? b : a)));
+  return places;
 }
 
 /** The field and its archipelagos for these dials, grown once and kept while the dials that shape it hold. */
 let grown = {};
 function diffusionFor(d, W, H) {
-  if (d.pinned) {
-    const { key, field, arch } = d.pinned;
-    grown = { key, akey: key, field, arch };
-    return { field, arch, level: 0.62 - d.land * 0.5 };
-  }
   const nx = Math.max(16, Math.round((40 + d.scale * 70) * (W / DEFAULTS.width))), ny = Math.round((nx * H) / W), level = 0.62 - d.land * 0.5;
   const key = `${nx}|${ny}|${d.pattern}|${d.variety}|${d.seed}`;
   if (grown.key !== key) grown = { key, field: grow({ nx, ny, pattern: d.pattern, variety: d.variety, seed: d.seed }) };
   // Anchors (page units) start the grouping where the places are, so each archipelago gathers the islands near it.
-  const starts = d.anchors?.map(([x, y]) => ({ x: (x / W) * nx, y: (y / H) * ny }));
+  // Without them, the places stand where the seed puts them, whatever the land does, so no dial moves a palette.
+  const starts = d.anchors?.map(([x, y]) => ({ x: (x / W) * nx, y: (y / H) * ny })) ?? placesOf(Math.max(1, d.chains), d.seed).map(([x, y]) => ({ x: x * nx, y: y * ny }));
   const akey = `${level}|${d.chains}|${JSON.stringify(starts)}`;
-  if (grown.akey !== akey) Object.assign(grown, { akey, arch: archipelagos(grown.field, level, starts?.length ?? Math.max(1, d.chains), d.seed, starts) });
+  if (grown.akey !== akey) Object.assign(grown, { akey, arch: archipelagos(grown.field, level, starts.length, d.seed, starts, !d.anchors) });
   return { field: grown.field, arch: grown.arch, level };
 }
 

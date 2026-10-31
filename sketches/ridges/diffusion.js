@@ -23,17 +23,18 @@ function torusNoise(nx, ny, cells, rnd) {
 }
 
 /**
- * A field that keeps growing: a Gray-Scott grid on an nx × ny torus, run on by `run(steps, pattern, diffuse)`, where
- * pattern is the dial and diffuse (0 to 1) how fast the chemicals spread, so how fine the forms are. Turning the
- * dials between runs carries the forms there: nothing is grown again, so nothing jumps. With variety, the pattern is
- * not one setting but drifts across the page with a slow noise: spots in one place, worms or coral in another.
+ * v, 0 to 1, on an nx × ny torus. With variety, the pattern is not one setting but drifts across the page with a
+ * slow noise: spots in one place, worms or coral in another, grown as one field.
  */
-export function growing({ nx, ny, variety = 0, seed = 1 }) {
+export function grow({ nx, ny, pattern = 0.3, variety = 0, steps = 4000, seed = 1 }) {
   const rnd = random(seed * 104729 + 7);
   const size = nx * ny;
   const drift = torusNoise(nx, ny, 3, random(seed * 7 + 11));
-  const drifts = Float32Array.from({ length: size }, (_, i) => variety * 1.6 * (drift(i % nx, Math.floor(i / nx)) - 0.5));
   const feedAt = new Float32Array(size), killAt = new Float32Array(size);
+  for (let i = 0; i < size; i++) {
+    const t = Math.max(-0.6, Math.min(2.2, pattern + variety * 1.6 * (drift(i % nx, Math.floor(i / nx)) - 0.5)));
+    ({ feed: feedAt[i], kill: killAt[i] } = rates(t));
+  }
   let u = new Float32Array(size).fill(1), v = new Float32Array(size), u2 = new Float32Array(size), v2 = new Float32Array(size);
   // Seeds: small squares of the second chemical, enough that the field fills fast.
   for (let s = 0; s < 6 + Math.round(size / 300); s++) {
@@ -49,38 +50,22 @@ export function growing({ nx, ny, variety = 0, seed = 1 }) {
     const i = (y * nx + x) * 8;
     [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([dx, dy], k) => (nb[i + k] = ((y + dy + ny) % ny) * nx + ((x + dx + nx) % nx)));
   }
-  const run = (steps, pattern, diffuse = 1) => {
+  for (let s = 0; s < steps; s++) {
     for (let i = 0; i < size; i++) {
-      const t = Math.max(-0.6, Math.min(2.2, pattern + drifts[i]));
-      ({ feed: feedAt[i], kill: killAt[i] } = rates(t));
+      const j = i * 8, ui = u[i], vi = v[i];
+      const lu = 0.2 * (u[nb[j]] + u[nb[j + 1]] + u[nb[j + 2]] + u[nb[j + 3]]) + 0.05 * (u[nb[j + 4]] + u[nb[j + 5]] + u[nb[j + 6]] + u[nb[j + 7]]) - ui;
+      const lv = 0.2 * (v[nb[j]] + v[nb[j + 1]] + v[nb[j + 2]] + v[nb[j + 3]]) + 0.05 * (v[nb[j + 4]] + v[nb[j + 5]] + v[nb[j + 6]] + v[nb[j + 7]]) - vi;
+      const uvv = ui * vi * vi;
+      u2[i] = ui + lu - uvv + feedAt[i] * (1 - ui);
+      v2[i] = vi + 0.5 * lv + uvv - (feedAt[i] + killAt[i]) * vi;
     }
-    for (let s = 0; s < steps; s++) {
-      for (let i = 0; i < size; i++) {
-        const j = i * 8, ui = u[i], vi = v[i];
-        const lu = 0.2 * (u[nb[j]] + u[nb[j + 1]] + u[nb[j + 2]] + u[nb[j + 3]]) + 0.05 * (u[nb[j + 4]] + u[nb[j + 5]] + u[nb[j + 6]] + u[nb[j + 7]]) - ui;
-        const lv = 0.2 * (v[nb[j]] + v[nb[j + 1]] + v[nb[j + 2]] + v[nb[j + 3]]) + 0.05 * (v[nb[j + 4]] + v[nb[j + 5]] + v[nb[j + 6]] + v[nb[j + 7]]) - vi;
-        const uvv = ui * vi * vi;
-        u2[i] = ui + diffuse * lu - uvv + feedAt[i] * (1 - ui);
-        v2[i] = vi + diffuse * 0.5 * lv + uvv - (feedAt[i] + killAt[i]) * vi;
-      }
-      [u, u2] = [u2, u];
-      [v, v2] = [v2, v];
-    }
-  };
-  /** The field as it stands, 0 to 1. */
-  const field = () => {
-    let max = 1e-6;
-    for (let i = 0; i < size; i++) max = Math.max(max, v[i]);
-    return { nx, ny, v: Float32Array.from(v, (c) => c / max) };
-  };
-  return { run, field };
-}
-
-/** v, 0 to 1, on an nx × ny torus, grown from its seeds with the dials held. */
-export function grow({ nx, ny, pattern = 0.3, variety = 0, steps = 4000, seed = 1 }) {
-  const g = growing({ nx, ny, variety, seed });
-  g.run(steps, pattern);
-  return g.field();
+    [u, u2] = [u2, u];
+    [v, v2] = [v2, v];
+  }
+  let max = 1e-6;
+  for (let i = 0; i < size; i++) max = Math.max(max, v[i]);
+  for (let i = 0; i < size; i++) v[i] /= max;
+  return { nx, ny, v };
 }
 
 /** The field at any point in cell units, smoothly, wrapping. */
@@ -95,7 +80,7 @@ export function sample({ nx, ny, v }, x, y) {
  * The islands the field makes above level t, gathered into k archipelagos by where they lie (k-means on their
  * middles, across the seams). Answers each cell's archipelago (-1 for sea) and each archipelago's island middles.
  */
-export function archipelagos({ nx, ny, v }, t, k, seed = 1, starts = null) {
+export function archipelagos({ nx, ny, v }, t, k, seed = 1, starts = null, fixed = false) {
   const size = nx * ny, island = new Int32Array(size).fill(-1), middles = [];
   for (let start = 0; start < size; start++) {
     if (v[start] < t || island[start] >= 0) continue;
@@ -112,7 +97,8 @@ export function archipelagos({ nx, ny, v }, t, k, seed = 1, starts = null) {
     middles.push({ x: ang(sx, cx, nx), y: ang(sy, cy, ny), n });
   }
   // A labyrinth is one island, or a few: then the land itself is split by where it lies, a piece per archipelago.
-  const byIsland = middles.length >= k;
+  // Places fixed from outside split land the same way, so no island's joining another changes whose it is.
+  const byIsland = !fixed && middles.length >= k;
   const points = byIsland ? middles : [];
   if (!byIsland) for (let i = 0; i < size; i += 3) if (island[i] >= 0) points.push({ x: i % nx, y: Math.floor(i / nx), n: 1 });
   const { of, centres, nearest } = byPlace(points, k, nx, ny, seed, starts);
@@ -125,7 +111,7 @@ export function archipelagos({ nx, ny, v }, t, k, seed = 1, starts = null) {
     (byGroup.get(g) ?? byGroup.set(g, []).get(g)).push(i);
   });
   for (const ids of byGroup.values()) ids.sort((a, b) => middles[b].n - middles[a].n).forEach((id, r) => (rank[id] = (r + 1) ** -0.6));
-  return { group, island, rank, centres, members: centres.map((_, i) => points.filter((_, j) => of[j] === i)) };
+  return { group, island, rank, centres, members: centres.map((c, i) => (fixed ? [c] : points.filter((_, j) => of[j] === i))) };
 }
 
 /** k-means over points on the torus: k centres started far apart, biggest first, settled across the seams. */
