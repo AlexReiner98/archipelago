@@ -44,7 +44,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       reason: z.string().min(1).optional().describe('Why this change is being made. Shown in the activity log. Needed, except with retry.'),
       retry: z.string().optional().describe('The name a refused change was kept under (the refusal gives it). The change is sent again as it was, with fixes put in: send only retry and fixes.'),
       fixes: z
-        .array(z.object({ at: z.number().int().positive().describe('The op’s number as the refusal counted it, from 1.'), op: op.nullable().describe('The whole op as it should be; null to leave it out.') }))
+        .array(z.object({ at: z.number().int().positive().describe('The op’s number as the refusal counted it, from 1.'), op: z.record(z.string(), z.unknown()).nullable().describe('The whole op as it should be, as in ops; null to leave it out.') }))
         .optional()
         .describe('With retry: the ops to put in place of the ones that were wrong.'),
       source: source.optional().describe('Where these facts came from. Individual ops can override it.'),
@@ -69,7 +69,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         const ops = [...kept.input.ops];
         for (const fix of fixes ?? []) {
           if (fix.at > ops.length) throw new Error(`Change rejected:\n- fixes: the change kept as "${retry}" has ${ops.length} ops, so there is no op ${fix.at}.`);
-          ops[fix.at - 1] = fix.op;
+          ops[fix.at - 1] = fix.op && op.parse(fix.op);
         }
         // What is said again (a reason, an authority) stands in for what was kept.
         input = { ...kept.input, ...Object.fromEntries(Object.entries(given).filter(([, v]) => v !== undefined)), ops: ops.filter(Boolean) };

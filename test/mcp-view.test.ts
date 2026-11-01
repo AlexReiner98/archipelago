@@ -32,6 +32,7 @@ test('query and report name the view, and the server says it speaks the extensio
 
 test('the view is listed and read through the endpoint: its type, its policy, no token and nothing it could fetch', async () => {
   const { client, token } = await connected();
+  assert.match(client.getInstructions() ?? '', /session_start/, 'a client with no hooks is told how to work here');
   const { resources } = await client.listResources();
   assert.deepEqual(resources.filter((r) => r.uri === URI).map((r) => r.mimeType), [TYPE]);
 
