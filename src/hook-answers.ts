@@ -12,6 +12,7 @@ import { sessionLabelled } from './session-name.ts';
 import { addTouched } from './touched.ts';
 import { fileSaid } from './file-said.ts';
 import { keepGit } from './git-state.ts';
+import { sessionOpened } from './tool-change.ts';
 import { describeChanges, humanChanges, latestSeq } from './tools.ts';
 import { summed } from './summary.ts';
 import { keep, kept } from './transient.ts';
@@ -121,10 +122,13 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   }
   if (event === 'session-start') {
     await keep(whole, heardKey(body.session_id), await latestSeq(pelago), HEARD_MS);
+    const known = body.session_id ? await resolveRun(pelago, body.session_id) : undefined;
     let additionalContext = await hookSessionStart(pelago, body);
     // The hook keeps it in the checkout, where the commit-msg hook the setup installs finds it to name the run in a commit.
     const run = body.session_id ? await resolveRun(pelago, body.session_id, true) : undefined;
     if (run) call.ran?.(run.id);
+    // A new one gets a tab of its own on the owner's page; one taken up again has its own already.
+    if (run && !known) await sessionOpened(pelago, { kind: 'agent', name: 'claude-code' }, run.id).catch((err) => console.error(`hook tab: ${(err as Error).message}`));
     // A project keeps the files it was given when it was set up; the server moves on. A session is told when its
     // project is behind, since nothing else would: an old hook counts less, and old rules name tools as they were.
     if (body.setup !== SETUP_VERSION)

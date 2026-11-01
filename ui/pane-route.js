@@ -2,6 +2,8 @@
 // from whom each tab follows and whose each pane is, and nothing else, so it is tested without a page. A tab is a set of
 // panes, every one alike, and follows everyone (as the first does unless the reader says), one session, or nobody (decisions
 // e_622ev534, e_nwmx4tbd, e_y7uz9pk9; tabs: e_mzer5m4t, e_q3amet26, e_ezb7s3a7, e_xjrpyysn):
+// - A session that has just begun (`opens`, said by the server, never by a show) gets a tab of its own, out of sight and
+//   marked, wherever it could have landed; a page whose tabs all follow nobody takes none (the owner, 1 Nov 2026, e_c5stzz6z).
 // - Only a show lands (ui/live.js sends no other). A change or a beat of a session's story moves nothing (the owner,
 //   29 Oct 2026, e_e7yfp2yg): with several sessions at work, the reader's canvas stays where they left it.
 // - A show goes to a tab that follows its session, else to one that follows everyone and no other session at work
@@ -105,6 +107,7 @@ export function route(step, tabs, { now, recent, drawable = true }) {
   }
   const own = tabs.filter((t) => t.follows === session).sort((a, b) => (last(b)?.at ?? 0) - (last(a)?.at ?? 0))[0];
   if (own) return into(own);
+  if (step.opens) return tabs.some((t) => t.follows !== 'none') ? ownTab() : { nowhere: true };
   // A pane of its own moved into a tab that follows someone else stays its own (ui/tab-bar.js); the reader's Nobody is kept.
   const holding = tabs.find((t) => !['all', 'none'].includes(t.follows) && !t.popped && t.panes.some((p) => p.held === session));
   if (holding) return into(holding);

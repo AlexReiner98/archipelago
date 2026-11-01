@@ -40,7 +40,8 @@ export function follow(steps = []) {
   const fresh = seenStep === undefined ? [] : steps.filter((s) => s.at > seenStep);
   seenStep = steps.at(-1)?.at ?? seenStep ?? 0;
   for (const s of steps) hear(s);
-  for (const s of fresh) if (s.kind === 'show' && s.hash) waiting.set(sessionOf(s), s);
+  // A later show takes the place of what waits, and its tab of its own, if it was owed one, stays owed.
+  for (const s of fresh) if (s.kind === 'show' && s.hash) waiting.set(sessionOf(s), { ...s, opens: s.opens || waiting.get(sessionOf(s))?.opens });
   if (!hooks.land || document.querySelector('dialog[open]')) return;
   for (const s of waiting.values()) hooks.land(s);
   waiting.clear();
