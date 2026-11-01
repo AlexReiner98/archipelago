@@ -164,6 +164,32 @@ export async function loadRows(tx: Q, rows: Partial<Rows>): Promise<void> {
   }
 }
 
+/**
+ * What the log never made, from today's tables: a map older than its log (24 Oct 2026) holds items and links no entry
+ * made, and held changes no entry records, so a walk from the log's start begins with them, as they stand. What the
+ * log then says of them is said on top, so the head comes out as it is; a past position shows a value the log has not
+ * said yet as it stands today. Without them a rebuild would take them from the map, as the log says nothing of them.
+ */
+export async function beforeTheLog(tx: Q, kept: string[]): Promise<Rows> {
+  const read = async (sql: string, params: unknown[] = []) => (await tx.query<{ row: Props }>(sql, params)).rows.map((r) => r.row);
+  return {
+    entity: await read(
+      `select to_jsonb(e) || jsonb_build_object('props', e.props - $1::text[]) as row from public.entity e where not exists (
+         select 1 from log_fact t join log_fact h on h.stream = t.stream and h.pos = t.pos and h.id = t.id
+         where t.id = e.id and t.field = 'type' and t.op = '+' and t.stream = 'facts' and h.field = 'title' and h.op = '+') -- index log_fact_history`,
+      [kept],
+    ),
+    // A link's type said again by a pack that took it over does not make it.
+    relation: await read(
+      `select to_jsonb(r) as row from public.relation r where not exists (
+         select 1 from log_fact f join log_entry l on l.stream = f.stream and l.pos = f.pos
+         where f.id = r.id and f.field = 'link' and f.op = '+' and f.stream = 'facts' and coalesce(l.head #>> '{action}', '') <> all($1::text[])) -- index log_fact_history`,
+      [MOVED],
+    ),
+    proposal: await read(`select to_jsonb(p) as row from public.proposal p where not exists (select 1 from log_entry l where l.id = p.id) -- index log_entry_id`),
+  };
+}
+
 const ITEM = ['type', 'kind', 'title', 'body', 'status', 'is_open', 'owner', 'visibility', 'confidence', 'source_id', 'private_to', 'created_at', 'updated_at', 'archived_at'];
 const LINK = ['type', 'from_id', 'to_id', 'props', 'confidence', 'source_id', 'valid_from', 'valid_to'];
 const QUEUE = ['ts', 'actor', 'reason', 'source', 'ops', 'warnings', 'status', 'decided_by', 'decided_at', 'note', 'private_to', 'held_by'];

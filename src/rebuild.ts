@@ -7,7 +7,7 @@
 import { setImmediate } from 'node:timers/promises';
 import type { Db, Q } from './db.ts';
 import { headOf, stored, type Entry } from './log.ts';
-import { inOrder, type Kinds, loadRows, projectEntry, projectedRows, PROJECTED, shadowTables, swapIn, SHADOW, type Rows } from './replay.ts';
+import { beforeTheLog, inOrder, type Kinds, loadRows, projectEntry, projectedRows, PROJECTED, shadowTables, swapIn, SHADOW, type Rows } from './replay.ts';
 import { projectsApart, regatherAll } from './closure.ts';
 import { mentionedAll } from './mentions.ts';
 import { openAll } from './seal.ts';
@@ -78,7 +78,7 @@ export async function catchUp(db: Db, reg: Kinds, ws: string, swap: boolean, o: 
     await db.transaction(async (tx) => {
       await shadowTables(tx);
       await inShadow(tx);
-      if (start) await loadRows(tx, start.rows);
+      await loadRows(tx, start?.rows ?? (await beforeTheLog(tx, KEPT_FIELDS)));
       // A snapshot keeps items, links and the queue: what is inside what and what names what are made from them, when
       // they are to be swapped in. A snapshot alone never reads them.
       if (swap) {
@@ -150,7 +150,7 @@ export async function asOf(db: Db, reg: Kinds, ws: string, pos: number, reader: 
   const start = await newestValid(db, ws, pos);
   const out = await db.transaction(async (tx) => {
     for (const t of PROJECTED) await tx.query(`create temp table ${t} (like public.${t} including defaults including indexes) on commit drop`);
-    if (start) await loadRows(tx, start.rows);
+    await loadRows(tx, start?.rows ?? (await beforeTheLog(tx, KEPT_FIELDS)));
     const at: Positions = start ? { ...start.snapshot.positions } : { facts: 0, pending: 0 };
     // The moment of fact entry `pos`: the held changes made by then are in, those after it are not.
     const until = (await tx.query<{ at: Date }>(`select at from log_entry where stream = 'facts' and pos = $1`, [pos])).rows[0]?.at;

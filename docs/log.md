@@ -885,6 +885,11 @@ never sees the log ahead of them.
   newest one; where none fits the running code (a new projector, or none
   yet), the projections are rebuilt from the start in the background and
   swapped in.
+- **Older than the log.** A map from before 24 Oct 2026 holds items, links
+  and held changes no entry made. A walk from the log's start begins with
+  them as they stand today (`beforeTheLog`, `src/replay.ts`), and what the
+  log says of them goes on top: the head is right, and a past position shows
+  a value the log has not said yet as it stands today.
 - **As of a position.** The nearest snapshot at or before it, then the
   entries of both streams up to the moment of that fact entry, projected
   into temporary tables that live for one transaction. The reader sees of it
