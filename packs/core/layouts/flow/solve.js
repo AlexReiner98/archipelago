@@ -2,7 +2,7 @@
 // another keeps a least distance, by what the two are. The distance is asked for, not kept as found, so wires too near are
 // moved apart and no two wires share a line. Order on an axis is read off the drawing as given, so nothing crossed is undone
 // and nothing new is crossed. What is held stays where it stands and the rest keeps its distances from it, so a first draw
-// and a step put by hand are the same pass with different things held. Layer: metrics. Pure: places and lines in, changed in place.
+// and a step put by hand are the same pass, the second with pins held. Layer: metrics. Pure: places and lines in, changed in place.
 
 import { pair, tidy } from './polyline.js';
 import { shelve } from './shelves.js';
@@ -152,7 +152,7 @@ function sides(group, axis) {
 const byTie = (p, q) => (p.tie ?? 0) - (q.tie ?? 0) || (p.far ?? 0) - (q.far ?? 0);
 
 /** One pass along `axis`, 0 across and 1 down. */
-function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart, told, still }) {
+function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart, told, pins }) {
   const other = 1 - axis, stretches = [], places = [];
   const number = (value) => (places.push(value), places.length - 1);
   for (const b of boxes) ((b.low = number(b.at[axis] - b.size[axis] / 2)), (b.high = number(b.at[axis] + b.size[axis] / 2)));
@@ -208,19 +208,12 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
     const left = from < to && seen[from].lo < it.lo ? [{ lo: seen[from].lo, hi: it.lo, it: seen[from].it }] : [], right = from < to && seen[to - 1].hi > it.hi ? [{ lo: it.hi, hi: seen[to - 1].hi, it: seen[to - 1].it }] : [];
     seen.splice(from, to - from, ...left, { lo: it.lo, hi: it.hi, it }, ...right);
   }
-  let at;
-  if (still) {
-    // A stretch stays with a box that does not move: only what lands on what moved goes with it.
-    const held = new Set(boxes.flatMap((b) => [b.low, b.high]));
-    for (const s of stretches) if (!s.line.free || s.own.some((id) => !s.line.free.has(id))) held.add(s.n);
-    at = within(places, held, arcs, told);
-  } else {
-    at = freely(places, arcs, boxes, told);
-    for (const b of boxes) {
-      const [low, high] = [at[b.low], at[b.high]];
-      b.at[axis] = (low + high) / 2;
-      b.size[axis] = high - low;
-    }
+  const at = pins ? within(places, new Set(boxes.filter((b) => pins.has(b.id)).flatMap((b) => [b.low, b.high])), arcs, told) : freely(places, arcs, boxes, told);
+  for (const b of boxes) {
+    const [low, high] = [at[b.low], at[b.high]];
+    b.at[axis] = (low + high) / 2;
+    // Round what is held a box keeps its size: it moves to make room, and is not stretched by it.
+    if (!pins) b.size[axis] = high - low;
   }
   for (const s of stretches) {
     const p = s.line.points;
@@ -229,7 +222,6 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
   }
   // An end that comes across the box's side, not onto it, stands on that side.
   for (const line of lines) {
-    if (still && !line.free) continue;
     const p = line.points;
     for (const [end_, next, id, across] of [[p[0], p[1], line.a, line.across[0]], [p.at(-1), p.at(-2), line.b, line.across[1]]]) {
       if (!next || !across) continue;
@@ -272,14 +264,15 @@ export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, joi
 }
 
 /**
- * Wires set again round what stands: every box stays, every line stays but those with `free`, the items that moved, and of
- * those what lands on anything else stays too. `boxes` are { id, at, size, named } and `lines` { a, b, points, free }, whose
- * points are changed. Says how many distances could not be kept.
+ * The picture set again round pins: every box in `held` stays where it stands, and the rest, boxes and wires, each as near
+ * where it stands as its distances from all that let it. `boxes` are { id, at, size, named } and `lines` { k, a, b, points },
+ * changed in place. Says how many distances could not be kept.
  */
-export function settle({ boxes, lines, wire, room, run, corner, apart, rounds = 2 }) {
+export function settle({ boxes, lines, held, wire, room, run, corner, apart, join, rounds }) {
   const told = { freed: 0, squeezed: 0, rings: 0 };
   lines.box = new Map(boxes.map((b) => [b.id, b]));
-  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, told, still: true });
+  lines.joined = new Set(lines.map((l) => pair(l.a, l.b)));
+  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, join, told, pins: held });
   return told;
 }
 

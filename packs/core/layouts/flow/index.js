@@ -21,6 +21,7 @@ import { latest, layout } from './layout.js';
 import { css } from './look.js';
 import { addClass, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
+import { drawn } from './polyline.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 
@@ -126,7 +127,8 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   // A tie's head is on the end its link points to (`headAt`, the end or the start of its line), the way the line comes into it.
   const headless = new Set(Array.isArray(style.headless) ? style.headless : []);
   const tieHead = (t) => head(t.headAt === 'start' ? [...t.points].reverse() : t.points);
-  const line = (points) => `M${points.map((p) => p.join(' ')).join('L')}`;
+  // A wire is broken where it passes under another; one that is drawn in as a story plays stays whole.
+  const line = (w) => drawn(w.points, story ? [] : w.gaps, z('break_half'));
   // A held change's badge: where the person decides it, on the step's corner or a wire's middle. One per mark.
   let badges = 0;
   const badge = (pending, [bx, by]) => titled(m('g', { key: `held:${pending.proposal}:${++badges}`, on: ['click'], class: 'lf-held', transform: `translate(${bx} ${by})` }, m('circle', { cx: 0, cy: 0, r: z('held_badge') }), m('text', { x: 0, y: 0 }, '?')), `Held for you${pending.reason ? `: ${pending.reason}` : ''}`);
@@ -139,7 +141,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
 
   // What can be dimmed, by the item it is of; each step's key, for hovering; the badge of each step a held change is on.
   const dims = new Map(), keyed = new Map(), tipped = new Set(), stepBadges = new Map();
-  // Ties under everything, then wires, then the breaks cut across them, then the steps over all, then what each choice is.
+  // Ties under everything, then wires, each broken where it passes under, then the steps over all, then what each choice is.
   const drawIn = story ? { pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 } : {};
   const pend = (p) => (p ? ` held${p.mine ? ' mine' : ''}` : '');
   // Each link type its colour: the one the style names for it (link_colours), else one of link_hues, the same for the
@@ -182,18 +184,17 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const partOf = (id) => (hexOf.has(shownAs.of.get(id)) ? placeClass(hexOf.get(shownAs.of.get(id))) : '');
   const tieLayer = g.ties.map((t, n) => {
     const cls = `${kind(t.type)}${pend(t.pending)}`;
-    const path = m('path', { key: `n:${n}`, d: line(t.points), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${headless.has(t.type) ? '' : ' headed'}${cls}`, ...drawIn, ...hidden });
+    const path = m('path', { key: `n:${n}`, d: line(t), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${headless.has(t.type) ? '' : ' headed'}${cls}`, ...drawIn, ...hidden });
     return headless.has(t.type) ? path : [path, m('path', { key: `nh:${n}`, d: tieHead(t), class: `lf-head${cls}`, ...hidden })];
   });
   const wireLayer = g.chains.map((c, n) => {
-    return [m('path', { key: `w:${n}`, d: line(c.points), class: `lf-wire${kind(ORDER_TYPE)}${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden }), m('path', { key: `h:${n}`, d: head(c.points), class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}`, ...hidden })];
+    return [m('path', { key: `w:${n}`, d: line(c), class: `lf-wire${kind(ORDER_TYPE)}${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden }), m('path', { key: `h:${n}`, d: head(c.points), class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}`, ...hidden })];
   });
   // The badges of held links, with the wire or tie each sits on, so a step moved takes them with its wires. A link of a
   // new item held in the same change is decided with it: the item's badge is the one.
   const madeBy = (id, p) => g.nodes.get(id)?.item?.pending?.op === 'create' && g.nodes.get(id).item.pending.proposal === p.proposal;
   const wiresIn = (model) => [...model.chains, ...model.ties];
   const linkBadges = wiresIn(g).map((l, n) => [l, n]).filter(([l]) => held(l.pending) && !madeBy(l.a, l.pending) && !madeBy(l.b, l.pending)).map(([l, n]) => ({ n, mark: badge(l.pending, middleOf(l.points)) }));
-  const breakLayer = g.breaks.map(([bx, by]) => m('g', { class: 'lf-break' }, m('rect', { x: bx - z('break_half'), y: by - z('break_reach'), width: 2 * z('break_half'), height: 2 * z('break_reach') }), m('path', { d: `M${bx - z('break_track')} ${by}H${bx + z('break_track')}` })));
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + (n.stub ? z('stub_text_x') : z('text_x'));
@@ -234,7 +235,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     const text = saysText(c), w = saysWide(c), [lx, ly] = saysAt(g, c), sh = z('says_height');
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
-  const svg = m('svg', { viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, breakLayer, stepLayer, saysLayer, [...stepBadges.values()], linkBadges.map((b) => b.mark));
+  const svg = m('svg', { viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, stepLayer, saysLayer, [...stepBadges.values()], linkBadges.map((b) => b.mark));
 
   // The key: what each mark this picture uses means, one to a row (the page draws it, docs/layouts.md). A step with no
   // other mark is said by its own status ("Todo", "Decided"), one row for each its steps have, in its colour.
@@ -296,10 +297,10 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
       patches.push({ key, set: { transform: `translate(${x - g.x.get(id)} ${y - g.y.get(id)})` } });
       if (stepBadges.has(id)) patches.push({ key: stepBadges.get(id)[1].key, set: { transform: `translate(${x + n.w / 2} ${y - n.h / 2})` } });
     }
-    next.chains.forEach((c, n) => c.points !== was.chains[n].points && patches.push({ key: `w:${n}`, set: { d: line(c.points) } }, { key: `h:${n}`, set: { d: head(c.points) } }));
+    next.chains.forEach((c, n) => (c.points !== was.chains[n].points || c.gaps !== was.chains[n].gaps) && patches.push({ key: `w:${n}`, set: { d: line(c) } }, { key: `h:${n}`, set: { d: head(c.points) } }));
     next.ties.forEach((t, n) => {
       if (t.points === was.ties[n].points) return;
-      patches.push({ key: `n:${n}`, set: { d: line(t.points) } });
+      patches.push({ key: `n:${n}`, set: { d: line(t) } });
       if (!headless.has(t.type)) patches.push({ key: `nh:${n}`, set: { d: tieHead(t) } });
     });
     const wires = wiresIn(next), before = wiresIn(was);
