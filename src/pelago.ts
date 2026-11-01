@@ -271,7 +271,7 @@ export class Archipelago {
     if (verdict.outcome === 'hold') {
       const id = newId('p');
       // What it would do on the map as it is now, with the ids it would make: approved with nothing moved, it appends these facts.
-      const { facts = [], ids = {} } = await this.apply(me, input, { authority, dry: true });
+      const { facts = [], ids = {}, created: would = {} } = await this.apply(me, input, { authority, dry: true });
       const base = (await headOf(this.db)).pos, rule = verdict.by && { rule: verdict.by.rule, pack: verdict.by.pack, say: verdict.by.say };
       // The queue is a projection of the pending stream: the record makes its row (src/replay.ts).
       await this.db.transaction(async (tx) =>
@@ -282,8 +282,8 @@ export class Archipelago {
         status: 'proposed' as const,
         proposal: id,
         held_by: verdict.by,
-        warnings,
-        note: 'Nothing has changed yet. A human must approve this proposal before it appears in the map.',
+        warnings, would_make: would,
+        note: 'Nothing has changed yet: this waits for a person. would_make names what it makes once approved. Those ids do not exist until then, so send what builds on them in this same change, or carry on with other work.',
       };
     }
     const spared = [...new Map(verdict.spared.flat().map((r) => [`${r.pack}.${r.rule}`, { rule: r.rule, pack: r.pack }])).values()];

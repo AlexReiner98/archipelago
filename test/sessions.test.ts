@@ -329,3 +329,20 @@ test('a session that says it is done or succeeded has finished', async () => {
     assert.equal(((await callTool(l, agent, 'session_end', { run, outcome })) as any).status, 'finished');
   }
 });
+
+test('a session announced again after it ended takes up its own run, with no second one beside it', async () => {
+  const l = await fresh();
+  const { run, name } = await sessionStart(l, agent, { session_id: 'back' });
+  await sessionEnd(l, agent, { run: run!, outcome: 'finished' });
+  const again = await sessionStart(l, agent, { session_id: 'back' });
+  assert.deepEqual([again.run, again.name, again.status, again.resumed], [run, name, 'running', true]);
+  assert.equal((await l.entity(run!))?.is_open, true);
+});
+
+test('a held change says what it would make', async () => {
+  const l = await fresh();
+  const held = (await callTool(l, agent, 'change', { reason: 'test', hold: true, ops: [{ op: 'create', ref: 'it', type: 'task', title: 'Held' }] })) as any;
+  assert.equal(held.status, 'proposed');
+  assert.match(held.would_make.it, /^e_/);
+  assert.ok(!(await l.entity(held.would_make.it)), 'and it does not exist yet');
+});
