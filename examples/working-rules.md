@@ -13,8 +13,9 @@ actions; `query` with name `actions` gives their inputs whole.
 
 ## At the start
 
-1. `query` with name `handoff` and params `repo` (the id the session hook gave). One
-   answer holds the last push, what has happened lately, what sessions left
+1. Handed a task, `query` with name `brief` and params `task`: it holds what that
+   task needs. Otherwise `query` with name `handoff` and params `repo` (the id
+   the session hook gave). One answer holds the last push, what has happened lately, what sessions left
    unpushed (`left`), what nobody has seen working (`unseen`), the traps in
    the repository's files (`traps`), and the open work. If it has `for_owner` with questions settled on an
    agent's own judgment, show the owner those in your first reply and ask

@@ -171,7 +171,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       'Close a registered session with its outcome and a summary. Everything it held is released. A session that finishes in a repository is first shown that repository\'s open work nobody has changed since it began (answer: ended false, with the list): change what is done or no longer as written, name what you checked and found still true in still_true, name what this session had nothing to do with and cannot check in cannot_tell (cannot_tell_rest: true for all the rest), and call again. What waits on a person’s answer (waits_on), or has a change of its own waiting for the human, is not asked about.',
     input: {
       run: z.string().describe('The run id from session_start, or the session id.'),
-      outcome: z.enum(['finished', 'failed', 'cancelled']).optional(),
+      outcome: z.enum(['finished', 'failed', 'cancelled', 'done', 'success']).optional().describe('finished, failed or cancelled; done and success are read as finished.'),
       summary: z.string().optional().describe('What was done and what is left.'),
       still_true: z.array(z.string()).optional().describe('Ids of open items you have checked and found still true as written.'),
       cannot_tell: z.array(z.string()).optional().describe('Ids of open items this session had nothing to do with and cannot check from where it is. They are left as they were, and the session says it did not check them.'),
@@ -179,7 +179,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => {
       // An agent says where the repository's work stands; the human ending a session from the UI is not asked.
-      const result = await sessionEnd(l, actor, { ...input, reconcile: actor.kind === 'agent' });
+      const outcome = input.outcome === 'done' || input.outcome === 'success' ? 'finished' : input.outcome;
+      const result = await sessionEnd(l, actor, { ...input, outcome, reconcile: actor.kind === 'agent' });
       if ('ended' in result) return result;
       // If this server started the session's process, stop that too.
       return { ...result, process_stopped: stopLaunched(result.run) };

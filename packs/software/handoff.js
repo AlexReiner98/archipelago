@@ -66,7 +66,10 @@ export async function handoff(input, ctx) {
   for (const r of ran) ended.push({ id: r.id, title: r.title, status: r.status, ended: r.updated_at, said: said((await ctx.read({ get: r.id }))?.body) });
   // What agents settled and the owner has not confirmed, as attention gives it to the owner.
   const asked = await ctx.read({ view: 'attention', params: { reasons: ['to_confirm'], limit: 15 } });
-  const unconfirmed = asked.to_confirm ? { ...asked.to_confirm, questions: asked.items.map((i) => ({ id: i.id, title: i.title, ...Object.fromEntries(Object.entries(i.reasons[0]).filter(([k]) => k !== 'why')) })) } : { count: 0 };
+  // Only what is on an agent's judgment asks anything of a session; the rest is a count, as the session's start says it.
+  const judged = asked.items.map((i) => ({ id: i.id, title: i.title, ...Object.fromEntries(Object.entries(i.reasons[0]).filter(([k]) => k !== 'why')) })).filter((q) => !String(q.on).startsWith('the owner'));
+  const { how: confirmHow, ...counted } = asked.to_confirm ?? { count: 0 };
+  const unconfirmed = { ...counted, ...(judged.length > 0 && { how: confirmHow, questions: judged }) };
   const inRepo = new Set([repo.id, ...(await ctx.read({ scope: repo.id, fields: [] })).map((e) => e.id)]);
   const unshaped = (await ctx.read({ view: 'hubs', params: { within: repo.id } })).hubs.filter((h) => h.views === 0 && inRepo.has(h.id));
   // Built or done, and nobody has seen it work where it is used: said on the item itself.

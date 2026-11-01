@@ -62,10 +62,10 @@ const inputsOf = (tool: Tool) => {
  */
 export function contentOf(result: unknown) {
   const image = result && typeof result === 'object' ? (result as { image?: { data?: unknown; content_type?: unknown } }).image : undefined;
-  if (!image || typeof image.data !== 'string' || typeof image.content_type !== 'string') return [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }];
+  if (!image || typeof image.data !== 'string' || typeof image.content_type !== 'string') return [{ type: 'text' as const, text: JSON.stringify(result) }];
   const { image: _sent, ...rest } = result as Record<string, unknown>;
   return [
-    { type: 'text' as const, text: JSON.stringify(rest, null, 2) },
+    { type: 'text' as const, text: JSON.stringify(rest) },
     { type: 'image' as const, data: image.data, mimeType: image.content_type },
   ];
 }

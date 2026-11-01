@@ -321,3 +321,11 @@ test('a session says it is one, and carries what Claude calls it, cut to a name'
   await sessionLabelled(l, run, 42);
   assert.equal((await l.db.query<{ n: number }>('select count(*)::int as n from log_entry')).rows[0].n, before, 'the same title again writes nothing');
 });
+
+test('a session that says it is done or succeeded has finished', async () => {
+  const l = await fresh();
+  for (const [n, outcome] of ['done', 'success'].entries()) {
+    const { run } = await sessionStart(l, agent, { session_id: `said-${n}` });
+    assert.equal(((await callTool(l, agent, 'session_end', { run, outcome })) as any).status, 'finished');
+  }
+});
