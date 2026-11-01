@@ -12,6 +12,8 @@ const IDLE_MS = 5 * 60_000;
 const DRAW_MS = 15_000;
 /** Past this a PNG is sent as a JPEG instead: a picture is for reading, not for keeping. */
 const PNG_MOST = 400_000;
+/** Past this a drawing's marks are not sent: the picture is, as for a drawing with no marks. */
+const MARKS_MOST = 1_500_000;
 
 export interface Drawn {
   data: Buffer;
@@ -24,6 +26,18 @@ export interface Drawn {
   /** Whether two pictures a moment apart were the same: false for a drawing that moves. */
   settled: boolean;
   ms: number;
+  /** The drawing as marks, where they were asked for and it has them (ui/look-marks.js). */
+  marks?: Marks;
+}
+
+/** A drawing as marks: what an inline view mounts, with no code of the drawing's. */
+export interface Marks {
+  id: string;
+  html: string;
+  css: string;
+  vars: Record<string, string>;
+  width: number;
+  height: number;
 }
 
 let browser: Promise<Browser> | null = null;
@@ -43,13 +57,13 @@ const getBrowser = () => {
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Draw `address` (the app's page, in look mode) at this size, once the queue reaches it. */
-export function drawLook(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light'): Promise<Drawn> {
-  const turn = queue.then(() => drawNow(address, pass, width, height, scheme));
+export function drawLook(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks = false): Promise<Drawn> {
+  const turn = queue.then(() => drawNow(address, pass, width, height, scheme, marks));
   queue = turn.catch(() => {});
   return turn;
 }
 
-async function drawNow(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light'): Promise<Drawn> {
+async function drawNow(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks: boolean): Promise<Drawn> {
   clearTimeout(idle);
   const began = Date.now();
   const tab = await (await getBrowser()).tab();
@@ -77,8 +91,9 @@ async function drawNow(address: string, pass: string, width: number, height: num
       last = now;
     }
     const jpeg = last.length > PNG_MOST;
+    const made = marks && state === 'drawn' ? await tab.evaluate<Marks | null>('window.lookMarks()').catch(() => null) : null;
     const why = state === 'late' ? `The view did not say it had drawn within ${DRAW_MS / 1000} s: this is how it stood.` : said.why;
-    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, ms: Date.now() - began };
+    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }) };
   } finally {
     await tab.close();
     clearTimeout(idle);

@@ -268,6 +268,8 @@ ${JSON.stringify(input)}`;
     const redraw = () => !ended && port.postMessage({ type: 'restyle', style: plain({ ...style, drawing: undefined, code: undefined }) });
     host.redraw = redraw;
     if (stillReading(host, scene, keys)) return redraw();
+    // What a look hands on as marks (ui/look-marks.js): the scene the sandbox answered with, as it answered.
+    host.scene = scene;
     adopt(id, scene.css);
     host.dataset.drawing = id;
     const picture = build(scene.svg, keys, tell);

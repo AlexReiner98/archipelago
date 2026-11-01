@@ -293,13 +293,14 @@ export const READ_TOOLS: Record<string, Tool> = {
   look: {
     description:
       'See what a view looks like: the server draws it in its own browser, from the same page, layouts and sandbox the owner’s screen uses, as you see the map (private items as query shows them to you), and answers with the picture as an image, once the view says it has drawn: state (drawn, empty: the query found nothing, error, late), settled (false for a layout still moving), why. ' +
-      'It never moves the owner’s page (show with look: true does both). The same view at the same size, the map unchanged, answers with the picture already taken (again: true) unless fresh. At most 60 an hour per workspace.',
+      'It never moves the owner’s page (show with look: true does both). In a client that draws MCP Apps (Claude chat), the person sees the view drawn in the chat as well. The same view at the same size, the map unchanged, answers with the picture already taken (again: true) unless fresh. At most 60 an hour per workspace.',
     input: {
       ...VIEW_INPUT,
       width: z.number().int().min(320).max(1920).optional().describe('The picture’s width in pixels (1200).'),
       height: z.number().int().min(240).max(1600).optional().describe('Its height (750).'),
       scheme: z.enum(['dark', 'light']).optional().describe('The theme it is drawn in, as a reader whose system is dark or light sees it (dark).'),
       fresh: z.boolean().optional().describe('Draw it again even when the map has not changed since the last look at it.'),
+      marks: z.boolean().optional().describe('Answer with the drawing as marks (markup and its stylesheet, large) in place of the image, where it has them: what a view drawn in a chat asks for. To see a view yourself, leave this out.'),
     },
     run: async (l, actor, input) => takeLook((await wholeMap(l)).db, l.db, l, actor.name, await viewAddress(l, input), input),
   },
