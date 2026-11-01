@@ -3,7 +3,8 @@
 // so what is moved on it goes to its own places (the places stream, under its id, apart from the map's) and the bar
 // names it. The bar switches between them and keeps what is up as one; Home lists them, one line each.
 // The views kept before the flat lens were translated into such canvases when the workspace opened
-// (src/query-saved.ts); a view kept about an item is listed on Home under the views of items, folded.
+// (src/query-saved.ts); a view kept about an item is listed on Home under the views of items, folded, and one a
+// document brings in is a part of that page, in neither list unless it is pinned or up.
 
 import { api, ask, h, hooks, idsOf, state, tell, wordsOf, withIds } from './base.js';
 import { addressOf, flatView } from './query.js';
@@ -21,15 +22,18 @@ const TYPE = 'lens';
 let known = null;
 export function savedCanvases(fresh = false) {
   if (fresh || !known)
-    known = api('search', { type: TYPE, open: true, limit: 200 })
-      .catch(() => [])
-      .then((rows) => {
-        const kept = new Set(rows.map((r) => r.props?.preset).filter(Boolean));
-        const offered = (state.schema?.canvases ?? []).filter((p) => !kept.has(p.id)).map((p) => ({ id: p.id, title: p.title, preset: true, props: { ...p.props, preset: p.id } }));
-        return [...rows, ...offered].sort((a, b) => Number(b.props?.pinned === true) - Number(a.props?.pinned === true) || a.title.localeCompare(b.title));
-      });
+    known = Promise.all([api('search', { type: TYPE, open: true, limit: 200 }).catch(() => []), api('view', { name: 'saved_views', params: { limit: 200 } }).catch(() => null)]).then(([rows, views]) => {
+      const said = new Map((views?.pictures ?? []).map((p) => [p.lens, p]));
+      const marked = rows.map((r) => ({ ...r, ofItem: Boolean(said.get(r.id)?.of && !said.get(r.id).pinned), inDocument: Boolean(said.get(r.id)?.document) }));
+      const kept = new Set(rows.map((r) => r.props?.preset).filter(Boolean));
+      const offered = (state.schema?.canvases ?? []).filter((p) => !kept.has(p.id)).map((p) => ({ id: p.id, title: p.title, preset: true, props: { ...p.props, preset: p.id } }));
+      return [...marked, ...offered].sort((a, b) => Number(b.props?.pinned === true) - Number(a.props?.pinned === true) || a.title.localeCompare(b.title));
+    });
   return known;
 }
+
+/** The views a person picks from: not those a document brings in, unless pinned or up (`up`, an id). */
+const pickable = (all, up) => all.filter((c) => !c.inDocument || c.props?.pinned === true || c.id === up);
 
 /** What a saved canvas draws: its filter with its pins, its walk and its limit; and its style, with its own id. */
 export function viewParts(item) {
@@ -167,7 +171,7 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
       // Not saved, it is named as its tab and its pane are: by what its filter finds.
       !current && !isHome && h('option', { value: '', selected: true }, filterSaid(lens.filter, () => {}) || 'View'),
       h('option', { value: '#/', selected: isHome && !current }, 'Home'),
-      all.map((c) => h('option', { value: canvasAt(c), selected: c === current }, `${c.title}${c === current && changed ? ' •' : ''}`)),
+      pickable(all, current?.id).map((c) => h('option', { value: canvasAt(c), selected: c === current }, `${c.title}${c === current && changed ? ' •' : ''}`)),
     );
     // In a browser's order: back and forward, then the canvas up, as its address, and its style, with Save beside them, Split, and the canvas's menu at the end.
     const own = hooks.paneButtons?.() ?? [];
@@ -201,13 +205,13 @@ const row = (c, now) =>
     c.id === now && h('span', { class: 'pill ok', title: 'The view up now' }, 'up'),
   );
 
-/** Home's list: every saved canvas of the workspace, then, folded, those kept as views of an item. */
+/** Home's list: the saved canvases of the workspace, then, folded, those kept as views of an item. */
 export async function canvasesPiece(host, title) {
-  const [all, kept] = await Promise.all([savedCanvases(true), api('view', { name: 'saved_views' }).catch(() => null)]);
+  const all = await savedCanvases(true);
   if (!host.isConnected) return;
   const now = up;
-  const ofItem = new Set((kept?.pictures ?? []).filter((p) => p.of && !p.pinned).map((p) => p.lens));
-  const [own, items] = [all.filter((c) => !ofItem.has(c.id)), all.filter((c) => ofItem.has(c.id))];
+  const listed = pickable(all, now);
+  const [own, items] = [listed.filter((c) => !c.ofItem), listed.filter((c) => c.ofItem)];
   host.replaceChildren(
     h(
       'section',
