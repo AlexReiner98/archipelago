@@ -2,7 +2,9 @@
 
 [![Tests](https://github.com/AlexReiner98/archipelago/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexReiner98/archipelago/actions/workflows/tests.yml)
 
-**A shared workspace for your people and your AI agents.**
+![Archipelago: islands in stacked rows, with the name set in spaced capitals across the water](brand/share-1200x630.png)
+
+**A living map of all your work. From a chat to a structured model that keeps you, your team, and your agents on the same page.**
 
 *Early: built and used daily by its author; expect rough edges.*
 

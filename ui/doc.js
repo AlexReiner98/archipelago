@@ -51,6 +51,40 @@ function h(tag, attrs, ...kids) {
 
 const day = (ts) => new Date(ts).toLocaleDateString(undefined, { dateStyle: 'long' });
 
+/** A control that copies code, in line with it, saying so until the pointer or the focus leaves. Where the browser refuses, the code is selected instead, to copy by hand. */
+const copyButton = (text, code) => {
+  const again = (e) => {
+    e.currentTarget.classList.remove('copied');
+    e.currentTarget.title = 'Copy';
+  };
+  return h('button', {
+    class: 'copy',
+    type: 'button',
+    title: 'Copy',
+    'aria-label': 'Copy',
+    onpointerleave: again,
+    onblur: again,
+    onclick: (e) => {
+      const button = e.currentTarget;
+      const done = () => {
+        button.classList.add('copied');
+        button.title = 'Copied';
+      };
+      (navigator.clipboard?.writeText(text) ?? Promise.reject()).then(done, () => getSelection()?.selectAllChildren(code));
+    },
+  });
+};
+/** Code in a line of words, with its copy control beside it. */
+const inlineCode = (text) => {
+  const code = h('code', {}, text);
+  return h('span', { class: 'code-line' }, code, copyButton(text, code));
+};
+/** A block of code, with its copy control in its corner. */
+const codeBlock = (text) => {
+  const code = h('code', {}, text);
+  return h('div', { class: 'code-block' }, h('pre', {}, code), copyButton(text, code));
+};
+
 /** Other published documents a published one names, by id, with their titles: each is read at its own page beside this one. */
 let away = new Map();
 // On a site's own domain a published page is read at its address word, the front page at /.
@@ -71,7 +105,7 @@ function inline(text, titles) {
       if (s.t === 'text') return s.text;
       if (s.t === 'strong') return h('strong', {}, draw(s.spans));
       if (s.t === 'em') return h('em', {}, draw(s.spans));
-      if (s.t === 'code') return h('code', {}, s.text);
+      if (s.t === 'code') return inlineCode(s.text);
       if (s.t === 'link') return h('a', { href: s.href, rel: 'noopener noreferrer', target: '_blank' }, s.text ?? s.href.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''));
       if (s.t === 'page') return pathTo(s.path) ? h('a', { href: pathTo(s.path) }, s.text) : s.text;
       return titles.has(s.id) ? h('a', { href: `#${s.id}` }, s.text ?? titles.get(s.id)) : away.has(s.id) ? h('a', { href: pageOf(s.id) }, s.text ?? away.get(s.id)) : (s.text ?? '');
@@ -98,7 +132,7 @@ function blocks(text, titles, depth) {
       if (b.kind === 'para') return h('p', {}, inline(b.text, titles));
       if (b.kind === 'title') return h(`h${Math.min(depth + (b.level || 2) - 1, 4)}`, {}, inline(b.text, titles));
       if (b.kind === 'table') return drawTable(b, (text) => inline(text, titles));
-      if (b.kind === 'code') return h('pre', {}, h('code', {}, b.text));
+      if (b.kind === 'code') return codeBlock(b.text);
       if (b.kind === 'callout') return h('aside', { class: b.tone ? `callout ${b.tone}` : 'callout quote' }, draw(b.blocks));
       if (b.items.some((it) => it.check !== null)) return h('ul', { class: 'checklist' }, b.items.map((it) => h('li', { class: it.check ? 'done' : '' }, h('span', { class: 'tick' }, it.check ? '☑ ' : '☐ '), inline(it.text, titles))));
       return h(b.ordered ? 'ol' : 'ul', {}, b.items.map((it) => h('li', {}, inline(it.text, titles))));
