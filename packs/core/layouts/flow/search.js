@@ -1,10 +1,8 @@
-// The best way found to draw one part: a few fixed trials judged before the pull, the slower embedding where they all leave
-// wires up, and even rows for a small sparse part. Layer: shape, by what it chooses. Pure: a part in, its drawing out.
+// The best way found to draw one part: a few fixed trials judged before the pull, and the slower embedding where they all
+// leave wires up. Layer: shape, by what it chooses. Pure: a part in, its drawing out.
 
-import { count } from './count.js';
 import { costOf, drawPart } from './part.js';
 import { pair } from './polyline.js';
-import { tidy } from './tidy.js';
 
 /** The ways a part may be drawn, a fixed order of its ties and which face is outer, the likeliest first: the style says how many. */
 const TRIALS = [[0, 0], [1, 0], [2, 0], [3, 0], [0, 1], [1, 1], [2, 1], [3, 1], [0, 2], [1, 2]].map(([ties, nth]) => ({ ties, nth }));
@@ -22,9 +20,9 @@ export function linksOf(list, every, ways) {
 }
 
 /** How one part is drawn, and how many crossings its threading made. `total` is how many items are in the core. */
-export function drawnPart(list, part, { block, stepSize, ways, z, even, rowsLinks, total }) {
+export function drawnPart(list, part, { block, stepSize, ways, z, total }) {
   let drawn, threaded = 0;
-  if (list.length >= 3 && part.length >= 3) {
+  if (list.length >= 3 && part.length >= 2) {
     for (const trial of list.length <= z.trial_most && total <= z.trial_total ? TRIALS.slice(0, z.trials) : TRIALS.slice(0, 1)) {
       try {
         const made = drawPart(list, part, block, stepSize, z, trial), cost = costOf(made, stepSize, z);
@@ -40,17 +38,16 @@ export function drawnPart(list, part, { block, stepSize, ways, z, even, rowsLink
     }
     if (drawn) threaded = drawn.crossings;
   }
+  // Two boxes, the one over the other, a wire straight between them.
   if (!drawn) {
     let run = 0;
-    const first = (p, q) => (ways.has(`${q} ${p}`) ? 1 : ways.has(`${p} ${q}`) ? -1 : 0);
-    drawn = { places: new Map([...list].sort(first).map((id) => { const p = [0, run]; run += block(id).h + z.row; return [id, p]; })), points: new Map(), crossings: 0 };
-  }
-  // A small picture stands in even rows, in the order along each row the planar drawing found.
-  if (even && list.length >= 2 && part.length <= list.length * rowsLinks) {
-    const from = new Map([...drawn.places].map(([id, [px]]) => [id, px - block(id).w / 2 + stepSize(id).w / 2])), crossed = (d) => count([...d.points.values()].map((r) => r.points)).crossings;
-    const neat = tidy(list, part, from, stepSize, block, z);
-    // A knot keeps its planar drawing: even rows would cross what that does not.
-    if (crossed(neat) <= crossed(drawn) || !drawn.points.size) drawn = neat;
+    const first = (p, q) => (ways.has(`${q} ${p}`) ? 1 : ways.has(`${p} ${q}`) ? -1 : 0), places = new Map([...list].sort(first).map((id) => { const p = [0, run]; run += block(id).h + z.row; return [id, p]; }));
+    const portOf = (id, way) => places.get(id)[1] + block(id).lead + (way > 0 ? stepSize(id).h : 0);
+    const points = new Map(part.map(([p, q]) => {
+      const [upper, lower] = places.get(p)[1] < places.get(q)[1] ? [p, q] : [q, p], [from, to] = [[0, portOf(upper, 1)], [0, portOf(lower, -1)]];
+      return [pair(p, q), { from: p, to: q, points: upper === p ? [from, to] : [to, from] }];
+    }));
+    drawn = { places, points, crossings: 0 };
   }
   return { drawn, threaded };
 }

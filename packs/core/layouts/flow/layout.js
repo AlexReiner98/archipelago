@@ -7,10 +7,12 @@
 // in, geometry out, as the flow's layout answers.
 
 import { assemble, rigidOf, shelfOf } from './assemble.js';
+import { count } from './count.js';
 import { directions } from './direction.js';
 import { finisher } from './finish.js';
 import { flatten, ORDER } from './graph.js';
 import { hangsOf, partsOf } from './hangs.js';
+import { pair } from './polyline.js';
 import { drawnPart, linksOf } from './search.js';
 import { shape } from './shape.js';
 import { solveSections } from './solve.js';
@@ -42,36 +44,59 @@ export function layout(args) {
   return laid;
 }
 
-/** Each wire's way chosen, the boxes where the first drawing has them. */
-function shapeWires({ nodes, x, y, routes, z }) {
+/** Each line's way chosen, the boxes at `x` and `y`. */
+function shapeWires({ nodes, x, y, lines, z, through }) {
   const boxes = new Map([...x.keys()].map((id) => [id, { x: x.get(id), y: y.get(id), w: nodes.get(id).w, h: nodes.get(id).h, pointed: nodes.get(id).shape === 'diamond' }]));
-  const wires = [...routes].map(([k, r]) => { const [p, q] = k.split('|'); return { r, a: r.from, b: r.from === p ? q : p, points: r.points, kept: r.set }; });
-  shape(boxes, wires, { room: z.room, run: z.run, corner: z.corner, wire: z.turn, ports: z.ports, rounds: z.rounds, cost_cross: z.shape_cross, cost_bend: z.cost_bend, cost_side: z.cost_side, work: z.shape_work });
-  for (const w of wires) w.r.points = w.points;
+  shape(boxes, lines, { room: z.room, run: z.run, corner: z.corner, wire: z.turn, ports: z.ports, rounds: z.rounds, cost_cross: z.shape_cross, cost_bend: z.cost_bend, cost_side: z.cost_side, work: z.shape_work, through });
+}
+
+/** The routes as lines, each from its `from`. */
+const linesOf = (routes) => [...routes].map(([k, r]) => { const [p, q] = k.split('|'); return { r, a: r.from, b: r.from === p ? q : p, points: r.points }; });
+
+/** Gives each link its own route (`route`): the first between two boxes their pair, each after it a key of its own. Answers with those, each to the first. */
+function routesOf(every) {
+  const seen = new Map(), twins = new Map();
+  for (const w of every) {
+    const of = pair(w.a, w.b), n = seen.get(of) ?? 0;
+    seen.set(of, n + 1);
+    w.route = n ? `${of}|${n}` : of;
+    if (n) twins.set(w.route, of);
+  }
+  return twins;
 }
 
 /** Every length and limit the layout works by, from the style. */
 function lengthsOf(sizes) {
   const gap = sizes.flow_node_gap;
   return {
-    row: sizes.flow_layer_gap / 2, col: sizes.flow_wire_column, turn: Math.max(gap / 3, sizes.flow_wire_gap), gap,
+    row: sizes.flow_layer_gap / 2, pin_rounds: sizes.flow_pin_rounds, col: sizes.flow_wire_column, turn: Math.max(gap / 3, sizes.flow_wire_gap), gap,
     room: sizes.flow_wire_room, join: sizes.flow_joined_room, run: sizes.flow_port_run, corner: sizes.flow_port_corner,
     trials: sizes.flow_trials, trial_most: sizes.flow_trial_most, cost_up: sizes.flow_cost_up, cost_cross: sizes.flow_cost_crossing, shape_cross: sizes.flow_shape_crossing, shape_most: sizes.flow_shape_most, shape_work: sizes.flow_shape_work, cost_bend: sizes.flow_cost_bend, cost_side: sizes.flow_cost_side, ports: sizes.flow_reroute_ports, rounds: sizes.flow_reroute_rounds, cost_wrong: sizes.flow_cost_wrong_side, embed_most: sizes.flow_embed_most, embed_big: sizes.flow_embed_big, hub_most: sizes.flow_hub_most, embed_cost: sizes.flow_embed_crossings, slide_sweeps: sizes.flow_slide_sweeps, number_tries: sizes.flow_number_tries, trial_total: sizes.flow_trial_total,
-    row_gap: sizes.flow_row_gap, row_space: sizes.flow_row_space,
   };
 }
 
-function laidOut({ items: given, links: told = [], undrawn = [], headless = ['part_of'], measure, sizes, aspect = 1.6 }) {
+/** How many times a finished picture's wires cross. */
+const crossed = ({ seen }) => count([...seen.chains, ...seen.ties].map((w) => w.points)).crossings;
+
+/** Every picture is drawn the same two ways, its headed links as wires and as comb leaves, and the finished picture that crosses less kept, as wires where they tie. */
+function laidOut(args) {
+  // Past what the style gives the search, a picture is drawn the one way, which takes the less room.
+  if (args.items.length > args.sizes.flow_trial_total) return drawnOut({ ...args, chains: false });
+  const [wired, combed] = [true, false].map((chains) => drawnOut({ ...args, chains }));
+  return crossed(wired({})) <= crossed(combed({})) ? wired : combed;
+}
+
+function drawnOut({ items: given, links: told = [], undrawn = [], headless = ['part_of'], measure, sizes, aspect = 1.6, chains: asWires }) {
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
   const z = lengthsOf(sizes), { gap } = z, margin = sizes.flow_margin, stepSize = (id) => nodes.get(id);
   const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ a: l.from, b: l.to, type: l.type, ...(l.pending && { pending: l.pending }) }));
   const chains = edges.map((e) => ({ ...e, key: `${e.a} ${e.b}`, path: [e.a, e.b], dashed: potential.has(e.b) }));
-  const every = [...chains, ...ties];
+  const every = [...chains, ...ties], twins = routesOf(every);
   const a = new Map([...nodes.keys()].map((id) => [id, new Set()]));
   for (const w of every) if (w.a !== w.b && a.has(w.a) && a.has(w.b)) (a.get(w.a).add(w.b), a.get(w.b).add(w.a));
-  const ways = directions(chains, ties, headless), hangs = hangsOf({ a, ways, nodes, sizes, gap, z, aspect }), { core, block } = hangs;
-  const how = { block, stepSize, ways, z, even: nodes.size <= sizes.flow_rows_most, rowsLinks: sizes.flow_rows_links, total: core.length };
+  const ways = directions(chains, ties, headless), hangs = hangsOf({ a, ways, nodes, sizes, gap, z, aspect, chains: asWires }), { core, block } = hangs;
+  const how = { block, stepSize, ways, z, total: core.length };
   let threaded = 0;
   const shelves = partsOf(core, a).map((list) => {
     const made = drawnPart(list, linksOf(list, every, ways), how);
@@ -79,11 +104,17 @@ function laidOut({ items: given, links: told = [], undrawn = [], headless = ['pa
     return shelfOf(made.drawn, block);
   });
   const { x, y, routes, holder } = assemble(shelves, { ...hangs, stepSize, gap, margin, aspect });
+  // Two links between one pair of boxes are drawn from one sketch, and each is then a wire like any other.
+  for (const [k, of] of twins) if (routes.has(of)) routes.set(k, { ...routes.get(of), points: routes.get(of).points.map((p) => [...p]) });
   const rigid = rigidOf({ combs: hangs.combs, x, y, stepSize, block });
   staging?.('bars and combs', routes);
   const lengths = { nodes, x, y, routes, section: sizes.flow_section_gap, gap, margin, aspect, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: gap / 2, join: z.join }, firstWires = new Map([...routes].map(([k, r]) => [k, r.points]));
   const before = { x: new Map(x), y: new Map(y), sizes: new Map([...nodes].map(([id, n]) => [id, [n.w, n.h]])) };
-  if (routes.size <= z.shape_most) shapeWires({ nodes, x, y, routes, z });
+  if (routes.size <= z.shape_most) {
+    const lines = linesOf(routes);
+    shapeWires({ nodes, x, y, lines, z });
+    for (const l of lines) l.r.points = l.points;
+  }
   staging?.('shape', routes);
   try {
     solveSections(lengths);
@@ -97,5 +128,7 @@ function laidOut({ items: given, links: told = [], undrawn = [], headless = ['pa
   staging?.('solve', routes);
   // What a step put by hand starts from: each box where the solve left it, with what hangs on it.
   for (const id of x.keys()) rigid.set(id, { at: [x.get(id), y.get(id)], size: [nodes.get(id).w, nodes.get(id).h], hangs: rigid.get(id)?.hangs ?? [], pointed: nodes.get(id).shape === 'diamond' });
-  return finisher({ nodes, potential, chains, ties, x, y, routes, rigid, holder, headless, sizes, z, margin, stepSize, tally: { threaded } });
+  // Round a pin no wire stays in a box, however much it crosses to get out.
+  const reshape = (px, py, lines) => shapeWires({ nodes, x: px, y: py, lines, z, through: Infinity });
+  return finisher({ nodes, potential, chains, ties, x, y, routes, rigid, holder, headless, sizes, z, margin, stepSize, reshape, tally: { threaded } });
 }
