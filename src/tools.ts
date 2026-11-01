@@ -97,7 +97,7 @@ function surfaceOf(reg: Registry): Record<string, Tool> {
   return tools;
 }
 
-/** What an agent is offered, in order: query, change, undo and the six verbs. */
+/** What an agent is offered, in order: query, change, undo, the six verbs and draw. */
 export const surfaceFor = (reg: Registry): [string, Tool][] => SURFACE.map((name) => [name, TOOLS[name] ?? surfaceOf(reg)[name]]);
 
 /** The call that replaces a tool's old name, for one release (src/surface.ts); undefined for a name that stays. */

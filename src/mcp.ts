@@ -46,7 +46,7 @@ export interface Caller {
   actor: (label?: string) => Actor;
 }
 
-/** What an agent is offered: query, change, undo and the six verbs (src/surface.ts), whatever packs are on. */
+/** What an agent is offered: query, change, undo, the six verbs and draw (src/surface.ts), whatever packs are on. */
 const offered = (registry: Archipelago['registry']) => surfaceFor(registry);
 
 /** A tool's inputs as MCP is given them, made once per tool rather than for every request. */

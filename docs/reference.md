@@ -39,12 +39,13 @@ Approving, launching and tokens stay with you. Dev mode refuses to start with
 
 All three call the tools in [src/tools.ts](../src/tools.ts). The web UI and CLI
 have human authority and call each tool by its name; the MCP endpoint does not,
-and offers agents nine tools ([src/surface.ts](../src/surface.ts)): `query`
+and offers agents ten tools ([src/surface.ts](../src/surface.ts)): `query`
 reads (a view, a lens, or a read such as `get`, `search`, `schema`, `events`),
 `change` writes, `undo` takes a change set back, and every other action is
 called under one of the six verbs the core pack declares (`capture`, `assign`,
 `report`, `ask`, `settle`, `revise`) by its name, with its inputs as `params`:
-`report` with action `tell`. A pack's actions join its verb. The human's own
+`report` with action `tell`. A pack's actions join its verb. `draw` draws a
+view in a chat, in a client that draws MCP Apps. The human's own
 tools (`decide`, `init`, tokens, members) are not offered to agents at all.
 
 The web UI has five places, and one page for each thing.
@@ -268,7 +269,7 @@ at once; they are the session's own state, not facts about the world.
   open `/connect/setup.mjs` on the server. With no terminal to ask at and no
   `--yes` (an agent running it), it brings up to date only what Archipelago
   wrote there before and refuses a first setup.
-- **From a script:** `POST /agent/<tool>` takes the same nine tools as plain
+- **From a script:** `POST /agent/<tool>` takes the same ten tools as plain
   JSON with agent authority. A tool's name from before the surface was made
   small still answers there for one release, with `moved_to` beside `result`
   naming the call that replaces it. `POST /agent/report` with no action is what

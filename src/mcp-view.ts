@@ -1,8 +1,9 @@
-// A view drawn inline in a chat, through the MCP Apps extension (SEP-1865, stable 2026-01-26): query and report name
-// one ui:// resource, the page in ui/mcp-view.html, and a host that draws Apps opens it beside each call of theirs. A
-// host that does not has the words it always had: nothing here changes a tool's answer.
+// A view drawn inline in a chat, through the MCP Apps extension (SEP-1865, stable 2026-01-26): one tool, draw, names
+// one ui:// resource, the page in ui/mcp-view.html, and a host that draws Apps opens it beside each call of draw. The
+// extension ties a page to a tool, not a call, so draw is a tool of its own and no other tool names the page: an
+// ordinary call opens nothing. A host that does not draw Apps has draw's words.
 //
-// The resource holds no data and no token. It is told of the call by the host, and for a view it asks the server, by
+// The resource holds no data and no token. It is told of the call by the host, and it asks the server, by
 // the host, for a look (src/looks.ts): the server's own browser draws it in the sandbox, as the agent sees the map, and
 // the page mounts the marks that come back (ui/look-marks.js), or the picture of a drawing that has none. No drawing's
 // code runs in the host's frame: it could not (no worker, no second origin), and a style's code runs behind its two
@@ -22,11 +23,8 @@ export const VIEW_TYPE = 'text/html;profile=mcp-app';
 /** What the server says it speaks. */
 export const VIEW_CAPABILITY = { 'io.modelcontextprotocol/ui': { mimeTypes: [VIEW_TYPE] } };
 
-/** The tools whose calls can answer with a view. Per tool, as the extension has it: a host opens the page for each call of theirs, and the page stays shut for any that is no view. */
-const VIEW_TOOLS = new Set(['query', 'report']);
-
-/** What a tool's listing carries for this: a tool that can show a view names the page. */
-export const toolView = (tool: string) => (VIEW_TOOLS.has(tool) ? { _meta: { ui: { resourceUri: VIEW_URI } } } : {});
+/** What a tool's listing carries for this: only draw names the page. */
+export const toolView = (tool: string) => (tool === 'draw' ? { _meta: { ui: { resourceUri: VIEW_URI } } } : {});
 
 /** What the host is told of the page: it reaches nothing outside itself. */
 const META = { ui: { csp: { connectDomains: [], resourceDomains: [], frameDomains: [], baseUriDomains: [] }, prefersBorder: false } };

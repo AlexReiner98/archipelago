@@ -21,12 +21,36 @@ async function connected() {
   return { client, token };
 }
 
-test('query and report name the view, and the server says it speaks the extension', async () => {
+test('only draw names the view, so an ordinary call opens no page, and the server says it speaks the extension', async () => {
   const { client } = await connected();
   assert.deepEqual(client.getServerCapabilities()?.extensions?.['io.modelcontextprotocol/ui'], { mimeTypes: [TYPE] });
   const { tools } = await client.listTools();
   const named = tools.filter((t) => t._meta?.ui).map((t) => [t.name, (t._meta?.ui as { resourceUri: string }).resourceUri]);
-  assert.deepEqual(named, [['query', URI], ['report', URI]]);
+  assert.deepEqual(named, [['draw', URI]]);
+  for (const ordinary of ['query', 'report']) assert.equal(tools.find((t) => t.name === ordinary)?._meta, undefined, `${ordinary} carries no _meta`);
+  await client.close();
+});
+
+test('draw answers in words, takes a view as a look does, and refuses what could not be drawn', async () => {
+  const { client } = await connected();
+  const view = await client.callTool({ name: 'draw', arguments: { query: { filter: { find: ['type task'] } }, style: { layout: 'flow' } } });
+  assert.ok(!view.isError, JSON.stringify(view.content));
+  assert.deepEqual((view.content as { type: string }[]).map((c) => c.type), ['text'], 'no picture and no marks for the model');
+  const { text } = (view.content as { text: string }[])[0];
+  assert.match(JSON.parse(text).view, /shape=flow/);
+
+  const refused = async (args: Record<string, unknown>) => (await client.callTool({ name: 'draw', arguments: args })).isError;
+  assert.ok(await refused({}), 'nothing named');
+  assert.ok(await refused({ entity: 'e_00000000' }), 'no such item');
+  assert.ok(await refused({ query: {}, style: { layout: 'no such layout' } }), 'a layout that is none');
+  assert.ok(await refused({ lens: {} }), 'the old name of query is not taken on a new tool');
+  await client.close();
+});
+
+test('the tool list grows by little for draw: its inputs say what a look says, in a line each', async () => {
+  const { client } = await connected();
+  const draw = (await client.listTools()).tools.find((t) => t.name === 'draw');
+  assert.ok(JSON.stringify(draw).length < 1000, `${JSON.stringify(draw).length} characters`);
   await client.close();
 });
 

@@ -15,7 +15,7 @@ import { serve } from './serve.ts';
 after(stopLayout);
 
 /** A host: it frames the page, answers its handshake, tells it of one call, and proxies its tools/call to /mcp. */
-const HOST = (html: string, mcp: string, token: string, input: unknown, context: unknown) => `(() => {
+const HOST = (html: string, mcp: string, token: string, input: unknown, context: unknown, isError = false) => `(() => {
   const frame = document.createElement('iframe');
   frame.sandbox = 'allow-scripts';
   frame.style = 'width: 640px; height: 600px; border: 0';
@@ -29,7 +29,7 @@ const HOST = (html: string, mcp: string, token: string, input: unknown, context:
     if (method === 'ui/notifications/initialized') {
       said.initialized = true;
       to({ method: 'ui/notifications/tool-input', params: { arguments: ${JSON.stringify(input)} } });
-      return to({ method: 'ui/notifications/tool-result', params: { content: [{ type: 'text', text: '{}' }] } });
+      return to({ method: 'ui/notifications/tool-result', params: { content: [{ type: 'text', text: '{}' }], isError: ${isError} } });
     }
     if (method === 'ui/notifications/size-changed') return said.sizes.push(params);
     if (method === 'tools/call') {
@@ -42,7 +42,7 @@ const HOST = (html: string, mcp: string, token: string, input: unknown, context:
   document.body.replaceChildren(frame);
 })()`;
 
-test('in a browser, the page draws a flow from the look it asks the host for, and stays shut for what is no view', { skip: !chrome() && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, the page draws a flow from the look it asks the host for, for a call of draw alone', { skip: !chrome() && 'no Chrome here (set CHROME)' }, async () => {
   const { workspaces, base, call } = await serve('tokens');
   const pelago = (await workspaces.get('default')).pelago;
   const { token } = await createToken(pelago.db, 'default', { kind: 'agent', name: 'chat' });
@@ -73,17 +73,22 @@ test('in a browser, the page draws a flow from the look it asks the host for, an
   };
   try {
     await page.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
-    // A call that is no view: the page stays shut, and asks nothing.
-    await page.evaluate(HOST(html, `${base}/mcp`, token, { name: 'get', params: { id: made.a } }, { theme: 'light' }));
-    assert.ok(await page.evaluate<boolean>(`new Promise((r) => { const t = setInterval(() => window.said.initialized && (clearInterval(t), r(true)), 50); })`));
-    await new Promise((r) => setTimeout(r, 400));
-    const shut = await page.evaluate<{ sizes: { height: number }[]; calls: unknown[] }>('window.said');
-    assert.deepEqual(shut.calls, []);
-    assert.ok(shut.sizes.every((s) => s.height === 0), JSON.stringify(shut.sizes));
+    // What is no call of draw, as a client holding the old list would send it, and a draw that was refused: the page
+    // stays shut, and asks nothing. A query flat draws nothing.
+    for (const [input, refused] of [[{ name: 'get', params: { id: made.a } }, false], [{ name: 'flat', params: { filter: { find: [`id ${made.a}`] } } }, false], [{ action: 'show', params: { entity: view } }, false], [{ entity: view }, true]] as const) {
+      await page.go(`${base}/health`);
+      await page.evaluate(HOST(html, `${base}/mcp`, token, input, { theme: 'light' }, refused));
+      assert.ok(await page.evaluate<boolean>(`new Promise((r) => { const t = setInterval(() => window.said.initialized && (clearInterval(t), r(true)), 50); })`));
+      await new Promise((r) => setTimeout(r, 400));
+      const shut = await page.evaluate<{ sizes: { height: number }[]; calls: unknown[] }>('window.said');
+      assert.deepEqual(shut.calls, [], JSON.stringify(input));
+      assert.ok(shut.sizes.every((s) => s.height === 0), JSON.stringify(shut.sizes));
+    }
 
-    // A show of a kept view: the page asks the host for a look, and mounts the marks.
+    // A draw of a kept view, called through the endpoint as a host would: the page asks the host for a look, and mounts the marks.
+    assert.ok(!(await client.callTool({ name: 'draw', arguments: { entity: view } })).isError);
     await page.go(`${base}/health`);
-    await page.evaluate(HOST(html, `${base}/mcp`, token, { action: 'show', params: { entity: view, note: 'The steps' } }, { theme: 'light', containerDimensions: { width: 640, maxHeight: 600 }, availableDisplayModes: ['inline', 'fullscreen'] }));
+    await page.evaluate(HOST(html, `${base}/mcp`, token, { entity: view }, { theme: 'light', containerDimensions: { width: 640, maxHeight: 600 }, availableDisplayModes: ['inline', 'fullscreen'] }));
     assert.ok(await until(`Boolean(document.querySelector('#view svg text'))`), `the drawing is mounted: ${JSON.stringify([await page.logs(), await page.evaluate('window.said'), await frameSees(`document.body.innerHTML.slice(0, 500)`).catch((e: Error) => String(e))])}`);
     const seen = await frameSees(`({ words: document.querySelector('#view').textContent, drawing: document.querySelector('#view').dataset.drawing, scripts: document.querySelectorAll('#view script').length })`);
     assert.match(seen.words, /First step/);

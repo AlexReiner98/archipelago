@@ -38,7 +38,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       'It lands within a couple of seconds in a pane of your session’s own on each page of theirs that is open, beside the pane they are in, which it never takes. The answer says how many of their pages are open and how many take your shows (pages). Add a short note saying what they are looking at. ' +
       'A change moves nothing on their page: show what is worth watching. ' +
       'With look: true, the answer also carries the picture of it, as an image: drawn by the server as you see the map, whether or not a page of theirs is open (query look takes one without moving their page). ' +
-      'In a client that draws MCP Apps (Claude chat), the view is also drawn in the chat, for the person reading it there.',
+      'For the person reading a chat, call draw.',
     input: {
       ...VIEW_INPUT,
       screen: z.enum(['workspace', 'you']).optional().describe('The workspace sheet, or what waits for them.'),
