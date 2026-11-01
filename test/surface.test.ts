@@ -51,6 +51,9 @@ test('the tool list stays small, and what it leaves out is one call away', async
   for (const read of QUERY_READS) assert.ok(query.includes(`${read} (`), `${read} is named with its params`);
   const said = async (args: Record<string, unknown>) => JSON.parse(words(await client.callTool({ name: 'query', arguments: args })));
   assert.match((await said({})).views.flat, /The filter is/, 'the query’s terms are in the list of names');
+  assert.match((await said({ name: 'actions', params: { read: 'flat' } })).description, /The filter is/, 'one view’s text, alone');
+  assert.ok((await said({ name: 'actions', params: { read: 'search' } })).params.properties.q, 'a read says its params');
+  assert.match(words(await client.callTool({ name: 'query', arguments: { name: 'actions', params: { read: 'nothing' } } })), /No read or view "nothing"/);
   const [change] = await said({ name: 'actions', params: { action: 'change' } });
   assert.equal(change.params.properties.ops.items.oneOf.length, 9, 'every op, whole');
 

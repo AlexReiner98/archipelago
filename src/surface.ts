@@ -96,15 +96,22 @@ export function surfaceTools(reg: Registry, tools: Record<string, Tool>, offered
   const out: Record<string, Tool> = {
     query: {
       description:
-        `Read the map: every read is one call, query with the name of what to read and its params. With no name, every name with what it answers, each view's params and terms included. ` +
-        `${LIST} (verb?, action?) says what each action and change's ops take, whole. ` +
+        `Read the map: every read is one call, query with the name of what to read and its params. With no name, every name with what it answers. ` +
+        `${LIST} says what one takes, whole: params read (a read or view, such as flat), action (or change, for its ops) or verb. ` +
         `An agent is given each answer without its empty fields and with long lists cut to what is read (params.full: true for all of it). ` +
         `The reads and their params: ${reads}. ` +
         `Every other name is a view: ${viewNames(reg).join(', ')}. flat is the query: filter { find, only, not }, walk { over, steps }, limit.`,
       input: { name: z.string().optional().describe('What to read: a read, a view or a lens. Left out, the list of them.'), params: props.optional().describe('Its inputs, as the list names them.') },
       run: async (l, actor, input) => {
         if (input.name !== LIST) return { reads: Object.fromEntries(QUERY_READS.map((name) => [name, gist(tools[name].description)])), [LIST]: 'what each verb’s actions and change’s ops take', views: viewList(l) };
-        const { verb, action } = (input.params ?? {}) as { verb?: string; action?: string };
+        const { verb, action, read } = (input.params ?? {}) as { verb?: string; action?: string; read?: string };
+        if (read) {
+          // One name's whole text, without the list of every name.
+          const views = viewList(l);
+          if (QUERY_READS.includes(read)) return { read, description: tools[read].description, params: schemaOf(tools[read].input) };
+          if (views[read]) return { read, description: views[read] };
+          throw new Error(`No read or view "${read}". ${[...QUERY_READS, ...Object.keys(views)].join(', ')}`);
+        }
         if (action === 'change') return [{ action, description: tools.change.description, params: schemaOf(tools.change.input) }];
         const mine = actionsOf(l.registry, tools).filter((a) => (actor.kind === 'human' || offered(a)) && (!verb || a.verb === verb) && (!action || a === findAction([a], action)));
         if (action && !mine.length) throw new Error(`No action "${action}". ${verbsSaid(l.registry, actions.filter(offered))}`);
