@@ -136,6 +136,19 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
     await page.evaluate(`(() => { const d = document.querySelector('.canvases .old-views'); d.open = true; [...d.querySelectorAll('a')].find((a) => a.textContent === 'A view of it').click(); })()`);
     assert.ok(await until(`${picked} === 'A view of it'`), `opened as a canvas: ${page.logs().join(' | ')}`);
     assert.ok(await until(drawn(made.a)));
+
+    // A view a document brings in is a part of that page: in neither list, and named in the bar only while it is up.
+    const held = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'A page’s picture', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } } }, { op: 'link', type: 'about', from: 'v', to: made.p }] })).result.created.v as string;
+    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'document', title: 'A page', body: `Words.\n\n${held}` }] });
+    await page.go(`${base}/#/you`);
+    assert.ok(await until(`Boolean(document.querySelector('.canvases .old-views'))`));
+    const listed = `[...document.querySelectorAll('.canvases a'), ...document.querySelectorAll('#query .q-pick option')].map((a) => a.textContent)`;
+    assert.ok(!(await page.evaluate<string[]>(listed)).includes('A page’s picture'), 'not on Home');
+    await page.go(`${base}/#/v?canvas=${other}`);
+    assert.ok(await until(`${picked} === 'The other one'`));
+    assert.ok(!(await page.evaluate<string[]>(listed)).includes('A page’s picture'), 'not in the switch');
+    await page.go(`${base}/#/v?canvas=${held}`);
+    assert.ok(await until(`${picked} === 'A page’s picture'`), 'named while it is up');
   } finally {
     await page.close();
   }
