@@ -53,14 +53,15 @@ export async function sessionStart(
   actor: Actor,
   input: { title?: string; surface?: string; cwd?: string; remote?: string; session_id?: string; task?: string; branch?: string },
 ) {
-  // A surface may announce the same session more than once (resume, compact).
+  // A surface may announce the same session again (resume, compact), even ended: its own run takes up, not a second.
   if (input.session_id) {
-    const existing = await resolveRun(l, input.session_id, true);
+    const existing = await resolveRun(l, input.session_id);
     if (existing) {
+      if (!existing.is_open) await roomForSession(l.workspace, () => sessionsAwake(l)).then(() => l.apply(actorId(actor), { ops: [{ op: 'update', id: existing.id, status: 'running' }], reason: 'Session taken up again' }));
       await touch(l, existing.id);
       await nameIfUnnamed(l, actor, existing);
       // Its repository is said again: the hook tells a resumed session where things stand, as it told it at first.
-      return { run: existing.id, name: ((await l.entity(existing.id))?.props.name as string | undefined) ?? existing.title, status: existing.status, resumed: true, repo: (await placeFor(l, input)) ?? undefined };
+      return { run: existing.id, name: ((await l.entity(existing.id))?.props.name as string | undefined) ?? existing.title, status: 'running', resumed: true, repo: (await placeFor(l, input)) ?? undefined };
     }
   }
   const task = input.task ? await l.entity(input.task) : undefined;

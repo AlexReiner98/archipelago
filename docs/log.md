@@ -1132,7 +1132,7 @@ section 4, Where this stands. Nothing else writes the map today
 | `release`: `update relation set valid_to`, `log resource.release` | `claims` stream: `["-", r, "link"]` |
 | `checkConnections`: `update entity set status` (outside `change` today), `log connection.check` | `observations` stream: the connection's reachability as an observed `status` (the connection item itself stays facts) |
 | `setSecret`: `insert into setting`, `delete from setting` | the key vault's `vault_secret`; the `settings` stream records the name only (`e_7cv7xefh`) |
-| `init`: owner person created through `apply`; `insert into setting` (`agent_changes`, `me`) | facts for the person; `settings` stream |
+| `init`: owner person created through `apply`; `insert into setting` (`me`, and `agent_changes` when it begins the workspace) | facts for the person; `settings` stream |
 | `restoreRows` (restore from a backup) | gone: restoring is verifying a copied log and replaying it; a copy that diverged from this one has its later entries proposed here, rebased by section 3 (`e_u7a3ubgy`) |
 
 ### Stores named in `src/operational.ts`

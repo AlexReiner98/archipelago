@@ -1,6 +1,6 @@
 # Agents held to the map: principles and structure
 
-An agent works through the same nine tools as a person, and what it is asked
+An agent works through the same ten tools as a person, and what it is asked
 to do is held the same way the page's looks are: as items the map keeps,
 read each time, checked by rules kept as data. Five principles decide it;
 from them a developer can predict how an agent is told, checked and

@@ -345,6 +345,11 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #canvas .pane-canvas .lens-view:has(.lf-stage) { overflow: hidden; }
 #canvas .pane-canvas .lf-stage { height: 100%; }
 #canvas .pane-canvas .lens-view > .toolbar { display: none; }
+/* A finger needs more to land on than a pointer does. */
+@media (pointer: coarse) {
+  #query .q-save { min-width: var(--box-8); height: var(--box-9); }
+  #tabs .tab-act, #tabs > .tab-new { width: var(--box-8); height: var(--box-8); }
+}
 #canvas .pane-canvas > .empty, #canvas .pane-canvas > .error, #canvas .pane-canvas .lens-view > .empty { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
 /* The line between two panes: drawn by the sash itself, over the bands it crosses, wider and in the accent while it is
    pointed at or dragged; what takes the pointer is wider than what is drawn. */

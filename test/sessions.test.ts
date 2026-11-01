@@ -321,3 +321,41 @@ test('a session says it is one, and carries what Claude calls it, cut to a name'
   await sessionLabelled(l, run, 42);
   assert.equal((await l.db.query<{ n: number }>('select count(*)::int as n from log_entry')).rows[0].n, before, 'the same title again writes nothing');
 });
+
+test('a session that says it is done or succeeded has finished', async () => {
+  const l = await fresh();
+  for (const [n, outcome] of ['done', 'success'].entries()) {
+    const { run } = await sessionStart(l, agent, { session_id: `said-${n}` });
+    assert.equal(((await callTool(l, agent, 'session_end', { run, outcome })) as any).status, 'finished');
+  }
+});
+
+test('a session announced again after it ended takes up its own run, with no second one beside it', async () => {
+  const l = await fresh();
+  const { run, name } = await sessionStart(l, agent, { session_id: 'back' });
+  await sessionEnd(l, agent, { run: run!, outcome: 'finished' });
+  const again = await sessionStart(l, agent, { session_id: 'back' });
+  assert.deepEqual([again.run, again.name, again.status, again.resumed], [run, name, 'running', true]);
+  assert.equal((await l.entity(run!))?.is_open, true);
+});
+
+test('a held change says what it would make', async () => {
+  const l = await fresh();
+  const held = (await callTool(l, agent, 'change', { reason: 'test', hold: true, ops: [{ op: 'create', ref: 'it', type: 'task', title: 'Held' }] })) as any;
+  assert.equal(held.status, 'proposed');
+  assert.match(held.would_make.it, /^e_/);
+  assert.ok(!(await l.entity(held.would_make.it)), 'and it does not exist yet');
+});
+
+test('a list tells an agent of a long field and a hub\'s links without reading them whole', async () => {
+  const l = await fresh();
+  const ops = [{ op: 'create', ref: 'hub', type: 'project', title: 'Hub' }, { op: 'create', ref: 'look', type: 'style', title: 'Long look', props: { code: 'x'.repeat(3000) } }, ...Array.from({ length: 25 }, (_, k) => ({ op: 'create', ref: `t${k}`, type: 'task', title: `Task ${k}` })), ...Array.from({ length: 25 }, (_, k) => ({ op: 'link', type: 'part_of', from: `t${k}`, to: 'hub' }))];
+  const { created } = (await callTool(l, human, 'change', { reason: 'test', ops })) as any;
+  const [found] = (await callTool(l, agent, 'search', { q: 'Long look', type: 'style' })) as any[];
+  assert.match(String(found.props.code), /3000 characters/);
+  assert.equal(((await callTool(l, agent, 'search', { q: 'Long look', type: 'style', full: true })) as any[])[0].props.code.length, 3000);
+  const got = (await callTool(l, agent, 'get', { id: created.hub })) as any;
+  assert.equal(got.incoming.length, 20);
+  assert.equal(got.links_cut.incoming.by_type.part_of, 25);
+  assert.equal(((await callTool(l, agent, 'get', { id: created.hub, full: true })) as any).incoming.length, 25);
+});

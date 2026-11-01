@@ -1,15 +1,16 @@
 // What an agent is offered (Rule 7 of the target model): it reads with query, writes with change, takes back with
 // undo, and calls every other action under one of the six verbs the core pack declares (capture, assign, report, ask,
-// settle, revise), naming the action. The named operations beneath stay one table (src/tools.ts) for the human's CLI
-// and the web UI; for agents, query and the verbs are routed onto them here. An old name still answers for one
-// release, as POST /agent/<name>, with the call that replaces it (movedTo).
+// settle, revise), naming the action. One tool stands apart, draw: a client opens a page for a tool, not for a call, so
+// a view drawn in a chat has a tool of its own (src/mcp-view.ts). The named operations beneath stay one table
+// (src/tools.ts) for the human's CLI and the web UI; for agents, query and the verbs are routed onto them here. An old
+// name still answers for one release, as POST /agent/<name>, with the call that replaces it (movedTo).
 
 import { z } from 'zod';
-import { viewList, viewsSaid } from './askview.ts';
+import { viewList, viewNames } from './askview.ts';
 import { KERNEL_VERBS } from './declared.ts';
 import type { ActionDef } from './declared.ts';
 import type { Registry } from './packs.ts';
-import { props } from './tool-ops.ts';
+import { op, props } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 
 /** The kernel's tools an agent reaches through query, each by its own name. Every view, lens and pack view is a name of query too. */
@@ -70,23 +71,49 @@ function paramsSaid(schema: unknown): string {
   return keys.length ? keys.map((k) => (s?.required?.includes(k) ? k : `${k}?`)).join(', ') : 'none';
 }
 
+/**
+ * change as the tool list writes it: each op a line, its fields behind query actions, since writing the union out costs
+ * every request more than the rest of the list. Only the list is loose: the call is checked against change's own ops.
+ */
+export function listedChange(change: Tool): Tool {
+  const ops = op.options.map((o) => {
+    const { op: name, ...fields } = o.shape;
+    return `${name.value} (${paramsSaid(schemaOf(fields))})`;
+  });
+  return {
+    ...change,
+    description: `${change.description} Each op is { op, ...its fields }: ${ops.join('; ')}. query ${LIST} with action change says each field.`,
+    input: { ...change.input, ops: z.array(props).min(1).optional().describe('What to change. Needed, except with retry.') },
+  };
+}
+
 /** The tools an agent is offered, in order. */
-export const SURFACE = ['query', 'change', 'undo', 'capture', 'assign', 'report', 'ask', 'settle', 'revise'];
+export const SURFACE = ['query', 'change', 'undo', 'capture', 'assign', 'report', 'ask', 'settle', 'revise', 'draw'];
 
 /** query and the six verbs as tools, described with what this workspace offers (offered: an action an agent may call here). */
 export function surfaceTools(reg: Registry, tools: Record<string, Tool>, offered: (a: Action) => boolean): Record<string, Tool> {
   const actions = actionsOf(reg, tools);
-  const reads = QUERY_READS.map((name) => `${name} (${gist(tools[name].description)} Params: ${paramsSaid(schemaOf(tools[name].input))})`).join('; ');
+  const reads = QUERY_READS.map((name) => `${name} (${paramsSaid(schemaOf(tools[name].input))})`).join('; ');
   const out: Record<string, Tool> = {
     query: {
       description:
-        `Read the map: every read is one call, query with the name of what to read and its params. With no name, the list of every name. ` +
-        `The reads: ${reads}. ${LIST} (what each verb's actions take, whole; params: verb, action). ` +
-        `Every other name is a view: ${viewsSaid(reg).replace(/ call with no name for all of them\.$/, '')}`,
+        `Read the map: every read is one call, query with the name of what to read and its params. With no name, every name with what it answers. ` +
+        `${LIST} says what one takes, whole: params read (a read or view, such as flat), action (or change, for its ops) or verb. ` +
+        `An agent is given each answer without its empty fields and with long lists cut to what is read (params.full: true for all of it). ` +
+        `The reads and their params: ${reads}. ` +
+        `Every other name is a view: ${viewNames(reg).join(', ')}. flat is the query: filter { find, only, not }, walk { over, steps }, limit.`,
       input: { name: z.string().optional().describe('What to read: a read, a view or a lens. Left out, the list of them.'), params: props.optional().describe('Its inputs, as the list names them.') },
       run: async (l, actor, input) => {
-        if (input.name !== LIST) return { reads: Object.fromEntries(QUERY_READS.map((name) => [name, gist(tools[name].description)])), [LIST]: 'what each verb’s actions take', views: viewList(l) };
-        const { verb, action } = (input.params ?? {}) as { verb?: string; action?: string };
+        if (input.name !== LIST) return { reads: Object.fromEntries(QUERY_READS.map((name) => [name, gist(tools[name].description)])), [LIST]: 'what each verb’s actions and change’s ops take', views: viewList(l) };
+        const { verb, action, read } = (input.params ?? {}) as { verb?: string; action?: string; read?: string };
+        if (read) {
+          // One name's whole text, without the list of every name.
+          const views = viewList(l);
+          if (QUERY_READS.includes(read)) return { read, description: tools[read].description, params: schemaOf(tools[read].input) };
+          if (views[read]) return { read, description: views[read] };
+          throw new Error(`No read or view "${read}". ${[...QUERY_READS, ...Object.keys(views)].join(', ')}`);
+        }
+        if (action === 'change') return [{ action, description: tools.change.description, params: schemaOf(tools.change.input) }];
         const mine = actionsOf(l.registry, tools).filter((a) => (actor.kind === 'human' || offered(a)) && (!verb || a.verb === verb) && (!action || a === findAction([a], action)));
         if (action && !mine.length) throw new Error(`No action "${action}". ${verbsSaid(l.registry, actions.filter(offered))}`);
         return mine.map(({ name, verb, description, params }) => ({ action: name, verb, description, params }));
@@ -95,10 +122,9 @@ export function surfaceTools(reg: Registry, tools: Record<string, Tool>, offered
   };
   for (const verb of reg.verbs) {
     const mine = actions.filter((a) => a.verb === verb.id && offered(a));
-    const kuma = verb.id === 'report' ? ' Sent as POST /agent/report with no action, the body is what a running system measured (health): Uptime Kuma posts its webhook so.' : '';
     out[verb.id] = {
-      description: `${verb.description} Call with the action and its params; each action is one of the six verbs, and here these are ${verb.id}: ${mine.map((a) => `${a.name} (${gist(a.description)} Params: ${paramsSaid(a.params)})`).join('; ') || 'none'}. query ${LIST} gives each one's params whole.${kuma}`,
-      input: { action: z.string().optional().describe('The action, by its name.'), params: props.optional().describe('Its inputs.') },
+      description: `${verb.description} Call with the action and its params. Its actions: ${mine.map((a) => `${a.name} (${paramsSaid(a.params)})`).join('; ') || 'none'}. query ${LIST} says what each does.`,
+      input: { action: z.string().optional(), params: props.optional() },
       // Reached only with no action: then what this verb's actions are.
       run: async () => mine.map(({ name, description }) => ({ action: name, description: gist(description) })),
     };

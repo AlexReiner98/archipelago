@@ -11,7 +11,7 @@ test('with auth off, one workspace and the surface decides who is calling', asyn
   assert.equal((await call('/api/workspace_info')).result.owner, null, 'a new workspace has no owner');
   assert.equal((await call('/api/init', undefined, { name: 'Alex' })).status, 200, '/api is the human');
   assert.equal((await call('/api/workspace_info')).result.owner.title, 'Alex');
-  // A workspace begins with its first owner, and from then on what its agents change takes effect as they make it.
+  // What the agents of a new workspace change takes effect as they make it, owner or no owner.
   const applied = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'note', title: 'M' }] });
   assert.equal(applied.result.status, 'applied', 'a new workspace applies what agents change');
   await call('/api/workspace_set', undefined, { agent_changes: 'hold' });
@@ -44,6 +44,7 @@ test('a token fixes identity and authority, whichever surface is used', async ()
   const { workspaces, call, base } = await serve('tokens');
   const db = (await workspaces.get('default')).pelago.db;
   const owner = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  await call('/api/workspace_set', owner, { agent_changes: 'hold' });
 
   const who = await call('/whoami', owner, undefined, 'GET');
   assert.deepEqual([who.auth, who.actor.kind, who.actor.name], ['tokens', 'human', 'alex']);
@@ -282,7 +283,7 @@ test('a workspace receives notifications only from workspaces its admin accepts'
 
   const set = await call('/api/workspace_set', theirs, { accepts_from: ['default'] });
   const { reply_rules, ...settings } = set.result;
-  assert.deepEqual(settings, { id: 'acme', default_visibility: 'private', agent_changes: 'hold', accepts_from: ['default'], agent_backups: false, agent_publish: false, agent_code: false, lifted: { reply_account_commits: false, reply_draw_answers: false } });
+  assert.deepEqual(settings, { id: 'acme', default_visibility: 'private', agent_changes: 'apply', accepts_from: ['default'], agent_backups: false, agent_publish: false, agent_code: false, lifted: { reply_account_commits: false, reply_draw_answers: false } });
   assert.deepEqual(reply_rules.map((r: { rule: string; off: boolean }) => [r.rule, r.off]), [['core.draw_answers', false], ['software.account_commits', false]]);
   assert.deepEqual((await send(mine, 'acme')).result, { delivered_to: 'acme' });
 

@@ -37,7 +37,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
       'Answer the human with a view on their canvas: a kept view (entity: a view (type lens), a saved canvas) or a query and layout of your own, or open an item\'s page or the workspace. ' +
       'It lands within a couple of seconds in a pane of your session’s own on each page of theirs that is open, beside the pane they are in, which it never takes. The answer says how many of their pages are open and how many take your shows (pages). Add a short note saying what they are looking at. ' +
       'A change moves nothing on their page: show what is worth watching. ' +
-      'With look: true, the answer also carries the picture of it, as an image: drawn by the server as you see the map, whether or not a page of theirs is open (query look takes one without moving their page).',
+      'With look: true, the answer also carries the picture of it, as an image: drawn by the server as you see the map, whether or not a page of theirs is open (query look takes one without moving their page). ' +
+      'For the person reading a chat, call draw.',
     input: {
       ...VIEW_INPUT,
       screen: z.enum(['workspace', 'you']).optional().describe('The workspace sheet, or what waits for them.'),
@@ -171,7 +172,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       'Close a registered session with its outcome and a summary. Everything it held is released. A session that finishes in a repository is first shown that repository\'s open work nobody has changed since it began (answer: ended false, with the list): change what is done or no longer as written, name what you checked and found still true in still_true, name what this session had nothing to do with and cannot check in cannot_tell (cannot_tell_rest: true for all the rest), and call again. What waits on a person’s answer (waits_on), or has a change of its own waiting for the human, is not asked about.',
     input: {
       run: z.string().describe('The run id from session_start, or the session id.'),
-      outcome: z.enum(['finished', 'failed', 'cancelled']).optional(),
+      outcome: z.enum(['finished', 'failed', 'cancelled', 'done', 'success']).optional().describe('finished, failed or cancelled; done and success are read as finished.'),
       summary: z.string().optional().describe('What was done and what is left.'),
       still_true: z.array(z.string()).optional().describe('Ids of open items you have checked and found still true as written.'),
       cannot_tell: z.array(z.string()).optional().describe('Ids of open items this session had nothing to do with and cannot check from where it is. They are left as they were, and the session says it did not check them.'),
@@ -179,7 +180,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => {
       // An agent says where the repository's work stands; the human ending a session from the UI is not asked.
-      const result = await sessionEnd(l, actor, { ...input, reconcile: actor.kind === 'agent' });
+      const outcome = input.outcome === 'done' || input.outcome === 'success' ? 'finished' : input.outcome;
+      const result = await sessionEnd(l, actor, { ...input, outcome, reconcile: actor.kind === 'agent' });
       if ('ended' in result) return result;
       // If this server started the session's process, stop that too.
       return { ...result, process_stopped: stopLaunched(result.run) };
