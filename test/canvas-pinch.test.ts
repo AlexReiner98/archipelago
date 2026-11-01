@@ -1,6 +1,6 @@
 // Zooming the canvas with fingers, in a real browser with a touch screen (skipped where there is no Chrome): a phone has
-// no wheel, so two fingers zoom about the point between them, and the plane's zoom stays in sight, where a mouse's page
-// keeps it out of the way. A pinch that began on a step leaves that step where it stood.
+// no wheel, so two fingers zoom about the point between them, and the page shows no buttons for it. A pinch that began on
+// a step leaves that step where it stood; one finger moves the picture. Headless Chrome makes no click of a tap, even on a plain button, so a tap is not tried here.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -9,7 +9,7 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-test('in a browser with a touch screen, two fingers zoom the canvas and its buttons show', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser with a touch screen, two fingers zoom the canvas', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const titles = Array.from({ length: 6 }, (_, k) => `Step ${k + 1} of the order`);
   const made = (await call('/api/change', undefined, {
@@ -38,18 +38,7 @@ test('in a browser with a touch screen, two fingers zoom the canvas and its butt
     assert.ok(await until(`Boolean(document.querySelector('#canvas svg a[href="#/e/${made.s5}"]')) && Boolean(${moves})`), `the order is drawn: ${page.logs().join('\n')}`);
     await wait(500);
 
-    // The buttons stand in sight, and only they of that bar.
-    const buttons = await page.evaluate<{ title: string; top: boolean; width: number }[]>(`[...document.querySelectorAll('#canvas .plane-zoom button')].map((b) => {
-      const r = b.getBoundingClientRect();
-      const e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return { title: b.title, width: r.width, rect: [r.x, r.y, r.width, r.height], over: e && (e.className.baseVal ?? e.className ?? e.tagName), z: getComputedStyle(b.closest('.toolbar')).zIndex, top: b.contains(e) };
-    })`);
-    assert.equal(buttons.length, 3, 'the plane has its three buttons');
-    for (const b of buttons) assert.ok(b.top && b.width > 20, `${b.title} can be tapped: ${JSON.stringify(b)}`);
-
-    await page.evaluate(`(async () => { document.querySelector('#canvas .plane-zoom button[title="Zoom in"]').click(); await ${frames}; })()`);
-    const tapped = await page.evaluate<number>(`${moves}.state().s`);
-    await page.evaluate(`(async () => { document.querySelector('#canvas .plane-zoom button[title="Zoom out"]').click(); await ${frames}; })()`);
-    assert.ok(tapped > (await page.evaluate<number>(`${moves}.state().s`)), 'the buttons zoom');
+    assert.equal(await page.evaluate(`[...document.querySelectorAll('#canvas button[title="Zoom in"]')].some((b) => b.getClientRects().length)`), false, 'the canvas keeps its zoom buttons hidden');
 
     // Two fingers on a step, drawn apart: bigger, the point between them still under them, the step not moved.
     const step = `document.querySelector('#canvas svg a[href="#/e/${made.s1}"]')`;
@@ -57,6 +46,17 @@ test('in a browser with a touch screen, two fingers zoom the canvas and its butt
     const before = await page.evaluate<{ s: number; x: number; y: number }>(`${moves}.state()`);
     const shift = await page.evaluate<string | null>(`${step}.getAttribute('transform')`);
     const stage = await page.evaluate<{ x: number; y: number }>(`(() => { const r = document.querySelector('#canvas .lf-stage').getBoundingClientRect(); return { x: r.x, y: r.y }; })()`);
+    assert.equal(await page.evaluate(`Boolean(document.querySelector('#canvas .lf-legend'))`), false, 'the key does not cover a phone\'s picture');
+
+    // One finger on a step moves the picture, not the step.
+    await touch('touchStart', [[x, y]]);
+    for (const by of [10, 20, 30]) (await touch('touchMove', [[x, y + by]]), await wait(30));
+    await touch('touchEnd', []);
+    await page.evaluate(frames);
+    assert.ok((await page.evaluate<{ y: number }>(`${moves}.state()`)).y < before.y, 'one finger moved the picture');
+    assert.equal(await page.evaluate(`${step}.getAttribute('transform')`), shift, 'and left the step where it stood');
+    await page.evaluate(`(async () => { ${moves}.restore(${JSON.stringify(before)}); await ${frames}; })()`);
+
     await touch('touchStart', [[x - 10, y]]);
     await touch('touchStart', [[x - 10, y], [x + 10, y]]);
     for (const by of [20, 30, 40]) (await touch('touchMove', [[x - by, y], [x + by, y]]), await wait(30));
@@ -68,6 +68,7 @@ test('in a browser with a touch screen, two fingers zoom the canvas and its butt
     assert.ok(Math.abs(world(after) - world(before)) < 5, `the point between them stays under them: ${world(before)} and ${world(after)}`);
     assert.equal(await page.evaluate(`${step}.getAttribute('transform')`), shift, 'the step a finger began on did not move');
     assert.equal(await page.evaluate(`location.hash.includes('/e/')`), false, 'and did not open');
+
     const gone = page.logs().filter((l) => /error/i.test(l) && !/favicon/.test(l));
     assert.deepEqual(gone, [], 'the page said nothing went wrong');
   } finally {

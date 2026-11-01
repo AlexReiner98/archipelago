@@ -11,7 +11,8 @@ export function dragOf(host, keys, send, style) {
   return (key, ev) => {
     const el = keys.get(key);
     const svg = el?.ownerSVGElement;
-    if (!svg || ev.button !== 0) return;
+    // A finger on a phone stands on a mark nearly everywhere: there it moves the picture, and a tap still opens the mark.
+    if (!svg || ev.button !== 0 || ev.pointerType === 'touch') return;
     // The press is the mark's, not the frame's: the picture does not pan under it.
     ev.stopPropagation();
     const at = (e) => {
