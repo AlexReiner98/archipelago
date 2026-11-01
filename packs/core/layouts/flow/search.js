@@ -19,9 +19,9 @@ export function linksOf(list, every, ways) {
   return part;
 }
 
-/** How one part is drawn, and how many crossings its threading made. `total` is how many items are in the core. */
+/** How one part is drawn. `total` is how many items are in the core. */
 export function drawnPart(list, part, { block, stepSize, ways, z, total }) {
-  let drawn, threaded = 0;
+  let drawn;
   if (list.length >= 3 && part.length >= 2) {
     for (const trial of list.length <= z.trial_most && total <= z.trial_total ? TRIALS.slice(0, z.trials) : TRIALS.slice(0, 1)) {
       try {
@@ -36,7 +36,6 @@ export function drawnPart(list, part, { block, stepSize, ways, z, total }) {
         if (cost < drawn.cost) drawn = { ...made, cost };
       } catch (e) { console.warn?.(`The bars fell back: ${e.message}`); }
     }
-    if (drawn) threaded = drawn.crossings;
   }
   // Two boxes, the one over the other, a wire straight between them.
   if (!drawn) {
@@ -49,5 +48,5 @@ export function drawnPart(list, part, { block, stepSize, ways, z, total }) {
     }));
     drawn = { places, points, crossings: 0 };
   }
-  return { drawn, threaded };
+  return drawn;
 }

@@ -21,10 +21,6 @@ import { stepsOf } from './steps.js';
 /** How many finished pictures are kept. */
 const KEPT = 8;
 
-let last = null;
-/** What the last layout drew, for the count in the key. */
-export const latest = () => last;
-
 /** For a bench: told each stage's lines as it ends, by link. */
 let staging = null;
 export const stages = (fn) => (staging = fn);
@@ -39,9 +35,7 @@ export function layout(args) {
   kept.delete(key);
   kept.set(key, hit);
   if (kept.size > KEPT) kept.delete(kept.keys().next().value);
-  const { laid, seen } = hit(args.placed ?? {});
-  last = seen;
-  return laid;
+  return hit(args.placed ?? {});
 }
 
 /** Each line's way chosen, the boxes at `x` and `y`. */
@@ -76,7 +70,7 @@ function lengthsOf(sizes) {
 }
 
 /** How many times a finished picture's wires cross. */
-const crossed = ({ seen }) => count([...seen.chains, ...seen.ties].map((w) => w.points)).crossings;
+const crossed = ({ chains, ties }) => count([...chains, ...ties].map((w) => w.points)).crossings;
 
 /** Every picture is drawn the same two ways, its headed links as wires and as comb leaves, and the finished picture that crosses less kept, as wires where they tie. */
 function laidOut(args) {
@@ -97,12 +91,7 @@ function drawnOut({ items: given, links: told = [], undrawn = [], headless = ['p
   for (const w of every) if (w.a !== w.b && a.has(w.a) && a.has(w.b)) (a.get(w.a).add(w.b), a.get(w.b).add(w.a));
   const ways = directions(chains, ties, headless), hangs = hangsOf({ a, ways, nodes, sizes, gap, z, aspect, chains: asWires }), { core, block } = hangs;
   const how = { block, stepSize, ways, z, total: core.length };
-  let threaded = 0;
-  const shelves = partsOf(core, a).map((list) => {
-    const made = drawnPart(list, linksOf(list, every, ways), how);
-    threaded += made.threaded;
-    return shelfOf(made.drawn, block);
-  });
+  const shelves = partsOf(core, a).map((list) => shelfOf(drawnPart(list, linksOf(list, every, ways), how), block));
   const { x, y, routes, holder } = assemble(shelves, { ...hangs, stepSize, gap, margin, aspect });
   // Two links between one pair of boxes are drawn from one sketch, and each is then a wire like any other.
   for (const [k, of] of twins) if (routes.has(of)) routes.set(k, { ...routes.get(of), points: routes.get(of).points.map((p) => [...p]) });
@@ -130,5 +119,5 @@ function drawnOut({ items: given, links: told = [], undrawn = [], headless = ['p
   for (const id of x.keys()) rigid.set(id, { at: [x.get(id), y.get(id)], size: [nodes.get(id).w, nodes.get(id).h], hangs: rigid.get(id)?.hangs ?? [], pointed: nodes.get(id).shape === 'diamond' });
   // Round a pin no wire stays in a box, however much it crosses to get out.
   const reshape = (px, py, lines) => shapeWires({ nodes, x: px, y: py, lines, z, through: Infinity });
-  return finisher({ nodes, potential, chains, ties, x, y, routes, rigid, holder, headless, sizes, z, margin, stepSize, reshape, tally: { threaded } });
+  return finisher({ nodes, potential, chains, ties, x, y, routes, rigid, holder, sizes, z, margin, stepSize, reshape });
 }

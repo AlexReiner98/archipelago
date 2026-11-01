@@ -5,7 +5,7 @@
 // head where it points unless the style draws its type headless (core's house style: part_of).
 // What follows an open question is dashed, as a scenario. Hovering a step lights its wires and ties and shows a tip:
 // its title and the start of its note. Every wire is drawn all the time: the layout places them all, so a wire left out of
-// the picture hides what placed it, and the key says how they cross, counted from those wires (./count.js). Drawn from the
+// the picture hides what placed it. Drawn from the
 // flat lens's answer (items and links); the older lens's still draws, what each item is `inside` read as part_of. The
 // layout is ./layout.js, its model; this turns a model into the marks to draw (SVG and HTML as data), which the page checks
 // and mounts, so every name is in the page and every step a link, and two models into the patches between them. Its
@@ -15,9 +15,8 @@
 // item faint, a link dashed, an edit marked on its step), each with a badge keyed `held:<proposal>` that the page
 // answers a click on by putting the change to the person; a link the person just drew (`mine`) is dashed until it is.
 
-import { count } from './count.js';
 import { shownOnly } from './graph.js';
-import { latest, layout } from './layout.js';
+import { layout } from './layout.js';
 import { css } from './look.js';
 import { addClass, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
@@ -106,7 +105,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const g = layout({ items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, placed });
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
-  const told = latest(), size = { width: g.width, height: g.height };
+  const size = { width: g.width, height: g.height };
 
   const yours = (i) => Boolean(i.state.needs_you);
   // What a step's dot says first: that it waits on you, is blocked or is under way; else its status, in its colour.
@@ -321,10 +320,6 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     if (done) (at.set(id, put), (pins[id] = put));
     return patches;
   };
-  // The key says how the wires cross as they stand when drawn.
-  const { crossings, seen, shared } = count(wiresIn(g).map((w) => w.points));
-  const crossed = () => m('svg', { width: z('key_width'), height: z('key_height'), viewBox: '0 0 22 14' }, m('path', { d: 'M1 1L21 13M1 13L21 1', class: 'lf-wire' }));
-  key.push(...[`${crossings} crossings`, `${seen} seen`, `${shared} shared`, `${told.up} of ${told.headed ?? g.chains.length} up`].map((label) => ({ glyph: crossed(), label })));
   // Still on a page, a picture stands at its own size in the middle of the frame it is given, which would stretch it.
   if (style.still && width > size.width && Array.isArray(svg)) {
     svg[1].viewBox = `${(size.width - width) / 2} 0 ${width} ${size.height}`;
