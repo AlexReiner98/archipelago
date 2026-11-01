@@ -67,7 +67,7 @@ export function drawDiagram(host, data, { download } = {}) {
   const moves = panZoom(stage, picture, { width: data.width, height: data.height, style: state.style });
   const zoom = h(
     'span',
-    { class: 'switch' },
+    { class: 'switch plane-zoom' },
     h('button', { title: 'Zoom out', onclick: () => moves.zoomBy(1 / numberOf(state.style, 'zoom_step')) }, '−'),
     h('button', { title: 'All of it in sight', onclick: () => moves.fit() }, 'Fit'),
     h('button', { title: 'Zoom in', onclick: () => moves.zoomBy(numberOf(state.style, 'zoom_step')) }, '+'),

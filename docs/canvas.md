@@ -189,6 +189,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `layout.js`, `draw.html`, `draw.js`, `marks.js` | a drawing run in the sandbox; its marks checked and mounted |
 | `reader-frame.js` | the one mark the page makes itself: a document's draft or published page, read in a frame on the canvas |
 | `pan-zoom.js` | the infinite plane |
+| `pinch.js` | two fingers on it |
 | `drag.js`, `canvas-wires.js` | moving a node; drawing a wire and making its link |
 | `live.js`, `replica.js`, `ghosts.js` | tailing the log; the store; held changes drawn into it |
 | `panes.js`, `pane-drag.js`, `pane-address.js` | more than one canvas at once: panes alike side by side in a tab, dragged; the address and back and forward the pane in focus's |

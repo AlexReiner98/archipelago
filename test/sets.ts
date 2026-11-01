@@ -14,6 +14,7 @@ export const SLOW: Record<string, string> = {
   'test/agents-beside.test.ts': 'browser',
   'test/canvas-drag.test.ts': 'browser',
   'test/canvas-pan.test.ts': 'browser',
+  'test/canvas-pinch.test.ts': 'browser',
   'test/canvas-replica.test.ts': 'browser',
   'test/canvas-wires.test.ts': 'browser',
   'test/canvas-zoom.test.ts': 'browser',

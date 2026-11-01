@@ -319,7 +319,7 @@ ${JSON.stringify(input)}`;
     const moves = (host.moves = panZoom(stage, picture, { width, height, start: scene.start, aside: !legend || legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room'), style, told: (view) => !ended && port.postMessage({ type: 'viewport', view }) }));
     const zoom = h(
       'span',
-      { class: 'switch' },
+      { class: 'switch plane-zoom' },
       h('button', { title: 'Zoom out', onclick: () => moves.zoomBy(1 / numberOf(style, 'zoom_step')) }, '−'),
       h('button', { title: 'All of it in sight', onclick: () => moves.fit() }, 'Fit'),
       h('button', { title: 'Zoom in', onclick: () => moves.zoomBy(numberOf(style, 'zoom_step')) }, '+'),
