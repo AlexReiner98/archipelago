@@ -137,9 +137,12 @@ reason and a source.
    `pelago.config.json`: `{ "policy": { "create": "auto", "link": "auto" } }`.
    A workspace can make the choice for itself, on its Workspace screen under
    Agents ("Their changes"): held until you have looked, or taking
-   effect as agents make it, merges and archives included. A workspace
-   begins taking effect: its first owner being set chooses that for it
-   (since 21 Oct 2026; one made before keeps what it had). Then an agent can
+   effect as agents make it, merges and archives included. A new workspace
+   begins taking effect, from the moment it is first opened, whether a
+   signup, the operator or a pack made it or it is a new server's default
+   (since 1 Nov 2026; from 21 Oct its first owner being set chose that). One
+   that exists and never chose, or comes from a backup, keeps what it has.
+   Then an agent can
    settle a decision or a hypothesis too: a decision must say what was chosen
    and why, and you are notified on the Changes screen. The log and Undo are the record,
    not a gate. Its admin sets it; an agent cannot.

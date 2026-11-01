@@ -2,7 +2,7 @@
 // by the rules (src/rules.ts), then either applied or stored as a proposal for a human, and always logged.
 
 import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts'; import { renamedQuery } from './query-names.ts';
-import { AGENT_CHANGES, agentChanges, decide, DEFAULT_AGENT_POLICY, type Policy, type Ruled } from './rules.ts';
+import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, type Policy, type Ruled } from './rules.ts';
 import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.ts'; import { authorityOf } from './authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts'; import { mergeRefusals, once, overtaken } from './merge.ts'; import { readEvents, type EventQuery } from './eventlog.ts'; import { ownerFollows } from './owner-link.ts';
@@ -724,10 +724,9 @@ export class Archipelago {
     const found = await this.db.query<{ id: string }>(`select id from entity where type = 'person' and lower(title) = lower($1) and archived_at is null -- index entity_type_title`, [input.name]);
     let id = found.rows[0]?.id;
     if (!id) id = (await this.apply(actorId(actor), { ops: [{ op: 'create', ref: 'me', type: 'person', title: input.name, props: input.email ? { email: input.email } : {} }], reason: 'Workspace owner' })).created.me;
-    // Its first owner begins a workspace: what its agents change takes effect as they make it, until the owner says otherwise (owner, 21 Oct 2026).
-    if ((await this.setting('me')) === undefined) await this.db.query(`insert into setting (key, value) values ($1, '"apply"'::jsonb) on conflict (key) do nothing`, [AGENT_CHANGES]);
+    const begun = (await this.setting('me')) === undefined ? await beginApplying(this.db) : [];
     await this.db.query(`insert into setting (key, value) values ('me', $1::jsonb) on conflict (key) do update set value = excluded.value`, [JSON.stringify(id)]);
-    await this.record('settings', actorId(actor), [['+', 'setting', 'me', id], ['+', 'setting', AGENT_CHANGES, await this.setting(AGENT_CHANGES)]]);
+    await this.record('settings', actorId(actor), [['+', 'setting', 'me', id], ...begun]);
     return { me: id };
   }
 
