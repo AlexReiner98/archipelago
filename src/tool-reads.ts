@@ -88,6 +88,31 @@ function shortHistory<T>(events: T[], once = true, more = 'ask again with full: 
     return { ...ev, ...(again && { reason: undefined }), detail: detail && { ...detail, ...(changes && { changes }), ...(again && { authority: undefined }) } };
   });
 }
+/**
+ * What a list answers an agent: each long string cut to its start and its length, and anything large (a session's
+ * story, a style's code) said by its size, so finding one item does not read the whole of it. `more` says where it is.
+ */
+function shorter(value: unknown, more: string): unknown {
+  if (typeof value === 'string') return value.length > 300 ? `${value.slice(0, 200)}… (${value.length} characters; ${more})` : value;
+  if (!value || typeof value !== 'object' || value instanceof Date) return value;
+  const size = JSON.stringify(value).length;
+  if (size > 2000) return `(${size} characters; ${more})`;
+  return Array.isArray(value) ? value.map((v) => shorter(v, more)) : Object.fromEntries(Object.entries(value).map(([k, v]) => [k, shorter(v, more)]));
+}
+
+/** How many of an item's links in each direction `get` lists for an agent before it counts them by type. */
+const GET_LISTED = 20;
+/** A hub's links as an agent reads them: the first few, and the rest as a count of each type. */
+function fewLinks<T extends { type: string }>(links: T[]) {
+  if (links.length <= GET_LISTED) return { links };
+  const by_type: Record<string, number> = {};
+  for (const { type } of links) by_type[type] = (by_type[type] ?? 0) + 1;
+  return { links: links.slice(0, GET_LISTED), counted: { total: links.length, by_type } };
+}
+
+/** How many of a closed status's proposals an agent is given, the newest. */
+const PROPOSALS_LISTED = 20;
+
 /** How many of a repository's open items the handoff lists for an agent before it says how many more there are. */
 const HANDOFF_LISTED = 25;
 
@@ -151,19 +176,26 @@ export const READ_TOOLS: Record<string, Tool> = {
       open: z.boolean().optional().describe('true for unfinished only, false for finished only.'),
       include_archived: z.boolean().optional(),
       limit: z.number().int().positive().optional(),
+      full: z.boolean().optional().describe('true for every field whole. Left out, an agent is given long fields cut, with their length; get has one item whole.'),
     },
-    run: async (l, _actor, input) => l.search(input),
+    run: async (l, actor, { full, ...input }) => {
+      const found = await l.search(input);
+      return actor.kind !== 'agent' || full ? found : found.map((row) => ({ ...row, props: Object.fromEntries(Object.entries(row.props).map(([k, v]) => [k, shorter(v, 'get has it')])) }));
+    },
   },
   get: {
     description: 'One item in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the views it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in) and its links in both directions. Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
-    input: { id: z.string(), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe('Taken, and changes nothing here: the whole record is in events, with full: true.') },
+    input: { id: z.string(), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe(`true for every link: past ${GET_LISTED} in a direction, an agent is given those and a count by type (links_cut). The whole record is in events, with full: true.`) },
     run: async (l, actor, input) => {
       const found = { ...(await l.get(input.id)), shown_in: [] as Awaited<ReturnType<typeof shownIn>> };
       found.shown_in = await shownIn(l, input.id, found.trail);
       // Only the last few changes, long values cut, for anyone; an agent mostly wants the item, so has them when it asks.
       const { recent_events, ...item } = found;
       const recent = shortHistory(recent_events, actor.kind !== 'human', 'query events, with full: true, has all of it');
-      return actor.kind === 'human' || input.history ? { ...item, recent_events: recent } : item;
+      const said = actor.kind === 'human' || input.history ? { ...item, recent_events: recent } : item;
+      if (actor.kind !== 'agent' || input.full) return said;
+      const [out, into] = [fewLinks(item.outgoing as { type: string }[]), fewLinks(item.incoming as { type: string }[])];
+      return { ...said, outgoing: out.links, incoming: into.links, ...((out.counted || into.counted) && { links_cut: { outgoing: out.counted, incoming: into.counted, how: 'get with full: true has them all.' } }) };
     },
   },
   view: {
@@ -205,9 +237,11 @@ export const READ_TOOLS: Record<string, Tool> = {
   proposals: {
     description:
       'List the changes held for a human, by status (default pending; "approved" is applied, "rejected" is declined, "superseded" asked only for what a later change had already made so). Agents can read these but only a human can decide them.',
-    input: { status: z.enum(['pending', 'approved', 'rejected', 'superseded']).optional() },
-    run: async (l, _actor, input) => {
-      const held = await l.proposals(input);
+    input: { status: z.enum(['pending', 'approved', 'rejected', 'superseded']).optional(), full: z.boolean().optional().describe(`true for all of them, whole. Left out, an agent is given long values cut, and of a closed status the newest ${PROPOSALS_LISTED}.`) },
+    run: async (l, actor, { full, ...input }) => {
+      const all = await l.proposals(input);
+      const short = actor.kind === 'agent' && !full;
+      const held = short ? all.slice(input.status && input.status !== 'pending' ? -PROPOSALS_LISTED : 0).map((p) => ({ ...p, ops: (p.ops as unknown[]).map((op) => shorter(op, 'proposals with full: true has it')) })) : all;
       // The session each was proposed in, named by its name, as everywhere a session is (the held entry says which).
       const { rows } = await l.db.query<{ id: string; run_name: string }>(
         `select p.id, r.title as run_name from log_entry p join entity r on r.id = p.head->>'run' where p.stream = 'pending' and p.id = any($1::text[])`,

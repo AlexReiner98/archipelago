@@ -346,3 +346,16 @@ test('a held change says what it would make', async () => {
   assert.match(held.would_make.it, /^e_/);
   assert.ok(!(await l.entity(held.would_make.it)), 'and it does not exist yet');
 });
+
+test('a list tells an agent of a long field and a hub\'s links without reading them whole', async () => {
+  const l = await fresh();
+  const ops = [{ op: 'create', ref: 'hub', type: 'project', title: 'Hub' }, { op: 'create', ref: 'look', type: 'style', title: 'Long look', props: { code: 'x'.repeat(3000) } }, ...Array.from({ length: 25 }, (_, k) => ({ op: 'create', ref: `t${k}`, type: 'task', title: `Task ${k}` })), ...Array.from({ length: 25 }, (_, k) => ({ op: 'link', type: 'part_of', from: `t${k}`, to: 'hub' }))];
+  const { created } = (await callTool(l, human, 'change', { reason: 'test', ops })) as any;
+  const [found] = (await callTool(l, agent, 'search', { q: 'Long look', type: 'style' })) as any[];
+  assert.match(String(found.props.code), /3000 characters/);
+  assert.equal(((await callTool(l, agent, 'search', { q: 'Long look', type: 'style', full: true })) as any[])[0].props.code.length, 3000);
+  const got = (await callTool(l, agent, 'get', { id: created.hub })) as any;
+  assert.equal(got.incoming.length, 20);
+  assert.equal(got.links_cut.incoming.by_type.part_of, 25);
+  assert.equal(((await callTool(l, agent, 'get', { id: created.hub, full: true })) as any).incoming.length, 25);
+});
