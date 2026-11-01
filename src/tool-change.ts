@@ -32,32 +32,30 @@ type Refused = { who: string; input: Record<string, unknown> & { ops: unknown[] 
 export const WRITE_TOOLS: Record<string, Tool> = {
   change: {
     description:
-      'The only way to change the map. Send a list of ops (create, update, link, unlink, archive, restore, merge, define_type, forget) with the reason. ' +
-      'Creates can carry a ref so later ops in the same change can link to them, and a title or note in the same change can name what it makes: write {ref} and it becomes that item\u2019s id. Give the source the facts came from. ' +
-      'To add to a note or change one passage of it, send append or replace on the update, not the whole body again. ' +
-      'An update that changes nothing (only the id) says you checked the item and it is still true as written: it records when it was last known true. ' +
-      'The change is validated as a whole; depending on policy it is applied at once or held as a proposal for a human. ' +
-      'A change that is refused is kept for a few minutes under a name the refusal gives: correct it with retry and fixes (the ops that were wrong, by number) instead of sending it all again. ' +
-      'Closing a decision or a hypothesis is held for the human to confirm, unless the workspace applies agents\u2019 changes: then a decision must carry what was chosen (props.outcome) and why (props.rationale), and is put to the owner later (attention, reason to_confirm).',
+      'The only way to change the map: a list of ops with a reason. ' +
+      'A create\u2019s ref lets later ops link to it, and a title or note in the same change names what it makes as {ref}. Give the source the facts came from. ' +
+      'To add to a note or change a passage, send append or replace, not the whole body. An update with only the id says you checked the item and it is still true. ' +
+      'Checked as a whole, then applied or held as a proposal for a human, by policy. A refused change is kept for a few minutes under a name the refusal gives: send retry and fixes (the ops that were wrong, by number), not all of it again. ' +
+      'Closing a decision or hypothesis is held for the human, unless the workspace applies agents\u2019 changes: then a decision must carry props.outcome and props.rationale, and is put to the owner later (attention, to_confirm).',
     input: {
       ops: z.array(op).min(1).optional().describe('What to change. Needed, except with retry.'),
-      reason: z.string().min(1).optional().describe('Why this change is being made. Shown in the activity log. Needed, except with retry.'),
-      retry: z.string().optional().describe('The name a refused change was kept under (the refusal gives it). The change is sent again as it was, with fixes put in: send only retry and fixes.'),
+      reason: z.string().min(1).optional().describe('Why, as the activity log shows it. Needed, except with retry.'),
+      retry: z.string().optional().describe('The name the refusal gave. Send only retry and fixes.'),
       fixes: z
-        .array(z.object({ at: z.number().int().positive().describe('The op’s number as the refusal counted it, from 1.'), op: op.nullable().describe('The whole op as it should be; null to leave it out.') }))
+        .array(z.object({ at: z.number().int().positive().describe('The op’s number in the refusal, from 1.'), op: z.record(z.string(), z.unknown()).nullable().describe('The whole op, as in ops; null to leave it out.') }))
         .optional()
-        .describe('With retry: the ops to put in place of the ones that were wrong.'),
-      source: source.optional().describe('Where these facts came from. Individual ops can override it.'),
+        .describe('With retry: the ops that replace those that were wrong.'),
+      source: source.optional().describe('Where these facts came from.'),
       authority: z
         .object({
-          of: z.enum(['human', 'agent']).describe('"human" when a person told you to make this change or decided what it records; "agent" when it is your own judgment of the work.'),
-          basis: z.string().optional().describe('For "human": what they said and where (required). For "agent": what you saw that it rests on.'),
+          of: z.enum(['human', 'agent']).describe('"human" when a person told you or decided it; "agent" for your own judgment.'),
+          basis: z.string().optional().describe('For "human": what they said and where (required). For "agent": what it rests on.'),
         })
         .optional()
-        .describe('On whose authority this change is made. Kept on every event it logs. Left out, it is recorded as your own judgment; settling a decision or hypothesis needs it said.'),
-      hold: z.boolean().optional().describe('true to have this change wait for the human even where agents\u2019 changes are applied as made: for something you want looked at before it takes effect.'),
-      drawing: z.string().optional().describe('Sent by the page alone: the style whose code asked for this change, as the person looking.'),
-      run: z.string().optional().describe('The session making it: the run id from session_start (or the session id). Kept in the log, so the change reads as that session’s.'),
+        .describe('On whose authority. Left out, your own judgment; settling a decision or hypothesis needs it said.'),
+      hold: z.boolean().optional().describe('true to wait for the human even where agents\u2019 changes apply as made.'),
+      drawing: z.string().optional().describe('Sent by the page alone.'),
+      run: z.string().optional().describe('The run id from session_start, or the session id.'),
     },
     run: async (l, actor, { retry, fixes, ...given }) => {
       // Whose it is: the token's, not the name a session gives itself, which it may leave out the second time.
@@ -69,7 +67,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         const ops = [...kept.input.ops];
         for (const fix of fixes ?? []) {
           if (fix.at > ops.length) throw new Error(`Change rejected:\n- fixes: the change kept as "${retry}" has ${ops.length} ops, so there is no op ${fix.at}.`);
-          ops[fix.at - 1] = fix.op;
+          ops[fix.at - 1] = fix.op && op.parse(fix.op);
         }
         // What is said again (a reason, an authority) stands in for what was kept.
         input = { ...kept.input, ...Object.fromEntries(Object.entries(given).filter(([, v]) => v !== undefined)), ops: ops.filter(Boolean) };

@@ -251,10 +251,11 @@ ${JSON.stringify(input)}`;
   /**
    * The key, in the frame every key has: a scene says what its marks mean (`key`: each { glyph, label, item }, a glyph
    * a small mark checked as every mark is, a label in words, an item its row opens), and the page draws it, shown
-   * unless the style says `key: "hidden"`. A scene from before the key was data gives `legend`, marks it drew itself.
+   * unless the style says `key: "hidden"`, or the frame is narrower than the style's `flow_key_least` and the key would
+   * cover the picture. A scene from before the key was data gives `legend`, marks it drew itself.
    */
   function keyOf(scene, style, keys, tell) {
-    if (style.key === 'hidden') return null;
+    if (style.key === 'hidden' || (host.clientWidth && !style.still && host.clientWidth < Number(style.sizes?.flow_key_least))) return null;
     if (!Array.isArray(scene.key)) return scene.legend ? build(scene.legend, keys, tell) : null;
     const rows = scene.key.filter((e) => e && typeof e.label === 'string' && e.label);
     if (!rows.length) return null;
@@ -267,6 +268,8 @@ ${JSON.stringify(input)}`;
     const redraw = () => !ended && port.postMessage({ type: 'restyle', style: plain({ ...style, drawing: undefined, code: undefined }) });
     host.redraw = redraw;
     if (stillReading(host, scene, keys)) return redraw();
+    // What a look hands on as marks (ui/look-marks.js): the scene the sandbox answered with, as it answered.
+    host.scene = scene;
     adopt(id, scene.css);
     host.dataset.drawing = id;
     const picture = build(scene.svg, keys, tell);

@@ -1,6 +1,6 @@
 // One infinite plane: an SVG in a frame of fixed size, seen through a window that stands in the picture's own units
-// (its world). The wheel zooms about the pointer, a drag moves it, and a link is followed only when the pointer did not
-// move. Nothing holds it in: it goes as far as the reader takes it. Zoom is only scale, never structure; what is too
+// (its world). The wheel or two fingers zoom about the pointer, a drag moves it, and a link is followed only when the
+// pointer did not move. Nothing holds it in: it goes as far as the reader takes it. Zoom is only scale, never structure; what is too
 // small on screen to read is not drawn (the text's tier, `data-text` on the frame: none, names, all), and what is out
 // of sight is not drawn at all. Whoever drew it is told what is in view (`told`), once a frame at most. It opens with
 // all of it in sight when that can be read, else at a size that reads, brought to where it starts.
@@ -8,6 +8,7 @@
 import { numberOf } from './query-base.js';
 import { sheetAside } from './sheet-follow.js';
 import { panLock } from './pan-lock.js';
+import { pinchOf } from './pinch.js';
 
 /** What a frame of `n` units' text is shown as, on screen at `px` a unit: none, its names, or all of it. */
 export const tierOf = (px, { text_least, more_from }) => (px < text_least ? 'none' : px < more_from ? 'names' : 'all');
@@ -110,11 +111,13 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     view.y = start[1] - plane.fit_pad / view.s;
     now();
   };
+  /** A scale kept between the least and the most, the least never above what shows all of it. */
+  const scaled = (s) => Math.min(plane.zoom_most, Math.max(Math.min(plane.zoom_least, fitted), s));
   /** Zoom by a factor about a point of the frame (its middle when none is given): only the scale, never what is drawn. */
   const zoomBy = (factor, px, py) => {
     const [W, H] = size();
     const [mx, my] = [px ?? W / 2, py ?? H / 2];
-    const s = Math.min(plane.zoom_most, Math.max(Math.min(plane.zoom_least, fitted), view.s * factor));
+    const s = scaled(view.s * factor);
     view.x += mx / view.s - mx / s;
     view.y += my / view.s - my / s;
     view.s = s;
@@ -183,6 +186,21 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   };
   frame.addEventListener('pointerup', end);
   frame.addEventListener('pointercancel', end);
+  // Two fingers keep the point between them under them, however they move: the pan one began ends, as a drag does.
+  let held = null;
+  pinchOf(frame, {
+    begin: ([x, y]) => {
+      if (drag) ((drag.moved = true), end());
+      dragged = true;
+      held = { s: view.s, x: view.x + x / view.s, y: view.y + y / view.s };
+    },
+    pinch: (by, [x, y]) => {
+      view.s = scaled(held.s * by);
+      view.x = held.x - x / view.s;
+      view.y = held.y - y / view.s;
+      apply();
+    },
+  });
   // A frame that changes size keeps what was in the middle of it in the middle (a pane whose edge is dragged does not
   // carry the picture with that edge), but the sheet coming or going leaves it where the reader put it: only the room
   // beside it changes. One first given a size opens.

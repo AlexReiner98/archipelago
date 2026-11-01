@@ -12,6 +12,8 @@ export const saidDrawn = (el, state, why) => el.dispatchEvent(new CustomEvent('v
 
 if (lookMode) {
   const root = document.documentElement;
+  // The drawing as marks, for a look that asks for them (src/look-draw.ts): loaded only here.
+  window.lookMarks = async () => (await import('./look-marks.js')).marksOf(document.querySelector('#canvas [data-drawing]'));
   root.dataset.look = 'drawing';
   // The canvas's first word is the one taken; two frames on, so what was mounted has been painted.
   document.getElementById('canvas')?.addEventListener('view-drawn', (ev) => {

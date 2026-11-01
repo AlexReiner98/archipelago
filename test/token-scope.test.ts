@@ -77,7 +77,8 @@ test('a token that may propose has every change wait, even where agents’ chang
 });
 
 test('a token is within any item, and writes only what is part of it', async () => {
-  const { call, made, token } = await setUp();
+  const { call, admin, made, token } = await setUp();
+  await call('/api/workspace_set', admin, { agent_changes: 'hold' });
   const env = await token({ name: 'env', within: [made.env] });
   assert.equal((await call('/agent/change', env, { reason: 'x', ops: [{ op: 'update', id: made.blue, props: { host: 'app-blue' } }] })).result.status, 'proposed');
   assert.match((await call('/agent/change', env, { reason: 'x', ops: [{ op: 'update', id: made.task, status: 'doing' }] })).error, /limited to the work of server-1\. "Paint the fence" is not part of it/);

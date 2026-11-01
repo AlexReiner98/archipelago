@@ -1,13 +1,13 @@
-// The small surface for agents (Rule 7): query, change, undo and the six verbs are all MCP offers, every tool an
+// The small surface for agents (Rule 7): query, change, undo, the six verbs and draw are all MCP offers, every tool an
 // agent called before answers by its old name for one release with the call that replaces it, and a session's work
-// is done through the nine alone.
+// is done through the ten alone.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { canAsk } from '../src/askview.ts';
-import { route, SURFACE } from '../src/surface.ts';
+import { QUERY_READS, route, SURFACE } from '../src/surface.ts';
 import { callTool, replacementOf, surfaceFor, TOOLS } from '../src/tools.ts';
 import { agent, fresh } from './map.ts';
 import { closers, serve } from './serve.ts';
@@ -22,11 +22,11 @@ const OLD = [
   'time_invoice_paid', 'time_invoice_void', 'time_today', 'time_timesheet', 'time_week',
 ];
 
-test('the surface is exactly query, change, undo and the six verbs, over MCP too', async () => {
+test('the surface is exactly query, change, undo, the six verbs and draw, over MCP too', async () => {
   const l = await fresh();
-  assert.deepEqual(SURFACE, ['query', 'change', 'undo', 'capture', 'assign', 'report', 'ask', 'settle', 'revise']);
+  assert.deepEqual(SURFACE, ['query', 'change', 'undo', 'capture', 'assign', 'report', 'ask', 'settle', 'revise', 'draw']);
   assert.deepEqual(surfaceFor(l.registry).map(([name]) => name), SURFACE);
-  assert.deepEqual(l.registry.verbs.map((v) => v.id), SURFACE.slice(3), 'a verb tool for each verb the core pack declares');
+  assert.deepEqual(l.registry.verbs.map((v) => v.id), SURFACE.slice(3, -1), 'a verb tool for each verb the core pack declares');
 
   const { base } = await serve('off');
   const client = new Client({ name: 'test', version: '1' });
@@ -35,6 +35,34 @@ test('the surface is exactly query, change, undo and the six verbs, over MCP too
   assert.deepEqual((await client.listTools()).tools.map((t) => t.name), SURFACE);
   const found = await client.callTool({ name: 'query', arguments: { name: 'search', params: { q: 'anything' } } });
   assert.ok(!found.isError, 'a read through query');
+});
+
+test('the tool list stays small, and what it leaves out is one call away', async () => {
+  const { base } = await serve('off');
+  const client = new Client({ name: 'test', version: '1' });
+  await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`)));
+  closers.push(() => client.close());
+  const { tools } = await client.listTools();
+  const size = JSON.stringify(tools).length;
+  assert.ok(size < 12_000, `the list is ${size} characters, and every request pays for it`);
+
+  const words = (answer: unknown) => (answer as { content: { text: string }[] }).content[0].text;
+  const query = tools.find((t) => t.name === 'query')!.description!;
+  for (const read of QUERY_READS) assert.ok(query.includes(`${read} (`), `${read} is named with its params`);
+  const said = async (args: Record<string, unknown>) => JSON.parse(words(await client.callTool({ name: 'query', arguments: args })));
+  assert.match((await said({})).views.flat, /The filter is/, 'the query’s terms are in the list of names');
+  assert.match((await said({ name: 'actions', params: { read: 'flat' } })).description, /The filter is/, 'one view’s text, alone');
+  assert.ok((await said({ name: 'actions', params: { read: 'search' } })).params.properties.q, 'a read says its params');
+  assert.match(words(await client.callTool({ name: 'query', arguments: { name: 'actions', params: { read: 'nothing' } } })), /No read or view "nothing"/);
+  const [change] = await said({ name: 'actions', params: { action: 'change' } });
+  assert.equal(change.params.properties.ops.items.oneOf.length, 9, 'every op, whole');
+
+  const listed = tools.find((t) => t.name === 'change')!;
+  for (const op of ['create', 'update', 'link', 'unlink', 'archive', 'restore', 'merge', 'define_type', 'forget']) assert.ok(listed.description!.includes(`${op} (`), `${op} has its line`);
+  const wrong = await client.callTool({ name: 'change', arguments: { reason: 'test', ops: [{ op: 'create', title: 'No type' }] } });
+  assert.ok(wrong.isError, 'only the list is loose: an op is checked as it always was');
+  assert.match(words(wrong), /Invalid input for change/);
+  assert.ok(!(await client.callTool({ name: 'change', arguments: { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Typed' }] } })).isError);
 });
 
 test('every old name answers with its replacement, and the replacement reaches the same tool', async () => {
@@ -77,7 +105,7 @@ test('an agent does a session’s work through the surface: start, change, tell,
   assert.equal(start.status, 'running');
   const made = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: 'Try the surface', status: 'todo' }] })) as { status: string };
   assert.ok(['applied', 'proposed'].includes(made.status));
-  const told = (await callTool(l, agent, 'report', { action: 'tell', params: { run: start.run, said: 'The nine tools are enough for a session.' } })) as { run: string };
+  const told = (await callTool(l, agent, 'report', { action: 'tell', params: { run: start.run, said: 'The ten tools are enough for a session.' } })) as { run: string };
   assert.equal(told.run, start.run);
   await callTool(l, agent, 'report', { action: 'session_update', params: { run: start.run, note: 'Halfway' } });
   const ended = (await callTool(l, agent, 'report', { action: 'session_end', params: { run: start.run, summary: 'Done', cannot_tell_rest: true } })) as { status: string };

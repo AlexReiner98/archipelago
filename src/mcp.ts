@@ -12,12 +12,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
+import { registerView, toolView, VIEW_CAPABILITY } from './mcp-view.ts';
 import { onToolsChanged } from './packstate.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { callTool, surfaceFor, type Tool } from './tools.ts';
 
 const actorField = {
-  actor: z.string().optional().describe('Who you are, e.g. "claude-code:my-project". Recorded against everything you do.'),
+  actor: z.string().optional().describe('Who you are, for the log.'),
 };
 
 /**
@@ -45,7 +46,7 @@ export interface Caller {
   actor: (label?: string) => Actor;
 }
 
-/** What an agent is offered: query, change, undo and the six verbs (src/surface.ts), whatever packs are on. */
+/** What an agent is offered: query, change, undo, the six verbs and draw (src/surface.ts), whatever packs are on. */
 const offered = (registry: Archipelago['registry']) => surfaceFor(registry);
 
 /** A tool's inputs as MCP is given them, made once per tool rather than for every request. */
@@ -62,19 +63,23 @@ const inputsOf = (tool: Tool) => {
  */
 export function contentOf(result: unknown) {
   const image = result && typeof result === 'object' ? (result as { image?: { data?: unknown; content_type?: unknown } }).image : undefined;
-  if (!image || typeof image.data !== 'string' || typeof image.content_type !== 'string') return [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }];
+  if (!image || typeof image.data !== 'string' || typeof image.content_type !== 'string') return [{ type: 'text' as const, text: JSON.stringify(result) }];
   const { image: _sent, ...rest } = result as Record<string, unknown>;
   return [
-    { type: 'text' as const, text: JSON.stringify(rest, null, 2) },
+    { type: 'text' as const, text: JSON.stringify(rest) },
     { type: 'image' as const, data: image.data, mimeType: image.content_type },
   ];
 }
 
+/** What any client is told on connecting: one with no hooks has nothing else to go by. */
+const INSTRUCTIONS = 'Archipelago is a shared map of people, work and what waits on what. To work here: start with capture, action session_start, params cwd and remote, and keep the run it gives. Read with query: name handoff with repo for where things stand, brief with task for one task; query with name actions says what each action takes. Write only with change, giving run and authority. Say what you conclude with report, action tell. Finish with report, action session_end, and a summary.';
+
 /** A server for one request, with the tools the caller's workspace offers now. */
 function serverFor(caller: Caller): McpServer {
-  const mcp = new McpServer({ name: 'pelago', version: '0.1.0' }, { capabilities: { tools: { listChanged: true } } });
+  const mcp = new McpServer({ name: 'pelago', version: '0.1.0' }, { capabilities: { tools: { listChanged: true }, extensions: VIEW_CAPABILITY }, instructions: INSTRUCTIONS });
+  registerView(mcp);
   for (const [name, tool] of offered(caller.pelago.registry))
-    mcp.registerTool(name, { description: tool.description, inputSchema: inputsOf(tool) }, async (args: Record<string, unknown>) => {
+    mcp.registerTool(name, { description: tool.description, inputSchema: inputsOf(tool), ...toolView(name) }, async (args: Record<string, unknown>) => {
       const { actor, ...input } = args;
       try {
         const result = await callTool(caller.pelago, caller.actor(actor as string | undefined), name, input);

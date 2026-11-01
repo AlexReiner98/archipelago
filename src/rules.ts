@@ -19,7 +19,7 @@ export type OpKind = 'create' | 'update' | 'link' | 'unlink' | 'archive' | 'rest
 /** The server's word on agents' changes, per op (pelago.config.json): auto lifts the rule a workspace that has not chosen is under, forbidden refuses. */
 export type Policy = Record<OpKind, Level>;
 
-/** As shipped, the server lifts nothing: an agent's change waits for a person until the workspace or the server says otherwise. */
+/** As shipped, the server lifts nothing: a workspace that never chose keeps waiting for a person. A new one chooses as it begins (beginApplying). */
 export const DEFAULT_AGENT_POLICY: Policy = {
   create: 'propose',
   update: 'propose',
@@ -140,7 +140,7 @@ export interface Who {
 const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.isArray(x) ? x : [x]);
 /** The settings an owner lifts a rule by: each one an agent's token may read (src/schema.ts, AGENT_CODE_READ). On is true, or "apply". */
 export const LIFTS = ['agent_changes', 'agent_code', 'agent_publish', 'agent_backups'];
-/** The lift by which agents' changes apply as they are made; the owner's first sign-in sets it (Archipelago.init). */
+/** The lift by which agents' changes apply as they are made; a new workspace begins with it (beginApplying). */
 export const AGENT_CHANGES = 'agent_changes';
 const COMPARE = /^\s*([a-z_][a-z0-9_]*)\s*(>=|<=|!=|>|<|=)\s*(-?\d+(?:\.\d+)?|[a-z_][a-z0-9_]*)\s*$/;
 
@@ -313,6 +313,16 @@ async function liftsOf(q: Q, rules: Rule[], policy: Partial<Policy>): Promise<Li
     if (value === false || value === 'hold' || !rule.server) return false;
     return policy[op as OpKind] === 'auto';
   };
+}
+
+/**
+ * A workspace begins: what its agents change takes effect as they make it, until the owner says otherwise (the owner,
+ * 21 Oct and 1 Nov 2026). Only for one that has held nothing, or has no owner yet: one that never chose stays held.
+ * Answers the fact to put on the settings stream, if it was set here.
+ */
+export async function beginApplying(q: Q): Promise<['+', string, string, unknown][]> {
+  const { rows } = await q.query(`insert into setting (key, value) values ($1, '"apply"'::jsonb) on conflict (key) do nothing returning key`, [AGENT_CHANGES]);
+  return rows.length ? [['+', 'setting', AGENT_CHANGES, 'apply']] : [];
 }
 
 /** What a workspace's agent_changes comes to: its own choice, or what the server's policy does with an agent's change. */
