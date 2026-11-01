@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { canAsk } from '../src/askview.ts';
-import { route, SURFACE } from '../src/surface.ts';
+import { QUERY_READS, route, SURFACE } from '../src/surface.ts';
 import { callTool, replacementOf, surfaceFor, TOOLS } from '../src/tools.ts';
 import { agent, fresh } from './map.ts';
 import { closers, serve } from './serve.ts';
@@ -35,6 +35,31 @@ test('the surface is exactly query, change, undo and the six verbs, over MCP too
   assert.deepEqual((await client.listTools()).tools.map((t) => t.name), SURFACE);
   const found = await client.callTool({ name: 'query', arguments: { name: 'search', params: { q: 'anything' } } });
   assert.ok(!found.isError, 'a read through query');
+});
+
+test('the tool list stays small, and what it leaves out is one call away', async () => {
+  const { base } = await serve('off');
+  const client = new Client({ name: 'test', version: '1' });
+  await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`)));
+  closers.push(() => client.close());
+  const { tools } = await client.listTools();
+  const size = JSON.stringify(tools).length;
+  assert.ok(size < 12_000, `the list is ${size} characters, and every request pays for it`);
+
+  const words = (answer: unknown) => (answer as { content: { text: string }[] }).content[0].text;
+  const query = tools.find((t) => t.name === 'query')!.description!;
+  for (const read of QUERY_READS) assert.ok(query.includes(`${read} (`), `${read} is named with its params`);
+  const said = async (args: Record<string, unknown>) => JSON.parse(words(await client.callTool({ name: 'query', arguments: args })));
+  assert.match((await said({})).views.flat, /The filter is/, 'the query’s terms are in the list of names');
+  const [change] = await said({ name: 'actions', params: { action: 'change' } });
+  assert.equal(change.params.properties.ops.items.oneOf.length, 9, 'every op, whole');
+
+  const listed = tools.find((t) => t.name === 'change')!;
+  for (const op of ['create', 'update', 'link', 'unlink', 'archive', 'restore', 'merge', 'define_type', 'forget']) assert.ok(listed.description!.includes(`${op} (`), `${op} has its line`);
+  const wrong = await client.callTool({ name: 'change', arguments: { reason: 'test', ops: [{ op: 'create', title: 'No type' }] } });
+  assert.ok(wrong.isError, 'only the list is loose: an op is checked as it always was');
+  assert.match(words(wrong), /Invalid input for change/);
+  assert.ok(!(await client.callTool({ name: 'change', arguments: { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Typed' }] } })).isError);
 });
 
 test('every old name answers with its replacement, and the replacement reaches the same tool', async () => {
