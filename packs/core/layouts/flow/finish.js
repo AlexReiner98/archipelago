@@ -3,16 +3,15 @@
 // its last step. Pure: places in, a layout's answer out.
 
 import { count } from './count.js';
-import { runsUp } from './faults.js';
 import { pinner } from './pins.js';
 import { upright } from './polyline.js';
 import { landOn } from './shapes.js';
 
 /**
- * Answers a function of `placed`, where steps were put by hand: the layout and what the key says of it, in `seen`. The
- * layout's `place(placed)` is the same picture with other pins, shared with this one and not to be changed.
+ * Answers a function of `placed`, where steps were put by hand: the layout. Its `place(placed)` is the same picture
+ * with other pins, shared with this one and not to be changed.
  */
-export const finisher = ({ nodes, potential, chains, ties, x: pulledX, y: pulledY, routes, rigid, headless, z, margin, stepSize, reshape, tally }) => {
+export const finisher = ({ nodes, potential, chains, ties, x: pulledX, y: pulledY, routes, rigid, z, margin, stepSize, reshape }) => {
   const pinned = pinner({ nodes, x: pulledX, y: pulledY, routes, rigid, reshape, lengths: { wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: z.gap / 2, join: z.join, rounds: z.pin_rounds } });
   /** A line from `w.a` to `w.b`, its ends on the outlines that are drawn, not on the boxes round them. */
   const landed = (w, r, line, x, y) => {
@@ -47,10 +46,7 @@ export const finisher = ({ nodes, potential, chains, ties, x: pulledX, y: pulled
     return { nodes, all, chains: wired.map(cut), ties: tied.map(cut), breaks, potential, x, y, width, height, place, told };
   };
   return (placed) => {
-    const laid = place(placed), own = (w) => ({ ...w, points: w.points.map((p) => [...p]) }), wires = [...laid.chains, ...laid.ties];
-    const rectOf = (id) => { const n = nodes.get(id); return { l: laid.x.get(id) - n.w / 2, r: laid.x.get(id) + n.w / 2, t: laid.y.get(id) - n.h / 2, u: laid.y.get(id) + n.h / 2 }; };
-    const headed = wires.filter((w) => !headless.includes(w.type) && laid.x.has(w.a) && laid.x.has(w.b));
-    const seen = { chains: laid.chains, ties: laid.ties, ...tally, headed: headed.length, up: headed.filter((w) => runsUp(rectOf(w.a), rectOf(w.b), w.points)).length };
-    return { laid: { ...laid, chains: laid.chains.map(own), ties: laid.ties.map(own) }, seen };
+    const laid = place(placed), own = (w) => ({ ...w, points: w.points.map((p) => [...p]) });
+    return { ...laid, chains: laid.chains.map(own), ties: laid.ties.map(own) };
   };
 };
