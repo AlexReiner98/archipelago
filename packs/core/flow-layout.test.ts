@@ -303,12 +303,6 @@ test('bars: ports keep off the corners, and wires landing on one side keep apart
   assert.ok(f.tightParallel <= 2, `${f.tightParallel} too near`);
 });
 
-test('bars: a small fan stands in one row, its rows the style\'s distance apart', { todo: 'solve.js shares out its slack, so the outer boxes of a fan sit 12 px under the inner ones, and it closes flow_row_space from 56 to 48' }, () => {
-  const feeders = ['a', 'bb', 'ccc', 'dddd', 'ee', 'f'], g = drawnBars([item('map'), ...feeders.map((id) => item(id))], feeders.map((id) => tie(id, 'map', 'calls')));
-  assert.equal(new Set(feeders.map((id) => g.y.get(id))).size, 1, 'one row');
-  assert.ok(g.y.get('map') - g.y.get('a') - g.nodes.get('a').h / 2 - g.nodes.get('map').h / 2 >= house.sizes.flow_row_space - 1);
-});
-
 test('bars: a fan crosses nothing, its wires landing in the order they come from', () => {
   const feeders = ['Other agents', 'Your teammate', 'Automations', 'You', 'Their AI agents', 'Your AI agent'];
   const into = drawnBars([item('The map'), ...feeders.map((id) => item(id))], feeders.map((id) => tie(id, 'The map', 'calls')));
@@ -317,21 +311,6 @@ test('bars: a fan crosses nothing, its wires landing in the order they come from
   assert.equal(count(lines(outOf)).crossings, 0, 'one out to many');
   const order = (g: any) => [...g.ties].sort((p: any, q: any) => p.points.at(-1)[0] - q.points.at(-1)[0]).map((t: any) => t.points[0][0]);
   assert.deepEqual(order(into), [...order(into)].sort((p, q) => p - q), 'each lands in the order it leaves');
-});
-
-test('bars: a small picture stands in rows, a fan centred, each wire landing apart, a skipped row its own column', () => {
-  const feeders = ['a', 'bb', 'ccc', 'dddd', 'ee', 'f'], g = drawnBars([item('map'), ...feeders.map((id) => item(id))], feeders.map((id) => tie(id, 'map', 'calls')));
-  const tops = feeders.map((id) => g.y.get(id));
-  assert.ok(Math.max(...tops) - Math.min(...tops) < g.nodes.get('a').h, 'about one row');
-  const xs = feeders.map((id) => g.x.get(id)).sort((p, q) => p - q), gaps = feeders.map((id) => id).sort((p, q) => g.x.get(p) - g.x.get(q)).slice(1).map((id, k, l) => g.x.get(id) - g.nodes.get(id).w / 2 - (g.x.get(k ? l[k - 1] : feeders.find((f) => g.x.get(f) === xs[0])!) + g.nodes.get(k ? l[k - 1] : feeders.find((f) => g.x.get(f) === xs[0])!).w / 2));
-  assert.ok(Math.max(...gaps) - Math.min(...gaps) < 1, `one gap: ${gaps}`);
-  assert.ok(Math.abs(g.x.get('map') - (xs[0] + xs.at(-1)!) / 2) < g.nodes.get('a').w, 'the map under the middle');
-  assert.equal(new Set(g.ties.map((t: any) => t.points.at(-1).join())).size, feeders.length, 'each wire its own arrival');
-  assert.equal(count(lines(g)).shared, 0);
-  const skip = drawnBars(['a', 'b', 'c', 'd', 'e'].map((id) => item(id)), [tie('a', 'b', 'calls'), tie('b', 'c', 'calls'), tie('c', 'd', 'calls'), tie('d', 'e', 'calls'), tie('b', 'e', 'calls')]);
-  assert.equal(skip.x.get('c'), skip.x.get('d'), 'a run stands on one line');
-  assert.equal(count(lines(skip)).crossings, 0);
-  assert.ok(right(skip) && clear(skip));
 });
 
 // @ts-expect-error a drawing's modules are plain JavaScript

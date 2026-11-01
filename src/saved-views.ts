@@ -3,6 +3,7 @@
 // names it, as the way it is drawn is what a person remembers. Pinned ones first, then the newest.
 
 import { keptOf } from './query-kept.ts';
+import { bringersIn } from './query-saved.ts';
 import type { Archipelago } from './pelago.ts';
 
 export interface Picture {
@@ -16,6 +17,8 @@ export interface Picture {
   of?: { id: string; title: string; type: string };
   /** The project that is in or is, nearest first: what a person knows the picture by. */
   project?: { id: string; title: string };
+  /** The document that brings it in: it is a part of that page, read there, and not one of the views a person picks from. */
+  document?: { id: string; title: string };
   pinned: boolean;
 }
 
@@ -25,6 +28,10 @@ export async function savedViews(l: Archipelago, input: { limit?: number } = {})
   const { rows } = ofIds.length ? await l.db.query<{ id: string; title: string; type: string }>(`select id, title, type from entity where id = any($1::text[]) and archived_at is null`, [ofIds]) : { rows: [] };
   const items = new Map(rows.map((r) => [r.id, r]));
   const projectOf = await projects(l, ofIds);
+  const { rows: held } = lenses.length
+    ? await l.db.query<{ lens: string; id: string; title: string }>(`select m.to_id as lens, e.id, e.title from mention m join entity e on e.id = m.from_id where m.to_id = any($1::text[]) and e.type = any($2::text[]) and e.archived_at is null order by e.id`, [lenses.map((x) => x.id), bringersIn(l)])
+    : { rows: [] };
+  const documents = new Map(held.map((r) => [r.lens, { id: r.id, title: r.title }]));
   // keptOf answers oldest first; saved views read newest first, the pinned above the rest.
   const pictures = lenses
     .reverse()
@@ -32,7 +39,8 @@ export async function savedViews(l: Archipelago, input: { limit?: number } = {})
       const style = styles.find((s) => s.about.includes(x.id));
       const of = x.about.map((id) => items.get(id)).find(Boolean);
       const shape = style?.props.shape;
-      return { lens: x.id, title: style?.title || x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), pinned: x.props.pinned === true };
+      const document = documents.get(x.id);
+      return { lens: x.id, title: style?.title || x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), ...(document && { document }), pinned: x.props.pinned === true };
     })
     .sort((a, b) => Number(b.pinned) - Number(a.pinned));
   const limit = input.limit ?? 100;

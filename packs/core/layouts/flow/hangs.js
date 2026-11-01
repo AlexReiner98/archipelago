@@ -4,11 +4,11 @@
 import { comb, peel } from './combs.js';
 
 /** `a` is who is joined to whom, `ways` how each link runs; answers with the core, the combs, and each item's block. */
-export function hangsOf({ a, ways, nodes, sizes, gap, z, aspect }) {
+export function hangsOf({ a, ways, nodes, sizes, gap, z, aspect, chains }) {
   const stepSize = (id) => nodes.get(id), firm = (p, q) => (ways.get(`${p} ${q}`) ?? ways.get(`${q} ${p}`) ?? 0) > 1;
   const zc = { row: gap / 4, col: gap, stub: z.run, join: z.join, bus: sizes.flow_comb_bus }, combGap = Math.max(gap, z.join);
-  // In a small picture a headed link is a wire in the rows, so a chain reads straight down; a big one needs the room combs save.
-  const { kids, core } = peel(a, new Set(), nodes.size <= sizes.flow_rows_most ? firm : undefined);
+  // With `chains` a headed link is a wire of the core, so a chain reads straight down, and without it a leaf in a comb.
+  const { kids, core } = peel(a, new Set(), chains ? firm : undefined);
   // What comes before an item hangs above it, and the rest below; `lead` is the room over the box.
   const sideOf = (p, k) => (ways.has(`${p} ${k}`) ? 1 : ways.has(`${k} ${p}`) ? -1 : 0);
   const combs = new Map(core.map((id) => {

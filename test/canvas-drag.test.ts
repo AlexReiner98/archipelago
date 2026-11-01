@@ -23,7 +23,7 @@ for (const shape of ['']) test(`in a browser, a step dragged on the canvas${shap
     ],
   })).result.created as Record<string, string>;
   const events = async () => (await call('/api/events', undefined, { limit: 100 })).result.length as number;
-  const form = shape && `&shape=${shape}`, canvas = `${made.p}@${shape || 'solved'}`, page = await open(`${base}/#/v?from=${made.p}${form}`);
+  const form = shape && `&shape=${shape}`, canvas = `${made.p}@${shape || 'wired'}`, page = await open(`${base}/#/v?from=${made.p}${form}`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const until = async (expression: string) => {
     for (const end = Date.now() + 20000; Date.now() < end; await wait(200)) if (await page.evaluate(expression)) return true;
