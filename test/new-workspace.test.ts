@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { dump } from '../src/backup.ts';
+import { callTool } from '../src/tools.ts';
 import { Workspaces } from '../src/workspaces.ts';
 import type { Actor, Op } from '../src/pelago.ts';
 import { mayDo } from '../src/rules.ts';
@@ -91,6 +92,7 @@ test('a new workspace still keeps from its agents what the core rules keep', asy
 test('a settle waits for the owner wherever changes wait, and where they apply it is put to the owner with what was chosen and why', async () => {
   const at = new Workspaces({ ...servers(), dataDir: null });
   const { pelago: l } = await at.create('acme', 'Acme');
+  await l.init(person, { name: 'Alex' });
   const { d } = ((await l.change(person, { ops: [{ op: 'create', ref: 'd', type: 'decision', title: 'Which way?' }], reason: 'a question' })) as { created: Record<string, string> }).created;
   const settle = { op: 'update', id: d, status: 'decided', props: { outcome: 'this', rationale: 'that' } } as const;
   const said = { of: 'agent', basis: 'the test' } as const;
@@ -106,5 +108,7 @@ test('a settle waits for the owner wherever changes wait, and where they apply i
   await assert.rejects(l.change(agent, { ops: [{ op: 'update', id: d, status: 'decided' }], reason: 'bare', authority: said }), /what was chosen/);
   await assert.rejects(l.change(agent, { ops: [settle], reason: 'unsaid' }), /on whose authority/);
   assert.equal((await l.change(agent, { ops: [settle], reason: 'settle it', authority: said })).status, 'applied');
+  const asked = (await callTool(l, person, 'view', { name: 'attention', params: { person: 'me', reasons: ['to_confirm'] } })) as { items: { id: string }[] };
+  assert.deepEqual(asked.items.map((i) => i.id), [d], 'and the owner is asked to confirm it');
   await at.closeAll();
 });
