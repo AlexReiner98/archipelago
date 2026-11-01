@@ -39,6 +39,30 @@ async function busy(l: Archipelago) {
 
 const rows = async (l: Archipelago) => (await replayed(l)).live;
 
+test('a map older than its log keeps what no entry made, through every walk from the start', async () => {
+  const l = await fresh();
+  const made = await make(l, [{ op: 'create', ref: 'n', type: 'note', title: 'Said in the log' }]);
+  // As a map from before the log has them: rows no entry made, and the operational field an item keeps.
+  await l.db.query(`insert into entity (id, type, kind, title, body, status, is_open, visibility, confidence, props) select 'e_oldoldol', type, kind, 'From before', 'Its note.', status, is_open, visibility, confidence, '{"tokens_used": 3}' from entity where id = $1`, [made.n]);
+  await l.db.query(`insert into entity (id, type, kind, title, status, is_open, visibility, confidence) select 'e_oldgone1', type, kind, 'Forgotten since', status, is_open, visibility, confidence from entity where id = $1`, [made.n]);
+  await l.db.query(`insert into relation (id, type, from_id, to_id) values ('r_oldoldol', 'depends_on', 'e_oldoldol', $1)`, [made.n]);
+  await l.retype('note', 'issue');
+  await make(l, [{ op: 'update', id: 'e_oldoldol', body: 'Said since.' }]);
+  await l.db.query(`delete from entity where id = 'e_oldgone1'`);
+
+  const rebuilt = await rebuildProjections(l.db, l.registry, l.workspace, { fromStart: true });
+  assert.deepEqual(rebuilt.swapped, { entity: 0, relation: 0, proposal: 0, part_closure: 0, mention: 0 }, 'nothing taken away, and nothing to put right');
+  const old = (await l.entity('e_oldoldol'))!;
+  assert.deepEqual([old.title, old.body, old.type, old.props.tokens_used], ['From before', 'Said since.', 'issue', 3]);
+
+  const head = (await headOf(l.db, 'facts')).pos;
+  const { rows: past } = await asOf(l.db, l.registry, l.workspace, head - 1);
+  assert.equal(past.entity.find((e) => e.id === 'e_oldoldol')?.type, 'issue', 'at a position before the last thing said of it');
+  assert.ok(past.relation.some((r) => r.id === 'r_oldoldol'));
+  assert.ok(!past.entity.some((e) => e.id === 'e_oldgone1'), 'a fact on what is no longer here makes nothing');
+  assert.equal((await snapshotNow(l.db, l.registry, l.workspace, { fromStart: true })).snapshots.length, 1);
+});
+
 test('a rebuild from a snapshot is the rebuild from the start, made beside the live tables and swapped in', async () => {
   const l = await fresh();
   const made = await busy(l);
