@@ -7,7 +7,7 @@ import { addCommits } from './commits.ts';
 import type { Q } from './db.ts';
 import type { Archipelago, May } from './pelago.ts';
 import { askOnReply } from './replies.ts';
-import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, resolveRun, sessionBegan, sessionHeard } from './sessions.ts';
+import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, resolveRun, sessionBegan, sessionHeard, sessionPrompted } from './sessions.ts';
 import { sessionLabelled } from './session-name.ts';
 import { addTouched } from './touched.ts';
 import { fileSaid } from './file-said.ts';
@@ -88,6 +88,8 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   }
   // Said in the server's log, so "did the hook run?" has an answer.
   console.log(`hook ${event} from session ${body.session_id ?? 'unknown'}`);
+  // One chat is one session: a prompt takes up a run that was ended while the chat went on, before anything is kept on it.
+  if (event === 'prompt') await sessionPrompted(pelago, body.session_id).catch((err) => console.error(`hook take up: ${(err as Error).message}`));
   // The hook counts what the session has used so far; it is recorded before anything else, so an ending session's last tokens reach its work.
   if (event !== 'session-start') await recordUsage(pelago, body.session_id, body.tokens).catch((err) => console.error(`hook usage: ${(err as Error).message}`));
   // And what it touched, so that report, action session_end, asks about those when it ends.

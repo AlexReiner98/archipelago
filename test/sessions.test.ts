@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { hookSessionEnd, hookSessionStart, resolveRun, sessionEnd, sessionStart, sessionUpdate, tell } from '../src/sessions.ts';
+import { hookSessionEnd, hookSessionStart, resolveRun, sessionEnd, sessionPrompted, sessionStart, sessionUpdate, tell } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { VIEWS } from '../src/views.ts';
 import { askView } from '../src/askview.ts';
@@ -40,6 +40,48 @@ test('a session registers, takes the lane its task needs, and gives it back when
   assert.deepEqual(view.open.map((r: any) => r.id), [two.run]);
   assert.equal((await l.claim(agent, { resource: made.lane, holder: two.run, reason: 'My turn' })).status, 'claimed');
   await assert.rejects(sessionUpdate(l, agent, { run: one.run, note: 'late' }), /already ended/);
+});
+
+test('one chat is one session: its agent saying it is done keeps it open, and only the chat ends it', async () => {
+  const l = await fresh();
+  const { run, name } = await sessionStart(l, agent, { title: 'Chat', session_id: 'chat', surface: 'claude-code' });
+  const said = (await callTool(l, agent, 'session_end', { run, summary: 'The project is open' })) as any;
+  assert.equal(said.status, 'waiting');
+  assert.equal((await l.entity(run))!.is_open, true, 'still there to follow');
+  assert.deepEqual(((await VIEWS.sessions.run(l, {})) as any).open.map((r: any) => r.id), [run]);
+
+  await sessionPrompted(l, 'chat');
+  assert.equal((await l.entity(run))!.status, 'running', 'the next message puts it back to work');
+  await sessionUpdate(l, agent, { run, note: 'Going on' });
+
+  await callTool(l, agent, 'session_end', { run, summary: 'All done' });
+  await hookSessionEnd(l, { session_id: 'chat', reason: 'exit' });
+  const closed = (await l.entity(run))!;
+  assert.deepEqual([closed.status, closed.is_open], ['finished', false], 'the chat ending ends it');
+  assert.match(closed.body, /finished: All done$/, 'what the session said stands as its last word');
+
+  // Ended for it after going quiet, the same chat comes back under its own name.
+  await sessionPrompted(l, 'chat');
+  const back = (await l.entity(run))!;
+  assert.deepEqual([back.status, back.is_open, back.props.name], ['running', true, name]);
+});
+
+test('a run with no chat is ended by its agent, and a person ends a chat’s run from its page', async () => {
+  const l = await fresh();
+  const { run } = await sessionStart(l, agent, { title: 'No chat' });
+  await callTool(l, agent, 'session_end', { run, summary: 'Done' });
+  assert.equal((await l.entity(run))!.is_open, false);
+  await sessionPrompted(l, undefined);
+
+  const headless = await sessionStart(l, agent, { session_id: 'head', surface: 'claude-headless' });
+  await callTool(l, agent, 'session_end', { run: headless.run, summary: 'Done' });
+  assert.equal((await l.entity(headless.run))!.is_open, false, 'a launched run is not a chat');
+  await sessionPrompted(l, 'head');
+  assert.equal((await l.entity(headless.run))!.is_open, false);
+
+  const chat = await sessionStart(l, agent, { session_id: 'mine', surface: 'claude-code' });
+  await callTool(l, human, 'session_end', { run: chat.run, summary: 'Stopped from the page' });
+  assert.equal((await l.entity(chat.run))!.is_open, false);
 });
 
 test('a project’s open questions are what needs the owner in it, and its next release says where it stands', async () => {
