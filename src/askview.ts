@@ -30,6 +30,13 @@ export function viewList(l: Archipelago): Record<string, string> {
   return out;
 }
 
+/** The name of every question that can be asked here, the flat lens first: what the tool list says, the list above saying the rest. */
+export function viewNames(reg: Registry): string[] {
+  const names = new Set(['flat', ...Object.keys(VIEWS)]);
+  for (const pack of reg.packs) for (const v of parts(pack).views) names.add(short(v.id));
+  return [...names];
+}
+
 /** What the view tool says it answers: the views the core pack declares (none without a registry), the flat lens first, then the kernel's own views, then the packs'. */
 export function viewsSaid(reg?: Registry): string {
   const core = reg ? parts(reg.packs.find((p) => p.id === 'core')!).views : [];
