@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="{{policy}}">
+<title>A view of the map</title>
+<!-- A view drawn inline in a chat (src/mcp-view.ts): one self-contained page, opened by a host that draws MCP Apps. It
+     holds no data and no token and reaches nothing itself: all it knows comes from the host over postMessage, and all
+     it asks goes through the host to this server's own tools. It stays shut for a call that is no view. -->
+<style>
+  :root { color-scheme: light dark; }
+  html, body { margin: 0; background: transparent; }
+  body { font-family: var(--font-sans, system-ui, sans-serif); font-size: var(--font-text-sm-size, small); color: var(--color-text-secondary, inherit); }
+  [hidden] { display: none !important; }
+  #view { position: relative; overflow: auto; }
+  #view.near .lf-stage.still > svg, #view.near img { max-width: none; }
+  #view img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  #bar { position: absolute; top: 0; right: 0; z-index: 1; }
+  #bar button { background: none; border: none; color: inherit; font: inherit; cursor: pointer; }
+</style>
+<style id="drawn"></style>
+</head>
+<body>
+<div id="bar" hidden><button id="whole" type="button" title="Fill the screen">⤢</button></div>
+<main id="view" hidden></main>
+<p id="said" hidden></p>
+<script>
+  const view = document.getElementById('view'), said = document.getElementById('said'), bar = document.getElementById('bar');
+  let context = {}, args, result, asked = null, next = 1;
+  const waiting = new Map();
+
+  const send = (message) => window.parent.postMessage({ jsonrpc: '2.0', ...message }, '*');
+  const notify = (method, params = {}) => send({ method, params });
+  const request = (method, params) =>
+    new Promise((resolve, reject) => {
+      const id = next++;
+      waiting.set(id, { resolve, reject });
+      send({ id, method, params });
+    });
+
+  /** How big the page is now: nothing, for a call that is no view, so the host has nothing to leave room for. */
+  const told = () => notify('ui/notifications/size-changed', { width: document.documentElement.scrollWidth, height: Math.ceil(document.documentElement.getBoundingClientRect().height) });
+  new ResizeObserver(told).observe(document.documentElement);
+
+  /** What of a call names a view, as a look takes it; nothing for any other call. */
+  function viewAsked(call) {
+    const given = call?.params ?? {};
+    if (call?.name === 'flat') {
+      if (given.preview) return null;
+      return { query: Object.fromEntries(['filter', 'walk', 'limit', 'time'].filter((k) => given[k] !== undefined).map((k) => [k, given[k]])) };
+    }
+    if (call?.action !== 'show' && call?.name !== 'look') return null;
+    const { entity, query, lens, style } = given;
+    return entity || query || lens || style ? JSON.parse(JSON.stringify({ entity, query, lens, style })) : null;
+  }
+
+  /** The size to draw at: what the host gives, within what a look takes. A drawing lays out to the shape of its pane. */
+  function room() {
+    const box = context.containerDimensions ?? {};
+    const width = Math.min(1920, Math.max(320, Math.round(box.width || box.maxWidth || window.innerWidth || 600)));
+    const most = Math.min(1600, box.height || box.maxHeight || window.screen?.height || 800);
+    return { width, height: Math.max(240, Math.round(Math.min(most, width))), most };
+  }
+  const scheme = () => context.theme ?? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+
+  function mount(marks) {
+    document.getElementById('drawn').textContent = marks.css;
+    for (const [name, value] of Object.entries(marks.vars)) view.style.setProperty(name, value);
+    view.dataset.drawing = marks.id;
+    view.style.background = 'var(--ln-sea)';
+    view.innerHTML = marks.html;
+  }
+
+  function show(image) {
+    const picture = new Image();
+    picture.alt = 'A view of the map';
+    picture.src = `data:${image.mimeType};base64,${image.data}`;
+    view.replaceChildren(picture);
+  }
+
+  async function draw(wanted) {
+    const { width, height, most } = room();
+    try {
+      const got = await request('tools/call', { name: 'query', arguments: { name: 'look', params: { ...wanted, width, height, scheme: scheme(), marks: true } } });
+      if (got.isError) throw new Error(got.content?.[0]?.text ?? 'The view could not be drawn.');
+      const answer = JSON.parse(got.content?.find((c) => c.type === 'text')?.text ?? '{}');
+      if (answer.state === 'empty') return;
+      if (answer.marks) mount(answer.marks);
+      else {
+        const image = got.content?.find((c) => c.type === 'image');
+        if (!image) throw new Error(answer.why ?? 'The view could not be drawn.');
+        show(image);
+      }
+      view.style.maxHeight = `${most}px`;
+      view.hidden = false;
+      bar.hidden = !context.availableDisplayModes?.includes('fullscreen');
+      said.hidden = true;
+    } catch (err) {
+      said.textContent = String(err.message ?? err).slice(0, 200);
+      said.hidden = false;
+    }
+  }
+
+  /** Once the host has said both what was called and that it went well. */
+  function ready() {
+    if (asked || !args || !result || result.isError) return;
+    asked = viewAsked(args);
+    if (asked) draw(asked);
+  }
+
+  function hostChanged(changed) {
+    const was = context.theme;
+    context = { ...context, ...changed };
+    if (asked && changed.theme && changed.theme !== was) draw(asked);
+    if (changed.displayMode === 'fullscreen') view.style.maxHeight = 'none';
+  }
+
+  addEventListener('message', (ev) => {
+    if (ev.source !== window.parent || ev.data?.jsonrpc !== '2.0') return;
+    const { id, method, params, result: answer, error } = ev.data;
+    if (id !== undefined && !method) {
+      const call = waiting.get(id);
+      waiting.delete(id);
+      return error ? call?.reject(new Error(error.message ?? 'The host refused.')) : call?.resolve(answer);
+    }
+    if (method === 'ui/notifications/tool-input') (args = params?.arguments ?? {}), ready();
+    else if (method === 'ui/notifications/tool-result') (result = params ?? {}), ready();
+    else if (method === 'ui/notifications/host-context-changed') hostChanged(params ?? {});
+    else if (id !== undefined) send(method === 'ping' || method === 'ui/resource-teardown' ? { id, result: {} } : { id, error: { code: -32601, message: `No ${method} here.` } });
+  });
+
+  // A press on a picture too small to read: it goes to its own size, and the frame scrolls.
+  view.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    view.classList.toggle('near');
+  });
+  document.getElementById('whole').addEventListener('click', () => request('ui/request-display-mode', { mode: 'fullscreen' }).catch(() => {}));
+
+  request('ui/initialize', { appInfo: { name: 'pelago-view', version: '1.0.0' }, appCapabilities: { availableDisplayModes: ['inline', 'fullscreen'] }, protocolVersion: '2026-01-26' }).then((got) => {
+    context = got?.hostContext ?? {};
+    notify('ui/notifications/initialized');
+    told();
+    ready();
+  });
+</script>
+</body>
+</html>

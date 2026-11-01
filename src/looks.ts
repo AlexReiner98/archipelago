@@ -8,7 +8,7 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 import type { Q } from './db.ts';
-import { drawLook } from './look-draw.ts';
+import { drawLook, type Marks } from './look-draw.ts';
 import { whose, type Whose } from './presence.ts';
 import { looksAllowed, overLimit } from './plan.ts';
 import { headPos } from './tail.ts';
@@ -80,9 +80,10 @@ interface Kept {
   why?: string;
   hash: string;
   ms: number;
+  marks?: Marks;
 }
 
-/** What a look answers: what was drawn and how it stood, with the picture as an image (src/mcp.ts sends it as one). */
+/** What a look answers: what was drawn and how it stood, with the picture as an image (src/mcp.ts sends it as one), or the drawing's marks where they were asked for and it has them. */
 const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
   look,
   view: k.hash,
@@ -94,19 +95,21 @@ const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
   height: k.height,
   bytes: data.length,
   ...(again ? { again: true } : { ms: k.ms }),
-  image: { data: data.toString('base64'), content_type: k.content_type },
+  ...(k.marks ? { marks: k.marks } : { image: { data: data.toString('base64'), content_type: k.content_type } }),
 });
 
 /**
  * Draw the page at `hash` (as the UI addresses it: v?canvas=<id>, v?<lens>, e/<id>) for the asking agent and keep the
  * picture. `fresh` draws it again even when the map has not changed since the last look at it.
  */
-export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; scheme?: 'dark' | 'light'; fresh?: boolean } = {}) {
+export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; scheme?: 'dark' | 'light'; fresh?: boolean; marks?: boolean } = {}) {
   const width = Math.min(1920, Math.max(320, Math.round(size.width ?? 1200)));
   const height = Math.min(1600, Math.max(240, Math.round(size.height ?? 750)));
   const scheme = size.scheme ?? 'dark';
+  // Marks are a canvas's: an item's page is a page, and is a picture.
+  const marks = Boolean(size.marks) && hash.startsWith('v');
   const pos = await headPos(mapDb);
-  const same = `lookof:${whose(w)}:${createHash('sha256').update(JSON.stringify([hash, width, height, scheme, pos])).digest('hex').slice(0, 32)}`;
+  const same = `lookof:${whose(w)}:${createHash('sha256').update(JSON.stringify([hash, width, height, scheme, pos, marks])).digest('hex').slice(0, 32)}`;
   if (!size.fresh) {
     const was = await kept<{ look: string }>(db, same);
     const had = was && (await keptWith<Kept>(db, `look:${whose(w)}:${was.look}`));
@@ -114,9 +117,9 @@ export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: s
   }
   await countLook(w.workspace, w.viewer || actor);
   const pass = await passFor(db, w, actor);
-  const got = await drawLook(`${origin}/?look#/${hash}`, pass, width, height, scheme);
+  const got = await drawLook(`${origin}/?look#/${hash}`, pass, width, height, scheme, marks);
   const look = `l_${randomBytes(6).toString('hex')}`;
-  const k: Kept = { scheme, content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms };
+  const k: Kept = { scheme, content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms, ...(got.marks && { marks: got.marks }) };
   await keep(db, `look:${whose(w)}:${look}`, k, LOOK_MS, got.data);
   await keep(db, same, { look }, LOOK_MS);
   return answer(look, k, got.data);
