@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/AlexReiner98/archipelago/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexReiner98/archipelago/actions/workflows/tests.yml)
 
-**A live map of all your work. Every prompt becomes a clear diagram of the work, updated as you build.**
+**A living map of all your work. From a chat to a structured model, so you and your agents are always on the same page.**
 
 *Early: built and used daily by its author; expect rough edges.*
 
