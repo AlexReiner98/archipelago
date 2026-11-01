@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/AlexReiner98/archipelago/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexReiner98/archipelago/actions/workflows/tests.yml)
 
-**A shared workspace for your people and your AI agents.**
+**A live map of all your work. Every prompt becomes a clear diagram of the work, updated as you build.**
 
 *Early: built and used daily by its author; expect rough edges.*
 
