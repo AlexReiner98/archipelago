@@ -32,7 +32,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './auth.ts'; import { firstStart } from './first-start.ts';
-import { notify } from './notify.ts';
+import { notify } from './notify.ts'; import { alertOnCrash } from './alert.ts';
 import { backupAll, parseBackup, parseVault } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts'; import { askedAs, configurePlan, requestWait, slowTokensAt, storageBytes, tooManyRequests } from './plan.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { env } from './env.ts';
@@ -494,7 +494,7 @@ If that process is not a pelago server, delete ${lock}.`);
     process.exit(code);
   };
   process.on('SIGINT', () => stop());
-  process.on('SIGTERM', () => stop());
+  process.on('SIGTERM', () => stop()); alertOnCrash(hostname()); // a crash is mailed to the owner on the way down (src/alert.ts)
   // Leave time for the answer to the restart call to be sent, then hand over to src/dev.ts.
   if (config.dev) configureRestart(() => void setTimeout(() => stop(RESTART_EXIT), 200));
 }
