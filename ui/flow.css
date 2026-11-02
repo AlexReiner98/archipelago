@@ -38,3 +38,5 @@
 .view-frame > .lens-wrap { position: absolute; inset: 0; }
 .view-frame .lens-wrap .lens-wrap, .view-frame .lens-view, .view-frame .code-stage, .view-frame .lens-frame { height: 100%; }
 .view-frame > .view-next { visibility: hidden; pointer-events: none; }
+/* On a canvas a named view is drawn in a pane of its own (ui/view-frame.js): its room beside the drawing is not kept. */
+.sp-shown:has(> .view-frame.beside) { display: none; }
