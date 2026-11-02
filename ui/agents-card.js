@@ -57,7 +57,7 @@ export function tokensCard({ tokens, row, then, fail, say }) {
 export function agentsMayCard(info, then, fail) {
   return card(
     'What agents may do',
-    'Every change is in the log with who made it and why, and can be undone.',
+    'Every change is in the log with who made it and why.',
     h(
       'ul',
       { class: 'rows' },
