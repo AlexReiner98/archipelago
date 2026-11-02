@@ -328,8 +328,9 @@ addEventListener('resize', () => {
   const dir = dirNow();
   if (started && host.dataset.dir !== dir) ((host.dataset.dir = dir), draw());
 });
-// The sheet opening or shutting changes the room the panes share.
-new MutationObserver(() => started && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
+// The sheet opening or shutting changes the room the panes share. Each pulse of the map says the sheet again as it was
+// (ui/app.js): that is no change, and laying the panes out for it would fit a canvas again under a pan.
+new MutationObserver((list) => started && list.some((m) => m.oldValue !== document.body.getAttribute('data-sheet')) && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'], attributeOldValue: true });
 
 /** The query bar's own for the pane it acts on, the same in every pane: back and forth (dimmed with nowhere to go) and split. Each pane's move and close stay in its strip. */
 export function paneButtons() {
@@ -352,6 +353,20 @@ export function flash(id) {
   void entry.el.offsetWidth;
   entry.el.classList.add('pane-shown');
 }
+
+/**
+ * A view a drawing in pane `from` names (a replay's milestone, ui/view-frame.js), drawn in a pane of its own on its
+ * right: opened once, then moved to each view named, with no step in its history; the reader slides the sash between
+ * them. Closed, it opens again with the next view named.
+ */
+hooks.besidePane = (from, view) => {
+  const t = front();
+  if (!t.groups.includes(from)) return;
+  const at = `v?canvas=${view}`;
+  const mine = t.groups.find((id) => t.panes[id]?.shows === from);
+  if (mine) goPane(mine, at, false);
+  else openPane(at, 'right', from, { anew: true, shows: from });
+};
 
 let started = false;
 /** Draw the panes of the tab in sight, once the page has read its tabs (ui/tab-bar.js). */

@@ -13,7 +13,7 @@ import type { Archipelago } from './pelago.ts';
 
 type Props = Record<string, unknown>;
 
-const PAGE_FIELDS = ['theme', 'page', 'page_css', 'faces', 'type', 'emblem', 'font'];
+const PAGE_FIELDS = ['theme', 'page', 'page_css', 'faces', 'type', 'emblem', 'icon', 'font'];
 
 interface Tie {
   style: string;

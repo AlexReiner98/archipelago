@@ -93,8 +93,11 @@ async function expand(db: Q, found: Group[]): Promise<Omit<LoggedEvent, 'target_
      from log_fact f where f.stream = 'facts' and (f.pos, f.id) in (select * from unnest($1::bigint[], $2::text[])) order by f.pos, f.n`,
     [found.map((g) => g.pos), found.map((g) => g.id)],
   );
-  const { rows: heads } = await db.query<{ pos: number; id: string; at: Date; head: Record<string, any>; merged: string[] }>(
-    `select e.pos::int as pos, e.id, e.at, e.head, coalesce((select jsonb_agg(m.id) from log_fact m where m.stream = e.stream and m.at = e.at and m.pos = e.pos and m.field = 'merged_into'), '[]') as merged
+  // Whether it undid another, was undone itself, or forgot something (which nothing takes back): what a page offers on its line.
+  const { rows: heads } = await db.query<{ pos: number; id: string; at: Date; head: Record<string, any>; merged: string[]; undoes: string | null; undone_by: string | null; forgot: boolean }>(
+    `select e.pos::int as pos, e.id, e.at, e.head, coalesce((select jsonb_agg(m.id) from log_fact m where m.stream = e.stream and m.at = e.at and m.pos = e.pos and m.field = 'merged_into'), '[]') as merged,
+       e.undoes, (select u.id from log_entry u where u.stream = 'facts' and u.undoes = e.id limit 1) as undone_by,
+       exists (select 1 from log_fact g where g.stream = e.stream and g.pos = e.pos and g.field = 'forgotten') as forgot
      from log_entry e where e.stream = 'facts' and e.pos = any($1::bigint[])`,
     [[...new Set(found.map((g) => g.pos))]],
   );
@@ -143,6 +146,9 @@ async function expand(db: Q, found: Group[]): Promise<Omit<LoggedEvent, 'target_
       ...(h.authority && { authority: h.authority }),
       ...(h.action && { action: h.action }),
       ...(h.run && { run: h.run }),
+      ...(e.undoes && { undoes: e.undoes }),
+      ...(e.undone_by && { undone_by: e.undone_by }),
+      ...(e.forgot && { forgot: true }),
     };
     const event = (action: string, target: string | null, detail: Record<string, unknown>) =>
       out.push({ seq: g.seq, ts: e.at, origin: 'pelago', actor: h.actor?.id, action, target_id: target, changeset: e.id, reason: h.reason ?? '', detail: { ...detail, ...extra } });

@@ -1,5 +1,6 @@
 // How a story looks (story.js, play.js): the chapters above the picture, what was said beside it (on its right, three
-// to one, under it only where the row cannot hold both at side_least), and the marks of a
+// to one, under it only where the row cannot hold both at side_least; on its left, narrow, story_chat, where a milestone's
+// drawing stands on its right, story_shown_grow to the picture's three: a milestone draws its own dials beside it), and the marks of a
 // step: what comes in, in the accent; what goes, in the colour of what is wrong; a flag in it too. Every colour and
 // length is the page's (its theme and lengths, read as --<name>). The rail's and the conversation's buttons are named
 // within them, so they weigh more than a page's own rule for buttons (a published page has one).
@@ -43,6 +44,13 @@ export const css = `
 .ar-place-box.sp-flagged { stroke: var(--bad); stroke-width: var(--border-2); }
 .ar-place.sp-flagged text { fill: var(--bad); }
 .sp-chat { position: relative; flex: 1 1 0; min-width: var(--side-least); min-height: calc(var(--box-9) * 5); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-4); }
+.sp-side { display: contents; }
+.sp-side > .sp-chat { order: -1; flex: 0 0 var(--ln-story-chat); min-width: 0; }
+.sp-shown { flex: var(--ln-story-shown-grow) 1 0; min-width: var(--side-least); display: flex; flex-direction: column; gap: var(--space-4); }
+.sp-shown > .view-frame { flex: 1 1 0; min-height: 0; }
+.sp-shown-name { flex: none; font-size: var(--text-3); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: none; }
+.sp-shown-name:hover { color: var(--text); }
+.sp-side > .sp-chat .sp-line { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
 .sp-head { display: flex; align-items: center; gap: var(--space-5); height: var(--box-8); padding: 0 var(--space-7); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-2); color: var(--muted); }
 .sp-head .grow { flex: 1; }
 .sp-live { width: var(--box-3); height: var(--box-3); border-radius: 50%; background: var(--ok); }

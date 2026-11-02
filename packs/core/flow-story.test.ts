@@ -106,13 +106,13 @@ test('a story waits until its conversation is scrolled into sight, and starts on
 });
 
 /** Drawn with the page's timers held: `flush` runs what is due, in order, until nothing is left. */
-function held(style: any) {
+function held(style: any, told = answer) {
   const sent: any[] = [];
   let timers: [number, () => void][] = [];
   const realSet = globalThis.setTimeout, realClear = globalThis.clearTimeout;
   (globalThis as any).setTimeout = (fn: () => void, ms: number) => (timers.push([ms, fn]), timers.length);
   (globalThis as any).clearTimeout = () => {};
-  const out = picture({ answer, style, reduced: false }, { measure, patch: (l: any[]) => sent.push(...l), frame: () => Promise.resolve(0), open: () => {} });
+  const out = picture({ answer: told, style, reduced: false }, { measure, patch: (l: any[]) => sent.push(...l), frame: () => Promise.resolve(0), open: () => {} });
   const flush = () => {
     while (timers.length) {
       const due = timers.sort((a, b) => a[0] - b[0]);
@@ -159,6 +159,49 @@ test('a step back and a step on, held there, with the word a step flags on a thi
     out.on({ name: 'click', key: 'next' });
     flush();
     assert.equal(text(sent, 'at'), '2 of 3');
+  } finally {
+    done();
+  }
+});
+
+// A step that adds a kept view reaches a milestone: the page draws that view beside the flow (a `view` mark), the
+// conversation on the left (the owner, 2 Nov 2026, e_dnewbxxh).
+const [FIRST, SECOND] = ['e_firstvwz', 'e_secondvw'];
+const view = (id: string, title: string) => ({ ...item(id, title), kind: 'system', type: 'lens' });
+const withViews = {
+  ...answer,
+  items: [...answer.items, view(FIRST, 'Milestone: first'), view(SECOND, 'Milestone: second')],
+  steps: [answer.steps[0], { ...answer.steps[1], add: [...answer.steps[1].add!, FIRST] }, { ...answer.steps[2], add: [...answer.steps[2].add!, SECOND] }],
+};
+const shownView = (sent: any[]) => sent.filter((p) => p.key === 'shown' && p.mark).at(-1)?.mark[1].id ?? null;
+
+test('a step that adds a kept view shows its drawing beside the flow, and a step back the one it had', () => {
+  const { out, sent, flush, done } = held({ ...house, play: 'asked' }, withViews);
+  try {
+    flush();
+    const aside = JSON.stringify(out.scene.aside);
+    assert.match(aside, /"sp-side"/, 'the conversation and the milestone side by side');
+    assert.match(aside, /\["view",\{"key":"shown"\}\]/, 'a frame for the view, empty until a milestone is reached');
+    assert.equal(shownView(sent), SECOND, 'the last step shows the last milestone');
+    assert.equal(text(sent, 'shown-name'), 'Milestone: second');
+    out.on({ name: 'click', key: 'back' });
+    flush();
+    assert.equal(shownView(sent), FIRST, 'a step back, the milestone that step had');
+    out.on({ name: 'click', key: 'back' });
+    flush();
+    assert.equal(shownView(sent), null, 'before the first milestone, none');
+    assert.equal(sent.filter((p) => p.key === 'shown-name' && p.set).at(-1).set.href, null);
+  } finally {
+    done();
+  }
+});
+
+test('a story that adds no kept view keeps its conversation on the right, alone', () => {
+  const { out, sent, flush, done } = held({ ...house, play: 'asked' });
+  try {
+    flush();
+    assert.ok(!JSON.stringify(out.scene.aside).includes('sp-side'));
+    assert.ok(!sent.some((p) => p.key === 'shown'));
   } finally {
     done();
   }

@@ -113,6 +113,7 @@ test('a forget destroys the keys, leaves digests where the words were, and the c
   // What it left says nothing in an item's history: the digest of a forgotten reason is not a reason.
   const history = (await l.events({ target: made.t })) as any[];
   assert.ok(history.some((e) => e.changeset === made.said && e.reason === '' && e.authority?.basis === undefined), 'a forgotten reason reads as none');
+  assert.ok(history.every((e) => e.changeset !== forgot.changeset || e.detail.forgot), 'a forget is marked, so no page offers to undo it');
 
   // The held change that asked to forget Sam touched Sam: it leaves the queue, its ops with it.
   const { rows: held } = await l.db.query<{ status: string; ops: unknown[] }>(`select status, ops from proposal where id = $1`, [(asked as { proposal: string }).proposal]);
