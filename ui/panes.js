@@ -328,8 +328,9 @@ addEventListener('resize', () => {
   const dir = dirNow();
   if (started && host.dataset.dir !== dir) ((host.dataset.dir = dir), draw());
 });
-// The sheet opening or shutting changes the room the panes share.
-new MutationObserver(() => started && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
+// The sheet opening or shutting changes the room the panes share. Each pulse of the map says the sheet again as it was
+// (ui/app.js): that is no change, and laying the panes out for it would fit a canvas again under a pan.
+new MutationObserver((list) => started && list.some((m) => m.oldValue !== document.body.getAttribute('data-sheet')) && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'], attributeOldValue: true });
 
 /** The query bar's own for the pane it acts on, the same in every pane: back and forth (dimmed with nowhere to go) and split. Each pane's move and close stay in its strip. */
 export function paneButtons() {
