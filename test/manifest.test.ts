@@ -3,7 +3,7 @@
 // kept to) and in time (a pack's presence a fact on the log, its registrations derived from the set of packs).
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
@@ -151,6 +151,31 @@ test("adding and taking out a pack is a fact on the log; its registrations follo
 
   l.registry.hashes.set('time', 'f'.repeat(64));
   assert.deepEqual(await syncPacks(l), [['+', 'pack:time', 'pack', { version: '0.1.0', manifest: 'f'.repeat(64) }]], 'a manifest that changed on the server is asserted again');
+});
+
+test('a pack renamed takes the place of the one the owner added: inquiry is science now', async () => {
+  // A map that had the inquiry pack: the science pack as it was, under its old name.
+  const before = packsWith();
+  const science = JSON.parse(readFileSync(join(before, 'science', 'pack.json'), 'utf8'));
+  rmSync(join(before, 'science'), { recursive: true });
+  mkdirSync(join(before, 'inquiry'));
+  writeFileSync(join(before, 'inquiry', 'pack.json'), JSON.stringify({ ...science, id: 'inquiry', types: science.types.filter((t: { id: string }) => t.id !== 'investigation'), views: [], styles: [] }));
+  const old = await mapOf(before);
+  await syncPacks(old);
+  await syncTypes(old);
+  const h = (await old.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'h', type: 'hypothesis', title: 'Replay is fast' }] })) as { created: Record<string, string> };
+
+  const reg = new Registry(packsWith());
+  registries.push(reg);
+  const now = new Archipelago(old.db, reg);
+  const facts = await syncPacks(now);
+  assert.deepEqual(facts.filter((f) => /inquiry|science/.test(f[1])).map((f) => [f[0], f[1]]), [['+', 'pack:science'], ['-', 'pack:inquiry']]);
+  assert.ok(!(await packsOff(now)).includes('science'), 'on, as inquiry was');
+  now.registry.turnOff(await packsOff(now));
+  await syncTypes(now);
+  assert.ok(!now.registry.type('hypothesis')!.dormant && now.registry.type('investigation'), 'its types live, and the new ones with them');
+  assert.equal((await now.entity(h.created.h))!.type, 'hypothesis');
+  assert.deepEqual(await syncPacks(now), [], 'once');
 });
 
 test('a new workspace starts with the kernel alone, and a pack the log never added waits for the owner', async () => {
