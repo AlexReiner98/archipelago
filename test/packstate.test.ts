@@ -116,3 +116,14 @@ test('a pack turned off on one server is followed by another on the same databas
   assert.equal(await followPacks(other), true);
   assert.equal(other.registry.states.get('time')!.state, 'active');
 });
+
+test('an owner signed in turns a pack off and on: the type table is the system’s, kept whole whoever asked', async () => {
+  const l = await fresh();
+  // Signed in, a person's acts run as the member role, which may only read the type table.
+  const owner = l.as('e_owner01', true);
+  const state = async (id: string) => (await l.db.query<{ state: string }>(`select state from type_def where id = $1`, [id])).rows[0]?.state;
+  assert.deepEqual((await setPack(owner, human, { pack: 'time', on: false })).dormant.includes('time_entry'), true);
+  assert.equal(await state('time_entry'), 'dormant');
+  assert.deepEqual((await setPack(owner, human, { pack: 'time', on: true })).activated.includes('time_entry'), true);
+  assert.equal(await state('time_entry'), 'active');
+});
