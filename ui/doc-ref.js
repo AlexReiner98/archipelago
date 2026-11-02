@@ -19,7 +19,8 @@ function source(from, site, referrer) {
   const ref = from.searchParams.get('ref');
   if (ref) return REF.test(ref) ? ref : null;
   const utm = from.searchParams.get('utm_source');
-  if (utm) return tag(utm);
+  // A site's address (chatgpt.com) is named as a referrer is; a plain word (newsletter) is the tag itself.
+  if (utm) return utm.includes('.') ? tag(utm) : REF.test(utm) ? utm.toLowerCase() : null;
   let by;
   try { by = new URL(referrer).hostname; } catch { return null; }
   return by && !within(by, site) ? tag(by) : null;

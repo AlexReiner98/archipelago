@@ -27,7 +27,8 @@ test('without a ref, a public page’s links carry its utm_source, or else the o
   assert.equal(carried(join, 'https://site.example/', 'https://site.example/pricing'), join, 'the site itself is no source');
   assert.equal(carried(join, 'https://www.site.example/', 'https://app.site.example/'), join, 'nor a name under it');
   assert.equal(carried(join, 'https://site.example/', ''), join, 'no referrer, no change');
-  assert.equal(carried(join, 'https://site.example/?utm_source=com', 'https://claude.ai/'), join, 'a utm_source that makes no tag');
+  assert.equal(carried(join, 'https://site.example/?utm_source=Newsletter', 'https://claude.ai/'), `${join}?ref=newsletter`, 'a plain word is the tag');
+  assert.equal(carried(join, 'https://site.example/?utm_source=a%20b', 'https://claude.ai/'), join, 'a utm_source that makes no tag');
   assert.equal(carried(join, 'https://site.example/?utm_source=%2A%2A.x', ''), join);
   assert.equal(carried(join, 'https://site.example/', 'https://localhost/'), join, 'a referrer that makes no tag');
   assert.equal(carried(join, 'https://site.example/?ref=a%20b', 'https://claude.ai/'), join, 'a ref that is no tag falls back to nothing');
