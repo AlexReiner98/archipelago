@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A shared workspace for people and AI agents: a typed map of work, decisions and what waits on what.",
+  "description": "A living map of all your work: a structured model of work, decisions and what waits on what, for you, your team and your agents.",
   "license": "MIT",
   "author": "Aperture Design Tools Inc.",
   "engines": {

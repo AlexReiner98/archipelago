@@ -52,27 +52,25 @@ test('sections: what is not joined stands a section apart, and what is joined to
 
 const standing = (boxes: Record<string, [number, number, number, number]>) => Object.entries(boxes).map(([id, b]) => ({ id, at: [b[0], b[1]], size: [b[2], b[3]], named: [b[2], b[3]] }));
 
-test('settle: what is free is parted from what stands, and nothing else moves', () => {
+test('settle: what is held stays, and two wires are parted', () => {
   const boxes = standing({ a: [100, 20, 200, 40], b: [100, 300, 200, 40] });
-  const fixed = { a: 'a', b: 'b', points: [[100, 40], [100, 280]], free: null }, moved = { a: 'a', b: 'b', points: [[100, 40], [100, 280]], free: new Set(['a', 'b']) };
-  settle({ boxes, lines: [fixed, moved], ...sizes });
-  assert.deepEqual(fixed.points, [[100, 40], [100, 280]]);
-  assert.equal(Math.abs(moved.points[0][0] - 100), sizes.wire);
+  const one = { a: 'a', b: 'b', points: [[100, 40], [100, 280]] }, two = { a: 'a', b: 'b', points: [[100, 40], [100, 280]] };
+  settle({ boxes, lines: [one, two], held: new Set(['a', 'b']), rounds: 2, ...sizes });
+  assert.equal(Math.abs(one.points[0][0] - two.points[0][0]), sizes.wire);
   assert.deepEqual(boxes[0].at, [100, 20]);
 });
 
-test('settle: a stretch landing on what did not move stays on its port', () => {
-  const boxes = standing({ a: [100, 20, 200, 40], b: [100, 300, 200, 40] });
-  const fixed = { a: 'a', b: 'b', points: [[60, 40], [60, 280]], free: null }, moved = { a: 'a', b: 'b', points: [[60, 40], [60, 160], [140, 160], [140, 280]], free: new Set(['a']) };
-  settle({ boxes, lines: [fixed, moved], ...sizes });
-  assert.equal(moved.points.at(-1)![0], 140, 'its port on b, which did not move');
-  assert.equal(moved.points[0][0], 60 + sizes.wire, 'and on a, which did, a wire away');
+test('settle: what stood where a pin lands makes room, the pin stays', () => {
+  const boxes = standing({ p: [100, 100, 100, 40], q: [130, 110, 100, 40] }), told = settle({ boxes, lines: [], held: new Set(['p']), rounds: 2, ...sizes });
+  assert.deepEqual(boxes[0].at, [100, 100]);
+  assert.ok(Math.max(Math.abs(boxes[1].at[0] - 100) - 100, Math.abs(boxes[1].at[1] - 100) - 40) >= sizes.apart - 0.5, 'side by side, a gap apart');
+  assert.equal(told.freed, 0);
 });
 
 test('settle: with too little room every distance gives way alike, and no two wires share a line', () => {
   const boxes = standing({ l: [20, 100, 40, 200], r: [100, 100, 40, 200], t: [60, -60, 100, 40], f: [60, 260, 100, 40] });
-  const wire = (at: number) => ({ a: 't', b: 'f', points: [[at, -40], [at, 240]], free: new Set(['t', 'f']) }), three = [wire(60), wire(60), wire(60)];
-  const told = settle({ boxes, lines: three, ...sizes });
+  const wire = (at: number) => ({ a: 't', b: 'f', points: [[at, -40], [at, 240]] }), three = [wire(60), wire(60), wire(60)];
+  const told = settle({ boxes, lines: three, held: new Set(['l', 'r', 't', 'f']), rounds: 2, ...sizes });
   assert.ok(told.squeezed > 0);
   assert.equal(new Set(three.map((l) => l.points[0][0])).size, 3);
   assert.ok(three.every((l) => l.points[0][0] > 40 && l.points[0][0] < 80), 'all between the boxes');

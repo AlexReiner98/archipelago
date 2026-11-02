@@ -50,6 +50,14 @@ test('several sessions of one agent each keep a tab, and come back to it', () =>
   assert.deepEqual(route(step('e_bbbbbbbb'), [first({}, [its('e_aaaaaaaa', 700_000)])], at), { tab: 't0', split: { side: 'right' }, front: true });
 });
 
+test('a session that has just begun gets a tab of its own, unless one follows it or all follow nobody', () => {
+  const opens = { ...step('r1'), opens: true };
+  assert.deepEqual(route(opens, [first()], at), { open: { follows: 'r1' }, front: false }, 'with one tab, and a free pane to split, still its own');
+  assert.deepEqual(route(opens, [first({ follows: undefined } as object), tab('t1', 'r2', {}, [], {})], at), { open: { follows: 'r1' }, front: false });
+  assert.deepEqual(route(opens, [tab('t0', 'none', {}, [], { front: true })], at), { nowhere: true }, 'the reader’s Nobody is kept');
+  assert.deepEqual(route(opens, [first(), tab('t1', 'r1')], at), { tab: 't1', pane: 'p0', front: false }, 'it is not opened twice');
+});
+
 test('no tab is brought into sight: a show into another is drawn there, out of sight', () => {
   const tabs = [first({}, [its('e_aaaaaaaa', 5000)]), tab('t1', 'e_bbbbbbbb')];
   assert.deepEqual(route(step('e_bbbbbbbb'), tabs, at), { tab: 't1', pane: 'p0', front: false });
@@ -140,13 +148,18 @@ test('a pane the reader is busy in is passed by: a show opens a tab of its own i
   assert.deepEqual(route(step('e_aaaaaaaa'), [first({ busy: true }, [its('e_aaaaaaaa')])], at), { tab: 't0', pane: 'p1', front: true });
   // Its own pane busy: a tab of its own.
   assert.deepEqual(route(step('e_aaaaaaaa'), [first({}, [{ ...its('e_aaaaaaaa'), busy: true }])], at), { open: { follows: 'e_aaaaaaaa' }, front: false });
+  // A session has one tab: when the reader is at work in it, its show waits, whatever the step or the pane it names.
+  const own = [first(), tab('t1', 'e_aaaaaaaa', { busy: true }, [], { front: true })];
+  assert.deepEqual(route(step('e_aaaaaaaa'), own, at), { later: true });
+  assert.deepEqual(route({ ...step('e_aaaaaaaa'), opens: true }, own, at), { later: true });
+  assert.deepEqual(route(step('e_aaaaaaaa', 'review'), own, at), { later: true });
 });
 
 test('a tab popped out into a window of its own is drawn in its canvas, never brought into sight here', () => {
   const out = [first({ busy: true }), tab('w1', 'e_aaaaaaaa', {}, [], { popped: true })];
   assert.deepEqual(route(step('e_aaaaaaaa', 'review'), out, at), { tab: 'w1', pane: 'p0', front: false });
   // A window the reader is at work in is passed by too.
-  assert.deepEqual(route(step('e_aaaaaaaa'), [first(), tab('w1', 'e_aaaaaaaa', { busy: true }, [], { popped: true })], at), { open: { follows: 'e_aaaaaaaa' }, front: false });
+  assert.deepEqual(route(step('e_aaaaaaaa'), [first(), tab('w1', 'e_aaaaaaaa', { busy: true }, [], { popped: true })], at), { later: true });
   // A window that follows everyone is not taken: the show goes beside the reader's pane here.
   assert.deepEqual(route(step('e_aaaaaaaa'), [first(), tab('w1', 'all', {}, [], { popped: true })], at), { tab: 't0', split: { side: 'right' }, front: true });
 });

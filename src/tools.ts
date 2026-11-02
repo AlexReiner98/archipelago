@@ -22,7 +22,7 @@ import { packActionByShort, packTool, packTools } from './packtools.ts';
 import { took } from './presence.ts';
 import { withinScope } from './scope.ts';
 import { viewsSaid } from './askview.ts';
-import { movedTo, route, SURFACE, surfaceTools, type Action } from './surface.ts';
+import { listedChange, movedTo, route, SURFACE, surfaceTools, type Action } from './surface.ts';
 import { ACT_TOOLS } from './tool-acts.ts';
 import { WRITE_TOOLS } from './tool-change.ts';
 import { devMode } from './tool-config.ts';
@@ -97,8 +97,10 @@ function surfaceOf(reg: Registry): Record<string, Tool> {
   return tools;
 }
 
-/** What an agent is offered, in order: query, change, undo and the six verbs. */
-export const surfaceFor = (reg: Registry): [string, Tool][] => SURFACE.map((name) => [name, TOOLS[name] ?? surfaceOf(reg)[name]]);
+const CHANGE = listedChange(TOOLS.change);
+
+/** What an agent is offered, in order: query, change, undo, the six verbs and draw. */
+export const surfaceFor = (reg: Registry): [string, Tool][] => SURFACE.map((name) => [name, name === 'change' ? CHANGE : (TOOLS[name] ?? surfaceOf(reg)[name])]);
 
 /** The call that replaces a tool's old name, for one release (src/surface.ts); undefined for a name that stays. */
 export const replacementOf = (reg: Registry, name: string) => movedTo(reg, TOOLS, FORMER_NAMES[name] ?? name);

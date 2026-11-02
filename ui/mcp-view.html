@@ -7,7 +7,8 @@
 <title>A view of the map</title>
 <!-- A view drawn inline in a chat (src/mcp-view.ts): one self-contained page, opened by a host that draws MCP Apps. It
      holds no data and no token and reaches nothing itself: all it knows comes from the host over postMessage, and all
-     it asks goes through the host to this server's own tools. It stays shut for a call that is no view. -->
+     it asks goes through the host to this server's own tools. A call of draw names what to draw, and any other call
+     (a client that still holds the old tool list opens it for query and report) leaves it shut. -->
 <style>
   :root { color-scheme: light dark; }
   html, body { margin: 0; background: transparent; }
@@ -39,20 +40,13 @@
       send({ id, method, params });
     });
 
-  /** How big the page is now: nothing, for a call that is no view, so the host has nothing to leave room for. */
+  /** How big the page is now: nothing, until there is a drawing, so the host has nothing to leave room for. */
   const told = () => notify('ui/notifications/size-changed', { width: document.documentElement.scrollWidth, height: Math.ceil(document.documentElement.getBoundingClientRect().height) });
   new ResizeObserver(told).observe(document.documentElement);
 
-  /** What of a call names a view, as a look takes it; nothing for any other call. */
-  function viewAsked(call) {
-    const given = call?.params ?? {};
-    if (call?.name === 'flat') {
-      if (given.preview) return null;
-      return { query: Object.fromEntries(['filter', 'walk', 'limit', 'time'].filter((k) => given[k] !== undefined).map((k) => [k, given[k]])) };
-    }
-    if (call?.action !== 'show' && call?.name !== 'look') return null;
-    const { entity, query, lens, style } = given;
-    return entity || query || lens || style ? JSON.parse(JSON.stringify({ entity, query, lens, style })) : null;
+  /** What a call of draw names, as a look takes it; nothing for any other call. */
+  function viewAsked({ entity, query, style }) {
+    return entity || query || style ? JSON.parse(JSON.stringify({ entity, query, style })) : null;
   }
 
   /** The size to draw at: what the host gives, within what a look takes. A drawing lays out to the shape of its pane. */

@@ -9,6 +9,8 @@ import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
+/** A session as the page calls it, without the run it adds when a session of an earlier test goes by the same name. */
+const called = (names: string[]) => names.map((n) => n.replace(/ · \w{4}$/, ''));
 
 test('in a browser, a show lands without a line at the foot: a note on its pane, a screen in a tab, a question waited for, a pane moved to a tab', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
@@ -85,6 +87,34 @@ test('in a browser, a show lands without a line at the foot: a note on its pane,
   }
 });
 
+test('in a browser, a session that begins opens a tab of its own, out of sight, and its shows land there', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base, call } = await serve('off');
+  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'work', title: 'Something shown' }] })).result.created as Record<string, string>;
+  const agent = 'agent:claude-code/archipelago';
+  const page = await open(`${base}/`);
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const strip = () => page.evaluate<string>(`JSON.stringify([...document.querySelectorAll('.tab-name')].map((t) => t.textContent))`).then(JSON.parse).then(called);
+  try {
+    await wait(2500);
+    const before = await page.evaluate<string>('location.hash');
+    const { name } = (await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: 'tab-one', surface: 'claude-code' } })).result;
+    let said: string[] = [];
+    for (let n = 0; n < 40 && !said.includes(`Session ${name}`); n++) {
+      await wait(250);
+      said = await strip();
+    }
+    assert.ok(said.includes(`Session ${name}`), `the tabs: ${JSON.stringify(said)} ${page.logs().join(' ')}`);
+    assert.equal(await page.evaluate<string>('location.hash'), before, 'the reader stays where they were');
+    await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: 'tab-one', surface: 'claude-code' } });
+    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a } });
+    await wait(2500);
+    assert.equal(await page.evaluate<string>('location.hash'), before, 'its shows go to its tab, not the one in sight');
+    assert.equal((await strip()).filter((t) => t === `Session ${name}`).length, 1, 'taking it up again opens no second tab');
+  } finally {
+    await page.close();
+  }
+});
+
 test('in a browser, the Follows menu lists the sessions open now', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'work', title: 'Something shown' }] })).result.created as Record<string, string>;
@@ -94,7 +124,7 @@ test('in a browser, the Follows menu lists the sessions open now', { skip: !brow
   const quiet = await start('stays-quiet');
   const page = await open(`${base}/`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const menu = () => page.evaluate<string>(`JSON.stringify([...document.querySelectorAll('.tab-menu [role="menuitemradio"]')].map((b) => b.textContent))`).then(JSON.parse) as Promise<string[]>;
+  const menu = () => page.evaluate<string>(`JSON.stringify([...document.querySelectorAll('.tab-menu [role="menuitemradio"]')].map((b) => b.textContent))`).then(JSON.parse).then(called);
   const opened = async (ok: (names: string[]) => boolean) => {
     for (let n = 0; n < 40; n++) {
       await page.evaluate(`document.querySelector('[aria-label="This tab: whom it follows, pop it out"]').click()`);

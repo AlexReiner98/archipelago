@@ -32,7 +32,7 @@ const pageId = Math.random().toString(36).slice(2, 14);
 // (src/seeing.ts). A popped-out tab is the main page's too.
 const thisPage = () => (lookMode ? undefined : { page: pageId, on: tabs.list.some((t) => t.follows !== 'none'), where: location.hash.slice(2, 2002) });
 let seenStep;
-/** Each session's last show not yet landed: it waits while a question is open over the page. */
+/** Each session's last show not yet landed: it waits while a question is open over the page, or the reader is busy in its tab. */
 const waiting = new Map();
 
 export function follow(steps = []) {
@@ -42,10 +42,11 @@ export function follow(steps = []) {
   const fresh = seenStep === undefined ? [] : steps.filter((s) => s.at > seenStep);
   seenStep = steps.at(-1)?.at ?? seenStep ?? 0;
   for (const s of steps) hear(s);
-  for (const s of fresh) if (s.kind === 'show' && s.hash) waiting.set(sessionOf(s), s);
+  // A later show takes the place of what waits, and its tab of its own, if it was owed one, stays owed.
+  for (const s of fresh) if (s.kind === 'show' && s.hash) waiting.set(sessionOf(s), { ...s, opens: s.opens || waiting.get(sessionOf(s))?.opens });
   if (!hooks.land || document.querySelector('dialog[open]')) return;
-  for (const s of waiting.values()) hooks.land(s);
-  waiting.clear();
+  // One the reader is busy where it would land stays, and is tried again at the next look.
+  for (const [session, s] of waiting) if (hooks.land(s) !== 'later') waiting.delete(session);
 }
 
 /** The items the sheet shows: what it is the page of, what it names or links to, and what its views hold. */

@@ -2,58 +2,72 @@
 
 [![Tests](https://github.com/AlexReiner98/archipelago/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexReiner98/archipelago/actions/workflows/tests.yml)
 
-**A shared workspace for your people and your AI agents.**
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/hero-dark.svg">
+  <img alt="A living map of all your work: islands drawn in stacked rows, parting round the title and its line, from a chat to a structured model that keeps you, your team, and your agents on the same page." src="brand/hero-light.svg">
+</picture>
+
+**A living map of all your work. From a chat to a structured model that keeps you, your team, and your agents on the same page.**
 
 *Early: built and used daily by its author; expect rough edges.*
 
-Each agent session usually starts from nothing, and what it learned stays in
-a chat. Archipelago is the place the work lives instead: a map of projects,
-tasks, decisions, people and what waits on what. You look at it in a web page;
-agents read and change it through the same tools, over MCP. What an agent
-changes is applied, logged and one click to undo, or waits for your yes if
-you choose that.
+AI is speeding up lots of tasks, but more speed is only helpful if you're
+moving in the right direction. Making a map before you execute helps identify
+risks and dependencies, and makes it easy to keep track as people and agents
+work.
 
-![Archipelago in its own demo map: you, Claude Code and GitHub working on one project, and the release it is waiting for](docs/demo-map.png)
+One shared map means anyone can pick up the work at any time, from anywhere.
+Detailed history makes it possible to analyze how projects actually
+developed, what was missed, and how to improve.
 
-## What you get
+The site is [archipelago.tools](https://archipelago.tools).
 
-- **Home:** each project's open questions and its next release.
-- **One page per item:** its fields, its note folded to the point, and a
-  view of what it is tied to and what blocks it.
-- **Changes:** what agents sent, to apply, trim or decline, and what they
-  changed on their own, each with Undo.
-- **Sessions that tell their story:** each agent session registers itself,
-  says what it took on, and leaves the map true when it ends.
-- **GitHub:** every push is read against the open work.
-- **Time:** a calendar of your hours beside the agents' sessions, and
-  invoices from it.
-- **A log, not a table:** every change is one entry in an append-only,
-  hash-chained log, and everything you see is read from it. Any item can be
-  read as it was at any moment, and forgetting one takes its words out of the
-  log and every backup with them.
-- **Your own kinds of thing:** types and ways of working are plain files
-  ("packs"), and one type can be a flavour of another. Which packs a
-  workspace has is in its log too.
+## How it works
 
-## Start in five minutes
+Archipelago is a small unopinionated core, the rest is yours to shape.
 
-You need [Node.js](https://nodejs.org) 24 or newer. The database is embedded.
+**People stay in control.** Agents do much of the work, and you decide what
+needs your approval. Every change records the source of authority, and what
+is applied can be undone. [You stay in charge](https://archipelago.tools/in-charge)
+
+**The log is the truth.** Every change is added to one log and never
+rewritten. Undo, history, live updates and backups all read the same record.
+[docs/log.md](docs/log.md)
+
+**Everything is an item, every item has a type.** Every type extends one of
+seven kinds. Because Archipelago is built around those kinds, what works on
+the types we ship works just as well on a type you add.
+
+**Plugin architecture.** Packs are where opinion enters the system. Create a
+pack with the item types, link types, view styles, and features you need. A
+type, view or rule of yours works like the ones that ship.
+[Write a pack](https://archipelago.tools/write-a-pack)
+
+**One surface for people and agents.** You and your agents use the map
+through the same tools. What an agent is told is kept on the map, where you
+can read and change it. [The agent tools](https://archipelago.tools/tools)
+
+**One way to read.** A query is a filter, a walk and a limit, and a view is a
+query with its layout. You and your agents read the same query.
+
+## Host it yourself
+
+Archipelago is one Node 24 server and a persistent disk, MIT licensed, with
+everything included. The database is embedded; for a team, keep the maps on a
+Postgres server instead. If you'd rather not run a server, the
+[Quickstart](https://archipelago.tools/quickstart) has it running for you in
+about five minutes.
 
 ```bash
 git clone https://github.com/AlexReiner98/archipelago.git
 cd archipelago
 npm install
-npm run demo
+npm start
 ```
 
-Open `http://127.0.0.1:3200`: a map of Archipelago itself, with a release
-waiting on you, two open questions and an agent's proposal on **Changes**.
-The screenshot above is its project page, drawn by a style of its own
-([examples/demo/overview.js](examples/demo/overview.js)).
-
-For your own map, `npm start` and open `http://127.0.0.1:3100`, go to
-**Workspace** and type your name under Owner. The demo keeps its data apart,
-in `demo/`.
+Open `http://127.0.0.1:3100`, go to **Workspace** and type your name under
+Owner. To look around first, `npm run demo` opens a map of Archipelago itself
+on port 3200, its data kept apart.
 
 ## Connect Claude Code
 
@@ -63,32 +77,29 @@ In the folder of a project you work on, with the server running:
 node -e "fetch('http://127.0.0.1:3100/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"
 ```
 
-It shows the files it will write (`.mcp.json`, a few hooks, working rules in
+It lists the files it will write (`.mcp.json`, a few hooks, working rules in
 `CLAUDE.md`) and asks first. Add ` -- --dry-run` to only see the list, or
-` -- --remove` to take it out again. Then reopen Claude Code in that folder
-and ask it something like:
+` -- --remove` to take it out. Then reopen Claude Code in that folder and say:
 
-> Put this repository in Archipelago as a project, with the three things I am
-> working on as tasks, and tell me what you would do first.
+> Put this project in Archipelago, with the three things I am working on as
+> tasks, and tell me what you would do first.
 
-Its change is on the map at once, and on **Changes** with Undo; under
-**Workspace → Agents** you can have agents' changes wait for you instead.
+Your tasks appear on the map right away. To take anything back, open
+**Changes** and choose **Undo**. Any other MCP client works the map at
+`http://127.0.0.1:3100/mcp`.
 
-## Host your own
+## Read on
 
-One Node server with a persistent disk. Set `PELAGO_HOST=0.0.0.0`, `PELAGO_AUTH=tokens` and
-`PELAGO_PUBLIC_HOST`; see [Hosting](docs/reference.md#hosting). For a team,
-keep the maps on a Postgres server instead; `node src/cli.ts move` carries a
-map between the two by replaying its log.
-
-## More
-
-- [Reference](docs/reference.md): every screen, tool, view, setting and
-  limit.
-- [Glossary](docs/glossary.md): the one word for each idea.
+- [Host it yourself](https://archipelago.tools/self-host) and
+  [Hosting](docs/reference.md#hosting): every setting and limit.
+- [Reference](docs/reference.md): every screen, tool, view, setting and limit.
+- [Agents held to the map](docs/agents.md): how an agent is told, checked and
+  reconciled.
+- [Packs](docs/packs.md): the manifest, key by key, and
+  [docs/layouts.md](docs/layouts.md): layouts and the sandbox.
 - [The log](docs/log.md): what is stored, and how everything else is read
   from it.
-- [Packs](docs/packs.md): the fifteen keys of a pack file.
+- [Glossary](docs/glossary.md): the one word for each idea.
 - [CONTRIBUTING.md](CONTRIBUTING.md) to work on Archipelago itself. It is
   published as it is, with no promise of answers or fixes.
 - [SECURITY.md](SECURITY.md) to report a security problem in private.

@@ -11,6 +11,7 @@ const browser = chrome();
 
 test('in a browser, opening a step keeps the canvas still and lights it, and a held change is decided where it would land', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
+  await call('/api/workspace_set', undefined, { agent_changes: 'hold' });
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
@@ -116,6 +117,7 @@ test('in a browser, opening a step keeps the canvas still and lights it, and a h
 
 test('in a browser, a change that only makes an item is drawn when it is all that is held, and its row opens its sheet', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
+  await call('/api/workspace_set', undefined, { agent_changes: 'hold' });
   await call('/agent/change', undefined, { actor: 'robot', reason: 'held alone', ops: [{ op: 'create', type: 'task', title: 'Nothing else held' }] });
   const page = await open(`${base}/#/v?find=held&shape=list`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));

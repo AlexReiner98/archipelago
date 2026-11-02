@@ -82,7 +82,8 @@ export type ItemStep =
 
 /** One run of facts on an item, folded into the columns and fields it sets. `was`: its type and status, if it is held. */
 export function itemStep(reg: Kinds, at: string, id: string, run: Fact[], was?: { type: string; status: string }): ItemStep {
-  if (!was && !run.some((f) => f[0] === '+' && f[2] === 'type')) return { skip: true }; // a type's definition, or another record: not an item
+  // A type's definition, another record, or a fact on what is no longer here (an item from before the log, forgotten): not an item.
+  if (!was && !(['type', 'title'] as const).every((field) => run.some((f) => f[0] === '+' && f[2] === field))) return { skip: true };
   if (run.some((f) => f[0] === '+' && f[2] === 'forgotten')) return { forget: true };
   const set: Row = {};
   const props: Row = {};

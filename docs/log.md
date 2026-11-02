@@ -155,7 +155,7 @@ when present.
 
 - **Every field holds one value.** Asserting a field supersedes whatever it
   held: an update is an assertion, with no retraction of the old value written
-  beside it (as Datomic does for cardinality-one attributes). A list (a lens's
+  beside it (as Datomic does for cardinality-one attributes). A list (a view's
   `kinds`) is one JSON value.
 - **Retracting a field clears it**: `["-", id, field]`, as `props: {x: null}`
   does today.
@@ -885,6 +885,11 @@ never sees the log ahead of them.
   newest one; where none fits the running code (a new projector, or none
   yet), the projections are rebuilt from the start in the background and
   swapped in.
+- **Older than the log.** A map from before 24 Oct 2026 holds items, links
+  and held changes no entry made. A walk from the log's start begins with
+  them as they stand today (`beforeTheLog`, `src/replay.ts`), and what the
+  log says of them goes on top: the head is right, and a past position shows
+  a value the log has not said yet as it stands today.
 - **As of a position.** The nearest snapshot at or before it, then the
   entries of both streams up to the moment of that fact entry, projected
   into temporary tables that live for one transaction. The reader sees of it
@@ -1079,7 +1084,7 @@ streams in the mix above (and the hosted Postgres as well as PGlite):
    and the time to write and to load one; the registry projection at a past
    position with a different pack set.
 5. **As-of reads**: one item's field at a random past position (one history
-   index lookup); one item whole at a past time; a lens over a subtree as of a
+   index lookup); one item whole at a past time; a query over a subtree as of a
    time a month back (snapshot plus replay).
 6. **Undo and approval at head**: the fast-path check and a rebase for a
    proposal whose base is 10,000 entries behind.
@@ -1132,7 +1137,7 @@ section 4, Where this stands. Nothing else writes the map today
 | `release`: `update relation set valid_to`, `log resource.release` | `claims` stream: `["-", r, "link"]` |
 | `checkConnections`: `update entity set status` (outside `change` today), `log connection.check` | `observations` stream: the connection's reachability as an observed `status` (the connection item itself stays facts) |
 | `setSecret`: `insert into setting`, `delete from setting` | the key vault's `vault_secret`; the `settings` stream records the name only (`e_7cv7xefh`) |
-| `init`: owner person created through `apply`; `insert into setting` (`agent_changes`, `me`) | facts for the person; `settings` stream |
+| `init`: owner person created through `apply`; `insert into setting` (`me`, and `agent_changes` when it begins the workspace) | facts for the person; `settings` stream |
 | `restoreRows` (restore from a backup) | gone: restoring is verifying a copied log and replaying it; a copy that diverged from this one has its later entries proposed here, rebased by section 3 (`e_u7a3ubgy`) |
 
 ### Stores named in `src/operational.ts`

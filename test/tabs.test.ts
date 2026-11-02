@@ -2,7 +2,7 @@
 // real browser (skipped where there is no Chrome), one session gets a pane of its own beside the reader's, several
 // sessions of one agent each keep a tab named by the session,
 // one showing just after another lands in the background and is marked, a press brings a tab into sight, a show while
-// the reader is at work goes to a tab behind, and a tab pops out into a window of its own and docks back whole (a tab merged is test/show-lands.test.ts).
+// the reader is at work in its session's tab waits for them, and a tab pops out into a window of its own and docks back whole (a tab merged is test/show-lands.test.ts).
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -10,6 +10,31 @@ import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
+
+test('in a browser, a new session’s tab opens on its canvas, with no page over it', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base, call } = await serve('off');
+  const page = await open(`${base}/`);
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const agent = 'agent:claude-code/archipelago';
+  try {
+    await wait(3000);
+    const started = (await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: 'tab-canvas' } })).result;
+    const task = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'work', title: 'A task' }] })).result.created as Record<string, string>;
+    const id = Object.values(task)[0];
+    const count = () => page.evaluate<number>(`document.querySelectorAll('#tabs .tab').length`);
+    for (let n = 0; n < 60 && (await count()) < 2; n++) await wait(250);
+    assert.equal(await count(), 2, 'a tab of its own');
+    await call('/agent/report', undefined, { actor: agent, action: 'session_update', params: { run: started.run, task: id } });
+    await wait(3000);
+    await page.evaluate(`document.querySelector('#tabs .tab:nth-child(2)').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`);
+    for (let n = 0; n < 20 && (await page.evaluate<string>(`document.querySelector('#tabs .tab:nth-child(2)').getAttribute('aria-selected')`)) !== 'true'; n++) await wait(250);
+    assert.equal(await page.evaluate<string>(`document.querySelector('#tabs .tab:nth-child(2)').getAttribute('aria-selected')`), 'true', 'brought into sight');
+    assert.ok(!(await page.evaluate<string>('location.hash')).startsWith('#/e/'), `no page over it: ${await page.evaluate('location.hash')}`);
+    assert.notEqual(await page.evaluate('document.body.dataset.sheet'), 'open');
+  } finally {
+    await page.close();
+  }
+});
 
 test('in a browser, several sessions each keep a tab, which pops out and docks back',{ skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
@@ -60,20 +85,26 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
     // A press brings a tab into sight, where its session last showed.
     await press(`${tabOf(2)} .tab-name`);
     await until('the second session’s tab is in sight', async () => (await page.evaluate<string>(`location.hash`)).startsWith(`#/e/${made.i2}?`) && (await strip())[1][1]);
-    // While the reader is at work in it, its session's next show goes to a tab behind.
-    await press('#canvas');
+    // While the reader is at work in it, its session's next show waits: a session has one tab.
+    await press('#canvas .pane-canvas');
     await show(1, 'i0');
-    await until('a tab behind', async () => (await strip()).length === 4);
+    await wait(4000);
+    assert.equal((await strip()).length, 3, 'no second tab for the session');
     assert.ok((await page.evaluate<string>(`location.hash`)).startsWith(`#/e/${made.i2}?`), 'the page the reader is in stays');
-    assert.deepEqual((await strip())[3].slice(0, 3), [`Session ${sessions[1].name}`, false, true]);
+    // Once they stop, it lands there.
+    for (const end = Date.now() + 30000; Date.now() < end && !(await page.evaluate<string>(`location.hash`)).startsWith(`#/e/${made.i0}?`); ) await wait(250);
+    assert.ok((await page.evaluate<string>(`location.hash`)).startsWith(`#/e/${made.i0}?`), 'the show lands when the reader is quiet');
+    assert.equal((await strip()).length, 3);
     // The tab in sight pops out into a window of its own, and docks back whole.
     await page.send('Target.setDiscoverTargets', { discover: true });
     await press(`${tabOf(2)} [aria-label="This tab: whom it follows, pop it out"]`);
+    // The menu is drawn again with the sessions open now: a press lands on the one that stays.
+    await wait(1000);
     await press('.tab-menu [role="menuitem"]');
     await until('the tab is out', async () => (await strip()).some((t) => t[3]));
-    assert.equal((await strip()).filter((t) => !t[3]).length, 3);
+    assert.equal((await strip()).filter((t) => !t[3]).length, 2);
     const targets = (await page.send('Target.getTargets')).result.targetInfos as { targetId: string; type: string; url: string }[];
-    const popped = targets.find((t) => t.type === 'page' && t.url.includes(`/e/${made.i2}`));
+    const popped = targets.find((t) => t.type === 'page' && t.url.includes(`/e/${made.i0}`));
     assert.ok(popped, 'a window was opened on the tab’s canvas');
     const { sessionId } = (await page.send('Target.attachToTarget', { targetId: popped.targetId, flatten: true })).result;
     const inPopped = async (expression: string) => (await page.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, sessionId)).result?.result?.value;
@@ -81,7 +112,7 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
     await inPopped(`document.querySelector('[aria-label="Dock back"]').click()`);
     await until('the tab docked back, in sight', async () => {
       const now = await strip();
-      return now.length === 4 && !now.some((t) => t[3]) && now.some((t) => t[0] === `Session ${sessions[1].name}` && t[1]);
+      return now.length === 3 && !now.some((t) => t[3]) && now.some((t) => t[0] === `Session ${sessions[1].name}` && t[1]);
     });
   } finally {
     await page.close();

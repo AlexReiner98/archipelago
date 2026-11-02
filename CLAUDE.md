@@ -17,11 +17,12 @@ where, and how that server is run.
   files, and the open work. Say what you take on with `report` action
   `session_update`, and keep the map true as you go: there is no handoff
   note to write.
-- **The pelago tools are nine.** `query` reads (a view, a query, or a read
+- **The pelago tools are ten.** `query` reads (a view, a query, or a read
   such as `get`, `search`, `schema`, `events`), `change` writes, `undo` takes
   a change set back, and every other action is called under its verb
   (`capture`, `assign`, `report`, `ask`, `settle`, `revise`) by name, with its
-  inputs as `params`: `report` with action `tell`. `query` with name
+  inputs as `params`: `report` with action `tell`. `draw` draws a view in
+  a chat, the one tool a client opens a page for (MCP Apps). `query` with name
   `actions` says what each action takes. The table of what every old tool
   became is on the task "A small surface for agents".
 - **The local server on port 3100 (`npm run dev`) is where the code is

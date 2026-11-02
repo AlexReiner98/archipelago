@@ -147,7 +147,9 @@ export async function pageLook(l: Archipelago, doc?: Record<string, unknown>) {
   const at = typeof doc?.style_at === 'number' ? doc.style_at : undefined;
   const key = at === undefined ? '' : `${l.workspace} ${at} ${String(doc?.id)}`;
   if (key && looks.has(key)) return looks.get(key)!;
-  const { kept, versions } = at === undefined ? { kept: await keptOf(l, 'style', undefined), versions: undefined } : await stylesAt(l, at);
+  const now = async () => ({ kept: await keptOf(l, 'style', undefined), versions: undefined });
+  // A page outlives its style: one that cannot be made again from the log is drawn in the style as it stands.
+  const { kept, versions } = at === undefined ? await now() : await stylesAt(l, at).catch((err) => (console.error(`the style of ${String(doc?.id)} at ${at}:`, err), now()));
   const style = (await styleFor(l, kept, hub, versions)).style as { theme: unknown; lengths: unknown; faces?: unknown; type?: unknown; page_css?: unknown; page?: { head?: unknown; share?: unknown } };
   const { theme, lengths, faces, type, page_css, page } = style;
   const look = {

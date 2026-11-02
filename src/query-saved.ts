@@ -30,6 +30,8 @@ export function viewQuery(props: Props) {
 
 /** Whether an item's type is a kept view. */
 export const isKept = (l: Archipelago, type: string) => l.registry.isA(type, KEPT);
+/** The types that bring a kept view in where a line names it. */
+export const bringersIn = (l: Archipelago) => l.registry.drawnWith('document');
 
 /**
  * The picture of a kept view: the flat lens's answer, and the style it is drawn in (the presets, the workspace's, its
@@ -68,7 +70,7 @@ export async function shownIn(l: Archipelago, id: string, trail: { id: string; t
       const item = await l.entity(view.id);
       const answer = item && (await flatRead(l, viewQuery(item.props)).catch(() => undefined));
       if (!answer?.items.some((one) => one.id === id)) continue;
-      const documents = (await l.mentionedIn(view.id)).filter((m) => l.registry.drawnWith('document').includes(m.type)).map((m) => ({ id: m.id, type: m.type, title: m.title }));
+      const documents = (await l.mentionedIn(view.id)).filter((m) => bringersIn(l).includes(m.type)).map((m) => ({ id: m.id, type: m.type, title: m.title }));
       shown.push({ id: view.id, title: view.title, of: { id: step.id, title: step.title }, documents });
     }
   return shown;

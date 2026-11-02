@@ -84,12 +84,12 @@ const roomOn = (b, side, wire, corner) => {
 };
 
 /**
- * `boxes` by id are { x, y, w, h, pointed }, `wires` { a, b, points }, those with `kept` not looked at. `room` is what a wire
+ * `boxes` by id are { x, y, w, h, pointed }, `wires` { a, b, points }, those that `stays` not looked at. `room` is what a wire
  * keeps from a box it passes, `run` from a port to its first corner, `corner` from a box's corner, `wire` from a wire beside it;
  * `ports` how many places along a side are tried, `rounds` how many times the wires are gone over, the costs what a
  * crossing, a bend and an end too many on a side are worth in length, and `work` how many meetings of two wires may be tried.
  */
-export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, cost_cross, cost_bend, cost_side, work: budget = Infinity }) {
+export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, cost_cross, cost_bend, cost_side, work: budget = Infinity, through = cost_cross / 2 }) {
   let work = 0;
   const rects = new Map([...boxes].map(([id, b]) => [id, { id, lo: [b.x - b.w / 2, b.y - b.h / 2], hi: [b.x + b.w / 2, b.y + b.h / 2], mid: [b.x, b.y], pointed: b.pointed }]));
   const CELL = Math.max(1, ...[...rects.values()].map((b) => b.hi[0] - b.lo[0])), columns = new Map(), lines = wires.filter((w) => w.points.length > 1).map((w) => Object.assign(w, { points: tidy(w.points) }));
@@ -182,8 +182,8 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
   const plain = (l) => (l.length - 2) * cost_bend + lengthOf(l);
   for (let round = 0; round < rounds; round++) {
     for (const w of [...lines].sort((p, q) => q.points.length - p.points.length || lengthOf(q.points) - lengthOf(p.points))) {
-      if (w.kept) continue;
       // Past what a picture can take on a page, the rest keep the lines they came with: the solve parts those as well.
+      if (w.stays) continue;
       if (work > budget) return work;
       const a = rects.get(w.a), b = rects.get(w.b);
       bump(w, -1);
@@ -193,7 +193,7 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
       const standing = clear(was, w, 0), slid = standing ? [] : aside(was, w).map((l) => { const line = tidy(l); return { l: line, plain: plain(line) }; });
       const beyond = round < rounds - 1 || (standing && met(was, w, cost_cross) < cost_cross) ? [] : past(was, w).map((l) => { const line = tidy(l); return { l: line, plain: plain(line) }; });
       if (slid.length || beyond.length) tried.push(...slid, ...beyond), tried.sort((p, q) => p.plain - q.plain);
-      let best = was, least = plain(was) + met(was, w, Infinity) + over(was, w) + (standing ? 0 : cost_cross / 2);
+      let best = was, least = plain(was) + met(was, w, Infinity) + over(was, w) + (standing ? 0 : through);
       for (const { l, plain: alone } of tried) {
         if (alone >= least) break;
         const cost = alone + over(l, w);

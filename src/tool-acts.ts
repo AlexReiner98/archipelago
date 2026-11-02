@@ -16,7 +16,7 @@ import { actorId } from './pelago.ts';
 import { PICTURE_TYPES, putPicture } from './pictures.ts';
 import { tellStamp, took, watching } from './presence.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
-import { point } from './tool-change.ts';
+import { point, sessionOpened, sessionTookUp } from './tool-change.ts';
 import { backupNow, restartNow } from './tool-config.ts';
 import { BRANCH } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
@@ -38,7 +38,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       'It lands within a couple of seconds in a pane of your session’s own on each page of theirs that is open, beside the pane they are in, which it never takes. The answer says how many of their pages are open and how many take your shows (pages). Add a short note saying what they are looking at. ' +
       'A change moves nothing on their page: show what is worth watching. ' +
       'With look: true, the answer also carries the picture of it, as an image: drawn by the server as you see the map, whether or not a page of theirs is open (query look takes one without moving their page). ' +
-      'In a client that draws MCP Apps (Claude chat), the view is also drawn in the chat, for the person reading it there.',
+      'For the person reading a chat, call draw.',
     input: {
       ...VIEW_INPUT,
       screen: z.enum(['workspace', 'you']).optional().describe('The workspace sheet, or what waits for them.'),
@@ -97,7 +97,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => putPlaces(l, actor, input),
   },
   session_start: {
-    description: 'Register this agent session in the map so the human can see it. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Takes effect at once.',
+    description: 'Register this agent session in the map so the human can see it: their page opens it a tab of its own. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Takes effect at once.',
     input: {
       title: z.string().optional().describe('A few words on what this session is for.'),
       task: z.string().optional().describe('Id of the item being worked on.'),
@@ -107,7 +107,11 @@ export const ACT_TOOLS: Record<string, Tool> = {
       session_id: z.string().optional().describe('The id your surface gave this session, if you know it. Makes this call safe to repeat.'),
       branch: BRANCH,
     },
-    run: async (l, actor, input) => sessionStart(l, actor, input),
+    run: async (l, actor, input) => {
+      const started = await sessionStart(l, actor, input);
+      if (!('resumed' in started)) await sessionOpened(l, actor, started.run, input.task);
+      return started;
+    },
   },
   session_update: {
     description: 'Report in from a registered session: a note worth keeping, a change to waiting or running, a task you have picked up, or the git branch you moved to. With only the run, it is a heartbeat.',
@@ -117,7 +121,12 @@ export const ACT_TOOLS: Record<string, Tool> = {
       note: z.string().optional().describe('What happened, what you found, or what you are blocked on.'),
       task: z.string().optional(), branch: BRANCH,
     },
-    run: async (l, actor, input) => sessionUpdate(l, actor, input),
+    run: async (l, actor, input) => {
+      const updated = await sessionUpdate(l, actor, input);
+      // What it takes on is what its tab draws, so the owner sees the work as it is taken up.
+      if (input.task) await sessionTookUp(l, actor, updated.run, input.task);
+      return updated;
+    },
   },
   tell: {
     description:
@@ -169,7 +178,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
   },
   session_end: {
     description:
-      'Close a registered session with its outcome and a summary. Everything it held is released. A session that finishes in a repository is first shown that repository\'s open work nobody has changed since it began (answer: ended false, with the list): change what is done or no longer as written, name what you checked and found still true in still_true, name what this session had nothing to do with and cannot check in cannot_tell (cannot_tell_rest: true for all the rest), and call again. What waits on a person’s answer (waits_on), or has a change of its own waiting for the human, is not asked about.',
+      'Say a registered session is done, with its outcome and a summary. Everything it held is released. A session a chat keeps stays open until the chat ends. A session that finishes in a repository is first shown that repository\'s open work nobody has changed since it began (answer: ended false, with the list): change what is done or no longer as written, name what you checked and found still true in still_true, name what this session had nothing to do with and cannot check in cannot_tell (cannot_tell_rest: true for all the rest), and call again. What waits on a person’s answer (waits_on), or has a change of its own waiting for the human, is not asked about.',
     input: {
       run: z.string().describe('The run id from session_start, or the session id.'),
       outcome: z.enum(['finished', 'failed', 'cancelled', 'done', 'success']).optional().describe('finished, failed or cancelled; done and success are read as finished.'),
@@ -181,7 +190,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => {
       // An agent says where the repository's work stands; the human ending a session from the UI is not asked.
       const outcome = input.outcome === 'done' || input.outcome === 'success' ? 'finished' : input.outcome;
-      const result = await sessionEnd(l, actor, { ...input, outcome, reconcile: actor.kind === 'agent' });
+      const result = await sessionEnd(l, actor, { ...input, outcome, reconcile: actor.kind === 'agent', chat_goes_on: actor.kind === 'agent' });
       if ('ended' in result) return result;
       // If this server started the session's process, stop that too.
       return { ...result, process_stopped: stopLaunched(result.run) };

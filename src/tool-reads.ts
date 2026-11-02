@@ -294,7 +294,7 @@ export const READ_TOOLS: Record<string, Tool> = {
   look: {
     description:
       'See what a view looks like: the server draws it in its own browser, from the same page, layouts and sandbox the owner’s screen uses, as you see the map (private items as query shows them to you), and answers with the picture as an image, once the view says it has drawn: state (drawn, empty: the query found nothing, error, late), settled (false for a layout still moving), why. ' +
-      'It never moves the owner’s page (show with look: true does both). In a client that draws MCP Apps (Claude chat), the person sees the view drawn in the chat as well. The same view at the same size, the map unchanged, answers with the picture already taken (again: true) unless fresh. At most 60 an hour per workspace.',
+      'It never moves the owner’s page (show with look: true does both), and the person reading a chat does not see it: draw shows them. The same view at the same size, the map unchanged, answers with the picture already taken (again: true) unless fresh. At most 60 an hour per workspace.',
     input: {
       ...VIEW_INPUT,
       width: z.number().int().min(320).max(1920).optional().describe('The picture’s width in pixels (1200).'),
@@ -313,6 +313,20 @@ export const READ_TOOLS: Record<string, Tool> = {
     run: async (l) => {
       const s = await seenNow((await wholeMap(l)).db, l);
       return s && Date.now() - s.said <= NOW_MS ? { ...(await seeing(l, s)), address: s.at } : null;
+    },
+  },
+  // The one tool that names the page in a chat (src/mcp-view.ts). The page takes the look, at the size it has: this only
+  // refuses what could not be drawn. Its inputs are cut short, since the tool list carries them on every request.
+  draw: {
+    description: 'Draw a view in this chat, for the person reading it, in a client that draws MCP Apps (Claude chat). Elsewhere nothing is drawn: report show opens it on their canvas, query look gives you the picture.',
+    input: {
+      entity: VIEW_INPUT.entity.describe('A view kept on the map (type lens), or any item.'),
+      query: VIEW_INPUT.query.describe('A query, as query flat takes it.'),
+      style: z.record(z.string(), z.unknown()).optional().describe('How it is drawn, as query look takes it: { layout, lit, id }.'),
+    },
+    run: async (l, _actor, { style, ...named }) => {
+      if (!named.entity && !named.query && !style) throw new Error('draw needs "entity" or "query".');
+      return { view: await viewAddress(l, { ...named, style: VIEW_INPUT.style.parse(style) }), said: 'Drawn here if this client draws MCP Apps.' };
     },
   },
   places: {
