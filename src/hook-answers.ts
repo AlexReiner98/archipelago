@@ -14,6 +14,7 @@ import { fileSaid } from './file-said.ts';
 import { keepGit } from './git-state.ts';
 import { describeChanges, humanChanges, latestSeq } from './tools.ts';
 import { summed } from './summary.ts';
+import { seeingLine } from './seeing.ts';
 import { keep, kept } from './transient.ts';
 
 export interface HookBody {
@@ -114,6 +115,9 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     // How many of each, and the newest few: the rest is one query away.
     const { newest, counts, more } = summed(changes, (c) => c.action);
     const tally = counts ? `${newest.length + more!} changes (${Object.entries(counts).map(([action, n]) => `${n} ${action}`).join(', ')}); the newest ${newest.length}, the rest with query events:\n` : '';
+    // And what the owner is looking at now, so "this" in their message has a referent (src/seeing.ts).
+    const looking = await seeingLine(pelago, whole).catch(() => undefined);
+    if (looking) told.push(looking);
     if (changes.length) told.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${tally}${describeChanges(newest)}`);
     return told.length ? { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: told.join('\n\n') } } : {};
   }

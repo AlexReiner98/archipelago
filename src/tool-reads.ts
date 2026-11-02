@@ -14,6 +14,7 @@ import { lookAt, takeLook } from './looks.ts';
 import { getPicture } from './pictures.ts';
 import { withScreens } from './screens.ts';
 import { schemaBrief, schemaOf } from './schema-brief.ts';
+import { NOW_MS, seeing, seenNow } from './seeing.ts';
 import { withStyles } from './styles.ts';
 import { props } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
@@ -303,6 +304,16 @@ export const READ_TOOLS: Record<string, Tool> = {
       marks: z.boolean().optional().describe('Answer with the drawing as marks (markup and its stylesheet, large) in place of the image, where it has them: what a view drawn in a chat asks for. To see a view yourself, leave this out.'),
     },
     run: async (l, actor, input) => takeLook((await wholeMap(l)).db, l.db, l, actor.name, await viewAddress(l, input), input),
+  },
+  seeing: {
+    description:
+      'What the owner is looking at on their page now: the view its canvas draws (a kept view by its name, or its query as terms), the item whose page is open over it, and how many seconds ago the page said so. ' +
+      'Nothing when no page of theirs has looked in the last ten minutes. The prompt hook says it in a line with each of their messages.',
+    input: {},
+    run: async (l) => {
+      const s = await seenNow((await wholeMap(l)).db, l);
+      return s && Date.now() - s.said <= NOW_MS ? { ...(await seeing(l, s)), address: s.at } : null;
+    },
   },
   places: {
     description: 'Where each thing stands on one canvas, as a person put it there: by item, the middle of each as [x, y] in the picture’s own units. Read beside the query of that canvas; what is not here is where the layout lays it.',
