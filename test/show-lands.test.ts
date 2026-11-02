@@ -33,13 +33,12 @@ test('in a browser, a show lands in its chat’s tab without a line at the foot,
     for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
   };
   try {
-    await until('the chat has a tab', async () => (await tabs()) === 2);
-    assert.equal(await page.evaluate(`Boolean(document.querySelector('#followed, #follow'))`), false, 'no line, and nothing in the menu to turn it on');
     // The page follows steps from its first look at the map on.
     await wait(3000);
-    // A show lands in its chat's tab, out of sight; the note is on the pane, in its mark's tooltip.
+    // A show lands in its chat's tab, opened for it out of sight; the note is on the pane, in its mark's tooltip.
     await show({ entity: made.a, note: 'What the note says' });
-    await wait(1500);
+    await until('the chat has a tab', async () => (await tabs()) === 2);
+    assert.equal(await page.evaluate(`Boolean(document.querySelector('#followed, #follow'))`), false, 'no line, and nothing in the menu to turn it on');
     assert.equal(await panes(), 1, 'the owner’s tab stays as it was');
     await press('#tabs .tab:nth-child(2) .tab-name');
     await until('its tab in sight', () => page.evaluate<boolean>(`document.querySelector('#tabs .tab:nth-child(2)').getAttribute('aria-selected') === 'true'`));
@@ -76,7 +75,7 @@ test('in a browser, a show lands in its chat’s tab without a line at the foot,
   }
 });
 
-test('in a browser, a chat that begins opens a tab of its own, out of sight; closed by hand it stays closed until its next show; it ends with the chat', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, a chat has a tab once it shows something, out of sight; closed by hand or gone quiet it stays closed until its next show; it ends with the chat', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'work', title: 'Something shown' }] })).result.created as Record<string, string>;
   const agent = 'agent:claude-code/archipelago';
@@ -92,6 +91,9 @@ test('in a browser, a chat that begins opens a tab of its own, out of sight; clo
     await wait(2500);
     const before = await page.evaluate<string>('location.hash');
     const { run } = (await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: 'tab-one', surface: 'claude-code', title: 'Tab one' } })).result;
+    await wait(2500);
+    assert.ok(!(await strip()).includes('Tab one'), 'a chat that has shown nothing has no tab');
+    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a, run } });
     await until('its tab', (names) => names.includes('Tab one'));
     assert.equal(await page.evaluate<string>('location.hash'), before, 'the reader stays where they were');
     await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: 'tab-one', surface: 'claude-code' } });
@@ -107,6 +109,11 @@ test('in a browser, a chat that begins opens a tab of its own, out of sight; clo
     assert.ok(!(await strip()).includes('Tab one'), 'a reload does not bring it back');
     await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a, run } });
     await until('its show brings it back', (names) => names.includes('Tab one'));
+    // Its agent says where its work stands: the chat goes on, waiting, and its tab goes until it shows something again.
+    await call('/agent/report', undefined, { actor: agent, action: 'session_end', params: { run, summary: 'Done for now', cannot_tell_rest: true } });
+    await until('gone while it waits', (names) => !names.includes('Tab one'));
+    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a, run } });
+    await until('back with its show', (names) => names.includes('Tab one'));
     // The chat ends: its tab goes.
     await call('/agent/report', undefined, { actor: agent, action: 'session_end', params: { run, reason: 'closed', cannot_tell_rest: true } });
     await until('gone with the chat', (names) => !names.includes('Tab one'));

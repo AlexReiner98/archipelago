@@ -45,6 +45,8 @@ export interface Step {
   takes?: string;
   /** The session has ended: the owner's page closes its tab (ui/tab-life.js). */
   ends?: boolean;
+  /** The session has gone quiet, or said where its work stands and waits: the owner's page lets its tab go until it next shows something. */
+  rests?: boolean;
   /** The session it was taken in, as the agent said it or last said it: a pane can follow one session. */
   run?: string;
   /** That session's word, never shown: the key to its hue (src/session-name.ts). */

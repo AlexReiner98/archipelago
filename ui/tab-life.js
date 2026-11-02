@@ -1,5 +1,6 @@
-// A chat's tab lives as its chat does (the design e_p6fr4uye): it opens as the chat begins, out of sight and marked,
-// carries the chat's title, and goes as the chat ends. A tab and each pane in it is a chat's (`chat` on the tab, `by` on
+// A chat's tab lives as its chat shows something (the design e_p6fr4uye): it opens with the chat's first show, out of
+// sight and marked, carries the chat's title, and goes as the chat goes quiet, says where its work stands, or ends; its
+// next show brings it back. A chat that only works keeps no tab (the owner, 2 Nov 2026). A tab and each pane in it is a chat's (`chat` on the tab, `by` on
 // a pane) or the owner's: at a chat's end what was made for it closes and what the owner made stays (e_g629ejm6), so a
 // chat's tab the owner split a pane in, or merged a tab of theirs into, stays as theirs. One in sight is struck and goes
 // when the reader leaves it (e_qyazzz7f); one kept (⋯ Keep) is the owner's already (e_n7gpy3pt). Every page mirrors the
@@ -9,7 +10,7 @@
 
 import { hooks } from './base.js';
 import { heard, nameOf } from './pane-route.js';
-import { drawStrip, openTab } from './tab-bar.js';
+import { drawStrip } from './tab-bar.js';
 import { draw } from './panes.js';
 import { dismissed, focusOf, freshTab, keep, landed, outTabs, poppedTab, tabs } from './tabs.js';
 
@@ -47,13 +48,27 @@ const taken = new Set();
 export function ended(run, why, found = false) {
   if (poppedTab || !isRun(run) || taken.has(run)) return;
   if (why === 'clear') return void setTimeout(() => ended(run), clearedFor);
-  let redraw = false;
   const one = heard.get(run);
   if (one) one.ended = true;
   dismissed.delete(run);
+  for (const t of tabs.list) for (const g of t.groups) if (t.panes[g]?.held === run) delete t.panes[g].held;
+  close(run, found, (t) => t.chat === run || t.follows === run);
+}
+
+/**
+ * Chat `run` has gone quiet, or said where its work stands and waits: its tab goes as at its end, struck first where
+ * the reader is, and its next show brings one back. A tab of the owner's that follows it keeps following it.
+ */
+export function rested(run) {
+  if (poppedTab || !isRun(run) || taken.has(run)) return;
+  close(run, false, (t) => t.chat === run);
+}
+
+/** Close what tabs keep for chat `run`: each tab `whose` says is its, and the panes made for it. */
+function close(run, found, whose) {
+  let redraw = false;
   for (const t of [...tabs.list]) {
-    for (const g of t.groups) if (t.panes[g]?.held === run) delete t.panes[g].held;
-    if (t.chat !== run && t.follows !== run && !madeFor(t, run).length) continue;
+    if (!whose(t) && !madeFor(t, run).length) continue;
     const inSight = t.id === tabs.front;
     if (inSight && !found && (t.chat === run || madeFor(t, run).includes(focusOf(t)))) t.ended = [...new Set([...(t.ended ?? []), run])];
     else (settle(t, run), (redraw ||= inSight));
@@ -98,18 +113,18 @@ function keptFor() {
   return runs;
 }
 
-/** The chats open now (the `sessions` view): each has a tab, unless the owner closed it, and those gone have none. */
+/** The chats open now (the `sessions` view): those gone keep no tab, nor those quiet or waiting. None is opened here. */
 export function mirror(open) {
   if (poppedTab) return;
   const live = new Set(open.map((s) => s.id));
   for (const run of [...dismissed]) if (!live.has(run)) dismissed.delete(run);
   const kept = keptFor();
   for (const run of kept) if (!live.has(run)) ended(run, undefined, true);
-  // Oldest first, so the newest chat is the last tab.
-  for (const s of [...open].reverse()) if (!kept.has(s.id) && !dismissed.has(s.id)) openTab(`#/e/${s.working_on?.[0]?.id ?? s.id}`, chatTab(s.id), false);
+  for (const s of open) if (kept.has(s.id) && (s.status === 'waiting' || (s.stale && !s.busy))) rested(s.id);
   drawStrip();
 }
 
 hooks.sessionEnded = ended;
+hooks.sessionRested = rested;
 hooks.settleTab = (t, run) => (settle(t, run), keep(), drawStrip());
 hooks.sessionsOpen = mirror;

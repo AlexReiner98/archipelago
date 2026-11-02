@@ -69,6 +69,7 @@ async function sessions(l: Archipelago) {
         started: r.created_at,
         last_seen: seen,
         stale: Date.now() - Date.parse(seen) > STALE_MINUTES * 60_000,
+        busy: r.props.busy === true,
         working_on: of(r.id, 'works_on'),
         holds: of(r.id, 'holds'),
         repo: of(r.id, ...homes)[0],

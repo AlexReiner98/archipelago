@@ -449,6 +449,7 @@ export async function sessionEnd(
   });
   await heard(l, run, `Session "${run.title}" ended`);
   // The owner's page closes its tab (ui/tab-life.js); a page that missed this finds it ended when it next reads the sessions.
-  if (!stays) await took((await wholeMap(l)).db, l, { kind: 'other', actor: actorId(actor), did: input.reason ?? 'ended', ends: true, run: run.id }, true).catch(() => {});
+  // One that stays, waiting, lets its tab go until it next shows something.
+  await took((await wholeMap(l)).db, l, { kind: 'other', actor: actorId(actor), did: stays ? 'waiting' : (input.reason ?? 'ended'), ...(stays ? { rests: true } : { ends: true }), run: run.id }, true).catch(() => {});
   return { run: run.id, status: stays ? 'waiting' : outcome, released: held.length, unaccounted_commits: commits.length ? commits : undefined, note: stays ? 'Kept. The session stays open, under its name, until its chat ends.' : undefined };
 }
