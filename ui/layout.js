@@ -173,6 +173,18 @@ export function drawWith(host, answer, style, keep) {
     for (const p of all.filter((p) => p && 'tip' in p)) p.tip ? tip.show(keys.get(String(p.tip.key)), build(p.tip.mark, keys, tell)) : tip.hide();
     patch(all.filter((p) => !(p && 'tip' in p)), keys, tell, moving);
   };
+  // A picture drawn again (the map changed) takes off what hovering a mark put on it: the drawing's answer to that mark's
+  // enter (its lit wires, its tip) is put on the same mark in the new one, the next frame, once the view is back where
+  // the reader left it (canvas.js) and before it is painted, while the pointer is still on it; else it is gone.
+  if (!host.pointerKept) host.addEventListener('pointermove', (ev) => (host.pointer = [ev.clientX, ev.clientY]), { passive: true });
+  host.pointerKept = true;
+  const hovered = () => requestAnimationFrame(() => {
+    const was = host.hovered;
+    if (!was || ended) return;
+    const el = keys.get(was.key), under = host.pointer && document.elementFromPoint(...host.pointer);
+    if (el?.isConnected && under && el.contains(under)) apply(was.list);
+    else ((host.hovered = null), tip.hide());
+  });
   // A surface has no marks for the page to light: its drawing is told what is lit, and paints it.
   host.lightSurface = (ids) => surface && port.postMessage({ type: 'event', event: { name: 'light', ids } });
   port.onmessage = (ev) => {
@@ -186,6 +198,7 @@ export function drawWith(host, answer, style, keep) {
         const got = performance.now();
         mounted = true;
         mount(said.scene ?? {});
+        hovered();
         // Drawn once its marks are mounted, and a surface over them has shown its first frame.
         (surface ? surface.first : Promise.resolve()).then(() => saidDrawn(host, 'drawn'));
         for (const list of early.splice(0)) apply(list);
@@ -198,7 +211,9 @@ export function drawWith(host, answer, style, keep) {
       else if (said.type === 'patch' && !mounted) early.push(said.list);
       else if (said.type === 'patch') {
         apply(said.list);
-        if (said.answers?.name === 'enter') answered(keys.get(String(said.answers.key)));
+        const { name, key } = said.answers ?? {};
+        if (name === 'enter') ((host.hovered = { key: String(key), list: said.list }), answered(keys.get(String(key))));
+        if (name === 'leave' && host.hovered?.key === String(key)) host.hovered = null;
         if (moving.size) requestAnimationFrame(run);
       }
       else if (said.type === 'frame?') requestAnimationFrame((t) => !ended && port.postMessage({ type: 'frame', t }));
@@ -225,11 +240,12 @@ ${JSON.stringify(input)}`;
   port.postMessage({ type: 'start', input });
   // A picture published with its first frame (src/published-frames.ts) has it on screen now; the drawing's own scene
   // takes its place when it answers.
-  if (kept) ((mounted = true), mount(kept), saidDrawn(host, 'drawn'));
+  if (kept) ((mounted = true), mount(kept), hovered(), saidDrawn(host, 'drawn'));
   else if (opening) {
     // Checked as any scene is: one that says what a drawing may not is not drawn, and the drawing draws the picture.
     try {
       mount(opening);
+      hovered();
       mounted = true;
     } catch {
       host.replaceChildren();

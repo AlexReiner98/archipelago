@@ -234,7 +234,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     const text = saysText(c), w = saysWide(c), [lx, ly] = saysAt(g, c), sh = z('says_height');
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
-  const svg = m('svg', { viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, stepLayer, saysLayer, [...stepBadges.values()], linkBadges.map((b) => b.mark));
+  const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, stepLayer, saysLayer, [...stepBadges.values()], linkBadges.map((b) => b.mark));
 
   // The key: what each mark this picture uses means, one to a row (the page draws it, docs/layouts.md). A step with no
   // other mark is said by its own status ("Todo", "Decided"), one row for each its steps have, in its colour.
@@ -260,8 +260,9 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const words = hits > 0 && hits < answer.items.length;
   const dimmed = (now) => [...dims.keys()].filter((id) => !lit(g.nodes.get(id).item, now, words));
   for (const id of dimmed(style)) addClass(dims.get(id), 'dim');
-  /** Light the wires and ties of a step, or of none. */
+  /** Light the wires and ties of a step, or of none: while one is lit, the rest fade. */
   const light = (id) => [
+    { key: 'flow', toggle: { lighting: Boolean(id) } },
     ...g.chains.flatMap((c, n) => [`w:${n}`, `h:${n}`].map((key) => ({ key, toggle: { lit: Boolean(id) && (c.a === id || c.b === id) } }))),
     ...g.ties.flatMap((t, n) => (headless.has(t.type) ? [`n:${n}`] : [`n:${n}`, `nh:${n}`]).map((key) => ({ key, toggle: { lit: Boolean(id) && (t.a === id || t.b === id) } }))),
   ];
