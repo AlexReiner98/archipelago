@@ -28,7 +28,9 @@ main.addEventListener('input', (e) => {
 /** This page, among the owner's open pages: the server counts those a show can land in, so an agent's show says whether it did. */
 const pageId = Math.random().toString(36).slice(2, 14);
 // A page the server draws for an agent's look is no page of the owner's: it is not counted. Every tab following nobody takes no show.
-const thisPage = () => (lookMode ? undefined : { page: pageId, on: tabs.list.some((t) => t.follows !== 'none') });
+// Where it stands goes with it: the address of the pane in focus, so an agent knows what the owner is looking at
+// (src/seeing.ts). A popped-out tab is the main page's too.
+const thisPage = () => (lookMode ? undefined : { page: pageId, on: tabs.list.some((t) => t.follows !== 'none'), where: location.hash.slice(2, 2002) });
 let seenStep;
 /** Each session's last show not yet landed: it waits while a question is open over the page. */
 const waiting = new Map();
