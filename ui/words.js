@@ -144,7 +144,10 @@ export function changeRow(g, { undone, onUndo, attention, onRead, here, fresh })
   const first = g.events[0];
   const work = g.events.find((e) => !e.action.startsWith('proposal.')) ?? first;
   const reason = g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? '';
-  const isUndo = g.events.some((e) => e.action === 'changeset.undo');
+  const isUndo = g.events.some((e) => e.action === 'changeset.undo' || e.detail?.undoes);
+  // An undo is said by what it took back: "undid" and the point of the change it undid; the undo of an undo, "redid".
+  const base = isUndo ? reason.replace(/^(Undo: )+/, '') : reason;
+  const said = base !== reason ? `${((reason.length - base.length) / 6) % 2 ? 'undid' : 'redid'} ${gist(base)}` : gist(reason);
   const approver = work.detail?.approved_by;
   // What it did, as marks: a status that moved, or how many things it touched.
   const touched = g.events.filter((e) => (e.target_type ?? '') !== 'source' && e.action !== 'changeset.undo' && !e.action.startsWith('proposal.'));
@@ -168,11 +171,11 @@ export function changeRow(g, { undone, onUndo, attention, onRead, here, fresh })
     'div',
     { class: `change line${undone || isUndo ? ' quiet' : ''}${attention?.length ? ' attn' : ''}${fresh ? ' fresh' : ''}`, title: attention?.map((n) => n.title).join(' / ') ?? '' },
     who(work.actor, work.detail?.run_name),
-    h('span', { class: 'gist', title: reason }, one ? [h('a', { href: `#/e/${one}`, onclick: read }, h('strong', {}, nameOf(one))), reason && ` · ${gist(reason)}`] : gist(reason) || verb(first)),
+    h('span', { class: 'gist', title: reason }, one ? [h('a', { href: `#/e/${one}`, onclick: read }, h('strong', {}, nameOf(one))), said && ` · ${said}`] : said || verb(first)),
     moved.length === 1 ? effect : ids.length > 1 && !here && menu(`${ids.length} items`, ids.map((id) => [nameOf(id), () => (read(), (location.hash = `#/e/${id}`))])),
     approver ? h('span', { class: 'mark mark-human', title: `Applied by ${approver}` }, 'you applied') : touched.length > 0 && authorityMark(work.detail?.authority),
     ago(first.ts),
-    undone || isUndo ? h('span', { class: 'pill closed' }, isUndo ? 'undo' : 'undone') : onUndo && h('button', { class: 'quiet-button', onclick: () => onUndo(g) }, 'Undo'),
+    undone ? h('span', { class: 'mark', title: 'Taken back by a later change' }, 'undone') : onUndo && h('button', { class: 'quiet-button', title: isUndo ? 'Take this undo back: what it reversed is made again' : 'Put back what this change did, as a new change', onclick: () => onUndo(g) }, 'Undo'),
   );
   return row;
 }

@@ -160,7 +160,7 @@ export async function entity(id, here) {
     keep: draft.field,
     save: draft.save,
   };
-  const history = historySection(id, past);
+  const history = historySection(id, past, !e.archived_at && again);
   const kids = [
     h(
       'div',
