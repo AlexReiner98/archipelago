@@ -16,7 +16,7 @@ import { actorId } from './pelago.ts';
 import { PICTURE_TYPES, putPicture } from './pictures.ts';
 import { tellStamp, took, watching } from './presence.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
-import { point, sessionOpened } from './tool-change.ts';
+import { point, sessionOpened, sessionTookUp } from './tool-change.ts';
 import { backupNow, restartNow } from './tool-config.ts';
 import { BRANCH } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
@@ -124,7 +124,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => {
       const updated = await sessionUpdate(l, actor, input);
       // What it takes on is what its tab draws, so the owner sees the work as it is taken up.
-      if (input.task) await point(l, actor, 'show', `e/${input.task}`, undefined, undefined, updated.run);
+      if (input.task) await sessionTookUp(l, actor, updated.run, input.task);
       return updated;
     },
   },

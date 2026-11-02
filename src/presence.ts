@@ -39,6 +39,8 @@ export interface Step {
   pane?: string;
   /** For a show: the session has just begun, and the owner's page opens it a tab of its own (ui/pane-route.js). */
   opens?: boolean;
+  /** For a show the server takes for a session: its pane draws the item's canvas, and no page opens over it. */
+  canvas?: boolean;
   /** The session it was taken in, as the agent said it or last said it: a pane can follow one session. */
   run?: string;
   /** That session's name, so every place that names it calls it alike. */
