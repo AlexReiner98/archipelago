@@ -56,6 +56,20 @@ it.
   drew nothing to draw it, and the owner can turn that off"; "the
   session-start text tells an agent to answer the owner with a drawing".
 
+### 3a. What an agent finds is told, unasked
+The map, not the chat, is the record of a session's work: each thing an
+agent concludes (a cause, a finding, a choice and why) is a beat told with
+`report` action `tell`, and each item it settles is changed. The session
+start leads with it (`core.report_in`), and core's reply rule
+`record_findings`, lifted by `reply_record_findings`, asks a reply that
+called other tools at least six times (`worked`) and told nothing (`told`)
+to tell what it found before it answers. A `when.reply` fact may be a
+number: at least that many times.
+- `test/replies.test.ts`: "core asks a reply that worked and told the map
+  nothing to tell what it found, and the owner can turn that off"; "the
+  session-start text says the map, not the chat, is the record, and that
+  telling is checked".
+
 ### 4. Every commit is accounted for before main
 A commit is accounted for once the map holds a `commit` item for
 its full sha, with a `settles` link to each item it settles (none
@@ -138,7 +152,7 @@ is still true, or say it cannot tell.
 ### In `packs/`
 | Pack | What it adds |
 | --- | --- |
-| `core` | the `instruction` type and its presets; the reply rule `draw_answers` |
+| `core` | the `instruction` type and its presets; the reply rules `draw_answers` and `record_findings` |
 | `software` | `commit` (with the `accounts` capability) and `settles`; the reply rule `account_commits`, naming its record |
 | `github` | `account.js`: the check on main, answered from the map |
 | `github_app` | `checks.js`: posts the check, keeps it while red, asks again each minute |
@@ -157,8 +171,8 @@ is still true, or say it cannot tell.
 
 ## How a reply is checked
 1. At each turn's end the stop hook reads the transcript since the owner's
-   last message: `read`, `surveyed`, `showed`, `changed`, `edited`,
-   `committed`, `pushed`, with the turn's id, the items touched, the
+   last message: `read`, `surveyed`, `showed`, `changed`, `told`, `worked`,
+   `edited`, `committed`, `pushed`, with the turn's id, the items touched, the
    session's commits and those the reply made (`turn_commits`: all of them
    when it pushed), found in what git answered and in the checkout's HEAD
    log.

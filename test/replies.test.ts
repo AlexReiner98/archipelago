@@ -46,6 +46,8 @@ test('a rule on a reply ending is checked as data', () => {
   assert.deepEqual(checkRules([SHOW], reg), []);
   const problems = checkRules([{ ...SHOW, then: 'hold', when: { reply: { drew: true }, op: 'create' }, say: 'one\ntwo', lifted: 'agent_changes' }], reg);
   for (const said of [/asks \(then: "ask"\)/, /reads only when.reply/, /no fact "drew"/, /one line/, /reply_<name>/]) assert.ok(problems.some((p) => said.test(p)), `${said}: ${problems.join(' | ')}`);
+  assert.deepEqual(checkRules([{ ...SHOW, when: { reply: { worked: 3, told: false } } }], reg), [], 'a number is how often at least');
+  assert.ok(checkRules([{ ...SHOW, when: { reply: { worked: 0.5 } } }], reg).some((p) => /how many times at least/.test(p)));
   const other = checkRules([{ on: 'turn_began', then: 'ask', when: { reply: { read: true } }, say: 'x', lifted: 'reply_x' }], reg);
   assert.ok(other.some((p) => /has an id/.test(p)) && other.some((p) => /on is "reply_ended"/.test(p)), other.join(' | '));
 });
@@ -76,7 +78,7 @@ test('a reply that did what a rule names is asked once a turn, the asking kept i
   await assert.rejects(callTool(l, owner, 'workspace_set', { lifted: { reply_nothing: true } }), /No rule here is turned off by "reply_nothing"/);
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: true } });
   const info = (await callTool(l, owner, 'workspace_info', {})) as any;
-  assert.deepEqual(info.lifted, { reply_draw_answers: false, reply_show_changes: true, reply_account_commits: false });
+  assert.deepEqual(info.lifted, { reply_draw_answers: false, reply_record_findings: false, reply_show_changes: true, reply_account_commits: false });
   assert.deepEqual(info.reply_rules.find((r: any) => r.rule === 'checks.show_changes'), { rule: 'checks.show_changes', say: SHOW.say, lifted: 'reply_show_changes', off: true, asked: 2 }, 'the owner’s switch, with how often it asked this week');
   assert.deepEqual(await stop(l, { session_id: 's1', turn: 'u4', reply: changed }), {}, 'turned off');
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: false } });
@@ -102,6 +104,7 @@ test('the hook counts what the reply did since the owner’s last message', asyn
     use('b7', 'mcp__pelago__query', { name: 'flat', params: { filter: { find: ['text open work'] } } }),
     use('b8', 'mcp__pelago__query', { name: 'actions', params: { verb: 'report' } }),
     use('b9', 'Edit', { file_path: 'a.ts', old_string: 'a', new_string: 'b' }),
+    use('b10', 'Grep', { pattern: 'x' }),
   ];
   const dir = mkdtempSync(join(tmpdir(), 'pelago-reply-'));
   const transcript = join(dir, 'session.jsonl');
@@ -123,7 +126,7 @@ test('the hook counts what the reply did since the owner’s last message', asyn
   });
   server.close();
   assert.equal(got.turn, 'p2');
-  assert.deepEqual(got.reply, { read: 3, surveyed: 1, showed: 1, changed: 1, edited: 1, committed: 1, pushed: 0 }, 'a get and a read of the tools are not surveys');
+  assert.deepEqual(got.reply, { read: 3, surveyed: 1, showed: 1, changed: 1, told: 1, worked: 4, edited: 1, committed: 1, pushed: 0 }, 'a get and a read of the tools are not surveys; every tool but the map’s is work');
   assert.equal(got.stop_hook_active, false, 'what Claude Code said goes through');
   assert.deepEqual(JSON.parse(out), { decision: 'block', reason: 'asked' }, 'and the answer comes back to Claude Code');
 });
@@ -156,4 +159,29 @@ test('the session-start text tells an agent to answer the owner with a drawing',
   const text = await hookSessionStart(l, { session_id: 'd2', cwd: tmpdir() });
   assert.match(text, /report, action show/);
   assert.match(text, /A yes, a number or one item is a line in chat/);
+});
+
+test('core asks a reply that worked and told the map nothing to tell what it found, and the owner can turn that off', async () => {
+  const l = await map();
+  const record = l.registry.rules.find((r) => r.pack === 'core' && r.id === 'record_findings')!;
+  assert.ok(record && checkRules([record], { types: new Map() }).length === 0, 'core ships it, checked as data');
+  await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: true } });
+  const { run } = await sessionStart(l, agent, { session_id: 'f1' });
+  const worked = { read: 1, worked: 12, edited: 3, changed: 1, told: 0 };
+  assert.deepEqual(await stop(l, { session_id: 'f1', turn: 't1', reply: worked }), { decision: 'block', reason: record.say }, 'a status changed is not a finding told');
+  assert.deepEqual((await story(l, { run })).beats.map((b) => b.asked), ['core.record_findings']);
+  const not: [string, Record<string, number>][] = [
+    ['told', { ...worked, told: 1 }],
+    ['a short reply', { ...worked, worked: 2 }],
+  ];
+  for (const [why, reply] of not) assert.deepEqual(await stop(l, { session_id: 'f1', turn: `t-${why}`, reply }), {}, why);
+  await callTool(l, owner, 'workspace_set', { lifted: { reply_record_findings: true } });
+  assert.deepEqual(await stop(l, { session_id: 'f1', turn: 't2', reply: worked }), {}, 'turned off');
+});
+
+test('the session-start text says the map, not the chat, is the record, and that telling is checked', async () => {
+  const l = await map();
+  const text = await hookSessionStart(l, { session_id: 'f2', cwd: tmpdir() });
+  assert.match(text, /The map is the record of this work, not the chat/);
+  assert.match(text, /a reply that worked and told nothing is asked to/);
 });

@@ -20,7 +20,8 @@
 // what it touched: the server cannot tell apart sessions that share a token.
 // And what Claude Code calls the session (its title), which the map shows beside the session's name.
 // And what the reply did since the owner's last message (the turn): how many times it read the map (and of those,
-// surveyed it: read about several items), showed the owner something, changed the map, edited a file, committed and pushed, so that a rule on a reply's end can ask the agent to go on.
+// surveyed it: read about several items), showed the owner something, changed the map, told a beat of its story, called
+// any other tool (worked), edited a file, committed and pushed, so that a rule on a reply's end can ask the agent to go on.
 // And the commits the session made, by their full ids (what git answered each commit with, looked up in the
 // checkout, and what the checkout's HEAD log records while each commit command ran, for one that answered nothing),
 // with those the reply made or, when it pushed, all of them: the map asks about those it does not account for.
@@ -109,12 +110,12 @@ function readTranscript(text) {
         // A line that is not whole yet: the next count has it.
       }
     }
-    if (!line.includes('"usage"') && !calls && !answered && !asked && !line.includes('"Bash"') && !/"(Edit|Write|MultiEdit|NotebookEdit)"/.test(line)) continue;
+    if (!line.includes('"usage"') && !line.includes('"tool_use"') && !calls && !answered && !asked && !line.includes('"Bash"') && !/"(Edit|Write|MultiEdit|NotebookEdit)"/.test(line)) continue;
     try {
       const entry = JSON.parse(line);
       if (prompted(entry)) {
         turn = entry.uuid;
-        reply = { read: 0, surveyed: 0, showed: 0, changed: 0, edited: 0, committed: 0, pushed: 0 };
+        reply = { read: 0, surveyed: 0, showed: 0, changed: 0, told: 0, worked: 0, edited: 0, committed: 0, pushed: 0 };
         turnMade = [];
         turns++;
       }
@@ -124,10 +125,12 @@ function readTranscript(text) {
         if (part.type === 'tool_use' && MAP_TOOL.test(part.name ?? '')) {
           named(part.input);
           if (part.name.endsWith('__change')) changes.add(part.id);
-          const did = part.name.endsWith('__query') ? 'read' : part.name.endsWith('__change') ? 'changed' : part.name.endsWith('__report') && part.input?.action === 'show' ? 'showed' : undefined;
+          const told = part.name.endsWith('__report') && part.input?.action;
+          const did = part.name.endsWith('__query') ? 'read' : part.name.endsWith('__change') ? 'changed' : told === 'show' ? 'showed' : told === 'tell' ? 'told' : undefined;
           if (did) reply[did] = (reply[did] ?? 0) + 1;
           if (did === 'read' && typeof part.input?.name === 'string' && !NOT_SURVEYS.has(part.input.name)) reply.surveyed = (reply.surveyed ?? 0) + 1;
         }
+        if (part.type === 'tool_use' && !MAP_TOOL.test(part.name ?? '')) reply.worked = (reply.worked ?? 0) + 1;
         if (part.type === 'tool_use' && EDITS.has(part.name)) reply.edited = (reply.edited ?? 0) + 1;
         if (part.type === 'tool_use' && part.name === 'Bash' && typeof part.input?.command === 'string') {
           if (COMMIT.test(part.input.command)) (reply.committed = (reply.committed ?? 0) + 1), committing.add(part.id), running.set(part.id, { from: Date.parse(entry.timestamp), turn: turns });
