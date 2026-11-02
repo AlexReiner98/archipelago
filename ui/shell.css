@@ -350,6 +350,8 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #canvas .pane-canvas .lens-view:has(> .lf-beside) { display: flex; flex-direction: column; }
 #canvas .pane-canvas .lens-view > .sp-top { flex: none; margin: 0; padding: var(--space-4) var(--space-6) 0; }
 #canvas .pane-canvas .lens-view > .lf-beside { flex: 1 1 0; min-height: 0; padding: var(--space-6); }
+/* A view drawn inside another (a milestone beside a replay, ui/view-frame.js) is not under the bars: no room is kept for them. */
+body[data-panes] #canvas .pane-canvas .view-frame .lens-view:is(*, :has(.lf-stage), :has(.code-stage)) { padding: 0; }
 #canvas .pane-canvas .lf-beside > .sp-chat, #canvas .pane-canvas .lf-beside > .sp-side > .sp-shown { min-height: 0; margin-bottom: var(--safe-bottom); }
 /* Beside a milestone the conversation is narrow; where the row cannot hold all three it goes above them, a few lines tall. */
 #canvas .pane-canvas .lf-beside > .sp-side > .sp-chat { min-height: calc(var(--box-9) * 4); margin-bottom: var(--safe-bottom); }
