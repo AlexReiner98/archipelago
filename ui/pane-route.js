@@ -59,7 +59,8 @@ export function followable({ now, recent }) {
 export function nameOf(key) {
   const one = heard.get(key);
   if (!one) return key.startsWith('e_') ? key : key.split(/[/:]/).at(-1);
-  const twin = [...heard].some(([k, o]) => k !== key && !o.ended && o.called === one.called);
+  // Only another run is a twin: a step heard by its agent before its run was known is the same session under another key.
+  const twin = [...heard].some(([k, o]) => k !== key && o.run && o.run !== one.run && !o.ended && o.called === one.called);
   return twin && one.run ? `${one.called} · ${one.run.slice(-4)}` : one.called;
 }
 

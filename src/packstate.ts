@@ -77,9 +77,28 @@ function present(l: Archipelago, pack: { id: string; version: string }, kept: Se
 }
 
 /**
+ * Packs renamed: a pack the log added that this server no longer has, whose every type and link type (as the type
+ * table kept them) one pack here not yet added defines now, by its name or a name it had (moved_from). By the new
+ * pack's id, the old one's.
+ */
+async function renamedPacks(l: Archipelago, said: Map<string, Said>): Promise<Map<string, string>> {
+  const here = new Set(l.registry.found.map((p) => p.id));
+  const out = new Map<string, string>();
+  for (const [old, s] of said) {
+    if (s.op !== '+' || here.has(old)) continue;
+    const { rows } = await l.db.query<{ id: string }>(`select id from type_def where pack = $1`, [old]);
+    const defines = (p: PackFile, id: string) => [...(p.types ?? []), ...(p.links ?? [])].some((d) => 'id' in d && (d.id === id || d.moved_from?.includes(id)));
+    const by = l.registry.found.filter((p) => said.get(p.id)?.op !== '+' && rows.every((r) => defines(p, r.id)));
+    if (rows.length && by.length === 1) out.set(by[0].id, old);
+  }
+  return out;
+}
+
+/**
  * Bring the log in line with the packs this server has, when a workspace opens. The kernel's packs are asserted, and a
  * pack the log has added is asserted again when its version or manifest changed. A pack the log never added is not
- * added: that is the owner's. A new workspace starts with the kernel's packs (and those the server starts with); one
+ * added: that is the owner's, unless it is one the owner added under its old name (renamedPacks), which takes its
+ * place once. A new workspace starts with the kernel's packs (and those the server starts with); one
  * made before packs were facts is said to have what it had (and one the old setting turned off is retracted once). A
  * pack the server does not enable is not said either way. One system change set.
  */
@@ -89,13 +108,15 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
   const kept = await keptManifests(l);
   const start = startPacks();
   const first = !said.size && !(await l.db.query(`select 1 from entity limit 1`)).rows.length;
+  const renamed = await renamedPacks(l, said);
   const facts: Fact[] = [];
   for (const p of l.registry.found) {
     if (p.id === LOCAL_PACK || (l.registry.only && !l.registry.only.includes(p.id))) continue;
     const was = said.get(p.id);
     const kernel = KERNEL_PACKS.includes(p.id);
     const changed = !was || was.op === '-' || was.value?.version !== p.version || was.value?.manifest !== l.registry.hashes.get(p.id);
-    if (kernel || was?.op === '+') {
+    if (renamed.has(p.id)) facts.push(present(l, p, kept), ['-', packFact(renamed.get(p.id)!), 'pack']);
+    else if (kernel || was?.op === '+') {
       if (changed) facts.push(present(l, p, kept));
     } else if (!said.size && first) {
       if (start === 'all' || start.includes(p.id)) facts.push(present(l, p, kept));

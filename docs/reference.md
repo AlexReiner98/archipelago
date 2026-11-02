@@ -396,7 +396,7 @@ Types live in files under `packs/`, one folder per pack:
   which name kinds at their ends. It is the one pack always on.
 - `work`: project, task, decision, issue, meeting,
   idea, note, file, document and procedure, as `task` and so on.
-- `inquiry`: hypothesis, experiment and result, with tests, supports,
+- `science`: investigation, hypothesis, experiment and result, with tests, supports,
   refutes, assumes and explains.
 - `money`: what is paid regularly (`cost`).
 - `software`: application, repo, feature, bug, release, proof question, test,
