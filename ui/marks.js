@@ -6,10 +6,11 @@
 // A mark is [tag, attributes, ...what is in it], a string being text. Two attributes are not drawn: `key`, the name
 // a patch uses for it, and `on`, the events the drawing is told of (enter, leave, click). A mark says the item it
 // stands for with `item` (an id), which a link to the item says too: the page lights marks by it (ui/query-light.js),
-// whatever drew them. One tag is the page's own:
-// `reader`, a document as its reader meets it, which the page makes from an item's id alone (ui/reader-frame.js).
+// whatever drew them. Two tags are the page's own, made from an item's id alone: `reader`, a document as its reader
+// meets it (ui/reader-frame.js), and `view`, a kept view drawn as it is kept (ui/view-frame.js).
 
 import { readerFrame } from './reader-frame.js';
+import { viewFrame } from './view-frame.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const SVG_TAGS = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'title', 'a', 'defs', 'clipPath', 'linearGradient', 'radialGradient', 'stop']);
@@ -57,6 +58,11 @@ export function build(mark, keys, tell, svg = false, count = { n: 0 }) {
     if (attrs?.key !== undefined) keys.set(String(attrs.key), el);
     return el;
   }
+  if (tag === 'view' && !svg) {
+    const el = viewFrame(attrs ?? {}, fail);
+    if (attrs?.key !== undefined) keys.set(String(attrs.key), el);
+    return el;
+  }
   const inSvg = svg || tag === 'svg';
   if (!(inSvg ? SVG_TAGS : HTML_TAGS).has(tag)) fail(`the tag "${tag}"`);
   const el = inSvg ? document.createElementNS(SVG, tag) : document.createElement(tag);
@@ -97,7 +103,8 @@ export function patch(list, keys, tell, moving) {
     for (const [name, on] of Object.entries(p.toggle ?? {})) el.classList.toggle(name, Boolean(on));
     if (p.text !== undefined) el.textContent = String(p.text);
     if (p.remove) (el.remove(), keys.delete(String(p.key)));
-    if (p.mark) el.replaceWith(build(p.mark, keys, tell, el instanceof SVGElement && el.tagName !== 'svg'));
+    // A view named again is drawn in the same frame, the old in sight until the new has drawn.
+    if (p.mark && !el.swap?.(p.mark)) el.replaceWith(build(p.mark, keys, tell, el instanceof SVGElement && el.tagName !== 'svg'));
     if (p.append) el.append(build(p.append, keys, tell, el instanceof SVGElement));
     const set = Object.entries(p.set ?? {});
     const over = Number(p.over) > 0 ? Math.min(Number(p.over), 10000) : 0;
