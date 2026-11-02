@@ -40,7 +40,7 @@ Approving, launching and tokens stay with you. Dev mode refuses to start with
 All three call the tools in [src/tools.ts](../src/tools.ts). The web UI and CLI
 have human authority and call each tool by its name; the MCP endpoint does not,
 and offers agents ten tools ([src/surface.ts](../src/surface.ts)): `query`
-reads (a view, a lens, or a read such as `get`, `search`, `schema`, `events`),
+reads (a view, a query, or a read such as `get`, `search`, `schema`, `events`),
 `change` writes, `undo` takes a change set back, and every other action is
 called under one of the six verbs the core pack declares (`capture`, `assign`,
 `report`, `ask`, `settle`, `revise`) by its name, with its inputs as `params`:
@@ -105,8 +105,8 @@ your next message, what you did since it last heard (the `UserPromptSubmit`
 hook the setup writes into `.claude/settings.json`).
 
 **Views.** An item's page draws it among what it is tied to. What a
-view holds is a `lens` (a filter, a walk along links and a limit) and how
-it looks is a `style`; both are items on the map, so a project can keep views
+view holds is a query (a filter, a walk along links and a limit, kept as an
+item of type `lens`) and how it looks is a `style`; both are items on the map, so a project can keep views
 of its own, each named for the question it answers. A style may carry its own
 drawing code, which runs in a sandboxed worker with no page and no network
 (`ui/draw.html`).
@@ -329,7 +329,7 @@ The questions the map exists to answer. `npm run pelago -- view` lists them.
 | `questions` | What is still to be decided in a project? |
 | `gate` | What does a release wait for, and what can follow it? |
 | `tree` | A project's roadmap |
-| `flat` | What is in a view: the flat lens |
+| `flat` | What is in a view: the flat query |
 | `to_confirm` | What did agents settle that I have not confirmed? |
 | `oldest` | What has gone longest without being checked? |
 | `costs` | What does the work cost? |
@@ -337,7 +337,7 @@ The questions the map exists to answer. `npm run pelago -- view` lists them.
 There are more (`hubs`, `proof`, `changelog`, `recheck`, `agent_usage`,
 `notifications`, `graph`).
 
-The lens is the flat lens (`flat`): a filter, a walk and a limit, answered as
+The query is the flat query (`flat`): a filter, a walk and a limit, answered as
 items and the links among them (`src/query-flat.ts`). Its filter's text is
 the `search` read's own search, ranked the same, and the find bar on the page
 sets it. A pack declares its views
@@ -346,12 +346,12 @@ kernel's that its `answer` names (`src/query-presets.ts`), in the form that view
 has always had; any other is answered by the pack's own code. The core pack's
 are `flat`, `attention`, `brief`, `graph` (`src/view-graph.ts`), `tree`
 (`src/view-tree.ts`) and `hubs`, each read on its own. A view kept on the map
-(an item of type `lens`, a saved canvas on the page) is a flat lens and a
+(an item of type `lens`, a view on Home) is a flat query and a
 style (`src/query-saved.ts`): a document draws it where a line names it, and
 publishing freezes its picture. `gate` is the software pack's, and reads around its event (the pack
 read `around`). No view reads the whole map: a read around an item reads only
 what is around it (`src/region.ts`), so what it costs follows what it answers;
-the flat lens refuses a filter that includes nothing. `attention` reads what is a person's
+the flat query refuses a filter that includes nothing. `attention` reads what is a person's
 (`person`) or inside an item (`within`); for everyone, only `to_confirm`,
 from the log. `hubs` read within an item (`within`). A `graph` with no
 focus is drawn from the newest links of each kind. What is inside what, all
@@ -422,7 +422,7 @@ issues sees bugs too. A type or link type is named by what it is (`task`,
 `commit`, `calls`), whichever pack ships it; which pack that is, the schema
 says. A workspace's own is `local.<name>`. When a type takes another's name
 over (`moved_from`), its items move once, and the old name still reads as the
-new one: in a change, a search and a lens (`work.task` is `task`).
+new one: in a change, a search and a query (`work.task` is `task`).
 
 ## Not built yet
 

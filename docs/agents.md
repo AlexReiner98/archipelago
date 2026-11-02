@@ -46,7 +46,7 @@ change: `judge` skips it, and what applies or waits stays the other rules'
 
 ### 3. Answers are drawn when they have a shape
 An answer about several items, or how they relate, order or stand, is a
-lens opened with `report` action `show`, with one line in chat; a yes, a
+view opened with `report` action `show`, with one line in chat; a yes, a
 number or one item is a line in chat. It is said at session start
 (`core.draw_answers`, an instruction) and checked by core's reply rule
 `draw_answers`, lifted by `reply_draw_answers`: a reply that surveyed the
