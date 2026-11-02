@@ -1,11 +1,43 @@
 // A drawing's tip: what it says of a mark, beside that mark. The drawing decides when (it answers an event with a
 // patch `{ tip: { key, mark } }`, or `{ tip: null }`) and what, as marks the page checks, styled by its own
-// stylesheet; the page keeps only where: beside the mark, above it or below where there is no room. It is shown in
+// stylesheet; the page keeps only where: beside the mark, off what it lights (below). It is shown in
 // the top layer, above every bar and pane, and the page's own tip (tip.js) says nothing over the mark meanwhile. The
-// mark's title is left to that one, which alone takes titles off and puts them back.
+// mark's title is left to that one, which alone takes titles off and puts them back. Of the places beside the mark
+// it takes the one the fewest lit lines (the mark's wires, lit with it) run under: above first, all else even.
 
 import { h } from './base.js';
 import { quietTip } from './tip.js';
+
+/** Points along the lines lit in host, on the screen: what the tip keeps off. */
+function litPoints(host) {
+  const points = [];
+  for (const line of host.querySelectorAll('path.lit, line.lit, polyline.lit')) {
+    const m = line.getScreenCTM?.(), length = line.getTotalLength?.();
+    if (!m || !length) continue;
+    const scale = Math.hypot(m.a, m.b), n = Math.min(400, Math.ceil((length * scale) / 6));
+    for (let k = 0; k <= n; k++) {
+      const p = line.getPointAtLength((length * k) / n);
+      points.push([m.a * p.x + m.c * p.y + m.e, m.b * p.x + m.d * p.y + m.f]);
+    }
+  }
+  return points;
+}
+
+/** Where a box w by h goes beside mark (top left), in the window, over as few of points as it can. */
+function placeOff(mark, w, h, points) {
+  const middle = mark.left + mark.width / 2, centre = mark.top + mark.height / 2;
+  const tries = [
+    [middle - w / 2, mark.top - h], [middle - w / 2, mark.bottom],
+    [mark.right, centre - h / 2], [mark.left - w, centre - h / 2],
+    [mark.right - w, mark.top - h], [mark.left, mark.top - h],
+    [mark.right - w, mark.bottom], [mark.left, mark.bottom],
+  ].map(([x, y]) => [Math.min(Math.max(x, 0), innerWidth - w), Math.min(Math.max(y, 0), innerHeight - h)]);
+  const over = ([x, y]) => points.filter(([px, py]) => px > x && px < x + w && py > y && py < y + h).length;
+  // Pushed back into the window, a place may come to lie over the mark itself: that is the worst of all.
+  const onMark = ([x, y]) => x < mark.right && x + w > mark.left && y < mark.bottom && y + h > mark.top;
+  const cost = (p) => (onMark(p) ? Infinity : over(p));
+  return tries.reduce((best, p) => (cost(p) < cost(best) ? p : best));
+}
 
 /** The one tip of the picture drawn in host: kept on it, so drawing it again does not add another. */
 export function tipOf(host) {
@@ -29,12 +61,9 @@ export function tipOf(host) {
     box.replaceChildren(node);
     box.hidden = false;
     box.showPopover();
-    const mark = el.getBoundingClientRect();
-    const half = box.offsetWidth / 2, middle = mark.left + mark.width / 2;
-    const below = mark.top < box.offsetHeight;
-    box.classList.toggle('below', below);
-    box.style.left = `${Math.min(Math.max(middle, half), innerWidth - half)}px`;
-    box.style.top = `${below ? mark.bottom : mark.top}px`;
+    const [left, top] = placeOff(el.getBoundingClientRect(), box.offsetWidth, box.offsetHeight, litPoints(host));
+    box.style.left = `${left}px`;
+    box.style.top = `${top}px`;
   };
   // Gone when the pointer leaves the picture, or a tap lands elsewhere in it (a tap on a mark may then show its own).
   host.addEventListener('mouseleave', hide);
