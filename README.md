@@ -20,7 +20,7 @@ One shared map means anyone can pick up the work at any time, from anywhere.
 Detailed history makes it possible to analyze how projects actually
 developed, what was missed, and how to improve.
 
-The site is [archipelago.tools](https://archipelago.tools).
+The site is [archipelago.tools](https://archipelago.tools/?ref=github).
 
 ## How it works
 
@@ -28,7 +28,7 @@ Archipelago is a small unopinionated core, the rest is yours to shape.
 
 **People stay in control.** Agents do much of the work, and you decide what
 needs your approval. Every change records the source of authority, and what
-is applied can be undone. [You stay in charge](https://archipelago.tools/in-charge)
+is applied can be undone. [You stay in charge](https://archipelago.tools/in-charge?ref=github)
 
 **The log is the truth.** Every change is added to one log and never
 rewritten. Undo, history, live updates and backups all read the same record.
@@ -41,11 +41,11 @@ the types we ship works just as well on a type you add.
 **Plugin architecture.** Packs are where opinion enters the system. Create a
 pack with the item types, link types, view styles, and features you need. A
 type, view or rule of yours works like the ones that ship.
-[Write a pack](https://archipelago.tools/write-a-pack)
+[Write a pack](https://archipelago.tools/write-a-pack?ref=github)
 
 **One surface for people and agents.** You and your agents use the map
 through the same tools. What an agent is told is kept on the map, where you
-can read and change it. [The agent tools](https://archipelago.tools/tools)
+can read and change it. [The agent tools](https://archipelago.tools/tools?ref=github)
 
 **One way to read.** A query is a filter, a walk and a limit, and a view is a
 query with its layout. You and your agents read the same query.
@@ -55,7 +55,7 @@ query with its layout. You and your agents read the same query.
 Archipelago is one Node 24 server and a persistent disk, MIT licensed, with
 everything included. The database is embedded; for a team, keep the maps on a
 Postgres server instead. If you'd rather not run a server, the
-[Quickstart](https://archipelago.tools/quickstart) has it running for you in
+[Quickstart](https://archipelago.tools/quickstart?ref=github) has it running for you in
 about five minutes.
 
 ```bash
@@ -90,7 +90,7 @@ Your tasks appear on the map right away. To take anything back, open
 
 ## Read on
 
-- [Host it yourself](https://archipelago.tools/self-host) and
+- [Host it yourself](https://archipelago.tools/self-host?ref=github) and
   [Hosting](docs/reference.md#hosting): every setting and limit.
 - [Reference](docs/reference.md): every screen, tool, view, setting and limit.
 - [Agents held to the map](docs/agents.md): how an agent is told, checked and
