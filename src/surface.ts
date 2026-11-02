@@ -90,6 +90,25 @@ export function listedChange(change: Tool): Tool {
 /** The tools an agent is offered, in order. */
 export const SURFACE = ['query', 'change', 'undo', 'capture', 'assign', 'report', 'ask', 'settle', 'revise', 'draw'];
 
+/**
+ * What a client is told each tool may do, so it knows what to ask the person before calling it (MCP's tool
+ * annotations, leaving out what MCP assumes: a tool that does not say readOnlyHint may write). Every tool works on the
+ * map alone. change can archive or forget, undo takes changes back and revise voids, releases and restarts: those may
+ * destroy. The rest only read or add. Each hint is paid for on every request, so they stay this short.
+ */
+export const ANNOTATIONS: Record<string, { title: string; readOnlyHint?: boolean; destructiveHint?: boolean; openWorldHint: false }> = {
+  query: { title: 'Read', readOnlyHint: true, openWorldHint: false },
+  change: { title: 'Change', destructiveHint: true, openWorldHint: false },
+  undo: { title: 'Undo', destructiveHint: true, openWorldHint: false },
+  capture: { title: 'Capture', destructiveHint: false, openWorldHint: false },
+  assign: { title: 'Assign', destructiveHint: false, openWorldHint: false },
+  report: { title: 'Report', destructiveHint: false, openWorldHint: false },
+  ask: { title: 'Ask', destructiveHint: false, openWorldHint: false },
+  settle: { title: 'Settle', destructiveHint: false, openWorldHint: false },
+  revise: { title: 'Revise', destructiveHint: true, openWorldHint: false },
+  draw: { title: 'Draw', readOnlyHint: true, openWorldHint: false },
+};
+
 /** query and the six verbs as tools, described with what this workspace offers (offered: an action an agent may call here). */
 export function surfaceTools(reg: Registry, tools: Record<string, Tool>, offered: (a: Action) => boolean): Record<string, Tool> {
   const actions = actionsOf(reg, tools);
