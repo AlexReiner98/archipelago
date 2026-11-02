@@ -9,6 +9,7 @@ import { lastSeq, readEvents } from './eventlog.ts';
 import { launch } from './launcher.ts';
 import type { Entity, Archipelago } from './pelago.ts';
 import { notify } from './notify.ts';
+import { alertOwner } from './alert.ts';
 import { sessionEnd } from './sessions.ts';
 import { callTool } from './tools.ts';
 import { VIEWS } from './views.ts';
@@ -41,7 +42,7 @@ export class Automations {
   }
 
   start(everyMs = 30_000): void {
-    this.timer = setInterval(() => void this.tick().catch((err) => console.error('automation tick failed:', err)), everyMs);
+    this.timer = setInterval(() => void this.tick().catch((err) => alertOwner(this.l, { key: 'automations', title: 'The scheduler failed', body: `A pass over the automations failed: ${(err as Error).message}`, from: 'pelago' })), everyMs);
   }
 
   stop(): void {
@@ -145,6 +146,7 @@ export class Automations {
       { props: { last_fired: now.toISOString(), last_result: `${ok ? 'ok' : 'failed'}: ${result}`.slice(0, 500) } },
       { actor: `agent:${name}`, action: 'automation.fire', reason: ev ? `Triggered by ${ev.action}` : `Scheduled (${p.trigger})`, detail: { ok, result, trigger_event: ev?.seq } },
     );
+    if (!ok) await alertOwner(this.l, { key: `automation/${auto.id}`, title: `The automation "${auto.title}" failed`, body: result.slice(0, 2000), level: 'warning', from: 'pelago', about: auto.id });
     return { automation: auto.id, ok, result };
   }
 

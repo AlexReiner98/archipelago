@@ -74,8 +74,9 @@ test('in a browser, several sessions each keep a tab, which pops out and docks b
     await until('the second keeps a tab', async () => (await strip()).length === 2);
     await show(2, 'i2');
     await until('the third keeps a tab', async () => (await strip()).length === 3);
-    const names = (await strip()).map((t) => t[0]);
-    assert.deepEqual(names.slice(1), [`Session ${sessions[1].name}`, `Session ${sessions[2].name}`], 'a session’s tab is named by the session, and says it is one');
+    // A tab is named as soon as its session is heard: what the page has heard settles within a pass of the sessions view.
+    const named = [`Session ${sessions[1].name}`, `Session ${sessions[2].name}`];
+    await until('a session’s tab is named by the session, and says it is one', async () => JSON.stringify((await strip()).map((t) => t[0]).slice(1)) === JSON.stringify(named));
     assert.deepEqual((await strip()).map((t) => [t[1], t[2]]), [[true, false], [false, true], [false, true]], 'the tab in sight stays; the others are marked');
     assert.equal(await page.evaluate(`location.hash`), reader);
     // Each session comes back to its own tab: no fourth.
