@@ -4,6 +4,9 @@
 // back or on; with less motion asked for, it is the last step at once, and so it is where it is played only when
 // asked (style.play "asked": a view up on the canvas, which opens on the map as it is). Once a step changes the look, the key is the look's. Every time is the
 // style's (numbers, arch_story_*). Shared by the drawings that tell stories.
+// A step that adds a kept view (an item of the lens type) reaches a milestone: that view's own drawing stands beside
+// the picture, as large as it, until a later step adds another, and the conversation moves to the left, narrow (the
+// owner, 2 Nov 2026, e_dnewbxxh). The page draws it from a `view` mark (ui/view-frame.js): a drawing never opens a view.
 
 import { m } from './marks.js';
 
@@ -17,6 +20,12 @@ export function play({ answer, style, reduced, tools, shape }) {
   const steps = answer.steps, last = frames.length - 1;
   const chapters = steps.flatMap((s, k) => (s.chapter ? [{ ...s.chapter, at: k }] : []));
   const total = chapters.at(-1)?.count;
+  // The milestone each step shows: the last kept view added by then.
+  const views = new Map((answer.items ?? []).filter((i) => i.type === 'lens').map((i) => [i.id, i.title]));
+  const shownAt = [];
+  for (const s of steps) shownAt.push((s.add ?? []).filter((id) => views.has(id)).at(-1) ?? shownAt.at(-1) ?? null);
+  const milestones = shownAt.some(Boolean);
+  const reaches = (k) => Boolean(shownAt[k]) && shownAt[k] !== (shownAt[k - 1] ?? null);
 
   // ---- Above the picture: the chapters, and what each dot says. Beside it: the conversation.
   // A key for the story's own look and one for each other look it changes to, each shown while its look is.
@@ -32,7 +41,7 @@ export function play({ answer, style, reduced, tools, shape }) {
     chapters.length > 0 && m('div', { class: 'sp-rail' }, chapters.map((c, k) => m('button', { key: `c:${k}`, on: ['click'], class: 'sp-era', title: [c.name, c.when].filter(Boolean).join(', ') }, m('b', {}, c.name), c.when && m('small', {}, c.when)))),
     [null, ...keyLooks].map(keyFor),
   );
-  const after = m(
+  const chat = m(
     'div',
     { key: 'chat', on: ['seen'], class: 'sp-chat' },
     m(
@@ -48,6 +57,8 @@ export function play({ answer, style, reduced, tools, shape }) {
     ),
     m('ol', { key: 'log', class: 'sp-log', 'aria-live': 'polite' }),
   );
+  // Beside the picture: the milestone reached, its name under it, a link to its page.
+  const after = milestones ? m('div', { class: 'sp-side' }, chat, m('div', { class: 'sp-shown' }, m('view', { key: 'shown' }), m('a', { key: 'shown-name', class: 'sp-shown-name' }, ''))) : chat;
 
   // ---- Changing what is drawn.
   let timers = [], cur = -1, playing = false, seq = 0, typing = false;
@@ -98,7 +109,14 @@ export function play({ answer, style, reduced, tools, shape }) {
 
   // ---- Showing a step, on the picture's own stage.
   const stage = shape.stage({ t, send, later });
-  const apply = (k, dur) => ((cur = k), stage.apply(k, dur));
+  let showing = null;
+  const showView = (k) => {
+    const id = k < 0 ? null : shownAt[k];
+    if (!milestones || id === showing) return;
+    showing = id;
+    send([{ key: 'shown', mark: m('view', { key: 'shown', ...(id && { id }) }) }, { key: 'shown-name', text: id ? views.get(id) : '', set: { href: id ? `#/e/${id}` : null, title: id ? views.get(id) : null } }]);
+  };
+  const apply = (k, dur) => ((cur = k), stage.apply(k, dur), showView(k));
   const away = (k) => stage.away(k);
 
   // ---- Playing.
@@ -111,7 +129,7 @@ export function play({ answer, style, reduced, tools, shape }) {
       sayLines(k);
       apply(k, t('quick_move'));
       rail(k);
-      later(t('quick') + (away(k) ? t('gone_hold') + t('gone_fade') : 0), () => beat(k + 1));
+      later(t('quick') + (away(k) ? t('gone_hold') + t('gone_fade') : 0) + (reaches(k) ? t('milestone') : 0), () => beat(k + 1));
       return;
     }
     let at = 0;
@@ -122,7 +140,8 @@ export function play({ answer, style, reduced, tools, shape }) {
     later(at, () => (typingOn(false), end && say('theirs', end.text, end.by), apply(k, t('move')), rail(k)));
     at += end ? read(end.text) : 0;
     for (const l of after) (later(at, () => say(kindOf(l, end), l.text, l.by)), (at += read(l.text)));
-    at += Math.max(t('beat_least') - (end ? read(end.text) : 0), t('beat_after')) + (away(k) ? t('gone_hold') + t('gone_fade') : 0);
+    // A milestone reached holds a while longer, for its drawing to be seen.
+    at += Math.max(t('beat_least') - (end ? read(end.text) : 0), t('beat_after')) + (away(k) ? t('gone_hold') + t('gone_fade') : 0) + (reaches(k) ? t('milestone') : 0);
     later(at, () => beat(k + 1));
   };
   const finish = () => ((playing = false), send([{ key: 'play', text: 'Replay' }]));
