@@ -9,7 +9,7 @@
 
 import { api, h, hooks, state } from './base.js';
 import { activate, canvasIn, focusOn } from './canvas.js';
-import { viewParts } from './canvases.js';
+import { presetSettings, viewParts } from './canvases.js';
 import { addressOf, readAddress } from './query.js';
 import { numberOf } from './query-base.js';
 import { dragPane, sashes } from './pane-drag.js';
@@ -38,7 +38,7 @@ async function lensOf(at) {
   const asked = readAddress(query);
   // A saved canvas is named by its title, read from the map when the page does not know it yet.
   if (asked.style.canvas && !titles.has(asked.style.canvas) && asked.lens) await api('get', { id: asked.style.canvas }).then((got) => titles.set(got.entity.id, got.entity.title), () => {});
-  if (asked.lens) return asked;
+  if (asked.lens) return asked.style.canvas ? asked : { ...asked, style: { ...presetSettings(asked.lens), ...asked.style } };
   if (asked.style.canvas) {
     const got = await api('get', { id: asked.style.canvas });
     titles.set(got.entity.id, got.entity.title);

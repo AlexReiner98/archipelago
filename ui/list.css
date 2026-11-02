@@ -32,6 +32,12 @@ a.ll-title:hover { text-decoration: underline; }
 .ll-status { width: var(--ln-list-status); }
 .ll-waits { width: var(--ln-list-waits); }
 .ll-sessions { width: var(--ln-list-sessions); }
+/* A field's column: its values, numbers lined up; its head names it. */
+.ll-field { width: var(--ln-list-field); color: var(--ln-text); font-variant-numeric: tabular-nums; }
+.ll-head { min-height: auto; padding-top: var(--ln-list-pad-top); padding-bottom: var(--ln-list-pad-top); }
+.ll-head .ll-field { color: var(--ln-muted); }
+.ll-field > span { overflow: hidden; text-overflow: ellipsis; }
+.ll-narrow .ll-field { width: var(--ln-list-field-narrow); }
 .ll-who, .ll-blocked { overflow: hidden; text-overflow: ellipsis; padding: var(--ln-pill-pad-y) var(--ln-pill-pad-x); border-radius: 999px; font-size: var(--ln-tiny-text); }
 .ll-who { background: var(--ln-inner); color: var(--ln-text); }
 .ll-who.you { background: var(--ln-you); color: var(--on-mark); }
