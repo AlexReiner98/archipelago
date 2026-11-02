@@ -47,6 +47,15 @@ export class ServerPacks {
     return undefined;
   }
 
+  /** Where a person with no account begins: the first page a pack marks start, by its address. */
+  start(): string | undefined {
+    for (const { file } of this.packs) {
+      const page = file.reach.server.pages?.find((p) => p.start);
+      if (page) return `/x/${file.id}/${page.id}`;
+    }
+    return undefined;
+  }
+
   /** The control plane: the default workspace's database. */
   async control(): Promise<Q> {
     return (await this.at.get('default')).pelago.db;
