@@ -41,10 +41,16 @@ export interface Step {
   opens?: boolean;
   /** For a show the server takes for a session: its pane draws the item's canvas, and no page opens over it. */
   canvas?: boolean;
+  /** With opens: the session whose chat this one goes on (after a clear), whose tab it takes over. */
+  takes?: string;
+  /** The session has ended: the owner's page closes its tab (ui/tab-life.js). */
+  ends?: boolean;
   /** The session it was taken in, as the agent said it or last said it: a pane can follow one session. */
   run?: string;
-  /** That session's name, so every place that names it calls it alike. */
+  /** That session's word, never shown: the key to its hue (src/session-name.ts). */
   name?: string;
+  /** What its chat is called, read at each step so a rename reaches every page. */
+  title?: string;
   /** What its surface calls it (its title in Claude Code), when that is known. */
   label?: string;
 }
@@ -94,11 +100,12 @@ export async function took(db: Q, w: Whose, step: Omit<Step, 'at'>, now = false)
   timer ??= setTimeout(() => void flushAll().catch(() => {}), FLUSH_MS).unref();
 }
 
-/** A session's name and what its surface calls it, which may change while it runs: read each time, by its id. */
-async function namesOf(db: Q, run: string): Promise<{ name?: string; label?: string }> {
-  const { rows } = await db.query<{ name: string | null; label: string | null }>(`select props->>'name' as name, props->>'label' as label from entity where id = $1`, [run]).catch(() => ({ rows: [] as { name: string | null; label: string | null }[] }));
-  const { name, label } = rows[0] ?? {};
-  return { ...(name && { name }), ...(label && { label }) };
+/** A session's word and what its chat is called, which may change while it runs: read each time, by its id. */
+async function namesOf(db: Q, run: string): Promise<{ name?: string; title?: string; label?: string }> {
+  type Row = { name: string | null; title: string | null; label: string | null };
+  const { rows } = await db.query<Row>(`select props->>'name' as name, title, props->>'label' as label from entity where id = $1`, [run]).catch(() => ({ rows: [] as Row[] }));
+  const { name, title, label } = rows[0] ?? {};
+  return { ...(name && { name }), ...(title && { title }), ...(label && { label }) };
 }
 
 async function flush(key: string): Promise<void> {

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { checkDeclared } from '../src/declared.ts';
 import { said, filled, globNames } from '../src/instructions.ts';
-import { hookSessionStart } from '../src/sessions.ts';
+import { hookSessionStart } from '../src/session-hook.ts';
 import { VIEWS } from '../src/views.ts';
 import { fresh, laneSetup, make } from './map.ts';
 

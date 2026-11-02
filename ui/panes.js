@@ -276,7 +276,7 @@ export function draw() {
 export function openPane(at, side = 'right', by = undefined, { anew = false, ...own } = {}, t = front()) {
   if (!drawable(at)) return null;
   at = paneAt(at);
-  const same = !anew && !own.slot && !own.held && Object.entries(t.panes).find(([id, p]) => t.groups.includes(id) && !p.slot && !p.held && named(p.at) === named(at));
+  const same = !anew && !own.slot && !own.held && !own.by && Object.entries(t.panes).find(([id, p]) => t.groups.includes(id) && !p.slot && !p.held && named(p.at) === named(at));
   const id = same?.[0] ?? newId('p');
   t.panes[id] = { ...freshPane(at), ...t.panes[id], at, ...own };
   place(id, side, by ?? focusOf(t), t);

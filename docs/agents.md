@@ -132,6 +132,27 @@ that was ended.
   session touched is asked about first"; "the hook reads from the transcript
   the items the session’s calls to the map named".
 
+### 6. A chat's tab lives as the chat does, whatever the client
+The owner's page gives every open chat a tab, named by the chat's title and
+closed when the chat ends (the design e_p6fr4uye). Every client says the
+same four things, by MCP alone; Claude Code's hooks are one adapter onto
+them, not the model:
+
+| Call | Carries |
+|---|---|
+| `capture` `session_start` | `session_id` (the client's own), `title`, `surface`, `cwd`, `remote`, `source` (`clear` to go on in the tab of the session a clear ended) |
+| `report` `session_update` | `title` when the chat is renamed |
+| `report` `session_end` | `reason` when the chat itself has ended (closed, archived, exit, clear); without it the chat goes on |
+| any call | heard-from: a chat not heard from for 12 hours is ended for it |
+
+Claude Code's hook reads the title from the transcript (the owner's, else
+the one Claude Code made) at the start and at every event, and passes
+SessionStart's `source` and SessionEnd's `reason`.
+- `test/sessions.test.ts`: "a session is called what its chat is called";
+  "a chat that ends ends its session, and after a clear the next one in its
+  folder takes over its tab"; "Claude Code's hooks name a session by its chat".
+- `test/tabs.test.ts`, `test/show-lands.test.ts`: the tabs in a browser.
+
 ## The modules
 
 ### On the agent's machine

@@ -38,3 +38,17 @@ test('the view and the open item the page says reach the prompt hook and query s
   await seen(l.db, l, 'p3', 'home');
   assert.equal(((await callTool(l, agent, 'query', { name: 'seeing' })) as any).screen, 'home');
 });
+
+test("an agent is told whether the tab in sight is its own chat's, another chat's, or the owner's following it", async () => {
+  const l = await fresh();
+  const mine = await callTool(l, agent, 'session_start', { session_id: 'mine', title: 'My chat' }) as any;
+  const theirs = await callTool(l, agent, 'session_start', { session_id: 'theirs', title: 'Their chat' }) as any;
+  const line = async () => ((await answerHook('prompt', { whole: l.db, pelago: l, within: [], body: { session_id: 'mine' }, running: { started: new Date(0).toISOString() }, origin: 'http://127.0.0.1' })) as any).hookSpecificOutput.additionalContext as string;
+  await callTool(l, human, 'tail', { page: { page: 'p1', on: true, where: `e/${mine.run}`, tab: { chat: mine.run, own: true } } });
+  assert.match(await line(), /^On your tab, the owner's page shows/m);
+  assert.deepEqual(((await callTool(l, agent, 'query', { name: 'seeing', params: { run: mine.run } })) as any).tab, { chat: mine.run, title: 'My chat', own: true, yours: true });
+  await callTool(l, human, 'tail', { page: { page: 'p1', on: true, where: `e/${theirs.run}`, tab: { chat: theirs.run, own: true } } });
+  assert.match(await line(), /The owner's page shows another chat's tab \("Their chat"\), not yours\./);
+  await callTool(l, human, 'tail', { page: { page: 'p1', on: true, where: `e/${mine.run}`, tab: { chat: mine.run, own: false } } });
+  assert.match(await line(), /^On a tab of theirs following you, the owner's page shows/m);
+});

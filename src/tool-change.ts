@@ -23,9 +23,9 @@ export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change
 }
 
 /** A session began: the owner's page opens it a tab of its own, on what it is working on. A show cannot ask for this. */
-export async function sessionOpened(l: Archipelago, actor: Actor, run: string, task?: string): Promise<void> {
+export async function sessionOpened(l: Archipelago, actor: Actor, run: string, task?: string, takes?: string): Promise<void> {
   const { db } = await wholeMap(l);
-  await took(db, l, { kind: 'show', actor: actor.name, hash: `e/${task ?? run}`, opens: true, canvas: true, run }, true);
+  await took(db, l, { kind: 'show', actor: actor.name, hash: `e/${task ?? run}`, opens: true, canvas: true, run, ...(takes && { takes }) }, true);
 }
 
 /** A session took up a task: the canvas of its tab moves to it. Nobody asked to read its page, so none opens. */

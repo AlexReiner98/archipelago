@@ -18,7 +18,8 @@
 // session is on. From the same record it says which items the session's calls
 // to the map named (read, shown or changed), so the session's end asks about
 // what it touched: the server cannot tell apart sessions that share a token.
-// And what Claude Code calls the session (its title), which the map shows beside the session's name.
+// And what Claude Code calls the session (its title: the one the owner gave it, else the one Claude Code made), which
+// the map calls the session by and its tab on the owner's page shows, at the start (on a resume) and at every event.
 // And what the reply did since the owner's last message (the turn): how many times it read the map (and of those,
 // surveyed it: read about several items), showed the owner something, changed the map, told a beat of its story, called
 // any other tool (worked), edited a file, committed and pushed, so that a rule on a reply's end can ask the agent to go on.
@@ -95,6 +96,7 @@ function readTranscript(text) {
   let turns = 0;
   let turn;
   let title;
+  let made_title;
   let reply = {};
   const named = (said) => {
     for (const id of JSON.stringify(said ?? '').match(ITEM) ?? []) touched.add(id);
@@ -103,9 +105,11 @@ function readTranscript(text) {
     const calls = line.includes('"mcp__pelago__') || line.includes('"mcp__lattice__');
     const answered = (changes.size > 0 || committing.size > 0) && line.includes('"tool_result"');
     const asked = line.includes('"user"') && !line.includes('"tool_result"');
-    if (line.includes('"custom-title"')) {
+    if (line.includes('"custom-title"') || line.includes('"ai-title"')) {
       try {
-        title = JSON.parse(line).customTitle ?? title;
+        const said = JSON.parse(line);
+        if (said.type === 'custom-title') title = said.customTitle ?? title;
+        else if (said.type === 'ai-title') made_title = said.aiTitle ?? said.title ?? made_title;
       } catch {
         // A line that is not whole yet: the next count has it.
       }
@@ -148,7 +152,8 @@ function readTranscript(text) {
   let tokens = 0;
   for (const n of answers.values()) tokens += n;
   const ran = [...running.values()].map((r) => ({ ...r, mine: Boolean(turn) && r.turn === turns }));
-  return { tokens, touched: [...touched], made, ran, ...(title && { title }), ...(turn && { turn, reply, turnMade }) };
+  const called = title ?? made_title;
+  return { tokens, touched: [...touched], made, ran, ...(called && { title: called }), ...(turn && { turn, reply, turnMade }) };
 }
 
 /** Commits by their full ids, looked up in the checkout: what it does not hold (gone, or another folder's) is left out. */
@@ -224,6 +229,14 @@ if (name === 'session-start') {
     if (remote) body = JSON.stringify({ ...said, remote: remote.replace(/^([a-z][a-z0-9+.-]*:[/][/])[^/@]*@/i, '$1'), commits: recentCommits(said.cwd || '.') });
   } catch {
     // Not a checkout, or no git here: the folder is all there is to go on.
+  }
+  // A chat resumed has a title already: its tab is named by it from the start.
+  try {
+    const said = JSON.parse(body);
+    const { title } = said.transcript_path ? readTranscript(readFileSync(said.transcript_path, 'utf8')) : {};
+    if (title) body = JSON.stringify({ ...said, title });
+  } catch {
+    // No record yet: a new chat has no title until it is given one.
   }
 } else if (name === 'file-used') {
   // The path alone: what the tool read or wrote stays here.

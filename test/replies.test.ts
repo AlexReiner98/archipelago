@@ -11,7 +11,8 @@ import { answerHook } from '../src/hook-answers.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
 import { checkRules, type RuleDef } from '../src/rules.ts';
-import { hookSessionStart, sessionStart, story } from '../src/sessions.ts';
+import { sessionStart, story } from '../src/sessions.ts';
+import { hookSessionStart } from '../src/session-hook.ts';
 import { callTool } from '../src/tools.ts';
 import { syncTypes } from '../src/typetable.ts';
 

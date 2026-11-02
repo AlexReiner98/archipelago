@@ -2,7 +2,7 @@ import { api, h, hooks, main, route, state } from './base.js';
 import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
 import { lookMode } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
-import { poppedTab, tabs } from './tabs.js';
+import { front, poppedTab } from './tabs.js';
 import { types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
@@ -27,10 +27,16 @@ main.addEventListener('input', (e) => {
 // the log, a story is on its session's page (the owner, 30 Oct 2026).
 /** This page, among the owner's open pages: the server counts those a show can land in, so an agent's show says whether it did. */
 const pageId = Math.random().toString(36).slice(2, 14);
-// A page the server draws for an agent's look is no page of the owner's: it is not counted. Every tab following nobody takes no show.
-// Where it stands goes with it: the address of the pane in focus, so an agent knows what the owner is looking at
-// (src/seeing.ts). A popped-out tab is the main page's too.
-const thisPage = () => (lookMode ? undefined : { page: pageId, on: tabs.list.some((t) => t.follows !== 'none'), where: location.hash.slice(2, 2002) });
+// A page the server draws for an agent's look is no page of the owner's: it is not counted. Any other takes a show: a
+// chat with no tab here is opened one. Where it stands goes with it: the address of the pane in focus, and the chat whose
+// tab is in sight, so an agent knows what the owner is looking at and whether it is its own tab (src/seeing.ts). A
+// popped-out tab is the main page's too.
+const thisPage = () => {
+  if (lookMode) return undefined;
+  const t = front();
+  const chat = t?.chat ?? (/^e_[a-z0-9]{8}$/.test(t?.follows ?? '') ? t.follows : undefined);
+  return { page: pageId, on: true, where: location.hash.slice(2, 2002), ...(chat && { tab: { chat, own: Boolean(t.chat) } }) };
+};
 let seenStep;
 /** Each session's last show not yet landed: it waits while a question is open over the page, or the reader is busy in its tab. */
 const waiting = new Map();
@@ -42,6 +48,10 @@ export function follow(steps = []) {
   const fresh = seenStep === undefined ? [] : steps.filter((s) => s.at > seenStep);
   seenStep = steps.at(-1)?.at ?? seenStep ?? 0;
   for (const s of steps) hear(s);
+  // A chat that ended closes its tab here (ui/tab-life.js).
+  for (const s of fresh) if (s.ends && s.run) hooks.sessionEnded?.(s.run, s.did);
+  // A chat renamed is named anew on its tab.
+  if (fresh.some((s) => s.did === 'titled')) hooks.drawStrip?.();
   // A later show takes the place of what waits, and its tab of its own, if it was owed one, stays owed.
   for (const s of fresh) if (s.kind === 'show' && s.hash) waiting.set(sessionOf(s), { ...s, opens: s.opens || waiting.get(sessionOf(s))?.opens });
   if (!hooks.land || document.querySelector('dialog[open]')) return;

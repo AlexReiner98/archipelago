@@ -7,10 +7,8 @@
 import { livesIn, livesInFor, placeFor } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
-import { heldResources } from './blocking.ts'; import { mintName, sessionTitle } from './session-name.ts';
-import { toConfirm } from './confirm.ts'; import { commitRule } from './commit-rule.ts';
-import { sentCommits, unaccountedText } from './unaccounted.ts'; import { roomForSession } from './plan.ts';
-import { STALE_DAYS } from './attention.ts'; import { instructionsFor } from './instructions.ts';
+import { cutTitle, mintName, saidTitle, sessionLabelled, sessionTitle } from './session-name.ts';
+import { commitRule } from './commit-rule.ts'; import { roomForSession } from './plan.ts'; import { wholeMap } from './outbox.ts'; import { took } from './presence.ts';
 import { VIEWS } from './views.ts'; import type { StartedBy } from './launcher.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts'; import { unaccountedBy } from './commits.ts';
 import { isChat, resolveRun, sessionsAwake, takeUp } from './chat-run.ts';
 export { resolveRun, sessionPrompted, sessionsAwake } from './chat-run.ts';
@@ -39,17 +37,19 @@ export async function sessionBegan(l: Archipelago, sessionId: string | undefined
 export async function sessionStart(
   l: Archipelago,
   actor: Actor,
-  input: { title?: string; surface?: string; cwd?: string; remote?: string; session_id?: string; task?: string; branch?: string },
+  input: { title?: string; surface?: string; cwd?: string; remote?: string; session_id?: string; task?: string; branch?: string; source?: string },
 ) {
   // A surface may announce the same session again (resume, compact), even ended: its own run takes up, not a second.
   if (input.session_id) {
     const existing = await resolveRun(l, input.session_id);
     if (existing) {
-      if (!existing.is_open) await takeUp(l, actor, existing);
+      const reopened = !existing.is_open;
+      if (reopened) await takeUp(l, actor, existing);
       await touch(l, existing.id);
       await nameIfUnnamed(l, actor, existing);
+      await sessionLabelled(l, existing, input.title, actorId(actor));
       // Its repository is said again: the hook tells a resumed session where things stand, as it told it at first.
-      return { run: existing.id, name: ((await l.entity(existing.id))?.props.name as string | undefined) ?? existing.title, status: 'running', resumed: true, repo: (await placeFor(l, input)) ?? undefined };
+      return { run: existing.id, name: ((await l.entity(existing.id))?.props.name as string | undefined) ?? existing.title, status: 'running', resumed: true, reopened, repo: (await placeFor(l, input)) ?? undefined };
     }
   }
   const task = input.task ? await l.entity(input.task) : undefined;
@@ -59,11 +59,17 @@ export async function sessionStart(
 
   const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };
   for (const k of ['surface', 'cwd', 'session_id', 'branch'] as const) if (input[k]) props[k] = input[k];
-  // Its name is its title, the one a person calls it by everywhere; what it was started for is its note.
+  // Its word is its hue's key, never shown (src/session-name.ts).
   const name = await mintName(l);
   if (name) props.name = name;
-  const title = name ? sessionTitle(name) : input.title ?? (task ? `Session: ${task.title}` : `Session in ${repo?.title ?? input.cwd ?? 'unknown folder'}`);
-  const ops: Op[] = [{ op: 'create', ref: 'run', type: 'run', title, status: 'running', props, ...(name && input.title && { body: input.title }) }];
+  // After a clear, the chat goes on as a new session: it takes over the tab of the one the clear ended.
+  const before = input.source === 'clear' ? await clearedHere(l, input.cwd) : undefined;
+  if (before) props.took_over = before.id;
+  // It is called what its chat is called, else what the chat was called before the clear, else what it works on.
+  const label = saidTitle(input.title) || (typeof before?.props.label === 'string' ? before.props.label : '');
+  if (label) props.label = label;
+  const title = label ? cutTitle(label) : sessionTitle({ task: task?.title, place: repo?.title ?? input.cwd });
+  const ops: Op[] = [{ op: 'create', ref: 'run', type: 'run', title, status: 'running', props }];
   if (task) ops.push({ op: 'link', type: 'works_on', from: 'run', to: task.id });
   if (repo) ops.push({ op: 'link', type: livesInFor(l, repo.type), from: 'run', to: repo.id });
   const { created } = await l.apply(actorId(actor), { ops, reason: 'Session started' });
@@ -93,6 +99,7 @@ export async function sessionStart(
   return {
     run,
     name,
+    took_over: before?.id,
     status: blocked.length ? 'waiting' : 'running',
     repo: repo && { id: repo.id, title: repo.title },
     claimed,
@@ -104,11 +111,24 @@ export async function sessionStart(
   };
 }
 
-/** A session registered before sessions were named is named when it is heard from again. */
+/** A session registered before sessions were given a word is given one, for its hue, when it is heard from again. */
 async function nameIfUnnamed(l: Archipelago, actor: Actor, run: Entity): Promise<void> {
   if (run.props.name) return;
   const name = await mintName(l);
-  if (name) await l.apply(actorId(actor), { ops: [{ op: 'update', id: run.id, title: sessionTitle(name), props: { name } }], reason: 'Session named' });
+  if (name) await l.apply(actorId(actor), { ops: [{ op: 'update', id: run.id, props: { name } }], reason: 'Session given its mark' });
+}
+
+/** How soon after a clear ended a session the next one in its folder is taken to be the same chat going on. */
+const CLEAR_MS = 2 * 60_000;
+/** The session a clear ended a moment ago in this folder, whose chat goes on, and not already taken over. */
+async function clearedHere(l: Archipelago, cwd: string | undefined): Promise<Entity | undefined> {
+  if (!cwd) return undefined;
+  const { rows } = await l.db.query<Entity>(
+    `select * from entity e where type = any($1::text[]) and not is_open and archived_at is null and props->>'ended_by' = 'clear' and props->>'cwd' = $2 and updated_at > $3
+       and not exists (select 1 from entity o where o.type = any($1::text[]) and o.props->>'took_over' = e.id) order by updated_at desc limit 1`,
+    [l.registry.family('run'), cwd, new Date(Date.now() - CLEAR_MS).toISOString()],
+  );
+  return rows[0];
 }
 
 /** Two signs of a session at work this close together are one stretch of work; further apart, it was idle between. */
@@ -222,11 +242,13 @@ export async function recordRun(
   return { run: created.run, recorded: true };
 }
 
-export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string; branch?: string }) {
+export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string; branch?: string; title?: string }) {
   const run = await resolveRun(l, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
   if (!run.is_open) throw new Error(`Session "${run.title}" has already ended`);
   await heard(l, run, `Session "${run.title}" reported in again`);
+  // Its chat was renamed: what it is called follows, wherever it is named.
+  await sessionLabelled(l, run, input.title, actorId(actor));
   // A bare call is a heartbeat: it moves last_seen and leaves no event. A branch it has not said before is kept.
   if (!input.status && !input.note && !input.task && (!input.branch || input.branch === run.props.branch)) {
     await touch(l, run.id);
@@ -364,6 +386,8 @@ export async function sessionEnd(
     reconcile?: boolean;
     /** Said by the session itself: a chat's run then says where its work stands and waits, for the chat ends it, not its agent. */
     chat_goes_on?: boolean;
+    /** Why its chat ended, as its client says it (clear, logout, exit, closed, archived, deleted): the chat is over, whoever says so. */
+    reason?: string;
   },
 ) {
   const run = await resolveRun(l, input.run);
@@ -418,76 +442,13 @@ export async function sessionEnd(
   const { rows: working } = await l.db.query<{ id: string }>(`select id from relation where type = 'works_on' and from_id = $1 and valid_to is null`, [run.id]);
   await l.apply(actorId(actor), {
     ops: [
-      { op: 'update', id: run.id, status: stays ? 'waiting' : outcome, body: summary ? [run.body, `[${now()}] ${outcome}: ${summary}`].filter(Boolean).join('\n') : undefined },
+      { op: 'update', id: run.id, status: stays ? 'waiting' : outcome, body: summary ? [run.body, `[${now()}] ${outcome}: ${summary}`].filter(Boolean).join('\n') : undefined, ...(!stays && input.reason && { props: { ended_by: input.reason.slice(0, 40) } }) },
       ...working.map((w): Op => ({ op: 'unlink', relation: w.id })),
     ],
     reason: input.summary ?? `Session ${outcome}`,
   });
   await heard(l, run, `Session "${run.title}" ended`);
+  // The owner's page closes its tab (ui/tab-life.js); a page that missed this finds it ended when it next reads the sessions.
+  if (!stays) await took((await wholeMap(l)).db, l, { kind: 'other', actor: actorId(actor), did: input.reason ?? 'ended', ends: true, run: run.id }, true).catch(() => {});
   return { run: run.id, status: stays ? 'waiting' : outcome, released: held.length, unaccounted_commits: commits.length ? commits : undefined, note: stays ? 'Kept. The session stays open, under its name, until its chat ends.' : undefined };
-}
-
-/**
- * A Claude Code SessionStart hook: register the session and return the text
- * to put in front of the model, so it starts knowing what the map knows.
- */
-export async function hookSessionStart(l: Archipelago, input: { session_id?: string; cwd?: string; remote?: string; commits?: unknown }): Promise<string> {
-  const started = await sessionStart(l, { kind: 'agent', name: 'claude-code' }, { session_id: input.session_id, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined, surface: 'claude-code' });
-  const lines = [`This session is registered in Archipelago, the owner's map of work and dependencies, as run ${started.run}${started.name ? `, named ${started.name}` : ''}.`];
-  const repo = 'repo' in started ? started.repo : undefined;
-  if (repo) lines.push(`Repository: ${repo.title} (${repo.id}).`);
-  // Where the work there stands is the place's pack's to say: a repository's, the software pack's views.
-  if (repo && canAsk(l, 'repo_work') && canAsk(l, 'handoff')) {
-    const work = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'repo_work', { repo: repo.id })) as { ready: { id: string; title: string; type: string; last_confirmed: string | Date }[]; blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[] };
-    // Where things stand is read off the map: how much has moved lately, and what sessions left, nobody has seen work, or bites here.
-    const stand = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'handoff', { repo: repo.id })) as { from: string | { title: string; began: string }; left?: unknown[]; unseen?: unknown[]; traps?: unknown[]; since_then: Record<'pushes' | 'settled' | 'opened' | 'sessions', unknown[]> & { counts: Record<'pushes' | 'settled' | 'opened' | 'sessions', number> }; to_shape?: { hubs: { id: string; title: string; inside: number }[] } };
-    const n = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
-    const then = stand.since_then;
-    const marks = [stand.left?.length && `${n(stand.left.length, 'checkout')} left unpushed (left)`, stand.unseen?.length && `${n(stand.unseen.length, 'item')} nobody has seen working (unseen)`, stand.traps?.length && `${n(stand.traps.length, 'trap')} in its files (traps)`].filter(Boolean);
-    lines.push(`Where things stand: view "handoff" with repo ${repo.id}. ${typeof stand.from === 'object' ? `Since the last session here to end, ${stand.from.title}, began (${stand.from.began.slice(0, 16).replace('T', ' ')} UTC)` : 'In the last week'}: ${n(then.counts.pushes, 'push', 'pushes')}, ${n(then.counts.settled, 'item')} settled, ${n(then.counts.opened, 'item')} opened, ${n(then.counts.sessions, 'session')} ended.${marks.length ? ` And ${marks.join(', ')}.` : ''}`);
-    const kind = (t: { type: string }) => `${l.registry.type(t.type)?.title ?? t.type}: `;
-    // What nobody has touched for a while is said to be so: it may no longer be true.
-    const age = (t: { last_confirmed: string | Date }) => {
-      const days = Math.floor((Date.now() - new Date(t.last_confirmed).getTime()) / 86_400_000);
-      return days >= STALE_DAYS ? `, not confirmed for ${days} days: check it before relying on it` : '';
-    };
-    if (work.ready.length) lines.push('', 'Open work and issues here that nothing blocks:', ...work.ready.slice(0, 15).map((t) => `- ${kind(t)}${t.title} (${t.id})${age(t)}`));
-    if (work.blocked.length) lines.push('', 'Blocked work here:', ...work.blocked.slice(0, 15).map((t) => `- ${t.title} (${t.id}), waiting on: ${t.waiting_on.join('; ')}`));
-    // Work that is owed though nobody wrote it down: what has grown into the hub of its problem and has no view of its own.
-    const owed = 'to_shape' in stand ? stand.to_shape!.hubs : [];
-    if (owed.length)
-      lines.push(
-        '',
-        'Hubs here with no view of their own (each holds enough to be the hub of its problem; when you work in one, give it its views: lens items about it, named for the questions they answer. View "hubs" says how much each holds):',
-        ...owed.slice(0, 8).map((h) => `- ${h.title} (${h.id}), holding ${h.inside}`),
-      );
-  } else if (!repo) {
-    lines.push(`Archipelago does not know a repository for this folder${input.remote ? ` (a checkout of ${input.remote})` : ''}. If its work belongs in the map, give a repository there this address as its remote.`);
-  }
-  // The owner is here, in chat, and mostly nowhere else: what agents settled since they last answered is put to them now.
-  const ask = await toConfirm(l, { limit: 15 });
-  const judged = ask.questions.filter((q) => !q.on.startsWith('the owner'));
-  if (ask.on_agents_judgment)
-    lines.push(
-      '',
-      `For the owner, in your first reply: since they last looked, agents have settled ${ask.on_agents_judgment} ${ask.on_agents_judgment === 1 ? 'question' : 'questions'} on their own judgment${ask.on_owners_word ? ` (and recorded ${ask.on_owners_word} more as the owner's own answers in chat: say how many, and list them only if asked, with query "attention", reason to_confirm)` : ''}. Show them these, a line for each, and ask them to confirm or correct. When they have answered, call settle with action confirmed, upto ${ask.upto} and what they said; change or reopen what they correct.`,
-      ...judged.map((q) => `- ${q.title}: ${q.answer} (${q.id})`),
-      ...(ask.on_agents_judgment > judged.length ? [`- and ${ask.on_agents_judgment - judged.length} more: query "attention" with person "me" and reasons ["to_confirm"].`] : []),
-    );
-  // The commits in this checkout that no one has accounted for are put to the session as unconfirmed answers are.
-  if (repo) lines.push(...((u) => (u.length ? ['', ...u] : []))(await unaccountedText(l, sentCommits(input.commits), repo.id)));
-  const [heldNow, { rows: holdable }] = await Promise.all([heldResources(l), l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null`, [l.registry.having('capacity')])]);
-  for (const res of holdable.filter((one) => l.registry.capacity(one) !== Infinity)) {
-    const held = heldNow.find((h) => h.resource === res.id);
-    lines.push('', `Exclusive resource "${res.title}" (${res.id}) is ${held ? `HELD by ${held.held_by_title}: do not use it` : 'free'}. Claim it with the pelago assign tool, action claim (holder ${started.run}), before using it, and give it back with revise, action release, after.`);
-  }
-  // What every session is told is kept on the map as instructions (src/instructions.ts): the core pack's, under the owner's.
-  lines.push('', ...(await instructionsFor(l, 'session_start', { about: repo?.id, fill: { run: started.run } })).map((one) => one.text));
-  return lines.join('\n');
-}
-
-export async function hookSessionEnd(l: Archipelago, input: { session_id?: string; reason?: string }): Promise<void> {
-  if (!input.session_id) return;
-  const run = await resolveRun(l, input.session_id, true);
-  if (run) await sessionEnd(l, { kind: 'agent', name: 'claude-code' }, { run: run.id, outcome: 'finished', summary: input.reason ? `Session ended (${input.reason})` : undefined });
 }

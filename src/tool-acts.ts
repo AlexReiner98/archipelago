@@ -97,19 +97,21 @@ export const ACT_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => putPlaces(l, actor, input),
   },
   session_start: {
-    description: 'Register this agent session in the map so the human can see it: their page opens it a tab of its own. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Takes effect at once.',
+    description: 'Register this agent session in the map so the human can see it: their page opens it a tab of its own, named by your chat’s title, and closes it when the chat ends (report session_end with reason; a chat that goes quiet for 12 hours is ended for it). Safe to call again on resume: the same session_id takes up the same session. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Takes effect at once.',
     input: {
-      title: z.string().optional().describe('A few words on what this session is for.'),
+      title: z.string().optional().describe('What your chat is called, as your client shows it; else a few words on what this session is for. Renamed later: report session_update with title.'),
       task: z.string().optional().describe('Id of the item being worked on.'),
       surface: z.string().optional().describe('Where you are running, e.g. claude-code, claude-desktop.'),
       cwd: z.string().optional().describe('Your working directory. Used to find the repository.'),
       remote: z.string().optional().describe('The address the checkout was cloned from (git remote origin). Finds the repository on any machine; the directory is used when this is not given or not known.'),
       session_id: z.string().optional().describe('The id your surface gave this session, if you know it. Makes this call safe to repeat.'),
       branch: BRANCH,
+      source: z.enum(['startup', 'resume', 'clear', 'compact']).optional().describe('Why your client started it, if it says: after clear, the chat goes on, and this session takes over the tab of the one the clear ended in the same folder.'),
     },
     run: async (l, actor, input) => {
       const started = await sessionStart(l, actor, input);
-      if (!('resumed' in started)) await sessionOpened(l, actor, started.run, input.task);
+      // A new session, or one taken up again after it ended, gets its tab; one still open has it.
+      if (!started.resumed || started.reopened) await sessionOpened(l, actor, started.run, input.task, started.took_over);
       return started;
     },
   },
@@ -120,6 +122,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       status: z.enum(['running', 'waiting']).optional(),
       note: z.string().optional().describe('What happened, what you found, or what you are blocked on.'),
       task: z.string().optional(), branch: BRANCH,
+      title: z.string().optional().describe('What your chat is called now, when it was renamed: the tab on the owner’s page follows.'),
     },
     run: async (l, actor, input) => {
       const updated = await sessionUpdate(l, actor, input);
@@ -182,6 +185,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     input: {
       run: z.string().describe('The run id from session_start, or the session id.'),
       outcome: z.enum(['finished', 'failed', 'cancelled', 'done', 'success']).optional().describe('finished, failed or cancelled; done and success are read as finished.'),
+      reason: z.string().max(40).optional().describe('Only when the chat itself has ended, as your client says it (closed, archived, deleted, exit): the session then ends, its tab on the owner’s page closes. Without it, a session a chat keeps stays open until the chat ends.'),
       summary: z.string().optional().describe('What was done and what is left.'),
       still_true: z.array(z.string()).optional().describe('Ids of open items you have checked and found still true as written.'),
       cannot_tell: z.array(z.string()).optional().describe('Ids of open items this session had nothing to do with and cannot check from where it is. They are left as they were, and the session says it did not check them.'),
@@ -190,7 +194,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => {
       // An agent says where the repository's work stands; the human ending a session from the UI is not asked.
       const outcome = input.outcome === 'done' || input.outcome === 'success' ? 'finished' : input.outcome;
-      const result = await sessionEnd(l, actor, { ...input, outcome, reconcile: actor.kind === 'agent', chat_goes_on: actor.kind === 'agent' });
+      const result = await sessionEnd(l, actor, { ...input, outcome, reconcile: actor.kind === 'agent', chat_goes_on: actor.kind === 'agent' && !input.reason });
       if ('ended' in result) return result;
       // If this server started the session's process, stop that too.
       return { ...result, process_stopped: stopLaunched(result.run) };

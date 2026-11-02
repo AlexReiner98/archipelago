@@ -85,7 +85,7 @@ const NAMES_PACK_TYPES: Record<string, number> = {
   'src/diagram-types.ts': 1, 'src/documents.ts': 2, 'src/eventlog.ts': 1, 'src/launcher.ts': 1, 'src/query-presets.ts': 1, 'src/query-saved.ts': 1, 'src/looks.ts': 1,
   'src/manifest.ts': 1, 'src/outside.ts': 1, 'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2, 'src/pg.ts': 1,
   'src/public-document.ts': 1, 'src/public.ts': 2, 'src/replay.ts': 1, 'src/rules.ts': 1, 'src/saved-views.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2,
-  'src/sessions.ts': 4, 'src/surface.ts': 2, 'src/tail.ts': 1, 'src/tool-ops.ts': 2, 'src/tool-reads.ts': 2, 'src/ui-files.ts': 2, 'src/workspace-share.ts': 1,
+  'src/session-hook.ts': 4, 'src/surface.ts': 2, 'src/tail.ts': 1, 'src/tool-ops.ts': 2, 'src/tool-reads.ts': 2, 'src/ui-files.ts': 2, 'src/workspace-share.ts': 1,
   'ui/app.js': 1, 'ui/canvas.js': 1, 'ui/doc.js': 5, 'ui/draft.js': 2, 'ui/item-doc.js': 1, 'ui/item.js': 2, 'ui/proof.js': 2, 'ui/screens.js': 4, 'ui/workspace-cards.js': 1,
 };
 

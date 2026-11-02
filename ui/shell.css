@@ -63,7 +63,9 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 @keyframes tab-shown { 50% { background: var(--accent-soft); } }
 #tabs .tab-name { min-width: 0; margin-right: var(--space-5); overflow: hidden; text-overflow: ellipsis; }
 #tabs .tab-name.who-session::before { margin-right: var(--space-3); }
-#tabs > .tab[data-follows="none"] .tab-name { font-style: italic; }
+#tabs > .tab[data-ended] .tab-name { text-decoration: line-through; }
+#tabs > .tab[data-quiet] .tab-name { opacity: var(--ln-dim); }
+#tabs > .tab.tab-chats { margin-left: var(--space-6); }
 /* Every control on the strip, in the bar and on a pane is a button a finger finds: a square of one size, its mark large enough to read. */
 #tabs .tab-act, #tabs > .tab-new, #query .q-save, .pane-bar .pane-act { flex: none; display: inline-grid; place-items: center; box-sizing: border-box; width: var(--box-7); height: var(--box-7); padding: 0; border: 0; border-radius: var(--radius-2); background: none; color: var(--muted); font-size: var(--text-8); line-height: 1; cursor: pointer; }
 #tabs .tab-act:hover, #tabs > .tab-new:hover, #query .q-save:hover:not(:disabled), .pane-bar .pane-act:hover { color: var(--text); background: var(--accent-soft); }

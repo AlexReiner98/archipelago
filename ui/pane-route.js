@@ -1,15 +1,14 @@
 // Where an agent's step lands among the owner's tabs and the panes in each (ui/tab-bar.js, ui/panes.js), worked out
 // from whom each tab follows and whose each pane is, and nothing else, so it is tested without a page. A tab is a set of
-// panes, every one alike, and follows everyone (as the first does unless the reader says), one session, or nobody (decisions
-// e_622ev534, e_nwmx4tbd, e_y7uz9pk9; tabs: e_mzer5m4t, e_q3amet26, e_ezb7s3a7, e_xjrpyysn):
-// - A session that has just begun (`opens`, said by the server, never by a show) gets a tab of its own, out of sight and
-//   marked, wherever it could have landed; a page whose tabs all follow nobody takes none (the owner, 1 Nov 2026, e_c5stzz6z).
+// panes, every one alike, and follows one session or nobody (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9; tabs:
+// e_mzer5m4t, e_q3amet26, e_ezb7s3a7, e_xjrpyysn). Every chat has a tab of its own, opened as it begins, named by its
+// title and closed as it ends (ui/tab-life.js; the design e_p6fr4uye); the owner's own tabs follow nobody unless they
+// set one to follow a chat (e_jk6bnuh9):
 // - Only a show lands (ui/live.js sends no other). A change or a beat of a session's story moves nothing (the owner,
 //   29 Oct 2026, e_e7yfp2yg): with several sessions at work, the reader's canvas stays where they left it.
-// - A show goes to a tab that follows its session, else to one that follows everyone and no other session at work
-//   holds: the one it holds already, else the one drawing it, else the one in sight. A session holds such a tab while
-//   it lands there within `recent`. When every such tab is another's, the session gets a tab of its own, following it,
-//   out of sight and marked; there is no most.
+// - A show goes to a tab that follows its session, else to a tab holding a pane of its own (one the owner merged
+//   elsewhere), else to a tab of its own, opened out of sight and marked: a chat's tab the owner closed comes back with
+//   its next show (e_qvdrv6h3), and a session that has just begun (`opens`, said by the server) gets one too.
 // - Within the tab: the pane it named (`pane: "review"`), opened beside the others if there is none; a side asked for
 //   moves its pane there. Else its own pane: the one held for it (a pane keeps whose it is as long as it stands, so a
 //   long session finds it again), else one drawing what it shows or one nobody holds, never the pane the reader is in
@@ -29,11 +28,15 @@ export const sessionOf = (step) => step.run ?? step.actor;
 
 /** The sessions heard from while the page is open, by key: what to call each one, and when it last took a step. */
 export const heard = new Map();
-/** Hear a step: its session is among those a tab can follow, called by what its surface calls it, else by its name, else by its agent's. */
+/**
+ * Hear a step: its session is among those a tab can follow, called by what its chat is called (`title`, the run's, which
+ * follows a rename), else by its agent's name. `name` is its word, never shown: the key to its hue (ui/words.js).
+ */
 export function hear(step) {
   const key = sessionOf(step);
-  const name = step.name ?? step.actor.split(/[/:]/).at(-1);
-  heard.set(key, { name, label: step.label, called: step.label ?? (step.name ? `Session ${step.name}` : name), at: Math.max(step.at, heard.get(key)?.at ?? 0), run: step.run, ended: heard.get(key)?.ended });
+  const agent = step.actor.split(/[/:]/).at(-1);
+  const was = heard.get(key);
+  heard.set(key, { name: step.name ?? was?.name ?? agent, called: step.title ?? step.label ?? was?.called ?? agent, at: Math.max(step.at, was?.at ?? 0), run: step.run, ended: step.ends ? true : step.opens ? false : was?.ended, quiet: was?.quiet });
 }
 /**
  * Hear the sessions open now (the `sessions` view): one this page has heard nothing from can be followed too, and one
@@ -43,9 +46,8 @@ export function hearOpen(open) {
   const now = new Set(open.map((s) => s.id));
   for (const [key, one] of heard) if (key.startsWith('e_')) one.ended = !now.has(key);
   for (const s of open) {
-    if (heard.has(s.id)) continue;
-    const called = s.label ?? (s.name ? `Session ${s.name}` : s.title);
-    heard.set(s.id, { name: s.name ?? s.title, label: s.label, called, at: Date.parse(s.last_seen), run: s.id });
+    const was = heard.get(s.id);
+    heard.set(s.id, { name: s.name ?? was?.name ?? s.title, called: s.title, at: Math.max(Date.parse(s.last_seen), was?.at ?? 0), run: s.id, ended: false, quiet: Boolean(s.stale) });
   }
 }
 /** Whom a tab can follow, newest first: the sessions not ended, and an agent at work with no session of its own, within `recent`. */
@@ -62,21 +64,20 @@ export function nameOf(key) {
 }
 
 /**
- * Where this step goes. `tabs` are the tabs there are, each { id, follows: 'all' | 'none' | <session>, front?, popped?,
+ * Where this step goes. `tabs` are the tabs there are, each { id, follows: 'none' | <session>, front?, popped?,
  * panes }, `front` for the one in sight and `popped` for one in a window of its own; `panes` are its panes in order,
- * each { id, slot?, held?, focus?, draws?, busy?, landed?: { session, at } }, with `held` the session it is kept for,
+ * each { id, slot?, held?, by?, focus?, draws?, busy?, landed?: { session, at } }, with `held` the session it is kept for, `by` the one it was made for,
  * `focus` on the one the reader last touched, `draws` true where it draws what the step names and `busy` where the
  * reader is at work in it. Answers { tab, pane, side?, front } to draw it in a pane (moved to `side` when one is
  * asked), { tab, split: { slot?, side }, side?, front } to split a pane into a tab, { open: { follows, slot? }, front }
  * to open a tab, { later: true } to try again, or { nowhere: true } when no tab takes it; `front` says whether the tab
  * is in sight, never brought there.
  */
-export function route(step, tabs, { now, recent, drawable = true }) {
+export function route(step, tabs, { drawable = true } = {}) {
   const session = sessionOf(step);
   const asked = step.pane;
   const slot = asked && !SIDE_WORDS.has(asked) ? asked : undefined;
   const last = (t) => t.panes.map((p) => p.landed).filter(Boolean).sort((a, b) => b.at - a.at)[0];
-  const lately = (l, within) => Boolean(l) && now - l.at < within;
   const working = (t) => t.panes.some((p) => p.busy);
   // A tab of its own is opened out of sight, marked for the reader to go to; the one in sight stays in sight.
   const ownTab = () => ({ open: { follows: session, ...(slot && { slot }) }, front: false });
@@ -92,8 +93,8 @@ export function route(step, tabs, { now, recent, drawable = true }) {
       return named ? { pane: named.id } : { split: { slot, side: 'right' } };
     }
     // A pane nobody holds or named, never the one the reader is in or touched last.
-    const free = (p) => (!p.held || p.held === session) && !p.slot && !p.focus && !p.busy;
-    const mine = t.panes.find((p) => p.held === session && !p.focus) ?? (all ? inFocus : t.panes.find((p) => free(p) && p.draws) ?? t.panes.find(free));
+    const free = (p) => (!p.held || p.held === session) && (!p.by || p.by === session) && !p.slot && !p.focus && !p.busy;
+    const mine = t.panes.find((p) => (p.held === session || p.by === session) && !p.focus) ?? (all ? inFocus : t.panes.find((p) => free(p) && p.draws) ?? t.panes.find(free));
     // Alone closes the other panes: only in a tab that follows this session alone.
     const side = asked && SIDE_WORDS.has(asked) && asked !== 'main' && (asked !== 'alone' || all) ? asked : undefined;
     const moved = side ? { side } : {};
@@ -109,14 +110,8 @@ export function route(step, tabs, { now, recent, drawable = true }) {
   }
   const own = tabs.filter((t) => t.follows === session).sort((a, b) => (last(b)?.at ?? 0) - (last(a)?.at ?? 0))[0];
   if (own) return into(own);
-  if (step.opens) return tabs.some((t) => t.follows !== 'none') ? ownTab() : { nowhere: true };
-  // A pane of its own moved into a tab that follows someone else stays its own (ui/tab-bar.js); the reader's Nobody is kept.
-  const holding = tabs.find((t) => !['all', 'none'].includes(t.follows) && !t.popped && t.panes.some((p) => p.held === session));
+  // A pane of its own the owner merged into another tab: its shows find it there, and no tab of its own is opened.
+  const holding = !step.opens && tabs.find((t) => !t.popped && t.panes.some((p) => p.held === session || p.by === session));
   if (holding) return into(holding);
-  const heldByOther = (t) => !t.panes.some((p) => p.held === session) && lately(last(t), recent) && last(t).session !== session;
-  const open = tabs.filter((t) => t.follows === 'all' && !t.popped && !heldByOther(t));
-  const free = open.find((t) => t.panes.some((p) => p.held === session)) ?? open.find((t) => last(t)?.session === session) ?? open.find((t) => t.panes.some((p) => p.draws && !p.focus)) ?? open.find((t) => t.front) ?? open[0];
-  if (free) return into(free);
-  // Every tab that follows everyone is someone else's now: a tab of its own, if there are any that follow everyone.
-  return tabs.some((t) => t.follows === 'all') ? ownTab() : { nowhere: true };
+  return ownTab();
 }

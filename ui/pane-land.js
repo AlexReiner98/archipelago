@@ -6,9 +6,10 @@
 
 import { hooks } from './base.js';
 import { busy, windowOf } from './pane-busy.js';
-import { heard, nameOf, route, sessionOf } from './pane-route.js';
+import { route, sessionOf } from './pane-route.js';
 import { activeId, flash, goPane, markPanes, only, openPane, paneAt, place } from './panes.js';
 import { arrived, drawStrip, openTab, toFront } from './tab-bar.js';
+import { chatTab, revive, takeOver } from './tab-life.js';
 import { drawable, focusOf, keep, landed, named, outTabs, poppedTab, tabOf, tabs } from './tabs.js';
 
 /** The page starts its tabs through here (ui/app.js), so that where a step lands is loaded with them. */
@@ -25,6 +26,9 @@ hooks.land = (step) => {
   const page = step.canvas ? undefined : itemOf(at);
   const session = sessionOf(step);
   const now = Date.now();
+  // The chat is heard from: a tab struck or closed for it is its own again; after a clear, the one before it is this one.
+  if (step.takes) takeOver(step.takes, session);
+  revive(session);
   const paneOf = (t, id, inSight) => ({
     id,
     slot: t.panes[id]?.slot,
@@ -34,11 +38,11 @@ hooks.land = (step) => {
     busy: inSight && busy(id),
     draws: named(t.panes[id]?.at) === named(paneAt(at)),
   });
-  const docked = tabs.list.map((t) => ({ id: t.id, follows: t.follows ?? 'all', front: t.id === tabs.front, panes: t.groups.map((g) => paneOf(t, g, t.id === tabs.front)) }));
+  const docked = tabs.list.map((t) => ({ id: t.id, follows: t.follows ?? 'none', front: t.id === tabs.front, panes: t.groups.map((g) => paneOf(t, g, t.id === tabs.front)) }));
   const out = outTabs()
     .filter((t) => !tabOf(t.id) && windowOf(t.id))
-    .map((t) => ({ id: t.id, follows: t.follows ?? 'all', popped: true, panes: [{ ...paneOf(t, focusOf(t), false), busy: busy(t.id) }] }));
-  const to = route(step, [...docked, ...out], { now, recent: 600_000, drawable: drawable(at) });
+    .map((t) => ({ id: t.id, follows: t.follows ?? 'none', popped: true, panes: [{ ...paneOf(t, focusOf(t), false), busy: busy(t.id) }] }));
+  const to = route(step, [...docked, ...out], { drawable: drawable(at) });
   // The pane is held for the session from now on, unless it is the reader's in focus (lit only because it drew this) or
   // named; its strip's mark says who sent it, and the mark's tooltip why (ui/panes.js).
   const lit = (t, pane) => {
@@ -53,7 +57,7 @@ hooks.land = (step) => {
     if (to.later) return 'later';
     if (to.open) {
       // A page that is no canvas opens over a tab's Home, as one of its own open over its pane does.
-      const id = openTab(drawable(at) ? `#/${at}` : '#/', { follows: to.open.follows, named: nameOf(to.open.follows), word: heard.get(to.open.follows)?.name, ...(to.open.slot && { slot: to.open.slot }) }, to.front);
+      const id = openTab(drawable(at) ? `#/${at}` : '#/', { ...chatTab(to.open.follows), ...(to.open.slot && { slot: to.open.slot }) }, to.front);
       const t = tabOf(id);
       if (page || !drawable(at)) ((t.sheet = page ? `e/${page}` : at.split('?')[0]), keep());
       lit(t, focusOf(t));
@@ -68,7 +72,8 @@ hooks.land = (step) => {
       landed.set(`${to.tab}:${to.pane}`, { session, at: now });
       return;
     }
-    const split = () => openPane(at, to.split.side, t.groups.at(-1), { ...(to.split.slot && { slot: to.split.slot }), ...(!to.split.slot && t.follows !== session && { held: session }) }, t);
+    // A pane split for the session is its own, and closes as its chat ends (ui/tab-life.js).
+    const split = () => openPane(at, to.split.side, t.groups.at(-1), { by: session, ...(to.split.slot && { slot: to.split.slot }), ...(!to.split.slot && t.follows !== session && { held: session }) }, t);
     // Not a canvas (a screen, the workspace): the page opens over the tab's pane in focus.
     if (!drawable(at)) {
       if (t.id === tabs.front) location.hash = `#/${at}`;

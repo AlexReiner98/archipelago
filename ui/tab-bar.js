@@ -1,7 +1,8 @@
 // Tabs at the top of the page (decision e_mzer5m4t): each a set of panes side by side, every one alike (ui/panes.js),
-// kept by ui/tabs.js. Several sessions at work each keep a tab of their own, named by the session and marked in its hue
-// (ui/words.js), so their work mirrors into the page without squeezing a pane or opening a window; where a step lands
-// is ui/pane-route.js. There is no most: many tabs shrink to their mark and first letters (e_q3amet26). A tab, not a
+// kept by ui/tabs.js. Every chat at work has a tab of its own, named by its title and marked in its hue (ui/words.js),
+// opened and closed as the chat begins and ends (ui/tab-life.js), so its work mirrors into the page without squeezing a
+// pane or opening a window; where a step lands is ui/pane-route.js. The owner's own tabs stand at the left, the chats'
+// after them (e_pfpgendq). There is no most: many tabs shrink to their mark and first letters (e_q3amet26). A tab, not a
 // pane, pops out into a window of its own, from its strip or dragged out of the page, and docks back whole (e_ezb7s3a7).
 // Tabs merge: from ⋯, or a tab dragged onto another, and a pane dragged onto a tab joins it (e_c5stzz6z's way back).
 // What is the tab's own lives on the strip, never in the query bar, which shows the lens (decision e_j7ggggjr, asked):
@@ -15,7 +16,7 @@ import { windowOf, windows } from './pane-busy.js';
 import { followable, heard, hearOpen, nameOf } from './pane-route.js';
 import { activeAt, activeIs, close, draw, paneAt, paneButtons, startPanes } from './panes.js';
 import { filterSaid } from './query-bar.js';
-import { focusOf, front, freshTab, isOutKey, keep, landed, listKey, named, outKey, outTabs, poppedTab, read, save, tabHref, tabOf, tabs } from './tabs.js';
+import { dismissed, focusOf, front, freshTab, isOutKey, keep, landed, listKey, named, outKey, outTabs, poppedTab, read, save, tabHref, tabOf, tabs } from './tabs.js';
 import { sessionHue, titles } from './words.js';
 
 read();
@@ -23,6 +24,9 @@ const strip = document.getElementById('tabs');
 
 /** Bring tab `t` into sight: its panes drawn, the address its pane in focus's, the page it had open over it open again. */
 function show(t) {
+  // A tab struck because its chat ended while it was in sight goes once the reader leaves it (ui/tab-life.js).
+  const left = front();
+  if (left && left !== t && left.ended) for (const run of left.ended) hooks.settleTab?.(left, run);
   tabs.front = t.id;
   t.unseen = false;
   keep();
@@ -105,9 +109,14 @@ export function arrived(id) {
   void el?.offsetWidth;
   el?.classList.add('tab-shown');
 }
+/** Whether tab `t` can be closed: any chat's, and the owner's while they have another (a page always keeps one of theirs). */
+const closable = (t) => Boolean(t.chat) || tabs.list.filter((o) => !o.chat).length > 1;
 function closeTab(id) {
   const n = tabs.list.findIndex((t) => t.id === id);
-  if (n < 0 || tabs.list.length < 2) return;
+  if (n < 0 || !closable(tabs.list[n])) return;
+  // A running chat's tab closed by hand stays closed until the chat next shows something (e_qvdrv6h3).
+  const chat = tabs.list[n].chat;
+  if (chat && !tabs.list[n].ended && !heard.get(chat)?.ended) dismissed.add(chat);
   tabs.list.splice(n, 1);
   for (const key of [...landed.keys()]) if (key.startsWith(`${id}:`)) landed.delete(key);
   if (id === tabs.front) show(tabs.list[Math.max(0, n - 1)]);
@@ -174,7 +183,8 @@ function pressTab(ev, t, out) {
 function tabEl(t, out) {
   const { name, hue, session } = nameOfTab(t);
   const inSight = t.id === tabs.front && !out;
-  const whom = t.follows === 'none' ? 'follows nobody' : session ? 'follows its session' : 'follows everyone';
+  const one = session ? heard.get(session) : undefined;
+  const whom = t.chat ? 'this chat’s tab: it closes as the chat ends' : session ? 'yours, following this chat' : 'yours';
   const act = (label, mark, onclick) => h('button', { type: 'button', class: 'tab-act', title: label, 'aria-label': label, onclick }, mark);
   const el = h(
     'div',
@@ -185,14 +195,16 @@ function tabEl(t, out) {
       'aria-selected': String(inSight),
       'data-tab': t.id,
       'data-unseen': t.unseen && !inSight ? 'true' : null,
-      'data-follows': t.follows === 'none' ? 'none' : null,
-      title: [session && heard.get(session)?.label && `Session ${heard.get(session).name}`, name, whom, out && 'in a window of its own: press to go to it', !out && !inSight && 'drag it out of the page to pop it out'].filter(Boolean).join(' · '),
+      'data-chat': t.chat ? 'true' : null,
+      'data-ended': t.chat && t.ended?.includes(t.chat) ? 'true' : null,
+      'data-quiet': one?.quiet && !one.ended ? 'true' : null,
+      title: [name, whom, t.chat && t.ended?.includes(t.chat) && 'its chat has ended: it goes when you leave it', one?.quiet && !one.ended && 'not heard from for a while', out && 'in a window of its own: press to go to it', !out && !inSight && 'drag it out of the page to pop it out'].filter(Boolean).join(' · '),
       style: hue ? `--session-hue: ${hue}` : null,
     },
     h('span', { class: `tab-name${session ? ' who-session' : ''}` }, name),
     // Every tab has the same controls, in sight or not, so nothing moves when another is brought into sight.
     !out && act('This tab: whom it follows, pop it out', '⋯', (ev) => tabMenu(ev.currentTarget, t)),
-    !out && tabs.list.length > 1 && act('Close this tab', '×', () => closeTab(t.id)),
+    !out && closable(t) && act('Close this tab', '×', () => closeTab(t.id)),
   );
   el.addEventListener('pointerdown', (ev) => pressTab(ev, t, out));
   el.addEventListener('keydown', (ev) => ev.key === 'Enter' && toFront(t.id));
@@ -203,13 +215,17 @@ function tabEl(t, out) {
 export function drawStrip() {
   if (!strip || poppedTab) return;
   const out = outTabs().filter((t) => !tabOf(t.id));
-  const all = [...tabs.list.map((t) => [t, false]), ...out.map((t) => [t, true])];
+  // The owner's tabs first, then the chats', each in the order they opened.
+  const all = [...tabs.list.map((t) => [t, false]), ...out.map((t) => [t, true])].sort(([a], [b]) => Boolean(a.chat) - Boolean(b.chat));
   const fresh = h('button', { type: 'button', class: 'tab-new', title: 'New tab: this canvas in a tab of its own', 'aria-label': 'New tab', onclick: () => openTab(activeAt()) }, '+');
-  strip.replaceChildren(...all.map(([t, o]) => tabEl(t, o)), fresh);
+  const els = all.map(([t, o]) => tabEl(t, o));
+  // Set apart by space where the chats' begin.
+  els.find((el, n) => n > 0 && el.dataset.chat && !els[n - 1].dataset.chat)?.classList.add('tab-chats');
+  strip.replaceChildren(...els, fresh);
   document.body.dataset.tabs = String(all.length);
 }
 
-// ---- Whom the tab in sight follows: everyone, nobody, or one session (its run, or the agent's name).
+// ---- Whom the tab in sight follows: nobody, or one session (its run, or the agent's name).
 
 /** The reader picks whom the tab in sight follows; a session it held lets go of it. */
 function setFollows(follows, t = front()) {
@@ -222,7 +238,7 @@ function setFollows(follows, t = front()) {
 const menuEl = h('div', { class: 'menu-items tab-menu', popover: 'auto', role: 'menu', 'aria-label': 'This tab' });
 document.body.append(menuEl);
 /** Ask which sessions are open: the menu is drawn at once from what is known, and again with the answer. */
-const readOpen = () => api('view', { name: 'sessions' }).then(({ open = [] }) => hearOpen(open), () => {});
+const readOpen = () => api('view', { name: 'sessions' }).then(({ open = [] }) => (hearOpen(open), hooks.sessionsOpen?.(open)), () => {});
 function tabMenu(anchor, t) {
   drawMenu(t);
   menuEl.showPopover();
@@ -234,23 +250,33 @@ function tabMenu(anchor, t) {
   });
 }
 function drawMenu(t) {
-  const now = t.follows ?? 'all';
+  const now = t.follows ?? 'none';
   const sessions = followable({ now: Date.now(), recent: 600_000 });
   // What the tab follows stays in sight, ended or not, so the reader can see it and change it.
-  if (!['all', 'none', ...sessions].includes(now)) sessions.unshift(now);
+  if (!['none', ...sessions].includes(now)) sessions.unshift(now);
   const pick = (key, said, title) => h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(key === now), title, onclick: () => (menuEl.hidePopover(), setFollows(key, t)) }, said);
   menuEl.replaceChildren(
     ...[
       h('div', { class: 'tab-menu-head', title: 'Whose shows and changes come into this tab' }, 'Follows'),
-      pick('all', 'Everyone', 'Every session’s, unless another tab follows it'),
       pick('none', 'Nobody', 'No agent moves this tab'),
       ...sessions.map((key) => pick(key, key === now && !heard.has(key) ? (t.named ?? nameOf(key)) : nameOf(key), key)),
+      t.chat && h('hr'),
+      t.chat && h('button', { type: 'button', role: 'menuitem', title: 'Make this tab yours: it stays when its chat ends', onclick: () => (menuEl.hidePopover(), keepTab(t)) }, 'Keep'),
       tabs.list.length > 1 && h('hr'),
       tabs.list.length > 1 && h('button', { type: 'button', role: 'menuitem', title: 'Into a window of its own: ⇲ there docks it back', onclick: () => (menuEl.hidePopover(), popOut(t.id)) }, 'Pop out'),
       tabs.list.length > 1 && h('div', { class: 'tab-menu-head', title: 'Put this tab’s panes beside those of another' }, 'Merge into'),
       ...tabs.list.filter((o) => o !== t).map((o) => h('button', { type: 'button', role: 'menuitem', onclick: () => (menuEl.hidePopover(), joinTab(t, o)) }, nameOfTab(o).name)),
     ].filter(Boolean),
   );
+}
+
+/** Keep a chat's tab: every pane in it is the owner's, so it stays as theirs when the chat ends (e_n7gpy3pt). */
+function keepTab(t) {
+  delete t.chat;
+  delete t.ended;
+  for (const g of t.groups) delete t.panes[g].by;
+  keep();
+  drawStrip();
 }
 
 /** The query bar's own: the pane's buttons (in a popped window, dock back). Whom the tab follows and a new tab are the strip's. */
@@ -285,6 +311,7 @@ addEventListener('hashchange', () => {
   drawStrip();
 });
 hooks.paneMoved = () => drawStrip();
+hooks.drawStrip = () => drawStrip();
 // What a popped window docked back or let go, or another of the reader's pages changed, is drawn here as it is kept.
 addEventListener('storage', (ev) => {
   if (poppedTab) return;
@@ -321,4 +348,6 @@ export function startTabs() {
   startPanes();
   drawStrip();
   if (!poppedTab) readOpen();
+  // Coming back to the page, what ended or began while it was out of sight is mirrored.
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && !poppedTab && readOpen());
 }

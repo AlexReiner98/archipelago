@@ -33,13 +33,13 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       seq: z.number().int().nonnegative().optional().describe('The `seq` of the last answer: what other events after it touched is said.'),
       ids: z.array(z.string()).max(HELD_MOST).optional().describe('The items and links the page holds. Facts are read only on these, the links made touching them, and what those bring.'),
       page: z
-        .object({ page: z.string().max(40), on: z.boolean(), where: z.string().max(2000).optional() })
+        .object({ page: z.string().max(40), on: z.boolean(), where: z.string().max(2000).optional(), tab: z.object({ chat: z.string().max(40), own: z.boolean() }).optional() })
         .optional()
         .describe('The page asking, whether a show can land in it, and where it stands (its address after "#/"): an agent’s show says how many pages can take it, and an agent is told what the owner is looking at.'),
     },
     run: async (l, _actor, { after, seq, ids = [], page }) => {
       if (page) await looked((await wholeMap(l)).db, l, { page: page.page, on: page.on });
-      if (page?.where !== undefined) await standsAt((await wholeMap(l)).db, l, page.page, page.where);
+      if (page?.where !== undefined) await standsAt((await wholeMap(l)).db, l, page.page, page.where, page.tab);
       const [queue, { told, ...seen }, pos] = await Promise.all([l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending' -- index proposal_status`), presence((await wholeMap(l)).db, l), headPos(l.db)]);
       const stand = { queue: `${queue.rows[0].n}.${told}`, ...seen, ui: uiStamp() };
       const events = await eventsAfter(l.db, { seq, ids });
