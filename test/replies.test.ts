@@ -162,22 +162,32 @@ test('the session-start text tells an agent to answer the owner with a drawing',
   assert.match(text, /A yes, a number or one item is a line in chat/);
 });
 
-test('core asks a reply that worked and told the map nothing to tell what it found, and the owner can turn that off', async () => {
+test('core asks a reply that worked and put nothing on the map to tell what it found, at a number the owner sets, until they turn it off', async () => {
   const l = await map();
   const record = l.registry.rules.find((r) => r.pack === 'core' && r.id === 'record_findings')!;
   assert.ok(record && checkRules([record], { types: new Map() }).length === 0, 'core ships it, checked as data');
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: true } });
   const { run } = await sessionStart(l, agent, { session_id: 'f1' });
-  const worked = { read: 1, worked: 12, edited: 3, changed: 1, told: 0 };
-  assert.deepEqual(await stop(l, { session_id: 'f1', turn: 't1', reply: worked }), { decision: 'block', reason: record.say }, 'a status changed is not a finding told');
+  const worked = { read: 1, worked: 12, edited: 3, changed: 0, told: 0 };
+  assert.deepEqual(await stop(l, { session_id: 'f1', turn: 't1', reply: worked }), { decision: 'block', reason: record.say });
   assert.deepEqual((await story(l, { run })).beats.map((b) => b.asked), ['core.record_findings']);
   const not: [string, Record<string, number>][] = [
     ['told', { ...worked, told: 1 }],
-    ['a short reply', { ...worked, worked: 2 }],
+    ['an item changed, a note as much as a new one', { ...worked, changed: 1 }],
+    ['a short reply', { ...worked, worked: 5 }],
   ];
   for (const [why, reply] of not) assert.deepEqual(await stop(l, { session_id: 'f1', turn: `t-${why}`, reply }), {}, why);
+
+  const row = async () => ((await callTool(l, owner, 'workspace_info', {})) as any).reply_rules.find((r: any) => r.rule === 'core.record_findings');
+  assert.deepEqual([(await row()).counts, (await row()).at], ['worked', 6], 'the pack’s number, and what it counts');
+  await assert.rejects(callTool(l, owner, 'workspace_set', { asks_at: { reply_draw_answers: 3 } }), /No rule here that counts/);
+  await callTool(l, owner, 'workspace_set', { asks_at: { reply_record_findings: 20 } });
+  assert.equal((await row()).at, 20, 'the owner’s number');
+  assert.deepEqual(await stop(l, { session_id: 'f1', turn: 't-under', reply: worked }), {}, 'under the owner’s number');
+  assert.equal(((await stop(l, { session_id: 'f1', turn: 't-over', reply: { ...worked, worked: 20 } })) as any).decision, 'block', 'at it');
+
   await callTool(l, owner, 'workspace_set', { lifted: { reply_record_findings: true } });
-  assert.deepEqual(await stop(l, { session_id: 'f1', turn: 't2', reply: worked }), {}, 'turned off');
+  assert.deepEqual(await stop(l, { session_id: 'f1', turn: 't2', reply: { ...worked, worked: 30 } }), {}, 'turned off');
 });
 
 test('the session-start text says the map, not the chat, is the record, and that telling is checked', async () => {

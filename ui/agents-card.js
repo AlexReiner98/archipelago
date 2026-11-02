@@ -77,5 +77,8 @@ export function checkRow(r) {
   const on = h('input', { type: 'checkbox', checked: !r.off, title: 'On: it asks an agent whose reply did what it names' });
   const name = h('span', { class: 'grow', title: `A check: once a turn, it asks an agent whose reply did what it names.\n${r.say}` }, h('strong', {}, r.rule.split('.').pop().replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase())), ' ', h('span', { class: 'muted small' }, 'a check on replies'));
   on.onchange = () => api('workspace_set', { lifted: { [r.lifted]: !on.checked } }).catch((err) => ((on.checked = !on.checked), (name.title = err.message)));
-  return line(name, h('span', { class: 'pill', title: `Asked ${r.asked} time${r.asked === 1 ? '' : 's'} in the last week` }, String(r.asked)), on);
+  // A check that counts: how many the reply must do before it asks, the owner's to set.
+  const at = r.counts && h('input', { type: 'number', min: '1', step: '1', value: String(r.at), style: 'width: var(--hours-field)', title: `Asks once a reply has done this many (${r.counts})` });
+  if (at) at.onchange = () => api('workspace_set', { asks_at: { [r.lifted]: Number(at.value) } }).then(() => (r.at = Number(at.value))).catch((err) => ((at.value = String(r.at)), (at.title = err.message)));
+  return line(name, ...(at ? [at] : []), h('span', { class: 'pill', title: `Asked ${r.asked} time${r.asked === 1 ? '' : 's'} in the last week` }, String(r.asked)), on);
 }

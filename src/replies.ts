@@ -5,7 +5,7 @@ import { shas, unaccounted } from './commits.ts';
 import type { Q } from './db.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { tellStamp } from './presence.ts';
-import { holds, onReply, replyFacts } from './reply-rules.ts';
+import { atSetting, countsTo, holds, isAt, onReply, replyFacts } from './reply-rules.ts';
 import type { Rule } from './rules.ts';
 import { tell } from './sessions.ts';
 import { keep, kept } from './transient.ts';
@@ -13,12 +13,12 @@ import { keep, kept } from './transient.ts';
 /** How long a turn's asking is remembered: past it, the turn is long over. */
 const ASKED_MS = 86_400_000;
 
-/** Which reply rules the owner has turned off here. */
-async function liftedHere(whole: Q, rules: Rule[]): Promise<Set<string>> {
-  const names = rules.map((r) => r.lifted!);
-  if (!names.length) return new Set();
+/** Which reply rules the owner has turned off here, and the number each rule that counts is set to count to. */
+async function liftedHere(whole: Q, rules: Rule[]): Promise<{ off: Set<string>; at: Map<string, number> }> {
+  const names = rules.flatMap((r) => [r.lifted!, atSetting(r)]);
+  if (!names.length) return { off: new Set(), at: new Map() };
   const { rows } = await whole.query<{ key: string; value: unknown }>(`select key, value from setting where key = any($1::text[])`, [names]);
-  return new Set(rows.filter((r) => r.value === true).map((r) => r.key));
+  return { off: new Set(rows.filter((r) => r.value === true).map((r) => r.key)), at: new Map(rows.filter((r) => isAt(r.value)).map((r) => [r.key, r.value as number])) };
 }
 
 /** How far back a rule's askings are counted for the owner: a week. */
@@ -47,13 +47,13 @@ export async function askOnReply(whole: Q, l: Archipelago, run: Entity | undefin
   const turn = typeof body.turn === 'string' && body.turn ? body.turn : undefined;
   if (body.stop_hook_active === true || !facts || !turn || !run?.is_open) return undefined;
   const rules = l.registry.rules.filter(onReply);
-  const off = await liftedHere(whole, rules);
+  const { off, at } = await liftedHere(whole, rules);
   // The one fact read of the map: which of the commits the reply made or pushed nothing accounts for yet.
   const open = rules.some((r) => !off.has(r.lifted!) && r.when?.reply && 'unaccounted' in r.when.reply) ? await unaccounted(l, shas(body.turn_commits)) : [];
   facts.unaccounted = open.length;
   const asking: Rule[] = [];
   for (const rule of rules) {
-    if (off.has(rule.lifted!) || !holds(rule, facts)) continue;
+    if (off.has(rule.lifted!) || !holds(rule, facts, at.get(atSetting(rule)))) continue;
     const key = `asked:${run.id}:${turn}:${rule.pack}.${rule.id ?? ''}`;
     if (await kept(whole, key)) continue;
     await keep(whole, key, true, ASKED_MS);
