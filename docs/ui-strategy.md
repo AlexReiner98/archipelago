@@ -1,7 +1,7 @@
 # UI strategy: one flat canvas, and a sheet over it
 
 The map grows faster than a person can read it, so the page draws only what
-a lens asks for, on one flat canvas, and one thing at a time is read in a
+a query asks for, on one flat canvas, and one thing at a time is read in a
 **sheet** that opens over it from the side. This file says what each surface
 is for; `docs/canvas.md` gives the principles and the modules that build it.
 
@@ -20,7 +20,7 @@ canvas as a flat graph", with its decisions.
   `depends_on` draws the order, every other link a quiet tie. Depth is never
   drawn (decision "Depth is never drawn"). The plane has no edge; zoom is
   scale and how much text shows.
-- **A lens says what is on it.** A filter (three lists of the same terms,
+- **A query says what is on it.** A filter (three lists of the same terms,
   such as a type, words, `tagged e_x` or `waits_on me`: Find adds what each
   finds, Only keeps what is in each, Not takes it away), a walk along the
   link types named for some steps, and a limit. It is kept in the address
@@ -33,7 +33,7 @@ canvas as a flat graph", with its decisions.
   workspace or a project, open, with what is directly in each.
 
 ### Growing a canvas
-- **A click on a node opens its page** in the sheet and leaves the lens as
+- **A click on a node opens its page** in the sheet and leaves the query as
   it was (the owner, 28 Oct 2026). Hover shows its title and the start of
   its note.
 - **Find, at the canvas's foot, is the query.** A click or / opens it, and
@@ -53,9 +53,9 @@ canvas as a flat graph", with its decisions.
   the item, and otherwise draws the item with what it holds, depends on and
   waits on.
 
-### Saved canvases and Home
-- **A saved canvas is a lens and a style** kept on the map (core's `lens`
-  type; the page calls it a canvas). The bar names the one up and switches
+### Views and Home
+- **A view is a query and a layout** kept on the map (an item of core's
+  type `lens`; a canvas opens on one). The bar names the one up and switches
   to the others; ☆ saves the canvas as it is, under a name.
 - **Home's sheet, For you, lists the canvases first,** then Start here,
   what is held for your word and Your move (at most five). The mark in the
@@ -95,11 +95,11 @@ canvas as a flat graph", with its decisions.
   "The page as a bare markdown file"); what is settled is above: Save, a
   status of its own, and no list of links.
 - **Nothing else is on screen:** the top bar (the view's band, the mark, the
-  menu) and find, which holds the lens. The key, fit and snap are settings in the menu, kept in the
+  menu) and find, which holds the query. The key, fit and snap are settings in the menu, kept in the
   reader's browser.
 
 ### Staying current
-- **The page is a replica of the log.** It holds the lens's answer as items
+- **The page is a replica of the log.** It holds the query's answer as items
   and links and keeps it current from the facts written after it read, so an
   agent's change lands in place without the canvas being read again.
 
@@ -135,8 +135,8 @@ agreed to it as written on 19 Oct 2026.
 
 Before adding or changing a screen, check:
 
-- Is it a lens? A new way of choosing what is drawn is a term of the flat
-  lens or a saved canvas, never a page of its own.
+- Is it a query? A new way of choosing what is drawn is a term of the flat
+  query or a view, never a page of its own.
 - Is it a look? Then it is a style, or a drawing a pack ships.
 - Does it draw one thing inside another? Then it is a tie, not a box.
 - Does it write? Then it builds ops through `change`, on the person's
@@ -149,7 +149,7 @@ Before adding or changing a screen, check:
 
 - 19 Oct 2026: Your move is capped at five; noticed items as in section 2.
 - 22 Oct 2026: names say the technical mechanism, not a theme (Atlas became
-  Saved views, now saved canvases).
+  Saved views, now views).
 - 24 Oct 2026: canvas first; connections drawn, never listed.
 - 25 Oct 2026: the flat canvas (decisions "Depth is never drawn", "The lens
   is a filter, a walk and a limit", the view stream for places, tags); only

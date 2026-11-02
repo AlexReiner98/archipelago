@@ -155,7 +155,7 @@ when present.
 
 - **Every field holds one value.** Asserting a field supersedes whatever it
   held: an update is an assertion, with no retraction of the old value written
-  beside it (as Datomic does for cardinality-one attributes). A list (a lens's
+  beside it (as Datomic does for cardinality-one attributes). A list (a view's
   `kinds`) is one JSON value.
 - **Retracting a field clears it**: `["-", id, field]`, as `props: {x: null}`
   does today.
@@ -1084,7 +1084,7 @@ streams in the mix above (and the hosted Postgres as well as PGlite):
    and the time to write and to load one; the registry projection at a past
    position with a different pack set.
 5. **As-of reads**: one item's field at a random past position (one history
-   index lookup); one item whole at a past time; a lens over a subtree as of a
+   index lookup); one item whole at a past time; a query over a subtree as of a
    time a month back (snapshot plus replay).
 6. **Undo and approval at head**: the fast-path check and a rebase for a
    proposal whose base is 10,000 entries behind.
