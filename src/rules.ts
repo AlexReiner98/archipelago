@@ -69,8 +69,8 @@ export interface RuleDef {
     drawing?: boolean;
     /** "outside": it writes a type, a link type or a field outside the reach of the pack that makes it (src/manifest.ts), or of a drawing, the types its style declares (writes). */
     reach?: 'outside';
-    /** For a rule on a reply's end: what the reply did (true) or did not (false), as its hook read it. */
-    reply?: Record<string, boolean>;
+    /** For a rule on a reply's end: what the reply did (true), did not (false) or did at least so often (a number), as its hook read it. */
+    reply?: Record<string, boolean | number>;
   };
   then?: 'hold' | 'refuse' | 'ask' | { require: string[] };
   /** For a rule on a reply's end that reads unaccounted: what accounts for a commit, a type and its field holding the full sha. */
