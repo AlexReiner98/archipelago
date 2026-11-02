@@ -67,7 +67,10 @@ canvas as a flat graph", with its decisions.
     asks which link it is, and makes it;
   - the sheet's Save writes title and note as one change set, undoable as
     one, after asking if someone changed the item since it opened;
-  - a status is an action of its own.
+  - a status is an action of its own;
+  - a change in an item's History is undone there (the owner, 2 Nov 2026):
+    its opposite is a new change, held where a rule holds it; what it could
+    not take back is said, and a forget offers no Undo.
 - **A held change is drawn as a ghost where it would land** (a faint node,
   a dashed wire, a badge on an edited one); a click on it applies or
   declines it.

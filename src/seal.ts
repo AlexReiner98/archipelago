@@ -105,7 +105,10 @@ export async function openEntries(q: Q, entries: Entry[]): Promise<Entry[]> {
     for (const k of (e.keys as string[] | undefined) ?? []) ids.add(k);
   }
   if (!ids.size) return entries;
-  const [ring, visible] = await Promise.all([keysOf(q, [...ids]), seen(q, [...ids, ...entries.filter((e) => e.stream === 'pending').map((e) => e.id)])]);
+  // Every item an entry names is asked about, not only those it seals a value of: a header is read by whoever may see
+  // one of them, and an entry that only clears a field (an undo of a note) names its item by that alone.
+  const named = entries.flatMap((e) => e.facts.map((f) => f[1]).filter((id) => id.startsWith('e_') || id.startsWith('r_')));
+  const [ring, visible] = await Promise.all([keysOf(q, [...ids]), seen(q, [...new Set([...ids, ...named]), ...entries.filter((e) => e.stream === 'pending').map((e) => e.id)])]);
   const read = (id: string, field: string, v: unknown, may: boolean) => (isSealed(v) ? opened(may ? open(ring.get(id), field, v) : undefined, v) : v);
   return entries.map((e) => {
     // A held change's reader also reads what it would make, which no one can see yet.
