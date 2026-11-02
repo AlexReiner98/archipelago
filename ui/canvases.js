@@ -82,6 +82,8 @@ export function keptView(id, { key = `kept:${id}`, style = {} } = {}) {
     .catch((err) => host.replaceChildren(h('div', { class: 'error' }, err.message)));
   return host;
 }
+// What a drawing's `view` mark draws (ui/view-frame.js), handed over so the marks need not import the canvases.
+hooks.keptView = keptView;
 
 /** The style a canvas keeps: how it is drawn, not which canvas it is. */
 const keptStyle = (style) => Object.fromEntries(['shape', 'lit', 'style'].filter((k) => style?.[k]).map((k) => [k, style[k]]));

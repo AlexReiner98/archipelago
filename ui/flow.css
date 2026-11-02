@@ -32,3 +32,7 @@
 .lf-surface { position: absolute; display: block; pointer-events: none; }
 /* The frame drawings run in: drawn, with no size, so the browser does not slow it as a frame that is not drawn. */
 .drawing-sandbox { position: fixed; left: 0; top: 0; width: 0; height: 0; border: 0; pointer-events: none; }
+/* A kept view a drawing names (ui/view-frame.js): the one drawn fills the frame, the next drawn under it out of sight until it has. */
+.view-frame { position: relative; }
+.view-frame > .lens-wrap { position: absolute; inset: 0; }
+.view-frame > .view-next { visibility: hidden; pointer-events: none; }
