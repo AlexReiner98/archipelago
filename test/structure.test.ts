@@ -364,14 +364,15 @@ test('no read of the whole map', () => {
 // (`view`), kept current from the log (`tail`) and written through `change`, the tools an agent calls. Every other tool
 // the page calls through /api is one more way in that an agent does not share, so the names it calls are frozen as
 // they stood on 25 Oct 2026, and may only go: a name the page stops calling comes off this list. A tool a pack's
-// screen names (ui/screens.js calls it by the name its pack declares) is the pack's, and is not counted.
+// screen names (ui/screens.js calls it by the name its pack declares) is the pack's, and is not counted. `undo`, one of
+// the agents' ten tools, came on 2 Nov 2026 at the owner's word: the page takes a change back as an agent does.
 const PAGE_CALLS = [
   'backup_download', 'change', 'connections', 'decide', 'document', 'events', 'get', 'github', 'import_backup', 'init',
   'launch', 'member_add', 'member_list', 'member_set', 'model_account', 'pack_set', 'packs', 'picture', 'places',
   'places_put', 'proposals', 'publish', 'publish_all', 'publish_plan', 'published', 'schema', 'search', 'server_packs',
   'session_end', 'share_create', 'share_figure', 'share_list', 'share_revoke', 'share_workspace', 'tail',
   'time_invoice_draft', 'time_invoice_paid', 'time_log', 'time_timesheet', 'time_week', 'token_create', 'token_list',
-  'token_request_answer', 'token_requests', 'token_revoke', 'unpublish', 'view', 'workspace_info', 'workspace_set',
+  'token_request_answer', 'token_requests', 'token_revoke', 'undo', 'unpublish', 'view', 'workspace_info', 'workspace_set',
 ];
 
 test('the page calls no more tools through /api than it did', () => {

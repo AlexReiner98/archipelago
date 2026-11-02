@@ -110,6 +110,18 @@ test('approving after the map moved: planned again, or refused as overtaken with
   assert.deepEqual([last.actor, last.rule], [{ id: 'system' }, { outcome: 'superseded', held_by: { rule: 'agent_changes', pack: 'core' }, proposal: moot.proposal, proposal_hash: (await entry(l.db, moot.proposal))!.hash, by: by.id }]);
 });
 
+test('an entry that only clears a field still reads its reason, so an undo of its undo says what it undoes', async () => {
+  const l = await fresh();
+  const made = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'A' }]);
+  const noted = (await l.change(human, { reason: 'Noted', ops: [{ op: 'update', id: made.t, body: 'A note' }] })) as { changeset: string };
+  const back = (await undo(l, human, { changeset: noted.changeset })) as { changeset: string };
+  const cleared = (await entry(l.db, back.changeset))!;
+  assert.deepEqual(cleared.facts, [['-', made.t, 'body']], 'it seals nothing of the item');
+  assert.equal(cleared.reason, 'Undo: Noted');
+  const again = (await undo(l, human, { changeset: back.changeset })) as { changeset: string };
+  assert.equal((await entry(l.db, again.changeset))!.reason, 'Undo: Undo: Noted');
+});
+
 test('undo appends the opposite change set, and the facts replay into the rows the map has', async () => {
   const l = await fresh();
   const me = (await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }])).me;
@@ -148,6 +160,11 @@ test('undo appends the opposite change set, and the facts replay into the rows t
   assert.equal(opposite.undoes, edit.changeset);
   assert.deepEqual(back.skipped, ['"Build the stream": owner has changed again since, so it was left as it is']);
   assert.deepEqual(opposite.facts.filter((f) => f[1] === made.c), [['+', made.c, 'title', 'Build it'], ['-', made.c, 'priority']]);
+  // An item's history says which change undid which: the page offers Undo by it.
+  const told = new Map(((await l.events({ target: made.c })) as any[]).map((e) => [e.changeset, e.detail]));
+  assert.equal(told.get(edit.changeset).undone_by, back.changeset);
+  assert.equal(told.get(back.changeset).undoes, edit.changeset);
+  assert.equal(told.get(back.changeset).undone_by, undefined);
   await undo(l, human, { changeset: back.changeset });
   assert.equal((await l.entity(made.c))!.title, 'Build the stream');
   await assert.rejects(undo(l, human, { changeset: edit.changeset }), /already been undone/);

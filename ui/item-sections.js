@@ -2,7 +2,7 @@
 // declares (empty ones too), where it came from, and its history. Nothing here is drawn from what it is tied to: the
 // canvas shows that. A value that names an item is the way to it; every other value is said as it is kept.
 
-import { h } from './base.js';
+import { api, ask, h, state, tell } from './base.js';
 import { fieldEditor, wordsEditor } from './field-edit.js';
 import { choicesOf } from './fields.js';
 import { ago, changeRow, eventLine, label, link, statusesOf, typeTitle, types } from './words.js';
@@ -124,14 +124,36 @@ export function sourceSection(source) {
   );
 }
 
-/** What happened to it, a change set a line, newest first. */
-export function historySection(id, past) {
+/**
+ * Take a change set back, on the person's word: its opposite is a new change (src/undo.ts), held where a rule holds it.
+ * What it could not reach (a field changed again since, an act made outside the map) is said, not passed over.
+ */
+async function undoSet(g, done) {
+  const n = new Set(g.events.map((e) => e.target_id).filter(Boolean)).size;
+  const message = `What it did${n > 1 ? ` to ${n} items` : ''} is put back as a new change. Both stay in the log.`;
+  if (!(await ask({ title: 'Undo this change?', message, action: 'Undo' }))) return;
+  try {
+    const made = await api('undo', { changeset: g.changeset });
+    // The page draws its own undo again below: the log moving under it is no news.
+    state.selfDrawn = made.status === 'applied';
+    if (made.status !== 'applied') await tell('Held for approval', made.held_by?.say ?? 'A rule holds this undo for a person to approve before it applies.');
+    else if (made.skipped?.length) await tell('Undone, except', made.skipped.map((s) => `- ${s}`).join('\n'));
+  } catch (err) {
+    await tell('That was not undone', err.message);
+  }
+  done();
+}
+
+/** What happened to it, a change set a line, newest first; each can be undone, but a forget, which nothing brings back. */
+export function historySection(id, past, done) {
   const sets = [];
   for (const ev of past) {
     const last = sets.at(-1);
     if (ev.changeset && last?.changeset === ev.changeset) last.events.push(ev);
     else sets.push({ changeset: ev.changeset, events: [ev] });
   }
-  const lines = sets.flatMap((g) => (g.changeset ? changeRow(g, { here: id }) : g.events.map(eventLine)));
+  const onUndo = done && ((g) => undoSet(g, done));
+  const row = (g) => changeRow(g, { here: id, undone: g.events.some((e) => e.detail?.undone_by), onUndo: !g.events.some((e) => e.detail?.forgot) && onUndo });
+  const lines = sets.flatMap((g) => (g.changeset ? row(g) : g.events.map(eventLine)));
   return section('history', 'History', lines.length, h('div', { class: 'page-lines' }, lines));
 }
