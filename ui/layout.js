@@ -170,8 +170,9 @@ export function drawWith(host, answer, style, keep) {
   const tip = tipOf(host);
   const apply = (list) => {
     const all = Array.isArray(list) ? list : [];
-    for (const p of all.filter((p) => p && 'tip' in p)) p.tip ? tip.show(keys.get(String(p.tip.key)), build(p.tip.mark, keys, tell)) : tip.hide();
+    // The marks first, so the tip is placed off what they light.
     patch(all.filter((p) => !(p && 'tip' in p)), keys, tell, moving);
+    for (const p of all.filter((p) => p && 'tip' in p)) p.tip ? tip.show(keys.get(String(p.tip.key)), build(p.tip.mark, keys, tell)) : tip.hide();
   };
   // A picture drawn again (the map changed) takes off what hovering a mark put on it: the drawing's answer to that mark's
   // enter (its lit wires, its tip) is put on the same mark in the new one, the next frame, once the view is back where
