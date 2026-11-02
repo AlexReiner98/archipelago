@@ -17,10 +17,12 @@ export { startTabs } from './tab-bar.js';
 /** An item's page, as a show names one: it opens over the pane that draws it when that pane is in focus. */
 const itemOf = (at) => /^e\/(e_[a-z0-9]{8})(?:\?|$)/.exec(at)?.[1];
 
-/** Land an agent's show where it goes: a pane, a tab in the background, a window of its own, or nowhere where no tab takes it. */
+/** Land an agent's show where it goes: a pane, a tab in the background, a window of its own, or nowhere where no tab takes it. Answers 'later' when it is to be tried again. */
 hooks.land = (step) => {
   if (poppedTab) return;
   const at = step.hash;
+  // What the server says of a session, rather than what an agent asked to show, draws its canvas and opens no page.
+  const page = step.canvas ? undefined : itemOf(at);
   const session = sessionOf(step);
   const now = Date.now();
   const paneOf = (t, id, inSight) => ({
@@ -48,11 +50,12 @@ hooks.land = (step) => {
   };
   try {
     if (to.nowhere) return;
+    if (to.later) return 'later';
     if (to.open) {
       // A page that is no canvas opens over a tab's Home, as one of its own open over its pane does.
       const id = openTab(drawable(at) ? `#/${at}` : '#/', { follows: to.open.follows, named: nameOf(to.open.follows), word: heard.get(to.open.follows)?.name, ...(to.open.slot && { slot: to.open.slot }) }, to.front);
       const t = tabOf(id);
-      if (itemOf(at) || !drawable(at)) ((t.sheet = itemOf(at) ? `e/${itemOf(at)}` : at.split('?')[0]), keep());
+      if (page || !drawable(at)) ((t.sheet = page ? `e/${page}` : at.split('?')[0]), keep());
       lit(t, focusOf(t));
       if (to.front) location.replace(`#/${at}`);
       return void (to.front && flash(focusOf(t)));
@@ -80,7 +83,7 @@ hooks.land = (step) => {
       else if (to.side) place(pane, to.side, t.groups.find((g) => g !== pane) ?? pane, t);
       t.panes[pane] = { ...t.panes[pane], at: paneAt(at) };
       // An item's page asked for opens over its pane when the tab is brought into sight, if that pane is its one in focus.
-      if (itemOf(at) && pane === focusOf(t)) t.sheet = `e/${itemOf(at)}`;
+      if (page && pane === focusOf(t)) t.sheet = `e/${page}`;
       keep();
       lit(t, pane);
       arrived(t.id);
@@ -94,7 +97,7 @@ hooks.land = (step) => {
     goPane(id, paneAt(at));
     lit(t, id);
     // An item's page asked for opens over its pane when that pane is the one in focus.
-    if (itemOf(at) && id === activeId()) location.hash = `#/e/${itemOf(at)}?${queryOf(t, id)}`;
+    if (page && id === activeId()) location.hash = `#/e/${page}?${queryOf(t, id)}`;
     flash(id);
   } finally {
     markPanes();

@@ -7,11 +7,12 @@ import { addCommits } from './commits.ts';
 import type { Q } from './db.ts';
 import type { Archipelago, May } from './pelago.ts';
 import { askOnReply } from './replies.ts';
-import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, resolveRun, sessionBegan, sessionHeard } from './sessions.ts';
+import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, resolveRun, sessionBegan, sessionHeard, sessionPrompted } from './sessions.ts';
 import { sessionLabelled } from './session-name.ts';
 import { addTouched } from './touched.ts';
 import { fileSaid } from './file-said.ts';
 import { keepGit } from './git-state.ts';
+import { sessionOpened } from './tool-change.ts';
 import { describeChanges, humanChanges, latestSeq } from './tools.ts';
 import { summed } from './summary.ts';
 import { keep, kept } from './transient.ts';
@@ -88,6 +89,8 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   }
   // Said in the server's log, so "did the hook run?" has an answer.
   console.log(`hook ${event} from session ${body.session_id ?? 'unknown'}`);
+  // One chat is one session: a prompt takes up a run that was ended while the chat went on, before anything is kept on it.
+  if (event === 'prompt') await sessionPrompted(pelago, body.session_id).catch((err) => console.error(`hook take up: ${(err as Error).message}`));
   // The hook counts what the session has used so far; it is recorded before anything else, so an ending session's last tokens reach its work.
   if (event !== 'session-start') await recordUsage(pelago, body.session_id, body.tokens).catch((err) => console.error(`hook usage: ${(err as Error).message}`));
   // And what it touched, so that report, action session_end, asks about those when it ends.
@@ -119,10 +122,13 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   }
   if (event === 'session-start') {
     await keep(whole, heardKey(body.session_id), await latestSeq(pelago), HEARD_MS);
+    const known = body.session_id ? await resolveRun(pelago, body.session_id) : undefined;
     let additionalContext = await hookSessionStart(pelago, body);
     // The hook keeps it in the checkout, where the commit-msg hook the setup installs finds it to name the run in a commit.
     const run = body.session_id ? await resolveRun(pelago, body.session_id, true) : undefined;
     if (run) call.ran?.(run.id);
+    // A new one gets a tab of its own on the owner's page; one taken up again has its own already.
+    if (run && !known) await sessionOpened(pelago, { kind: 'agent', name: 'claude-code' }, run.id).catch((err) => console.error(`hook tab: ${(err as Error).message}`));
     // A project keeps the files it was given when it was set up; the server moves on. A session is told when its
     // project is behind, since nothing else would: an old hook counts less, and old rules name tools as they were.
     if (body.setup !== SETUP_VERSION)

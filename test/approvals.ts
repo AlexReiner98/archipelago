@@ -23,7 +23,7 @@ export const POLICIES: Record<string, Partial<Policy>> = {
   mixed: { create: 'auto', update: 'auto', link: 'auto', merge: 'forbidden' },
 };
 
-/** The workspace's own settings. */
+/** The workspace's own settings: none is one that never chose (it follows the server), apply is where a new one begins. */
 const SETTINGS: Record<string, Record<string, unknown>> = {
   none: {},
   apply: { agent_changes: 'apply' },

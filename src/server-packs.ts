@@ -64,8 +64,9 @@ export interface ServerReach {
   /**
    * Pages anyone may open, as GET /x/<pack>/<id>: an HTML file in its public/ folder, under a strict policy. A page may
    * send a form to one of its hosts (form_action), as when a person is handed to another site with what it asks for.
+   * One marked start is where a person with no account begins: the sign-in page and its mail lead there.
    */
-  pages?: { id: string; file: string; form_action?: string }[];
+  pages?: { id: string; file: string; form_action?: string; start?: boolean }[];
   /**
    * What a workspace's admin may connect it to (src/server-connect.ts): entries the kernel calls, never public. status
    * says whether it is ready to be connected; start answers where to send the admin, given a one-time word (state).

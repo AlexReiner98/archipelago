@@ -24,18 +24,23 @@ export const css = `
 .lf-dot.blocked { fill: var(--ln-blocked); stroke: none; } .lf-dot.session { fill: var(--ln-session); stroke: none; }
 .lf-wire { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }
 .lf-wire.dashed { stroke-dasharray: var(--ln-flow-dash-choice); }
-.lf-wire.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-lit); }
+.lf-wire.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-hover); }
 .lf-head { fill: var(--ln-muted); } .lf-head.lit { fill: var(--ln-text); }
 /* A tie (part_of, or any link that is not the order): quiet, under the wires; one to what a step is part of is solid. */
 .lf-tie { fill: none; stroke: var(--ln-line); stroke-width: var(--ln-rule); stroke-dasharray: var(--ln-flow-dash-choice); }
 .lf-tie.near { stroke-dasharray: none; }
 /* A tie with a head says which way its link points, as a wire does: solid, the head in its colour. */
 .lf-tie.headed { stroke-dasharray: none; }
-.lf-tie.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke); }
+.lf-tie.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-hover); stroke-dasharray: none; }
+/* While a step is hovered, what is not tied to it fades, so its own wires and ties stand out. */
+.lighting :is(.lf-wire, .lf-tie, .lf-head):not(.lit) { opacity: var(--ln-flow-unlit); }
 /* Each link type in its own colour (the style's link_colours, else one of its hues), lit or not; a held change keeps
    the colour of what waits on you, below. */
 .lf-wire[class*=lf-k-], .lf-tie[class*=lf-k-] { stroke: var(--lf-link); }
 .lf-head[class*=lf-k-] { fill: var(--lf-link); }
+/* Lit, a link keeps its colour, brightened toward the text's (flow_lit_mix). */
+.lf-wire.lit[class*=lf-k-], .lf-tie.lit[class*=lf-k-] { stroke: color-mix(in srgb, var(--lf-link), var(--ln-text) var(--ln-flow-lit-mix)); }
+.lf-head.lit[class*=lf-k-] { fill: color-mix(in srgb, var(--lf-link), var(--ln-text) var(--ln-flow-lit-mix)); }
 /* A tie the style draws only on hover: out of sight until one of its ends is hovered and lights it. */
 /* A change held for the owner, where it would land: a new step faint, an edit marked on its step, a link dashed in the
    colour of what waits on you; a link just drawn here dashed until it is; the badge where it is decided. */
@@ -52,7 +57,6 @@ export const css = `
 .lf-tip { max-width: var(--tip-most); padding: var(--space-5) var(--space-7); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--edge); border-radius: var(--radius-3); font-size: var(--text-3); line-height: 1.4; }
 .lf-tip b { display: block; }
 .lf-tip span { display: block; margin-top: var(--space-2); color: var(--muted); }
-.lf-break rect { fill: var(--ln-sea); } .lf-break path { stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }
 /* Zoomed out until only names are read (ui/pan-zoom.js): what a choice is is not drawn. */
 [data-text=names] .lf-says { display: none; }
 .lf-says rect { fill: var(--ln-sea); } .lf-says text { fill: var(--ln-muted); font-size: var(--ln-flow-says-text); font-family: var(--type-water-family, var(--ln-font)); font-weight: var(--type-water-weight, 400); font-style: var(--type-water-style, normal); text-transform: var(--type-water-case, none); letter-spacing: var(--type-water-track, 0); text-anchor: middle; dominant-baseline: middle; }

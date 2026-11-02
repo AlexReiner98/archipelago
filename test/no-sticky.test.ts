@@ -64,7 +64,7 @@ test('a backup link, a refused change and the prompt hook are answered by the ot
   const refused = (await post(a, '/agent/change', { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'x'.repeat(80) }] })).json.error as string;
   const name = /kept for \d+ minutes as "([^"]+)"/.exec(refused)![1];
   const fixed = await post(b, '/agent/change', { retry: name, fixes: [{ at: 1, op: { op: 'create', type: 'task', title: 'Short' } }] });
-  assert.equal(fixed.json.result?.status, 'proposed', 'the change refused by one server is corrected on the other');
+  assert.equal(fixed.json.result?.status, 'applied', 'the change refused by one server is corrected on the other');
 
   await post(a, '/hooks/session-start', { session_id: 's1' });
   await post(a, '/api/change', { reason: 'the owner decides', ops: [{ op: 'create', type: 'task', title: 'Done by the owner' }] });

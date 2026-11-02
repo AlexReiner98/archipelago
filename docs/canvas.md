@@ -1,7 +1,7 @@
 # The canvas: principles and structure
 
 The page is built from the same three things as the store: items and links,
-read by a lens, drawn by a style. It is one flat canvas, where every item is
+read by a query, drawn by a style. It is one flat canvas, where every item is
 a node and every link a wire, with a sheet over it for one item at a time.
 Seven principles decide it; from them a developer can predict what the page
 does, and each names the check in `npm test` that holds it. What each surface
@@ -10,7 +10,7 @@ is for is `docs/ui-strategy.md`; the words are `docs/glossary.md`.
 ## The principles
 
 ### 1. Three things on screen
-What is drawn is items and links; which ones is a lens; how they look is a
+What is drawn is items and links; which ones is a query; how they look is a
 style. The page keeps no other state of the map and no look of its own.
 - `test/query-flat.test.ts`: "the answer is items and links, and nothing of
   the old lens".
@@ -27,9 +27,9 @@ never structure. Containment is a projection the server keeps (the
 - `packs/core/flow.test.ts`: "a flat lens's answer is drawn: every item a
   step, part_of a tie, depends_on the order, nothing nested".
 - `test/structure.test.ts`: "the canvas draws no depth, and places are read
-  only to draw" (the canvas asks for no nesting; the flat lens names none).
+  only to draw" (the canvas asks for no nesting; the flat query names none).
 
-### 3. The lens is a filter, a walk and a limit, and the only bound
+### 3. The query is a filter, a walk and a limit, and the only bound
 Its parts have one name each, on the page and in an agent's answer: Find,
 Only, Not, Walk and Limit (e_drt4g872, `docs/glossary.md`). Find, Only and Not
 take one list of terms (`src/query-terms.ts`, e_4y5x454z), each a set of items
@@ -46,12 +46,12 @@ nor a word finds, since each would read the map), Only keeps what is in it
 away from everything the walk reaches and every item named by id
 (e_ndcxf2bv); the default Not, which nobody said, hides nothing named. Walk
 follows the link types named, each out (→, `depends_on>`), in (←,
-`depends_on<`) or either way (↔, as a lens kept before ways were said), for
+`depends_on<`) or either way (↔, as a view kept before ways were said), for
 some steps, a click on its arrow in the bar turning it (e_gue6cg6q); Limit
 caps it. A filter that includes nothing is refused, so no canvas reads the
 whole map. Words typed in find are a Find term, the filter's text; tags are
 a core `tag` type and a `tagged` link, found by and, in the house style, not
-drawn. A lens may instead name a view whose answer is items and links
+drawn. A query may instead name a view whose answer is items and links
 (`view`, in the address `?view=usage`), drawn in place of what a filter
 finds: the plan pack's Usage canvas draws core's `usage` view, asked by the
 page as an agent asks it (the owner, 29 Oct 2026, e_7frmyj2q). It is not a
@@ -70,13 +70,13 @@ term added in find makes it a filter of the map.
 - `test/find-query.test.ts`: "in a browser, the find bar sets the text of the
   canvas lens".
 
-### 4. Lens and style are the whole surface, for people and agents
-A person grows a canvas by editing its lens in find, at the canvas's foot,
-which is the query's (e_2a4mddx8): at rest it says the lens in one line;
+### 4. Query and layout are the whole surface, for people and agents
+A person grows a canvas by editing its query in find, at the canvas's foot,
+which is the query's (e_2a4mddx8): at rest it says the query in one line;
 open, the rows Find, Only, Not, Walk and Limit rise above it; typed, it
 lists what the words could be, each said by its kind, Words first and lit,
 and a part's word and a space (`only `) puts it in that part (a click only
-opens an item's page, e_jedng69e). The top keeps the view's band. An agent reads the same lens
+opens an item's page, e_jedng69e). The top keeps the view's band. An agent reads the same query
 (`query` name `flat`) and points the page at one (`report` action `show`
 with `lens`). The page calls no tool an agent lacks for it. A term is made
 by picking its kind, then the thing (Find's kinds: Words, Type, Tag, Link,
@@ -95,16 +95,16 @@ offered (`ui/picker-rank.js`, task e_css8swr9).
   through change, and report show opens it".
 
 ### 5. Views are items; places live in a stream of their own
-A saved canvas is a lens and a style kept on the map, an item of core's
+A view is a query and a layout kept on the map, an item of core's
 system type `lens`, and Home lists them. Where a person put a node is a
 place in the `places` stream: one per canvas and item, compacted to the
 newest, never an item or a link, read only to draw it there. Position never
 carries meaning; a grouping that matters is made as a link.
-A pack ships saved canvases as presets (a `styles` entry of `type: "lens"`,
+A pack ships views as presets (a `styles` entry of `type: "lens"`,
 decision e_x8bghuce): the picker and Home list each until the owner saves
 their own version, which names it (`preset`) and stands in its place.
 Four things make a view (decision e_47pjkbxb): a query says what is on it (the
-lens above), a layout how it is arranged (a drawing a pack ships, or a style
+query above), a layout how it is arranged (a drawing a pack ships, or a style
 with code kept on the map), a style how it looks, and the view is a name for
 a query and a layout with its settings, which it holds itself (`style` on the
 item): nothing reaches into it by a link, and a style is about nothing. Looks
@@ -129,7 +129,7 @@ layout or style says which views use it; they go to the default.
   canvas draws no depth, and places are read only to draw".
 
 ### 6. The page is a replica of the log
-The page holds a lens's answer as items and links by id, and keeps it
+The page holds a query's answer as items and links by id, and keeps it
 current by reading the facts after its position on what it holds, folded in
 by the same pure projector the server runs. It never polls for a picture or
 compares answers.
@@ -179,13 +179,13 @@ measure it reads at), shipped by the house style and a pack's presets.
 | Module | What it is |
 | --- | --- |
 | `app.js` | routes the address to the canvas and the sheet |
-| `canvas.js` | a pane's canvas: its lens, Home's lens, clicks, moves batched, Arrange |
-| `query.js` | the address codec (`readAddress`, `addressOf`); `flatView` reads, holds and draws a lens |
-| `query-bar.js` | the lens said in one line at rest, and as the rows Find, Only, Not, Walk and Limit, changed in place |
+| `canvas.js` | a pane's canvas: its query, Home's query, clicks, moves batched, Arrange |
+| `query.js` | the address codec (`readAddress`, `addressOf`); `flatView` reads, holds and draws a query |
+| `query-bar.js` | the query said in one line at rest, and as the rows Find, Only, Not, Walk and Limit, changed in place |
 | `find.js` | the bar at the canvas's foot: opened, its rows; typed, what the words could be; Enter takes the lit choice, Shift+Enter adds the words (e_e3k797d3) |
 | `find-choices.js` | what typed words could be in each part, each said by its kind, Words first |
 | `term-kinds.js`, `term-pick.js` | a row's +: its kinds, then the things of that kind, picked, never guessed |
-| `canvases.js` | saved canvases: the bar's switch, Save, Home's list |
+| `canvases.js` | views: the bar's switch, Save, Home's list |
 | `layout.js`, `draw.html`, `draw.js`, `marks.js` | a drawing run in the sandbox; its marks checked and mounted |
 | `reader-frame.js` | the one mark the page makes itself: a document's draft or published page, read in a frame on the canvas |
 | `pan-zoom.js` | the infinite plane |
@@ -201,8 +201,8 @@ measure it reads at), shipped by the house style and a pack's presets.
 ### In `src/` and `packs/`
 | Module | What it is |
 | --- | --- |
-| `src/query-flat.ts` | the flat lens (core view `flat`) |
-| `src/query-saved.ts` | saved canvases: their picture, `shown_in`, the move from old views |
+| `src/query-flat.ts` | the flat query (core view `flat`) |
+| `src/query-saved.ts` | kept views: their picture, `shown_in`, the move from old views |
 | `src/styles.ts` | the style a page or view is drawn in (core view `style`) |
 | `src/layouts.ts` | which drawing a style names, and the owner's version of it |
 | `src/canvas-places.ts` | the places stream: `places`, `places_put` |
@@ -211,28 +211,28 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `packs/core/layouts/flow/` | the flow drawing: `graph.js` flattens, `layout.js` orders, `free.js` keeps places, `index.js` answers marks |
 
 ## How a canvas is read
-1. The address holds the lens (`#/v?…` or `#/e/<id>?…`); `app.js` reads it
-   with `readAddress` and `canvas.js` `showCanvas` puts it up (Home's lens
+1. The address holds the query (`#/v?…` or `#/e/<id>?…`); `app.js` reads it
+   with `readAddress` and `canvas.js` `showCanvas` puts it up (Home's query
    when there is none).
-2. `flatView` asks `view` `flat` with the lens and `view` `style` beside it,
-   and `canvas.js` asks `places` for the canvas (the saved canvas, else the
+2. `flatView` asks `view` `flat` with the query and `view` `style` beside it,
+   and `canvas.js` asks `places` for the canvas (the kept view, else the
    first id in the filter, else the whole map).
 3. The answer goes into a store (`live.js` `replicate`), with the position
-   read before the lens and the changes held for the owner.
+   read before the query and the changes held for the owner.
 
 ## How it is drawn
 1. The style names a drawing; `layout.js` sends it the store's `drawn()`
    (the answer with ghosts and the person's pending wires) in the sandbox.
 2. The flow lays out what has no place round what has one, and answers with
    marks; the page checks them and mounts them in the plane.
-3. The query bar draws the lens; a click on a node rewrites the address with
+3. The query bar draws the query; a click on a node rewrites the address with
    the node's id added, and the cycle starts again.
 
 ## How it is kept current
 1. `live.js` calls `tail` with the page's position and the ids it holds.
 2. Each store folds the facts in with the projector and tells its listeners
    what changed; `flatView` draws again. Only a link to something the store
-   does not hold reads the lens again, since the walk may now reach further.
+   does not hold reads the query again, since the walk may now reach further.
 3. When the queue moves, the held changes are read again and the ghosts
    follow.
 
@@ -246,7 +246,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 
 ## Tabs and panes: more than one canvas at once
 Every pane in a tab is alike (the owner, 28 Oct 2026): none is the main one.
-Each is a canvas of its own (`canvas.js`): a lens and a style, held in its
+Each is a canvas of its own (`canvas.js`): a query and a style, held in its
 own store and kept current from the log, with its places, its wires, its
 fitting and Arrange. Panes stand side by side, as a code editor's groups do:
 ◫ in the bar opens the pane in focus's canvas in a pane beside it, a pane's
@@ -255,12 +255,12 @@ them), the line between two shares the room, and × closes it; the last one stay
 over its top, as the page's canvas always did.
 
 The pane last touched is in focus: the view's band sits in its strip and
-find acts on its lens (decision e_h2pqjy2q). The address is its address
-(`pane-address.js`): `#/v?…` says its lens, and an item's page open over it
-is `#/e/<id>?…` with that lens beside it. Moving focus rewrites the address
-without a step of the browser's; a lens given to a pane in focus is one. Each
+find acts on its query (decision e_h2pqjy2q). The address is its address
+(`pane-address.js`): `#/v?…` says its query, and an item's page open over it
+is `#/e/<id>?…` with that query beside it. Moving focus rewrites the address
+without a step of the browser's; a query given to a pane in focus is one. Each
 pane keeps its own back and forward, kept with its tab, so a reload draws
-every pane as it was, history included: a step for each lens it is given,
+every pane as it was, history included: a step for each query it is given,
 none for typing or for a page opened over it (e_ssnyd3ex). ‹ › in the bar,
 dimmed with nowhere to go, and the browser's own back and forward, all act on
 the pane in focus. A click on a node in any pane puts that pane in focus,
@@ -274,10 +274,10 @@ whatever draws it, and no view does this itself.
 A tab (`tab-bar.js`, `tabs.js`; decision e_mzer5m4t) is a set of panes,
 which stay together in it. The tabs stand in the
 top bar, one tab included, each named as its pane in focus is: a session's by the
-session in its hue, else a saved canvas or an item by its name, a lens by
+session in its hue, else a view or an item by its name, a query by
 what its filter finds, Home by Home. There is no most: many shrink to their
 mark and first letters (e_q3amet26). What is the tab's own is on the strip,
-never in the query bar, which shows the lens (e_j7ggggjr): + at its end
+never in the query bar, which shows the query (e_j7ggggjr): + at its end
 opens the canvas in a tab of its own; a press brings a tab into sight, a
 middle press closes it, and every tab has ⋯, its menu, and ×, in sight or not. A tab,
 not a pane, pops out into a window of its own (Pop out in ⋯, or the tab
@@ -340,11 +340,11 @@ pane in focus when that tab follows the session.
 
 ## What is not yet so
 - Not leaves out only closed, system or a type; an item named to leave out
-  is not yet a term of the lens.
+  is not yet a term of the query.
 - A kept view drawn in a document or a screen (`canvases.js` `keptView`)
   still nests what is inside what for the drawings that box it
   (architecture, grid, list). The canvas itself never does.
 - An item started loose is followed with `get` calls and a list in the
   browser (`canvas.js`), not yet through a store.
 - A store does not judge the filter again: an item that stops matching stays
-  until the lens is read again.
+  until the query is read again.

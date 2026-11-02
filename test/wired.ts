@@ -113,7 +113,7 @@ export const LAYERS = ['graph', 'topology', 'shape', 'metrics', 'marks'];
 const LAYERS_OWED: Record<string, Record<string, string>> = {
   flow: {
     graph: 'combs graph lines places polyline shapes steps', topology: 'count numbering planar thread upward', shape: 'faults',
-    metrics: 'layout tidy', marks: 'index look story',
+    metrics: 'layout', marks: 'index look story',
   },
   architecture: {
     shape: 'sides', 'shape and metrics': 'route', 'graph and metrics': 'layout',

@@ -9,25 +9,13 @@ import { actorId, type Actor, type Entity, type Archipelago, type Op } from './p
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
 import { heldResources } from './blocking.ts'; import { mintName, sessionTitle } from './session-name.ts';
 import { toConfirm } from './confirm.ts'; import { commitRule } from './commit-rule.ts';
-import { sentCommits, unaccountedText } from './unaccounted.ts'; import { awakeSessions, roomForSession } from './plan.ts'; import { wholeMap } from './outbox.ts';
+import { sentCommits, unaccountedText } from './unaccounted.ts'; import { roomForSession } from './plan.ts';
 import { STALE_DAYS } from './attention.ts'; import { instructionsFor } from './instructions.ts';
 import { VIEWS } from './views.ts'; import type { StartedBy } from './launcher.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts'; import { unaccountedBy } from './commits.ts';
+import { isChat, resolveRun, sessionsAwake, takeUp } from './chat-run.ts';
+export { resolveRun, sessionPrompted, sessionsAwake } from './chat-run.ts';
 
 const now = () => new Date().toISOString();
-/** How many sessions are at work in the workspace, whoever's they are (src/plan.ts). */
-export const sessionsAwake = async (l: Archipelago) => awakeSessions((await wholeMap(l)).db, l.registry.family('run'));
-
-/** Find a run by its entity id or by the session id its surface gave it. */
-export async function resolveRun(l: Archipelago, key: string, openOnly = false): Promise<Entity | undefined> {
-  const byId = await l.entity(key);
-  if (byId && l.registry.isA(byId.type, 'run')) return byId;
-  const { rows } = await l.db.query<Entity>(
-    `select * from entity where type = any($1::text[]) and props->>'session_id' = $2 and archived_at is null
-       and ($3::boolean is false or is_open) order by is_open desc, created_at desc limit 1`,
-    [l.registry.family('run'), key, openOnly],
-  );
-  return rows[0];
-}
 
 /**
  * Whether a hook may speak for the session it names, when the token it came with is within some items: a session
@@ -36,7 +24,7 @@ export async function resolveRun(l: Archipelago, key: string, openOnly = false):
 export async function hookWithin(l: Archipelago, within: string[], input: { session_id?: string; cwd?: string; remote?: string }, starting: boolean): Promise<boolean> {
   const [scope, place] = [await scopeWithin(l, within), starting ? await placeFor(l, { cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined }) : undefined];
   if (starting) return Boolean(place && scope.has(place.id));
-  const run = input.session_id ? await resolveRun(l, input.session_id, true) : undefined;
+  const run = input.session_id ? await resolveRun(l, input.session_id) : undefined;
   if (!run) return true; // nothing to speak for: the hook does nothing either way
   const { rows } = await l.db.query(`select 1 from relation where type = any($3::text[]) and from_id = $1 and to_id = any($2::text[]) and valid_to is null`, [run.id, [...scope], livesIn(l)]);
   return rows.length > 0;
@@ -57,7 +45,7 @@ export async function sessionStart(
   if (input.session_id) {
     const existing = await resolveRun(l, input.session_id);
     if (existing) {
-      if (!existing.is_open) await roomForSession(l.workspace, () => sessionsAwake(l)).then(() => l.apply(actorId(actor), { ops: [{ op: 'update', id: existing.id, status: 'running' }], reason: 'Session taken up again' }));
+      if (!existing.is_open) await takeUp(l, actor, existing);
       await touch(l, existing.id);
       await nameIfUnnamed(l, actor, existing);
       // Its repository is said again: the hook tells a resumed session where things stand, as it told it at first.
@@ -374,15 +362,20 @@ export async function sessionEnd(
     cannot_tell_rest?: boolean;
     /** Ask the session about the repository's open work before letting it finish. */
     reconcile?: boolean;
+    /** Said by the session itself: a chat's run then says where its work stands and waits, for the chat ends it, not its agent. */
+    chat_goes_on?: boolean;
   },
 ) {
   const run = await resolveRun(l, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
   if (!run.is_open) return { run: run.id, status: run.status, already_ended: true };
   const outcome = input.outcome ?? 'finished';
-  const unsaid = outcome === 'finished' ? await unreconciled(l, run) : [];
+  const stays = Boolean(input.chat_goes_on) && isChat(run);
+  // A chat that has said where its work stands and is then ended for it: what it said stands as its last word.
+  const said_already = !stays && !input.reconcile && run.status === 'waiting' && isChat(run);
+  const unsaid = outcome === 'finished' && !said_already ? await unreconciled(l, run) : [];
   // Beside them, the commits it made that the map does not account for yet (src/commits.ts).
-  const commits = outcome === 'finished' ? await unaccountedBy(l, run.id) : [];
+  const commits = outcome === 'finished' && !said_already ? await unaccountedBy(l, run.id) : [];
   const vouched = unsaid.filter((i) => input.still_true?.includes(i.id));
   // "Cannot tell" is an answer too: the item is left exactly as it was, last known true when it was, and the run says so.
   const named = unsaid.filter((i) => !vouched.includes(i) && input.cannot_tell?.includes(i.id));
@@ -408,7 +401,7 @@ export async function sessionEnd(
     commits.length && `Commits not accounted for: ${commits.map((c) => c.slice(0, 7)).join(', ')}.`,
     left.length && (left.length > 8 ? `Not reconciled: ${left.length} open items left unsaid.` : `Not reconciled, open and left unsaid: ${left.map((i) => `${i.title} (${i.id})`).join('; ')}.`),
   ].filter(Boolean);
-  const summary = [input.summary, ...said].filter(Boolean).join('\n');
+  const summary = said_already ? '' : [input.summary, ...said].filter(Boolean).join('\n');
   // Vouching is said on the items too: an update that changes nothing marks each as checked now.
   if (vouched.length) {
     await l.change(actor, {
@@ -425,13 +418,13 @@ export async function sessionEnd(
   const { rows: working } = await l.db.query<{ id: string }>(`select id from relation where type = 'works_on' and from_id = $1 and valid_to is null`, [run.id]);
   await l.apply(actorId(actor), {
     ops: [
-      { op: 'update', id: run.id, status: outcome, body: summary ? [run.body, `[${now()}] ${outcome}: ${summary}`].filter(Boolean).join('\n') : undefined },
+      { op: 'update', id: run.id, status: stays ? 'waiting' : outcome, body: summary ? [run.body, `[${now()}] ${outcome}: ${summary}`].filter(Boolean).join('\n') : undefined },
       ...working.map((w): Op => ({ op: 'unlink', relation: w.id })),
     ],
     reason: input.summary ?? `Session ${outcome}`,
   });
   await heard(l, run, `Session "${run.title}" ended`);
-  return { run: run.id, status: outcome, released: held.length, unaccounted_commits: commits.length ? commits : undefined };
+  return { run: run.id, status: stays ? 'waiting' : outcome, released: held.length, unaccounted_commits: commits.length ? commits : undefined, note: stays ? 'Kept. The session stays open, under its name, until its chat ends.' : undefined };
 }
 
 /**

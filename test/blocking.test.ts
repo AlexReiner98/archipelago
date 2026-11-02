@@ -81,7 +81,7 @@ test('overdue work is due, and what is far off is not', async () => {
     { op: 'create', type: 'task', title: 'File return', props: { due: '2020-01-01' } },
     { op: 'create', type: 'task', title: 'Far off', props: { due: '2999-01-01' } },
   ]);
-  // Work resting on a refuted hypothesis is the inquiry pack's to show, not the kernel's.
+  // Work resting on a refuted hypothesis is the science pack's to show, not the kernel's.
   await owned(l);
   const due = await attend(l, { person: 'me', reasons: ['due'] });
   assert.deepEqual(due.items.map((t: any) => [t.title, t.reasons[0].overdue]), [['File return', true]]);

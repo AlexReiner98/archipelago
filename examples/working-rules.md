@@ -49,7 +49,7 @@ actions; `query` with name `actions` gives their inputs whole.
 - **If a pelago tool answers with a web page or "502",** the server is
   restarting. Do not send the call again through MCP: each such answer is a
   whole page in your context. Wait until `GET /health` on the server answers,
-  then send it as plain JSON (`POST /agent/<tool>`, the same nine tools, with
+  then send it as plain JSON (`POST /agent/<tool>`, the same ten tools, with
   the agent token from the environment, never printed).
 - **When Archipelago gets in your way,** record it with the `pelago-bump` skill
   when it happens. That is how it gets fixed.

@@ -35,14 +35,14 @@ test('a way that passes through a box is not taken', () => {
 });
 
 test('a wire takes a way that crosses nothing over a shorter one that does', () => {
-  const still = { a: 'r', b: 's', kept: true, points: [[300, 0], [300, 400]] };
+  const still = { a: 'r', b: 's', stays: true, points: [[300, 0], [300, 400]] };
   const w = { a: 'p', b: 'q', points: [[100, 20], [100, 200], [500, 200], [500, 380]] };
   shape(boxes({ p: box(100, 0), q: box(500, 400), r: box(300, -20), s: box(300, 420) }), [still, w], SIZES);
   assert.deepEqual(still.points, [[300, 0], [300, 400]]);
 });
 
 test('a wire does not stop on another: the solve could only cross them', () => {
-  const still = { a: 'r', b: 's', kept: true, points: [[200, -200], [200, 600]] };
+  const still = { a: 'r', b: 's', stays: true, points: [[200, -200], [200, 600]] };
   const w = { a: 'p', b: 'q', points: [[100, 20], [100, 180]] };
   shape(boxes({ p: box(100, 0), q: box(100, 200), r: box(200, -220), s: box(200, 620) }), [still, w], SIZES);
   assert.equal(bends(w), 0);
@@ -61,14 +61,14 @@ test('a pointed box is only left from its middle', () => {
   assert.ok(w.points[0][0] === 100 || w.points[0][1] === 0, 'it leaves on an axis of the box');
 });
 
-test('what was set by rows is left as it stands', () => {
-  const w = { a: 'p', b: 'q', kept: true, points: [[100, 20], [100, 100], [160, 100], [160, 180]] };
+test('a wire that stays is left as it stands', () => {
+  const w = { a: 'p', b: 'q', stays: true, points: [[100, 20], [100, 100], [160, 100], [160, 180]] };
   shape(boxes({ p: box(100, 0), q: box(140, 200) }), [w], SIZES);
   assert.equal(bends(w), 2);
 });
 
 test('a line through a box gives way, but not for a way that crosses more', () => {
-  const still = { a: 'r', b: 's', kept: true, points: [[200, -100], [200, 300]] };
+  const still = { a: 'r', b: 's', stays: true, points: [[200, -100], [200, 300]] };
   const w = { a: 'p', b: 'q', points: [[100, 20], [100, 180]] };
   shape(boxes({ p: box(100, 0), q: box(100, 200), m: box(100, 100, 300, 20), r: box(200, -120), s: box(200, 320) }), [still, w], SIZES);
   assert.ok(w.points.every((c) => c[0] < 200), 'it does not go round across the wire beside it');

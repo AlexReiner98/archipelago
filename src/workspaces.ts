@@ -17,6 +17,7 @@ import { databaseFor, dropDatabaseFor } from './pg.ts';
 import { dueForDeletion, setEnded } from './ended.ts';
 import { Archipelago, type Policy } from './pelago.ts';
 import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
+import { beginApplying } from './rules.ts';
 import { followPacks, packsOff, syncPacks } from './packstate.ts';
 import { hostFor } from './packtools.ts';
 import { syncTypes } from './typetable.ts';
@@ -249,11 +250,14 @@ export class Workspaces {
       const registry = new Registry(packsDir, packs, await localTypes<TypeDef>(db));
       registry.keepLocal = (def) => addLocalType(db, def);
       const pelago = new Archipelago(db, registry, policy, id);
+      // Nothing on its log and nothing brought in: a new workspace, opened for the first time. Any other keeps what it has.
+      const begins = !backup && !(await db.query(`select 1 from log_entry limit 1`)).rows.length;
       // The packs the owner turned off here stay off; what they made is dormant.
       await syncPacks(pelago); // which packs are present, and as which manifests, is a fact on the log
       pelago.registry.turnOff(await packsOff(pelago));
       await takeTypeItems(pelago);
       await syncTypes(pelago);
+      if (begins) await pelago.record('settings', 'system', await beginApplying(db));
       const ws = { id, name: isDefault ? 'Default' : (this.known.get(id) ?? id), pelago, automations: new Automations(pelago) };
       if (this.leading) this.clocks(ws, true);
       return ws;

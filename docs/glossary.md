@@ -85,7 +85,8 @@ the map and changed like anything else. Replaces *picture*
 where a picture meant this (an *image* is a picture file, such as a test's
 screenshot). The read tools a pack declares (`views` in a pack file) are
 also called views; one declared with a `lens` is answered by a read of the
-kernel's that it names (the flat lens, the graph, the tree, attention...).
+kernel's that it names (the flat query, the graph, the tree, attention...).
+Replaces *lens* in prose, which stays only as the stored name.
 
 **theme.** A style's colours (its `theme` field): a few given, the rest
 worked out from them as data (a mix, or a contrast held), finished on the
@@ -100,7 +101,7 @@ sandbox (`ui/draw.html`), answering with marks the page checks
 (`docs/layouts.md`). Replaces *shape* where a shape meant this; the field
 that names it is still `shape`.
 
-**Find, Only, Not, Walk, Limit.** The parts of a lens, by the words the
+**Find, Only, Not, Walk, Limit.** The parts of a query, by the words the
 query bar and an agent's answer give them (decision e_drt4g872). **Find** is
 what adds: words, a type, a tag, a link and its end, an item, in an item
 (all that is part of it, at any depth); any of them (words typed in find
@@ -116,18 +117,18 @@ drawn, said as how many of it. In the code: the filter's `text`, `types`,
 thing, never guessed from words (e_45sgrfqd). Replaces *search*, *nodes*,
 *edges*, *steps* and *alone* where the bar meant these.
 
-**canvas.** The page's one flat plane, where every item a lens reaches is a
-node and every link a wire; depth is never drawn (`docs/canvas.md`). A
-**saved canvas** is a lens and a style kept on the map, listed on Home. In
-the code: `ui/canvas.js`; a saved canvas is an item of core's system type
-`lens` (`src/query-saved.ts`, `ui/canvases.js`).
+**canvas.** The page's one flat plane, where every item a query reaches is a
+node and every link a wire; depth is never drawn (`docs/canvas.md`). The
+views kept on the map are listed on Home, and a canvas opens on one. In the
+code: `ui/canvas.js`; a kept view is an item of core's system type `lens`
+(`src/query-saved.ts`, `ui/canvases.js`).
 
 **sheet.** The panel that opens over the canvas from the side, holding one
 item's page (or a new item, the Workspace page, a screen, For you). In the
 code: `#sheet` in `ui/index.html`, routed by `ui/app.js`.
 
 **tag.** What items belong with, named in a word or two: an item of core's
-`tag` type, tied by a `tagged` link, any number to an item. A lens filters by
+`tag` type, tied by a `tagged` link, any number to an item. A query filters by
 one (`tagged <tag>`); the house style draws no wire for it.
 
 **place.** Where a person put an item on a canvas: one per canvas and item,
@@ -208,5 +209,7 @@ true with its links. In the code: `commit` and
 | knowledge graph | the map |
 | type pack | pack |
 | picture, where it means a view | view |
+| lens, where it means a filter, a walk and a limit | query |
+| lens or saved canvas, where it means one kept on the map | view |
 | shape, where it means a drawing | drawing |
-| search, nodes, edges, steps, alone, where the query bar meant a part of a lens | Find, Only, Not, Walk, Limit |
+| search, nodes, edges, steps, alone, where the query bar meant a part of a query | Find, Only, Not, Walk, Limit |

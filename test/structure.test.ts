@@ -59,7 +59,7 @@ const count = (files: string[], pattern: RegExp) =>
 
 // 1. No file over 500 lines.
 const LONG_FILES: Record<string, number> = {
-  'src/pelago.ts': 840,
+  'src/pelago.ts': 839,
   'ui/style.css': 679,
 };
 
@@ -415,8 +415,8 @@ test("a drawing's list holds every module it reaches", () => {
 const LENGTHS_IN_DRAWINGS: Record<string, number> = {
   'architecture/boats.js': 3, 'architecture/deep.js': 32, 'architecture/index.js': 28, 'architecture/islands.js': 18, 'architecture/layout.js': 9, 'architecture/moves.js': 6,
   'architecture/route.js': 8, 'architecture/says.js': 3, 'architecture/sides.js': 1, 'architecture/story.js': 3, 'flow/combs.js': 1, 'flow/direction.js': 1, 'flow/faults.js': 4,
-  'flow/index.js': 22, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/search.js': 2,
-  'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 3, 'flow/tidy.js': 2, 'flow/topology.js': 1, 'flow/upward.js': 6, 'flow/ways.js': 9, 'flow/wrap.js': 2, 'grid/index.js': 8, 'grid/look.js': 1,
+  'flow/index.js': 22, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/search.js': 1,
+  'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 6, 'flow/wrap.js': 2, 'grid/index.js': 8, 'grid/look.js': 1,
   'pages/index.js': 5, 'time/index.js': 31, 'packs/plan/layouts/meters/index.js': 10,
 };
 const BARE = /(?<![\w.$#])\d+(?:\.\d+)?(?![\w.])/g;
@@ -438,7 +438,7 @@ test('a length in a drawing is named on the style', () => {
 // will say, read as if they did, so the rules hold of them today, and a name goes from it as its module says it.
 // LAYERS_MIXED are modules that are more than one layer. Each list here may only shrink, LAYERS_OWED too.
 const LAYERS_MIXED: Record<string, number> = { 'architecture/layout.js': 1, 'architecture/route.js': 1, 'flow/part.js': 1 };
-const LAYER_IMPORTS: Record<string, number> = { 'flow/search.js -> flow/tidy.js': 1 };
+const LAYER_IMPORTS: Record<string, number> = {};
 const WRITERS: Record<string, number> = { 'architecture/boards.js': 4, 'architecture/boats.js': 1, 'architecture/deep.js': 1, 'architecture/islands.js': 8, 'architecture/sides.js': 1, 'flow/combs.js': 1, 'flow/shape.js': 1 };
 const wired = drawings.filter((d) => d.id in WIRED);
 const wiredFiles = [...new Set(wired.flatMap((d) => Object.keys(d.modules).map((name) => pathOf(d, name))))];

@@ -15,6 +15,7 @@ test('the GitHub pack hears a push: it is recorded against its repository, and w
   const db = (await workspaces.get('default')).pelago.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const robot = (await createToken(db, 'default', { kind: 'agent', name: 'robot' })).token;
+  await call('/api/workspace_set', admin, { agent_changes: 'hold' });
   const made = (
     await call('/api/change', admin, {
       reason: 'x',

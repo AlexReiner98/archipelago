@@ -1,6 +1,6 @@
 # Agents held to the map: principles and structure
 
-An agent works through the same nine tools as a person, and what it is asked
+An agent works through the same ten tools as a person, and what it is asked
 to do is held the same way the page's looks are: as items the map keeps,
 read each time, checked by rules kept as data. Five principles decide it;
 from them a developer can predict how an agent is told, checked and
@@ -46,7 +46,7 @@ change: `judge` skips it, and what applies or waits stays the other rules'
 
 ### 3. Answers are drawn when they have a shape
 An answer about several items, or how they relate, order or stand, is a
-lens opened with `report` action `show`, with one line in chat; a yes, a
+view opened with `report` action `show`, with one line in chat; a yes, a
 number or one item is a line in chat. It is said at session start
 (`core.draw_answers`, an instruction) and checked by core's reply rule
 `draw_answers`, lifted by `reply_draw_answers`: a reply that surveyed the
@@ -125,7 +125,12 @@ The items a session read, showed or changed, and the commits it made, are
 kept with its run, so two sessions on one token are told apart. When it
 ends (`report` action `session_end`), it is asked first about what it
 touched and nobody has changed since it began: change each, vouch that it
-is still true, or say it cannot tell.
+is still true, or say it cannot tell. A run a chat keeps is one session for
+as long as the chat lives: its agent's end says where the work stands and
+leaves it open, waiting, the chat ending closes it, and a prompt takes up one
+that was ended.
+- `test/sessions.test.ts`: "one chat is one session: its agent saying it is
+  done keeps it open, and only the chat ends it".
 - `test/touched.test.ts`: "what a session touched is kept with its run,
   apart from another session of the same agent"; "in a repository, what the
   session touched is asked about first"; "the hook reads from the transcript

@@ -36,7 +36,7 @@ export function assemble(shelves, { kids, combs, combGap, portOff, block, stepSi
         }
       }
     }
-    for (const [k, r] of c.drawn.points) routes.set(k, { from: r.from, to: r.to, set: c.drawn.set, points: r.points.map(([p, q]) => [p + dx, q + dy]) });
+    for (const [k, r] of c.drawn.points) routes.set(k, { from: r.from, to: r.to, points: r.points.map(([p, q]) => [p + dx, q + dy]) });
   });
   return { x, y, routes, holder };
 }
