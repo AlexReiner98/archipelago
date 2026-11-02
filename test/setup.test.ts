@@ -11,6 +11,7 @@ import { gzipSync } from 'node:zlib';
 import { createToken, OPERATOR_RESET_FILE } from '../src/auth.ts';
 import { dump } from '../src/backup.ts';
 import { loadConfig } from '../src/config.ts';
+import { linkFor } from '../src/members.ts';
 import { createHttpServer, lenient } from '../src/server.ts';
 import { Workspaces } from '../src/workspaces.ts';
 import { serve, closers } from './serve.ts';
@@ -197,7 +198,10 @@ test('beyond this machine the server needs tokens, and answers only to the names
   assert.deepEqual([hosted.host, hosted.port, hosted.publicHosts, hosted.launch], ['0.0.0.0', 10000, ['pelago.example.com', 'other.example.com'], false], 'and it does not launch sessions');
 
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(mkdtempSync(join(tmpdir(), 'pelago-public-')), 'workspaces'), packsDir: join(import.meta.dirname, '..', 'packs') });
+  // As hosted: the server's own browser reaches it by a name inside the host, which no mailed link may carry.
+  process.env.PELAGO_LOOK_ORIGIN = 'http://archipelago-app:3100';
   const server = createHttpServer(workspaces, 0, { auth: 'tokens', publicHosts: hosted.publicHosts });
+  delete process.env.PELAGO_LOOK_ORIGIN;
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   closers.push(async () => {
     server.close();
@@ -215,6 +219,7 @@ test('beyond this machine the server needs tokens, and answers only to the names
     });
   assert.equal(await ask('pelago.example.com'), 200, 'its public name');
   assert.equal(await ask('evil.example.net'), 403, 'any other name');
+  assert.match(await linkFor((await workspaces.get('default')).pelago.db, 'default', 'ann@example.com', 60_000), /^https:\/\/pelago\.example\.com\/#\/join\//, 'a mailed sign-in link names its public name');
 });
 
 test('the operator can issue a workspace a new owner token, and nobody else can', async () => {
