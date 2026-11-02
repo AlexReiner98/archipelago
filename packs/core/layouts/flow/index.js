@@ -209,6 +209,8 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
       n.lines?.length > 1
         ? m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, ...n.lines.map((line, k) => m('tspan', { x: left, dy: k ? n.line : (-(n.lines.length - 1) * n.line) / 2 }, fit(line, room, n.stub ? STUB_TEXT : TEXT))))
         : m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, fit(i.title, room, n.stub ? STUB_TEXT : TEXT)),
+      // In a story, the word a step flags on it then, over its top right corner.
+      story && !n.stub && m('text', { key: `f:${n.id}`, x: X + n.w / 2, y: Y - n.h / 2 - z('flag_lift'), class: 'lf-flag' }, ''),
     ];
     const key = `s:${n.id}`;
     keyed.set(key, i.id);
@@ -280,6 +282,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
       steps: new Map(steps.map((n) => [`s:${n.id}`, [n.item.id]])),
       wires: [...g.chains.map((c, n) => ({ keys: [`w:${n}`, `h:${n}`], from: [c.a], to: [g.nodes.get(c.b).item.id], item: { from: c.a, to: c.b } })), ...g.ties.map((t, n) => ({ keys: headless.has(t.type) ? [`n:${n}`] : [`n:${n}`, `nh:${n}`], from: [t.a], to: [t.b], item: { from: t.a, to: t.b } }))],
       says: new Map([...said.values()].map((c) => [g.chains.indexOf(c), `t:${g.chains.indexOf(c)}`])),
+      flags: new Map(steps.filter((n) => !n.stub).map((n) => [n.item.id, `f:${n.id}`])),
     };
     const frames = statesOf(answer.steps);
     player = play({ answer, style, reduced, tools, shape: { frames, stage: (ctx) => reveal({ frames, marks, ...ctx }) } });
@@ -331,7 +334,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     end: player?.end,
     on(event) {
       const { name, key } = event;
-      if (player && (key === 'play' || key === 'chat' || key.startsWith('c:'))) return player.on(event);
+      if (player?.hears(key)) return player.on(event);
       if (name === 'drag' || name === 'drop') return move(key, event, name === 'drop');
       if (name === 'leave') return [...light(null), ...(story ? [] : [{ tip: null }])];
       if (!keyed.has(key)) return [];

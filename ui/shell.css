@@ -346,6 +346,11 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #canvas .pane-canvas .lens-view { position: relative; box-sizing: border-box; overflow: auto; }
 #canvas .pane-canvas .lens-view:has(.lf-stage) { overflow: hidden; }
 #canvas .pane-canvas .lf-stage { height: 100%; }
+/* A view that plays its steps: the chapters over the canvas, what was said beside the picture, both held in the pane. */
+#canvas .pane-canvas .lens-view:has(> .lf-beside) { display: flex; flex-direction: column; }
+#canvas .pane-canvas .lens-view > .sp-top { flex: none; margin: 0; padding: var(--space-4) var(--space-6) 0; }
+#canvas .pane-canvas .lens-view > .lf-beside { flex: 1 1 0; min-height: 0; padding: var(--space-6); }
+#canvas .pane-canvas .lf-beside > .sp-chat { min-height: 0; margin-bottom: var(--safe-bottom); }
 #canvas .pane-canvas .lens-view > .toolbar { display: none; }
 /* A finger needs more to land on than a pointer does. */
 @media (pointer: coarse) {

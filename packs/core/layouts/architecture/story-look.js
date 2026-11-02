@@ -48,6 +48,7 @@ export const css = `
 .sp-live { width: var(--box-3); height: var(--box-3); border-radius: 50%; background: var(--ok); }
 .sp-count { font-variant-numeric: tabular-nums; }
 .sp-chat .sp-head button { font: inherit; color: var(--text); background: var(--bg); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); padding: var(--space-1) var(--space-7); cursor: pointer; }
+.sp-chat .sp-head button.sp-step { border: none; background: none; padding: var(--space-1) var(--space-3); font-size: var(--text-4); }
 .sp-log { position: absolute; inset: var(--box-8) 0 0 0; margin: 0; padding: var(--space-6) var(--space-7); list-style: none; display: flex; flex-direction: column; justify-content: flex-end; gap: var(--space-4); overflow: hidden; mask-image: linear-gradient(to bottom, transparent 0, black var(--box-9)); }
 .sp-line { flex: none; max-width: min(88%, 62ch); opacity: 0; transform: translateY(var(--space-4)); transition: opacity 0.35s ease, transform 0.35s ease; display: flex; gap: var(--space-5); align-items: baseline; }
 .sp-line.in { opacity: 1; transform: none; }

@@ -1,20 +1,24 @@
 // A process told as it happens: a lens's steps over the flow's own picture (index.js). The process is laid out once,
 // whole, from every step the story ever brings in, so nothing moves; each step of the story shows what it brings, in
-// the accent a while, its wires drawn in once both their ends are there, takes away what it takes away, and lights
-// the wires it names. The conversation beside it and the chapters above it are play.js's, shared with the
+// the accent a while, its wires drawn in once both their ends are there, takes away what it takes away, lights
+// the wires it names and writes the word it flags on a step beside it. The conversation beside it and the chapters above it are play.js's, shared with the
 // architecture's stories. The last step is the map as it is: what the steps leave in, with its own state now.
 
 import { css as storyLook } from './story-look.js';
 
-/** What each step shows: the ids it has in (as the steps add and take away), its chapter, the wires it lights. */
+/**
+ * What each step shows: the ids it has in (as the steps add and take away), its chapter, the wires it lights, and the
+ * word flagged on each thing then (`flags`, by id), none on the last: that is the map as it is.
+ */
 export function statesOf(steps) {
-  const present = new Set();
+  const present = new Set(), flags = new Map();
   let chapter = -1;
-  return steps.map((s) => {
+  return steps.map((s, k) => {
     for (const id of s.add ?? []) present.add(id);
     for (const id of s.remove ?? []) present.delete(id);
+    for (const [id, word] of Object.entries(s.flag ?? {})) word ? flags.set(id, String(word)) : flags.delete(id);
     if (s.chapter) chapter++;
-    return { step: s, chapter, ids: new Set(present), lit: (s.lit ?? []).map((w) => [...w].sort().join(' ')) };
+    return { step: s, chapter, ids: new Set(present), lit: (s.lit ?? []).map((w) => [...w].sort().join(' ')), flags: k === steps.length - 1 ? new Map() : new Map(flags) };
   });
 }
 
@@ -25,6 +29,7 @@ export const everyNamed = (steps) => new Set(steps.flatMap((s) => s.add ?? []));
 export const css = `${storyLook}
 .lf-step .lf-shape, .lf-wire, .lf-tie, .lf-head { transition: stroke 0.8s, stroke-width 0.8s, fill 0.8s; }
 .lf-step.sp-new .lf-shape { stroke: var(--accent); stroke-width: var(--border-3); }
+.lf-flag { fill: var(--accent); font-size: var(--ln-flow-says-text); font-family: var(--ln-font); text-anchor: end; }
 .lf-wire.sp-new, .lf-wire.sp-lit, .lf-tie.sp-new, .lf-tie.sp-lit, .lf-wire[class*=lf-k-].sp-new, .lf-wire[class*=lf-k-].sp-lit, .lf-tie[class*=lf-k-].sp-new, .lf-tie[class*=lf-k-].sp-lit { stroke: var(--accent); stroke-width: var(--border-3); }
 .lf-head.sp-new, .lf-head.sp-lit, .lf-head[class*=lf-k-].sp-new, .lf-head[class*=lf-k-].sp-lit { fill: var(--accent); }
 `;
@@ -32,7 +37,7 @@ export const css = `${storyLook}
 /**
  * The flow's stage for play.js: `apply(k, dur)` shows step k. `marks` says what the picture drew: each step's mark
  * key and the items it stands for (`steps`: key to ids), each wire's keys and the steps at its ends (`wires`), and the
- * key of what each choice is (`says`: wire index to key).
+ * key of what each choice is (`says`: wire index to key), and the key of the word flagged on each step (`flags`: id to key).
  */
 export function reveal({ frames, marks, t, send, later }) {
   let was = null;
@@ -62,6 +67,8 @@ export function reveal({ frames, marks, t, send, later }) {
           fresh.push(...w.keys);
         }
       });
+      // The word flagged on each step then, or none.
+      for (const [id, key] of marks.flags ?? []) if ((f.flags.get(id) ?? '') !== (was?.flags.get(id) ?? '') || !was) list.push({ key, text: f.flags.get(id) ?? '' });
       // What a step brings is in the accent a while.
       if (fresh.length) (list.push(...fresh.map((key) => ({ key, toggle: { 'sp-new': true } }))), later(t('new_for'), () => send(fresh.map((key) => ({ key, toggle: { 'sp-new': false } })))));
       send(list);

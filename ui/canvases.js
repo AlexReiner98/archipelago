@@ -7,7 +7,7 @@
 // document brings in is a part of that page, in neither list unless it is pinned or up.
 
 import { api, ask, h, hooks, idsOf, state, tell, wordsOf, withIds } from './base.js';
-import { addressOf, flatView } from './query.js';
+import { addressOf, flatView, stepsOf } from './query.js';
 import { filterSaid, fitBar } from './query-bar.js';
 import { canvasMenu } from './canvas-menu.js';
 import { lookSwitch, styleDelete } from './look-switch.js';
@@ -67,8 +67,7 @@ export function keptView(id, { key = `kept:${id}`, style = {} } = {}) {
       const kept = viewParts(got.entity);
       const of = got.outgoing.find((o) => o.type === 'about')?.id;
       // Its steps are played by a drawing that knows them, with what they name drawn too.
-      const steps = Array.isArray(got.entity.props?.steps) ? got.entity.props.steps : undefined;
-      const told = (steps ?? []).flatMap((s) => [...(s.add ?? []), ...(s.remove ?? []), ...Object.keys(s.titles ?? {}), ...Object.keys(s.fields ?? {}), ...Object.keys(s.flag ?? {})]);
+      const { steps, told } = stepsOf(got.entity);
       if (told.length) kept.lens.filter = withIds(kept.lens.filter, told);
       // It starts from what it is about, where it draws that or what is in it (in it, within it, or the end of a link term); else from the one item it names.
       const ids = idsOf(kept.lens.filter);
