@@ -170,7 +170,7 @@ export function drawWith(host, answer, style, keep) {
   const tip = tipOf(host);
   const apply = (list) => {
     const all = Array.isArray(list) ? list : [];
-    for (const p of all.filter((p) => p && 'tip' in p)) p.tip ? tip.show(keys.get(String(p.tip.key)), build(p.tip.mark, keys, tell)) : tip.hide();
+    for (const p of all.filter((p) => p && 'tip' in p)) p.tip ? tip.show(keys.get(String(p.tip.key)), build(p.tip.mark, keys, tell), p.tip.key) : tip.hide();
     patch(all.filter((p) => !(p && 'tip' in p)), keys, tell, moving);
   };
   // A surface has no marks for the page to light: its drawing is told what is lit, and paints it.
@@ -186,6 +186,7 @@ export function drawWith(host, answer, style, keep) {
         const got = performance.now();
         mounted = true;
         mount(said.scene ?? {});
+        tip.carry(keys);
         // Drawn once its marks are mounted, and a surface over them has shown its first frame.
         (surface ? surface.first : Promise.resolve()).then(() => saidDrawn(host, 'drawn'));
         for (const list of early.splice(0)) apply(list);
@@ -225,11 +226,12 @@ ${JSON.stringify(input)}`;
   port.postMessage({ type: 'start', input });
   // A picture published with its first frame (src/published-frames.ts) has it on screen now; the drawing's own scene
   // takes its place when it answers.
-  if (kept) ((mounted = true), mount(kept), saidDrawn(host, 'drawn'));
+  if (kept) ((mounted = true), mount(kept), tip.carry(keys), saidDrawn(host, 'drawn'));
   else if (opening) {
     // Checked as any scene is: one that says what a drawing may not is not drawn, and the drawing draws the picture.
     try {
       mount(opening);
+      tip.carry(keys);
       mounted = true;
     } catch {
       host.replaceChildren();
