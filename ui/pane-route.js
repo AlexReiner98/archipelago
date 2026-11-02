@@ -1,14 +1,15 @@
 // Where an agent's step lands among the owner's tabs and the panes in each (ui/tab-bar.js, ui/panes.js), worked out
 // from whom each tab follows and whose each pane is, and nothing else, so it is tested without a page. A tab is a set of
 // panes, every one alike, and follows one session or nobody (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9; tabs:
-// e_mzer5m4t, e_q3amet26, e_ezb7s3a7, e_xjrpyysn). Every chat has a tab of its own, opened as it begins, named by its
-// title and closed as it ends (ui/tab-life.js; the design e_p6fr4uye); the owner's own tabs follow nobody unless they
+// e_mzer5m4t, e_q3amet26, e_ezb7s3a7, e_xjrpyysn). A chat has a tab of its own once it shows something, named by its
+// title and closed as it goes quiet or ends (ui/tab-life.js; the design e_p6fr4uye); the owner's own tabs follow nobody unless they
 // set one to follow a chat (e_jk6bnuh9):
 // - Only a show lands (ui/live.js sends no other). A change or a beat of a session's story moves nothing (the owner,
 //   29 Oct 2026, e_e7yfp2yg): with several sessions at work, the reader's canvas stays where they left it.
 // - A show goes to a tab that follows its session, else to a tab holding a pane of its own (one the owner merged
 //   elsewhere), else to a tab of its own, opened out of sight and marked: a chat's tab the owner closed comes back with
-//   its next show (e_qvdrv6h3), and a session that has just begun (`opens`, said by the server) gets one too.
+//   its next show (e_qvdrv6h3). What the server says of a session (`canvas`: it began, took up a task) moves a tab it
+//   has, and opens none.
 // - Within the tab: the pane it named (`pane: "review"`), opened beside the others if there is none; a side asked for
 //   moves its pane there. Else its own pane: the one held for it (a pane keeps whose it is as long as it stands, so a
 //   long session finds it again), else one drawing what it shows or one nobody holds, never the pane the reader is in
@@ -114,5 +115,7 @@ export function route(step, tabs, { drawable = true } = {}) {
   // A pane of its own the owner merged into another tab: its shows find it there, and no tab of its own is opened.
   const holding = !step.opens && tabs.find((t) => !t.popped && t.panes.some((p) => p.held === session || p.by === session));
   if (holding) return into(holding);
+  // What the server says of a session (it began, it took up a task) opens no tab: a chat has one once it shows something.
+  if (step.canvas) return { nowhere: true };
   return ownTab();
 }

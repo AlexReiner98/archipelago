@@ -198,7 +198,7 @@ function tabEl(t, out) {
       'data-chat': t.chat ? 'true' : null,
       'data-ended': t.chat && t.ended?.includes(t.chat) ? 'true' : null,
       'data-quiet': one?.quiet && !one.ended ? 'true' : null,
-      title: [name, whom, t.chat && t.ended?.includes(t.chat) && 'its chat has ended: it goes when you leave it', one?.quiet && !one.ended && 'not heard from for a while', out && 'in a window of its own: press to go to it', !out && !inSight && 'drag it out of the page to pop it out'].filter(Boolean).join(' · '),
+      title: [name, whom, t.chat && t.ended?.includes(t.chat) && 'its chat has ended or gone quiet: it goes when you leave it', one?.quiet && !one.ended && 'not heard from for a while', out && 'in a window of its own: press to go to it', !out && !inSight && 'drag it out of the page to pop it out'].filter(Boolean).join(' · '),
       style: hue ? `--session-hue: ${hue}` : null,
     },
     h('span', { class: `tab-name${session ? ' who-session' : ''}` }, name),

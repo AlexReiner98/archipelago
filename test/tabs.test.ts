@@ -1,6 +1,6 @@
 // Tabs at the top of the owner's page (ui/tab-bar.js, ui/tab-life.js; decisions e_mzer5m4t, e_q3amet26, e_ezb7s3a7,
-// e_xjrpyysn, and the tab lifecycle e_p6fr4uye): in a real browser (skipped where there is no Chrome), every chat open
-// has a tab named by its title, kept live as it is renamed and closed as it ends; its shows land there in the background
+// e_xjrpyysn, and the tab lifecycle e_p6fr4uye): in a real browser (skipped where there is no Chrome), every chat that
+// has shown something has a tab named by its title, kept live as it is renamed and closed as it ends; its shows land there in the background
 // and marked, a press brings a tab into sight, a show while the reader is at work in its chat's tab waits for them, and a
 // tab pops out into a window of its own and docks back whole (a tab merged is test/show-lands.test.ts).
 
@@ -22,6 +22,9 @@ test('in a browser, a new session’s tab opens on its canvas, with no page over
     const task = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'work', title: 'A task' }] })).result.created as Record<string, string>;
     const id = Object.values(task)[0];
     const count = () => page.evaluate<number>(`document.querySelectorAll('#tabs .tab').length`);
+    await wait(2500);
+    assert.equal(await count(), 1, 'no tab while it has shown nothing');
+    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { query: {}, run: started.run } });
     for (let n = 0; n < 60 && (await count()) < 2; n++) await wait(250);
     assert.equal(await count(), 2, 'a tab of its own');
     await call('/agent/report', undefined, { actor: agent, action: 'session_update', params: { run: started.run, task: id } });
@@ -36,7 +39,7 @@ test('in a browser, a new session’s tab opens on its canvas, with no page over
   }
 });
 
-test('in a browser, every chat open has a tab named by its title, kept live, closed as it ends, which pops out and docks back', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, every chat that shows something has a tab named by its title, kept live, closed as it ends, which pops out and docks back', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {
     reason: 'test',
@@ -63,15 +66,17 @@ test('in a browser, every chat open has a tab named by its title, kept live, clo
   /** The tab named `name`, as a selector. */
   const tabNamed = async (name: string) => `#tabs .tab:nth-child(${(await names()).indexOf(name) + 1})`;
   try {
-    // The page mirrors the chats open: the owner's tab first, then one for each, by its title, out of sight and marked.
+    // The page follows steps from its first look at the map on. A chat open that has shown nothing has no tab.
+    await wait(3000);
+    assert.equal((await strip()).length, 1);
+    const reader = await page.evaluate<string>('location.hash');
+    // Each chat's first show opens its tab: the owner's tab first, then one for each, by its title, out of sight and marked.
+    for (const n of [0, 1, 2]) await show(n, `i${n}`);
     await until('a tab for each chat', async () => (await strip()).length === 4);
     const now = await strip();
     assert.equal(now[0][0], 'Home');
     assert.deepEqual(now.slice(1).map((t) => t[0]).sort(), ['Chat 0', 'Chat 1', 'Chat 2']);
     assert.deepEqual(now.map((t) => [t[1], t[2]]), [[true, false], [false, true], [false, true], [false, true]], 'the tab in sight stays; the others are marked');
-    const reader = await page.evaluate<string>('location.hash');
-    // The page follows steps from its first look at the map on.
-    await wait(3000);
     // A show goes to its chat's tab, in the background: no tab is added and the reader stays.
     await show(1, 'i1');
     await wait(2000);

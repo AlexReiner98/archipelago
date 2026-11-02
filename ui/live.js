@@ -50,6 +50,8 @@ export function follow(steps = []) {
   for (const s of steps) hear(s);
   // A chat that ended closes its tab here (ui/tab-life.js).
   for (const s of fresh) if (s.ends && s.run) hooks.sessionEnded?.(s.run, s.did);
+  // One gone quiet or waiting lets its tab go too, until it next shows something.
+  for (const s of fresh) if (s.rests && s.run) hooks.sessionRested?.(s.run);
   // A chat renamed is named anew on its tab.
   if (fresh.some((s) => s.did === 'titled')) hooks.drawStrip?.();
   // A later show takes the place of what waits, and its tab of its own, if it was owed one, stays owed.

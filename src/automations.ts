@@ -9,6 +9,8 @@ import { lastSeq, readEvents } from './eventlog.ts';
 import { launch } from './launcher.ts';
 import type { Entity, Archipelago } from './pelago.ts';
 import { notify } from './notify.ts';
+import { wholeMap } from './outbox.ts';
+import { took } from './presence.ts';
 import { alertOwner } from './alert.ts';
 import { sessionEnd } from './sessions.ts';
 import { callTool } from './tools.ts';
@@ -153,7 +155,7 @@ export class Automations {
   /** Tell the human, once, about each open session that has stopped reporting. */
   private async flagStaleSessions(): Promise<void> {
     if (!this.l.registry.type('notification')) return;
-    const view = (await VIEWS.sessions.run(this.l, {})) as { stale_after_minutes: number; open: { id: string; title: string; stale: boolean; last_seen: string; holds: { title: string }[] }[] };
+    const view = (await VIEWS.sessions.run(this.l, {})) as { stale_after_minutes: number; open: { id: string; title: string; stale: boolean; busy: boolean; last_seen: string; holds: { title: string }[] }[] };
     for (const run of view.open.filter((r) => r.stale)) {
       // Half a day without a word: its window was shut, or its machine was. It is ended for it, as its end hook
       // would have ended it, and what it held is given back.
@@ -164,6 +166,8 @@ export class Automations {
       const entity = await this.l.entity(run.id);
       if (entity?.props.stale_flagged) continue;
       await this.l.operational(run.id, { props: { stale_flagged: true } }, { actor: 'agent:pelago', action: 'run.stale', reason: `No report for over ${view.stale_after_minutes} minutes` });
+      // Its tab on the owner's page goes until it next shows something (ui/tab-life.js); not while a turn is under way.
+      if (!run.busy) await took((await wholeMap(this.l)).db, this.l, { kind: 'other', actor: 'agent:pelago', did: 'quiet', rests: true, run: run.id }, true).catch(() => {});
       // Worth a person's attention only when it keeps something from everyone else: the rest end by themselves.
       if (!run.holds.length) continue;
       await notify(

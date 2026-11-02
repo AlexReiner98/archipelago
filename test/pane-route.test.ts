@@ -36,6 +36,9 @@ test("a chat with no tab gets one of its own, out of sight; the owner's tab is n
   // A page of the owner's tabs alone still takes a new chat; a tab the owner closed comes back with its next show.
   assert.deepEqual(route({ ...step('r1'), opens: true }, [first()], at), { open: { follows: 'r1' }, front: false });
   assert.deepEqual(route({ ...step('r1'), opens: true }, [first(), tab('t1', 'r1')], at), { tab: 't1', pane: 'p0', front: false }, 'it is not opened twice');
+  // What the server says of a session (it began, took up a task) moves a tab it has, and opens none.
+  assert.deepEqual(route({ ...step('r1'), opens: true, canvas: true }, [first()], at), { nowhere: true });
+  assert.deepEqual(route({ ...step('r1'), canvas: true }, [first(), tab('t1', 'r1')], at), { tab: 't1', pane: 'p0', front: false });
 });
 
 test('several chats each keep a tab, and come back to it; there is no most', () => {
