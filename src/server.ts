@@ -115,12 +115,12 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...named.map((name) => `https://${name}`), lookAt.origin];
   const tokens = options.auth === 'tokens';
   configureOutbox(async (id) => ((await workspaces.has(id)) ? (await workspaces.get(id)).pelago : undefined));
-  // The server packs are told the address this server is reached at from outside; a workspace's packs reach them as its connections (src/pack-reach.ts).
+  // The address this server is reached at from outside: what a mailed link and the server packs (ctx.origin) name, never the look's.
   const serverPacks = serverPacksOf(workspaces);
-  serverPacks.origin = named[0] ? `https://${named[0]}` : `http://127.0.0.1:${port}`;
+  serverPacks.origin = named[0] ? `https://${named[0]}` : origins[0];
   configureConnections(serverPacks);
   setReach({ hold: (id) => workspaces.hold(id), connection: async (id, pack) => { const c = await serverPacks.connectionOf(pack, id); return c ? { id: c.id, account: c.account } : null; }, via: (id, pack, host, path) => serverPacks.lent(pack, host, id, path) });
-  configureMembers({ origin: origins.at(-1)!, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), limitOf: async (id) => (id === 'default' ? undefined : memberLimit((await workspaces.get('default')).pelago.db, id)) }); configureIndex(() => workspaces.control()); configureEnded(async (id) => (id === 'default' ? undefined : readEnded((await workspaces.get('default')).pelago.db, id))); configurePlan({ storageOf: async (id) => storageBytes((await workspaces.get(id)).pelago.db) }); slowTokensAt(options.limits?.token);
+  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), limitOf: async (id) => (id === 'default' ? undefined : memberLimit((await workspaces.get('default')).pelago.db, id)) }); configureIndex(() => workspaces.control()); configureEnded(async (id) => (id === 'default' ? undefined : readEnded((await workspaces.get('default')).pelago.db, id))); configurePlan({ storageOf: async (id) => storageBytes((await workspaces.get(id)).pelago.db) }); slowTokensAt(options.limits?.token);
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
   const running = { commit: startedFrom(), started: new Date().toISOString() };
