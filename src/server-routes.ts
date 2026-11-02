@@ -9,7 +9,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
-import { notify } from './notify.ts';
+import { alertOwner } from './alert.ts';
 import { serverPacksOf } from './server-host.ts';
 import { hostBase, serverSecret } from './server-requests.ts';
 import type { ActPlaces } from './server-acts.ts';
@@ -28,19 +28,10 @@ export interface ServerRoutes {
   raw: () => Promise<Buffer>;
 }
 
-/** How often the owner is told that one pack's webhook refused a delivery or failed on one: once an hour at most. */
-const TOLD_EVERY_MS = 3_600_000;
-const told = new Map<string, number>();
-/** Tell the owner of the server, on the default map, that a webhook refused a delivery or failed on it. */
+/** Tell the owner of the server, on the default map and by mail, that a webhook refused a delivery or failed on it (src/alert.ts). */
 async function tellOwner(workspaces: ActPlaces, pack: string, hook: string, what: 'refused' | 'failed', detail: string): Promise<void> {
-  const key = `${pack}/${hook}/${what}`;
-  if (Date.now() - (told.get(key) ?? 0) < TOLD_EVERY_MS) return;
-  told.set(key, Date.now());
-  const owner = (await workspaces.get('default')).pelago;
   const title = what === 'refused' ? `The ${pack} pack's webhook "${hook}" refused a delivery` : `The ${pack} pack's webhook "${hook}" failed`;
-  await notify(owner, { kind: 'agent', name: `pack:${pack}` }, { title, body: `${detail}
-
-Said once an hour at most; the server's log has each one.`, level: what === 'failed' ? 'urgent' : 'warning' }).catch((err) => console.error(`telling the owner: ${(err as Error).message}`));
+  await alertOwner((await workspaces.get('default')).pelago, { key: `hook/${pack}/${hook}/${what}`, title, body: detail, level: what === 'failed' ? 'urgent' : 'warning', from: `pack:${pack}` });
 }
 
 /** Whether a body was signed with the secret: sha256=<hex> (prefixed, as GitHub sends) or the bare hex. */
