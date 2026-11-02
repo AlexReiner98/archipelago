@@ -104,10 +104,10 @@ test('a type a pack took over takes its items with it, once, when no pack define
   assert.deepEqual((await syncTypes(now)).moved, {}, 'once moved, nothing moves again');
 });
 test('a relation a pack took over takes its links with it, and the work at risk is still found', async () => {
-  // A map made while the inquiry pack named its types and links inquiry.<name>, before a type was named by what it is.
+  // A map made while the inquiry pack (science now) named its types and links inquiry.<name>, before a type was named by what it is.
   const before = mkdtempSync(join(tmpdir(), 'pelago-moved-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), before, { recursive: true });
-  const file = join(before, 'inquiry', 'pack.json');
+  const file = join(before, 'science', 'pack.json');
   let text = readFileSync(file, 'utf8');
   const shipped = JSON.parse(text) as { types: { id: string }[]; links: { id: string }[] };
   for (const { id } of [...shipped.types, ...shipped.links]) text = text.replaceAll(`"${id}"`, `"inquiry.${id}"`);
@@ -138,7 +138,7 @@ test('a relation a pack took over takes its links with it, and the work at risk 
   assert.deepEqual((await now.entity(made.created.quiet))!.props.filter, { find: ['type task'], only: [], not: ['type hypothesis'] });
   const { rows } = await db.query<{ type: string }>(`select type from relation where from_id = $1 and to_id = $2`, [made.created.t, made.created.h]);
   assert.deepEqual(rows.map((r) => r.type), ['assumes']);
-  const risk = (await callTool(now, human, 'inquiry_undermined', {})) as { id: string }[];
+  const risk = (await callTool(now, human, 'science_undermined', {})) as { id: string }[];
   assert.deepEqual(risk.map((r) => r.id), [made.created.t], 'the pack finds the work through the moved link');
   const brief = (await callTool(now, human, 'view', { name: 'brief', params: { task: made.created.t } })) as { text: string };
   assert.match(brief.text, /## Assumes\n- People read the blog \(refuted\)/);
