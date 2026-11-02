@@ -199,8 +199,10 @@ export function signIn(message, title = 'Sign in') {
   const input = h('input', { type: 'text', placeholder: 'pel_…', style: 'flex: 1; min-width: var(--input-wide)', autocomplete: 'off' });
   const error = h('div', { class: 'error', style: 'padding: 0 var(--space-8) var(--space-8)' }, message ?? '');
   const byEmail = h('div', { class: 'toolbar', style: 'padding: var(--space-8)' });
+  // Someone a client sent here to connect, with no account yet, came by MCP: where they begin says so (?ref=mcp).
+  const ref = waitingOnSignIn() ? 'mcp' : undefined;
   const sendLink = async () => {
-    const res = await fetch('/connect/sign-in', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email.value.trim() }) });
+    const res = await fetch('/connect/sign-in', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email.value.trim(), ref }) });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) return (error.textContent = body.error ?? 'That did not work.');
     error.textContent = '';
@@ -214,7 +216,7 @@ export function signIn(message, title = 'Sign in') {
       enter(given.token);
     };
     code.addEventListener('keydown', (e) => e.key === 'Enter' && typed());
-    byEmail.replaceChildren(h('span', { class: 'muted grow', title: `If ${body.sent_to} is a member here, a sign-in link and a code are on their way to it` }, `Check ${body.sent_to}`), code, h('button', { class: 'primary', onclick: typed }, 'Sign in'));
+    byEmail.replaceChildren(h('span', { class: 'muted grow', title: `A sign-in link and a code are on their way to ${body.sent_to}, or where to start, if it has no workspace here` }, `Check ${body.sent_to}`), code, h('button', { class: 'primary', onclick: typed }, 'Sign in'));
     code.focus();
   };
   const submit = async () => {
@@ -230,6 +232,14 @@ export function signIn(message, title = 'Sign in') {
   email.addEventListener('keydown', (e) => e.key === 'Enter' && sendLink());
   input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
   byEmail.replaceChildren(email, h('button', { class: 'primary', onclick: sendLink }, 'Email me a link'));
+  // Where a person with no account begins, if this server offers it; a client waiting to connect is returned to after.
+  const begin = h('div');
+  fetch('/connect/start').then((r) => r.json()).then(({ url }) => {
+    if (!url) return;
+    const to = new URL(url, location.origin);
+    if (ref) to.searchParams.set('ref', ref);
+    begin.replaceWith(h('div', { class: 'toolbar', style: 'padding: 0 var(--space-8) var(--space-8)' }, h('span', { class: 'muted grow' }, 'New here?'), h('a', { href: to.href, title: 'Make a workspace of your own; a client waiting to connect is asked again once you are in' }, 'Start a workspace')));
+  }, () => undefined);
   const others = Object.entries(known.all());
   document.querySelector('#nav .brand').replaceChildren('Archipelago');
   document.title = 'Archipelago';
@@ -240,6 +250,7 @@ export function signIn(message, title = 'Sign in') {
       { class: 'card', style: 'max-width: var(--card-most)' },
       others.length > 0 && h('div', { class: 'toolbar', style: 'padding: var(--space-8) var(--space-8) 0' }, h('span', { class: 'muted' }, 'Signed in before:'), others.map(([, w]) => h('button', { onclick: () => enter(w.token) }, w.name))),
       byEmail,
+      begin,
       h('details', { class: 'fold-bar' }, h('summary', { class: 'muted small', title: 'For an agent, or a workspace’s first sign-in' }, 'With a token'), h('div', { class: 'toolbar fold-bar' }, input, h('button', { onclick: submit }, 'Sign in'))),
       error,
     ),

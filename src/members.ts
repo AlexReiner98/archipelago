@@ -193,10 +193,11 @@ async function redeemWith(db: Q, workspace: string, key: string): Promise<string
 }
 
 /**
- * Someone asks to sign in at an address: one mail, with a link and a code for each workspace it is a member of.
- * Nothing is said back either way, so the page cannot be used to learn who is a member where.
+ * Someone asks to sign in at an address: one mail, with a link and a code for each workspace it is a member of, or,
+ * to an address in none, where to begin one (start) if this server offers that. Nothing is said back either way, so
+ * the page cannot be used to learn who is a member where.
  */
-export async function requestSignIn(workspaces: { id: string; name: string; db: () => Promise<Q> }[], email: string, origin: string): Promise<void> {
+export async function requestSignIn(workspaces: { id: string; name: string; db: () => Promise<Q> }[], email: string, origin: string, start?: string): Promise<void> {
   const links: string[] = [];
   for (const ws of workspaces) {
     const db = await ws.db();
@@ -204,7 +205,20 @@ export async function requestSignIn(workspaces: { id: string; name: string; db: 
     const ms = LINK_MINUTES * 60_000;
     links.push(`${ws.name}:\n${await linkFor(db, ws.id, email, ms, origin)}\nOr type this code on the sign-in page: ${await codeFor(db, email, ms)}`);
   }
-  if (!links.length) return;
+  if (!links.length) {
+    if (!start) return;
+    return sendMail({
+      to: email,
+      subject: 'Signing in to Archipelago',
+      text: [
+        'Hello,',
+        'Someone asked to sign in to Archipelago at this address, and it has no workspace here yet.',
+        `To start one, open this link: ${start}`,
+        'If you meant another address, ask again with that one. If you did not ask, you can ignore this email.',
+        '- Archipelago',
+      ].join('\n\n'),
+    });
+  }
   await sendMail({
     to: email,
     subject: 'Your Archipelago sign-in link',

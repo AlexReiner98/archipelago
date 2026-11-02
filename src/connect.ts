@@ -83,6 +83,17 @@ function askedLately(email: string): boolean {
   return false;
 }
 
+/** Where a person with no account begins on this server, if anywhere: a server pack's start page, or the kernel's signup. */
+const startOf = (at: ConnectRoutes) => serverPacksOf(at.workspaces).start() ?? (signupOffer().open ? '/#/signup' : undefined);
+const REF = /^[A-Za-z0-9_-]{1,40}$/;
+/** An address with where its reader came from (?ref=), when that is a tag and not anything else. */
+const withRef = (address: string, ref: unknown) => {
+  if (typeof ref !== 'string' || !REF.test(ref)) return address;
+  const url = new URL(address);
+  url.searchParams.set('ref', ref);
+  return url.href;
+};
+
 const reply = (res: ServerResponse, status: number, body: unknown) => res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(body));
 
 /**
@@ -113,6 +124,11 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
   if (req.method === 'GET' && path === '/connect/agreements') {
     if (at.tooOften()) return;
     return reply(res, 200, { agreements: await serverPacksOf(at.workspaces).agreements() });
+  }
+  // Where a person with no account begins, for the sign-in page to offer: a pack's start page, or the kernel's signup.
+  if (req.method === 'GET' && path === '/connect/start') {
+    if (at.tooOften()) return;
+    return reply(res, 200, { url: startOf(at) ?? null });
   }
   // Buying a workspace: what is sold, a request that goes on to the checkout, and the browser that began it asking
   // whether it is made. Lemon Squeezy's word that it is paid for comes signed, from no browser (src/signup.ts).
@@ -147,7 +163,7 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
   if (req.method === 'POST' && (path === '/connect/sign-in' || path === '/connect/join' || path === '/connect/code')) {
     if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in.' });
     if (at.tooOften()) return;
-    const body = ((await at.body()) ?? {}) as { email?: unknown; code?: unknown; agree?: unknown };
+    const body = ((await at.body()) ?? {}) as { email?: unknown; code?: unknown; agree?: unknown; ref?: unknown };
     const all = async () => (await at.workspaces.list()).map((w) => ({ ...w, db: async () => (await at.workspaces.get(w.id)).pelago.db }));
     // Only the workspaces this address is a member of are opened: an unknown address opens none (src/control-index.ts).
     const theirs = async (email: string) => {
@@ -164,8 +180,11 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     if (path === '/connect/sign-in') {
       const email = normalEmail(body.email);
       if (!email) return reply(res, 400, { error: 'That is not an email address.' });
-      // Answered at once and the same either way: whether the address is a member anywhere is not told.
-      if (!askedLately(email)) void requestSignIn(await theirs(email), email, origin).catch((err) => console.error(`sign-in mail to ${email} failed:`, (err as Error).message));
+      // Answered at once and the same either way: whether the address is a member anywhere is not told. An address in
+      // no workspace is mailed where to begin, which only its owner reads.
+      const start = startOf(at);
+      const begin = start && withRef(`${origin}${start}`, body.ref);
+      if (!askedLately(email)) void requestSignIn(await theirs(email), email, origin, begin).catch((err) => console.error(`sign-in mail to ${email} failed:`, (err as Error).message));
       return reply(res, 200, { sent_to: email });
     }
     // A code from the mail, typed with the address it was sent to.
