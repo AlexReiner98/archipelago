@@ -63,6 +63,9 @@ test('in a browser, a pan follows the pointer natively, and a click stays a clic
     await press();
     const was = await view();
     await mouse('mouseMoved', x + 80, y + 30, 1);
+    // The map moving under it says the sheet again as it was (ui/app.js): that is no new room, and the pan goes on
+    // where it is, not fitted back to where it began.
+    await page.evaluate(`document.body.dataset.sheet = document.body.dataset.sheet ?? ''`);
     await page.evaluate(frames);
     const now = await view();
     assert.ok(Math.abs((was.x - now.x) * now.s - 60) < 1 && Math.abs((was.y - now.y) * now.s - 30) < 1, `the plane follows the pointer: ${JSON.stringify([was, now])}`);
