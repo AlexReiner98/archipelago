@@ -20,6 +20,8 @@ export interface Q {
 export interface Db extends Q {
   transaction<T>(fn: (tx: Q) => Promise<T>): Promise<T>;
   close(): Promise<void>;
+  /** The database a person's view was made of (scoped), for the system's own tables, such as the type table. */
+  whole?: Db;
 }
 
 /** The database itself, PGlite's or a server's: a Db that can also run several statements at once. */
@@ -140,6 +142,7 @@ export function scoped(db: Db, viewer: string, admin = false): Db {
         return fn(tx);
       }),
     close: () => db.close(),
+    whole: db.whole ?? db,
   };
 }
 

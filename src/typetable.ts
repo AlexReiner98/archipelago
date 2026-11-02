@@ -4,7 +4,7 @@
 // capabilities. A definition that changed (a pack upgraded, or added back after a while) is logged with what changed.
 // A type that took another over (moved_from) takes its items once the old one is defined by no pack; a relation, its links.
 
-import type { Archipelago } from './pelago.ts';
+import { Archipelago } from './pelago.ts';
 import type { ResolvedRelation, ResolvedType } from './packs.ts';
 import { movePlaces } from './canvas-places.ts';
 import { moveQueries, termQueries } from './query-saved.ts';
@@ -50,8 +50,12 @@ export function differences(was: Record<string, unknown>, now: Record<string, un
   return out;
 }
 
+/** The map whole: the type table is the system's own, kept as the server keeps it whoever's act changed the types. */
+const wholeMap = (l: Archipelago) => (l.db.whole ? new Archipelago(l.db.whole, l.registry, l.policy, l.workspace) : l);
+
 /** Bring the table in line with the packs, and the registry in line with the table. Returns what it changed. */
-export async function syncTypes(l: Archipelago): Promise<{ activated: string[]; dormant: string[]; changed: Record<string, string[]>; moved: Record<string, number> }> {
+export async function syncTypes(given: Archipelago): Promise<{ activated: string[]; dormant: string[]; changed: Record<string, string[]>; moved: Record<string, number> }> {
+  const l = wholeMap(given);
   const reg = l.registry;
   const { rows } = await l.db.query<Row>(`select id, what, pack, state, def from type_def`);
   const kept = new Map(rows.map((r) => [r.id, r]));
