@@ -62,11 +62,15 @@ agent concludes (a cause, a finding, a choice and why) is a beat told with
 `report` action `tell`, and each item it settles is changed. The session
 start leads with it (`core.report_in`), and core's reply rule
 `record_findings`, lifted by `reply_record_findings`, asks a reply that
-called other tools at least six times (`worked`) and told nothing (`told`)
-to tell what it found before it answers. A `when.reply` fact may be a
-number: at least that many times.
-- `test/replies.test.ts`: "core asks a reply that worked and told the map
-  nothing to tell what it found, and the owner can turn that off"; "the
+called other tools at least six times (`worked`) and neither told nor
+changed anything (a note updated is as much a record as a new one: the
+owner, 2 Nov 2026) to tell what it found before it answers. A `when.reply`
+fact may be a number: at least that many times. The owner sets another
+number on the check's row (`workspace_set` `asks_at`, kept as the setting
+`<lifted>_at`).
+- `test/replies.test.ts`: "core asks a reply that worked and put nothing on
+  the map to tell what it found, at a number the owner sets, until they turn
+  it off"; "the
   session-start text says the map, not the chat, is the record, and that
   telling is checked".
 

@@ -967,10 +967,10 @@
     {
       "id": "record_findings",
       "on": "reply_ended",
-      "when": { "reply": { "worked": 6, "told": false } },
+      "when": { "reply": { "worked": 6, "told": false, "changed": false } },
       "then": "ask",
       "lifted": "reply_record_findings",
-      "say": "This reply worked and told the map nothing. Before you answer: each thing you found or decided, report action tell with its items; each item it settles, change it."
+      "say": "This reply worked and put nothing on the map. Before you answer: tell each thing you found or decided (report, action tell, with its items), or change the items it settles."
     },
     {
       "id": "sessions",

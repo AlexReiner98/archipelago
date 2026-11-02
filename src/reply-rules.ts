@@ -63,11 +63,27 @@ export function replyFacts(said: unknown): ReplyFacts | undefined {
   return facts;
 }
 
-/** Whether a reply rule's when holds of what the reply did: true at least once, false never, a number at least that often. */
-export function holds(rule: RuleDef, facts: ReplyFacts): boolean {
+/** The fact a rule counts to (a number in its when.reply) and that number, as its pack says: the owner may set another. */
+export function countsTo(rule: RuleDef): { fact: string; at: number } | undefined {
+  const found = Object.entries(rule.when?.reply ?? {}).find(([, did]) => typeof did === 'number');
+  return found && { fact: found[0], at: found[1] as number };
+}
+
+/** The setting that holds the owner's own number for a rule that counts: its lifted, with _at. */
+export const atSetting = (rule: RuleDef) => `${rule.lifted}_at`;
+/** The most a rule may be set to count to. */
+export const AT_MAX = 1000;
+/** Whether a setting is a number a rule may count to. */
+export const isAt = (v: unknown) => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= AT_MAX;
+
+/**
+ * Whether a reply rule's when holds of what the reply did: true at least once, false never, a number at least that
+ * often (at, the owner's number, in place of the pack's when it is given).
+ */
+export function holds(rule: RuleDef, facts: ReplyFacts, at?: number): boolean {
   return Object.entries(rule.when?.reply ?? {}).every(([fact, did]) => {
     const n = facts[fact as keyof ReplyFacts] ?? 0;
-    return typeof did === 'number' ? n >= did : n > 0 === did;
+    return typeof did === 'number' ? n >= (at ?? did) : n > 0 === did;
   });
 }
 
