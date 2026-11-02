@@ -14,6 +14,7 @@ import { lookAt, takeLook } from './looks.ts';
 import { getPicture } from './pictures.ts';
 import { withScreens } from './screens.ts';
 import { schemaBrief, schemaOf } from './schema-brief.ts';
+import { NOW_MS, seeing, seenNow } from './seeing.ts';
 import { withStyles } from './styles.ts';
 import { props } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
@@ -303,6 +304,17 @@ export const READ_TOOLS: Record<string, Tool> = {
       marks: z.boolean().optional().describe('Answer with the drawing as marks (markup and its stylesheet, large) in place of the image, where it has them: what a view drawn in a chat asks for. To see a view yourself, leave this out.'),
     },
     run: async (l, actor, input) => takeLook((await wholeMap(l)).db, l.db, l, actor.name, await viewAddress(l, input), input),
+  },
+  seeing: {
+    description:
+      'What the owner is looking at on their page now: the view its canvas draws (a kept view by its name, or its query as terms), the item whose page is open over it, and how many seconds ago the page said so. ' +
+      'Nothing when no page of theirs has looked in the last ten minutes. The prompt hook says it in a line with each of their messages. ' +
+      'With run, tab says whether the tab in sight is that session’s (yours), another chat’s, or one of the owner’s following a chat (own false).',
+    input: { run: z.string().optional().describe('Your run id, to be told whether the tab in sight is yours.') },
+    run: async (l, _actor, input) => {
+      const s = await seenNow((await wholeMap(l)).db, l);
+      return s && Date.now() - s.said <= NOW_MS ? { ...(await seeing(l, s, input.run)), address: s.at } : null;
+    },
   },
   // The one tool that names the page in a chat (src/mcp-view.ts). The page takes the look, at the size it has: this only
   // refuses what could not be drawn. Its inputs are cut short, since the tool list carries them on every request.

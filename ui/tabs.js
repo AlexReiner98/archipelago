@@ -15,15 +15,27 @@ export const listKey = () => `pelago-tabs:${ws()}`;
 export const outKey = (id) => `pelago-tab:${ws()}:${id}`;
 export const isOutKey = (key) => key?.startsWith(`pelago-tab:${ws()}:`);
 export const newId = (prefix) => `${prefix}${Math.random().toString(36).slice(2, 10)}`;
-/** A pane: the address it draws, its back and forth, and whose it is (`slot`, a name a session gave it; `held`, the session it is for). */
+/**
+ * A pane: the address it draws, its back and forth, and whose it is (`slot`, a name a session gave it; `held`, the session
+ * it is kept for; `by`, the chat it was made for, which closes it as it ends: a pane with none is the owner's).
+ */
 export const freshPane = (at, more = {}) => ({ at: asPane(at || '#/'), back: [], forth: [], ...more });
-/** A tab: its panes, each its share, whom it follows, and the pane last touched in it; `sheet`, the page open over it when it was last in sight. */
-export function freshTab(at = '#/', { slot, held, ...more } = {}) {
+/**
+ * A tab: its panes, each its share, whom it follows (a session, or nobody), and the pane last touched in it; `sheet`, the
+ * page open over it when it was last in sight; `chat`, the session it is the tab of (ui/tab-life.js), none for the owner's.
+ */
+export function freshTab(at = '#/', { slot, held, by, ...more } = {}) {
   const p = newId('p');
-  return { id: newId('t'), follows: 'all', dir: 'row', groups: [p], sizes: [1], panes: { [p]: freshPane(at, { ...(slot && { slot }), ...(held && { held }) }) }, focus: p, ...more };
+  return { id: newId('t'), follows: 'none', dir: 'row', groups: [p], sizes: [1], panes: { [p]: freshPane(at, { ...(slot && { slot }), ...(held && { held }), ...(by && { by }) }) }, focus: p, ...more };
 }
-/** A tab kept before every pane was equal (its canvas `main`, its address `at`): the canvas becomes a pane like the others. */
+/** The chats this page will not open a tab for until each next shows something: their tabs the owner closed (e_qvdrv6h3). */
+export const dismissed = new Set();
+/**
+ * A tab kept before every pane was equal (its canvas `main`, its address `at`): the canvas becomes a pane like the
+ * others. One kept when a tab could follow everyone follows nobody now: every chat has a tab of its own (e_jk6bnuh9).
+ */
 function upgrade(t) {
+  if (t?.follows === 'all') t.follows = 'none';
   if (!t?.groups?.includes('main')) return t;
   const p = newId('p');
   const { at, slot, ...rest } = t;
@@ -92,13 +104,15 @@ export function read() {
   landed.clear();
   for (const [key, l] of Object.entries(got?.landed ?? {})) if (Date.now() - l.at < 600_000) landed.set(key, l);
   tabs.list = (got?.tabs ?? []).map(upgrade).filter(sound);
+  dismissed.clear();
+  for (const run of got?.dismissed ?? []) dismissed.add(run);
   outTabs();
   if (!tabs.list.length) tabs.list = [freshTab(location.hash || '#/')];
   tabs.front = tabs.list.some((t) => t.id === got?.front) ? got.front : tabs.list[0].id;
 }
 export function keep() {
   if (poppedTab) return save(outKey(poppedTab), front());
-  save(listKey(), { tabs: tabs.list, front: tabs.front, landed: Object.fromEntries(landed) });
+  save(listKey(), { tabs: tabs.list, front: tabs.front, landed: Object.fromEntries(landed), dismissed: [...dismissed] });
 }
 
 /** Whether an address can be drawn in a pane: a canvas or an item's, not the workspace's sheet. */

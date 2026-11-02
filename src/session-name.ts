@@ -1,11 +1,14 @@
-// A session's name: a short word the run type declares among the values of its field `name`, minted when it starts,
-// none held by another open session. Where it stands among those values picks its mark among the style's hues
-// (ui/session.js), so the name is chosen to step past a hue another open session holds: two at work at once are told
-// apart by name and at a glance. The words are the pack's; the colours are the style's. Its title says it is a session,
-// and what its surface calls it once that is known, so a person can tie the two together and find it by either.
+// What a session is called: its chat's title, as its client gives it (Claude Code's title, a bot's name for its chat),
+// kept live as the chat is renamed; before it has one, what it works on, else where it runs (decision e_r2qbv95d: no
+// island word on any screen). Each open session also holds a word the run type declares among the values of its field
+// `name`, none held by another open session, never shown: where it stands among those values picks its mark among the
+// style's hues (ui/words.js), so two at work at once are told apart at a glance. The words are the pack's; the colours
+// are the style's.
 
-import { actorId, type Archipelago, type Entity } from './pelago.ts';
+import type { Archipelago, Entity } from './pelago.ts';
 import { pageStyle } from './styles.ts';
+import { wholeMap } from './outbox.ts';
+import { took } from './presence.ts';
 
 /** The words a session may be named, in the order their marks take the style's hues. */
 export function sessionNames(l: Archipelago): string[] {
@@ -15,17 +18,20 @@ export function sessionNames(l: Archipelago): string[] {
 
 /** The most a run's title takes, as any item's name. */
 const TITLE_MOST = 60;
-/** A session's title: `Session Sark`, and `Session Sark · what Claude calls it`, cut to a name's length. */
-export function sessionTitle(name: string, label?: string): string {
-  const title = label ? `Session ${name} · ${label}` : `Session ${name}`;
-  return title.length > TITLE_MOST ? `${title.slice(0, TITLE_MOST - 1).trimEnd()}…` : title;
-}
+/** A title cut to a name's length. */
+export const cutTitle = (title: string) => (title.length > TITLE_MOST ? `${title.slice(0, TITLE_MOST - 1).trimEnd()}…` : title);
+/** What a session is called before its chat has a title: what it works on, else where it runs. */
+export const sessionTitle = (fallback: { task?: string; place?: string }) => cutTitle(fallback.task ?? `Session in ${fallback.place ?? 'an unknown folder'}`);
+/** A title as a client said it: its words, trimmed, or nothing. */
+export const saidTitle = (label: unknown) => (typeof label === 'string' ? label.trim().replace(/\s+/g, ' ').slice(0, 200) : '');
 
-/** What the session's surface calls it, as its hook read it: kept beside its name, and in its title. Only a new one is written. */
-export async function sessionLabelled(l: Archipelago, run: Entity, label: unknown): Promise<void> {
-  const said = typeof label === 'string' ? label.trim().slice(0, 200) : '';
-  if (!said || said === run.props.label || typeof run.props.name !== 'string') return;
-  await l.apply(actorId({ kind: 'agent', name: 'claude-code' }), { ops: [{ op: 'update', id: run.id, title: sessionTitle(run.props.name, said), props: { label: said } }], reason: 'Session labelled' });
+/** What the session's client calls it now: kept as its label, and its title. Only a new one is written. */
+export async function sessionLabelled(l: Archipelago, run: Entity, label: unknown, actor = 'agent:claude-code'): Promise<void> {
+  const said = saidTitle(label);
+  if (!said || (said === run.props.label && run.title === cutTitle(said))) return;
+  await l.apply(actor, { ops: [{ op: 'update', id: run.id, title: cutTitle(said), props: { label: said } }], reason: 'Session titled' });
+  // Every page open hears it at once: its tab is named anew (ui/pane-route.js reads the title off the step).
+  await took((await wholeMap(l)).db, l, { kind: 'other', actor, did: 'titled', run: run.id }, true).catch(() => {});
 }
 
 /** How many hues the workspace's style tells things apart by. */

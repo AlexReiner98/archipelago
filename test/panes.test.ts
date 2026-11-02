@@ -1,5 +1,5 @@
 // More than one canvas at once (ui/panes.js), every pane alike: an agent's show can name a pane of the owner's page, the
-// step carrying it; in a real browser (skipped where there is no Chrome) a session's show opens a pane of its own beside
+// step carrying it; in a real browser (skipped where there is no Chrome) a session's show opens a tab of its own, apart from
 // the reader's, a change reaches every pane, the bar, find, back and the address follow the pane last touched, a reload
 // draws every pane again, a click in any pane opens the item's page over it, and a pane's name dragged docks it.
 
@@ -21,7 +21,7 @@ test('a show names the pane it goes to, and the page is told it with the step', 
 
 const browser = chrome();
 
-test('in a browser, every pane is alike: its own lens, history and address, an agent beside the reader', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, every pane is alike: its own lens, history and address, an agent in a tab of its own', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {
     reason: 'test',
@@ -61,25 +61,22 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
   const find = (words: string) => page.evaluate(`(() => { const input = document.querySelector('#find input[type=search]'); input.value = ${JSON.stringify(words)}; input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); document.getElementById('find').requestSubmit(); })()`);
   try {
     await wait(3000);
-    // A session's show opens a pane of its own beside the reader's, which keeps what it drew and the address.
+    // A session's show opens a tab of its own, out of sight: the reader's pane, the bar and the address stay theirs.
     await show({ entity: views.f });
-    await until('a pane of its own draws the first', async () => (await panes()).length === 2 && (await draws(1, 'First step')));
-    assert.deepEqual((await panes()).map((p) => [p[0], p[2], p[3]]), [['Home', '', true], ['The first', 'robot', false]], 'the reader keeps their pane and the bar; the new one says whose it is');
+    await until('a tab of its own', () => page.evaluate<boolean>(`document.querySelectorAll('#tabs .tab').length === 2`));
+    assert.deepEqual((await panes()).map((p) => [p[0], p[3]]), [['Home', true]], 'the reader keeps their pane and the bar');
     assert.ok(['', '#/'].includes(await page.evaluate<string>('location.hash')), 'the address stays the reader’s');
+    // Brought into sight, its tab draws what it showed.
+    await page.evaluate(`document.querySelector('#tabs .tab:nth-child(2)').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`);
+    await until('its tab draws the first', async () => (await panes()).length === 1 && (await draws(0, 'First step')));
     // A pane by a name of the session's own, beside it.
     await show({ entity: views.g, pane: 'second' });
-    await until('the named pane draws the second', async () => (await panes()).length === 3 && (await draws(2, 'Second step')));
+    await until('the named pane draws the second', async () => (await panes()).length === 2 && (await draws(1, 'Second step')));
     // Every pane stays live: a rename reaches each from the log.
     await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.a, title: 'First step, renamed' }, { op: 'update', id: made.b, title: 'Second step, renamed' }] });
-    await until('each pane follows the log', async () => (await draws(1, 'First step, renamed')) && (await draws(2, 'Second step, renamed')));
-    // Its next show goes to its own pane again, which a side moves; alone keeps only that one.
-    await show({ entity: views.f, pane: 'left' });
-    await until('its pane moved to the left', async () => (await panes())[0]?.[0] === 'The first' && (await panes())[0][1] === 0);
-    // Alone closes no pane of the reader's (e_e7yfp2yg): only the reader does, by hand.
+    await until('each pane follows the log', async () => (await draws(0, 'First step, renamed')) && (await draws(1, 'Second step, renamed')));
+    // In its own tab, alone keeps only the pane it names.
     await show({ entity: views.f, pane: 'alone' });
-    await wait(3000);
-    assert.equal((await panes()).length, 3, 'the reader’s panes stay');
-    for (const name of ['Home', 'The second']) await page.evaluate(`[...document.querySelectorAll('#canvas > .pane')].find((p) => p.querySelector('.pane-name').textContent === ${JSON.stringify(name)}).querySelector('[aria-label="Close this pane"]').click()`);
     await until('only its pane', async () => (await panes()).length === 1 && (await draws(0, 'First step, renamed')));
     assert.ok(await page.evaluate(`${nth(0)}.getBoundingClientRect().width > 1200`), 'the one pane has the page');
     // The sheet takes its room from the pane, one alone too, so whatever it draws stands beside the sheet; shut, it has the page again.

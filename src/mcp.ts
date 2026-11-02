@@ -72,7 +72,7 @@ export function contentOf(result: unknown) {
 }
 
 /** What any client is told on connecting: one with no hooks has nothing else to go by. */
-const INSTRUCTIONS = 'Archipelago is a shared map of people, work and what waits on what. To work here: start with capture, action session_start, params cwd and remote, and keep the run it gives. Read with query: name handoff with repo for where things stand, brief with task for one task; query with name actions says what each action takes. Write only with change, giving run and authority. Say what you conclude with report, action tell. Finish with report, action session_end, and a summary.';
+const INSTRUCTIONS = 'Archipelago is a shared map of people, work and what waits on what. To work here: start with capture, action session_start, params cwd, remote, session_id and title (what your chat is called), and keep the run it gives; when the chat is renamed, report session_update with title. Read with query: name handoff with repo for where things stand, brief with task for one task; query with name actions says what each action takes. Write only with change, giving run and authority. Say what you conclude with report, action tell. Finish with report, action session_end, and a summary; when the chat itself ends, add its reason (closed, archived), and its tab on the owner’s page closes.';
 
 /** A server for one request, with the tools the caller's workspace offers now. */
 function serverFor(caller: Caller): McpServer {

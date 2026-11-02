@@ -7,7 +7,8 @@ import { addCommits } from './commits.ts';
 import type { Q } from './db.ts';
 import type { Archipelago, May } from './pelago.ts';
 import { askOnReply } from './replies.ts';
-import { hookSessionEnd, hookSessionStart, hookWithin, recordUsage, resolveRun, sessionBegan, sessionHeard, sessionPrompted } from './sessions.ts';
+import { hookWithin, recordUsage, resolveRun, sessionBegan, sessionHeard, sessionPrompted } from './sessions.ts';
+import { hookSessionEnd, hookSessionStart } from './session-hook.ts';
 import { sessionLabelled } from './session-name.ts';
 import { addTouched } from './touched.ts';
 import { fileSaid } from './file-said.ts';
@@ -15,6 +16,7 @@ import { keepGit } from './git-state.ts';
 import { sessionOpened } from './tool-change.ts';
 import { describeChanges, humanChanges, latestSeq } from './tools.ts';
 import { summed } from './summary.ts';
+import { seeingLine } from './seeing.ts';
 import { keep, kept } from './transient.ts';
 
 export interface HookBody {
@@ -25,8 +27,10 @@ export interface HookBody {
   tokens?: number;
   /** The items the session's calls to the map have named so far, read from its transcript (src/touched.ts). */
   touched?: unknown;
-  /** What Claude Code calls the session, read from its transcript. */
+  /** What Claude Code calls the session, read from its transcript: the title the owner gave it, else the one it made. */
   title?: unknown;
+  /** At the start: why Claude Code started it (startup, resume, clear, compact). */
+  source?: unknown;
   /**
    * At the start: the checkout's newest commits (id and message), which the session is asked to account for. After
    * it: the commits the session has made so far, by full sha, and those its reply made or pushed (src/commits.ts).
@@ -117,6 +121,10 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     // How many of each, and the newest few: the rest is one query away.
     const { newest, counts, more } = summed(changes, (c) => c.action);
     const tally = counts ? `${newest.length + more!} changes (${Object.entries(counts).map(([action, n]) => `${n} ${action}`).join(', ')}); the newest ${newest.length}, the rest with query events:\n` : '';
+    // And what the owner is looking at now, so "this" in their message has a referent (src/seeing.ts).
+    const asking = body.session_id ? await resolveRun(pelago, body.session_id, true) : undefined;
+    const looking = await seeingLine(pelago, whole, asking?.id).catch(() => undefined);
+    if (looking) told.push(looking);
     if (changes.length) told.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${tally}${describeChanges(newest)}`);
     return told.length ? { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: told.join('\n\n') } } : {};
   }
@@ -127,8 +135,9 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     // The hook keeps it in the checkout, where the commit-msg hook the setup installs finds it to name the run in a commit.
     const run = body.session_id ? await resolveRun(pelago, body.session_id, true) : undefined;
     if (run) call.ran?.(run.id);
-    // A new one gets a tab of its own on the owner's page; one taken up again has its own already.
-    if (run && !known) await sessionOpened(pelago, { kind: 'agent', name: 'claude-code' }, run.id).catch((err) => console.error(`hook tab: ${(err as Error).message}`));
+    // A new one gets a tab of its own on the owner's page, or the tab of the one a clear ended in its chat; one taken up
+    // again after it ended gets its tab back; one still open has its own already.
+    if (run && (!known || !known.is_open)) await sessionOpened(pelago, { kind: 'agent', name: 'claude-code' }, run.id, undefined, typeof run.props.took_over === 'string' ? run.props.took_over : undefined).catch((err) => console.error(`hook tab: ${(err as Error).message}`));
     // A project keeps the files it was given when it was set up; the server moves on. A session is told when its
     // project is behind, since nothing else would: an old hook counts less, and old rules name tools as they were.
     if (body.setup !== SETUP_VERSION)

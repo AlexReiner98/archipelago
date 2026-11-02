@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { hookSessionEnd, hookSessionStart, resolveRun, sessionEnd, sessionPrompted, sessionStart, sessionUpdate, tell } from '../src/sessions.ts';
+import { resolveRun, sessionEnd, sessionPrompted, sessionStart, sessionUpdate, tell } from '../src/sessions.ts';
+import { hookSessionEnd, hookSessionStart } from '../src/session-hook.ts';
 import { callTool } from '../src/tools.ts';
 import { wholeMap } from '../src/outbox.ts';
 import { presence } from '../src/presence.ts';
@@ -25,7 +26,7 @@ test('a session registers, takes the lane its task needs, and gives it back when
   // A second session wanting the same lane is told who has it, and waits.
   const two = await sessionStart(l, agent, { task: made.live, session_id: 's2' });
   assert.equal(two.status, 'waiting');
-  assert.match(two.blocked![0].why, new RegExp(`held by "Session ${one.name}"`), 'named by its name');
+  assert.match(two.blocked![0].why, /held by "Capture probe"/, 'named by what it works on, its chat having no title');
 
   await sessionUpdate(l, agent, { run: 's1', note: 'Probe captured; parity is off by 2 px' });
   let view = (await VIEWS.sessions.run(l, {})) as any;
@@ -181,9 +182,9 @@ test('a brief gathers a task\'s context, blockers, needs and rules', async () =>
 
   const brief = (await ask(l, 'brief', { task: made.live })) as any;
   assert.equal(brief.repo.path, 'C:\\code\\Apex');
-  assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', `Session ${holder.name}`]]);
+  assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', 'Other session']]);
   assert.deepEqual(brief.ties.map((r: any) => [r.relation, r.title]), [['governed_by', 'One live lane.']]);
-  for (const part of ['# Capture probe', 'Part of: Apex', `held by Session ${holder.name}`, 'Only one session drives the CAD app.']) {
+  for (const part of ['# Capture probe', 'Part of: Apex', 'held by Other session', 'Only one session drives the CAD app.']) {
     assert.ok(brief.text.includes(part), `expected "${part}" in:\n${brief.text}`);
   }
   const gated = (await ask(l, 'brief', { task: made.gated })) as any;
@@ -207,7 +208,7 @@ test('the session-start hook registers the session and hands it the repo\'s work
 
   const other = await sessionStart(l, agent, { title: 'Lane holder' });
   await l.claim(agent, { resource: made.lane, holder: other.run, reason: 'busy' });
-  assert.match(await hookSessionStart(l, { session_id: 'def', cwd: 'C:\\elsewhere' }), new RegExp(`does not know a repository.*HELD by Session ${other.name}: do not use it`, 's'));
+  assert.match(await hookSessionStart(l, { session_id: 'def', cwd: 'C:\\elsewhere' }), /does not know a repository.*HELD by Lane holder: do not use it/s);
 
   // On another machine the folder is somewhere else: the repository is known by the address it was cloned from, however that is written.
   await make(l, [{ op: 'update', id: repoId!, props: { remote: 'https://github.com/Acme/Apex' } }]);
@@ -364,21 +365,43 @@ test('work that waits on a person is blocked by them, needs them, and is not ask
 });
 
 
-test('a session says it is one, and carries what Claude calls it, cut to a name', async () => {
+test('a session is called what its chat is called, kept live as it is renamed, never by its word', async () => {
   const { sessionLabelled, sessionTitle } = await import('../src/session-name.ts');
-  assert.equal(sessionTitle('Sark'), 'Session Sark');
-  assert.equal(sessionTitle('Sark', 'Agent popup'), 'Session Sark · Agent popup');
-  assert.equal(sessionTitle('Sark', 'x'.repeat(80)).length, 60);
+  assert.equal(sessionTitle({ task: 'Tune the solver' }), 'Tune the solver');
+  assert.equal(sessionTitle({ place: 'Apex repo' }), 'Session in Apex repo');
   const l = await fresh();
-  const started = await sessionStart(l, { kind: 'agent', name: 'claude-code' }, { session_id: 'titled' });
-  assert.equal((await l.entity(started.run))!.title, `Session ${started.name}`);
-  await sessionLabelled(l, (await resolveRun(l, 'titled', true))!, '  Agent popup  ');
-  const run = (await l.entity(started.run))!;
-  assert.deepEqual([run.title, run.props.label, run.props.name], [`Session ${started.name} · Agent popup`, 'Agent popup', started.name], 'its name stays, for its hue');
+  const started = await sessionStart(l, { kind: 'agent', name: 'claude-code' }, { session_id: 'titled', title: 'Session tabs' });
+  let run = (await l.entity(started.run))!;
+  assert.deepEqual([run.title, run.props.label], ['Session tabs', 'Session tabs'], 'named by its chat from the start');
+  assert.ok(run.props.name && !run.title.includes(String(run.props.name)), 'its word is its hue, not its name');
+  await sessionLabelled(l, run, '  Agent   popup  ');
+  run = (await l.entity(started.run))!;
+  assert.deepEqual([run.title, run.props.label], ['Agent popup', 'Agent popup'], 'a rename is its title');
+  await callTool(l, agent, 'session_update', { run: run.id, title: 'x'.repeat(80) });
+  run = (await l.entity(started.run))!;
+  assert.equal(run.title.length, 60, 'cut to a name');
   const before = (await l.db.query<{ n: number }>('select count(*)::int as n from log_entry')).rows[0].n;
-  await sessionLabelled(l, run, 'Agent popup');
+  await sessionLabelled(l, run, 'x'.repeat(80));
   await sessionLabelled(l, run, 42);
   assert.equal((await l.db.query<{ n: number }>('select count(*)::int as n from log_entry')).rows[0].n, before, 'the same title again writes nothing');
+  // With no title, what it works on.
+  const untitled = await sessionStart(l, agent, { session_id: 'untitled', cwd: '/nowhere' });
+  assert.equal((await l.entity(untitled.run))!.title, 'Session in /nowhere');
+});
+
+test('a chat that ends ends its session, and after a clear the next one in its folder takes over its tab', async () => {
+  const l = await fresh();
+  const one = await sessionStart(l, agent, { session_id: 'c1', cwd: '/w', surface: 'codex', title: 'Fix it' });
+  // Its agent saying it is done leaves a chat's session open; the chat ending, said with a reason, closes it.
+  await callTool(l, agent, 'session_end', { run: one.run, cannot_tell_rest: true });
+  assert.equal((await l.entity(one.run))!.is_open, true, 'the chat goes on');
+  await callTool(l, agent, 'session_end', { run: one.run, reason: 'clear', cannot_tell_rest: true });
+  const ended = (await l.entity(one.run))!;
+  assert.deepEqual([ended.is_open, ended.props.ended_by], [false, 'clear']);
+  const next = await sessionStart(l, agent, { session_id: 'c2', cwd: '/w', surface: 'codex', source: 'clear' });
+  const run = (await l.entity(next.run))!;
+  assert.deepEqual([next.took_over, run.props.took_over, run.title], [one.run, one.run, 'Fix it'], "it goes on under the chat's title");
+  assert.equal((await sessionStart(l, agent, { session_id: 'c3', cwd: '/w', source: 'clear' })).took_over, undefined, 'taken over once');
 });
 
 test('a session that says it is done or succeeded has finished', async () => {
@@ -417,4 +440,21 @@ test('a list tells an agent of a long field and a hub\'s links without reading t
   assert.equal(got.incoming.length, 20);
   assert.equal(got.links_cut.incoming.by_type.part_of, 25);
   assert.equal(((await callTool(l, agent, 'get', { id: created.hub, full: true })) as any).incoming.length, 25);
+});
+
+test("Claude Code's hooks name a session by its chat, end it with the reason, and a clear goes on in the same tab", async () => {
+  const l = await fresh();
+  await hookSessionStart(l, { session_id: 'cc1', cwd: '/x', title: 'Hooked chat', source: 'startup' });
+  const run = (await resolveRun(l, 'cc1'))!;
+  assert.equal(run.title, 'Hooked chat');
+  await hookSessionEnd(l, { session_id: 'cc1', reason: 'clear' });
+  assert.deepEqual([(await l.entity(run.id))!.is_open, (await l.entity(run.id))!.props.ended_by], [false, 'clear']);
+  await hookSessionStart(l, { session_id: 'cc2', cwd: '/x', source: 'clear' });
+  const next = (await resolveRun(l, 'cc2'))!;
+  assert.deepEqual([next.props.took_over, next.title], [run.id, 'Hooked chat']);
+  // A resume of an ended chat takes up its own run again.
+  await hookSessionEnd(l, { session_id: 'cc2', reason: 'prompt_input_exit' });
+  await hookSessionStart(l, { session_id: 'cc2', cwd: '/x', source: 'resume', title: 'Renamed while away' });
+  const back = (await l.entity(next.id))!;
+  assert.deepEqual([back.is_open, back.title], [true, 'Renamed while away']);
 });

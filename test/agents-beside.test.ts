@@ -1,7 +1,7 @@
 // Agents beside the reader, in a real browser (skipped where there is no Chrome): with two sessions at work while the
-// reader works in a pane, an agent never moves the pane the reader is in. A change moves nothing; a show lands in a pane
-// of its session's own beside the reader's, or in a tab of its own out of sight, marked; and it lands whether or not
-// the page follows agents (the owner, 29 Oct 2026, e_e7yfp2yg, e_jk63uduv). An address as a show answers it, without
+// reader works in a pane, an agent never moves the pane the reader is in. A change moves nothing; a show lands in a tab
+// of its own out of sight, marked, never beside the reader in theirs (the owner, 29 Oct 2026, e_e7yfp2yg, e_jk63uduv;
+// every chat a tab of its own, e_jk6bnuh9). An address as a show answers it, without
 // its slash, opens what it names.
 
 import assert from 'node:assert/strict';
@@ -11,7 +11,7 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-test('in a browser, agents at work never move the reader’s pane; a show lands in a pane of its own', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, agents at work never move the reader’s pane; a show lands in a tab of its own', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {
     reason: 'test',
@@ -51,22 +51,23 @@ test('in a browser, agents at work never move the reader’s pane; a show lands 
     await wait(5000);
     assert.equal(JSON.parse(await page.evaluate<string>(panes)).length, 1, 'no pane opened for a change');
     assert.ok(await page.evaluate(readers), `the reader's pane as they left it: ${await page.evaluate('location.hash')}`);
-    // A show lands, following off, in a pane of its own beside the reader's, which stays the one the bar acts on.
+    // A show lands in a tab of its own, out of sight and marked: the reader's tab and pane stay as they left them.
+    const front = await page.evaluate<string>(`document.querySelector('#tabs .tab[aria-selected="true"]').dataset.tab`);
     const shown = await show('robot', { entity: views.f, note: 'test' });
     assert.ok(shown.pages.following >= 1, `the page takes shows: ${JSON.stringify(shown.pages)}`);
-    assert.ok(await until(`(([r, a]) => r?.[1] === true && a?.[0] === 'The agent’s view' && a[1] === false)(JSON.parse(${panes}))`), `a pane of its own beside the reader's: ${await page.evaluate(panes)}`);
+    assert.ok(await until(`document.querySelectorAll('#tabs .tab').length === 2`), `a tab of its own: ${await page.evaluate(`document.getElementById('tabs').textContent`)}`);
+    assert.equal(await page.evaluate<string>(`document.querySelector('#tabs .tab[aria-selected="true"]').dataset.tab`), front, 'the tab in sight stays');
+    assert.ok(await page.evaluate<boolean>(`Boolean(document.querySelector('#tabs .tab[data-unseen="true"]'))`), 'its tab is marked');
+    assert.equal(JSON.parse(await page.evaluate<string>(panes)).length, 1, 'no pane beside the reader');
     assert.ok(await page.evaluate(readers), 'the reader’s pane is still theirs');
-    // Its next show goes to that pane again; the reader's stays.
+    // Its next show goes to that tab again.
     await show('robot', { entity: made.b });
     await wait(3000);
-    assert.equal(JSON.parse(await page.evaluate<string>(panes)).length, 2, 'its own pane again, not another');
-    assert.ok(await page.evaluate(readers), 'the reader’s pane is still theirs');
-    // A second session at work: a tab of its own, out of sight and marked; the tab in sight stays.
-    const front = await page.evaluate<string>(`document.querySelector('#tabs .tab[aria-selected="true"]').dataset.tab`);
+    assert.equal(await page.evaluate(`document.querySelectorAll('#tabs .tab').length`), 2, 'its own tab again, not another');
+    // A second agent at work: a tab of its own too, out of sight; the tab in sight stays.
     await show('other', { entity: views.g });
-    assert.ok(await until(`document.querySelectorAll('#tabs .tab').length === 2`), `the other's tab: ${await page.evaluate(`document.getElementById('tabs').textContent`)}`);
+    assert.ok(await until(`document.querySelectorAll('#tabs .tab').length === 3`), `the other's tab: ${await page.evaluate(`document.getElementById('tabs').textContent`)}`);
     assert.equal(await page.evaluate<string>(`document.querySelector('#tabs .tab[aria-selected="true"]').dataset.tab`), front, 'the tab in sight stays');
-    assert.ok(await page.evaluate<boolean>(`Boolean(document.querySelector('#tabs .tab[data-unseen="true"]'))`), 'the other tab is marked');
     assert.ok(await page.evaluate(readers), 'the reader’s pane is still theirs');
     // An address as a show answers it, without its slash, opens what it names.
     await page.evaluate(`location.hash = '#e/${made.c}'`);

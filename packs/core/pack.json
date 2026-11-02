@@ -388,13 +388,12 @@
         "name": {
           "type": "enum",
           "values": ["Skye", "Islay", "Mull", "Arran", "Jura", "Iona", "Tiree", "Coll", "Eigg", "Barra", "Lewis", "Harris", "Unst", "Yell", "Hoy", "Sark", "Herm", "Capri", "Elba", "Corfu", "Naxos", "Paros", "Hydra", "Kos", "Malta", "Gozo", "Bute", "Rum", "Fair", "Lundy", "Aran", "Clare"],
-          "description": "What a person calls the session: a short word minted when it starts, none held by another open session, kept for its life, and its title as Session Sark. Its place in these values picks its mark among the style's hues, so two open sessions are told apart at a glance.",
-          "system": true,
-          "shown": true
+          "description": "The session's mark, never shown as a word: minted when it starts, none held by another open session, kept for its life. Its place in these values picks its hue among the style's, so two open sessions are told apart at a glance.",
+          "system": true
         },
         "label": {
           "type": "string",
-          "description": "What the session's surface calls it, its title in Claude Code: read by its hook, and said in its title after its name.",
+          "description": "What the session's chat is called in its client (Claude Code's title, a bot's name for the chat): given at its start and whenever it is renamed, and its title.",
           "system": true,
           "shown": true
         },
@@ -409,6 +408,16 @@
         },
         "cwd": {
           "type": "string"
+        },
+        "ended_by": {
+          "type": "string",
+          "description": "Why its client said it ended: clear, logout, exit, archived... Kept so a session started after a clear takes over its tab.",
+          "system": true
+        },
+        "took_over": {
+          "type": "string",
+          "description": "The run this session took over from in the same chat (after a clear): the owner's page gives it that session's tab.",
+          "system": true
         },
         "branch": {
           "type": "string",

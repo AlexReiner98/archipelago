@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { hookSessionStart } from '../src/sessions.ts';
+import { hookSessionStart } from '../src/session-hook.ts';
 import { commitLine, sentCommits, unaccounted } from '../src/unaccounted.ts';
 import { fresh, laneSetup, make } from './map.ts';
 
