@@ -92,20 +92,20 @@ export const SURFACE = ['query', 'change', 'undo', 'capture', 'assign', 'report'
 
 /**
  * What a client is told each tool may do, so it knows what to ask the person before calling it (MCP's tool
- * annotations, leaving out what MCP assumes: a tool that does not say readOnlyHint may write). Every tool works on the
+ * annotations; each says readOnlyHint, which the connectors directory's review asks for). Every tool works on the
  * map alone. change can archive or forget, undo takes changes back and revise voids, releases and restarts: those may
  * destroy. The rest only read or add. Each hint is paid for on every request, so they stay this short.
  */
-export const ANNOTATIONS: Record<string, { title: string; readOnlyHint?: boolean; destructiveHint?: boolean; openWorldHint: false }> = {
+export const ANNOTATIONS: Record<string, { title: string; readOnlyHint: boolean; destructiveHint?: boolean; openWorldHint: false }> = {
   query: { title: 'Read', readOnlyHint: true, openWorldHint: false },
-  change: { title: 'Change', destructiveHint: true, openWorldHint: false },
-  undo: { title: 'Undo', destructiveHint: true, openWorldHint: false },
-  capture: { title: 'Capture', destructiveHint: false, openWorldHint: false },
-  assign: { title: 'Assign', destructiveHint: false, openWorldHint: false },
-  report: { title: 'Report', destructiveHint: false, openWorldHint: false },
-  ask: { title: 'Ask', destructiveHint: false, openWorldHint: false },
-  settle: { title: 'Settle', destructiveHint: false, openWorldHint: false },
-  revise: { title: 'Revise', destructiveHint: true, openWorldHint: false },
+  change: { title: 'Change', readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+  undo: { title: 'Undo', readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+  capture: { title: 'Capture', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  assign: { title: 'Assign', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  report: { title: 'Report', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  ask: { title: 'Ask', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  settle: { title: 'Settle', readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  revise: { title: 'Revise', readOnlyHint: false, destructiveHint: true, openWorldHint: false },
   draw: { title: 'Draw', readOnlyHint: true, openWorldHint: false },
 };
 

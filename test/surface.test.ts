@@ -34,7 +34,7 @@ test('the surface is exactly query, change, undo, the six verbs and draw, over M
   closers.push(() => client.close());
   const listed = (await client.listTools()).tools;
   assert.deepEqual(listed.map((t) => t.name), SURFACE);
-  for (const t of listed) assert.ok(t.annotations?.title && (t.annotations.readOnlyHint || t.annotations.destructiveHint !== undefined), `${t.name} says whether it reads, writes or destroys`);
+  for (const t of listed) assert.ok(t.annotations?.title && typeof t.annotations.readOnlyHint === 'boolean' && (t.annotations.readOnlyHint || t.annotations.destructiveHint !== undefined), `${t.name} says whether it reads, writes or destroys`);
   assert.deepEqual(listed.filter((t) => t.annotations?.readOnlyHint).map((t) => t.name), ['query', 'draw']);
   assert.deepEqual(listed.filter((t) => t.annotations?.destructiveHint).map((t) => t.name), ['change', 'undo', 'revise']);
   const found = await client.callTool({ name: 'query', arguments: { name: 'search', params: { q: 'anything' } } });
@@ -48,7 +48,8 @@ test('the tool list stays small, and what it leaves out is one call away', async
   closers.push(() => client.close());
   const { tools } = await client.listTools();
   const size = JSON.stringify(tools).length;
-  assert.ok(size < 12_000, `the list is ${size} characters, and every request pays for it`);
+  // 12,000 until every tool said readOnlyHint, which the connectors directory's review asks for (2 Nov 2026).
+  assert.ok(size < 12_200, `the list is ${size} characters, and every request pays for it`);
 
   const words = (answer: unknown) => (answer as { content: { text: string }[] }).content[0].text;
   const query = tools.find((t) => t.name === 'query')!.description!;
