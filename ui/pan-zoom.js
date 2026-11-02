@@ -7,7 +7,6 @@
 
 import { numberOf } from './query-base.js';
 import { sheetAside } from './sheet-follow.js';
-import { panLock } from './pan-lock.js';
 import { pinchOf } from './pinch.js';
 
 /** What a frame of `n` units' text is shown as, on screen at `px` a unit: none, its names, or all of it. */
@@ -137,9 +136,7 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     (e) => {
       e.preventDefault();
       const r = frame.getBoundingClientRect();
-      // With the pointer locked its place stands still: the one drawn is where the reader is looking.
-      const [x, y] = drag?.lock?.at() ?? [e.clientX - r.left, e.clientY - r.top];
-      zoomBy(Math.exp(-e.deltaY * plane.wheel), x, y);
+      zoomBy(Math.exp(-e.deltaY * plane.wheel), e.clientX - r.left, e.clientY - r.top);
     },
     { passive: false },
   );
@@ -149,12 +146,6 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   });
   frame.addEventListener('pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return;
-    if (drag.lock?.held()) {
-      const [mx, my] = drag.lock.move(e);
-      view.x -= mx / view.s;
-      view.y -= my / view.s;
-      return apply();
-    }
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.abs(dx) + Math.abs(dy) <= plane.drag_from) return;
     if (!drag.moved) {
@@ -164,8 +155,6 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
       try {
         frame.setPointerCapture(e.pointerId);
       } catch {}
-      // Locked too, where the browser allows it, so the pan has no edge: a real drag only, so a click stays a click.
-      if (e.pointerType === 'mouse') drag.lock = panLock(frame, e, end);
     }
     view.x = drag.vx - dx / view.s;
     view.y = drag.vy - dy / view.s;
@@ -177,11 +166,9 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   frame.addEventListener('pointerdown', () => (dragged = false), { capture: true });
   frame.addEventListener('click', (e) => dragged && (e.preventDefault(), e.stopPropagation()), { capture: true });
   const end = () => {
-    // A lock lost mid-press has ended it already, and the release that follows is still the end of a drag.
     if (!drag) return;
     frame.classList.remove('moving');
     dragged = drag.moved;
-    drag.lock?.end();
     drag = null;
   };
   frame.addEventListener('pointerup', end);

@@ -26,12 +26,11 @@ export function dragOf(host, keys, send, style) {
     const middle = [box.x + box.width / 2 + (shift?.e ?? 0), box.y + box.height / 2 + (shift?.f ?? 0)];
     const scale = svg.getScreenCTM().a;
     let moved = false, frame = 0, by = [0, 0];
-    // Let go on a grid, when the reader asked for one: the middle on the nearest line.
-    // Never above or left of the picture's corner, where it could not be seen.
+    // Let go on a grid, when the reader asked for one: the middle on the nearest line. Anywhere on the plane, above or
+    // left of the picture's corner too.
     const snapped = ([dx, dy]) => {
       const g = style.snap ? Number(style.sizes?.snap) : 0;
-      const [x, y] = g > 0 ? [Math.round((middle[0] + dx) / g) * g, Math.round((middle[1] + dy) / g) * g] : [middle[0] + dx, middle[1] + dy];
-      return [Math.max(x, box.width / 2) - middle[0], Math.max(y, box.height / 2) - middle[1]];
+      return g > 0 ? [Math.round((middle[0] + dx) / g) * g - middle[0], Math.round((middle[1] + dy) / g) * g - middle[1]] : [dx, dy];
     };
     const move = (e) => {
       const p = at(e);
