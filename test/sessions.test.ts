@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { hookSessionEnd, hookSessionStart, resolveRun, sessionEnd, sessionPrompted, sessionStart, sessionUpdate, tell } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
+import { wholeMap } from '../src/outbox.ts';
+import { presence } from '../src/presence.ts';
 import { VIEWS } from '../src/views.ts';
 import { askView } from '../src/askview.ts';
 import { human, agent, fresh, attend, make, laneSetup } from './map.ts';
@@ -64,6 +66,21 @@ test('one chat is one session: its agent saying it is done keeps it open, and on
   await sessionPrompted(l, 'chat');
   const back = (await l.entity(run))!;
   assert.deepEqual([back.status, back.is_open, back.props.name], ['running', true, name]);
+});
+
+test('a session opens a tab once, on what it works on, and what it takes on is shown there', async () => {
+  const l = await fresh();
+  const made = await make(l, [{ op: 'create', ref: 'task', type: 'task', title: 'Some work' }]);
+  const shows = async () => (await presence((await wholeMap(l)).db, l)).steps.filter((s) => s.kind === 'show');
+  const { run } = (await callTool(l, agent, 'session_start', { session_id: 'tabbed', surface: 'claude-code', task: made.task })) as any;
+  assert.deepEqual((await shows()).map((s) => [s.hash, s.opens, s.run]), [[`e/${made.task}`, true, run]]);
+  await callTool(l, agent, 'session_start', { session_id: 'tabbed', surface: 'claude-code' });
+  assert.equal((await shows()).length, 1, 'taken up again, it has its tab');
+  await callTool(l, agent, 'session_update', { run, note: 'A word' });
+  assert.equal((await shows()).length, 1, 'a word moves nothing');
+  await callTool(l, agent, 'session_update', { run, task: made.task });
+  assert.deepEqual((await shows()).at(-1)!.hash, `e/${made.task}`);
+  assert.equal((await shows()).at(-1)!.opens, undefined);
 });
 
 test('a run with no chat is ended by its agent, and a person ends a chat’s run from its page', async () => {

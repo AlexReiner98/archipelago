@@ -16,7 +16,7 @@ import { actorId } from './pelago.ts';
 import { PICTURE_TYPES, putPicture } from './pictures.ts';
 import { tellStamp, took, watching } from './presence.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
-import { point } from './tool-change.ts';
+import { point, sessionOpened } from './tool-change.ts';
 import { backupNow, restartNow } from './tool-config.ts';
 import { BRANCH } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
@@ -97,7 +97,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => putPlaces(l, actor, input),
   },
   session_start: {
-    description: 'Register this agent session in the map so the human can see it. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Takes effect at once.',
+    description: 'Register this agent session in the map so the human can see it: their page opens it a tab of its own. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Takes effect at once.',
     input: {
       title: z.string().optional().describe('A few words on what this session is for.'),
       task: z.string().optional().describe('Id of the item being worked on.'),
@@ -107,7 +107,11 @@ export const ACT_TOOLS: Record<string, Tool> = {
       session_id: z.string().optional().describe('The id your surface gave this session, if you know it. Makes this call safe to repeat.'),
       branch: BRANCH,
     },
-    run: async (l, actor, input) => sessionStart(l, actor, input),
+    run: async (l, actor, input) => {
+      const started = await sessionStart(l, actor, input);
+      if (!('resumed' in started)) await sessionOpened(l, actor, started.run, input.task);
+      return started;
+    },
   },
   session_update: {
     description: 'Report in from a registered session: a note worth keeping, a change to waiting or running, a task you have picked up, or the git branch you moved to. With only the run, it is a heartbeat.',
@@ -117,7 +121,12 @@ export const ACT_TOOLS: Record<string, Tool> = {
       note: z.string().optional().describe('What happened, what you found, or what you are blocked on.'),
       task: z.string().optional(), branch: BRANCH,
     },
-    run: async (l, actor, input) => sessionUpdate(l, actor, input),
+    run: async (l, actor, input) => {
+      const updated = await sessionUpdate(l, actor, input);
+      // What it takes on is what its tab draws, so the owner sees the work as it is taken up.
+      if (input.task) await point(l, actor, 'show', `e/${input.task}`, undefined, undefined, updated.run);
+      return updated;
+    },
   },
   tell: {
     description:
