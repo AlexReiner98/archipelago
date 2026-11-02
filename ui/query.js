@@ -1,4 +1,4 @@
-import { api, h } from './base.js';
+import { api, h, withIds } from './base.js';
 import { replicate } from './live.js';
 import { unfollow } from './replica.js';
 import { drawWith, layouts, warmLayouts } from './layout.js';
@@ -176,6 +176,16 @@ const narrowed = (only) => (answer) => {
   return { ...answer, items, links: answer.links.filter((k) => ids.has(k.from) && ids.has(k.to)) };
 };
 
+/**
+ * A kept view's steps (the lens type's `steps`), and every item they name: drawn with its answer, so a drawing that
+ * knows steps plays them, whatever folds those items away now.
+ */
+export function stepsOf(entity) {
+  const steps = Array.isArray(entity?.props?.steps) && entity.props.steps.length ? entity.props.steps : undefined;
+  const told = (steps ?? []).flatMap((s) => [...(s.add ?? []), ...(s.remove ?? []), ...Object.keys(s.titles ?? {}), ...Object.keys(s.fields ?? {}), ...Object.keys(s.flag ?? {})]);
+  return { steps, told: [...new Set(told)] };
+}
+
 /** The styles asked for (by what was asked) whose drawing reads each note whole. */
 const whole = new Set();
 
@@ -183,11 +193,12 @@ const whole = new Set();
  * The canvas's picture of a flat lens: its answer (items and the links among them) drawn with the style of what it
  * opens on (`of`), by the drawing that style names. `only` draws the items of those types alone (a pack's picture of
  * one kind of thing); `nest` (true, or the item it starts from) says what each item is inside, from the part_of links among them (a kept view, drawn as
- * it was before the flat lens); `extra` is drawn with the answer (a kept view's steps); `quiet` hides the card it is in when there
+ * it was before the flat lens); `extra` is drawn with the answer (a kept view's steps); `played` is a kept view whose steps
+ * are read and drawn with it, what they name asked for too (a view up on the canvas); `quiet` hides the card it is in when there
  * is nothing to draw. `refresh` asks again and draws
  * again only when the answer differs; `mark` lights the item whose page is open.
  */
-export function flatView({ lens, style = {}, of, key, only, nest = false, extra, quiet = false }) {
+export function flatView({ lens, style = {}, of, key, only, nest = false, extra, played, quiet = false }) {
   const chosen = {};
   const body = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
   const host = h('div', { class: 'lens-wrap' }, body);
@@ -195,6 +206,8 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   const keep = (change) => Object.assign(chosen, change);
   let look;
   let raw;
+  // The lens as it is asked of the map: with what a kept view's steps name, where it plays them.
+  let asking = lens;
   // Asked of a drawing that reads each note whole (the pages: `notes` on the drawing), the lens is read with them.
   const asked = JSON.stringify([of, style.style, style.canvas, style.shape]);
   // The answer is held in a store kept current from the log (ui/replica.js): facts redraw it without the lens being
@@ -242,8 +255,14 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     }
     let store;
     try {
+      // A kept view's steps, read once: what they name is asked for beside the lens, not added to the query up.
+      if (played && extra === undefined) {
+        const { steps, told } = stepsOf((await api('get', { id: played }).catch(() => null))?.entity);
+        extra = steps ? { steps } : null;
+        if (steps) asking = { ...lens, filter: withIds(lens.filter, told) };
+      }
       [store, look] = await Promise.all([
-        replicate(async () => (raw = await api('view', { name: 'flat', params: { ...lens, ...(whole.has(asked) && { notes: 'whole' }) } }))),
+        replicate(async () => (raw = await api('view', { name: 'flat', params: { ...asking, ...(whole.has(asked) && { notes: 'whole' }) } }))),
         api('view', { name: 'style', params: { ...(of && { of }), ...(style.style && { style: style.style }), ...(style.canvas && { view: style.canvas }), ...(style.shape && { shape: style.shape }), have: [...layouts.keys()] } }),
       ]);
     } catch (err) {

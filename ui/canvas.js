@@ -117,7 +117,7 @@ export function canvasIn(host, pane) {
       // Moves made on the canvas left are written before another is drawn.
       writeMoves();
       // Where things were put here is read beside the lens, into `placed`: one object the picture keeps, filled in place.
-      const style = { ...asked, ...(here && { here }), snap: Boolean(settings.snap), placed: {} };
+      const style = { ...asked, ...(here && { here }), ...(asked.canvas && { play: 'asked' }), snap: Boolean(settings.snap), placed: {} };
       // The same lens drawn again (an item's page opened over it says it anew) stays where the reader moved it, and one
       // they have not moved fits the room beside the page.
       const same = at && JSON.stringify(at.lens) === JSON.stringify(lens);
@@ -128,7 +128,8 @@ export function canvasIn(host, pane) {
     /** Draw the lens up now anew, with the places it has now: a picture already drawn takes no new places in a restyle. */
     draw() {
       const of = idsOf(at.lens.filter)[0];
-      const view = flatView({ lens: at.lens, style: at.style, of, key: `canvas:${canvasOf(at.lens, at.asked) || 'map'}` });
+      // A kept view up plays its steps, if it keeps any (from the map as it is, when Play is pressed: style.play).
+      const view = flatView({ lens: at.lens, style: at.style, of, key: `canvas:${canvasOf(at.lens, at.asked) || 'map'}`, played: at.style.canvas });
       // The picture it replaces stops being kept current from the log.
       if (at.view?.store) unfollow(at.view.store);
       at.view = view;

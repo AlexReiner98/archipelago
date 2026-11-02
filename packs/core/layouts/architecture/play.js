@@ -1,7 +1,8 @@
 // The steps of a story played: above the picture, the chapters (a rail); beside it, what was said (a conversation), a
 // line at a time; and each step shown on the picture's own stage (`shape.stage`: the architecture's moves.js, the
-// flow's reveal). It plays on its own, a quick step at a fast-forward pace; a chapter can be chosen; with less motion
-// asked for, it is the last step at once. Once a step changes the look, the key is the look's. Every time is the
+// flow's reveal). It plays on its own, a quick step at a fast-forward pace; a chapter can be chosen, and a step taken
+// back or on; with less motion asked for, it is the last step at once, and so it is where it is played only when
+// asked (style.play "asked": a view up on the canvas, which opens on the map as it is). Once a step changes the look, the key is the look's. Every time is the
 // style's (numbers, arch_story_*). Shared by the drawings that tell stories.
 
 import { m } from './marks.js';
@@ -34,7 +35,17 @@ export function play({ answer, style, reduced, tools, shape }) {
   const after = m(
     'div',
     { key: 'chat', on: ['seen'], class: 'sp-chat' },
-    m('div', { class: 'sp-head' }, m('span', { class: 'sp-live' }), m('span', { class: 'grow' }), total !== undefined && m('span', { key: 'count', class: 'sp-count' }, ''), m('button', { key: 'play', on: ['click'] }, 'Play')),
+    m(
+      'div',
+      { class: 'sp-head' },
+      m('span', { class: 'sp-live' }),
+      m('span', { class: 'grow' }),
+      total !== undefined && m('span', { key: 'count', class: 'sp-count' }, ''),
+      m('span', { key: 'at', class: 'sp-count', title: 'The step shown, of all the steps' }, ''),
+      m('button', { key: 'back', on: ['click'], class: 'sp-step', title: 'A step back' }, '‹'),
+      m('button', { key: 'play', on: ['click'] }, 'Play'),
+      m('button', { key: 'next', on: ['click'], class: 'sp-step', title: 'A step on' }, '›'),
+    ),
     m('ol', { key: 'log', class: 'sp-log', 'aria-live': 'polite' }),
   );
 
@@ -75,6 +86,7 @@ export function play({ answer, style, reduced, tools, shape }) {
   const rail = (k) => {
     const now = k < 0 ? -1 : frames[k].chapter;
     const list = chapters.map((_, n) => ({ key: `c:${n}`, toggle: { done: n < now || k === last, now: n === now && k !== last } }));
+    list.push({ key: 'at', text: k < 0 ? '' : `${k + 1} of ${steps.length}` });
     // How far it had got: the chapter's count, reached by its last step.
     if (total !== undefined) {
       const c = chapters[now], start = now > 0 ? chapters[now - 1].count ?? 0 : 0, inIt = steps.map((_, s) => s).filter((s) => frames[s].chapter === now);
@@ -141,7 +153,8 @@ export function play({ answer, style, reduced, tools, shape }) {
   // it is the last step at once. Played or paused before, it is not started again.
   let started = false;
   const begin = () => !started && ((started = true), (playing = true), send([{ key: 'play', text: 'Pause' }]), rail(-1), later(t('start'), () => beat(0)));
-  if (reduced) later(0, () => ((started = true), jump(last, 0)));
+  const asked = style.play === 'asked';
+  if (reduced || asked) later(0, () => ((started = true), jump(last, 0), asked && send([{ key: 'play', text: 'Play' }])));
   return {
     before,
     after,
@@ -154,6 +167,11 @@ export function play({ answer, style, reduced, tools, shape }) {
         // Paused before its first step is drawn, the story only stops: there is no step to hold.
         else if (playing) ((playing = false), cur >= 0 ? jump(cur, 0) : (stop(), typingOn(false)), send([{ key: 'play', text: 'Play' }]));
         else ((playing = true), send([{ key: 'play', text: 'Pause' }]), beat(cur + 1));
+      } else if (key === 'back' || key === 'next') {
+        // A step taken by hand holds there: it is paused.
+        playing = false;
+        send([{ key: 'play', text: 'Play' }]);
+        jump(Math.max(0, Math.min(last, cur + (key === 'next' ? 1 : -1))), t('jump'));
       } else if (key.startsWith('c:')) {
         // A chapter chosen plays from its start, paused or not.
         playing = true;
@@ -163,6 +181,8 @@ export function play({ answer, style, reduced, tools, shape }) {
       return [];
     },
     end: stop,
+    /** Whether a mark's event is the player's: its buttons, a chapter, the conversation. */
+    hears: (key) => ['play', 'back', 'next', 'chat'].includes(key) || key.startsWith('c:'),
     /** The step on screen: -1 before the first. */
     step: () => cur,
   };

@@ -29,7 +29,7 @@ const answer = {
   ],
   steps: [
     { chapter: { name: 'How' }, add: [ASK, OLD], lines: [{ by: 'Alex', text: 'How does it go?' }] },
-    { add: [PLAN], remove: [OLD], lines: [{ by: 'Agent', text: 'A plan.' }] },
+    { add: [PLAN], remove: [OLD], flag: { [ASK]: 'decided' }, lines: [{ by: 'Agent', text: 'A plan.' }] },
     { add: [BUILD], lit: [[BUILD, PLAN]] },
   ],
 };
@@ -102,5 +102,64 @@ test('a story waits until its conversation is scrolled into sight, and starts on
     assert.ok(sent.some((p) => p.key === 'play' && p.text === 'Pause'));
   } finally {
     globalThis.setTimeout = realSet;
+  }
+});
+
+/** Drawn with the page's timers held: `flush` runs what is due, in order, until nothing is left. */
+function held(style: any) {
+  const sent: any[] = [];
+  let timers: [number, () => void][] = [];
+  const realSet = globalThis.setTimeout, realClear = globalThis.clearTimeout;
+  (globalThis as any).setTimeout = (fn: () => void, ms: number) => (timers.push([ms, fn]), timers.length);
+  (globalThis as any).clearTimeout = () => {};
+  const out = picture({ answer, style, reduced: false }, { measure, patch: (l: any[]) => sent.push(...l), frame: () => Promise.resolve(0), open: () => {} });
+  const flush = () => {
+    while (timers.length) {
+      const due = timers.sort((a, b) => a[0] - b[0]);
+      timers = [];
+      for (const [, fn] of due) fn();
+    }
+  };
+  const done = () => ((globalThis.setTimeout = realSet), (globalThis.clearTimeout = realClear));
+  return { out, sent, flush, done };
+}
+const text = (sent: any[], key: string) => sent.filter((p) => p.key === key && 'text' in p).at(-1)?.text;
+
+test('played where asked (a view up on the canvas), it opens on the map as it is and waits for Play', () => {
+  const { out, sent, flush, done } = held({ ...house, play: 'asked' });
+  try {
+    flush();
+    assert.equal(text(sent, 'at'), '3 of 3', 'the last step');
+    assert.equal(text(sent, 'play'), 'Play');
+    for (const id of [ASK, PLAN, BUILD]) assert.equal(last(sent, `s:${id}`, 'opacity'), 1);
+    const before = sent.length;
+    out.on({ name: 'seen', key: 'chat' });
+    flush();
+    assert.equal(text(sent.slice(before), 'play'), undefined, 'seen, it does not start');
+  } finally {
+    done();
+  }
+});
+
+test('a step back and a step on, held there, with the word a step flags on a thing beside it', () => {
+  const { out, sent, flush, done } = held({ ...house, play: 'asked' });
+  try {
+    flush();
+    assert.equal(text(sent, `f:${ASK}`), '', 'the last step is the map as it is: no flag');
+    out.on({ name: 'click', key: 'back' });
+    flush();
+    assert.equal(text(sent, 'at'), '2 of 3');
+    assert.equal(text(sent, 'play'), 'Play', 'held there');
+    assert.equal(last(sent, `s:${BUILD}`, 'opacity'), 0, 'what the next step brings is not in yet');
+    assert.equal(text(sent, `f:${ASK}`), 'decided');
+    out.on({ name: 'click', key: 'back' });
+    out.on({ name: 'click', key: 'back' });
+    flush();
+    assert.equal(text(sent, 'at'), '1 of 3', 'no step before the first');
+    out.on({ name: 'click', key: 'next' });
+    flush();
+    assert.equal(text(sent, 'at'), '2 of 3');
+  } finally {
+    done();
   }
 });

@@ -301,7 +301,7 @@ export function picture({ answer, style, width, height, reduced }, tools) {
     scene: { css: [css, ...c.rules, story ? storyCss : ''].join('\n'), svg, key, flat: true, ...(style.layout !== 'bars' && { shaped: true }), ...(player && { before: player.before, aside: player.after }) },
     end: player?.end,
     on(event) {
-      if (player && (event.key === 'play' || event.key === 'chat' || event.key.startsWith('c:'))) return player.on(event);
+      if (player?.hears(event.key)) return player.on(event);
       if (event.name === 'click' && c.opens.has(event.key)) tools.open(c.opens.get(event.key));
       return [];
     },
