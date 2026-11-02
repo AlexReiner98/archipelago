@@ -48,6 +48,12 @@ export const canvasAt = (c) => (c.preset ? `#/v?${addressOf(viewParts(c).lens, v
 /** The saved canvas up: the one the address names, else a pack's whose lens is the one up (its style changed, it is marked so). */
 const upOf = (all, lens, style) => (style.canvas ? all.find((c) => c.id === style.canvas) : all.find((c) => c.preset && addressOf(viewParts(c).lens) === addressOf(lens)));
 
+/** A view a pack ships, opened by its address: its own settings (a list's columns), which the address does not carry. */
+export const presetSettings = (lens) => {
+  const preset = (state.schema?.canvases ?? []).find((p) => addressOf(viewParts({ ...p, preset: true, props: p.props }).lens) === addressOf(lens));
+  return preset ? settingsOf({ props: preset.props }) : {};
+};
+
 /** Open a saved canvas named with no lens beside it: its lens and style put in the address, in place of the one asked. */
 export async function openCanvas(id) {
   const got = await api('get', { id }).catch(() => null);

@@ -10,6 +10,9 @@ import { isClosed, relations, titles, typeTitle } from './words.js';
 
 /** The columns a row may have, in the order they are drawn; a style's `show` picks among them. */
 const COLUMNS = ['type', 'status', 'waits', 'sessions'];
+/** Any other name in `show` is a field its items' types mark shown: a column of its values, after those, with a head. */
+const FIELD = /^[a-z][a-z0-9_]*$/;
+const fieldWords = (name) => name.charAt(0).toUpperCase() + name.slice(1).replaceAll('_', ' ');
 
 /** The list: a table of one-line rows, grouped by what holds what. Reads only what a lens answers with. */
 export function drawList(host, answer, style, keep, kept) {
@@ -18,6 +21,7 @@ export function drawList(host, answer, style, keep, kept) {
   // Which columns and how far it opens are the style's: the house style says, and a nearer one may say otherwise.
   const asked = (Array.isArray(style.show) ? style.show : []).map((s) => (['you', 'blocked'].includes(s) ? 'waits' : s));
   const columns = COLUMNS.filter((c) => asked.includes(c));
+  const fields = asked.filter((c) => !COLUMNS.includes(c) && !['you', 'blocked', 'count'].includes(c) && FIELD.test(c));
   const levels = Number(style.open);
   const { opened } = kept;
   // Around one item, what it sits in is open down to it, and how far things open is counted from it.
@@ -48,7 +52,9 @@ export function drawList(host, answer, style, keep, kept) {
                 n.state.blocked && !n.state.waits_on.length && h('span', { class: 'll-blocked', title: waits.has(n.id) ? `Waits on: ${waits.get(n.id).join('; ')}` : 'Blocked' }, 'blocked'),
               )
             : cell('sessions', n.state.sessions > 0 && h('span', { class: 'll-at', title: 'A session is at work here' })),
-    );
+    ).concat(fields.map((f) => cell('field', n.fields?.[f] != null && h('span', { title: `${fieldWords(f)}: ${n.fields[f]}` }, String(n.fields[f]).replaceAll('_', ' ')))));
+  // Fields named in show get a head, so a column of numbers says what it counts.
+  const head = () => fields.length > 0 && h('div', { class: 'll-row ll-head' }, h('span', { class: 'll-name' }), ...columns.map((c) => cell(c)), ...fields.map((f) => cell('field', h('span', { title: fieldWords(f) }, fieldWords(f)))));
   // A group's line says what is in it: how many are open, blocked, and waiting on the one looking.
   const counts = (n) =>
     h(
@@ -112,8 +118,8 @@ export function drawList(host, answer, style, keep, kept) {
       rows.push(h('div', { class: 'll-row ll-group ll-lane open', style: indent(0) }, h('span', { class: 'll-name' }, h('span', { class: 'll-title' }, said(lane)), h('span', { class: 'll-counts' }, h('span', { class: 'll-n' }, String(things.length))))));
       for (const n of things) add(n, 1);
     }
-    body.style.setProperty('--ll-columns', String(columns.length));
-    body.replaceChildren(...rows);
+    body.style.setProperty('--ll-columns', String(columns.length + fields.length));
+    body.replaceChildren(...[head(), ...rows].filter(Boolean));
   };
   const lit = litSwitch(me, style, keep, draw);
   host.replaceChildren(...[lit && h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), lit), body].filter(Boolean));

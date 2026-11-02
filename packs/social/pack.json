@@ -1,0 +1,45 @@
+{
+  "id": "social",
+  "version": "0.1.0",
+  "title": "Social",
+  "description": "Posts on social media, each with the source tag its link carries, and what each brought: the trials asked for, begun and paid for under its tag, counted onto it as they happen by the server that sells workspaces, beside the replies and conversations its author records.",
+  "requires": ["core", "work"],
+  "types": [
+    {
+      "id": "post",
+      "extends": "work",
+      "title": "Post",
+      "description": "One post on one channel, written by a person. Its tag is the ?ref= its link carries (linkedin-26w46-1: the channel, the year and week, its number that week), so each signup is counted onto the post that brought it. Make it part of the work or project it is for, and waits_on whoever writes it. Its note holds the facts it is drawn from; the post itself is its author's.",
+      "statuses": { "open": ["to_write", "ready"], "closed": ["posted", "dropped"] },
+      "fields": {
+        "channel": { "type": "enum", "values": ["linkedin", "x", "bluesky", "threads", "instagram", "youtube", "hn", "dm", "blog", "substack"], "shown": true, "description": "Where it goes out." },
+        "tag": { "type": "string", "shown": true, "description": "The source tag its link carries (?ref=<tag>): letters, digits, - and _, up to 40. One post, one tag." },
+        "posted": { "type": "date", "description": "The day it went out." },
+        "url": { "type": "url", "description": "The post itself, once it is out." },
+        "replies": { "type": "number", "shown": true, "description": "Replies it drew, as its author counts them." },
+        "conversations": { "type": "number", "shown": true, "description": "Conversations it began: replies or messages that said the problem." },
+        "asked": { "type": "number", "shown": true, "system": true, "description": "Trials asked for under its tag." },
+        "begun": { "type": "number", "shown": true, "system": true, "description": "Trials begun under its tag." },
+        "paid": { "type": "number", "shown": true, "system": true, "description": "Trials paid for, and workspaces bought with no trial, under its tag." },
+        "ended": { "type": "number", "system": true, "description": "Trials under its tag that ended unpaid." }
+      }
+    }
+  ],
+  "handlers": [{ "webhook": "social.count", "records": ["signup.counted"] }],
+  "reach": {
+    "webhooks": [{ "id": "social.count", "secret": "count" }]
+  },
+  "styles": [
+    {
+      "id": "social.posts",
+      "type": "lens",
+      "title": "Posts and what each brought",
+      "props": {
+        "filter": { "find": ["type post"], "only": [], "not": [] },
+        "walk": { "over": [], "steps": 0 },
+        "limit": 200,
+        "style": { "shape": "list", "show": ["status", "channel", "asked", "begun", "paid", "replies", "conversations"] }
+      }
+    }
+  ]
+}
