@@ -354,6 +354,20 @@ export function flash(id) {
   entry.el.classList.add('pane-shown');
 }
 
+/**
+ * A view a drawing in pane `from` names (a replay's milestone, ui/view-frame.js), drawn in a pane of its own on its
+ * right: opened once, then moved to each view named, with no step in its history; the reader slides the sash between
+ * them. Closed, it opens again with the next view named.
+ */
+hooks.besidePane = (from, view) => {
+  const t = front();
+  if (!t.groups.includes(from)) return;
+  const at = `v?canvas=${view}`;
+  const mine = t.groups.find((id) => t.panes[id]?.shows === from);
+  if (mine) goPane(mine, at, false);
+  else openPane(at, 'right', from, { anew: true, shows: from });
+};
+
 let started = false;
 /** Draw the panes of the tab in sight, once the page has read its tabs (ui/tab-bar.js). */
 export function startPanes() {
