@@ -181,7 +181,7 @@ const FRONT = 'home';
 // A link followed takes where the reader came from with it (?ref=), set as it is followed so every link drawn has it.
 const carry = (e) => {
   const link = e.target.closest?.('a[href]');
-  if (link) link.href = carried(link.href, location.href);
+  if (link) link.href = carried(link.href, location.href, document.referrer);
 };
 addEventListener('click', carry, true);
 addEventListener('auxclick', carry, true);
