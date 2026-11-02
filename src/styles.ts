@@ -136,6 +136,13 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: u
   return input.have === undefined ? read : { ...read, style: await drawn(l, read.style, input.have) };
 }
 
+/** The workspace's mark, the icon a browser's tab and a client listing this server show: its style's emblem as PNG bytes, or none. */
+export async function emblemOf(l: Archipelago): Promise<Buffer | null> {
+  const emblem = (await pageStyle(l, {}, false)).style.emblem;
+  const png = typeof emblem === 'string' ? /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(emblem) : null;
+  return png ? Buffer.from(png[1], 'base64') : null;
+}
+
 /**
  * What a page read by no login is drawn in: the colours (theme), lengths, typefaces (faces) and text roles (type) of
  * the workspace's style, and of a document, its own style over the workspace's, with the head it gives its page

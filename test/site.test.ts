@@ -178,3 +178,14 @@ test('a link to a site’s page shows the figure its style names, and the page l
   assert.match((await visit(base, '/how-it-works', 'site.test')).body, new RegExp(`og:image" content="https://site\.test/picture/${card}"`));
   assert.equal(JSON.parse((await visit(base, '/data', 'site.test')).body).share, card, 'the page is told which section not to draw');
 });
+
+test('the app and a site serve the style’s emblem as their icon, and every page links it', async () => {
+  const { base } = await serve('off', undefined, { 'site.test': 'default' });
+  for (const [path, host] of [['/favicon.ico', 'site.test'], ['/favicon.png', new URL(base).host]]) {
+    const icon = await visit(base, path, host);
+    assert.equal(icon.status, 200, `${host}${path}`);
+    assert.equal(icon.headers['content-type'], 'image/png');
+    assert.ok(icon.body.startsWith('\uFFFDPNG'), 'a PNG');
+  }
+  assert.match((await visit(base, '/', new URL(base).host)).body, /<link rel="icon" type="image\/png" href="\/favicon\.png" \/>/);
+});
