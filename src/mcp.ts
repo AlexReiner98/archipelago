@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { registerView, toolView, VIEW_CAPABILITY } from './mcp-view.ts';
 import { onToolsChanged } from './packstate.ts';
 import type { Actor, Archipelago } from './pelago.ts';
+import { ANNOTATIONS } from './surface.ts';
 import { callTool, surfaceFor, type Tool } from './tools.ts';
 
 const actorField = {
@@ -79,7 +80,7 @@ function serverFor(caller: Caller): McpServer {
   const mcp = new McpServer({ name: 'pelago', version: '0.1.0' }, { capabilities: { tools: { listChanged: true }, extensions: VIEW_CAPABILITY }, instructions: INSTRUCTIONS });
   registerView(mcp);
   for (const [name, tool] of offered(caller.pelago.registry))
-    mcp.registerTool(name, { description: tool.description, inputSchema: inputsOf(tool), ...toolView(name) }, async (args: Record<string, unknown>) => {
+    mcp.registerTool(name, { description: tool.description, inputSchema: inputsOf(tool), annotations: ANNOTATIONS[name], ...toolView(name) }, async (args: Record<string, unknown>) => {
       const { actor, ...input } = args;
       try {
         const result = await callTool(caller.pelago, caller.actor(actor as string | undefined), name, input);

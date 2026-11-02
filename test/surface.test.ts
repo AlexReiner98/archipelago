@@ -32,7 +32,11 @@ test('the surface is exactly query, change, undo, the six verbs and draw, over M
   const client = new Client({ name: 'test', version: '1' });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`)));
   closers.push(() => client.close());
-  assert.deepEqual((await client.listTools()).tools.map((t) => t.name), SURFACE);
+  const listed = (await client.listTools()).tools;
+  assert.deepEqual(listed.map((t) => t.name), SURFACE);
+  for (const t of listed) assert.ok(t.annotations?.title && (t.annotations.readOnlyHint || t.annotations.destructiveHint !== undefined), `${t.name} says whether it reads, writes or destroys`);
+  assert.deepEqual(listed.filter((t) => t.annotations?.readOnlyHint).map((t) => t.name), ['query', 'draw']);
+  assert.deepEqual(listed.filter((t) => t.annotations?.destructiveHint).map((t) => t.name), ['change', 'undo', 'revise']);
   const found = await client.callTool({ name: 'query', arguments: { name: 'search', params: { q: 'anything' } } });
   assert.ok(!found.isError, 'a read through query');
 });
