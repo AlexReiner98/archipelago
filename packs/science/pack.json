@@ -144,7 +144,8 @@
       "title": "Record",
       "nav": true,
       "pieces": [{ "piece": "view", "view": "science.record_rows" }]
-    }
+    },
+    { "form": "screen", "id": "science.figure", "title": "Figure", "on": ["experiment"], "pieces": [{ "piece": "figure" }] }
   ],
   "styles": [
     {

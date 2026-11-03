@@ -1,5 +1,5 @@
-// The pictures kept for items whose page shows one: a figure (a test result's, a note's, a file's), and the still
-// of a lens. What a test run found is the software pack's test_report, which asks for pictures to be dropped.
+// The pictures kept for items whose page shows one: a figure (a test result's, a commit's, an experiment's, a
+// note's, a file's), and the still of a lens. What a test run found is the software pack's test_report, which asks for pictures to be dropped.
 
 import { createHash } from 'node:crypto';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
@@ -13,14 +13,16 @@ export const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/sv
 
 /**
  * Keep the picture for an item whose page shows one (a screen of it draws a
- * figure: a test result, a note, a file), or for a lens the picture a link
+ * figure: a test result, a commit, an experiment, a note, a file), or for a lens the picture a link
  * shows in place of the live one. A result's is meant for one that is shown
  * in public: until then the picture stays in the repository it was made in.
  * There is one per item; sent again, it replaces what was kept.
  */
 export async function putPicture(l: Archipelago, actor: Actor, input: { result: string; data: string; content_type: string }) {
   const result = await l.entity(input.result);
-  if (!result || ![...l.registry.drawnWith('figure'), ...l.registry.family('lens')].includes(result.type)) throw new Error(`picture_put: "${input.result}" is not a test result, a note, a file or a lens: nothing whose page shows a picture.`);
+  if (!result) throw new Error(`picture_put: there is no item "${input.result}".`);
+  const keeps = [...l.registry.drawnWith('figure'), ...l.registry.family('lens')];
+  if (!keeps.includes(result.type)) throw new Error(`picture_put: "${input.result}" is of type ${result.type}, and a picture is kept only on a type whose page shows one (${keeps.join(', ')}). For one to be kept on a ${result.type}, a pack needs a screen on that type with the figure piece.`);
   if (!(PICTURE_TYPES as readonly string[]).includes(input.content_type)) throw new Error(`picture_put: the picture must be one of ${PICTURE_TYPES.join(', ')}, not ${input.content_type}.`);
   const bytes = Buffer.from(input.data, 'base64');
   if (!bytes.length) throw new Error('picture_put: "data" is empty. Send the file as base64.');
