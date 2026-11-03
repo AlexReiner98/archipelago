@@ -25,6 +25,29 @@
       }
     }
   ],
+  "views": [
+    {
+      "form": "screen",
+      "id": "social.length",
+      "title": "Length",
+      "on": ["post"],
+      "pieces": [
+        {
+          "piece": "count",
+          "section": "Text",
+          "by": "channel",
+          "limits": {
+            "linkedin": { "max": 3000, "low": 1200, "high": 1900 },
+            "x": { "max": 280, "split": "paragraph", "emoji": 2, "link": 23 },
+            "bluesky": { "max": 300 },
+            "threads": { "max": 500 },
+            "instagram": { "max": 2200 },
+            "youtube": { "max": 100 }
+          }
+        }
+      ]
+    }
+  ],
   "handlers": [{ "webhook": "social.count", "records": ["signup.counted"] }],
   "reach": {
     "webhooks": [{ "id": "social.count", "secret": "count" }]

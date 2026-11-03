@@ -176,6 +176,23 @@ export interface PieceDef {
   reasons?: string[];
   /** For attention and saved views: how many rows are shown; the rest are counted, by the project each is in. */
   limit?: number;
+  /** For a count: the section of the note counted, by its heading; the whole note when left out. */
+  section?: string;
+  /** For a count: the field whose value picks the limit, and the limit for each value. */
+  by?: string;
+  limits?: Record<string, LimitDef>;
+}
+
+/** How long a counted text may be: `max` at most, best between `low` and `high`. `split: "paragraph"` counts each
+ * paragraph as one post against it; `emoji` and `link` are what an emoji and an address weigh, where the place weighs
+ * them more than one character each. */
+export interface LimitDef {
+  max: number;
+  low?: number;
+  high?: number;
+  split?: 'paragraph';
+  emoji?: number;
+  link?: number;
 }
 
 /**
@@ -228,8 +245,9 @@ export interface ScreenDef {
  * The pieces the kernel draws, each with what it must be told. A tree, a gate, proof, usage and a document draw the
  * kernel's views of the item; a figure is the picture it keeps; a diagram, the boxes and wires its props.diagram holds; rows and a form are the pack's own view and action.
  * A button stands in the page's head, not its column: it opens the pack's action's form, or draws the canvas up as it says.
+ * A count stands under the note while it is written: how long it is, against the limit its field's value picks.
  */
-export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [], button: ['label', 'tip'] } as const;
+export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [], button: ['label', 'tip'], count: [] } as const;
 
 /** The pages the kernel still draws itself, which a screen can hold as a piece until a pack draws them from pieces. */
 export const PAGES = ['time'];
@@ -332,6 +350,8 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       if (piece.page && !PAGES.includes(piece.page)) problems.push(`${at}: the kernel draws no page "${piece.page}": one of ${PAGES.join(', ')}`);
       for (const r of piece.reasons ?? []) if (!(REASONS as readonly string[]).includes(r)) problems.push(`${at}: "${r}" is not a reason attention gives: one of ${REASONS.join(', ')}`);
       if (piece.lens && typeof piece.lens === 'object' && (typeof piece.lens.filter !== 'object' || !piece.lens.filter)) problems.push(`${at}: a view piece's lens is a flat lens: { filter, walk, limit }`);
+      if (piece.by && !(screen.on ?? []).every((t) => types.get(t)?.fields[piece.by!])) problems.push(`${at}: a count's by is a field of every type it is on`);
+      for (const [value, l] of Object.entries(piece.limits ?? {})) if (!(l?.max > 0) || (l.split !== undefined && l.split !== 'paragraph')) problems.push(`${at}: the limit for "${value}" needs its max, and splits only by paragraph`);
       if (piece.style && typeof piece.style === 'object' && 'code' in piece.style) problems.push(`${at}: a view's style has no code: code runs only from a style kept on the map`);
     }
   }

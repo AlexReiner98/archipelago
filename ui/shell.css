@@ -251,8 +251,17 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .draft-body[hidden] { display: none; }
 #sheet .draft-bar { position: sticky; z-index: 1; bottom: 0; display: flex; align-items: center; gap: var(--space-5); margin: 0 calc(-1 * var(--space-11)) var(--space-10); padding: var(--space-6) var(--space-11); background: var(--bg); border-top: var(--border-1) solid var(--line); }
 #sheet .draft-bar[hidden] { display: none; }
+/* The bar's wrapper draws no box, so the bar sticks to the foot of the sheet and not of a wrapper its own size. */
+#sheet .draft { display: contents; }
 #sheet .draft-said { color: var(--muted); font-size: var(--text-4); }
 #sheet .draft-bar > .grow { flex: 1; }
+/* How long the note is while it is written: quiet, until it is in its best length, past it or over its limit. */
+#sheet .draft-count { color: var(--muted); font-size: var(--text-4); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#sheet .draft-count[data-state='best'] { color: var(--ok); }
+#sheet .draft-count[data-state='near'] { color: var(--warn); }
+#sheet .draft-count[data-state='over'] { color: var(--bad); }
+/* Hidden until there is something to save, the buttons keep their room: the bar is one height, and the count stays put. */
+#sheet .draft-bar button[hidden] { display: inline-block; visibility: hidden; }
 #sheet .grid { display: block; }
 #sheet .card { margin: 0 0 var(--space-10); background: none; border: 0; border-radius: 0; overflow: visible; }
 #sheet .card > header, #sheet details.fold > summary { padding: 0 0 var(--space-4); border: 0; background: none; }

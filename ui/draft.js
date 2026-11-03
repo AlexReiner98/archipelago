@@ -9,6 +9,7 @@
 import { api, ask, h, state, tell } from './base.js';
 import { renderBody } from './body.js';
 import { followLoose, refreshCanvas } from './canvas.js';
+import { countMark } from './note-count.js';
 import { ticked } from './text.js';
 
 /** Where the cursor was in the words saved last: the page is drawn again, and it stays there. */
@@ -52,9 +53,10 @@ export const mayLeave = async () => !unsaved() || Boolean(await ask({ title: 'Le
  * updated_at }), or a new item's type and any title it starts with. `note`: false where the note is not written here
  * (a document, read whole). `reading`: what the note reads as, where it is not the note itself (a document, with the
  * sections it brings in). `writing`: the note opens as words to write, not as it reads (read beside it already, the
- * pages). `call`: the map it is written on, this one unless said. `saved(id)` is told when the change is made.
+ * pages). `call`: the map it is written on, this one unless said. `saved(id)` is told when the change is made. `count`:
+ * the count piece its screens declare, which says how its note is counted while it is written (ui/note-count.js).
  */
-export function draftOf({ base, style, editable = true, note = true, reading, writing = false, call = api, saved }) {
+export function draftOf({ base, style, editable = true, note = true, reading, writing = false, call = api, saved, count }) {
   const isNew = !base.id;
   const here = call === api;
   // Words kept from before a reload or a redraw. Written against an older version of the item, they are saved against
@@ -86,8 +88,18 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
   const said = h('span', { class: 'draft-said' });
   const save = h('button', { class: 'primary', type: 'button' }, isNew ? 'Create' : 'Save');
   const discard = h('button', { class: 'quiet-button', type: 'button' }, 'Discard');
-  const bar = h('div', { class: 'draft-bar', hidden: true }, said, h('span', { class: 'grow' }), discard, save);
+  // How long the note is, in sight at the foot of the sheet while it is written.
+  const length = note && editable && countMark(count, base.props ?? {});
+  const bar = h('div', { class: 'draft-bar', hidden: true }, said, h('span', { class: 'grow' }), length?.node, discard, save);
   const box = h('div', { class: 'draft' }, bar);
+  // The line being written is scrolled into sight above the bar, not behind it: the sheet keeps the bar's height clear.
+  // Kept once the bar is on the sheet, so taken off with the page it clears what it set.
+  let sheet = null;
+  const clear = () => {
+    sheet = bar.closest('#sheet') ?? sheet;
+    if (sheet) sheet.style.scrollPaddingBottom = bar.offsetHeight ? `${bar.offsetHeight + parseFloat(getComputedStyle(bar).marginBottom)}px` : '';
+  };
+  new ResizeObserver(clear).observe(bar);
   // Fields written in place wait here for the same Save (ui/field-edit.js): a name, what it held, what it holds now.
   const fields = new Map();
   const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -96,13 +108,25 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
   const now = () => ({ title: title.textContent.replace(/\s+/g, ' ').trim(), body: area.value });
   const worded = () => now().title !== (from.title ?? '').trim() || now().body !== (from.body ?? '');
   const changed = () => worded() || Object.keys(props()).length > 0;
-  const grow = () => ((area.style.height = 'auto'), (area.style.height = `${area.scrollHeight}px`));
+  // The words are as tall as they are. Measuring them collapses the box for a moment, which would scroll the sheet
+  // away from the line being written: the sheet is put back where it was, as a word processor keeps the page still.
+  const grow = () => {
+    const sheet = area.closest('#sheet');
+    const top = sheet?.scrollTop;
+    area.style.height = 'auto';
+    area.style.height = `${area.scrollHeight}px`;
+    if (sheet) sheet.scrollTop = top;
+  };
   const update = () => {
     const open = isNew || changed();
-    bar.hidden = !open;
+    bar.hidden = !open && !(length && !area.hidden && (area.value.trim() || document.activeElement === area));
+    discard.hidden = save.hidden = !open;
+    length?.update(area.value);
     box.dataset.draft = changed() ? 'unsaved' : '';
     save.disabled = !now().title || !changed() || Boolean(bad());
     said.textContent = !now().title ? 'A title first' : bad() ?? (changed() ? (restored ? 'Restored · not saved' : 'Not saved') : '');
+    // Before the browser scrolls to the line being written, not a frame after.
+    clear();
   };
   // Each word written is kept in this browser, beside the version of the item it was written against.
   const keep = () => {
@@ -115,12 +139,14 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
     if (read) read.hidden = true;
     area.hidden = false;
     grow();
+    update();
     area.focus();
   };
   if (read && editable) read.addEventListener('click', (ev) => !ev.target.closest('a, summary, button, input, .doc-lens') && write());
   title.addEventListener('input', () => (keep(), update()));
   title.addEventListener('keydown', (ev) => ev.key === 'Enter' && (ev.preventDefault(), note ? write() : title.blur()));
   area.addEventListener('input', () => (grow(), keep(), update()));
+  area.addEventListener('focus', update);
   discard.addEventListener('click', () => {
     kept.drop(base);
     from = base;
@@ -191,6 +217,7 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
     if (read) read.hidden = true;
     area.hidden = false;
     grow();
+    update();
   };
   return { title, note: note ? [read, area].filter(Boolean) : [], bar: box, field, open, save: () => save.click(), unsaved: () => changed() };
 }
