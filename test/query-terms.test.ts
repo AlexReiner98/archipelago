@@ -87,6 +87,12 @@ test("Only's plain words: each must hold of every seed, and the walk is not narr
   await l.db.query(`update entity set updated_at = now() - interval '10 days', created_at = now() - interval '10 days' where id = $1`, [made.a]);
   assert.ok(!(await only('changed since 7d')).includes('Find in') && (await only('changed since 7d')).includes('Mine'), 'changed since so many days');
   assert.ok(!(await only('made since 3d')).includes('Find in') && (await only('made since 2020-01-01')).includes('Find in'), 'made since days or a date');
+  assert.deepEqual(await only('made before 3d'), ['Find in'], 'made before so many days');
+  assert.ok(!(await only('changed before 2020-01-01')).length && (await only('changed before 7d')).includes('Find in'), 'changed before a date or days');
+  // A since and a before are a range, a date its day in the workspace's zone (Toronto's, unless set).
+  await l.db.query(`update entity set created_at = '2026-07-15T23:30:00-04:00' where id = $1`, [made.a]);
+  assert.deepEqual(await only('made since 2026-07-15', 'made before 2026-07-16'), ['Find in'], 'made that day, late in the evening in Toronto');
+  assert.deepEqual(await only('made since 2026-07-16', 'made before 2026-07-17'), [], 'not the day after');
   // Who last set its status: the owner, or an agent on its own judgment.
   const loose = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', archive: 'auto', restore: 'auto', link: 'auto' });
   assert.equal((await loose.change(agent, { reason: 'test', authority: { of: 'agent', basis: 'It is done' }, ops: [{ op: 'update', id: more.hers, status: 'done' }] })).status, 'applied');

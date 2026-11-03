@@ -39,7 +39,9 @@ e_tvsdqjeq), `related <item>` (any link to it, either way), `<link> <item>`
 (`tagged e_x`; `<link>< <item>` what it links to), `owner <person>`, and
 words that can only be checked of what is found: `done`, `blocked`,
 `status <s>`, `no owner`, `over estimate`, `changed since 7d`,
-`made since <date>`, `by owner`, `by agent` (`src/query-only.ts`, e_xe5dx55e).
+`made since <date>`, `made before <date>` (a since and a before are a range;
+a date is its day in the workspace's zone), `by owner`, `by agent`
+(`src/query-only.ts`, e_xe5dx55e).
 The part says what is done with a set: Find adds it (a union; neither `kind`
 nor a word finds, since each would read the map), Only keeps what is in it
 (an AND; an item is of one type, so its types are one set), and Not takes it

@@ -49,16 +49,17 @@ const linkEnd = (c, r) => ({
  * here, then the rest of the types'), and days (how far back changed and made since look, in days, from the style).
  */
 export function onlyKinds(c) {
-  const since = (word) => ({
-    label: `${word[0].toUpperCase()}${word.slice(1)} since`,
-    title: `What was ${word} since a day`,
+  // Since and before: a since and a before together are a range of days.
+  const since = (word, way = 'since') => ({
+    label: `${word[0].toUpperCase()}${word.slice(1)} ${way}`,
+    title: way === 'since' ? `What was ${word} since a day` : `What was ${word} before a day began`,
     next: () => ({
-      label: `${word} since`,
-      groups: [{ label: '', items: c.days.map((d) => ({ label: `${d} day${d === 1 ? '' : 's'}`, title: `${word} in the last ${d} days`, pick: () => c.add(`${word} since ${d}d`) })) }],
+      label: `${word} ${way}`,
+      groups: [{ label: '', items: c.days.map((d) => ({ label: `${d} day${d === 1 ? '' : 's'}`, title: way === 'since' ? `${word} in the last ${d} days` : `${word} over ${d} days ago`, pick: () => c.add(`${word} ${way} ${d}d`) })) }],
       typed: {
         placeholder: 'Or a date: 2026-10-01',
         title: 'A date, as year-month-day',
-        pick: (w) => /^\d{4}-\d{2}-\d{2}$/.test(w) && !Number.isNaN(Date.parse(w)) && (c.add(`${word} since ${w}`), true),
+        pick: (w) => /^\d{4}-\d{2}-\d{2}$/.test(w) && !Number.isNaN(Date.parse(w)) && (c.add(`${word} ${way} ${w}`), true),
       },
     }),
   });
@@ -73,6 +74,8 @@ export function onlyKinds(c) {
         { label: 'Status', title: 'What has a status', next: () => ({ label: 'Status', groups: [{ label: '', items: c.statuses.map((s) => ({ label: s, title: `What is ${s}`, pick: () => c.add(`status ${s}`) })) }] }) },
         since('changed'),
         since('made'),
+        since('changed', 'before'),
+        since('made', 'before'),
       ] },
     ],
   };
