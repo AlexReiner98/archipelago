@@ -16,7 +16,7 @@ export function viewFrame(attrs, fail) {
   const draw = (want) => {
     // Where it stands is known once the mark is on the page.
     const pane = el.closest('[data-pane]')?.dataset.pane;
-    if (pane && hooks.besidePane) return void (el.classList.add('beside'), want && hooks.besidePane(pane, want));
+    if (pane && hooks.besidePane) return void (el.classList.add('beside'), hooks.besidePane(pane, want));
     for (const old of el.querySelectorAll(':scope > .view-next')) old.remove();
     // A page that draws no kept views (one with no canvases) leaves the frame empty.
     if (!want || !hooks.keptView) return el.replaceChildren();

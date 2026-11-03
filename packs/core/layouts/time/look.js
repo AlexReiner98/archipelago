@@ -16,6 +16,12 @@ export const css = `
 .t-day-key rect { fill: var(--t-hue); }
 .t-day-key[role=link] { cursor: pointer; }
 .t-h-none { --t-hue: var(--ln-muted); }
+.t-controls { display: flex; align-items: baseline; gap: var(--ln-time-key-gap); padding: var(--ln-time-key-pad) 0; font-size: var(--ln-small-text); color: var(--ln-muted); white-space: nowrap; overflow: hidden; }
+.t-control { background: none; border: 0; padding: 0; font: inherit; color: var(--ln-muted); cursor: pointer; }
+.t-control:hover, .t-control.on { color: var(--ln-text); }
+.t-control.on { text-decoration: underline; text-underline-offset: var(--ln-time-key-pad); }
+.t-control-at { color: var(--ln-text); }
+.t-control-gap { flex: 0 0 var(--ln-time-key-stripe); }
 `;
 
 /** The class a colour is drawn by, and its rule: named by the colour itself, so two pictures on a page never differ on one. */

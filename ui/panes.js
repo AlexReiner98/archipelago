@@ -84,6 +84,9 @@ function paneEl(id) {
   return el;
 }
 
+/** The address of a pane beside a replay that has reached no milestone yet: it draws nothing. */
+const NONE = 'v?shown=none';
+
 /** Draw this address in pane `id`, in place of what it drew: the pane, its name and its history stay. */
 function load(id, at) {
   const entry = drawn.get(id);
@@ -91,6 +94,7 @@ function load(id, at) {
   // A web page is framed in place of the canvas (ui/pane-web.js).
   frameIn(entry, webOf(at));
   if (webOf(at)) return;
+  if (at === NONE) return void ((entry.name.textContent = ''), entry.canvas.empty());
   lensOf(at)
     .then(({ lens, style, here }) => {
       if (drawn.get(id) !== entry || entry.at !== at) return;
@@ -362,13 +366,15 @@ export function flash(id) {
 /**
  * A view a drawing in pane `from` names (a replay's milestone, ui/view-frame.js), drawn in a pane of its own on its
  * right: opened once, then moved to each view named, with no step in its history; the reader slides the sash between
- * them. Closed, it opens again with the next view named.
+ * them. Closed, it opens again with the next view named; named with none (a step before the first milestone), it is empty.
  */
 hooks.besidePane = (from, view) => {
   const t = front();
   if (!t.groups.includes(from)) return;
-  const at = `v?canvas=${view}`;
   const mine = t.groups.find((id) => t.panes[id]?.shows === from);
+  // Before its first milestone, the pane beside a replay that has one stands empty: nothing is shown before it is real.
+  if (!view) return void (mine && goPane(mine, NONE, false));
+  const at = `v?canvas=${view}`;
   if (mine) goPane(mine, at, false);
   else openPane(at, 'right', from, { anew: true, shows: from });
 };

@@ -125,6 +125,13 @@ export function canvasIn(host, pane) {
       c.draw();
       readPlaces(c, canvasOf(lens, asked), style.placed);
     },
+    /** Draw nothing: a replay's pane before its first milestone (ui/panes.js). */
+    empty() {
+      writeMoves();
+      if (at?.view?.store) unfollow(at.view.store);
+      at = null;
+      host.replaceChildren();
+    },
     /** Draw the lens up now anew, with the places it has now: a picture already drawn takes no new places in a restyle. */
     draw() {
       const of = idsOf(at.lens.filter)[0];

@@ -206,3 +206,40 @@ test('a story that adds no kept view keeps its conversation on the right, alone'
     done();
   }
 });
+
+// The whole map from the first step, each step saying where its work stood then (a status, sent with its phase) and
+// which item a session works on (a link it makes and takes back), so the dots and the one wire tell where it is.
+const RUN = 'e_runzzzzz';
+const working = {
+  ...answer,
+  items: [...answer.items, { ...item(RUN, 'A session'), kind: 'system', type: 'run', status: 'finished', open: false }],
+  links: [...answer.links, { kind: 'works_on', from: RUN, to: ASK }, { kind: 'works_on', from: RUN, to: PLAN }],
+  steps: [
+    { add: [ASK, PLAN, RUN], fields: { [ASK]: { status: 'doing', phase: 'under_way' }, [PLAN]: { status: 'todo', phase: 'not_started' } }, link: [[RUN, ASK]] },
+    { fields: { [ASK]: { status: 'done', phase: 'finished' }, [PLAN]: { status: 'doing', phase: 'under_way' } }, unlink: [[RUN, ASK]], link: [[RUN, PLAN]] },
+    { unlink: [[RUN, PLAN]] },
+  ],
+};
+const dotOf = (sent: any[], id: string) => JSON.stringify(sent.filter((p) => p.key === `d:${id}` && p.mark).at(-1)?.mark ?? null);
+
+test('a step gives each thing the dot of where it stood then, and a session the one link it works along', () => {
+  const { out, sent, flush, done } = held({ ...house, play: 'asked' }, working);
+  try {
+    flush();
+    const ties = JSON.stringify(out.scene.svg).match(/"key":"n:\d+"/g)!.map((k) => k.slice(7, -1));
+    const shown = () => ties.filter((k) => last(sent, k, 'opacity') === 1);
+    assert.equal(shown().length, 0, 'the last step has taken the session off its work');
+    out.on({ name: 'click', key: 'back' });
+    flush();
+    assert.match(dotOf(sent, PLAN), /ph-under_way/, 'what is under way then has its half dot');
+    assert.match(dotOf(sent, ASK), /ph-finished/, 'what was done then, its full one');
+    assert.equal(shown().length, 1, 'the session is tied to the one thing it works on');
+    out.on({ name: 'click', key: 'back' });
+    flush();
+    assert.match(dotOf(sent, ASK), /ph-under_way/);
+    assert.match(dotOf(sent, PLAN), /ph-not_started/);
+    assert.equal(shown().length, 1);
+  } finally {
+    done();
+  }
+});
