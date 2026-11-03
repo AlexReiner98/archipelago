@@ -3,7 +3,8 @@
 // keystrokes (the owner, 25 Oct 2026). A new item is a draft until it has a title and is saved; closed unsaved,
 // nothing is written. Saving asks first when someone changed the item since the sheet opened, so no one's words are
 // overwritten unseen. What applies is the rules' to say, never the page's. A note whose words live on another map is
-// written there, by that map's `call`.
+// written there, by that map's `call`. Until then a copy of the words is kept in this browser alone (`kept`), so a
+// reload or a closed tab does not lose them: put back when the sheet opens again, still unsaved.
 
 import { api, ask, h, state, tell } from './base.js';
 import { renderBody } from './body.js';
@@ -12,6 +13,33 @@ import { ticked } from './text.js';
 
 /** Where the cursor was in the words saved last: the page is drawn again, and it stays there. */
 let left = null;
+
+/** The copy of a draft this browser keeps until it is saved or discarded: by item id, or a new item's type. Storage
+ * can be blocked or full: then nothing is kept, and the words last as long as the page. */
+const keyOf = (base) => `pelago-draft:${base.id ?? `new:${base.type}`}`;
+export const kept = {
+  get(base) {
+    try {
+      return JSON.parse(localStorage.getItem(keyOf(base)) ?? 'null');
+    } catch {
+      return null;
+    }
+  },
+  put(base, copy) {
+    try {
+      localStorage.setItem(keyOf(base), JSON.stringify(copy));
+    } catch {
+      // Not kept: the words are still on the page.
+    }
+  },
+  drop(base) {
+    try {
+      localStorage.removeItem(keyOf(base));
+    } catch {
+      // Nothing could be kept, so nothing is left.
+    }
+  },
+};
 
 /** Whether the sheet holds words not yet saved: the router asks before they are left behind. */
 export const unsaved = () => Boolean(document.querySelector('#sheet [data-draft="unsaved"]'));
@@ -29,9 +57,15 @@ export const mayLeave = async () => !unsaved() || Boolean(await ask({ title: 'Le
 export function draftOf({ base, style, editable = true, note = true, reading, writing = false, call = api, saved }) {
   const isNew = !base.id;
   const here = call === api;
-  const title = h('h1', { class: 'draft-title', contenteditable: editable ? 'plaintext-only' : 'false', 'data-placeholder': 'Title', spellcheck: 'true' }, base.title ?? '');
-  const area = h('textarea', { class: 'draft-body', placeholder: 'What is it, and how does it relate to other items?', rows: 4, hidden: !isNew && !writing && Boolean(base.body) });
-  area.value = base.body ?? '';
+  // Words kept from before a reload or a redraw. Written against an older version of the item, they are saved against
+  // that one, so Save asks before writing over what changed since.
+  const copy = editable && kept.get(base);
+  let from = copy?.was && copy.was.updated_at !== base.updated_at ? { ...base, ...copy.was } : base;
+  let restored = Boolean(copy) && (copy.title !== (from.title ?? '') || copy.body !== (from.body ?? ''));
+  if (copy && !restored) kept.drop(base);
+  const title = h('h1', { class: 'draft-title', contenteditable: editable ? 'plaintext-only' : 'false', 'data-placeholder': 'Title', spellcheck: 'true' }, restored ? copy.title : (base.title ?? ''));
+  const area = h('textarea', { class: 'draft-body', placeholder: 'What is it, and how does it relate to other items?', rows: 4, hidden: !isNew && !writing && !restored && Boolean(base.body) });
+  area.value = restored ? copy.body : (base.body ?? '');
   // A checklist item ticked as the note reads is a change to that one line of it, on the person's word.
   const tick = async (line, done) => {
     const t = ticked(base.body, line, done);
@@ -48,7 +82,7 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
     }
   };
   // The note as it reads, folded (renderBody), until it is clicked to be written.
-  const read = !isNew && !writing && base.body && h('div', { class: 'draft-read', title: editable ? 'Click to write' : '' }, reading ?? renderBody(base.body, { style, tick: editable ? tick : undefined }));
+  const read = !isNew && !writing && base.body && h('div', { class: 'draft-read', hidden: restored, title: editable ? 'Click to write' : '' }, reading ?? renderBody(base.body, { style, tick: editable ? tick : undefined }));
   const said = h('span', { class: 'draft-said' });
   const save = h('button', { class: 'primary', type: 'button' }, isNew ? 'Create' : 'Save');
   const discard = h('button', { class: 'quiet-button', type: 'button' }, 'Discard');
@@ -60,14 +94,22 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
   const props = () => Object.fromEntries([...fields].filter(([, f]) => !same(f.now, f.was)).map(([k, f]) => [k, f.now ?? null]));
   const bad = () => [...fields.values()].find((f) => f.bad)?.bad;
   const now = () => ({ title: title.textContent.replace(/\s+/g, ' ').trim(), body: area.value });
-  const changed = () => now().title !== (base.title ?? '').trim() || now().body !== (base.body ?? '') || Object.keys(props()).length > 0;
+  const worded = () => now().title !== (from.title ?? '').trim() || now().body !== (from.body ?? '');
+  const changed = () => worded() || Object.keys(props()).length > 0;
   const grow = () => ((area.style.height = 'auto'), (area.style.height = `${area.scrollHeight}px`));
   const update = () => {
     const open = isNew || changed();
     bar.hidden = !open;
     box.dataset.draft = changed() ? 'unsaved' : '';
     save.disabled = !now().title || !changed() || Boolean(bad());
-    said.textContent = !now().title ? 'A title first' : bad() ?? (changed() ? 'Not saved' : '');
+    said.textContent = !now().title ? 'A title first' : bad() ?? (changed() ? (restored ? 'Restored · not saved' : 'Not saved') : '');
+  };
+  // Each word written is kept in this browser, beside the version of the item it was written against.
+  const keep = () => {
+    restored = false;
+    if (!worded()) return kept.drop(base);
+    const words = now();
+    kept.put(base, { title: title.textContent, body: words.body, was: { title: from.title ?? '', body: from.body ?? '', updated_at: from.updated_at } });
   };
   const write = () => {
     if (read) read.hidden = true;
@@ -76,10 +118,13 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
     area.focus();
   };
   if (read && editable) read.addEventListener('click', (ev) => !ev.target.closest('a, summary, button, input, .doc-lens') && write());
-  title.addEventListener('input', update);
+  title.addEventListener('input', () => (keep(), update()));
   title.addEventListener('keydown', (ev) => ev.key === 'Enter' && (ev.preventDefault(), note ? write() : title.blur()));
-  area.addEventListener('input', () => (grow(), update()));
+  area.addEventListener('input', () => (grow(), keep(), update()));
   discard.addEventListener('click', () => {
+    kept.drop(base);
+    from = base;
+    restored = false;
     title.textContent = base.title ?? '';
     area.value = base.body ?? '';
     if (read) (read.hidden = false), (area.hidden = true);
@@ -99,6 +144,7 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
       if (isNew) {
         const made = await api('change', { ops: [{ op: 'create', ref: 'new', type: base.type, title: next.title, ...(next.body.trim() && { body: next.body }) }], reason: 'Started on the canvas' });
         box.dataset.draft = '';
+        kept.drop(base);
         followLoose(made.created?.new);
         refreshCanvas();
         return saved(made.created?.new);
@@ -106,14 +152,15 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
       // Someone else's words since the sheet opened are not written over unseen.
       const live = (await call('get', { id: base.id })).entity;
       const fresh = props();
-      const moved = live.updated_at !== base.updated_at && (live.title !== base.title || (live.body ?? '') !== (base.body ?? '') || Object.keys(fresh).some((k) => !same(live.props[k], fields.get(k).was)));
+      const moved = live.updated_at !== from.updated_at && (live.title !== from.title || (live.body ?? '') !== (from.body ?? '') || Object.keys(fresh).some((k) => !same(live.props[k], fields.get(k).was)));
       if (moved && !(await ask({ title: 'Changed since you opened it', message: 'Someone changed what you are writing while you were. Save yours over theirs?', action: 'Save mine', danger: true }))) return update();
-      const ops = [{ op: 'update', id: base.id, ...(next.title !== (base.title ?? '').trim() && { title: next.title }), ...(next.body !== (base.body ?? '') && { body: next.body }), ...(Object.keys(fresh).length && { props: fresh }) }];
+      const ops = [{ op: 'update', id: base.id, ...(next.title !== (from.title ?? '').trim() && { title: next.title }), ...(next.body !== (from.body ?? '') && { body: next.body }), ...(Object.keys(fresh).length && { props: fresh }) }];
       left = { id: base.id, from: area.selectionStart, to: area.selectionEnd };
       const done = await call('change', { ops, reason: 'Written in the sheet' });
       // Held for someone's word by a rule: it is on the map as a proposal, not yet applied.
       if (done.status && done.status !== 'applied') await tell('Saved as a proposal', 'A rule holds this change for a person to approve before it applies.');
       box.dataset.draft = '';
+      kept.drop(base);
       fields.clear();
       state.selfDrawn = here && done.status === 'applied';
       saved(base.id);
@@ -124,6 +171,8 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
     }
   });
   update();
+  // Words put back are as tall as they are.
+  if (restored) requestAnimationFrame(grow);
   // A new item opens with its title ready to be typed.
   if (isNew) requestAnimationFrame(() => title.focus());
   // Words to write are as tall as they are, and saving leaves the cursor where it was.
@@ -146,6 +195,14 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
   return { title, note: note ? [read, area].filter(Boolean) : [], bar: box, field, open, save: () => save.click(), unsaved: () => changed() };
 }
 
+/** A new item's kept words follow it to the type chosen for it. */
+function moveKept(was, to) {
+  const copy = kept.get({ type: was });
+  if (!copy) return;
+  kept.drop({ type: was });
+  kept.put({ type: to }, copy);
+}
+
 /** A new item as a draft in the sheet: its type (a task unless chosen), a title to type and a note. Saved, it is a loose
  * item on the map, tied to nothing: how it relates is said in its note, and an agent proposes the links. */
 export function newItem(host, { type, title = '', style, types, choices }) {
@@ -156,7 +213,7 @@ export function newItem(host, { type, title = '', style, types, choices }) {
         'div',
         { class: 'page-head' },
         draft.title,
-        h('div', { class: 'sheet-marks' }, h('select', { class: 'mark-type', title: 'What kind of item it is', onchange: (ev) => ((title = draft.title.textContent), draw(ev.target.value)) }, choices.map((t) => h('option', { value: t.id, selected: t.id === chosen }, t.label))), h('span', { class: 'muted' }, 'new, tied to nothing yet')),
+        h('div', { class: 'sheet-marks' }, h('select', { class: 'mark-type', title: 'What kind of item it is', onchange: (ev) => ((title = draft.title.textContent), moveKept(chosen, ev.target.value), draw(ev.target.value)) }, choices.map((t) => h('option', { value: t.id, selected: t.id === chosen }, t.label))), h('span', { class: 'muted' }, 'new, tied to nothing yet')),
       ),
       h('section', { class: 'note' }, draft.note),
       draft.bar,
