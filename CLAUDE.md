@@ -261,7 +261,8 @@ else a pack"). These rules keep it composable while that happens, and
 - **The kernel names no pack.** No pack's type or link type by name in `src/`
   or `ui/`: ask the registry for a kind or a capability.
 - **One write path, checked.** Items and links are written only in
-  `src/pelago.ts` and the projector it runs (`src/replay.ts`): through
+  `src/pelago.ts`, its apply loop (`src/change-apply.ts`) and the
+  projector it runs (`src/replay.ts`): through
   `change`, or through the operational writes and the restore path
   `src/operational.ts` names.
 - **No read of the whole map.** Every SQL read of items, links, the log or
