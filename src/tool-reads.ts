@@ -18,7 +18,7 @@ import { NOW_MS, seeing, seenNow } from './seeing.ts';
 import { withStyles } from './styles.ts';
 import { props } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
-import { VIEW_INPUT, viewAddress } from './view-address.ts';
+import { previewAddress, VIEW_INPUT, viewAddress } from './view-address.ts';
 import { withCovers } from './withdraw.ts';
 
 /** One thing the human did to the map, small enough to put in front of a model. */
@@ -295,17 +295,18 @@ export const READ_TOOLS: Record<string, Tool> = {
   },
   look: {
     description:
-      'See what a view looks like: the server draws it in its own browser, from the same page, layouts and sandbox the owner’s screen uses, as you see the map (private items as query shows them to you), and answers with the picture as an image, once the view says it has drawn: state (drawn, empty: the query found nothing, error, late), settled (false for a layout still moving), why. ' +
-      'It never moves the owner’s page (show with look: true does both), and the person reading a chat does not see it: draw shows them. The same view at the same size, the map unchanged, answers with the picture already taken (again: true) unless fresh. At most 60 an hour per workspace.',
+      'See what a view looks like: the server draws it in its own browser, from the same page, layouts and sandbox the owner’s screen uses, as you see the map (private items as query shows them to you), and answers with the picture as an image, once the view says it has drawn: state (drawn, empty: the query found nothing, error, late), settled (false for a layout still moving), why, the workspace it was drawn from, drawn_at, and fell_back: each face the page asked for that the server drew in another. ' +
+      'It never moves the owner’s page (show with look: true does both), and the person reading a chat does not see it: draw shows them. The same view at the same size, the map and the server unchanged, answers with the picture already taken (again: true, and when it was drawn) unless fresh. With published and a document, the page a reader would get if it were published now. At most 60 an hour per workspace.',
     input: {
       ...VIEW_INPUT,
       width: z.number().int().min(320).max(1920).optional().describe('The picture’s width in pixels (1200).'),
       height: z.number().int().min(240).max(1600).optional().describe('Its height (750).'),
       scheme: z.enum(['dark', 'light']).optional().describe('The theme it is drawn in, as a reader whose system is dark or light sees it (dark).'),
-      fresh: z.boolean().optional().describe('Draw it again even when the map has not changed since the last look at it.'),
+      fresh: z.boolean().optional().describe('Draw it again, never the picture already taken.'),
+      published: z.boolean().optional().describe('With entity a document: draw the page publishing it now would give, as its preview does, not the app.'),
       marks: z.boolean().optional().describe('Answer with the drawing as marks (markup and its stylesheet, large) in place of the image, where it has them: what a view drawn in a chat asks for. To see a view yourself, leave this out.'),
     },
-    run: async (l, actor, input) => takeLook((await wholeMap(l)).db, l.db, l, actor.name, await viewAddress(l, input), input),
+    run: async (l, actor, input) => takeLook((await wholeMap(l)).db, l.db, l, actor.name, input.published ? await previewAddress(l, input.entity) : await viewAddress(l, input), input),
   },
   seeing: {
     description:

@@ -1,15 +1,24 @@
 // A view drawn for an agent's look, in the server's headless Chrome (src/chrome.ts): the app's own page, opened in
 // look mode with a pass that reads as the agent (src/looks.ts), so the drawing, its sandboxed frame and a style's own
 // code run exactly as they do for any reader. The page says when it has drawn (`data-look` on its root: ui/look.js);
-// then the picture is taken twice, a moment apart, to say whether it had settled. Looks are drawn one at a time in
-// this process; Chrome is started on the first and stopped when none has come for IDLE_MS.
+// then the picture is taken twice, a moment apart, to say whether it had settled, and the faces its text was drawn in
+// are read off Chrome, to say which fell back to another (decision e_vr5vyrhr: said, never installed). Up to AT_ONCE
+// looks are drawn at a time in this process, each in a tab of its own, and none waits for a turn past WAIT_MS or is
+// drawn past LATE_MS: a page that never yields is answered for, not waited on. Chrome is started on the first and
+// stopped when none has come for IDLE_MS.
 
-import { openBrowser, type Browser } from './chrome.ts';
+import { openBrowser, type Browser, type Tab } from './chrome.ts';
 
 /** How long Chrome is kept after the last look. */
 const IDLE_MS = 5 * 60_000;
 /** The longest a view is given to say it has drawn. */
 const DRAW_MS = 15_000;
+/** How many looks are drawn at once. */
+const AT_ONCE = 3;
+/** The longest a look waits for its turn. */
+const WAIT_MS = 60_000;
+/** The longest one drawing takes, from its turn to its picture. */
+const LATE_MS = 45_000;
 /** Past this a PNG is sent as a JPEG instead: a picture is for reading, not for keeping. */
 const PNG_MOST = 400_000;
 /** Past this a drawing's marks are not sent: the picture is, as for a drawing with no marks. */
@@ -28,6 +37,8 @@ export interface Drawn {
   ms: number;
   /** The drawing as marks, where they were asked for and it has them (ui/look-marks.js). */
   marks?: Marks;
+  /** Each face the page asked for and Chrome drew another in: the first named in its family, and what drew instead. */
+  fell_back?: { asked: string; drawn: string }[];
 }
 
 /** A drawing as marks: what an inline view mounts, with no code of the drawing's. */
@@ -42,7 +53,8 @@ export interface Marks {
 
 let browser: Promise<Browser> | null = null;
 let idle: NodeJS.Timeout | undefined;
-let queue: Promise<unknown> = Promise.resolve();
+let drawing = 0;
+const waiting: (() => void)[] = [];
 
 const getBrowser = () => {
   if (!browser) {
@@ -56,17 +68,80 @@ const getBrowser = () => {
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Draw `address` (the app's page, in look mode) at this size, once the queue reaches it. */
-export function drawLook(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks = false): Promise<Drawn> {
-  const turn = queue.then(() => drawNow(address, pass, width, height, scheme, marks));
-  queue = turn.catch(() => {});
-  return turn;
+/** A turn to draw: at once while fewer than AT_ONCE are drawing, else when one ends, else refused after WAIT_MS. */
+async function turn(): Promise<() => void> {
+  if (drawing >= AT_ONCE) {
+    const ahead = waiting.length + 1;
+    await new Promise<void>((go, refuse) => {
+      const mine = () => (clearTimeout(late), go());
+      const late = setTimeout(() => (waiting.splice(waiting.indexOf(mine), 1), refuse(new Error(`${ahead + AT_ONCE - 1} looks were ahead of this one for ${WAIT_MS / 1000} s: ask again in a minute.`))), WAIT_MS);
+      waiting.push(mine);
+    });
+  }
+  drawing++;
+  return () => (drawing--, waiting.shift()?.());
+}
+
+/** Draw `address` (the app's page in look mode, or a document's preview) at this size, once it has a turn. */
+export async function drawLook(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks = false): Promise<Drawn> {
+  const done = await turn();
+  try {
+    return await drawNow(address, pass, width, height, scheme, marks);
+  } finally {
+    done();
+  }
+}
+
+const GENERIC = /^(serif|sans-serif|monospace|cursive|fantasy|math|emoji|fangsong|system-ui|ui-[a-z-]+|-apple-system|blinkmacsystemfont)$/i;
+
+/**
+ * The face a family asks for, when it names one before any generic: the first named. Null for a family that starts
+ * with a generic or the system's face, which asks for whatever the machine has.
+ */
+export function askedFace(family: string): string | null {
+  const first = family.split(',')[0]?.trim().replace(/^["']|["']$/g, '') ?? '';
+  return first && !GENERIC.test(first) ? first : null;
+}
+
+/** Whether a face asked for was drawn in another: none of the faces Chrome used is it, and none is a web font of the page's own. */
+export const fellBack = (asked: string, used: { familyName: string; isCustomFont?: boolean }[]) => used.length > 0 && !used.some((f) => f.isCustomFont || f.familyName.toLowerCase() === asked.toLowerCase());
+
+/** The faces this page's text asked for that Chrome drew in another: one element read for each family the page uses. */
+async function facesOf(tab: Tab): Promise<Drawn['fell_back']> {
+  const families = await tab.evaluate<string[]>(`(async () => {
+    await document.fonts.ready;
+    const seen = new Set();
+    for (const el of document.querySelectorAll('body *')) {
+      if (seen.size >= 40) break;
+      if (![...el.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim())) continue;
+      const f = getComputedStyle(el).fontFamily;
+      if (!seen.has(f)) (seen.add(f), el.setAttribute('data-look-face', String(seen.size - 1)));
+    }
+    return [...seen];
+  })()`);
+  const asking = families.map(askedFace);
+  if (!asking.some(Boolean)) return undefined;
+  await tab.send('DOM.enable');
+  await tab.send('CSS.enable');
+  const { root } = await tab.send('DOM.getDocument', { depth: 0 });
+  const { nodeIds } = await tab.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector: '[data-look-face]' });
+  const out = new Map<string, string>();
+  for (const nodeId of nodeIds as number[]) {
+    const attrs: string[] = (await tab.send('DOM.getAttributes', { nodeId })).attributes;
+    const asked = asking[Number(attrs[attrs.indexOf('data-look-face') + 1])];
+    if (!asked || out.has(asked)) continue;
+    const { fonts } = await tab.send('CSS.getPlatformFontsForNode', { nodeId });
+    if (fellBack(asked, fonts)) out.set(asked, fonts.map((f: { familyName: string }) => f.familyName).join(', '));
+  }
+  return out.size ? [...out].map(([asked, drawn]) => ({ asked, drawn })) : undefined;
 }
 
 async function drawNow(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks: boolean): Promise<Drawn> {
   clearTimeout(idle);
   const began = Date.now();
   const tab = await (await getBrowser()).tab();
+  // Past LATE_MS the tab is closed, which ends whatever command was waiting on it.
+  const late = setTimeout(() => void tab.close(), LATE_MS);
   try {
     await tab.send('Page.enable');
     await tab.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
@@ -92,9 +167,13 @@ async function drawNow(address: string, pass: string, width: number, height: num
     }
     const jpeg = last.length > PNG_MOST;
     const made = marks && state === 'drawn' ? await tab.evaluate<Marks | null>('window.lookMarks()').catch(() => null) : null;
+    const fell_back = await facesOf(tab).catch(() => undefined);
     const why = state === 'late' ? `The view did not say it had drawn within ${DRAW_MS / 1000} s: this is how it stood.` : said.why;
-    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }) };
+    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }) };
+  } catch (err) {
+    throw Date.now() - began >= LATE_MS ? new Error(`The view had not drawn within ${LATE_MS / 1000} s, and its page stopped answering: it was closed.`) : err;
   } finally {
+    clearTimeout(late);
     await tab.close();
     clearTimeout(idle);
     idle = setTimeout(async () => {

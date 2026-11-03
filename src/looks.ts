@@ -3,8 +3,8 @@
 // page reads with a look pass: a token for one look, minted here for the asking agent's own person (never an admin),
 // good for LOOK_PASS_MS and for the reads a canvas makes (LOOK_READS) and nothing else. So private items are drawn
 // exactly as query shows them to that agent. The picture is kept in the transient table for LOOK_MS, under the
-// screen it was asked for, and read again with query picture; the same view at the same size, the map unchanged
-// since, is that kept picture again rather than a second drawing.
+// screen it was asked for, and read again with query picture; the same view at the same size, the map, the UI's files
+// and this process unchanged since, is that kept picture again rather than a second drawing, and says when it was drawn.
 
 import { createHash, randomBytes } from 'node:crypto';
 import type { Q } from './db.ts';
@@ -13,6 +13,7 @@ import { whose, type Whose } from './presence.ts';
 import { looksAllowed, overLimit } from './plan.ts';
 import { headPos } from './tail.ts';
 import { keep, kept, keptWith } from './transient.ts';
+import { uiVersion } from './ui-files.ts';
 
 /** How long a look's picture is kept. */
 export const LOOK_MS = 30 * 60_000;
@@ -21,6 +22,8 @@ const LOOK_PASS_MS = 90_000;
 /** The most looks drawn for one workspace in an hour, by this process. */
 const PER_HOUR = 60;
 const LOOK = /^l_[0-9a-f]{12}$/;
+/** When this process began: a picture kept by another process (the server restarted on new code) is not taken again. */
+const BEGAN = new Date().toISOString();
 const PASS = /^look_([a-z0-9][a-z0-9-]{0,39})_[0-9a-f]{40}$/;
 
 /** What a look pass may call through /api: what the canvas reads to draw a view (the pages ask whether each document is published), and nothing that writes. */
@@ -80,17 +83,24 @@ interface Kept {
   why?: string;
   hash: string;
   ms: number;
+  /** When it was drawn. */
+  at: string;
+  workspace: string;
   marks?: Marks;
+  fell_back?: { asked: string; drawn: string }[];
 }
 
 /** What a look answers: what was drawn and how it stood, with the picture as an image (src/mcp.ts sends it as one), or the drawing's marks where they were asked for and it has them. */
 const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
   look,
   view: k.hash,
+  workspace: k.workspace,
+  drawn_at: k.at,
   scheme: k.scheme,
   state: k.state,
   settled: k.settled,
   ...(k.why && { why: k.why }),
+  ...(k.fell_back && { fell_back: k.fell_back }),
   width: k.width,
   height: k.height,
   bytes: data.length,
@@ -99,8 +109,8 @@ const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
 });
 
 /**
- * Draw the page at `hash` (as the UI addresses it: v?canvas=<id>, v?<lens>, e/<id>) for the asking agent and keep the
- * picture. `fresh` draws it again even when the map has not changed since the last look at it.
+ * Draw the page at `hash` (as the UI addresses it: v?canvas=<id>, v?<lens>, e/<id>; or preview/<id>, a document as it
+ * would publish) for the asking agent and keep the picture. `fresh` draws it again whatever has changed or not.
  */
 export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; scheme?: 'dark' | 'light'; fresh?: boolean; marks?: boolean } = {}) {
   const width = Math.min(1920, Math.max(320, Math.round(size.width ?? 1200)));
@@ -109,7 +119,7 @@ export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: s
   // Marks are a canvas's: an item's page is a page, and is a picture.
   const marks = Boolean(size.marks) && hash.startsWith('v');
   const pos = await headPos(mapDb);
-  const same = `lookof:${whose(w)}:${createHash('sha256').update(JSON.stringify([hash, width, height, scheme, pos, marks])).digest('hex').slice(0, 32)}`;
+  const same = `lookof:${whose(w)}:${createHash('sha256').update(JSON.stringify([hash, width, height, scheme, pos, marks, await uiVersion(), BEGAN])).digest('hex').slice(0, 32)}`;
   if (!size.fresh) {
     const was = await kept<{ look: string }>(db, same);
     const had = was && (await keptWith<Kept>(db, `look:${whose(w)}:${was.look}`));
@@ -117,9 +127,10 @@ export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: s
   }
   await countLook(w.workspace, w.viewer || actor);
   const pass = await passFor(db, w, actor);
-  const got = await drawLook(`${origin}/?look#/${hash}`, pass, width, height, scheme, marks);
+  const address = hash.startsWith('preview/') ? `${origin}/${hash}?look` : `${origin}/?look#/${hash}`;
+  const got = await drawLook(address, pass, width, height, scheme, marks);
   const look = `l_${randomBytes(6).toString('hex')}`;
-  const k: Kept = { scheme, content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms, ...(got.marks && { marks: got.marks }) };
+  const k: Kept = { scheme, content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms, at: new Date().toISOString(), workspace: w.workspace, ...(got.marks && { marks: got.marks }), ...(got.fell_back && { fell_back: got.fell_back }) };
   await keep(db, `look:${whose(w)}:${look}`, k, LOOK_MS, got.data);
   await keep(db, same, { look }, LOOK_MS);
   return answer(look, k, got.data);

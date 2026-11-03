@@ -11,6 +11,9 @@ import { isIP } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+/** The longest one DevTools command is waited for. */
+const SEND_MS = 20_000;
+
 const PLACES = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'];
 
 /** Where Chrome is installed here, or null. */
@@ -133,11 +136,13 @@ export async function openBrowser(): Promise<Browser> {
     waiting.clear();
     ended();
   };
+  // A page whose own code never yields answers no command sent to it: each is given SEND_MS, and is then refused.
   const send = (method: string, params: Record<string, unknown> = {}, sessionId?: string) =>
     new Promise<any>((resolve, reject) => {
       if (socket.readyState !== WebSocket.OPEN) return reject(new Error('Chrome went away.'));
       const n = ++id;
-      waiting.set(n, { resolve, reject });
+      const late = setTimeout(() => waiting.delete(n) && reject(new Error(`Chrome did not answer ${method} within ${SEND_MS / 1000} s: the page is busy.`)), SEND_MS);
+      waiting.set(n, { resolve: (m) => (clearTimeout(late), resolve(m)), reject: (e) => (clearTimeout(late), reject(e)) });
       socket.send(JSON.stringify({ id: n, method, params, ...(sessionId && { sessionId }) }));
     });
   return {

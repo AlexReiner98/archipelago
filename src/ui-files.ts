@@ -81,6 +81,9 @@ async function current() {
   return held;
 }
 
+/** The UI's version as served now: it moves when one of its files is saved. */
+export const uiVersion = async () => (await current()).version;
+
 /** The modules a page's scripts import, at once or when they run, each once: fetched together, not round by round. */
 function reached(text: Map<string, string>, from: string[]): string[] {
   const seen = new Set<string>();
