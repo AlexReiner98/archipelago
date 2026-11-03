@@ -55,6 +55,33 @@ interface Proc {
   child: ChildProcess;
   waiting: Map<number, (line: Record<string, unknown>) => void>;
   stderr: string;
+  /** Settled once its handler is loaded: a call's clock starts then, so a slow start on a busy machine is not its time. */
+  ready: Promise<void>;
+}
+
+/**
+ * A call's clock: it runs while the handler has the call and stops while the kernel answers what it read, so a
+ * limit is the handler's own time, not the kernel's under load. A handler that hangs still runs out of it, and one
+ * that reads without end runs out of the most any call may take, read time and all.
+ */
+function clock(ms: number, out: () => void) {
+  let left = ms;
+  let since = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const pause = () => {
+    if (!timer) return;
+    clearTimeout(timer);
+    timer = undefined;
+    left -= Date.now() - since;
+  };
+  const whole = setTimeout(() => (pause(), out()), Math.max(ms, MAX_MS));
+  const run = () => {
+    if (timer) return;
+    since = Date.now();
+    timer = setTimeout(() => (clearTimeout(whole), out()), Math.max(0, left));
+  };
+  const stop = () => (pause(), clearTimeout(whole));
+  return { run, pause, stop };
 }
 
 /** What a call may ask the kernel while it runs: a workspace pack reads the map; a server pack asks for acts and its store. */
@@ -81,7 +108,13 @@ export class Sandbox {
     // An idle pack's process does not keep the kernel running: a call waiting on it does, by its timer.
     child.unref();
     for (const pipe of [child.stdin, child.stdout, child.stderr]) (pipe as unknown as { unref?: () => void } | null)?.unref?.();
-    const proc: Proc = { child, waiting: new Map(), stderr: '' };
+    let loaded!: () => void;
+    let failed!: (err: Error) => void;
+    const ready = new Promise<void>((resolve, reject) => ((loaded = resolve), (failed = reject)));
+    ready.catch(() => undefined);
+    // A handler that never finishes loading is stopped all the same, at the most any call may take.
+    const starting = setTimeout(() => (failed(new Error(`The pack's handler did not load in ${MAX_MS} ms.`)), child.kill()), MAX_MS);
+    const proc: Proc = { child, waiting: new Map(), stderr: '', ready };
     child.stderr!.on('data', (chunk) => (proc.stderr = (proc.stderr + chunk).slice(-2000)));
     createInterface({ input: child.stdout! }).on('line', (text) => {
       let line: Record<string, unknown>;
@@ -90,9 +123,12 @@ export class Sandbox {
       } catch {
         return;
       }
+      if (line.ready === true) return (clearTimeout(starting), loaded());
       proc.waiting.get(line.id as number)?.(line);
     });
     child.on('exit', () => {
+      clearTimeout(starting);
+      failed(new Error(`The pack's process ended${proc.stderr ? `: ${proc.stderr.trim().split('\n').at(-1)}` : ''}`));
       if (this.proc === proc) this.proc = undefined;
       for (const settle of proc.waiting.values()) settle({ error: `The pack's process ended${proc.stderr ? `: ${proc.stderr.trim().split('\n').at(-1)}` : ''}` });
       proc.waiting.clear();
@@ -109,31 +145,41 @@ export class Sandbox {
   call(l: Archipelago | Answerer, message: Record<string, unknown>, ms: number): Promise<Done> {
     const answer: Answerer = typeof l === 'function' ? l : (query) => answerRead(l, query as Read);
     const run = async (): Promise<Done> => {
-      const { child, waiting } = (this.proc ??= this.start());
+      const { child, waiting, ready } = (this.proc ??= this.start());
+      await ready;
       const id = ++this.seq;
       return new Promise<Done>((resolve, reject) => {
-        const timer = setTimeout(() => {
+        const timer = clock(ms, () => {
           waiting.delete(id);
           this.stop();
           reject(new Error(`"${message.name}" took longer than ${ms} ms and was stopped.`));
-        }, ms);
+        });
         const finish = (fn: () => void) => {
-          clearTimeout(timer);
+          timer.stop();
           waiting.delete(id);
           fn();
+        };
+        // Reads asked at once are answered side by side: the clock runs again when none is left to answer.
+        let reading = 0;
+        const answered = (line: Record<string, unknown>) => {
+          if (!waiting.has(id)) return; // stopped meanwhile
+          child.stdin!.write(JSON.stringify(line) + '\n');
+          if (--reading === 0) timer.run();
         };
         waiting.set(id, (line) => {
           if (line.error !== undefined && line.read === undefined) return finish(() => reject(new Error(String(line.error))));
           if (line.done !== undefined) return finish(() => resolve(line.done as Done));
           if (typeof line.read === 'number') {
             const { id: _, read, ...query } = line;
+            if (reading++ === 0) timer.pause();
             answer(query).then(
-              (result) => child.stdin!.write(JSON.stringify({ id, read, result }) + '\n'),
-              (err) => child.stdin!.write(JSON.stringify({ id, read, error: (err as Error).message }) + '\n'),
+              (result) => answered({ id, read, result }),
+              (err) => answered({ id, read, error: (err as Error).message }),
             );
           }
         });
         child.stdin!.write(JSON.stringify({ id, ...message }) + '\n');
+        timer.run();
       });
     };
     const result = this.queue.then(run, run);
