@@ -29,7 +29,9 @@ export function pageData(doc: Doc, here: string) {
       return [id, { ...lens, style: { ...lens.style, drawing: { ...named, src: `${here.replace(/\/$/, '')}/drawing/${drawing.hash}` } } }];
     }),
   );
-  return { ...doc, ...(doc.lenses && { lenses }) };
+  // The look it was published in is sent as the page's own fields (src/styles.ts, pageLook), never twice.
+  const { look: _look, ...rest } = doc as Doc & { look?: unknown };
+  return { ...rest, ...(doc.lenses && { lenses }) };
 }
 
 /** The code of a drawing a published document's pictures are drawn by, by its hash, or null. */
