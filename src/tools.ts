@@ -22,7 +22,7 @@ import { packActionByShort, packTool, packTools } from './packtools.ts';
 import { took } from './presence.ts';
 import { withinScope } from './scope.ts';
 import { viewsSaid } from './askview.ts';
-import { listedChange, movedTo, route, SURFACE, surfaceTools, type Action } from './surface.ts';
+import { actionsOf, listedChange, movedTo, route, SURFACE, surfaceTools, type Action } from './surface.ts';
 import { ACT_TOOLS } from './tool-acts.ts';
 import { WRITE_TOOLS } from './tool-change.ts';
 import { devMode } from './tool-config.ts';
@@ -83,6 +83,9 @@ export const toolsFor = (reg: Registry): [string, Tool][] => [...Object.entries(
 
 /** Whether an agent may call an action here: never the human's own, and the dev server's only in dev mode. */
 const offered = (a: Action) => !a.humanOnly && !(a.devOnly && !devMode());
+
+/** The actions an agent is offered here, each as its verb and name ("revise withdraw"): what a restart is compared by. */
+export const offeredActions = (reg: Registry): string[] => actionsOf(reg, TOOLS).filter(offered).map((a) => `${a.verb} ${a.name}`);
 
 /**
  * query and the six verbs of a registry, made once for each set of packs it has loaded (a pack turned off or on
