@@ -23,6 +23,8 @@ A style whose `shape` a drawing draws is drawn by it (`src/layouts.ts`). The own
 
 **A drawing asks in data; the page acts as the person** (the owner, 27 Oct 2026, decision e_h7he5guk). A style's own code never hears a key and never writes. It asks for a text field (`field(key, at)`): the frame's own code (`ui/draw.js`) draws a real one over the canvas and tells the code its value (`on('field')`), so what is typed stays in the page that drew the field. It asks for a change (`change(ops, reason)`): the page (`ui/style-code.js`) sends the ops through `change` as the person looking, naming the style whose code asked (`drawing`, the style answer's `coder`), and tells the code what came of it. The rules read such a change as the drawing's (`src/layout-changes.ts`, `Who.drawing`): it may create, update, archive, restore, link and unlink, and core's `drawing_reach`, `drawing_code` and `drawing_public` hold for that person what writes outside the types its style declares (`writes`), code or what a drawing may write, or makes something public. The rest applies, as the person's own act. An agent's change to `writes` waits, as code does. Code that listens for `on('answer')` is handed the answer again as the map changes; code that does not is started again.
 
+An agent reads how a style's own code is written from the map, not from this file: `query` with name `instructions` and `for: "guide:style_code"` (the software pack's `software.style_code`). Keep the two alike when the function's inputs change.
+
 A query's answer carries the drawing as `style.drawing`: its id, the hash of its modules, and the modules only when the page did not say it has them (`have`).
 
 ## What a drawing is
