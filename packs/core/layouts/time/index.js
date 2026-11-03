@@ -5,48 +5,18 @@
 // the page gives it (`width`), and laid out by the page: the frame does not pan or zoom it. Its look is ./look.js. A
 // lens with steps tells the plan as it comes together (./story.js), the conversation beside it.
 
+import { DAY, dayAt, dayOf, fmtDay, fmtTime, zoneIs } from './clock.js';
+import { controls } from './range.js';
 import { css, hueClass, hueRule } from './look.js';
 import { m } from './marks.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 
-const DAY = 86_400_000;
 const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place'];
 const HEX = /^#[0-9a-f]{3,8}$/i;
+/** The range the reader has up, for the view drawn last: kept when the page draws it again. */
+let kept = {};
 
-// Days and hours are counted in the zone the answer's window was worked out in (the workspace's), so every reader
-// sees the same calendar; with none said, in this browser's. Set by picture() before anything is laid out.
-let zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const clocks = new Map();
-/** The wall clock in the zone at an instant: year, month, day, hour, minute, second. */
-const wall = (t) => {
-  const f = clocks.get(zone) ?? clocks.set(zone, new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })).get(zone);
-  const p = Object.fromEntries(f.formatToParts(t).map((x) => [x.type, Number(x.value)]));
-  return [p.year, p.month, p.day, p.hour, p.minute, p.second];
-};
-/** Milliseconds the zone's clock is ahead of UTC at an instant. */
-const offset = (t) => {
-  const [y, mo, d, h, mi, s] = wall(t);
-  return Date.UTC(y, mo - 1, d, h, mi, s) - Math.floor(t / 1000) * 1000;
-};
-/** The instant a day begins in the zone, from its date (a day past the month's end runs on into the next). */
-const startOf = (y, m, d) => {
-  const guess = Date.UTC(y, m - 1, d);
-  return guess - offset(guess - offset(guess));
-};
-/** The start of a day, from a date or a date-time. */
-const dayOf = (value) => {
-  const date = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  const [y, m, d] = date ? date.slice(1).map(Number) : wall(new Date(value).getTime());
-  return startOf(y, m, d);
-};
-/** The start of the day so many days after another: a day is not always 24 hours (the clocks change). */
-const dayAt = (day, n) => {
-  const [y, m, d] = wall(day);
-  return startOf(y, m, d + n);
-};
-const fmtDay = (t) => new Date(t).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: zone });
-const fmtTime = (t) => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: zone });
 /** As many letters as fit a width, at about `letter` pixels a letter (the style's time_letter). */
 const cutAt = (letter) => (text, width) => {
   const n = Math.max(0, Math.floor(width / letter));
@@ -247,7 +217,7 @@ function calendar(answer, style, c) {
     }),
   );
   const tall = height + keyHeight;
-  return { svg: m('svg', { class: 'timeline', width, height: tall, viewBox: `0 0 ${width} ${tall}` }, marks), key: null };
+  return { svg: m('svg', { key: 'tl', class: 'timeline', width, height: tall, viewBox: `0 0 ${width} ${tall}` }, marks), key: null };
 }
 
 /** Each lane a row (each item its own when there are no lanes), its spans as bars across the days. */
@@ -276,21 +246,40 @@ function bars(answer, style, c) {
     const x0 = x(b.start);
     marks.push(c.block(b, { title: said(b), x: x0, y: head + i * rowH + 4, width: Math.max(x(b.end) - x0, 6), height: rowH - 8 }, null));
   }
-  return { svg: m('svg', { class: 'timeline', width, height, viewBox: `0 0 ${width} ${height}` }, marks), key: null };
+  return { svg: m('svg', { key: 'tl', class: 'timeline', width, height, viewBox: `0 0 ${width} ${height}` }, marks), key: null };
 }
 
 /** Draw a lens's answer along its time axis, in the style's layout, as wide as the page gives it (`width`). */
 export function picture({ answer, style, width, height, reduced }, tools) {
   if (!answer.lens.time) return { scene: { message: 'This view has no time axis.' } };
-  zone = answer.lens.time.zone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  zoneIs(answer.lens.time.zone);
   // A story lays out what its steps bring in, all of it, each block hidden until a step shows it.
   const story = Array.isArray(answer.steps) && answer.steps.length > 0;
   if (story) {
     const named = everyNamed(answer.steps);
     answer = { ...answer, items: answer.items.filter((i) => named.has(i.id) || i.id === answer.lens.from) };
   }
-  const c = { ...canvas(answer, style, width, story, height), story };
-  const { svg, key } = (style.layout === 'bars' ? bars : calendar)(answer, style, c);
+  // How many days are drawn, and from which, is the reader's to change over the picture (./range.js), within the
+  // window the view asked for: the style's ranges are the choices, the whole window where it starts, kept while the
+  // page has the view.
+  const days = Math.max(1, Math.round((dayOf(answer.lens.time.to) - dayOf(answer.lens.time.from)) / DAY) + 1);
+  const from = dayOf(answer.lens.time.from);
+  const ranges = (Array.isArray(style.ranges) ? style.ranges.map(Number) : []).filter((n) => n > 0 && n < days);
+  const id = JSON.stringify([answer.lens.time, answer.lens.find, answer.lens.only]);
+  const now = (kept.id === id && kept.now) || { span: days, start: 0 };
+  kept = { id, now };
+  const today = Math.round((dayOf(new Date().toISOString()) - from) / DAY);
+  const fit = () => (now.start = Math.min(Math.max(0, now.start), days - now.span));
+  let c;
+  const draw = () => {
+    c = { ...canvas(answer, style, width, story, height), story };
+    // Every colour the style has is ruled for at once, so the picture drawn again over other days finds its own.
+    for (const hex of style.hues ?? []) c.hued(hex);
+    const shown = now.span === days ? answer : { ...answer, lens: { ...answer.lens, time: { ...answer.lens.time, from: new Date(dayAt(from, now.start)).toISOString(), to: new Date(dayAt(from, now.start + now.span - 1)).toISOString() } } };
+    return (style.layout === 'bars' ? bars : calendar)(shown, style, c);
+  };
+  const { svg, key } = draw();
+  const panel = () => ranges.length > 0 && controls(now, { days, from, ranges });
   let player = null;
   if (story) {
     const frames = statesOf(answer.steps);
@@ -298,10 +287,18 @@ export function picture({ answer, style, width, height, reduced }, tools) {
   }
   // A calendar fits its hours to the height it is given: drawn again when that settles (`shaped`).
   return {
-    scene: { css: [css, ...c.rules, story ? storyCss : ''].join('\n'), svg, key, flat: true, ...(style.layout !== 'bars' && { shaped: true }), ...(player && { before: player.before, aside: player.after }) },
+    scene: { css: [css, ...c.rules, story ? storyCss : ''].join('\n'), svg, key, flat: true, ...(style.layout !== 'bars' && { shaped: true }), ...((player || panel()) && { before: player ? player.before : panel() }), ...(player && { aside: player.after }) },
     end: player?.end,
     on(event) {
       if (player?.hears(event.key)) return player.on(event);
+      if (event.name === 'click' && typeof event.key === 'string' && event.key.startsWith('tc:')) {
+        const [, what, n] = event.key.split(':');
+        // A narrower range keeps today in it where the window holds today, else the days it started from.
+        if (what === 'span') (now.span = Number(n) || days), (now.start = today >= 0 && today < days ? today - Math.floor((now.span - 1) / 2) : now.start);
+        else now.start += what === 'next' ? 1 : -1;
+        fit();
+        return [{ key: 'tl', mark: draw().svg }, { key: 'tc', mark: panel() }];
+      }
       if (event.name === 'click' && c.opens.has(event.key)) tools.open(c.opens.get(event.key));
       return [];
     },
