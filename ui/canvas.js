@@ -181,9 +181,15 @@ export function canvasIn(host, pane) {
   // that moved nothing leaves it where it was fitted, so it is fitted again.
   const keepIt = () => at && c.moves() && (at.kept = moved() ?? at.kept);
   for (const name of ['pointerup', 'wheel']) host.addEventListener(name, () => setTimeout(keepIt, 0), { passive: true });
+  // Its frame changing size (a story's milestone coming in beside it) fits it again, as a page opened or shut does:
+  // never once the reader has moved it. At the next frame, once the plane has kept its middle (ui/pan-zoom.js).
+  const sized = new ResizeObserver(() => requestAnimationFrame(() => c.fit()));
   // A drawing mounted anew (a new view, the map changed under it): back where the reader left it, else fitted.
   new MutationObserver((list) => {
     if (!list.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && (n.matches('.lf-stage') || n.querySelector?.('.lf-stage'))))) return;
+    sized.disconnect();
+    const stage = host.querySelector('.lf-stage');
+    if (stage) sized.observe(stage);
     if (at?.kept) c.moves()?.restore(at.kept);
     else c.fit();
   }).observe(host, { childList: true, subtree: true });
