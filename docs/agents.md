@@ -205,7 +205,8 @@ SessionStart's `source` and SessionEnd's `reason`.
    `edited`, `committed`, `pushed`, with the turn's id, the items touched, the
    session's commits and those the reply made (`turn_commits`: all of them
    when it pushed), found in what git answered and in the checkout's HEAD
-   log.
+   log. A call to another workspace's server (one named `pelago-<name>`)
+   counts as a read, change or tell too; its items are not this map's.
 2. `askOnReply` reads one fact of the map, `unaccounted` (which of the
    reply's commits no record accounts for), when a rule asks for it. It takes
    the reply rules not lifted whose `when.reply` holds and that have not
@@ -237,5 +238,7 @@ SessionStart's `source` and SessionEnd's `reason`.
   owner's versions on the map.
 - Files written through Bash are not counted as `edited`, so a reply that
   read a view and wrote code that way can be asked to draw once.
+- A map server connected under a name not starting with `pelago` (a
+  claude.ai connector) is counted as work, not as the map.
 - A session in a worktree has hooks only once the setup was run in the
   checkout, so that `.worktreeinclude` carries them.
