@@ -5,6 +5,7 @@
 import { drawFrozen } from './doc-lens.js';
 import { carried } from './doc-ref.js';
 import { warmLayouts } from './layout.js';
+import { sayLook } from './look.js';
 import { checkedCss } from './marks.js';
 import { readSpans, readText } from './text.js';
 import { applyTheme } from './theme.js';
@@ -279,7 +280,8 @@ if (!given) warmLayouts();
     })
 )
   .then(draw)
-  .catch((err) => main.replaceChildren(h('p', { class: 'error' }, err.message)));
+  // Opened for an agent's look (src/looks.ts), it says when the page is drawn.
+  .then(() => sayLook('drawn'), (err) => (main.replaceChildren(h('p', { class: 'error' }, err.message)), sayLook('error', err.message)));
 
 // Opened with ?live, a published page is drawn anew each time its document is published again (src/published-live.ts).
 if (given && new URLSearchParams(location.search).has('live'))

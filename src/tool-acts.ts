@@ -52,6 +52,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       width: z.number().int().min(320).max(1920).optional().describe('With look: the picture’s width in pixels (1200).'),
       height: z.number().int().min(240).max(1600).optional().describe('With look: its height (750).'),
       scheme: z.enum(['dark', 'light']).optional().describe('With look: the theme it is drawn in (dark).'),
+      fresh: z.boolean().optional().describe('With look: draw it again, never the picture already taken.'),
       pane: z
         .string()
         .regex(/^[a-z][a-z0-9-]{0,23}$/, 'pane is a side (left, right, above, below), main, alone, or a short lower-case name of your own')
