@@ -1,0 +1,39 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { sessionHeard, sessionStart } from '../src/sessions.ts';
+import { hookSessionStart } from '../src/session-hook.ts';
+import { resolveRun } from '../src/chat-run.ts';
+import { agent, fresh, make } from './map.ts';
+
+test('a chat its hook registered, told to register itself, gets the hook’s run back with the task and title it sent', async () => {
+  const l = await fresh();
+  const { task } = await make(l, [{ op: 'create', ref: 'task', type: 'task', title: 'One run per session' }]);
+  await hookSessionStart(l, { session_id: 'cc-1', cwd: 'C:\\code\\apex\\.claude\\worktrees\\one', source: 'startup' });
+  const hooked = (await resolveRun(l, 'cc-1'))!;
+  await sessionHeard(l, 'cc-1', 'begin');
+
+  // The brief's call: no session id, the folder as the agent spells it, its branch, its task and a title.
+  const again = await sessionStart(l, agent, { cwd: 'C:/code/apex/.claude/worktrees/one/', branch: 'claude/one', task, title: 'One run per session' });
+  assert.deepEqual([again.run, again.joined], [hooked.id, true], 'the hook’s run, not a second');
+  const run = (await l.entity(hooked.id))!;
+  assert.deepEqual([run.title, run.props.branch], ['One run per session', 'claude/one']);
+  const { rows } = await l.db.query(`select 1 from relation where type = 'works_on' and from_id = $1 and to_id = $2 and valid_to is null`, [run.id, task]);
+  assert.equal(rows.length, 1, 'and it works on the task');
+
+  // Elsewhere, or on another branch than the one the hook's run is on, it is a session of its own.
+  assert.notEqual((await sessionStart(l, agent, { cwd: 'C:/code/other' })).run, hooked.id);
+  assert.notEqual((await sessionStart(l, agent, { cwd: 'C:/code/apex/.claude/worktrees/one', branch: 'claude/two' })).run, hooked.id);
+});
+
+test('of two chats in one folder, a call to register joins the one mid-turn, and neither when it cannot tell', async () => {
+  const l = await fresh();
+  await hookSessionStart(l, { session_id: 'a', cwd: '/w', source: 'startup' });
+  await hookSessionStart(l, { session_id: 'b', cwd: '/w', source: 'startup' });
+  const [a, b] = [(await resolveRun(l, 'a'))!, (await resolveRun(l, 'b'))!];
+  const own = await sessionStart(l, agent, { cwd: '/w' });
+  assert.ok(![a.id, b.id].includes(own.run), 'two chats here, neither at work: a run of its own');
+  await sessionHeard(l, 'b', 'begin');
+  assert.equal((await sessionStart(l, agent, { cwd: '/w' })).run, b.id, 'the one mid-turn is the one asking');
+  // A call that names its own session id is that session, found by it or made.
+  assert.notEqual((await sessionStart(l, agent, { cwd: '/w', session_id: 'c' })).run, b.id);
+});

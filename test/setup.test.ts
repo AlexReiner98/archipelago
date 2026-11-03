@@ -157,6 +157,20 @@ test('the hook script takes a Claude Code hook to whichever server the machine i
   await hook('session-end', { session_id: 'desk-1', reason: 'exit', cwd: checkout }, { PELAGO_AGENT_TOKEN: robot });
   assert.ok(!existsSync(join(checkout, '.git', 'pelago-runs', 'desk-1.said')), 'the end takes it out');
   assert.equal((await call('/agent/view', robot, { name: 'sessions' })).result.open.length, 0, 'and is closed there');
+  // A chat archived or closed before its end was heard: the next hook in the checkout finds its Claude Code gone and ends it.
+  const runs = join(checkout, '.git', 'pelago-runs');
+  const gone = await new Promise<number>((done) => {
+    const child = spawn(process.execPath, ['-e', '']);
+    child.on('close', () => done(child.pid!));
+  });
+  await hook('session-start', { session_id: 'desk-2', cwd: checkout }, { PELAGO_AGENT_TOKEN: robot, CLAUDE_PID: String(gone) });
+  assert.equal(readFileSync(join(runs, 'desk-2.pid'), 'utf8'), String(gone), 'its Claude Code is kept beside its run');
+  await hook('session-start', { session_id: 'desk-3', cwd: checkout }, { PELAGO_AGENT_TOKEN: robot, CLAUDE_PID: String(process.pid) });
+  assert.deepEqual([existsSync(join(runs, 'desk-2')), existsSync(join(runs, 'desk-2.pid')), existsSync(join(runs, 'desk-3.pid'))], [false, false, true]);
+  assert.equal((await call('/agent/view', robot, { name: 'sessions' })).result.open.length, 1, 'the one whose process is gone is ended, the one still running is not');
+  await hook('prompt', { session_id: 'desk-3', cwd: checkout }, { PELAGO_AGENT_TOKEN: robot, CLAUDE_PID: String(process.pid) });
+  assert.equal((await call('/agent/view', robot, { name: 'sessions' })).result.open.length, 1, 'a session never ends itself so');
+  await hook('session-end', { session_id: 'desk-3', reason: 'exit', cwd: checkout }, { PELAGO_AGENT_TOKEN: robot });
 
   // A client with an old tool list sends an input it does not know as a string: it is taken as what it spells.
   const { z } = await import('zod');
