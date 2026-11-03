@@ -7,7 +7,7 @@ import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.
 import { typesAfter, typesApplied } from './type-items.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { append, type Decision, type Fact } from './log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
-import { supersede } from './proposals.ts'; import { asOwner, forgetIn } from './forget.ts';
+import { supersede } from './proposals.ts'; import { unwaitFollows, whoseWord, type Unwaited } from './unwait.ts'; import { asOwner, forgetIn } from './forget.ts';
 import type { Authority, ChangeInput, SourceSpec } from './pelago-types.ts';
 import type { Archipelago } from './pelago.ts';
 import type { Verdict } from './rules.ts';
@@ -37,6 +37,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
   const at = new Map(input.ops.map((op, i) => [op, i + 1]));
   const facts: Fact[] = [];
   const DRY = Symbol('dry');
+  const unwaited: Unwaited[] = [], word = await whoseWord(map, opts.authority);
 
   await map.db.transaction(async (tx) => {
     // Facts first: each op is planned on the map as the ops before it left it, and its facts projected at once.
@@ -139,6 +140,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
           break; // registered after the transaction
       }
       await said(await ownerFollows(tx, op, resolve, resolve(op.op === 'create' ? (op.ref ?? `#${i + 1}`) : ''), () => mint(`owner#${at.get(op)}`, 'r')));
+      await said(await unwaitFollows(tx, reg, op, word, unwaited, ops));
     }
     if (opts.dry) throw DRY;
     const rule: Decision = opts.rule ?? { outcome: 'apply', spared: [] };
@@ -150,7 +152,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
   if (opts.dry) return { status: 'dry' as const, changeset, created, warnings, facts, ids };
 
   await afterLog(warnings, () => typesApplied(map, ops, reg), () => supersede(map, changeset));
-  return { status: 'applied' as const, changeset, created, warnings };
+  return { status: 'applied' as const, changeset, created, warnings, ...(unwaited.length && { unwaited }) };
 }
 
 /**
