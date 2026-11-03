@@ -22,7 +22,7 @@
       "extends": "question",
       "title": "Hypothesis",
       "description": "A belief about the world that could be wrong. The title is the statement; its prediction says what would show it false. Make it part of the investigation it belongs to.",
-      "statuses": { "open": ["untested", "testing"], "closed": ["supported", "refuted"] },
+      "statuses": { "open": ["untested", "testing"], "closed": ["supported", "refuted"], "phases": { "refuted": "finished" } },
       "fields": {
         "prediction": { "type": "string", "shown": true, "description": "What should be observed if it holds, and what would refute it." }
       }

@@ -1,5 +1,8 @@
-// A lens answer drawn as a flat graph on one plane, where depth is never drawn (e_ktdensts): every item a step (work
-// a box, a question a diamond, an occurrence a pill, a record a sheet with a wavy foot) showing its name, the order
+// A lens answer drawn as a flat graph on one plane, where depth is never drawn (e_ktdensts): every item a step showing its
+// name in its kind's outline (the style's kind_shapes: in the house style work a box, a question a diamond, an
+// occurrence a pill, a record a sheet with a wavy foot, the system's own a box with cut corners, an actor a hexagon, an
+// aim a flag, a place a box with a tab), where it stands in its course a dot (hollow, half or full, none for what only
+// stands: ./state.js), and colour only for what waits on you and what is in trouble (e_rnyqarfe), the order
 // (depends_on) read from the top down in wires at right angles from what is depended on to what depends on it, broken
 // where one passes under another, and every other link (part_of first) a quiet tie between the two it ties, with a
 // head where it points unless the style draws its type headless (core's house style: part_of).
@@ -23,28 +26,39 @@ import { placesAsColours } from './places.js';
 import { drawn } from './polyline.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
+import { statesOf as standing } from './state.js';
 
 /** Whether an item stays lit: what was asked for by name (style.only), else what the style's lit says. */
 /** A colour a style may name. */
 const HEX = /^#[0-9a-f]{3,8}$/i;
 /** The link type the order's wires are, for their colour. */
 const ORDER_TYPE = 'depends_on';
+/** What the key calls each kind's outline, and the order its rows go in. */
+const KIND_WORDS = { work: 'Work', question: 'Question', occurrence: 'Event', record: 'Record', system: 'System', actor: 'Person', aim: 'Aim', place: 'Place' };
+const KEY_ORDER = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'end'];
+/** What the key calls each phase, in its order; what only stands has no dot and no row. */
+const PHASE_WORDS = { not_started: 'Not started', under_way: 'Under way', finished: 'Finished', ended: 'Ended', trouble: 'Trouble' };
 /** A link type as the key says it: its name without its pack, in words ("could_fund" is "Could fund"). */
 const linkName = (type) => {
   const words = type.split('.').pop().replaceAll('_', ' ');
   return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
-function lit(i, style, words) {
+function lit(i, style, words, state) {
   if (Array.isArray(style.only)) return style.only.includes(i.id);
   // What the lens's words found among the rest it draws stays lit, the rest dimmed (Find's hits, e_d9q8b5zr).
   if (words) return Boolean(i.found?.includes('text'));
-  return style.lit === 'you' ? Boolean(i.state.needs_you) : style.lit === 'blocked' ? Boolean(i.state.blocked) : true;
+  return style.lit === 'you' ? Boolean(state.you) : style.lit === 'blocked' ? Boolean(state.blocked) : true;
 }
 
-/** A step's outline, centred on x, y, its corners as round as rx. */
-function outline(shape, x, y, w, hgt, rx) {
+/** A step's outline, centred on x, y, its corners as round as rx, cut into by `cut` (a bevel, a point, a tab). */
+function outline(shape, x, y, w, hgt, rx, cut = 0) {
   const l = x - w / 2, r = x + w / 2, t = y - hgt / 2, b = y + hgt / 2;
+  if (shape === 'cut') return m('path', { d: `M${l + cut} ${t}H${r - cut}L${r} ${t + cut}V${b - cut}L${r - cut} ${b}H${l + cut}L${l} ${b - cut}V${t + cut}Z`, class: 'lf-shape' });
+  if (shape === 'hexagon') return m('path', { d: `M${l + cut} ${t}H${r - cut}L${r} ${y}L${r - cut} ${b}H${l + cut}L${l} ${y}Z`, class: 'lf-shape' });
+  if (shape === 'flag') return m('path', { d: `M${l} ${t}H${r - cut}L${r} ${y}L${r - cut} ${b}H${l}Z`, class: 'lf-shape' });
+  // A place: a tab over the left third of its top.
+  if (shape === 'tab') return m('path', { d: `M${l} ${t}H${l + w / 3}L${l + w / 3 + cut} ${t + cut}H${r}V${b}H${l}Z`, class: 'lf-shape' });
   if (shape === 'diamond') return m('path', { d: `M${x} ${t}L${r} ${y}L${x} ${b}L${l} ${y}Z`, class: 'lf-shape' });
   if (shape === 'pill' || shape === 'end') return m('rect', { x: l, y: t, width: w, height: hgt, rx: hgt / 2, class: 'lf-shape' });
   // A document: a sheet whose foot is a wave.
@@ -102,15 +116,29 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   });
   const pane = width > 0 && height > 0 ? width / height : ASPECT;
   const aspect = ASPECT * (pane / ASPECT) ** FOLLOW;
-  const g = layout({ items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, placed });
+  const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+  const shapes = { kind: record(style.kind_shapes), type: record(style.type_shapes) };
+  const g = layout({ items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, placed, shapes });
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
 
-  const yours = (i) => Boolean(i.state.needs_you);
-  // What a step's dot says first: that it waits on you, is blocked or is under way; else its status, in its colour.
-  const dotOf = (i) => (!i.open ? '' : yours(i) ? 'you' : i.state.blocked ? 'blocked' : i.state.sessions ? 'session' : '');
-  const statusOf = (i) => String(i.status ?? (i.open ? 'open' : 'done'));
+  // Where each step stands, read from what is drawn (./state.js): its phase, whether it waits on you, whether it is held up.
+  const states = standing({ items: answer.items, links: answer.links ?? [], viewer: answer.viewer });
+  const stateOf = (i) => states.get(i.id) ?? { phase: i.open === false ? 'finished' : 'not_started' };
+  const yours = (i) => Boolean(stateOf(i).you);
+  // How each phase's dot is drawn (the style's phase_marks): hollow, half, full or none.
+  const MARKS = ['hollow', 'half', 'full', 'none'], marks = record(style.phase_marks);
+  const markOf = (phase) => (MARKS.includes(marks[phase]) ? marks[phase] : 'hollow');
+  // Whether a step held up by an open step it depends on is marked in the trouble colour (the style's held_up): the
+  // house style does not, since the order's wire already says it and red is kept for trouble (the owner, 3 Nov 2026).
+  const heldUp = (i) => style.held_up === 'trouble' && Boolean(stateOf(i).blocked);
+  /** A step's dot: its phase's mark, in the trouble colour when it is in trouble or, as the style says, held up. */
+  const dotClass = (i) => `ph-${stateOf(i).phase} ${markOf(stateOf(i).phase)}${stateOf(i).phase === 'trouble' || heldUp(i) ? ' trouble' : ''}`;
+  /** The dot itself, as its mark says: a ring, a ring half filled, a disc, or nothing. */
+  const dot = (cls, mark, cx, cy, r) => (mark === 'none' ? null : mark === 'half'
+    ? m('g', { class: `lf-dot ${cls}` }, m('circle', { cx, cy, r }), m('path', { d: `M${cx} ${cy - r}A${r} ${r} 0 0 0 ${cx} ${cy + r}Z`, class: 'lf-dot-fill' }))
+    : m('circle', { cx, cy, r, class: `lf-dot ${cls}` }));
   // The start of a note: its first paragraph, cut where the style says a note's opening is cut.
   const opening = (i) => {
     const text = String(i.body ?? i.gist ?? '').split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
@@ -160,9 +188,6 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     return out;
   };
   const linkColours = coloursOf([...new Set([...(g.chains.length ? [ORDER_TYPE] : []), ...g.ties.map((t) => t.type)])].sort(), named, hues);
-  // Each status its colour too, as each link type has one: the style's (status_colours), else one of status_hues (link_hues when not set).
-  const statusHues = Array.isArray(style.status_hues) && style.status_hues.length ? style.status_hues : hues;
-  const statusColours = coloursOf([...new Set(steps.filter((n) => !n.stub).map((n) => statusOf(n.item)))].sort(), style.status_colours && typeof style.status_colours === 'object' ? style.status_colours : {}, statusHues);
   const colourRules = new Set();
   /** A colour is a class with a rule of its own: a drawing sets no style on a mark. */
   const colourClass = (hex, prefix, variable) => {
@@ -172,8 +197,9 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     return ` ${cls}`;
   };
   const kind = (type) => colourClass(linkColours.get(type), 'k', 'link');
-  /** A step's dot: filled in the colour of what it says first; else its status's, a ring while open and filled once closed. */
-  const dotClass = (i) => dotOf(i) || `st${i.open ? '' : ' shut'}${colourClass(statusColours.get(statusOf(i)), 's', 'status')}`;
+  // A wait on the person looking is drawn in the colour of what waits on you, whatever its link type's colour.
+  const waits = new Set((answer.links ?? []).filter((l) => l.type === 'waits_on' || l.is?.includes('waits_on')).map((l) => l.type));
+  const onYou = (t) => (waits.has(t.type) && answer.viewer && t.b === answer.viewer ? ' you' : '');
   // A part in its place's colour: a class with a rule of its own, as a link's colour is.
   const placeClass = (hex) => {
     const cls = `lf-p-${hex.slice(1).toLowerCase()}`;
@@ -182,7 +208,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   };
   const partOf = (id) => (hexOf.has(shownAs.of.get(id)) ? placeClass(hexOf.get(shownAs.of.get(id))) : '');
   const tieLayer = g.ties.map((t, n) => {
-    const cls = `${kind(t.type)}${pend(t.pending)}`;
+    const cls = `${kind(t.type)}${onYou(t)}${pend(t.pending)}`;
     const path = m('path', { key: `n:${n}`, d: line(t), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${headless.has(t.type) ? '' : ' headed'}${cls}`, ...drawIn, ...hidden });
     return headless.has(t.type) ? path : [path, m('path', { key: `nh:${n}`, d: tieHead(t), class: `lf-head${cls}`, ...hidden })];
   });
@@ -196,15 +222,17 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const linkBadges = wiresIn(g).map((l, n) => [l, n]).filter(([l]) => held(l.pending) && !madeBy(l.a, l.pending) && !madeBy(l.b, l.pending)).map(([l, n]) => ({ n, mark: badge(l.pending, middleOf(l.points)) }));
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
-    const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + (n.stub ? z('stub_text_x') : z('text_x'));
-    const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
+    // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
+    const point = n.shape === 'hexagon' ? n.bevel : 0, ends = n.shape === 'hexagon' ? 2 * n.bevel : n.shape === 'flag' ? n.bevel : 0;
+    const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : z('text_x'));
+    const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
     const ghost = !n.stub && i.pending?.op === 'create';
     const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held'].filter(Boolean).join(' ');
     const body = [
-      outline(n.shape, X, Y, n.w, n.h, CORNER),
+      outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
       // A sheet's wave stops short of its box: this says where the box is, so the page reads its middle (ui/drag.js) as drawn here.
       n.shape === 'sheet' && m('rect', { x: X - n.w / 2, y: Y - n.h / 2, width: n.w, height: n.h, class: 'lf-room' }),
-      !n.stub && m('circle', { cx: left - z('dot_gap'), cy: Y, r: z('dot'), class: `lf-dot ${dotClass(i)}` }),
+      !n.stub && dot(dotClass(i), markOf(stateOf(i).phase), left - z('dot_gap'), Y, z('dot')),
       // Its name in the lines the layout gave it (./lines.js): a second line under the first, the two about the middle.
       n.lines?.length > 1
         ? m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, ...n.lines.map((line, k) => m('tspan', { x: left, dy: k ? n.line : (-(n.lines.length - 1) * n.line) / 2 }, fit(line, room, n.stub ? STUB_TEXT : TEXT))))
@@ -238,17 +266,23 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   });
   const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, stepLayer, saysLayer, [...stepBadges.values()], linkBadges.map((b) => b.mark));
 
-  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/layouts.md). A step with no
-  // other mark is said by its own status ("Todo", "Decided"), one row for each its steps have, in its colour.
-  const statusWords = (status) => ((w) => w.charAt(0).toUpperCase() + w.slice(1))(status.replaceAll('_', ' '));
-  const statusRows = () => [...new Map(steps.filter((n) => !n.stub && !dotOf(n.item)).map((n) => [statusOf(n.item), n.item])).entries()]
-    .sort(([a], [b]) => a.localeCompare(b)).map(([status, i]) => [dotClass(i), statusWords(status)]);
+  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/layouts.md): each outline by
+  // the kinds (or types) drawn in it, each phase's dot, and the two colours, where the picture has them.
+  const words = (name) => ((w) => w.charAt(0).toUpperCase() + w.slice(1))(String(name).replaceAll('_', ' '));
+  const kindWord = (i) => (shapes.type[i.type] ? words(i.type) : KIND_WORDS[i.kind] ?? words(i.kind ?? 'item'));
+  const drawnAs = new Map();
+  for (const n of steps) (drawnAs.get(n.shape) ?? drawnAs.set(n.shape, new Set()).get(n.shape)).add(n.stub ? 'Possible end' : kindWord(n.item));
+  // A row's mark is drawn in a box of its own: G is where its middle is, how wide and tall a step is in it, and a dot's size.
+  const G = { x: 11, y: 7, w: 20, h: 11, r: 4 };
   const mark = (inner, label) => ({ glyph: m('svg', { width: z('key_width'), height: z('key_height'), viewBox: '0 0 22 14' }, inner), label });
   const uses = (test) => steps.some(test);
+  const phases = new Set(steps.filter((n) => !n.stub && markOf(stateOf(n.item).phase) !== 'none').map((n) => stateOf(n.item).phase));
   const key = [
-    [['box', 'Work'], ['diamond', 'Question'], ['pill', 'Event'], ['sheet', 'Record'], ['end', 'Possible end']].filter(([shape]) => uses((n) => n.shape === shape)).map(([shape, label]) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, 11, 7, 20, shape === 'diamond' ? 12 : 11, CORNER)), label)),
-    [...[['blocked', 'Blocked'], ['you', 'Waits on you'], ['session', 'Under way']].filter(([dot]) => uses((n) => !n.stub && dotOf(n.item) === dot)), ...statusRows()].map(([dot, label]) => mark(m('circle', { cx: 11, cy: 7, r: 4, class: `lf-dot ${dot}` }), label)),
-    shownAs.places.filter((p) => steps.some((n) => !n.stub && shownAs.of.get(n.id) === p.id)).map((p) => mark(m('g', { class: `lf-step placed ${placeClass(p.hex)}` }, outline('box', 11, 7, 20, 11, CORNER)), p.within ? `${p.title}, in ${p.within}` : p.title)),
+    [...drawnAs.keys()].sort((a, b) => KEY_ORDER.indexOf(a) - KEY_ORDER.indexOf(b)).map((shape) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), [...drawnAs.get(shape)].join(', '))),
+    Object.keys(PHASE_WORDS).filter((p) => phases.has(p)).map((p) => mark(dot(`ph-${p} ${markOf(p)}${p === 'trouble' ? ' trouble' : ''}`, markOf(p), G.x, G.y, G.r), PHASE_WORDS[p])),
+    uses((n) => !n.stub && heldUp(n.item)) && mark(dot('trouble hollow', 'hollow', G.x, G.y, G.r), 'Held up'),
+    uses((n) => !n.stub && yours(n.item)) && mark(m('g', { class: 'lf-step you' }, outline('box', G.x, G.y, G.w, G.h, CORNER)), 'Waits on you'),
+    shownAs.places.filter((p) => steps.some((n) => !n.stub && shownAs.of.get(n.id) === p.id)).map((p) => mark(m('g', { class: `lf-step placed ${placeClass(p.hex)}` }, outline('box', G.x, G.y, G.w, G.h, CORNER)), p.within ? `${p.title}, in ${p.within}` : p.title)),
     g.chains.length > 0 && mark(m('path', { d: 'M1 7H21', class: `lf-wire${kind(ORDER_TYPE)}` }), 'Leads to'),
     g.chains.some((c) => c.dashed) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire dashed' }), 'If chosen'),
     g.breaks.length > 0 && mark(m('path', { d: 'M1 7H21M11 0V4M11 10V14', class: 'lf-wire' }), 'Passes under'),
@@ -259,8 +293,8 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   // What stays lit, as the style says: the rest dimmed. Where the lens's words found some of what is drawn and not all,
   // what they found is lit.
   const hits = answer.items.filter((i) => i.found?.includes('text')).length;
-  const words = hits > 0 && hits < answer.items.length;
-  const dimmed = (now) => [...dims.keys()].filter((id) => !lit(g.nodes.get(id).item, now, words));
+  const found = hits > 0 && hits < answer.items.length;
+  const dimmed = (now) => [...dims.keys()].filter((id) => !lit(g.nodes.get(id).item, now, found, stateOf(g.nodes.get(id).item)));
   for (const id of dimmed(style)) addClass(dims.get(id), 'dim');
   /** Light the wires and ties of a step, or of none: while one is lit, the rest fade. */
   const light = (id) => [

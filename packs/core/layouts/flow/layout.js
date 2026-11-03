@@ -30,7 +30,7 @@ const kept = new Map();
 
 /** The layout of an answer: what it was drawn from worked out once, and what was put by hand set on top of that. */
 export function layout(args) {
-  const { items, links, undrawn, headless, sizes, aspect } = args, key = JSON.stringify([items, links, undrawn, headless, sizes, aspect]);
+  const { items, links, undrawn, headless, sizes, aspect, shapes } = args, key = JSON.stringify([items, links, undrawn, headless, sizes, aspect, shapes]);
   const hit = kept.get(key) ?? laidOut(args);
   kept.delete(key);
   kept.set(key, hit);
@@ -80,9 +80,9 @@ function laidOut(args) {
   return crossed(wired({})) <= crossed(combed({})) ? wired : combed;
 }
 
-function drawnOut({ items: given, links: told = [], undrawn = [], headless = ['part_of'], measure, sizes, aspect = 1.6, chains: asWires }) {
+function drawnOut({ items: given, links: told = [], undrawn = [], headless = ['part_of'], measure, sizes, shapes, aspect = 1.6, chains: asWires }) {
   const { items, links } = flatten({ items: given, links: told, undrawn });
-  const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes });
+  const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes, shapes });
   const z = lengthsOf(sizes), { gap } = z, margin = sizes.flow_margin, stepSize = (id) => nodes.get(id);
   const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ a: l.from, b: l.to, type: l.type, ...(l.pending && { pending: l.pending }) }));
   const chains = edges.map((e) => ({ ...e, key: `${e.a} ${e.b}`, path: [e.a, e.b], dashed: potential.has(e.b) }));

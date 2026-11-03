@@ -77,7 +77,7 @@ export const op = z.discriminatedUnion('op', [
       title: z.string(),
       description: z.string(),
       extends: z.string().optional().describe('Needed: one of the seven kinds of the work (actor, aim, work, question, record, occurrence, place) or a type of one; it inherits fields, statuses and the kind.'),
-      statuses: z.object({ open: z.array(z.string()).min(1), closed: z.array(z.string()) }).optional(),
+      statuses: z.object({ open: z.array(z.string()).min(1), closed: z.array(z.string()), phases: z.record(z.string(), z.string()).optional().describe('Where each status stands in its course, by status: not_started, under_way, finished, ended, trouble or standing. Unsaid, read from its place in the lists.') }).optional(),
       fields: z.record(z.string(), field).optional(),
       deliverable: z.boolean().optional().describe('true when it is made for a reader or a customer, like a document or a release: what it is part of names it under its title.'),
     }),
