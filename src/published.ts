@@ -148,6 +148,9 @@ export async function unpublish(l: Archipelago, actor: Actor, id: string) {
 
 /** Whether a document is published, when and by whom, and whether its draft now says something else. */
 export async function publishedState(l: Archipelago, id: string) {
+  // An item no type of which can be public (a post, a task) has no draft to preview: a page reads it as its reader sees it.
+  const item = await l.entity(id);
+  if (item && (!readable(l).includes(item.type) || item.private_to || item.visibility === 'private')) return { published: false, publishable: false };
   const { rows } = await l.db.query<{ given: Record<string, unknown>; published_by: string; published_at: Date }>(`select given, published_by, published_at from published where entity_id = $1`, [id]);
   if (!rows[0]) return { published: false };
   const now = await freeze(l, id).catch(() => null);

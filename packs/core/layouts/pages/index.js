@@ -1,5 +1,5 @@
-// A lens answer drawn as pages: each document a row, its draft alone (with the style's `published`, beside what is
-// published; a private one as its reader sees it), each drawn by the reader
+// A lens answer drawn as pages: each item a row, read by its note as a document is, its draft alone (with the style's
+// `published`, beside what is published; a private one, or one that is not a document, as its reader sees it), each drawn by the reader
 // itself (the page's `reader` mark, ui/reader-frame.js), so it reads and looks as the site does, figures and drawings
 // included, and says whether the draft differs from what is published. A line of a note holding only an item's id
 // brings that item in as a section (src/documents.ts): an item another page brings in is read there, not as a row of
