@@ -8,7 +8,7 @@
 
 import { flatRead, fromBefore, LENS_LIMIT } from './query-flat.ts';
 import { keptOf } from './query-kept.ts';
-import { stepIds, stepsWrong, type Step } from './query-steps.ts';
+import { stepIds, stepsPhased, stepsWrong, type Step } from './query-steps.ts';
 import type { Fact } from './log.ts';
 import type { Archipelago } from './pelago.ts';
 import { drawn, ownStyle, styleFor } from './styles.ts';
@@ -58,7 +58,10 @@ export async function keptPicture(l: Archipelago, id: string, have?: unknown) {
   // Or what it draws what is in: the items it finds in or is narrowed within, and the ends of its link terms.
   const ends = [...list((lens.filter as Props).find), ...list((lens.filter as Props).only)].filter((t) => !/^(id|text|type|kind) /.test(t)).map((t) => t.split(/\s+/).slice(1).join(' '));
   const from = rows.map((r) => r.to_id).find((x) => ids.includes(x) || ends.includes(x)) ?? (ids.length === 1 ? ids[0] : undefined);
-  return { ...answer, lens: { ...answer.lens, ...(from && { from }) }, ...(steps && { steps }), ...(wrong && { steps_wrong: wrong }), style: await drawn(l, style, have ?? []) };
+  // A status a step gives is sent with its phase, by the type of what it is given to.
+  const typeOf = new Map(answer.items.map((i) => [i.id, i.type]));
+  const phased = steps && stepsPhased(steps, (at, status) => l.registry.type(typeOf.get(at) ?? '')?.statuses.phases?.[status]);
+  return { ...answer, lens: { ...answer.lens, ...(from && { from }) }, ...(phased && { steps: phased }), ...(wrong && { steps_wrong: wrong }), style: await drawn(l, style, have ?? []) };
 }
 
 /**

@@ -134,7 +134,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   // house style does not, since the order's wire already says it and red is kept for trouble (the owner, 3 Nov 2026).
   const heldUp = (i) => style.held_up === 'trouble' && Boolean(stateOf(i).blocked);
   /** A step's dot: its phase's mark, in the trouble colour when it is in trouble or, as the style says, held up. */
-  const dotClass = (i) => `ph-${stateOf(i).phase} ${markOf(stateOf(i).phase)}${stateOf(i).phase === 'trouble' || heldUp(i) ? ' trouble' : ''}`;
+  const dotClass = (i, phase = stateOf(i).phase) => `ph-${phase} ${markOf(phase)}${phase === 'trouble' || heldUp(i) ? ' trouble' : ''}`;
   /** The dot itself, as its mark says: a ring, a ring half filled, a disc, or nothing. */
   const dot = (cls, mark, cx, cy, r) => (mark === 'none' ? null : mark === 'half'
     ? m('g', { class: `lf-dot ${cls}` }, m('circle', { cx, cy, r }), m('path', { d: `M${cx} ${cy - r}A${r} ${r} 0 0 0 ${cx} ${cy + r}Z`, class: 'lf-dot-fill' }))
@@ -220,6 +220,12 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const madeBy = (id, p) => g.nodes.get(id)?.item?.pending?.op === 'create' && g.nodes.get(id).item.pending.proposal === p.proposal;
   const wiresIn = (model) => [...model.chains, ...model.ties];
   const linkBadges = wiresIn(g).map((l, n) => [l, n]).filter(([l]) => held(l.pending) && !madeBy(l.a, l.pending) && !madeBy(l.b, l.pending)).map(([l, n]) => ({ n, mark: badge(l.pending, middleOf(l.points)) }));
+  /** A step's dot where it is drawn: of its own phase, or of the phase a story's step gives it then. */
+  const dotAt = (n, phase = stateOf(n.item).phase) => {
+    const X = g.x.get(n.id), point = n.shape === 'hexagon' ? n.bevel : 0;
+    const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + z('text_x');
+    return dot(dotClass(n.item, phase), markOf(phase), left - z('dot_gap'), g.y.get(n.id), z('dot'));
+  };
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
@@ -232,7 +238,8 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
       outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
       // A sheet's wave stops short of its box: this says where the box is, so the page reads its middle (ui/drag.js) as drawn here.
       n.shape === 'sheet' && m('rect', { x: X - n.w / 2, y: Y - n.h / 2, width: n.w, height: n.h, class: 'lf-room' }),
-      !n.stub && dot(dotClass(i), markOf(stateOf(i).phase), left - z('dot_gap'), Y, z('dot')),
+      // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
+      !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : dotAt(n)),
       // Its name in the lines the layout gave it (./lines.js): a second line under the first, the two about the middle.
       n.lines?.length > 1
         ? m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, ...n.lines.map((line, k) => m('tspan', { x: left, dy: k ? n.line : (-(n.lines.length - 1) * n.line) / 2 }, fit(line, room, n.stub ? STUB_TEXT : TEXT))))
@@ -276,7 +283,9 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const G = { x: 11, y: 7, w: 20, h: 11, r: 4 };
   const mark = (inner, label) => ({ glyph: m('svg', { width: z('key_width'), height: z('key_height'), viewBox: '0 0 22 14' }, inner), label });
   const uses = (test) => steps.some(test);
-  const phases = new Set(steps.filter((n) => !n.stub && markOf(stateOf(n.item).phase) !== 'none').map((n) => stateOf(n.item).phase));
+  // A story's key has the phases its steps give too.
+  const stepPhases = story ? answer.steps.flatMap((s) => Object.values(s.fields ?? {}).map((f) => f?.phase).filter((p) => typeof p === 'string')) : [];
+  const phases = new Set([...steps.filter((n) => !n.stub).map((n) => stateOf(n.item).phase), ...stepPhases].filter((p) => markOf(p) !== 'none'));
   const key = [
     [...drawnAs.keys()].sort((a, b) => KEY_ORDER.indexOf(a) - KEY_ORDER.indexOf(b)).map((shape) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), [...drawnAs.get(shape)].join(', '))),
     Object.keys(PHASE_WORDS).filter((p) => phases.has(p)).map((p) => mark(dot(`ph-${p} ${markOf(p)}${p === 'trouble' ? ' trouble' : ''}`, markOf(p), G.x, G.y, G.r), PHASE_WORDS[p])),
@@ -314,9 +323,11 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   if (story) {
     const marks = {
       steps: new Map(steps.map((n) => [`s:${n.id}`, [n.item.id]])),
-      wires: [...g.chains.map((c, n) => ({ keys: [`w:${n}`, `h:${n}`], from: [c.a], to: [g.nodes.get(c.b).item.id], item: { from: c.a, to: c.b } })), ...g.ties.map((t, n) => ({ keys: headless.has(t.type) ? [`n:${n}`] : [`n:${n}`, `nh:${n}`], from: [t.a], to: [t.b], item: { from: t.a, to: t.b } }))],
+      wires: [...g.chains.map((c, n) => ({ keys: [`w:${n}`, `h:${n}`], from: [c.a], to: [g.nodes.get(c.b).item.id], pair: [c.a, c.b].sort().join(' ') })), ...g.ties.map((t, n) => ({ keys: headless.has(t.type) ? [`n:${n}`] : [`n:${n}`, `nh:${n}`], from: [t.a], to: [t.b], pair: [t.a, t.b].sort().join(' ') }))],
       says: new Map([...said.values()].map((c) => [g.chains.indexOf(c), `t:${g.chains.indexOf(c)}`])),
       flags: new Map(steps.filter((n) => !n.stub).map((n) => [n.item.id, `f:${n.id}`])),
+      dots: new Map(steps.filter((n) => !n.stub).map((n) => [n.item.id, `d:${n.id}`])),
+      dot: (id, phase) => m('g', { key: `d:${id}` }, dotAt(g.nodes.get(id), phase)),
     };
     const frames = statesOf(answer.steps);
     player = play({ answer, style, reduced, tools, shape: { frames, stage: (ctx) => reveal({ frames, marks, ...ctx }) } });

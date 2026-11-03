@@ -15,6 +15,10 @@ export interface Step {
   fields?: Record<string, Record<string, unknown>>;
   /** The wires lit in this step, each as [from, to]: what passes along them then. */
   lit?: [string, string][];
+  /** Links made then, each as [from, to]: a link any step makes or takes back is drawn only while made. */
+  link?: [string, string][];
+  /** Links taken back then, each as [from, to]. */
+  unlink?: [string, string][];
   /** A word marked on a thing then (a flag), by id; null takes it off. */
   flag?: Record<string, string | null>;
   /** The chapter this step starts: its name, when, and how far it got (a count, such as commits). */
@@ -44,7 +48,7 @@ export function readSteps(value: unknown): Step[] {
     if (typeof s !== 'object' || s === null) throw new Error(`${at} is not a step`);
     if ((s.add !== undefined && !ids(s.add)) || (s.remove !== undefined && !ids(s.remove))) throw new Error(`${at}: add and remove are lists of ids`);
     if (!byId(s.titles) || !byId(s.fields) || !byId(s.flag)) throw new Error(`${at}: titles, fields and flag are kept by id`);
-    if (s.lit !== undefined && !(Array.isArray(s.lit) && s.lit.every((w: unknown) => Array.isArray(w) && w.length === 2 && ids(w)))) throw new Error(`${at}: lit is a list of wires, each [from, to]`);
+    for (const name of ['lit', 'link', 'unlink'] as const) if (s[name] !== undefined && !(Array.isArray(s[name]) && s[name].every((w: unknown) => Array.isArray(w) && w.length === 2 && ids(w)))) throw new Error(`${at}: ${name} is a list of wires, each [from, to]`);
     if (s.chapter !== undefined && typeof s.chapter?.name !== 'string') throw new Error(`${at}: a chapter has a name`);
     if (s.look !== undefined && s.look !== null && !(typeof s.look === 'string' && LOOK.test(s.look))) throw new Error(`${at}: a look is named in a word of small letters, such as "islands"`);
     if (s.quick !== undefined && typeof s.quick !== 'boolean') throw new Error(`${at}: quick is true or false`);
@@ -89,5 +93,22 @@ export function stepsShown(steps: Step[], shown: Set<string>): Step[] {
     ...(s.fields && { fields: only(s.fields) }),
     ...(s.flag && { flag: only(s.flag) }),
     ...(s.lit && { lit: s.lit.filter(([a, b]) => shown.has(a) && shown.has(b)) }),
+    ...(s.link && { link: s.link.filter(([a, b]) => shown.has(a) && shown.has(b)) }),
+    ...(s.unlink && { unlink: s.unlink.filter(([a, b]) => shown.has(a) && shown.has(b)) }),
   }));
+}
+
+/**
+ * The steps with the phase of each status they give (src/phases.ts), by the type of the item it is given to, so a
+ * drawing reads where a thing stood then as it reads where it stands now, and keeps no registry.
+ */
+export function stepsPhased(steps: Step[], phaseOf: (id: string, status: string) => string | undefined): Step[] {
+  return steps.map((s) => {
+    if (!s.fields) return s;
+    const fields = Object.fromEntries(Object.entries(s.fields).map(([id, f]) => {
+      const phase = typeof f?.status === 'string' ? phaseOf(id, f.status) : undefined;
+      return [id, phase ? { ...f, phase } : f];
+    }));
+    return { ...s, fields };
+  });
 }
