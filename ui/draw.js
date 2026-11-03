@@ -21,15 +21,27 @@
 // differently: one frame serves every picture on the page, and the drawing
 // answers with marks the page checks and mounts, not pixels. That half is
 // draw-marks.js, loaded first.
+//
+// Where the owner has turned the sandbox off for drawings (drawings_open), the
+// page asks for this frame opened (draw.html?open=1): served with no policy but
+// who may frame it, in the page's own origin, and the code runs here, in this
+// window, not in a worker. It has the network, fonts, files and links, and what
+// it puts in `root` (a panel of its own) is in the app's page, over the
+// picture, where an agent driving the browser reads it.
 'use strict';
 
 const home = new URL(location.href).origin;
+const opened = document.documentElement.dataset.drawOpen === 'on';
 const say = (message) => parent.postMessage(message, '*');
 const fail = (err) => say({ type: 'error', message: String(err?.message ?? err).slice(0, 300) });
 
-/** What runs in the worker, around the style's code. Written as a function and handed over as its text. */
-function inside(home) {
-  const post = (message) => self.postMessage(message);
+/**
+ * What runs in the worker, around the style's code. Written as a function and handed over as its text; opened, run in
+ * this window instead, over a channel (`port`), given the canvas and the body it draws in (`given`).
+ */
+function inside(home, port, given) {
+  const me = port ?? self;
+  const post = (message) => me.postMessage(message);
   const fail = (err) => post({ type: 'error', message: String(err?.message ?? err) });
   self.addEventListener('unhandledrejection', (ev) => fail(ev.reason));
   /** A lens answer as a tree, each thing with what it says of itself and of all that is inside it: the same numbers at every depth. */
@@ -53,7 +65,7 @@ function inside(home) {
   const asking = new Map();
   let asked = 0;
   const size = { width: 0, height: 0, dpr: 1 };
-  self.onmessage = async (ev) => {
+  me.onmessage = async (ev) => {
     const said = ev.data;
     if (said.type === 'ping') return post({ type: 'pong' });
     if (said.type === 'event') {
@@ -79,9 +91,12 @@ function inside(home) {
     try {
       // The code is a module of its own, loaded from its text: by a blob's address where the browser allows that here, else as a data address.
       const made = await import(URL.createObjectURL(new Blob([said.code], { type: 'text/javascript' }))).catch(() => import(`data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(said.code)))}`));
-      if (typeof made.default !== 'function') throw new Error('The code of a style must export a default function: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor, field, change }) { … }. An item in answer has its values under fields; a change writes them as props.');
+      if (typeof made.default !== 'function') throw new Error('The code of a style must export a default function: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor, field, change, sandboxed, root }) { … }. An item in answer has its values under fields; a change writes them as props.');
       await made.default({
-        canvas: said.canvas,
+        canvas: given?.canvas ?? said.canvas,
+        // Opened, an element of the app's page over the picture, for a panel of its own; walled in, there is none.
+        root: given?.root ?? null,
+        sandboxed: !given,
         answer: said.answer,
         style: said.style,
         theme: said.theme,
@@ -89,6 +104,7 @@ function inside(home) {
         tree: () => tree(said.answer),
         three: () => import(`${home}/three.js`),
         on: (name, fn) => (heard[name] ??= []).push(fn),
+        // An item's id, or opened, an https address too.
         open: (id) => post({ type: 'open', id: String(id) }),
         tip: (text, x, y) => post({ type: 'tip', text: text == null ? null : String(text), x: Number(x), y: Number(y) }),
         cursor: (name) => post({ type: 'cursor', name: String(name) }),
@@ -148,11 +164,18 @@ function start({ code, answer, style, theme }) {
   document.body.style.background = theme.sea;
   Object.assign(tip.style, { background: theme.land, color: theme.text, borderColor: theme.line });
   const room = () => ({ width: innerWidth, height: innerHeight, dpr: Math.min(devicePixelRatio || 1, 2) });
-  const surface = canvas.transferControlToOffscreen();
+  // Opened, the code draws on the canvas itself; walled in, on one handed to its worker, which can be handed over once.
+  const surface = opened ? canvas : canvas.transferControlToOffscreen();
   Object.assign(surface, { width: Math.round(room().width * room().dpr), height: Math.round(room().height * room().dpr) });
   // A page with no origin may not start a worker every way a page can, and browsers differ in which: each is tried until one answers.
   const text = `(${inside})(${JSON.stringify(home)})`;
-  const ways = [
+  const inPage = () => {
+    const { port1, port2 } = new MessageChannel();
+    addEventListener('error', (ev) => fail(ev.error ?? ev.message));
+    inside(home, port2, { canvas, root: frameElement?.parentElement?.querySelector(':scope > .code-panel') ?? document.body });
+    return Object.assign(port1, { terminate: () => port1.close() });
+  };
+  const ways = opened ? [inPage] : [
     () => new Worker(URL.createObjectURL(new Blob([text], { type: 'text/javascript' })), { type: 'module' }),
     () => new Worker(`data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(text)))}`, { type: 'module' }),
     () => new Worker(URL.createObjectURL(new Blob([text], { type: 'text/javascript' }))),
@@ -166,6 +189,7 @@ function start({ code, answer, style, theme }) {
     unanswered = 0;
     // Only these, and each one checked: what the code says is never trusted.
     if (said?.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) say({ type: 'open', id: said.id });
+    else if (said?.type === 'open' && opened && /^https:\/\/\S+$/.test(said.id)) open(said.id, '_blank', 'noopener');
     else if (said?.type === 'drew') say({ type: 'drew' });
     else if (said?.type === 'error') fail(said.message);
     else if (said?.type === 'cursor' && CURSORS.includes(said.name)) canvas.style.cursor = said.name;
@@ -204,7 +228,8 @@ function start({ code, answer, style, theme }) {
         worker = mine;
         for (const other of tried) if (other && other !== mine) other.terminate();
         worker.onerror = (err) => fail(err.message || 'The code of this style stopped.');
-        worker.postMessage({ type: 'draw', code, answer, style, theme, canvas: surface, ...room() }, [surface]);
+        if (opened) worker.postMessage({ type: 'draw', code, answer, style, theme, ...room() });
+        else worker.postMessage({ type: 'draw', code, answer, style, theme, canvas: surface, ...room() }, [surface]);
       }
       if (mine === worker) hear(ev);
     };
@@ -229,8 +254,9 @@ function start({ code, answer, style, theme }) {
   addEventListener('resize', () => tell('resize', room()));
   // Code that stops answering is ended: it cannot hold the page, and it is not left to burn. A slow draw is waited for:
   // only a minute of silence ends it. A hidden page is not asked: the browser slows what runs there, so long work is
-  // not to be told from code that has stopped.
+  // not to be told from code that has stopped. Opened, the code shares this page's one thread: nothing here runs while it does.
   const watch = setInterval(() => {
+    if (opened) return void clearInterval(watch);
     if (!started || document.hidden) return void (unanswered = 0);
     if (unanswered++ < 30) return void worker.postMessage({ type: 'ping' });
     clearInterval(watch);

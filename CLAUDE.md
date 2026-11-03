@@ -160,7 +160,12 @@ reply ending, commits accounted for) is `docs/agents.md`.
   changing `ui/draw.js`, `ui/draw.html`, `ui/marks.js`, `ui/surface.js` or the frame's policy in
   `src/server.ts`, run a hostile style against it in a real browser (the
   browser pane will not load a sandboxed frame; to see drawings there, start a dev server with `PELAGO_UNSANDBOXED=1`, which drops that wall and keeps the worker); `test/layouts.test.ts`
-  does, in headless Chrome.
+  does, in headless Chrome. The owner can take both walls down for a style's
+  own code, per workspace (`drawings_open`, the owner, 3 Nov 2026,
+  e_eezrwza2): it then runs in an unsandboxed frame of the page's origin,
+  `draw.html?open=1`, as the person looking (`docs/layouts.md`, "The walls").
+  Off is the default, and with it off nothing above changes; never turn it
+  on for a workspace yourself.
 
 ## UI rules
 

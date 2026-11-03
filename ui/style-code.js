@@ -1,8 +1,11 @@
 // A style that carries its own code: the drawing a person or an agent wrote for their own project.
 
-import { api, frameSandbox, h } from './base.js';
+import { api, drawingsOpen, frameSandbox, h } from './base.js';
 import { STYLE_COLORS, litSwitch } from './query-base.js';
 import { saidDrawn } from './look.js';
+
+/** The frame's address (named with the UI's version as it is served), asked for opened. */
+const opened = (frame) => ((frame = new URL(frame, location.href)), frame.searchParams.set('open', '1'), frame.pathname + frame.search);
 
 /** The most ops one ask of a drawing may carry. */
 const mostOps = 50;
@@ -10,7 +13,7 @@ const mostOps = 50;
 /**
  * A style that carries its own code is the drawing: the page runs it in a
  * frame that is sandboxed (an origin of its own, nothing loaded from outside,
- * nothing sent anywhere), hands it the lens answer, the style's fields and the
+ * nothing sent anywhere), or opened where the owner turned that off, hands it the lens answer, the style's fields and the
  * page's colours, and listens for three things: open this item, change the map
  * (sent here as the person, naming the style whose code asked, `coder`, for the
  * rules to judge: src/layout-changes.ts), and what went wrong. A new frame for
@@ -28,10 +31,13 @@ export function drawCode(host, answer, style, keep, _place, coder) {
   if (host.coded) window.removeEventListener('message', host.coded.hear);
   const run = (host.coded = { code, fields: JSON.stringify(fields), data, frame: undefined, hear: undefined });
   const shown = (said) => ((error.textContent = said), (error.title = said), (error.hidden = false), saidDrawn(host, 'error', said));
-  const draw = (tries = 0) => {
+  // Where the owner turned the sandbox off (drawingsOpen), the frame is opened: the page's own origin, and no policy.
+  const draw = (tries = 0) => drawingsOpen().then((open) => run === host.coded && put(open, tries));
+  const put = (open, tries) => {
     error.hidden = true;
-    run.frame = h('iframe', { class: 'lens-frame', sandbox: frameSandbox(), src: '/draw.html', title: 'The map, drawn by this style' });
-    stage.replaceChildren(run.frame);
+    run.frame = h('iframe', { class: 'lens-frame', sandbox: open ? null : frameSandbox(), src: open ? opened('/draw.html') : '/draw.html', title: 'The map, drawn by this style' });
+    // Opened, what the code puts in `root` is in this page, over its picture, where an agent driving the browser reads it.
+    stage.replaceChildren(run.frame, ...(open ? [h('div', { class: 'code-panel' })] : []));
     // A frame not ready in a while (a page reloading is busy) is put up again, twice; one that is still not ready was not
     // let in by the browser: say so, not a blank. Waited for while the page is hidden, since the browser holds it back then.
     const mine = run.frame;
