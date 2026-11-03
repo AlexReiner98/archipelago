@@ -5,12 +5,16 @@
 import type { Actor, Archipelago, Op, UpdateOp } from './pelago.ts';
 import { entry, factAt, type Fact } from './log.ts';
 import { OWNED_BY } from './owner-link.ts';
+import { ITEM_COLUMNS } from './project.ts';
+import { newestValid } from './snapshot.ts';
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 /** The head fields an update op sets by name; any other field of an item is a declared one, in props. */
 const HEAD: Record<string, unknown> = { title: undefined, body: '', status: undefined, owner: null, visibility: undefined, confidence: 1 };
 /** Fields that move with another (private_to with visibility) or that no op sets. */
 const FOLLOWS = ['private_to', 'type', 'source', 'checked'];
+/** A head field's column in a row. */
+const COLUMN = new Map(ITEM_COLUMNS.map(([column, field]) => [field, column]));
 
 export async function undo(l: Archipelago, actor: Actor, input: { changeset: string }) {
   const done = await entry(l.db, input.changeset);
@@ -32,6 +36,7 @@ export async function undo(l: Archipelago, actor: Actor, input: { changeset: str
   const inMerge = new Set(merged.flatMap((f) => [f[1], f[3] as string]));
   for (const f of merged) skipped.push(`merging "${await title(f[1])}" into "${await title(f[3] as string)}" cannot be undone automatically: its links were moved`);
 
+  let snapshot: Promise<Map<string, Record<string, unknown>>> | undefined;
   const updates = new Map<string, UpdateOp>();
   // Newest first, so a create is undone after the links that hang off it.
   for (const fact of [...done.facts].reverse()) {
@@ -71,7 +76,18 @@ export async function undo(l: Archipelago, actor: Actor, input: { changeset: str
       skipped.push(`"${entity.title}": ${field} has changed again since, so it was left as it is`);
       continue;
     }
-    const was = value(await before(id, field));
+    const said = await before(id, field);
+    let was = value(said);
+    // An item from before the log: what a field held then is in no fact, only in a snapshot of the rows taken since.
+    if (!said && !(await before(id, 'type'))) {
+      snapshot ??= newestValid(l.db, l.workspace, done.pos - 1).then((s) => new Map(s?.rows.entity.map((r) => [r.id as string, r])));
+      const old = (await snapshot).get(id);
+      if (!old) {
+        skipped.push(`"${entity.title}": what ${field} held is from before the log, so it was left as it is`);
+        continue;
+      }
+      was = COLUMN.has(field) ? old[COLUMN.get(field)!] : (old.props as Record<string, unknown> | null)?.[field];
+    }
     const update = updates.get(id) ?? { op: 'update', id };
     updates.set(id, update);
     if (field in HEAD) (update as unknown as Record<string, unknown>)[field] = was ?? HEAD[field];
