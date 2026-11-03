@@ -1,5 +1,5 @@
 import { api, h, withIds } from './base.js';
-import { replicate } from './live.js';
+import { kinds, replicate } from './live.js';
 import { unfollow } from './replica.js';
 import { drawWith, layouts, warmLayouts } from './layout.js';
 import { dress, layered } from './query-base.js';
@@ -186,6 +186,12 @@ export function stepsOf(entity) {
   return { steps, told: [...new Set(told)] };
 }
 
+/** The steps with the phase of each status they give, by the type of what it is given to, as a drawing reads a phase now (src/query-steps.ts). */
+const phased = (steps, items = []) => {
+  const typeOf = new Map(items.map((i) => [i.id, i.type]));
+  return steps.map((s) => (s.fields ? { ...s, fields: Object.fromEntries(Object.entries(s.fields).map(([id, f]) => [id, typeof f?.status === 'string' && kinds.phase(typeOf.get(id), f.status) ? { ...f, phase: kinds.phase(typeOf.get(id), f.status) } : f])) } : s));
+};
+
 /** The styles asked for (by what was asked) whose drawing reads each note whole. */
 const whole = new Set();
 
@@ -216,7 +222,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   // into it (`shown`, ui/ghosts.js); what the canvas holds (`host.answer`) is the answer alone.
   const draw = (answer, shown, refreshing) => {
     if (only) [answer, shown] = [answer, shown].map(narrowed(only));
-    if (extra) [answer, shown] = [answer, shown].map((a) => ({ ...a, ...extra }));
+    if (extra) [answer, shown] = [answer, shown].map((a) => ({ ...a, ...extra, ...(extra.steps && { steps: phased(extra.steps, a.items) }) }));
     if (nest) shown = nested(shown, typeof nest === 'string' ? nest : undefined);
     const said = JSON.stringify(shown);
     if (refreshing && said === host.said) return;

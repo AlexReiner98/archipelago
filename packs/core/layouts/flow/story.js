@@ -1,24 +1,33 @@
 // A process told as it happens: a lens's steps over the flow's own picture (index.js). The process is laid out once,
 // whole, from every step the story ever brings in, so nothing moves; each step of the story shows what it brings, in
-// the accent a while, its wires drawn in once both their ends are there, takes away what it takes away, lights
-// the wires it names and writes the word it flags on a step beside it. The conversation beside it and the chapters above it are play.js's, shared with the
+// the accent a while, its wires drawn in once both their ends are there (or, for a link a step makes or takes back,
+// while it is made), takes away what it takes away, lights the wires it names, writes the word it flags on a step
+// beside it and gives each step the dot of where it stood then. The conversation beside it and the chapters above it are play.js's, shared with the
 // architecture's stories. The last step is the map as it is: what the steps leave in, with its own state now.
 
 import { css as storyLook } from './story-look.js';
 
 /**
- * What each step shows: the ids it has in (as the steps add and take away), its chapter, the wires it lights, and the
- * word flagged on each thing then (`flags`, by id), none on the last: that is the map as it is.
+ * What each step shows: the ids it has in (as the steps add and take away), its chapter, the wires it lights, the
+ * word flagged on each thing then (`flags`, by id), none on the last: that is the map as it is, the phase each thing
+ * had then (`phases`, by id, from the status a step gives it), and the links made then (`linked`, each [from, to]
+ * sorted and joined) of those a step makes or takes back (`made`): every other link is drawn once both its ends are.
  */
 export function statesOf(steps) {
-  const present = new Set(), flags = new Map();
+  const present = new Set(), flags = new Map(), phases = new Map(), linked = new Set();
+  const pair = (w) => [...w].sort().join(' ');
+  const made = new Set(steps.flatMap((s) => [...(s.link ?? []), ...(s.unlink ?? [])].map(pair)));
   let chapter = -1;
   return steps.map((s, k) => {
     for (const id of s.add ?? []) present.add(id);
     for (const id of s.remove ?? []) present.delete(id);
     for (const [id, word] of Object.entries(s.flag ?? {})) word ? flags.set(id, String(word)) : flags.delete(id);
+    for (const [id, f] of Object.entries(s.fields ?? {})) if (f && 'status' in f) f.status === null ? phases.delete(id) : f.phase && phases.set(id, String(f.phase));
+    for (const w of s.link ?? []) linked.add(pair(w));
+    for (const w of s.unlink ?? []) linked.delete(pair(w));
     if (s.chapter) chapter++;
-    return { step: s, chapter, ids: new Set(present), lit: (s.lit ?? []).map((w) => [...w].sort().join(' ')), flags: k === steps.length - 1 ? new Map() : new Map(flags) };
+    const final = k === steps.length - 1;
+    return { step: s, chapter, ids: new Set(present), lit: (s.lit ?? []).map(pair), flags: final ? new Map() : new Map(flags), phases: final ? new Map() : new Map(phases), made, linked: new Set(linked) };
   });
 }
 
@@ -37,7 +46,8 @@ export const css = `${storyLook}
 /**
  * The flow's stage for play.js: `apply(k, dur)` shows step k. `marks` says what the picture drew: each step's mark
  * key and the items it stands for (`steps`: key to ids), each wire's keys and the steps at its ends (`wires`), and the
- * key of what each choice is (`says`: wire index to key), and the key of the word flagged on each step (`flags`: id to key).
+ * key of what each choice is (`says`: wire index to key), the key of the word flagged on each step (`flags`: id to
+ * key), and the key of each step's dot (`dots`: id to key) with `dot(id, phase)`, the dot drawn for a phase (or its own).
  */
 export function reveal({ frames, marks, t, send, later }) {
   let was = null;
@@ -52,9 +62,11 @@ export function reveal({ frames, marks, t, send, later }) {
         list.push({ key, toggle: { 'sp-off': !now }, set: { opacity: now ? 1 : 0 }, ...over });
         if (now && !then && dur) fresh.push(key);
       }
+      // A wire is there once both its ends are, and a link a step makes or takes back only while made.
+      const there = (fr, w) => w.from.some((id) => fr.ids.has(id)) && w.to.some((id) => fr.ids.has(id)) && (!fr.made.has(w.pair) || fr.linked.has(w.pair));
       marks.wires.forEach((w, n) => {
-        const now = on(w.from) && on(w.to), then = was ? w.from.some((id) => was.ids.has(id)) && w.to.some((id) => was.ids.has(id)) : false;
-        const lit = f.lit.includes([w.item.from, w.item.to].sort().join(' '));
+        const now = there(f, w), then = was ? there(was, w) : false;
+        const lit = f.lit.includes(w.pair);
         for (const key of w.keys) list.push({ key, toggle: { 'sp-lit': now && lit } });
         if (!now) for (const key of [...w.keys, marks.says.get(n)].filter(Boolean)) list.push({ key, toggle: { 'sp-off': true }, set: { opacity: 0 } });
         else if (then || !dur) for (const key of [...w.keys, marks.says.get(n)].filter(Boolean)) list.push({ key, toggle: { 'sp-off': false }, set: { opacity: 1, 'stroke-dashoffset': 0 } });
@@ -67,6 +79,8 @@ export function reveal({ frames, marks, t, send, later }) {
           fresh.push(...w.keys);
         }
       });
+      // The dot of where each step stood then: its own, where no step has said.
+      for (const [id, key] of marks.dots ?? []) if (!was || f.phases.get(id) !== was.phases.get(id)) list.push({ key, mark: marks.dot(id, f.phases.get(id)) });
       // The word flagged on each step then, or none.
       for (const [id, key] of marks.flags ?? []) if ((f.flags.get(id) ?? '') !== (was?.flags.get(id) ?? '') || !was) list.push({ key, text: f.flags.get(id) ?? '' });
       // What a step brings is in the accent a while.
