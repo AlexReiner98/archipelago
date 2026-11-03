@@ -108,7 +108,15 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
   const now = () => ({ title: title.textContent.replace(/\s+/g, ' ').trim(), body: area.value });
   const worded = () => now().title !== (from.title ?? '').trim() || now().body !== (from.body ?? '');
   const changed = () => worded() || Object.keys(props()).length > 0;
-  const grow = () => ((area.style.height = 'auto'), (area.style.height = `${area.scrollHeight}px`));
+  // The words are as tall as they are. Measuring them collapses the box for a moment, which would scroll the sheet
+  // away from the line being written: the sheet is put back where it was, as a word processor keeps the page still.
+  const grow = () => {
+    const sheet = area.closest('#sheet');
+    const top = sheet?.scrollTop;
+    area.style.height = 'auto';
+    area.style.height = `${area.scrollHeight}px`;
+    if (sheet) sheet.scrollTop = top;
+  };
   const update = () => {
     const open = isNew || changed();
     bar.hidden = !open && !(length && !area.hidden && (area.value.trim() || document.activeElement === area));
