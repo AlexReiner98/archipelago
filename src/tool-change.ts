@@ -12,6 +12,7 @@ import type { Tool } from './tools.ts';
 import { keep, kept as keptFor, take } from './transient.ts';
 import { undo } from './undo.ts';
 import { resolveRun } from './sessions.ts';
+import { holdsOff } from './rules.ts';
 
 // Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
 export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string, pane?: string, run?: string): Promise<Focus> {
@@ -147,6 +148,8 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         const picture = result.status !== 'proposed' && target ? await pictureOf(l, target) : undefined;
         await point(l, actor, 'change', result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason, undefined, input.run).catch(() => {});
       }
+      // With holds off (src/rules.ts, HOLDS_OFF), the answer says so: no rule held it, and none will until the owner turns them on.
+      if (actor.kind === 'agent' && result.status !== 'proposed' && (await holdsOff(l.db))) return { ...result, holds: 'off' };
       return result;
     },
   },

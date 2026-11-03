@@ -142,6 +142,12 @@ const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.
 export const LIFTS = ['agent_changes', 'agent_code', 'agent_publish', 'agent_backups'];
 /** The lift by which agents' changes apply as they are made; a new workspace begins with it (beginApplying). */
 export const AGENT_CHANGES = 'agent_changes';
+/**
+ * The setting by which the owner turns holds off: every change applies as it is made, whatever rule would hold it,
+ * forget included (the owner, 3 Nov 2026, decision e_66mwta3w). A wait the change or its token asked for still holds.
+ * Off unless set. An agent's token reads it (src/schema.ts, HOLDS_OFF_READ).
+ */
+export const HOLDS_OFF = 'holds_off';
 const COMPARE = /^\s*([a-z_][a-z0-9_]*)\s*(>=|<=|!=|>|<|=)\s*(-?\d+(?:\.\d+)?|[a-z_][a-z0-9_]*)\s*$/;
 
 /** Problems with a pack's rules, given the registry it loads into. Empty means they can be enforced. */
@@ -340,6 +346,11 @@ export async function liftsOn(q: Q): Promise<Record<string, boolean>> {
   return Object.fromEntries(LIFTS.map((key) => [key, set.get(key) === true || set.get(key) === 'apply']));
 }
 
+/** Whether the owner has turned holds off here. */
+export async function holdsOff(q: Q): Promise<boolean> {
+  return (await q.query<{ value: unknown }>(`select value from setting where key = $1`, [HOLDS_OFF])).rows[0]?.value === true;
+}
+
 export interface Verdict {
   /** What becomes of the change: it applies, waits for a person, or is refused. */
   outcome: 'apply' | 'hold' | 'refuse';
@@ -348,8 +359,10 @@ export interface Verdict {
   /** Every rule that holds it. */
   held: Ruled[];
   refused: string[];
-  /** For each op, the rules it would be under but for a setting or the server that lifted them. */
+  /** For each op, the rules it would be under but for a setting or the server that lifted them, or holds being off. */
   spared: Ruled[][];
+  /** Holds are off here, and they spared it at least one rule. */
+  holds_off?: true;
 }
 
 /** How particular a rule is: the more it asks of a change, the more it says about why one waits. */
@@ -362,15 +375,20 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
   const ops = given as (Written & { id?: string; keep?: string; drop?: string })[];
   const on = (op: (typeof ops)[number]) => (op.op === 'merge' ? [op.keep!, op.drop!] : op.id ? [op.id] : []);
   const found = new Map((await q.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ops.flatMap(on)])).rows.map((e) => [e.id, e]));
+  // With holds off, what a rule holds applies as made; a wait the change or its token asked for (asked, may) still holds.
+  const off = who.human && !who.drawing ? false : await holdsOff(q);
+  const askedFor = (r: Ruled) => { const when = rules.find((x) => x.id === r.rule && x.pack === r.pack)?.when; return when?.asked !== undefined || when?.may !== undefined; };
   const judged = await Promise.all(ops.map(async (op) => {
     const targets = on(op).flatMap((id) => found.get(id) ?? []);
     const one = judge(rules, reg, who, op, targets, lifted);
-    return { ...one, refused: [...one.refused, ...(await clashes(q, reg, op, targets[0]))] };
+    const passed = off ? one.held.filter((r) => !askedFor(r)) : [];
+    return { held: one.held.filter((r) => !passed.includes(r)), spared: [...one.spared, ...passed], passed: passed.length, refused: [...one.refused, ...(await clashes(q, reg, op, targets[0]))] };
   }));
   const refused = judged.flatMap((j) => j.refused);
   const held = judged.flatMap((j) => j.held);
   const by = [...held].sort((a, b) => particular(b, rules) - particular(a, rules))[0];
-  return { outcome: refused.length ? 'refuse' : held.length ? 'hold' : 'apply', by, held, refused, spared: judged.map((j) => j.spared) };
+  const passed = judged.some((j) => j.passed);
+  return { outcome: refused.length ? 'refuse' : held.length ? 'hold' : 'apply', by, held, refused, spared: judged.map((j) => j.spared), ...(passed && { holds_off: true as const }) };
 }
 
 /** Whether this actor may do an act that is not a change: refused, with the rule's reason, when a rule refuses it. */

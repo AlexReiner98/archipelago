@@ -9,7 +9,7 @@
 
 import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
-import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, MEMBER, ORDERED, SCHEMA, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
+import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, HOLDS_OFF_READ, MEMBER, ORDERED, SCHEMA, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
 import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';
 import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH, SHARE_PUBLISHABLE } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
@@ -68,6 +68,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 27, name: 'the activity from before the log began, gone', sql: PRE_LOG_ACTIVITY },
   { version: 28, name: 'what each item adds to the log, in bytes', sql: ITEM_BYTES },
   { version: 29, name: 'a token a person granted a client by signing in', sql: TOKEN_GRANT },
+  { version: 30, name: 'an agent reads whether holds are off', sql: HOLDS_OFF_READ },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;
