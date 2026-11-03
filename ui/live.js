@@ -15,7 +15,13 @@ import { relations, types } from './words.js';
 // offers the refresh instead. A change elsewhere on the map leaves the page still.
 export let uiFiles;
 export let outdated = false;
-export const stale = h('div', { id: 'stale', hidden: true }, 'The map has changed.', h('button', { onclick: () => (outdated ? location.reload() : route()) }, 'Refresh'));
+// Refresh throws away words not yet saved, so it asks first (ui/draft.js); loaded when clicked, as draft.js reaches
+// this module through the canvas and a static import would close the loop.
+const refresh = async () => {
+  if (!(await (await import('./draft.js')).mayLeave())) return;
+  return outdated ? location.reload() : route();
+};
+export const stale = h('div', { id: 'stale', hidden: true }, 'The map has changed.', h('button', { onclick: refresh }, 'Refresh'));
 document.body.append(stale);
 // Words typed and not yet saved hold the page; a dial, a tick or a pick is not unsaved work.
 main.addEventListener('input', (e) => {
