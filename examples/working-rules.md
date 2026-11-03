@@ -26,8 +26,8 @@ actions; `query` with name `actions` gives their inputs whole.
    tell the owner to run the setup in this repository's own folder.
 2. Say what you take on: `report` with action `session_update` and the
    item's id as `task`. If it
-   has no estimate, give it one (`tokens_estimated` in its props: input and
-   output, not counting cached re-reads). What is used is measured for you.
+   has no estimate, give it one (`tokens_estimated` in its props: one number,
+   input and output together, not counting cached re-reads). What is used is measured for you.
 
 ## While you work
 

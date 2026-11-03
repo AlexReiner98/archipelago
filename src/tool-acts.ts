@@ -160,7 +160,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       repo: z.string().describe('The repository it ran for: its id or its GitHub name "owner/name".'),
       title: z.string().min(1).describe('What the run was, in a few words.'),
       ok: z.boolean().optional().describe('false when it failed.'),
-      tokens: z.number().optional().describe('Tokens it used: input and output, not counting cached re-reads.'),
+      tokens: z.number().optional().describe('Tokens it used, one number: input and output together, not counting cached re-reads.'),
       cost_usd: z.number().optional(),
       turns: z.number().optional(),
       link: z.string().optional().describe('Where the run can be looked at.'),

@@ -79,7 +79,7 @@ function inside(home) {
     try {
       // The code is a module of its own, loaded from its text: by a blob's address where the browser allows that here, else as a data address.
       const made = await import(URL.createObjectURL(new Blob([said.code], { type: 'text/javascript' }))).catch(() => import(`data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(said.code)))}`));
-      if (typeof made.default !== 'function') throw new Error('The code of a style must export a default function: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor, field, change }) { … }');
+      if (typeof made.default !== 'function') throw new Error('The code of a style must export a default function: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor, field, change }) { … }. An item in answer has its values under fields; a change writes them as props.');
       await made.default({
         canvas: said.canvas,
         answer: said.answer,

@@ -42,6 +42,7 @@ test('Find in an item: all that is part of it at any depth, of any type, not the
   assert.deepEqual(titles(await flatRead(l, { filter: { find: ['in e_nothing0'] } })), [], 'in nothing, nothing');
   assert.equal(await viewAddress(l, { lens: { filter: { find: [`in ${made.p}`] } } }), `v?find=in+${made.p}`, 'the address carries it');
   await assert.rejects(viewAddress(l, { lens: { filter: { find: ['in e_nothing0'] } } }), /No item/);
+  assert.equal(await viewAddress(l, { lens: made.p }), await viewAddress(l, { entity: made.p }), 'an id as lens is shown as entity');
 });
 
 test('the walk follows each link out, in or either way, as it is named', async () => {
