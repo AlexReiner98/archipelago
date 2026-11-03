@@ -12,7 +12,7 @@
       "extends": "occurrence",
       "title": "Cost",
       "description": "Something paid for regularly: hosting, a subscription, a licence, a domain. What agents spend per token is not kept here: it is measured from their runs.",
-      "statuses": { "open": ["paying"], "closed": ["ended"] },
+      "statuses": { "open": ["paying"], "closed": ["ended"], "phases": { "paying": "standing" } },
       "fields": {
         "amount": { "type": "number", "description": "What is paid each time, in the currency below. Left out when nobody has said: it is then shown as not priced." },
         "currency": { "type": "string", "default": "USD" },

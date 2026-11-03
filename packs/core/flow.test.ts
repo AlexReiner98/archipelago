@@ -19,7 +19,7 @@ const dep = (b: string, a: string, says?: string) => ({ kind: 'depends_on', from
 const measure = (text: string, px: number) => text.length * px * 0.55;
 // Laid out by the house style's lengths, as the page lays it out (packs/core/pack.json).
 const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
-const run = (items: any[], links: any[], placed = {}) => layout({ items: [{ ...item('r', 'aim'), inside: null }, ...items], links, placed, measure, sizes: house.sizes });
+const run = (items: any[], links: any[], placed = {}) => layout({ items: [{ ...item('r', 'aim'), inside: null }, ...items], links, placed, measure, sizes: house.sizes, shapes: { kind: house.kind_shapes } });
 /** A flat lens's answer: items with no inside, place or state; links each with its type. */
 const flat = (id: string, extra: Record<string, unknown> = {}) => ({ id, kind: 'work', type: 'task', title: `Step ${id}`, open: true, status: 'todo', ...extra });
 const link = (type: string, from: string, to: string) => ({ id: `r_${from}${to}`, type, from, to });
@@ -37,7 +37,7 @@ function timed<T>(f: () => T): [T, number] {
 
 const wires = (g: any) => [...g.chains, ...g.ties].map((w: any) => w.points);
 /** What is drawn from `items` with nothing above them: `run` puts one item over all the rest. */
-const alone = (items: any[], links: any[], extra: Record<string, unknown> = {}) => layout({ items: items.map((i) => ({ ...i, inside: null })), links, measure, sizes: house.sizes, ...extra });
+const alone = (items: any[], links: any[], extra: Record<string, unknown> = {}) => layout({ items: items.map((i) => ({ ...i, inside: null })), links, measure, sizes: house.sizes, shapes: { kind: house.kind_shapes }, ...extra });
 
 function checks(g: any) {
   const steps = g.all;
@@ -114,7 +114,7 @@ test('a tangle is laid out with few crossings and every wire readable', () => {
   checks(g);
   assert.ok(count(wires(g)).crossings <= 2, `${count(wires(g)).crossings} crossings`);
   assert.equal(count(wires(g)).shared, 0, 'no two wires share a line');
-  assert.deepEqual(new Set(g.all.map((n: any) => n.shape)), new Set(['box', 'diamond', 'pill', 'sheet', 'end']));
+  assert.deepEqual(new Set(g.all.map((n: any) => n.shape)), new Set(['box', 'diamond', 'pill', 'sheet', 'end', 'flag']));
 });
 
 test('a loop in the order is cut where it closes, and the rest still reads from the top down', () => {
@@ -177,7 +177,7 @@ test('a chain too long to fold into a comb is drawn', () => {
 });
 
 test('nothing to draw is an empty picture', () => {
-  const g = layout({ items: [], links: [], measure, sizes: house.sizes });
+  const g = layout({ items: [], links: [], measure, sizes: house.sizes, shapes: { kind: house.kind_shapes } });
   assert.equal(g.all.length, 0);
   assert.ok(g.width <= house.sizes.flow_margin, 'nothing but the margin');
 });
@@ -194,7 +194,7 @@ test('the item a picture is of is a step like any other, tied to what is part of
 test("a flat lens's answer is drawn: every item a step, part_of a tie, depends_on the order, nothing nested", () => {
   const items = [flat('p', { type: 'project' }), flat('a'), flat('b'), flat('c'), flat('d'), flat('q', { kind: 'question' }), flat('t', { kind: 'aim', type: 'tag' })];
   const links = [link('part_of', 'a', 'p'), link('part_of', 'b', 'p'), link('part_of', 'c', 'p'), link('depends_on', 'b', 'a'), link('depends_on', 'c', 'b'), link('link', 'q', 'c'), link('tagged', 'd', 't')];
-  const g = layout({ items, links, undrawn: ['tagged'], measure, sizes: house.sizes });
+  const g = layout({ items, links, undrawn: ['tagged'], measure, sizes: house.sizes, shapes: { kind: house.kind_shapes } });
   checks(g);
   assert.deepEqual([...g.nodes.values()].map((n: any) => n.id).sort(), ['a', 'b', 'c', 'd', 'p', 'q', 't'], 'every item a step');
   assert.deepEqual(g.chains.map((c: any) => c.key), ['a b', 'b c'], 'the order');
@@ -217,7 +217,7 @@ test('many leaves of one, in no order, fold beside it, each tie a line of its ow
 
 test('leaves lean to the shape asked for: down a narrow pane, across a wide one', () => {
   const leaves = Array.from({ length: 13 }, (_, k) => item(`l${k}`, 'question'));
-  const at = (aspect: number) => layout({ items: [{ ...item('r'), inside: null }, ...leaves], links: [], measure, sizes: house.sizes, aspect });
+  const at = (aspect: number) => layout({ items: [{ ...item('r'), inside: null }, ...leaves], links: [], measure, sizes: house.sizes, shapes: { kind: house.kind_shapes }, aspect });
   const [narrow, wide] = [at(0.5), at(2)];
   checks(narrow);
   checks(wide);
@@ -227,7 +227,7 @@ test('leaves lean to the shape asked for: down a narrow pane, across a wide one'
 
 test('what is tied to nothing is a step of its own, set apart from the rest', () => {
   const top = (id: string, extra: Record<string, unknown> = {}) => ({ ...item(id), inside: null, ...extra });
-  const g = layout({ items: [top('a'), top('b'), top('c'), top('p', { kind: 'actor' })], links: [dep('b', 'a'), { kind: 'waits_on', from: 'b', to: 'p' }], measure, sizes: house.sizes });
+  const g = layout({ items: [top('a'), top('b'), top('c'), top('p', { kind: 'actor' })], links: [dep('b', 'a'), { kind: 'waits_on', from: 'b', to: 'p' }], measure, sizes: house.sizes, shapes: { kind: house.kind_shapes } });
   checks(g);
   assert.ok(g.nodes.has('c') && g.nodes.has('p'), 'started on the canvas and not yet wired up, it is drawn; one waited on too');
   assert.ok(g.ties.some((t: any) => t.type === 'waits_on' && t.a === 'b' && t.b === 'p'), 'waits_on is a tie');
@@ -260,7 +260,7 @@ test('a large map wraps its wide layers into rows: it comes out about the page\'
     for (let k = 0; k < 9; k++) (items.push(flat(`p${p}.${k}`)), links.push(link('part_of', `p${p}.${k}`, `p${p}`)));
   }
   assert.ok(items.length > 60);
-  const g = layout({ items, links, measure, sizes: house.sizes });
+  const g = layout({ items, links, measure, sizes: house.sizes, shapes: { kind: house.kind_shapes } });
   assert.ok(g.width / g.height < 4, `${Math.round(g.width)} wide by ${Math.round(g.height)} tall`);
   assert.ok(g.y.get('p0') > g.y.get('top') && g.y.get('p7') > g.y.get('top'), 'what is part of something sits under it');
   assert.ok(Math.abs(g.y.get('p0.0') - g.y.get('p0')) < g.height / 2, 'and keeps near it');

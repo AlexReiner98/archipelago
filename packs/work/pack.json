@@ -82,7 +82,7 @@
       "extends": "record",
       "title": "Procedure",
       "description": "How something is done: a checklist, playbook or rule. One a machine can run is a function.",
-      "statuses": { "open": ["draft", "current"], "closed": ["retired"] },
+      "statuses": { "open": ["draft", "current"], "closed": ["retired"], "phases": { "retired": "ended" } },
       "fields": {
         "executable": { "type": "boolean", "default": false },
         "entrypoint": { "type": "string", "description": "For executable procedures: the command, skill or script." }

@@ -285,14 +285,17 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   lens.not = nots.map(sayTerm);
   return {
     lens,
+    // Who is looking (a person), so a drawing can say what waits on them.
+    ...(me && { viewer: me }),
     items: items.map((e) => {
-      const defs = l.registry.type(e.type)?.fields ?? {};
+      const type = l.registry.type(e.type), defs = type?.fields ?? {};
       const fields = Object.fromEntries(Object.entries(e.props ?? {}).filter(([key, value]) => defs[key]?.shown && value != null));
       return {
         id: e.id, kind: e.kind, type: e.type, title: e.title,
         // The start of the note, for a hover: the whole of it is on the item's page (or here, asked for whole).
         ...(e.body && { body: e.body.length > NOTE_START && !wholeIds.has(e.id) ? `${e.body.slice(0, NOTE_START)}…` : e.body }),
-        visibility: e.visibility, status: e.status, open: e.is_open, owner: e.owner,
+        // Where it stands in its course (src/phases.ts), so every drawing reads one phase and keeps no registry.
+        visibility: e.visibility, status: e.status, ...(type?.statuses.phases?.[e.status] && { phase: type.statuses.phases[e.status] }), open: e.is_open, owner: e.owner,
         created_at: e.created_at, updated_at: e.updated_at,
         ...(Object.keys(fields).length && { fields }),
         ...(spans && { time: filed!.filed.get(e.id) ?? spans.get(e.id) ?? [] }),
@@ -301,7 +304,8 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
         ...(foundBy.has(e.id) ? { found: foundBy.get(e.id), terms: termsBy.get(e.id) } : stepOf.has(e.id) && { step: stepOf.get(e.id) }),
       };
     }),
-    links: relations.map((r) => ({ id: r.id, type: r.type, from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
+    // A link that extends another says what it is a flavour of (`is`, nearest first), so a drawing treats it as its root.
+    links: relations.map((r) => ({ id: r.id, type: r.type, ...(flavourOf(l, r.type).length && { is: flavourOf(l, r.type) }), from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
     ...(filed && { lanes: filed.lanes, streams: filed.streams }),
     ...(cut && { cut: true }),
     ...(matched !== undefined && { matched }),
@@ -309,3 +313,10 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
     ...(whole && { whole: items.filter((e) => wholeIds.has(e.id)).map((e) => e.id) }),
   };
 }
+
+/** What a link type is a flavour of, nearest first: [] for a root. */
+const flavourOf = (l: Archipelago, type: string): string[] => {
+  const out: string[] = [];
+  for (let r = l.registry.relations.get(type); r?.extends && !out.includes(r.extends); r = l.registry.relations.get(r.extends)) out.push(r.extends);
+  return out;
+};

@@ -12,7 +12,7 @@
       "extends": "place",
       "title": "Funding program",
       "description": "One program that can pay for part of the work: who runs it, what kind of money it is, how much, and in which phase of the project it pays. Make it part of the work it would fund. Its note says who applies, what costs count and the source.",
-      "statuses": { "open": ["open", "upcoming", "watching", "applying"], "closed": ["funded", "closed", "not_a_fit"] },
+      "statuses": { "open": ["open", "upcoming", "watching", "applying"], "closed": ["funded", "closed", "not_a_fit"], "phases": { "open": "standing", "upcoming": "not_started", "watching": "standing" } },
       "fields": {
         "kind": { "type": "enum", "values": ["grant", "loan", "tax_credit", "wage_subsidy", "equity", "support"], "shown": true, "description": "What kind of money or help: a grant or contribution, a loan, a tax credit, a wage subsidy or placement, equity (a fund, angels or an accelerator that takes shares), or support (advice, testing, a test site)." },
         "phase": { "type": "enum", "values": ["set_up", "research", "build", "prove"], "shown": true, "description": "Where in the project it pays: setting up, the research core, building and adopting, or proving and selling." },
