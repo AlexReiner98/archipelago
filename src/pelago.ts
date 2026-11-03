@@ -12,7 +12,7 @@ import { search, type SearchInput } from './search.ts'; import { layoutOf } from
 import { append, headOf, type Fact } from './log.ts'; import { projectDecision, projectFacts, stamp } from './replay.ts'; import { linkFacts } from './facts.ts';
 import { decideProposal } from './proposals.ts'; import { guardedFetch } from './outbound.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
-import { planChange } from './change-plan.ts'; import { applyChange } from './change-apply.ts';
+import { planChange } from './change-plan.ts'; import { applyChange, letThrough } from './change-apply.ts';
 
 export * from './pelago-types.ts';
 export type { Level, OpKind, Policy } from './rules.ts';
@@ -123,7 +123,7 @@ export class Archipelago {
       };
     }
     const spared = [...new Map(verdict.spared.flat().map((r) => [`${r.pack}.${r.rule}`, { rule: r.rule, pack: r.pack }])).values()];
-    const applied = await this.apply(me, input, { authority, token: actor.token, rule: { outcome: 'apply', spared } });
+    const applied = { ...(await this.apply(me, input, { authority, token: actor.token, rule: { outcome: 'apply', spared } })), ...letThrough(verdict.spared) };
     return answered.length ? { ...applied, answered } : applied;
   }
 
