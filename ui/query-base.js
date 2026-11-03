@@ -11,7 +11,7 @@ export const LIT = [
 ];
 
 /** A style's colours, by the name the stylesheet knows each by. */
-export const STYLE_COLORS = ['sea', 'land', 'inner', 'line', 'text', 'muted', 'blocked', 'you', 'session', 'done', 'warn'];
+export const STYLE_COLORS = ['sea', 'land', 'inner', 'line', 'text', 'muted', 'accent', 'blocked', 'you', 'session', 'done', 'warn'];
 /** The sizes a style names at its top, and the stylesheet's name for each. */
 const TOP_SIZES = ['text', 'radius', 'gap', 'column'];
 /** A length as a style may give it: a number of pixels, or a number with one of these units. */
@@ -36,6 +36,16 @@ export function dress(host, style) {
   for (const name of [...host.style].filter((n) => /^--(ln|face|type)-/.test(n) && !set.has(n))) host.style.removeProperty(name);
   for (const [name, value] of set) host.style.setProperty(name, value);
 }
+const named = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+/**
+ * Styles laid one over another, the nearest last. A field that names things (sizes, numbers, colours) is merged name
+ * by name, as the server lays the styles kept on the map (src/styles.ts): a view that sets one size keeps the house's rest.
+ */
+export const layered = (...styles) => {
+  const out = {};
+  for (const style of styles) for (const [key, value] of Object.entries(style ?? {})) out[key] = named(value) && named(out[key]) ? { ...out[key], ...value } : value;
+  return out;
+};
 /** A size a drawing's code lays out by, in pixels: the style's, named by the house style. */
 export const sizeOf = (style, name) => {
   const v = style.sizes?.[name];

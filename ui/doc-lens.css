@@ -2,7 +2,7 @@
    (ui/style.css, .lens-view), and the few controls its shapes put over it. Every value is the style's. */
 .doc-lens .lens-view {
   --ln-sea: var(--bg); --ln-land: var(--panel); --ln-inner: var(--bg); --ln-line: var(--edge); --ln-text: var(--text); --ln-muted: var(--muted);
-  --ln-blocked: var(--g-blocked); --ln-you: var(--g-question); --ln-session: var(--accent); --ln-done: var(--ok); --ln-warn: var(--warn);
+  --ln-blocked: var(--g-blocked); --ln-you: var(--g-question); --ln-session: var(--accent); --ln-done: var(--ok); --ln-warn: var(--warn); --ln-accent: var(--accent);
   font-family: var(--ln-font);
 }
 /* Drawn right on the page: no border, no panel behind it, and a time picture no wider than the page. */

@@ -295,7 +295,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
           ...(file === 'draw.html' && { 'content-security-policy': options.unsandboxed ? DRAW_POLICY.replace('sandbox allow-scripts; ', '') : DRAW_POLICY }),
           // The frame has an origin of its own, so what it loads from here it loads as a stranger.
-          ...((file === 'draw.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
+          ...((file === 'draw.js' || file === 'draw-marks.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
         });
         const html = page && (await uiPage(file));
         // Marked so the page makes its drawing frames with no sandbox (ui/base.js frameSandbox), as draw.html is served.

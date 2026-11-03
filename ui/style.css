@@ -178,7 +178,7 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: var(--space-3); }
 /* A lens, drawn in a style. Its sizes are the style's, set by dress (ui/query-base.js) from the house style; its colours follow the page's until they are presets too. */
 .lens-view {
   --ln-sea: var(--bg); --ln-land: var(--panel); --ln-inner: var(--bg); --ln-line: var(--edge); --ln-text: var(--text); --ln-muted: var(--muted);
-  --ln-blocked: var(--g-blocked); --ln-you: var(--g-question); --ln-session: var(--accent); --ln-done: var(--ok); --ln-warn: var(--warn);
+  --ln-blocked: var(--g-blocked); --ln-you: var(--g-question); --ln-session: var(--accent); --ln-done: var(--ok); --ln-warn: var(--warn); --ln-accent: var(--accent);
 }
 .lens-card { overflow: hidden; }
 .lens-bar { padding: var(--space-6) var(--space-8) 0; flex-wrap: wrap; min-width: 0; }
