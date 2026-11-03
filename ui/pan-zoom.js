@@ -27,6 +27,9 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   const view = { s: 1, x: 0, y: 0 };
   let fitted = 1;
   let drag = null;
+  // Whether the reader (or a control on their behalf) has moved it since it opened: one nobody has moved opens again
+  // when its frame changes size (a story's milestone coming in beside it), rather than keeping its middle.
+  let moved = false;
   const size = () => [Math.max(1, frame.clientWidth), Math.max(1, frame.clientHeight)];
 
   // ---- What is drawn: each mark of the picture with where it lies, read once and again when the drawing moves one.
@@ -99,6 +102,7 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     view.s = fitted;
     view.x = -(aside + (room - width * view.s) / 2) / view.s;
     view.y = -(top + (tall - height * view.s) / 2) / view.s;
+    moved = false;
     now();
   };
   const open = () => {
@@ -117,6 +121,7 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     const [W, H] = size();
     const [mx, my] = [px ?? W / 2, py ?? H / 2];
     const s = scaled(view.s * factor);
+    moved = true;
     view.x += mx / view.s - mx / s;
     view.y += my / view.s - my / s;
     view.s = s;
@@ -126,6 +131,7 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   /** Bring a point of the picture to the middle of what is in sight, less `right` of the frame covered on its right. */
   const show = (px, py, right = 0) => {
     const [W, H] = size();
+    moved = true;
     view.x = px - (W - right) / 2 / view.s;
     view.y = py - H / 2 / view.s;
     now();
@@ -149,7 +155,7 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.abs(dx) + Math.abs(dy) <= plane.drag_from) return;
     if (!drag.moved) {
-      drag.moved = true;
+      drag.moved = moved = true;
       frame.classList.add('moving');
       // Held, so the drag goes on outside the frame; a pointer that cannot be held still drags inside it.
       try {
@@ -178,7 +184,7 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   pinchOf(frame, {
     begin: ([x, y]) => {
       if (drag) ((drag.moved = true), end());
-      dragged = true;
+      dragged = moved = true;
       held = { s: view.s, x: view.x + x / view.s, y: view.y + y / view.s };
     },
     pinch: (by, [x, y]) => {
@@ -190,13 +196,14 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   });
   // A frame that changes size keeps what was in the middle of it in the middle (a pane whose edge is dragged does not
   // carry the picture with that edge), but the sheet coming or going leaves it where the reader put it: only the room
-  // beside it changes. One first given a size opens.
+  // beside it changes. One first given a size opens, and so does one nobody has moved yet.
   let opened = Boolean(frame.clientWidth), was = size(), beside = sheetAside();
   if (opened) open();
   new ResizeObserver(() => {
     if (!frame.clientWidth) return;
     const now = size();
     if (!opened) return void ((opened = true), (was = now), open());
+    if (!moved) return void ((was = now), (beside = sheetAside()), open());
     const stays = sheetAside() !== beside;
     if (!stays) view.x += (was[0] - now[0]) / 2 / view.s;
     view.y += (was[1] - now[1]) / 2 / view.s;
@@ -206,6 +213,6 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   }).observe(frame);
   /** Where it stands now, and put back where it stood (a picture drawn again, kept where the reader left it). */
   const state = () => ({ ...view });
-  const restore = (was) => (Object.assign(view, was), now());
+  const restore = (was) => (Object.assign(view, was), (moved = true), now());
   return { zoomBy, fit, open, show, state, restore, inView };
 }
