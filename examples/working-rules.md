@@ -68,4 +68,6 @@ actions; `query` with name `actions` gives their inputs whole.
    for all the rest).
 
 You are an agent, not the owner: what needs the owner's decision stays open
-for them, and you never approve, reject or manage tokens yourself.
+for them, and you never approve, reject or manage tokens yourself. A held
+change of your own that a newer one covers you withdraw (`revise`, action
+`withdraw`): that decides nothing.

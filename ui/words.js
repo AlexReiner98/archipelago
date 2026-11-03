@@ -118,7 +118,7 @@ export function authorityMark(a) {
 export const VERBS = {
   'entity.create': 'created', 'entity.update': 'changed', 'entity.archive': 'archived', 'entity.restore': 'restored', 'entity.merge': 'merged',
   'relation.link': 'linked', 'relation.unlink': 'unlinked', 'type.define': 'new type',
-  'proposal.create': 'held', 'proposal.approve': 'applied', 'proposal.reject': 'declined', 'proposal.supersede': 'overtaken',
+  'proposal.create': 'held', 'proposal.approve': 'applied', 'proposal.reject': 'declined', 'proposal.supersede': 'overtaken', 'proposal.withdraw': 'withdrew',
   'changeset.undo': 'undid', 'changes.seen': 'marked seen', 'questions.confirmed': 'owner answered', 'repo.push': 'push', 'recheck.done': 're-checked',
   'automation.fire': 'automation', 'run.stale': 'went quiet', 'connection.check': 'connection', 'resource.claim': 'took', 'resource.release': 'gave back',
 };
@@ -282,6 +282,7 @@ export function describeEvent(ev) {
   if (ev.action === 'relation.link' || ev.action === 'relation.unlink') return `${relations.get(d.type)?.title ?? d.type} ${named(d.to)}`;
   if (ev.action === 'entity.create') return `${typeTitle(d.type)}, ${d.status ?? ''}`;
   if (ev.action === 'proposal.supersede') return `${d.proposal} asked only for what ${d.by} had already made so`;
+  if (ev.action === 'proposal.withdraw') return `${d.proposal}${d.by ? `, covered by ${d.by}` : ''}`;
   if (ev.action.startsWith('proposal.')) return `${d.proposal}${d.revised ? ', with corrections' : ''}`;
   if (ev.action === 'connection.check') return `${d.from} → ${d.to}`;
   if (ev.action.startsWith('resource.')) return d.holder_title ?? d.holder ?? '';
