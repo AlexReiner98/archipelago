@@ -97,6 +97,7 @@ test('refused tokens are counted by address, a backup unpacks only so far, and t
   const frame = await fetch(base + '/draw.html');
   assert.match(frame.headers.get('content-security-policy') ?? '', /^sandbox allow-scripts; default-src 'none'; script-src 'self' blob: data:; worker-src blob: data:;.*connect-src 'none'; webrtc 'block';/);
   assert.equal((await fetch(base + '/draw.js')).headers.get('access-control-allow-origin'), '*');
+  assert.equal((await fetch(base + '/draw-marks.js')).headers.get('access-control-allow-origin'), '*');
   assert.equal((await fetch(base + '/app.js')).headers.get('access-control-allow-origin'), null, 'and nothing else here is given to strangers');
 
   // The page names its files by the UI's version, so they are kept for good, and asks for every module it imports at once.

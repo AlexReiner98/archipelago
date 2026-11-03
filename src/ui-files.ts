@@ -32,6 +32,7 @@ export const UI_FILES: Record<string, string> = {
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
   '/draw.html': 'draw.html',
   '/draw.js': 'draw.js',
+  '/draw-marks.js': 'draw-marks.js',
   // The projector's pure part, which the page runs on the facts it reads (ui/replica.js): served from the kernel's own file.
   '/project.js': 'project.js',
   // What a stylesheet from the map may say, which the page checks a sheet by and the server checks page_css by on write.

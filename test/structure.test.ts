@@ -188,7 +188,9 @@ test('kernel modules import one way', () => {
 
 // 7. The UI loads as native modules, with no build step.
 const CLASSIC_SCRIPTS: Record<string, number> = {
-  // The sandboxed drawing frame has no origin of its own; a module there is untried.
+  // The sandboxed drawing frame has no origin of its own; a module there is untried. Its two halves (a style's code,
+  // drawings that answer with marks) are one script split to stay under 500 lines (e_vbmkhnyb), not a second page's.
+  'ui/draw.html: <script src="/draw-marks.js">': 1,
   'ui/draw.html: <script src="/draw.js">': 1,
 };
 
