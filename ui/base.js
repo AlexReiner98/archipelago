@@ -47,6 +47,12 @@ export const notOf = (filter) => filter?.not ?? ['kind system'];
 // drop it, for a browser that loads no sandboxed frame (the desktop app's pane); the worker inside is still a wall.
 export const frameSandbox = () => (document.documentElement.dataset.drawSandbox === 'off' ? null : 'allow-scripts');
 
+// Whether the owner turned the sandbox off for a style's code here (workspace_info drawings_open): read once a page, and
+// again once the setting is changed. Anything but a yes keeps the sandbox.
+let opened;
+export const drawingsOpen = () => (opened ??= api('workspace_info').then((info) => info?.drawings_open === true, () => false));
+export const drawingsChanged = () => void (opened = undefined);
+
 // Questions are asked in the page rather than with confirm() and prompt(), so
 // they can be styled and browser automation can answer them. Resolves to null
 // when dismissed; otherwise true, or the text typed when `input` is given, or,

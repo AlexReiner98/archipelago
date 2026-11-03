@@ -54,7 +54,7 @@ import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
-import { UI_FILES, uiFile, uiPage } from './ui-files.ts';
+import { UI_FILES, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY } from './page-policies.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
@@ -83,14 +83,6 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
 }
 
-// The page itself: its own script and stylesheet, this server, and the one frame a style's code is drawn in.
-const PAGE_POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
-/** A document's preview, which this server's own page may frame, to read drafts on the canvas (ui/reader-frame.js). */
-const PREVIEW_POLICY = PAGE_POLICY.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
-// The frame a style's code runs in. `sandbox` gives it an origin of its own, so it has no way to the page's token or storage, cannot open
-// windows or move the page, and `connect-src 'none'` with no outside source for anything leaves it nowhere to send what it is shown.
-// It does not say who may frame it: sandboxed, it has no origin for 'self' to match, and framed by a stranger it is an empty page that can reach nothing.
-const DRAW_POLICY = "sandbox allow-scripts; default-src 'none'; script-src 'self' blob: data:; worker-src blob: data:; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; webrtc 'block'; base-uri 'none'; form-action 'none'";
 const MIME: Record<string, string> = { html: 'text/html', js: 'text/javascript', css: 'text/css' };
 
 class Refused extends Error {
@@ -267,7 +259,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // (src/published-preview.ts), its site's other pages each led to by their own preview.
       if (req.method === 'GET' && /^\/preview\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
         res.writeHead(200, { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PREVIEW_POLICY });
-        return res.end((await uiPage('doc.html')).replace('<html', options.unsandboxed ? '<html data-draw-sandbox="off"' : '<html'));
+        return res.end(markPage(await uiPage('doc.html'), { unsandboxed: options.unsandboxed }));
       }
       const preview = req.method === 'POST' ? /^\/preview\/(e_[a-z0-9]{8})\/data$/.exec(url.pathname) : null;
       if (preview) {
@@ -283,7 +275,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       if (req.method === 'GET' && UI_FILES[url.pathname]) {
         const file = UI_FILES[url.pathname];
-        const page = file.endsWith('.html');
+        const page = file.endsWith('.html'), open = file === 'draw.html' && url.searchParams.get('open') === '1';
         const served = page || file === 'layout.css' ? null : await uiFile(file, url.searchParams.get('v'));
         // The page loads its own script and stylesheet and talks to this server: nothing else, from anywhere, and it is not framed.
         // A file named by the UI's current version is kept for good (src/ui-files.ts); the pages, and the rest, never.
@@ -293,13 +285,12 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           'x-content-type-options': 'nosniff',
           'referrer-policy': 'no-referrer',
           ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
-          ...(file === 'draw.html' && { 'content-security-policy': options.unsandboxed ? DRAW_POLICY.replace('sandbox allow-scripts; ', '') : DRAW_POLICY }),
+          ...(file === 'draw.html' && { 'content-security-policy': drawPolicy(open, Boolean(options.unsandboxed)) }),
           // The frame has an origin of its own, so what it loads from here it loads as a stranger.
           ...((file === 'draw.js' || file === 'draw-marks.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
         });
         const html = page && (await uiPage(file));
-        // Marked so the page makes its drawing frames with no sandbox (ui/base.js frameSandbox), as draw.html is served.
-        if (html && options.unsandboxed) return res.end(html.replace('<html', '<html data-draw-sandbox="off"'));
+        if (html && (options.unsandboxed || open)) return res.end(markPage(html, { open, unsandboxed: options.unsandboxed }));
         return res.end(file === 'layout.css' ? lengthsSheet((await workspaces.get(DEFAULT_WORKSPACE)).pelago.registry.packs) : html || served!.body);
       }
 

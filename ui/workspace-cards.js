@@ -1,7 +1,7 @@
 // The Workspace screen's cards for the workspace itself and what is outside it: the owner, connecting an agent, backups
 // and importing, GitHub's webhook, the server's packs and the workspace's own settings. Each setting is one row.
 
-import { api, ask, h } from './base.js';
+import { api, ask, drawingsChanged, h } from './base.js';
 import { hint, link, menu, when } from './words.js';
 import { plate, plates } from './plates.js';
 
@@ -203,7 +203,7 @@ export function allowance(info, key, label, tip, question) {
   allow.onchange = async () => {
     const on = allow.checked;
     if (on && !(await ask({ ...question, action: 'Allow', danger: true }))) return void (allow.checked = false);
-    api('workspace_set', { [key]: on }).catch((err) => ((allow.checked = !on), (name.title = err.message)));
+    api('workspace_set', { [key]: on }).then(drawingsChanged, (err) => ((allow.checked = !on), (name.title = err.message)));
   };
   return line(name, allow);
 }
