@@ -25,7 +25,11 @@ Anything where Archipelago, not the task, cost you something:
   needed;
 - a description, hook text or CLAUDE.md line that sent you the wrong way;
 - anything in the web UI the owner had to squint at, or said was bad;
-- the hosted server, a hook or the Actions workflow not doing what it says.
+- the hosted server, a hook or the Actions workflow not doing what it says;
+- the map saying something the code no longer bears out: an item still "not
+  merged" after the merge, a "Left" list another commit has done, a title
+  stating a problem that is fixed, "doing" on merged work, a handoff that
+  names the wrong head.
 
 What does not count: a bug in the code you are working on, or a mistake of
 your own that Archipelago could not have prevented. If Archipelago could have
@@ -34,12 +38,13 @@ prevented it cheaply, it counts.
 ## How to record one
 
 1. **Find the home.** Bumps live as issues under the Archipelago project's feature
-   for friction. `query` with name `search`, params type `software.feature` and q `friction`. On the
-   owner's hosted map its id is in `references/home.md`. If there is none in
-   this workspace, create the issue as part of the Archipelago project instead.
+   for friction. `query` with name `search`, params type `feature` and q
+   `friction`; `references/home.md` says the same for this workspace. If there
+   is none, create the issue as part of the Archipelago project instead.
 
-2. **Look for it first.** `query` `search` with type `issue`, open only, and two or
-   three words of what happened. The same bump is usually already there.
+2. **Look for it first.** `query` `search` with type `issue`, `open: true`, and
+   one distinctive word of what happened in q (a search of several words can
+   miss what one finds). The same bump is usually already there.
 
 3. **If it is there, add to it.** `query` `get` it, then `change` it with an `update` op that appends one
    more dated line under "Seen": what you were doing and what happened. A bump
@@ -75,14 +80,26 @@ prevented it cheaply, it counts.
    - Put exact error text in the body when there was one. It is what the
      person fixing it will search for.
 
-5. **Say so in one line** in your next message to the owner ("Recorded a
+5. **A map found out of date** is corrected before it is counted. Fix the item
+   itself first (its status, or a "Stands at" line rewritten, not appended),
+   then add one dated line under "Seen" on the open issue about the map going
+   stale (search q `stale`; create it if there is none), naming which cause it
+   was, so the causes are counted:
+   1. a body keeps "not merged" or "not pushed" after the merge;
+   2. the title or first line states a problem the fix below it removed;
+   3. another commit did part of the item's "Left" list;
+   4. "doing" lingers on merged work that waits only on a look;
+   5. the map heard nothing of commits that were not pushed;
+   6. the item read as confirmed because any edit counts as a check.
+
+6. **Say so in one line** in your next message to the owner ("Recorded a
    Archipelago bump: ..."), and carry on.
 
 ## When one is fixed
 
 When a change removes a bump, resolve its issue in the same breath, with the
-commit. Naming the id in the commit message ("fixes e_...") on the default
-branch closes it by itself.
+commit. A last line `Closes: e_...` in the commit message closes it when the
+push that carries the commit reaches the map, on any branch.
 
 ## Keeping this smooth
 
