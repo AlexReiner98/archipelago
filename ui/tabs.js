@@ -115,13 +115,26 @@ export function keep() {
   save(listKey(), { tabs: tabs.list, front: tabs.front, landed: Object.fromEntries(landed), dismissed: [...dismissed] });
 }
 
-/** Whether an address can be drawn in a pane: a canvas or an item's, not the workspace's sheet. */
-export const drawable = (at) => /^(v\b|e\/e_)/.test(at ?? '');
+/** Whether an address can be drawn in a pane: a canvas, an item's or a web page (`w?url=…`), not the workspace's sheet. */
+export const drawable = (at) => /^(v\b|e\/e_|w\?)/.test(at ?? '');
+/** The web address a pane's address frames (ui/pane-web.js), or nothing when it draws the map. */
+export const webOf = (at) => (/^(#\/)?w\?/.test(at ?? '') ? (new URLSearchParams(at.split('?')[1]).get('url') ?? undefined) : undefined);
 /** The saved canvas or item an address names first: two panes on it draw the same. */
 export const named = (at) => {
   const bare = (at ?? '').replace(/^#\//, '');
   return /canvas=(e_[a-z0-9]{8})/.exec(bare)?.[1] ?? /^e\/(e_[a-z0-9]{8})/.exec(bare)?.[1] ?? bare;
 };
+/**
+ * The sessions whose next show lands in tab `t`, by the rules of ui/pane-route.js: the one it follows or is the tab of,
+ * and one holding a pane in it that no other tab follows. The page says them with its beat, so a show can say whether
+ * the owner sees it land (src/seeing.ts).
+ */
+export function landsIn(t) {
+  if (!t) return [];
+  const runs = new Set([t.follows, t.chat].filter((r) => r && r !== 'none'));
+  for (const g of t.groups) for (const r of [t.panes[g]?.held, t.panes[g]?.by]) if (r && !tabs.list.some((o) => o !== t && o.follows === r)) runs.add(r);
+  return [...runs].slice(0, 24);
+}
 /** An address of the page (#/v?…, #/) as a pane's own. */
 export const asPane = (href) => href.replace(/^#\//, '') || 'v';
 /** A pane's address as the page's: Home is #/. */

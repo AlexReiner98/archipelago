@@ -13,6 +13,8 @@ export function atOf(hash) {
   const [, name = '', arg] = where.split('/');
   if (name === '') return 'v';
   if (name === 'v') return query ? `v?${query}` : 'v';
+  // A web page framed in a pane (ui/pane-web.js).
+  if (name === 'w') return query ? `w?${query}` : 'v';
   if (name === 'e' && arg && readAddress(query).lens) return `v?${query}`;
   return undefined;
 }

@@ -5,6 +5,8 @@
 // here would be heard by a page in another test.
 
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
@@ -150,5 +152,51 @@ test('in a browser, the Follows menu lists the chats open now, by title', { skip
     assert.deepEqual(names, ['Nobody', 'Stays quiet'], 'an ended chat leaves it; Everyone is gone, every chat having a tab of its own');
   } finally {
     await page.close();
+  }
+});
+
+test('in a browser, a show frames a web address in its pane, and says whether the owner is looking at that tab', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base, call } = await serve('off');
+  // A build being made, on this machine: what a dev server serves.
+  const build = createServer((_req, res) => res.writeHead(200, { 'content-type': 'text/html' }).end('<title>Build</title><p id="built">Built</p>'));
+  await new Promise<void>((done) => build.listen(0, '127.0.0.1', done));
+  const url = `http://localhost:${(build.address() as AddressInfo).port}/sketch`;
+  const agent = 'agent:claude-code/archipelago';
+  const { run } = (await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: 'web-show', title: 'Web show' } })).result;
+  const page = await open(`${base}/`);
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const until = async (what: string, ok: () => Promise<boolean>) => {
+    for (let n = 0; n < 60; n++) if (await ok()) return;
+    else await wait(250);
+    assert.fail(`${what}: ${page.logs().join('\n')}`);
+  };
+  const show = async (params: Record<string, unknown>) => (await call('/agent/report', undefined, { actor: agent, action: 'show', params: { ...params, run } })).result;
+  const press = async (selector: string) => {
+    const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })())`));
+    for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
+  };
+  try {
+    await wait(3000);
+    const first = await show({ url, note: 'The build' });
+    assert.equal(first.sight.looking, false, 'its first show opens a tab of its own, out of sight');
+    await until('the chat has a tab', () => page.evaluate<boolean>(`document.querySelectorAll('#tabs .tab').length === 2`));
+    await press('#tabs .tab:nth-child(2) .tab-name');
+    await until('the page framed in its pane', () => page.evaluate<boolean>(`document.querySelector('#canvas > .pane iframe.pane-web')?.src === ${JSON.stringify(url)}`));
+    assert.equal(await page.evaluate(`document.querySelector('#canvas > .pane .pane-name').textContent`), new URL(url).host, 'named by its host');
+    assert.equal(await page.evaluate(`document.querySelector('#canvas > .pane a.pane-act')?.href`), url, 'and ↗ opens it in a window of its own');
+    assert.equal(await page.evaluate(`document.querySelector('#canvas > .pane .pane-canvas').hidden`), true, 'in place of the canvas');
+    // Its tab in sight now: a show says the owner is looking at it, once the page has said so with its beat.
+    const sees = async (looking: boolean) => {
+      for (let n = 0; n < 30; n++) if ((await show({ url })).sight.looking === looking) return;
+      else await wait(500);
+      assert.fail(`sight never ${looking}: ${page.logs().join(' ')}`);
+    };
+    await sees(true);
+    // Back on the owner's tab, a show lands out of sight, and says so.
+    await press('#tabs .tab:nth-child(1) .tab-name');
+    await sees(false);
+  } finally {
+    await page.close();
+    build.close();
   }
 });

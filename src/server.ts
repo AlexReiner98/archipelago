@@ -83,10 +83,10 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
 }
 
-// The page itself: its own script and stylesheet, this server, and the one frame a style's code is drawn in.
-const PAGE_POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
-/** A document's preview, which this server's own page may frame, to read drafts on the canvas (ui/reader-frame.js). */
-const PREVIEW_POLICY = PAGE_POLICY.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
+// The page itself: its own script and stylesheet, this server, the frame a style's code is drawn in, and a web page an agent shows in a pane (ui/pane-web.js): any https address, plain http on this machine only.
+const PAGE_POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' https: http://localhost:* http://127.0.0.1:*; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+/** A document's preview, which this server's own page may frame, to read drafts on the canvas (ui/reader-frame.js): it frames only this server. */
+const PREVIEW_POLICY = PAGE_POLICY.replace(" https: http://localhost:* http://127.0.0.1:*", '').replace("frame-ancestors 'none'", "frame-ancestors 'self'");
 // The frame a style's code runs in. `sandbox` gives it an origin of its own, so it has no way to the page's token or storage, cannot open
 // windows or move the page, and `connect-src 'none'` with no outside source for anything leaves it nowhere to send what it is shown.
 // It does not say who may frame it: sandboxed, it has no origin for 'self' to match, and framed by a stranger it is an empty page that can reach nothing.
