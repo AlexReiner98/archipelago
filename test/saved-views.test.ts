@@ -42,3 +42,16 @@ test('a view a document brings in says which document, and an archived document 
   await l.change(human, { reason: 'test', ops: [{ op: 'archive', id: doc }] });
   assert.equal((await read()).find((p) => p.lens === view)?.document, undefined);
 });
+
+test('a saved view is named and shaped by the style it names itself, over one kept about it', async () => {
+  const l = await fresh();
+  const { grid } = await make(l, [{ op: 'create', ref: 'grid', type: 'style', title: 'The grid', props: { shape: 'grid' } }]);
+  const made = await make(l, [
+    { op: 'create', ref: 'about', type: 'style', title: 'Its old style', props: { shape: 'list' } },
+    { op: 'create', ref: 'v', type: 'lens', title: 'Work', props: { filter: { find: ['type task'] }, style: { style: grid } } },
+    { op: 'link', type: 'about', from: 'about', to: 'v' },
+    { op: 'create', ref: 'w', type: 'lens', title: 'Flow of work', props: { filter: { find: ['type task'] }, style: { shape: 'flow' } } },
+  ]);
+  const { pictures } = (await callTool(l, human, 'view', { name: 'saved_views', params: {} })) as { pictures: Record<string, unknown>[] };
+  assert.deepEqual(new Map(pictures.map((p) => [p.lens, [p.title, p.shape]])), new Map([[made.v, ['The grid', 'grid']], [made.w, ['Flow of work', 'flow']]]));
+});

@@ -5,6 +5,8 @@
 //   a preset on nothing (the workspace's), a style kept about nothing, a preset on nothing that says it lies over it,
 //   a preset on the item's kind or type, a style kept on it,
 //   a style kept about the item, one about the view drawn, one named outright.
+// A layer that names a shape and has no code, or says code: null, clears the code of those beneath it: a style named
+// outright draws as it says, whatever a style about the project draws.
 // A style kept with a preset's id (preset) is the owner's version of that preset: its fields over the preset's, in
 // the preset's place; retired, the preset is not used. Read each time, so a change shows on the next look.
 // A preset that says it is chosen (over: "chosen", a theme) is used only once the owner keeps a version of it, and
@@ -90,10 +92,15 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, give
   if (ask.own) layers.push({ weight: 5, id: 'view', title: 'This view', props: ask.own });
   layers.sort((a, b) => a.weight - b.weight);
   let style: Record<string, unknown> = {};
-  for (const layer of layers) style = over(style, fields(layer.props));
-  if (style.theme != null) style.theme = finishTheme(style.theme);
   // The style whose code draws, when one has code: what a change its drawing asks for names (src/layout-changes.ts).
-  const coder = [...layers].reverse().find((layer) => typeof layer.props.code === 'string' && layer.id !== layer.preset)?.id;
+  let coder: string | undefined;
+  for (const layer of layers) {
+    // A nearer style that names a shape and has no code of its own, or says code: null, is drawn as it says: the code beneath it is cleared.
+    if (typeof layer.props.code !== 'string' && (layer.props.code === null || typeof layer.props.shape === 'string')) (delete style.code, (coder = undefined));
+    style = over(style, fields(layer.props));
+    if (typeof layer.props.code === 'string' && layer.id !== layer.preset) coder = layer.id;
+  }
+  if (style.theme != null) style.theme = finishTheme(style.theme);
   return { style, used: layers.map(({ id, title, preset }) => ({ id, title, ...(preset && { preset }) })), ...(coder && { coder }) };
 }
 
@@ -133,7 +140,11 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: u
   const own = view === undefined ? undefined : ownStyle((await l.entity(view))?.props.style);
   const read = await styleFor(l, await keptOf(l, 'style', named), { ...(item && { hub: item }), ...(own && { own }), ...(named && { named }), ...(person && { person }), ...(tried && { try: tried }) });
   // The shape the reader chose for this view (the view band's switch) over that, so its drawing comes with it.
-  if (typeof input.shape === 'string' && input.shape) read.style.shape = input.shape;
+  if (typeof input.shape === 'string' && input.shape) {
+    read.style.shape = input.shape;
+    delete read.style.code;
+    delete read.coder;
+  }
   return input.have === undefined ? read : { ...read, style: await drawn(l, read.style, input.have) };
 }
 
