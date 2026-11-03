@@ -6,7 +6,9 @@
 // The tools are the small surface (src/surface.ts); a verb's description lists the actions a workspace's packs add,
 // so a client that opens the GET stream is told there when its workspace's tools change (a pack turned off or on), so
 // it asks again rather than holding the list it was given when it connected. The stream is this process's: after a
-// restart the client opens it again, on whichever server answers.
+// restart the client opens it again, on whichever server answers, and is told at once, since nothing here knows what
+// the server it heard from before offered. Claude Code (2.1) starts over instead when its stream drops, and lists the
+// tools again itself for some minutes after; a description its model has already read stays as it was read.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -94,10 +96,10 @@ function serverFor(caller: Caller): McpServer {
 
 /** The GET streams open on this process, by workspace: each is told when that workspace's tools change. */
 const streams = new Map<string, Set<ServerResponse>>();
-const event = (message: unknown) => `event: message\ndata: ${JSON.stringify(message)}\n\n`;
+const LIST_CHANGED = `event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' })}\n\n`;
 
 onToolsChanged((workspace) => {
-  for (const res of streams.get(workspace) ?? []) res.write(event({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' }));
+  for (const res of streams.get(workspace) ?? []) res.write(LIST_CHANGED);
 });
 
 // A stream that says nothing for long is cut by the proxies in front: a comment now and then keeps it open.
@@ -116,6 +118,8 @@ function listen(req: IncomingMessage, res: ServerResponse, caller: Caller, allow
   if (!String(req.headers.accept ?? '').includes('text/event-stream')) return fail(res, 406, 'Not Acceptable: the client must accept text/event-stream.');
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache, no-transform', connection: 'keep-alive' });
   res.flushHeaders();
+  // A stream opened again after a deploy may have been offered other tools before: the client asks for the list again.
+  res.write(LIST_CHANGED);
   const open = streams.get(caller.workspace) ?? new Set();
   streams.set(caller.workspace, open.add(res));
   res.on('close', () => {

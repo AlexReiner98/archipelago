@@ -14,7 +14,7 @@ import { addTouched } from './touched.ts';
 import { fileSaid } from './file-said.ts';
 import { keepGit } from './git-state.ts';
 import { sessionOpened } from './tool-change.ts';
-import { describeChanges, humanChanges, latestSeq } from './tools.ts';
+import { describeChanges, humanChanges, latestSeq, offeredActions } from './tools.ts';
 import { summed } from './summary.ts';
 import { seeingLine } from './seeing.ts';
 import { keep, kept } from './transient.ts';
@@ -75,8 +75,14 @@ const heardKey = (session: string | undefined) => `heard:${session ?? ''}`;
 const LIMITED =
   'This machine’s Archipelago token is limited to some repositories, and this folder is not a checkout of one that is theirs: the session is not registered in Archipelago, and its work is not kept there. Tell the owner in your first reply; a token for this repository is made on the Workspace screen.';
 
-const restarted = ({ started, commit }: HookCall['running']) =>
-  `The Archipelago server has restarted since this session began (at ${started}${commit ? `, now running commit ${commit.slice(0, 7)}` : ''}). If that was a deploy, its tools may have changed, and your client still holds the list from when it connected: a tool, an action or an input that CLAUDE.md or a tool's answer names, but your list lacks, is there on the server (the tools are query, change, undo and the six verbs, each taking an action by name). Ask the owner to reconnect the pelago MCP server, or until then call the tool as plain JSON: POST /agent/<tool> on the same server with the same token. And if a pelago tool answers with a web page or "502" while the server is coming back, do not send it again through MCP (each such answer is a whole page in your context): wait until GET /health answers, then send it as plain JSON.`;
+const actionsKey = (session: string | undefined) => `actions:${session ?? ''}`;
+
+// Claude Code lists the tools again when it reconnects after a restart (for some minutes after the stream drops), but
+// what its model already read of them (a tool loaded with ToolSearch) is the description as it was.
+const restarted = ({ started, commit }: HookCall['running'], added: string[] | undefined) =>
+  `The Archipelago server has restarted since this session began (at ${started}${commit ? `, now running commit ${commit.slice(0, 7)}` : ''}). ${
+    added?.length ? `Actions new since you were given the tools: ${added.join('; ')}. ` : added ? 'No action is new since you were given the tools. ' : ''
+  }A pelago tool's description you read before the restart may be the old one: call an action by name under its verb even if that description lacks it (query with name actions gives its inputs), or load the tool again (ToolSearch, select:mcp__pelago__<verb>) for the new one. If a pelago tool is missing altogether or answers that it is not connected, the client gave up reconnecting: ask the owner to reconnect it (in Claude Code: /mcp, pelago, Reconnect), and until then call it as plain JSON: POST /agent/<tool> on the same server with the same token. And if a pelago tool answers with a web page or "502" while the server is coming back, do not send it again through MCP (each such answer is a whole page in your context): wait until GET /health answers, then send it as plain JSON.`;
 
 /** The answer to one hook, or undefined for an event there is none for. */
 export async function answerHook(event: string, call: HookCall): Promise<object | undefined> {
@@ -117,7 +123,13 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     const restartKey = `restart:${running.started}:${body.session_id ?? ''}`;
     const began = (await kept(whole, restartKey)) ? undefined : await sessionBegan(pelago, body.session_id);
     await keep(whole, restartKey, true, HEARD_MS);
-    if (began && began.getTime() < Date.parse(running.started)) told.push(restarted(running));
+    if (began && began.getTime() < Date.parse(running.started)) {
+      // Which actions are new is told against what the session was given, or was last told of.
+      const now = offeredActions(pelago.registry);
+      const had = await kept<string[]>(whole, actionsKey(body.session_id));
+      told.push(restarted(running, had && now.filter((a) => !had.includes(a))));
+      await keep(whole, actionsKey(body.session_id), now, HEARD_MS);
+    }
     // How many of each, and the newest few: the rest is one query away.
     const { newest, counts, more } = summed(changes, (c) => c.action);
     const tally = counts ? `${newest.length + more!} changes (${Object.entries(counts).map(([action, n]) => `${n} ${action}`).join(', ')}); the newest ${newest.length}, the rest with query events:\n` : '';
@@ -130,6 +142,7 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   }
   if (event === 'session-start') {
     await keep(whole, heardKey(body.session_id), await latestSeq(pelago), HEARD_MS);
+    await keep(whole, actionsKey(body.session_id), offeredActions(pelago.registry), HEARD_MS);
     const known = body.session_id ? await resolveRun(pelago, body.session_id) : undefined;
     let additionalContext = await hookSessionStart(pelago, body);
     // The hook keeps it in the checkout, where the commit-msg hook the setup installs finds it to name the run in a commit.
