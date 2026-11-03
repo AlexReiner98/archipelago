@@ -341,6 +341,13 @@ test('what nobody has seen working is said on the item and listed in the handoff
   const brief = (await ask(l, 'brief', { task: made.offline })) as any;
   assert.deepEqual(brief.traps, [{ id: trap, title: 'The pane cannot load draw.html', files: ['ui/draw.*'] }]);
   assert.match(brief.text, /## Where it bites\n- ui\/draw\.\*: The pane cannot load draw\.html\. Drawings stay/);
+  // A task that names its files is told the way round only for the traps in them: the rest by name, said whole when opened.
+  const { other } = await make(l, [{ op: 'create', ref: 'other', type: 'task', title: 'Tidy the plan', body: '## Files\n- src/plan.ts' }, { op: 'link', type: 'part_of', from: 'other', to: made.repo }]);
+  const elsewhere = (await ask(l, 'brief', { task: other })) as any;
+  assert.match(elsewhere.text, /## Where it bites\n- ui\/draw\.\*: The pane cannot load draw\.html\.\n/);
+  assert.doesNotMatch(elsewhere.text, /Drawings stay/);
+  await make(l, [{ op: 'update', id: other, body: 'Fix the frame in ui/draw.html.' }]);
+  assert.match(((await ask(l, 'brief', { task: other })) as any).text, /draw\.html\. Drawings stay/, 'its own file, whole');
   // A task part of the repository itself, with nothing between, has it as its repository too.
   const { direct } = await make(l, [{ op: 'create', ref: 'direct', type: 'task', title: 'Tidy the probe' }, { op: 'link', type: 'part_of', from: 'direct', to: made.repo }]);
   const near = (await ask(l, 'brief', { task: direct })) as any;
