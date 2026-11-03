@@ -243,6 +243,8 @@ export function signIn(message, title = 'Sign in') {
   const others = Object.entries(known.all());
   document.querySelector('#nav .brand').replaceChildren('Archipelago');
   document.title = 'Archipelago';
+  // The form is drawn in the sheet, which is shut on the canvas: opened from Home (the workspace switch), it opens too.
+  document.body.dataset.sheet = 'open';
   main.replaceChildren(
     h('div', { class: 'page-head' }, h('h1', {}, title)),
     h(
@@ -292,6 +294,7 @@ function agreeFirst(documents, again) {
     go.disabled = false;
   };
   document.querySelector('#nav .brand').replaceChildren('Archipelago');
+  document.body.dataset.sheet = 'open';
   main.replaceChildren(
     h('div', { class: 'page-head' }, h('h1', {}, documents.length === 1 ? `Agree to the ${documents[0].title}` : 'Agree to our terms')),
     h(
