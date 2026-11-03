@@ -4,7 +4,8 @@
 // that finds nothing are titles with a word close to what was typed taken instead: a slip of the keys should find
 // something, but "hosting" should not also bring up "posting". Two letters swapped ("qurey") share too few trigrams
 // with the word meant to be close to it, so the near match also tries what was typed with each pair side by side
-// swapped back (issue e_3m3nt2e3).
+// swapped back (issue e_3m3nt2e3). Only when neither finds anything is an item with any one of the words taken,
+// the most words first: "stale map unpushed commits" should still find the issue that "stale" finds (issue e_vb4ykndy).
 
 import type { Q } from './db.ts';
 import type { Entity } from './pelago.ts';
@@ -32,6 +33,19 @@ begin
   end if;
 end $fn$;
 grant execute on function pelago_search_ids(text, boolean) to pelago_member;
+`;
+
+// Any of the words: each word of q, in the form the index keeps, looked up in the index on its own, and each item
+// found counted once for every word it has. Like pelago_search_ids, it finds through the index as one that sees
+// everything and gives ids (with their counts) only. Step 30 of src/migrate.ts.
+export const SEARCH_ANY = `
+create or replace function pelago_search_any(q text) returns table (id text, hits int)
+language sql stable security definer set search_path = public as $fn$
+  select e.id, count(*)::int from unnest(tsvector_to_array(to_tsvector('english', q))) w(word)
+    join entity e on to_tsvector('english', e.title || ' ' || e.body) @@ quote_literal(w.word)::tsquery
+  group by e.id
+$fn$;
+grant execute on function pelago_search_any(text) to pelago_member;
 `;
 
 /**
@@ -65,7 +79,8 @@ export const rankSql = (q: string, e = '') =>
 
 /** Items matching the input, best match first. `family` gives a type and the types that extend it. */
 export async function search(db: Q, family: (type: string) => string[], input: SearchInput) {
-  const run = async (near: boolean) => {
+  // all: every word (or the text as typed in a title); near: titles close to it; any: an item with any of the words.
+  const run = async (how: 'all' | 'near' | 'any') => {
     const where: string[] = [];
     const params: unknown[] = [];
     const add = (sql: string, value: unknown) => {
@@ -73,8 +88,13 @@ export async function search(db: Q, family: (type: string) => string[], input: S
       where.push(sql.replaceAll('?', `$${params.length}`));
     };
     let rank = '';
-    if (input.q) {
-      add(`id in (${searchIds('?', near)})`, input.q);
+    let hits = '';
+    if (input.q && how === 'any') {
+      params.push(input.q);
+      hits = `join pelago_search_any($${params.length}) h using (id)`;
+      rank = `h.hits desc, ${rankSql(`$${params.length}`)} desc, `;
+    } else if (input.q) {
+      add(`id in (${searchIds('?', how === 'near')})`, input.q);
       rank = `${rankSql(`$${params.length}`)} desc, `;
     }
     if (input.type) add(`type = any(?::text[])`, family(input.type));
@@ -84,12 +104,16 @@ export async function search(db: Q, family: (type: string) => string[], input: S
     if (!input.include_archived) where.push(`archived_at is null`);
     params.push(Math.min(input.limit ?? 25, 200));
     const { rows } = await db.query<Entity>(
-      `select id, type, title, status, is_open, owner, confidence, props, updated_at from entity
+      `select id, type, title, status, is_open, owner, confidence, props, updated_at from entity ${hits}
        ${where.length ? 'where ' + where.join(' and ') : ''} order by ${rank}updated_at desc limit $${params.length}`,
       params,
     );
     return rows;
   };
-  const rows = await run(false);
-  return rows.length || !input.q ? rows : run(true);
+  if (!input.q) return run('all');
+  for (const how of ['all', 'near'] as const) {
+    const rows = await run(how);
+    if (rows.length) return rows;
+  }
+  return run('any');
 }
