@@ -15,7 +15,8 @@ ships it as a preset, and the owner changes it by keeping their own version
 on the map (its `preset` field names the one it replaces; retired, it is not
 said). Its `for` says where it is said: `session_start`,
 `unaccounted_commits`, `working_rules` (the rules file a project is handed),
-`tool:<name>`. Each working rule is worded once, in its preset, and said in
+`tool:<name>`, `guide:<name>` (a guide an agent reads when it asks: core
+view `instructions` with that `for`), `file:<glob>`. Each working rule is worded once, in its preset, and said in
 one place only. Nothing an agent is told is written in kernel code or
 hand-written in a file beside it.
 - `test/instructions.test.ts`: "what is said: presets in order, the owner's
@@ -183,7 +184,7 @@ SessionStart's `source` and SessionEnd's `reason`.
 | Pack | What it adds |
 | --- | --- |
 | `core` | the `instruction` type and its presets; the reply rules `draw_answers` and `record_findings` |
-| `software` | `commit` (with the `accounts` capability) and `settles`; the reply rule `account_commits`, naming its record |
+| `software` | `commit` (with the `accounts` capability) and `settles`; the reply rule `account_commits`, naming its record; the instructions `build_first` (lay a build out as items and have the owner agree it before the first edit) and `drawing_on_map` (a drawing is a style on the map), and the guide `guide:style_code` |
 | `github` | `account.js`: the check on main, answered from the map |
 | `github_app` | `checks.js`: posts the check, keeps it while red, asks again each minute |
 

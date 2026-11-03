@@ -74,8 +74,15 @@ test('the session-start text is read from the instructions on the map', async ()
   const far = await hookSessionStart(l, { session_id: 'i2', cwd: 'C:\\elsewhere' });
   assert.match(far, /how many tokens/, 'elsewhere the preset is said');
   const view = (await VIEWS.instructions.run(l, { about: repo })) as { said: { id: string; preset?: string }[] };
-  assert.deepEqual(view.said.map((s) => s.preset), ['core.estimate', 'core.report_in', 'core.draw_answers', 'science.hours']);
+  assert.deepEqual(view.said.map((s) => s.preset), ['core.estimate', 'core.report_in', 'core.draw_answers', 'software.build_first', 'software.drawing_on_map', 'science.hours']);
   assert.equal(view.said[0].id, made.v);
+  assert.match(again, /Before your first edit to a file, lay the build out on the map/, 'the software pack says to agree a build first');
+  // A guide is said only when asked for, and the drawing instruction names where.
+  assert.match(again, /params for guide:style_code/);
+  const guide = (await VIEWS.instructions.run(l, { for: 'guide:style_code' })) as { said: { preset?: string; text: string }[] };
+  assert.deepEqual(guide.said.map((s) => s.preset), ['software.style_code']);
+  assert.match(guide.said[0].text, /export default function draw\(\{ canvas, answer, style/);
+  assert.doesNotMatch(again, /export default function draw/);
 });
 
 test('each working rule is said once: in the rules file a project is handed, from its preset, and nowhere else', async () => {
