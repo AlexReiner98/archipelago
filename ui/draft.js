@@ -92,6 +92,14 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
   const length = note && editable && countMark(count, base.props ?? {});
   const bar = h('div', { class: 'draft-bar', hidden: true }, said, h('span', { class: 'grow' }), length?.node, discard, save);
   const box = h('div', { class: 'draft' }, bar);
+  // The line being written is scrolled into sight above the bar, not behind it: the sheet keeps the bar's height clear.
+  // Kept once the bar is on the sheet, so taken off with the page it clears what it set.
+  let sheet = null;
+  const clear = () => {
+    sheet = bar.closest('#sheet') ?? sheet;
+    if (sheet) sheet.style.scrollPaddingBottom = bar.offsetHeight ? `${bar.offsetHeight + parseFloat(getComputedStyle(bar).marginBottom)}px` : '';
+  };
+  new ResizeObserver(clear).observe(bar);
   // Fields written in place wait here for the same Save (ui/field-edit.js): a name, what it held, what it holds now.
   const fields = new Map();
   const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -109,6 +117,8 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
     box.dataset.draft = changed() ? 'unsaved' : '';
     save.disabled = !now().title || !changed() || Boolean(bad());
     said.textContent = !now().title ? 'A title first' : bad() ?? (changed() ? (restored ? 'Restored · not saved' : 'Not saved') : '');
+    // Before the browser scrolls to the line being written, not a frame after.
+    clear();
   };
   // Each word written is kept in this browser, beside the version of the item it was written against.
   const keep = () => {

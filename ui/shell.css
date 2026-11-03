@@ -260,7 +260,8 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .draft-count[data-state='best'] { color: var(--ok); }
 #sheet .draft-count[data-state='near'] { color: var(--warn); }
 #sheet .draft-count[data-state='over'] { color: var(--bad); }
-#sheet .draft-bar button[hidden] { display: none; }
+/* Hidden until there is something to save, the buttons keep their room: the bar is one height, and the count stays put. */
+#sheet .draft-bar button[hidden] { display: inline-block; visibility: hidden; }
 #sheet .grid { display: block; }
 #sheet .card { margin: 0 0 var(--space-10); background: none; border: 0; border-radius: 0; overflow: visible; }
 #sheet .card > header, #sheet details.fold > summary { padding: 0 0 var(--space-4); border: 0; background: none; }
