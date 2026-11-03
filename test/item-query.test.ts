@@ -79,6 +79,21 @@ test('an item knows the pictures it is drawn in, and the documents that show the
   assert.deepEqual(await shown(made.out), [], 'a task is not in a picture of programs');
 });
 
+test('get of an item reads a view it is drawn in whose steps no longer pass, and says what is wrong beside it', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Replay' },
+    { op: 'create', ref: 't', type: 'task', title: 'Told of' },
+    { op: 'link', type: 'part_of', from: 't', to: 'p' },
+  ]);
+  const steps = [{ add: [made.t], lines: [{ by: 'Alex', text: 'x'.repeat(241) }] }];
+  Object.assign(made, await make(l, [{ op: 'create', ref: 'v', type: 'lens', title: 'The replay', props: { filter: { find: [] }, steps } }, { op: 'link', type: 'about', from: 'v', to: made.p }]));
+  const got = (await callTool(l, human, 'get', { id: made.t })) as { entity: { id: string }; shown_in: { id: string; steps_wrong?: string }[] };
+  assert.equal(got.entity.id, made.t);
+  assert.deepEqual(got.shown_in.map((v) => v.id), [made.v], 'the view still finds what its steps name');
+  assert.match(got.shown_in[0].steps_wrong ?? '', /step 1: each line says by whom and what, in 240 characters at most/);
+});
+
 test('a session’s turns are kept as stretches of work: a prompt begins one, a stop ends it, a long quiet starts the next', async () => {
   const { stretch, IDLE_MS } = await import('../src/sessions.ts');
   const t = (m: number) => new Date(Date.parse('2026-10-15T12:00:00Z') + m * 60_000).toISOString();
