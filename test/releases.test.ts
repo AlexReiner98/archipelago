@@ -12,6 +12,20 @@ import { human, agent, fresh, make } from './map.ts';
 /** A view asked by its name, as the view tool asks it. */
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
+test('a commit and an experiment keep the picture they draw, and their page has the figure for it', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'c', type: 'commit', title: 'Draw the ridges', props: { sha: 'a'.repeat(40) } },
+    { op: 'create', ref: 'x', type: 'experiment', title: 'Ridges at three scales' },
+  ]);
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]).toString('base64');
+  for (const id of [made.c, made.x]) {
+    assert.equal(((await callTool(l, human, 'picture_put', { result: id, data: png, content_type: 'image/png' })) as { size: number }).size, 10);
+    assert.equal(((await callTool(l, human, 'picture', { result: id })) as { data: string }).data, png);
+  }
+  assert.deepEqual(['commit', 'experiment'].filter((t) => l.registry.drawnWith('figure').includes(t)), ['commit', 'experiment']);
+});
+
 test('a picture is kept for a result only when sent, travels in a backup, and goes when the test is run again', async () => {
   const l = await fresh();
   const made = await make(l, [
@@ -42,7 +56,7 @@ test('a picture is kept for a result only when sent, travels in a backup, and go
   assert.equal((await l.db.query<{ n: number; size: number }>(`select count(*)::int as n, max(size)::int as size from picture`)).rows[0].size, png.length * 2);
   await assert.rejects(put(Buffer.alloc(1_000_001)), /the most kept is/);
   await assert.rejects(callTool(l, human, 'picture_put', { result: first.id, data: png.toString('base64'), content_type: 'image/svg+xml' }), /drawing alone/);
-  await assert.rejects(put(png, 'image/png', made.noaa), /not a test result/);
+  await assert.rejects(put(png, 'image/png', made.noaa), /a pack needs a screen on that type with the figure piece/);
 
   // A backup carries the picture, byte for byte.
   const copy = new Archipelago(await openDb(), l.registry);

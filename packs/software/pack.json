@@ -393,7 +393,7 @@
       "pieces": [{ "piece": "proof" }]
     },
     { "form": "screen", "id": "software.usage", "title": "Tokens used here", "on": ["repo"], "pieces": [{ "piece": "usage" }] },
-    { "form": "screen", "id": "software.drawn", "title": "What it drew", "on": ["test_result"], "pieces": [{ "piece": "figure" }] },
+    { "form": "screen", "id": "software.drawn", "title": "What it drew", "on": ["test_result", "commit"], "pieces": [{ "piece": "figure" }] },
     { "form": "screen", "id": "software.diagram", "title": "The diagram", "on": ["diagram"], "pieces": [{ "piece": "diagram" }] }
   ],
   "actions": [
