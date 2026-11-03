@@ -1,6 +1,6 @@
 // What the app's pages may load and who may frame them: the content policies the server sends with each.
 
-// The page itself: its own script and stylesheet, this server, and the one frame a style's code is drawn in.
+// The page itself: its own script and stylesheet, this server, the frame a style's code is drawn in, and a web page an agent shows in a pane (ui/pane-web.js): any https address, plain http on this machine only.
 export const PAGE_POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' https: http://localhost:* http://127.0.0.1:*; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 /** A document's preview, which this server's own page may frame, to read drafts on the canvas (ui/reader-frame.js). */
 export const PREVIEW_POLICY = PAGE_POLICY.replace(" https: http://localhost:* http://127.0.0.1:*", '').replace("frame-ancestors 'none'", "frame-ancestors 'self'");
