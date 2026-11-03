@@ -215,7 +215,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   return createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
-      if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, leading: options.leading?.() ?? true });
+      if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, data: devMode() ? (workspaces.config.dataDir ?? undefined) : undefined, leading: options.leading?.() ?? true });
       // A domain that serves a workspace's public site: its pages by address word (src/site.ts), its icon; the rest as on any name.
       const host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined;
       if (site && (tooOften(req, res, open) || (await serveSite(res, url.pathname, { host, workspace: site, workspaces })))) return;

@@ -100,5 +100,34 @@ export async function migrate(db: Database, server: boolean): Promise<{ from: nu
       throw new Error(`Migration ${m.version} (${m.name}) failed: ${(err as Error).message}`, { cause: err });
     }
   }
+  if (from > 0) await remake(db, server, from);
   return { from, to: Math.max(from, LATEST) };
+}
+
+/** The tables each step makes and no later step drops: what a database recorded as past that step must have. */
+const MADE = MIGRATIONS.map((m) => {
+  const later = MIGRATIONS.filter((n) => n.version > m.version).map((n) => n.sql + (n.server ?? '')).join('\n');
+  const made = [...m.sql.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(\w+)/gi)].map((t) => t[1].toLowerCase());
+  return { m, tables: [...new Set(made)].filter((t) => !new RegExp(`drop\\s+table\\s+(?:if\\s+exists\\s+)?${t}\\b`, 'i').test(later)) };
+}).filter((s) => s.tables.length);
+
+/**
+ * A step recorded as applied whose tables are not there is run again (its record kept): a local map once said it was
+ * past step 6 and had no member table, so every backup of it failed. One query when nothing is missing.
+ */
+async function remake(db: Database, server: boolean, at: number) {
+  const steps = MADE.filter((s) => s.m.version <= at);
+  const names = [...new Set(steps.flatMap((s) => s.tables))];
+  const { rows } = await db.query<{ name: string }>(`select n as name from unnest($1::text[]) n where to_regclass(n) is null`, [names]);
+  const missing = new Set(rows.map((r) => r.name));
+  for (const { m, tables } of steps.filter((s) => s.tables.some((t) => missing.has(t)))) {
+    console.error(`Schema step ${m.version} (${m.name}) is recorded, but ${tables.filter((t) => missing.has(t)).join(', ')} is missing: running it again.`);
+    const sql = m.sql + (server && m.server ? `\n${m.server}` : '');
+    try {
+      await db.exec(`begin;\n${sql}\ncommit;`);
+    } catch (err) {
+      await db.exec('rollback').catch(() => {});
+      throw new Error(`Migration ${m.version} (${m.name}) was recorded without its tables, and running it again failed: ${(err as Error).message}`, { cause: err });
+    }
+  }
 }
