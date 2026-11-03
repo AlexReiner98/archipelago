@@ -145,7 +145,8 @@ export function drawWith(host, answer, style, keep) {
     reshape = new ResizeObserver(() => {
       clearTimeout(wait);
       wait = setTimeout(() => {
-        const [w, hgt] = [host.clientWidth, host.clientHeight];
+        // Measured as it was laid out (`across`, below): a panned picture's width is the pane's with the sheet shut, so the sheet open is no new shape.
+        const [w, hgt] = [drawing?.flat ? host.clientWidth : host.clientWidth / (1 - sheetAside()), host.clientHeight];
         const apart = input.height > 0 ? Math.abs(Math.log((w / hgt) / (input.width / input.height))) : Infinity;
         if (!ended && w > 0 && hgt > 0 && apart > Math.log(numberOf(style, 'plane_reshape_ratio'))) drawWith(host, answer, style, keep);
       }, numberOf(style, 'plane_reshape_after'));

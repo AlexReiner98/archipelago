@@ -59,7 +59,6 @@ const count = (files: string[], pattern: RegExp) =>
 
 // 1. No file over 500 lines.
 const LONG_FILES: Record<string, number> = {
-  'src/pelago.ts': 839,
   'ui/style.css': 679,
 };
 
@@ -98,13 +97,14 @@ test("the kernel names no pack's type by its bare name", () => {
   assert.deepEqual(ratchet(named, NAMES_PACK_TYPES), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
 });
 
-// 3. Writes to items and relations go through the write path (src/pelago.ts): change for facts, projected by the
-// projector it runs (src/replay.ts), and the operational writes and the restore path src/operational.ts names.
+// 3. Writes to items and relations go through the write path (src/pelago.ts, its apply loop in src/change-apply.ts):
+// change for facts, projected by the projector it runs (src/replay.ts), and the operational writes and the restore path src/operational.ts names.
 // Every other store is named there too.
 const WRITES_ELSEWHERE: Record<string, number> = {};
+const WRITE_PATH = ['src/pelago.ts', 'src/change-apply.ts', 'src/replay.ts'];
 
 test('items and relations are written in one place', () => {
-  const others = walk('src').filter((f) => f.endsWith('.ts') && f !== 'src/pelago.ts' && f !== 'src/replay.ts');
+  const others = walk('src').filter((f) => f.endsWith('.ts') && !WRITE_PATH.includes(f));
   const writes = count(others, /\b(?:insert\s+into|update|delete\s+from)\s+(?:entity|relation)\b/gi);
   assert.deepEqual(ratchet(writes, WRITES_ELSEWHERE), [], 'Send the change through Archipelago.change.');
 });
@@ -188,7 +188,9 @@ test('kernel modules import one way', () => {
 
 // 7. The UI loads as native modules, with no build step.
 const CLASSIC_SCRIPTS: Record<string, number> = {
-  // The sandboxed drawing frame has no origin of its own; a module there is untried.
+  // The sandboxed drawing frame has no origin of its own; a module there is untried. Its two halves (a style's code,
+  // drawings that answer with marks) are one script split to stay under 500 lines (e_vbmkhnyb), not a second page's.
+  'ui/draw.html: <script src="/draw-marks.js">': 1,
   'ui/draw.html: <script src="/draw.js">': 1,
 };
 
@@ -416,7 +418,7 @@ test("a drawing's list holds every module it reaches", () => {
 const LENGTHS_IN_DRAWINGS: Record<string, number> = {
   'architecture/boats.js': 3, 'architecture/deep.js': 32, 'architecture/index.js': 28, 'architecture/islands.js': 18, 'architecture/layout.js': 9, 'architecture/moves.js': 6,
   'architecture/route.js': 8, 'architecture/says.js': 3, 'architecture/sides.js': 1, 'architecture/story.js': 3, 'flow/combs.js': 1, 'flow/direction.js': 1, 'flow/faults.js': 4,
-  'flow/index.js': 22, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/search.js': 1,
+  'flow/index.js': 15, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/search.js': 1,
   'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 6, 'flow/wrap.js': 2, 'grid/index.js': 8, 'grid/look.js': 1,
   'pages/index.js': 5, 'time/index.js': 31, 'packs/plan/layouts/meters/index.js': 10,
 };

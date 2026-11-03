@@ -19,6 +19,7 @@ import { withStyles } from './styles.ts';
 import { props } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 import { VIEW_INPUT, viewAddress } from './view-address.ts';
+import { withCovers } from './withdraw.ts';
 
 /** One thing the human did to the map, small enough to put in front of a model. */
 export interface HumanChange {
@@ -185,7 +186,7 @@ export const READ_TOOLS: Record<string, Tool> = {
     },
   },
   get: {
-    description: 'One item in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the views it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in) and its links in both directions. Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
+    description: 'One item in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the views it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in, and steps_wrong where the steps of a view no longer pass) and its links in both directions. Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
     input: { id: z.string(), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe(`true for every link: past ${GET_LISTED} in a direction, an agent is given those and a count by type (links_cut). The whole record is in events, with full: true.`) },
     run: async (l, actor, input) => {
       const found = { ...(await l.get(input.id)), shown_in: [] as Awaited<ReturnType<typeof shownIn>> };
@@ -237,10 +238,11 @@ export const READ_TOOLS: Record<string, Tool> = {
   },
   proposals: {
     description:
-      'List the changes held for a human, by status (default pending; "approved" is applied, "rejected" is declined, "superseded" asked only for what a later change had already made so). Agents can read these but only a human can decide them.',
-    input: { status: z.enum(['pending', 'approved', 'rejected', 'superseded']).optional(), full: z.boolean().optional().describe(`true for all of them, whole. Left out, an agent is given long values cut, and of a closed status the newest ${PROPOSALS_LISTED}.`) },
+      'List the changes held for a human, by status (default pending; "approved" is applied, "rejected" is declined, "superseded" asked only for what a later change had already made so, "withdrawn" was taken back by its proposer). A pending one says which older ones of the same proposer it covers (covers, covered_by). Agents can read these but only a human can decide them.',
+    input: { status: z.enum(['pending', 'approved', 'rejected', 'superseded', 'withdrawn']).optional(), full: z.boolean().optional().describe(`true for all of them, whole. Left out, an agent is given long values cut, and of a closed status the newest ${PROPOSALS_LISTED}.`) },
     run: async (l, actor, { full, ...input }) => {
-      const all = await l.proposals(input);
+      const listed = await l.proposals(input);
+      const all = (input.status ?? 'pending') === 'pending' ? withCovers(listed) : listed;
       const short = actor.kind === 'agent' && !full;
       const held = short ? all.slice(input.status && input.status !== 'pending' ? -PROPOSALS_LISTED : 0).map((p) => ({ ...p, ops: (p.ops as unknown[]).map((op) => shorter(op, 'proposals with full: true has it')) })) : all;
       // The session each was proposed in, named by its name, as everywhere a session is (the held entry says which).

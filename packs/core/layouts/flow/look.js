@@ -9,7 +9,10 @@ export const css = `
 /* A part outlined in the colour of the place it is part of (place_hues): the place is not drawn, the key names it. */
 .lf-step.placed .lf-shape { stroke: var(--lf-place); stroke-width: var(--ln-flow-stroke-lit); }
 .lf-step.scenario .lf-shape { stroke: var(--ln-muted); stroke-dasharray: var(--ln-flow-dash-scenario); }
-.lf-step.you .lf-shape { stroke: var(--ln-you); }
+/* What waits on you: the whole step in its colour, the one patch on the page that says act (e_rnyqarfe). */
+.lf-step.you .lf-shape { stroke: var(--ln-you); stroke-width: var(--ln-flow-stroke-lit); fill: color-mix(in srgb, var(--ln-you) var(--ln-flow-you-tint), var(--ln-land)); }
+/* What is closed recedes: its line as quiet as its name. */
+.lf-step.closed .lf-shape { stroke: var(--ln-line); }
 .lf-step:hover .lf-shape, .lf-step:focus .lf-shape { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-lit); }
 /* The step whose page is open is lit, in the page's accent, while the page is open: not as a hover is. */
 .lf-step.here .lf-shape { stroke: var(--accent, var(--ln-text)); stroke-width: var(--ln-flow-stroke-lit); fill: color-mix(in srgb, var(--accent, var(--ln-text)) 18%, var(--ln-land)); }
@@ -17,11 +20,12 @@ export const css = `
 .lf-step.closed text, .lf-step.stub text { fill: var(--ln-muted); }
 .lf-step.stub text { font-size: var(--ln-flow-stub-text); }
 .lf-step.dim { opacity: var(--ln-dim); }
-.lf-dot { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-flow-dot-ring); }
-/* A status's own colour (status_colours): a ring while open, filled once closed. */
-.lf-dot.st { stroke: var(--lf-status, var(--ln-muted)); } .lf-dot.st.shut { fill: var(--lf-status, var(--ln-done)); stroke: none; }
-.lf-dot.you { fill: var(--ln-you); stroke: none; }
-.lf-dot.blocked { fill: var(--ln-blocked); stroke: none; } .lf-dot.session { fill: var(--ln-session); stroke: none; }
+/* Where a step stands, by its phase's mark (phase_marks): a ring not started, half filled under way, a disc finished;
+   what has ended is a disc in the closed grey, and trouble or a step held up is its mark in the trouble colour. */
+.lf-dot, .lf-dot circle { fill: none; stroke: var(--ln-text); stroke-width: var(--ln-flow-dot-ring); }
+.lf-dot.full { fill: var(--ln-text); stroke: none; } .lf-dot-fill { fill: var(--ln-text); stroke: none; }
+.lf-dot.ph-ended { fill: var(--ln-muted); stroke: var(--ln-muted); }
+.lf-dot.trouble, .lf-dot.trouble circle { stroke: var(--ln-blocked); } .lf-dot.trouble.full, .lf-dot.trouble .lf-dot-fill { fill: var(--ln-blocked); }
 .lf-wire { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }
 .lf-wire.dashed { stroke-dasharray: var(--ln-flow-dash-choice); }
 .lf-wire.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-hover); }
@@ -41,7 +45,8 @@ export const css = `
 /* Lit, a link keeps its colour, brightened toward the text's (flow_lit_mix). */
 .lf-wire.lit[class*=lf-k-], .lf-tie.lit[class*=lf-k-] { stroke: color-mix(in srgb, var(--lf-link), var(--ln-text) var(--ln-flow-lit-mix)); }
 .lf-head.lit[class*=lf-k-] { fill: color-mix(in srgb, var(--lf-link), var(--ln-text) var(--ln-flow-lit-mix)); }
-/* A tie the style draws only on hover: out of sight until one of its ends is hovered and lights it. */
+/* A wait on the person looking, in the colour of what waits on you, whatever its link type's colour. */
+.lf-tie.you { stroke: var(--ln-you); } .lf-head.you { fill: var(--ln-you); }
 /* A change held for the owner, where it would land: a new step faint, an edit marked on its step, a link dashed in the
    colour of what waits on you; a link just drawn here dashed until it is; the badge where it is decided. */
 .lf-step.ghost { opacity: var(--ln-flow-ghost); cursor: pointer; }

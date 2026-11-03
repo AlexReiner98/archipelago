@@ -9,12 +9,12 @@
 
 import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
-import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, MEMBER, ORDERED, SCHEMA, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
+import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, HOLDS_OFF_READ, MEMBER, ORDERED, SCHEMA, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
 import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';
 import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH, SHARE_PUBLISHABLE } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
 import { ITEM_KIND } from './head.ts';
-import { SEARCH_INDEX } from './search.ts';
+import { SEARCH_ANY, SEARCH_INDEX } from './search.ts';
 import { LOG } from './log.ts';
 import { ACTIVITY, PRE_LOG_ACTIVITY } from './eventlog.ts';
 import { VAULT } from './vault.ts';
@@ -68,6 +68,8 @@ export const MIGRATIONS: Migration[] = [
   { version: 27, name: 'the activity from before the log began, gone', sql: PRE_LOG_ACTIVITY },
   { version: 28, name: 'what each item adds to the log, in bytes', sql: ITEM_BYTES },
   { version: 29, name: 'a token a person granted a client by signing in', sql: TOKEN_GRANT },
+  { version: 30, name: 'search finds an item with any of the words', sql: SEARCH_ANY },
+  { version: 31, name: 'an agent reads whether holds are off', sql: HOLDS_OFF_READ },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;
@@ -99,5 +101,34 @@ export async function migrate(db: Database, server: boolean): Promise<{ from: nu
       throw new Error(`Migration ${m.version} (${m.name}) failed: ${(err as Error).message}`, { cause: err });
     }
   }
+  if (from > 0) await remake(db, server, from);
   return { from, to: Math.max(from, LATEST) };
+}
+
+/** The tables each step makes and no later step drops: what a database recorded as past that step must have. */
+const MADE = MIGRATIONS.map((m) => {
+  const later = MIGRATIONS.filter((n) => n.version > m.version).map((n) => n.sql + (n.server ?? '')).join('\n');
+  const made = [...m.sql.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(\w+)/gi)].map((t) => t[1].toLowerCase());
+  return { m, tables: [...new Set(made)].filter((t) => !new RegExp(`drop\\s+table\\s+(?:if\\s+exists\\s+)?${t}\\b`, 'i').test(later)) };
+}).filter((s) => s.tables.length);
+
+/**
+ * A step recorded as applied whose tables are not there is run again (its record kept): a local map once said it was
+ * past step 6 and had no member table, so every backup of it failed. One query when nothing is missing.
+ */
+async function remake(db: Database, server: boolean, at: number) {
+  const steps = MADE.filter((s) => s.m.version <= at);
+  const names = [...new Set(steps.flatMap((s) => s.tables))];
+  const { rows } = await db.query<{ name: string }>(`select n as name from unnest($1::text[]) n where to_regclass(n) is null`, [names]);
+  const missing = new Set(rows.map((r) => r.name));
+  for (const { m, tables } of steps.filter((s) => s.tables.some((t) => missing.has(t)))) {
+    console.error(`Schema step ${m.version} (${m.name}) is recorded, but ${tables.filter((t) => missing.has(t)).join(', ')} is missing: running it again.`);
+    const sql = m.sql + (server && m.server ? `\n${m.server}` : '');
+    try {
+      await db.exec(`begin;\n${sql}\ncommit;`);
+    } catch (err) {
+      await db.exec('rollback').catch(() => {});
+      throw new Error(`Migration ${m.version} (${m.name}) was recorded without its tables, and running it again failed: ${(err as Error).message}`, { cause: err });
+    }
+  }
 }

@@ -131,7 +131,7 @@ export function newEntity(typeId) {
 
 /** What an automation does, in a line: when it fires and what it then does. */
 export const automationDoes = (p) => {
-  const when = p.trigger === 'every' ? `every ${p.every_minutes} min` : p.trigger === 'daily' ? `daily at ${p.at}` : `when ${p.on_action} is logged`;
+  const when = p.trigger === 'every' ? `every ${p.every_minutes} min` : p.trigger === 'daily' ? `daily at ${p.at}` : p.trigger === 'weekly' ? `${[].concat(p.days).join(', ')} at ${p.at}` : `when ${p.on_action} is logged`;
   const what = p.action === 'notify' ? `notify: ${p.message ?? '(its title)'}` : p.action === 'tool' ? `call ${p.tool}` : `launch a session (${p.input?.mode ?? 'plan'}) on ${p.input?.task}`;
   return `${when} → ${what}`;
 };

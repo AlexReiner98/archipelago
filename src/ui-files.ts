@@ -32,15 +32,18 @@ export const UI_FILES: Record<string, string> = {
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
   '/draw.html': 'draw.html',
   '/draw.js': 'draw.js',
+  '/draw-marks.js': 'draw-marks.js',
   // The projector's pure part, which the page runs on the facts it reads (ui/replica.js): served from the kernel's own file.
   '/project.js': 'project.js',
+  // What a stylesheet from the map may say, which the page checks a sheet by and the server checks page_css by on write.
+  '/css-check.js': 'css-check.js',
   // three.js as its authors build it (MIT), offered to a style's code; loaded only when one asks for it.
   '/three.js': 'three.module.min.js',
 };
 
 const UI_DIR = join(import.meta.dirname, '..', 'ui');
 /** Files served to the page from the kernel's source, as the page names them: TypeScript of erasable syntax only, its types stripped. */
-const FROM_SOURCE: Record<string, string> = { 'project.js': join(import.meta.dirname, 'project.ts') };
+const FROM_SOURCE: Record<string, string> = { 'project.js': join(import.meta.dirname, 'project.ts'), 'css-check.js': join(import.meta.dirname, 'css-check.ts') };
 const pathOf = (f: string) => FROM_SOURCE[f] ?? join(UI_DIR, f);
 const readText = async (f: string) => (FROM_SOURCE[f] ? stripTypeScriptTypes(await readFile(FROM_SOURCE[f], 'utf8')) : readFile(join(UI_DIR, f), 'utf8'));
 /** The pages a browser opens, and so asks for again on every visit; read whole, with the files they name versioned. */

@@ -11,26 +11,10 @@ import { createInterface } from 'node:readline';
 import { createToken, revokeToken } from './auth.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
-import { askView } from './askview.ts';
+import { cloudLaunch, cloudOn } from './cloud-launch.ts';
+import { briefFor, promptFor, type LaunchInput, type StartedBy } from './launch-brief.ts';
 
-/**
- * Who started a run, when it was not the owner: another person, an automation, or a delivery from outside (a push).
- * Such a run only proposes, whatever agents may do here: what it changes waits for the owner.
- */
-export interface StartedBy {
-  kind: 'person' | 'automation' | 'webhook';
-  id?: string;
-  name: string;
-}
-
-/** What the launched session may do without anyone there to approve it. */
-export type LaunchMode = 'plan' | 'acceptEdits';
-
-const MODE_NOTE: Record<LaunchMode, string> = {
-  plan: 'You are running unattended in plan mode: you cannot edit files or run commands that change anything. Investigate, then reply with what you found and a concrete plan.',
-  acceptEdits:
-    'You are running unattended and may edit files in this repository. Do not commit, push or delete anything. Do not use a live application unless this brief says its resource is claimed for you. Finish with a summary of what you changed and what is left.',
-};
+export type { LaunchMode, StartedBy } from './launch-brief.ts';
 
 // The pelago tools a launched session may call unprompted. `change` is safe
 // here because agent changes are held as proposals.
@@ -54,18 +38,13 @@ export function configureLauncher(next: LauncherConfig): void {
   config = next;
 }
 
-export async function launch(l: Archipelago, actor: Actor, input: { task: string; mode?: LaunchMode; instructions?: string }, by?: StartedBy) {
+export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, by?: StartedBy) {
   if (actor.kind !== 'human') throw new Error('Only a human can launch a session.');
-  // Started by anyone but the owner (another member, or an automation), the session only proposes.
-  const owner = await l.setting<string>('me');
-  const started = by ?? (owner && actor.person && actor.person !== owner ? { kind: 'person' as const, id: actor.person, name: actor.name } : undefined);
-  if (!config) throw new Error('Launching is off on this server. It starts Claude Code in a repository on the machine the server runs on, so it works only on a server that listens on that machine alone.');
+  // A hosted server starts it in the cloud instead, on the workspace's own model account.
+  if (cloudOn()) return cloudLaunch(l, actor, input, by);
+  if (!config) throw new Error('Launching is off on this server. It starts Claude Code in a repository on the machine the server runs on, so it works only on a server that listens on that machine alone, or in the cloud where its operator turns that on.');
   const mode = input.mode ?? 'plan';
-  const brief = (await askView(l, actor, 'brief', { task: input.task })) as {
-    task: { id: string; title: string };
-    repo?: { title: string; path?: string };
-    text: string;
-  };
+  const { brief, started } = await briefFor(l, actor, input, by);
   const cwd = brief.repo?.path;
   if (!cwd) throw new Error(`"${brief.task.title}" is not linked to a repository with a local path, so there is nowhere to run it.`);
   if (!existsSync(cwd)) throw new Error(`The repository path ${cwd} does not exist on this machine.`);
@@ -89,14 +68,7 @@ export async function launch(l: Archipelago, actor: Actor, input: { task: string
   const mcpFile = join(config.dir, `${run}.mcp.json`);
   writeFileSync(mcpFile, JSON.stringify({ mcpServers: { pelago: { type: 'http', url: config.mcpUrl, ...(key && { headers: { Authorization: `Bearer ${key.token}` } }) } } }));
   const transcript = join(config.dir, `${run}.jsonl`);
-  const prompt = [
-    brief.text,
-    '',
-    '## How you are running',
-    MODE_NOTE[mode],
-    `Your Archipelago run id is ${run}; it is already registered and will be closed for you. Use the pelago report tool, action session_update (run ${run}), for anything the owner should know along the way.`,
-    input.instructions ? `\n## Instructions from the owner\n${input.instructions}` : '',
-  ].join('\n');
+  const prompt = promptFor(brief, mode, run, input.instructions);
 
   const args = ['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', mode, '--session-id', sessionId, '--mcp-config', mcpFile, '--allowedTools', ALLOWED_TOOLS];
   // On Windows the CLI is a .cmd shim, which only a shell can start.

@@ -29,6 +29,17 @@ test('a database from before browser sign-in gets its column on opening, and its
   await db.close();
 });
 
+test('a step recorded without its table is run again on opening, and members can be listed', async () => {
+  const dir = folder();
+  const made = await openDb(dir);
+  await made.exec(`drop table member`);
+  await made.close();
+  const db = await openDb(dir);
+  assert.equal((await db.query(`select count(*)::int as n from member`)).rows.length, 1);
+  assert.equal((await steps(db)).filter((s) => s.version === 6).length, 1);
+  await db.close();
+});
+
 test('opening a database that has every step applies none again', async () => {
   const dir = folder();
   const first = await openDb(dir);
@@ -97,5 +108,16 @@ test('a folder keeps a small write-ahead log', async () => {
   const dir = folder();
   const db = await openDb(dir);
   assert.deepEqual((await db.query<{ min: string; max: string }>(`select current_setting('min_wal_size') as min, current_setting('max_wal_size') as max`)).rows[0], { min: '32MB', max: '64MB' });
+  await db.close();
+});
+
+test('a database from before any-word search gets its function on opening', async () => {
+  const dir = folder();
+  const made = await openDb(dir);
+  await made.exec(`drop function pelago_search_any(text); delete from schema_version where version >= 30;`);
+  await made.close();
+  const db = await openDb(dir);
+  assert.equal(await versionOf(db), LATEST);
+  assert.deepEqual((await db.query(`select * from pelago_search_any('nothing here')`)).rows, []);
   await db.close();
 });

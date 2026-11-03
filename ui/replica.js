@@ -23,7 +23,7 @@ const linkRow = (r) => ({ id: r.id, type: r.type, from_id: r.from, to_id: r.to, 
 const blank = () => ({ items: { added: [], changed: [], removed: [] }, links: { added: [], changed: [], removed: [] }, missing: [] });
 
 export class Replica {
-  /** kinds: what the projector asks of the types (isOpen, type, relationFamily), and shown(type, field) for the fields a lens sends. */
+  /** kinds: what the projector asks of the types (isOpen, type, relationFamily), shown(type, field) for the fields a lens sends, and phase(type, status) and flavour(link) as the server's answer gives them. */
   constructor(kinds) {
     this.kinds = kinds;
     this.items = new Map();
@@ -48,6 +48,7 @@ export class Replica {
     this.whole = new Set(answer.whole ?? []);
     this.pos = pos;
     this.lens = answer.lens;
+    this.viewer = answer.viewer;
   }
 
   /** The ids the tail reads facts on: every item and link held. */
@@ -63,7 +64,7 @@ export class Replica {
     return {
       id: r.id, kind: r.kind, type: r.type, title: r.title,
       ...(r.body && { body: r.body.length > NOTE_START && !this.whole?.has(id) ? `${r.body.slice(0, NOTE_START)}…` : r.body }),
-      visibility: r.visibility, status: r.status, open: r.is_open, owner: r.owner, created_at: r.created_at, updated_at: r.updated_at,
+      visibility: r.visibility, status: r.status, ...(this.kinds.phase?.(r.type, r.status) && { phase: this.kinds.phase(r.type, r.status) }), open: r.is_open, owner: r.owner, created_at: r.created_at, updated_at: r.updated_at,
       ...(Object.keys(fields).length && { fields }),
       ...this.why.get(id),
       ...this.placed?.get(id),
@@ -76,8 +77,8 @@ export class Replica {
     const shown = new Set(items.map((i) => i.id));
     const links = [...this.links.values()]
       .filter((r) => !r.valid_to && shown.has(r.from_id) && shown.has(r.to_id))
-      .map((r) => ({ id: r.id, type: r.type, from: r.from_id, to: r.to_id, ...(Object.keys(r.props ?? {}).length && { props: r.props }) }));
-    return { ...(this.lens && { lens: this.lens }), items, links };
+      .map((r) => ({ id: r.id, type: r.type, ...(this.kinds.flavour?.(r.type)?.length && { is: this.kinds.flavour(r.type) }), from: r.from_id, to: r.to_id, ...(Object.keys(r.props ?? {}).length && { props: r.props }) }));
+    return { ...(this.lens && { lens: this.lens }), ...(this.viewer && { viewer: this.viewer }), items, links };
   }
 
   /**

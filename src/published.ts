@@ -18,6 +18,7 @@ import { picturesOf } from './published-pictures.ts';
 import { freezeShared } from './published-share.ts';
 import { republished } from './published-live.ts';
 import { mayDo } from './rules.ts';
+import { pageLook } from './styles.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
 
@@ -112,8 +113,9 @@ export async function publish(l: Archipelago, actor: Actor, id: string, said?: S
   // A shared one is frozen first: whether its sender lets it be published is known before it is made public.
   const early = doc.type === SHARED ? await freeze(l, id) : null;
   if (doc.visibility !== 'public') await l.apply(actorId(actor), { ops: [{ op: 'update', id, visibility: 'public' }], reason: 'Published, for anyone to read' }, { authority });
-  // Drawn as the map's styles stood now (src/styles.ts, pageLook), until it is published again.
-  const given = { ...(early ?? (await freeze(l, id))), style_at: (await headOf(l.db)).pos };
+  // Drawn as the map's styles stand now (src/styles.ts, pageLook), kept with it until it is published again.
+  const frozen = early ?? (await freeze(l, id));
+  const given = { ...frozen, style_at: (await headOf(l.db)).pos, look: await pageLook(l, { ...frozen, id }) };
   if (given.path) {
     const { rows } = await l.db.query<{ title: string }>(`select given ->> 'title' as title from published where path = $1 and entity_id <> $2`, [given.path, id]);
     if (rows[0]) throw new Error(`"${rows[0].title}" is already published at /${given.path}: give this one another path.`);
@@ -149,7 +151,7 @@ export async function publishedState(l: Archipelago, id: string) {
   const { rows } = await l.db.query<{ given: Record<string, unknown>; published_by: string; published_at: Date }>(`select given, published_by, published_at from published where entity_id = $1`, [id]);
   if (!rows[0]) return { published: false };
   const now = await freeze(l, id).catch(() => null);
-  const { style_at: _, ...given } = rows[0].given;
+  const { style_at: _, look: _look, ...given } = rows[0].given;
   return { published: true, at: rows[0].published_at, by: rows[0].published_by, changed: !now || !same(now, given) };
 }
 

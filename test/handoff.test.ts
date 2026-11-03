@@ -225,7 +225,7 @@ test('launching runs a headless session on a task, holding the lane and recordin
   assert.match(done.body, /saw=true\/true/, 'the prompt carried the brief and the mode note');
   assert.match(done.body, /3 turns, \$0\.50; transcript: /);
   assert.ok(done.body.toLowerCase().includes(`cwd=${dir}`.toLowerCase()), 'it ran in the repository');
-  assert.match(readFileSync(first.transcript, 'utf8'), /"type":"result"/);
+  assert.match(readFileSync((first as { transcript: string }).transcript, 'utf8'), /"type":"result"/);
   assert.equal((await heldResources(l)).length, 0, 'the lane came back');
 
   const planned = await ended((await launch(l, human, { task: made.live, instructions: 'PLANONLY' })).run);

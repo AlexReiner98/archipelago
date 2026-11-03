@@ -1,5 +1,6 @@
 // Where a wire meets a step, on the outline that is drawn and not on its box: a diamond's slopes, a pill's round ends, a
-// sheet's wave. These are the shapes `outline` in ./index.js draws. Pure: a step and a line in, points out.
+// sheet's wave, the cut corners of a system's box, a hexagon's points, a flag's point and a place's tab. These are the
+// shapes `outline` in ./index.js draws, each cutting into its box by its `bevel`. Pure: a step and a line in, points out.
 
 const near = (a, b) => Math.abs(a - b);
 
@@ -20,6 +21,11 @@ function downTo(n, cx, cy, x, side) {
     return cy + side * Math.sqrt(Math.max(0, hh * hh - over * over));
   }
   if (n.shape === 'sheet' && side > 0) return waveAt(x, cx, cy, n.w, n.h);
+  const b = n.bevel ?? 0, over = Math.max(0, dx - (hw - b));
+  if (n.shape === 'cut') return cy + side * (hh - over);
+  if (n.shape === 'hexagon' || (n.shape === 'flag' && x > cx)) return cy + side * hh * (1 - over / b);
+  // A place's tab stands over the left third of its top; the rest of its top is lower by the tab.
+  if (n.shape === 'tab' && side < 0) return x < cx - hw + n.w / 3 ? cy - hh : cy - hh + b;
   return cy + side * hh;
 }
 
@@ -28,6 +34,9 @@ function acrossTo(n, cx, cy, y, side) {
   const hw = n.w / 2, hh = n.h / 2, dy = Math.min(hh, near(y, cy));
   if (n.shape === 'diamond') return cx + side * hw * (1 - dy / hh);
   if (n.shape === 'pill' || n.shape === 'end') return cx + side * (hw - hh + Math.sqrt(Math.max(0, hh * hh - dy * dy)));
+  const b = n.bevel ?? 0;
+  if (n.shape === 'cut') return cx + side * (hw - Math.max(0, dy - (hh - b)));
+  if (n.shape === 'hexagon' || (n.shape === 'flag' && side > 0)) return cx + side * (hw - (b * dy) / hh);
   return cx + side * hw;
 }
 

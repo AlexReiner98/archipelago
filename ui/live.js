@@ -3,7 +3,7 @@ import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
 import { lookMode } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
 import { front, poppedTab } from './tabs.js';
-import { types } from './words.js';
+import { relations, types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
 
@@ -78,6 +78,8 @@ export const kinds = {
   type: (id) => types.get(id),
   relationFamily: (...roots) => roots,
   shown: (type, field) => Boolean(types.get(type)?.fields?.[field]?.shown),
+  phase: (type, status) => types.get(type)?.statuses?.phases?.[status],
+  flavour: (link) => { const out = []; for (let r = relations.get(link); r?.extends && !out.includes(r.extends); r = relations.get(r.extends)) out.push(r.extends); return out; },
 };
 
 /**

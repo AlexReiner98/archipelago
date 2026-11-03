@@ -1,0 +1,115 @@
+// Planning a change: its ops checked against the schema and the map as it is now, before anything is written. The
+// write path (src/pelago.ts) asks it before a change is judged and again before it is applied.
+
+import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts';
+import { bodyAfter } from './ops.ts'; import { mergeRefusals } from './merge.ts';
+import { currentNames, typesAfter } from './type-items.ts'; import { privateDependencies } from './private-deps.ts';
+import { publicTypes, type Entity, type Op } from './pelago-types.ts';
+import type { Archipelago } from './pelago.ts';
+
+/** Validate ops against the schema and the current map. Throws listing every problem. */
+export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warnings: string[] }> {
+  if (!ops.length) throw new Error('A change needs at least one op.'); currentNames(map.registry, ops);
+  const errors: string[] = [], warnings: string[] = [];
+  const refs = new Map<string, string>(); // ref -> type
+  const seen = new Set<string>(), dropped = new Set<string>(); // dropped: what this change has merged away so far
+  const reg = await typesAfter(map, ops); // a type made in this change can be used in it (src/type-items.ts)
+
+  const typeOf = async (key: string, where: string): Promise<string | undefined> => {
+    const local = refs.get(key);
+    if (local) return local;
+    const found = await map.entity(key);
+    if (!found) errors.push(`${where}: no entity or ref "${key}"`);
+    else if (found.archived_at) warnings.push(`${where}: "${found.title}" (${key}) is archived`);
+    return found?.type;
+  };
+  const existing = async (id: string, where: string) => {
+    const found = await map.entity(id);
+    if (!found) errors.push(`${where}: no entity "${id}"`);
+    return found;
+  };
+  const checkOwner = async (owner: string, where: string) => {
+    const type = await typeOf(owner, where);
+    if (type && !reg.isA(type, 'person') && !reg.isA(type, 'agent')) errors.push(`${where}: owner must be a person or agent, not ${type}`);
+  };
+
+  for (const [i, op] of ops.entries()) {
+    const where = `op ${i + 1} (${op.op})`;
+    switch (op.op) {
+      case 'create': {
+        if (!op.title?.trim()) errors.push(`${where}: title is required`);
+        errors.push(...reg.check(op.type, op.status, op.props ?? {}).map((p) => `${where}: ${p}`));
+        if (op.owner) await checkOwner(op.owner, where);
+        const type = reg.type(op.type);
+        if (!type) break; if (type.retired) errors.push(`${where}: ${op.type} is retired here: no new item is made of it`);
+        if (op.visibility === 'public' && !type.public) errors.push(`${where}: a ${op.type} cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
+        errors.push(...[...checkWritten(reg, op.type, op.props ?? {}), ...undeclaredColumns(type, op)].map((p) => `${where}: ${p}`));
+        if (op.ref) {
+          if (refs.has(op.ref)) errors.push(`${where}: ref "${op.ref}" is used twice`);
+          refs.set(op.ref, op.type);
+        }
+        const root = type.base;
+        const key = `${root}\n${op.title.trim().toLowerCase()}`;
+        if (seen.has(key)) warnings.push(`${where}: "${op.title}" appears more than once in this change`);
+        seen.add(key);
+        const { rows } = await map.db.query<Entity>(
+          `select id, type, title from entity where lower(title) = lower($1) and type = any($2::text[]) and archived_at is null`,
+          [op.title.trim(), reg.family(root)],
+        );
+        for (const dup of rows) warnings.push(`${where}: possible duplicate of existing ${dup.type} "${dup.title}" (${dup.id})`);
+        break;
+      }
+      case 'update': {
+        const target = await existing(op.id, where);
+        if (!target) break;
+        errors.push(...[...reg.check(target.type, op.status, op.props ?? {}), ...undeclaredColumns(reg.type(target.type), op)].map((p) => `${where}: ${p}`));
+        if (op.visibility === 'public' && !reg.type(target.type)?.public) errors.push(`${where}: "${target.title}" is a ${target.type}, which cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
+        if (op.title !== undefined && !op.title.trim()) errors.push(`${where}: title cannot be empty`);
+        try {
+          bodyAfter(target.body, op);
+        } catch (e) {
+          errors.push(`${where}: "${target.title}": ${(e as Error).message}`);
+        }
+        if (op.owner) await checkOwner(op.owner, where);
+        break;
+      }
+      case 'link': {
+        const from = await typeOf(op.from, where);
+        const to = await typeOf(op.to, where);
+        if (op.from === op.to) errors.push(`${where}: cannot link an entity to itself`);
+        if (from && to) {
+          const problem = reg.checkRelation(op.type, from, to);
+          if (problem) errors.push(`${where}: ${problem}`);
+        }
+        break;
+      }
+      case 'unlink': {
+        const { rows } = await map.db.query(`select 1 from relation where id = $1 and valid_to is null`, [op.relation]);
+        if (!rows.length) errors.push(`${where}: no active relation "${op.relation}"`);
+        break;
+      }
+      case 'archive': case 'forget':
+        await existing(op.id, where);
+        if (op.op === 'forget' && (ops.length > 1 || op.reasons?.some((c) => !/^[cp]_\w+$/.test(c)))) errors.push(`${where}: a forget is a change of its own, and its reasons name change sets (c_…) or held changes (p_…)`);
+        break;
+      case 'restore': {
+        const target = await existing(op.id, where);
+        if (target && !target.archived_at) errors.push(`${where}: "${target.title}" is not archived`);
+        break;
+      }
+      case 'merge': {
+        const keep = await existing(op.keep, where);
+        const drop = await existing(op.drop, where);
+        errors.push(...(await mergeRefusals(map.db, where, keep, drop, dropped)));
+        if (keep && drop && keep.type !== drop.type) warnings.push(`${where}: merging a ${drop.type} into a ${keep.type}`);
+        break;
+      }
+      case 'define_type':
+        errors.push(...reg.checkNewType(op.type).map((p) => `${where}: ${p}`));
+        break;
+    }
+  }
+  if (!errors.length) errors.push(...(await privateDependencies(map, ops)));
+  if (errors.length) throw new Error(`Change rejected:\n- ${errors.join('\n- ')}`);
+  return { warnings };
+}

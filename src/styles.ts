@@ -13,6 +13,7 @@
 
 import { stylesOf, type StyleDef } from './declared.ts';
 import { finishTheme, mergeTheme } from './colours.ts';
+import { cssProblem } from './css-check.ts';
 import { layoutFor } from './layouts.ts';
 import { keptOf, type Kept } from './query-kept.ts';
 import { asOf } from './rebuild.ts';
@@ -147,10 +148,12 @@ export async function iconOf(l: Archipelago): Promise<Buffer | null> {
 /**
  * What a page read by no login is drawn in: the colours (theme), lengths, typefaces (faces) and text roles (type) of
  * the workspace's style, and of a document, its own style over the workspace's, with the head it gives its page
- * (page.head: an invoice's) and the section whose figure is shown where a link to it is posted (page.share). Never a viewer's own. A published document is drawn as the map stood at the position
- * it was published at (`at`, kept with it), so its colours change only when a person publishes it again.
+ * (page.head: an invoice's) and the section whose figure is shown where a link to it is posted (page.share). Never a viewer's own. A published document is drawn in the look kept with
+ * it (`look`), or one published before that was kept, as the map stood at the position it was published at (`at`), so its look changes only when a person publishes it again.
  */
 export async function pageLook(l: Archipelago, doc?: Record<string, unknown>) {
+  // One published since its look is kept with it (src/published.ts) is drawn in that, whatever the map holds now.
+  if (doc?.look && typeof doc.look === 'object') return doc.look as Look;
   const hub = doc && typeof doc.type === 'string' ? { hub: { id: String(doc.id ?? ''), type: doc.type } } : {};
   const at = typeof doc?.style_at === 'number' ? doc.style_at : undefined;
   const key = at === undefined ? '' : `${l.workspace} ${at} ${String(doc?.id)}`;
@@ -160,9 +163,9 @@ export async function pageLook(l: Archipelago, doc?: Record<string, unknown>) {
   const { kept, versions } = at === undefined ? await now() : await stylesAt(l, at).catch((err) => (console.error(`the style of ${String(doc?.id)} at ${at}:`, err), now()));
   const style = (await styleFor(l, kept, hub, versions)).style as { theme: unknown; lengths: unknown; faces?: unknown; type?: unknown; page_css?: unknown; page?: { head?: unknown; share?: unknown } };
   const { theme, lengths, faces, type, page_css, page } = style;
-  const look = {
+  const look: Look = {
     theme, lengths, faces, type,
-    ...(typeof page_css === 'string' && page_css.trim() && { page_css }),
+    ...(typeof page_css === 'string' && page_css.trim() && !cssProblem(page_css, true) && { page_css }),
     ...(typeof page?.head === 'string' && { head: page.head }),
     ...(typeof page?.share === 'string' && SECTION.test(page.share) && { share: page.share }),
   };
@@ -173,11 +176,13 @@ export async function pageLook(l: Archipelago, doc?: Record<string, unknown>) {
   return look;
 }
 
+interface Look { theme: unknown; lengths: unknown; faces?: unknown; type?: unknown; page_css?: string; head?: string; share?: string }
+
 /** An item's id, as a style names the section whose figure is a page's link picture (page.share). */
 const SECTION = /^e_[a-z0-9]{8}$/;
 
 /** Published looks already read, by workspace, position and document: what stood then does not change. */
-const looks = new Map<string, Record<string, unknown>>();
+const looks = new Map<string, Look>();
 const LOOKS_KEPT = 256;
 
 /** The styles kept on the map as they stood at a fact position: made again from the log (src/rebuild.ts, asOf). */

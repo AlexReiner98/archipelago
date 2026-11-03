@@ -37,7 +37,7 @@ import { backupAll, parseBackup, parseVault } from './backup.ts'; import { confi
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { env } from './env.ts';
 import { serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
-import { configureLauncher, stopAllLaunched } from './launcher.ts';
+import { configureLauncher, stopAllLaunched } from './launcher.ts'; import { configureCloud } from './cloud-launch.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
 import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts';
 import type { Actor, Archipelago } from './pelago.ts';
@@ -215,7 +215,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   return createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
-      if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, leading: options.leading?.() ?? true });
+      if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, data: devMode() ? (workspaces.config.dataDir ?? undefined) : undefined, leading: options.leading?.() ?? true });
       // A domain that serves a workspace's public site: its pages by address word (src/site.ts), its icon; the rest as on any name.
       const host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined;
       if (site && (tooOften(req, res, open) || (await serveSite(res, url.pathname, { host, workspace: site, workspaces })))) return;
@@ -295,7 +295,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
           ...(file === 'draw.html' && { 'content-security-policy': options.unsandboxed ? DRAW_POLICY.replace('sandbox allow-scripts; ', '') : DRAW_POLICY }),
           // The frame has an origin of its own, so what it loads from here it loads as a stranger.
-          ...((file === 'draw.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
+          ...((file === 'draw.js' || file === 'draw-marks.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
         });
         const html = page && (await uiPage(file));
         // Marked so the page makes its drawing frames with no sandbox (ui/base.js frameSandbox), as draw.html is served.
@@ -418,7 +418,7 @@ if (import.meta.main) {
   // Before anything reads a secret: where the key they are sealed with is kept.
   configureSecrets(rootDir, !config.databaseUrl);
   const workspaces = new Workspaces({ dataDir: config.dataDir, databaseUrl: config.databaseUrl, rootDir, packsDir: config.packsDir, packs: config.packs, policy: config.policy, backupsDir: config.backup ? config.backup.dir : undefined });
-  if (config.launch) configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
+  if (config.launch === 'cloud') configureCloud({ mcpUrl: config.cloudMcpUrl!, auth: config.auth === 'tokens' }); else if (config.launch) configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
 
   // One server per data folder, whatever port each is on: two of them writing
   // the same database files destroy it. The lock names the process that has it.

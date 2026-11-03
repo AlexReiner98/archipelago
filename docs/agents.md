@@ -15,7 +15,8 @@ ships it as a preset, and the owner changes it by keeping their own version
 on the map (its `preset` field names the one it replaces; retired, it is not
 said). Its `for` says where it is said: `session_start`,
 `unaccounted_commits`, `working_rules` (the rules file a project is handed),
-`tool:<name>`. Each working rule is worded once, in its preset, and said in
+`tool:<name>`, `guide:<name>` (a guide an agent reads when it asks: core
+view `instructions` with that `for`), `file:<glob>`. Each working rule is worded once, in its preset, and said in
 one place only. Nothing an agent is told is written in kernel code or
 hand-written in a file beside it.
 - `test/instructions.test.ts`: "what is said: presets in order, the owner's
@@ -183,7 +184,7 @@ SessionStart's `source` and SessionEnd's `reason`.
 | Pack | What it adds |
 | --- | --- |
 | `core` | the `instruction` type and its presets; the reply rules `draw_answers` and `record_findings` |
-| `software` | `commit` (with the `accounts` capability) and `settles`; the reply rule `account_commits`, naming its record |
+| `software` | `commit` (with the `accounts` capability) and `settles`; the reply rule `account_commits`, naming its record; the instructions `build_first` (lay a build out as items and have the owner agree it before the first edit) and `drawing_on_map` (a drawing is a style on the map), and the guide `guide:style_code` |
 | `github` | `account.js`: the check on main, answered from the map |
 | `github_app` | `checks.js`: posts the check, keeps it while red, asks again each minute |
 
@@ -205,7 +206,8 @@ SessionStart's `source` and SessionEnd's `reason`.
    `edited`, `committed`, `pushed`, with the turn's id, the items touched, the
    session's commits and those the reply made (`turn_commits`: all of them
    when it pushed), found in what git answered and in the checkout's HEAD
-   log.
+   log. A call to another workspace's server (one named `pelago-<name>`)
+   counts as a read, change or tell too; its items are not this map's.
 2. `askOnReply` reads one fact of the map, `unaccounted` (which of the
    reply's commits no record accounts for), when a rule asks for it. It takes
    the reply rules not lifted whose `when.reply` holds and that have not
@@ -237,5 +239,7 @@ SessionStart's `source` and SessionEnd's `reason`.
   owner's versions on the map.
 - Files written through Bash are not counted as `edited`, so a reply that
   read a view and wrote code that way can be asked to draw once.
+- A map server connected under a name not starting with `pelago` (a
+  claude.ai connector) is counted as work, not as the map.
 - A session in a worktree has hooks only once the setup was run in the
   checkout, so that `.worktreeinclude` carries them.

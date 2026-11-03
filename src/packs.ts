@@ -12,7 +12,7 @@ import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 import { isServerPack, parts, readManifest, withoutAbsent, type Manifest } from './manifest.ts';
 import { createHash } from 'node:crypto';
-import { ownPack, withVersions, type TypeItem } from './type-overlay.ts';
+import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from './phases.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
 
@@ -25,12 +25,12 @@ export interface FieldDef {
   system?: boolean;
   /** Sent with the item in a lens answer, so a style can draw by it (a kind to colour, an amount, a date). */
   shown?: boolean;
-  /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a kind (src/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean;
+  /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a kind (src/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (src/css-check.ts). */ css?: boolean;
 }
 
 export interface Statuses {
-  open: string[];
-  closed: string[];
+  open: string[]; closed: string[];
+  /** Where each stands in its course, by status (src/phases.ts): what it says, else read from its place. Resolved, every status has one. */ phases?: Record<string, string>;
 }
 
 export interface TypeDef {
@@ -223,7 +223,7 @@ export class Registry {
         kind,
         base: !parent || parent.id === parent.kind ? id : parent.base,
         system: kind === SYSTEM,
-        statuses,
+        statuses: { ...statuses, phases: phasesOf(statuses, [def.statuses?.phases, parent?.statuses.phases]) },
         ...headOf({ ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id) }, statuses),
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
         public: def.public ?? parent?.public ?? false,
@@ -270,7 +270,7 @@ export class Registry {
     for (const rel of relations.values()) rel.root = rootOf(declared.get(rel.id)!, []);
 
     for (const type of types.values()) {
-      const problems = [...checkCapabilities(type.capabilities, type.fields, new Set(relations.keys()), [...type.statuses.open, ...type.statuses.closed]), ...checkFieldDecls(type, raw.get(type.id), extra.get(type.id))];
+      const problems = [...checkCapabilities(type.capabilities, type.fields, new Set(relations.keys()), [...type.statuses.open, ...type.statuses.closed]), ...checkFieldDecls(type, raw.get(type.id), extra.get(type.id)), ...checkPhases(raw.get(type.id)?.statuses ?? { open: [], closed: [] })];
       if (problems.length) throw new Error(`Type "${type.id}" in pack "${type.pack}": ${problems.join('; ')}`);
     }
 

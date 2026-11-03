@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { openDb } from '../src/db.ts';
-import { PackHost } from '../src/packhost.ts';
+import { PackHost, Sandbox, type Answerer } from '../src/packhost.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { readEvents } from '../src/eventlog.ts';
@@ -39,6 +39,16 @@ test('a handler that overruns is stopped, and the next call starts it again', as
   const env = ((await host.call(l, human, 'demo', 'action', 'demo.env', {})) as { answer: string[] }).answer;
   // It runs again, given nothing of the server's environment (Windows adds its own system variables, none secret).
   assert.ok(!env.some((k) => /PELAGO|TOKEN|KEY|SECRET/i.test(k)), env.join(', '));
+});
+
+test("a limit is the handler's own time: its process starting and the kernel answering its reads are not counted", async () => {
+  const box = new Sandbox(join(dir, 'demo'));
+  after(() => box.stop());
+  // A busy machine: the process starts cold, and each read is answered well after the limit.
+  const slow: Answerer = () => new Promise((done) => setTimeout(() => done([{ title: 'Visit Barn' }]), 400));
+  const message = { call: 'action', actor: { name: 'test', kind: 'human' } };
+  assert.deepEqual((await box.call(slow, { ...message, name: 'demo.visits', input: { site: 'Barn' } }, 200)).answer, ['Visit Barn']);
+  await assert.rejects(box.call(slow, { ...message, name: 'demo.spin', input: {} }, 200), /took longer than 200 ms and was stopped/);
 });
 
 test("a handler reads as the actor: another person's private item is not there for it", async () => {

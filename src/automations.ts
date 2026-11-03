@@ -4,8 +4,9 @@
 // agent proposes does nothing until a human approves it. Every firing is
 // logged with its result.
 
-import { AUTOMATION_TOOLS, checkAutomation } from './automation-rules.ts';
+import { AUTOMATION_TOOLS, checkAutomation, weekdays } from './automation-rules.ts';
 import { lastSeq, readEvents } from './eventlog.ts';
+import { checkCloud, cloudOn } from './cloud-launch.ts';
 import { launch } from './launcher.ts';
 import type { Entity, Archipelago } from './pelago.ts';
 import { notify } from './notify.ts';
@@ -57,6 +58,8 @@ export class Automations {
     this.busy = true;
     try {
       await this.flagStaleSessions();
+      // Runs launched in the cloud are ended here when their sessions stop: nothing on this server waits on them.
+      if (cloudOn()) await checkCloud(this.l);
       const { rows: autos } = await this.l.db.query<Entity>(
         `select * from entity where type = any($1::text[]) and status = 'enabled' and archived_at is null order by created_at`,
         [this.l.registry.family('automation')],
@@ -89,7 +92,9 @@ export class Automations {
   private due(auto: Entity, now: Date): boolean {
     const last = auto.props.last_fired ? new Date(auto.props.last_fired as string) : undefined;
     if (auto.props.trigger === 'every') return !last || now.getTime() - last.getTime() >= (auto.props.every_minutes as number) * 60_000;
-    if (auto.props.trigger === 'daily') {
+    if (auto.props.trigger === 'daily' || auto.props.trigger === 'weekly') {
+      // A weekly one is a daily one on its days alone (getDay counts Sunday as 0).
+      if (auto.props.trigger === 'weekly' && !weekdays(auto.props.days)?.includes(now.getDay() || 7)) return false;
       const [h, m] = (auto.props.at as string).split(':').map(Number);
       const slot = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
       return now >= slot && (!last || last < slot);
@@ -134,7 +139,7 @@ export class Automations {
       } else {
         // A human approved this automation, launch settings included, so it may launch.
         // The session it starts only proposes, and its run names the automation.
-        const started = await launch(this.l, { kind: 'human', name }, { task: input.task as string, mode: input.mode as 'plan', instructions: input.instructions as string | undefined }, { kind: 'automation', id: auto.id, name: auto.title });
+        const started = await launch(this.l, { kind: 'human', name }, { task: input.task as string, mode: input.mode as 'plan', instructions: input.instructions as string | undefined, budget_usd: input.budget_usd as number | undefined }, { kind: 'automation', id: auto.id, name: auto.title });
         await this.l.operational(auto.id, { props: { last_run: started.run } });
         result = `launched run ${started.run} (${started.mode})`;
       }
