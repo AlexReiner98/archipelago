@@ -260,7 +260,7 @@ const draw = (ctx, p) => (Object.hasOwn(PIECES, p.piece) ? PIECES[p.piece](ctx, 
 const PAGES = { time };
 
 /** A piece that draws something of an item has nothing to draw on a screen of its own. */
-const OF_ITEM = ['tree', 'gate', 'proof', 'usage', 'fields', 'token', 'button'];
+const OF_ITEM = ['tree', 'gate', 'proof', 'usage', 'fields', 'token', 'button', 'count'];
 
 /** The column a screen of its own draws: its pieces, with no item. */
 export function drawScreen(screen, redraw) {
@@ -303,10 +303,12 @@ const piecesOn = (data) => {
 };
 /** The buttons the screens on this item declare: they stand in its page's head (ui/item.js), not in the column. */
 export const buttonsOn = (data) => piecesOn(data).filter((p) => p.piece === 'button');
+/** The count a screen on this item declares: it stands at the foot of its note while it is written (ui/note-count.js). */
+export const countOn = (data) => piecesOn(data).find((p) => p.piece === 'count');
 
 export function drawScreens(ctx) {
   const drawn = piecesOn(ctx.data)
-    .filter((p) => p.piece !== 'button')
+    .filter((p) => p.piece !== 'button' && p.piece !== 'count')
     .map((p) => draw(ctx, p))
     .filter(Boolean);
   return settle(drawn);

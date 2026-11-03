@@ -14,7 +14,7 @@ import { choicesSection, fieldsSection, headSection, historySection, section, so
 import { relationEditor } from './item-links.js';
 import { added } from './query-bar.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
-import { actionForm, actionsFor, buttonsOn, drawnBy, keepsFigure, readWhole, toolOf } from './screens.js';
+import { actionForm, actionsFor, buttonsOn, countOn, drawnBy, keepsFigure, readWhole, toolOf } from './screens.js';
 import { idsIn, isA, label, menu, relations, titles, types } from './words.js';
 
 /** The root relation a relation extends: what the page reads, whichever pack's flavour of it was used. */
@@ -136,7 +136,7 @@ export async function entity(id, here) {
   const reading = doc && readingOf(doc, looks);
   // Read beside its draft (the pages), a document opens as words to write: it reads on the left already.
   const writing = Boolean(doc && document.querySelector('.lens-view.beside-sheet'));
-  const draft = draftOf({ base: e, style: looks, editable: !e.archived_at, reading, writing: writing && !doc.from, saved: again });
+  const draft = draftOf({ base: e, style: looks, editable: !e.archived_at, reading, writing: writing && !doc.from, saved: again, count: countOn(data) });
   // Shared by a map this browser is signed in to, its words are written there, as the person they are there.
   const home = await homeOf(doc);
   const words = home && draftOf({ base: home.item, style: looks, reading, writing, call: home.call, saved: () => (readAgain(id), again()) });
