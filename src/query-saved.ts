@@ -84,15 +84,16 @@ export async function shownIn(l: Archipelago, id: string, trail: { id: string; t
 
 // ---- Views kept before the flat lens ------------------------------------------------------------------------------
 
-/** The fields a view kept before the flat lens said what was in it with. */
-export const OLD_FIELDS = ['from', 'controls', 'kinds', 'by', 'over', 'far', 'near', 'lanes', 'order', 'measure', 'fold', 'time'];
+/** The fields a view kept before the flat lens said what was in it with. Not time: a flat lens keeps its window of
+ * time in the same field, in the same words, so a time view kept now is no old view (it was moved, and lost its query,
+ * on every start). */
+export const OLD_FIELDS = ['from', 'controls', 'kinds', 'by', 'over', 'far', 'near', 'lanes', 'order', 'measure', 'fold'];
 /** Each old field the flat lens has no word for, and why. */
 const UNSAID: Record<string, string> = {
   controls: 'what the person may change on the page',
   lanes: 'lanes',
   order: 'an ordering field',
   measure: 'what size counts',
-  time: 'a time axis',
   near: 'near',
 };
 
@@ -103,7 +104,7 @@ const UNSAID: Record<string, string> = {
  * types of what is part of it (a step), drawn in it as the frame, and not walked (the walk is not narrowed).
  * What is left out stays left out. `lost` says each thing it said that the flat lens cannot: a depth other than one
  * step or every step (the flat walk goes either way, so walking part_of further would climb to what holds it), what
- * the links of a narrowed view reached, unlinked, lanes, a time axis, controls...
+ * the links of a narrowed view reached, unlinked, lanes, controls...
  * Null when nothing in it says what a filter includes.
  */
 export function oldQuery(l: Archipelago, props: Props, about: string[]): { lens: { filter: Props; walk: { over: string[] | 'all'; steps: number } } | null; lost: string[] } {
