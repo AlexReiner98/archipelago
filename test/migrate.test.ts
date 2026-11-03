@@ -99,3 +99,14 @@ test('a folder keeps a small write-ahead log', async () => {
   assert.deepEqual((await db.query<{ min: string; max: string }>(`select current_setting('min_wal_size') as min, current_setting('max_wal_size') as max`)).rows[0], { min: '32MB', max: '64MB' });
   await db.close();
 });
+
+test('a database from before any-word search gets its function on opening', async () => {
+  const dir = folder();
+  const made = await openDb(dir);
+  await made.exec(`drop function pelago_search_any(text); delete from schema_version where version >= 30;`);
+  await made.close();
+  const db = await openDb(dir);
+  assert.equal(await versionOf(db), LATEST);
+  assert.deepEqual((await db.query(`select * from pelago_search_any('nothing here')`)).rows, []);
+  await db.close();
+});

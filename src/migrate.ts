@@ -14,7 +14,7 @@ import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';
 import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH, SHARE_PUBLISHABLE } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
 import { ITEM_KIND } from './head.ts';
-import { SEARCH_INDEX } from './search.ts';
+import { SEARCH_ANY, SEARCH_INDEX } from './search.ts';
 import { LOG } from './log.ts';
 import { ACTIVITY, PRE_LOG_ACTIVITY } from './eventlog.ts';
 import { VAULT } from './vault.ts';
@@ -68,6 +68,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 27, name: 'the activity from before the log began, gone', sql: PRE_LOG_ACTIVITY },
   { version: 28, name: 'what each item adds to the log, in bytes', sql: ITEM_BYTES },
   { version: 29, name: 'a token a person granted a client by signing in', sql: TOKEN_GRANT },
+  { version: 30, name: 'search finds an item with any of the words', sql: SEARCH_ANY },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;
