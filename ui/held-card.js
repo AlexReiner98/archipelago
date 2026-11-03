@@ -45,6 +45,9 @@ export function proposalCard(p, names, done) {
       h('div', { class: 'row-top nowrap-row' }, h('strong', { class: 'grow gist', title: p.reason }, gist(p.reason)), who(p.actor, p.run_name), ago(p.ts)),
       p.source && h('div', { class: 'muted small gist', title: p.source.uri }, `source: ${p.source.title ?? p.source.uri}`),
       p.warnings.map((w) => h('div', { class: 'warning small' }, `Warning: ${w}`)),
+      // A newer held change of the same proposer that sets again all an older one asks (src/withdraw.ts).
+      p.covered_by && h('div', { class: 'muted small', title: p.covered_by.join(', ') }, 'A newer change covers this one'),
+      p.covers && h('div', { class: 'muted small', title: p.covers.join(', ') }, `Covers ${p.covers.length === 1 ? 'an older change' : `${p.covers.length} older changes`}`),
     ),
     h('table', { class: 'ops' }, h('thead', {}, h('tr', {}, h('th', {}), h('th', {}, 'Change'), h('th', {}, 'What'), h('th', {}, 'Status'))), body),
     h(

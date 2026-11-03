@@ -19,6 +19,7 @@ import { withStyles } from './styles.ts';
 import { props } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 import { VIEW_INPUT, viewAddress } from './view-address.ts';
+import { withCovers } from './withdraw.ts';
 
 /** One thing the human did to the map, small enough to put in front of a model. */
 export interface HumanChange {
@@ -237,10 +238,11 @@ export const READ_TOOLS: Record<string, Tool> = {
   },
   proposals: {
     description:
-      'List the changes held for a human, by status (default pending; "approved" is applied, "rejected" is declined, "superseded" asked only for what a later change had already made so). Agents can read these but only a human can decide them.',
-    input: { status: z.enum(['pending', 'approved', 'rejected', 'superseded']).optional(), full: z.boolean().optional().describe(`true for all of them, whole. Left out, an agent is given long values cut, and of a closed status the newest ${PROPOSALS_LISTED}.`) },
+      'List the changes held for a human, by status (default pending; "approved" is applied, "rejected" is declined, "superseded" asked only for what a later change had already made so, "withdrawn" was taken back by its proposer). A pending one says which older ones of the same proposer it covers (covers, covered_by). Agents can read these but only a human can decide them.',
+    input: { status: z.enum(['pending', 'approved', 'rejected', 'superseded', 'withdrawn']).optional(), full: z.boolean().optional().describe(`true for all of them, whole. Left out, an agent is given long values cut, and of a closed status the newest ${PROPOSALS_LISTED}.`) },
     run: async (l, actor, { full, ...input }) => {
-      const all = await l.proposals(input);
+      const listed = await l.proposals(input);
+      const all = (input.status ?? 'pending') === 'pending' ? withCovers(listed) : listed;
       const short = actor.kind === 'agent' && !full;
       const held = short ? all.slice(input.status && input.status !== 'pending' ? -PROPOSALS_LISTED : 0).map((p) => ({ ...p, ops: (p.ops as unknown[]).map((op) => shorter(op, 'proposals with full: true has it')) })) : all;
       // The session each was proposed in, named by its name, as everywhere a session is (the held entry says which).

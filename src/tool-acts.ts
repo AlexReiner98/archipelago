@@ -21,6 +21,7 @@ import { backupNow, restartNow } from './tool-config.ts';
 import { BRANCH } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 import { VIEW_INPUT, viewAddress } from './view-address.ts';
+import { withdraw } from './withdraw.ts';
 
 export const ACT_TOOLS: Record<string, Tool> = {
   backup: {
@@ -86,6 +87,12 @@ export const ACT_TOOLS: Record<string, Tool> = {
       reason: z.string().min(1),
     },
     run: async (l, actor, input) => l.release(actor, input),
+  },
+  withdraw: {
+    description:
+      'Take back a held change you proposed yourself, e.g. one a newer change of yours covers (proposals lists covers and covered_by). It leaves the queue as withdrawn. Never another’s, and it decides nothing: approving or declining one stays a person’s.',
+    input: { proposal: z.string().describe('The held change’s id (p_...).'), reason: z.string().min(1).optional().describe('Why, shown on it. Left out, what covers it.') },
+    run: async (l, actor, input) => withdraw(l, actor, input),
   },
   places_put: {
     description: 'Put things where they stand on one canvas, a batch of moves in one call: each item’s middle as [x, y] in the picture’s own units, or null to let the layout lay it again; clear: true forgets every place on the canvas first. Never a fact about the work: kept in the places stream, newest per canvas and item. Takes effect at once.',

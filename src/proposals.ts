@@ -41,15 +41,15 @@ export async function overtakenFields(l: Archipelago, base: number, ops: Op[]): 
 }
 
 /**
- * An entry with no facts, for a held change that was declined, or made moot by a change that did what it asked; the
+ * An entry with no facts, for a held change that was declined, withdrawn by its proposer (src/withdraw.ts), or made moot by a change that did what it asked; the
  * queue's row says so from it. Only while it is pending: false when something else decided it first.
  */
-export async function rejection(tx: Q, ws: string, proposal: string, d: { outcome: 'rejected' | 'superseded'; actor: string; by: string; reason: string }): Promise<boolean> {
+export async function rejection(tx: Q, ws: string, proposal: string, d: { outcome: 'rejected' | 'superseded' | 'withdrawn'; actor: string; by: string; reason: string; note?: string }): Promise<boolean> {
   await stamp(tx); // the fact stream's lock: one decision at a time
   if ((await tx.query(`select 1 from proposal where id = $1 and status = 'pending'`, [proposal])).rows.length === 0) return false;
   const record = await entry(tx, proposal);
   const held = record?.held_by as { rule: string; pack: string } | null | undefined;
-  const rule: Decision = { outcome: d.outcome, held_by: held ? { rule: held.rule, pack: held.pack } : null, proposal, proposal_hash: record?.hash ?? '', by: d.by };
+  const rule: Decision = { outcome: d.outcome, held_by: held ? { rule: held.rule, pack: held.pack } : null, proposal, proposal_hash: record?.hash ?? '', by: d.by, ...(d.note && { note: d.note }) };
   await projectDecision(tx, await append(tx, ws, 'facts', { id: newId('c'), actor: { id: d.actor }, authority: null, rule, reason: d.reason, source: null, action: null, undoes: null, keys: [] }, []));
   return true;
 }

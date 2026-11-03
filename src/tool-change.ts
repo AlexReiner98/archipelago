@@ -12,6 +12,7 @@ import type { Tool } from './tools.ts';
 import { keep, kept as keptFor, take } from './transient.ts';
 import { undo } from './undo.ts';
 import { resolveRun } from './sessions.ts';
+import { covering } from './withdraw.ts';
 
 // Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
 export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string, pane?: string, run?: string): Promise<Focus> {
@@ -135,6 +136,9 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         );
       }
       if (retry) await take((await wholeMap(l)).db, `refused:${retry}`);
+      // A held change that sets again all an older one of the same proposer asked says so, so that one can be withdrawn.
+      const covers = result.status === 'proposed' ? covering(await l.proposals()).get(result.proposal) : undefined;
+      if (covers && result.status === 'proposed') result = { ...result, covers, note: `${result.note} It covers ${covers.join(', ')}, held before it: withdraw those (revise, action withdraw).` };
       // A question an agent settled is not left for the human to come across: it is put to them by the next session
       // they talk to (attention, reason to_confirm, and the handoff), all of them in one list, not a notification for each.
       // The human's screen follows an agent's change: to Review when it waits
