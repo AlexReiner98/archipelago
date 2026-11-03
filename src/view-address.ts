@@ -13,7 +13,7 @@ export const VIEW_INPUT = {
     .record(z.string(), z.unknown())
     .optional()
     .describe('What the view draws: a query, as query flat takes it ({ filter: { find, only, not }, walk: { over (depends_on> out, depends_on< in, depends_on either way), steps }, limit }), shown in the query bar as if written there. With entity, under that item\'s page. {} is the canvas as it opens.'),
-  lens: z.record(z.string(), z.unknown()).optional().describe('The old name of query, still taken.'),
+  lens: z.union([z.string(), z.record(z.string(), z.unknown())]).optional().describe('The old name of query, still taken; a kept view\'s id here is taken as entity.'),
   style: z
     .object({
       lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.'),
@@ -29,13 +29,15 @@ export interface ViewAsked {
   entity?: string;
   screen?: string;
   query?: Record<string, unknown>;
-  lens?: Record<string, unknown>;
+  lens?: string | Record<string, unknown>;
   style?: { lit?: string; layout?: string; shape?: string; id?: string };
 }
 
 /** The page's address (after "#/") for what is asked. */
 export async function viewAddress(l: Archipelago, asked: ViewAsked): Promise<string> {
-  const input = { ...asked, lens: asked.query ?? asked.lens, ...(asked.style && { style: { ...asked.style, shape: asked.style.layout ?? asked.style.shape } }) };
+  // A kept view's id given as lens is the view it names, as entity takes it.
+  if (typeof asked.lens === 'string') asked = { ...asked, entity: asked.entity ?? asked.lens, lens: undefined };
+  const input = { ...asked, lens: asked.query ?? (asked.lens as Record<string, unknown> | undefined), ...(asked.style && { style: { ...asked.style, shape: asked.style.layout ?? asked.style.shape } }) };
   // A saved canvas is opened as what the canvas draws: the page reads its lens and style from the map.
   const kept = input.entity && (await l.entity(input.entity));
   if (input.entity && !kept) throw new Error(`No item "${input.entity}"`);
