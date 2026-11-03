@@ -273,7 +273,7 @@ export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: 
     run: run.id,
     status: input.status ?? run.status,
     ...(task && { commit: commitRule(task.id) }),
-    ...(unestimated && { estimate: `"${task.title}" has no estimate. Say how many tokens you expect it to take (input and output, not counting cached re-reads): change, update ${task.id}, props.tokens_estimated. What it actually uses is measured for you.` }),
+    ...(unestimated && { estimate: `"${task.title}" has no estimate. Say how many tokens you expect it to take (one number: input and output together, not counting cached re-reads): change, update ${task.id}, props.tokens_estimated. What it actually uses is measured for you.` }),
   };
 }
 

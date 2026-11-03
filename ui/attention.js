@@ -57,19 +57,25 @@ const ASKS = [
 ];
 const sentence = (text) => text && text.charAt(0).toUpperCase() + text.slice(1);
 
-/** A row of what is yours to do, read as the thing to do: its verb, what is asked (or the item, when nothing more is said), then the item and where it sits, muted. */
-export function moveRow(item, latest = false) {
+/** What an item asks of you: the reason that asks first, its verb, and what it is you do, when the map says. */
+function askOf(item) {
   // A pack's reason says its own verb (ask) when no reason of the kernel's asks first.
   const own = item.reasons.find((r) => r.ask && !MARKS[r.why]);
   const [why, ask] = ASKS.find(([w]) => item.reasons.some((r) => r.why === w)) ?? (own ? [own.why, (r) => [r.ask]] : []);
   const [verb, said] = ask ? ask(item.reasons.find((r) => r.why === why)) : ['Look', undefined];
+  return { why, verb, said };
+}
+
+/** A row of what is yours to do, read as the thing to do: its verb, what is asked (or the item, when nothing more is said), then the item and where it sits, muted. Under its kind's line the verb is that line's. */
+export function moveRow(item, latest = false, under = false) {
+  const { why, verb, said } = askOf(item);
   const cut = 'min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis';
   // Beside it, muted: the item, when the ask is not its title; else what it waits on you for.
   const aside = said ? item.title : sentence(item.reasons.find((r) => r.why === 'waits_on')?.for);
   return h(
     'li',
     { class: 'row-top', style: 'flex-wrap: nowrap' },
-    h('span', { class: `pill ${why === 'due' || why === 'to_confirm' ? 'warn' : ''}`.trim(), style: 'flex: none', title: item.reasons.map((r) => mark(r)[2]).filter(Boolean).join('\n') }, verb),
+    !under && h('span', { class: `pill ${why === 'due' || why === 'to_confirm' ? 'warn' : ''}`.trim(), style: 'flex: none', title: item.reasons.map((r) => mark(r)[2]).filter(Boolean).join('\n') }, verb),
     h('a', { class: 'grow', href: `#/e/${item.id}`, title: said ? `${sentence(said)}\n${item.title}` : item.title, style: cut }, sentence(said) || item.title),
     aside && h('span', { class: 'muted small', title: aside, style: `${cut}; max-width: 35%; flex-shrink: 2` }, aside),
     item.top && h('a', { class: 'muted small', href: `#/e/${item.top.id}`, title: item.top.title, style: `${cut}; max-width: 20%; flex-shrink: 3` }, item.top.title),
@@ -87,16 +93,47 @@ function overflow(rest) {
   const groups = [...by.values()].sort((a, b) => b.n - a.n);
   return h(
     'div',
-    { class: 'row-top muted small overflow', style: 'padding: 0 var(--space-8) var(--space-7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis' },
+    { class: 'row-top muted small overflow', style: 'white-space: nowrap; overflow: hidden; text-overflow: ellipsis' },
     `and ${rest.length} more:`,
     groups.map((g) => (g.top ? h('a', { href: `#/e/${g.top.id}`, title: `${g.n} in ${g.top.title}` }, `${g.top.title} ${g.n}`) : h('span', { title: 'In no project' }, `elsewhere ${g.n}`))),
+  );
+}
+
+/** What is yours to do, a band for each thing it asks of you, in the order its first row comes. Every kind keeps a row
+ * in sight: the limit is shared out a row at a time from the first kind on, and the rest of a kind is one line under it. */
+function byKind(items, limit, latest) {
+  const kinds = new Map();
+  for (const item of items) {
+    const { verb } = askOf(item);
+    kinds.set(verb, [...(kinds.get(verb) ?? []), item]);
+  }
+  const groups = [...kinds].map(([verb, all]) => ({ verb, all, n: limit ? 1 : all.length }));
+  for (let left = (limit ?? 0) - groups.length, grew = true; left > 0 && grew; ) {
+    grew = false;
+    for (const g of groups) if (left > 0 && g.n < g.all.length) (g.n++, left--, (grew = true));
+  }
+  return groups.map((g) =>
+    h(
+      'div',
+      { class: 'kind' },
+      h('div', { class: 'row-top small kind-head' }, h('strong', {}, g.verb), h('span', { class: 'muted' }, g.all.length)),
+      h('ul', { class: 'rows' }, g.all.slice(0, g.n).map((item) => moveRow(item, latest, true))),
+      g.n < g.all.length && overflow(g.all.slice(g.n)),
+    ),
   );
 }
 
 /** A card of attention rows. On an item's page it is left out when nothing there needs anyone; on Home it says so. Given a limit, the rest are one line. */
 export async function attentionCard(host, params, title, onItem, limit) {
   const order = savedOrder();
-  const answer = await api('view', { name: 'attention', params: { ...params, ...(order === 'latest' && { order }) } });
+  let answer;
+  try {
+    answer = await api('view', { name: 'attention', params: { ...params, ...(order === 'latest' && { order }) } });
+  } catch (err) {
+    // What could not be read is said where the card stands, never left as nothing.
+    if (host.isConnected) host.replaceChildren(h('section', { class: 'card wide needs', style: 'margin-bottom: var(--space-8)' }, h('header', {}, h('h2', {}, title)), h('div', { class: 'error' }, `Could not read what needs you: ${err.message}`)));
+    return;
+  }
   if (!host.isConnected) return;
   if (!answer.items.length && onItem) return host.remove();
   const pick = (to) => () => {
@@ -108,6 +145,8 @@ export async function attentionCard(host, params, title, onItem, limit) {
     attentionCard(host, params, title, onItem, limit);
   };
   const shown = limit ? answer.items.slice(0, limit) : answer.items;
+  // What is yours to do, when it comes in more than one kind: a band for each, so no kind is pushed out of sight.
+  const split = params.person === 'me' && new Set(answer.items.map((item) => askOf(item).verb)).size > 1;
   const orders = [['pressing', 'Pressing', 'What matters most first'], ['latest', 'Latest', 'What changed most recently first']];
   host.replaceChildren(
     h(
@@ -120,8 +159,11 @@ export async function attentionCard(host, params, title, onItem, limit) {
         answer.items.length > 0 && h('span', { class: 'n' }, answer.items.length),
         answer.items.length > 1 && h('span', { class: 'switch', style: 'margin-left: auto' }, orders.map(([key, label, tip]) => h('button', { class: order === key ? 'on' : '', title: tip, onclick: pick(key) }, label))),
       ),
-      answer.items.length ? h('ul', { class: 'rows' }, shown.map((item) => (params.person === 'me' ? moveRow : attentionRow)(item, order === 'latest'))) : h('div', { class: 'empty' }, 'Nothing needs you.'),
-      shown.length < answer.items.length && overflow(answer.items.slice(shown.length)),
+      split
+        ? byKind(answer.items, limit, order === 'latest')
+        : answer.items.length
+          ? [h('ul', { class: 'rows' }, shown.map((item) => (params.person === 'me' ? moveRow : attentionRow)(item, order === 'latest'))), shown.length < answer.items.length && overflow(answer.items.slice(shown.length))]
+          : h('div', { class: 'empty' }, 'Nothing needs you.'),
       answer.more && h('div', { class: 'muted small', style: 'padding: 0 var(--space-8) var(--space-7)' }, answer.more),
     ),
   );

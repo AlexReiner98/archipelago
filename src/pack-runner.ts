@@ -56,6 +56,8 @@ async function run(call: Line) {
   }
 }
 
+send({ ready: true }); // the host starts a call's clock from here: starting the process is not the handler's time
+
 for await (const text of createInterface({ input: process.stdin })) {
   const line = JSON.parse(text) as Line;
   if (typeof line.read === 'number') {

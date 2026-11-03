@@ -54,11 +54,22 @@ export function readSteps(value: unknown): Step[] {
   return value as Step[];
 }
 
-/** Every item the steps name: sent with the picture whatever it folds away. */
+/** What is wrong with the steps a lens keeps, in a sentence; nothing when they pass. A read says it, never throws it. */
+export function stepsWrong(value: unknown): string | undefined {
+  try {
+    readSteps(value);
+  } catch (e) {
+    return (e as Error).message;
+  }
+}
+
+/** Every item the steps name: sent with the picture whatever it folds away. Read from whatever is kept, passing or not. */
 export function stepIds(steps: unknown): string[] {
   if (!Array.isArray(steps)) return [];
   const named = new Set<string>();
-  for (const s of readSteps(steps)) for (const id of [...(s.add ?? []), ...(s.remove ?? []), ...Object.keys(s.titles ?? {}), ...Object.keys(s.fields ?? {}), ...Object.keys(s.flag ?? {})]) named.add(id);
+  const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  const keys = (v: unknown) => (typeof v === 'object' && v !== null && !Array.isArray(v) ? Object.keys(v) : []);
+  for (const s of steps) if (typeof s === 'object' && s !== null) for (const id of [...ids(s.add), ...ids(s.remove), ...keys(s.titles), ...keys(s.fields), ...keys(s.flag)]) named.add(id);
   return [...named];
 }
 

@@ -13,15 +13,17 @@ const AGAIN_MS = 15_000;
 /** The piece: drawn into host on a server where tokens sign people in, and drawn again while it is on the page. */
 export async function tokenAskPiece(host, e) {
   if (!host.isConnected) return;
-  const me = await fetch('/whoami', { headers: authHeaders() }).then((r) => r.json()).catch(() => null);
-  if (me?.auth !== 'tokens' || e?.archived_at) return host.remove();
-  const asks = await api('token_requests', { ...(e && { within: e.id }), answered: true }).catch(() => []);
+  // What could not be read is said in the card, and looked for again: a card that draws nothing is never a failure.
+  let failed;
+  const me = await fetch('/whoami', { headers: authHeaders() }).then((r) => r.json()).catch((err) => ((failed = `Could not ask who you are: ${err.message}`), null));
+  if ((!failed && me?.auth !== 'tokens') || e?.archived_at) return host.remove();
+  const asks = failed ? [] : await api('token_requests', { ...(e && { within: e.id }), answered: true }).catch((err) => ((failed = `Could not read the requests: ${err.message}`), []));
   const waiting = asks.filter((a) => a.state === 'pending');
   if (!host.isConnected) return;
   const again = () => tokenAskPiece(host, e);
   clearTimeout(host.later);
   host.later = setTimeout(again, AGAIN_MS);
-  const error = h('div', { class: 'error' });
+  const error = h('div', { class: 'error' }, failed);
   const known = (a) => a.items.every(Boolean);
   const names = (a) => a.items.map((i, n) => i?.title ?? a.addresses[n]).join(', ');
   const answer = async (a, approve) => {
@@ -51,8 +53,8 @@ export async function tokenAskPiece(host, e) {
       h('button', { onclick: () => answer(a, false) }, 'Refuse'),
     );
   host.replaceChildren(
-    ...(asks.length
-      ? [h('section', { class: `card wide${waiting.length ? ' needs' : ''}`, style: 'margin-bottom: var(--space-8)' }, h('header', {}, h('h2', {}, 'Asking for a token'), waiting.length > 0 && h('span', { class: 'n' }, waiting.length)), h('ul', { class: 'rows' }, asks.map((a) => (a.state === 'pending' ? row(a) : answered(a)))), error)]
+    ...(asks.length || failed
+      ? [h('section', { class: `card wide${waiting.length || failed ? ' needs' : ''}`, style: 'margin-bottom: var(--space-8)' }, h('header', {}, h('h2', {}, 'Asking for a token'), waiting.length > 0 && h('span', { class: 'n' }, waiting.length)), asks.length > 0 && h('ul', { class: 'rows' }, asks.map((a) => (a.state === 'pending' ? row(a) : answered(a)))), error)]
       : []),
   );
 }

@@ -27,7 +27,8 @@ const GHOST = /^p_[a-z0-9]+:/;
 const SHEET = { e: 'item', held: 'item', new: 'item', s: 'screen', workspace: 'workspace', you: 'you' };
 const sheet = document.getElementById('sheet');
 startTips();
-const close = () => (location.hash = hrefNow());
+// A sheet opened where the address stays (the sign-in form, from Home) is shut by drawing that address again.
+const close = () => (location.hash === hrefNow() ? route() : (location.hash = hrefNow()));
 document.getElementById('sheet-close').addEventListener('click', close);
 addEventListener('keydown', (ev) => ev.key === 'Escape' && document.body.dataset.sheet && !document.querySelector('dialog[open]') && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? '') && close());
 

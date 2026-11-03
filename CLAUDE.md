@@ -42,7 +42,9 @@ reply ending, commits accounted for) is `docs/agents.md`.
   Under `npm start` they wait as proposals; under `npm run dev` they apply at
   once, so check them before you send them. Either way, never approve, reject,
   launch or manage tokens by calling the CLI or `/api` yourself: those carry
-  the human's authority.
+  the human's authority. Withdrawing a held change you proposed yourself
+  (`revise` action `withdraw`, e.g. one a newer change of yours covers) is not
+  deciding it: it applies nothing, and another's is never yours to withdraw.
 - **Say on whose authority.** A `change` takes `authority`: `of: "human"`
   with `basis` (what the owner said and where) when the owner told you to or
   decided it, `of: "agent"` when it is your own reading of the work. Do not

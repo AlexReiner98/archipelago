@@ -21,6 +21,7 @@ export const SLOW: Record<string, string> = {
   'test/docs-beside.test.ts': 'browser',
   'test/layouts-moved.test.ts': 'browser',
   'test/layout-asks.test.ts': 'browser',
+  'test/code-style-starts.test.ts': 'browser',
   'test/layouts.test.ts': 'browser',
   'test/find-query.test.ts': 'browser',
   'test/kept-views.test.ts': 'browser',

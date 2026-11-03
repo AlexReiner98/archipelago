@@ -56,6 +56,21 @@ function groupsOf(list, item) {
 
 const isId = (s) => /^e_[a-z0-9]{8}$/.test(s);
 const linkTitle = (id) => relations.get(id)?.title ?? id.replaceAll('_', ' ');
+/** Names come one at a time: what waits on them is drawn once a frame, however many came in it. */
+const due = new Set();
+let dueAt = 0;
+function drawSoon(draws) {
+  for (const draw of draws) due.add(draw);
+  dueAt ||= requestAnimationFrame(() => {
+    dueAt = 0;
+    const now = [...due];
+    due.clear();
+    for (const draw of now) draw();
+  });
+}
+/** The bar drawn again for the lens it was drawn for last: one function, so a name asked for by every draw waits on it once. */
+const redrawLast = () => last && drawQuery(...last);
+
 /** An item named by its title, once the page knows it; until then a mark, and the name asked for. */
 function nameOf(id, redraw) {
   if (titles.has(id)) return titles.get(id);
@@ -69,7 +84,7 @@ function nameOf(id, redraw) {
     api('get', { id })
       .then((got) => {
         titles.set(id, got.entity.title);
-        for (const draw of asking.get(id) ?? []) draw();
+        drawSoon(asking.get(id) ?? []);
         asking.set(id, new Set());
       })
       .catch(() => again && ask(false));
@@ -152,7 +167,7 @@ export function filterSaid(f, redraw) {
 /** Draw the bar for this lens, over the view that draws it (its answer names what the lens names); `lead` goes first (the saved canvas up, ui/canvases.js). */
 export function drawQuery(lens, view, go, lead) {
   if (!bar) return;
-  const redraw = () => drawQuery(lens, view, go, lead);
+  const redraw = redrawLast;
   last = [lens, view, go, lead];
   const f = lens.filter;
   const answer = view?.answer;
@@ -302,22 +317,31 @@ export function drawQuery(lens, view, go, lead) {
   fitBar();
 }
 
-/** Each row of the editor shows as many of its terms as it has room for, and how many more: drawn again as the bar's width changes. */
+/**
+ * Each row of the editor shows as many of its terms as it has room for, and how many more: drawn again as the bar's width
+ * changes. How many is found by halving, so a row of many terms is measured a few times, not once a term.
+ */
 function fitRows() {
   for (const row of rows?.querySelectorAll(':scope > .q-part') ?? []) {
     const box = row.querySelector('.q-terms');
     const more = box.querySelector(':scope > .q-more');
     if (!more) continue;
     const terms = [...box.querySelectorAll(':scope > .q-term')];
-    for (const t of terms) t.hidden = false;
-    more.hidden = true;
-    let shown = terms.length;
-    while (shown > 1 && box.scrollWidth > box.clientWidth + 1) {
-      terms[--shown].hidden = true;
+    const keep = (shown) => {
+      terms.forEach((t, i) => { t.hidden = i >= shown; });
       const rest = terms.slice(shown);
-      Object.assign(more, { hidden: false, textContent: `+${rest.length} more`, title: rest.map((t) => t.dataset.said).join(' · ') });
+      Object.assign(more, { hidden: rest.length === 0, textContent: `+${rest.length} more`, title: rest.map((t) => t.dataset.said).join(' · ') });
       more.setAttribute('aria-label', `${rest.length} more`);
+      return box.scrollWidth <= box.clientWidth + 1;
+    };
+    if (keep(terms.length)) continue;
+    // One term is kept however little room there is; the most that fit lies between it and all but one.
+    let fit = 1;
+    for (let over = terms.length; over - fit > 1;) {
+      const mid = (fit + over) >> 1;
+      if (keep(mid)) fit = mid; else over = mid;
     }
+    keep(fit);
   }
 }
 /** Every term of the line back in sight, its counts gone, to be measured whole. */
@@ -327,19 +351,48 @@ function showLine() {
 }
 /**
  * The line's parts share its width. While a part's terms run past what it is given, the part furthest over gives up its
- * last term, and says how many it has given up: the terms left are whole, and one alone is cut with an ellipsis.
+ * terms past its width at once, and says how many it has given up: the terms left are whole, and one alone is cut with an
+ * ellipsis. Where each term ends is measured once, all in sight (a line that does not wrap keeps them where they are),
+ * so the line is laid out about once a part, not once a term.
  */
 function fitLine() {
-  const shown = (box) => [...box.children].filter((t) => !t.hidden);
-  const excess = (box) => box.scrollWidth - box.clientWidth;
+  showLine();
   const boxes = [...line.querySelectorAll('.q-sum-terms')];
+  // Measured the first time a box is over, before it has hidden any.
+  const ends = new Map();
+  const endsOf = (b) => {
+    if (!ends.has(b)) {
+      const left = b.getBoundingClientRect().left;
+      ends.set(b, [...b.children].map((t) => t.getBoundingClientRect().right - left));
+    }
+    return ends.get(b);
+  };
+  const shown = new Map(boxes.map((b) => [b, b.children.length]));
+  const excess = (box) => box.scrollWidth - box.clientWidth;
+  const overs = () => boxes.filter((b) => shown.get(b) > 1 && excess(b) > 1);
+  const keepIn = (box, keep) => {
+    const terms = [...box.children];
+    terms.forEach((t, i) => { t.hidden = i >= keep; });
+    shown.set(box, keep);
+    const rest = terms.slice(keep);
+    Object.assign(box.nextElementSibling, { hidden: rest.length === 0, textContent: `+${rest.length}`, title: rest.map((t) => t.dataset.said).join(' · ') });
+  };
   for (;;) {
-    const box = boxes.filter((b) => excess(b) > 1 && shown(b).length > 1).sort((a, b) => excess(b) - excess(a))[0];
-    if (!box) return;
-    shown(box).at(-1).hidden = true;
-    const rest = [...box.children].filter((t) => t.hidden);
-    const more = box.nextElementSibling;
-    Object.assign(more, { hidden: false, textContent: `+${rest.length}`, title: rest.map((t) => t.dataset.said).join(' · ') });
+    const box = overs().sort((a, b) => excess(b) - excess(a))[0];
+    if (!box) break;
+    // The terms that end within the box's width stay, at least one and one fewer than before; the counter it then shows
+    // takes room, and the next round gives up what that leaves over.
+    const room = box.clientWidth + 1;
+    keepIn(box, Math.max(1, Math.min(shown.get(box) - 1, endsOf(box).filter((end) => end <= room).length)));
+  }
+  // What a part gave up widens the others: each takes back a term while the line still fits.
+  for (const box of boxes) {
+    while (shown.get(box) < box.children.length) {
+      keepIn(box, shown.get(box) + 1);
+      if (overs().length === 0) continue;
+      keepIn(box, shown.get(box) - 1);
+      break;
+    }
   }
 }
 

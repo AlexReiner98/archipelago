@@ -106,6 +106,8 @@ test('the hook counts what the reply did since the owner’s last message', asyn
     use('b8', 'mcp__pelago__query', { name: 'actions', params: { verb: 'report' } }),
     use('b9', 'Edit', { file_path: 'a.ts', old_string: 'a', new_string: 'b' }),
     use('b10', 'Grep', { pattern: 'x' }),
+    use('b11', 'mcp__pelago-site__change', { reason: 'r', ops: [{ op: 'update', id: 'e_elsewhre' }] }),
+    use('b12', 'mcp__pelago-site__report', { action: 'tell', params: { run: 'z', said: 'y' } }),
   ];
   const dir = mkdtempSync(join(tmpdir(), 'pelago-reply-'));
   const transcript = join(dir, 'session.jsonl');
@@ -127,7 +129,8 @@ test('the hook counts what the reply did since the owner’s last message', asyn
   });
   server.close();
   assert.equal(got.turn, 'p2');
-  assert.deepEqual(got.reply, { read: 3, surveyed: 1, showed: 1, changed: 1, told: 1, worked: 4, edited: 1, committed: 1, pushed: 0 }, 'a get and a read of the tools are not surveys; every tool but the map’s is work');
+  assert.deepEqual(got.reply, { read: 3, surveyed: 1, showed: 1, changed: 2, told: 2, worked: 4, edited: 1, committed: 1, pushed: 0 }, 'a get and a read of the tools are not surveys; every tool but a map’s is work, and another workspace’s server is a map’s');
+  assert.ok(!got.touched.includes('e_elsewhre'), 'an item named on another workspace is not this map’s');
   assert.equal(got.stop_hook_active, false, 'what Claude Code said goes through');
   assert.deepEqual(JSON.parse(out), { decision: 'block', reason: 'asked' }, 'and the answer comes back to Claude Code');
 });

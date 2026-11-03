@@ -151,9 +151,10 @@ test('in a browser, the workspace style’s page_css is how a published page loo
   const spacing = () => page.evaluate(`(async () => { for (let n = 0; n < 200 && !document.querySelector('section > h2'); n++) await new Promise((r) => setTimeout(r, 25)); return getComputedStyle(document.querySelector('section > h2')).letterSpacing; })()`);
   try {
     assert.equal(await spacing(), '3px');
-    // One that would fetch something is not read, and the page is drawn as it is.
+    // One that would fetch something is refused when it is written (test/page-css.test.ts); another is read once published.
     const { rows } = { rows: (await call('/api/search', undefined, { q: 'The site', type: 'style' })).result };
-    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: rows[0].id, props: { page_css: 'h2 { letter-spacing: 3px; background: url(https://example.com/) }' } }] });
+    assert.equal((await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: rows[0].id, props: { page_css: 'h2 { letter-spacing: 3px; background: url(https://example.com/) }' } }] })).status, 400);
+    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: rows[0].id, props: { page_css: 'h2 { letter-spacing: normal; }' } }] });
     // What is published keeps the look it was published with until it is published again.
     await page.go(`${base}/p/default/${d}`);
     assert.equal(await spacing(), '3px');

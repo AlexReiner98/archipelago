@@ -458,6 +458,13 @@ create policy member_setting_read on setting for select to pelago_member
   using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish', 'agent_code'));
 `;
 
+/** Step 30 (src/migrate.ts): and whether the owner has turned holds off (src/rules.ts, HOLDS_OFF). */
+export const HOLDS_OFF_READ = `
+drop policy if exists member_setting_read on setting;
+create policy member_setting_read on setting for select to pelago_member
+  using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish', 'agent_code', 'holds_off'));
+`;
+
 export const AGENT_PUBLISH_READ = `
 drop policy if exists member_setting_read on setting;
 create policy member_setting_read on setting for select to pelago_member

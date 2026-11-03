@@ -96,6 +96,15 @@ export async function connection(l: Archipelago): Promise<Connection | undefined
   return undefined;
 }
 
+/**
+ * The workspace's own Anthropic account, for what only Anthropic runs (a cloud session, src/cloud-launch.ts). Never the
+ * server's model: what runs there for hours the workspace pays for, not the server.
+ */
+export async function anthropicAccount(l: Archipelago): Promise<{ key: string; model: string } | undefined> {
+  const a = await stored(l);
+  return a?.provider === 'anthropic' && a.key ? { key: a.key, model: a.model || DEFAULT_MODEL } : undefined;
+}
+
 export const hasModel = async (l: Archipelago): Promise<boolean> => Boolean(await connection(l));
 
 /** What the page is told: which account and model, a key's last four characters at most, and what runs when there is none. */
