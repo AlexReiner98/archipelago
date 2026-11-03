@@ -16,6 +16,7 @@ import { withScreens } from './screens.ts';
 import { schemaBrief, schemaOf } from './schema-brief.ts';
 import { NOW_MS, seeing, seenNow } from './seeing.ts';
 import { withStyles } from './styles.ts';
+import { LARGE, sizeOf } from './head.ts';
 import { props } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 import { VIEW_INPUT, viewAddress } from './view-address.ts';
@@ -102,6 +103,20 @@ function shorter(value: unknown, more: string): unknown {
   return Array.isArray(value) ? value.map((v) => shorter(v, more)) : Object.fromEntries(Object.entries(value).map(([k, v]) => [k, shorter(v, more)]));
 }
 
+/** How many lines of a large field (a style's code, a stylesheet) `get` gives an agent before it says its size. */
+const LARGE_LINES = 8;
+/** An item's large fields as an agent reads them in `get`: the first lines and the size, so a look at its links does not read the whole module. */
+function cutLarge<T extends { props?: Record<string, unknown> }>(entity: T): T {
+  const props = entity?.props;
+  if (!props || !Object.values(props).some((v) => sizeOf(v) > LARGE)) return entity;
+  const cut = (v: unknown) => {
+    if (sizeOf(v) <= LARGE) return v;
+    const text = typeof v === 'string' ? v : JSON.stringify(v, null, 1);
+    return `${text.split('\n').slice(0, LARGE_LINES).join('\n').slice(0, 600)}\n… (${text.length} characters; get with full: true has it)`;
+  };
+  return { ...entity, props: Object.fromEntries(Object.entries(props).map(([k, v]) => [k, cut(v)])) };
+}
+
 /** How many of an item's links in each direction `get` lists for an agent before it counts them by type. */
 const GET_LISTED = 20;
 /** A hub's links as an agent reads them: the first few, and the rest as a count of each type. */
@@ -111,6 +126,12 @@ function fewLinks<T extends { type: string }>(links: T[]) {
   for (const { type } of links) by_type[type] = (by_type[type] ?? 0) + 1;
   return { links: links.slice(0, GET_LISTED), counted: { total: links.length, by_type } };
 }
+
+/** How many of what names an item `get` gives an agent before it counts them. */
+const GET_MENTIONS = 10;
+
+/** How much of each note a query (flat) gives an agent: enough to tell items apart; get has the whole. */
+const FLAT_NOTE = 160;
 
 /** How many of a closed status's proposals an agent is given, the newest. */
 const PROPOSALS_LISTED = 20;
@@ -147,6 +168,16 @@ function forAgent(name: string, answer: unknown): unknown {
       return { ...light(node), ...(node.branches && { branches: node.branches.map(prune) }), ...(node.work && { work: open.map((w) => light(w)), ...(work.length > open.length && { finished_work: work.length - open.length }) }) };
     };
     out.branches = (out.branches as Node[]).map(prune);
+  }
+  if (name === 'flat' && Array.isArray(out?.items)) {
+    // A row as an agent reads it: what its type and status already say (kind, open) and when it was made are left out,
+    // the term that found it only when the filter has more than one, and its note to a shorter start. A quarter of a query.
+    const finds = ((out.lens as { find?: unknown[] } | undefined)?.find ?? []).length;
+    out.items = (out.items as Record<string, unknown>[]).map(({ kind, open, created_at, found, terms, body, ...row }) => ({
+      ...row,
+      ...(typeof body === 'string' && { body: body.length > FLAT_NOTE ? `${body.slice(0, FLAT_NOTE).trimEnd()}…` : body }),
+      ...(finds > 1 && terms !== undefined && { found, terms }),
+    }));
   }
   if (name === 'handoff' && out?.open) {
     const open = out.open as { ready: unknown[]; blocked: unknown[] };
@@ -187,7 +218,7 @@ export const READ_TOOLS: Record<string, Tool> = {
   },
   get: {
     description: 'One item in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the views it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in, and steps_wrong where the steps of a view no longer pass) and its links in both directions. Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
-    input: { id: z.string(), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe(`true for every link: past ${GET_LISTED} in a direction, an agent is given those and a count by type (links_cut). The whole record is in events, with full: true.`) },
+    input: { id: z.string(), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe(`true for all of it whole. Past ${GET_LISTED} links in a direction, an agent is given those and a count by type (links_cut); of what names it the first ${GET_MENTIONS}; of what holds it the number of views about each; and of a large field (a style's code) its first lines and size. The whole record is in events, with full: true.`) },
     run: async (l, actor, input) => {
       const found = { ...(await l.get(input.id)), shown_in: [] as Awaited<ReturnType<typeof shownIn>> };
       found.shown_in = await shownIn(l, input.id, found.trail);
@@ -197,7 +228,11 @@ export const READ_TOOLS: Record<string, Tool> = {
       const said = actor.kind === 'human' || input.history ? { ...item, recent_events: recent } : item;
       if (actor.kind !== 'agent' || input.full) return said;
       const [out, into] = [fewLinks(item.outgoing as { type: string }[]), fewLinks(item.incoming as { type: string }[])];
-      return { ...said, outgoing: out.links, incoming: into.links, ...((out.counted || into.counted) && { links_cut: { outgoing: out.counted, incoming: into.counted, how: 'get with full: true has them all.' } }) };
+      // What holds it, with the number of views kept about each (shown_in names those it is drawn in), and the first
+      // few that name it: a fifth of what get answered an agent was these two lists.
+      const trail = said.trail.map(({ views, ...t }) => ({ ...t, ...(views.length && { views: views.length }) }));
+      const mentioned = said.mentioned_in;
+      return { ...said, entity: cutLarge(said.entity), trail, mentioned_in: mentioned.slice(0, GET_MENTIONS), ...(mentioned.length > GET_MENTIONS && { mentioned_count: mentioned.length }), outgoing: out.links, incoming: into.links, ...((out.counted || into.counted) && { links_cut: { outgoing: out.counted, incoming: into.counted, how: 'get with full: true has them all.' } }) };
     },
   },
   view: {
