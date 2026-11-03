@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { createHttpServer } from '../src/server.ts';
 import { Workspaces } from '../src/workspaces.ts';
 
@@ -78,9 +79,19 @@ test('a client connected over MCP goes on through a deploy with the session it h
   const port = await map.free();
   const before = await map.start(port);
   const client = new Client({ name: 'test', version: '1' });
+  // Each time its stream opens, the client is told to ask for the tools again: once on connecting, once after the deploy.
+  let told = 0;
+  const toldTimes = (n: number) =>
+    new Promise<void>((done, failed) => {
+      const at = Date.now();
+      const look = () => (told >= n ? done() : Date.now() - at > 10_000 ? failed(new Error(`told ${told} times, not ${n}`)) : setTimeout(look, 50));
+      look();
+    });
+  client.setNotificationHandler(ToolListChangedNotificationSchema, () => void told++);
   await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`)));
   closers.push(() => client.close());
   assert.ok((await client.listTools()).tools.some((t) => t.name === 'query'));
+  await toldTimes(1);
 
   // The deploy: the old server stops, a new one starts in its place.
   await stop(before);
@@ -89,6 +100,7 @@ test('a client connected over MCP goes on through a deploy with the session it h
   await map.start(port);
   const found = await client.callTool({ name: 'query', arguments: { name: 'search', params: { q: 'anything' } } });
   assert.ok(!found.isError, 'the call is answered, without a new session');
+  await toldTimes(2);
 
   // A client of a server that held sessions in memory carries an id the new one never gave: it is answered all the same.
   const res = await fetch(`http://127.0.0.1:${port}/mcp`, {

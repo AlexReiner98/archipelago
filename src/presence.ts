@@ -102,6 +102,9 @@ export async function took(db: Q, w: Whose, step: Omit<Step, 'at'>, now = false)
   timer ??= setTimeout(() => void flushAll().catch(() => {}), FLUSH_MS).unref();
 }
 
+/** The session an agent last named on this screen, for a step of its that names none. */
+export const runNamed = (w: Whose, actor: string) => runs.get(`${whose(w)}|${actor}`);
+
 /** A session's word and what its chat is called, which may change while it runs: read each time, by its id. */
 async function namesOf(db: Q, run: string): Promise<{ name?: string; title?: string; label?: string }> {
   type Row = { name: string | null; title: string | null; label: string | null };

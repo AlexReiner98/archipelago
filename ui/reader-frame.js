@@ -1,7 +1,7 @@
 // A document as its reader meets it, in a frame on the canvas: the `reader` mark a drawing may make (ui/marks.js), as
 // the pages drawing does. Its draft is the preview, what publishing it would give now (/preview/<id>); its published
-// page is what visitors read (/p/<workspace>/<id>); one that cannot be published (a private one) is read as the person
-// looking sees it (/read/<id>). Each is drawn by the reader itself (ui/doc.js), so it reads and
+// page is what visitors read (/p/<workspace>/<id>); one that cannot be published (a private one, or any item that is
+// not a document, read by its note) is read as the person looking sees it (/read/<id>). Each is drawn by the reader itself (ui/doc.js), so it reads and
 // looks as the site does, figures and drawings included. A drawing names only the item and which of the two; the page
 // makes the address, says whether the draft differs from what is published (the published read), and loads the frame
 // once it comes into sight. The frame is as tall as what it holds, so the canvas scrolls, not the frame. A document
@@ -110,8 +110,9 @@ export function readerFrame(attrs, fail) {
   el.seenAt = attrs.at;
   const read = async (at) => {
     const state = await stateOf(id, String(at ?? ''));
-    if (as === 'own') {
-      said.textContent = 'Private · as you see it';
+    // One that cannot be published has no draft: its draft is read as its reader sees it, and nothing is published.
+    if (as === 'own' || (as === 'draft' && state?.publishable === false)) {
+      said.textContent = as === 'own' ? 'Private · as you see it' : 'As you see it · not a page to publish';
       return show(`/read/${id}`, `Private: ${id}`);
     }
     if (as === 'published' && !state?.published) {

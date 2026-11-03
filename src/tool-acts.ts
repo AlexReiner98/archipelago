@@ -14,13 +14,15 @@ import { notify } from './notify.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId } from './pelago.ts';
 import { PICTURE_TYPES, putPicture } from './pictures.ts';
-import { tellStamp, took, watching } from './presence.ts';
+import { runNamed, tellStamp, took, watching } from './presence.ts';
+import { inSight } from './seeing.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
 import { point, sessionOpened, sessionTookUp } from './tool-change.ts';
 import { backupNow, restartNow } from './tool-config.ts';
 import { BRANCH } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
-import { VIEW_INPUT, viewAddress } from './view-address.ts';
+import { waitsOn, whoseWord } from './unwait.ts';
+import { VIEW_INPUT, viewAddress, WEB_URL, webAddress } from './view-address.ts';
 import { withdraw } from './withdraw.ts';
 
 export const ACT_TOOLS: Record<string, Tool> = {
@@ -36,18 +38,21 @@ export const ACT_TOOLS: Record<string, Tool> = {
   show: {
     description:
       'Answer the human with a view on their canvas: a kept view (entity: a view (type lens), a saved canvas) or a query and layout of your own, or open an item\'s page or the workspace. ' +
-      'It lands within a couple of seconds in a pane of your session’s own on each page of theirs that is open, beside the pane they are in, which it never takes. The answer says how many of their pages are open and how many take your shows (pages). Add a short note saying what they are looking at. ' +
+      'Or frame a web page in a pane (url: a dev server\'s build, a sketch, a page), so they watch it beside the map: it reloads only when you show it again. A site that refuses to be framed (X-Frame-Options or frame-ancestors, as most sign-in pages and large sites do) stays blank, and the pane\'s ↗ opens it in a window of its own; a plain http address frames only on localhost or 127.0.0.1, and this server\'s own pages are shown by entity, not url. ' +
+      'It lands within a couple of seconds in a pane of your session’s own on each page of theirs that is open, beside the pane they are in, which it never takes. The answer says how many of their pages are open and how many take your shows (pages), and whether it lands in the tab they are looking at (sight: looking, and where, in a line); when it does not, tell them where to look. Add a short note saying what they are looking at. ' +
       'A change moves nothing on their page: show what is worth watching. ' +
       'With look: true, the answer also carries the picture of it, as an image: drawn by the server as you see the map, whether or not a page of theirs is open (query look takes one without moving their page). ' +
       'For the person reading a chat, call draw.',
     input: {
       ...VIEW_INPUT,
       screen: z.enum(['workspace', 'you']).optional().describe('The workspace sheet, or what waits for them.'),
+      url: WEB_URL.optional().describe('A web page to frame in a pane, in place of a view: http or https (plain http on localhost only).'),
       note: z.string().max(200).optional().describe('One line, kept on your pane as its tooltip.'),
       look: z.boolean().optional().describe('Also answer with a picture of it, drawn by the server (as query look draws it).'),
       width: z.number().int().min(320).max(1920).optional().describe('With look: the picture’s width in pixels (1200).'),
       height: z.number().int().min(240).max(1600).optional().describe('With look: its height (750).'),
       scheme: z.enum(['dark', 'light']).optional().describe('With look: the theme it is drawn in (dark).'),
+      fresh: z.boolean().optional().describe('With look: draw it again, never the picture already taken.'),
       pane: z
         .string()
         .regex(/^[a-z][a-z0-9-]{0,23}$/, 'pane is a side (left, right, above, below), main, alone, or a short lower-case name of your own')
@@ -55,17 +60,20 @@ export const ACT_TOOLS: Record<string, Tool> = {
         .describe(
           'Which pane of their page it goes to. A name of your own ("map", "review") is a pane of your session’s: opened beside their main canvas the first time, drawn in again each time you name it, so you can keep two things in sight at once. ' +
             'A side (left, right, above, below) puts your session’s pane there; main is the main canvas; alone closes the other panes first. ' +
-            'Left out, it goes to the pane that follows your session, else to one of your own beside the pane they are in, opened the first time. The owner picks whom each tab follows, and a pane following someone else, or the one they are in, is not yours to move. Only a canvas or an item goes to a pane.',
+            'Left out, it goes to the pane that follows your session, else to one of your own beside the pane they are in, opened the first time. The owner picks whom each tab follows, and a pane following someone else, or the one they are in, is not yours to move. Only a canvas, an item or a url goes to a pane.',
         ),
       run: z.string().optional().describe('Your session’s run id, so the pane that follows your session is the one it goes to. Left out, the one you last named in a session_update or tell.'),
     },
     run: async (l, actor, input) => {
       // Where it pointed, and whether a page of theirs is there to follow it; with a look, the picture of what is there.
-      const hash = await viewAddress(l, input);
+      if (input.url && input.look) throw new Error('look draws the map: a url is framed on their page, never drawn by the server.');
+      const hash = input.url ? webAddress(input.url) : await viewAddress(l, input);
       const { db } = await wholeMap(l);
       const at = await point(l, actor, 'show', hash, input.note, input.pane, input.run);
       const pages = await watching(db, l);
-      return { ...at, pages, ...(input.look && (await takeLook(db, l.db, l, actor.name, hash, input))) };
+      // Whether the owner sees it: the tab in sight is the one this session's shows go to.
+      const sight = await inSight(l, db, input.run ?? runNamed(l, actor.name), pages.open);
+      return { ...at, pages, sight, ...(input.look && (await takeLook(db, l.db, l, actor.name, hash, input))) };
     },
   },
   claim: {
@@ -254,7 +262,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => {
       const asked = await toConfirm(l, { limit: 500 });
       const answered = asked.questions.filter((q) => q.seq <= input.upto).map((q) => q.id);
-      await l.log(l.db, { actor: actorId(actor), action: 'questions.confirmed', reason: input.basis, detail: { upto: input.upto, questions: answered.length, authority: actor.kind === 'human' ? { of: 'human', who: actorId(actor) } : { of: 'human', basis: input.basis, stated_by: actorId(actor) } } });
+      const authority = actor.kind === 'human' ? { of: 'human' as const, who: actorId(actor) } : { of: 'human' as const, basis: input.basis, stated_by: actorId(actor) };
+      await l.log(l.db, { actor: actorId(actor), action: 'questions.confirmed', reason: input.basis, detail: { upto: input.upto, questions: answered.length, authority } });
       await l.record('settings', actorId(actor), [['+', actorId(actor), 'questions.confirmed', input.upto]], input.basis);
       // The notices that said each one was settled have been answered with them.
       const { rows } = await l.db.query<{ id: string }>(
@@ -263,7 +272,10 @@ export const ACT_TOOLS: Record<string, Tool> = {
         [answered],
       );
       if (rows.length) await l.apply('agent:pelago', { ops: rows.map((n) => ({ op: 'update' as const, id: n.id, status: 'read' })), reason: 'Put to the owner and answered in chat' });
-      return { confirmed_upto: input.upto, questions: answered.length, left: (await toConfirm(l)).count };
+      // Answered on the owner's word, they no longer wait on the owner (src/unwait.ts).
+      const person = await whoseWord(l, authority), waits = person ? await waitsOn(l.db, l.registry, answered, person) : [];
+      if (waits.length) await l.apply(actorId(actor), { ops: waits.map((w) => ({ op: 'unlink' as const, relation: w.id })), reason: 'Answered on their word: no longer waits on them' }, { authority });
+      return { confirmed_upto: input.upto, questions: answered.length, left: (await toConfirm(l)).count, ...(waits.length && { unwaited: waits.map((w) => ({ item: w.from_id, person, relation: w.id })) }) };
     },
   },
   restart: {

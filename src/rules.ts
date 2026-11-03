@@ -100,6 +100,8 @@ export interface Ruled {
   rule: string;
   pack: string;
   say: string;
+  /** Of a rule that did not hold it: what let it through, a setting (agent_code), the server's policy (server) or holds being off (holds_off). */
+  lifted_by?: string;
 }
 
 /** An item a change is written to, as it is before the change. */
@@ -250,8 +252,8 @@ export function outsideLayout(reg: Registry, writes: string[], w: Written, targe
   return types.find((t) => !writes.some((x) => reg.isA(t, x)));
 }
 
-/** Whether a rule is lifted for this op: by its setting, or where the workspace has not set it, by the server's policy. */
-export type Lifted = (rule: RuleDef, op: string) => boolean;
+/** Whether a rule is lifted for this op, and by what: its setting, or where the workspace has not set it, the server's policy (server). */
+export type Lifted = (rule: RuleDef, op: string) => string | false;
 
 /** What the rules make of one op: the rules that hold it, the ones a lift spared it, and what refuses it. */
 export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, targets: Target[], lifted: Lifted = () => false) {
@@ -266,8 +268,9 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   const order = [...rules.filter((r) => r.when?.held === undefined), ...rules.filter((r) => r.when?.held !== undefined)];
   for (const rule of order) {
     if (rule.unique || rule.stream || onReply(rule) || !applies(rule, reg, who, w, targets, held.length > 0)) continue;
-    if (rule.lifted && lifted(rule, w.op)) {
-      spared.push(ruled(rule));
+    const by = rule.lifted && lifted(rule, w.op);
+    if (by) {
+      spared.push({ ...ruled(rule), lifted_by: by });
       continue;
     }
     if (rule.then === 'hold') {
@@ -315,9 +318,9 @@ async function liftsOf(q: Q, rules: Rule[], policy: Partial<Policy>): Promise<Li
   const set = new Map(rows.map((r) => [r.key, r.value]));
   return (rule, op) => {
     const value = set.get(rule.lifted!);
-    if (value === true || value === 'apply') return true;
+    if (value === true || value === 'apply') return rule.lifted!;
     if (value === false || value === 'hold' || !rule.server) return false;
-    return policy[op as OpKind] === 'auto';
+    return policy[op as OpKind] === 'auto' && 'server';
   };
 }
 
@@ -371,7 +374,7 @@ const particular = (r: Ruled, rules: Rule[]) => Object.keys(rules.find((x) => x.
 /** What the rules make of a change: whether it applies, waits or is refused, and the rule that decided it. */
 export async function decide(q: Q, reg: Registry, who: Who, given: { op: string }[], policy: Partial<Policy> = {}): Promise<Verdict> {
   const rules = [...serverRules(policy), ...reg.rules];
-  const lifted = who.human && !who.drawing ? () => false : await liftsOf(q, rules, policy);
+  const lifted: Lifted = who.human && !who.drawing ? () => false : await liftsOf(q, rules, policy);
   const ops = given as (Written & { id?: string; keep?: string; drop?: string })[];
   const on = (op: (typeof ops)[number]) => (op.op === 'merge' ? [op.keep!, op.drop!] : op.id ? [op.id] : []);
   const found = new Map((await q.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ops.flatMap(on)])).rows.map((e) => [e.id, e]));
@@ -382,7 +385,7 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
     const targets = on(op).flatMap((id) => found.get(id) ?? []);
     const one = judge(rules, reg, who, op, targets, lifted);
     const passed = off ? one.held.filter((r) => !askedFor(r)) : [];
-    return { held: one.held.filter((r) => !passed.includes(r)), spared: [...one.spared, ...passed], passed: passed.length, refused: [...one.refused, ...(await clashes(q, reg, op, targets[0]))] };
+    return { held: one.held.filter((r) => !passed.includes(r)), spared: [...one.spared, ...passed.map((r) => ({ ...r, lifted_by: HOLDS_OFF }))], passed: passed.length, refused: [...one.refused, ...(await clashes(q, reg, op, targets[0]))] };
   }));
   const refused = judged.flatMap((j) => j.refused);
   const held = judged.flatMap((j) => j.held);

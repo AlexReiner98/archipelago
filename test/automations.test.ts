@@ -156,6 +156,28 @@ test('a note is added to, or one passage of it replaced, without sending it agai
   assert.ok(((await callTool(l, human, 'get', { id: t })) as any).recent_events.length);
 });
 
+
+test('get gives an agent a large field cut to its first lines and its size, and whole with full', async () => {
+  const l = await fresh();
+  const code = Array.from({ length: 400 }, (_, i) => `const line${i} = ${i};`).join('\n');
+  const { s } = await make(l, [{ op: 'create', ref: 's', type: 'style', title: 'Coded', props: { code } }]);
+  const cut = ((await callTool(l, agent, 'get', { id: s })) as any).entity.props.code as string;
+  assert.ok(cut.startsWith('const line0 = 0;\nconst line1 = 1;'), cut);
+  assert.ok(cut.endsWith(`… (${code.length} characters; get with full: true has it)`), cut);
+  assert.ok(cut.length < 400, `${cut.length} characters`);
+  assert.equal(((await callTool(l, agent, 'get', { id: s, full: true })) as any).entity.props.code, code, 'whole with full');
+  assert.equal(((await callTool(l, human, 'get', { id: s })) as any).entity.props.code, code, 'whole for a person');
+});
+
+test('a query gives an agent each row without what its type and status say, and a shorter note', async () => {
+  const l = await fresh();
+  const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'project', title: 'Roof' }, { op: 'create', ref: 't', type: 'task', title: 'Tiles', body: 'Lay them. '.repeat(40) }, { op: 'link', type: 'part_of', from: 't', to: 'p' }]);
+  const rows = async (who: typeof agent, full?: boolean) => ((await callTool(l, who, 'view', { name: 'flat', params: { filter: { find: [`in ${p}`] }, ...(full && { full }) } })) as any).items as any[];
+  const [row] = await rows(agent);
+  assert.deepEqual([row.title, row.kind, row.open, row.created_at, row.terms, row.status], ['Tiles', undefined, undefined, undefined, undefined, 'todo']);
+  assert.ok(row.body.length <= 161 && row.body.endsWith('…'), row.body);
+  for (const [who, full] of [[human, false], [agent, true]] as const) assert.deepEqual(((await rows(who, full))[0]).terms, [`in ${p}`], `${who.kind}, full ${full}`);
+});
 test('a refused change is kept and corrected by its one wrong op; history says a change set’s reason once', async () => {
   const l = await fresh();
   const ops = [

@@ -9,9 +9,10 @@ import { actorId, type Actor, type Entity, type Archipelago, type Op } from './p
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
 import { cutTitle, mintName, saidTitle, sessionLabelled, sessionTitle } from './session-name.ts';
 import { commitRule } from './commit-rule.ts'; import { roomForSession } from './plan.ts'; import { wholeMap } from './outbox.ts'; import { took } from './presence.ts';
-import { VIEWS } from './views.ts'; import type { StartedBy } from './launcher.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts'; import { unaccountedBy } from './commits.ts';
-import { isChat, resolveRun, sessionsAwake, takeUp } from './chat-run.ts';
+import { VIEWS } from './views.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts'; import { unaccountedBy } from './commits.ts';
+import { hookRunHere, isChat, resolveRun, sessionsAwake, takeUp } from './chat-run.ts';
 export { resolveRun, sessionPrompted, sessionsAwake } from './chat-run.ts';
+export { recordRun } from './run-record.ts';
 
 const now = () => new Date().toISOString();
 
@@ -33,11 +34,13 @@ export async function sessionBegan(l: Archipelago, sessionId: string | undefined
   const run = sessionId ? await resolveRun(l, sessionId, true) : undefined;
   return run && new Date(run.created_at);
 }
+/** What a session says of itself as it registers. */
+type SessionSaid = { title?: string; surface?: string; cwd?: string; remote?: string; session_id?: string; task?: string; branch?: string; source?: string };
 
 export async function sessionStart(
   l: Archipelago,
   actor: Actor,
-  input: { title?: string; surface?: string; cwd?: string; remote?: string; session_id?: string; task?: string; branch?: string; source?: string },
+  input: SessionSaid,
 ) {
   // A surface may announce the same session again (resume, compact), even ended: its own run takes up, not a second.
   if (input.session_id) {
@@ -54,26 +57,18 @@ export async function sessionStart(
   }
   const task = input.task ? await l.entity(input.task) : undefined;
   if (input.task && !task) throw new Error(`No item "${input.task}" to work on`);
-  await roomForSession(l.workspace, () => sessionsAwake(l));
+  // A chat its hook registered, told to register itself as well: the hook's run is this session, given what it is sent.
+  const hooked = input.session_id ? undefined : await hookRunHere(l, input);
+  if (hooked) {
+    await touch(l, hooked.id);
+    await sessionLabelled(l, hooked, input.title, actorId(actor));
+    const ops: Op[] = [];
+    if (task) ops.push({ op: 'link', type: 'works_on', from: hooked.id, to: task.id });
+    if (input.branch && input.branch !== hooked.props.branch) ops.push({ op: 'update', id: hooked.id, props: { branch: input.branch } });
+    if (ops.length) await l.apply(actorId(actor), { ops, reason: 'Session registered again: its hook had registered it' });
+  } else await roomForSession(l.workspace, () => sessionsAwake(l));
   const repo = await placeFor(l, input);
-
-  const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };
-  for (const k of ['surface', 'cwd', 'session_id', 'branch'] as const) if (input[k]) props[k] = input[k];
-  // Its word is its hue's key, never shown (src/session-name.ts).
-  const name = await mintName(l);
-  if (name) props.name = name;
-  // After a clear, the chat goes on as a new session: it takes over the tab of the one the clear ended.
-  const before = input.source === 'clear' ? await clearedHere(l, input.cwd) : undefined;
-  if (before) props.took_over = before.id;
-  // It is called what its chat is called, else what the chat was called before the clear, else what it works on.
-  const label = saidTitle(input.title) || (typeof before?.props.label === 'string' ? before.props.label : '');
-  if (label) props.label = label;
-  const title = label ? cutTitle(label) : sessionTitle({ task: task?.title, place: repo?.title ?? input.cwd });
-  const ops: Op[] = [{ op: 'create', ref: 'run', type: 'run', title, status: 'running', props }];
-  if (task) ops.push({ op: 'link', type: 'works_on', from: 'run', to: task.id });
-  if (repo) ops.push({ op: 'link', type: livesInFor(l, repo.type), from: 'run', to: repo.id });
-  const { created } = await l.apply(actorId(actor), { ops, reason: 'Session started' });
-  const run = created.run;
+  const { run, name, before } = hooked ? { run: hooked.id, name: hooked.props.name as string | undefined, before: undefined } : await newRun(l, actor, input, task, repo);
 
   // Take every exclusive resource the task needs, or say who has it.
   const claimed: string[] = [];
@@ -108,7 +103,29 @@ export async function sessionStart(
       ? 'Do not start work that needs the resources listed under blocked. Take work that does not need them, or wait.'
       : 'Call report with action session_update and a note when something worth knowing happens, and report with action session_end when you finish.',
     commit: task ? commitRule(task.id) : undefined,
+    joined: hooked ? true : undefined,
   };
+}
+
+/** A session's run, made: named, labelled, tied to its task and its place. */
+async function newRun(l: Archipelago, actor: Actor, input: SessionSaid, task: Entity | undefined, repo: Entity | null | undefined) {
+  const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };
+  for (const k of ['surface', 'cwd', 'session_id', 'branch'] as const) if (input[k]) props[k] = input[k];
+  // Its word is its hue's key, never shown (src/session-name.ts).
+  const name = await mintName(l);
+  if (name) props.name = name;
+  // After a clear, the chat goes on as a new session: it takes over the tab of the one the clear ended.
+  const before = input.source === 'clear' ? await clearedHere(l, input.cwd) : undefined;
+  if (before) props.took_over = before.id;
+  // It is called what its chat is called, else what the chat was called before the clear, else what it works on.
+  const label = saidTitle(input.title) || (typeof before?.props.label === 'string' ? before.props.label : '');
+  if (label) props.label = label;
+  const title = label ? cutTitle(label) : sessionTitle({ task: task?.title, place: repo?.title ?? input.cwd });
+  const ops: Op[] = [{ op: 'create', ref: 'run', type: 'run', title, status: 'running', props }];
+  if (task) ops.push({ op: 'link', type: 'works_on', from: 'run', to: task.id });
+  if (repo) ops.push({ op: 'link', type: livesInFor(l, repo.type), from: 'run', to: repo.id });
+  const { created } = await l.apply(actorId(actor), { ops, reason: 'Session started' });
+  return { run: created.run, name, before };
 }
 
 /** A session registered before sessions were given a word is given one, for its hue, when it is heard from again. */
@@ -206,40 +223,6 @@ export async function recordUsage(l: Archipelago, sessionId: string | undefined,
   const work = rows.filter((w) => l.registry.type(w.type)?.fields.tokens_used);
   for (const w of work) await l.operational(w.id, { add: { tokens_used: Math.round(added / work.length) } });
   return { run: run.id, added, to: work.map((w) => w.id) };
-}
-
-/**
- * A run that happened where Archipelago cannot watch it (the agent in GitHub
- * Actions that reads a push, or re-checks the map) says so once it is over:
- * what it was, how it ended and what it used. It is kept as a run that has
- * ended, in the repository it ran for. Told twice of the same run (its link
- * is the same), it is recorded once.
- */
-export async function recordRun(
-  l: Archipelago,
-  actor: Actor,
-  input: { repo: string; title: string; ok?: boolean; tokens?: number; cost_usd?: number; turns?: number; link?: string; summary?: string; surface?: string; started_by?: StartedBy },
-) {
-  const repo = /^e_[a-z0-9]{8}$/.test(input.repo) ? await l.entity(input.repo) : await placeFor(l, { remote: input.repo });
-  if (!repo) throw new Error(`No repository "${input.repo}" in the map`);
-  if (input.link) {
-    const { rows } = await l.db.query<{ id: string }>(`select id from entity where type = any($1::text[]) and props->>'link' = $2 and title = $3 and archived_at is null limit 1`, [l.registry.family('run'), input.link, input.title]);
-    if (rows.length) return { run: rows[0].id, recorded: false };
-  }
-  const number = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : undefined);
-  const props: Record<string, unknown> = { surface: input.surface ?? 'github-actions', last_seen: now() };
-  if (number(input.tokens) !== undefined) props.tokens_used = Math.round(input.tokens!);
-  if (number(input.cost_usd) !== undefined) props.cost_usd = Math.round(input.cost_usd! * 10_000) / 10_000;
-  if (number(input.turns) !== undefined) props.turns = input.turns;
-  if (input.link) props.link = input.link; if (input.started_by) props.started_by = input.started_by;
-  const { created } = await l.apply(actorId(actor), {
-    ops: [
-      { op: 'create', ref: 'run', type: 'run', title: input.title, status: input.ok === false ? 'failed' : 'finished', body: input.summary?.slice(0, 4000), props },
-      { op: 'link', type: livesInFor(l, repo.type), from: 'run', to: repo.id },
-    ],
-    reason: 'Run reported',
-  });
-  return { run: created.run, recorded: true };
 }
 
 export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string; branch?: string; title?: string }) {

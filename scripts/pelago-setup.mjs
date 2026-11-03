@@ -188,14 +188,16 @@ function connect() {
   const settings = parsed('.claude/settings.json');
   const settingsOwn = hasHooks(settings);
   settings.hooks ??= {};
-  for (const [event, name, matcher] of [['SessionStart', 'session-start', 'startup|resume|clear'], ['UserPromptSubmit', 'prompt'], ['Stop', 'stop'], ['SessionEnd', 'session-end'], ['PostToolUse', 'file-used', 'Read|Edit|Write|MultiEdit|NotebookEdit']]) {
+  // Claude Code gives a SessionEnd hook a second and a half unless it asks for more, too little to read the
+  // session's record and its checkout before it says so: it asks for half a minute.
+  for (const [event, name, matcher, timeout] of [['SessionStart', 'session-start', 'startup|resume|clear'], ['UserPromptSubmit', 'prompt'], ['Stop', 'stop'], ['SessionEnd', 'session-end', undefined, 30], ['PostToolUse', 'file-used', 'Read|Edit|Write|MultiEdit|NotebookEdit']]) {
     const list = (settings.hooks[event] ??= []);
     const command = `node ${HOOK} ${name}`;
     // A hook registered at another place (an older setup, or Archipelago's own repository running the script it
     // hands out) is pointed at the one written here: the other does not say which hand-out it is.
-    for (const entry of list) for (const hook of entry.hooks ?? []) if (typeof hook.command === 'string' && ourHook.test(hook.command)) hook.command = command;
+    for (const entry of list) for (const hook of entry.hooks ?? []) if (typeof hook.command === 'string' && ourHook.test(hook.command)) Object.assign(hook, { command }, timeout && { timeout });
     if (ourHook.test(JSON.stringify(list))) continue;
-    list.push({ ...(matcher && { matcher }), hooks: [{ type: 'command', command }] });
+    list.push({ ...(matcher && { matcher }), hooks: [{ type: 'command', command, ...(timeout && { timeout }) }] });
   }
   put('.claude/settings.json', json(settings), { own: settingsOwn, note: settingsOwn ? '' : '(adds five hooks that run the script above)' });
 

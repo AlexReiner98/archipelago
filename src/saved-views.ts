@@ -1,6 +1,6 @@
 // Saved views: every picture kept on the map, named, with what it is a picture of, so a person finds it without
 // knowing which item it hangs on (docs/ui-strategy.md). A picture is a kept lens; a style kept about that lens
-// names it, as the way it is drawn is what a person remembers. Pinned ones first, then the newest.
+// names it (the one it names itself first, as the page draws it), as the way it is drawn is what a person remembers. Pinned ones first, then the newest.
 
 import { keptOf } from './query-kept.ts';
 import { bringersIn } from './query-saved.ts';
@@ -36,9 +36,13 @@ export async function savedViews(l: Archipelago, input: { limit?: number } = {})
   const pictures = lenses
     .reverse()
     .map((x): Picture => {
-      const style = styles.find((s) => s.about.includes(x.id));
+      // The style the view names itself, as the page draws it, else one kept about it.
+      const own = (x.props.style ?? {}) as Record<string, unknown>;
+      const named = styles.find((s) => s.id === own.style);
+      const style = named ?? styles.find((s) => s.about.includes(x.id));
       const of = x.about.map((id) => items.get(id)).find(Boolean);
-      const shape = style?.props.shape;
+      // A style it names lies over its own settings, and one with code draws no shape.
+      const shape = named ? (typeof named.props.code === 'string' ? undefined : (named.props.shape ?? own.shape)) : (own.shape ?? style?.props.shape);
       const document = documents.get(x.id);
       return { lens: x.id, title: style?.title || x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), ...(document && { document }), pinned: x.props.pinned === true };
     })

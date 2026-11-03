@@ -20,9 +20,16 @@ test('a style about an item moves into every view of it, and one about the view 
   assert.deepEqual(held.get('w'), { shape: 'grid', gap: 3 });
 });
 
-test('a layout stays, and a view of what it was about names it', () => {
-  const { held, retired } = stylesMoved([{ id: 'k', props: { code: 'x' } }], [tie('k', 'item', 'project')], new Map([['item', ['v']]]), isView, new Map());
+test('a layout stays, and a view it is about that holds no style names it', () => {
+  const { held, retired } = stylesMoved([{ id: 'k', props: { code: 'x' } }], [tie('k', 'v', 'lens')], new Map(), isView, new Map([['v', {}]]));
   assert.deepEqual(held.get('v'), { style: 'k' });
+  assert.deepEqual(retired, []);
+});
+
+test("a layout about a project is never written into that project's views, nor over a view's own style", () => {
+  const ties = [tie('k', 'item', 'project'), tie('k', 'w', 'lens')];
+  const { held, retired } = stylesMoved([{ id: 'k', props: { code: 'x' } }], ties, new Map([['item', ['v']]]), isView, new Map([['v', {}], ['w', { style: { shape: 'flow' } }]]));
+  assert.equal(held.size, 0);
   assert.deepEqual(retired, []);
 });
 

@@ -48,6 +48,21 @@
 #sheet .field-line { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
 #sheet .field-line > .field-name { flex: 0 0 auto; max-width: var(--chip-most); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #sheet .field-rows { overflow-x: auto; }
+
+/* Code in a field: its own ground, monospace, folded to a few lines (code-fold); opened, it scrolls inside its box (code-open). */
+#sheet .page-rows dd .field-read:has(.field-code) { white-space: normal; overflow: visible; }
+#sheet .page-rows dd .field-read:has(.field-code):hover { background: none; }
+#sheet .field-codes { display: flex; flex-direction: column; gap: var(--space-4); }
+#sheet .field-code { min-width: 0; border-radius: var(--radius-2); background: var(--closed-soft); cursor: pointer; }
+#sheet .field-code.open { cursor: text; }
+#sheet .field-code-text { margin: 0; padding: var(--space-5) var(--space-6); font: var(--text-3)/1.5 var(--face-mono); white-space: pre; tab-size: 2; max-height: var(--code-fold); overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent); mask-image: linear-gradient(to bottom, black 55%, transparent); }
+#sheet .field-code.open .field-code-text { max-height: var(--code-open); overflow: auto; -webkit-mask-image: none; mask-image: none; }
+#sheet .field-code-fold { display: block; width: 100%; text-align: left; padding: var(--space-2) var(--space-6) var(--space-3); color: var(--muted); font-variant-numeric: tabular-nums; }
+#sheet textarea.field-code-write { font: var(--text-3)/1.5 var(--face-mono); white-space: pre; tab-size: 2; }
+#sheet details.fields-empty { margin-top: var(--space-6); }
+#sheet details.fields-empty > summary { cursor: pointer; color: var(--muted); list-style: none; }
+#sheet details.fields-empty > summary::-webkit-details-marker { display: none; }
+#sheet details.fields-empty[open] > summary { margin-bottom: var(--space-3); }
 #sheet .field-rows table.field-table td { padding: 0 var(--space-2); }
 #sheet .field-add { align-self: flex-start; }
 #sheet .field-item { display: flex; align-items: center; gap: var(--space-3); min-width: 0; white-space: nowrap; }

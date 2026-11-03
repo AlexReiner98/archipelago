@@ -88,6 +88,14 @@ test('an agent hears what the human does: by waiting for it, and with the owner\
   assert.deepEqual(await later('/hooks/prompt', undefined, { session_id: 'before' }), { status: 200 }, 'told once');
   await later('/hooks/session-start', undefined, { session_id: 'after', cwd: '/nowhere' });
   assert.deepEqual(await later('/hooks/prompt', undefined, { session_id: 'after' }), { status: 200 }, 'a session that began on this server is not told');
+  // One whose start the hook heard is told which actions are new since it was given the tools.
+  const given = (await later('/agent/session_start', undefined, { session_id: 'given', title: 'Given the tools before the deploy' })).result.run;
+  await later('/hooks/session-start', undefined, { session_id: 'given', cwd: '/nowhere' });
+  const db = (await ws.get('default')).pelago.db;
+  await db.query(`update transient set value = value - 'revise withdraw' where key = 'actions:given'`);
+  await db.query(`update entity set created_at = now() - interval '1 hour' where id = $1`, [given]);
+  const added = (await later('/hooks/prompt', undefined, { session_id: 'given' })).hookSpecificOutput.additionalContext;
+  assert.match(added, /Actions new since you were given the tools: revise withdraw\. .*ToolSearch/s);
 });
 
 test('a server that asks for no token does not send the setup to look for one', async () => {

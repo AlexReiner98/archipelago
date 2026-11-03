@@ -6,7 +6,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { join } from 'node:path';
 
 /** The app's own modules, each a part of the page (ui/app.js imports them), served at /<name>.js. */
-const APP_MODULES = ['doc-ref', 'base', 'words', 'body', 'forms', 'home', 'held', 'held-card', 'item-held', 'canvas', 'pinch', 'query-bar', 'find', 'find-choices', 'menu-place', 'draft', 'item', 'item-doc', 'item-read', 'item-links', 'item-sections', 'screens', 'attention', 'nav', 'graph', 'graph-draw', 'query', 'query-base', 'list', 'style-code', 'pan-zoom', 'gate', 'proof', 'roadmap', 'live', 'settle', 'week', 'time', 'workspace', 'workspace-cards', 'model-card', 'connections-card', 'members-card', 'styles-card', 'themes-card', 'agents-card', 'connect-agent', 'plates', 'theme', 'token-piece', 'token-ask', 'canvases', 'diagram', 'start', 'plan-card', 'doc-lens', 'marks', 'reader-frame', 'view-frame', 'sheet-follow', 'layout', 'drag', 'layout-tip', 'tip', 'surface', 'replica', 'ghosts', 'canvas-wires', 'signup', 'authorize', 'text', 'fields', 'field-edit', 'look', 'look-marks', 'panes', 'pane-drag', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'tab-life', 'pane-land', 'picker-rank', 'term-pick', 'look-switch', 'canvas-menu', 'only-words', 'term-kinds'];
+const APP_MODULES = ['doc-ref', 'base', 'words', 'body', 'forms', 'home', 'held', 'held-card', 'item-held', 'canvas', 'pinch', 'query-bar', 'find', 'find-choices', 'menu-place', 'draft', 'item', 'item-doc', 'item-read', 'item-links', 'item-sections', 'screens', 'attention', 'nav', 'graph', 'graph-draw', 'query', 'query-base', 'list', 'style-code', 'pan-zoom', 'gate', 'proof', 'roadmap', 'live', 'settle', 'week', 'time', 'workspace', 'workspace-cards', 'model-card', 'connections-card', 'members-card', 'styles-card', 'themes-card', 'agents-card', 'connect-agent', 'plates', 'theme', 'token-piece', 'token-ask', 'canvases', 'diagram', 'start', 'plan-card', 'doc-lens', 'marks', 'reader-frame', 'view-frame', 'sheet-follow', 'layout', 'drag', 'layout-tip', 'tip', 'surface', 'replica', 'ghosts', 'canvas-wires', 'signup', 'authorize', 'text', 'fields', 'field-edit', 'look', 'look-marks', 'panes', 'pane-drag', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'tab-life', 'pane-land', 'pane-web', 'picker-rank', 'term-pick', 'look-switch', 'canvas-menu', 'only-words', 'term-kinds'];
 
 export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
@@ -80,6 +80,9 @@ async function current() {
   held = { key, version, text };
   return held;
 }
+
+/** The UI's version as served now: it moves when one of its files is saved. */
+export const uiVersion = async () => (await current()).version;
 
 /** The modules a page's scripts import, at once or when they run, each once: fetched together, not round by round. */
 function reached(text: Map<string, string>, from: string[]): string[] {

@@ -63,10 +63,13 @@ export const shownOf = (l: Archipelago, type: string, props: Record<string, unkn
   return Object.fromEntries(Object.entries(props ?? {}).filter(([key, value]) => defs[key]?.shown && value != null));
 };
 
-/** A document whole, as the one asking may see it. */
+/**
+ * An item read whole by its note, as the one asking may see it: a document, or any other item (a post, a task), whose
+ * note is read the way a document's is. Only a document's type can be given as a link, shared or published.
+ */
 export async function readDocument(l: Archipelago, id: string) {
   const doc = await l.entity(id);
-  if (!doc || !l.registry.drawnWith('document').includes(doc.type)) throw new Error(`"${id}" is not a document`);
+  if (!doc) throw new Error(`"${id}" is not on this map, or is not yours to read`);
   const items = new Map<string, Section>();
   const ids = sectionIds(doc.body);
   const pictured = new Set((await l.db.query<{ entity_id: string }>(`select entity_id from picture where entity_id = any($1::text[])`, [ids])).rows.map((r) => r.entity_id));

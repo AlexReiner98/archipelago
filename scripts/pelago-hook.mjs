@@ -33,6 +33,10 @@
 // (CLAUDE_CODE_SESSION_ID), so a commit made in the session names its run, and one made by anybody else does not:
 // several sessions in one checkout each find their own.
 //
+// Beside it, the process of the Claude Code that runs the session (CLAUDE_PID, pelago-runs/<session id>.pid). A chat
+// archived or closed may be stopped before its SessionEnd hook is heard: the next hook in the checkout finds its
+// process gone and ends its run for it.
+//
 // After a file is read or changed (file-used) it sends the file's path alone, never what is in it, and the
 // instructions the session has been told about files already, kept beside its run (pelago-runs/<session id>.said):
 // the server answers what bites in that file, said once a session.
@@ -44,8 +48,8 @@
 // answers nothing.
 
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 
 // Which hand-out of Archipelago's files this project has: the setup writes it in, and the server says when it is behind.
 const SETUP = '';
@@ -317,6 +321,7 @@ try {
       if (file) {
         mkdirSync(resolve(file, '..'), { recursive: true });
         writeFileSync(file, run);
+        if (/^\d+$/.test(process.env.CLAUDE_PID ?? '')) writeFileSync(`${file}.pid`, process.env.CLAUDE_PID);
       }
     } catch (err) {
       console.error(`Archipelago ${name} hook: the run could not be kept for commits (${err.message})`);
@@ -330,8 +335,43 @@ try {
 if (name === 'session-end') {
   try {
     const file = runFile(JSON.parse(body));
-    if (file) for (const kept of [file, `${file}.said`]) rmSync(kept, { force: true });
+    if (file) for (const kept of [file, `${file}.said`, `${file}.pid`]) rmSync(kept, { force: true });
   } catch {
     // Nothing kept, or nothing to read it by.
+  }
+}
+
+/** Whether a process is still running: one that is gone answers ESRCH; one that is another user's, EPERM. */
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err.code !== 'ESRCH';
+  }
+}
+
+// A chat archived or closed whose own end was not heard: its Claude Code is gone, so its run is ended for it, and
+// what was kept for it goes. Looked for as a session starts, is prompted or ends a turn, in the checkout's git folder.
+if (name === 'session-start' || name === 'prompt' || name === 'stop') {
+  try {
+    const said = JSON.parse(body);
+    const file = runFile(said);
+    const folder = file && dirname(file);
+    const gone = folder ? readdirSync(folder).filter((f) => f.endsWith('.pid') && f !== `${said.session_id}.pid`).map((f) => f.slice(0, -4)).filter((id) => /^[\w-]+$/.test(id) && !alive(Number(readFileSync(resolve(folder, `${id}.pid`), 'utf8')))) : [];
+    await Promise.all(
+      gone.map(async (id) => {
+        const res = await fetch(`${base}/hooks/session-end`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) },
+          body: JSON.stringify({ session_id: id, cwd: said.cwd, reason: 'closed', setup: SETUP }),
+          signal: AbortSignal.timeout(5_000),
+        }).catch(() => null);
+        // Kept until the server has heard it, so a later hook tries again.
+        if (res?.ok) for (const kept of [id, `${id}.said`, `${id}.pid`]) rmSync(resolve(folder, kept), { force: true });
+      }),
+    );
+  } catch {
+    // No checkout, nothing kept, or the server away: the next hook looks again.
   }
 }

@@ -16,7 +16,8 @@ import { dragPane, sashes } from './pane-drag.js';
 import { heard, nameOf } from './pane-route.js';
 import { filterSaid } from './query-bar.js';
 import { sheetAside } from './sheet-follow.js';
-import { asPane, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId } from './tabs.js';
+import { frameIn, reframe } from './pane-web.js';
+import { asPane, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId, webOf } from './tabs.js';
 import { titles } from './words.js';
 
 /** The sides a pane is docked on, beside the pane it is put by: along a row, or down a column. */
@@ -87,6 +88,9 @@ function paneEl(id) {
 function load(id, at) {
   const entry = drawn.get(id);
   entry.at = at;
+  // A web page is framed in place of the canvas (ui/pane-web.js).
+  frameIn(entry, webOf(at));
+  if (webOf(at)) return;
   lensOf(at)
     .then(({ lens, style, here }) => {
       if (drawn.get(id) !== entry || entry.at !== at) return;
@@ -345,10 +349,11 @@ export function paneButtons() {
 /** The address the pane the bar acts on draws, for a new tab to open on. */
 export const activeAt = () => hrefOf(front().panes[active]?.at);
 
-/** Light a pane an agent's step was just drawn in. */
+/** Light a pane an agent's step was just drawn in; a web page framed there is loaded again. */
 export function flash(id) {
   const entry = drawn.get(id);
   if (!entry) return;
+  reframe(entry);
   entry.el.classList.remove('pane-shown');
   void entry.el.offsetWidth;
   entry.el.classList.add('pane-shown');

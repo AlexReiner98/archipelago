@@ -52,3 +52,24 @@ test("an agent is told whether the tab in sight is its own chat's, another chat'
   await callTool(l, human, 'tail', { page: { page: 'p1', on: true, where: `e/${mine.run}`, tab: { chat: mine.run, own: false } } });
   assert.match(await line(), /^On a tab of theirs following you, the owner's page shows/m);
 });
+
+test('a show says whether it lands in the tab the owner is looking at, and frames a web address', async () => {
+  const l = await fresh();
+  const mine = (await callTool(l, agent, 'session_start', { session_id: 'shows', title: 'Shows' })) as any;
+  const theirs = (await callTool(l, agent, 'session_start', { session_id: 'other', title: 'Other chat' })) as any;
+  const show = async (params: Record<string, unknown>) => (await callTool(l, agent, 'show', { run: mine.run, ...params })) as any;
+  assert.equal((await show({ screen: 'workspace' })).sight.looking, false, 'no page open: nobody sees it');
+  // The tab in sight is another chat's: the show lands out of sight, and the answer names the tab they are on.
+  await callTool(l, human, 'tail', { page: { page: 'p1', on: true, where: 'v', tab: { chat: theirs.run, own: true }, lands: [theirs.run] } });
+  const away = await show({ screen: 'workspace' });
+  assert.equal(away.sight.looking, false);
+  assert.match(away.sight.where, /another chat’s tab \("Other chat"\)/);
+  // The tab in sight is the one this session's shows go to.
+  await callTool(l, human, 'tail', { page: { page: 'p1', on: true, where: 'v', tab: { chat: mine.run, own: true }, lands: [mine.run] } });
+  const here = await show({ url: 'http://localhost:5173/sketch?x=1' });
+  assert.deepEqual(here.sight, { looking: true, where: 'In the tab they are looking at.' });
+  assert.equal(here.hash, `w?url=${encodeURIComponent('http://localhost:5173/sketch?x=1')}`, 'a web page is framed in a pane: w?url=…');
+  await assert.rejects(show({ url: 'javascript:alert(1)' }), /http or https/);
+  await assert.rejects(show({ url: 'https://me:secret@example.com/' }), /no name or password/);
+  await assert.rejects(show({ url: 'https://example.com/', look: true }), /look draws the map/);
+});

@@ -40,3 +40,7 @@
 .view-frame > .view-next { visibility: hidden; pointer-events: none; }
 /* On a canvas a named view is drawn in a pane of its own (ui/view-frame.js): its room beside the drawing is not kept. */
 .sp-shown:has(> .view-frame.beside) { display: none; }
+.code-stage:has(> .code-panel) { position: relative; }
+/* Where a style's code opened (drawings_open) puts a panel of its own: over its picture, in the page; only what it puts there takes the pointer. */
+.code-panel { position: absolute; inset: 0; pointer-events: none; }
+.code-panel > * { pointer-events: auto; }

@@ -4,7 +4,7 @@
 
 import { api, ask, h, state, tell } from './base.js';
 import { fieldEditor, wordsEditor } from './field-edit.js';
-import { choicesOf } from './fields.js';
+import { choicesOf, empty } from './fields.js';
 import { ago, changeRow, eventLine, label, link, statusesOf, typeTitle, types } from './words.js';
 
 /** One section: a heading, a count where it has one, and what it holds. */
@@ -58,7 +58,17 @@ export function fieldsSection(e, style, edit) {
       save: edit && edit.save,
       list: k === settles?.choices,
     });
-  return section('fields', 'Fields', 0, rows(names.map((k) => [label(k), editor(k), declared[k]?.description ?? 'Not declared by its type'])));
+  const row = (k) => [label(k), editor(k), declared[k]?.description ?? 'Not declared by its type'];
+  // What it holds first; the fields that hold nothing after, in one fold, so the page opens on what the item says.
+  const held = names.filter((k) => !empty(e.props[k]));
+  const unheld = names.filter((k) => empty(e.props[k]));
+  return section(
+    'fields',
+    'Fields',
+    0,
+    held.length ? rows(held.map(row)) : '',
+    unheld.length ? h('details', { class: 'fields-empty' }, h('summary', { title: unheld.map(label).join(', ') }, `${unheld.length} empty`), rows(unheld.map(row))) : '',
+  );
 }
 
 /**

@@ -6,7 +6,7 @@ import { commitRule } from './commit-rule.ts';
 import { blockGraph } from './blocking.ts';
 import { scanAround, type Row } from './region.ts';
 import { whereOf } from './places.ts';
-import { FILE, instructionsFor } from './instructions.ts';
+import { FILE, globNames, instructionsFor } from './instructions.ts';
 import { ACTIVE_HOLDS, type Entity, type Archipelago } from './pelago.ts';
 
 interface Brief {
@@ -109,8 +109,12 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
     for (const { e: r } of ties.filter((t) => t.rel === rel)) lines.push(`- ${r.title} (${r.status})${r.props.outcome ? ` ${r.props.outcome}` : ''}${r.props.rationale ? ` Why: ${r.props.rationale}` : ''}${!r.props.outcome && notes.get(r.id) ? `: ${notes.get(r.id)}` : ''}`);
   }
   // What bites in the files of its repository: the instructions said for files there, each with the files it names.
+  // Each is named; the way round is said for the files the task names (all of them, when it names none), since the
+  // rest is said whole when a session opens one of its files. Most of a brief was traps of files the work never opened.
   const traps = await instructionsFor(l, FILE, { ...(repo && { about: repo.id }) });
-  if (traps.length) lines.push('', '## Where it bites', ...traps.map((t) => `- ${t.files!.join(', ')}: ${t.title}. ${t.text}`));
+  const named = task.body?.match(/[\w.*-]+(?:\/[\w.*-]+)+|[\w*-]+\.(?:[cm]?[jt]s|json|css|html|md|sql|ya?ml|py|cs)\b/gi) ?? [];
+  const bites = (t: (typeof traps)[number]) => !named.length || t.files!.some((g) => named.some((p) => globNames(g, p) || globNames(p, g)));
+  if (traps.length) lines.push('', '## Where it bites', ...traps.map((t) => `- ${t.files!.join(', ')}: ${t.title}.${bites(t) ? ` ${t.text}` : ''}`));
   lines.push('', '## Reporting', `Register with pelago (capture, action session_start, task ${task.id}, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. ${commitRule(task.id)}`);
 
   const slim = (e: Row) => ({ id: e.id, type: e.type, title: e.title, status: e.status });

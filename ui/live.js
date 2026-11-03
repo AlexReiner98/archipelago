@@ -2,7 +2,7 @@ import { api, h, hooks, main, route, state } from './base.js';
 import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
 import { lookMode } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
-import { front, poppedTab } from './tabs.js';
+import { front, landsIn, poppedTab } from './tabs.js';
 import { relations, types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
@@ -41,7 +41,8 @@ const thisPage = () => {
   if (lookMode) return undefined;
   const t = front();
   const chat = t?.chat ?? (/^e_[a-z0-9]{8}$/.test(t?.follows ?? '') ? t.follows : undefined);
-  return { page: pageId, on: true, where: location.hash.slice(2, 2002), ...(chat && { tab: { chat, own: Boolean(t.chat) } }) };
+  const lands = landsIn(t);
+  return { page: pageId, on: true, where: location.hash.slice(2, 2002), ...(chat && { tab: { chat, own: Boolean(t.chat) } }), ...(lands.length && { lands }) };
 };
 let seenStep;
 /** Each session's last show not yet landed: it waits while a question is open over the page, or the reader is busy in its tab. */

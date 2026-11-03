@@ -7,9 +7,10 @@ import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.
 import { typesAfter, typesApplied } from './type-items.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { append, type Decision, type Fact } from './log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
-import { supersede } from './proposals.ts'; import { asOwner, forgetIn } from './forget.ts';
+import { supersede } from './proposals.ts'; import { unwaitFollows, whoseWord, type Unwaited } from './unwait.ts'; import { asOwner, forgetIn } from './forget.ts';
 import type { Authority, ChangeInput, SourceSpec } from './pelago-types.ts';
 import type { Archipelago } from './pelago.ts';
+import type { Verdict } from './rules.ts';
 
 type Props = Record<string, unknown>;
 
@@ -36,6 +37,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
   const at = new Map(input.ops.map((op, i) => [op, i + 1]));
   const facts: Fact[] = [];
   const DRY = Symbol('dry');
+  const unwaited: Unwaited[] = [], word = await whoseWord(map, opts.authority);
 
   await map.db.transaction(async (tx) => {
     // Facts first: each op is planned on the map as the ops before it left it, and its facts projected at once.
@@ -61,7 +63,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
           await said(itemFacts({
             id, type: op.type, title: named(op.title.trim()), body: named(op.body) ?? '', status: op.status ?? type.statuses.open[0],
             visibility, private_to: privateTo(map, visibility), owner: op.owner ? resolve(op.owner) : null, confidence: op.confidence ?? 1,
-            source_id: type.columns && !type.columns.source ? null : await sourceOf(op), props: { ...reg.defaults(op.type), ...op.props },
+            source_id: type.columns && !type.columns.source ? null : await sourceOf(op), props: { ...reg.defaults(op.type), ...refsIn(op.props, named) },
           }));
           await kept(tx, id, op.props);
           break;
@@ -69,7 +71,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
         case 'update': {
           const before = (await map.entity(op.id, tx))!;
           const props = { ...before.props };
-          for (const [key, value] of Object.entries(op.props ?? {})) {
+          for (const [key, value] of Object.entries(refsIn(op.props, named) ?? {})) {
             if (value === null) delete props[key];
             else props[key] = value;
           }
@@ -138,6 +140,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
           break; // registered after the transaction
       }
       await said(await ownerFollows(tx, op, resolve, resolve(op.op === 'create' ? (op.ref ?? `#${i + 1}`) : ''), () => mint(`owner#${at.get(op)}`, 'r')));
+      await said(await unwaitFollows(tx, reg, op, word, unwaited, ops));
     }
     if (opts.dry) throw DRY;
     const rule: Decision = opts.rule ?? { outcome: 'apply', spared: [] };
@@ -148,9 +151,34 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
   }).catch((err) => { if (err !== DRY) throw err; });
   if (opts.dry) return { status: 'dry' as const, changeset, created, warnings, facts, ids };
 
-  await typesApplied(map, ops, reg);
-  await supersede(map, changeset);
-  return { status: 'applied' as const, changeset, created, warnings };
+  await afterLog(warnings, () => typesApplied(map, ops, reg), () => supersede(map, changeset));
+  return { status: 'applied' as const, changeset, created, warnings, ...(unwaited.length && { unwaited }) };
+}
+
+/**
+ * What follows a change once its log entry is written: the change has applied, whatever becomes of these, so a failure
+ * among them is said as a warning, never as an error that would make the change look undone and be sent again.
+ */
+async function afterLog(warnings: string[], ...steps: (() => Promise<unknown>)[]) {
+  for (const step of steps)
+    await step().catch((err) => {
+      console.error(err);
+      warnings.push(`Applied, but what follows it failed: ${(err as Error).message}`);
+    });
+}
+
+/** A prop's value with {ref} replaced by the id it makes, in every string inside it (a lens's filter, a style named in it). */
+function refsIn<T>(value: T, named: (text: string) => string): T {
+  if (typeof value === 'string') return named(value) as T;
+  if (Array.isArray(value)) return value.map((v) => refsIn(v, named)) as T;
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, refsIn(v, named)])) as T;
+  return value;
+}
+
+/** Of an applied change, what let it through: each rule that would have held it, and the setting, policy or holds off that did not let it. */
+export function letThrough(spared: Verdict['spared']): { let_through?: { rule: string; pack: string; by: string }[] } {
+  const each = new Map(spared.flat().map((r) => [`${r.pack}.${r.rule}`, { rule: r.rule, pack: r.pack, by: r.lifted_by ?? 'setting' }]));
+  return each.size ? { let_through: [...each.values()] } : {};
 }
 
 /** What an op sets of an item's operational state (src/operational.ts) is not a fact: it is written beside them, never logged. */

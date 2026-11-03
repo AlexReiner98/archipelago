@@ -4,7 +4,8 @@
 //
 // A style about a view, or about an item that has views, has its fields put in those views, the one about the view
 // last, its own settings over them, and is retired. One about only what is archived is retired. One with code is a
-// layout: it stays, and a view of what it was about names it. One about an item with no view stays until that item has
+// layout: it stays, and a view it is about itself names it if that view holds no style; the views of an item it is
+// about are left as they are, so it never changes a view's style unasked. One about an item with no view stays until that item has
 // one, and one that sets how a page looks stays, as what it says belongs to the page.
 
 import { ownStyle } from './styles.ts';
@@ -36,7 +37,8 @@ export function stylesMoved(styles: { id: string; props: Props }[], ties: Tie[],
     const live = tied.filter((t) => !t.gone);
     const into = [...new Set(live.flatMap((t) => (isView(t.to_type) ? [t.to] : (viewsOf.get(t.to) ?? []))))];
     if (typeof style.props.code === 'string') {
-      for (const view of into) if (!(views.get(view)?.style as Props | undefined)?.style) hold(view, { style: style.id });
+      // Named only by a view it is about itself that holds no style yet: never by the views of an item it is about, nor over a style a view was given.
+      for (const t of live) if (isView(t.to_type) && views.get(t.to)?.style === undefined) hold(t.to, { style: style.id });
       continue;
     }
     if (PAGE_FIELDS.some((field) => style.props[field] != null)) continue;

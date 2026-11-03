@@ -32,9 +32,10 @@ test('in a browser, a document is written beside its draft, shared or not', { sk
       { op: 'update', id: offer.id, status: 'accepted', props: { path: 'shared' } },
       { op: 'create', ref: 'a', type: 'document', title: 'Own page', visibility: 'shared', status: 'draft', body: long('first'), props: { path: 'own', menu: 1 } },
       { op: 'create', ref: 'b', type: 'document', title: 'Next page', visibility: 'shared', status: 'draft', body: long('second'), props: { path: 'next', menu: 2 } },
+      { op: 'create', ref: 't', type: 'task', title: 'Task, not a page', visibility: 'shared', body: 'A task read by its note.' },
     ],
   })).created as Record<string, string>;
-  const ids = [site.a, site.b, offer.id].map((id) => `find=id+${id}`).join('&');
+  const ids = [site.a, site.b, offer.id, site.t].map((id) => `find=id+${id}`).join('&');
 
   const page = await open(`${base}/`);
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -101,6 +102,10 @@ test('in a browser, a document is written beside its draft, shared or not', { sk
     const written = (await api(mine, 'get', { id: home })).entity;
     assert.ok(written.body.startsWith('From the site. '), 'written on its own map');
     assert.ok((await api(theirs, 'get', { id: offer.id })).entity.body.startsWith('From the workspace'), 'the share itself is as it was');
+
+    // An item that is not a document is read by its note, as its reader sees it, not refused.
+    await scrollTo(site.t);
+    assert.ok(await until(reads(site.t, 'A task read by its note.')), `an item that is not a document is read by its note: ${page.logs().join('\n')}`);
   } finally {
     await page.close();
   }
