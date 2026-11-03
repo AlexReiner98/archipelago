@@ -1,6 +1,7 @@
 // How a story looks (story.js, play.js): the chapters above the picture, what was said beside it (on its right, three
 // to one, under it only where the row cannot hold both at side_least; on its left, narrow, story_chat, where a milestone's
-// drawing stands on its right, story_shown_grow to the picture's three: a milestone draws its own dials beside it), and the marks of a
+// drawing stands on its right, story_shown_grow to the picture's three: a milestone draws its own dials beside it; with
+// nothing said, no conversation, and the player's buttons plain at the end of the chapters' row), and the marks of a
 // step: what comes in, in the accent; what goes, in the colour of what is wrong; a flag in it too. Every colour and
 // length is the page's (its theme and lengths, read as --<name>). The rail's and the conversation's buttons are named
 // within them, so they weigh more than a page's own rule for buttons (a published page has one).
@@ -9,6 +10,13 @@ export const css = `
 .lf-beside { gap: var(--space-8); }
 .lf-beside > .lf-stage { flex: 3 1 0; min-width: var(--side-least); }
 .sp-top { display: grid; gap: var(--space-6); margin-bottom: var(--space-6); }
+.sp-row { display: flex; align-items: flex-start; gap: var(--space-8); }
+.sp-row > .sp-rail { flex: 1 1 0; min-width: 0; }
+.sp-controls { flex: none; }
+.sp-controls .sp-head { height: auto; padding: 0; border-bottom: none; }
+.sp-controls .sp-head button { all: unset; cursor: pointer; color: var(--text); padding: 0 var(--space-3); font-size: var(--text-3); }
+.sp-controls .sp-head button:focus-visible { outline: var(--border-3) solid var(--accent); outline-offset: var(--space-2); }
+.sp-controls .sp-head button.sp-step { font-size: var(--text-4); }
 .sp-rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-4); overflow-x: auto; }
 .sp-rail .sp-era { all: unset; cursor: pointer; display: block; min-width: 0; padding: 0 var(--space-3) var(--space-4); border-bottom: var(--border-4) solid var(--line); transition: border-color 0.4s; }
 .sp-rail .sp-era:focus-visible { outline: var(--border-3) solid var(--accent); outline-offset: var(--space-2); }

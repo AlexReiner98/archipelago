@@ -7,6 +7,8 @@
 // A step that adds a kept view (an item of the lens type) reaches a milestone: that view's own drawing stands beside
 // the picture, as large as it, until a later step adds another, and the conversation moves to the left, narrow (the
 // owner, 2 Nov 2026, e_dnewbxxh). The page draws it from a `view` mark (ui/view-frame.js): a drawing never opens a view.
+// A story none of whose steps says anything has no conversation: the map tells it, and the player's buttons stand at
+// the end of the chapters' row (the owner, 3 Nov 2026, e_7vdaan2k).
 
 import { m } from './marks.js';
 
@@ -26,6 +28,7 @@ export function play({ answer, style, reduced, tools, shape }) {
   for (const s of steps) shownAt.push((s.add ?? []).filter((id) => views.has(id)).at(-1) ?? shownAt.at(-1) ?? null);
   const milestones = shownAt.some(Boolean);
   const reaches = (k) => Boolean(shownAt[k]) && shownAt[k] !== (shownAt[k - 1] ?? null);
+  const talks = steps.some((s) => s.lines?.length);
 
   // ---- Above the picture: the chapters, and what each dot says. Beside it: the conversation.
   // A key for the story's own look and one for each other look it changes to, each shown while its look is.
@@ -35,30 +38,28 @@ export function play({ answer, style, reduced, tools, shape }) {
     const values = [...order.filter((v) => v in names), ...Object.keys(names).filter((v) => !order.includes(v))];
     return values.length > 0 && m('ul', { key: `key:${look ?? ''}`, class: `sp-key${look ? ` sp-${look} sp-hide` : ''}` }, values.map((v) => m('li', {}, m('span', { class: `sp-swatch k-${v}` }), String(names[v]))));
   };
+  // The player's buttons: atop the conversation, or, with none, at the end of the chapters' row.
+  const head = m(
+    'div',
+    { class: 'sp-head' },
+    m('span', { class: 'sp-live' }),
+    m('span', { class: 'grow' }),
+    total !== undefined && m('span', { key: 'count', class: 'sp-count' }, ''),
+    m('span', { key: 'at', class: 'sp-count', title: 'The step shown, of all the steps' }, ''),
+    m('button', { key: 'back', on: ['click'], class: 'sp-step', title: 'A step back' }, '‹'),
+    m('button', { key: 'play', on: ['click'] }, 'Play'),
+    m('button', { key: 'next', on: ['click'], class: 'sp-step', title: 'A step on' }, '›'),
+  );
+  const eras = chapters.length > 0 && m('div', { class: 'sp-rail' }, chapters.map((c, k) => m('button', { key: `c:${k}`, on: ['click'], class: 'sp-era', title: [c.name, c.when].filter(Boolean).join(', ') }, m('b', {}, c.name), c.when && m('small', {}, c.when))));
   const before = m(
     'div',
-    { class: 'sp-top' },
-    chapters.length > 0 && m('div', { class: 'sp-rail' }, chapters.map((c, k) => m('button', { key: `c:${k}`, on: ['click'], class: 'sp-era', title: [c.name, c.when].filter(Boolean).join(', ') }, m('b', {}, c.name), c.when && m('small', {}, c.when)))),
+    { class: 'sp-top', ...(!talks && { key: 'top', on: ['seen'] }) },
+    talks ? eras : m('div', { class: 'sp-row' }, eras, m('div', { class: 'sp-controls' }, head)),
     [null, ...keyLooks].map(keyFor),
   );
-  const chat = m(
-    'div',
-    { key: 'chat', on: ['seen'], class: 'sp-chat' },
-    m(
-      'div',
-      { class: 'sp-head' },
-      m('span', { class: 'sp-live' }),
-      m('span', { class: 'grow' }),
-      total !== undefined && m('span', { key: 'count', class: 'sp-count' }, ''),
-      m('span', { key: 'at', class: 'sp-count', title: 'The step shown, of all the steps' }, ''),
-      m('button', { key: 'back', on: ['click'], class: 'sp-step', title: 'A step back' }, '‹'),
-      m('button', { key: 'play', on: ['click'] }, 'Play'),
-      m('button', { key: 'next', on: ['click'], class: 'sp-step', title: 'A step on' }, '›'),
-    ),
-    m('ol', { key: 'log', class: 'sp-log', 'aria-live': 'polite' }),
-  );
+  const chat = talks && m('div', { key: 'chat', on: ['seen'], class: 'sp-chat' }, head, m('ol', { key: 'log', class: 'sp-log', 'aria-live': 'polite' }));
   // Beside the picture: the milestone reached, its name under it, a link to its page.
-  const after = milestones ? m('div', { class: 'sp-side' }, chat, m('div', { class: 'sp-shown' }, m('view', { key: 'shown' }), m('a', { key: 'shown-name', class: 'sp-shown-name' }, ''))) : chat;
+  const after = milestones ? m('div', { class: 'sp-side' }, chat, m('div', { class: 'sp-shown' }, m('view', { key: 'shown' }), m('a', { key: 'shown-name', class: 'sp-shown-name' }, ''))) : chat || null;
 
   // ---- Changing what is drawn.
   let timers = [], cur = -1, playing = false, seq = 0, typing = false;
@@ -68,6 +69,7 @@ export function play({ answer, style, reduced, tools, shape }) {
 
   const kept = t('lines_kept');
   const say = (kind, text, by) => {
+    if (!talks) return;                                            // no conversation to say it in
     const key = `l:${seq++}`;
     const list = [{ key: 'log', append: m('li', { key, class: `sp-line ${kind}` }, by && m('span', { class: 'sp-who' }, by), m('p', {}, text)) }];
     if (seq > kept) list.push({ key: `l:${seq - kept - 1}`, remove: true });
@@ -76,7 +78,7 @@ export function play({ answer, style, reduced, tools, shape }) {
     tools.frame().then(() => send([{ key, toggle: { in: true } }]));
   };
   const typingOn = (on) => {
-    if (on === typing) return;
+    if (on === typing || !talks) return;
     typing = on;
     send(on ? [{ key: 'log', append: m('li', { key: 'typing', class: 'sp-line sp-typing in' }, m('p', {}, '…')) }] : [{ key: 'typing', remove: true }]);
   };
@@ -200,8 +202,8 @@ export function play({ answer, style, reduced, tools, shape }) {
       return [];
     },
     end: stop,
-    /** Whether a mark's event is the player's: its buttons, a chapter, the conversation. */
-    hears: (key) => ['play', 'back', 'next', 'chat'].includes(key) || key.startsWith('c:'),
+    /** Whether a mark's event is the player's: its buttons, a chapter, the conversation (or, with none, the top). */
+    hears: (key) => ['play', 'back', 'next', 'chat', 'top'].includes(key) || key.startsWith('c:'),
     /** The step on screen: -1 before the first. */
     step: () => cur,
   };
