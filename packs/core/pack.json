@@ -539,9 +539,10 @@
           "values": [
             "every",
             "daily",
+            "weekly",
             "event"
           ],
-          "description": "every: an interval. daily: a time of day. event: something logged in the activity feed."
+          "description": "every: an interval. daily: a time of day. weekly: a time of day on the days named. event: something logged in the activity feed."
         },
         "every_minutes": {
           "type": "number",
@@ -549,7 +550,11 @@
         },
         "at": {
           "type": "string",
-          "description": "For trigger daily: local time as HH:MM."
+          "description": "For trigger daily or weekly: local time as HH:MM."
+        },
+        "days": {
+          "type": "json",
+          "description": "For trigger weekly: the days of the week it fires on, as names (\"monday\") or numbers, 1 for Monday to 7 for Sunday."
         },
         "on_action": {
           "type": "string",
@@ -582,7 +587,7 @@
         },
         "input": {
           "type": "json",
-          "description": "For action tool: the tool's input. For action launch: {task, mode, instructions}."
+          "description": "For action tool: the tool's input. For action launch: {task, mode, instructions, budget_usd}."
         },
         "last_fired": {
           "type": "datetime",

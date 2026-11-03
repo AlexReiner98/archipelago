@@ -56,8 +56,13 @@ export interface Config {
    * the next request, to free its memory (PELAGO_IDLE_MINUTES). 0 never closes.
    */
   idleMinutes: number;
-  /** Whether this server may start Claude Code sessions: only when it listens on this machine alone. */
-  launch: boolean;
+  /**
+   * Where this server starts sessions (PELAGO_LAUNCH): local, Claude Code on this machine, only when the server
+   * listens on it alone (the default there); cloud, a Managed Agents session on each workspace's own Anthropic
+   * account, reaching the map at cloudMcpUrl (PELAGO_MCP_URL, or the first public host's /mcp); or not at all.
+   */
+  launch: 'local' | 'cloud' | false;
+  cloudMcpUrl?: string;
   /**
    * For working on Archipelago itself, one person on one machine: agent changes
    * apply without review unless `policy` says otherwise, and agents may restart
@@ -118,6 +123,12 @@ export function loadConfig(): Config {
   const sendTo = url && key ? { url, key } : undefined;
   const wanted = fromFile.backup === false ? false : { ...(fromFile.backup as object | undefined) } as { dir?: string; everyHours?: number; keep?: number };
   const backup = wanted && { dir: resolve(ROOT, env('BACKUP_DIR') ?? wanted.dir ?? join(dataDir, '..', 'backups')), everyHours: wanted.everyHours ?? 24, keep: wanted.keep ?? 7, upload: sendTo };
+  const wantLaunch = env('LAUNCH') ?? (local ? 'local' : 'off');
+  if (!['local', 'cloud', 'off'].includes(wantLaunch)) throw new Error('PELAGO_LAUNCH is local, cloud or off.');
+  if (wantLaunch === 'local' && !local) throw new Error('Launching on this machine starts Claude Code as the server, so it runs only on a server that listens on this machine alone: PELAGO_LAUNCH=cloud starts sessions in the cloud instead.');
+  const launch = wantLaunch === 'off' ? false : (wantLaunch as 'local' | 'cloud');
+  const cloudMcpUrl = env('MCP_URL') ?? (named[0] ? `https://${named[0].trim().toLowerCase()}/mcp` : undefined);
+  if (launch === 'cloud' && !cloudMcpUrl?.startsWith('https://')) throw new Error('Launching in the cloud needs the map’s MCP address as the internet reaches it, over https: PELAGO_MCP_URL, or a PELAGO_PUBLIC_HOST.');
   const unreviewed = Object.fromEntries(Object.keys(DEFAULT_AGENT_POLICY).map((op) => [op, 'auto'])) as Policy;
   return {
     packs: fromFile.packs,
@@ -126,8 +137,9 @@ export function loadConfig(): Config {
     dev,
     host,
     idleMinutes: Number(env('IDLE_MINUTES') ?? fromFile.idleMinutes ?? 30),
-    // A hosted server has neither its customers' repositories nor their Claude CLI.
-    launch: local,
+    // A hosted server has neither its customers' repositories nor their Claude CLI: it launches in the cloud, or not at all.
+    launch,
+    ...(launch === 'cloud' && { cloudMcpUrl }),
     publicHosts: named.map((name) => name.trim().toLowerCase()).filter(Boolean),
     sites: Object.fromEntries((env('SITES') ?? '').split(',').map((pair) => pair.split('=').map((part) => part.trim().toLowerCase())).filter(([host, ws]) => host && ws)),
     trustedProxies: env('TRUSTED_PROXIES') ?? fromFile.trustedProxies,

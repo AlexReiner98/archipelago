@@ -2,6 +2,7 @@
 // typed by the admin whose account it is, never handed over by an agent.
 
 import { z } from 'zod';
+import { REPO_TOKEN } from './cloud-launch.ts';
 import { connectModel, forgetModel, modelStatus, named, priceModel, priceOf, PROVIDERS } from './model-account.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId } from './pelago.ts';
@@ -41,6 +42,24 @@ export const MODEL_TOOLS: Record<string, Tool> = {
       // The log says which account and by whom: never the key.
       await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `Model account connected: ${named(account)}` });
       return modelStatus(whole);
+    },
+  },  repo_token: {
+    description:
+      'The GitHub token a cloud session clones its task’s repository with (where this server starts sessions in the cloud). With nothing given: whether one is kept. token: keep one, replacing any before (a fine-grained token with read access to the repositories, or read and write to let a session push). remove: forget it. Admins only.',
+    humanOnly: true,
+    input: {
+      token: z.string().max(500).optional().describe('The GitHub token. Kept sealed, never shown again, and never put inside the session’s sandbox.'),
+      remove: z.boolean().optional(),
+    },
+    run: async (l, actor, input) => {
+      const whole = await wholeMap(l);
+      if (!input.token && !input.remove) return { kept: Boolean(await whole.secret(REPO_TOKEN)) };
+      if (!actor.admin) throw new Error('Only a workspace admin can give or forget its GitHub token.');
+      const token = input.remove ? undefined : input.token!.trim();
+      if (token && !/^(github_pat_|ghp_|ghs_)\w{20,}$/.test(token)) throw new Error('That is not a GitHub token: one starts github_pat_ (fine-grained) or ghp_.');
+      await whole.setSecret(REPO_TOKEN, token);
+      await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: token ? 'GitHub token given, for cloud sessions' : 'GitHub token removed' });
+      return { kept: Boolean(token) };
     },
   },
 };
