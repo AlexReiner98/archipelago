@@ -30,7 +30,7 @@ test('a look pass reads as its agent’s person, only through /api, and only wha
   const flat = (await call('/api/view', pass, { name: 'flat', params: { filter: { find: [`id ${mine}`, `id ${theirs}`] } } })).result;
   assert.deepEqual(flat.items.map((i: { id: string }) => i.id), [mine]);
   // It asks what a reader frame asks: whether a document is published (the pages, ui/reader-frame.js).
-  assert.deepEqual((await call('/api/published', pass, { id: mine })).result, { published: false });
+  assert.deepEqual((await call('/api/published', pass, { id: mine })).result, { published: false, publishable: false });
   // It writes nothing, and is no token anywhere but the page's reads.
   const refused = await call('/api/change', pass, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'From a look' }] });
   assert.equal(refused.status, 403);
