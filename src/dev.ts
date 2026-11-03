@@ -28,8 +28,13 @@ let stopping = false;
 let waiting: (() => void) | undefined;
 
 function start(): void {
-  const kept = takePulled(loadConfig().dataDir);
-  if (kept) note(`the pulled copy of the live map is in place; what was there is kept as ${kept}`);
+  try {
+    const kept = takePulled(loadConfig().dataDir);
+    if (kept) note(`the pulled copy of the live map is in place; what was there is kept as ${kept}`);
+  } catch (err) {
+    // A second pull is putting its copy there as this one starts: the server starts on the map it had, and the next restart takes the copy.
+    note(`the pulled copy could not go in place yet (${(err as Error).message}); the server starts on the map it had`);
+  }
   note('starting the server');
   const child = spawn(process.execPath, [join(ROOT, 'src', 'server.ts')], { cwd: ROOT, env: { ...process.env, PELAGO_DEV: '1' }, stdio: ['inherit', 'pipe', 'pipe'] });
   child.stdout.on('data', say);

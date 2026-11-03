@@ -29,6 +29,17 @@ test('a database from before browser sign-in gets its column on opening, and its
   await db.close();
 });
 
+test('a step recorded without its table is run again on opening, and members can be listed', async () => {
+  const dir = folder();
+  const made = await openDb(dir);
+  await made.exec(`drop table member`);
+  await made.close();
+  const db = await openDb(dir);
+  assert.equal((await db.query(`select count(*)::int as n from member`)).rows.length, 1);
+  assert.equal((await steps(db)).filter((s) => s.version === 6).length, 1);
+  await db.close();
+});
+
 test('opening a database that has every step applies none again', async () => {
   const dir = folder();
   const first = await openDb(dir);

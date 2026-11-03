@@ -11,11 +11,12 @@
 // three of them.
 //
 // With the local server stopped, the copy goes in place at once. Under `npm run dev` the server is asked to
-// restart, and the copy goes in place while it is down. Under `npm start`, stop it first.
+// restart, and the copy goes in place while it is down: only a server whose /health names this data folder, so another
+// worktree's server on the port is left alone. Under `npm start`, stop it first.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { basename, dirname, join } from 'node:path';
+import { homedir, hostname } from 'node:os';
+import { basename, dirname, join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { parseBackup, parseVault, readable, restore, type Dump } from './backup.ts';
 import { rewrap, type VaultDump } from './vault.ts';
@@ -26,13 +27,22 @@ import { configureSecrets } from './secrets.ts';
 /** Where a pulled copy waits until the data folder can be swapped for it. */
 export const pulledDir = (dataDir: string) => `${dataDir}.pulled`;
 
-/** Put a pulled copy in place of the data folder, keeping the old one beside it. Only with no server on the folder. */
+/**
+ * Put a pulled copy in place of the data folder, keeping the old one beside it. Only with no server on the folder.
+ * When the copy cannot be moved (a second pull is replacing it), the data folder is put back as it was and this throws.
+ */
 export function takePulled(dataDir: string): string | undefined {
   const pulled = pulledDir(dataDir);
   if (!existsSync(pulled)) return undefined;
   const kept = `${dataDir}-backup-${new Date().toISOString().replaceAll(':', '-')}`;
-  if (existsSync(dataDir)) renameSync(dataDir, kept);
-  renameSync(pulled, dataDir);
+  const had = existsSync(dataDir);
+  if (had) renameSync(dataDir, kept);
+  try {
+    renameSync(pulled, dataDir);
+  } catch (err) {
+    if (had) renameSync(kept, dataDir);
+    throw err;
+  }
   pruneKept(dataDir);
   return kept;
 }
@@ -56,17 +66,42 @@ export function pruneKept(dataDir: string) {
 export async function takeIn(dataDir: string, backup: Dump, keys?: { vault: VaultDump; key: Buffer }) {
   configureSecrets(join(dataDir, '..', 'workspaces'));
   if (keys) backup.vault = { ...rewrap(keys.vault, keys.key), secrets: [] };
-  const target = pulledDir(dataDir);
-  rmSync(target, { recursive: true, force: true });
-  const db = await openDb(target);
+  // Made in a folder of this process's own and moved to where it waits only once whole and closed: a server taking the
+  // copy in as it starts, or a second pull, never meets one half made.
+  const making = `${dataDir}.pulling-${process.pid}`;
+  rmSync(making, { recursive: true, force: true });
+  const db = await openDb(making);
+  let made;
   try {
     // Its items as the file's log makes them, read before they go in, so its automations can be paused on the way.
     const clear = await readable(db, backup);
     let paused = 0;
     for (const row of clear.tables.entity ?? []) if (row.type === 'automation' && row.status === 'enabled') (row.status = 'paused'), paused++;
-    return { counts: await restore(db, clear, 'default'), paused, vault: backup.vault };
+    made = { counts: await restore(db, clear, 'default'), paused, vault: backup.vault };
   } finally {
     await db.close();
+  }
+  const target = pulledDir(dataDir);
+  rmSync(target, { recursive: true, force: true });
+  renameSync(making, target);
+  return made;
+}
+
+/** Whether the data folder is the one a server's /health names (a dev server's only): pull restarts no other. */
+export const sameFolder = (a: string | undefined, b: string) => {
+  const norm = (p: string) => (process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p));
+  return a !== undefined && norm(a) === norm(b);
+};
+
+/** Whether a live process holds the data folder's lock (src/server.ts), on whatever port. */
+export function held(dataDir: string) {
+  const [pid, machine] = existsSync(`${dataDir}.lock`) ? readFileSync(`${dataDir}.lock`, 'utf8').split('@') : [];
+  if (!Number(pid) || (machine !== undefined && machine !== hostname())) return false;
+  try {
+    process.kill(Number(pid), 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
   }
 }
 
@@ -128,25 +163,41 @@ async function pull() {
     if (!got.ok) return fail(`The link to its keys gave HTTP ${got.status}: ask again.`);
     keys = { vault: parseVault(Buffer.from(await got.arrayBuffer())), key: Buffer.from(answer.result.vault_key, 'base64url') };
   }
-  const target = pulledDir(dataDir);
   const { counts, paused, vault } = await takeIn(dataDir, parseBackup(file), keys);
   if (vault) writeFileSync(saved.replace('.json.gz', '.vault.json.gz'), gzipSync(JSON.stringify(vault)));
   console.log(`Pulled ${url} as of ${answer.result.taken}: ${counts.entity} items, ${counts.relation} links, ${counts.event} events; ${paused} automations paused. Kept as ${saved}`);
 
-  const health = () => fetch(`http://127.0.0.1:${port}/health`).then((r) => r.json() as Promise<{ started: string }>, () => undefined);
+  try {
+    console.log(await putInPlace(dataDir, port));
+  } catch (err) {
+    fail((err as Error).message);
+  }
+}
+
+/**
+ * The pulled copy put in place of the data folder: at once with no server on it, or by asking this folder's own dev
+ * server on the port to restart. What it did, said; thrown when the server did not come back.
+ */
+export async function putInPlace(dataDir: string, port: number): Promise<string> {
+  const target = pulledDir(dataDir);
+  const health = () => fetch(`http://127.0.0.1:${port}/health`).then((r) => r.json() as Promise<{ started: string; data?: string }>, () => undefined);
   const before = await health();
-  if (!before) return console.log(`In place in ${dataDir}; what was there is kept as ${takePulled(dataDir) ?? 'nothing'}.`);
+  // Port 3100 may be another folder's server (another worktree's): it is never asked to restart for this one.
+  if (!before || !sameFolder(before.data, dataDir)) {
+    if (!held(dataDir)) return `In place in ${dataDir}; what was there is kept as ${takePulled(dataDir) ?? 'nothing'}.`;
+    return `The server on port ${port} is not on ${dataDir}, and another server is: the copy waits in ${target} and goes in place when this folder's npm run dev next starts its server. PELAGO_PORT names this folder's port.`;
+  }
   const restart = await fetch(`http://127.0.0.1:${port}/agent/revise`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'restart' }) }).then((r) => r.ok, () => false);
-  if (!restart) return console.log(`The local server is not in dev mode: stop it, and the copy waiting in ${target} goes in place when it next starts under npm run dev.`);
+  if (!restart) return `The local server is not in dev mode: stop it, and the copy waiting in ${target} goes in place when it next starts under npm run dev.`;
   for (let i = 0; i < 60; i++) {
     await new Promise((r) => setTimeout(r, 500));
     const now = await health();
     if (now && now.started !== before.started)
       return existsSync(target)
-        ? console.log(`The local server restarted, but npm run dev was started before it knew to take the copy: stop it and start it again, and the copy in ${target} goes in place.`)
-        : console.log(`The local server restarted on the pulled map (http://127.0.0.1:${port}).`);
+        ? `The local server restarted, but npm run dev was started before it knew to take the copy: stop it and start it again, and the copy in ${target} goes in place.`
+        : `The local server restarted on the pulled map (http://127.0.0.1:${port}).`;
   }
-  fail(`The local server did not come back within 30 seconds: see runs/dev-server.log. The copy is in ${existsSync(target) ? target : dataDir}.`);
+  throw new Error(`The local server did not come back within 30 seconds: see runs/dev-server.log. The copy is in ${existsSync(target) ? target : dataDir}.`);
 }
 
 if (import.meta.main) await pull();
