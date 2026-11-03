@@ -67,8 +67,8 @@ function box(v, field, style, keep, save) {
   const text = v === null || v === undefined ? '' : String(v);
   const long = text.length > style.numbers.field_fold_at || text.includes('\n');
   const was = field?.type === 'number' ? 0 : v;
-  if (long) {
-    const area = h('textarea', { class: 'field-write', rows: 3, oninput: () => keep(typed(area.value, was)) });
+  if (long || field?.code) {
+    const area = h('textarea', { class: field?.code ? 'field-write field-code-write' : 'field-write', rows: field?.code ? 12 : 3, spellcheck: !field?.code, oninput: () => keep(typed(area.value, was)) });
     area.value = text;
     return area;
   }
@@ -183,6 +183,8 @@ export function fieldEditor(v, field, { style, editable, pick, keep, save, list 
   const read = h('span', { class: 'field-read', title: 'Click to change' }, fieldValue(v, field, style));
   read.addEventListener('click', (ev) => {
     if (ev.target.closest('a, summary')) return;
+    // Code being read (some of it picked out) is not being changed.
+    if (ev.target.closest('.field-code') && !getSelection().isCollapsed) return;
     const editor = wordsEditor(v, field, style, keep, save, { list });
     read.replaceWith(editor);
     editor.matches('input, textarea') ? editor.focus() : editor.querySelector('input')?.focus();

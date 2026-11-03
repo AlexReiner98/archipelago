@@ -25,7 +25,7 @@ export interface FieldDef {
   system?: boolean;
   /** Sent with the item in a lens answer, so a style can draw by it (a kind to colour, an amount, a date). */
   shown?: boolean;
-  /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a kind (src/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (src/css-check.ts). */ css?: boolean;
+  /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a kind (src/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (src/css-check.ts). */ css?: boolean; /** Holds code (a module, a stylesheet): drawn as a code block, folded. */ code?: boolean;
 }
 
 export interface Statuses {

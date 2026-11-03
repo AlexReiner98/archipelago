@@ -64,9 +64,34 @@ function shaped(v, style) {
   return folded(Array.isArray(v) ? `${v.length} entries` : Object.keys(v).map(label).join(', '), h('pre', { class: 'page-json' }, JSON.stringify(v, null, 1)));
 }
 
+/**
+ * Code (a field its type declares code: a module, a stylesheet) as a block in its own ground, folded to a few lines;
+ * its count of lines opens it, to scroll inside its box. A set of modules by name is a block each.
+ */
+function codeBlock(text, name) {
+  const lines = text.split('\n').length;
+  const block = h('div', { class: 'field-code' });
+  const fold = h('button', { type: 'button', class: 'quiet-button field-code-fold', title: 'Open it' }, name ? `${name} · ${lines.toLocaleString()} lines` : `${lines.toLocaleString()} lines`);
+  const set = (open) => (block.classList.toggle('open', open), (fold.title = open ? 'Fold it' : 'Open it'));
+  // A click opens it; only an open block is written in (ui/field-edit.js).
+  fold.addEventListener('click', (ev) => (ev.stopPropagation(), set(!block.classList.contains('open'))));
+  block.addEventListener('click', (ev) => block.classList.contains('open') || (ev.stopPropagation(), set(true)));
+  block.append(h('pre', { class: 'field-code-text' }, text), fold);
+  return block;
+}
+const code = (v) =>
+  typeof v === 'string' ? codeBlock(v) : plain(v) && Object.values(v).every((x) => typeof x === 'string') ? h('div', { class: 'field-codes' }, Object.entries(v).map(([k, x]) => codeBlock(x, k))) : null;
+
+/** Whether a field holds nothing: the page puts those last, folded. */
+export const empty = (v) => v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length) || (plain(v) && !Object.keys(v).length);
+
 /** A field's value, by the kind its type declares it as, else by its shape. `field` is its declaration, if it has one. */
 export function fieldValue(v, field, style) {
-  if (v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length)) return none();
+  if (empty(v)) return none();
+  if (field?.code) {
+    const block = code(v);
+    if (block) return block;
+  }
   if (field?.type === 'enum' && typeof v === 'string') return h('span', { class: 'pill field-pill', title: field.description ?? '' }, v.replaceAll('_', ' '));
   if (field?.type === 'datetime' && typeof v === 'string') return ago(v);
   if (field?.type === 'date' && typeof v === 'string' && DAY.test(v)) return day(v);
