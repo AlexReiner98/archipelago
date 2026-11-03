@@ -342,6 +342,9 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 .pane-bar .pane-follows[hidden] { display: none; }
 /* A pane is never scrolled itself, not even by code bringing a mark into sight: only what it holds scrolls. */
 #canvas .pane-canvas { position: relative; flex: 1; min-height: 0; overflow: clip; }
+#canvas .pane-canvas[hidden] { display: none; }
+#canvas .pane-web { flex: 1; min-height: 0; border: 0; background: var(--panel); }
+body[data-panes="1"] #canvas .pane-web { margin: var(--safe-top) 0 var(--safe-bottom); }#canvas .pane-web.error { padding: var(--space-5); }
 #canvas .pane-canvas > .lens-wrap, #canvas .pane-canvas .lens-view { height: 100%; }
 #canvas .pane-canvas .lens-view { position: relative; box-sizing: border-box; overflow: auto; }
 #canvas .pane-canvas .lens-view:has(.lf-stage) { overflow: hidden; }

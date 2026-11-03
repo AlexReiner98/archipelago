@@ -16,6 +16,8 @@ export interface Seen {
   said: number;
   /** The chat whose tab is in sight (src/sessions.ts), and whether it is that chat's own tab or one of the owner's following it. */
   tab?: { chat: string; own: boolean };
+  /** The sessions whose next show lands in the tab in sight (ui/tabs.js, landsIn). */
+  lands?: string[];
 }
 
 /** What the owner is looking at, said to an agent. */
@@ -46,11 +48,11 @@ const key = (w: Whose) => `seeing:${whose(w)}`;
 const last = new Map<string, Seen>();
 
 /** A page said where it stands. */
-export async function seen(db: Q, w: Whose, page: string, at: string, tab?: Seen['tab']): Promise<void> {
+export async function seen(db: Q, w: Whose, page: string, at: string, tab?: Seen['tab'], lands?: string[]): Promise<void> {
   const k = key(w);
   const was = last.get(k);
-  if (was && was.at === at && was.page === page && was.tab?.chat === tab?.chat && Date.now() - was.said < AGAIN_MS) return;
-  const now = { at, page, said: Date.now(), ...(tab && { tab }) };
+  if (was && was.at === at && was.page === page && was.tab?.chat === tab?.chat && String(was.lands ?? []) === String(lands ?? []) && Date.now() - was.said < AGAIN_MS) return;
+  const now = { at, page, said: Date.now(), ...(tab && { tab }), ...(lands?.length && { lands }) };
   last.set(k, now);
   await keep(db, k, now, KEPT_MS);
 }
@@ -104,4 +106,26 @@ export async function seeingLine(l: Archipelago, db: Q, run?: string): Promise<s
   // An item's page over its own canvas is said once.
   const where = v.screen ? `the ${v.screen} screen` : v.item && v.view === `from "${v.item.title}"` ? open : `the view ${v.view}${v.lens ? ` (${v.lens})` : ''}${open ? `, with ${open}` : ''}`;
   return `${whose} owner's page shows ${where}. "This", "here" or "it" may mean that (query seeing has it).`.trimStart();
+}
+
+/** Whether the owner sees a show of session `run` land, said to the agent that showed it. */
+export interface Sight {
+  /** true: it lands in the tab in sight; false: in a tab out of sight, marked, or on no page at all. */
+  looking: boolean;
+  /** Where it lands, in a line. */
+  where: string;
+}
+
+/**
+ * Whether a show of session `run` lands where the owner looks: a page of theirs is open and in sight (`open`, from the
+ * pages counted in the last few seconds), and the tab in sight is the one its shows go to (`lands`, which the page says).
+ */
+export async function inSight(l: Archipelago, db: Q, run: string | undefined, open: number): Promise<Sight> {
+  if (!open) return { looking: false, where: 'No page of theirs is open in sight: it waits there for them.' };
+  const s = await seenNow(db, l);
+  if (!s || Date.now() - s.said > NOW_MS) return { looking: false, where: 'Their page has not said which tab is in sight.' };
+  if (run && s.lands?.includes(run)) return { looking: true, where: 'In the tab they are looking at.' };
+  const chat = s.tab && s.tab.chat !== run ? await l.entity(s.tab.chat) : undefined;
+  const there = chat ? `another chat’s tab ("${chat.title}")` : 'a tab of their own';
+  return { looking: false, where: `In a tab out of sight, marked; their page shows ${there}. Tell them where to look.` };
 }

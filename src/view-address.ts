@@ -33,6 +33,15 @@ export interface ViewAsked {
   style?: { lit?: string; layout?: string; shape?: string; id?: string };
 }
 
+/** A web address a show frames in a pane: http or https, no name and password in it. */
+export const WEB_URL = z
+  .string()
+  .max(2000)
+  .refine((s) => URL.canParse(s) && /^https?:$/.test(new URL(s).protocol) && !new URL(s).username && !new URL(s).password, 'url is an http or https address, with no name or password in it');
+
+/** The page's address for a web page framed in a pane (ui/panes.js): `w?url=…`. */
+export const webAddress = (url: string) => `w?${new URLSearchParams({ url: new URL(url).href })}`;
+
 /** The page's address (after "#/") for what is asked. */
 export async function viewAddress(l: Archipelago, asked: ViewAsked): Promise<string> {
   // A kept view's id given as lens is the view it names, as entity takes it.
