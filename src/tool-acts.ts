@@ -20,6 +20,7 @@ import { point, sessionOpened, sessionTookUp } from './tool-change.ts';
 import { backupNow, restartNow } from './tool-config.ts';
 import { BRANCH } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
+import { waitsOn, whoseWord } from './unwait.ts';
 import { VIEW_INPUT, viewAddress } from './view-address.ts';
 import { withdraw } from './withdraw.ts';
 
@@ -254,7 +255,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => {
       const asked = await toConfirm(l, { limit: 500 });
       const answered = asked.questions.filter((q) => q.seq <= input.upto).map((q) => q.id);
-      await l.log(l.db, { actor: actorId(actor), action: 'questions.confirmed', reason: input.basis, detail: { upto: input.upto, questions: answered.length, authority: actor.kind === 'human' ? { of: 'human', who: actorId(actor) } : { of: 'human', basis: input.basis, stated_by: actorId(actor) } } });
+      const authority = actor.kind === 'human' ? { of: 'human' as const, who: actorId(actor) } : { of: 'human' as const, basis: input.basis, stated_by: actorId(actor) };
+      await l.log(l.db, { actor: actorId(actor), action: 'questions.confirmed', reason: input.basis, detail: { upto: input.upto, questions: answered.length, authority } });
       await l.record('settings', actorId(actor), [['+', actorId(actor), 'questions.confirmed', input.upto]], input.basis);
       // The notices that said each one was settled have been answered with them.
       const { rows } = await l.db.query<{ id: string }>(
@@ -263,7 +265,10 @@ export const ACT_TOOLS: Record<string, Tool> = {
         [answered],
       );
       if (rows.length) await l.apply('agent:pelago', { ops: rows.map((n) => ({ op: 'update' as const, id: n.id, status: 'read' })), reason: 'Put to the owner and answered in chat' });
-      return { confirmed_upto: input.upto, questions: answered.length, left: (await toConfirm(l)).count };
+      // Answered on the owner's word, they no longer wait on the owner (src/unwait.ts).
+      const person = await whoseWord(l, authority), waits = person ? await waitsOn(l.db, l.registry, answered, person) : [];
+      if (waits.length) await l.apply(actorId(actor), { ops: waits.map((w) => ({ op: 'unlink' as const, relation: w.id })), reason: 'Answered on their word: no longer waits on them' }, { authority });
+      return { confirmed_upto: input.upto, questions: answered.length, left: (await toConfirm(l)).count, ...(waits.length && { unwaited: waits.map((w) => ({ item: w.from_id, person, relation: w.id })) }) };
     },
   },
   restart: {
