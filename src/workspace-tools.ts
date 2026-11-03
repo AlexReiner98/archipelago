@@ -11,7 +11,7 @@ import { acceptedSenders, wholeMap } from './outbox.ts';
 import { actorId, type Archipelago } from './pelago.ts';
 import { askedLately } from './replies.ts';
 import { atSetting, AT_MAX, countsTo, isAt, onReply } from './reply-rules.ts';
-import { liftsOn } from './rules.ts';
+import { HOLDS_OFF, holdsOff, liftsOn } from './rules.ts';
 import type { Tool } from './tools.ts';
 
 /** The settings that turn off a rule on a reply's end, one for each such rule the packs here declare. */
@@ -24,7 +24,7 @@ const settings = async (l: Archipelago) => {
   const { rows } = names.length ? await l.db.query<{ key: string; value: unknown }>(`select key, value from setting where key = any($1::text[])`, [[...names, ...ats]]) : { rows: [] };
   const lifted = Object.fromEntries(names.map((name) => [name, rows.some((r) => r.key === name && r.value === true)]));
   const set = new Map(rows.filter((r) => ats.includes(r.key) && isAt(r.value)).map((r) => [r.key, r.value as number]));
-  return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups, agent_publish, agent_code, ...(names.length && { lifted, reply_rules: await replyRules(l, lifted, set) }) };
+  return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups, agent_publish, agent_code, [HOLDS_OFF]: await holdsOff(l.db), ...(names.length && { lifted, reply_rules: await replyRules(l, lifted, set) }) };
 };
 
 /**
@@ -49,7 +49,7 @@ async function planUse(l: Archipelago, limits: Limits) {
 
 export const WORKSPACE_TOOLS: Record<string, Tool> = {
   workspace_info: {
-    description: 'This workspace’s settings: its id, its owner (null until one is set with init), the default visibility of new things, whether agents’ changes are applied as they are made or held for a human, whether agents may download backups or publish documents, which workspaces it accepts notifications from, and on a workspace sold on a plan, its limits (member_limit) and how much of each it uses (use).',
+    description: 'This workspace’s settings: its id, its owner (null until one is set with init), the default visibility of new things, whether agents’ changes are applied as they are made or held for a human, whether agents may download backups or publish documents, whether holds are off (holds_off), which workspaces it accepts notifications from, and on a workspace sold on a plan, its limits (member_limit) and how much of each it uses (use).',
     humanOnly: true,
     input: {},
     run: async (l) => {
@@ -70,6 +70,7 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       agent_backups: z.boolean().optional().describe('Whether agents may download the whole workspace as a backup file (backup_download), private items included.'),
       agent_publish: z.boolean().optional().describe('Whether agents may publish documents here (publish, publish_all), each publish logged with its authority. Taking one down stays a human’s.'),
       agent_code: z.boolean().optional().describe('Whether agents’ changes to the code a drawing or a style runs (modules, code) take effect as they make them, instead of waiting for a human. That code runs only in the sandbox; each change is logged and undoable.'),
+      holds_off: z.boolean().optional().describe('Whether every change applies as it is made, whatever rule would hold it: settling, code, what is public, forget (which cannot be undone) included. A wait the change or its token asked for still holds. Off unless set.'),
       name: z.string().trim().min(1).max(60).optional().describe('What this workspace is called. Its id and addresses stay as they are.'),
       lifted: z.record(z.string(), z.boolean()).optional().describe('Turn a rule on a session’s reply ending off (true) or on again (false), by the setting it names (its lifted, such as reply_draw): workspace_info lists them.'),
       asks_at: z.record(z.string(), z.number().int().min(1).max(AT_MAX)).optional().describe('For a rule on a reply’s end that counts (workspace_info: its counts and at), how many the reply must do before it asks, by the rule’s lifted.'),

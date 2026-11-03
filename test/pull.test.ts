@@ -3,18 +3,20 @@
 // hanging. In a file of its own: it moves the sealing key to a folder, as a server keeps it.
 
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import fs, { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
-import test from 'node:test';
+import { createServer } from 'node:http';
+import { syncBuiltinESMExports } from 'node:module';
+import test, { mock } from 'node:test';
 import { agent, fresh, human, make } from './map.ts';
 import { parseBackup, parseVault } from '../src/backup.ts';
 import { takeBackup } from '../src/backup-tools.ts';
 import { openDb } from '../src/db.ts';
 import { configureOutbox } from '../src/outbox.ts';
 import { Archipelago } from '../src/pelago.ts';
-import { connection, takeIn, takePulled } from '../src/pull.ts';
+import { connection, held, putInPlace, sameFolder, takeIn, takePulled } from '../src/pull.ts';
 import { configureSecrets } from '../src/secrets.ts';
 import { hashOf } from '../src/snapshot.ts';
 import { callTool } from '../src/tools.ts';
@@ -93,5 +95,71 @@ test("an agent's backup is pulled whole: private items, items from before the lo
       rmSync(dir, { recursive: true, force: true });
       configureSecrets(null);
     }
+  }
+});
+
+test('a pull restarts only a server on its own data folder, and the lock says whether another holds it', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-pull-'));
+  const dataDir = join(dir, 'data');
+  assert.ok(sameFolder(join(dir, '.', 'data'), dataDir));
+  assert.ok(!sameFolder(join(dir, 'other'), dataDir), "another worktree's server");
+  assert.ok(!sameFolder(undefined, dataDir), 'a server that does not say its folder');
+  assert.ok(!held(dataDir));
+  writeFileSync(`${dataDir}.lock`, `${process.pid}@${hostname()}`);
+  assert.ok(held(dataDir));
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('a copy that cannot be moved in, as when a second pull is replacing it, leaves the data folder as it was', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-pull-'));
+  const dataDir = join(dir, 'data');
+  mkdirSync(dataDir);
+  writeFileSync(join(dataDir, 'mine'), 'kept');
+  mkdirSync(`${dataDir}.pulled`);
+  const real = fs.renameSync;
+  mock.method(fs, 'renameSync', (from: string, to: string) => {
+    if (from === `${dataDir}.pulled`) throw Object.assign(new Error('EBUSY: in use'), { code: 'EBUSY' });
+    real(from, to);
+  });
+  syncBuiltinESMExports();
+  try {
+    assert.throws(() => takePulled(dataDir), /EBUSY/);
+  } finally {
+    mock.restoreAll();
+    syncBuiltinESMExports();
+  }
+  assert.equal(readFileSync(join(dataDir, 'mine'), 'utf8'), 'kept');
+  assert.deepEqual(readdirSync(dir).sort(), ['data', 'data.pulled']);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("a pull leaves another folder's server on the port alone, and restarts only its own", async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-pull-'));
+  const dataDir = join(dir, 'data');
+  let serving = join(dir, 'other', 'data'), restarts = 0, started = 'one';
+  const server = createServer((req, res) => {
+    if (req.url === '/agent/revise') (restarts++, (started = 'two'), fs.renameSync(`${dataDir}.pulled`, dataDir));
+    res.end(JSON.stringify({ started, data: serving }));
+  });
+  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+  const port = (server.address() as { port: number }).port;
+  try {
+    // Another worktree's server on the port, and none on this folder: the copy goes in at once, and that server is not asked.
+    mkdirSync(`${dataDir}.pulled`);
+    assert.match(await putInPlace(dataDir, port), /^In place/);
+    assert.equal(restarts, 0);
+    // Another server holds this folder on another port: the copy waits for it.
+    mkdirSync(`${dataDir}.pulled`);
+    writeFileSync(`${dataDir}.lock`, `${process.pid}@${hostname()}`);
+    assert.match(await putInPlace(dataDir, port), /waits in/);
+    assert.equal(restarts, 0);
+    // This folder's own server: asked to restart, and it takes the copy.
+    rmSync(dataDir, { recursive: true, force: true });
+    serving = dataDir;
+    assert.match(await putInPlace(dataDir, port), /restarted on the pulled map/);
+    assert.equal(restarts, 1);
+  } finally {
+    server.close();
+    rmSync(dir, { recursive: true, force: true });
   }
 });

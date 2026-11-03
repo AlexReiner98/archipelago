@@ -1,6 +1,7 @@
 // A field's value checked against its definition: what a pack file says a field holds.
 
 import type { FieldDef } from './packs.ts';
+import { cssProblem } from './css-check.ts';
 import { LARGE, sizeOf } from './head.ts';
 
 /** What is wrong with a value for a field, or nothing. */
@@ -9,7 +10,9 @@ export function checkValue(field: FieldDef, value: unknown): string | undefined 
   if (!field.large && sizeOf(value) > LARGE) return `is too large (${sizeOf(value)} characters; a field holds ${LARGE} at most, unless it is a system item's declared large)`;
   switch (field.type) {
     case 'string':
-      return typeof value === 'string' ? undefined : 'must be a string';
+      if (typeof value !== 'string') return 'must be a string';
+      // A published page's stylesheet, refused here by the rules the page reads it by, so a page never meets one it would drop.
+      return field.css && cssProblem(value, true) ? `is a stylesheet a page refuses: ${cssProblem(value, true)}` : undefined;
     case 'number':
       return typeof value === 'number' && Number.isFinite(value) ? undefined : 'must be a number';
     case 'boolean':

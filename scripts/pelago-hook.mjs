@@ -57,8 +57,11 @@ const token = process.env.PELAGO_AGENT_TOKEN || process.env.LATTICE_AGENT_TOKEN;
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
 
-// The map's tools, as the setup names their server (pelago; lattice before it), and an item's id.
+// The map's tools, as the setup names their server (pelago; lattice before it), and an item's id. A session may be
+// connected to other workspaces too, each its own server named after this one (pelago-site): what the reply read,
+// changed or told there counts for what it did, while the items it named there are not this map's to ask about.
 const MAP_TOOL = /^mcp__(pelago|lattice)__/;
+const ANY_MAP_TOOL = /^mcp__(pelago|lattice)([-_][\w-]*?)?__/;
 const ITEM = /\be_[a-z0-9]{8}\b/g;
 // A git command, past the options that come before its subcommand (git -C dir commit, git -c a=b push).
 const GIT = (sub) => new RegExp(String.raw`(^|[\s;&|(])git(\s+(-[Cc]\s+("[^"]*"|'[^']*'|\S+)|--?[\w-]+(=\S+)?))*\s+` + sub + String.raw`(?![\w-])`);
@@ -102,7 +105,7 @@ function readTranscript(text) {
     for (const id of JSON.stringify(said ?? '').match(ITEM) ?? []) touched.add(id);
   };
   for (const line of text.split('\n')) {
-    const calls = line.includes('"mcp__pelago__') || line.includes('"mcp__lattice__');
+    const calls = line.includes('"mcp__pelago') || line.includes('"mcp__lattice');
     const answered = (changes.size > 0 || committing.size > 0) && line.includes('"tool_result"');
     const asked = line.includes('"user"') && !line.includes('"tool_result"');
     if (line.includes('"custom-title"') || line.includes('"ai-title"')) {
@@ -129,12 +132,14 @@ function readTranscript(text) {
         if (part.type === 'tool_use' && MAP_TOOL.test(part.name ?? '')) {
           named(part.input);
           if (part.name.endsWith('__change')) changes.add(part.id);
+        }
+        if (part.type === 'tool_use' && ANY_MAP_TOOL.test(part.name ?? '')) {
           const told = part.name.endsWith('__report') && part.input?.action;
           const did = part.name.endsWith('__query') ? 'read' : part.name.endsWith('__change') ? 'changed' : told === 'show' ? 'showed' : told === 'tell' ? 'told' : undefined;
           if (did) reply[did] = (reply[did] ?? 0) + 1;
           if (did === 'read' && typeof part.input?.name === 'string' && !NOT_SURVEYS.has(part.input.name)) reply.surveyed = (reply.surveyed ?? 0) + 1;
         }
-        if (part.type === 'tool_use' && !MAP_TOOL.test(part.name ?? '')) reply.worked = (reply.worked ?? 0) + 1;
+        if (part.type === 'tool_use' && !ANY_MAP_TOOL.test(part.name ?? '')) reply.worked = (reply.worked ?? 0) + 1;
         if (part.type === 'tool_use' && EDITS.has(part.name)) reply.edited = (reply.edited ?? 0) + 1;
         if (part.type === 'tool_use' && part.name === 'Bash' && typeof part.input?.command === 'string') {
           if (COMMIT.test(part.input.command)) (reply.committed = (reply.committed ?? 0) + 1), committing.add(part.id), running.set(part.id, { from: Date.parse(entry.timestamp), turn: turns });

@@ -2,7 +2,7 @@ import { api, h, withIds } from './base.js';
 import { replicate } from './live.js';
 import { unfollow } from './replica.js';
 import { drawWith, layouts, warmLayouts } from './layout.js';
-import { dress } from './query-base.js';
+import { dress, layered } from './query-base.js';
 import { drawList } from './list.js';
 import { drawCode } from './style-code.js';
 import { saidDrawn } from './look.js';
@@ -234,7 +234,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
       return saidDrawn(body, 'empty');
     }
     for (const name of Object.keys(chosen)) delete chosen[name];
-    Object.assign(chosen, look.style, keptStyle(key), style, { noLit: true });
+    Object.assign(chosen, layered(look.style, keptStyle(key), style), { noLit: true });
     dress(body, chosen);
     const drawn = chosen.drawing && (chosen.drawing.shape ?? chosen.shape) === chosen.shape;
     const coded = typeof chosen.code === 'string' && chosen.code.trim();

@@ -27,13 +27,21 @@ export function drawCode(host, answer, style, keep, _place, coder) {
   const colours = () => Object.fromEntries(STYLE_COLORS.map((name) => [name, getComputedStyle(host).getPropertyValue(`--ln-${name}`).trim()]));
   if (host.coded) window.removeEventListener('message', host.coded.hear);
   const run = (host.coded = { code, fields: JSON.stringify(fields), data, frame: undefined, hear: undefined });
-  const draw = () => {
+  const shown = (said) => ((error.textContent = said), (error.title = said), (error.hidden = false), saidDrawn(host, 'error', said));
+  const draw = (tries = 0) => {
     error.hidden = true;
     run.frame = h('iframe', { class: 'lens-frame', sandbox: frameSandbox(), src: '/draw.html', title: 'The map, drawn by this style' });
     stage.replaceChildren(run.frame);
-    // A frame that never says it is ready was not let in by the browser: say so, not a blank.
+    // A frame not ready in a while (a page reloading is busy) is put up again, twice; one that is still not ready was not
+    // let in by the browser: say so, not a blank. Waited for while the page is hidden, since the browser holds it back then.
     const mine = run.frame;
-    setTimeout(() => mine === run.frame && !mine.ready && host.isConnected && ((error.textContent = 'This style has code of its own, and the browser did not start the frame it runs in.'), (error.hidden = false), saidDrawn(host, 'error', error.textContent)), 5000);
+    const check = () => {
+      if (mine !== run.frame || mine.ready || !host.isConnected) return;
+      if (document.hidden) return void setTimeout(check, 5000);
+      if (tries < 2) return draw(tries + 1);
+      shown('This style has code of its own, and the browser did not start the frame it runs in.');
+    };
+    setTimeout(check, 5000);
   };
   // What the drawing asked for, sent as the person looking; what came of it goes back to the drawing, and nothing else.
   const ask = async (said) => {
@@ -55,21 +63,21 @@ export function drawCode(host, answer, style, keep, _place, coder) {
     if (ev.source !== run.frame?.contentWindow) return;
     const said = ev.data ?? {};
     // The frame has no origin to name, so it is spoken to by its window alone; what goes in is only what it is to draw.
-    if (said.type === 'ready') run.frame.ready = true;
+    if (said.type === 'ready') ((run.frame.ready = true), (error.hidden = true));
     if (said.type === 'ready') run.frame.contentWindow.postMessage({ type: 'draw', code, answer: run.data, style: fields, theme: { ...colours(), dark: matchMedia('(prefers-color-scheme: dark)').matches } }, '*');
-    // Its code has returned and its worker painted: the view has drawn (ui/look.js).
-    else if (said.type === 'drew') saidDrawn(host, 'drawn');
+    // Its code has returned and its worker painted: the view has drawn (ui/look.js), and what was said before is past.
+    else if (said.type === 'drew') ((error.hidden = true), saidDrawn(host, 'drawn'));
     // It may ask for an item's page and nothing else: an id is the only address taken from it.
     else if (said.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) location.hash = `#/e/${said.id}`;
     else if (said.type === 'change') ask(said);
     // Its code hears no new answer: drawn again from the start.
     else if (said.type === 'stale') draw();
     // The first thing that went wrong is the one to read: what follows is usually its echo.
-    else if (said.type === 'error' && error.hidden) ((error.textContent =`This style's code stopped: ${String(said.message).slice(0, 300)}`), (error.title = error.textContent), (error.hidden = false), saidDrawn(host, 'error', error.textContent));
+    else if (said.type === 'error' && error.hidden) shown(`This style's code stopped: ${String(said.message).slice(0, 300)}`);
   });
   window.addEventListener('message', hear);
   // A bar only for the switch, when the view offers it.
-  const lit = litSwitch(answer.viewer, style, (change) => (keep(change), Object.assign(fields, change)), draw);
+  const lit = litSwitch(answer.viewer, style, (change) => (keep(change), Object.assign(fields, change)), () => draw());
   host.replaceChildren(...[lit && h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), lit), error, stage].filter(Boolean));
   draw();
 }

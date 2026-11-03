@@ -117,7 +117,7 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
   return {
     task: slim(task),
     part_of: chain.slice(1).map(slim),
-    repo: repo && { ...slim(repo), path: repo.props.path },
+    repo: repo && { ...slim(repo), path: repo.props.path, address: at?.address },
     blocked_by: blockedBy,
     root_blockers: roots.map((id) => names.get(id)),
     needs: needs.map((n) => ({ ...slim(n), exclusive: l.registry.capacity(n) !== Infinity, held_by: held.find((h) => h.to_id === n.id)?.title })),

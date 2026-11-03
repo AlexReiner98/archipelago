@@ -30,6 +30,9 @@ const SETTINGS: Record<string, Record<string, unknown>> = {
   hold: { agent_changes: 'hold' },
   code: { agent_code: true },
   'apply+code': { agent_changes: 'apply', agent_code: true },
+  // Holds off (the owner, 3 Nov 2026, e_66mwta3w): whatever a rule holds applies; asked and propose-only still wait.
+  off: { holds_off: true },
+  'hold+off': { agent_changes: 'hold', holds_off: true },
 };
 
 /** Who sends it: a person, an agent, an agent asking for a look, an agent whose token only proposes, a report's reading. */
@@ -94,6 +97,7 @@ const CASES: Record<string, Case> = {
   'restore task': { given: [task()], ops: (i) => [{ op: 'restore', id: i.t }] },
   'merge tasks': { given: [task(), task('u')], ops: (i) => [{ op: 'merge', keep: i.t, drop: i.u }] },
   'merge styles': { given: [style(), style('z')], ops: (i) => [{ op: 'merge', keep: i.s, drop: i.z }] },
+  'forget task': { given: [task()], ops: (i) => [{ op: 'forget', id: i.t }] },
   'define type': { ops: () => [{ op: 'define_type', type: { id: 'local.thing', title: 'Thing', description: 'A thing.', extends: 'work' } }] },
 };
 

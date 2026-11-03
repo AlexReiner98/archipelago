@@ -92,9 +92,11 @@ test('a picture with steps is sent them, and the finished parts they name, whate
   assert.deepEqual(answer.steps, steps);
   assert.ok(answer.items.some((i) => i.id === made.o && !i.open), 'the retired part is sent');
   assert.ok(answer.links.some((k) => k.from === made.a && k.to === made.o), 'and its wire');
-  // Steps that cannot be read say why.
+  // Steps that cannot be read are not played, and the picture says why beside them.
   await make(l, [{ op: 'update', id: made.l, props: { steps: [{ add: 'all of it' }] } }]);
-  await assert.rejects(keptPicture(l, made.l), /add and remove are lists of ids/);
+  const wrong = await keptPicture(l, made.l);
+  assert.equal(wrong.steps, undefined);
+  assert.match(wrong.steps_wrong ?? '', /add and remove are lists of ids/);
 });
 
 test('a published picture keeps its steps, naming only what it shows', () => {

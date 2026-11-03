@@ -8,7 +8,7 @@
 
 import { flatRead, fromBefore, LENS_LIMIT } from './query-flat.ts';
 import { keptOf } from './query-kept.ts';
-import { readSteps, stepIds } from './query-steps.ts';
+import { stepIds, stepsWrong, type Step } from './query-steps.ts';
 import type { Fact } from './log.ts';
 import type { Archipelago } from './pelago.ts';
 import { drawn, ownStyle, styleFor } from './styles.ts';
@@ -46,7 +46,9 @@ export async function keptPicture(l: Archipelago, id: string, have?: unknown) {
   const { style } = await styleFor(l, await keptOf(l, 'style', named), { own: ownStyle(own), ...(named && { named }) });
   const lens = viewQuery(item.props);
   let answer = await flatRead(l, lens);
-  const steps = item.props.steps === undefined ? undefined : readSteps(item.props.steps);
+  // Steps that no longer pass are not played, and what is wrong is said beside the picture: a read never refuses.
+  const wrong = item.props.steps === undefined ? undefined : stepsWrong(item.props.steps);
+  const steps = item.props.steps === undefined || wrong ? undefined : (item.props.steps as Step[]);
   const told = stepIds(item.props.steps).filter((id) => !answer.items.some((i) => i.id === id));
   // What a step names that was left out: read again with it, leaving nothing out but what was not sent, so the links among them all come too.
   if (told.length) answer = { ...(await flatRead(l, { filter: { find: [...answer.items.map((i) => i.id), ...told].map((id) => `id ${id}`), not: [] }, limit: Math.min(answer.items.length + told.length, LENS_LIMIT) })), lens: answer.lens };
@@ -56,7 +58,7 @@ export async function keptPicture(l: Archipelago, id: string, have?: unknown) {
   // Or what it draws what is in: the items it finds in or is narrowed within, and the ends of its link terms.
   const ends = [...list((lens.filter as Props).find), ...list((lens.filter as Props).only)].filter((t) => !/^(id|text|type|kind) /.test(t)).map((t) => t.split(/\s+/).slice(1).join(' '));
   const from = rows.map((r) => r.to_id).find((x) => ids.includes(x) || ends.includes(x)) ?? (ids.length === 1 ? ids[0] : undefined);
-  return { ...answer, lens: { ...answer.lens, ...(from && { from }) }, ...(steps && { steps }), style: await drawn(l, style, have ?? []) };
+  return { ...answer, lens: { ...answer.lens, ...(from && { from }) }, ...(steps && { steps }), ...(wrong && { steps_wrong: wrong }), style: await drawn(l, style, have ?? []) };
 }
 
 /**
@@ -64,14 +66,15 @@ export async function keptPicture(l: Archipelago, id: string, have?: unknown) {
  * the documents that bring the view in. The way back from an item to the picture it was reached from.
  */
 export async function shownIn(l: Archipelago, id: string, trail: { id: string; title: string; views: { id: string; title: string }[] }[]) {
-  const shown: { id: string; title: string; of: { id: string; title: string }; documents: { id: string; type: string; title: string }[] }[] = [];
+  const shown: { id: string; title: string; of: { id: string; title: string }; documents: { id: string; type: string; title: string }[]; steps_wrong?: string }[] = [];
   for (const step of trail)
     for (const view of step.views) {
       const item = await l.entity(view.id);
-      const answer = item && (await flatRead(l, viewQuery(item.props)).catch(() => undefined));
-      if (!answer?.items.some((one) => one.id === id)) continue;
+      const answer = item && (await Promise.resolve(item.props).then((props) => flatRead(l, viewQuery(props))).catch(() => undefined));
+      if (!item || !answer?.items.some((one) => one.id === id)) continue;
       const documents = (await l.mentionedIn(view.id)).filter((m) => bringersIn(l).includes(m.type)).map((m) => ({ id: m.id, type: m.type, title: m.title }));
-      shown.push({ id: view.id, title: view.title, of: { id: step.id, title: step.title }, documents });
+      const wrong = item.props.steps === undefined ? undefined : stepsWrong(item.props.steps);
+      shown.push({ id: view.id, title: view.title, of: { id: step.id, title: step.title }, documents, ...(wrong && { steps_wrong: wrong }) });
     }
   return shown;
 }

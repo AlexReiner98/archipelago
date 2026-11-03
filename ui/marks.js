@@ -9,6 +9,7 @@
 // whatever drew them. Two tags are the page's own, made from an item's id alone: `reader`, a document as its reader
 // meets it (ui/reader-frame.js), and `view`, a kept view drawn as it is kept (ui/view-frame.js).
 
+import { cssProblem, uncommented } from './css-check.js';
 import { readerFrame } from './reader-frame.js';
 import { viewFrame } from './view-frame.js';
 
@@ -139,17 +140,11 @@ export function cssFor(id, text) {
 }
 
 /**
- * A stylesheet as a drawing or a published page may say it, comments taken out: refused if it could fetch anything
- * or reach out of where it is read. A page's (`page`) may look at what a part holds (:has), which a drawing may not:
- * that is how a drawing would reach past its host.
+ * A stylesheet as a drawing or a published page (`page`) may say it, comments taken out: refused if it could fetch
+ * anything or reach out of where it is read, by the rules the server checks page_css by on write (src/css-check.ts).
  */
 export function checkedCss(text, page = false) {
-  const css = String(text ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
-  const refused = [/[\\"'&<]/, /@(import|font-face|namespace|property|keyframes|layer|page|scope|charset)/i, page ? /url\(|image-set\(|:host|:root|expression\(/i : /url\(|image-set\(|:has\(|:host|:root|expression\(/i, /(^|[{};,])\s*[~+>]/];
-  const bad = refused.find((re) => re.test(css));
-  if (bad) fail(`a stylesheet with ${bad}`);
-  let depth = 0;
-  for (const c of css) if ((depth += c === '{' ? 1 : c === '}' ? -1 : 0) < 0) fail('a stylesheet that closes more than it opens');
-  if (depth) fail('a stylesheet that does not close what it opens');
-  return css;
+  const problem = cssProblem(text, page);
+  if (problem) fail(`a stylesheet with ${problem}`);
+  return uncommented(text);
 }
