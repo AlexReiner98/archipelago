@@ -76,6 +76,7 @@ hooks.land = (step) => {
     const split = () => openPane(at, to.split.side, t.groups.at(-1), { by: session, ...(to.split.slot && { slot: to.split.slot }), ...(!to.split.slot && t.follows !== session && { held: session }) }, t);
     // Not a canvas (a screen, the workspace): the page opens over the tab's pane in focus.
     if (!drawable(at)) {
+      if (to.front) toFront(t.id);
       if (t.id === tabs.front) location.hash = `#/${at}`;
       else ((t.sheet = at.split('?')[0]), keep(), arrived(t.id));
       return;

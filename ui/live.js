@@ -61,8 +61,11 @@ export function follow(steps = []) {
   for (const s of fresh) if (s.rests && s.run) hooks.sessionRested?.(s.run);
   // A chat renamed is named anew on its tab.
   if (fresh.some((s) => s.did === 'titled')) hooks.drawStrip?.();
-  // A later show takes the place of what waits, and its tab of its own, if it was owed one, stays owed.
-  for (const s of fresh) if (s.kind === 'show' && s.hash) waiting.set(sessionOf(s), { ...s, opens: s.opens || waiting.get(sessionOf(s))?.opens });
+  // A later show takes the place of what waits, and its tab of its own, if it was owed one, stays owed; so does its tab brought into sight.
+  for (const s of fresh) if (s.kind === 'show' && s.hash) {
+    const was = waiting.get(sessionOf(s));
+    waiting.set(sessionOf(s), { ...s, opens: s.opens || was?.opens, focus: s.focus || was?.focus });
+  }
   if (!hooks.land || document.querySelector('dialog[open]')) return;
   // One the reader is busy where it would land stays, and is tried again at the next look.
   for (const [session, s] of waiting) if (hooks.land(s) !== 'later') waiting.delete(session);

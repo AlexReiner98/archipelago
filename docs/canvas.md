@@ -324,7 +324,9 @@ out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
   in a tab that follows the session alone every pane is its own. A page that
   is not a canvas opens over a pane only there, else in a tab of its own;
 - no tab is brought into sight: a show into a tab out of sight is drawn
-  there and its mark rings (e_xjrpyysn);
+  there and its mark rings (e_xjrpyysn). Only a show with `focus`, sent
+  when the reader asked to be taken there, brings its tab into sight (the
+  owner, 3 Nov 2026, e_gt2rfab4);
 - a pane the reader is busy in (`pane-busy.js`: a press, scroll or key there
   in the last twenty seconds, text selected there, or words typed in the
   sheet and not saved; moving the pointer or turning a dial is not busy) is
