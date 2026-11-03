@@ -6,7 +6,7 @@
 import { authorizePage } from './authorize.js';
 import { SignInNeeded, h, hooks, join, main, part, showIdentity, signIn, state, store } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
-import { mayLeave, newItem } from './draft.js';
+import { mayLeave, newItem, unsaved } from './draft.js';
 import { drawFind } from './find.js';
 import { signupPage, welcome } from './signup.js';
 import { home } from './home.js';
@@ -102,6 +102,10 @@ window.addEventListener('hashchange', async () => {
   if (!(await mayLeave())) return void ((back = true), (location.hash = at));
   at = location.hash;
   route();
+});
+// Nor lost to a reload or a closed tab: the browser asks, in its own words.
+window.addEventListener('beforeunload', (e) => {
+  if (unsaved()) (e.preventDefault(), (e.returnValue = ''));
 });
 
 route();
