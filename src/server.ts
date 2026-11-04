@@ -44,7 +44,7 @@ import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from './control-index.ts';
 import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { setReach } from './pack-reach.ts'; import './agent-run.ts';
 import { pgLeader, soleLeader, type Leader } from './leader.ts'; import { drained } from './drain.ts';
-import { serverDuties } from './duties.ts'; import { onSitePage } from './visits.ts';
+import { serverDuties } from './duties.ts'; import { keepVisits, onSitePage } from './visits.ts';
 import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
 import { servePublic } from './public-route.ts'; import { serveSite, siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
@@ -474,12 +474,14 @@ If that process is not a pelago server, delete ${lock}.`);
   let idle: ReturnType<typeof setInterval> | undefined;
   let leader: Leader | undefined;
   let stopDuties = () => {};
+  const stopVisits = keepVisits((id) => workspaces.get(id)); // the visits counted, written down each minute and on the way down
   const stop = async (code = 0) => {
     stopDuties();
     clearInterval(idle);
     await leader?.stop();
     stopAllLaunched();
     await drained(server, config.dev ? 1_000 : undefined); // the requests in hand answered before their databases close (src/drain.ts)
+    await stopVisits();
     await workspaces.closeAll();
     rmSync(lock, { force: true });
     process.exit(code);

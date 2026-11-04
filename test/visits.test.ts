@@ -4,7 +4,9 @@
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import { test } from 'node:test';
-import { dayOf, heldVisits, isVisit } from '../src/visits.ts';
+import { opEntries } from '../src/streams.ts';
+import { countVisit, dayOf, flushVisits, heldVisits, isVisit, keepVisits, visitsSince } from '../src/visits.ts';
+import { fresh } from './map.ts';
 import { serve } from './serve.ts';
 
 const BROWSER = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
@@ -52,4 +54,57 @@ test('a page read with a tag is counted once, under its tag; its data, figures, 
   await visit(base, '/', { referer: 'https://visits.test/other' });
   await visit(base, '/', {});
   assert.deepEqual(heldVisits('default').map((r) => r.tag).sort(), ['x', 'ycombinator'], 'no tag, no count');
+});
+
+test('the counts are written down each minute in the visits stream, adding to the day, and read after a position', async () => {
+  const l = await fresh();
+  // Every workspace that counted is written down: this one to its own map, the others (the tests above) apart.
+  const others = await fresh();
+  const open = async (ws: string) => ({ pelago: ws === 'flushed' ? l : others });
+  countVisit('flushed', 'x', '2026-11-04');
+  countVisit('flushed', 'x', '2026-11-04');
+  countVisit('flushed', 'y', '2026-11-04');
+  await flushVisits(open);
+  const first = await opEntries(l.db, 'visits');
+  assert.equal(first.length, 1, 'a flush appends one entry');
+  assert.equal(first[0].rule, 'visits');
+  assert.deepEqual(first[0].facts, [['+', 'tag:x', '2026-11-04', 2], ['+', 'tag:y', '2026-11-04', 1]]);
+  assert.deepEqual(heldVisits('flushed'), [], 'what is written down leaves memory');
+  await flushVisits(open);
+  assert.equal((await opEntries(l.db, 'visits')).length, 1, 'nothing counted, nothing appended');
+
+  countVisit('flushed', 'x', '2026-11-04');
+  countVisit('flushed', 'x', '2026-11-05');
+  await flushVisits(open);
+  const all = await visitsSince(l);
+  assert.deepEqual(all.counts, [{ tag: 'x', day: '2026-11-04', n: 3 }, { tag: 'y', day: '2026-11-04', n: 1 }, { tag: 'x', day: '2026-11-05', n: 1 }], 'two flushes in a day sum');
+  const later = await visitsSince(l, first[0].pos);
+  assert.deepEqual(later.counts, [{ tag: 'x', day: '2026-11-04', n: 1 }, { tag: 'x', day: '2026-11-05', n: 1 }], 'after a position, only what was added since');
+  assert.equal(later.pos, all.pos);
+  assert.deepEqual(await visitsSince(l, all.pos), { counts: [], pos: all.pos });
+
+  // What has not been written down when the server stops is written down on the way; a crash loses that minute only.
+  countVisit('flushed', 'z', '2026-11-05');
+  await keepVisits(open, 3_600_000)();
+  assert.deepEqual((await visitsSince(l, all.pos)).counts, [{ tag: 'z', day: '2026-11-05', n: 1 }]);
+});
+
+test('a tag that reads like an item id is written down as a tag, in the clear', async () => {
+  const l = await fresh();
+  const others = await fresh();
+  countVisit('ids', 'e_abcdefgh', '2026-11-04');
+  await flushVisits(async (ws) => ({ pelago: ws === 'ids' ? l : others }));
+  assert.deepEqual((await opEntries(l.db, 'visits'))[0].facts, [['+', 'tag:e_abcdefgh', '2026-11-04', 1]]);
+});
+
+test('a failed write keeps the counts for the next minute', async () => {
+  countVisit('fails', 'x', '2026-11-04', 2);
+  const was = console.error;
+  console.error = () => {};
+  try {
+    await flushVisits(async () => { throw new Error('closed'); });
+  } finally {
+    console.error = was;
+  }
+  assert.deepEqual(heldVisits('fails'), [{ tag: 'x', day: '2026-11-04', n: 2 }]);
 });
