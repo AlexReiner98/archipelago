@@ -34,8 +34,9 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
   // canvas pack's preset over it (packs/canvas), which draws it as a flow.
   const house = { id: 'core.house', title: 'House style', preset: 'core.house' };
   const canvas = { id: 'canvas.house', title: 'Canvas', preset: 'canvas.house' };
-  // The colours the work and software packs add to every page's, worked out from the house style's, and the plan pack's lengths.
+  // The marks of a session's state, the colours the work and software packs add to every page's, worked out from the house style's, and the plan pack's lengths.
   const added = [
+    { id: 'core.sessions_look', title: "A session's state", preset: 'core.sessions_look' },
     { id: 'work.reader_colours', title: "A document's colours", preset: 'work.reader_colours' },
     { id: 'software.public_colours', title: "A product's public page colours", preset: 'software.public_colours' },
     { id: 'plan.meters_look', title: "The usage meters' lengths", preset: 'plan.meters_look' },
