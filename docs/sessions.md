@@ -80,16 +80,18 @@ and the time now. The first that holds:
 
 1. `done`: the run is closed.
 2. `waiting`: a `wait.start` with no `wait.end` (`for` says which).
-3. `blocked`: the run is `waiting` on a resource, or works on an item with an
-   open `depends_on`.
+3. `blocked`: it works on an item with an open `depends_on`. A run's status
+   `waiting` is not it: a chat's run waits once its agent says it is done.
 4. `quiet`: its latest turn is open and nothing has come for 30 minutes (a
    style's number, `quiet_after`): a turn under way gone silent, likely dead.
    A turn that ended is waiting on its person and is never quiet.
-5. `working`: its latest turn is open.
+5. `working`: its latest turn is open; for a run that has sent no events
+   yet (its checkout's hook is older), its heartbeat says `busy`.
 6. `your_move`: its latest turn ended `asked`, `stopped` or `failed`.
 7. `idle`: its latest turn ended `done`.
 
-Its line: what its open wait is for, else the question its latest turn
+A beat a rule asked for (`asked`) is not the session's own and is never its
+line. Its line: what its open wait is for, else the question its latest turn
 asked, else its latest beat, else what its latest turn was asked to do (its
 gist), else the title of what it works on (drawn beside it, so the last
 resort).
