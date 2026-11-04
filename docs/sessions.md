@@ -102,3 +102,38 @@ title of what it works on.
 
 A change to this vocabulary is made here first, and said to every task that
 reads it.
+
+## Claude Code's telemetry
+
+Claude Code can export OpenTelemetry metrics and log events (from its
+monitoring docs, read 3 Nov 2026). The adapter does not use it: every job it
+does, a hook already does, without a collector on each machine.
+
+- **What it carries.** Events `claude_code.user_prompt` (`prompt_length`,
+  `prompt`), `tool_result` (`tool_name`, `tool_use_id`, `success`,
+  `duration_ms`, `error`), `api_request` (`model`, `cost_usd`, tokens by
+  kind), `api_error`, `tool_decision` (accept or reject, and its `source`),
+  and more; metrics for sessions, lines changed, commits, pull requests, cost,
+  tokens and active time. Every event has `session.id` and `prompt.id`, the
+  same id hooks are given as `prompt_id`.
+- **What it keeps back.** Prompt text is redacted unless
+  `OTEL_LOG_USER_PROMPTS=1`; tool inputs and commands unless
+  `OTEL_LOG_TOOL_DETAILS=1`; replies unless `OTEL_LOG_ASSISTANT_RESPONSES`.
+- **How it is turned on.** `CLAUDE_CODE_ENABLE_TELEMETRY=1` and an exporter
+  (`OTEL_LOGS_EXPORTER=otlp`, `OTEL_EXPORTER_OTLP_ENDPOINT`) in the
+  environment Claude Code is started with; a project's settings cannot set
+  the exporter. Logs are sent every 5 seconds.
+- **Where it would do better.** Cost in dollars, time per tool and how a
+  permission was decided, which no hook says. Worth taking only if the map
+  wants those: it would need an OTLP route and the owner to set the
+  environment on each machine.
+
+How the hooks feed the vocabulary: a turn is named by the hook's `prompt_id`
+(`promptId` on the transcript's lines); `turn.start` is told on
+UserPromptSubmit, `session.start` and `session.end` on SessionStart and
+SessionEnd; `tool.end`, `test.run` and `commit` are read off the transcript at
+Stop, and again at the next prompt for a turn stopped (which hears no Stop),
+with its `turn.end` `stopped`; `wait.start` on Notification (a permission
+prompt or a question to answer, not the idle reminder), `wait.end` at the next
+tool, prompt or Stop; `turn.end` `failed` on StopFailure. A Stop the server
+answers with a block has no `turn.end`: the reply goes on.

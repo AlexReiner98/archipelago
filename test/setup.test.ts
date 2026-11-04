@@ -67,7 +67,7 @@ test('the setup shows what it will change and waits for a yes, keeps a copy of w
   assert.ok(!done.out.includes('lat_default_secret'));
   for (const path of Object.keys(theirs)) assert.equal(file(`${path}.pelago-backup`), theirs[path as keyof typeof theirs], `${path} is copied as it was`);
   assert.ok(JSON.parse(file('.mcp.json')).mcpServers.pelago && JSON.parse(file('.mcp.json')).mcpServers.other);
-  assert.deepEqual(Object.keys(JSON.parse(file('.claude/pelago-setup.json')).files).sort(), ['.claude/pelago-hook.mjs', '.claude/pelago.md', '.claude/skills/pelago-bump/SKILL.md', '.claude/skills/pelago-bump/references/home.md']);
+  assert.deepEqual(Object.keys(JSON.parse(file('.claude/pelago-setup.json')).files).sort(), ['.claude/pelago-events.mjs', '.claude/pelago-hook.mjs', '.claude/pelago.md', '.claude/skills/pelago-bump/SKILL.md', '.claude/skills/pelago-bump/references/home.md']);
 
   // Later, with nobody to ask: what Archipelago wrote is brought up to date; what is theirs is left, and said.
   writeFileSync(at('.claude/pelago.md'), 'rules as an older server handed them out\n');

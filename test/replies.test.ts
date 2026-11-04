@@ -116,7 +116,7 @@ test('the hook counts what the reply did since the owner’s last message', asyn
   const server = createServer((req, res) => {
     let body = '';
     req.on('data', (d) => (body += d));
-    req.on('end', () => ((got = JSON.parse(body)), res.end(JSON.stringify({ decision: 'block', reason: 'asked' }))));
+    req.on('end', () => (req.url === '/hooks/events' ? res.end('{}') : ((got = JSON.parse(body)), res.end(JSON.stringify({ decision: 'block', reason: 'asked' })))));
   });
   await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
   const port = (server.address() as { port: number }).port;

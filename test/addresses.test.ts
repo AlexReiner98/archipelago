@@ -18,7 +18,7 @@ test('the hook says which repository a session is in without the name and passwo
     let body = '';
     req.on('data', (d) => (body += d));
     req.on('end', () => {
-      heard.push(JSON.parse(body));
+      if (req.url !== '/hooks/events') heard.push(JSON.parse(body));
       res.writeHead(200, { 'content-type': 'application/json' }).end('{}');
     });
   });

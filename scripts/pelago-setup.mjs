@@ -7,7 +7,8 @@
 //
 //   .mcp.json                         the pelago tools, for Claude Code
 //   .claude/pelago-hook.mjs          tells Archipelago a session started, was prompted, ended
-//   .claude/settings.json             the five hooks that run it
+//   .claude/pelago-events.mjs        what the hook reads a session's events from (docs/sessions.md)
+//   .claude/settings.json             the hooks that run it
 //   .claude/skills/pelago-bump/      how to record friction with Archipelago
 //   .claude/pelago.md                how to work with the map, read through CLAUDE.md
 //   .claude/pelago-setup.json        what the setup wrote, so it can be taken out again
@@ -55,8 +56,9 @@ const copied = (file) => existsSync(file + COPY) || existsSync(file + '.lattice-
 const MANIFEST = '.claude/pelago-setup.json';
 const HOOK = '.claude/pelago-hook.mjs';
 const RULES = '.claude/pelago.md';
+const EVENTS = '.claude/pelago-events.mjs';
 // The files that are Archipelago's own, whole: written by the setup and replaced by it when the server's change.
-const OWN = { [HOOK]: FILES.hook, '.claude/skills/pelago-bump/SKILL.md': FILES.skill, '.claude/skills/pelago-bump/references/home.md': FILES.home, [RULES]: FILES.rules };
+const OWN = { [HOOK]: FILES.hook, [EVENTS]: FILES.events, '.claude/skills/pelago-bump/SKILL.md': FILES.skill, '.claude/skills/pelago-bump/references/home.md': FILES.home, [RULES]: FILES.rules };
 const SECTION = /(^|\n+)## (Archipelago|Lattice)\n\nThis project's work is kept in \2 \([^)\n]*\)\. How to work with it:\n\n@\.claude\/(pelago|lattice)\.md\n*$/;
 const section = `## Archipelago\n\nThis project's work is kept in Archipelago (${ORIGIN}). How to work with it:\n\n@${RULES}\n`;
 // The same things as a setup wrote them while this was called Lattice.
@@ -81,7 +83,7 @@ exit 0
 // .worktreeinclude names. Without them a session there has no hooks, so no run, and its commits name none.
 const INCLUDE = '.worktreeinclude';
 const INCLUDE_MARK = "# Archipelago's setup: what it wrote, for each worktree Claude Code makes";
-const CARRIED = ['.mcp.json', '.claude/settings.json', HOOK, RULES, '.claude/skills/pelago-bump/references/home.md'];
+const CARRIED = ['.mcp.json', '.claude/settings.json', HOOK, EVENTS, RULES, '.claude/skills/pelago-bump/references/home.md'];
 /** A .worktreeinclude without the setup's lines in it. */
 const withoutCarried = (text) => {
   const lines = text.split('\n');
@@ -190,16 +192,19 @@ function connect() {
   settings.hooks ??= {};
   // Claude Code gives a SessionEnd hook a second and a half unless it asks for more, too little to read the
   // session's record and its checkout before it says so: it asks for half a minute.
-  for (const [event, name, matcher, timeout] of [['SessionStart', 'session-start', 'startup|resume|clear'], ['UserPromptSubmit', 'prompt'], ['Stop', 'stop'], ['SessionEnd', 'session-end', undefined, 30], ['PostToolUse', 'file-used', 'Read|Edit|Write|MultiEdit|NotebookEdit']]) {
+  // A wait asked for (Notification), a turn ended in an error (StopFailure) and a tool that ran once a wait was
+  // answered (tool-used) only tell events; tool-used runs after every tool, so it runs beside the session (async).
+  for (const [event, name, matcher, timeout, async] of [['SessionStart', 'session-start', 'startup|resume|clear'], ['UserPromptSubmit', 'prompt'], ['Stop', 'stop'], ['SessionEnd', 'session-end', undefined, 30], ['PostToolUse', 'file-used', 'Read|Edit|Write|MultiEdit|NotebookEdit'], ['Notification', 'notification'], ['StopFailure', 'stop-failure'], ['PostToolUse', 'tool-used', undefined, 10, true]]) {
     const list = (settings.hooks[event] ??= []);
     const command = `node ${HOOK} ${name}`;
+    const named = (hook) => typeof hook.command === 'string' && ourHook.test(hook.command) && hook.command.trim().endsWith(` ${name}`);
     // A hook registered at another place (an older setup, or Archipelago's own repository running the script it
     // hands out) is pointed at the one written here: the other does not say which hand-out it is.
-    for (const entry of list) for (const hook of entry.hooks ?? []) if (typeof hook.command === 'string' && ourHook.test(hook.command)) Object.assign(hook, { command }, timeout && { timeout });
-    if (ourHook.test(JSON.stringify(list))) continue;
-    list.push({ ...(matcher && { matcher }), hooks: [{ type: 'command', command, ...(timeout && { timeout }) }] });
+    for (const entry of list) for (const hook of entry.hooks ?? []) if (named(hook)) Object.assign(hook, { command }, timeout && { timeout }, async && { async });
+    if (list.some((entry) => (entry.hooks ?? []).some(named))) continue;
+    list.push({ ...(matcher && { matcher }), hooks: [{ type: 'command', command, ...(timeout && { timeout }), ...(async && { async }) }] });
   }
-  put('.claude/settings.json', json(settings), { own: settingsOwn, note: settingsOwn ? '' : '(adds five hooks that run the script above)' });
+  put('.claude/settings.json', json(settings), { own: settingsOwn, note: settingsOwn ? '' : '(adds the hooks that run the script above)' });
 
   for (const [path, text] of Object.entries(OWN)) if (path !== HOOK) put(path, text, { own: true });
 
@@ -307,7 +312,7 @@ function remove() {
     }
     if (!Object.keys(settings.hooks).length) delete settings.hooks;
     const empty = !Object.keys(settings).length;
-    take('.claude/settings.json', empty ? null : json(settings), empty ? '(it holds nothing else)' : '(takes the five hooks out)');
+    take('.claude/settings.json', empty ? null : json(settings), empty ? '(it holds nothing else)' : '(takes its hooks out)');
   }
 
   // What the setup wrote is known by the list it left. Without one (a project set up before there was a list),
