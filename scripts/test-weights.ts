@@ -1,7 +1,7 @@
 // The seconds each test file takes, per engine, written to test/weights.json for shard() to deal CI's shards by and
 // for scripts/test.ts to start the heaviest first (test/sets.ts). Run it when sets.test.ts says a shard is over its
 // budget, or when files have come and gone:
-//   node scripts/test-weights.ts ci [run]        from the latest passing run of the tests on main (or that run), with gh
+//   node scripts/test-weights.ts ci [runs]       the middle of the last 5 passing runs of the tests on main (or those runs), with gh
 //   node scripts/test-weights.ts local [files]   each file alone, four at a time, on this machine's engine; with no
 //                                                files, those weights.json does not have yet
 import { spawn, spawnSync } from 'node:child_process';
@@ -29,31 +29,47 @@ function write(next: Weights) {
 }
 
 if (mode === 'ci') {
-  const run = rest[0] ?? gh('run', 'list', '--workflow', 'Tests', '--branch', 'main', '--status', 'success', '--limit', '1', '--json', 'databaseId', '--jq', '.[0].databaseId');
-  if (!run) throw new Error('No passing run of the tests on main');
-  // Each shard's artifact holds { file: seconds } (test/times.ts); the steps on shard 1 are timed from the run's jobs.
-  const into = mkdtempSync(join(tmpdir(), 'pelago-weights-'));
-  try {
-    gh('run', 'download', run, '--pattern', 'times-*', '--dir', into);
-  } catch {} // none kept: said below
-  const files: Weights['files'] = {};
-  for (const dir of readdirSync(into)) {
-    const engine = ENGINES.find((e) => dir.startsWith(`times-${e}-`));
-    const path = join(into, dir, 'times.json');
-    if (!engine || !existsSync(path)) continue;
-    for (const [f, s] of Object.entries(JSON.parse(readFileSync(path, 'utf8')) as Record<string, number>)) (files[f] ??= {})[engine] = s;
-  }
-  rmSync(into, { recursive: true, force: true });
-  if (!Object.keys(files).length) throw new Error(`Run ${run} kept no times: it ran before the shards wrote them`);
-  const jobs: { name: string; steps: { name: string; started_at: string; completed_at: string }[] }[] = JSON.parse(gh('api', `repos/{owner}/{repo}/actions/runs/${run}/jobs?per_page=100`, '--jq', '.jobs'));
-  const steps = Object.fromEntries(
-    ENGINES.map((e) => {
+  // A file's time swings with what runs beside it on the runner (main's run of 4 Nov 2026 took 53-103 s on shards
+  // one run before had made even), so each weight is the middle of its times over the last RUNS passing runs.
+  const RUNS = 5;
+  const runs = rest.length ? rest : gh('run', 'list', '--workflow', 'Tests', '--branch', 'main', '--status', 'success', '--limit', String(RUNS * 2), '--json', 'databaseId', '--jq', '.[].databaseId').split('\n').filter(Boolean);
+  const median = (xs: number[]) => {
+    const s = [...xs].sort((a, b) => a - b);
+    return Math.round(((s[(s.length - 1) >> 1] + s[s.length >> 1]) / 2) * 10) / 10;
+  };
+  const seen: Record<string, Record<string, number[]>> = {};
+  const stepsSeen: Record<string, number[]> = {};
+  const used: string[] = [];
+  const tests = new Set(allTests());
+  for (const run of runs) {
+    if (used.length === RUNS) break;
+    // Each shard's artifact holds { file: seconds } (test/times.ts); the steps on shard 1 are timed from the run's jobs.
+    const into = mkdtempSync(join(tmpdir(), 'pelago-weights-'));
+    try {
+      gh('run', 'download', run, '--pattern', 'times-*', '--dir', into);
+    } catch {} // none kept: skipped below
+    const files: Record<string, Record<string, number>> = {};
+    for (const dir of readdirSync(into)) {
+      const engine = ENGINES.find((e) => dir.startsWith(`times-${e}-`));
+      const path = join(into, dir, 'times.json');
+      if (!engine || !existsSync(path)) continue;
+      for (const [f, s] of Object.entries(JSON.parse(readFileSync(path, 'utf8')) as Record<string, number>)) (files[f] ??= {})[engine] = s;
+    }
+    rmSync(into, { recursive: true, force: true });
+    // A run before test/times.ts timed each file whole kept some under a helper's name (test/approvals.ts): not used.
+    if (!Object.keys(files).length || Object.keys(files).some((f) => !tests.has(f) && f.startsWith('test/') && !f.endsWith('.test.ts'))) continue;
+    for (const [f, w] of Object.entries(files)) for (const [e, s] of Object.entries(w)) ((seen[f] ??= {})[e] ??= []).push(s);
+    const jobs: { name: string; steps: { name: string; started_at: string; completed_at: string }[] }[] = JSON.parse(gh('api', `repos/{owner}/{repo}/actions/runs/${run}/jobs?per_page=100`, '--jq', '.jobs'));
+    for (const e of ENGINES) {
       const first = jobs.find((j) => j.name.startsWith(`${e} (1/`));
-      const seconds = (first?.steps ?? []).filter((s) => FIRST_STEPS.includes(s.name)).reduce((sum, s) => sum + (Date.parse(s.completed_at) - Date.parse(s.started_at)) / 1000, 0);
-      return [e, seconds];
-    }),
-  );
-  console.log(`From run ${run}:`);
+      (stepsSeen[e] ??= []).push((first?.steps ?? []).filter((s) => FIRST_STEPS.includes(s.name)).reduce((sum, s) => sum + (Date.parse(s.completed_at) - Date.parse(s.started_at)) / 1000, 0));
+    }
+    used.push(run);
+  }
+  if (!used.length) throw new Error(`None of runs ${runs.join(', ')} kept whole-file times`);
+  const files: Weights['files'] = Object.fromEntries(Object.entries(seen).map(([f, w]) => [f, Object.fromEntries(Object.entries(w).map(([e, xs]) => [e, median(xs)]))]));
+  const steps = Object.fromEntries(ENGINES.map((e) => [e, median(stepsSeen[e] ?? [0])]));
+  console.log(`The middle of runs ${used.join(', ')}:`);
   write({ files, steps });
 } else if (mode === 'local') {
   const engine = process.env.PELAGO_TEST_DATABASE_URL ? 'postgres' : 'pglite';
