@@ -61,7 +61,8 @@ reply ending, commits accounted for) is `docs/agents.md`.
   only lifts `agent_changes` where the workspace has not chosen, or forbids
   an op. Never decide an approval anywhere else: `test/structure.test.ts`
   refuses it, and `test/approvals.ts` keeps the table of what becomes of
-  each change (checked a server policy per file, in the full run).
+  each change (checked a server policy and part of its settings per file,
+  `approvals-<policy>-<part>.test.ts`, in the full run).
 - **Restart the local server yourself in dev mode.** After changing anything
   under `src/` or `packs/`, run the tests it touches and
   `npm run typecheck`, then restart it and wait for `GET /health`: with `revise` action `restart` if your

@@ -48,10 +48,13 @@ export const SLOW: Record<string, string> = {
   'test/pull.test.ts': 'whole map',
   'test/snapshots.test.ts': 'whole map',
   'test/stats.test.ts': 'whole map',
-  // The approvals table: about 2800 changes, half a minute per policy.
-  'test/approvals.test.ts': 'table',
-  'test/approvals-dev.test.ts': 'table',
-  'test/approvals-mixed.test.ts': 'table',
+  // The approvals table: about 4000 changes, a policy's settings dealt between two files (test/approvals.ts, PARTS).
+  'test/approvals-review-1.test.ts': 'table',
+  'test/approvals-review-2.test.ts': 'table',
+  'test/approvals-dev-1.test.ts': 'table',
+  'test/approvals-dev-2.test.ts': 'table',
+  'test/approvals-mixed-1.test.ts': 'table',
+  'test/approvals-mixed-2.test.ts': 'table',
 };
 
 const walk = (dir: string): string[] =>
