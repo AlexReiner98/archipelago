@@ -160,7 +160,8 @@
       "inverse": "is addressed by",
       "from": ["*"],
       "to": ["issue"],
-      "description": "Work meant to fix or reduce the issue."
+      "offers_close": true,
+      "description": "Work meant to fix or reduce the issue. Closing the work offers to close the issue, while it is open."
     },
     {
       "id": "based_on",

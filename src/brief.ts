@@ -3,6 +3,7 @@
 // from what the brief reads around the task (briefRead): the task, what holds it, and what they link to.
 
 import { commitRule } from './commit-rule.ts';
+import { openTargets } from './close-offer.ts';
 import { blockGraph } from './blocking.ts';
 import { scanAround, type Row } from './region.ts';
 import { whereOf } from './places.ts';
@@ -115,7 +116,7 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
   const named = task.body?.match(/[\w.*-]+(?:\/[\w.*-]+)+|[\w*-]+\.(?:[cm]?[jt]s|json|css|html|md|sql|ya?ml|py|cs)\b/gi) ?? [];
   const bites = (t: (typeof traps)[number]) => !named.length || t.files!.some((g) => named.some((p) => globNames(g, p) || globNames(p, g)));
   if (traps.length) lines.push('', '## Where it bites', ...traps.map((t) => `- ${t.files!.join(', ')}: ${t.title}.${bites(t) ? ` ${t.text}` : ''}`));
-  lines.push('', '## Reporting', `Register with pelago (capture, action session_start, task ${task.id}, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. ${commitRule(task.id)}`);
+  lines.push('', '## Reporting', `Register with pelago (capture, action session_start, task ${task.id}, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. ${commitRule(task.id, (await openTargets(l.db, l.registry, [task.id])).map((o) => o.id))}`);
 
   const slim = (e: Row) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
   return {
