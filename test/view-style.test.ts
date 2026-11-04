@@ -21,7 +21,7 @@ test("a style named outright, or a view's own shape, draws as it says: a project
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'p', type: 'project', title: 'Rebuild', status: 'active' },
-    { op: 'create', ref: 'ridges', type: 'style', title: 'Ridges', props: { code: 'export default function draw() {}' } },
+    { op: 'create', ref: 'ridges', type: 'layout', title: 'Ridges', props: { code: 'export default function draw() {}' } },
     { op: 'link', type: 'about', from: 'ridges', to: 'p' },
     { op: 'create', ref: 'flow', type: 'style', title: 'Flow', props: { shape: 'flow' } },
     { op: 'create', ref: 'v', type: 'lens', title: 'Plan', props: { filter: { find: ['type task'] }, style: { shape: 'flow' } } },

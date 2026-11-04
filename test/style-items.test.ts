@@ -73,13 +73,13 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     }
     await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 
-    // The switch lists layouts: a style with code is one, and any other style is reached by find; Use here puts it in the
+    // The switch lists layouts: a layout is one, and any other style is reached by find; Use here puts it in the
     // switch while it is drawn.
     const own = (await call('/api/change', undefined, {
       reason: 'test',
       ops: [
         { op: 'create', ref: 'o', type: 'style', title: 'Slab section look', props: { shape: 'list' } },
-        { op: 'create', ref: 'k', type: 'style', title: 'Board layout', props: { code: 'export default function draw() {}' } },
+        { op: 'create', ref: 'k', type: 'layout', title: 'Board layout', props: { code: 'export default function draw() {}' } },
       ],
     })).result.created as Record<string, string>;
     await page.evaluate(`location.reload()`);

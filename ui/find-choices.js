@@ -57,10 +57,11 @@ const viewsFound = async (q, most) => {
  * without being an item: the layouts the packs ship (ui/look-switch.js offers them too) and the default.
  */
 const stylesFound = async (q, most) => {
-  const kept = await api('search', { ...(q && { q }), type: 'style', open: true, limit: most }).catch(() => []);
+  const [layouts, styles] = await Promise.all(['layout', 'style'].map((type) => api('search', { ...(q && { q }), type, open: true, limit: most }).catch(() => [])));
+  const kept = [...layouts.filter((s) => !s.props?.preset).map((s) => ({ ...s, layout: true })), ...styles];
   const shapes = [{ shape: 'list', title: 'List' }, ...(state.schema?.shapes ?? [])].filter((s) => has(s.title, q)).map((s) => ({ title: s.title, style: { shape: s.shape } }));
   return [
-    ...kept.map((s) => ({ kind: typeof s.props?.code === 'string' ? 'Layout' : 'Style', label: s.title, note: '', title: `Open ${s.title}`, page: s.id })),
+    ...kept.map((s) => ({ kind: s.layout ? 'Layout' : 'Style', label: s.title, note: '', title: `Open ${s.title}`, page: s.id })),
     ...[...shapes, ...(has('Default', q) ? [{ title: 'Default', style: {} }] : [])].map((s) => ({ kind: 'Layout', label: s.title, note: '', title: `Draw this view in ${s.title}`, style: s.style })),
   ].slice(0, most);
 };

@@ -40,7 +40,7 @@ export const UI_FILES: Record<string, string> = {
   '/css-check.js': 'css-check.js',
   // Where a reader of a public page came from, as a tag: the page carries it on, the server counts a visit by it.
   '/source-tag.js': 'source-tag.js',
-  // three.js as its authors build it (MIT), offered to a style's code; loaded only when one asks for it.
+  // three.js as its authors build it (MIT), offered to a layout's code; loaded only when one asks for it.
   '/three.js': 'three.module.min.js',
 };
 

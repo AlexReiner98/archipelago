@@ -160,7 +160,7 @@ test('a note is added to, or one passage of it replaced, without sending it agai
 test('get gives an agent a large field cut to its first lines and its size, and whole with full', async () => {
   const l = await fresh();
   const code = Array.from({ length: 400 }, (_, i) => `const line${i} = ${i};`).join('\n');
-  const { s } = await make(l, [{ op: 'create', ref: 's', type: 'style', title: 'Coded', props: { code } }]);
+  const { s } = await make(l, [{ op: 'create', ref: 's', type: 'layout', title: 'Coded', props: { code } }]);
   const cut = ((await callTool(l, agent, 'get', { id: s })) as any).entity.props.code as string;
   assert.ok(cut.startsWith('const line0 = 0;\nconst line1 = 1;'), cut);
   assert.ok(cut.endsWith(`… (${code.length} characters; get with full: true has it)`), cut);

@@ -1,4 +1,4 @@
-// A style that carries its own code: the drawing a person or an agent wrote for their own project.
+// A layout's code: the drawing a person or an agent wrote for their own project.
 
 import { api, drawingsOpen, frameSandbox, h } from './base.js';
 import { STYLE_COLORS, litSwitch } from './query-base.js';
@@ -11,11 +11,11 @@ const opened = (frame) => ((frame = new URL(frame, location.href)), frame.search
 const mostOps = 50;
 
 /**
- * A style that carries its own code is the drawing: the page runs it in a
+ * A layout's code is the drawing: the page runs it in a
  * frame that is sandboxed (an origin of its own, nothing loaded from outside,
  * nothing sent anywhere), or opened where the owner turned that off, hands it the lens answer, the style's fields and the
  * page's colours, and listens for three things: open this item, change the map
- * (sent here as the person, naming the style whose code asked, `coder`, for the
+ * (sent here as the person, naming the layout whose code asked, `coder`, for the
  * rules to judge: src/layout-changes.ts), and what went wrong. A new frame for
  * each picture, so nothing of the last is left running; a new answer for the same
  * code and fields goes to the frame already running, when its code listens for one.
@@ -45,7 +45,7 @@ export function drawCode(host, answer, style, keep, _place, coder) {
       if (mine !== run.frame || mine.ready || !host.isConnected) return;
       if (document.hidden) return void setTimeout(check, 5000);
       if (tries < 2) return draw(tries + 1);
-      shown('This style has code of its own, and the browser did not start the frame it runs in.');
+      shown('The browser did not start the frame this layout runs in.');
     };
     setTimeout(check, 5000);
   };
@@ -79,7 +79,7 @@ export function drawCode(host, answer, style, keep, _place, coder) {
     // Its code hears no new answer: drawn again from the start.
     else if (said.type === 'stale') draw();
     // The first thing that went wrong is the one to read: what follows is usually its echo.
-    else if (said.type === 'error' && error.hidden) shown(`This style's code stopped: ${String(said.message).slice(0, 300)}`);
+    else if (said.type === 'error' && error.hidden) shown(`This layout's code stopped: ${String(said.message).slice(0, 300)}`);
   });
   window.addEventListener('message', hear);
   // A bar only for the switch, when the view offers it.

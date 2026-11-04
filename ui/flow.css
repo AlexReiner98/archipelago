@@ -33,7 +33,7 @@
 /* The frame drawings run in: drawn, with no size, so the browser does not slow it as a frame that is not drawn. */
 .drawing-sandbox { position: fixed; left: 0; top: 0; width: 0; height: 0; border: 0; pointer-events: none; }
 /* A kept view a drawing names (ui/view-frame.js): the one drawn fills the frame, the next drawn under it out of sight until it has.
-   Every box between the frame and the picture is as tall as the frame: a style's code draws in a frame of its own, which is otherwise the browser's short default. */
+   Every box between the frame and the picture is as tall as the frame: a layout's code draws in a frame of its own, which is otherwise the browser's short default. */
 .view-frame { position: relative; }
 .view-frame > .lens-wrap { position: absolute; inset: 0; }
 .view-frame .lens-wrap .lens-wrap, .view-frame .lens-view, .view-frame .code-stage, .view-frame .lens-frame { height: 100%; }
@@ -41,6 +41,6 @@
 /* On a canvas a named view is drawn in a pane of its own (ui/view-frame.js): its room beside the drawing is not kept. */
 .sp-shown:has(> .view-frame.beside) { display: none; }
 .code-stage:has(> .code-panel) { position: relative; }
-/* Where a style's code opened (drawings_open) puts a panel of its own: over its picture, in the page; only what it puts there takes the pointer. */
+/* Where a layout's code opened (drawings_open) puts a panel of its own: over its picture, in the page; only what it puts there takes the pointer. */
 .code-panel { position: absolute; inset: 0; pointer-events: none; }
 .code-panel > * { pointer-events: auto; }

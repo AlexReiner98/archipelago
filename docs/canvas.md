@@ -106,12 +106,13 @@ A pack ships views as presets (a `styles` entry of `type: "lens"`,
 decision e_x8bghuce): the picker and Home list each until the owner saves
 their own version, which names it (`preset`) and stands in its place.
 Four things make a view (decision e_47pjkbxb): a query says what is on it (the
-query above), a layout how it is arranged (a drawing a pack ships, or a style
-with code kept on the map), a style how it looks, and the view is a name for
+query above), a layout how it is arranged (a drawing a pack ships, or a layout
+item kept on the map, core's `layout` type), a style how it looks, and the view is a name for
 a query and a layout with its settings, which it holds itself (`style` on the
 item): nothing reaches into it by a link, and a style is about nothing. Looks
 stack in one line: the packs', the workspace's, the view's, then a person's own
-colours. What moved from the styles made for one view is `src/style-move.ts`.
+colours. What moved from the styles made for one view is `src/style-move.ts`;
+how the styles with code became layouts is `src/layout-move.ts`.
 A layout is the pane's: editing the query keeps it, opening a saved view
 brings its own. The view band switches it (`ui/look-switch.js`), which lists
 layouts and nothing else. A change in a pane is a draft: Save is marked and
@@ -205,7 +206,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `src/query-flat.ts` | the flat query (core view `flat`) |
 | `src/query-saved.ts` | kept views: their picture, `shown_in`, the move from old views |
 | `src/styles.ts` | the style a page or view is drawn in (core view `style`) |
-| `src/layouts.ts` | which drawing a style names, and the owner's version of it |
+| `src/layouts.ts` | which drawing a style names, and the owner's version of it (a layout with its `preset`) |
 | `src/tail.ts`, `src/project.ts` | facts after a position; the pure projector (served as `/project.js`) |
 | `src/pelago.ts`, `src/rules.ts` | the one write path, and what decides it |
 | `packs/core/layouts/flow/` | the flow drawing: `graph.js` flattens, `layout.js` orders, `free.js` keeps places, `index.js` answers marks |

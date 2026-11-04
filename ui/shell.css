@@ -17,7 +17,7 @@ option, optgroup { background: var(--panel); color: var(--text); }
 #canvas { --safe-top: calc(max(var(--strip), var(--band)) + var(--space-4)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
 body[data-panes="1"] #canvas .pane-canvas .lens-view { padding: var(--safe-top) 0 var(--safe-bottom); }
 body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.lf-stage), body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.code-stage) { padding: var(--safe-top) 0 0; }
-/* A style's own code fills its pane, not the height a document gives its frame. */
+/* A layout's code fills its pane, not the height a document gives its frame. */
 #canvas .code-stage { height: 100%; }
 #canvas .code-stage > .lens-frame { height: 100%; min-height: 0; }
 /* The key, always in sight on a pane alone: in the safe zone, under the query bar, as long as it is. */

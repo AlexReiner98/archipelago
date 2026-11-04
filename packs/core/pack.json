@@ -190,7 +190,7 @@
         "limit": { "type": "number", "description": "The most items it draws." },
         "time": { "type": "json", "description": "A window each item is placed in, for a layout along a time axis: { from, to }, as query flat's time (dates, today, or days from today as -6d or 7d)." },
         "view": { "type": "string", "description": "A view whose answer is items and links (such as usage), drawn in place of what a filter finds: then it needs no filter." },
-        "style": { "type": "json", "description": "How it is drawn, held in the view: { shape, lit, style } (a built-in layout, what stays lit, a style or layout kept on the map by its id) and any style field that holds for this view alone, such as a grid's rows and labels. No code: that is a layout kept on the map. A shape here, or in the style it names, is drawn as it says: the code of a style about what the view is of does not carry into it." },
+        "style": { "type": "json", "description": "How it is drawn, held in the view: { shape, lit, style } (a built-in layout, what stays lit, a layout or style kept on the map by its id) and any style field that holds for this view alone, such as a grid's rows and labels. No code: that is a layout kept on the map. A shape here, or in the style it names, is drawn as it says: the code of a layout about what the view is of does not carry into it." },
         "pins": { "type": "json", "description": "Items kept on it by hand, as a list of ids: drawn with what the filter finds." },
         "pinned": { "type": "boolean", "description": "Kept in sight by the owner: first on Home." },
         "preset": { "type": "string", "description": "The id of the pack's canvas this is the owner's version of.", "system": true },
@@ -202,7 +202,7 @@
       "id": "style",
       "extends": "system",
       "title": "Style",
-      "description": "How the map looks: colours, type and sizes, and how a page reads. About nothing, the workspace's; on kinds or types (on), how every such item's page looks. What one view needs is not a style: a view holds its own layout and settings (its style field), so a style about a view draws nothing. With code of its own (code), it is a layout: it draws only where a view or the band names it. A field left empty comes from the level below. The defaults are styles too: a pack ships them as presets, and one kept on the map with the preset's id (preset) is the owner's version of it, its fields over the preset's; retired, the preset is not used. Read only by the page that draws.",
+      "description": "How the map looks: colours, type and sizes, and how a page reads. About nothing, the workspace's; on kinds or types (on), how every such item's page looks. What one view needs is not a style: a view holds its own layout and settings (its style field), so a style about a view draws nothing. How a view is drawn as code is not a style: that is a layout. A field left empty comes from the level below. The defaults are styles too: a pack ships them as presets, and one kept on the map with the preset's id (preset) is the owner's version of it, its fields over the preset's; retired, the preset is not used. Read only by the page that draws.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "shape": { "type": "enum", "values": ["list", "flow", "grid", "time", "architecture", "pages"], "description": "One of the layouts that come built in, used when the style has no code of its own. architecture: a system read from the top down, each part a box (a store a cylinder, a client a pill) inside a box for the place it is part of (a host, a cloud), wires at right angles from a part to what it depends on or calls, each labelled with what the link says; a dot for each part's health (read from its status: up, degraded, down, being wired, planned), and each wire wired, not yet wired (dashed) or broken (red), by the link's own state or else by its two ends. list: a table, one line a row, its marks in columns; a thing that holds others a group that folds. grid: rows by what the start holds, columns by the query's lanes, each thing a card; no lines are drawn. time: along a time axis (the query's time), as a calendar of days with hours down (layout: calendar) or as bars across days (layout: bars, a Gantt chart), each lane a row; the one a query on a time axis is drawn in unless said. flow: a flat graph read from the top down, each item a step showing its name (work a box, a question a diamond, an occurrence a pill, a record a sheet), wires at right angles from what is depended on to what depends on it, every other link (part_of first) a quiet tie at right angles round the steps that keeps its ends near, nothing nested, an open question's choices as dashed scenarios. pages: each document a row (any other item too, read by its note as its reader sees it), its draft (the preview), each drawn by the reader itself, saying whether they differ; an item a document brings in as a section is read there, not as a row of its own. Any other look is code of its own. list unless said." },
@@ -250,11 +250,22 @@
         "emblem": { "type": "string", "large": true, "description": "The mark at the top of the page, as a data URL of a PNG twice the size it is shown. A theme carries its own, drawn in its place's colours (scripts/emblems.ts)." },
         "icon": { "type": "string", "large": true, "description": "The map's icon where a browser's tab or a client listing this server shows one (/favicon.ico), as a data URL of a PNG; left out, the emblem." },
         "page_css": { "type": "string", "large": true, "css": true, "code": true, "description": "How a published page looks, as CSS read after the page's own (ui/doc.css, ui/doc-lens.css): rules such as h2 { ... } or section:has(> .doc-lens.wide) > h2 { ... }, read only inside the published page. Checked when it is written as a layout’s stylesheet is (no url(), no @import, no quotes, backslashes, & or <), and refused with what is wrong. Taken from the workspace's style when a page is opened, so a page shows a change once it is opened again (or at once, opened with ?live, when it is published again). Written by an agent, it waits for the human unless the owner lets agents change layouts (agent_code)." },
-        "code": { "type": "string", "large": true, "code": true, "description": "The layout itself, as a JavaScript module: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor, field, change }). It runs in the browser of whoever looks, in a worker inside a sandboxed frame: it has a canvas to draw on and no page, no network and no storage. Written by an agent, it waits for the human to approve it before it runs. canvas is an OffscreenCanvas (2D or WebGL); answer is what the query view answered; style is this style's other fields; theme is the page's colours by what each is for, as colors says (sea is the ground, so take accent for what must stand out on it; land, inner, line, text, muted, blocked, you, session, done, warn) and dark; size is { width, height, dpr }, kept current; tree() gives the answer as a tree ({ root, byId, me }, each thing with kids, up, depth and its counts all, work, blk, you, at); three() resolves to three.js; on(name, fn) hears pointerdown, pointermove, pointerup, pointerleave, wheel (each { x, y, button, buttons, deltaY, shift, ctrl }) and resize; open(id) opens an item's page; tip(text, x, y) shows words by the pointer (null hides them); cursor(name) sets the pointer; field(key, { x, y, width, height, value, placeholder, title }) puts a text field the page draws over the canvas (null takes it away), and on('field') hears { key, value, done }, never a key; change(ops, reason) asks the page to send ops as the person looking and resolves to { status, created, proposal, held } or { error }: it applies where it writes only the types in writes, and waits for that person otherwise; on('answer') hears the query answer again as the map changes (code that does not listen is started again). With code, shape is not used; a nearer style that names a shape and has no code (a view's own, one about the item, one named outright) clears it, so it draws only where nothing nearer says how." },
-        "writes": { "type": "json", "description": "The types this style's code may change by itself, as a list, e.g. [\"local.ridges_setup\"]: what its layout asks for (a preset saved, one deleted) the page sends as the person looking, and it applies where it writes only these types; anything else waits for that person (core's drawing_* rules). Written by an agent, it waits for the human, as code does." },
-        "modules": { "type": "json", "large": true, "code": true, "description": "The owner's version of a layout a pack ships (with preset, the layout’s id): its modules by name, each a JavaScript module's text, standing in for the pack's module of that name. The layout runs as code does, in a worker inside a sandboxed frame, and answers with marks (SVG and HTML as data) the page checks before it draws them. Written by an agent, it waits for the human to approve it." },
         "on": { "type": "json", "description": "The kinds or types whose pictures and pages it is for, as a list. Left empty, it is about what it is linked to by about, or the whole workspace." },
         "preset": { "type": "string", "description": "The id of the pack's style this is the owner's version of.", "system": true }
+      }
+    },
+    {
+      "id": "layout",
+      "extends": "system",
+      "title": "Layout",
+      "description": "How a view is drawn, as code: a drawing kept on the map. It draws only where a view names it (its style field's style) or, about an item, on the pictures of that item; never as the workspace's. With code (code), it is a drawing of its own; with a pack drawing's id (preset) and modules, the owner's version of that drawing, its modules over the pack's; retired, the pack's drawing is not used. Its settings are the style fields it draws with unless the style or the view says otherwise. Written by an agent, its code waits for the human.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "code": { "type": "string", "large": true, "code": true, "description": "The layout itself, as a JavaScript module: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor, field, change }). It runs in the browser of whoever looks, in a worker inside a sandboxed frame: it has a canvas to draw on and no page, no network and no storage. Written by an agent, it waits for the human to approve it before it runs. canvas is an OffscreenCanvas (2D or WebGL); answer is what the query view answered; style is what it is drawn with: its settings, under the style and the view's own; theme is the page's colours by what each is for, as colors says (sea is the ground, so take accent for what must stand out on it; land, inner, line, text, muted, blocked, you, session, done, warn) and dark; size is { width, height, dpr }, kept current; tree() gives the answer as a tree ({ root, byId, me }, each thing with kids, up, depth and its counts all, work, blk, you, at); three() resolves to three.js; on(name, fn) hears pointerdown, pointermove, pointerup, pointerleave, wheel (each { x, y, button, buttons, deltaY, shift, ctrl }) and resize; open(id) opens an item's page; tip(text, x, y) shows words by the pointer (null hides them); cursor(name) sets the pointer; field(key, { x, y, width, height, value, placeholder, title }) puts a text field the page draws over the canvas (null takes it away), and on('field') hears { key, value, done }, never a key; change(ops, reason) asks the page to send ops as the person looking and resolves to { status, created, proposal, held } or { error }: it applies where it writes only the types in writes, and waits for that person otherwise; on('answer') hears the query answer again as the map changes (code that does not listen is started again). With code, shape is not used; a nearer style that names a shape and has no code (a view's own, one about the item, one named outright) clears it, so it draws only where nothing nearer says how." },
+        "writes": { "type": "json", "description": "The types this layout's code may change by itself, as a list, e.g. [\"local.ridges_setup\"]: what its layout asks for (a preset saved, one deleted) the page sends as the person looking, and it applies where it writes only these types; anything else waits for that person (core's drawing_* rules). Written by an agent, it waits for the human, as code does." },
+        "modules": { "type": "json", "large": true, "code": true, "description": "The owner's version of a layout a pack ships (with preset, the layout’s id): its modules by name, each a JavaScript module's text, standing in for the pack's module of that name. The layout runs as code does, in a worker inside a sandboxed frame, and answers with marks (SVG and HTML as data) the page checks before it draws them. Written by an agent, it waits for the human to approve it." },
+        "settings": { "type": "json", "description": "The style fields it draws with, such as text or colors, as a style holds them: under the view's own, which say otherwise." },
+        "preset": { "type": "string", "description": "The id of the pack's drawing this is the owner's version of (a layout in a pack's layouts).", "system": true }
       }
     },
     {
@@ -871,7 +882,7 @@
       "id": "drawing_reach",
       "when": { "drawing": true, "reach": "outside" },
       "then": "hold",
-      "say": "A drawing asked to change a {type}, which its style does not say it writes: you look first."
+      "say": "A drawing asked to change a {type}, which its layout does not say it writes: you look first."
     },
     {
       "id": "drawing_code",
@@ -893,10 +904,10 @@
     },
     {
       "id": "styles_merge",
-      "when": { "actor": "agent", "op": "merge", "type": "style" },
+      "when": { "actor": "agent", "op": "merge", "type": ["style", "layout"] },
       "then": "hold",
       "lifted": "agent_code",
-      "say": "Folding one style into another can bring its code along: the human's to allow."
+      "say": "Folding one style or layout into another can bring its code along: the human's to allow."
     },
     {
       "id": "public",
@@ -1228,7 +1239,7 @@
       "form": "screen",
       "id": "core.style_apply",
       "title": "Apply",
-      "on": ["style"],
+      "on": ["style", "layout"],
       "pieces": [{ "piece": "button", "label": "Use here", "tip": "Draw this view with this; Save keeps it", "draw": { "style": "{here}" } }]
     },
     {

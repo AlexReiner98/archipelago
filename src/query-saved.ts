@@ -43,7 +43,7 @@ export async function keptPicture(l: Archipelago, id: string, have?: unknown) {
   if (!item || !isKept(l, item.type)) throw new Error(`"${id}" is not a view kept on the map`);
   const own = (item.props.style ?? {}) as Props;
   const named = typeof own.style === 'string' ? own.style : undefined;
-  const { style } = await styleFor(l, await keptOf(l, 'style', named), { own: ownStyle(own), ...(named && { named }) });
+  const { style } = await styleFor(l, await keptOf(l, ['style', 'layout'], named), { own: ownStyle(own), ...(named && { named }) });
   const lens = viewQuery(item.props);
   let answer = await flatRead(l, lens);
   // Steps that no longer pass are not played, and what is wrong is said beside the picture: a read never refuses.

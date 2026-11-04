@@ -7,11 +7,11 @@ import { api, ask, h, state, tell } from './base.js';
 import { addressOf } from './query.js';
 import { titles } from './words.js';
 
-/** The layouts kept on the map (a style with code of its own), read once. */
+/** The layouts kept on the map (core's layout type, not the owner's versions of a pack's drawing), read once. */
 let named = null;
 const namedStyles = () =>
-  (named ??= api('search', { type: 'style', open: true, limit: 100 })
-    .then((rows) => rows.filter((s) => typeof s.props?.code === 'string' && !s.props?.preset && !s.props?.on?.length).sort((a, b) => a.title.localeCompare(b.title)))
+  (named ??= api('search', { type: 'layout', open: true, limit: 100 })
+    .then((rows) => rows.filter((s) => !s.props?.preset).sort((a, b) => a.title.localeCompare(b.title)))
     .catch(() => []));
 
 /** A style's name, read when no page has named it yet: only layouts are listed. */
