@@ -1,6 +1,6 @@
 // The tests, as a set (test/sets.ts):
 //   npm test                       the fast set: every file but those test/sets.ts names as slow
-//   npm run test:full              every file: before a commit to main, and in CI
+//   npm run test:full              every file, as CI runs them before main deploys (CI is the gate)
 //   npm run test:changed [base]    the files what changed since base (where this branch left main) can reach
 //   npm test -- test/a.test.ts …   just those files; an argument starting -- goes to node (--test-name-pattern=…)
 //   node scripts/test.ts shard browser 1/2   one shard of the full run, as CI runs them side by side

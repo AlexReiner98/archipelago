@@ -329,23 +329,21 @@ or pull a whole map (`SLOW` in `test/sets.ts`, each with why). The structure
 test is always in it. `npm run test:changed` runs only the files your
 branch's changes can reach (with the slow ones they reach).
 
-Once, right before pushing to main or opening a pull request, and never
-between tries, run every file:
+CI is the gate (the owner, 4 Nov 2026): it runs every file on every pull
+request and push to main, on both engines, and main deploys only when all of
+it has passed, so every file runs before a push lands. A local
+`npm run test:full` is not needed before a push: it ran the same files on
+the same commit again. Run it when you want to see the whole set on Windows
+(the nightly run does too), or when CI cannot run.
 
-```bash
-npm run test:full
-```
-
-That run is needed before a push of any change to the rules, a layout, the
-canvas, a page the browser tests load, the schema, backups or the log's
-storage.
-
-CI runs every file on every pull request and push to main, as shards
-side by side (`shard` in `test/sets.ts`: the rest, and one per reason in
-`SLOW`), so a push deploys after its slowest shard. A new test that starts a
-browser or takes more than a few seconds of one process goes in `SLOW`,
-with why; never move the structure test there. A new reason there is a new
-shard, to add to both matrices in `.github/workflows/tests.yml`.
+CI deals every file into equal shards by the seconds each took in CI
+(`shard` in `test/sets.ts`, `test/weights.json`), side by side, so a push
+deploys after its slowest shard. `test/sets.test.ts` fails when the
+predicted slowest shard goes over its budget: refresh the weights
+(`node scripts/test-weights.ts ci`) or add a shard to both matrices in
+`.github/workflows/tests.yml`. A new test that starts a browser or takes more
+than a few seconds of one process goes in `SLOW` (out of the local fast set),
+with why; never move the structure test there.
 
 The UI asks its questions in the page (`ask` and `tell` in `ui/base.js`), so
 browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.
