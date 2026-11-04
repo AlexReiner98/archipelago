@@ -15,6 +15,8 @@ export const listKey = () => `pelago-tabs:${ws()}`;
 export const outKey = (id) => `pelago-tab:${ws()}:${id}`;
 export const isOutKey = (key) => key?.startsWith(`pelago-tab:${ws()}:`);
 export const newId = (prefix) => `${prefix}${Math.random().toString(36).slice(2, 10)}`;
+/** What a new tab or pane draws: no query, and so nothing, until the reader finds something or a show lands there (the owner, 3 Nov 2026, e_33eqyryy). */
+export const BLANK = 'v?nothing=';
 /**
  * A pane: the address it draws, its back and forth, and whose it is (`slot`, a name a session gave it; `held`, the session
  * it is kept for; `by`, the chat it was made for, which closes it as it ends: a pane with none is the owner's).
@@ -24,7 +26,7 @@ export const freshPane = (at, more = {}) => ({ at: asPane(at || '#/'), back: [],
  * A tab: its panes, each its share, whom it follows (a session, or nobody), and the pane last touched in it; `sheet`, the
  * page open over it when it was last in sight; `chat`, the session it is the tab of (ui/tab-life.js), none for the owner's.
  */
-export function freshTab(at = '#/', { slot, held, by, ...more } = {}) {
+export function freshTab(at = BLANK, { slot, held, by, ...more } = {}) {
   const p = newId('p');
   return { id: newId('t'), follows: 'none', dir: 'row', groups: [p], sizes: [1], panes: { [p]: freshPane(at, { ...(slot && { slot }), ...(held && { held }), ...(by && { by }) }) }, focus: p, ...more };
 }

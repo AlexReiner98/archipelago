@@ -19,7 +19,7 @@ const { followable, hear, heard, hearOpen, nameOf, route } = (await import(`../u
 
 const now = 1_000_000;
 const at = {};
-type Pane = { id: string; slot?: string; held?: string; by?: string; focus?: boolean; draws?: boolean; busy?: boolean; landed?: { session: string; at: number } };
+type Pane = { id: string; slot?: string; held?: string; by?: string; focus?: boolean; draws?: boolean; blank?: boolean; busy?: boolean; landed?: { session: string; at: number } };
 /** A tab: its pane in focus (with `more` on it) and the panes beside it. */
 const tab = (id: string, follows: string, more: Partial<Pane> = {}, beside: Pane[] = [], also = {}) => ({ id, follows, panes: [{ id: 'p0', focus: true, ...more }, ...beside], ...also });
 /** The owner's tab in sight, following nobody. */
@@ -130,4 +130,14 @@ test('a show with focus brings its tab into sight, as the owner asked to be take
   assert.deepEqual(route(focus('e_aaaaaaaa', 'story'), [first(), tab('t1', 'e_aaaaaaaa', { slot: 'story' })], at), { tab: 't1', pane: 'p0', front: true }, 'its tab out of sight, brought into sight');
   assert.deepEqual(route(focus('e_aaaaaaaa'), [chat('e_aaaaaaaa')], at), { tab: 't0', pane: 'p0', front: true }, 'already in sight, it stays');
   assert.deepEqual(route(focus('e_aaaaaaaa'), [first(), tab('w1', 'e_aaaaaaaa', {}, [], { popped: true })], at), { tab: 'w1', pane: 'p0', front: false }, 'a window of its own is not a tab here');
+});
+
+test('a blank pane (a new tab, a split: no query) is taken before one is split beside it (e_33eqyryy)', () => {
+  const run = 'e_aaaaaaaa';
+  assert.deepEqual(route(step(run, 'story'), [chat(run, { blank: true })], at), { tab: 't0', pane: 'p0', slot: 'story', front: true }, 'a name asked for takes the blank pane in its tab, in focus too');
+  assert.deepEqual(route(step(run), [chat(run, { blank: true, by: run })], at), { tab: 't0', pane: 'p0', front: true }, 'so does a show with no name');
+  assert.deepEqual(route(step(run), [tab('t0', run, {}, [{ id: 'p1', blank: true }], { front: true })], at), { tab: 't0', pane: 'p0', front: true }, 'in its own tab every pane is its own: the one in focus first');
+  assert.deepEqual(route(step(run, 'story'), [chat(run, { slot: 'review', blank: true })], at), { tab: 't0', split: { slot: 'story', side: 'right' }, front: true }, 'a named pane is no blank one to take');
+  assert.deepEqual(route(step(run, 'story'), [chat(run, { blank: true, busy: true })], at), { later: true }, 'nor one the reader is busy in');
+  assert.deepEqual(route(step(run, 'story'), [chat(run, { blank: true, held: 'e_bbbbbbbb' })], at), { tab: 't0', split: { slot: 'story', side: 'right' }, front: true }, 'nor one held for another');
 });
