@@ -128,6 +128,7 @@ export const VIEWS: Record<string, View> = {
     description: 'Agent sessions and automation runs: what each open one is working on and holding, the session that started it (parent), its state (session: state, for, line, since) and latest turn, and the last ten that ended. The open ones come in the order they ask for attention: waiting, your_move, blocked, working, quiet, idle, each the longest in it first.',
     run: sessions,
   },
+  session_measures: { description: 'What sessions’ turns tell over a range: those waiting on their person now and since when (waiting), turns and tokens per item worked on (per_item), open sessions with an hour of turns and no test passed or commit since (stalled). Params: since, until (ISO; a week to now), stall_minutes (60).', run: async (l, input) => (await import('./session-measures.ts')).sessionMeasures(l, input) }, // read when asked: it reaches src/sessions.ts, which reads these views
   saved_views: {
     description: 'Every view kept on the map (a query, named by the style that draws it), with what it is a view of: pinned first, then the newest. Params: limit (100).',
     run: (l, input) => savedViews(l, input as { limit?: number }),
