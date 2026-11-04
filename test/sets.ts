@@ -75,15 +75,23 @@ export const ENGINES = ['pglite', 'postgres'];
 export const LANES = 3;
 /** What a file costs beyond its tests' own time: a process started and its modules loaded (fitted to CI, 3 Nov 2026). */
 export const PER_FILE = 0.6;
+/**
+ * How much more of a runner a browser test's second takes than another's: its Chrome draws on cores of its own beside
+ * the test's process (fitted to main's run 41751821168, 4 Nov 2026: the shards with most browser seconds ran longest).
+ */
+export const BROWSER = 1.7;
 /** The steps of the workflow that run on shard 1 alone, beside its tests; their time counts toward it. */
 export const FIRST_STEPS = ['Type check', 'The log as a role that is not a superuser'];
 
 export const readWeights = (): Weights => JSON.parse(readFileSync(join(ROOT, 'test/weights.json'), 'utf8'));
 
-/** The seconds a file takes on an engine: as measured, or the middle of those measured when it is new. */
+/**
+ * The seconds of a runner a file takes on an engine: as measured, or the middle of those measured when it is new, and
+ * a browser test's BROWSER times over.
+ */
 export function weigher(weights = readWeights()) {
   const middle = Object.fromEntries(ENGINES.map((e) => [e, Object.values(weights.files).map((w) => w[e] ?? 0).sort((a, b) => a - b)]).map(([e, ws]) => [e, (ws as number[])[(ws as number[]).length >> 1] ?? 1]));
-  return (f: string, engine: string) => weights.files[f]?.[engine] ?? middle[engine];
+  return (f: string, engine: string) => (weights.files[f]?.[engine] ?? middle[engine]) * (SLOW[f] === 'browser' ? BROWSER : 1);
 }
 
 /** Files heaviest first, as node is given them: it starts them in that order, so the longest do not start last. */

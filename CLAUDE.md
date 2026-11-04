@@ -344,7 +344,9 @@ more than a few seconds of one process goes in `SLOW`, with why; never move
 the structure test there. `SLOW` decides only the local fast set. When
 `test/sets.test.ts` says a shard is over its budget, refresh the weights
 from main's latest run (`node scripts/test-weights.ts ci`), and if it still
-is, add a shard to both matrices in `.github/workflows/tests.yml`.
+is, add a shard to both matrices in `.github/workflows/tests.yml`. When it
+says one file is over its own budget, split that file's tests into files of
+their own: no number of shards waits less than its longest file.
 
 The UI asks its questions in the page (`ask` and `tell` in `ui/base.js`), so
 browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.
