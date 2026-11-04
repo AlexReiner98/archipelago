@@ -84,7 +84,11 @@ function drawnOut({ items: given, links: told = [], undrawn = [], headless = ['p
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes, shapes });
   const z = lengthsOf(sizes), { gap } = z, margin = sizes.flow_margin, stepSize = (id) => nodes.get(id);
-  const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ a: l.from, b: l.to, type: l.type, ...(l.pending && { pending: l.pending }) }));
+  // A link from an item to an actor (waits on, owned by) is drawn from the actor to the item, as the order is drawn from
+  // what is depended on: the person first, the head on what they act on (the owner, 4 Nov 2026). `flipped` says so.
+  const kindOf = new Map(items.map((i) => [i.id, i.kind]));
+  const toActor = (l) => kindOf.get(l.to) === 'actor' && kindOf.get(l.from) !== 'actor';
+  const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ ...(toActor(l) ? { a: l.to, b: l.from, flipped: true } : { a: l.from, b: l.to }), type: l.type, ...(l.pending && { pending: l.pending }) }));
   const chains = edges.map((e) => ({ ...e, key: `${e.a} ${e.b}`, path: [e.a, e.b], dashed: potential.has(e.b) }));
   const every = [...chains, ...ties], twins = routesOf(every);
   const a = new Map([...nodes.keys()].map((id) => [id, new Set()]));
