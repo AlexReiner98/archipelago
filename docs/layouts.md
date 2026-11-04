@@ -53,7 +53,7 @@ export function picture({ answer, style, reduced }, { measure, patch, open, fram
 
 Every drawing has one path: the answer, the style and the pins (`placed`) go in, a model is made from them, and the marks are drawn from the model. Every drawing's module list holds all it imports, and every length is a size on the style.
 
-A wired drawing, one with wires between its boxes, adds layers and one solver. The wired ones are Flow and Architecture. Grid, Time, Pages and Meters have no wires.
+A wired drawing, one with wires between its boxes, adds layers and one solver. The wired ones are Flow and Architecture. Grid, Time, Pages, Meters and the social pack's channels table (`social.table`: a row per channel per month, summed from its posts, the conversations linked `came_from` them and the hours `part_of` them, sources below) have no wires.
 
 `test/structure.test.ts` checks all of this. Each rule keeps a list of what already breaks it, and a list may only shrink: when a number comes down, lower it in the same commit, and never raise one.
 
