@@ -130,3 +130,36 @@ test('a post’s tag still goes to the post, and a source with no post to stand 
   const alone = await deliver({ tag: 'google', what: 'begun' }, ctxOver([]));
   assert.deepEqual(alone.changes[0].ops, [{ op: 'create', ref: 'source', type: 'traffic_source', title: 'google', status: 'counting', props: { tag: 'google', begun: 1 } }]);
 });
+
+// A conversation a post began, made by the pack's action: the count is read from the links that are there.
+const conversationOver = (items: Record<string, { type: string; title: string; props?: Record<string, unknown> }>, cameFrom: string[]) => ({
+  now: '2026-11-04T16:00:00Z',
+  zone: 'America/Toronto',
+  read: async (q: Record<string, any>) => {
+    if (q.get !== undefined) return items[q.get] ? { id: q.get, props: {}, ...items[q.get], is: [items[q.get].type] } : null;
+    if (q.related !== undefined) return q.relation === 'came_from' && q.direction === 'in' ? cameFrom.map((id) => ({ id, type: 'conversation' })) : [];
+    return [];
+  },
+});
+const converse = (input: Record<string, unknown>, ctx: ReturnType<typeof conversationOver>) => (handler as any)['social.conversation'](input, ctx);
+
+test('a conversation from a post is linked came_from it, and the post counts the ones there and this one', async () => {
+  const ctx = conversationOver({ e_post0001: { type: 'post', title: 'Launch', props: { channel: 'linkedin' } } }, ['e_conv0001', 'e_conv0002']);
+  const done = await converse({ from: 'e_post0001', person: 'Sam', problem: 'Agents forget what was decided' }, ctx);
+  assert.deepEqual(done.ops, [
+    { op: 'create', ref: 'c', type: 'conversation', title: 'Sam: Agents forget what was decided', status: 'open', body: '', props: { person: 'Sam', problem: 'Agents forget what was decided', began: '2026-11-04', channel: 'linkedin' } },
+    { op: 'link', type: 'came_from', from: 'c', to: 'e_post0001' },
+    { op: 'update', id: 'e_post0001', props: { conversations: 3 } },
+  ]);
+  assert.equal(done.answer.conversations, 3);
+});
+
+test('a conversation from a source counts nothing on it; a long problem makes a short title; nothing to come from is refused', async () => {
+  const ctx = conversationOver({ e_src00001: { type: 'traffic_source', title: 'Newsletter' } }, []);
+  const done = await converse({ from: 'e_src00001', person: 'Ana', problem: 'x'.repeat(200), channel: 'email' }, ctx);
+  assert.equal(done.ops.length, 2);
+  assert.equal(done.ops[0].title.length, 60);
+  assert.equal(done.ops[0].props.channel, 'email');
+  await assert.rejects(converse({ from: 'e_none0000', person: 'A', problem: 'B' }, ctx), /No post or source/);
+  await assert.rejects(converse({ from: 'e_src00001', person: ' ', problem: 'B' }, ctx), /names the person/);
+});
