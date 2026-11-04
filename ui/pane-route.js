@@ -17,7 +17,7 @@
 //   every pane is its own, and only there does `alone` close the others or a page that is not a canvas open over it:
 //   elsewhere such a page gets a tab of its own, out of sight and marked.
 // - No tab is brought into sight: a show into another tab draws it in the background and marks it. Only a show with
-//   `focus`, sent when the owner asked to be taken there, brings its tab into sight (the owner, 3 Nov 2026, e_gt2rfab4).
+//   `focus`, which a show sends unless told `focus: false`, brings its tab into sight (the owner, 4 Nov 2026, e_uh7qu8ts).
 // - A pane the reader is busy in is never taken, and no pane is split into a tab the reader is at work in: the show
 //   goes to a tab of its own in the background instead. A session has one tab: when the reader is busy in the tab that
 //   follows it, the show waits there until they are not (the owner, 2 Nov 2026).

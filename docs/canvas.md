@@ -318,10 +318,10 @@ out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
   the pane the reader is in or touched last (the owner, 28 and 29 Oct 2026);
   in a tab that follows the session alone every pane is its own. A page that
   is not a canvas opens over a pane only there, else in a tab of its own;
-- no tab is brought into sight: a show into a tab out of sight is drawn
-  there and its mark rings (e_xjrpyysn). Only a show with `focus`, sent
-  when the reader asked to be taken there, brings its tab into sight (the
-  owner, 3 Nov 2026, e_gt2rfab4);
+- a show brings its tab into sight (the owner, 4 Nov 2026: "the tab you
+  open should automatically take focus", e_uh7qu8ts). Only a show sent with
+  `focus: false` is drawn in a tab out of sight, where its mark rings
+  (e_xjrpyysn); a change, a tell or a session's tab opening brings none;
 - a pane the reader is busy in (`pane-busy.js`: a press, scroll or key there
   in the last twenty seconds, text selected there, or words typed in the
   sheet and not saved; moving the pointer or turning a dial is not busy) is

@@ -34,7 +34,7 @@ test('in a browser, agents at work never move the reader’s pane; a show lands 
     for (const end = Date.now() + 20000; Date.now() < end; await wait(150)) if (await page.evaluate(expression)) return true;
     return false;
   };
-  const show = (actor: string, params: Record<string, unknown>) => call('/agent/report', undefined, { actor, action: 'show', params }).then((r) => r.result);
+  const show = (actor: string, params: Record<string, unknown>) => call('/agent/report', undefined, { actor, action: 'show', params: { focus: false, ...params } }).then((r) => r.result);
   const change = (actor: string, ops: object[]) => call('/agent/change', undefined, { actor, reason: 'test', ops });
   /** The panes of the tab in sight: each one's name, and whether it is the one the bar acts on. */
   const panes = `JSON.stringify([...document.querySelectorAll('#canvas > .pane')].map((p) => [p.querySelector('.pane-name').textContent, p.classList.contains('pane-active')]))`;
