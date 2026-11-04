@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-const { carried } = (await import(`../ui/${'doc-ref'}.js`)) as { carried: (href: string, here: string, referrer?: string) => string };
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { sourceOf } from '../src/source-tag.ts';
+import { uiFile } from '../src/ui-files.ts';
+
+// The page's module as the server serves it, with the shared rule it imports (src/source-tag.ts), loaded as a browser would.
+const dir = mkdtempSync(join(tmpdir(), 'pelago-doc-ref-'));
+writeFileSync(join(dir, 'package.json'), '{"type":"module"}');
+for (const f of ['source-tag.js', 'doc-ref.js']) writeFileSync(join(dir, f), (await uiFile(f, null)).body as string);
+const { carried } = (await import(pathToFileURL(join(dir, 'doc-ref.js')).href)) as { carried: (href: string, here: string, referrer?: string) => string };
 
 const HERE = 'https://site.example/pricing?ref=linkedin';
 
@@ -33,4 +44,15 @@ test('without a ref, a public page’s links carry its utm_source, or else the o
   assert.equal(carried(join, 'https://site.example/', 'https://localhost/'), join, 'a referrer that makes no tag');
   assert.equal(carried(join, 'https://site.example/?ref=a%20b', 'https://claude.ai/'), join, 'a ref that is no tag falls back to nothing');
   assert.equal(carried('https://github.com/x', 'https://site.example/?utm_source=chatgpt.com', 'https://claude.ai/'), 'https://github.com/x', 'another site learns nothing');
+});
+
+test('the server reads the same tag the page carries, from the one rule', () => {
+  const at = (q: string) => new URL(`https://site.example/${q}`);
+  assert.equal(sourceOf(at('?ref=linkedin'), 'site.example', ''), 'linkedin');
+  assert.equal(sourceOf(at('?utm_source=chatgpt.com'), 'site.example', ''), 'chatgpt');
+  assert.equal(sourceOf(at('?utm_source=Newsletter'), 'site.example', ''), 'newsletter');
+  assert.equal(sourceOf(at(''), 'site.example', 'https://news.ycombinator.com/item?id=1'), 'ycombinator');
+  assert.equal(sourceOf(at(''), 'site.example', 'https://app.site.example/'), null, 'the site itself is no source');
+  assert.equal(sourceOf(at('?ref=a%20b'), 'site.example', 'https://claude.ai/'), null, 'junk');
+  assert.equal(sourceOf(at(''), 'site.example', 'not a url'), null);
 });
