@@ -1093,9 +1093,9 @@
       "id": "places",
       "stream": "places",
       "keep": {
-        "latest": true
+        "history": "P1D"
       },
-      "say": "Where each thing stands on each canvas now, and not where it stood before."
+      "say": "Retired: where things were put by hand on a canvas, which nothing keeps now. What is left goes a day after it was put."
     },
     {
       "id": "pack",

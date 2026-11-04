@@ -1,7 +1,7 @@
 // Saved canvases (task e_uq77ps44): a flat lens and a style kept as an item of core's `lens` type. An agent makes and
 // changes one through change and opens it on the owner's screen with report show; in a real browser (skipped where
 // there is no Chrome) one is saved from the query bar, listed on Home one line each, opened in one click and switched
-// to from the bar, its places kept apart from the map's, at 1280 and at 560 px.
+// to from the bar, at 1280 and at 560 px.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -54,7 +54,7 @@ test("a pack ships canvases as presets: the schema offers each, its lens answers
   assert.equal(got.entity.props.preset, 'core.waiting', 'the owner’s version names the preset it stands for');
 });
 
-test('in a browser, a canvas is saved from the bar, listed on Home, opened and switched to, its places its own', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, a canvas is saved from the bar, listed on Home, opened and switched to', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {
     reason: 'test',
@@ -93,15 +93,6 @@ test('in a browser, a canvas is saved from the bar, listed on Home, opened and s
       assert.ok(saved, 'kept on the map');
       assert.deepEqual([saved.props.filter.find, saved.props.walk], [[`id ${made.p}`], { over: ['part_of'], steps: 1 }], 'its lens: the filter, the walk');
       assert.equal(await canvasUp(), saved.id, 'its id in the address');
-
-      // Moved on it: written under its own id, not the item's canvas or the map's.
-      await page.evaluate(`document.querySelector('#canvas .pane-canvas').dispatchEvent(new CustomEvent('drawing-drop', { detail: { id: '${made.a}', x: ${width}, y: 77 } }))`);
-      await page.evaluate(`location.hash = '#/'`);
-      let mine: Record<string, [number, number]> = {};
-      for (const end = Date.now() + 10000; Date.now() < end && !mine[made.a]; await wait(200)) mine = (await call('/api/places', undefined, { canvas: `${saved.id}@wired` })).result;
-      assert.deepEqual(mine[made.a], [width, 77], 'kept in its places');
-      assert.equal((await call('/api/places', undefined, { canvas: made.p })).result[made.a], undefined, 'not in the places of the item it is drawn from');
-      assert.equal((await call('/api/places', undefined, {})).result[made.a], undefined, 'not in the map’s');
 
       // Home: one line each, opening in one click.
       await page.evaluate(`location.hash = '#/you'`);

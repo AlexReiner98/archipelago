@@ -1,11 +1,10 @@
 // The kernel's actions: what an agent does besides changing facts, each one of the six verbs (KERNEL_VERBS in
 // src/declared.ts): a session registered, reporting in and ending, the story it tells, a resource taken and given
-// back, things put where they stand on a canvas, the owner's screen pointed, a notification sent, the owner's word
+// back, the owner's screen pointed, a notification sent, the owner's word
 // recorded, a backup taken.
 
 import { z } from 'zod';
 import { askView } from './askview.ts';
-import { putPlaces } from './canvas-places.ts';
 import { importAudit } from './audit.ts';
 import { takeLook } from './looks.ts';
 import { toConfirm } from './confirm.ts';
@@ -101,15 +100,6 @@ export const ACT_TOOLS: Record<string, Tool> = {
       'Take back a held change you proposed yourself, e.g. one a newer change of yours covers (proposals lists covers and covered_by). It leaves the queue as withdrawn. Never another’s, and it decides nothing: approving or declining one stays a person’s.',
     input: { proposal: z.string().describe('The held change’s id (p_...).'), reason: z.string().min(1).optional().describe('Why, shown on it. Left out, what covers it.') },
     run: async (l, actor, input) => withdraw(l, actor, input),
-  },
-  places_put: {
-    description: 'Put things where they stand on one canvas, a batch of moves in one call: each item’s middle as [x, y] in the picture’s own units, or null to let the layout lay it again; clear: true forgets every place on the canvas first. Never a fact about the work: kept in the places stream, newest per canvas and item. Takes effect at once.',
-    input: {
-      canvas: z.string().optional().describe("The canvas: the id of the item it is drawn from; the workspace's (or nothing) for the whole map."),
-      moves: z.record(z.string(), z.tuple([z.number(), z.number()]).nullable()).optional().describe('By item id: where its middle now is, or null.'),
-      clear: z.boolean().optional().describe('Forget every place on this canvas first: it is laid out again.'),
-    },
-    run: async (l, actor, input) => putPlaces(l, actor, input),
   },
   session_start: {
     description: 'Register this agent session in the map so the human can see it: their page opens it a tab of its own, named by your chat’s title, and closes it when the chat ends (report session_end with reason; a chat that goes quiet for 12 hours is ended for it). Safe to call again on resume: the same session_id takes up the same session. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Takes effect at once.',

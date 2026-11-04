@@ -370,8 +370,8 @@ test('no read of the whole map', () => {
 // the agents' ten tools, came on 2 Nov 2026 at the owner's word: the page takes a change back as an agent does.
 const PAGE_CALLS = [
   'backup_download', 'change', 'connections', 'decide', 'document', 'events', 'get', 'github', 'import_backup', 'init',
-  'launch', 'member_add', 'member_list', 'member_set', 'model_account', 'pack_set', 'packs', 'picture', 'places',
-  'places_put', 'proposals', 'publish', 'publish_all', 'publish_plan', 'published', 'schema', 'search', 'server_packs',
+  'launch', 'member_add', 'member_list', 'member_set', 'model_account', 'pack_set', 'packs', 'picture',
+  'proposals', 'publish', 'publish_all', 'publish_plan', 'published', 'schema', 'search', 'server_packs',
   'session_end', 'share_create', 'share_figure', 'share_list', 'share_revoke', 'share_workspace', 'tail',
   'time_invoice_draft', 'time_invoice_paid', 'time_log', 'time_timesheet', 'time_week', 'token_create', 'token_list',
   'token_request_answer', 'token_requests', 'token_revoke', 'undo', 'unpublish', 'view', 'workspace_info', 'workspace_set',
@@ -386,13 +386,13 @@ test('the page calls no more tools through /api than it did', () => {
 
 // 17. Depth is never drawn on the canvas (decision e_ktdensts): the flat lens answers items and links with nothing of
 // what is inside what, and the canvas asks for no nesting of its picture (flatView's `nest` is for a kept view drawn in
-// a document or a screen). Places never carry meaning (decision e_n2825x2w): the places stream is read in one module,
-// to hand a drawing where things were put, and no lens, rule or view reads it.
-test('the canvas draws no depth, and places are read only to draw', () => {
+// a document or a screen). Places are never kept (the owner, 3 Nov 2026): a view is drawn from its query alone, so
+// nothing reads or appends to the places stream, which stays only so entries from before still read.
+test('the canvas draws no depth, and nothing keeps places', () => {
   assert.doesNotMatch(read('ui/canvas.js'), /\bnest\s*:/, 'The canvas draws a flat lens flat: part_of is a tie, never a box inside a box.');
   assert.doesNotMatch(read('src/query-flat.ts').replace(/\/\/.*$/gm, ''), /\b(?:depth|places?)\b|\binside\s*:/, 'The flat lens answers items and links: no containment and no places.');
-  const readers = walk('src').filter((f) => f.endsWith('.ts') && /readOps\([^)]*'places'/.test(read(f)));
-  assert.deepEqual(readers, ['src/canvas-places.ts'], 'Where a person put a thing is read only to draw it there (src/canvas-places.ts); grouping that matters is a link.');
+  const keepers = walk('src').filter((f) => f.endsWith('.ts') && /(?:readOps|record)\([^)]*'places'/.test(read(f)));
+  assert.deepEqual(keepers, [], 'Nothing keeps where a person put a thing: a view is drawn from its query alone; grouping that matters is a link.');
 });
 
 // 18. A drawing's modules (docs/layouts.md): what it imports is in its list in pack.json, the only files the page is sent.

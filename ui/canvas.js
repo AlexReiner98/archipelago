@@ -24,15 +24,13 @@ export const home = () => ({
 });
 /** The canvas an item's address opens when no lens is asked: the item and what it holds, depends on and waits on. */
 export const focusOn = (id) => ({ filter: { find: [`id ${id}`] }, walk: { over: FOCUS, steps: 1 } });
-/** The canvas as places are kept for it: the saved canvas up (ui/canvases.js), else the first item its filter names, else the whole map (''). */
-/** The item a lens is drawn from: the first it names by id, else what `in` an item it draws. */
-const drawnFrom = (filter) => idsOf(filter)[0] ?? (filter?.find ?? []).map((t) => /^in (e_[a-z0-9]{8})$/.exec(t)?.[1]).find(Boolean);
 /**
- * What a picture's places are kept under: its canvas, and the form it is laid out in. A place means something only in the
- * picture it was put on, so the flow's are kept apart from each older layout's, whose places stay in the stream unread:
- * `flow` here names no pack, only that the form asked for is the canvas's own.
+ * What a picture is kept under in this browser: the saved view up (ui/canvases.js), and the form it is laid out in.
+ * Nothing put by hand is kept with it: every view is drawn from its query's answer alone, the same each time it is asked,
+ * and a step moved by hand stays where it was put only until the canvas is drawn anew (the owner, 3 Nov 2026: Home
+ * wore down under places put on other pictures). `flow` here names no pack, only that the form asked for is the canvas's own.
  */
-const canvasOf = (lens, asked) => `${asked?.canvas ?? drawnFrom(lens.filter) ?? ''}@${asked?.shape && asked.shape !== 'flow' ? asked.shape : 'wired'}`;
+const canvasOf = (asked) => `${asked?.canvas ?? ''}@${asked?.shape && asked.shape !== 'flow' ? asked.shape : 'wired'}`;
 
 /** Every canvas drawn now, and the one the bar and find act on: the pane in focus (decision e_h2pqjy2q). */
 const all = new Set();
@@ -104,39 +102,31 @@ export function canvasIn(host, pane) {
     get style() {
       return at?.style ?? null;
     },
-    /** The canvas as the places stream names it: what it is drawn from, '' for the whole map; null with nothing up. */
-    get places() {
-      return at ? canvasOf(at.lens, at.asked) : null;
-    },
     /** Draw this lens (Home when it is null), the item `here` lit, unless it is up already: then only what is lit changes. */
     show(lens, here, asked = {}) {
       const isHome = !lens;
       lens ??= home();
       const key = JSON.stringify([lens, asked]);
       if (at?.key === key && at.view.isConnected) return c.mark(here);
-      // Moves made on the canvas left are written before another is drawn.
-      writeMoves();
-      // Where things were put here is read beside the lens, into `placed`: one object the picture keeps, filled in place.
+      // Where things were put by hand on this drawing, into `placed`: one object the picture keeps, filled in place.
       const style = { ...asked, ...(here && { here }), ...(asked.canvas && { play: 'asked' }), snap: Boolean(settings.snap), placed: {} };
       // The same lens drawn again (an item's page opened over it says it anew) stays where the reader moved it, and one
       // they have not moved fits the room beside the page.
       const same = at && JSON.stringify(at.lens) === JSON.stringify(lens);
       at = { key, view: null, lens, home: isHome, here, kept: same ? (c.moves() ? moved() : at.kept) : null, fitted: same ? at.fitted : null, style, asked };
       c.draw();
-      readPlaces(c, canvasOf(lens, asked), style.placed);
     },
     /** Draw nothing: a replay's pane before its first milestone (ui/panes.js). */
     empty() {
-      writeMoves();
       if (at?.view?.store) unfollow(at.view.store);
       at = null;
       host.replaceChildren();
     },
-    /** Draw the lens up now anew, with the places it has now: a picture already drawn takes no new places in a restyle. */
+    /** Draw the lens up now anew, with what was put by hand on it since it was shown. */
     draw() {
       const of = idsOf(at.lens.filter)[0];
       // A kept view up plays its steps, if it keeps any (from the map as it is, when Play is pressed: style.play).
-      const view = flatView({ lens: at.lens, style: at.style, of, key: `canvas:${canvasOf(at.lens, at.asked) || 'map'}`, played: at.style.canvas });
+      const view = flatView({ lens: at.lens, style: at.style, of, key: `canvas:${canvasOf(at.asked)}`, played: at.style.canvas });
       // The picture it replaces stops being kept current from the log.
       if (at.view?.store) unfollow(at.view.store);
       at.view = view;
@@ -152,13 +142,11 @@ export function canvasIn(host, pane) {
     },
     has: (id) => Boolean(at?.view?.answer?.items.some((i) => i.id === id)),
     refresh: (tail = false) => (tail && at?.view?.store ? undefined : at?.view?.refresh?.()),
-    /** Lay this canvas out again as its drawing does: what was put by hand here is forgotten, in the next batch. */
+    /** Lay this canvas out again as its drawing does: what was put by hand here is forgotten. */
     arrange() {
       if (!at) return;
-      batched.set(c.places, { clear: true, moves: {} });
       for (const id of Object.keys(at.style.placed)) delete at.style.placed[id];
       c.draw();
-      writeMoves();
     },
     /** The frame the drawing moves in now, and what moves it (ui/pan-zoom.js). */
     moves: () => at?.view?.querySelector('.lens-view')?.moves,
@@ -208,13 +196,10 @@ export function canvasIn(host, pane) {
     ev.preventDefault();
     pane.opened(id, at.lens);
   });
-  // Let go on the canvas (ui/drag.js): kept on the page, and in the picture's places, so a redraw keeps it where it was put.
+  // Let go on the canvas (ui/drag.js): kept on this drawing, so the map changing under it keeps it where it was put;
+  // drawn anew (another view, the page opened again), it is laid out as its drawing does.
   host.addEventListener('drawing-drop', (ev) => {
-    if (!at) return;
-    const put = [Math.round(ev.detail.x), Math.round(ev.detail.y)];
-    const was = batched.get(c.places) ?? { clear: false, moves: {} };
-    batched.set(c.places, { ...was, moves: { ...was.moves, [ev.detail.id]: put } });
-    at.style.placed[ev.detail.id] = put;
+    if (at) at.style.placed[ev.detail.id] = [Math.round(ev.detail.x), Math.round(ev.detail.y)];
   });
   // A held change is decided where it is drawn.
   wiresOn(host, () => at?.view?.store);
@@ -253,47 +238,6 @@ hooks.touched = async (touched) => {
     else location.hash = `#/e/${id}`;
   }
 };
-
-// ---- Where things were put by hand: batched on the page and written in one call just before the next action (the
-// owner, 25 Oct 2026), into the places stream (decision e_n2825x2w): by canvas (what the picture is drawn from, or the
-// whole map), then by item. Read beside the lens when a canvas is drawn, and handed to its drawing as `placed`.
-
-/** Moves made and not yet written: by canvas ('' for the whole map), each { clear, moves }: laid out again, and the middle of each item moved since. */
-const batched = new Map();
-let writing = null;
-const asked = (canvas) => (canvas ? { canvas } : {});
-/** Where things were put on this canvas, into `placed` (the picture's own), once what waits to be written is. */
-async function readPlaces(c, canvas, placed) {
-  await writeMoves();
-  const got = await api('places', asked(canvas)).catch(() => null);
-  if (!got || c.style?.placed !== placed) return;
-  // What was moved here while they were read stays where it was put.
-  Object.assign(placed, got, batched.get(canvas)?.moves);
-  // Read before the lens answered, they are drawn with it; after, the picture is drawn again with them.
-  if (Object.keys(placed).length && c.view.answer) c.draw();
-}
-/** Write what was moved, one call for each canvas; asked for before any action (ui/base.js), and when leaving. */
-async function writeMoves() {
-  if (writing) return writing;
-  if (!batched.size) return;
-  writing = (async () => {
-    const batch = [...batched];
-    batched.clear();
-    for (const [canvas, put] of batch) {
-      try {
-        await api('places_put', { ...asked(canvas), moves: put.moves, ...(put.clear && { clear: true }) });
-      } catch {
-        // Not written: kept for the next try, under what was moved since.
-        const since = batched.get(canvas);
-        batched.set(canvas, !since ? put : since.clear ? since : { clear: put.clear, moves: { ...put.moves, ...since.moves } });
-      }
-    }
-    writing = null;
-  })();
-  return writing;
-}
-hooks.act = () => writeMoves();
-addEventListener('visibilitychange', () => document.hidden && writeMoves());
 
 // ---- What the reader chose for the canvas, in the view band's menu (decision e_yxp78scv): kept in this browser, the same for every pane.
 

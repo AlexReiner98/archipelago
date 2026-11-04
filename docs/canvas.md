@@ -26,8 +26,8 @@ never structure. Containment is a projection the server keeps (the
 `part_of` closure), never geometry.
 - `packs/core/flow.test.ts`: "a flat lens's answer is drawn: every item a
   step, part_of a tie, depends_on the order, nothing nested".
-- `test/structure.test.ts`: "the canvas draws no depth, and places are read
-  only to draw" (the canvas asks for no nesting; the flat query names none).
+- `test/structure.test.ts`: "the canvas draws no depth, and nothing keeps
+  places" (the canvas asks for no nesting; the flat query names none).
 
 ### 3. The query is a filter, a walk and a limit, and the only bound
 Its parts have one name each, on the page and in an agent's answer: Find,
@@ -94,12 +94,14 @@ offered (`ui/picker-rank.js`, task e_css8swr9).
 - `test/saved-canvases.test.ts`: "an agent makes and changes a saved canvas
   through change, and report show opens it".
 
-### 5. Views are items; places live in a stream of their own
+### 5. Views are items, drawn from their query alone
 A view is a query and a layout kept on the map, an item of core's
-system type `lens`, and Home lists them. Where a person put a node is a
-place in the `places` stream: one per canvas and item, compacted to the
-newest, never an item or a link, read only to draw it there. Position never
-carries meaning; a grouping that matters is made as a link.
+system type `lens`, and Home lists them. It is drawn from its answer alone,
+the same each time it is asked: a node moved by hand stays where it was put
+on that drawing only, and is laid out anew when the view is drawn again
+(the owner, 3 Nov 2026: Home wore down under places kept from other
+pictures). Position never carries meaning; a grouping that matters is made
+as a link.
 A pack ships views as presets (a `styles` entry of `type: "lens"`,
 decision e_x8bghuce): the picker and Home list each until the owner saves
 their own version, which names it (`preset`) and stands in its place.
@@ -120,13 +122,11 @@ canvas, and Use here there, a button its type declares on a screen
 (`docs/packs.md`), does what the switch does (task e_q3yfvnz7). Deleting a
 layout or style says which views use it; they go to the default.
 - `test/saved-canvases.test.ts`: "in a browser, a canvas is saved from the
-  bar, listed on Home, opened and switched to, its places its own".
+  bar, listed on Home, opened and switched to".
 - `test/style-items.test.ts`: "in a browser, find opens a style’s page and
   Apply draws the canvas in it".
-- `test/canvas-places.test.ts`: "a move names a canvas and items the map
-  has"; "compaction leaves the newest place of each item on each canvas".
 - `test/structure.test.ts`: "every store is named, with its rule"; "the
-  canvas draws no depth, and places are read only to draw".
+  canvas draws no depth, and nothing keeps places".
 
 ### 6. The page is a replica of the log
 The page holds a query's answer as items and links by id, and keeps it
@@ -143,16 +143,16 @@ compares answers.
 A status, Save in the sheet: each builds ops and sends
 them through `change` on the person's authority, where the rules decide
 whether it applies or waits. A held change is drawn as a ghost where it
-would land and decided there. Moves are the one batch outside it, written to
-the places stream just before the person's next action.
+would land and decided there. A move by hand is not a change: nothing of it
+is kept.
 - `test/structure.test.ts`: "items and relations are written in one place";
   "every approval is decided by a rule".
 - `test/canvas-wires.test.ts`: "in a browser, opening a step keeps the canvas
   still and lights it, and a held change is decided where it would land".
 - `test/ghosts.test.ts`: "held changes are drawn where they would land, and
   only there".
-- `test/canvas-drag.test.ts`: "in a browser, a step dragged on the canvas is
-  kept in the places stream and drawn there again".
+- `test/canvas-drag.test.ts`: "in a browser, a step dragged on the canvas
+  stays there until the view is drawn anew".
 
 ### 8. An item reads the same everywhere
 Rule 11 of the target model (decided 26 Oct 2026, e_bed3aj7d). An item's page
@@ -179,7 +179,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | Module | What it is |
 | --- | --- |
 | `app.js` | routes the address to the canvas and the sheet |
-| `canvas.js` | a pane's canvas: its query, Home's query, clicks, moves batched, Arrange |
+| `canvas.js` | a pane's canvas: its query, Home's query, clicks, moves held on the drawing, Arrange |
 | `query.js` | the address codec (`readAddress`, `addressOf`); `flatView` reads, holds and draws a query |
 | `query-bar.js` | the query said in one line at rest, and as the rows Find, Only, Not, Walk and Limit, changed in place |
 | `find.js` | the bar at the canvas's foot: opened, its rows; typed, what the words could be; Enter takes the lit choice, Shift+Enter adds the words (e_e3k797d3) |
@@ -205,7 +205,6 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `src/query-saved.ts` | kept views: their picture, `shown_in`, the move from old views |
 | `src/styles.ts` | the style a page or view is drawn in (core view `style`) |
 | `src/layouts.ts` | which drawing a style names, and the owner's version of it |
-| `src/canvas-places.ts` | the places stream: `places`, `places_put` |
 | `src/tail.ts`, `src/project.ts` | facts after a position; the pure projector (served as `/project.js`) |
 | `src/pelago.ts`, `src/rules.ts` | the one write path, and what decides it |
 | `packs/core/layouts/flow/` | the flow drawing: `graph.js` flattens, `layout.js` orders, `free.js` keeps places, `index.js` answers marks |
@@ -215,8 +214,7 @@ measure it reads at), shipped by the house style and a pack's presets.
    with `readAddress` and `canvas.js` `showCanvas` puts it up (Home's query
    when there is none).
 2. `flatView` asks `view` `flat` with the query and `view` `style` beside it,
-   and `canvas.js` asks `places` for the canvas (the kept view, else the
-   first id in the filter, else the whole map).
+   and nothing else: no place is read beside it.
 3. The answer goes into a store (`live.js` `replicate`), with the position
    read before the query and the changes held for the owner.
 
@@ -239,15 +237,15 @@ measure it reads at), shipped by the house style and a pack's presets.
 ## How it is written
 1. A wire let go on a node asks which link, then `change` as the person; it
    is drawn at once as pending and kept or dropped when the answer comes.
-2. A drop on the canvas is batched; before any act (`change`, `decide`,
-   `undo`...) `ui/base.js` writes the batch with `places_put`.
+2. A drop on the canvas is held on that drawing (`placed`) and written
+   nowhere.
 3. A held change comes back as a proposal, drawn as a ghost; a click on it
    asks Apply or Decline, and `decide` settles it.
 
 ## Tabs and panes: more than one canvas at once
 Every pane in a tab is alike (the owner, 28 Oct 2026): none is the main one.
 Each is a canvas of its own (`canvas.js`): a query and a style, held in its
-own store and kept current from the log, with its places, its wires, its
+own store and kept current from the log, with its wires, its
 fitting and Arrange. Panes stand side by side, as a code editor's groups do:
 ◫ in the bar opens the pane in focus's canvas in a pane beside it, a pane's
 name dragged onto a side of another docks it there (onto its middle swaps

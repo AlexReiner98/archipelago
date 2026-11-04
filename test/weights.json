@@ -26,7 +26,6 @@
  "test/attention.test.ts": 12,
  "test/automations.test.ts": 27,
  "test/blocking.test.ts": 22,
- "test/canvas-places.test.ts": 21,
  "test/capabilities.test.ts": 22,
  "test/changes.test.ts": 35,
  "test/commit-run.test.ts": 35,
