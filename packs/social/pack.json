@@ -17,11 +17,62 @@
         "posted": { "type": "date", "description": "The day it went out." },
         "url": { "type": "url", "description": "The post itself, once it is out." },
         "replies": { "type": "number", "shown": true, "description": "Replies it drew, as its author counts them." },
-        "conversations": { "type": "number", "shown": true, "description": "Conversations it began: replies or messages that said the problem." },
+        "conversations": { "type": "number", "shown": true, "system": true, "description": "Conversations it began: replies or messages that said the problem, counted from the conversations that came from it." },
+        "impressions": { "type": "number", "shown": true, "description": "Times it was seen, as the channel counts them, typed in at about 3 and 7 days. A weak signal: never summed into a judgement." },
+        "reactions": { "type": "number", "shown": true, "description": "Likes and other reactions, as the channel counts them. A weak signal." },
+        "reposts": { "type": "number", "shown": true, "description": "Reposts and shares, as the channel counts them. A weak signal." },
         "asked": { "type": "number", "shown": true, "system": true, "description": "Trials asked for under its tag." },
         "begun": { "type": "number", "shown": true, "system": true, "description": "Trials begun under its tag." },
         "paid": { "type": "number", "shown": true, "system": true, "description": "Trials paid for, and workspaces bought with no trial, under its tag." },
         "ended": { "type": "number", "system": true, "description": "Trials under its tag that ended unpaid." }
+      }
+    },
+    {
+      "id": "conversation",
+      "extends": "occurrence",
+      "title": "Conversation",
+      "description": "Someone who replied or wrote and said the problem they have: a conversation a post began. It is linked came_from the post, or the source it came through, and the post counts it. Its title is the person and the problem in a few words; its note holds what was said.",
+      "statuses": { "open": ["open"], "closed": ["closed"] },
+      "fields": {
+        "person": { "type": "string", "shown": true, "description": "Who it is with: their name or handle." },
+        "channel": { "type": "enum", "values": ["linkedin", "x", "bluesky", "threads", "instagram", "youtube", "hn", "dm", "blog", "substack", "email"], "shown": true, "description": "Where it is had; the post's channel unless said." },
+        "problem": { "type": "string", "shown": true, "description": "The problem they said, in their words." },
+        "began": { "type": "date", "shown": true, "description": "The day it began." }
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": "came_from",
+      "extends": "about",
+      "title": "came from",
+      "inverse": "began",
+      "from": ["conversation"],
+      "to": ["post"],
+      "description": "The conversation came from this post, or the source it came through (a tag with no post): what the post's count of conversations is read from."
+    }
+  ],
+  "actions": [
+    {
+      "id": "social.conversation",
+      "title": "Conversation",
+      "verb": "capture",
+      "limit_ms": 10000,
+      "description": "Record a conversation a post began: someone who replied or wrote and said the problem they have. from is the post (or source) it came from; person who it is with; problem what they said, in their words. The channel is the post's unless given, the day today unless given. It is linked came_from the post, and the post's conversations is counted again from those links.",
+      "on": ["post"],
+      "item": "from",
+      "input": {
+        "type": "object",
+        "properties": {
+          "from": { "type": "string", "description": "Id of the post or source it came from." },
+          "person": { "type": "string", "minLength": 1, "maxLength": 80, "description": "Who it is with: their name or handle." },
+          "problem": { "type": "string", "minLength": 1, "maxLength": 400, "description": "The problem they said, in their words." },
+          "channel": { "type": "string", "enum": ["linkedin", "x", "bluesky", "threads", "instagram", "youtube", "hn", "dm", "blog", "substack", "email"], "description": "Where it is had, when not the post's channel." },
+          "date": { "type": "string", "description": "The day it began, as 2026-11-04. Today when left out." },
+          "note": { "type": "string", "description": "What was said, if there is more." }
+        },
+        "required": ["from", "person", "problem"],
+        "additionalProperties": false
       }
     }
   ],
@@ -46,6 +97,13 @@
           }
         }
       ]
+    },
+    {
+      "form": "screen",
+      "id": "social.conversation",
+      "title": "Conversation",
+      "on": ["post"],
+      "pieces": [{ "piece": "button", "label": "Conversation", "tip": "A reply that said the problem: record it as a conversation this post began", "action": "social.conversation" }]
     }
   ],
   "handlers": [{ "webhook": "social.count", "records": ["signup.counted"] }],
