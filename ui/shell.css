@@ -418,3 +418,9 @@ body[data-panes="1"] #canvas .pane-bar { display: none; }
 /* Room for the strip's ⠿ on its left and its ⧉ and × on its right. */
 body:not([data-panes="1"]) #query .q-view { margin: 0 calc(var(--space-5) + (var(--box-7) + var(--space-3)) * 2) 0 calc(var(--space-5) + var(--box-7) + var(--space-3)); padding: 0; background: none; border: 0; }
 #canvas > .pane-sash.row { top: var(--band, 0%); }
+
+/* A view's thumbnail (ui/thumbs.js): a small still of it at the head of its row, and the frame it is drawn in, off screen. */
+.thumb { display: block; flex: none; width: var(--thumb); height: var(--thumb-high); border-radius: var(--box-1); background: var(--bg); overflow: hidden; }
+.thumb > img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.thumb-stage { position: fixed; top: 0; left: 100%; width: var(--thumb-frame); height: var(--thumb-frame-high); overflow: hidden; visibility: hidden; pointer-events: none; contain: strict; }
+.thumb-stage .lens-wrap, .thumb-stage .lens-view { width: 100%; height: 100%; }
