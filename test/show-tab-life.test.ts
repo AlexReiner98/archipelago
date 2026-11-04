@@ -25,11 +25,11 @@ test('in a browser, a chat has a tab once it shows something, out of sight; clos
     const { run } = (await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: 'tab-one', surface: 'claude-code', title: 'Tab one' } })).result;
     await wait(2500);
     assert.ok(!(await strip()).includes('Tab one'), 'a chat that has shown nothing has no tab');
-    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a, run } });
+    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a, run, focus: false } });
     await until('its tab', (names) => names.includes('Tab one'));
     assert.equal(await page.evaluate<string>('location.hash'), before, 'the reader stays where they were');
     await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: 'tab-one', surface: 'claude-code' } });
-    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a, run } });
+    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a, run, focus: false } });
     await wait(2500);
     assert.equal(await page.evaluate<string>('location.hash'), before, 'its shows go to its tab, not the one in sight');
     assert.equal((await strip()).filter((t) => t === 'Tab one').length, 1, 'taking it up again opens no second tab');
@@ -39,12 +39,12 @@ test('in a browser, a chat has a tab once it shows something, out of sight; clos
     await page.evaluate('location.reload()');
     await wait(3500);
     assert.ok(!(await strip()).includes('Tab one'), 'a reload does not bring it back');
-    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a, run } });
+    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a, run, focus: false } });
     await until('its show brings it back', (names) => names.includes('Tab one'));
     // Its agent says where its work stands: the chat goes on, waiting, and its tab goes until it shows something again.
     await call('/agent/report', undefined, { actor: agent, action: 'session_end', params: { run, summary: 'Done for now', cannot_tell_rest: true } });
     await until('gone while it waits', (names) => !names.includes('Tab one'));
-    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a, run } });
+    await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.a, run, focus: false } });
     await until('back with its show', (names) => names.includes('Tab one'));
     // The chat ends: its tab goes.
     await call('/agent/report', undefined, { actor: agent, action: 'session_end', params: { run, reason: 'closed', cannot_tell_rest: true } });

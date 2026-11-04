@@ -45,7 +45,7 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     else await wait(250);
     assert.fail(`${what}: ${JSON.stringify(await panes())} ${await page.evaluate<string>('location.hash')} ${page.logs().join('\n')}`);
   };
-  const show = (params: Record<string, unknown>) => call('/agent/report', undefined, { actor: 'robot', action: 'show', params }).then((r) => r.result);
+  const show = (params: Record<string, unknown>) => call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { focus: false, ...params } }).then((r) => r.result);
   /** The panes as the reader sees them, in order: each one's name, its left edge, whose it is, and whether it is in focus. */
   const panes = () =>
     page

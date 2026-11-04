@@ -30,7 +30,7 @@ test('in a browser, every chat that shows something has a tab named by its title
     else await wait(250);
     assert.fail(`${what}: ${JSON.stringify(await strip())} ${page.logs().join('\n')}`);
   };
-  const show = (n: number, item: string) => call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made[item], run: sessions[n].run } });
+  const show = (n: number, item: string) => call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made[item], run: sessions[n].run, focus: false } });
   /** The tab named `name`, as a selector. */
   const tabNamed = async (name: string) => `#tabs .tab:nth-child(${(await names()).indexOf(name) + 1})`;
   try {
