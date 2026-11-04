@@ -13,7 +13,10 @@ import { notify } from './notify.ts';
 import { wholeMap } from './outbox.ts';
 import { took } from './presence.ts';
 import { alertOwner } from './alert.ts';
+import { sessionEvents } from './session-events.ts';
 import { sessionEnd } from './sessions.ts';
+import { keptOf } from './query-kept.ts';
+import { styleFor } from './styles.ts';
 import { callTool } from './tools.ts';
 import { VIEWS } from './views.ts';
 
@@ -28,8 +31,15 @@ interface LoggedEvent {
 
 const CURSOR = 'automation_cursor';
 
-/** Hours without a word before an open session is taken to be gone, and ended for it. */
-export const QUIET_HOURS = 12;
+/** Minutes without a word before an open session is taken to be gone, and ended for it: the house style's `quiet_end_after`, or this while a style lacks it. */
+export const QUIET_END_AFTER = 1440;
+
+/** The workspace style's number of minutes, read each pass so the owner's change shows on the next. */
+async function quietEndAfter(l: Archipelago): Promise<number> {
+  const { style } = await styleFor(l, await keptOf(l, 'style', undefined), {});
+  const n = (style.numbers as Record<string, unknown> | undefined)?.quiet_end_after;
+  return typeof n === 'number' && n > 0 ? n : QUIET_END_AFTER;
+}
 
 const fill = (template: string, values: Record<string, string>) => template.replace(/\{(\w+)\}/g, (whole, key) => values[key] ?? whole);
 
@@ -157,15 +167,22 @@ export class Automations {
     return { automation: auto.id, ok, result };
   }
 
-  /** Tell the human, once, about each open session that has stopped reporting. */
+  /** Tell the human, once, about each open session that has stopped reporting; end it once it has said nothing for quiet_end_after. */
   private async flagStaleSessions(): Promise<void> {
-    if (!this.l.registry.type('notification')) return;
     const view = (await VIEWS.sessions.run(this.l, {})) as { stale_after_minutes: number; open: { id: string; title: string; stale: boolean; busy: boolean; last_seen: string; holds: { title: string }[] }[] };
-    for (const run of view.open.filter((r) => r.stale)) {
-      // Half a day without a word: its window was shut, or its machine was. It is ended for it, as its end hook
-      // would have ended it, and what it held is given back.
-      if (Date.now() - Date.parse(run.last_seen) > QUIET_HOURS * 3_600_000) {
-        await sessionEnd(this.l, { kind: 'agent', name: 'pelago' }, { run: run.id, outcome: 'finished', summary: `Not heard from for over ${QUIET_HOURS} hours: ended for it` });
+    const stale = view.open.filter((r) => r.stale);
+    if (!stale.length) return;
+    const endAfter = await quietEndAfter(this.l);
+    const hours = Math.round(endAfter / 60);
+    for (const run of stale) {
+      // A heartbeat sets last_seen; a hook's raw events do not, and are a word from it too.
+      const events = await sessionEvents(this.l, run.id);
+      const heard = Math.max(Date.parse(run.last_seen), ...events.map((e) => Date.parse(e.at)).filter(Number.isFinite));
+      if (Date.now() - heard <= view.stale_after_minutes * 60_000) continue;
+      // Nothing for that long: its window was shut, or its machine was. It is ended for it, as its end hook
+      // would have ended it, what it held is given back, and its works_on closes, so it leaves its task's canvas.
+      if (Date.now() - heard > endAfter * 60_000) {
+        await sessionEnd(this.l, { kind: 'agent', name: 'pelago' }, { run: run.id, outcome: 'finished', reason: 'quiet', summary: `Not heard from for over ${hours} hours: ended for it` });
         continue;
       }
       const entity = await this.l.entity(run.id);
@@ -174,11 +191,11 @@ export class Automations {
       // Its tab on the owner's page goes until it next shows something (ui/tab-life.js); not while a turn is under way.
       if (!run.busy) await took((await wholeMap(this.l)).db, this.l, { kind: 'other', actor: 'agent:pelago', did: 'quiet', rests: true, run: run.id }, true).catch(() => {});
       // Worth a person's attention only when it keeps something from everyone else: the rest end by themselves.
-      if (!run.holds.length) continue;
+      if (!run.holds.length || !this.l.registry.type('notification')) continue;
       await notify(
         this.l,
         { kind: 'agent', name: 'pelago' },
-        { title: `Session "${run.title}" has gone quiet`, body: `It still holds: ${run.holds.map((h) => h.title).join(', ')}. End it from its page to release them; left alone, it is ended after ${QUIET_HOURS} hours.`, level: 'warning', about: run.id },
+        { title: `Session "${run.title}" has gone quiet`, body: `It still holds: ${run.holds.map((h) => h.title).join(', ')}. End it from its page to release them; left alone, it is ended after ${hours} hours.`, level: 'warning', about: run.id },
       );
     }
   }
