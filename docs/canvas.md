@@ -280,7 +280,9 @@ session in its hue, else a view or an item by its name, a query by
 what its filter finds, Home by Home. There is no most: many shrink to their
 mark and first letters (e_q3amet26). What is the tab's own is on the strip,
 never in the query bar, which shows the query (e_j7ggggjr): + at its end
-opens the canvas in a tab of its own; a press brings a tab into sight, a
+opens a blank tab, one pane with no query, as Split in the bar opens a blank
+pane (the owner, 3 Nov 2026, e_33eqyryy), and an agent's show takes a blank
+pane before it splits one; a press brings a tab into sight, a
 middle press closes it, and every tab has ⋯, its menu, and ×, in sight or not. A tab,
 not a pane, pops out into a window of its own (Pop out in ⋯, or the tab
 dragged out of the page) and ⇲ there docks it back whole (e_ezb7s3a7).

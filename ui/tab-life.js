@@ -74,7 +74,7 @@ function close(run, found, whose) {
     else (settle(t, run), (redraw ||= inSight));
   }
   // A page always keeps a tab of the owner's.
-  if (!tabs.list.length) tabs.list = [freshTab('#/')];
+  if (!tabs.list.length) tabs.list = [freshTab()];
   if (!tabs.list.some((t) => t.id === tabs.front)) tabs.front = tabs.list[0].id;
   keep();
   if (redraw) draw();
