@@ -122,6 +122,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       remote: z.string().optional().describe('The address the checkout was cloned from (git remote origin). Finds the repository on any machine; the directory is used when this is not given or not known.'),
       session_id: z.string().optional().describe('The id your surface gave this session, if you know it. Makes this call safe to repeat.'),
       branch: BRANCH,
+      parent: z.string().optional().describe('The session that started this one: run or session id.'),
       source: z.enum(['startup', 'resume', 'clear', 'compact']).optional().describe('Why your client started it, if it says: after clear, the chat goes on, and this session takes over the tab of the one the clear ended in the same folder.'),
     },
     run: async (l, actor, input) => {
@@ -139,6 +140,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       note: z.string().optional().describe('What happened, what you found, or what you are blocked on.'),
       task: z.string().optional(), branch: BRANCH,
       title: z.string().optional().describe('What your chat is called now, when it was renamed: the tab on the owner’s page follows.'),
+      parent: z.string().optional().describe('Its parent, learnt later.'),
     },
     run: async (l, actor, input) => {
       const updated = await sessionUpdate(l, actor, input);

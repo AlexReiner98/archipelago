@@ -592,18 +592,6 @@ details.menu.ok > summary { font-size: var(--text-2); color: var(--warn); }
 
 /* A session's story: what it found, over a picture of that; how it got there, folded. */
 .story .finding { margin: var(--space-3) var(--space-8) var(--space-7); max-width: var(--measure); font-size: var(--text-6); line-height: 1.5; }
-.beats { list-style: none; margin: 0; padding: var(--space-3) 0 var(--space-5); }
-.beat summary { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-4) var(--space-8); cursor: pointer; list-style: none; white-space: nowrap; }
-.beat summary::-webkit-details-marker { display: none; }
-.beat summary .n { flex: none; min-width: var(--rhythm-8); color: var(--muted); font-size: var(--text-2); text-align: right; }
-.beat summary .said { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.beat summary .ago { flex: none; }
-.beat:hover summary, .beat summary:focus-visible { background: var(--accent-soft); }
-.beat.found summary .said { font-weight: 600; }
-.beat.taken-back summary .said { text-decoration: line-through; color: var(--muted); }
-.beat-more { padding: var(--space-2) var(--space-8) var(--space-6) calc(var(--space-8) + var(--rhythm-8) + var(--space-5)); max-width: var(--measure); }
-.beat-more p { margin: 0 0 var(--space-4); }
-.beat-items { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-7); font-size: var(--text-4); }
 .story-picture { min-width: 0; border-top: var(--border-1) solid var(--line); }
 
 /* Home: a card per project, its questions beside its next release. */

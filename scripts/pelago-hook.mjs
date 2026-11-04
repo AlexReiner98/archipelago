@@ -49,6 +49,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 
 // Which hand-out of Archipelago's files this project has: the setup writes it in, and the server says when it is behind.
@@ -228,7 +229,51 @@ function runFile(said) {
   }
 }
 
+// What the session did, as the events of docs/sessions.md (pelago-events.mjs, handed out beside this). One
+// missing (a copy from before it) tells nothing: the hook goes on as before.
+const adapter = await import('./pelago-events.mjs').catch(() => null);
+
+/** A wait the session stopped for, kept outside any checkout until something shows it was answered. */
+const waitFile = (said) => (typeof said.session_id === 'string' && /^[\w-]+$/.test(said.session_id) ? resolve(tmpdir(), 'pelago-waits', said.session_id) : null);
+function waitEnded(said) {
+  const file = waitFile(said);
+  try {
+    const kept = file && readFileSync(file, 'utf8');
+    if (!kept) return [];
+    rmSync(file, { force: true });
+    return [{ at: new Date().toISOString(), kind: 'wait.end', ...(said.prompt_id && { turn: said.prompt_id }), for: kept.trim() }];
+  } catch {
+    return [];
+  }
+}
+
+/** Sends events to /hooks/events, briefly: a server away, or one without the route yet, costs the turn nothing. */
+async function sendEvents(said, events) {
+  if (!events.length || typeof said.session_id !== 'string') return;
+  await fetch(`${base}/hooks/events`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) },
+    body: JSON.stringify({ session_id: said.session_id, source: 'claude-code', events }),
+    signal: AbortSignal.timeout(3_000),
+  }).catch(() => null);
+}
+
+// The hooks that only tell events: a wait begun or answered, a turn that ended in an error.
+if (name === 'notification' || name === 'tool-used' || name === 'stop-failure') {
+  try {
+    const said = JSON.parse(input || '{}');
+    const wait = name === 'notification' && adapter?.waitStart(said);
+    const file = wait && waitFile(said);
+    if (file) mkdirSync(dirname(file), { recursive: true }), writeFileSync(file, wait.for);
+    if (adapter) await sendEvents(said, wait ? [wait] : name === 'tool-used' ? waitEnded(said) : name === 'stop-failure' ? [...waitEnded(said), adapter.failedEnd(said)] : []);
+  } catch {
+    // Not JSON, or nothing to say: the session goes on.
+  }
+  process.exit(0);
+}
+
 let body = input.trim() || '{}';
+let transcript = '';
 if (name === 'session-start') {
   // Which repository this is, by the address it was cloned from: a folder is somewhere else on every machine.
   try {
@@ -242,7 +287,8 @@ if (name === 'session-start') {
   // A chat resumed has a title already: its tab is named by it from the start.
   try {
     const said = JSON.parse(body);
-    const { title } = said.transcript_path ? readTranscript(readFileSync(said.transcript_path, 'utf8')) : {};
+    transcript = said.transcript_path ? readFileSync(said.transcript_path, 'utf8') : '';
+    const { title } = transcript ? readTranscript(transcript) : {};
     if (title) body = JSON.stringify({ ...said, title });
   } catch {
     // No record yet: a new chat has no title until it is given one.
@@ -268,7 +314,8 @@ if (name === 'session-start') {
   try {
     const said = JSON.parse(body);
     if (said.transcript_path) {
-      const { made, turnMade, ran, ...read } = readTranscript(readFileSync(said.transcript_path, 'utf8'));
+      transcript = readFileSync(said.transcript_path, 'utf8');
+      const { made, turnMade, ran, ...read } = readTranscript(transcript);
       const log = logged(said.cwd, ran);
       const commits = [...new Set([...fullIds(said.cwd, made), ...log.map((c) => c.sha)])];
       const turnCommits = read.reply?.pushed ? commits : [...new Set([...fullIds(said.cwd, turnMade ?? []), ...log.filter((c) => c.mine).map((c) => c.sha)])];
@@ -295,6 +342,27 @@ try {
   // Not JSON: it goes as it came.
 }
 
+// The events this hook tells, beside its own call; at a turn's end after it, as its answer may send the reply on.
+const said = (() => { try { return JSON.parse(input || '{}'); } catch { return {}; } })();
+let events = [];
+if (adapter) try {
+  const at = new Date().toISOString();
+  if (name === 'session-start') {
+    const { title } = JSON.parse(body);
+    const branch = (() => { try { return execFileSync('git', ['-C', said.cwd || '.', 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 }).trim(); } catch { return ''; } })();
+    events = [{ at, kind: 'session.start', ...((title ?? said.session_title) && { title: title ?? said.session_title }), ...(branch && { branch }) }];
+  } else if (name === 'prompt') events = [...(transcript ? adapter.turnEvents(transcript, said) : []), ...waitEnded(said), { at, kind: 'turn.start', ...(said.prompt_id && { turn: said.prompt_id }), ...adapter.promptedBy(said.prompt) }];
+  else if (name === 'stop') events = [...(transcript ? adapter.turnEvents(transcript) : []).map((e) => (e.turn || !said.prompt_id ? e : { ...e, turn: said.prompt_id })), ...waitEnded(said)];
+  else if (name === 'session-end') events = [...waitEnded(said), { at, kind: 'session.end', ...(typeof said.reason === 'string' && { reason: said.reason.slice(0, 40) }) }];
+  // A commit by its full id, where the checkout has it.
+  const full = fullIds(said.cwd, events.filter((e) => e.kind === 'commit').map((e) => e.sha));
+  events = events.map((e) => (e.kind === 'commit' ? { ...e, sha: full.find((f) => f.startsWith(e.sha)) ?? e.sha } : e));
+} catch {
+  // Nothing to tell this time; what the hook is for still goes through.
+}
+const telling = name === 'stop' ? null : sendEvents(said, events);
+let answered = '';
+
 try {
   const res = await fetch(`${base}/hooks/${name}`, {
     method: 'POST',
@@ -302,7 +370,7 @@ try {
     body,
     signal: AbortSignal.timeout(10_000),
   });
-  const answer = await res.text();
+  const answer = (answered = await res.text());
   if (res.ok && name === 'file-used') {
     // What it said is kept, so the next file's answer leaves it out; the rest is Claude Code's.
     const { said: ids, ...rest } = JSON.parse(answer || '{}');
@@ -330,6 +398,15 @@ try {
 } catch (err) {
   console.error(`Archipelago ${name} hook: ${base} did not answer (${err.message})`);
 }
+// A reply the server sends on has not ended: its turn goes on.
+if (name === 'stop') {
+  try {
+    if (adapter && !/"decision"\s*:\s*"block"/.test(answered)) events.push(adapter.turnEnd(transcript, said));
+  } catch {
+    // No end to tell: the next prompt opens the next turn all the same.
+  }
+  await sendEvents(said, events);
+} else await telling;
 
 // A session that has ended makes no more commits: its run is not left for another to be named by.
 if (name === 'session-end') {

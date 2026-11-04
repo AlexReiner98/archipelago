@@ -6,6 +6,7 @@ import { type Actor, type Entity, type Archipelago } from './pelago.ts';
 import { spent } from './spent.ts';
 import { usage } from './usage.ts';
 import { factEvents } from './eventlog.ts';
+import { byAttention, markOf, sessionStates } from './session-state.ts';
 
 /** The most change sets' events changed_since counts: past that, its counts are of the newest. */
 const COUNTED = 20_000;
@@ -42,18 +43,22 @@ const STALE_MINUTES = 30;
 
 async function sessions(l: Archipelago) {
   const runs = l.registry.family('run');
-  const homes = livesIn(l);
+  const homes = livesIn(l), parents = l.registry.relationFamily('started_from');
   const { rows: open } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null order by created_at desc`, [runs]);
   const { rows: links } = await l.db.query<{ run: string; type: string; id: string; title: string; entity_type: string }>(
     `select r.from_id as run, r.type, e.id, e.title, e.type as entity_type from relation r join entity e on e.id = r.to_id
      where r.from_id = any($1::text[]) and r.valid_to is null and r.type = any($2::text[])`,
-    [open.map((r) => r.id), ['works_on', 'holds', ...homes]],
+    [open.map((r) => r.id), ['works_on', 'holds', ...homes, ...parents]],
   );
   const { rows: ended } = await l.db.query(
     `select id, title, status, updated_at from entity where type = any($1::text[]) and not is_open and archived_at is null order by updated_at desc limit 10`,
     [runs],
   );
   const of = (run: string, ...types: string[]) => links.filter((x) => x.run === run && types.includes(x.type)).map(({ id, title, entity_type }) => ({ id, title, type: entity_type }));
+  // Each open run's state and latest turn (src/session-state.ts), and the open ones in the order they ask for attention.
+  const states = await sessionStates(l, open.map((r) => r.id));
+  const at = (id: string) => states.get(id) ?? { state: 'idle', line: '', since: null, turns: 0 };
+  open.sort((a, b) => byAttention(at(a.id), at(b.id)));
   return {
     stale_after_minutes: STALE_MINUTES,
     open: open.map((r) => {
@@ -73,6 +78,9 @@ async function sessions(l: Archipelago) {
         working_on: of(r.id, 'works_on'),
         holds: of(r.id, 'holds'),
         repo: of(r.id, ...homes)[0],
+        parent: of(r.id, ...parents)[0],
+        session: markOf(at(r.id)),
+        turn: at(r.id).turn,
       };
     }),
     recently_ended: ended,
@@ -117,9 +125,10 @@ export const VIEWS: Record<string, View> = {
     run: notifications,
   },
   sessions: {
-    description: 'Agent sessions and automation runs: what each open one is working on and holding, whether it has gone quiet, and the last ten that ended.',
+    description: 'Agent sessions and automation runs: what each open one is working on and holding, the session that started it (parent), its state (session: state, for, line, since) and latest turn, and the last ten that ended. The open ones come in the order they ask for attention: waiting, your_move, blocked, working, quiet, idle, each the longest in it first.',
     run: sessions,
   },
+  session_measures: { description: 'What sessions’ turns tell over a range: those waiting on their person now and since when (waiting), turns and tokens per item worked on (per_item), open sessions with an hour of turns and no test passed or commit since (stalled). Params: since, until (ISO; a week to now), stall_minutes (60).', run: async (l, input) => (await import('./session-measures.ts')).sessionMeasures(l, input) }, // read when asked: it reaches src/sessions.ts, which reads these views
   saved_views: {
     description: 'Every view kept on the map (a query, named by the style that draws it), with what it is a view of: pinned first, then the newest. Params: limit (100).',
     run: (l, input) => savedViews(l, input as { limit?: number }),

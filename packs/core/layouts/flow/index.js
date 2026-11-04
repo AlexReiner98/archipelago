@@ -27,6 +27,8 @@ import { drawn } from './polyline.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
+import { css as sessionCss, hueRules, litStates, sessionItems, sessionMarks, sessionOf, stateMark, STATES, STATE_WORDS } from './session.js';
+import { cut } from './lines.js';
 
 /** Whether an item stays lit: what was asked for by name (style.only), else what the style's lit says. */
 /** A colour a style may name. */
@@ -116,13 +118,16 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const aspect = ASPECT * (pane / ASPECT) ** FOLLOW;
   const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
   const shapes = { kind: record(style.kind_shapes), type: record(style.type_shapes) };
+  // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
+  const sessions = sessionMarks(style);
+  answer = { ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) };
   const g = layout({ items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes });
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
 
   // Where each step stands, read from what is drawn (./state.js): its phase, whether it waits on you, whether it is held up.
-  const states = standing({ items: answer.items, links: answer.links ?? [], viewer: answer.viewer });
+  const states = standing({ items: answer.items, links: answer.links ?? [], viewer: answer.viewer, lit: litStates(sessions) });
   const stateOf = (i) => states.get(i.id) ?? { phase: i.open === false ? 'finished' : 'not_started' };
   const yours = (i) => Boolean(stateOf(i).you);
   // How each phase's dot is drawn (the style's phase_marks): hollow, half, full or none.
@@ -219,11 +224,15 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const wiresIn = (model) => [...model.chains, ...model.ties];
   const linkBadges = wiresIn(g).map((l, n) => [l, n]).filter(([l]) => held(l.pending) && !madeBy(l.a, l.pending) && !madeBy(l.b, l.pending)).map(([l, n]) => ({ n, mark: badge(l.pending, middleOf(l.points)) }));
   /** A step's dot where it is drawn: of its own phase, or of the phase a story's step gives it then. */
-  const dotAt = (n, phase = stateOf(n.item).phase) => {
+  const dotPlace = (n) => {
     const X = g.x.get(n.id), point = n.shape === 'hexagon' ? n.bevel : 0;
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + z('text_x');
-    return dot(dotClass(n.item, phase), markOf(phase), left - z('dot_gap'), g.y.get(n.id), z('dot'));
+    return [left - z('dot_gap'), g.y.get(n.id)];
   };
+  const dotAt = (n, phase = stateOf(n.item).phase) => dot(dotClass(n.item, phase), markOf(phase), ...dotPlace(n), z('dot'));
+  /** A run's session drawn in its dot's place: its state's mark, as the style says (./session.js). */
+  const marked = (i) => sessions.get(sessionOf(i)?.state);
+  const sessionDot = (n) => marked(n.item) && stateMark(m, sessionOf(n.item).state, marked(n.item), ...dotPlace(n), z('dot'));
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
@@ -235,7 +244,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     const body = [
       outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
-      !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : dotAt(n)),
+      !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : sessionDot(n) || dotAt(n)),
       // Its name in the lines the layout gave it (./lines.js): a second line under the first, the two about the middle.
       n.lines?.length > 1
         ? m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, ...n.lines.map((line, k) => m('tspan', { x: left, dy: k ? n.line : (-(n.lines.length - 1) * n.line) / 2 }, fit(line, room, n.stub ? STUB_TEXT : TEXT))))
@@ -250,7 +259,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     if (held(i.pending)) stepBadges.set(n.id, badge(i.pending, [X + n.w / 2, Y - n.h / 2]));
     tipped.add(key);
     if (ghost) return m('g', { key: `held:${i.pending.proposal}:${n.id}`, on: ['click'] }, titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nHeld for you`));
-    const el = titled(m('a', { key, on: ['enter', 'leave'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), i.title);
+    const el = titled(m('a', { key, on: ['enter', 'leave'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), i.said ?? i.title);
     dims.set(n.id, el);
     return el;
   });
@@ -281,10 +290,11 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const uses = (test) => steps.some(test);
   // A story's key has the phases its steps give too.
   const stepPhases = story ? answer.steps.flatMap((s) => Object.values(s.fields ?? {}).map((f) => f?.phase).filter((p) => typeof p === 'string')) : [];
-  const phases = new Set([...steps.filter((n) => !n.stub).map((n) => stateOf(n.item).phase), ...stepPhases].filter((p) => markOf(p) !== 'none'));
+  const phases = new Set([...steps.filter((n) => !n.stub && (story || !marked(n.item))).map((n) => stateOf(n.item).phase), ...stepPhases].filter((p) => markOf(p) !== 'none'));
   const key = [
     [...drawnAs.keys()].sort((a, b) => KEY_ORDER.indexOf(a) - KEY_ORDER.indexOf(b)).map((shape) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), [...drawnAs.get(shape)].join(', '))),
     Object.keys(PHASE_WORDS).filter((p) => phases.has(p)).map((p) => mark(dot(`ph-${p} ${markOf(p)}${p === 'trouble' ? ' trouble' : ''}`, markOf(p), G.x, G.y, G.r), PHASE_WORDS[p])),
+    !story && STATES.filter((s) => uses((n) => !n.stub && marked(n.item) && sessionOf(n.item).state === s)).map((s) => mark(stateMark(m, s, sessions.get(s), G.x, G.y, G.r), STATE_WORDS[s])),
     uses((n) => !n.stub && heldUp(n.item)) && mark(dot('trouble hollow', 'hollow', G.x, G.y, G.r), 'Held up'),
     uses((n) => !n.stub && yours(n.item)) && mark(m('g', { class: 'lf-step you' }, outline('box', G.x, G.y, G.w, G.h, CORNER)), 'Waits on you'),
     shownAs.places.filter((p) => steps.some((n) => !n.stub && shownAs.of.get(n.id) === p.id)).map((p) => mark(m('g', { class: `lf-step placed ${placeClass(p.hex)}` }, outline('box', G.x, G.y, G.w, G.h, CORNER)), p.within ? `${p.title}, in ${p.within}` : p.title)),
@@ -310,7 +320,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   /** A step's tip: its title, and the start of its note. */
   const tipFor = (key) => {
     const i = g.nodes.get(key.slice(2)).item, note = held(i.pending) ? `Held for you${i.pending.reason ? `: ${i.pending.reason}` : ''}` : opening(i);
-    return m('div', { class: 'lf-tip' }, m('b', {}, i.title), note && m('span', {}, note));
+    return m('div', { class: 'lf-tip' }, m('b', {}, i.said ?? i.title), (i.named ?? note) && m('span', {}, i.named ?? note));
   };
   // Opened from an item's page, the picture is brought to that item; else to the step nearest its top left.
   const start = g.nodes.has(style.here) ? style.here : steps.filter((n) => !n.stub).reduce((p, q) => (g.y.get(q.id) - q.h / 2 < g.y.get(p.id) - p.h / 2 || (g.y.get(q.id) - q.h / 2 === g.y.get(p.id) - p.h / 2 && g.x.get(q.id) < g.x.get(p.id)) ? q : p), steps[0])?.id;
@@ -334,7 +344,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     size.width = width;
   }
   return {
-    scene: { css: [css, ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
+    scene: { css: [css, sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: player?.end,
     on(event) {
       const { name, key } = event;

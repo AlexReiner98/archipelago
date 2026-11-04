@@ -59,7 +59,7 @@ const count = (files: string[], pattern: RegExp) =>
 
 // 1. No file over 500 lines.
 const LONG_FILES: Record<string, number> = {
-  'ui/style.css': 679,
+  'ui/style.css': 667,
 };
 
 test(`no file is over ${MAX_LINES} lines`, () => {

@@ -55,7 +55,7 @@ test('a commit a session makes names its run, and one made by anybody else does 
 
   // A session in a worktree of the checkout: Claude Code copies in what .worktreeinclude names, so it has the hooks,
   // and its run is kept in the git folder the worktrees share, for a commit made there.
-  assert.deepEqual(readFileSync(join(repo, '.worktreeinclude'), 'utf8').split('\n').slice(1, -1), ['.mcp.json', '.claude/settings.json', '.claude/pelago-hook.mjs', '.claude/pelago.md', '.claude/skills/pelago-bump/references/home.md']);
+  assert.deepEqual(readFileSync(join(repo, '.worktreeinclude'), 'utf8').split('\n').slice(1, -1), ['.mcp.json', '.claude/settings.json', '.claude/pelago-hook.mjs', '.claude/pelago-events.mjs', '.claude/pelago.md', '.claude/skills/pelago-bump/references/home.md']);
   execFileSync('git', ['commit', '-q', '--allow-empty', '-m', 'The start'], { cwd: repo });
   const tree = join(repo, '.claude', 'worktrees', 'side');
   execFileSync('git', ['worktree', 'add', '-q', '-b', 'side', tree], { cwd: repo });

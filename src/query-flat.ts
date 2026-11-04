@@ -14,6 +14,7 @@ import { checkedAfter, holding, wordConditions, type Narrowing, type Word } from
 import { heldIds } from './query-held.ts';
 import { endsOf, readTerm, sayTerm, setOf, type Term } from './query-terms.ts';
 import { rankSql, searchIds, slipsOf } from './search.ts';
+import { markOf, sessionStates } from './session-state.ts';
 import { fileOnAxis } from './timelanes.ts';
 import { placeAll, readAxis, resolveAxis, windowOf, zoneOf, type TimeAxis } from './timeaxis.ts';
 
@@ -279,6 +280,9 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
     `with s(id) as (select unnest($1::text[])) select r.id, r.type, r.from_id, r.to_id, r.props from relation r join s a on a.id = r.from_id join s b on b.id = r.to_id where r.valid_to is null order by r.id`,
     [items.map((e) => e.id)],
   );
+  // Each run sent says where its session stands (src/session-state.ts), read for all of them at once.
+  const runTypes = new Set(l.registry.family('run'));
+  const states = await sessionStates(l, items.filter((e) => runTypes.has(e.type)).map((e) => e.id));
   // An end said by name goes back in the lens as its id.
   lens.find = finds.map(sayTerm);
   lens.only = onlys.map(sayTerm);
@@ -296,6 +300,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
         ...(e.body && { body: e.body.length > NOTE_START && !wholeIds.has(e.id) ? `${e.body.slice(0, NOTE_START)}…` : e.body }),
         // Where it stands in its course (src/phases.ts), so every drawing reads one phase and keeps no registry.
         visibility: e.visibility, status: e.status, ...(type?.statuses.phases?.[e.status] && { phase: type.statuses.phases[e.status] }), open: e.is_open, owner: e.owner,
+        ...(states.has(e.id) && { session: markOf(states.get(e.id)!) }),
         created_at: e.created_at, updated_at: e.updated_at,
         ...(Object.keys(fields).length && { fields }),
         ...(spans && { time: filed!.filed.get(e.id) ?? spans.get(e.id) ?? [] }),

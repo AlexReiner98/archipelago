@@ -19,6 +19,7 @@ export const MAP_TABLES = ['entity', 'relation', 'event', 'log_entry', 'log_fact
  */
 export const ON_THE_MAP: Record<string, string> = {
   sessions: "A run's tokens_used (shared onto the work it is on), story and stale flag: kept at once by operational and appended to the sessions stream; its start, end and task are facts; its heartbeat (last_seen, active, busy) and where its checkout stands (git, src/git-state.ts) are in no stream.",
+  session_events: "What a session did, as raw events in one vocabulary (docs/sessions.md): sent by its adapter to /hooks/events, appended at once to the sessions stream as event facts on its run, sealed with the run's key, a resent one dropped (src/session-events.ts); kept two weeks.",
   claims: 'A holds link from holder to resource: made by claim and ended by release, at once, appended to the claims stream.',
   notifications: 'A notification item, made by apply at once and never held; who may read it is set by operational and appended to the notifications stream.',
   automations: "An automation's last_run, last_fired and last_result, the event cursor and run_once marks: kept at once, appended to the automations stream.",
@@ -68,7 +69,9 @@ export const VIEWS_OPERATIONAL: Record<string, string> = {
   notifications: "The human's unread notifications: the notifications store above, newest first.",
   usage: "What the workspace's plan limits, used: the database's own count of each table's size, the counts kept beside the log (item_bytes), the sessions store's runs at work, and the server's counts of requests and looks.",
   spent: "What runs report they cost: the sessions store's tokens_used and cost_usd, summed by where they ran.",
+  session_measures: "What sessions' turns tell over a range: the sessions store's events and the runs they are on, worked out into turns.",
   story: 'What a session told of its work: the story the sessions store keeps on its run.',
+  turns: "A session's turns: the events the sessions store keeps on its run, worked out by the core pack's turnsOf.",
   changed_since: 'The log, counted and cut to its newest events: what happened, not what the map is.',
   style: 'How a page looks: the styles the packs ship and the map keeps, merged; the system tier, not the work.',
   saved_views: 'The views kept on the map, each named by the style that draws it: the system tier, not the work.',
