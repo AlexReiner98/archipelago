@@ -1,6 +1,8 @@
 // What a Claude Code session did, as the events of docs/sessions.md, read from what its hooks are given and from its
 // transcript: a gist of what was said, never a transcript. The hook (pelago-hook.mjs) loads it and sends what it
-// answers to /hooks/events; nothing here reads a file, the network or the environment, so it is tested as input
+// answers to /hooks/events, as eventsPost has every adapter send them (the Agent SDK's runner,
+// pelago-sdk-runner.mjs, reads its tools and replies through callEvents and replyEnd too); nothing here reads a
+// file, the network or the environment, so it is tested as input
 // in, events out (test/hook-events.test.ts). A turn is named by Claude Code's prompt_id (promptId on the
 // transcript's lines); the tools of a turn, its tests and commits are read off the transcript, each at its own
 // time, so sending them again changes nothing.
@@ -46,6 +48,26 @@ const entriesOf = (text) => text.split('\n').flatMap((line) => { try { return li
 const startsTurn = (e) => prompted(e) && !INTERRUPTED.test(textOf(e.message.content));
 
 /**
+ * What one tool call says once its result is back: its tool.end, and the test.run or commits a shell call made. Any
+ * source's adapter that has the call (a tool_use block) and its result (a tool_result block) reads them so.
+ */
+export function callEvents(call, part, at, turn) {
+  const events = [];
+  const ok = !part.is_error, out = textOf(part.content), input = call.input ?? {};
+  const file = EDITS.has(call.name) && (input.file_path ?? input.notebook_path);
+  const items = MAP_TOOL.test(call.name) ? [...new Set([...JSON.stringify(input).matchAll(ITEM), ...(call.name.endsWith('__change') ? out.matchAll(ITEM) : [])].map((m) => m[0]))] : [];
+  events.push({ at, kind: 'tool.end', turn, tool: kindOf(call.name), name: call.name, ok, ...(file && { files: [file] }), ...(items.length && { items }) });
+  const command = typeof input.command === 'string' ? input.command : '';
+  if (kindOf(call.name) === 'shell' && TESTS.test(command)) {
+    const passed = count(out, /^[ℹ#] pass (\d+)/m) || count(out, /(\d+) passed/);
+    const failed = Number.isFinite(count(out, /^[ℹ#] fail (\d+)/m)) ? count(out, /^[ℹ#] fail (\d+)/m) : count(out, /(\d+) failed/);
+    events.push({ at, kind: 'test.run', turn, ok: ok && !(failed > 0), ...(Number.isFinite(passed) && { passed }), ...(Number.isFinite(failed) && { failed }), command: command.slice(0, 120) });
+  }
+  if (kindOf(call.name) === 'shell' && COMMIT.test(command)) for (const m of out.matchAll(/^\[[^\]\n]*? ([0-9a-f]{7,40})\] (.*)$/gm)) events.push({ at, kind: 'commit', turn, sha: m[1], subject: m[2].slice(0, 200) });
+  return events;
+}
+
+/**
  * The events of the transcript's last turn: its tools, tests and commits. Given the prompt just sent (`current`),
  * of the turn before it, and that turn's end when its person stopped it: a turn stopped hears no Stop.
  */
@@ -64,18 +86,7 @@ export function turnEvents(text, current) {
     for (const part of Array.isArray(e.message?.content) ? e.message.content : []) {
       if (part.type === 'tool_use') calls.set(part.id, part);
       const call = part.type === 'tool_result' && calls.get(part.tool_use_id);
-      if (!call) continue;
-      const at = e.timestamp, ok = !part.is_error, out = textOf(part.content), input = call.input ?? {};
-      const file = EDITS.has(call.name) && (input.file_path ?? input.notebook_path);
-      const items = MAP_TOOL.test(call.name) ? [...new Set([...JSON.stringify(input).matchAll(ITEM), ...(call.name.endsWith('__change') ? out.matchAll(ITEM) : [])].map((m) => m[0]))] : [];
-      events.push({ at, kind: 'tool.end', turn, tool: kindOf(call.name), name: call.name, ok, ...(file && { files: [file] }), ...(items.length && { items }) });
-      const command = typeof input.command === 'string' ? input.command : '';
-      if (kindOf(call.name) === 'shell' && TESTS.test(command)) {
-        const passed = count(out, /^[ℹ#] pass (\d+)/m) || count(out, /(\d+) passed/);
-        const failed = Number.isFinite(count(out, /^[ℹ#] fail (\d+)/m)) ? count(out, /^[ℹ#] fail (\d+)/m) : count(out, /(\d+) failed/);
-        events.push({ at, kind: 'test.run', turn, ok: ok && !(failed > 0), ...(Number.isFinite(passed) && { passed }), ...(Number.isFinite(failed) && { failed }), command: command.slice(0, 120) });
-      }
-      if (kindOf(call.name) === 'shell' && COMMIT.test(command)) for (const m of out.matchAll(/^\[[^\]\n]*? ([0-9a-f]{7,40})\] (.*)$/gm)) events.push({ at, kind: 'commit', turn, sha: m[1], subject: m[2].slice(0, 200) });
+      if (call) events.push(...callEvents(call, part, e.timestamp, turn));
     }
   }
   const last = turnEntries.at(-1);
@@ -93,18 +104,26 @@ export function turnEnd(text, said) {
   for (const e of turnEntries) {
     if (e.type !== 'assistant') continue;
     const u = e.message?.usage;
-    if (u) used.set(e.message.id ?? e.uuid, { input: u.input_tokens ?? 0, output: u.output_tokens ?? 0, cache_read: u.cache_read_input_tokens ?? 0, cache_write: u.cache_creation_input_tokens ?? 0 });
+    if (u) used.set(e.message.id ?? e.uuid, tokensOf(u));
     for (const part of Array.isArray(e.message?.content) ? e.message.content : []) {
       if (part.type === 'tool_use' && /__wrap_up$/.test(part.name ?? '')) asked = typeof part.input?.ask === 'string' && part.input.ask.trim() ? part.input.ask.trim() : undefined;
       if (part.type === 'text' && part.text?.trim()) reply = part.text;
     }
   }
   reply = typeof said.last_assistant_message === 'string' && said.last_assistant_message.trim() ? said.last_assistant_message : reply;
-  const paragraph = String(reply ?? '').trim().split(/\n\s*\n/).at(-1)?.trim() ?? '';
-  const question = asked ?? (paragraph.endsWith('?') ? paragraph : undefined);
   const tokens = [...used.values()].reduce((sum, u) => Object.fromEntries(Object.keys(u).map((k) => [k, sum[k] + u[k]])), { input: 0, output: 0, cache_read: 0, cache_write: 0 });
   const turn = said.prompt_id ?? turnEntries[0]?.promptId;
-  return { at: new Date().toISOString(), kind: 'turn.end', ...(turn && { turn }), ended: question ? 'asked' : 'done', ...(question && { question: question.slice(0, 500) }), ...(gist(reply) && { gist: gist(reply) }), ...(used.size && { tokens }) };
+  return { at: new Date().toISOString(), kind: 'turn.end', ...(turn && { turn }), ...replyEnd(reply, asked), ...(used.size && { tokens }) };
+}
+
+/** A Messages API usage as the vocabulary counts tokens. */
+export const tokensOf = (u) => ({ input: u.input_tokens ?? 0, output: u.output_tokens ?? 0, cache_read: u.cache_read_input_tokens ?? 0, cache_write: u.cache_creation_input_tokens ?? 0 });
+
+/** How a reply ends its turn: on a question (the one it was told to ask, else its last paragraph's) or done, and its gist. */
+export function replyEnd(reply, asked) {
+  const paragraph = String(reply ?? '').trim().split(/\n\s*\n/).at(-1)?.trim() ?? '';
+  const question = asked ?? (paragraph.endsWith('?') ? paragraph : undefined);
+  return { ended: question ? 'asked' : 'done', ...(question && { question: question.slice(0, 500) }), ...(gist(reply) && { gist: gist(reply) }) };
 }
 
 /** What a Notification hook says the session waits on, or null: permission for a tool, or an answer from its person. */
@@ -119,3 +138,9 @@ export function failedEnd(said, at = new Date().toISOString()) {
   const said_ = gist(said.error ?? said.last_assistant_message);
   return { at, kind: 'turn.end', ...(said.prompt_id && { turn: said.prompt_id }), ended: 'failed', ...(said_ && { gist: said_ }) };
 }
+
+/** The request that sends a batch of events to /hooks/events, as fetch takes it (url, init): every adapter sends them so. */
+export const eventsPost = ({ base, token, session_id, source, events }) => [
+  `${String(base).replace(/\/$/, '')}/hooks/events`,
+  { method: 'POST', headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }, body: JSON.stringify({ session_id, source, events }) },
+];

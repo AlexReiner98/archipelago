@@ -138,6 +138,33 @@ prompt or a question to answer, not the idle reminder), `wait.end` at the next
 tool, prompt or Stop; `turn.end` `failed` on StopFailure. A Stop the server
 answers with a block has no `turn.end`: the reply goes on.
 
+## The Agent SDK adapter
+
+`scripts/pelago-sdk-runner.mjs` runs one prompt on the Claude Agent SDK and
+tells its session in this vocabulary, with `source: "agent-sdk"`. A sketch,
+for the harness to grow from (e_k3g5c8yh).
+
+- **How it is run.** `node scripts/pelago-sdk-runner.mjs "the prompt"
+  [--title ...] [--parent <session id>]`, against `PELAGO_URL` with
+  `PELAGO_AGENT_TOKEN`. The SDK is no dependency: it is imported only if
+  present (`npm i --no-save @anthropic-ai/claude-agent-sdk`), and uses Claude
+  Code's sign-in.
+- **The run.** Made on the SDK's `system` `init` message, by its
+  `session_id`, through `/hooks/session-start`, as a hook makes one; ended
+  through `/hooks/session-end`. The run's surface is still `claude-code`.
+- **The mapping** is `sdkEvents` (test/sdk-runner.test.ts): the messages as
+  received, each stamped with the runner's clock (the SDK's carry no time),
+  in; events out. One prompt is one turn. `init` is `session.start`, then
+  `turn.start`; each `tool_result` in a `user` message, against its
+  `tool_use`, is read by the hook's own `callEvents` (`tool.end`, `test.run`,
+  `commit`); `session_state_changed` to `requires_action` and back is a
+  `wait` for permission; `result` is `turn.end`, `done` or `asked` as the
+  hook reads a reply (`replyEnd`), `stopped` for `aborted_*`, else `failed`,
+  with its `usage` as `tokens`. A subagent's messages
+  (`parent_tool_use_id`) are left out, as the hook leaves its transcript out.
+- **Sending.** After each message the runner sends what is new, with
+  `eventsPost` from `pelago-events.mjs`; the server drops what it has.
+
 ## Wired: what the server gives
 
 Phase 2 builds against these shapes; the wiring (`src/session-state.ts`)
