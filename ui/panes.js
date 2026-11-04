@@ -17,7 +17,7 @@ import { heard, nameOf } from './pane-route.js';
 import { filterSaid } from './query-bar.js';
 import { sheetAside } from './sheet-follow.js';
 import { frameIn, reframe } from './pane-web.js';
-import { asPane, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId, webOf } from './tabs.js';
+import { BLANK, asPane, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId, webOf } from './tabs.js';
 import { titles } from './words.js';
 
 /** The sides a pane is docked on, beside the pane it is put by: along a row, or down a column. */
@@ -340,18 +340,16 @@ addEventListener('resize', () => {
 // (ui/app.js): that is no change, and laying the panes out for it would fit a canvas again under a pan.
 new MutationObserver((list) => started && list.some((m) => m.oldValue !== document.body.getAttribute('data-sheet')) && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'], attributeOldValue: true });
 
-/** The query bar's own for the pane it acts on, the same in every pane: back and forth (dimmed with nowhere to go) and split. Each pane's move and close stay in its strip. */
+/** The query bar's own for the pane it acts on, the same in every pane: back and forth (dimmed with nowhere to go) and split, which opens a pane with no query beside it. Each pane's move and close stay in its strip. */
 export function paneButtons() {
   const { back = [], forth = [] } = historyNow();
   const button = (label, title, mark, onclick, off, cls = 'q-save') => h('button', { type: 'button', class: cls, title, 'aria-label': label, disabled: off, onclick }, mark);
   return [
     button('Back', 'Back to what this pane drew before', '‹', () => travel(-1), !back.length, 'q-save q-travel'),
     button('Forward', 'Forward again', '›', () => travel(1), !forth.length, 'q-save q-travel'),
-    button('Split', 'Split: open this canvas in a pane beside it (drag the pane’s name to dock it elsewhere)', ['◫', h('span', { class: 'q-word-text' }, 'Split')], () => openPane(historyNow().at, 'right', active, { anew: true }), false, 'q-save q-word q-split'),
+    button('Split', 'Split: a new pane beside this one (drag the pane’s name to dock it elsewhere)', ['◫', h('span', { class: 'q-word-text' }, 'Split')], () => openPane(BLANK, 'right', active, { anew: true }), false, 'q-save q-word q-split'),
   ];
 }
-/** The address the pane the bar acts on draws, for a new tab to open on. */
-export const activeAt = () => hrefOf(front().panes[active]?.at);
 
 /** Light a pane an agent's step was just drawn in; a web page framed there is loaded again. */
 export function flash(id) {

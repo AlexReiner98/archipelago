@@ -71,7 +71,7 @@ test('in a browser, the query line says the lens in one line at both widths', { 
     await page.send('Emulation.clearDeviceMetricsOverride');
     // Split, then find in the second: the bar is the second's. A press in the first gives the bar back to it.
     await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
-    assert.ok(await until(`document.querySelectorAll('#canvas > .pane').length === 2 && ${drawn(1, made.roof)}`), 'Split opens a second pane of the same lens');
+    assert.ok(await until(`document.querySelectorAll('#canvas > .pane').length === 2 && !${drawn(1, made.roof)}`), 'Split opens a blank pane, with no query');
     await press(1);
     assert.ok(await until(`[...document.querySelectorAll('#canvas > .pane')][1].classList.contains('pane-active')`), 'the second is the one touched');
     await find('gutters');
