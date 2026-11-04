@@ -120,7 +120,7 @@ export function surfaceTools(reg: Registry, tools: Record<string, Tool>, offered
         `${LIST} says what one takes, whole: params read (a read or view, such as flat), action (or change, for its ops) or verb. ` +
         `An agent is given each answer without its empty fields and with long lists cut to what is read (params.full: true for all of it). ` +
         `The reads and their params: ${reads}. ` +
-        `Every other name is a view: ${viewNames(reg).join(', ')}. flat is the query: filter { find, only, not }, walk { over, steps }, limit.`,
+        `Every other name is a view: ${viewNames(reg).join(', ')}. flat is the query: filter { find, only, not }, walk { over (part_of< down, part_of> up), steps }, limit.`,
       input: { name: z.string().optional().describe('What to read: a read, a view or a lens. Left out, the list of them.'), params: props.optional().describe('Its inputs, as the list names them.') },
       run: async (l, actor, input) => {
         if (input.name !== LIST) return { reads: Object.fromEntries(QUERY_READS.map((name) => [name, gist(tools[name].description)])), [LIST]: 'what each verb’s actions and change’s ops take', views: viewList(l) };

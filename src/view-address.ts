@@ -12,7 +12,7 @@ export const VIEW_INPUT = {
   query: z
     .record(z.string(), z.unknown())
     .optional()
-    .describe('What the view draws: a query, as query flat takes it ({ filter: { find, only, not }, walk: { over (depends_on> out, depends_on< in, depends_on either way), steps }, limit }), shown in the query bar as if written there. With entity, under that item\'s page. {} is the canvas as it opens.'),
+    .describe('What the view draws: a query, as query flat takes it ({ filter: { find, only, not }, walk: { over (part_of< in: down a project, part_of> out: up, part_of either way), steps }, limit }), shown in the query bar as if written there. With entity, under that item\'s page. {} is the canvas as it opens.'),
   lens: z.union([z.string(), z.record(z.string(), z.unknown())]).optional().describe('The old name of query, still taken; a kept view\'s id here is taken as entity.'),
   style: z
     .object({
