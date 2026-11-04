@@ -51,7 +51,7 @@ export function readTerm(l: Archipelago, raw: unknown, part: string): Term {
   const [, link, back, end] = LINK.exec(s) ?? [];
   if (link && l.registry.relations.has(l.registry.canonical(link))) return { sort: 'link', link, end, back: back === '<' };
   if (l.registry.types.has(l.registry.canonical(s))) return { sort: 'type', type: s };
-  throw new Error(`filter.${part}: "${s}" is no term: held, text <words>, a type, kind <k>, id <item>, in <item>, related <item>, <link type> <item>, owner <person>, or one of Only's words (done, blocked, status <s>, no owner, over estimate, changed since <7d|date>, made since <7d|date>, by owner, by agent)`);
+  throw new Error(`filter.${part}: "${s}" is no term: held, text <words>, a type, kind <k>, id <item>, in <item>, related <item>, <link type> <item>, owner <person>, or one of Only's words (done, blocked, status <s>, no owner, over estimate, changed since|before <7d|date>, made since|before <7d|date>, by owner, by agent)`);
 }
 
 /** A term as words again, its end now the id it was found to be. */

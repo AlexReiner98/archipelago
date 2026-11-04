@@ -13,10 +13,11 @@
 // - Within the tab: the pane it named (`pane: "review"`), opened beside the others if there is none; a side asked for
 //   moves its pane there. Else its own pane: the one held for it (a pane keeps whose it is as long as it stands, so a
 //   long session finds it again), else one drawing what it shows or one nobody holds, never the pane the reader is in
-//   or touched last (the owner, 28 and 29 Oct 2026), else one split for it. In a tab that follows the session alone,
+//   or touched last (the owner, 28 and 29 Oct 2026), else a blank one (no query: a new tab's or a split's, e_33eqyryy), else one split for it. In a tab that follows the session alone,
 //   every pane is its own, and only there does `alone` close the others or a page that is not a canvas open over it:
 //   elsewhere such a page gets a tab of its own, out of sight and marked.
-// - No tab is brought into sight: a show into another tab draws it in the background and marks it.
+// - No tab is brought into sight: a show into another tab draws it in the background and marks it. Only a show with
+//   `focus`, sent when the owner asked to be taken there, brings its tab into sight (the owner, 3 Nov 2026, e_gt2rfab4).
 // - A pane the reader is busy in is never taken, and no pane is split into a tab the reader is at work in: the show
 //   goes to a tab of its own in the background instead. A session has one tab: when the reader is busy in the tab that
 //   follows it, the show waits there until they are not (the owner, 2 Nov 2026).
@@ -68,12 +69,12 @@ export function nameOf(key) {
 /**
  * Where this step goes. `tabs` are the tabs there are, each { id, follows: 'none' | <session>, front?, popped?,
  * panes }, `front` for the one in sight and `popped` for one in a window of its own; `panes` are its panes in order,
- * each { id, slot?, held?, by?, focus?, draws?, busy?, landed?: { session, at } }, with `held` the session it is kept for, `by` the one it was made for,
- * `focus` on the one the reader last touched, `draws` true where it draws what the step names and `busy` where the
- * reader is at work in it. Answers { tab, pane, side?, front } to draw it in a pane (moved to `side` when one is
- * asked), { tab, split: { slot?, side }, side?, front } to split a pane into a tab, { open: { follows, slot? }, front }
+ * each { id, slot?, held?, by?, focus?, draws?, blank?, busy?, landed?: { session, at } }, with `held` the session it is kept for, `by` the one it was made for,
+ * `focus` on the one the reader last touched, `draws` true where it draws what the step names, `blank` where it has no
+ * query and `busy` where the reader is at work in it. Answers { tab, pane, slot?, side?, front } to draw it in a pane
+ * (named `slot` when it takes a blank one for that name, moved to `side` when one is asked), { tab, split: { slot?, side }, side?, front } to split a pane into a tab, { open: { follows, slot? }, front }
  * to open a tab, { later: true } to try again, or { nowhere: true } when no tab takes it; `front` says whether the tab
- * is in sight, never brought there.
+ * is in sight, brought there only by a step with `focus`.
  */
 export function route(step, tabs, { drawable = true } = {}) {
   const session = sessionOf(step);
@@ -81,8 +82,9 @@ export function route(step, tabs, { drawable = true } = {}) {
   const slot = asked && !SIDE_WORDS.has(asked) ? asked : undefined;
   const last = (t) => t.panes.map((p) => p.landed).filter(Boolean).sort((a, b) => b.at - a.at)[0];
   const working = (t) => t.panes.some((p) => p.busy);
+  const focus = Boolean(step.focus);
   // A tab of its own is opened out of sight, marked for the reader to go to; the one in sight stays in sight.
-  const ownTab = () => ({ open: { follows: session, ...(slot && { slot }) }, front: false });
+  const ownTab = () => ({ open: { follows: session, ...(slot && { slot }) }, front: focus });
   /** The pane of tab `t` this step is for: by the name or side asked, else the session's own, never the reader's in focus. */
   function paneIn(t) {
     const all = t.follows === session;
@@ -90,13 +92,16 @@ export function route(step, tabs, { drawable = true } = {}) {
     // A window of its own draws in its one canvas, and a page that is not a canvas opens over the pane in focus: only
     // in a tab that follows this session alone, else in a tab of its own.
     if (t.popped || !drawable) return all ? { pane: inFocus.id } : ownTab();
+    // A blank pane (a new tab's, a split's: no query) is taken before one is split beside it, the reader's in focus too:
+    // it draws nothing to lose.
+    const blank = t.panes.find((p) => p.blank && !p.busy && !p.slot && (!p.held || p.held === session) && (!p.by || p.by === session));
     if (slot) {
       const named = t.panes.find((p) => p.slot === slot);
-      return named ? { pane: named.id } : { split: { slot, side: 'right' } };
+      return named ? { pane: named.id } : blank ? { pane: blank.id, slot } : { split: { slot, side: 'right' } };
     }
     // A pane nobody holds or named, never the one the reader is in or touched last.
     const free = (p) => (!p.held || p.held === session) && (!p.by || p.by === session) && !p.slot && !p.focus && !p.busy;
-    const mine = t.panes.find((p) => (p.held === session || p.by === session) && !p.focus) ?? (all ? inFocus : t.panes.find((p) => free(p) && p.draws) ?? t.panes.find(free));
+    const mine = t.panes.find((p) => (p.held === session || p.by === session) && !p.focus) ?? (all ? inFocus : t.panes.find((p) => free(p) && p.draws) ?? blank ?? t.panes.find(free));
     // Alone closes the other panes: only in a tab that follows this session alone.
     const side = asked && SIDE_WORDS.has(asked) && asked !== 'main' && (asked !== 'alone' || all) ? asked : undefined;
     const moved = side ? { side } : {};
@@ -108,7 +113,7 @@ export function route(step, tabs, { drawable = true } = {}) {
     if (at.open) return at;
     const taken = at.split ? t.front && working(t) : t.panes.find((p) => p.id === at.pane)?.busy;
     if (taken) return t.follows === session ? { later: true } : ownTab();
-    return { tab: t.id, ...at, front: Boolean(t.front) };
+    return { tab: t.id, ...at, front: Boolean(t.front || (focus && !t.popped)) };
   }
   const own = tabs.filter((t) => t.follows === session).sort((a, b) => (last(b)?.at ?? 0) - (last(a)?.at ?? 0))[0];
   if (own) return into(own);

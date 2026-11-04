@@ -58,6 +58,11 @@ test('a view kept before the flat lens is translated once into the flat lens its
   assert.deepEqual([about.items.map((i) => i.title), about.lens.from], [['T'], made.p]);
   // Once: nothing is left to move, and the log says what did not translate.
   assert.deepEqual((await moveQueries(l)).moved, 0);
+  // A time view kept now is no old view: its window is the flat lens's own, and a start leaves its query as it was.
+  const day = { filter: { find: ['type run'], only: ['made since 2026-10-10', 'made before 2026-10-11'], not: [] }, walk: { over: [], steps: 0 }, time: { from: '2026-10-10', to: '2026-10-10' }, style: { shape: 'time' } };
+  await l.db.transaction((tx) => l.moved(tx, 'test', 'test: a time view', Object.entries(day).map(([k, v]): ['+', string, string, unknown] => ['+', made.cut, k, v])));
+  assert.deepEqual((await moveQueries(l)).moved, 0);
+  assert.deepEqual(await props(made.cut), day);
   const said = (await l.events({ action: 'lens.moved' })) as unknown as { detail: { lost: Record<string, string[]> } }[];
   assert.deepEqual(said[0].detail.lost[made.whole], ['kinds nothing.like_it', 'leaving out what is linked to nothing']);
 });

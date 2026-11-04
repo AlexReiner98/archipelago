@@ -61,7 +61,8 @@ reply ending, commits accounted for) is `docs/agents.md`.
   only lifts `agent_changes` where the workspace has not chosen, or forbids
   an op. Never decide an approval anywhere else: `test/structure.test.ts`
   refuses it, and `test/approvals.ts` keeps the table of what becomes of
-  each change (checked a server policy per file, in the full run).
+  each change (checked a server policy and part of its settings per file,
+  `approvals-<policy>-<part>.test.ts`, in the full run).
 - **Restart the local server yourself in dev mode.** After changing anything
   under `src/` or `packs/`, run the tests it touches and
   `npm run typecheck`, then restart it and wait for `GET /health`: with `revise` action `restart` if your
@@ -329,23 +330,23 @@ or pull a whole map (`SLOW` in `test/sets.ts`, each with why). The structure
 test is always in it. `npm run test:changed` runs only the files your
 branch's changes can reach (with the slow ones they reach).
 
-Once, right before pushing to main or opening a pull request, and never
-between tries, run every file:
+CI is the gate (the owner, 4 Nov 2026): it runs every file on every pull
+request and push to main, on both engines, and main deploys only when all of
+it has passed, so every file runs before a push lands. A local
+`npm run test:full` is not needed before a push: it ran the same files on
+the same commit again. Run it when you want to see the whole set on Windows
+(the nightly run does too), or when CI cannot run.
 
-```bash
-npm run test:full
-```
-
-That run is needed before a push of any change to the rules, a layout, the
-canvas, a page the browser tests load, the schema, backups or the log's
-storage.
-
-CI runs every file on every pull request and push to main, as shards
-side by side (`shard` in `test/sets.ts`: the rest, and one per reason in
-`SLOW`), so a push deploys after its slowest shard. A new test that starts a
-browser or takes more than a few seconds of one process goes in `SLOW`,
-with why; never move the structure test there. A new reason there is a new
-shard, to add to both matrices in `.github/workflows/tests.yml`.
+CI deals every file into equal shards by the seconds each took in CI
+(`shard` in `test/sets.ts`, `test/weights.json`), side by side, so a push
+deploys after its slowest shard. A new test that starts a browser or takes
+more than a few seconds of one process goes in `SLOW`, with why; never move
+the structure test there. `SLOW` decides only the local fast set. When
+`test/sets.test.ts` says a shard is over its budget, refresh the weights
+from main's latest run (`node scripts/test-weights.ts ci`), and if it still
+is, add a shard to both matrices in `.github/workflows/tests.yml`. When it
+says one file is over its own budget, split that file's tests into files of
+their own: no number of shards waits less than its longest file.
 
 The UI asks its questions in the page (`ask` and `tell` in `ui/base.js`), so
 browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.

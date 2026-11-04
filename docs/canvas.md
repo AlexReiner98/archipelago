@@ -39,7 +39,9 @@ e_tvsdqjeq), `related <item>` (any link to it, either way), `<link> <item>`
 (`tagged e_x`; `<link>< <item>` what it links to), `owner <person>`, and
 words that can only be checked of what is found: `done`, `blocked`,
 `status <s>`, `no owner`, `over estimate`, `changed since 7d`,
-`made since <date>`, `by owner`, `by agent` (`src/query-only.ts`, e_xe5dx55e).
+`made since <date>`, `made before <date>` (a since and a before are a range;
+a date is its day in the workspace's zone), `by owner`, `by agent`
+(`src/query-only.ts`, e_xe5dx55e).
 The part says what is done with a set: Find adds it (a union; neither `kind`
 nor a word finds, since each would read the map), Only keeps what is in it
 (an AND; an item is of one type, so its types are one set), and Not takes it
@@ -269,7 +271,9 @@ session in its hue, else a view or an item by its name, a query by
 what its filter finds, Home by Home. There is no most: many shrink to their
 mark and first letters (e_q3amet26). What is the tab's own is on the strip,
 never in the query bar, which shows the query (e_j7ggggjr): + at its end
-opens the canvas in a tab of its own; a press brings a tab into sight, a
+opens a blank tab, one pane with no query, as Split in the bar opens a blank
+pane (the owner, 3 Nov 2026, e_33eqyryy), and an agent's show takes a blank
+pane before it splits one; a press brings a tab into sight, a
 middle press closes it, and every tab has ⋯, its menu, and ×, in sight or not. A tab,
 not a pane, pops out into a window of its own (Pop out in ⋯, or the tab
 dragged out of the page) and ⇲ there docks it back whole (e_ezb7s3a7).
@@ -313,7 +317,9 @@ out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
   in a tab that follows the session alone every pane is its own. A page that
   is not a canvas opens over a pane only there, else in a tab of its own;
 - no tab is brought into sight: a show into a tab out of sight is drawn
-  there and its mark rings (e_xjrpyysn);
+  there and its mark rings (e_xjrpyysn). Only a show with `focus`, sent
+  when the reader asked to be taken there, brings its tab into sight (the
+  owner, 3 Nov 2026, e_gt2rfab4);
 - a pane the reader is busy in (`pane-busy.js`: a press, scroll or key there
   in the last twenty seconds, text selected there, or words typed in the
   sheet and not saved; moving the pointer or turning a dial is not busy) is

@@ -1,9 +1,9 @@
 // Only's plain words (decision e_xe5dx55e), as the bar says and offers them: done, blocked, status <s>,
-// no owner, over estimate, changed since <7d|date>, made since <7d|date>, by owner, by agent. The server reads them
+// no owner, over estimate, changed since|before <7d|date>, made since|before <7d|date>, by owner, by agent. The server reads them
 // (src/query-only.ts); here they are told from other terms, and offered in the menus of Only and Not.
 
 /** Whether an Only term is one of the words (else it is a type). */
-export const isWord = (term) => /^(done|blocked|no owner|over estimate|by owner|by agent)$|^(status|changed since|made since)\s+\S/i.test(term.trim());
+export const isWord = (term) => /^(done|blocked|no owner|over estimate|by owner|by agent)$|^(status|(?:changed|made) (?:since|before))\s+\S/i.test(term.trim());
 
 /** What each word keeps, for its tooltip. */
 const MEANS = {

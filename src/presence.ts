@@ -37,6 +37,8 @@ export interface Step {
   hash?: string;
   /** For a show: the pane of the owner's page it goes to (ui/panes.js): a side of the main canvas, the main one, the main one alone, or a pane of the session's own by the name it gives. */
   pane?: string;
+  /** For a show: the owner asked to be taken there, and their page brings its tab into sight (ui/pane-route.js). */
+  focus?: boolean;
   /** For a show: the session has just begun, and the owner's page opens it a tab of its own (ui/pane-route.js). */
   opens?: boolean;
   /** For a show the server takes for a session: its pane draws the item's canvas, and no page opens over it. */

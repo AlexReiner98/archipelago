@@ -14,9 +14,9 @@ import { lookMode } from './look.js';
 import { placeBy } from './menu-place.js';
 import { windowOf, windows } from './pane-busy.js';
 import { followable, heard, hearOpen, nameOf } from './pane-route.js';
-import { activeAt, activeIs, close, draw, paneAt, paneButtons, startPanes } from './panes.js';
+import { activeIs, close, draw, paneAt, paneButtons, startPanes } from './panes.js';
 import { filterSaid } from './query-bar.js';
-import { dismissed, focusOf, front, freshTab, isOutKey, keep, landed, listKey, named, outKey, outTabs, poppedTab, read, save, tabHref, tabOf, tabs } from './tabs.js';
+import { BLANK, dismissed, focusOf, front, freshTab, isOutKey, keep, landed, listKey, named, outKey, outTabs, poppedTab, read, save, tabHref, tabOf, tabs } from './tabs.js';
 import { sessionHue, titles } from './words.js';
 
 read();
@@ -65,7 +65,7 @@ hooks.paneToTab = (id, into) => {
   const went = landed.get(`${from.id}:${id}`);
   // Whose it is: held for a session, in a tab that follows one, or named by the session that last drew there.
   const session = held ?? sessionOfTab(from) ?? (pane.slot ? went?.session : undefined);
-  const t = { ...freshTab('#/'), ...(session && { follows: session, named: heard.has(session) ? nameOf(session) : undefined, word: heard.get(session)?.name }) };
+  const t = { ...freshTab(), ...(session && { follows: session, named: heard.has(session) ? nameOf(session) : undefined, word: heard.get(session)?.name }) };
   t.groups = [id];
   t.focus = id;
   t.panes = { [id]: kept };
@@ -151,6 +151,8 @@ function nameOfTab(t) {
   const lens = id ? readAddress(id.split('?')[1] ?? '').lens : null;
   // A lens that names a view, by the canvas a pack ships for it, else by the view's name.
   if (lens?.view) return { name: (state.schema?.canvases ?? []).find((c) => c.props?.view === lens.view)?.title ?? lens.view };
+  // A blank one, with no query, is a new tab.
+  if (lens && !lens.filter.find?.length) return { name: 'New tab' };
   // Named by what it finds but its types, which say little of a tab; by its types only when it has nothing else.
   const { types, ...rest } = lens?.filter ?? {};
   return { name: (lens && (filterSaid(rest, drawStrip) || filterSaid(lens.filter, drawStrip))) || 'Home' };
@@ -217,7 +219,7 @@ export function drawStrip() {
   const out = outTabs().filter((t) => !tabOf(t.id));
   // The owner's tabs first, then the chats', each in the order they opened.
   const all = [...tabs.list.map((t) => [t, false]), ...out.map((t) => [t, true])].sort(([a], [b]) => Boolean(a.chat) - Boolean(b.chat));
-  const fresh = h('button', { type: 'button', class: 'tab-new', title: 'New tab: this canvas in a tab of its own', 'aria-label': 'New tab', onclick: () => openTab(activeAt()) }, '+');
+  const fresh = h('button', { type: 'button', class: 'tab-new', title: 'New tab', 'aria-label': 'New tab', onclick: () => openTab(BLANK) }, '+');
   const els = all.map(([t, o]) => tabEl(t, o));
   // Set apart by space where the chats' begin.
   els.find((el, n) => n > 0 && el.dataset.chat && !els[n - 1].dataset.chat)?.classList.add('tab-chats');

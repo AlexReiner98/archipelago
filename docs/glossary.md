@@ -107,8 +107,8 @@ what adds: words, a type, a tag, a link and its end, an item, in an item
 (all that is part of it, at any depth); any of them (words typed in find
 are one Find term). **Only** is what must all hold of what Find finds: a
 type, within an item, or a plain word (done, blocked, status todo, owner me,
-no owner, over estimate, changed since 7d, made since a date, by owner, by
-agent). **Not** is what is left out of everything but an item named: closed,
+no owner, over estimate, changed since 7d, made since or before a date, by
+owner, by agent). **Not** is what is left out of everything but an item named: closed,
 system, or a type. **Walk** is the links followed from what Find finds, each
 out (→), in (←) or either way (↔), ×steps. **Limit** is the most items
 drawn, said as how many of it. In the code: the filter's `text`, `types`,
