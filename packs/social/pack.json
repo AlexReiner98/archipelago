@@ -68,6 +68,14 @@
       ]
     }
   ],
+  "layouts": [
+    {
+      "id": "social.table",
+      "title": "Channels table",
+      "shape": "table",
+      "modules": { "index.js": "layouts/table/index.js", "look.js": "layouts/table/look.js", "marks.js": "layouts/table/marks.js" }
+    }
+  ],
   "handlers": [{ "webhook": "social.count", "records": ["signup.counted", "visit.counted"] }],
   "reach": {
     "webhooks": [{ "id": "social.count", "secret": "count" }]
@@ -82,6 +90,13 @@
         "walk": { "over": [], "steps": 0 },
         "limit": 200,
         "style": { "shape": "list", "show": ["status", "channel", "asked", "begun", "paid", "replies", "conversations"] }
+      }
+    },
+    {
+      "id": "social.table_look",
+      "title": "The channels table's lengths",
+      "props": {
+        "sizes": { "table_pad": 16, "table_gap": 14, "table_most": 960, "table_row": 28, "table_col_gap": 10, "table_num": "6ch", "table_ratio": "11ch", "table_share": "4ch", "table_mark": 14, "table_bar": 6, "table_bar_gap": 6, "table_dot": 10, "table_dot_line": 0.3, "table_head_text": 12, "table_track_mix": "45%" }
       }
     }
   ]
