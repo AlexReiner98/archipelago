@@ -51,7 +51,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       'The only way to change the map: a list of ops with a reason. ' +
       'A create\u2019s ref lets later ops link to it, and a title or note in the same change names what it makes as {ref}. Give the source the facts came from. ' +
       'To add to a note or change a passage, send append or replace, not the whole body. An update of only the id says it is still true. ' +
-      'A plan is items, not a long note: a task per step, depends_on, waits_on, a flow lens. ' +
+      'A plan is a task per step, linked, never one long note. ' +
       'Checked as a whole, then applied or held as a proposal for a human, by policy. A refused change is kept for a few minutes under a name the refusal gives: send retry and fixes (the ops that were wrong, by number), not all of it again. ' +
       'Closing a decision or hypothesis is held for the human, unless the workspace applies agents\u2019 changes: then a decision must carry props.outcome and props.rationale, and is put to the owner later (attention, to_confirm).',
     input: {
