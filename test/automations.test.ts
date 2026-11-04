@@ -43,14 +43,14 @@ test('an agent can notify the human; a stale session raises one notification', a
   await silent(run, 1);
   await autos.tick();
   assert.equal(await quiet(), 1, 'told again when it goes quiet again');
-  // Half a day without a word, a session is ended for it: the notice goes, and what it held is given back.
-  assert.equal((await l.entity(idle))!.is_open, true, 'an hour is not half a day');
-  await silent(run, 13);
-  await silent(idle, 13);
+  // A day without a word (the house style's quiet_end_after), a session is ended for it: the notice goes, and what it held is given back.
+  assert.equal((await l.entity(idle))!.is_open, true, 'an hour is not a day');
+  await silent(run, 25);
+  await silent(idle, 25);
   await autos.tick();
   const gone = (await l.entity(run))!;
   assert.deepEqual([gone.status, (await l.entity(idle))!.status], ['finished', 'finished']);
-  assert.match(gone.body, /Not heard from for over 12 hours: ended for it/);
+  assert.match(gone.body, /Not heard from for over 24 hours: ended for it/);
   assert.equal(await quiet(), 0, 'withdrawn when the session ends');
   assert.equal((await heldResources(l)).length, 0, 'the lane is free');
   assert.equal(((await VIEWS.notifications.run(l, {})) as any[]).length, 1, 'other notifications are left alone');
