@@ -6,6 +6,7 @@ import { type Actor, type Entity, type Archipelago } from './pelago.ts';
 import { spent } from './spent.ts';
 import { usage } from './usage.ts';
 import { factEvents } from './eventlog.ts';
+import { byAttention, markOf, sessionStates } from './session-state.ts';
 
 /** The most change sets' events changed_since counts: past that, its counts are of the newest. */
 const COUNTED = 20_000;
@@ -54,6 +55,10 @@ async function sessions(l: Archipelago) {
     [runs],
   );
   const of = (run: string, ...types: string[]) => links.filter((x) => x.run === run && types.includes(x.type)).map(({ id, title, entity_type }) => ({ id, title, type: entity_type }));
+  // Each open run's state and latest turn (src/session-state.ts), and the open ones in the order they ask for attention.
+  const states = await sessionStates(l, open.map((r) => r.id));
+  const at = (id: string) => states.get(id) ?? { state: 'idle', line: '', since: null, turns: 0 };
+  open.sort((a, b) => byAttention(at(a.id), at(b.id)));
   return {
     stale_after_minutes: STALE_MINUTES,
     open: open.map((r) => {
@@ -74,6 +79,8 @@ async function sessions(l: Archipelago) {
         holds: of(r.id, 'holds'),
         repo: of(r.id, ...homes)[0],
         parent: of(r.id, ...parents)[0],
+        session: markOf(at(r.id)),
+        turn: at(r.id).turn,
       };
     }),
     recently_ended: ended,
@@ -118,7 +125,7 @@ export const VIEWS: Record<string, View> = {
     run: notifications,
   },
   sessions: {
-    description: 'Agent sessions and automation runs: what each open one is working on and holding, the session that started it (parent), whether it has gone quiet, and the last ten that ended.',
+    description: 'Agent sessions and automation runs: what each open one is working on and holding, the session that started it (parent), its state (session: state, for, line, since) and latest turn, and the last ten that ended. The open ones come in the order they ask for attention: waiting, your_move, blocked, working, quiet, idle, each the longest in it first.',
     run: sessions,
   },
   saved_views: {
