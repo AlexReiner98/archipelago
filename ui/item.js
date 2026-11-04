@@ -117,14 +117,16 @@ export async function entity(id, here) {
 
   // What it relates to, drawn one click from its page (decision e_jedng69e): the item found, and a walk of one step
   // along the links it has, in place of the canvas's lens or added to it.
-  const along = [...new Set([...data.outgoing, ...data.incoming].map((r) => r.type).filter((t) => !t.startsWith('sys.')))];
+  // What holds others walks part_of down only, so a step more goes deeper into it and never up to what holds it.
+  const holds = data.incoming.some((r) => rootOf(r.type) === 'part_of');
+  const along = [...new Set([...data.outgoing, ...data.incoming].map((r) => r.type).filter((t) => !t.startsWith('sys.')).map((t) => (holds && rootOf(t) === 'part_of' ? `${t}<` : t)))];
   const walkFrom = (add) => {
     const now = queryNow();
     if (!add || !now) return goQuery({ filter: { find: [`id ${id}`] }, walk: { over: along, steps: 1 } });
     const over = now.walk?.over === 'all' ? 'all' : [...new Set([...(now.walk?.over ?? []), ...along])];
     goQuery({ ...added(now, { find: `id ${id}` }), walk: { over, steps: Math.max(1, now.walk?.steps ?? 0) } });
   };
-  const walkSaid = along.map((t) => relations.get(t)?.title ?? t).join(', ');
+  const walkSaid = along.map((t) => t.replace(/[<>]$/, '')).map((t) => relations.get(t)?.title ?? t).join(', ');
   // What its type's screens give it to do: the first in sight, beside Walk from it, any more in the menu.
   const buttons = e.archived_at ? [] : buttonsOn(data);
   const press = (b) => (b.draw ? drawIn(drawnBy(b.draw, id)) : act(toolOf(b.action)));
