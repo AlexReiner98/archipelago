@@ -69,7 +69,7 @@ export interface RelationDef {
   inverse: string;
   from: string[];
   to: string[];
-  description: string; moved_from?: string[]; retired?: boolean; // Relations whose links are this one's now, moved once no pack defines them; retired, as a type is.
+  description: string; offers_close?: boolean; /* closing its source offers to close its target (src/close-offer.ts) */ moved_from?: string[]; retired?: boolean; // Relations whose links are this one's now, moved once no pack defines them; retired, as a type is.
 }
 
 /** A pack file as the registry reads it: the manifest (src/manifest.ts). */
