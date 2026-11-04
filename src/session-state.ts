@@ -88,8 +88,8 @@ async function eventsOf(l: Archipelago, runs: RunRow[]): Promise<Map<string, Ses
   return out;
 }
 
-/** Its latest beat that stands (none taken back), from its story. */
-const beatOf = (story: unknown) => (Array.isArray(story) ? (story as { said?: string; replaced_by?: number }[]).findLast((b) => b && b.replaced_by === undefined && typeof b.said === 'string') : undefined);
+/** Its latest beat that stands (none taken back), from its story: its own words, never what a rule asked of it (`asked`). */
+const beatOf = (story: unknown) => (Array.isArray(story) ? (story as { said?: string; replaced_by?: number; asked?: string }[]).findLast((b) => b && b.replaced_by === undefined && !b.asked && typeof b.said === 'string') : undefined);
 
 /** The states of many runs, by run id: a run not found is left out. */
 export async function sessionStates(l: Archipelago, runs: string[], now: string = new Date().toISOString()): Promise<Map<string, SessionState>> {
