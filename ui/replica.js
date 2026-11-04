@@ -16,6 +16,8 @@ import { NOTE_START, project } from './project.js';
 const itemRow = (i) => ({
   id: i.id, kind: i.kind ?? null, type: i.type, title: i.title, body: i.body ?? '', status: i.status, visibility: i.visibility,
   owner: i.owner ?? null, is_open: i.open, props: { ...(i.fields ?? {}) }, created_at: i.created_at, updated_at: i.updated_at, archived_at: null,
+  // A run's session is worked out by the server from its events, not folded from facts: kept as the answer gave it.
+  ...(i.session && { session: i.session }),
 });
 const linkRow = (r) => ({ id: r.id, type: r.type, from_id: r.from, to_id: r.to, props: { ...(r.props ?? {}) }, valid_to: null });
 
@@ -66,6 +68,7 @@ export class Replica {
       ...(r.body && { body: r.body.length > NOTE_START && !this.whole?.has(id) ? `${r.body.slice(0, NOTE_START)}…` : r.body }),
       visibility: r.visibility, status: r.status, ...(this.kinds.phase?.(r.type, r.status) && { phase: this.kinds.phase(r.type, r.status) }), open: r.is_open, owner: r.owner, created_at: r.created_at, updated_at: r.updated_at,
       ...(Object.keys(fields).length && { fields }),
+      ...(r.session && { session: r.session }),
       ...this.why.get(id),
       ...this.placed?.get(id),
     };
