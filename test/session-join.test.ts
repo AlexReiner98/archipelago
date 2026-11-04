@@ -4,6 +4,7 @@ import { sessionHeard, sessionStart } from '../src/sessions.ts';
 import { hookSessionStart } from '../src/session-hook.ts';
 import { resolveRun } from '../src/chat-run.ts';
 import { agent, fresh, make } from './map.ts';
+import { callTool } from '../src/tools.ts';
 
 test('a chat its hook registered, told to register itself, gets the hook’s run back with the task and title it sent', async () => {
   const l = await fresh();
@@ -36,4 +37,14 @@ test('of two chats in one folder, a call to register joins the one mid-turn, and
   assert.equal((await sessionStart(l, agent, { cwd: '/w' })).run, b.id, 'the one mid-turn is the one asking');
   // A call that names its own session id is that session, found by it or made.
   assert.notEqual((await sessionStart(l, agent, { cwd: '/w', session_id: 'c' })).run, b.id);
+});
+
+test('a session that joins its hook’s run is told what every session is told as it begins', async () => {
+  const l = await fresh();
+  await hookSessionStart(l, { session_id: 'cc-2', cwd: '/joined', source: 'startup' });
+  await sessionHeard(l, 'cc-2', 'begin');
+  const again = (await callTool(l, agent, 'capture', { action: 'session_start', params: { cwd: '/joined' } })) as { joined?: boolean; instructions?: string[] };
+  assert.equal(again.joined, true);
+  assert.ok(again.instructions?.some((one) => /report, action tell/.test(one)), 'how to report in, among the rest');
+  assert.ok(again.instructions?.every((one) => !one.includes('{run}')), 'with its run filled in');
 });

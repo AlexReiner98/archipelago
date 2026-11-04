@@ -6,6 +6,7 @@
 import { z } from 'zod';
 import { askView } from './askview.ts';
 import { importAudit } from './audit.ts';
+import { instructionsFor } from './instructions.ts';
 import { takeLook } from './looks.ts';
 import { toConfirm } from './confirm.ts';
 import { stopLaunched } from './launcher.ts';
@@ -131,7 +132,11 @@ export const ACT_TOOLS: Record<string, Tool> = {
       const started = await sessionStart(l, actor, input);
       // A new session, or one taken up again after it ended, gets its tab; one still open has it.
       if (!started.resumed || started.reopened) await sessionOpened(l, actor, started.run, input.task, started.took_over);
-      return started;
+      // What every session is told (instructions for session_start) is said in the answer too, so a session its hook
+      // registered and that joins that run hears it as a new one does (issue e_sm2sa75h). A resume was told at first.
+      if (started.resumed) return started;
+      const told = await instructionsFor(l, 'session_start', { about: started.repo?.id, fill: { run: started.run } });
+      return told.length ? { ...started, instructions: told.map((one) => one.text) } : started;
     },
   },
   session_update: {
