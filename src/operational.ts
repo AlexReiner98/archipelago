@@ -70,6 +70,7 @@ export const VIEWS_OPERATIONAL: Record<string, string> = {
   usage: "What the workspace's plan limits, used: the database's own count of each table's size, the counts kept beside the log (item_bytes), the sessions store's runs at work, and the server's counts of requests and looks.",
   spent: "What runs report they cost: the sessions store's tokens_used and cost_usd, summed by where they ran.",
   story: 'What a session told of its work: the story the sessions store keeps on its run.',
+  turns: "A session's turns: the events the sessions store keeps on its run, worked out by the core pack's turnsOf.",
   changed_since: 'The log, counted and cut to its newest events: what happened, not what the map is.',
   style: 'How a page looks: the styles the packs ship and the map keeps, merged; the system tier, not the work.',
   saved_views: 'The views kept on the map, each named by the style that draws it: the system tier, not the work.',

@@ -5,6 +5,7 @@
 
 import { api, h, state } from './base.js';
 import { renderBody } from './body.js';
+import { section } from './item-sections.js';
 import { attentionCard } from './attention.js';
 import { canvasesPiece } from './canvases.js';
 import { drawDiagram } from './diagram.js';
@@ -18,6 +19,7 @@ import { roadmap } from './roadmap.js';
 import { time } from './time.js';
 import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
+import { turnsPiece } from './turns.js';
 import { RAN, ago, chip, isA, label, link, pill, tokensText, unfolded } from './words.js';
 
 /** The screens shown on an item of this type, in the order the packs load. */
@@ -225,6 +227,11 @@ const PIECES = {
     const node = h('section', { class: 'card wide lens-card' });
     return { node, later: () => drawDiagram(node, ctx.e?.props?.diagram, { download: ctx.e?.props?.diagram?.drawio }) };
   },
+  // A run's turns along time, its beats among them (ui/turns.js): a section of the bare page (sectionsOn).
+  turns: (ctx) => {
+    const node = h('div');
+    return ctx.e && { node, later: () => turnsPiece(node, ctx.e, section) };
+  },
   figure: () => null,
   document: () => null,
 };
@@ -260,7 +267,7 @@ const draw = (ctx, p) => (Object.hasOwn(PIECES, p.piece) ? PIECES[p.piece](ctx, 
 const PAGES = { time };
 
 /** A piece that draws something of an item has nothing to draw on a screen of its own. */
-const OF_ITEM = ['tree', 'gate', 'proof', 'usage', 'fields', 'token', 'button', 'count'];
+const OF_ITEM = ['tree', 'gate', 'proof', 'usage', 'fields', 'token', 'button', 'count', 'turns'];
 
 /** The column a screen of its own draws: its pieces, with no item. */
 export function drawScreen(screen, redraw) {
@@ -303,6 +310,18 @@ const piecesOn = (data) => {
 };
 /** The buttons the screens on this item declare: they stand in its page's head (ui/item.js), not in the column. */
 export const buttonsOn = (data) => piecesOn(data).filter((p) => p.piece === 'button');
+/** What the screens on this item add to its bare page (ui/item.js), as sections of it: each a node, filled once it is read. */
+export const sectionsOn = (data) =>
+  piecesOn(data)
+    .filter((p) => SECTIONS.includes(p.piece))
+    .map((p) => {
+      const d = draw({ e: data.entity, id: data.entity.id }, p);
+      Promise.resolve(d?.later?.()).catch((err) => d.node.isConnected && d.node.replaceChildren(h('div', { class: 'error' }, err.message)));
+      return d?.node;
+    })
+    .filter(Boolean);
+/** The pieces the bare page draws as sections of its own. */
+const SECTIONS = ['turns'];
 /** The count a screen on this item declares: it stands at the foot of its note while it is written (ui/note-count.js). */
 export const countOn = (data) => piecesOn(data).find((p) => p.piece === 'count');
 

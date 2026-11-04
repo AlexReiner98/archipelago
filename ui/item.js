@@ -14,7 +14,7 @@ import { choicesSection, fieldsSection, headSection, historySection, section, so
 import { relationEditor } from './item-links.js';
 import { added } from './query-bar.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
-import { actionForm, actionsFor, buttonsOn, countOn, drawnBy, keepsFigure, readWhole, toolOf } from './screens.js';
+import { actionForm, actionsFor, buttonsOn, countOn, drawnBy, keepsFigure, readWhole, sectionsOn, toolOf } from './screens.js';
 import { idsIn, isA, label, menu, relations, titles, types } from './words.js';
 
 /** The root relation a relation extends: what the page reads, whichever pack's flavour of it was used. */
@@ -221,6 +221,8 @@ export async function entity(id, here) {
     acting,
     headSection(e, owner, (st) => change([{ op: 'update', id, status: st }], `Status set to ${st} in the UI`), (v) => change([{ op: 'update', id, visibility: v }], `Visibility set to ${v} in the UI`)),
     note,
+    // What its kind's screens add to the page: a run's turns, for one.
+    ...sectionsOn(data),
     choicesSection(e, pick, fieldEdit),
     fieldsSection(e, looks, fieldEdit),
     sourceSection(data.source),

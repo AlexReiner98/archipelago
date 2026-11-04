@@ -21,6 +21,7 @@ import { props } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 import { previewAddress, VIEW_INPUT, viewAddress } from './view-address.ts';
 import { withCovers } from './withdraw.ts';
+import './session-turns.ts'; // adds the turns view
 
 /** One thing the human did to the map, small enough to put in front of a model. */
 export interface HumanChange {

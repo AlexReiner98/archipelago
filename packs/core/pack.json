@@ -1225,6 +1225,13 @@
     },
     {
       "form": "screen",
+      "id": "core.run_turns",
+      "title": "Turns",
+      "on": ["run"],
+      "pieces": [{ "piece": "turns" }]
+    },
+    {
+      "form": "screen",
       "id": "core.shared_reading",
       "title": "Reading",
       "on": [
