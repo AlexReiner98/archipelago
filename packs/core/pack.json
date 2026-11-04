@@ -1012,6 +1012,19 @@
       "say": "A run's story and spend now, two weeks of how they got there, kept half a year after the run ends."
     },
     {
+      "id": "session_events",
+      "when": {
+        "fields": [
+          "event"
+        ]
+      },
+      "stream": "sessions",
+      "keep": {
+        "history": "P14D"
+      },
+      "say": "What a session did, as raw events, for two weeks."
+    },
+    {
       "id": "claims",
       "stream": "claims",
       "keep": {

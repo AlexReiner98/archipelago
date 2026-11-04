@@ -18,6 +18,7 @@ import { describeChanges, humanChanges, latestSeq, offeredActions } from './tool
 import { summed } from './summary.ts';
 import { seeingLine } from './seeing.ts';
 import { keep, kept } from './transient.ts';
+import { takeEvents } from './session-events.ts';
 
 export interface HookBody {
   session_id?: string;
@@ -48,6 +49,8 @@ export interface HookBody {
   said?: unknown;
   /** At a turn's end and at the end: where the checkout stands (src/git-state.ts). */
   git?: unknown;
+  /** At the events route: the adapter's batch of raw events, in the vocabulary of docs/sessions.md (src/session-events.ts). */
+  events?: unknown;
 }
 
 export interface HookCall {
@@ -97,6 +100,8 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     const told = await fileSaid(pelago, body).catch((err) => void console.error(`hook file: ${(err as Error).message}`));
     return told ? { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: told.text }, said: told.ids } : {};
   }
+  // An adapter's batch of what the session did, kept as raw events on its run.
+  if (event === 'events') return takeEvents(pelago, body);
   // Said in the server's log, so "did the hook run?" has an answer.
   console.log(`hook ${event} from session ${body.session_id ?? 'unknown'}`);
   // One chat is one session: a prompt takes up a run that was ended while the chat went on, before anything is kept on it.
