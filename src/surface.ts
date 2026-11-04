@@ -116,7 +116,7 @@ export function surfaceTools(reg: Registry, tools: Record<string, Tool>, offered
   const out: Record<string, Tool> = {
     query: {
       description:
-        `Read the map: every read is one call, query with the name of what to read and its params. With no name, every name with what it answers. ` +
+        `Read the map: one call a read, with the name of what to read and its params. With no name, every name with what it answers. ` +
         `${LIST} says what one takes, whole: params read (a read or view, such as flat), action (or change, for its ops) or verb. ` +
         `An agent is given each answer without its empty fields and with long lists cut to what is read (params.full: true for all of it). ` +
         `The reads and their params: ${reads}. ` +
