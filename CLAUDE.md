@@ -338,13 +338,13 @@ the same commit again. Run it when you want to see the whole set on Windows
 (the nightly run does too), or when CI cannot run.
 
 CI deals every file into equal shards by the seconds each took in CI
-( in , ), side by side, so a push
+(`shard` in `test/sets.ts`, `test/weights.json`), side by side, so a push
 deploys after its slowest shard. A new test that starts a browser or takes
-more than a few seconds of one process goes in , with why; never move
-the structure test there.  decides only the local fast set. When
- says a shard is over its budget, refresh the weights
-from main's latest run (Say ci [run] or local [files]), and if it still
-is, add a shard to both matrices in .
+more than a few seconds of one process goes in `SLOW`, with why; never move
+the structure test there. `SLOW` decides only the local fast set. When
+`test/sets.test.ts` says a shard is over its budget, refresh the weights
+from main's latest run (`node scripts/test-weights.ts ci`), and if it still
+is, add a shard to both matrices in `.github/workflows/tests.yml`.
 
 The UI asks its questions in the page (`ask` and `tell` in `ui/base.js`), so
 browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.
