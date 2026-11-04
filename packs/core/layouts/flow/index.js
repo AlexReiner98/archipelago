@@ -201,8 +201,8 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   };
   const kind = (type) => colourClass(linkColours.get(type), 'k', 'link');
   // A wait on the person looking is drawn in the colour of what waits on you, whatever its link type's colour.
-  const waits = new Set((answer.links ?? []).filter((l) => l.type === 'waits_on' || l.is?.includes('waits_on')).map((l) => l.type));
-  const onYou = (t) => (waits.has(t.type) && answer.viewer && t.b === answer.viewer ? ' you' : '');
+  const waits = new Set((answer.links ?? []).filter((l) => (l.type ?? l.kind) === 'waits_on' || l.is?.includes('waits_on')).map((l) => l.type ?? l.kind));
+  const onYou = (t) => (waits.has(t.type) && answer.viewer && (t.flipped ? t.a : t.b) === answer.viewer ? ' you' : '');
   // A part in its place's colour: a class with a rule of its own, as a link's colour is.
   const placeClass = (hex) => {
     const cls = `lf-p-${hex.slice(1).toLowerCase()}`;
@@ -301,7 +301,11 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     g.chains.length > 0 && mark(m('path', { d: 'M1 7H21', class: `lf-wire${kind(ORDER_TYPE)}` }), 'Leads to'),
     g.chains.some((c) => c.dashed) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire dashed' }), 'If chosen'),
     g.breaks.length > 0 && mark(m('path', { d: 'M1 7H21M11 0V4M11 10V14', class: 'lf-wire' }), 'Passes under'),
-    [...new Set(g.ties.map((t) => t.type))].sort().map((type) => mark(headless.has(type) ? m('path', { d: 'M1 7H21', class: `lf-tie${type === 'part_of' ? ' near' : ''}${kind(type)}` }) : m('g', {}, m('path', { d: 'M1 7H17', class: `lf-tie headed${kind(type)}` }), m('path', { d: 'M21 7L13 3V11Z', class: `lf-head${kind(type)}` })), linkName(type))),
+    // A tie of each type in the colour it is drawn in: its own, or that of what waits on you; "you" said only where both are drawn.
+    ((rows) => rows.map((row) => {
+      const [type, you] = row.split('\n'), cls = `${kind(type)}${you}`, both = rows.includes(`${type}\n`) && rows.includes(`${type}\n you`);
+      return mark(headless.has(type) ? m('path', { d: 'M1 7H21', class: `lf-tie${type === 'part_of' ? ' near' : ''}${cls}` }) : m('g', {}, m('path', { d: 'M1 7H17', class: `lf-tie headed${cls}` }), m('path', { d: 'M21 7L13 3V11Z', class: `lf-head${cls}` })), you && both ? `${linkName(type)} you` : linkName(type));
+    }))([...new Set(g.ties.map((t) => `${t.type}\n${onYou(t)}`))].sort()),
     (stepBadges.size > 0 || linkBadges.length > 0) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire held' }), 'Held for you'),
   ].flat().filter(Boolean);
 

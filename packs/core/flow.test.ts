@@ -230,9 +230,8 @@ test('what is tied to nothing is a step of its own, set apart from the rest', ()
   const g = layout({ items: [top('a'), top('b'), top('c'), top('p', { kind: 'actor' })], links: [dep('b', 'a'), { kind: 'waits_on', from: 'b', to: 'p' }], measure, sizes: house.sizes, shapes: { kind: house.kind_shapes } });
   checks(g);
   assert.ok(g.nodes.has('c') && g.nodes.has('p'), 'started on the canvas and not yet wired up, it is drawn; one waited on too');
-  assert.ok(g.ties.some((t: any) => t.type === 'waits_on' && t.a === 'b' && t.b === 'p'), 'waits_on is a tie');
+  assert.ok(g.ties.some((t: any) => t.type === 'waits_on' && t.a === 'p' && t.b === 'b' && t.flipped), 'waits_on is a tie, drawn from the person to what waits on them');
 });
-
 test('a large map wraps its wide layers into rows: it comes out about the page\'s shape, not one band', () => {
   // Twenty projects, each with nine parts: one cluster of two hundred steps, every layer far wider than tall.
   const items = [flat('top')];

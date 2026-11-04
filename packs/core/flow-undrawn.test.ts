@@ -50,3 +50,13 @@ test("the key is data the page draws: a row for every link type drawn, in its co
   const cls = JSON.stringify(tagged.glyph).match(/lf-k-[0-9a-f]+/)?.[0];
   assert.ok(cls && JSON.stringify(scene.svg).includes(cls), 'the tagged tie is drawn in the colour its row shows');
 });
+
+test('a wait on the person looking has its own row in their colour, and is drawn from them to what waits', () => {
+  const you = 'e_youzzzzz';
+  const waiting = { ...answer, viewer: you, items: [...answer.items, { ...item(you, 'Alex', null), kind: 'actor', type: 'person' }], links: [...answer.links, { kind: 'waits_on', from: 'e_askzzzzz', to: you }] };
+  const scene = picture({ answer: waiting, style: house, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene;
+  const rows = scene.key.filter((e: any) => e.label === 'Waits on');
+  assert.equal(rows.length, 1, `one row for the wait: ${scene.key.map((e: any) => e.label).join(', ')}`);
+  assert.match(JSON.stringify(rows[0].glyph), /lf-tie headed[^"]* you/, 'in the colour of what waits on you, as it is drawn');
+  assert.match(JSON.stringify(scene.svg), /lf-tie headed[^"]* you/, 'the wire is drawn in that colour');
+});
