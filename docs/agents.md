@@ -156,7 +156,8 @@ SessionStart's `source` and SessionEnd's `reason`.
 - `test/sessions.test.ts`: "a session is called what its chat is called";
   "a chat that ends ends its session, and after a clear the next one in its
   folder takes over its tab"; "Claude Code's hooks name a session by its chat".
-- `test/tabs.test.ts`, `test/show-lands.test.ts`: the tabs in a browser.
+- `test/tabs*.test.ts`, `test/show-*.test.ts`: the tabs in a browser, a test
+  to a file.
 
 ## The modules
 

@@ -121,8 +121,10 @@ draws in a style it names: it finds it as an item, whose page opens over the
 canvas, and Use here there, a button its type declares on a screen
 (`docs/packs.md`), does what the switch does (task e_q3yfvnz7). Deleting a
 layout or style says which views use it; they go to the default.
-- `test/saved-canvases.test.ts`: "in a browser, a canvas is saved from the
-  bar, listed on Home, opened and switched to, its places its own".
+- `test/saved-canvases.test.ts`, `test/saved-canvases-narrow.test.ts`: "in a
+  browser, a canvas is saved from the bar at 1280 px (560 px) and listed on
+  Home, its places its own"; `test/saved-canvases-switch.test.ts`: "a saved
+  canvas is opened from Home and switched to from the bar".
 - `test/style-items.test.ts`: "in a browser, find opens a style’s page and
   Apply draws the canvas in it".
 - `test/canvas-places.test.ts`: "a move names a canvas and items the map
