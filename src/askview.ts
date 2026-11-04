@@ -43,7 +43,7 @@ export function viewsSaid(reg?: Registry): string {
   const queries = core.map((v): [string, string] => [short(v.id), v.description]).sort(([a], [b]) => Number(b === 'flat') - Number(a === 'flat'));
   const views = [...queries, ...Object.entries(VIEWS).map(([name, v]): [string, string] => [name, v.description])];
   return (
-    'Answer one of the standing questions. Call with no name to list them. An agent is given each answer without its empty fields and with long lists cut to what is read (params.full: true for all of it). ' +
+    'Answer one of the standing questions. Call with no name to list them. Answers drop empty fields and cut long lists (params.full: true for all).' +
     views.map(([name, said]) => `${name}: ${said}`).join(' ') +
     ' The packs here add their own (the repository views handoff, repo_work, recheck and agent_usage, and a release’s gate, are the software pack’s): call with no name for all of them.'
   );

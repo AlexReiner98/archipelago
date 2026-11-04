@@ -118,7 +118,7 @@ export function surfaceTools(reg: Registry, tools: Record<string, Tool>, offered
       description:
         `Read the map: name what to read and give its params. With no name, every name with what it answers. ` +
         `${LIST} says what one takes, whole: params read (a read or view, such as flat), action (or change, for its ops) or verb. ` +
-        `An agent is given each answer without its empty fields and with long lists cut to what is read (params.full: true for all of it). ` +
+        `Answers drop empty fields and cut long lists (params.full: true for all). ` +
         `The reads and their params: ${reads}. ` +
         `Every other name is a view: ${viewNames(reg).join(', ')}. flat is the query: filter { find, only, not }, walk { over (part_of< down, part_of> up), steps }, limit.`,
       input: { name: z.string().optional().describe('What to read: a read, a view or a lens. Left out, the list of them.'), params: props.optional().describe('Its inputs, as the list names them.') },
