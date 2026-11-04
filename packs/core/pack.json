@@ -765,6 +765,15 @@
       "description": "Current occupancy of a place with a capacity (a resource). Created by claim, ended by release."
     },
     {
+      "id": "started_from",
+      "extends": "about",
+      "title": "was started from",
+      "inverse": "started",
+      "from": ["run"],
+      "to": ["run"],
+      "description": "The session that started this one: sessions form a tree. Made by session_start with parent, or session_update with parent when a session learns it later; a run has one."
+    },
+    {
       "id": "produced",
       "root": true,
       "title": "produced",
@@ -1230,7 +1239,7 @@
     {
       "id": "report",
       "title": "Report",
-      "description": "Say that something happened or is so: progress, a result, a payment received, a check that it is still true. Also answers the owner with a view: show, with a kept view or an ad-hoc lens and style.",
+      "description": "Say that something happened or is so: progress, a result, a payment, a check that it still holds. Also answers the owner with a view: show, with a kept view or an ad-hoc lens and style.",
       "kernel": true
     },
     { "id": "ask", "title": "Ask", "description": "Put a question to someone and wait for the answer.", "kernel": true },

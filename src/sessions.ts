@@ -10,7 +10,7 @@ import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './w
 import { cutTitle, mintName, saidTitle, sessionLabelled, sessionTitle } from './session-name.ts';
 import { commitRule } from './commit-rule.ts'; import { roomForSession } from './plan.ts'; import { wholeMap } from './outbox.ts'; import { took } from './presence.ts';
 import { VIEWS } from './views.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts'; import { unaccountedBy } from './commits.ts';
-import { hookRunHere, isChat, resolveRun, sessionsAwake, takeUp } from './chat-run.ts';
+import { hookRunHere, isChat, resolveRun, sessionsAwake, takeUp } from './chat-run.ts'; import { parentOps, parentRun } from './session-parent.ts';
 export { resolveRun, sessionPrompted, sessionsAwake } from './chat-run.ts';
 export { recordRun } from './run-record.ts';
 
@@ -35,17 +35,20 @@ export async function sessionBegan(l: Archipelago, sessionId: string | undefined
   return run && new Date(run.created_at);
 }
 /** What a session says of itself as it registers. */
-type SessionSaid = { title?: string; surface?: string; cwd?: string; remote?: string; session_id?: string; task?: string; branch?: string; source?: string };
+type SessionSaid = { title?: string; surface?: string; cwd?: string; remote?: string; session_id?: string; task?: string; branch?: string; source?: string; parent?: string };
 
 export async function sessionStart(
   l: Archipelago,
   actor: Actor,
   input: SessionSaid,
 ) {
+  // The session that started this one, refused before anything is made when there is none.
+  const parent = input.parent ? await parentRun(l, input.parent) : undefined;
   // A surface may announce the same session again (resume, compact), even ended: its own run takes up, not a second.
   if (input.session_id) {
     const existing = await resolveRun(l, input.session_id);
     if (existing) {
+      await parented(l, actor, existing.id, parent);
       const reopened = !existing.is_open;
       if (reopened) await takeUp(l, actor, existing);
       await touch(l, existing.id);
@@ -65,10 +68,11 @@ export async function sessionStart(
     const ops: Op[] = [];
     if (task) ops.push({ op: 'link', type: 'works_on', from: hooked.id, to: task.id });
     if (input.branch && input.branch !== hooked.props.branch) ops.push({ op: 'update', id: hooked.id, props: { branch: input.branch } });
+    if (parent) ops.push(...(await parentOps(l, hooked.id, parent)));
     if (ops.length) await l.apply(actorId(actor), { ops, reason: 'Session registered again: its hook had registered it' });
   } else await roomForSession(l.workspace, () => sessionsAwake(l));
   const repo = await placeFor(l, input);
-  const { run, name, before } = hooked ? { run: hooked.id, name: hooked.props.name as string | undefined, before: undefined } : await newRun(l, actor, input, task, repo);
+  const { run, name, before } = hooked ? { run: hooked.id, name: hooked.props.name as string | undefined, before: undefined } : await newRun(l, actor, input, task, repo, parent);
 
   // Take every exclusive resource the task needs, or say who has it.
   const claimed: string[] = [];
@@ -108,7 +112,7 @@ export async function sessionStart(
 }
 
 /** A session's run, made: named, labelled, tied to its task and its place. */
-async function newRun(l: Archipelago, actor: Actor, input: SessionSaid, task: Entity | undefined, repo: Entity | null | undefined) {
+async function newRun(l: Archipelago, actor: Actor, input: SessionSaid, task: Entity | undefined, repo: Entity | null | undefined, parent?: Entity) {
   const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };
   for (const k of ['surface', 'cwd', 'session_id', 'branch'] as const) if (input[k]) props[k] = input[k];
   // Its word is its hue's key, never shown (src/session-name.ts).
@@ -124,8 +128,15 @@ async function newRun(l: Archipelago, actor: Actor, input: SessionSaid, task: En
   const ops: Op[] = [{ op: 'create', ref: 'run', type: 'run', title, status: 'running', props }];
   if (task) ops.push({ op: 'link', type: 'works_on', from: 'run', to: task.id });
   if (repo) ops.push({ op: 'link', type: livesInFor(l, repo.type), from: 'run', to: repo.id });
+  if (parent) ops.push(...(await parentOps(l, 'run', parent, true)));
   const { created } = await l.apply(actorId(actor), { ops, reason: 'Session started' });
   return { run: created.run, name, before };
+}
+
+/** A run is tied to the session that started it, if it said one and is not tied to it already. */
+async function parented(l: Archipelago, actor: Actor, run: string, parent: Entity | undefined): Promise<void> {
+  const ops = parent ? await parentOps(l, run, parent) : [];
+  if (ops.length) await l.apply(actorId(actor), { ops, reason: `Started from "${parent!.title}"` });
 }
 
 /** A session registered before sessions were given a word is given one, for its hue, when it is heard from again. */
@@ -225,10 +236,12 @@ export async function recordUsage(l: Archipelago, sessionId: string | undefined,
   return { run: run.id, added, to: work.map((w) => w.id) };
 }
 
-export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string; branch?: string; title?: string }) {
+export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string; branch?: string; title?: string; parent?: string }) {
   const run = await resolveRun(l, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
   if (!run.is_open) throw new Error(`Session "${run.title}" has already ended`);
+  // A session that learns only now which one started it says so: its run is tied to that one's.
+  await parented(l, actor, run.id, input.parent ? await parentRun(l, input.parent) : undefined);
   await heard(l, run, `Session "${run.title}" reported in again`);
   // Its chat was renamed: what it is called follows, wherever it is named.
   await sessionLabelled(l, run, input.title, actorId(actor));

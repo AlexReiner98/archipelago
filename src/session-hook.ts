@@ -16,9 +16,10 @@ import { resolveRun, sessionEnd, sessionStart } from './sessions.ts';
  * A Claude Code SessionStart hook: register the session and return the text
  * to put in front of the model, so it starts knowing what the map knows.
  */
-export async function hookSessionStart(l: Archipelago, input: { session_id?: string; cwd?: string; remote?: string; commits?: unknown; source?: unknown; title?: unknown }): Promise<string> {
-  // Claude Code says why it starts (startup, resume, clear, compact) and, from its record, what the chat is called.
-  const said = { source: typeof input.source === 'string' ? input.source : undefined, title: typeof input.title === 'string' ? input.title : undefined };
+export async function hookSessionStart(l: Archipelago, input: { session_id?: string; cwd?: string; remote?: string; commits?: unknown; source?: unknown; title?: unknown; parent?: unknown }): Promise<string> {
+  // Claude Code says why it starts (startup, resume, clear, compact) and, from its record, what the chat is called; the
+  // session that started it, if it knows one, is kept only when the map has it, so a hook never fails to register.
+  const said = { source: typeof input.source === 'string' ? input.source : undefined, title: typeof input.title === 'string' ? input.title : undefined, parent: typeof input.parent === 'string' && input.parent && (await resolveRun(l, input.parent)) ? input.parent : undefined };
   const started = await sessionStart(l, { kind: 'agent', name: 'claude-code' }, { session_id: input.session_id, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined, surface: 'claude-code', ...said });
   const lines = [`This session is registered in Archipelago, the owner's map of work and dependencies, as run ${started.run}, called "${(await l.entity(started.run))?.title}" after this chat.`];
   const repo = 'repo' in started ? started.repo : undefined;
