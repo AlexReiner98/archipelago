@@ -32,7 +32,7 @@ export async function savedCanvasPage() {
   /** A canvas of the project and its parts, kept as the bar keeps one saved at `at` px: what a pass before this one left. */
   const keptBefore = (at: number) => call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: `Saved at ${at}`, props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } } }] });
 
-  /** At `w` px: a canvas saved from the bar, its places its own, listed on Home one line each. */
+  /** At `w` px: a canvas saved from the bar and listed on Home one line each. */
   async function savePass(w: number) {
     await width(w);
     const name = `Saved at ${w}`;
@@ -49,15 +49,6 @@ export async function savedCanvasPage() {
     assert.ok(saved, 'kept on the map');
     assert.deepEqual([saved.props.filter.find, saved.props.walk], [[`id ${made.p}`], { over: ['part_of'], steps: 1 }], 'its lens: the filter, the walk');
     assert.equal(await canvasUp(), saved.id, 'its id in the address');
-
-    // Moved on it: written under its own id, not the item's canvas or the map's.
-    await page.evaluate(`document.querySelector('#canvas .pane-canvas').dispatchEvent(new CustomEvent('drawing-drop', { detail: { id: '${made.a}', x: ${w}, y: 77 } }))`);
-    await page.evaluate(`location.hash = '#/'`);
-    let mine: Record<string, [number, number]> = {};
-    for (const end = Date.now() + 10000; Date.now() < end && !mine[made.a]; await wait(200)) mine = (await call('/api/places', undefined, { canvas: `${saved.id}@wired` })).result;
-    assert.deepEqual(mine[made.a], [w, 77], 'kept in its places');
-    assert.equal((await call('/api/places', undefined, { canvas: made.p })).result[made.a], undefined, 'not in the places of the item it is drawn from');
-    assert.equal((await call('/api/places', undefined, {})).result[made.a], undefined, 'not in the map’s');
 
     // Home: one line each, opening in one click.
     await page.evaluate(`location.hash = '#/you'`);

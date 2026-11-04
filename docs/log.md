@@ -543,7 +543,7 @@ kept forever as facts instead: a run's start, end and the task it is on
 | `access` | a token's last use (at most hourly), backup downloads (the grants themselves are facts) | `latest`, `history: P365D` |
 | `pack:<id>` | a pack's own keys and values (today's `pack_store`), read only while the pack is active | `latest`; the pack may declare more |
 | `observations` | readings from monitors and reports, connection reachability, imported external tool calls (`audit.import`), a test's picture (as a blob's hash) | `latest`, `thin: [["P1D", "PT1H"], ["P30D", "P1D"]]`; pictures `latest` only |
-| `places` | where a person put an item on a canvas: the field `place:<canvas>` on the item, its value `[x, y]`, one entry per item so a member reads only what they may see (decision `e_n2825x2w`; written by `places_put`, read by `places`) | `latest` |
+| `places` | retired (the owner, 3 Nov 2026: a view is drawn from its query alone): where a person once put an item on a canvas, the field `place:<canvas>` on the item, its value `[x, y]`. Nothing appends to it; the name stays so entries and backups from before still read | `history` a day |
 
 ### Blobs
 

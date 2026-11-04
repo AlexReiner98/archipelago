@@ -1,8 +1,7 @@
 // Saved canvases (task e_uq77ps44): a flat lens and a style kept as an item of core's `lens` type. An agent makes and
 // changes one through change and opens it on the owner's screen with report show; in a real browser (skipped where
-// there is no Chrome) one is saved from the query bar and listed on Home one line each, its places kept apart from the
-// map's, at 1280 px here and at 560 px in test/saved-canvases-narrow.test.ts; opened and switched to from the bar in
-// test/saved-canvases-switch.test.ts.
+// there is no Chrome) one is saved from the query bar and listed on Home one line each, at 1280 px here and at 560 px
+// in test/saved-canvases-narrow.test.ts; opened and switched to from the bar in test/saved-canvases-switch.test.ts.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -55,7 +54,7 @@ test("a pack ships canvases as presets: the schema offers each, its lens answers
   assert.equal(got.entity.props.preset, 'core.waiting', 'the owner’s version names the preset it stands for');
 });
 
-test('in a browser, a canvas is saved from the bar at 1280 px and listed on Home, its places its own', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, a canvas is saved from the bar at 1280 px and listed on Home', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { page, savePass } = await savedCanvasPage();
   try {
     await savePass(1280);

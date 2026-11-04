@@ -201,7 +201,7 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: var(--space-3); }
 .graph-scroll { overflow: auto; max-height: var(--scroll-most); scrollbar-color: var(--line) transparent; }
 .graph-scroll svg { display: block; touch-action: none; user-select: none; }
 .rm-link.other { stroke-dasharray: 2 4; }
-.g-node { cursor: grab; }
+.g-node { cursor: pointer; }
 .g-node .stripe { fill: var(--g-system); }
 .g-node.group-actor .stripe { fill: var(--g-actor); } .g-node.group-work .stripe { fill: var(--g-work); } .g-node.group-aim .stripe { fill: var(--g-aim); }
 .g-node.group-record .stripe { fill: var(--g-record); } .g-node.group-question .stripe { fill: var(--g-question); }

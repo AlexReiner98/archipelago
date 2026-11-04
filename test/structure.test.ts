@@ -14,7 +14,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../src/operational.ts';
-import { drawings, differsFromReload, faultsOf, imported, LAYERS, MOVED, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
+import { drawings, faultsOf, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const MAX_LINES = 500;
@@ -370,8 +370,8 @@ test('no read of the whole map', () => {
 // the agents' ten tools, came on 2 Nov 2026 at the owner's word: the page takes a change back as an agent does.
 const PAGE_CALLS = [
   'backup_download', 'change', 'connections', 'decide', 'document', 'events', 'get', 'github', 'import_backup', 'init',
-  'launch', 'member_add', 'member_list', 'member_set', 'model_account', 'pack_set', 'packs', 'picture', 'places',
-  'places_put', 'proposals', 'publish', 'publish_all', 'publish_plan', 'published', 'schema', 'search', 'server_packs',
+  'launch', 'member_add', 'member_list', 'member_set', 'model_account', 'pack_set', 'packs', 'picture',
+  'proposals', 'publish', 'publish_all', 'publish_plan', 'published', 'schema', 'search', 'server_packs',
   'session_end', 'share_create', 'share_figure', 'share_list', 'share_revoke', 'share_workspace', 'tail',
   'time_invoice_draft', 'time_invoice_paid', 'time_log', 'time_timesheet', 'time_week', 'token_create', 'token_list',
   'token_request_answer', 'token_requests', 'token_revoke', 'undo', 'unpublish', 'view', 'workspace_info', 'workspace_set',
@@ -386,13 +386,13 @@ test('the page calls no more tools through /api than it did', () => {
 
 // 17. Depth is never drawn on the canvas (decision e_ktdensts): the flat lens answers items and links with nothing of
 // what is inside what, and the canvas asks for no nesting of its picture (flatView's `nest` is for a kept view drawn in
-// a document or a screen). Places never carry meaning (decision e_n2825x2w): the places stream is read in one module,
-// to hand a drawing where things were put, and no lens, rule or view reads it.
-test('the canvas draws no depth, and places are read only to draw', () => {
+// a document or a screen). Places are never kept (the owner, 3 Nov 2026): a view is drawn from its query alone, so
+// nothing reads or appends to the places stream, which stays only so entries from before still read.
+test('the canvas draws no depth, and nothing keeps places', () => {
   assert.doesNotMatch(read('ui/canvas.js'), /\bnest\s*:/, 'The canvas draws a flat lens flat: part_of is a tie, never a box inside a box.');
   assert.doesNotMatch(read('src/query-flat.ts').replace(/\/\/.*$/gm, ''), /\b(?:depth|places?)\b|\binside\s*:/, 'The flat lens answers items and links: no containment and no places.');
-  const readers = walk('src').filter((f) => f.endsWith('.ts') && /readOps\([^)]*'places'/.test(read(f)));
-  assert.deepEqual(readers, ['src/canvas-places.ts'], 'Where a person put a thing is read only to draw it there (src/canvas-places.ts); grouping that matters is a link.');
+  const keepers = walk('src').filter((f) => f.endsWith('.ts') && /(?:readOps|record)\([^)]*'places'/.test(read(f)));
+  assert.deepEqual(keepers, [], 'Nothing keeps where a person put a thing: a view is drawn from its query alone; grouping that matters is a link.');
 });
 
 // 18. A drawing's modules (docs/layouts.md): what it imports is in its list in pack.json, the only files the page is sent.
@@ -481,17 +481,3 @@ test('a wired drawing keeps its wires apart', async () => {
   assert.deepEqual(ratchet(counted, NOT_SEALED), [], 'Wires take room in the solve: each stretch keeps its distance from every other (docs/layouts.md).');
 });
 
-// 22. One call: drawn, moved, let go and reloaded run one function with different pins, so every wire must match.
-// Architecture cannot be moved by hand. Each entry is 1, broken or not: how many wires differ follows every
-// change to the solve, so it is no count to hold a change to.
-const NOT_ONE_CALL: Record<string, number> = { 'core.architecture': 1 };
-
-test('a wired drawing draws the same wires moved as reloaded', async () => {
-  const counted: Record<string, number> = {};
-  for (const d of wired) {
-    if (!Object.keys(d.modules).some((name) => /['"]drag['"]/.test(read(pathOf(d, name))))) { counted[d.id] = 1; continue; }
-    const { picture } = await setOut(d, (url) => import(url('index.js')));
-    if (MOVED.some(([sketch, id, by]) => differsFromReload(picture, sketch, id, by))) counted[d.id] = 1;
-  }
-  assert.deepEqual(ratchet(counted, NOT_ONE_CALL), [], 'A drag frame, a drop and a reload are one solve with different pins.');
-});

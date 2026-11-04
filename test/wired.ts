@@ -139,32 +139,4 @@ export async function setOut<T>({ pack, modules }: Layout, use: (url: (name: str
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
-/** Every keyed wire's path in a scene's marks, by key. */
-function pathsIn(mark: unknown, out = new Map<string, string>()) {
-  if (!Array.isArray(mark)) return out;
-  const attrs = mark[1];
-  if (attrs && typeof attrs === 'object' && /^[wn]:/.test(attrs.key ?? '') && attrs.d) out.set(attrs.key, attrs.d);
-  for (const inner of mark) pathsIn(inner, out);
-  return out;
-}
 
-/** The steps the one-call rule moves: a sketch, a step, and how far. */
-export const MOVED: [string, string, number[]][] = [['knot', 'n10', [70, 40]], ['fan', 'mid', [-90, 60]], ['crossed', 'q1', [120, 30]]];
-
-/**
- * Wires that differ from the picture drawn afresh with the step there: at a drag frame halfway, and let go. Drawn, moved and
- * reloaded are one call when this is 0. Told what it is opened on (`here`), a picture starts at that step's middle.
- */
-export function differsFromReload(picture: (input: any, tools: any) => any, name: string, id: string, by: number[]) {
-  const { items, links } = SKETCHES[name], tools = { measure, patch() {}, open() {}, frame: async () => {} }, style = house();
-  const drawn = (placed: Record<string, number[]>) => picture({ answer: { items, links }, style: { ...style, placed, here: id }, reduced: true, width: 1600, height: 1000 }, tools);
-  const moving = drawn({}), from: number[] = moving.scene.start, paths = pathsIn(moving.scene.svg), key = `s:${id}`;
-  const spot = (part: number) => [Math.round(from[0] + by[0] * part), Math.round(from[1] + by[1] * part)];
-  const event = (what: string, to: number[]) => ({ name: what, key, dx: to[0] - from[0], dy: to[1] - from[1] });
-  const apply = (patches: any[]) => { for (const p of patches) if (p.set?.d && paths.has(p.key)) paths.set(p.key, p.set.d); };
-  const differing = (to: number[]) => { const again = pathsIn(drawn({ [id]: to }).scene.svg); return [...paths].filter(([k, d]) => again.get(k) !== d).length; };
-  apply(moving.on(event('drag', spot(0.5))));
-  const atFrame = differing(spot(0.5));
-  apply(moving.on(event('drop', spot(1))));
-  return atFrame + differing(spot(1));
-}

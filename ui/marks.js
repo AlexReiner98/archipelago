@@ -18,9 +18,8 @@ const SVG_TAGS = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line
 const HTML_TAGS = new Set(['div', 'span', 'p', 'b', 'strong', 'em', 'i', 'small', 'ul', 'ol', 'li', 'br', 'a', 'button']);
 const ITEM_ID = /^e_[a-z0-9]{8}$/;
 const ATTRS = new Set(['class', 'd', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'dx', 'dy', 'width', 'height', 'viewBox', 'points', 'transform', 'text-anchor', 'dominant-baseline', 'pathLength', 'offset', 'preserveAspectRatio', 'role', 'aria-label', 'aria-hidden', 'title', 'hidden', 'href', 'stroke-dasharray', 'stroke-dashoffset', 'aria-live', 'opacity', 'fill-opacity', 'stroke-opacity', 'gradientUnits']);
-/** The events a drawing may be told of, by the page's name for each; `seen` is told once, when the mark is first scrolled into sight;
- * `drag` hands the page the press that starts a drag, which the page follows and tells the drawing of (ui/layout.js). */
-const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click', seen: 'seen', drag: 'pointerdown' };
+/** The events a drawing may be told of, by the page's name for each; `seen` is told once, when the mark is first scrolled into sight. */
+const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click', seen: 'seen' };
 const seen = (el, fn) => {
   const sight = new IntersectionObserver((all) => all.some((e) => e.isIntersecting) && (sight.disconnect(), fn()), { threshold: 0.5 });
   sight.observe(el);

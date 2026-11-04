@@ -131,9 +131,10 @@ code: `#sheet` in `ui/index.html`, routed by `ui/app.js`.
 `tag` type, tied by a `tagged` link, any number to an item. A query filters by
 one (`tagged <tag>`); the house style draws no wire for it.
 
-**place.** Where a person put an item on a canvas: one per canvas and item,
-kept in the places stream, never an item or a link, and never meaning
-anything. In the code: `src/canvas-places.ts`, `places` and `places_put`.
+**place.** Where a drawing's layout puts an item: never set by hand (the
+owner, 3 Nov 2026), never meaning anything. The `places` stream that once
+kept hand places is retired: nothing appends to it, and what is left of it
+goes in a day.
 
 **ghost.** A held change drawn where it would land on the canvas: a faint
 node, a dashed wire, a badge. In the code: `ui/ghosts.js`.

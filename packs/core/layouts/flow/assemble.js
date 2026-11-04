@@ -41,13 +41,3 @@ export function assemble(shelves, { kids, combs, combGap, portOff, block, stepSi
   return { x, y, routes, holder };
 }
 
-/** A box and what hangs on it, as one for the pull. */
-export function rigidOf({ combs, x, y, stepSize, block }) {
-  const rigid = new Map();
-  for (const [id, c] of combs) {
-    if (!x.has(id)) continue;
-    const s = stepSize(id), b = block(id), left = x.get(id) - s.w / 2, top = y.get(id) - s.h / 2 - b.lead;
-    rigid.set(id, { at: [left + b.w / 2, top + b.h / 2], size: [b.w, b.h], reach: [[-b.w / 2, -b.w / 2 + s.w], [-b.h / 2 + b.lead, -b.h / 2 + b.lead + s.h]], was: [left + b.w / 2, top + b.h / 2], hangs: [...c.down.items, ...c.up.items].map((it) => it.id) });
-  }
-  return rigid;
-}
