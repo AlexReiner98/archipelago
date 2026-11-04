@@ -244,28 +244,6 @@ test('bars: the picture does not change with the order the answer came in', () =
   assert.deepEqual(at(drawnBars([...ids].reverse().map((id) => item(id)), [...links].reverse())), at(drawnBars(ids.map((id) => item(id)), links)));
 });
 
-test('bars: a step put by hand stays there, nothing else moves, and its wires stay at right angles clear of the boxes', () => {
-  const ids = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => item(id)), links = [dep('b', 'a'), dep('c', 'b'), dep('d', 'c'), dep('e', 'a'), dep('d', 'e'), tie('f', 'c', 'calls'), tie('f', 'a', 'calls')];
-  const free = bars({ items: ids, links, measure, sizes: house.sizes }), to = [free.x.get('c') + 900, free.y.get('c') + 300];
-  const g = bars({ items: ids, links, placed: { c: to }, measure, sizes: house.sizes });
-  assert.deepEqual([g.x.get('c'), g.y.get('c')], to);
-  for (const id of ['a', 'b', 'd', 'e', 'f']) assert.deepEqual([g.x.get(id), g.y.get(id)], [free.x.get(id), free.y.get(id)], `${id} stays`);
-  assert.ok(right(g));
-  const through = lines(g).some((w: number[][]) => g.all.some((n: any) => w.slice(1).some((p, i) => {
-    const q = w[i], [l, r, t, u] = [g.x.get(n.id) - n.w / 2 + 1, g.x.get(n.id) + n.w / 2 - 1, g.y.get(n.id) - n.h / 2 + 1, g.y.get(n.id) + n.h / 2 - 1];
-    return Math.max(p[0], q[0]) > l && Math.min(p[0], q[0]) < r && Math.max(p[1], q[1]) > t && Math.min(p[1], q[1]) < u;
-  })));
-  assert.equal(through, false, 'no wire runs through a box');
-});
-
-test('bars: a holder put by hand takes what hangs on it along', () => {
-  const ring = ['p', 'q', 'o'].map((id) => item(id)), kids = [item('k0'), item('k1'), item('k2')], links = [tie('p', 'q', 'serves'), tie('q', 'o', 'serves'), tie('o', 'p', 'serves'), ...kids.map((k) => tie(k.id, 'p'))];
-  const free = bars({ items: [...ring, ...kids], links, measure, sizes: house.sizes }), [dx, dy] = [400, 250];
-  const g = bars({ items: [...ring, ...kids], links, placed: { p: [free.x.get('p') + dx, free.y.get('p') + dy] }, measure, sizes: house.sizes });
-  for (const k of kids) assert.ok(Math.abs(g.x.get(k.id) - free.x.get(k.id) - dx) < 1e-6 && Math.abs(g.y.get(k.id) - free.y.get(k.id) - dy) < 1e-6, `${k.id} goes along`);
-  assert.ok(right(g));
-});
-
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { shownOnly } from './layouts/flow/graph.js';
 

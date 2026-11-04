@@ -917,7 +917,7 @@ on your own laptop.
 
 ```bash
 npm test            # the fast set: all but the slow files test/sets.ts names
-npm run test:full   # every file, as CI runs them
+npm run test:full   # every file, as CI runs them (CI is the gate: not needed before a push)
 npm run test:changed  # what this branch's changes can reach
 npm run typecheck
 ```

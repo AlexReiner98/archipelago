@@ -6,7 +6,6 @@ import { NEWEST, summed } from './summary.ts';
 import { lastSeq, readEvents } from './eventlog.ts';
 import { listening } from './presence.ts';
 import { askView, viewList, viewsSaid } from './askview.ts';
-import { placesOn } from './canvas-places.ts';
 import { shownIn } from './query-saved.ts';
 import { wholeMap } from './outbox.ts';
 import type { Archipelago } from './pelago.ts';
@@ -368,10 +367,5 @@ export const READ_TOOLS: Record<string, Tool> = {
       if (!named.entity && !named.query && !style) throw new Error('draw needs "entity" or "query".');
       return { view: await viewAddress(l, { ...named, style: VIEW_INPUT.style.parse(style) }), said: 'Drawn here if this client draws MCP Apps.' };
     },
-  },
-  places: {
-    description: 'Where each thing stands on one canvas, as a person put it there: by item, the middle of each as [x, y] in the picture’s own units. Read beside the query of that canvas; what is not here is where the layout lays it.',
-    input: { canvas: z.string().optional().describe("The canvas: the id of the item it is drawn from; the workspace's (or nothing) for the whole map.") },
-    run: async (l, _actor, input) => placesOn(l, input.canvas),
   },
 };

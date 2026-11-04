@@ -1,18 +1,12 @@
-// What stands, set out for drawing: the pins set on what the solve left (./pins.js), every wire landed on its outline, and the
-// picture's size. Each wire that nothing moved is worked out once, so a drag frame costs only what it moves. Layer: metrics,
-// its last step. Pure: places in, a layout's answer out.
+// What stands, set out for drawing: what the solve left, every wire landed on its outline, and the picture's size. Layer:
+// metrics, its last step. Pure: places in, a layout's answer out.
 
 import { count } from './count.js';
-import { pinner } from './pins.js';
 import { upright } from './polyline.js';
 import { landOn } from './shapes.js';
 
-/**
- * Answers a function of `placed`, where steps were put by hand: the layout. Its `place(placed)` is the same picture
- * with other pins, shared with this one and not to be changed.
- */
-export const finisher = ({ nodes, potential, chains, ties, x: pulledX, y: pulledY, routes, rigid, z, margin, stepSize, reshape }) => {
-  const pinned = pinner({ nodes, x: pulledX, y: pulledY, routes, rigid, reshape, lengths: { wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: z.gap / 2, join: z.join, rounds: z.pin_rounds } });
+/** The layout, from where the solve left each box and wire. Nothing is put by hand: a view is drawn from its query alone. */
+export const finisher = ({ nodes, potential, chains, ties, x, y, routes, margin, stepSize }) => {
   /** A line from `w.a` to `w.b`, its ends on the outlines that are drawn, not on the boxes round them. */
   const landed = (w, r, line, x, y) => {
     const edge = (id, to) => {
@@ -24,16 +18,11 @@ export const finisher = ({ nodes, potential, chains, ties, x: pulledX, y: pulled
     const first = landOn(nodes.get(w.a), x.get(w.a), y.get(w.a), p[0], p[1]), final = landOn(nodes.get(w.b), x.get(w.b), y.get(w.b), p.at(-1), p.at(-2));
     return p.map((q, i) => (i === 0 ? first : i === p.length - 1 ? final : q));
   };
-  const standing = (w) => ({ ...w, headAt: 'end', points: landed(w, routes.get(w.route), routes.get(w.route)?.points, pulledX, pulledY) });
-  const firstChains = chains.map(standing), firstTies = ties.map(standing);
-  const all = [...nodes.values()].filter((n) => pulledX.has(n.id));
-  const place = (placed) => {
-    const { x, y, moved, lines, told } = pinned(placed);
-    const now = (w) => {
-      const k = w.route, line = lines.get(k);
-      return line || ((moved.has(w.a) || moved.has(w.b)) && !routes.has(k)) ? { ...w, points: landed(w, routes.get(k), line, x, y) } : w;
-    };
-    const wired = firstChains.map(now), tied = firstTies.map(now), every = [...wired, ...tied], drawnPoints = every.flatMap((w) => w.points);
+  const standing = (w) => ({ ...w, headAt: 'end', points: landed(w, routes.get(w.route), routes.get(w.route)?.points, x, y) });
+  const wired = chains.map(standing), tied = ties.map(standing);
+  const all = [...nodes.values()].filter((n) => x.has(n.id));
+  const place = () => {
+    const every = [...wired, ...tied], drawnPoints = every.flatMap((w) => w.points);
     // Where two wires cross one passes under: a tie under a wire of the order, else what runs up or down.
     const breaks = count(every.map((w) => w.points)).where, gaps = new Map();
     for (const { lines: [p, q], at } of breaks) {
@@ -43,10 +32,10 @@ export const finisher = ({ nodes, potential, chains, ties, x: pulledX, y: pulled
     const cut = (w) => (gaps.has(w) ? { ...w, gaps: gaps.get(w) } : w);
     const width = Math.max(0, ...all.map((n) => x.get(n.id) + n.w / 2), ...drawnPoints.map((p) => p[0])) + margin;
     const height = Math.max(0, ...all.map((n) => y.get(n.id) + n.h / 2), ...drawnPoints.map((p) => p[1])) + margin;
-    return { nodes, all, chains: wired.map(cut), ties: tied.map(cut), breaks, potential, x, y, width, height, place, told };
+    return { nodes, all, chains: wired.map(cut), ties: tied.map(cut), breaks, potential, x, y, width, height };
   };
-  return (placed) => {
-    const laid = place(placed), own = (w) => ({ ...w, points: w.points.map((p) => [...p]) });
+  return () => {
+    const laid = place(), own = (w) => ({ ...w, points: w.points.map((p) => [...p]) });
     return { ...laid, chains: laid.chains.map(own), ties: laid.ties.map(own) };
   };
 };

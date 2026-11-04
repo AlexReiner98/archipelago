@@ -106,9 +106,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     while (t.length > 1 && measure(`${t}…`, px, role) > width) t = t.slice(0, -1);
     return `${t}…`;
   };
-  // Steps put where a person put them are pins (./pins.js). The link types the style draws no wire for (undrawn: core's
-  // house style, tagged) tie nothing here either.
-  const placed = story ? {} : { ...style.placed, ...style.moved };
+  // The link types the style draws no wire for (undrawn: core's house style, tagged) tie nothing here either.
   // The shape it is laid out toward: the pane's, as far as the style says to follow it (flow_aspect_follow, 0 not at
   // all, 1 wholly, more to lean further), from the shape it takes when the pane's is not known (flow_aspect).
   const [ASPECT, FOLLOW] = ['flow_aspect', 'flow_aspect_follow'].map((name) => {
@@ -123,7 +121,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
   answer = { ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) };
-  const g = layout({ items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, placed, shapes });
+  const g = layout({ items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes });
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
@@ -245,8 +243,6 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held'].filter(Boolean).join(' ');
     const body = [
       outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
-      // A sheet's wave stops short of its box: this says where the box is, so the page reads its middle (ui/drag.js) as drawn here.
-      n.shape === 'sheet' && m('rect', { x: X - n.w / 2, y: Y - n.h / 2, width: n.w, height: n.h, class: 'lf-room' }),
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
       !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : sessionDot(n) || dotAt(n)),
       // Its name in the lines the layout gave it (./lines.js): a second line under the first, the two about the middle.
@@ -263,7 +259,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     if (held(i.pending)) stepBadges.set(n.id, badge(i.pending, [X + n.w / 2, Y - n.h / 2]));
     tipped.add(key);
     if (ghost) return m('g', { key: `held:${i.pending.proposal}:${n.id}`, on: ['click'] }, titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nHeld for you`));
-    const el = titled(m('a', { key, on: story ? ['enter', 'leave'] : ['enter', 'leave', 'drag'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), i.said ?? i.title);
+    const el = titled(m('a', { key, on: ['enter', 'leave'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), i.said ?? i.title);
     dims.set(n.id, el);
     return el;
   });
@@ -342,43 +338,6 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     const frames = statesOf(answer.steps);
     player = play({ answer, style, reduced, tools, shape: { frames, stage: (ctx) => reveal({ frames, marks, ...ctx }) } });
   }
-  // A step moved by hand (the page follows the drag: ui/drag.js) is a pin: each frame is the model with it there, and what
-  // is drawn takes the difference. Let go, it stays a pin, for the next drag; the page keeps it.
-  const pins = { ...placed }, at = new Map(steps.map((n) => [n.id, [g.x.get(n.id), g.y.get(n.id)]]));
-  let now = g;
-  /** What changes on the page from one model to another. */
-  const between = (was, next) => {
-    const patches = [];
-    for (const [key, id] of keyed) {
-      if (next.x.get(id) === was.x.get(id) && next.y.get(id) === was.y.get(id)) continue;
-      const [x, y] = [next.x.get(id), next.y.get(id)], n = g.nodes.get(id);
-      patches.push({ key, set: { transform: `translate(${x - g.x.get(id)} ${y - g.y.get(id)})` } });
-      if (stepBadges.has(id)) patches.push({ key: stepBadges.get(id)[1].key, set: { transform: `translate(${x + n.w / 2} ${y - n.h / 2})` } });
-    }
-    next.chains.forEach((c, n) => (c.points !== was.chains[n].points || c.gaps !== was.chains[n].gaps) && patches.push({ key: `w:${n}`, set: { d: line(c) } }, { key: `h:${n}`, set: { d: head(c.points) } }));
-    next.ties.forEach((t, n) => {
-      if (t.points === was.ties[n].points) return;
-      patches.push({ key: `n:${n}`, set: { d: line(t) } });
-      if (!headless.has(t.type)) patches.push({ key: `nh:${n}`, set: { d: tieHead(t) } });
-    });
-    const wires = wiresIn(next), before = wiresIn(was);
-    for (const b of linkBadges) if (wires[b.n].points !== before[b.n].points) patches.push({ key: b.mark[1].key, set: { transform: `translate(${middleOf(wires[b.n].points).join(' ')})` } });
-    for (const c of said.values()) {
-      const [x, y] = saysAt(next, c), [x0, y0] = saysAt(g, c);
-      patches.push({ key: `t:${g.chains.indexOf(c)}`, set: { transform: `translate(${x - x0} ${y - y0})` } });
-    }
-    return patches;
-  };
-  const move = (key, { dx = 0, dy = 0 }, done) => {
-    const id = keyed.get(key);
-    if (!id || !at.has(id)) return [];
-    // On whole units, as the page keeps it, so the last frame is what is let go and what comes back.
-    const [x0, y0] = at.get(id), put = [Math.round(x0 + Number(dx)), Math.round(y0 + Number(dy))];
-    const next = g.place({ ...pins, [id]: put }), patches = [{ tip: null }, ...between(now, next)];
-    now = next;
-    if (done) (at.set(id, put), (pins[id] = put));
-    return patches;
-  };
   // Still on a page, a picture stands at its own size in the middle of the frame it is given, which would stretch it.
   if (style.still && width > size.width && Array.isArray(svg)) {
     svg[1].viewBox = `${(size.width - width) / 2} 0 ${width} ${size.height}`;
@@ -390,7 +349,6 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     on(event) {
       const { name, key } = event;
       if (player?.hears(key)) return player.on(event);
-      if (name === 'drag' || name === 'drop') return move(key, event, name === 'drop');
       if (name === 'leave') return [...light(null), ...(story ? [] : [{ tip: null }])];
       if (!keyed.has(key)) return [];
       return [...light(keyed.get(key)), ...(!story && tipped.has(key) ? [{ tip: { key, mark: tipFor(key) } }] : [])];

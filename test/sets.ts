@@ -23,6 +23,9 @@ export const SLOW: Record<string, string> = {
   'test/layout-asks.test.ts': 'browser',
   'test/code-style-starts.test.ts': 'browser',
   'test/layouts.test.ts': 'browser',
+  'test/layouts-architecture.test.ts': 'browser',
+  'test/layouts-flow.test.ts': 'browser',
+  'test/layouts-open.test.ts': 'browser',
   'test/find-query.test.ts': 'browser',
   'test/kept-views.test.ts': 'browser',
   'test/looks.test.ts': 'browser',
@@ -32,10 +35,17 @@ export const SLOW: Record<string, string> = {
   'test/published-frames.test.ts': 'browser',
   'test/query-line.test.ts': 'browser',
   'test/saved-canvases.test.ts': 'browser',
+  'test/saved-canvases-narrow.test.ts': 'browser',
+  'test/saved-canvases-switch.test.ts': 'browser',
   'test/show-lands.test.ts': 'browser',
+  'test/show-follows.test.ts': 'browser',
+  'test/show-tab-life.test.ts': 'browser',
+  'test/show-web.test.ts': 'browser',
   'test/stable-page.test.ts': 'browser',
   'test/style-items.test.ts': 'browser',
   'test/tabs.test.ts': 'browser',
+  'test/tabs-busy.test.ts': 'browser',
+  'test/tabs-canvas.test.ts': 'browser',
   'test/tips.test.ts': 'browser',
   'test/walk-from.test.ts': 'browser',
   // A whole map moved, backed up, restored, migrated or pulled: databases opened, filled and replayed from the log,
@@ -48,10 +58,13 @@ export const SLOW: Record<string, string> = {
   'test/pull.test.ts': 'whole map',
   'test/snapshots.test.ts': 'whole map',
   'test/stats.test.ts': 'whole map',
-  // The approvals table: about 2800 changes, half a minute per policy.
-  'test/approvals.test.ts': 'table',
-  'test/approvals-dev.test.ts': 'table',
-  'test/approvals-mixed.test.ts': 'table',
+  // The approvals table: about 4000 changes, a policy's settings dealt between two files (test/approvals.ts, PARTS).
+  'test/approvals-review-1.test.ts': 'table',
+  'test/approvals-review-2.test.ts': 'table',
+  'test/approvals-dev-1.test.ts': 'table',
+  'test/approvals-dev-2.test.ts': 'table',
+  'test/approvals-mixed-1.test.ts': 'table',
+  'test/approvals-mixed-2.test.ts': 'table',
 };
 
 const walk = (dir: string): string[] =>
@@ -63,32 +76,76 @@ export const allTests = () => [...walk('test').filter((f) => /^test\/[^/]+\.test
 export const fastTests = () => allTests().filter((f) => !(f in SLOW));
 
 /**
- * CI runs the full set as shards side by side (.github/workflows/tests.yml), so a push waits as long as its slowest
- * shard rather than for every file in turn: one for the fast set ("rest"), one for each reason in SLOW (its words
- * joined by "-"), and a shard split further as "rest 1/3", "rest 2/3", ... Every file is in exactly one shard;
- * sets.test.ts checks the workflow names them all. The parts are dealt by weight, heaviest first, each file to the
- * lightest part so far: the seconds each file took alone (test/weights.json, measured with scripts/test-weights.ts;
- * only their order matters), a file not there counted as the middle one.
+ * What test/weights.json holds, measured in CI by scripts/test-weights.ts: for each file, the seconds its tests took
+ * on each engine; and the seconds of the steps that only shard 1 runs (FIRST_STEPS), on each engine.
  */
-export function shard(name: string, part = '1/1'): string[] {
+export type Weights = { files: Record<string, Record<string, number>>; steps: Record<string, number> };
+export const ENGINES = ['pglite', 'postgres'];
+/** How many files a CI runner (4 cores) runs at once: node runs one fewer than it has. */
+export const LANES = 3;
+/** What a file costs beyond its tests' own time: a process started and its modules loaded (fitted to CI, 3 Nov 2026). */
+export const PER_FILE = 0.6;
+/**
+ * How much more of a runner a browser test's second takes than another's: its Chrome draws on cores of its own beside
+ * the test's process (fitted to main's run 41751821168, 4 Nov 2026: the shards with most browser seconds ran longest).
+ */
+export const BROWSER = 1.7;
+/** The steps of the workflow that run on shard 1 alone, beside its tests; their time counts toward it. */
+export const FIRST_STEPS = ['Type check', 'The log as a role that is not a superuser'];
+
+export const readWeights = (): Weights => JSON.parse(readFileSync(join(ROOT, 'test/weights.json'), 'utf8'));
+
+/**
+ * The seconds of a runner a file takes on an engine: as measured, or the middle of those measured when it is new, and
+ * a browser test's BROWSER times over.
+ */
+export function weigher(weights = readWeights()) {
+  const middle = Object.fromEntries(ENGINES.map((e) => [e, Object.values(weights.files).map((w) => w[e] ?? 0).sort((a, b) => a - b)]).map(([e, ws]) => [e, (ws as number[])[(ws as number[]).length >> 1] ?? 1]));
+  return (f: string, engine: string) => (weights.files[f]?.[engine] ?? middle[engine]) * (SLOW[f] === 'browser' ? BROWSER : 1);
+}
+
+/** Files heaviest first, as node is given them: it starts them in that order, so the longest do not start last. */
+export const heaviestFirst = (files: string[], engine: string, weight = weigher()) => [...files].sort((a, b) => weight(b, engine) - weight(a, engine) || (a < b ? -1 : 1));
+
+/** The seconds a shard is expected to take: its files dealt in order to LANES lanes, each to the one free first, and its steps after. */
+export function predict(files: string[], engine: string, steps = 0, weight = weigher()): number {
+  const lanes = Array<number>(LANES).fill(0);
+  for (const f of heaviestFirst(files, engine, weight)) lanes[lanes.indexOf(Math.min(...lanes))] += weight(f, engine) + PER_FILE;
+  return Math.max(...lanes) + steps;
+}
+
+/**
+ * CI runs the full set as N shards side by side (.github/workflows/tests.yml), named "1/N" to "N/N", so a push waits
+ * as long as its slowest shard rather than for every file in turn. Every file of the full run is dealt to one, by
+ * the time it took in CI (test/weights.json), heaviest first. The browser tests go first, each to the part with the
+ * fewest browser seconds so far: Chromes side by side on one runner slow each other far past BROWSER (main's run of 4
+ * Nov 2026: a shard of five took 123 s, its files up to four times their weight). The rest then go each to the part
+ * whose predicted time (predict, its lanes and on shard 1 FIRST_STEPS) it raises least, on the heavier engine.
+ * sets.test.ts checks the workflow runs every file once, and that the heaviest shard keeps under a budget.
+ */
+export function shard(part: string, weights = readWeights()): string[] {
   const [k, n] = part.split('/').map(Number);
-  if (!(n >= 1 && k >= 1 && k <= n)) throw new Error(`No part ${part}: say k/n`);
-  const files = allTests().filter((f) => (f in SLOW ? SLOW[f].replaceAll(' ', '-') : 'rest') === name);
-  if (!files.length) throw new Error(`No shard ${name}`);
-  const weights: Record<string, number> = JSON.parse(readFileSync(join(ROOT, 'test/weights.json'), 'utf8'));
-  const known = Object.values(weights).sort((a, b) => a - b);
-  const weight = (f: string) => weights[f] ?? known[known.length >> 1] ?? 1;
-  const parts = Array.from({ length: n }, () => ({ files: [] as string[], load: 0 }));
-  for (const f of [...files].sort((a, b) => weight(b) - weight(a) || (a < b ? -1 : 1))) {
-    const lightest = parts.reduce((min, p) => (p.load < min.load ? p : min));
-    lightest.files.push(f);
-    lightest.load += weight(f);
+  if (!(n >= 1 && k >= 1 && k <= n)) throw new Error(`No shard ${part}: say k/n`);
+  const weight = weigher(weights);
+  const steps = (i: number, e: string) => (i ? 0 : (weights.steps[e] ?? 0));
+  const parts = Array.from({ length: n }, (_, i) => ({ files: [] as string[], browser: Math.max(...ENGINES.map((e) => steps(i, e))) * LANES }));
+  const heavier = (f: string) => Math.max(...ENGINES.map((e) => weight(f, e)));
+  const browser = (f: string) => SLOW[f] === 'browser';
+  const order = (fs: string[]) => fs.sort((a, b) => heavier(b) - heavier(a) || (a < b ? -1 : 1));
+  const tests = allTests();
+  for (const f of order(tests.filter(browser))) {
+    const after = (p: (typeof parts)[number]) => Math.max(p.browser + heavier(f), ...ENGINES.map((e) => predict([...p.files, f], e, 0, weight)));
+    const best = parts.reduce((min, p) => (after(p) < after(min) || (after(p) === after(min) && p.browser < min.browser) ? p : min));
+    best.files.push(f);
+    best.browser += heavier(f) + PER_FILE;
+  }
+  for (const f of order(tests.filter((t) => !browser(t)))) {
+    const after = (i: number) => Math.max(...ENGINES.map((e) => predict([...parts[i].files, f], e, steps(i, e), weight)));
+    const best = parts.reduce((min, _, i) => (after(i) < after(min) ? i : min), 0);
+    parts[best].files.push(f);
   }
   return parts[k - 1].files.sort();
 }
-
-/** The names of the shards. */
-export const shardNames = () => ['rest', ...new Set(Object.values(SLOW).map((r) => r.replaceAll(' ', '-')))];
 
 const SPECIFIER = /(?:^|[\s;])(?:import|export)\s[^'"]*?from\s*['"](\.{1,2}\/[^'"]+)['"]|import\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)|^import\s*['"](\.{1,2}\/[^'"]+)['"]/gm;
 

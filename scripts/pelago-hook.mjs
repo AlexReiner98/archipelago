@@ -73,7 +73,7 @@ const GIT = (sub) => new RegExp(String.raw`(^|[\s;&|(])git(\s+(-[Cc]\s+("[^"]*"|
 const COMMIT = GIT('commit');
 const PUSH = GIT('push');
 // The reads that are not about several items: one item, what the tools take, where a session starts, how a page looks.
-const NOT_SURVEYS = new Set(['get', 'document', 'actions', 'schema', 'watch', 'picture', 'packs', 'places', 'style', 'story', 'published', 'publish_plan', 'backup_download', 'share_figure', 'brief', 'handoff']);
+const NOT_SURVEYS = new Set(['get', 'document', 'actions', 'schema', 'watch', 'picture', 'packs', 'style', 'story', 'published', 'publish_plan', 'backup_download', 'share_figure', 'brief', 'handoff']);
 // The tools that write a file.
 const EDITS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 // What git answers a commit with: [branch 1a2b3c4] Subject, or [main (root-commit) 1a2b3c4], or [detached HEAD 1a2b3c4].

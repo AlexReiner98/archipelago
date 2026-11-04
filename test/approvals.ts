@@ -2,8 +2,8 @@
 // workspace setting and server policy, and whether it applies, waits for a person or is refused. The table was taken
 // from the code before every approval was decided by a rule (main at 85b9d84) and is kept in
 // test/fixtures/approvals.json: the rules must come to the same answer on every row. APPROVALS_WRITE=1 writes it again.
-// The table is about 2800 changes, a minute of one process: it is checked a server policy per file
-// (approvals*.test.ts), so the three run side by side.
+// The table is about 4000 changes, minutes of one process: each server policy's rows are checked by PARTS files
+// (approvals-<policy>-<part>.test.ts), its settings dealt among them, so they all run side by side.
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -24,7 +24,7 @@ export const POLICIES: Record<string, Partial<Policy>> = {
 };
 
 /** The workspace's own settings: none is one that never chose (it follows the server), apply is where a new one begins. */
-const SETTINGS: Record<string, Record<string, unknown>> = {
+export const SETTINGS: Record<string, Record<string, unknown>> = {
   none: {},
   apply: { agent_changes: 'apply' },
   hold: { agent_changes: 'hold' },
@@ -34,6 +34,12 @@ const SETTINGS: Record<string, Record<string, unknown>> = {
   off: { holds_off: true },
   'hold+off': { agent_changes: 'hold', holds_off: true },
 };
+
+/** How many files check each policy's rows: its settings dealt among them, the first to part 1, the next to part 2, ... */
+export const PARTS = 2;
+
+/** The settings one part of a policy's rows is checked under. */
+export const settingsOf = (part: number) => Object.keys(SETTINGS).filter((_, i) => i % PARTS === part - 1);
 
 /** Who sends it: a person, an agent, an agent asking for a look, an agent whose token only proposes, a report's reading. */
 const ACTORS: Record<string, { actor: Actor; hold?: boolean; measured?: boolean }> = {
@@ -120,12 +126,14 @@ async function outcome(l: Archipelago, who: (typeof ACTORS)[string], c: Case): P
   }
 }
 
-/** The rows of the table under one server policy, checked against the fixture's rows for it. */
-export function checkPolicy(policyName: string) {
-  test(`every change comes to what it came to before the rules decided it all: the ${policyName} policy`, { timeout: 600_000 }, async () => {
+/** The rows of the table under one server policy and one part of its settings, checked against the fixture's rows for them. */
+export function checkPolicy(policyName: string, part: number) {
+  test(`every change comes to what it came to before the rules decided it all: the ${policyName} policy, part ${part} of ${PARTS}`, { timeout: 600_000 }, async () => {
     const policy = POLICIES[policyName];
+    const settings = settingsOf(part);
     const table: Record<string, string> = {};
-    for (const [settingName, setting] of Object.entries(SETTINGS)) {
+    for (const settingName of settings) {
+      const setting = SETTINGS[settingName];
       const base = await fresh();
       const l = new Archipelago(base.db, base.registry, policy);
       for (const [key, value] of Object.entries(setting)) await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb)`, [key, JSON.stringify(value)]);
@@ -133,11 +141,19 @@ export function checkPolicy(policyName: string) {
         for (const [caseName, c] of Object.entries(CASES)) table[`${policyName} | ${settingName} | ${actorName} | ${caseName}`] = await outcome(l, who, c);
       await base.db.close();
     }
-    const mine = (row: string) => row.startsWith(`${policyName} | `);
+    const mine = (row: string) => {
+      const [p, s] = row.split(' | ');
+      return p === policyName && settings.includes(s);
+    };
     const kept = existsSync(FILE) ? (JSON.parse(readFileSync(FILE, 'utf8')) as Record<string, string>) : {};
-    // Written again a policy at a time (run the three files one after another: --test-concurrency=1), the other rows kept.
-    if (process.env.APPROVALS_WRITE === '1' || !existsSync(FILE)) writeFileSync(FILE, `${JSON.stringify({ ...Object.fromEntries(Object.entries(kept).filter(([row]) => !mine(row))), ...table }, null, 1)}
+    // Written again a part at a time (run the files one after another: --test-concurrency=1): the other rows kept, every
+    // row where it stood, a row no longer made dropped and a new one added at the end, so the parts in any order write
+    // the same file.
+    if (process.env.APPROVALS_WRITE === '1' || !existsSync(FILE)) {
+      const rows = Object.fromEntries(Object.entries(kept).filter(([row]) => !mine(row) || row in table).map(([row, was]) => [row, mine(row) ? table[row] : was]));
+      writeFileSync(FILE, `${JSON.stringify({ ...rows, ...table }, null, 1)}
 `);
+    }
     const before = Object.fromEntries(Object.entries(JSON.parse(readFileSync(FILE, 'utf8')) as Record<string, string>).filter(([row]) => mine(row)));
     const differ = Object.keys({ ...before, ...table }).filter((row) => before[row] !== table[row]).map((row) => `${row}: was ${before[row]}, now ${table[row]}`);
     assert.deepEqual(differ, [], 'rows that changed');

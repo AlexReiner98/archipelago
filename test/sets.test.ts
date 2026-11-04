@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { affected, allTests, fastTests, ROOT, shard, shardNames, SLOW } from './sets.ts';
+import { affected, allTests, ENGINES, fastTests, FIRST_STEPS, PER_FILE, predict, readWeights, ROOT, shard, SLOW, weigher } from './sets.ts';
 
 test('the fast set is every test file but the slow ones, the structure test always among them', () => {
   const all = allTests();
@@ -16,7 +16,7 @@ test('the fast set is every test file but the slow ones, the structure test alwa
 
 test('a change runs the tests that import it or name it, the structure test, and more where it cannot tell', () => {
   const rules = affected(['src/rules.ts']).files;
-  for (const f of ['test/rules.test.ts', 'test/approvals.test.ts', 'test/approvals-mixed.test.ts', 'test/structure.test.ts']) assert.ok(rules.includes(f), f);
+  for (const f of ['test/rules.test.ts', 'test/approvals.test.ts', 'test/approvals-mixed-1.test.ts', 'test/structure.test.ts']) assert.ok(rules.includes(f), f);
 
   assert.deepEqual(affected(['test/kinds.test.ts']).files, ['test/kinds.test.ts', 'test/sets.test.ts', 'test/structure.test.ts'], 'a test alone, with the structure test (and this one, which names it)');
 
@@ -27,14 +27,39 @@ test('a change runs the tests that import it or name it, the structure test, and
   assert.ok(fastTests().every((f) => manifest.includes(f)), 'a pack’s manifest is read by every map: the fast set');
 });
 
-test('CI runs every file in exactly one shard, on each engine', () => {
-  const workflow = readFileSync(join(ROOT, '.github/workflows/tests.yml'), 'utf8');
-  const matrices = [...workflow.matchAll(/^\s+shard: \[(.+)\]$/gm)].map((m) => m[1].split(',').map((s) => s.trim()));
+const workflow = readFileSync(join(ROOT, '.github/workflows/tests.yml'), 'utf8');
+const matrices = [...workflow.matchAll(/^\s+shard: \[(.+)\]$/gm)].map((m) => m[1].split(',').map((s) => s.trim()));
+
+test('CI runs every file in exactly one shard, on each engine, and shard 1 alone runs the steps counted on it', () => {
   assert.equal(matrices.length, 2, 'one matrix for pglite, one for postgres');
   for (const shards of matrices) {
-    const files = shards.flatMap((s) => shard(...(s.split(' ') as [string, string?])));
-    assert.deepEqual([...files].sort(), allTests(), `${shards.join(', ')}: every file once`);
-    assert.deepEqual([...new Set(shards.map((s) => s.split(' ')[0]))].sort(), shardNames().sort(), 'every shard named');
+    const n = shards.length;
+    assert.deepEqual(shards, Array.from({ length: n }, (_, i) => `${i + 1}/${n}`), 'the shards are 1/N to N/N');
+    assert.deepEqual(shards.flatMap((s) => shard(s)).sort(), allTests(), `${n} shards: every file once`);
   }
-  assert.ok(shard('rest').includes('test/structure.test.ts'));
+  const guarded = [...workflow.matchAll(/^\s+- name: (.+)\n\s+if: (.+?)(?: #.*)?$/gm)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(guarded.filter(([, cond]) => cond.includes('matrix.shard')).map(([name, cond]) => [name, cond]), FIRST_STEPS.map((name) => [name, "startsWith(matrix.shard, '1/')"]), 'a step that runs on one shard only is one FIRST_STEPS counts on shard 1');
+});
+
+/**
+ * Seconds of a runner the heaviest shard may be expected to take on either engine (88 on 4 Nov 2026, with 8 shards),
+ * but for a shard its heaviest file alone holds up: more shards do not shorten that one, so it is held to FILE_BUDGET.
+ */
+const BUDGET = 95;
+/** Seconds one file may take, as measured: past it, split the file, as no number of shards waits less than it. */
+const FILE_BUDGET = 60;
+
+test('the heaviest shard keeps under its budget, so CI waits on no one shard', () => {
+  const weights = readWeights();
+  const weight = weigher(weights);
+  const n = matrices[0].length;
+  for (const engine of ENGINES)
+    for (let k = 1; k <= n; k++) {
+      const files = shard(`${k}/${n}`, weights);
+      const seconds = predict(files, engine, k === 1 ? weights.steps[engine] : 0, weight);
+      const alone = Math.max(...files.map((f) => weight(f, engine))) + PER_FILE;
+      if (seconds > alone + 1) assert.ok(seconds <= BUDGET, `shard ${k}/${n} on ${engine} is expected to take ${Math.round(seconds)} s, over the budget of ${BUDGET}: add a shard to both matrices in .github/workflows/tests.yml, or refresh the weights (node scripts/test-weights.ts ci) if they are old`);
+    }
+  const long = Object.entries(weights.files).flatMap(([f, w]) => ENGINES.filter((e) => (w[e] ?? 0) > FILE_BUDGET).map((e) => `${f} (${w[e]} s on ${e})`));
+  assert.deepEqual(long, [], `a file over ${FILE_BUDGET} s holds its shard up however many there are: split its tests into files of their own`);
 });
