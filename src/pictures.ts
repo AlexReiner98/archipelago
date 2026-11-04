@@ -1,4 +1,4 @@
-// The pictures kept for items whose page shows one: a figure (a test result's, a commit's, an experiment's, a
+// The pictures kept for items whose page shows one: a figure (a test result's, a commit's, an experiment's, an issue's, a
 // note's, a file's), and the still of a lens. What a test run found is the software pack's test_report, which asks for pictures to be dropped.
 
 import { createHash } from 'node:crypto';
@@ -13,7 +13,7 @@ export const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/sv
 
 /**
  * Keep the picture for an item whose page shows one (a screen of it draws a
- * figure: a test result, a commit, an experiment, a note, a file), or for a lens the picture a link
+ * figure: a test result, a commit, an experiment, an issue, a note, a file), or for a lens the picture a link
  * shows in place of the live one. A result's is meant for one that is shown
  * in public: until then the picture stays in the repository it was made in.
  * There is one per item; sent again, it replaces what was kept.

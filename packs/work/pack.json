@@ -184,7 +184,7 @@
     }
   ],
   "views": [
-    { "form": "screen", "id": "work.figure", "title": "Figure", "on": ["note", "file"], "pieces": [{ "piece": "figure" }] },
+    { "form": "screen", "id": "work.figure", "title": "Figure", "on": ["note", "file", "issue"], "pieces": [{ "piece": "figure" }] },
     { "form": "screen", "id": "work.reading", "title": "Reading", "on": ["document"], "pieces": [{ "piece": "document" }] },
     {
       "form": "screen",
