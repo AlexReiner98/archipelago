@@ -191,13 +191,12 @@ The canvas keeps to these (the flat canvas, 25 Oct 2026: document
   with its settings (core's `lens` type); Home lists them, and the bar switches between
   them. There is no other list of views.
 - **A view is its query and its layout, nothing more.** It is drawn from its
-  answer alone, the same each time it is asked. A node moved by hand stays
-  put on that drawing only, and is laid out anew when it is drawn again (the
-  owner, 3 Nov 2026). A grouping that matters is made as a link.
+  answer alone, the same each time it is asked, and no node is dragged or
+  put by hand (the owner, 3 Nov 2026). A grouping that matters is made as a
+  link.
 - **Every gesture is a change.** A status, Save in the sheet:
   each is `change` on the person's authority, through the one write path, and
-  a held change is drawn as a ghost where it would land. A move by hand is
-  not a change: nothing of it is kept.
+  a held change is drawn as a ghost where it would land.
 - **The page is a replica of the log.** It holds a query's answer as items
   and links by id and keeps it current from the facts after its position
   (`tail`), with the projector the server runs; it never polls for a picture.

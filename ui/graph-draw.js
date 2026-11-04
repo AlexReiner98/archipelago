@@ -155,7 +155,7 @@ export function timeline(nodes, edges, byId, focus, prefs) {
   return { axis: { scale, total: total || middling, top: ROW.top, bottom }, drawn: edges.filter((e) => !belongs(e) && !over(e) && !said(e)) };
 }
 
-/** The drawing itself: boxes joined by lines, each box leading to its page and free to be dragged. */
+/** The drawing itself: boxes joined by lines, each box leading to its page. */
 export function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
   const pad = 16;
   const cut = (text, max) => (text.length > max ? text.slice(0, max - 1) + '…' : text);
@@ -282,37 +282,8 @@ export function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
           n.blocked && s('circle', { class: 'flag', cx: n.w - 4, cy: 4, r: 5 }),
         );
     boxLayer.append(box);
-    // On the scale of tokens, where a bar is says when it happens and what it takes: it is not moved by hand, only followed.
-    if (axis) {
-      box.addEventListener('click', () => ((prefs.full = false), (location.hash = `#/e/${n.id}`)));
-      continue;
-    }
-    // A press that moves is a drag, and the box stays where it is put; one that does not is a click, and leads to its page.
-    box.addEventListener('pointerdown', (down) => {
-      if (down.button !== 0) return;
-      box.setPointerCapture(down.pointerId);
-      const ratio = width / svg.getBoundingClientRect().width;
-      const from = { x: n.x, y: n.y };
-      let far = false;
-      const move = (ev) => {
-        const [dx, dy] = [(ev.clientX - down.clientX) * ratio, (ev.clientY - down.clientY) * ratio];
-        far ||= Math.hypot(dx, dy) > 4;
-        if (!far) return;
-        n.x = Math.max(0, from.x + dx);
-        n.y = Math.max(0, from.y + dy);
-        box.setAttribute('transform', `translate(${n.x},${n.y})`);
-        lines.filter((l) => l.ends.includes(n.id)).forEach(route);
-      };
-      const up = () => {
-        box.removeEventListener('pointermove', move);
-        box.removeEventListener('pointerup', up);
-        if (far) prefs.moved.set(n.id, { x: n.x, y: n.y });
-        // Following a box leaves the drawing, and so the full window.
-        else ((prefs.full = false), (location.hash = `#/e/${n.id}`));
-      };
-      box.addEventListener('pointermove', move);
-      box.addEventListener('pointerup', up);
-    });
+    // Following a box leaves the drawing, and so the full window. Nothing is moved by hand (the owner, 3 Nov 2026).
+    box.addEventListener('click', () => ((prefs.full = false), (location.hash = `#/e/${n.id}`)));
   }
 
   const key = (cls, text) => h('span', { class: 'key' }, h('span', { class: cls }), text);

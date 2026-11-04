@@ -74,11 +74,10 @@ canvas as a flat graph", with its decisions.
 - **A held change is drawn as a ghost where it would land** (a faint node,
   a dashed wire, a badge on an edited one); a click on it applies or
   declines it.
-- **A node can be put anywhere by hand.** Moves stay on the page and are
-  written in one batch just before the person's next action, into the places
-  stream: one place per canvas and item, never an item or a link. Where a
-  thing sits never means anything; a grouping that matters is a link.
-  Arrange lays the canvas out again; snap is a setting.
+- **A node is where its layout puts it.** Nothing is dragged or put by
+  hand (the owner, 3 Nov 2026): a view is drawn from its query alone, the
+  same each time. Where a thing sits never means anything; a grouping that
+  matters is a link.
 - **A new item is started on the canvas:** double-click or +. It is loose
   until it is tied; once a change ties it, the canvas goes to it.
 

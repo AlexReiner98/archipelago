@@ -97,10 +97,8 @@ offered (`ui/picker-rank.js`, task e_css8swr9).
 ### 5. Views are items, drawn from their query alone
 A view is a query and a layout kept on the map, an item of core's
 system type `lens`, and Home lists them. It is drawn from its answer alone,
-the same each time it is asked: a node moved by hand stays where it was put
-on that drawing only, and is laid out anew when the view is drawn again
-(the owner, 3 Nov 2026: Home wore down under places kept from other
-pictures). Position never carries meaning; a grouping that matters is made
+the same each time it is asked, and no node is dragged or put by hand (the
+owner, 3 Nov 2026: Home wore down under places kept from other pictures). Position never carries meaning; a grouping that matters is made
 as a link.
 A pack ships views as presets (a `styles` entry of `type: "lens"`,
 decision e_x8bghuce): the picker and Home list each until the owner saves
@@ -116,7 +114,7 @@ A layout is the pane's: editing the query keeps it, opening a saved view
 brings its own. The view band switches it (`ui/look-switch.js`), which lists
 layouts and nothing else. A change in a pane is a draft: Save is marked and
 writes it to the view, and Save as new view makes another. The band's ⋯ holds
-Arrange, Fit and Snap for the main canvas (decision e_yxp78scv). Find never
+Fit for the main canvas (decision e_yxp78scv). Find never
 draws in a style it names: it finds it as an item, whose page opens over the
 canvas, and Use here there, a button its type declares on a screen
 (`docs/packs.md`), does what the switch does (task e_q3yfvnz7). Deleting a
@@ -143,16 +141,15 @@ compares answers.
 A status, Save in the sheet: each builds ops and sends
 them through `change` on the person's authority, where the rules decide
 whether it applies or waits. A held change is drawn as a ghost where it
-would land and decided there. A move by hand is not a change: nothing of it
-is kept.
+would land and decided there. A node is never moved by hand.
 - `test/structure.test.ts`: "items and relations are written in one place";
   "every approval is decided by a rule".
 - `test/canvas-wires.test.ts`: "in a browser, opening a step keeps the canvas
   still and lights it, and a held change is decided where it would land".
 - `test/ghosts.test.ts`: "held changes are drawn where they would land, and
   only there".
-- `test/canvas-drag.test.ts`: "in a browser, a step dragged on the canvas
-  stays there until the view is drawn anew".
+- `test/canvas-drag.test.ts`: "in a browser, a step cannot be dragged: a
+  press and move on it pans the canvas".
 
 ### 8. An item reads the same everywhere
 Rule 11 of the target model (decided 26 Oct 2026, e_bed3aj7d). An item's page
@@ -190,7 +187,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `reader-frame.js` | the one mark the page makes itself: a document's draft or published page, read in a frame on the canvas |
 | `pan-zoom.js` | the infinite plane |
 | `pinch.js` | two fingers on it |
-| `drag.js`, `canvas-wires.js` | moving a node; drawing a wire and making its link |
+| `canvas-wires.js` | a held change's badge clicked, opening where it is decided |
 | `live.js`, `replica.js`, `ghosts.js` | tailing the log; the store; held changes drawn into it |
 | `panes.js`, `pane-drag.js`, `pane-address.js` | more than one canvas at once: panes alike side by side in a tab, dragged; the address and back and forward the pane in focus's |
 | `tabs.js`, `tab-bar.js`, `pane-route.js`, `pane-land.js` | tabs at the top, one per session at work, popped out and back; where an agent's step lands |
@@ -221,7 +218,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 ## How it is drawn
 1. The style names a drawing; `layout.js` sends it the store's `drawn()`
    (the answer with ghosts and the person's pending wires) in the sandbox.
-2. The flow lays out what has no place round what has one, and answers with
+2. The flow lays out every item from the answer alone, and answers with
    marks; the page checks them and mounts them in the plane.
 3. The query bar draws the query; a click on a node rewrites the address with
    the node's id added, and the cycle starts again.
@@ -235,18 +232,14 @@ measure it reads at), shipped by the house style and a pack's presets.
    follow.
 
 ## How it is written
-1. A wire let go on a node asks which link, then `change` as the person; it
-   is drawn at once as pending and kept or dropped when the answer comes.
-2. A drop on the canvas is held on that drawing (`placed`) and written
-   nowhere.
-3. A held change comes back as a proposal, drawn as a ghost; a click on it
+1. A held change comes back as a proposal, drawn as a ghost; a click on it
    asks Apply or Decline, and `decide` settles it.
 
 ## Tabs and panes: more than one canvas at once
 Every pane in a tab is alike (the owner, 28 Oct 2026): none is the main one.
 Each is a canvas of its own (`canvas.js`): a query and a style, held in its
-own store and kept current from the log, with its wires, its
-fitting and Arrange. Panes stand side by side, as a code editor's groups do:
+own store and kept current from the log, with its wires and its
+fitting. Panes stand side by side, as a code editor's groups do:
 ◫ in the bar opens the pane in focus's canvas in a pane beside it, a pane's
 name dragged onto a side of another docks it there (onto its middle swaps
 them), the line between two shares the room, and × closes it; the last one stays. One pane alone has no strip: the bar floats

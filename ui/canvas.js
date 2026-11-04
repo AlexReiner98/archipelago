@@ -26,9 +26,9 @@ export const home = () => ({
 export const focusOn = (id) => ({ filter: { find: [`id ${id}`] }, walk: { over: FOCUS, steps: 1 } });
 /**
  * What a picture is kept under in this browser: the saved view up (ui/canvases.js), and the form it is laid out in.
- * Nothing put by hand is kept with it: every view is drawn from its query's answer alone, the same each time it is asked,
- * and a step moved by hand stays where it was put only until the canvas is drawn anew (the owner, 3 Nov 2026: Home
- * wore down under places put on other pictures). `flow` here names no pack, only that the form asked for is the canvas's own.
+ * Nothing is put by hand on it: every view is drawn from its query's answer alone, the same each time it is asked, and
+ * no step can be dragged (the owner, 3 Nov 2026: Home wore down under places put on other pictures). `flow` here names
+ * no pack, only that the form asked for is the canvas's own.
  */
 const canvasOf = (asked) => `${asked?.canvas ?? ''}@${asked?.shape && asked.shape !== 'flow' ? asked.shape : 'wired'}`;
 
@@ -108,8 +108,7 @@ export function canvasIn(host, pane) {
       lens ??= home();
       const key = JSON.stringify([lens, asked]);
       if (at?.key === key && at.view.isConnected) return c.mark(here);
-      // Where things were put by hand on this drawing, into `placed`: one object the picture keeps, filled in place.
-      const style = { ...asked, ...(here && { here }), ...(asked.canvas && { play: 'asked' }), snap: Boolean(settings.snap), placed: {} };
+      const style = { ...asked, ...(here && { here }), ...(asked.canvas && { play: 'asked' }) };
       // The same lens drawn again (an item's page opened over it says it anew) stays where the reader moved it, and one
       // they have not moved fits the room beside the page.
       const same = at && JSON.stringify(at.lens) === JSON.stringify(lens);
@@ -122,7 +121,7 @@ export function canvasIn(host, pane) {
       at = null;
       host.replaceChildren();
     },
-    /** Draw the lens up now anew, with what was put by hand on it since it was shown. */
+    /** Draw the lens up now anew. */
     draw() {
       const of = idsOf(at.lens.filter)[0];
       // A kept view up plays its steps, if it keeps any (from the map as it is, when Play is pressed: style.play).
@@ -142,12 +141,6 @@ export function canvasIn(host, pane) {
     },
     has: (id) => Boolean(at?.view?.answer?.items.some((i) => i.id === id)),
     refresh: (tail = false) => (tail && at?.view?.store ? undefined : at?.view?.refresh?.()),
-    /** Lay this canvas out again as its drawing does: what was put by hand here is forgotten. */
-    arrange() {
-      if (!at) return;
-      for (const id of Object.keys(at.style.placed)) delete at.style.placed[id];
-      c.draw();
-    },
     /** The frame the drawing moves in now, and what moves it (ui/pan-zoom.js). */
     moves: () => at?.view?.querySelector('.lens-view')?.moves,
     /**
@@ -160,9 +153,6 @@ export function canvasIn(host, pane) {
       if (at) at.kept = null;
       c.moves()?.fit(0, ...bars(host));
       if (at) at.fitted = c.moves()?.state();
-    },
-    snap() {
-      if (at?.style) at.style.snap = Boolean(settings.snap);
     },
     /** Stop: its picture is no longer kept current from the log. */
     close() {
@@ -195,11 +185,6 @@ export function canvasIn(host, pane) {
     if (!id || !at || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button !== 0) return;
     ev.preventDefault();
     pane.opened(id, at.lens);
-  });
-  // Let go on the canvas (ui/drag.js): kept on this drawing, so the map changing under it keeps it where it was put;
-  // drawn anew (another view, the page opened again), it is laid out as its drawing does.
-  host.addEventListener('drawing-drop', (ev) => {
-    if (at) at.style.placed[ev.detail.id] = [Math.round(ev.detail.x), Math.round(ev.detail.y)];
   });
   // A held change is decided where it is drawn.
   wiresOn(host, () => at?.view?.store);
@@ -242,7 +227,7 @@ hooks.touched = async (touched) => {
 // ---- What the reader chose for the canvas, in the view band's menu (decision e_yxp78scv): kept in this browser, the same for every pane.
 
 /** fit: all of it brought into sight on every change until the reader moves it; else the reader alone moves it. The key is the style's (key). */
-const settings = { fit: true, snap: false };
+const settings = { fit: true };
 try {
   Object.assign(settings, JSON.parse(localStorage.getItem('pelago-canvas') ?? '{}'));
 } catch {
@@ -265,9 +250,9 @@ function toggle(name) {
   } catch {
     // Kept until the page is reloaded.
   }
-  all.forEach((c) => (c.snap(), c.fit(true)));
+  all.forEach((c) => c.fit(true));
 }
-// What the band's menu (ui/canvas-menu.js) acts on: Arrange the pane in focus, and the reader's toggles.
-hooks.canvasNow = { arrange: () => current?.arrange(), settings, toggle };
+// What the band's menu (ui/canvas-menu.js) acts on: the reader's toggles.
+hooks.canvasNow = { settings, toggle };
 // The window resized, or the panes drawn again as the sheet opens or shuts (ui/panes.js), change the room each is fitted to.
 addEventListener('resize', fitAll);

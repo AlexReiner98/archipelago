@@ -47,7 +47,7 @@ function dense() {
   return { items, links };
 }
 
-const laidOut = (answer: { items: any[]; links: any[] }) => layout({ items: answer.items, links: answer.links, undrawn: house.undrawn, placed: {}, measure, sizes: house.sizes });
+const laidOut = (answer: { items: any[]; links: any[] }) => layout({ items: answer.items, links: answer.links, undrawn: house.undrawn, measure, sizes: house.sizes });
 const boxOf = (g: any, id: string) => ({ id, x: g.x.get(id), y: g.y.get(id), w: g.nodes.get(id).w, h: g.nodes.get(id).h });
 const square = (points: number[][]) => points.slice(1).every(([x, y], k) => Math.abs(x - points[k][0]) < 0.01 || Math.abs(y - points[k][1]) < 0.01);
 /** Which steps a path's runs pass through, its own ends left out. */

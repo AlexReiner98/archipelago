@@ -14,7 +14,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../src/operational.ts';
-import { drawings, differsFromReload, faultsOf, imported, LAYERS, MOVED, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
+import { drawings, faultsOf, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const MAX_LINES = 500;
@@ -481,17 +481,3 @@ test('a wired drawing keeps its wires apart', async () => {
   assert.deepEqual(ratchet(counted, NOT_SEALED), [], 'Wires take room in the solve: each stretch keeps its distance from every other (docs/layouts.md).');
 });
 
-// 22. One call: drawn, moved, let go and reloaded run one function with different pins, so every wire must match.
-// Architecture cannot be moved by hand. Each entry is 1, broken or not: how many wires differ follows every
-// change to the solve, so it is no count to hold a change to.
-const NOT_ONE_CALL: Record<string, number> = { 'core.architecture': 1 };
-
-test('a wired drawing draws the same wires moved as reloaded', async () => {
-  const counted: Record<string, number> = {};
-  for (const d of wired) {
-    if (!Object.keys(d.modules).some((name) => /['"]drag['"]/.test(read(pathOf(d, name))))) { counted[d.id] = 1; continue; }
-    const { picture } = await setOut(d, (url) => import(url('index.js')));
-    if (MOVED.some(([sketch, id, by]) => differsFromReload(picture, sketch, id, by))) counted[d.id] = 1;
-  }
-  assert.deepEqual(ratchet(counted, NOT_ONE_CALL), [], 'A drag frame, a drop and a reload are one solve with different pins.');
-});

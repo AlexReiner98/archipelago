@@ -3,8 +3,6 @@
 
 export const css = `
 .lf-step { cursor: pointer; }
-.lf-room { fill: none; }
-.lf-step.dragging { cursor: grabbing; }
 .lf-step .lf-shape { fill: var(--ln-land); stroke: var(--ln-line); stroke-width: var(--ln-flow-stroke); }
 /* A part outlined in the colour of the place it is part of (place_hues): the place is not drawn, the key names it. */
 .lf-step.placed .lf-shape { stroke: var(--lf-place); stroke-width: var(--ln-flow-stroke-lit); }

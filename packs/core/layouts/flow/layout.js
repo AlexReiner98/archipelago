@@ -6,7 +6,7 @@
 // shape and metrics (./part.js, ./search.js), shape (./shape.js), then metrics alone (./assemble.js, ./solve.js, ./finish.js). Pure: an answer
 // in, geometry out, as the flow's layout answers.
 
-import { assemble, rigidOf, shelfOf } from './assemble.js';
+import { assemble, shelfOf } from './assemble.js';
 import { count } from './count.js';
 import { directions } from './direction.js';
 import { finisher } from './finish.js';
@@ -28,14 +28,14 @@ export const stages = (fn) => (staging = fn);
 /** Pictures already pulled tight, the newest last: going back to a lens, or dropping a step, costs next to nothing. */
 const kept = new Map();
 
-/** The layout of an answer: what it was drawn from worked out once, and what was put by hand set on top of that. */
+/** The layout of an answer, worked out once for each answer and kept. */
 export function layout(args) {
   const { items, links, undrawn, headless, sizes, aspect, shapes } = args, key = JSON.stringify([items, links, undrawn, headless, sizes, aspect, shapes]);
   const hit = kept.get(key) ?? laidOut(args);
   kept.delete(key);
   kept.set(key, hit);
   if (kept.size > KEPT) kept.delete(kept.keys().next().value);
-  return hit(args.placed ?? {});
+  return hit();
 }
 
 /** Each line's way chosen, the boxes at `x` and `y`. */
@@ -63,7 +63,7 @@ function routesOf(every) {
 function lengthsOf(sizes) {
   const gap = sizes.flow_node_gap;
   return {
-    row: sizes.flow_layer_gap / 2, pin_rounds: sizes.flow_pin_rounds, col: sizes.flow_wire_column, turn: Math.max(gap / 3, sizes.flow_wire_gap), gap,
+    row: sizes.flow_layer_gap / 2, col: sizes.flow_wire_column, turn: Math.max(gap / 3, sizes.flow_wire_gap), gap,
     room: sizes.flow_wire_room, join: sizes.flow_joined_room, run: sizes.flow_port_run, corner: sizes.flow_port_corner,
     trials: sizes.flow_trials, trial_most: sizes.flow_trial_most, cost_up: sizes.flow_cost_up, cost_cross: sizes.flow_cost_crossing, shape_cross: sizes.flow_shape_crossing, shape_most: sizes.flow_shape_most, shape_work: sizes.flow_shape_work, cost_bend: sizes.flow_cost_bend, cost_side: sizes.flow_cost_side, ports: sizes.flow_reroute_ports, rounds: sizes.flow_reroute_rounds, cost_wrong: sizes.flow_cost_wrong_side, embed_most: sizes.flow_embed_most, embed_big: sizes.flow_embed_big, hub_most: sizes.flow_hub_most, embed_cost: sizes.flow_embed_crossings, slide_sweeps: sizes.flow_slide_sweeps, number_tries: sizes.flow_number_tries, trial_total: sizes.flow_trial_total,
   };
@@ -92,10 +92,9 @@ function drawnOut({ items: given, links: told = [], undrawn = [], headless = ['p
   const ways = directions(chains, ties, headless), hangs = hangsOf({ a, ways, nodes, sizes, gap, z, aspect, chains: asWires }), { core, block } = hangs;
   const how = { block, stepSize, ways, z, total: core.length };
   const shelves = partsOf(core, a).map((list) => shelfOf(drawnPart(list, linksOf(list, every, ways), how), block));
-  const { x, y, routes, holder } = assemble(shelves, { ...hangs, stepSize, gap, margin, aspect });
+  const { x, y, routes } = assemble(shelves, { ...hangs, stepSize, gap, margin, aspect });
   // Two links between one pair of boxes are drawn from one sketch, and each is then a wire like any other.
   for (const [k, of] of twins) if (routes.has(of)) routes.set(k, { ...routes.get(of), points: routes.get(of).points.map((p) => [...p]) });
-  const rigid = rigidOf({ combs: hangs.combs, x, y, stepSize, block });
   staging?.('bars and combs', routes);
   const lengths = { nodes, x, y, routes, section: sizes.flow_section_gap, gap, margin, aspect, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: gap / 2, join: z.join }, firstWires = new Map([...routes].map(([k, r]) => [k, r.points]));
   const before = { x: new Map(x), y: new Map(y), sizes: new Map([...nodes].map(([id, n]) => [id, [n.w, n.h]])) };
@@ -115,9 +114,5 @@ function drawnOut({ items: given, links: told = [], undrawn = [], headless = ['p
     solveSections(lengths);
   }
   staging?.('solve', routes);
-  // What a step put by hand starts from: each box where the solve left it, with what hangs on it.
-  for (const id of x.keys()) rigid.set(id, { at: [x.get(id), y.get(id)], size: [nodes.get(id).w, nodes.get(id).h], hangs: rigid.get(id)?.hangs ?? [], pointed: nodes.get(id).shape === 'diamond' });
-  // Round a pin no wire stays in a box, however much it crosses to get out.
-  const reshape = (px, py, lines) => shapeWires({ nodes, x: px, y: py, lines, z, through: Infinity });
-  return finisher({ nodes, potential, chains, ties, x, y, routes, rigid, holder, sizes, z, margin, stepSize, reshape });
+  return finisher({ nodes, potential, chains, ties, x, y, routes, margin, stepSize });
 }
