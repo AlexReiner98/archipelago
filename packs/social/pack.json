@@ -59,6 +59,23 @@
         "problem": { "type": "string", "shown": true, "description": "The problem they said, in their words." },
         "began": { "type": "date", "shown": true, "description": "The day it began." }
       }
+    },
+    {
+      "id": "channel_reading",
+      "extends": "record",
+      "title": "Channel reading",
+      "description": "A month of the channels table written down once the month is over: each channel's posts, visits, trials begun and paid, conversations and hours, and which met the strategy's bar. Made by the pack's schedule, part of the project the posts are in and about each post it counted, so months are read side by side.",
+      "statuses": { "open": ["recorded"], "closed": ["superseded"] },
+      "fields": {
+        "month": { "type": "string", "shown": true, "system": true, "description": "The month it reads, as 2026-11." },
+        "posts": { "type": "number", "shown": true, "system": true, "description": "Posts that went out that month." },
+        "visits": { "type": "number", "shown": true, "system": true, "description": "Visits to those posts' links." },
+        "begun": { "type": "number", "shown": true, "system": true, "description": "Trials begun under their tags." },
+        "paid": { "type": "number", "shown": true, "system": true, "description": "Trials paid for, and workspaces bought, under their tags." },
+        "conversations": { "type": "number", "shown": true, "system": true, "description": "Conversations had that month that came from a post." },
+        "hours": { "type": "number", "shown": true, "system": true, "description": "Hours logged against the posts." },
+        "met": { "type": "json", "system": true, "description": "The channels that met the bar." }
+      }
     }
   ],
   "links": [
@@ -134,7 +151,10 @@
       "modules": { "index.js": "layouts/table/index.js", "look.js": "layouts/table/look.js", "marks.js": "layouts/table/marks.js" }
     }
   ],
-  "handlers": [{ "webhook": "social.count", "records": ["signup.counted", "visit.counted"] }],
+  "handlers": [
+    { "webhook": "social.count", "records": ["signup.counted", "visit.counted"] },
+    { "schedule": "social.reading", "every_minutes": 360, "at_start": true, "limit_ms": 30000 }
+  ],
   "reach": {
     "webhooks": [{ "id": "social.count", "secret": "count" }]
   },

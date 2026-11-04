@@ -42,7 +42,7 @@ const authority = (c) => ({ of: 'agent', basis: `The seller counted it under the
 const reasonOf = (c) => (c.event === 'signup.counted' ? `A trial ${said(c)}` : `Counted ${said(c)}`);
 
 /** The project the posts are in, for a new source: the nearest project above the first post. None without a post. */
-async function projectOfPosts(ctx) {
+export async function projectOfPosts(ctx) {
   const [first] = await ctx.read({ items: { type: 'post' }, fields: ['tag'] });
   if (!first) return null;
   const trail = (await ctx.read({ trail: first.id })) ?? [];

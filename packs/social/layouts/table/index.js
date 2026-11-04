@@ -2,7 +2,7 @@
 // sources (tags no post has) as rows below. A row is its channel, its posts, visits, trials begun and paid, the
 // conversations its posts began and the hours spent on them, two short bars with their share (visits to begun, begun
 // to paid), and a dot for the bar the strategy sets (style.table.bar: so many conversations a month in under so many
-// hours). A post's counts fall in the month it went out (`posted`); a conversation in the month it was had (its `date`,
+// hours). A post's counts fall in the month it went out (`posted`); a conversation in the month it was had (its `began`,
 // else when it was recorded); an hour in the month it was logged. A source's counts are undated, so its row is all of
 // them. It reads the flat query's answer: posts and sources, the conversations linked came_from them and the time
 // entries part_of them. Laid out by the page, not drawn to a size; its look is ./look.js.
@@ -73,7 +73,7 @@ export function sums(answer, sourceType) {
     const from = byId.get(k.from), to = byId.get(k.to);
     if (!from || !to || !counted(to)) continue;
     if (k.type === 'came_from') {
-      const c = cell(to, monthOf(from.fields?.date) ?? monthOf(from.created_at) ?? posted(to));
+      const c = cell(to, monthOf(from.fields?.began) ?? monthOf(from.fields?.date) ?? monthOf(from.created_at) ?? posted(to));
       if (c) c.conversations += 1;
       linkedConversations.set(to.id, (linkedConversations.get(to.id) ?? 0) + 1);
     } else if (k.type === 'part_of' && from.type === 'time_entry' && from.status !== 'void' && from.status !== 'planned') {
