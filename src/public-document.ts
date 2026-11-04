@@ -21,6 +21,10 @@ const ID = /^e_[a-z0-9]{8}$/;
  */
 export const readable = (l: Archipelago) => l.registry.drawnWith('document').filter((t) => l.registry.type(t)?.public);
 
+/** Of those, each closed status that says its writing is done (phase finished), as type:status: still published with the open ones. */
+export const finishedStatuses = (l: Archipelago) =>
+  readable(l).flatMap((t) => Object.entries(l.registry.type(t)?.statuses.phases ?? {}).filter(([, p]) => p === 'finished').map(([s]) => `${t}:${s}`));
+
 /** A public document as anyone reads it, or null when there is no such public document. */
 export async function publicDocument(l: Archipelago, id: string, elsewhere?: Map<string, string>) {
   if (!ID.test(id)) return null;

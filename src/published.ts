@@ -13,7 +13,7 @@ import { headOf } from './log.ts';
 import { notify } from './notify.ts';
 import { actorId, type Actor, type Archipelago, type Authority } from './pelago.ts';
 import { SHARED } from './documents.ts';
-import { draftDocument, publicDocument, readable } from './public-document.ts';
+import { draftDocument, finishedStatuses, publicDocument, readable } from './public-document.ts';
 import { picturesOf } from './published-pictures.ts';
 import { freezeShared } from './published-share.ts';
 import { republished } from './published-live.ts';
@@ -72,8 +72,8 @@ async function draftPaths(l: Archipelago, parts: unknown) {
   const words = [...new Set([...JSON.stringify(parts).matchAll(/\]\(\/([a-z0-9-]*)\)/g)].map((m) => m[1] || 'home'))];
   if (!words.length) return {};
   const { rows } = await l.db.query<{ id: string; path: string }>(
-    `select id, props->>'path' as path from entity where type = any($1::text[]) and archived_at is null and is_open and private_to is null and props->>'path' = any($2::text[]) -- index entity_type_created`,
-    [readable(l), words],
+    `select id, props->>'path' as path from entity where type = any($1::text[]) and archived_at is null and (is_open or type || ':' || status = any($3::text[])) and private_to is null and props->>'path' = any($2::text[]) -- index entity_type_created`,
+    [readable(l), words, finishedStatuses(l)],
   );
   return Object.fromEntries(rows.map((r) => [r.id, r.path]));
 }
@@ -210,7 +210,7 @@ export async function sitePages(l: Archipelago): Promise<{ id: string; title: st
   return rows[0]?.pages ?? [];
 }
 
-/** The open documents an item holds, at any depth, of the types that can be public: what Publish all publishes. */
+/** The open or finished documents an item holds, at any depth, of the types that can be public: what Publish all publishes. */
 async function heldDocuments(l: Archipelago, within: string) {
   const { rows } = await l.db.query<{ id: string; title: string }>(
     `with recursive down(id, depth) as (
@@ -219,8 +219,8 @@ async function heldDocuments(l: Archipelago, within: string) {
        where r.type = 'part_of' and r.valid_to is null and d.depth < 8
      )
      select e.id, e.title from entity e where e.id in (select id from down where depth > 0)
-       and e.type = any($2::text[]) and e.is_open and e.archived_at is null order by e.title`,
-    [within, readable(l)],
+       and e.type = any($2::text[]) and (e.is_open or e.type || ':' || e.status = any($3::text[])) and e.archived_at is null order by e.title`,
+    [within, readable(l), finishedStatuses(l)],
   );
   return rows;
 }
