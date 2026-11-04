@@ -12,18 +12,20 @@ import { human, agent, fresh, make } from './map.ts';
 /** A view asked by its name, as the view tool asks it. */
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
-test('a commit and an experiment keep the picture they draw, and their page has the figure for it', async () => {
+test('a commit, an experiment and an issue keep their picture, and their page has the figure for it', async () => {
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'c', type: 'commit', title: 'Draw the ridges', props: { sha: 'a'.repeat(40) } },
     { op: 'create', ref: 'x', type: 'experiment', title: 'Ridges at three scales' },
+    { op: 'create', ref: 'i', type: 'issue', title: 'Two documents disagree' },
+    { op: 'create', ref: 'b', type: 'bug', title: 'The ridge is drawn twice' },
   ]);
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]).toString('base64');
-  for (const id of [made.c, made.x]) {
+  for (const id of [made.c, made.x, made.i, made.b]) {
     assert.equal(((await callTool(l, human, 'picture_put', { result: id, data: png, content_type: 'image/png' })) as { size: number }).size, 10);
     assert.equal(((await callTool(l, human, 'picture', { result: id })) as { data: string }).data, png);
   }
-  assert.deepEqual(['commit', 'experiment'].filter((t) => l.registry.drawnWith('figure').includes(t)), ['commit', 'experiment']);
+  assert.deepEqual(['commit', 'experiment', 'issue', 'bug'].filter((t) => l.registry.drawnWith('figure').includes(t)), ['commit', 'experiment', 'issue', 'bug']);
 });
 
 test('a picture is kept for a result only when sent, travels in a backup, and goes when the test is run again', async () => {

@@ -19,4 +19,5 @@ test('every type of every pack gives each status a phase, as its pack says', () 
   assert.equal(of('task')!.todo, 'not_started');
   assert.equal(of('person')!.active, 'standing');
   assert.equal(of('decision')!.open, 'not_started');
+  assert.deepEqual(of('document'), { draft: 'not_started', ready: 'under_way', final: 'finished', superseded: 'ended', withdrawn: 'ended' }, 'a document whose writing is done is final');
 });

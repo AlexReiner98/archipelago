@@ -33,6 +33,15 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
     if (type && !reg.isA(type, 'person') && !reg.isA(type, 'agent')) errors.push(`${where}: owner must be a person or agent, not ${type}`);
   };
 
+  // A kept view that walks part_of either way for more than a step climbs to what holds its start and draws all of it.
+  const climbs = (type: string | undefined, props: Record<string, unknown> | undefined, where: string) => {
+    const walk = props?.walk as { over?: unknown; steps?: unknown } | undefined;
+    if (!type || !reg.isA(type, 'lens') || !walk || !Array.isArray(walk.over) || !(Number(walk.steps) >= 2)) return;
+    const holds = reg.relationFamily('part_of');
+    const both = walk.over.filter((t): t is string => typeof t === 'string' && holds.includes(t));
+    if (both.length) warnings.push(`${where}: its walk follows ${both.join(', ')} either way for ${walk.steps} steps, so it climbs to what holds where it starts and draws all of that: write ${both[0]}< to walk down (what is in it) or ${both[0]}> to walk up`);
+  };
+
   for (const [i, op] of ops.entries()) {
     const where = `op ${i + 1} (${op.op})`;
     switch (op.op) {
@@ -57,6 +66,7 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
           [op.title.trim(), reg.family(root)],
         );
         for (const dup of rows) warnings.push(`${where}: possible duplicate of existing ${dup.type} "${dup.title}" (${dup.id})`);
+        climbs(op.type, op.props, where);
         break;
       }
       case 'update': {
@@ -71,6 +81,7 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
           errors.push(`${where}: "${target.title}": ${(e as Error).message}`);
         }
         if (op.owner) await checkOwner(op.owner, where);
+        climbs(target.type, op.props, where);
         break;
       }
       case 'link': {

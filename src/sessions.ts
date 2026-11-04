@@ -8,7 +8,7 @@ import { livesIn, livesInFor, placeFor } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
 import { cutTitle, mintName, saidTitle, sessionLabelled, sessionTitle } from './session-name.ts';
-import { commitRule } from './commit-rule.ts'; import { roomForSession } from './plan.ts'; import { wholeMap } from './outbox.ts'; import { took } from './presence.ts';
+import { commitRule } from './commit-rule.ts'; import { openTargets } from './close-offer.ts'; import { roomForSession } from './plan.ts'; import { wholeMap } from './outbox.ts'; import { took } from './presence.ts';
 import { VIEWS } from './views.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts'; import { unaccountedBy } from './commits.ts';
 import { hookRunHere, isChat, resolveRun, sessionsAwake, takeUp } from './chat-run.ts'; import { parentOps, parentRun } from './session-parent.ts';
 export { resolveRun, sessionPrompted, sessionsAwake } from './chat-run.ts';
@@ -106,7 +106,7 @@ export async function sessionStart(
     note: blocked.length
       ? 'Do not start work that needs the resources listed under blocked. Take work that does not need them, or wait.'
       : 'Call report with action session_update and a note when something worth knowing happens, and report with action session_end when you finish.',
-    commit: task ? commitRule(task.id) : undefined,
+    commit: task ? commitRule(task.id, (await openTargets(l.db, l.registry, [task.id])).map((o) => o.id)) : undefined,
     joined: hooked ? true : undefined,
   };
 }
@@ -268,7 +268,7 @@ export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: 
   return {
     run: run.id,
     status: input.status ?? run.status,
-    ...(task && { commit: commitRule(task.id) }),
+    ...(task && { commit: commitRule(task.id, (await openTargets(l.db, l.registry, [task.id])).map((o) => o.id)) }),
     ...(unestimated && { estimate: `"${task.title}" has no estimate. Say how many tokens you expect it to take (one number: input and output together, not counting cached re-reads): change, update ${task.id}, props.tokens_estimated. What it actually uses is measured for you.` }),
   };
 }
