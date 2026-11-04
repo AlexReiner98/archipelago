@@ -14,6 +14,7 @@ import { undo } from './undo.ts';
 import { resolveRun } from './sessions.ts';
 import { covering } from './withdraw.ts';
 import { holdsOff } from './rules.ts';
+import { type Noted, PLAN_SECTIONS, planAsText, sections } from './plan-note.ts';
 
 // Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
 export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string, pane?: string, run?: string, focus?: boolean): Promise<Focus> {
@@ -48,7 +49,8 @@ export const WRITE_TOOLS: Record<string, Tool> = {
     description:
       'The only way to change the map: a list of ops with a reason. ' +
       'A create\u2019s ref lets later ops link to it, and a title or note in the same change names what it makes as {ref}. Give the source the facts came from. ' +
-      'To add to a note or change a passage, send append or replace, not the whole body. An update with only the id says you checked the item and it is still true. ' +
+      'To add to a note or change a passage, send append or replace, not the whole body. An update of only the id says it is still true. ' +
+      'A plan is items, not a long note: a task per step, depends_on, waits_on, a flow lens. ' +
       'Checked as a whole, then applied or held as a proposal for a human, by policy. A refused change is kept for a few minutes under a name the refusal gives: send retry and fixes (the ops that were wrong, by number), not all of it again. ' +
       'Closing a decision or hypothesis is held for the human, unless the workspace applies agents\u2019 changes: then a decision must carry props.outcome and props.rationale, and is put to the owner later (attention, to_confirm).',
     input: {
@@ -89,6 +91,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       if (!input.ops?.length) throw new Error('A change needs ops, or retry with the name a refused change was kept under.');
       if (!input.reason) throw new Error('Every change needs a reason.');
       let result;
+      const noted: Noted[] = [];
       try {
         // Agents write sentences where a name is wanted, and every row and box then has to cut them. Held to a length here,
         // where an agent names things; a person may name a thing as they like, and an undo puts back what was there.
@@ -100,19 +103,28 @@ export const WRITE_TOOLS: Record<string, Tool> = {
           );
           // A note every session adds to (a handoff) is read whole by every session after it. Its type may hold it to a length
           // an agent can only keep by rewriting it (note_max); one that is already over may always be made shorter.
-          for (const [i, o] of (input.ops as { op: string; type?: string; id?: string; body?: string; append?: string; replace?: { find: string; with: string } }[]).entries()) {
+          const all = input.ops as { op: string; ref?: string; type?: string; to?: string; id?: string; body?: string; append?: string; replace?: { find: string; with: string } }[];
+          for (const [i, o] of all.entries()) {
             let before = 0;
             let after = 0;
             let type = o.op === 'create' ? l.registry.type(o.type ?? '') : undefined;
-            if (o.op === 'create') after = o.body?.length ?? 0;
-            else if (o.op === 'update' && (o.body !== undefined || o.append !== undefined || o.replace)) {
+            if (o.op === 'create') {
+              after = o.body?.length ?? 0;
+              if (o.body) noted.push({ at: i + 1, op: o.op, body: o.body, work: type?.kind === 'work', parts: all.some((p) => p.op === 'link' && p.type === 'part_of' && !!o.ref && p.to === o.ref) });
+            } else if (o.op === 'update' && (o.body !== undefined || o.append !== undefined || o.replace)) {
               const target = await l.entity(o.id!);
               if (!target || !(type = l.registry.type(target.type))) continue;
               before = target.body.length;
+              let text: string;
               try {
-                after = bodyAfter(target.body, o as Parameters<typeof bodyAfter>[1]).length;
+                text = bodyAfter(target.body, o as Parameters<typeof bodyAfter>[1]);
               } catch {
                 continue; // what is wrong with the op is said by the change itself
+              }
+              after = text.length;
+              if (type.kind === 'work' && sections(text) >= PLAN_SECTIONS && sections(text) > sections(target.body)) {
+                const parts = (await l.db.query(`select 1 from relation where to_id = $1 and type = 'part_of' and valid_to is null limit 1`, [target.id])).rows.length > 0;
+                noted.push({ at: i + 1, op: o.op, body: text, work: true, parts: parts || all.some((p) => p.op === 'link' && p.type === 'part_of' && p.to === target.id) });
               }
             }
             if (type?.noteMax && after > type.noteMax.chars && after > before) long.push(`op ${i + 1} (${o.op}): the ${type.title.toLowerCase()} note would be ${after} characters: ${type.noteMax.chars} at most.${type.noteMax.say ? ` ${type.noteMax.say}` : ''}`);
@@ -153,6 +165,9 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         await point(l, actor, 'change', result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason, undefined, input.run).catch(() => {});
       }
       // With holds off (src/rules.ts, HOLDS_OFF), the answer says so: no rule held it, and none will until the owner turns them on.
+      // A plan put in as one long note is said back, so the steps are laid out as items (src/plan-note.ts).
+      const plan = planAsText(noted);
+      if (plan) result = { ...result, plan };
       if (actor.kind === 'agent' && result.status !== 'proposed' && (await holdsOff(l.db))) return { ...result, holds: 'off' };
       return result;
     },
