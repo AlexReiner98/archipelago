@@ -415,5 +415,6 @@ body[data-panes="1"] .pane-bar .pane-act[aria-label="Move this pane to a new tab
 #canvas > .pane.pane-active > .pane-bar > .pane-name, #canvas > .pane.pane-active > .pane-bar > .pane-follows { visibility: hidden; }
 body[data-panes="1"] #canvas .pane-bar { display: none; }
 .pane-bar .pane-grip { cursor: grab; user-select: none; touch-action: none; }
-body:not([data-panes="1"]) #query .q-view { margin: 0 calc(var(--space-5) + var(--box-7) + var(--space-3)); padding: 0; background: none; border: 0; }
+/* Room for the strip's ⠿ on its left and its ⧉ and × on its right. */
+body:not([data-panes="1"]) #query .q-view { margin: 0 calc(var(--space-5) + (var(--box-7) + var(--space-3)) * 2) 0 calc(var(--space-5) + var(--box-7) + var(--space-3)); padding: 0; background: none; border: 0; }
 #canvas > .pane-sash.row { top: var(--band, 0%); }
