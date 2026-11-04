@@ -69,6 +69,7 @@ export const VIEWS_OPERATIONAL: Record<string, string> = {
   notifications: "The human's unread notifications: the notifications store above, newest first.",
   usage: "What the workspace's plan limits, used: the database's own count of each table's size, the counts kept beside the log (item_bytes), the sessions store's runs at work, and the server's counts of requests and looks.",
   spent: "What runs report they cost: the sessions store's tokens_used and cost_usd, summed by where they ran.",
+  session_measures: "What sessions' turns tell over a range: the sessions store's events and the runs they are on, worked out into turns.",
   story: 'What a session told of its work: the story the sessions store keeps on its run.',
   changed_since: 'The log, counted and cut to its newest events: what happened, not what the map is.',
   style: 'How a page looks: the styles the packs ship and the map keeps, merged; the system tier, not the work.',
