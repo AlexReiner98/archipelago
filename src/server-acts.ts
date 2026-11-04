@@ -1,6 +1,7 @@
 // The server acts: the closed list of things a server pack may ask the kernel to do, each only if the pack declares
 // it (src/server-packs.ts). These act only on the workspaces the pack made itself: it can sell a workspace and sign its
-// buyer in, never reach into another. What it may do on a workspace whose admin connected it is in src/server-connect.ts. Every act is logged on the default workspace's map with the pack that asked,
+// buyer in, never reach into another; the one read beyond them is a public site's visit counts (site.visits),
+// logged on that site's map.What it may do on a workspace whose admin connected it is in src/server-connect.ts. Every act is logged on the default workspace's map with the pack that asked,
 // so what a server pack did is in the owner's history like anything else.
 
 import { recordAgreement, type Agreement } from './agreements.ts';
@@ -11,6 +12,9 @@ import { setEnded } from './ended.ts';
 import { LIMITS, limitsFrom } from './plan.ts';
 import type { ServerAct, ServerPackFile } from './server-packs.ts';
 import { validWorkspaceId } from './auth.ts';
+import { env } from './env.ts';
+import { readSites } from './site.ts';
+import { visitsSince } from './visits.ts';
 import type { Workspaces } from './workspaces.ts';
 
 export type ActPlaces = Pick<Workspaces, 'has' | 'get' | 'create' | 'hold'>;
@@ -124,6 +128,18 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       const owes = await recordAgreement(owner.db, email, input.agreed, await agreements(), `pack:${pack.id}`);
       await log(`${email} agreed to the documents in force`, { workspace: ws.id, email, owes: owes.map((a) => a.id) });
       return { owes: owes.map(({ id, version }) => ({ id, version })) };
+    }
+    case 'site.visits': {
+      // Counts only, of a site this server serves: the readers each tag brought, per day, added since `after`.
+      const site = String(input.site ?? '').toLowerCase();
+      const workspace = readSites(env('SITES'))[site];
+      if (!workspace || !(await at.has(workspace))) throw new Error(`"${site}" is not a site this server serves.`);
+      const after = input.after == null ? 0 : Number(input.after);
+      if (!(Number.isInteger(after) && after >= 0)) throw new Error('after: a position of the visits stream, a whole number.');
+      const { pelago } = await at.get(workspace);
+      const read = await visitsSince(pelago, after);
+      await pelago.log(pelago.db, { actor: `pack:${pack.id}`, action: `server.${act}`, reason: `Read the visits to ${site}: ${read.counts.length} rows`, detail: { site, after, rows: read.counts.length, pos: read.pos } });
+      return read;
     }
     case 'mail.send': {
       const to = normalEmail(input.to);

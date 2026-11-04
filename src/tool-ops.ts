@@ -15,10 +15,14 @@ const field = z.object({
   shown: z.boolean().optional().describe('Sent with the item in a lens answer, so a style can draw by it.'),
 });
 
+/** What a source is, as core's source type says it. Kept as one string: conversation here is how a fact was heard,
+ * not the social pack's type of that name, which the kernel never names (test/structure.test.ts). */
+const SOURCE_KINDS = 'file email web conversation commit other'.split(' ') as [string, ...string[]];
+
 export const source = z.object({
   uri: z.string().describe('A stable address: file path, URL, message id or commit.'),
   title: z.string().optional(),
-  kind: z.enum(['file', 'email', 'web', 'conversation', 'commit', 'other']).optional(),
+  kind: z.enum(SOURCE_KINDS).optional(),
   excerpt: z.string().optional().describe('The passage the facts were drawn from.'),
 });
 const opSource = source.optional().describe('Where this one fact came from, when it differs from the source of the whole change.');

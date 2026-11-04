@@ -25,6 +25,7 @@ export const ON_THE_MAP: Record<string, string> = {
   automations: "An automation's last_run, last_fired and last_result, the event cursor and run_once marks: kept at once, appended to the automations stream.",
   rechecks: "A project's rechecked_at: kept by operational, appended to the automations stream.",
   places: "Retired (the owner, 3 Nov 2026: a view is drawn from its query alone): nothing appends to the places stream now. The name stays so entries and backups from before still read and restore, and core's retention rule places drops what is left a day after it was put.",
+  visits: "How many readers opened a public site's pages, per source tag per day: counted in memory and appended to the visits stream each minute as ['+', 'tag:<tag>', day, n], added to the day (src/visits.ts). No address, no browser string, no hash of either; core's retention rule visits keeps every entry.",
   kinds: "An item's kind column, read from its type: filled by fillKinds when a workspace opens, and by the database for a row written without it; never a fact anyone states.",
 };
 
