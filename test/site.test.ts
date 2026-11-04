@@ -80,30 +80,32 @@ test('everything a project holds is published with one click, an agent may only 
         { op: 'create', ref: 'b', type: 'document', title: 'Beta', visibility: 'shared', props: { path: 'beta' }, body: 'Beta. Back to {a}.' },
         { op: 'create', ref: 'd', type: 'document', title: 'Deeper', visibility: 'shared', props: { path: 'deeper' }, body: 'Held a step down.' },
         { op: 'create', ref: 'c', type: 'document', title: 'Withdrawn', status: 'withdrawn', visibility: 'shared', body: 'Not published.' },
+        { op: 'create', ref: 'f', type: 'document', title: 'Final', status: 'final', visibility: 'shared', props: { path: 'final' }, body: 'Finished, and still published.' },
         { op: 'create', ref: 'x', type: 'document', title: 'Taken', visibility: 'shared', props: { path: 'alpha' }, body: 'Its path is taken.' },
         { op: 'link', type: 'part_of', from: 'a', to: 'P' },
         { op: 'link', type: 'part_of', from: 'b', to: 'P' },
         { op: 'link', type: 'part_of', from: 'S', to: 'P' },
         { op: 'link', type: 'part_of', from: 'd', to: 'S' },
         { op: 'link', type: 'part_of', from: 'c', to: 'P' },
+        { op: 'link', type: 'part_of', from: 'f', to: 'P' },
         { op: 'link', type: 'part_of', from: 'x', to: 'P' },
       ],
     })
   ).result.created;
   const { P, a, b, c, x } = made;
   const plan = (await call('/api/publish_plan', undefined, { within: P })).result;
-  assert.equal(plan.to_publish, 4, 'every open document, at any depth');
+  assert.equal(plan.to_publish, 5, 'every open or final document, at any depth');
   assert.ok(!plan.documents.some((doc: { id: string }) => doc.id === c), 'what is closed is left out');
 
   // An agent asks: the person is told, and nothing is published.
   const asked = (await call('/agent/publish_ask', undefined, { within: P, reason: 'The docs are ready.' })).result;
-  assert.deepEqual([asked.asked, asked.to_publish], [true, 4]);
+  assert.deepEqual([asked.asked, asked.to_publish], [true, 5]);
   assert.notEqual((await call('/agent/publish_all', undefined, { within: P })).status, 200, 'only a person publishes');
   assert.equal((await fetch(`${base}/p/default/${a}/data`)).status, 404);
 
   // One click: all of it, each linking to the others; the one whose path is taken is named, the rest go ahead.
   const done = (await call('/api/publish_all', undefined, { within: P })).result;
-  assert.deepEqual(done.published.map((doc: { title: string }) => doc.title).sort(), ['Alpha', 'Beta', 'Deeper']);
+  assert.deepEqual(done.published.map((doc: { title: string }) => doc.title).sort(), ['Alpha', 'Beta', 'Deeper', 'Final']);
   assert.deepEqual(done.refused.map((doc: { id: string }) => doc.id), [x]);
   const alpha = (await (await fetch(`${base}/p/default/${a}/data`)).json()) as { links: Record<string, string>; paths: Record<string, string> };
   assert.deepEqual([alpha.links[b], alpha.paths[b]], ['Beta', 'beta'], 'published twice, so the first links to the second');

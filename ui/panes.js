@@ -9,7 +9,7 @@
 
 import { api, h, hooks, state } from './base.js';
 import { activate, canvasIn, focusOn } from './canvas.js';
-import { presetSettings, viewParts } from './canvases.js';
+import { presetSettings, savedCanvases, viewParts } from './canvases.js';
 import { addressOf, readAddress } from './query.js';
 import { numberOf } from './query-base.js';
 import { dragPane, sashes } from './pane-drag.js';
@@ -43,6 +43,9 @@ async function lensOf(at) {
   if (asked.style.canvas) {
     const got = await api('get', { id: asked.style.canvas });
     titles.set(got.entity.id, got.entity.title);
+    // The saved views read again with it, so the bar weighs it as the map has it now: one an agent made or changed
+    // since the page loaded is up as saved, not as new or as changed since (bump e_4j6xvm82).
+    savedCanvases(true);
     return viewParts(got.entity);
   }
   const id = /^e\/(e_[a-z0-9]{8})/.exec(where)?.[1];
