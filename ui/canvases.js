@@ -164,12 +164,17 @@ const styleMark = () =>
 
 /** The saved canvas the canvas draws now, if one is: Home marks it. */
 let up = null;
+/** The views the bar has read the list again for, not finding them in it. */
+const reread = new Set();
 
 /** The canvas up, in the bar: a switch to every saved one (the current named, marked when changed since), and Save. `open` goes to an address (a pane's own, ui/panes.js). */
 export function canvasSwitch(lens, style, isHome, open = (href) => (location.hash = href)) {
   up = style.canvas ?? null;
   const part = h('span', { class: 'q-part q-canvas', title: 'The view up: switch to another, or save this one' });
-  savedCanvases().then((all) => {
+  // A view the address names that the list lacks was kept since it was read (an agent's, another tab's): read it again.
+  // Once for each: one retired is never in it.
+  const listed = savedCanvases().then((all) => (style.canvas && !all.some((c) => c.id === style.canvas) && !reread.has(style.canvas) ? (reread.add(style.canvas), savedCanvases(true)) : all));
+  listed.then((all) => {
     const current = upOf(all, lens, style);
     const changed = current && edited(current, lens, style);
     const pick = h(
