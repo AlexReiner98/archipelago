@@ -312,8 +312,9 @@ export function drawQuery(lens, view, go, lead) {
         h('input', { class: 'q-limit', inputmode: 'numeric', value: limit, size: String(limit).length || 1, 'aria-label': 'The most items drawn', title: 'The most items drawn', onchange: (ev) => Number(ev.target.value) >= 1 && go({ ...lens, limit: Math.round(Number(ev.target.value)) }) }),
         drawn && drawn.cloneNode(true))),
   );
-  // A lens that names a view has no terms, and its band still says which canvas it is.
-  bar.hidden = !filled && !lens.view;
+  // A lens that names a view has no terms, and its band still says which canvas it is; a blank one (a new tab's, a
+  // split's) keeps its band too, for the pane's buttons and its canvas.
+  bar.hidden = !filled && !lens.view && !lead;
   fitBar();
 }
 
