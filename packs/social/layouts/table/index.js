@@ -97,7 +97,7 @@ export function sums(answer, sourceType) {
 /** The table. `style.table` says the source type, the channels' names and the bar. */
 export function picture({ answer, style = {} }) {
   const said = style.table ?? {};
-  const sourceType = typeof said.source_type === 'string' ? said.source_type : 'source';
+  const sourceType = typeof said.source_type === 'string' ? said.source_type : 'traffic_source';
   const names = said.channel_names && typeof said.channel_names === 'object' ? said.channel_names : {};
   const bar = said.bar && typeof said.bar === 'object' ? { conversations: num(said.bar.conversations), hours: num(said.bar.hours) } : null;
   const { months, sources } = sums(answer, sourceType);

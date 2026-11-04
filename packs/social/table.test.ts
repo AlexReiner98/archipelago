@@ -27,7 +27,7 @@ const answer = {
     post('p3', 'linkedin', '2026-10-20', { visits: 10, begun: 0 }),
     post('p4', 'x', '2026-11-03', { visits: 5, conversations: 1 }),
     post('p5', 'x', undefined, {}),
-    { id: 'src1', kind: 'work', type: 'social_source', title: 'chatgpt', status: 'open', created_at: '2026-10-01T00:00:00.000Z', fields: { visits: 12, begun: 3, paid: 1 } },
+    { id: 'src1', kind: 'work', type: 'traffic_source', title: 'chatgpt', status: 'open', created_at: '2026-10-01T00:00:00.000Z', fields: { visits: 12, begun: 3, paid: 1 } },
     talk('c1', '2026-11-04'),
     talk('c2', '2026-11-10'),
     talk('c3', '2026-11-11'),
@@ -43,10 +43,10 @@ const answer = {
     link('part_of', 'h1', 'p1'), link('part_of', 'h2', 'p2'), link('part_of', 'h3', 'p2'), link('part_of', 'h4', 'p5'), link('part_of', 'h5', 'p4'),
   ],
 };
-const style = { table: { source_type: 'social_source', bar: { conversations: 3, hours: 10 }, channel_names: { linkedin: 'LinkedIn' }, narrow: '640px' } };
+const style = { table: { source_type: 'traffic_source', bar: { conversations: 3, hours: 10 }, channel_names: { linkedin: 'LinkedIn' }, narrow: '640px' } };
 
 test('a channel’s month is summed from its posts, its conversations and its hours', () => {
-  const { months, sources } = sums(answer, 'social_source');
+  const { months, sources } = sums(answer, 'traffic_source');
   assert.deepEqual(months.map((m: any) => m.month), ['2026-11', '2026-10'], 'newest month first');
   const nov = months[0].rows;
   assert.deepEqual(nov.map((r: any) => r.channel), ['linkedin', 'x']);
@@ -81,7 +81,7 @@ test('a row on one line: its numbers, two ratio bars, and the bar’s dot; sourc
 });
 
 test('with no bar there is no dot, with no narrow no fold, and with nothing out it says so', () => {
-  const { scene } = picture({ answer, style: { table: { source_type: 'social_source' } } });
+  const { scene } = picture({ answer, style: { table: { source_type: 'traffic_source' } } });
   assert.ok(!marks(scene.svg).some((m) => /\btb-dot\b/.test(m[1].class ?? '')));
   assert.deepEqual(scene.key, []);
   assert.doesNotMatch(scene.css, /@container \(/);
