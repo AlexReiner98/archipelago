@@ -82,13 +82,17 @@ and the time now. The first that holds:
 2. `waiting`: a `wait.start` with no `wait.end` (`for` says which).
 3. `blocked`: the run is `waiting` on a resource, or works on an item with an
    open `depends_on`.
-4. `working`: its latest turn is open.
-5. `quiet`: open, no event for 30 minutes (a style's number, `quiet_after`).
+4. `quiet`: its latest turn is open and nothing has come for 30 minutes (a
+   style's number, `quiet_after`): a turn under way gone silent, likely dead.
+   A turn that ended is waiting on its person and is never quiet.
+5. `working`: its latest turn is open.
 6. `your_move`: its latest turn ended `asked`, `stopped` or `failed`.
 7. `idle`: its latest turn ended `done`.
 
-Its line: the question its latest turn asked, else its latest beat, else the
-title of what it works on.
+Its line: what its open wait is for, else the question its latest turn
+asked, else its latest beat, else what its latest turn was asked to do (its
+gist), else the title of what it works on (drawn beside it, so the last
+resort).
 
 ## Who builds what
 
@@ -180,8 +184,8 @@ makes them true.
   of reads (runs by id), as a `Map` by run id.
 - The `sessions` view: each open run also has `session: { state, for?, line,
   since }` and `turn` (its latest turn), and the open ones are ordered by the
-  states' order of attention: `waiting`, `your_move`, `blocked`, `working`,
-  `quiet`, `idle`, each oldest `since` first.
+  states' order of attention: `waiting`, `your_move`, `blocked`, `quiet`,
+  `working`, `idle`, each oldest `since` first.
 - The flat answer (`query` `flat`, `src/query-flat.ts`): an item that is a run
   has `session: { state, for?, line, since }` beside `status` and `phase`.
 - A new read `turns` (`query` name `turns`, params `run`, `limit?`): the run's

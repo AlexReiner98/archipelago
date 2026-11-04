@@ -47,7 +47,7 @@ test("a run's state and line move as its events arrive", async () => {
   s = await sessionState(l, run, at(3));
   assert.deepEqual([s?.state, s?.for, s?.since], ['waiting', 'permission', at(2)]);
   const [row] = await openRuns(l);
-  assert.deepEqual(row.session, { state: 'waiting', for: 'permission', line: 'Make the lane wait', since: at(2) });
+  assert.deepEqual(row.session, { state: 'waiting', for: 'permission', line: 'Run npm test', since: at(2) });
   assert.deepEqual((await flatOf(l, run)).session, row.session);
 
   // Answered, then a beat told: working again, its line the beat.
@@ -62,10 +62,14 @@ test("a run's state and line move as its events arrive", async () => {
   assert.deepEqual([s?.state, s?.line, s?.since], ['your_move', 'Should the lane wait a day?', at(5)]);
   assert.equal((await openRuns(l))[0].turn?.question, 'Should the lane wait a day?', 'the view carries its latest turn');
 
-  // Silent past the house style's quiet_after (30 minutes): quiet.
-  s = await sessionState(l, run, at(5 + 29));
-  assert.equal(s?.state, 'your_move', 'not yet');
-  s = await sessionState(l, run, at(5 + 30));
+  // Its turn ended: waiting on its person however long, never quiet.
+  s = await sessionState(l, run, at(5 + 90));
+  assert.equal(s?.state, 'your_move', 'a question waits');
+  // A turn under way, silent past the house style's quiet_after (30 minutes): quiet.
+  await post(l, 's1', [{ at: at(7), kind: 'turn.start', turn: 't2', by: 'person', gist: 'Make it a day.' }]);
+  s = await sessionState(l, run, at(7 + 29));
+  assert.equal(s?.state, 'working', 'not yet');
+  s = await sessionState(l, run, at(7 + 30));
   assert.equal(s?.state, 'quiet');
 
   // What it works on waits on open work: blocked.

@@ -16,7 +16,7 @@ const ended = (began: number, at: number, end: string, more: Record<string, unkn
 const state = (input: Record<string, unknown>) => stateOf({ run: open, now: NOW, quiet_after: QUIET, title: 'Session states', ...input });
 
 test('the states are one table, in the contract order', () => {
-  assert.deepEqual(STATES.map((s: any) => s.state), ['done', 'waiting', 'blocked', 'working', 'quiet', 'your_move', 'idle']);
+  assert.deepEqual(STATES.map((s: any) => s.state), ['done', 'waiting', 'blocked', 'quiet', 'working', 'your_move', 'idle']);
 });
 
 test('done: the run is closed', () => {
@@ -42,12 +42,15 @@ test('working: its latest turn is open', () => {
   assert.deepEqual(state({ turns: [ended(30, 25, 'done'), turn(10)] }), { state: 'working', line: 'Session states', since: ago(10) });
 });
 
-test('quiet: open, no event for quiet_after minutes', () => {
-  assert.deepEqual(state({ turns: [ended(60, 40, 'asked', { question: 'Merge it?' })] }), { state: 'quiet', line: 'Merge it?', since: ago(40) });
+test('quiet: a turn under way, no event for quiet_after minutes', () => {
+  assert.deepEqual(state({ turns: [turn(40)] }), { state: 'quiet', line: 'Session states', since: ago(40) });
   // The latest event the caller knows of counts, and the threshold is the caller's.
-  assert.equal(state({ turns: [ended(60, 40, 'done')], last: ago(10) }).state, 'idle');
-  assert.equal(state({ turns: [ended(60, 40, 'done')], quiet_after: 60 }).state, 'idle');
-  assert.equal(state({ turns: [ended(60, 40, 'done')], quiet_after: undefined }).state, 'idle');
+  assert.equal(state({ turns: [turn(40)], last: ago(10) }).state, 'working');
+  assert.equal(state({ turns: [turn(40)], quiet_after: 60 }).state, 'working');
+  assert.equal(state({ turns: [turn(40)], quiet_after: undefined }).state, 'working');
+  // A turn that ended is waiting on its person, however long: never quiet.
+  assert.equal(state({ turns: [ended(60, 40, 'asked', { question: 'Merge it?' })] }).state, 'your_move');
+  assert.equal(state({ turns: [ended(60, 40, 'done')] }).state, 'idle');
 });
 
 test('your_move: its latest turn ended asked, stopped or failed', () => {
@@ -65,11 +68,11 @@ test('the first that holds wins', () => {
   // Closed beats an open wait; an open wait beats blocked and an open turn.
   assert.equal(state({ run: { open: false, status: 'done' }, turns: [waitingTurn] }).state, 'done');
   assert.equal(state({ turns: [waitingTurn], blocked: true }).state, 'waiting');
-  // Blocked beats an open turn; an open turn beats quiet.
+  // Blocked beats an open turn; quiet beats working, for a turn under way that has gone silent.
   assert.equal(state({ turns: [turn(10)], blocked: true }).state, 'blocked');
-  assert.equal(state({ turns: [turn(90)] }).state, 'working');
-  // Quiet beats your move; only the latest turn's end counts.
-  assert.equal(state({ turns: [ended(90, 60, 'asked')] }).state, 'quiet');
+  assert.equal(state({ turns: [turn(90)] }).state, 'quiet');
+  // Your move however long ago it asked; only the latest turn's end counts.
+  assert.equal(state({ turns: [ended(90, 60, 'asked')] }).state, 'your_move');
   assert.equal(state({ turns: [ended(30, 20, 'asked'), ended(10, 5, 'done')] }).state, 'idle');
   assert.equal(state({ turns: [ended(30, 20, 'done'), ended(10, 5, 'failed')] }).state, 'your_move');
 });
@@ -81,6 +84,10 @@ test('the line: the question, else the latest beat, else the title', () => {
   assert.equal(lineOf({ turns: [], beat: 'Found the cause.', title: 'Session states' }), 'Found the cause.');
   assert.equal(lineOf({ turns: [ended(10, 5, 'done')], title: 'Session states' }), 'Session states');
   assert.equal(lineOf({}), '');
+  // With no question or beat, what its latest turn was asked to do, before the title.
+  assert.equal(lineOf({ turns: [turn(10, { gist: 'Deal the shards by time' })], title: 'Session states' }), 'Deal the shards by time');
+  // An open wait says what it waits on, before any question.
+  assert.equal(lineOf({ turns: [turn(10, { waits: [{ for: 'permission', began: ago(4), gist: 'Run gh run list' }] })], title: 'Session states' }), 'Run gh run list');
   // Only the latest turn's question: an earlier one is answered.
   assert.equal(lineOf({ turns: [asked, turn(3)], title: 'Session states' }), 'Session states');
 });

@@ -12,8 +12,10 @@ export const STATES = [
   { state: 'done', holds: (f) => f.closed, since: (f) => f.run.ended ?? f.last },
   { state: 'waiting', holds: (f) => !!f.wait, since: (f) => f.wait.began, for: (f) => f.wait.for },
   { state: 'blocked', holds: (f) => f.blocked, since: (f) => f.blockedSince ?? f.last },
-  { state: 'working', holds: (f) => !!f.turn && !f.turn.ended, since: (f) => f.turn.began },
-  { state: 'quiet', holds: (f) => f.quiet, since: (f) => f.last },
+  // Quiet is a turn under way that has said nothing for a while: likely dead. A session whose turn ended is silent by
+  // nature, waiting on its person, and is never quiet.
+  { state: 'quiet', holds: (f) => f.inTurn && f.quiet, since: (f) => f.last },
+  { state: 'working', holds: (f) => f.inTurn, since: (f) => f.turn.began },
   { state: 'your_move', holds: (f) => ASKED.includes(f.turn?.end), since: (f) => f.turn.ended },
   // The last: a run whose latest turn ended done, or one with no turn yet.
   { state: 'idle', holds: () => true, since: (f) => f.turn?.ended ?? f.last },
@@ -32,6 +34,7 @@ function facts({ run, turns = [], wait, blocked, last, now, quiet_after }) {
     wait: open,
     last: latest,
     closed: run.open === false,
+    inTurn: !!turn && !turn.ended,
     // A run held for a resource has status waiting; an item it works on with an open depends_on is the caller's.
     blocked: run.status === 'waiting' || !!blocked,
     blockedSince: typeof blocked === 'object' && blocked ? blocked.since : undefined,
@@ -39,11 +42,15 @@ function facts({ run, turns = [], wait, blocked, last, now, quiet_after }) {
   };
 }
 
-/** The line: the question its latest turn asked, else its latest beat, else the title of what it works on. */
-export function lineOf({ turns = [], beat, title }) {
-  const question = turns.at(-1)?.question;
+/**
+ * The line: what its open wait is for, else the question its latest turn asked, else its latest beat, else what its
+ * latest turn was asked to do, else the title of what it works on (drawn beside it, so the last resort).
+ */
+export function lineOf({ turns = [], wait, beat, title }) {
+  const latest = turns.at(-1);
+  const waiting = (wait ?? latest?.waits?.findLast((w) => !w.ended))?.gist;
   const said = typeof beat === 'string' ? beat : beat?.said;
-  return question || said || title || '';
+  return waiting || latest?.question || said || latest?.gist || title || '';
 }
 
 /**

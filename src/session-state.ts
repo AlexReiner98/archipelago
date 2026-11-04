@@ -48,7 +48,7 @@ const turnsOf = turnsOfJs as (events: SessionEvent[]) => Turn[];
 const stateOf = stateOfJs as (input: Record<string, unknown>) => SessionMark;
 
 /** The states in the order they ask for attention: what waits on a person first. */
-export const ATTENTION = ['waiting', 'your_move', 'blocked', 'working', 'quiet', 'idle', 'done'];
+export const ATTENTION = ['waiting', 'your_move', 'blocked', 'quiet', 'working', 'idle', 'done'];
 
 /** Of a state: the mark the sessions view and the flat answer carry, without its turns. */
 export const markOf = ({ state, for: f, line, since }: SessionState): SessionMark => ({ state, ...(f && { for: f }), line, since });
