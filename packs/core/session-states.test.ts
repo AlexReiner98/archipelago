@@ -33,13 +33,18 @@ test('waiting: a wait with no end, and what for', () => {
 });
 
 test('blocked: held for a resource, or on an item with an open depends_on', () => {
-  assert.deepEqual(state({ run: { ...open, status: 'waiting' }, turns: [ended(10, 5, 'done')] }), { state: 'blocked', line: 'Session states', since: ago(5) });
+  // A chat's run waits once its agent says it is done: that is not blocked.
+  assert.equal(state({ run: { ...open, status: 'waiting' }, turns: [ended(10, 5, 'done')] }).state, 'idle');
   assert.equal(state({ turns: [ended(10, 5, 'done')], blocked: { since: ago(8) } }).since, ago(8));
   assert.equal(state({ turns: [ended(10, 5, 'done')], blocked: true }).state, 'blocked');
 });
 
 test('working: its latest turn is open', () => {
   assert.deepEqual(state({ turns: [ended(30, 25, 'done'), turn(10)] }), { state: 'working', line: 'Session states', since: ago(10) });
+  // A run that has sent no events yet is working while its heartbeat says busy, and quiet once that goes silent.
+  assert.deepEqual(state({ run: { ...open, busy: true }, turns: [], last: ago(2) }), { state: 'working', line: 'Session states', since: ago(2) });
+  assert.equal(state({ run: { ...open, busy: true }, turns: [], last: ago(40) }).state, 'quiet');
+  assert.equal(state({ run: { ...open, busy: false }, turns: [], last: ago(2) }).state, 'idle');
 });
 
 test('quiet: a turn under way, no event for quiet_after minutes', () => {

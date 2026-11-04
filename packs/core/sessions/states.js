@@ -15,7 +15,7 @@ export const STATES = [
   // Quiet is a turn under way that has said nothing for a while: likely dead. A session whose turn ended is silent by
   // nature, waiting on its person, and is never quiet.
   { state: 'quiet', holds: (f) => f.inTurn && f.quiet, since: (f) => f.last },
-  { state: 'working', holds: (f) => f.inTurn, since: (f) => f.turn.began },
+  { state: 'working', holds: (f) => f.inTurn, since: (f) => f.turn?.began ?? f.last },
   { state: 'your_move', holds: (f) => ASKED.includes(f.turn?.end), since: (f) => f.turn.ended },
   // The last: a run whose latest turn ended done, or one with no turn yet.
   { state: 'idle', holds: () => true, since: (f) => f.turn?.ended ?? f.last },
@@ -34,9 +34,11 @@ function facts({ run, turns = [], wait, blocked, last, now, quiet_after }) {
     wait: open,
     last: latest,
     closed: run.open === false,
-    inTurn: !!turn && !turn.ended,
-    // A run held for a resource has status waiting; an item it works on with an open depends_on is the caller's.
-    blocked: run.status === 'waiting' || !!blocked,
+    // A run that has sent no events yet (its checkout's hook is older) is in a turn when its heartbeat says busy.
+    inTurn: turn ? !turn.ended : run.busy === true,
+    // An item it works on with an open depends_on, as the caller finds it. A run's status waiting is not it: a chat's
+    // run waits so once its agent says it is done.
+    blocked: !!blocked,
     blockedSince: typeof blocked === 'object' && blocked ? blocked.since : undefined,
     quiet: quiet_after != null && !!latest && Date.parse(now) - Date.parse(latest) >= quiet_after * 60_000,
   };

@@ -66,7 +66,7 @@ async function numbersOf(l: Archipelago): Promise<{ quiet_after?: number }> {
   return typeof numbers?.quiet_after === 'number' ? { quiet_after: numbers.quiet_after } : {};
 }
 
-type RunRow = { id: string; status: string; is_open: boolean; created_at: Date; updated_at: Date; story: unknown; last_seen: string | null };
+type RunRow = { id: string; status: string; is_open: boolean; created_at: Date; updated_at: Date; story: unknown; last_seen: string | null; busy: boolean | null };
 type Row = { stream: Light['stream']; pos: number; at: Date; head: Omit<Light, 'stream' | 'pos' | 'at' | 'facts'>; facts: OpFact[] };
 
 /** The events of many runs, in one read of the sessions stream from the earliest run's start: by run, each in order. */
@@ -96,7 +96,7 @@ export async function sessionStates(l: Archipelago, runs: string[], now: string 
   const ids = [...new Set(runs)];
   if (!ids.length) return new Map();
   const { rows } = await l.db.query<RunRow>(
-    `select id, status, is_open, created_at, updated_at, props->'story' as story, props->>'last_seen' as last_seen from entity where id = any($1::text[])`,
+    `select id, status, is_open, created_at, updated_at, props->'story' as story, props->>'last_seen' as last_seen, (props->>'busy')::boolean as busy from entity where id = any($1::text[])`,
     [ids],
   );
   // What each works on, newest first, and whether that waits on work still open.
@@ -117,7 +117,7 @@ export async function sessionStates(l: Archipelago, runs: string[], now: string 
     const blocked = works.find((w) => w.since);
     const last = [list.at(-1)?.at, r.last_seen ?? undefined].filter(Boolean).sort().at(-1);
     const mark = stateOf({
-      run: { open: r.is_open, status: r.status, started: r.created_at.toISOString(), ...(!r.is_open && { ended: r.updated_at.toISOString() }) },
+      run: { open: r.is_open, status: r.status, started: r.created_at.toISOString(), busy: r.busy === true, ...(!r.is_open && { ended: r.updated_at.toISOString() }) },
       turns,
       ...(blocked && { blocked: { since: blocked.since!.toISOString() } }),
       ...(beatOf(r.story) && { beat: beatOf(r.story) }),
