@@ -23,6 +23,9 @@ export const SLOW: Record<string, string> = {
   'test/layout-asks.test.ts': 'browser',
   'test/code-style-starts.test.ts': 'browser',
   'test/layouts.test.ts': 'browser',
+  'test/layouts-architecture.test.ts': 'browser',
+  'test/layouts-flow.test.ts': 'browser',
+  'test/layouts-open.test.ts': 'browser',
   'test/find-query.test.ts': 'browser',
   'test/kept-views.test.ts': 'browser',
   'test/looks.test.ts': 'browser',
@@ -32,10 +35,17 @@ export const SLOW: Record<string, string> = {
   'test/published-frames.test.ts': 'browser',
   'test/query-line.test.ts': 'browser',
   'test/saved-canvases.test.ts': 'browser',
+  'test/saved-canvases-narrow.test.ts': 'browser',
+  'test/saved-canvases-switch.test.ts': 'browser',
   'test/show-lands.test.ts': 'browser',
+  'test/show-follows.test.ts': 'browser',
+  'test/show-tab-life.test.ts': 'browser',
+  'test/show-web.test.ts': 'browser',
   'test/stable-page.test.ts': 'browser',
   'test/style-items.test.ts': 'browser',
   'test/tabs.test.ts': 'browser',
+  'test/tabs-busy.test.ts': 'browser',
+  'test/tabs-canvas.test.ts': 'browser',
   'test/tips.test.ts': 'browser',
   'test/walk-from.test.ts': 'browser',
   // A whole map moved, backed up, restored, migrated or pulled: databases opened, filled and replayed from the log,
@@ -107,21 +117,32 @@ export function predict(files: string[], engine: string, steps = 0, weight = wei
 /**
  * CI runs the full set as N shards side by side (.github/workflows/tests.yml), named "1/N" to "N/N", so a push waits
  * as long as its slowest shard rather than for every file in turn. Every file of the full run is dealt to one, by
- * the time it took in CI (test/weights.json): heaviest first, each to the part where it raises the heavier engine's
- * load least. Shard 1 starts with the time of FIRST_STEPS on it, LANES times over (a step has the runner to itself).
+ * the time it took in CI (test/weights.json), heaviest first. The browser tests go first, each to the part with the
+ * fewest browser seconds so far: Chromes side by side on one runner slow each other far past BROWSER (main's run of 4
+ * Nov 2026: a shard of five took 123 s, its files up to four times their weight). The rest then go each to the part
+ * whose predicted time (predict, its lanes and on shard 1 FIRST_STEPS) it raises least, on the heavier engine.
  * sets.test.ts checks the workflow runs every file once, and that the heaviest shard keeps under a budget.
  */
 export function shard(part: string, weights = readWeights()): string[] {
   const [k, n] = part.split('/').map(Number);
   if (!(n >= 1 && k >= 1 && k <= n)) throw new Error(`No shard ${part}: say k/n`);
   const weight = weigher(weights);
-  const parts = Array.from({ length: n }, (_, i) => ({ files: [] as string[], load: Object.fromEntries(ENGINES.map((e) => [e, i ? 0 : (weights.steps[e] ?? 0) * LANES])) }));
+  const steps = (i: number, e: string) => (i ? 0 : (weights.steps[e] ?? 0));
+  const parts = Array.from({ length: n }, (_, i) => ({ files: [] as string[], browser: Math.max(...ENGINES.map((e) => steps(i, e))) * LANES }));
   const heavier = (f: string) => Math.max(...ENGINES.map((e) => weight(f, e)));
-  for (const f of allTests().sort((a, b) => heavier(b) - heavier(a) || (a < b ? -1 : 1))) {
-    const after = (p: (typeof parts)[number]) => Math.max(...ENGINES.map((e) => p.load[e] + weight(f, e) + PER_FILE));
-    const best = parts.reduce((min, p) => (after(p) < after(min) ? p : min));
+  const browser = (f: string) => SLOW[f] === 'browser';
+  const order = (fs: string[]) => fs.sort((a, b) => heavier(b) - heavier(a) || (a < b ? -1 : 1));
+  const tests = allTests();
+  for (const f of order(tests.filter(browser))) {
+    const after = (p: (typeof parts)[number]) => Math.max(p.browser + heavier(f), ...ENGINES.map((e) => predict([...p.files, f], e, 0, weight)));
+    const best = parts.reduce((min, p) => (after(p) < after(min) || (after(p) === after(min) && p.browser < min.browser) ? p : min));
     best.files.push(f);
-    for (const e of ENGINES) best.load[e] += weight(f, e) + PER_FILE;
+    best.browser += heavier(f) + PER_FILE;
+  }
+  for (const f of order(tests.filter((t) => !browser(t)))) {
+    const after = (i: number) => Math.max(...ENGINES.map((e) => predict([...parts[i].files, f], e, steps(i, e), weight)));
+    const best = parts.reduce((min, _, i) => (after(i) < after(min) ? i : min), 0);
+    parts[best].files.push(f);
   }
   return parts[k - 1].files.sort();
 }

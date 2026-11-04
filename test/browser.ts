@@ -76,7 +76,9 @@ export async function open(url: string): Promise<Page> {
   await send('Runtime.enable');
   const go = async (to: string) => {
     events.length = 0;
-    await send('Page.navigate', { url: to });
+    // Only the hash moved: the page stays, and no load follows (Chrome gives no loader for it). A test waits for what
+    // the page then draws.
+    if (!(await send('Page.navigate', { url: to })).result?.loaderId) return;
     for (let n = 0; n < 200 && !events.some((e) => e.method === 'Page.loadEventFired'); n++) await new Promise((r) => setTimeout(r, 25));
   };
   await go(url);
