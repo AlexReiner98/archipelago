@@ -16,11 +16,11 @@ import { covering } from './withdraw.ts';
 import { holdsOff } from './rules.ts';
 
 // Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
-export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string, pane?: string, run?: string): Promise<Focus> {
+export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string, pane?: string, run?: string, focus?: boolean): Promise<Focus> {
   const next = { at: Date.now(), hash, actor: actor.name, note };
   const { db } = await wholeMap(l);
   await setFocus(db, l, next);
-  await took(db, l, { kind, actor: actor.name, did: note, hash, ...(pane && { pane }), ...(run && { run }) }, true);
+  await took(db, l, { kind, actor: actor.name, did: note, hash, ...(pane && { pane }), ...(run && { run }), ...(focus && { focus }) }, true);
   return next;
 }
 

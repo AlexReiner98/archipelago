@@ -123,3 +123,11 @@ test('a tab popped out into a window of its own is drawn in its canvas, never br
   assert.deepEqual(route(step('e_aaaaaaaa', 'review'), [first({ busy: true }), tab('w1', 'e_aaaaaaaa', {}, [], { popped: true })], at), { tab: 'w1', pane: 'p0', front: false });
   assert.deepEqual(route(step('e_aaaaaaaa'), [first(), tab('w1', 'e_aaaaaaaa', { busy: true }, [], { popped: true })], at), { later: true });
 });
+
+test('a show with focus brings its tab into sight, as the owner asked to be taken there (e_gt2rfab4)', () => {
+  const focus = (run: string, pane?: string) => ({ ...step(run, pane), focus: true });
+  assert.deepEqual(route(focus('e_aaaaaaaa'), [first()], at), { open: { follows: 'e_aaaaaaaa' }, front: true }, 'a tab of its own, opened in sight');
+  assert.deepEqual(route(focus('e_aaaaaaaa', 'story'), [first(), tab('t1', 'e_aaaaaaaa', { slot: 'story' })], at), { tab: 't1', pane: 'p0', front: true }, 'its tab out of sight, brought into sight');
+  assert.deepEqual(route(focus('e_aaaaaaaa'), [chat('e_aaaaaaaa')], at), { tab: 't0', pane: 'p0', front: true }, 'already in sight, it stays');
+  assert.deepEqual(route(focus('e_aaaaaaaa'), [first(), tab('w1', 'e_aaaaaaaa', {}, [], { popped: true })], at), { tab: 'w1', pane: 'p0', front: false }, 'a window of its own is not a tab here');
+});

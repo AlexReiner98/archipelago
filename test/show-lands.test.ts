@@ -195,6 +195,10 @@ test('in a browser, a show frames a web address in its pane, and says whether th
     // Back on the owner's tab, a show lands out of sight, and says so.
     await press('#tabs .tab:nth-child(1) .tab-name');
     await sees(false);
+    // Asked to be taken there, a show with focus brings its tab into sight, and its answer says they are looking.
+    const brought = await show({ url, focus: true });
+    assert.equal(brought.sight.looking, true, `brought into sight: ${brought.sight.where}`);
+    assert.equal(await page.evaluate(`document.querySelector('#tabs .tab:nth-child(2)').getAttribute('aria-selected') === 'true'`), true, "the chat's tab is the one in sight");
   } finally {
     await page.close();
     build.close();

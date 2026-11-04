@@ -5,12 +5,16 @@
 # Windows runs nightly (nightly.yml). Needs nothing set in the repository's
 # settings.
 #
-# Each engine runs the full set as shards side by side (shard in test/sets.ts):
-# a push to main deploys once the whole workflow passes, so it waits for the
-# slowest shard, not for every file in turn. Every file runs in one shard;
-# test/sets.test.ts checks the matrices below name every shard. The checks
-# main's ruleset requires are pglite and postgres: each passes when every
-# shard of its engine has.
+# Each engine runs the full set as shards side by side (shard in test/sets.ts),
+# dealt by the time each file took here (test/weights.json): a push to main
+# deploys once the whole workflow passes, so it waits for the slowest shard,
+# not for every file in turn. Every file runs in one shard; test/sets.test.ts
+# checks that, and that the heaviest shard keeps under its budget: when it
+# does not, add a shard to both matrices (the free plan runs 20 jobs at once).
+# Each shard keeps the seconds its files took as an artifact, and
+# node scripts/test-weights.ts ci makes test/weights.json from main's latest.
+# The checks main's ruleset requires are pglite and postgres: each passes when
+# every shard of its engine has.
 
 name: Tests
 
@@ -35,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false # every shard reports, so a failure shows all that broke
       matrix:
-        shard: [rest 1/3, rest 2/3, rest 3/3, browser 1/2, browser 2/2, whole-map, table]
+        shard: [1/8, 2/8, 3/8, 4/8, 5/8, 6/8, 7/8, 8/8]
     steps:
       - uses: actions/checkout@v4
 
@@ -46,10 +50,18 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run typecheck
-        if: matrix.shard == 'rest 1/3'
+      - name: Type check
+        if: startsWith(matrix.shard, '1/') # FIRST_STEPS in test/sets.ts: its time counts toward shard 1
+        run: npm run typecheck
 
       - run: node scripts/test.ts shard ${{ matrix.shard }}
+        env:
+          PELAGO_TEST_TIMES: runs/times.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: times-pglite-${{ strategy.job-index }}
+          path: runs/times.json
 
   postgres-shard:
     # The engine that runs live. Each test gets a database copied from a
@@ -60,7 +72,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [rest 1/3, rest 2/3, rest 3/3, browser 1/2, browser 2/2, whole-map, table]
+        shard: [1/8, 2/8, 3/8, 4/8, 5/8, 6/8, 7/8, 8/8]
     services:
       postgres:
         image: postgres:18
@@ -97,15 +109,22 @@ jobs:
           -c "select pg_reload_conf()"
 
       - run: node scripts/test.ts shard ${{ matrix.shard }}
+        env:
+          PELAGO_TEST_TIMES: runs/times.json
 
       # The log's triggers refuse everyone, but a superuser could drop them: a server should not log in as one. The
       # log, its lock and the move again as a role that may make databases and roles, and nothing more. The roles the
       # superuser's run made are granted to it to hand on, as it hands them to itself on opening (src/pg.ts).
       - name: The log as a role that is not a superuser
-        if: matrix.shard == 'table' # the shard with time to spare
+        if: startsWith(matrix.shard, '1/') # FIRST_STEPS in test/sets.ts: its time counts toward shard 1
         run: |
           psql "$PELAGO_TEST_DATABASE_URL" -c "create role pelago_app login password 'app' createdb createrole" -c "create database pelago_app owner pelago_app" -c "grant pelago_member, pelago_public, pelago_compactor to pelago_app with admin option"
           PELAGO_TEST_DATABASE_URL=postgres://pelago_app:app@127.0.0.1:5432/pelago_app node --test --test-force-exit --test-global-setup=./test/global.ts --import ./test/each.ts test/log.test.ts test/connections.test.ts test/move.test.ts test/streams.test.ts test/keys.test.ts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: times-postgres-${{ strategy.job-index }}
+          path: runs/times.json
 
   pglite:
     needs: pglite-shard

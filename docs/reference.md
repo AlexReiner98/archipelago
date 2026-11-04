@@ -93,7 +93,8 @@ pack can declare another tree the same way, with no code.
 **Following agents.** An agent's `show` opens what it names in a pane of its
 session's own beside yours, its strip saying whose it is and its tooltip the
 agent's note, or in a tab of its own out of sight, its mark ringing; it never
-takes the pane you are in or touched last. Whom each tab follows (everyone,
+takes the pane you are in or touched last. Ask an agent to take you there and
+its show (`focus`) brings that tab into sight. Whom each tab follows (everyone,
 nobody or one session) is in the tab's ⋯ menu.
 A change redraws a page, in place, only when it touches an item on it.
 
