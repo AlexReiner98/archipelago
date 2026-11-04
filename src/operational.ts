@@ -19,6 +19,7 @@ export const MAP_TABLES = ['entity', 'relation', 'event', 'log_entry', 'log_fact
  */
 export const ON_THE_MAP: Record<string, string> = {
   sessions: "A run's tokens_used (shared onto the work it is on), story and stale flag: kept at once by operational and appended to the sessions stream; its start, end and task are facts; its heartbeat (last_seen, active, busy) and where its checkout stands (git, src/git-state.ts) are in no stream.",
+  session_events: "What a session did, as raw events in one vocabulary (docs/sessions.md): sent by its adapter to /hooks/events, appended at once to the sessions stream as event facts on its run, sealed with the run's key, a resent one dropped (src/session-events.ts); kept two weeks.",
   claims: 'A holds link from holder to resource: made by claim and ended by release, at once, appended to the claims stream.',
   notifications: 'A notification item, made by apply at once and never held; who may read it is set by operational and appended to the notifications stream.',
   automations: "An automation's last_run, last_fired and last_result, the event cursor and run_once marks: kept at once, appended to the automations stream.",
