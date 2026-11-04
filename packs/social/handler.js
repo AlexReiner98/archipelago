@@ -1,5 +1,5 @@
-// The social pack's handler: run in its own sandboxed process by the kernel's pack host. Its webhook takes a signup
-// counted by the server that sells workspaces and adds it to the post whose tag it carries. It never calls out.
+// The social pack's handler: run in its own sandboxed process by the kernel's pack host. Its webhook takes a signup or
+// a day's visits counted by the server that sells workspaces and adds it to the post whose tag it carries. It never calls out.
 
 import { count } from './count.js';
 

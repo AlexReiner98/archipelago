@@ -14,14 +14,17 @@
       "fields": {
         "channel": { "type": "enum", "values": ["linkedin", "x", "bluesky", "threads", "instagram", "youtube", "hn", "dm", "blog", "substack"], "shown": true, "description": "Where it goes out." },
         "tag": { "type": "string", "shown": true, "description": "The source tag its link carries (?ref=<tag>): letters, digits, - and _, up to 40. One post, one tag." },
-        "posted": { "type": "date", "description": "The day it went out." },
+        "posted": { "type": "date", "shown": true, "description": "The day it went out." },
         "url": { "type": "url", "description": "The post itself, once it is out." },
         "replies": { "type": "number", "shown": true, "description": "Replies it drew, as its author counts them." },
         "conversations": { "type": "number", "shown": true, "description": "Conversations it began: replies or messages that said the problem." },
         "asked": { "type": "number", "shown": true, "system": true, "description": "Trials asked for under its tag." },
         "begun": { "type": "number", "shown": true, "system": true, "description": "Trials begun under its tag." },
         "paid": { "type": "number", "shown": true, "system": true, "description": "Trials paid for, and workspaces bought with no trial, under its tag." },
-        "ended": { "type": "number", "system": true, "description": "Trials under its tag that ended unpaid." }
+        "ended": { "type": "number", "system": true, "description": "Trials under its tag that ended unpaid." },
+        "visits": { "type": "number", "shown": true, "system": true, "description": "Page loads under its tag, as the seller counts them: nothing about the visitor is kept." },
+        "first_visit": { "type": "date", "system": true, "description": "The first day a visit was counted under its tag." },
+        "last_visit": { "type": "date", "system": true, "description": "The last day a visit was counted under its tag." }
       }
     }
   ],
@@ -48,7 +51,7 @@
       ]
     }
   ],
-  "handlers": [{ "webhook": "social.count", "records": ["signup.counted"] }],
+  "handlers": [{ "webhook": "social.count", "records": ["signup.counted", "visit.counted"] }],
   "reach": {
     "webhooks": [{ "id": "social.count", "secret": "count" }]
   },

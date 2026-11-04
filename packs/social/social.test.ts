@@ -50,3 +50,47 @@ test('a tag no post has, or a count that is not one, changes nothing', async () 
   }
   assert.equal(ctx.reads.length, 1, 'only a well-formed count reads the map');
 });
+
+test('a day’s visits add their number to the post and move its last day of visits', async () => {
+  const ctx = ctxOver([post('e_post0001', 'linkedin-26w46-1', { visits: 2, first_visit: '2026-11-10', last_visit: '2026-11-11' })]);
+  const done = await deliver({ tag: 'linkedin-26w46-1', n: 3, day: '2026-11-12' }, ctx);
+  assert.deepEqual(ctx.reads[0], { items: { type: 'post', where: { tag: 'linkedin-26w46-1' } }, fields: ['visits', 'first_visit', 'last_visit'] });
+  assert.deepEqual(done.changes[0].ops, [{ op: 'update', id: 'e_post0001', props: { visits: 5, last_visit: '2026-11-12' } }]);
+  assert.deepEqual(done.log[0], { action: 'visit.counted', target: 'e_post0001', reason: '3 visits under linkedin-26w46-1 on 2026-11-12', detail: { tag: 'linkedin-26w46-1', n: 3, day: '2026-11-12' } });
+  assert.deepEqual(done.answer, { recorded: true, post: 'e_post0001', visits: 5, last_visit: '2026-11-12' });
+});
+
+test('the first visits to a post set both its days, and a late count moves only the first', async () => {
+  const first = await deliver({ tag: 'x-26w46-1', n: 1, day: '2026-11-12' }, ctxOver([post('e_post0002', 'x-26w46-1')]));
+  assert.deepEqual(first.changes[0].ops[0].props, { visits: 1, first_visit: '2026-11-12', last_visit: '2026-11-12' });
+  const late = await deliver({ tag: 'x-26w46-1', n: 4, day: '2026-11-09' }, ctxOver([post('e_post0002', 'x-26w46-1', { visits: 1, first_visit: '2026-11-12', last_visit: '2026-11-12' })]));
+  assert.deepEqual(late.changes[0].ops[0].props, { visits: 5, first_visit: '2026-11-09' });
+});
+
+test('visits that are not a count change nothing', async () => {
+  const ctx = ctxOver([post('e_post0001', 'linkedin-26w46-1')]);
+  for (const payload of [
+    { tag: 'linkedin-26w46-1', n: 0, day: '2026-11-12' },
+    { tag: 'linkedin-26w46-1', n: 1.5, day: '2026-11-12' },
+    { tag: 'linkedin-26w46-1', n: '3', day: '2026-11-12' },
+    { tag: 'linkedin-26w46-1', n: 3 },
+    { tag: 'linkedin-26w46-1', n: 3, day: '2026-02-31' },
+    { tag: 'linkedin-26w46-1', n: 3, day: '12/11/2026' },
+    { tag: 'not a tag!', n: 3, day: '2026-11-12' },
+  ]) {
+    const refused = await deliver(payload, ctx);
+    assert.equal(refused.answer.recorded, false, JSON.stringify(payload));
+    assert.equal(refused.changes, undefined);
+  }
+  assert.equal(ctx.reads.length, 0, 'a count that is not one reads nothing');
+});
+
+test('the pack declares the visit fields and hears both counts', async () => {
+  const { readFileSync } = await import('node:fs');
+  const pack = JSON.parse(readFileSync(new URL('./pack.json', import.meta.url), 'utf8'));
+  const fields = pack.types.find((t: { id: string }) => t.id === 'post').fields;
+  assert.deepEqual(fields.visits, { ...fields.visits, type: 'number', shown: true, system: true });
+  for (const f of ['first_visit', 'last_visit']) assert.deepEqual([fields[f].type, fields[f].system], ['date', true]);
+  assert.equal(fields.posted.shown, true);
+  assert.deepEqual(pack.handlers.find((h: { webhook: string }) => h.webhook === 'social.count').records, ['signup.counted', 'visit.counted']);
+});
