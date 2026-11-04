@@ -19,6 +19,8 @@ import { isServerPack, parts, readManifest, type Manifest, type ReachDef } from 
 /** The acts a server pack may ask the kernel for, each only if it declares it. */
 export const SERVER_ACTS = [
   'workspace.create', 'workspace.admit', 'workspace.limit', 'workspace.end', 'signin.link', 'mail.send', 'agreement.record',
+  // How many readers each source tag brought to a public site (PELAGO_SITES), per day, after a position (src/visits.ts).
+  'site.visits',
   // On a workspace whose admin connected the pack (src/server-connect.ts).
   'begun.get', 'begun.take', 'connection.make', 'connection.get', 'connection.drop', 'workspace.add', 'workspace.deliver',
 ] as const;

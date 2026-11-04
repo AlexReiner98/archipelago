@@ -51,7 +51,7 @@ const xml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
  * Answer a GET on a site's domain, or say it is not the site's (false), so the server answers it as on any other
  * name: the page's own scripts and styles are served by name, as everywhere.
  */
-export async function serveSite(res: ServerResponse, pathname: string, at: { host: string; workspace: string; workspaces: Workspaces }): Promise<boolean> {
+export async function serveSite(res: ServerResponse, pathname: string, at: { host: string; workspace: string; workspaces: Workspaces; onPage?: () => void }): Promise<boolean> {
   const parts = pathname.split('/').filter(Boolean);
   const origin = `https://${at.host}`;
   const send = (status: number, type: string, body: string | Buffer, more: Record<string, string> = {}) => (res.writeHead(status, { ...GUARD, 'content-type': type, ...more }).end(body), true);
@@ -89,5 +89,6 @@ export async function serveSite(res: ServerResponse, pathname: string, at: { hos
   const front = own || doc.path === HOME || typeof look.share !== 'string' ? undefined : shareOf(((await publishedAt(pelago, HOME)) as { parts: Part[] } | null) ?? { parts: [] }, look.share);
   const image = own ? pictureAt(origin + siteHref(doc.path), own) : front && pictureAt(origin, front);
   const page = await publishedPage(doc, origin + siteHref(doc.path), site.name, data, image);
+  at.onPage?.(); // a page read, and only that: what counts as a visit (src/visits.ts)
   return send(200, 'text/html; charset=utf-8', page, { 'cache-control': 'no-store', 'content-security-policy': POLICY });
 }

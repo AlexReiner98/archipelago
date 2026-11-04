@@ -1121,6 +1121,14 @@
       "say": "Retired: where things were put by hand on a canvas, which nothing keeps now. What is left goes a day after it was put."
     },
     {
+      "id": "visits",
+      "stream": "visits",
+      "keep": {
+        "forever": true
+      },
+      "say": "How many readers each source tag brought to a public site, per day: counts only, every entry kept."
+    },
+    {
       "id": "pack",
       "stream": "pack:*",
       "keep": {
