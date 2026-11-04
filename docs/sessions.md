@@ -137,3 +137,42 @@ with its `turn.end` `stopped`; `wait.start` on Notification (a permission
 prompt or a question to answer, not the idle reminder), `wait.end` at the next
 tool, prompt or Stop; `turn.end` `failed` on StopFailure. A Stop the server
 answers with a block has no `turn.end`: the reply goes on.
+
+## Wired: what the server gives
+
+Phase 2 builds against these shapes; the wiring (`src/session-state.ts`)
+makes them true.
+
+- `sessionState(l, run, now?)`, in `src/session-state.ts`: reads the run's
+  events (`sessionEvents`), works out its turns (`turnsOf`) and its state
+  (`stateOf`, with its latest beat from `story`, the title of what it works
+  on, its open `depends_on`, and `quiet_after` from the house style's
+  `numbers`), and answers
+  `{ state, for?, line, since, turn?: <its latest turn>, turns: <count> }`.
+- `sessionStates(l, runs, now?)`: the same for many runs, in a bounded number
+  of reads (runs by id), as a `Map` by run id.
+- The `sessions` view: each open run also has `session: { state, for?, line,
+  since }` and `turn` (its latest turn), and the open ones are ordered by the
+  states' order of attention: `waiting`, `your_move`, `blocked`, `working`,
+  `quiet`, `idle`, each oldest `since` first.
+- The flat answer (`query` `flat`, `src/query-flat.ts`): an item that is a run
+  has `session: { state, for?, line, since }` beside `status` and `phase`.
+- A new read `turns` (`query` name `turns`, params `run`, `limit?`): the run's
+  turns, newest first, as "A turn"; built by task 10.
+- The house style (`packs/core/pack.json` `styles`) names `quiet_after` (30,
+  minutes) and `quiet_end_after` (1440, minutes) in `numbers`.
+
+## Who builds phase 2
+
+| task | files it owns |
+|---|---|
+| Wiring (part of e_ees7hr6q) | `src/session-state.ts`, `src/views.ts` (the `sessions` view only), `src/query-flat.ts`, the two numbers in the house style |
+| 7. Ended leave; quiet dim, then end (e_9jduzn9c) | the stale sweep in `src/automations.ts`, `src/sessions.ts` if ending needs it |
+| 8. A Sessions view (e_htwjh45d) | a lens preset and style preset in `packs/core/pack.json` (`views`, `styles`), `packs/core/layouts/flow/state.js` and the flow's marks for a session |
+| 9. The tab bar's count (e_82rggead) | `ui/tab-bar.js`, `ui/tab-life.js` |
+| 10. A session's page shows its turns (e_ezyzr7ms) | `src/session-turns.ts` (the `turns` read), a screen piece in `src/declared.ts` and its `ui/` module |
+| 11. What turns tell (e_ys9d9n25) | `src/session-measures.ts` and its view's one line in `src/views.ts` |
+| 12. An SDK adapter (e_bu29txug) | `scripts/pelago-sdk-runner.mjs`, `scripts/pelago-events.mjs` if it shares the posting |
+
+Tasks 8 to 11 build against the shapes above, not the wiring's code: where
+they need a run's state before the wiring lands, they read it from a fixture.
