@@ -7,6 +7,8 @@
 // Tabs merge: from ⋯, or a tab dragged onto another, and a pane dragged onto a tab joins it (e_c5stzz6z's way back).
 // What is the tab's own lives on the strip, never in the query bar, which shows the lens (decision e_j7ggggjr, asked):
 // every tab has ⋯ (whom it follows, pop out) and ×, the same in sight or not, and + ends the strip, which shows with one tab too.
+// A session's tab carries a mark for its state, and beside the strip a count of the sessions waiting on the owner goes
+// to the oldest one (ui/tab-count.js, e_82rggead).
 
 import { api, h, hooks, state } from './base.js';
 import { readAddress } from './query.js';
@@ -16,6 +18,7 @@ import { windowOf, windows } from './pane-busy.js';
 import { followable, heard, hearOpen, nameOf } from './pane-route.js';
 import { activeIs, close, draw, paneAt, paneButtons, startPanes } from './panes.js';
 import { filterSaid } from './query-bar.js';
+import { countGoes, countTip, onYou, stateSaid } from './tab-count.js';
 import { BLANK, dismissed, focusOf, front, freshTab, isOutKey, keep, landed, listKey, named, outKey, outTabs, poppedTab, read, save, tabHref, tabOf, tabs } from './tabs.js';
 import { sessionHue, titles } from './words.js';
 
@@ -186,6 +189,7 @@ function tabEl(t, out) {
   const { name, hue, session } = nameOfTab(t);
   const inSight = t.id === tabs.front && !out;
   const one = session ? heard.get(session) : undefined;
+  const st = session ? stateSaid(open.find((s) => s.id === session)?.session) : null;
   const whom = t.chat ? 'this chat’s tab: it closes as the chat ends' : session ? 'yours, following this chat' : 'yours';
   const act = (label, mark, onclick) => h('button', { type: 'button', class: 'tab-act', title: label, 'aria-label': label, onclick }, mark);
   const el = h(
@@ -200,9 +204,11 @@ function tabEl(t, out) {
       'data-chat': t.chat ? 'true' : null,
       'data-ended': t.chat && t.ended?.includes(t.chat) ? 'true' : null,
       'data-quiet': one?.quiet && !one.ended ? 'true' : null,
-      title: [name, whom, t.chat && t.ended?.includes(t.chat) && 'its chat has ended or gone quiet: it goes when you leave it', one?.quiet && !one.ended && 'not heard from for a while', out && 'in a window of its own: press to go to it', !out && !inSight && 'drag it out of the page to pop it out'].filter(Boolean).join(' · '),
+      'data-state': st?.state ?? null,
+      title: [name, st?.said, whom, t.chat && t.ended?.includes(t.chat) && 'its chat has ended or gone quiet: it goes when you leave it', one?.quiet && !one.ended && 'not heard from for a while', out && 'in a window of its own: press to go to it', !out && !inSight && 'drag it out of the page to pop it out'].filter(Boolean).join(' · '),
       style: hue ? `--session-hue: ${hue}` : null,
     },
+    st?.mark && h('span', { class: 'tab-state', 'aria-hidden': 'true' }, st.mark),
     h('span', { class: `tab-name${session ? ' who-session' : ''}` }, name),
     // Every tab has the same controls, in sight or not, so nothing moves when another is brought into sight.
     !out && act('This tab: whom it follows, pop it out', '⋯', (ev) => tabMenu(ev.currentTarget, t)),
@@ -225,6 +231,28 @@ export function drawStrip() {
   els.find((el, n) => n > 0 && el.dataset.chat && !els[n - 1].dataset.chat)?.classList.add('tab-chats');
   strip.replaceChildren(...els, fresh);
   document.body.dataset.tabs = String(all.length);
+  drawCount(all.map(([t]) => t));
+}
+
+// ---- The sessions waiting on the owner, counted beside the strip, so every tab sees them.
+
+/** The sessions open now, as the `sessions` view last answered. */
+let open = [];
+const countEl = h('button', { type: 'button', class: 'tab-count', hidden: true });
+strip?.after(countEl);
+function drawCount(all) {
+  const yours = onYou(open);
+  countEl.hidden = !yours.length || Boolean(poppedTab);
+  if (countEl.hidden) return;
+  const tip = countTip(yours, (s) => (heard.has(s.id) ? nameOf(s.id) : s.title ?? s.id));
+  countEl.title = tip;
+  countEl.setAttribute('aria-label', `${yours.length} waiting on you: ${tip}`);
+  countEl.replaceChildren(h('span', { class: 'tab-state', 'aria-hidden': 'true' }, '↩'), String(yours.length));
+  countEl.onclick = () => {
+    const to = countGoes(yours, all);
+    if (to?.tab) return tabOf(to.tab) ? toFront(to.tab) : windowOf(to.tab)?.focus();
+    if (to?.page) location.hash = to.page;
+  };
 }
 
 // ---- Whom the tab in sight follows: nobody, or one session (its run, or the agent's name).
@@ -240,7 +268,13 @@ function setFollows(follows, t = front()) {
 const menuEl = h('div', { class: 'menu-items tab-menu', popover: 'auto', role: 'menu', 'aria-label': 'This tab' });
 document.body.append(menuEl);
 /** Ask which sessions are open: the menu is drawn at once from what is known, and again with the answer. */
-const readOpen = () => api('view', { name: 'sessions' }).then(({ open = [] }) => (hearOpen(open), hooks.sessionsOpen?.(open)), () => {});
+const readOpen = () => api('view', { name: 'sessions' }).then((got) => ((open = got.open ?? []), hearOpen(open), hooks.sessionsOpen?.(open), drawStrip()), () => {});
+/** A session was heard from (ui/live.js): its state may have moved, so the open ones are read again, once for a burst. */
+let rereading;
+hooks.sessionsMoved = () => {
+  if (poppedTab || rereading) return;
+  rereading = setTimeout(() => ((rereading = undefined), readOpen()), 1000);
+};
 function tabMenu(anchor, t) {
   drawMenu(t);
   menuEl.showPopover();

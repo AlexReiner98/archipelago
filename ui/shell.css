@@ -66,6 +66,15 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 #tabs > .tab[data-ended] .tab-name { text-decoration: line-through; }
 #tabs > .tab[data-quiet] .tab-name { opacity: var(--ln-dim); }
 #tabs > .tab.tab-chats { margin-left: var(--space-6); }
+/* A session's state, a mark before its name; one waiting on the owner stands out (ui/tab-count.js). */
+#tabs .tab-state { flex: none; margin-right: var(--space-3); }
+#tabs > .tab:is([data-state="waiting"], [data-state="your_move"]) { color: var(--text); }
+#tabs > .tab:is([data-state="waiting"], [data-state="your_move"]) .tab-state, #nav > .tab-count { color: var(--warn); }
+/* The sessions waiting on the owner, counted beside the strip so every tab sees them; a press goes to the oldest. */
+#nav > .tab-count { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); height: var(--box-7); padding: 0 var(--space-4); border: 0; border-radius: var(--radius-2); background: none; font: inherit; font-size: var(--text-5); cursor: pointer; }
+#nav > .tab-count[hidden] { display: none; }
+#nav > .tab-count .tab-state { margin: 0; }
+#nav > .tab-count:hover { background: var(--accent-soft); }
 /* Every control on the strip, in the bar and on a pane is a button a finger finds: a square of one size, its mark large enough to read. */
 #tabs .tab-act, #tabs > .tab-new, #query .q-save, .pane-bar .pane-act { flex: none; display: inline-grid; place-items: center; box-sizing: border-box; width: var(--box-7); height: var(--box-7); padding: 0; border: 0; border-radius: var(--radius-2); background: none; color: var(--muted); font-size: var(--text-8); line-height: 1; cursor: pointer; }
 #tabs .tab-act:hover, #tabs > .tab-new:hover, #query .q-save:hover:not(:disabled), .pane-bar .pane-act:hover { color: var(--text); background: var(--accent-soft); }

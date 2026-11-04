@@ -55,6 +55,8 @@ export function follow(steps = []) {
   const fresh = seenStep === undefined ? [] : steps.filter((s) => s.at > seenStep);
   seenStep = steps.at(-1)?.at ?? seenStep ?? 0;
   for (const s of steps) hear(s);
+  // What a session does may move its state, which the tab bar counts (ui/tab-bar.js).
+  if (fresh.some((s) => s.run)) hooks.sessionsMoved?.();
   // A chat that ended closes its tab here (ui/tab-life.js).
   for (const s of fresh) if (s.ends && s.run) hooks.sessionEnded?.(s.run, s.did);
   // One gone quiet or waiting lets its tab go too, until it next shows something.
