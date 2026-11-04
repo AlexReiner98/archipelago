@@ -19,7 +19,7 @@ const dep = (b: string, a: string, says?: string) => ({ kind: 'depends_on', from
 const measure = (text: string, px: number) => text.length * px * 0.55;
 // Laid out by the house style's lengths, as the page lays it out (packs/core/pack.json).
 const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
-const run = (items: any[], links: any[], placed = {}) => layout({ items: [{ ...item('r', 'aim'), inside: null }, ...items], links, placed, measure, sizes: house.sizes, shapes: { kind: house.kind_shapes } });
+const run = (items: any[], links: any[]) => layout({ items: [{ ...item('r', 'aim'), inside: null }, ...items], links, measure, sizes: house.sizes, shapes: { kind: house.kind_shapes } });
 /** A flat lens's answer: items with no inside, place or state; links each with its type. */
 const flat = (id: string, extra: Record<string, unknown> = {}) => ({ id, kind: 'work', type: 'task', title: `Step ${id}`, open: true, status: 'todo', ...extra });
 const link = (type: string, from: string, to: string) => ({ id: `r_${from}${to}`, type, from, to });
@@ -231,23 +231,6 @@ test('what is tied to nothing is a step of its own, set apart from the rest', ()
   checks(g);
   assert.ok(g.nodes.has('c') && g.nodes.has('p'), 'started on the canvas and not yet wired up, it is drawn; one waited on too');
   assert.ok(g.ties.some((t: any) => t.type === 'waits_on' && t.a === 'b' && t.b === 'p'), 'waits_on is a tie');
-});
-
-test('a step put by hand stays exactly where it was put, and nothing overlaps', () => {
-  const items = ['a', 'b', 'c', 'd', 'e'].map((id) => item(id)), links = [dep('b', 'a'), dep('c', 'b'), dep('e', 'd')], free = run(items, links);
-  const to = { b: [free.width + 200, free.height + 200], d: [free.width + 600, free.height + 200] };
-  const g = run(items, links, to);
-  for (const [id, [px, py]] of Object.entries(to)) assert.ok(Math.abs(g.x.get(id) - px) < 1e-6 && Math.abs(g.y.get(id) - py) < 1e-6, `${id} stays where it was put`);
-  const steps = g.all;
-  for (const p of steps)
-    for (const q of steps) if (p !== q) assert.ok(Math.abs(g.x.get(p.id) - g.x.get(q.id)) >= (p.w + q.w) / 2 || Math.abs(g.y.get(p.id) - g.y.get(q.id)) >= (p.h + q.h) / 2, `${p.id} and ${q.id} overlap`);
-  // The wires to them solved at right angles, from the foot of one into the head of the other.
-  for (const key of ['a b', 'b c', 'd e']) {
-    const c = g.chains.find((w: any) => w.key === key);
-    assert.ok(c, `${key} is wired`);
-    assert.ok(c.points.slice(1).every(([px, py]: number[], k: number) => px === c.points[k][0] || py === c.points[k][1]), `${key} turns square`);
-  }
-  assert.ok(g.x.has('r'), 'what was not moved is still drawn');
 });
 
 test('a large map wraps its wide layers into rows: it comes out about the page\'s shape, not one band', () => {

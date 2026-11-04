@@ -6,7 +6,6 @@
 // paints in its worker shown on a canvas laid over its picture (surface.js).
 
 import { frameSandbox, h } from './base.js';
-import { dragOf } from './drag.js';
 import { HELD } from './ghosts.js';
 import { tipOf } from './layout-tip.js';
 import { answered } from './tip.js';
@@ -156,12 +155,9 @@ export function drawWith(host, answer, style, keep) {
   const end = () => ((ended = true), reshape?.disconnect(), surface?.end(), port.postMessage({ type: 'end' }), port.close());
   host.endDrawing = end;
   const send = (event) => !ended && port.postMessage({ type: 'event', event });
-  // A press on a mark that asked to be dragged is followed by the page (drag.js); every other event is told as it is.
-  const drag = dragOf(host, keys, send, style);
-  // A click on a mark keyed for a held change (`held:<proposal>…`, ui/ghosts.js) also asks the page to put that change to
+  // Every event is told as it is. A click on a mark keyed for a held change (`held:<proposal>…`, ui/ghosts.js) also asks the page to put that change to
   // the person, where it is drawn (`drawing-held` on the host): the drawing only says where; the page says what it is.
   const tell = (key, name, ev) => {
-    if (name === 'drag') return drag(key, ev);
     const held = name === 'click' && HELD.exec(key);
     if (held) host.dispatchEvent(new CustomEvent('drawing-held', { bubbles: true, detail: { proposal: held[1] } }));
     send({ key, name });

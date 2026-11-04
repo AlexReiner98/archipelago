@@ -29,14 +29,13 @@ export const s = (tag, attrs = {}, ...kids) => {
 // work as long as it is expected to take, with what it has used so far, and
 // down is the order it happens in: done, under way, to come.
 // Where there is none, what a thing belongs to or waits on is to its left
-// and what belongs to it or waits on it to its right. Anything can then be
-// dragged aside.
+// and what belongs to it or waits on it to its right.
 export const KINDS = { structure: ['part_of', 'serves', 'lives_in', 'works_at'], blocking: BLOCKING, all: null };
 export const KIND_LABELS = [['structure', 'Structure'], ['blocking', 'Blocking'], ['all', 'Everything']];
-/** Each drawing's filters and what was dragged in it, by what it is drawn around, kept while the page is open. */
+/** Each drawing's filters, by what it is drawn around, kept while the page is open. */
 export const graphPrefs = new Map();
 export const prefsOf = (key, defaults = {}) => {
-  if (!graphPrefs.has(key)) graphPrefs.set(key, { kind: 'all', steps: 1, finished: true, fit: false, moved: new Map(), ...defaults });
+  if (!graphPrefs.has(key)) graphPrefs.set(key, { kind: 'all', steps: 1, finished: true, fit: false, ...defaults });
   return graphPrefs.get(key);
 };
 
@@ -59,9 +58,8 @@ export function graphView({ focus, key, defaults, extras } = {}) {
       return host.replaceChildren(h('div', { class: 'error' }, err.message));
     }
     // A filter changed lays it out afresh; how it is sized does not.
-    const set = (change, tidy = true) => () => {
+    const set = (change) => () => {
       Object.assign(prefs, change);
-      if (tidy) prefs.moved.clear();
       draw();
     };
     const pick = (key, options, title) => h('span', { class: 'switch', title }, options.map(([value, label]) => h('button', { class: prefs[key] === value ? 'on' : '', onclick: set({ [key]: value }) }, label)));
@@ -78,11 +76,10 @@ export function graphView({ focus, key, defaults, extras } = {}) {
         !extras?.workOnly && pick('kind', KIND_LABELS, 'Which links to draw'),
         !extras?.workOnly && focus && pick('steps', [[1, 'Near'], [2, '2 steps'], [3, '3 steps']], 'How far out to draw'),
         h('span', { class: 'grow' }),
-        h('button', { title: prefs.full ? 'Back to the page (Esc)' : 'Fill the window with the drawing', onclick: set({ full: !prefs.full }, false) }, prefs.full ? 'Close' : 'Full screen'),
+        h('button', { title: prefs.full ? 'Back to the page (Esc)' : 'Fill the window with the drawing', onclick: set({ full: !prefs.full }) }, prefs.full ? 'Close' : 'Full screen'),
         menu('View', [
           [prefs.finished ? 'Hide what is finished' : 'Show what is finished', set({ finished: !prefs.finished })],
-          [prefs.fit ? 'Actual size' : 'Fit to width', set({ fit: !prefs.fit }, false)],
-          prefs.moved.size > 0 && !shaped.axis && ['Tidy', set({})],
+          [prefs.fit ? 'Actual size' : 'Fit to width', set({ fit: !prefs.fit })],
         ]),
       ),
       shaped.nodes.length > (focus ? 1 : 0) ? drawGraph(shaped, prefs) : h('div', { class: 'empty' }, focus ? 'Nothing is linked to it this way.' : 'Nothing to draw with these filters.'),
@@ -185,8 +182,6 @@ export function shapeGraph(data, focus, prefs, extras = {}) {
     n.y -= top;
     n.w = BOX.w;
     n.h = BOX.h;
-    const dragged = prefs.moved.get(n.id);
-    if (dragged) Object.assign(n, dragged);
   }
   return { nodes, edges, byId, focus };
 }
