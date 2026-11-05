@@ -4,12 +4,12 @@ import { menu, relations } from './words.js';
 
 // ---- Graph ---------------------------------------------------------------
 
-// Colour says what kind of thing a node is: one of the seven kinds every
-// type extends, or the system's own records. A palette checked for
+// Colour says what a node is: the starter type its type comes from (one of
+// core's seven of the work), or the system's own records. A palette checked for
 // colour-blind separation in both themes. Red is kept for "blocked", which is
 // also drawn as a ring and named in the tooltip.
 export const GROUPS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place'];
-export const groupOf = (kind) => (GROUPS.includes(kind) ? kind : 'system');
+export const groupOf = (starter) => (GROUPS.includes(starter) ? starter : 'system');
 export const BLOCKING = ['depends_on', 'waits_on', 'needs', 'holds'];
 /** Whether a relation is one of these, or extends one of them. */
 export const isOf = (list, type) => list.includes(type) || list.includes(relations.get(type)?.root);

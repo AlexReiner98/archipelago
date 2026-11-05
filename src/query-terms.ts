@@ -86,8 +86,9 @@ export async function endsOf(l: Archipelago, t: Extract<Term, { end: string }>, 
 export async function setOf(l: Archipelago, t: Exclude<Term, { sort: 'word' }>, me: string | null): Promise<Narrowing> {
   if (t.sort === 'text') return { cond: `e.id in (${searchIds('$?', false)})`, param: t.said };
   if (t.sort === 'type') return { cond: 'e.type = any($?::text[])', param: l.registry.family(t.type) };
-  // kind system is read as the kernel flag, so the views kept with it (the flat query's default Not) leave out the same.
-  if (t.sort === 'kind') return t.kind === SYSTEM ? { cond: 'e.type = any($?::text[])', param: kernelTypes(l.registry) } : { cond: 'e.kind = $?', param: t.kind };
+  // kind <k>, kept in views from before the starter types, is read through the type: the types k is the starter of
+  // (what the kind column held), and kind system as the kernel flag, so the flat query's default Not leaves out the same.
+  if (t.sort === 'kind') return { cond: 'e.type = any($?::text[])', param: t.kind === SYSTEM ? kernelTypes(l.registry) : [...l.registry.types.values()].filter((x) => x.starter === t.kind).map((x) => x.id) };
   if (t.sort === 'id') return { cond: 'e.id = $?', param: t.id };
   if (t.sort === 'held') return { cond: 'e.id = any($?::text[])', param: await heldIds(l) };
   const at = await endsOf(l, t, me);

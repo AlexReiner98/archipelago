@@ -23,9 +23,9 @@ export interface FieldDef {
   default?: unknown;
   /** Maintained by the system; shown but not offered for editing. */
   system?: boolean;
-  /** Sent with the item in a lens answer, so a style can draw by it (a kind to colour, an amount, a date). */
+  /** Sent with the item in a lens answer, so a style can draw by it (a type to colour, an amount, a date). */
   shown?: boolean;
-  /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a kind (src/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (src/css-check.ts). */ css?: boolean; /** Holds code (a module, a stylesheet): drawn as a code block, folded. */ code?: boolean;
+  /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a starter type (src/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (src/css-check.ts). */ css?: boolean; /** Holds code (a module, a stylesheet): drawn as a code block, folded. */ code?: boolean;
 }
 
 export interface Statuses {
@@ -38,8 +38,6 @@ export interface TypeDef {
   title: string;
   description: string;
   extends?: string;
-  /** One of the kinds every other type extends: the seven of the work, and system for the app's own. Only the core pack declares them. */
-  kind?: boolean;
   statuses?: Statuses;
   fields?: Record<string, FieldDef>;
   /** What is made for a reader or a customer (a document, a file, a release): named under the title of what it is part of. A flavour inherits it. */
@@ -80,16 +78,16 @@ export interface ResolvedType {
   pack: string;
   title: string;
   description: string;
-  /** This type first, then each ancestor, its kind last. */
+  /** This type first, then each ancestor, the starter type it comes from last. */
   lineage: string[];
-  /** The kind it falls back to: the last of its lineage. Undefined for a type of no kind, and a workspace's own type left to the type table. */
-  kind: string | undefined;
-  /** The type nearest its kind: what it is, said without the kind (task for an experiment). */
+  /** The starter type it comes from: the last of its lineage, a type that extends nothing (core's eight, or a pack's own). The item's `kind` column holds it. */
+  starter: string;
+  /** The type nearest its starter: what it is, said without the starter (task for an experiment). */
   base: string;
   /** The kernel's own (the kernel flag, src/capabilities.ts): the app's configuration, which views of the work leave out. */
   system: boolean;
   statuses: Statuses;
-  /** The fields kept in props, and those kept in the item's row (status and the rest a kind declares). */
+  /** The fields kept in props, and those kept in the item's row (status and the rest its starter declares). */
   fields: Record<string, FieldDef>; columns: Partial<Record<ColumnField, FieldDef>>;
   deliverable: boolean; altitude?: Altitude;
   public: boolean;
@@ -180,7 +178,6 @@ export class Registry {
     for (const pack of ordered) {
       for (const type of parts(pack).types) {
         if (raw.has(type.id)) throw new Error(`Type "${type.id}" is defined twice`);
-        if (type.kind && pack.id !== 'core') throw new Error(`Type "${type.id}": only the core pack declares kinds`);
         raw.set(type.id, { ...type, pack: pack.id });
       }
       for (const rel of parts(pack).relations) {
@@ -208,8 +205,6 @@ export class Registry {
       if (!def) throw new Error(`Unknown type "${id}"${trail.length ? ` (extended by "${trail.at(-1)}")` : ''}`);
       if (trail.includes(id)) throw new Error(`Type cycle: ${[...trail, id].join(' -> ')}`);
       const parent = def.extends ? resolve(def.extends, [...trail, id]) : undefined;
-      if (def.extends && def.kind) throw new Error(`Type "${id}" is a kind and extends nothing`);
-      const kind = def.kind ? id : parent?.kind;
       const kernel = Boolean(def.capabilities?.kernel ?? parent?.capabilities.kernel); if (kernel && !KERNEL_PACKS.includes(def.pack)) throw new Error(`Type "${id}" in pack "${def.pack}" cannot carry the kernel flag: that is the kernel's own`);
       const statuses = def.statuses ?? parent?.statuses;
       if (!statuses?.open.length) throw new Error(`Type "${id}" needs at least one open status`);
@@ -219,12 +214,12 @@ export class Registry {
         title: def.title,
         description: def.description,
         lineage: [id, ...(parent?.lineage ?? [])],
-        kind,
-        base: !parent || parent.id === parent.kind ? id : parent.base,
+        starter: parent?.starter ?? id,
+        base: !parent || parent.id === parent.starter ? id : parent.base,
         system: kernel,
         statuses: { ...statuses, phases: phasesOf(statuses, [def.statuses?.phases, parent?.statuses.phases]) },
-        // A kind is a starter type: one of no kind keeps in its row what it declares (src/head.ts, ownHead).
-        ...headOf({ ...ownHead(Boolean(kind), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id) }, statuses),
+        // A type that extends nothing keeps in its row the columns it declares, or the common ones (src/head.ts, ownHead).
+        ...headOf({ ...ownHead(Boolean(parent?.columns.status ?? def.fields?.status?.column), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id) }, statuses),
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
         public: def.public ?? parent?.public ?? false,
         ...((def.altitude ?? parent?.altitude) && { altitude: altitudeOf(id, def.altitude ?? parent?.altitude) }),
@@ -308,17 +303,18 @@ export class Registry {
   }
 
   /**
-   * Take in definitions the workspace kept whose packs are not loaded, as dormant: their items keep kind, statuses,
+   * Take in definitions the workspace kept whose packs are not loaded, as dormant: their items keep starter, statuses,
    * fields and capabilities. One that a pack defines again is the pack's.
    */
   keep(kept: { types: ResolvedType[]; relations: ResolvedRelation[] }): void {
     this.kept = kept;
     // One kept before owned was a capability says it by its owner column: links from it are allowed as they were.
-    for (const t of kept.types) if (!this.types.has(t.id)) this.types.set(t.id, { ...t, capabilities: { ...(t.columns?.owner && { owned: true }), ...t.capabilities }, dormant: true });
+    for (const t of kept.types) if (!this.types.has(t.id)) this.types.set(t.id, { ...t, starter: t.starter ?? t.lineage?.at(-1) ?? t.id, capabilities: { ...(t.columns?.owner && { owned: true }), ...t.capabilities }, dormant: true });
     for (const r of kept.relations) if (!this.relations.has(r.id)) this.relations.set(r.id, { ...r, dormant: true });
   }
 
   type(id: string): ResolvedType | undefined { return this.types.get(id); }
+  /** The starter type a type comes from (the item's kind column); null for a type nothing defines. */ starterOf = (id: string): string | null => this.types.get(id)?.starter ?? null;
   /** The name a type or link type has now, given one it had before (work.task is task). */ canonical = (id: string): string => this.renamed.get(id) ?? id;
 
   /** Turn packs off in this workspace (the rest on), and load again if that changed anything. The kernel's packs stay on. Says what was newly turned off, or undefined when nothing changed. */
@@ -331,9 +327,9 @@ export class Registry {
     return newly;
   }
 
-  /** The kinds, in the core pack's order: the seven of the work, then system. */
-  kinds(): ResolvedType[] {
-    return [...this.types.values()].filter((t) => t.kind === t.id);
+  /** The starter types: those that extend nothing, in the packs' order (core's eight first). */
+  starters(): ResolvedType[] {
+    return [...this.types.values()].filter((t) => t.starter === t.id);
   }
 
   /** A relation and every relation extending it: what the kernel computes from a root holds for all of them. */
@@ -347,10 +343,10 @@ export class Registry {
     return ancestor !== '*' && holds(capabilityOf(ancestor) ? ancestor : this.canonical(ancestor), this.types.get(this.canonical(typeId)));
   }
 
-  /** What a picture says a thing is: its type nearest the kind (root) and its kind. */
-  ancestry(typeId: string): { root: string; kind: string | null } {
+  /** What a picture says a thing is: its type nearest the starter (root) and its starter. */
+  ancestry(typeId: string): { root: string; starter: string } {
     const type = this.types.get(typeId);
-    return { root: type?.base ?? typeId, kind: type?.kind ?? null };
+    return { root: type?.base ?? typeId, starter: type?.starter ?? typeId };
   }
 
   /** How many may hold an item at once: Infinity for any number, undefined when it cannot be held. */
@@ -430,8 +426,8 @@ export class Registry {
     const problems: string[] = [];
     if (!/^local\.[a-z][a-z0-9_]*$/.test(def.id)) problems.push(`new type id must look like "local.my_type", got "${def.id}"`);
     if (this.types.has(def.id)) problems.push(`type "${def.id}" already exists`);
-    const kinds = this.kinds().filter((t) => !t.system).map((t) => t.id).join(', ');
-    if (!def.extends) problems.push(`a new type extends one of the kinds (${kinds}) or a type of one`);
+    const starters = this.starters().filter((t) => !t.system && !t.dormant).map((t) => t.id).join(', ');
+    if (!def.extends) problems.push(`a new type extends one of the starter types (${starters}) or a type of one`);
     else if (!this.types.has(def.extends)) problems.push(`cannot extend unknown type "${def.extends}"`);
     else if (this.types.get(def.extends)!.system) problems.push(`cannot extend "${def.extends}", which is the kernel's own`);
     return problems;
@@ -471,7 +467,7 @@ export class Registry {
   describe() {
     return {
       packs: this.packs.map((p) => ({ id: p.id, version: p.version, title: p.title, description: p.description })),
-      // The head every item has; status, owner, confidence and source are each type's columns, as its kind declares them.
+      // The head every item has; status, owner, confidence and source are each type's columns, as its starter declares them.
       common_fields: { title: 'Required. A short name.', body: 'Free-form markdown detail.', visibility: 'private (default) or shared.' },
       types: [...this.types.values()].map((t) => ({
         id: t.id,
@@ -479,7 +475,7 @@ export class Registry {
         title: t.title,
         description: t.description,
         flavour_of: t.lineage[1],
-        kind: t.kind,
+        starter: t.starter,
         statuses: t.statuses,
         fields: t.fields,
         columns: t.columns,

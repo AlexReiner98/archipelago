@@ -14,7 +14,7 @@ import { NOTE_START, project } from './project.js';
 
 /** An item of a lens answer as the row the projector folds facts into. */
 const itemRow = (i) => ({
-  id: i.id, kind: i.kind ?? null, type: i.type, title: i.title, body: i.body ?? '', status: i.status, visibility: i.visibility,
+  id: i.id, type: i.type, title: i.title, body: i.body ?? '', status: i.status, visibility: i.visibility,
   owner: i.owner ?? null, is_open: i.open, props: { ...(i.fields ?? {}) }, created_at: i.created_at, updated_at: i.updated_at, archived_at: null,
   // A run's session is worked out by the server from its events, not folded from facts: kept as the answer gave it.
   ...(i.session && { session: i.session }),
@@ -64,7 +64,7 @@ export class Replica {
     if (!r || r.archived_at) return undefined;
     const fields = Object.fromEntries(Object.entries(r.props ?? {}).filter(([k, v]) => v != null && this.kinds.shown?.(r.type, k) !== false));
     return {
-      id: r.id, kind: r.kind, type: r.type, ...(this.kinds.lineage?.(r.type)?.length && { is: this.kinds.lineage(r.type) }), title: r.title,
+      id: r.id, type: r.type, ...(this.kinds.lineage?.(r.type)?.length && { is: this.kinds.lineage(r.type) }), title: r.title,
       ...(r.body && { body: r.body.length > NOTE_START && !this.whole?.has(id) ? `${r.body.slice(0, NOTE_START)}…` : r.body }),
       visibility: r.visibility, status: r.status, ...(this.kinds.phase?.(r.type, r.status) && { phase: this.kinds.phase(r.type, r.status) }), open: r.is_open, owner: r.owner, created_at: r.created_at, updated_at: r.updated_at,
       ...(Object.keys(fields).length && { fields }),
@@ -127,7 +127,7 @@ export class Replica {
   /** The answer with what is held for the owner drawn where it would land, and the links drawn here and not yet answered for. */
   drawn() {
     const holds = (id) => Boolean(this.items.get(id) && !this.items.get(id).archived_at);
-    return withGhosts(this.answer(), ghostsOf(this.held, holds, (type) => this.kinds.type?.(type)?.kind ?? null, Boolean(this.lens?.find?.includes('held'))), [...this.mine.values()]);
+    return withGhosts(this.answer(), ghostsOf(this.held, holds, Boolean(this.lens?.find?.includes('held'))), [...this.mine.values()]);
   }
 
   /** Keep these held changes (the pending proposals) beside the answer; listeners are told when what is held moved. */

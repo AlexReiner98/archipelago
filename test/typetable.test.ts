@@ -44,7 +44,7 @@ test('a pack removed under live items leaves them dormant: editable by a person,
   assert.ok(synced.dormant.includes('program') && synced.dormant.includes('time_entry') && synced.dormant.includes('could_fund'));
   const program = l.registry.type('program')!;
   assert.equal(program.dormant, true);
-  assert.equal(program.kind, 'place');
+  assert.equal(program.starter, 'place');
 
   // Still at risk, by its kept bound.
   await callTool(l, { kind: 'human', name: 'test' }, 'init', { name: 'Owner' });

@@ -97,6 +97,15 @@ test("the kernel names no pack's type by its bare name", () => {
   assert.deepEqual(ratchet(named, NAMES_PACK_TYPES), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
 });
 
+// The kernel reads no kind (the owner, e_w46v6jf9): core's eight are starter types, and what an item is comes from its type
+// (its starter, lineage, capabilities). The kind column is written from the starter, the `kind <k>` term read through the type;
+// left: the database's own fill of the column, a released schema step that is never edited (src/head.ts, ITEM_KIND).
+const READS_KINDS: Record<string, number> = { 'src/head.ts': 1 };
+const KIND_READ = /\bkindsOf\b|\.kinds\(\)|\b(?:type|get)\([^)]*\)\??\.kind\b|\b(?:type|def|parent|resolved|item|entity)\??\.kind\b|\bkind\s*(?:[!=]==?|<>)\s*['"](?:actor|aim|work|question|record|occurrence|place|system)['"]|\be\.kind\s*(?:=|<>|!=)\s|def->>'kind'/g;
+test('the kernel reads no kind', () => {
+  assert.deepEqual(ratchet(count(kernelFiles, KIND_READ), READS_KINDS), [], "Read the type: its starter, its lineage (registry.isA) or a capability it declares, never an item's kind.");
+});
+
 // 3. Writes to items and relations go through the write path (src/pelago.ts, its apply loop in src/change-apply.ts):
 // change for facts, projected by the projector it runs (src/replay.ts), and the operational writes and the restore path src/operational.ts names.
 // Every other store is named there too.

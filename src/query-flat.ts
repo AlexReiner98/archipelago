@@ -103,7 +103,7 @@ export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLe
 }
 
 interface Row {
-  id: string; kind: string | null; type: string; title: string; body: string;
+  id: string; type: string; title: string; body: string;
   visibility: string; status: string; is_open: boolean; owner: string | null;
   props: Record<string, unknown>; created_at: Date; updated_at: Date;
 }
@@ -267,7 +267,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
 
   const cut = sent.size > lens.limit;
   const kept = [...sent].slice(0, lens.limit);
-  const { rows } = await l.db.query<Row>(`select id, kind, type, title, case when id = any($2::text[]) then body else left(body, ${NOTE_START + 1}) end as body, visibility, status, is_open, owner, ${l.props}, created_at, updated_at from entity where id = any($1::text[])`, [kept, whole ? kept.slice(0, NOTES_WHOLE_MOST) : []]);
+  const { rows } = await l.db.query<Row>(`select id, type, title, case when id = any($2::text[]) then body else left(body, ${NOTE_START + 1}) end as body, visibility, status, is_open, owner, ${l.props}, created_at, updated_at from entity where id = any($1::text[])`, [kept, whole ? kept.slice(0, NOTES_WHOLE_MOST) : []]);
   const wholeIds = new Set(whole ? kept.slice(0, NOTES_WHOLE_MOST) : []);
   const byId = new Map(rows.map((r) => [r.id, r]));
   const items = kept.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
@@ -295,7 +295,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
       const type = l.registry.type(e.type), defs = type?.fields ?? {};
       const fields = Object.fromEntries(Object.entries(e.props ?? {}).filter(([key, value]) => defs[key]?.shown && value != null));
       return {
-        id: e.id, kind: e.kind, type: e.type,
+        id: e.id, type: e.type,
         // What its type is a flavour of, nearest first (task: work), as a link says it: a drawing reads shapes and colours by it.
         ...(type && type.lineage.length > 1 && { is: type.lineage.slice(1) }),
         title: e.title,

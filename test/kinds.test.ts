@@ -30,19 +30,19 @@ function packsWith(extra?: PackFile): string {
   return dir;
 }
 
-test('every shipped type extends one of the kinds, the system tier included', () => {
+test('every shipped type comes from one of core’s starter types, the system tier included', () => {
   const reg = new Registry(packsWith());
-  assert.deepEqual(reg.kinds().map((t) => t.id), KINDS);
+  assert.deepEqual(reg.starters().map((t) => t.id), KINDS);
   for (const type of reg.types.values()) {
-    assert.ok(type.kind && KINDS.includes(type.kind), `${type.id} has a kind`);
-    if (type.id === 'system' || SYSTEM.includes(type.id)) assert.ok(type.kind === 'system' && type.system, `${type.id} is of the system kind`);
-    else assert.ok(type.kind !== 'system' && !type.system, `${type.id} is of the work`);
+    assert.ok(KINDS.includes(type.starter), `${type.id} comes from one of core's starter types`);
+    if (type.id === 'system' || SYSTEM.includes(type.id)) assert.ok(type.starter === 'system' && type.system, `${type.id} comes from system`);
+    else assert.ok(type.starter !== 'system' && !type.system, `${type.id} is of the work`);
   }
-  assert.equal(reg.type('experiment')!.kind, 'work');
-  assert.equal(reg.type('connection')!.kind, 'place');
-  assert.equal(reg.type('invoice')!.kind, 'record');
-  assert.deepEqual(reg.ancestry('experiment'), { root: 'task', kind: 'work' });
-  assert.deepEqual(reg.ancestry('run'), { root: 'run', kind: 'system' });
+  assert.equal(reg.type('experiment')!.starter, 'work');
+  assert.equal(reg.type('connection')!.starter, 'place');
+  assert.equal(reg.type('invoice')!.starter, 'record');
+  assert.deepEqual(reg.ancestry('experiment'), { root: 'task', starter: 'work' });
+  assert.deepEqual(reg.ancestry('run'), { root: 'run', starter: 'system' });
 });
 
 test('every relation extends one of the thirteen roots', () => {
@@ -57,8 +57,7 @@ test('every relation extends one of the thirteen roots', () => {
 test('a pack may leave a type or a link type without a kind or root, but cannot declare one or stretch a root', () => {
   const pack = (types: PackFile['types'], links: PackFile['links'] = []): PackFile => ({ id: 'x', version: '1', title: 'X', requires: ['core'], types, links });
   const statuses = { open: ['open'], closed: ['done'] };
-  assert.equal(new Registry(packsWith(pack([{ id: 'x.thing', title: 'T', description: '', statuses }]))).type('x.thing')!.kind, undefined, 'a kind is a starter type (test/kindless.test.ts)');
-  assert.throws(() => new Registry(packsWith(pack([{ id: 'x.kind', title: 'K', description: '', kind: true, statuses }]))), /only the core pack declares kinds/);
+  assert.equal(new Registry(packsWith(pack([{ id: 'x.thing', title: 'T', description: '', statuses }]))).type('x.thing')!.starter, 'x.thing', 'a type that extends nothing is a starter type (test/kindless.test.ts)');
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.tier', title: 'S', description: '', extends: 'system', statuses }]))), /cannot carry the kernel flag/);
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.lens', title: 'L', description: '', extends: 'lens' }]))), /kernel's own/);
   const rel = { title: 'r', inverse: 'r', description: '', from: ['*'], to: ['*'] };
@@ -93,7 +92,7 @@ test("a pack's relation extending depends_on blocks as depends_on does", async (
 
 test('a new type extends a kind or a type of one', async () => {
   const reg = new Registry(packsWith());
-  assert.match(reg.checkNewType({ id: 'local.site', title: 'Site', description: '' }).join(), /extends one of the kinds/);
+  assert.match(reg.checkNewType({ id: 'local.site', title: 'Site', description: '' }).join(), /extends one of the starter types/);
   assert.deepEqual(reg.checkNewType({ id: 'local.site', title: 'Site', description: '', extends: 'place' }), []);
   assert.match(reg.checkNewType({ id: 'local.view', title: 'V', description: '', extends: 'lens' }).join(), /kernel's own/);
   assert.match(reg.checkNewType({ id: 'local.conf', title: 'C', description: '', extends: 'system' }).join(), /kernel's own/);
@@ -116,7 +115,7 @@ test("the roots name kinds at their ends, so a pack's own actor can be waited on
   assert.deepEqual(ends('serves'), [['*'], ['aim']]);
   assert.deepEqual(ends('bears_on'), [['*'], ['question']]);
   assert.deepEqual(ends('defers'), [['occurrence'], ['*']]);
-  const core = new Set([...reg.types.keys()].filter((t) => reg.type(t)!.pack === 'core' && reg.type(t)!.kind !== t));
+  const core = new Set([...reg.types.keys()].filter((t) => reg.type(t)!.pack === 'core' && reg.type(t)!.starter !== t));
   for (const r of reg.relations.values()) if (r.root === r.id) for (const end of [...r.from, ...r.to]) assert.ok(!core.has(end), `${r.id} names the kind, not core's ${end}`);
   assert.equal(reg.checkRelation('waits_on', 'task', 'x.crew'), undefined);
   assert.equal(reg.checkRelation('needs', 'task', 'x.crane'), undefined);

@@ -43,10 +43,10 @@ test('a type of no kind keeps status, confidence and source in its row, and an o
   assert.deepEqual(columns('account'), ['confidence', 'owner', 'source', 'status']);
   assert.deepEqual(columns('savings'), ['confidence', 'owner', 'source', 'status'], 'a flavour inherits owned');
   assert.deepEqual(columns('period'), ['confidence', 'source', 'status']);
-  assert.equal(l.registry.type('account')!.kind, undefined);
-  assert.equal(l.registry.type('savings')!.base, 'account');
+  assert.equal(l.registry.type('account')!.starter, 'account');
+  assert.equal(l.registry.type('savings')!.base, 'savings', 'nearest its starter, as task is to work');
   assert.deepEqual(l.registry.type('period')!.columns.status!.values, ['open', 'closed']);
-  assert.ok(!l.registry.kinds().some((k) => k.id === 'account'), 'it is no kind');
+  assert.ok(l.registry.starters().some((k) => k.id === 'account'), 'it is a starter type, as core’s eight are');
 });
 
 test('a kindless item writes, closes, gets an owner only when owned, and rebuilds from the log', async () => {
@@ -59,7 +59,7 @@ test('a kindless item writes, closes, gets an owner only when owned, and rebuild
     { op: 'link', type: 'part_of', from: 's', to: 'a' },
   ]);
   const cash = (await l.entity(a))!;
-  assert.deepEqual([cash.kind, cash.status, cash.is_open, cash.confidence, cash.props.number], [null, 'open', true, 0.9, '1000']);
+  assert.deepEqual([cash.kind, cash.status, cash.is_open, cash.confidence, cash.props.number], ['account', 'open', true, 0.9, '1000']);
   await make(l, [{ op: 'update', id: a, owner: who }]);
   assert.equal((await l.entity(a))!.owner, who);
   await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: p, owner: who }] }), /period has no field "owner"/);
@@ -81,9 +81,9 @@ test('owned and actionable are capabilities: true or left out', () => {
 test('every type with an owner is owned, and the work and the questions are actionable, as their kinds were', async () => {
   const l = await fresh();
   for (const t of l.registry.types.values()) {
-    if (!t.kind) continue;
+    if (l.registry.type(t.starter)?.pack !== 'core') continue;
     assert.equal(Boolean(t.capabilities.owned), Boolean(t.columns.owner), `${t.id}: owned exactly when it has an owner`);
-    assert.equal(Boolean(t.capabilities.actionable), t.kind === 'work' || t.kind === 'question', `${t.id}: actionable exactly when work or a question`);
+    assert.equal(Boolean(t.capabilities.actionable), t.starter === 'work' || t.starter === 'question', `${t.id}: actionable exactly when work or a question`);
   }
   assert.deepEqual(l.registry.having('owned').sort(), [...l.registry.types.values()].filter((t) => t.columns.owner).map((t) => t.id).sort());
 });

@@ -63,7 +63,7 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on e.id = s.value #>> '{}' where s.key = 'me'`);
       const limits = await limitOf(l.workspace);
       // Whether anything has been put here yet beyond who is in it and how the app is set up.
-      const started = (await l.db.query(`select 1 from entity where kind <> 'actor' and ${notKernel(l.registry)} and archived_at is null limit 1`)).rows.length > 0;
+      const started = (await l.db.query(`select 1 from entity where type <> all($1::text[]) and ${notKernel(l.registry)} and archived_at is null limit 1`, [l.registry.family('actor')])).rows.length > 0;
       return { ...(await settings(l)), started, owner: rows[0] ?? null, member_limit: limits ? { ...limits, ...(limits.until && { days_left: daysLeft(limits.until) }) } : null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
     },
   },

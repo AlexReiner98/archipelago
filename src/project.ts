@@ -7,23 +7,24 @@ import type { Fact } from './log.ts';
 
 type Row = Record<string, any>;
 
-/** What the projector asks of the types: whether a status is open, and a type's kind. The registry answers; so does a backup's type table, and the page's schema. */
-export interface Kinds {
+/** What the projector asks of the types: whether a status is open, and the starter type a type comes from. The registry answers; so does a backup's type table, and the page's schema. */
+export interface TypesRead {
   isOpen(type: string, status: string): boolean;
-  type(id: string): { kind?: string | null } | undefined;
+  /** The starter type it comes from: the root of its lineage, which the item's kind column holds. */
+  starterOf(type: string): string | null;
   /** The link types a closure follows from these roots: part_of and those a pack makes of it. */
   relationFamily(...roots: string[]): string[];
 }
 
 /** The types as a list of definitions (a backup's type_def rows, or the schema's types) answering what the projector asks. */
-export function kindsOf(defs: { id: string; def: { kind?: string | null; statuses?: { open?: string[] } } }[]): Kinds {
+export function typesOf(defs: { id: string; def: { lineage?: string[]; statuses?: { open?: string[] } } }[]): TypesRead {
   const by = new Map(defs.map((d) => [d.id, d.def]));
-  return { isOpen: (type, status) => by.get(type)?.statuses?.open?.includes(status) ?? true, type: (id) => by.get(id), relationFamily: (...roots) => roots };
+  return { isOpen: (type, status) => by.get(type)?.statuses?.open?.includes(status) ?? true, starterOf: (id) => by.get(id)?.lineage?.at(-1) ?? null, relationFamily: (...roots) => roots };
 }
 
 /**
  * An item's columns and the field each is in the log. Kernel defaults are not asserted: the value a field has unsaid.
- * Its kind is not one: it is read from its type, as whether it is open is, and a field named kind is a pack's own.
+ * Its kind column is not one: it is its type's starter, as whether it is open is read from its type, and a field named kind is a pack's own.
  */
 export const ITEM_COLUMNS: [column: string, field: string, unsaid: unknown][] = [
   ['type', 'type', undefined],
@@ -81,7 +82,7 @@ export type ItemStep =
   | { update: Row; props: Row; unset: string[]; archived?: boolean; is_open: boolean; mentions: boolean };
 
 /** One run of facts on an item, folded into the columns and fields it sets. `was`: its type and status, if it is held. */
-export function itemStep(reg: Kinds, at: string, id: string, run: Fact[], was?: { type: string; status: string }): ItemStep {
+export function itemStep(reg: TypesRead, at: string, id: string, run: Fact[], was?: { type: string; status: string }): ItemStep {
   // A type's definition, another record, or a fact on what is no longer here (an item from before the log, forgotten): not an item.
   if (!was && !(['type', 'title'] as const).every((field) => run.some((f) => f[0] === '+' && f[2] === field))) return { skip: true };
   if (run.some((f) => f[0] === '+' && f[2] === 'forgotten')) return { forget: true };
@@ -99,8 +100,8 @@ export function itemStep(reg: Kinds, at: string, id: string, run: Fact[], was?: 
   }
   const type = (set.type ?? was?.type) as string;
   const is_open = reg.isOpen(type, (set.status ?? was?.status) as string);
-  // What kind it is comes with its type, as whether it is open does with its status.
-  if (set.type !== undefined) set.kind = reg.type(type)?.kind ?? null;
+  // Its kind column comes with its type (the starter it comes from), as whether it is open does with its status.
+  if (set.type !== undefined) set.kind = reg.starterOf(type);
   if (!was) {
     const row: Row = { id, ...Object.fromEntries(ITEM_COLUMNS.map(([column, , unsaid]) => [column, unsaid ?? null])), kind: null, ...set };
     return { insert: { ...row, is_open, props, created_at: at, updated_at: at, archived_at: archived ? at : null } };
@@ -161,7 +162,7 @@ export interface Moved {
  * Facts said at a moment, projected onto rows held in memory, as src/replay.ts projects them into its tables: the
  * same steps, applied to a Map instead of a table. moved: a pack moved a type or a kind, and the items' time stays.
  */
-export function project(held: Held, reg: Kinds, at: string, facts: Fact[], moved = false, out: Moved = { items: new Set(), links: new Set(), gone: new Set() }): Moved {
+export function project(held: Held, reg: TypesRead, at: string, facts: Fact[], moved = false, out: Moved = { items: new Set(), links: new Set(), gone: new Set() }): Moved {
   for (const run of runs(facts)) {
     const id = run[0][1];
     if (isLink(id)) {

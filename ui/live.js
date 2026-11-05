@@ -3,7 +3,7 @@ import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
 import { lookMode } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
 import { front, landsIn, poppedTab } from './tabs.js';
-import { relations, types } from './words.js';
+import { relations, starterOf, types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
 
@@ -87,7 +87,7 @@ const canvasViews = () => document.querySelectorAll('#canvas > .pane > .pane-can
 /** What the projector asks of the types, read from the schema the page loaded; and which fields a lens sends. */
 export const kinds = {
   isOpen: (type, status) => types.get(type)?.statuses?.open?.includes(status) ?? true,
-  type: (id) => types.get(id),
+  starterOf: (id) => (types.has(id) ? starterOf(id) : null),
   relationFamily: (...roots) => roots,
   shown: (type, field) => Boolean(types.get(type)?.fields?.[field]?.shown),
   phase: (type, status) => types.get(type)?.statuses?.phases?.[status],

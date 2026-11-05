@@ -142,8 +142,8 @@ export class Archipelago {
     await append(tx, this.workspace, 'facts', { id: newId('c'), actor: { id: 'system' }, authority: null, rule: { outcome: 'apply', spared: [] }, reason, source: null, action, undoes: null, keys: [] }, facts);
   }
 
-  /** Each item's kind in its row, from the type table, where the row lacks it or has another (src/head.ts): when a workspace opens. */
-  fillKinds = async () => (await this.db.query(`update entity e set kind = t.def->>'kind' from type_def t where t.id = e.type and e.kind is distinct from t.def->>'kind' returning e.id`)).rows.length;
+  /** Each item's kind column, its type's starter (the last of its lineage in the type table), where the row lacks it or has another (src/head.ts): when a workspace opens. */
+  fillKinds = async () => (await this.db.query(`update entity e set kind = t.def->'lineage'->>-1 from type_def t where t.id = e.type and t.def ? 'lineage' and e.kind is distinct from t.def->'lineage'->>-1 returning e.id`)).rows.length;
 
   /**
    * Move every item of a type (or link of a relation) no pack defines any more to the one that took it over

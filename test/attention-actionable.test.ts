@@ -60,16 +60,16 @@ async function reasonsFor(l: Archipelago, type: string) {
 
 test('a kindless actionable type appears in attention as work does', async () => {
   const l = await map();
-  assert.equal(l.registry.type('chore')!.kind, undefined, 'chore is of no kind');
+  assert.equal(l.registry.type('chore')!.starter, 'chore', 'chore extends nothing: it is its own starter type');
   const task = await reasonsFor(l, 'task');
   const chore = await reasonsFor(l, 'chore');
   assert.deepEqual(chore, task);
   assert.deepEqual(chore, { paint: ['blocked'], buy: ['holding_up', 'ready'], old: ['ready', 'stale'], est: ['ready'] });
 });
 
-test('every type of a kind is plannable exactly when it is work, so the live map reads the same', async () => {
+test('every type from core’s starters is plannable exactly when it is work, so the live map reads the same', async () => {
   const l = await map();
-  for (const t of l.registry.types.values()) if (t.kind) assert.equal(Boolean(t.capabilities.plannable), t.kind === 'work', t.id);
+  for (const t of l.registry.types.values()) if (l.registry.type(t.starter)?.pack === 'core') assert.equal(Boolean(t.capabilities.plannable), t.starter === 'work', t.id);
 });
 
 test('a kindless type that is not actionable is not counted', async () => {

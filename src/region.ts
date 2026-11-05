@@ -9,7 +9,7 @@ import { notKernel } from './head.ts';
 
 export interface Row {
   id: string;
-  type: string; kind: string | null;
+  type: string;
   title: string;
   status: string;
   is_open: boolean;
@@ -62,7 +62,7 @@ export interface Around {
 /** One link a region is tied by beyond what it holds: the sessions at work on what is in it, now or before. */
 const WORKS_ON = 'works_on';
 
-const COLUMNS = (props: string) => `id, type, kind, title, status, is_open, owner, ${props}, created_at, updated_at`;
+const COLUMNS = (props: string) => `id, type, title, status, is_open, owner, ${props}, created_at, updated_at`;
 /** What a lens reads of each link among some items (as r). */
 const LINKS_AMONG = `r.id, r.type, r.from_id, r.to_id, r.props ->> 'says' as says, r.props ->> 'state' as state, r.props ->> 'for' as for`;
 

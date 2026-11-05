@@ -2,13 +2,12 @@
   "id": "core",
   "version": "0.1.0",
   "title": "Core",
-  "description": "The kinds every type extends (the seven of the work, and system), the root links every link type extends, and the system tier.",
+  "description": "The starter types (the seven of the work, and system), the root links every link type extends, and the system tier.",
   "types": [
     {
       "id": "actor",
       "title": "Actor",
-      "kind": true,
-      "description": "Holds authority, owns work and is waited on: a person, a company, an agent. One of the seven kinds of the work; every type extends one of them or the system kind.",
+      "description": "Holds authority, owns work and is waited on: a person, a company, an agent. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["active"], "closed": ["inactive"] },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -21,8 +20,7 @@
       "capabilities": { "owned": true },
       "altitude": "workspace",
       "title": "Aim",
-      "kind": true,
-      "description": "Why work exists: what serves points at, such as a goal or an area. One of the seven kinds of the work; every type extends one of them or the system kind.",
+      "description": "Why work exists: what serves points at, such as a goal or an area. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["active"], "closed": ["achieved", "retired"], "phases": { "achieved": "finished" } },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -36,8 +34,7 @@
       "capabilities": { "owned": true, "actionable": true, "plannable": true },
       "altitude": "step",
       "title": "Work",
-      "kind": true,
-      "description": "Open until finished; it blocks and is blocked: a task, a project, an issue. One of the seven kinds of the work; every type extends one of them or the system kind.",
+      "description": "Open until finished; it blocks and is blocked: a task, a project, an issue. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["todo", "doing"], "closed": ["done", "dropped"] },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -53,8 +50,7 @@
       "capabilities": { "owned": true, "actionable": true },
       "altitude": "step",
       "title": "Question",
-      "kind": true,
-      "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. One of the seven kinds of the work; every type extends one of them or the system kind.",
+      "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["open"], "closed": ["settled", "dropped"], "phases": { "open": "not_started", "settled": "finished" } },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -68,8 +64,7 @@
       "capabilities": { "owned": true },
       "altitude": "step",
       "title": "Record",
-      "kind": true,
-      "description": "Explains, and is replaced by a newer one: a note, a result, a procedure, a document. One of the seven kinds of the work; every type extends one of them or the system kind.",
+      "description": "Explains, and is replaced by a newer one: a note, a result, a procedure, a document. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["current"], "closed": ["superseded"] },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -83,8 +78,7 @@
       "capabilities": { "owned": true },
       "altitude": "step",
       "title": "Occurrence",
-      "kind": true,
-      "description": "Happens at a time, and can be a gate: an event, a meeting, a release. One of the seven kinds of the work; every type extends one of them or the system kind.",
+      "description": "Happens at a time, and can be a gate: an event, a meeting, a release. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["upcoming"], "closed": ["happened", "cancelled"], "phases": { "upcoming": "not_started", "happened": "finished" } },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -96,8 +90,7 @@
     {
       "id": "place",
       "title": "Place",
-      "kind": true,
-      "description": "Exists somewhere, physical or not; work lives in it or uses it: a resource, a repository, a file. One of the seven kinds of the work; every type extends one of them or the system kind.",
+      "description": "Exists somewhere, physical or not; work lives in it or uses it: a resource, a repository, a file. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["available"], "closed": ["retired"] },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -108,7 +101,6 @@
     {
       "id": "system",
       "title": "System",
-      "kind": true,
       "description": "The app's own configuration, kept as items: views, styles, screens, runs, sources, notifications, automations. Views of the work leave it out unless asked: its types carry the kernel flag. Only the kernel's packs declare types of it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "capabilities": { "kernel": true },

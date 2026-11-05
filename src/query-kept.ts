@@ -37,8 +37,8 @@ export const HUB_AT = 12;
 export async function hubs(l: Archipelago, within?: string) {
   if (!within) throw new Error('hubs reads within an item or a place (within): across the whole map it would read every item.');
   const scope = [...(await scopeOf(l, within, true))];
-  const { rows: entities } = await l.db.query<{ id: string; type: string; title: string; kind: string | null; is_open: boolean; props: Record<string, unknown> }>(
-    `select id, type, title, kind, is_open, jsonb_build_object('hub_at', props -> 'hub_at') as props from entity where id = any($1::text[]) and archived_at is null`,
+  const { rows: entities } = await l.db.query<{ id: string; type: string; title: string; is_open: boolean; props: Record<string, unknown> }>(
+    `select id, type, title, is_open, jsonb_build_object('hub_at', props -> 'hub_at') as props from entity where id = any($1::text[]) and archived_at is null`,
     [scope],
   );
   const { rows: relations } = await l.db.query<{ type: string; from_id: string; to_id: string }>(

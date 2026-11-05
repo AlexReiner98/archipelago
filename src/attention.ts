@@ -20,7 +20,6 @@ export type Reason = (typeof REASONS)[number];
 export const STALE_DAYS = 14;
 
 interface Row {
-  kind: string | null;
   id: string;
   type: string;
   title: string;
@@ -52,7 +51,7 @@ export interface Input {
  * links among them. Attention then reads no items or links of its own: what it answers is the state of what was read.
  */
 export interface Read {
-  entities: { id: string; type: string; kind: string | null; title: string; status: string; owner: string | null; is_open: boolean; props: Record<string, unknown>; updated_at: Date }[];
+  entities: { id: string; type: string; title: string; status: string; owner: string | null; is_open: boolean; props: Record<string, unknown>; updated_at: Date }[];
   /** Those that say what waits on what as the map keeps them, the rest by id. */
   relations: { type: string; from_id: string; to_id: string; for: string | null }[];
   /** What blocks what, when the lens has read it already. */
@@ -82,7 +81,7 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   const staleDays = input.stale_days ?? STALE_DAYS;
 
   const rows: Row[] = read
-    ? read.entities.filter((e) => e.is_open).map(({ id, type, kind, title, status, owner, is_open, props, updated_at }) => ({ id, type, kind, title, status, owner, is_open, due: typeof props.due === 'string' ? props.due : props.due == null ? null : String(props.due), updated_at }))
+    ? read.entities.filter((e) => e.is_open).map(({ id, type, title, status, owner, is_open, props, updated_at }) => ({ id, type, title, status, owner, is_open, due: typeof props.due === 'string' ? props.due : props.due == null ? null : String(props.due), updated_at }))
     : await rowsFor(l, me, me !== null && me === owner, scope, wanted, weighed.flatMap((d) => l.registry.family(d.of)));
   const reg = l.registry;
   // Only what is work or a question to someone: not people, places, records of the past, or the system's own.
@@ -170,8 +169,8 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   // What was settled is closed: whether it is within is asked of the whole scope, for those few.
   const settledWithin = confirm && input.within ? await scopeOf(l, input.within, false, confirm.questions.map((q) => q.id)) : null;
   for (const q of confirm?.questions ?? []) {
-    const row = { id: q.id, type: '', kind: null, title: q.title, status: '', owner: null, is_open: false, due: null, updated_at: q.settled } as Row;
-    const { rows: [e] } = await l.db.query<Row>(`select id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at from entity where id = $1`, [q.id]);
+    const row = { id: q.id, type: '', title: q.title, status: '', owner: null, is_open: false, due: null, updated_at: q.settled } as Row;
+    const { rows: [e] } = await l.db.query<Row>(`select id, type, title, status, owner, is_open, props->>'due' as due, updated_at from entity where id = $1`, [q.id]);
     if (!settledWithin || settledWithin.has(q.id)) add(e ?? row, 'to_confirm', { answer: q.answer, on: q.on, seq: q.seq, settled: q.settled, by: q.by, ...(q.basis && { basis: q.basis }) });
   }
 
@@ -184,7 +183,7 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   const newer = (a: { row: Row }, b: { row: Row }) => +new Date(b.row.updated_at) - +new Date(a.row.updated_at);
   const items = [...found.values()]
     .sort((a, b) => (input.order === 'latest' && newer(a, b)) || rank(a.reasons) - rank(b.reasons) || place(a.row.id) - place(b.row.id) || String(a.row.due ?? '9').localeCompare(String(b.row.due ?? '9')) || +new Date(b.row.updated_at) - +new Date(a.row.updated_at))
-    .map(({ row, reasons }) => ({ id: row.id, type: row.type, kind: row.kind ?? null, title: row.title, status: row.status, owner: row.owner, open: row.is_open, due: row.due, changed: row.updated_at, reasons }));
+    .map(({ row, reasons }) => ({ id: row.id, type: row.type, title: row.title, status: row.status, owner: row.owner, open: row.is_open, due: row.due, changed: row.updated_at, reasons }));
   const counts = Object.fromEntries([...wanted].map((r) => [r, items.filter((i) => i.reasons.some((x) => x.why === r)).length]));
   const limit = input.limit ?? 100;
   // What each sits in at the top, for those sent: the outermost thing it is part of, for a page that groups by it.
@@ -209,7 +208,7 @@ const EVERYONE = ['to_confirm'];
  * on them. For everyone across the map, only reasons the log answers: weighing every open item would read them all.
  */
 async function rowsFor(l: Archipelago, me: string | null, isOwner: boolean, scope: Set<string> | null, wanted: Set<string>, declared: string[]): Promise<Row[]> {
-  const cols = `id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at`;
+  const cols = `id, type, title, status, owner, is_open, props->>'due' as due, updated_at`;
   const notSystem = notKernel(l.registry);
   if (scope) return (await l.db.query<Row>(`select ${cols} from entity where id = any($1::text[]) and is_open and archived_at is null and ${notSystem}`, [[...scope]])).rows;
   if (me !== null) {

@@ -17,7 +17,7 @@ function chosen(def: ViewDef, param: string, value: string): Record<string, unkn
 /** Each kind of link a preset names, with every kind of link that extends it. */
 const family = (l: Archipelago, over: unknown) => (Array.isArray(over) ? l.registry.relationFamily(...over.map(String)) : over);
 
-type Node = { id: string; type: string; root: string; kind: string | null; title: string; status: string; open: boolean; blocked: boolean };
+type Node = { id: string; type: string; root: string; starter: string; title: string; status: string; open: boolean; blocked: boolean };
 
 /** The items a graph is drawn from (those `keep` keeps, a condition on them), with whether each is blocked. */
 async function nodesOf(l: Archipelago, ids: string[], keep = ''): Promise<Node[]> {
@@ -87,7 +87,7 @@ export async function graph(l: Archipelago, def: ViewDef, params: Record<string,
     truncated: order.length > GRAPH_LIMIT ? { shown: GRAPH_LIMIT, of: order.length } : undefined,
     nodes: nodes.map((i) => {
       const t = tokens.of(i.id);
-      return { id: i.id, type: i.type, root: i.root, kind: i.kind, title: i.title, status: i.status, open: i.open, created: t?.created, blocked: i.blocked, ...(t?.work && { work: true, tokens: t.tokens, estimated: t.estimated, order: t.order }) };
+      return { id: i.id, type: i.type, root: i.root, starter: i.starter, title: i.title, status: i.status, open: i.open, created: t?.created, blocked: i.blocked, ...(t?.work && { work: true, tokens: t.tokens, estimated: t.estimated, order: t.order }) };
     }),
     edges: links.filter((r) => kept.has(r.from_id) && kept.has(r.to_id)).map((r) => ({ id: r.id, type: r.type, from: r.from_id, to: r.to_id })),
   };

@@ -1,11 +1,12 @@
 // An item is a small head and its fields (Rule 3 of the model). The head is what the store needs to hold any item:
 // id, kind, type, title, body, visibility, and when it was made, changed and archived. Everything else is a field its
-// kind or type declares, checked on write.
+// type declares, checked on write. The kind column holds the starter type the type comes from (the root of its
+// lineage), written with the item from its type, and read through the type, never on its own (test/structure.test.ts).
 //
 // Four of those fields are kept in columns of their own, not in props: status (with is_open, which the store keeps
 // beside it), owner, confidence and source. The store indexes them, row-level security and the foreign keys read
-// them, and the app before this one reads them during a switch (src/migrate.ts). They are fields all the same: a kind
-// declares them in the core pack ("column": true), a flavour inherits them, and a write that sets one its type does
+// them, and the app before this one reads them during a switch (src/migrate.ts). They are fields all the same: a starter
+// type declares them (core's in the core pack ("column": true), or is given them, ownHead), a flavour inherits them, and a write that sets one its type does
 // not declare is refused like any other undeclared field.
 
 import type { FieldDef, ResolvedType, TypeDef } from './packs.ts';
@@ -22,10 +23,10 @@ export const notKernel = (reg: { types: Map<string, ResolvedType> }, column = 't
 /** Whether an item of this type is the kernel's own. */
 export const isKernel = (reg: { types: Map<string, ResolvedType> }, type: string) => reg.types.get(type)?.system === true;
 
-/** The head: what every item has, whatever its kind. */
+/** The head: what every item has, whatever its type. */
 export const HEAD = ['id', 'kind', 'type', 'title', 'body', 'visibility', 'created_at', 'updated_at', 'archived_at'] as const;
 
-/** The fields a kind may keep in a column of the item's row, each with its column. */
+/** The fields a starter type may keep in a column of the item's row, each with its column. */
 export const COLUMNS = { status: 'status', owner: 'owner', confidence: 'confidence', source: 'source_id' } as const;
 export type ColumnField = keyof typeof COLUMNS;
 const columnNames = Object.keys(COLUMNS) as ColumnField[];
@@ -51,12 +52,13 @@ export function headOf(merged: Record<string, FieldDef>, statuses: { open: strin
 }
 
 /**
- * The column fields a type keeps in its row that its kind does not give it. A type of no kind has status, confidence
- * and source for its statuses (lifecycle); any type has an owner when it is owned, and only then.
+ * The column fields a type keeps in its row that nothing it extends or declares gives it. A starter type that declares
+ * no status of its own has status, confidence and source for its statuses (lifecycle); any type has an owner when it
+ * is owned, and only then.
  */
-export function ownHead(kinded: boolean, owned: boolean): Record<string, FieldDef> {
+export function ownHead(declared: boolean, owned: boolean): Record<string, FieldDef> {
   return {
-    ...(!kinded && {
+    ...(!declared && {
       status: { type: 'enum', column: true, description: 'Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item\'s row.' },
       confidence: { type: 'number', column: true, description: '0 to 1: how sure the author is that this is true. Kept in the item\'s row.' },
       source: { type: 'string', column: true, system: true, description: 'Where its facts came from: the source of the change that made it, or of its op. Kept in the item\'s row.' },
@@ -65,29 +67,28 @@ export function ownHead(kinded: boolean, owned: boolean): Record<string, FieldDe
   };
 }
 
-/** What is wrong with the fields a type declares: a column only on a kind and of the four, large only on a type with the kernel flag. */
+/** What is wrong with the fields a type declares: a column only on a starter type and of the four, large only on a type with the kernel flag. */
 export function checkFieldDecls(type: ResolvedType, def: TypeDef | undefined, extra: Record<string, FieldDef> = {}): string[] {
   const problems: string[] = [];
   for (const [name, field] of Object.entries({ ...def?.fields, ...extra })) {
     const isColumn = (columnNames as string[]).includes(name);
     if (field.column && !isColumn) problems.push(`field "${name}" cannot be kept in a column: only ${columnNames.join(', ')} are`);
-    else if (isColumn && !(def?.kind && field.column && !extra[name])) problems.push(`field "${name}" is one a kind declares, kept in the item's row`);
+    else if (isColumn && !(def && !def.extends && field.column && !extra[name])) problems.push(`field "${name}" is one a starter type declares, kept in the item's row`);
     if (field.large && !type.system) problems.push(`field "${name}" is declared large, which only a type with the kernel flag may be`);
   }
-  if (def?.kind && !type.columns.status) problems.push('a kind declares the status field ("column": true)');
-  if (def?.kind && def.fields?.owner && !type.capabilities.owned) problems.push('a kind with an owner is owned (capability "owned")');
+  if (def && !def.extends && def.fields?.owner && !type.capabilities.owned) problems.push('a starter type with an owner is owned (capability "owned")');
   return problems;
 }
 
-/** The column fields an op sets that its type does not declare. A type kept from before the kinds declared them has them all. */
+/** The column fields an op sets that its type does not declare. A type kept from before the starter types declared them has them all. */
 export function undeclaredColumns(type: ResolvedType | undefined, op: Partial<Record<ColumnField, unknown>>): string[] {
   if (!type?.columns) return [];
-  return columnNames.filter((name) => op[name] !== undefined && op[name] !== null && !type.columns[name]).map((name) => `${type.id} has no field "${name}" (its kind, ${type.kind}, declares none)`);
+  return columnNames.filter((name) => op[name] !== undefined && op[name] !== null && !type.columns[name]).map((name) => `${type.id} has no field "${name}" (its starter, ${type.starter}, declares none)`);
 }
 
 /**
- * Step 15 (src/migrate.ts): the kind as a column of the item's row. The app writes it with the item; the database
- * fills it from the type table for a row written without one (the app before this one, a backup restored) or whose
+ * Step 15 (src/migrate.ts): the kind as a column of the item's row: its type's starter. The app writes it with the item;
+ * the database fills it from the type table for a row written without one (the app before this one, a backup restored) or whose
  * type changes; rows made before the column are filled when the workspace opens (fillKinds, in src/pelago.ts).
  */
 export const ITEM_KIND = `

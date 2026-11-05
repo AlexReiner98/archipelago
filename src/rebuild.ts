@@ -7,7 +7,7 @@
 import { setImmediate } from 'node:timers/promises';
 import type { Db, Q } from './db.ts';
 import { headOf, stored, type Entry } from './log.ts';
-import { beforeTheLog, inOrder, type Kinds, loadRows, projectEntry, projectedRows, PROJECTED, shadowTables, swapIn, SHADOW, type Rows } from './replay.ts';
+import { beforeTheLog, inOrder, type TypesRead, loadRows, projectEntry, projectedRows, PROJECTED, shadowTables, swapIn, SHADOW, type Rows } from './replay.ts';
 import { projectsApart, regatherAll } from './closure.ts';
 import { mentionedAll } from './mentions.ts';
 import { openAll } from './seal.ts';
@@ -50,7 +50,7 @@ async function next(q: Q, at: Positions, limit: number): Promise<Entry[]> {
 }
 
 /** Project entries into the shadow (or temporary tables), in one transaction that names it first. */
-async function project(tx: Q, reg: Kinds, entries: Entry[], at: Positions): Promise<void> {
+async function project(tx: Q, reg: TypesRead, entries: Entry[], at: Positions): Promise<void> {
   projectsApart(tx);
   for (const e of entries) {
     await projectEntry(tx, reg, e);
@@ -66,7 +66,7 @@ const behind = (at: Positions, head: Positions) => head.facts - at.facts + head.
  * Walk the log into the shadow from the newest valid snapshot (or the start), a chunk at a time, then finish under
  * both streams' locks: swap the result in (`swap`), or only keep a snapshot of it. The database must be unscoped.
  */
-export async function catchUp(db: Db, reg: Kinds, ws: string, swap: boolean, o: RebuildOptions = {}): Promise<RebuildReport> {
+export async function catchUp(db: Db, reg: TypesRead, ws: string, swap: boolean, o: RebuildOptions = {}): Promise<RebuildReport> {
   if (running.has(db)) throw new Error('A rebuild is already running on this workspace.');
   running.add(db);
   const t0 = performance.now();
@@ -136,17 +136,17 @@ async function dropShadow(tx: Q) {
 }
 
 /** Make every projection again from the log, beside the live ones, and swap it in when caught up. */
-export const rebuildProjections = (db: Db, reg: Kinds, ws: string, o?: RebuildOptions) => catchUp(db, reg, ws, true, o);
+export const rebuildProjections = (db: Db, reg: TypesRead, ws: string, o?: RebuildOptions) => catchUp(db, reg, ws, true, o);
 
 /** Keep a snapshot of the projections at the head of the log, made from the newest one before it and what followed. */
-export const snapshotNow = (db: Db, reg: Kinds, ws: string, o?: RebuildOptions) => catchUp(db, reg, ws, false, o);
+export const snapshotNow = (db: Db, reg: TypesRead, ws: string, o?: RebuildOptions) => catchUp(db, reg, ws, false, o);
 
 /**
  * The projections as they stood at a fact position: the nearest snapshot at or before it, and the entries of both
  * streams up to that moment, projected into tables that live for one transaction and are thrown away. `reader` says
  * who asks: only the items and links their database shows them now are given back, as the log's facts are read.
  */
-export async function asOf(db: Db, reg: Kinds, ws: string, pos: number, reader: Q = db): Promise<{ at: Positions; rows: Rows }> {
+export async function asOf(db: Db, reg: TypesRead, ws: string, pos: number, reader: Q = db): Promise<{ at: Positions; rows: Rows }> {
   const start = await newestValid(db, ws, pos);
   const out = await db.transaction(async (tx) => {
     for (const t of PROJECTED) await tx.query(`create temp table ${t} (like public.${t} including defaults including indexes) on commit drop`);
