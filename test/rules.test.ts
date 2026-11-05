@@ -22,7 +22,7 @@ const SHOP: PackFile = {
   rules: [
     { id: 'big', when: { actor: 'agent', op: ['create', 'update'], type: 'shop.order', compare: 'total > 500' }, then: 'hold' },
     { id: 'paid', when: { op: 'update', type: 'shop.order', status: { to: 'closed' } }, then: { require: ['paid_on'] } },
-    { id: 'void', when: { actor: 'agent', kind: 'work', status: { to: 'void' } }, then: 'refuse', say: 'Only a person voids "{title}".' },
+    { id: 'void', when: { actor: 'agent', type: 'work', status: { to: 'void' } }, then: 'refuse', say: 'Only a person voids "{title}".' },
     { unique: ['number'], type: 'shop.order' },
   ],
 };
@@ -46,7 +46,7 @@ test('a rule holds what crosses a value, for agents only', async () => {
   assert.equal((await change(l, human, [{ op: 'create', type: 'shop.order', title: 'Mixer', props: { total: 900 } }])).status, 'applied');
 });
 
-test('a rule requires fields, refuses by kind, and keeps values unique within a type', async () => {
+test('a rule requires fields, refuses by type, and keeps values unique within a type', async () => {
   const l = await map();
   const made = (await change(l, human, [{ op: 'create', ref: 'o', type: 'shop.order', title: 'Flour', props: { number: 'A-1' } }])) as { created: Record<string, string> };
   const o = made.created.o;
@@ -67,6 +67,8 @@ test('a rule that names what is not there stops its pack from loading', async ()
   await assert.rejects(map([{ ...SHOP, rules: [{ when: { type: 'shop.nothing' }, then: 'hold' }] }]), /no type "shop.nothing"/);
   await assert.rejects(map([{ ...SHOP, rules: [{ when: { compare: 'total is big' }, then: 'hold' }] }]), /compare reads like/);
   await assert.rejects(map([{ ...SHOP, rules: [{ unique: ['colour'], type: 'shop.order' }] }]), /has no field "colour"/);
+  // A kind is no longer something a rule reads: it says a type (flavours included) or a capability.
+  await assert.rejects(map([{ ...SHOP, rules: [{ when: { kind: 'work' } as never, then: 'hold' }] }]), /a type or a capability, not a kind/);
 });
 
 test('a held change names the rule that held it, in its answer and on the proposal', async () => {

@@ -72,7 +72,7 @@ test('a kindless item writes, closes, gets an owner only when owned, and rebuild
 });
 
 test('owned and actionable are capabilities: true or left out', () => {
-  const bad = { ...LEDGER, types: [{ ...LEDGER.types![1], capabilities: { owned: false } }] } as PackFile;
+  const bad = { ...LEDGER, types: [{ ...LEDGER.types![1], capabilities: { owned: false } }] } as unknown as PackFile;
   assert.throws(() => new Registry(packsWith(bad)), /owned is true, or left out/);
   const odd = { ...LEDGER, types: [{ ...LEDGER.types![1], capabilities: { actionable: 'yes' } }] } as unknown as PackFile;
   assert.throws(() => new Registry(packsWith(odd)), /actionable is true, or left out/);

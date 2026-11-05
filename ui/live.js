@@ -91,6 +91,7 @@ export const kinds = {
   relationFamily: (...roots) => roots,
   shown: (type, field) => Boolean(types.get(type)?.fields?.[field]?.shown),
   phase: (type, status) => types.get(type)?.statuses?.phases?.[status],
+  lineage: (type) => { const out = []; for (let t = types.get(type)?.flavour_of; t && !out.includes(t); t = types.get(t)?.flavour_of) out.push(t); return out; },
   flavour: (link) => { const out = []; for (let r = relations.get(link); r?.extends && !out.includes(r.extends); r = relations.get(r.extends)) out.push(r.extends); return out; },
 };
 

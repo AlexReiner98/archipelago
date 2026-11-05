@@ -1,6 +1,6 @@
 // A lens answer drawn on its time axis. Two layouts of the same answer: a calendar (a column for each day, hours
 // running down, each item a block where it falls) and bars (each lane a row, each item a bar across the days it
-// covers: a Gantt chart). Colour is what a block counts toward (the part of the item it is in), else its kind; a name
+// covers: a Gantt chart). Colour is what a block counts toward (the part of the item it is in), else its type's; a name
 // too long for its block is cut, and is whole in its tooltip. A block opens its item's page. It is drawn as wide as
 // the page gives it (`width`), and laid out by the page: the frame does not pan or zoom it. Its look is ./look.js. A
 // lens with steps tells the plan as it comes together (./story.js), the conversation beside it.
@@ -12,6 +12,7 @@ import { m } from './marks.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 
+/** Core's starter types a block takes its colour from, by the one its type is or is a flavour of; any other is the system's. */
 const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place'];
 const HEX = /^#[0-9a-f]{3,8}$/i;
 /** The range the reader has up, for the view drawn last: kept when the page draws it again. */
@@ -28,7 +29,7 @@ const blocks = (answer) =>
   answer.items.flatMap((item) =>
     (item.time ?? []).map((span) => ({ item, start: Date.parse(span.start), end: Math.max(Date.parse(span.end), Date.parse(span.start)), by: span.by, on: span.on_title, stream: span.stream !== undefined ? span.stream : item.stream })),
   );
-const group = (item) => `t-block group-${KINDS.includes(item.kind) ? item.kind : 'system'}${item.open ? '' : ' closed'}`;
+const group = (item) => `t-block group-${[item.type, ...(Array.isArray(item.is) ? item.is : [])].find((t) => KINDS.includes(t)) ?? 'system'}${item.open ? '' : ' closed'}`;
 /** What a block is called: the work a session was on in that stretch, else the item itself. */
 const nameOf = (b) => b.on ?? b.item.title;
 const said = (b) => `${nameOf(b)}${b.on ? `\n${b.item.title}` : ''}\n${b.end - b.start >= DAY ? fmtDay(b.start) : `${fmtDay(b.start)}, ${fmtTime(b.start)}`}${b.end > b.start ? ` to ${b.end - b.start >= DAY ? fmtDay(b.end - 1) : fmtTime(b.end)}` : ''}${b.by === 'bound' ? ' (due)' : ''}`;
@@ -171,7 +172,7 @@ function calendar(answer, style, c) {
     const y = head + (hr - h0) * hourPx;
     marks.push(m('line', { class: 't-rule', x1: gutter, x2: width, y1: y, y2: y }), hr < h1 && m('text', { class: 't-hour', x: 2, y: y + 11 }, `${String(hr).padStart(2, '0')}:00`));
   }
-  // What each block counts toward, as its colour (Other muted); none, the kind's colour.
+  // What each block counts toward, as its colour (Other muted); none, its type's colour.
   const streamTitle = new Map(streams.map((st) => [st.key, st.title]));
   const place = (b, x, y, w, hgt) => {
     const title = [said(b), b.stream && streamTitle.get(b.stream), lanes.length > 1 && lanes[laneOf(b)].title].filter(Boolean).join('\n');

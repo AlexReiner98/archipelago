@@ -94,7 +94,7 @@ test('solve: boxes joined by a straight wire stand the larger gap apart', () => 
 
 test('solve: a graph that once went in a ring draws, every wire at right angles and on its boxes', () => {
   const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
-  const items = Array.from({ length: 37 }, (_, k) => ({ id: `n${k}`, title: `step ${k}`, kind: 'work', open: true }));
+  const items = Array.from({ length: 37 }, (_, k) => ({ id: `n${k}`, title: `step ${k}`, type: 'work', open: true }));
   const links = '26>18 19>13 30>2 16>0 31>9 29>28 22>21 30>1 25>14 19>0 28>25 35>3 7>1 25>17 30>18 21>3 35>33 11>6 26>5 35>5 15>2 34>8 8>0 25>19 20>11 33>26 25>4 33>26 31>12 26>11 23>19 9>0 32>12 17>13 9>0 19>3 26>5 12>1 23>3 28>10 27>2 32>3 23>17 19>15 18>15 21>18 12>11 26>21 28>20 8>4'.split(' ').map((l) => { const [from, to] = l.split(/[->]/); return { type: l.includes('>') ? 'depends_on' : 'calls', from: `n${from}`, to: `n${to}` }; });
   const g = layout({ items, links, measure: (t: string, px: number) => t.length * px * 0.55, sizes: house.sizes }), wires = [...g.chains, ...g.ties];
   assert.ok(wires.every((w: any) => w.points.every((p: number[], i: number) => !i || p[0] === w.points[i - 1][0] || p[1] === w.points[i - 1][1])));

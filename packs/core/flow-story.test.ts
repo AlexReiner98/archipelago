@@ -18,10 +18,10 @@ const measure = (t: string, px: number) => t.length * px * 0.55;
 const state = { blocked: false, waits_on: [], sessions: 0, needs_you: false };
 const ROOT = 'e_rootzzzz';
 const [ASK, PLAN, BUILD, OLD] = ['e_askzzzzz', 'e_planzzzz', 'e_buildzzz', 'e_oldzzzzz'];
-const item = (id: string, title: string) => ({ id, kind: 'work', type: 'task', inside: ROOT, title, place: 0, open: true, status: 'todo', state, within: { items: 0 }, fields: {} });
+const item = (id: string, title: string) => ({ id, type: 'task', is: ['work'], inside: ROOT, title, place: 0, open: true, status: 'todo', state, within: { items: 0 }, fields: {} });
 const answer = {
   lens: { from: ROOT },
-  items: [{ ...item(ROOT, 'A process'), kind: 'aim', inside: null }, item(ASK, 'Ask'), item(PLAN, 'Plan'), item(BUILD, 'Build'), item(OLD, 'Old way'), item('e_unnamedz', 'Never named')],
+  items: [{ ...item(ROOT, 'A process'), type: 'aim', is: [], inside: null }, item(ASK, 'Ask'), item(PLAN, 'Plan'), item(BUILD, 'Build'), item(OLD, 'Old way'), item('e_unnamedz', 'Never named')],
   links: [
     { kind: 'depends_on', from: PLAN, to: ASK, says: 'the ask' },
     { kind: 'depends_on', from: BUILD, to: PLAN },
@@ -167,7 +167,7 @@ test('a step back and a step on, held there, with the word a step flags on a thi
 // A step that adds a kept view reaches a milestone: the page draws that view beside the flow (a `view` mark), the
 // conversation on the left (the owner, 2 Nov 2026, e_dnewbxxh).
 const [FIRST, SECOND] = ['e_firstvwz', 'e_secondvw'];
-const view = (id: string, title: string) => ({ ...item(id, title), kind: 'system', type: 'lens' });
+const view = (id: string, title: string) => ({ ...item(id, title), type: 'lens', is: ['system'] });
 const withViews = {
   ...answer,
   items: [...answer.items, view(FIRST, 'Milestone: first'), view(SECOND, 'Milestone: second')],
@@ -212,7 +212,7 @@ test('a story that adds no kept view keeps its conversation on the right, alone'
 const RUN = 'e_runzzzzz';
 const working = {
   ...answer,
-  items: [...answer.items, { ...item(RUN, 'A session'), kind: 'system', type: 'run', status: 'finished', open: false }],
+  items: [...answer.items, { ...item(RUN, 'A session'), type: 'run', is: ['system'], status: 'finished', open: false }],
   links: [...answer.links, { kind: 'works_on', from: RUN, to: ASK }, { kind: 'works_on', from: RUN, to: PLAN }],
   steps: [
     { add: [ASK, PLAN, RUN], fields: { [ASK]: { status: 'doing', phase: 'under_way' }, [PLAN]: { status: 'todo', phase: 'not_started' } }, link: [[RUN, ASK]] },

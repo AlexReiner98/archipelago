@@ -9,6 +9,15 @@ const here = (...p: string[]) => join(import.meta.dirname, ...p);
 /** The house style, as the packs ship it, with the shape asked for. */
 export const house = (shape: string) => ({ ...JSON.parse(readFileSync(here('..', 'packs', 'core', 'pack.json'), 'utf8')).styles.find((s: { id: string }) => s.id === 'core.house').props, shape });
 
+/**
+ * An answer recorded before items carried their lineage, as the server sends it now (src/query-flat.ts): each item's
+ * `is` what its type is a flavour of, which for these ends in the kind they name. A drawing reads it, not the kind.
+ */
+export const withLineage = (answer: any) => ({
+  ...answer,
+  items: answer.items.map((i: any) => (i.is || !i.kind ? i : { ...i, type: i.type ?? i.kind, ...(i.type && i.type !== i.kind && { is: [i.kind] }) })),
+});
+
 const quiet = { blocked: false, waits_on: [] as string[], sessions: 0, needs_you: false };
 const within = { items: 0, work: 0, blocked: 0, waiting: 0, sessions: 0, tokens: { estimated: 0, used: 0 }, waits_on: {}, needs_you: 0, not_sent: 0 };
 const item = (id: string, title: string, inside: string | undefined, place: number, extra: Record<string, unknown> = {}) => ({ id, type: 'component', root: 'component', kind: 'place', title, status: 'up', open: true, inside, place, size: { work: 0, tokens: { estimated: 0, used: 0 } }, state: quiet, within, ...extra });
@@ -56,7 +65,7 @@ export interface DrawingCase {
 export function architectureCases(): DrawingCase[] {
   const fixture = (name: string) => JSON.parse(readFileSync(here('fixtures', 'layouts', `architecture-${name}.json`), 'utf8'));
   const style = house('architecture');
-  const answers = { hero: fixture('hero'), system: fixture('system'), variety: variety() };
+  const answers = { hero: withLineage(fixture('hero')), system: withLineage(fixture('system')), variety: withLineage(variety()) };
   const cases: DrawingCase[] = [];
   for (const [name, answer] of Object.entries(answers)) {
     cases.push({ name: `${name}, wide`, answer, style: { ...style, noLit: name !== 'variety', here: name === 'variety' ? 'e_db000000' : undefined }, width: 1100 });
@@ -102,7 +111,7 @@ function flowVariety() {
 export function flowCases(): DrawingCase[] {
   const fixture = (name: string) => JSON.parse(readFileSync(here('fixtures', 'layouts', `flow-${name}.json`), 'utf8'));
   const style = house('flow');
-  const answers = { onemap: fixture('onemap'), session: fixture('session'), inherits: fixture('inherits'), variety: flowVariety() };
+  const answers = { onemap: withLineage(fixture('onemap')), session: withLineage(fixture('session')), inherits: withLineage(fixture('inherits')), variety: withLineage(flowVariety()) };
   const cases: DrawingCase[] = [];
   for (const [name, answer] of Object.entries(answers)) {
     cases.push({ name: `${name}, wide`, answer, style: { ...style, noLit: name !== 'variety', here: name === 'variety' ? 'e_fwork100' : undefined }, width: 1100 });
@@ -126,7 +135,7 @@ export function flowCases(): DrawingCase[] {
 export function flatAnswer(answer: any) {
   const at = '2026-10-25T12:00:00.000Z';
   const items = answer.items.map((i: any, k: number) => ({
-    id: i.id, kind: i.kind, type: i.type, title: i.title,
+    id: i.id, kind: i.kind, type: i.type, ...(i.is && { is: i.is }), title: i.title,
     ...(k % 2 === 0 && { body: `${i.title} is one of the things this map holds.\n\nIts note goes on, in a section of its own that a tip does not show.` }),
     visibility: 'shared', status: i.status, open: i.open, owner: null, created_at: at, updated_at: at,
     ...(i.choices && { fields: { choices: i.choices } }),
@@ -216,10 +225,10 @@ export function timeCases(): DrawingCase[] {
   const style = house('time');
   const cases: DrawingCase[] = [];
   const answers: [string, unknown, Record<string, unknown>][] = [
-    ['launch', launch, { layout: 'bars' }],
-    ['week', timeVariety(), {}],
-    ['week bars', timeVariety(), { layout: 'bars' }],
-    ['week hours', timeVariety(), { hours: [7, 15] }],
+    ['launch', withLineage(launch), { layout: 'bars' }],
+    ['week', withLineage(timeVariety()), {}],
+    ['week bars', withLineage(timeVariety()), { layout: 'bars' }],
+    ['week hours', withLineage(timeVariety()), { hours: [7, 15] }],
   ];
   for (const [name, answer, own] of answers) {
     cases.push({ name: `${name}, wide`, answer: answer as Record<string, unknown>, style: { ...style, ...own, noLit: true }, width: 1100 });
