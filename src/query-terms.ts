@@ -2,7 +2,7 @@
 // items, written as words that read the same in the bar, the address and an agent's lens; the part it stands in says
 // what is done with that set: Find adds it, Only keeps what is in it, Not takes it away.
 //
-//   held (what changes held for me touch) · text <words> · type <t> (or the type alone) · kind <k> · id <item> · in <item> · related <item> · <link> <item> ·
+//   held (what changes held for me touch) · moved (what reads a finding that moved since, src/moved.ts) · text <words> · type <t> (or the type alone) · kind <k> · id <item> · in <item> · related <item> · <link> <item> ·
 //   island <island> (what lives on it, src/island-items.ts) ·
 //   <link>< <item> (what the item links to) · owner me|<person> · and Only's words (src/query-only.ts)
 //
@@ -13,6 +13,7 @@ import { readWord, type Narrowing, type Word } from './query-only.ts';
 import { searchIds } from './search.ts';
 import { OWNED_BY } from './owner-link.ts';
 import { heldIds } from './query-held.ts';
+import { movedIds } from './moved.ts';
 import { kernelTypes, SYSTEM } from './head.ts';
 import { ISLAND, onIslands } from './island-items.ts';
 
@@ -25,6 +26,7 @@ export type Term =
   | { sort: 'related'; end: string }
   | { sort: 'island'; end: string }
   | { sort: 'held' }
+  | { sort: 'moved' }
   | { sort: 'link'; link: string; end: string; back: boolean; owner?: boolean }
   | { sort: 'word'; word: Word; said: string };
 
@@ -37,6 +39,7 @@ export function readTerm(l: Archipelago, raw: unknown, part: string): Term {
   if (typeof raw !== 'string' || !raw.trim()) throw new Error(`filter.${part}: a term is words, not ${JSON.stringify(raw)}`);
   const s = raw.trim().replace(/\s+/g, ' ');
   if (/^held$/i.test(s)) return { sort: 'held' };
+  if (/^moved$/i.test(s)) return { sort: 'moved' };
   const kind = KIND.exec(s)?.[1];
   if (kind) return { sort: 'kind', kind };
   const [, head, rest] = SAID.exec(s) ?? [];
@@ -56,7 +59,7 @@ export function readTerm(l: Archipelago, raw: unknown, part: string): Term {
   const [, link, back, end] = LINK.exec(s) ?? [];
   if (link && l.registry.relations.has(l.registry.canonical(link))) return { sort: 'link', link, end, back: back === '<' };
   if (l.registry.types.has(l.registry.canonical(s))) return { sort: 'type', type: s };
-  throw new Error(`filter.${part}: "${s}" is no term: held, text <words>, a type, kind <k>, id <item>, in <item>, related <item>, island <island>, <link type> <item>, owner <person>, or one of Only's words (done, blocked, status <s>, no owner, over estimate, changed since|before <7d|date>, made since|before <7d|date>, by owner, by agent)`);
+  throw new Error(`filter.${part}: "${s}" is no term: held, moved, text <words>, a type, kind <k>, id <item>, in <item>, related <item>, island <island>, <link type> <item>, owner <person>, or one of Only's words (done, blocked, status <s>, no owner, over estimate, changed since|before <7d|date>, made since|before <7d|date>, by owner, by agent)`);
 }
 
 /** A term as words again, its end now the id it was found to be. */
@@ -69,6 +72,7 @@ export function sayTerm(t: Term): string {
   if (t.sort === 'related') return `related ${t.end}`;
   if (t.sort === 'island') return `island ${t.end}`;
   if (t.sort === 'held') return 'held';
+  if (t.sort === 'moved') return 'moved';
   if (t.sort === 'word') return t.said;
   return t.owner ? `owner ${t.end}` : `${t.link}${t.back ? '<' : ''} ${t.end}`;
 }
@@ -96,6 +100,7 @@ export async function setOf(l: Archipelago, t: Exclude<Term, { sort: 'word' }>, 
   if (t.sort === 'kind') return { cond: 'e.type = any($?::text[])', param: t.kind === SYSTEM ? kernelTypes(l.registry) : [...l.registry.types.values()].filter((x) => x.starter === t.kind).map((x) => x.id) };
   if (t.sort === 'id') return { cond: 'e.id = $?', param: t.id };
   if (t.sort === 'held') return { cond: 'e.id = any($?::text[])', param: await heldIds(l) };
+  if (t.sort === 'moved') return { cond: 'e.id = any($?::text[])', param: await movedIds(l) };
   const at = await endsOf(l, t, me);
   if (t.sort === 'island') return { cond: onIslands('$?'), param: at };
   if (t.sort === 'in') return { cond: 'exists (select 1 from part_closure c where c.descendant = e.id and c.ancestor = any($?::text[]))', param: at };

@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { checkCapabilities } from '../src/capabilities.ts';
 import { setIslands } from '../src/packstate.ts';
+import { flatRead } from '../src/query-flat.ts';
 import { attend, fresh, human, make } from './map.ts';
 
 async function twoIslands() {
@@ -74,4 +75,17 @@ test('promised names fields the type has', () => {
   assert.deepEqual(checkCapabilities({ promised: { fields: ['value', 'as_of'] } }, fields, new Set()), []);
   assert.match(checkCapabilities({ promised: { fields: ['worth'] } }, fields, new Set()).join(), /promised reads "worth"/);
   assert.match(checkCapabilities({ promised: { fields: [] } }, fields, new Set()).join(), /promised names the fields/);
+});
+
+test('the term moved finds what reads a moved finding, in find, only and not; a view of it walks to the finding', async () => {
+  const { l, f, budget } = await twoIslands();
+  const titles = async (filter: object, walk?: object) => (await flatRead(l, { filter, ...(walk && { walk }) })).items.map((i: { title: string }) => i.title).sort();
+  assert.deepEqual(await titles({ find: ['moved'] }), [], 'nothing moved');
+  await make(l, [{ op: 'update', id: f, props: { value: 450 } }]);
+  assert.deepEqual(await titles({ find: ['moved'] }), ['Set the budget']);
+  assert.deepEqual(await titles({ find: ['type task'], only: ['moved'] }), ['Set the budget']);
+  assert.deepEqual(await titles({ find: ['type task'], not: ['moved'] }), []);
+  assert.deepEqual(await titles({ find: ['moved'] }, { over: ['reads>'], steps: 1 }), ['Hosting a month', 'Set the budget'], 'the saved view draws the finding beside it');
+  await make(l, [{ op: 'update', id: budget }]);
+  assert.deepEqual(await titles({ find: ['moved'] }), [], 'said still true');
 });

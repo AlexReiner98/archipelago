@@ -75,16 +75,21 @@ export async function movedReadings(l: Archipelago, readers: string[]): Promise<
   return out;
 }
 
-/** The open items that read a promised item, of a person (owned by them, or by nobody when they are the owner). */
-export async function readersOf(l: Archipelago, me: string, isOwner: boolean): Promise<string[]> {
+/** The open items that read a promised item: a person's (owned by them, or by nobody when they are the owner), or everyone's. */
+export async function readersOf(l: Archipelago, me?: string, isOwner = false): Promise<string[]> {
   const kinds = readingTypes(l);
   const promised = promisedTypes(l);
   if (!kinds.length || !promised.length) return [];
   const { rows } = await l.db.query<{ id: string }>(
     `select distinct r.from_id as id from relation r join entity e on e.id = r.from_id join entity f on f.id = r.to_id
      where r.type = any($1::text[]) and r.valid_to is null and f.type = any($2::text[]) and e.is_open and e.archived_at is null
-       and (e.owner = $3 or ($4 and e.owner is null)) -- index relation_open_type`,
-    [kinds, promised, me, isOwner],
+       and ($3::text is null or e.owner = $3 or ($4 and e.owner is null)) -- index relation_open_type`,
+    [kinds, promised, me ?? null, isOwner],
   );
   return rows.map((r) => r.id);
+}
+
+/** The query term `moved`: every open item whose reading has moved, as the viewer may see them. */
+export async function movedIds(l: Archipelago): Promise<string[]> {
+  return [...(await movedReadings(l, await readersOf(l))).keys()];
 }
