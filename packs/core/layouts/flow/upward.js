@@ -38,9 +38,10 @@ function lineUp(items, links, noise) {
   while (ready.size) {
     let best, most = -Infinity;
     for (const v of ready) {
-      let last = -1;
-      for (const w of near.get(v)) if (at.has(w)) last = Math.max(last, at.get(w));
-      const score = last * 100 - [...near.get(v)].filter((w) => !at.has(w) && first.get(w) < first.get(v)).length + noise(v) * 3;
+      let last = -1, older = 0;
+      const mine = first.get(v);
+      for (const w of near.get(v)) if (at.has(w)) last = Math.max(last, at.get(w)); else if (first.get(w) < mine) older++;
+      const score = last * 100 - older + noise(v) * 3;
       if (score > most || (score === most && first.get(v) < first.get(best))) ((most = score), (best = v));
     }
     ready.delete(best);
@@ -117,7 +118,9 @@ function facesOf(line, sides) {
 /** One order of the items, tried through to the graph it makes. Only what the order touches goes on the line. */
 function attempt(links, items, k) {
   // Each try's leanings are keyed to the item or link they lean, so one more item leaves every other's as it was.
-  const rank = new Map(items.map((v, i) => [v, i])), lean = k ? (v) => keyed(k, rank.get(v), -1) : () => 0, noise = (l) => keyed(k, rank.get(l[0]), rank.get(l[1]));
+  // Each item's leaning is worked out once a try: the line asks it again for every item still waiting.
+  const rank = new Map(items.map((v, i) => [v, i])), leaning = new Map(items.map((v, i) => [v, k ? keyed(k, i, -1) : 0]));
+  const lean = (v) => leaning.get(v), noise = (l) => keyed(k, rank.get(l[0]), rank.get(l[1]));
   const inOrder = new Set(links.filter((l) => l[2]).flatMap((l) => [l[0], l[1]]));
   const here = inOrder.size > 2 ? new Set(items.filter((v) => inOrder.has(v))) : new Set(items);
   const onLine = links.filter(([u, v]) => here.has(u) && here.has(v)), later = links.filter(([u, v]) => !here.has(u) || !here.has(v));

@@ -128,7 +128,9 @@ test('a large answer is laid out within the budget', () => {
   const items = Array.from({ length: n }, (_, k) => item(`s${k}`));
   const links = items.slice(1).flatMap((_, k) => [dep(`s${k + 1}`, `s${k}`), ...(k > 2 ? [dep(`s${k + 1}`, `s${k - 3}`)] : [])]);
   const [g, took] = timed(() => run(items, links));
-  assert.ok(took < 3000, `laid out in ${Math.round(took)} ms of work`);
+  // 3300 since 5 Nov 2026: main ran near 3000 on CI, and a free choice of order by when made (task e_6z86je33) gives the
+  // wires about a tenth more to route here (shape.js), about 1.04 s of work on a laptop against 0.94 before.
+  assert.ok(took < 3300, `laid out in ${Math.round(took)} ms of work`);
   checks(g);
 });
 
