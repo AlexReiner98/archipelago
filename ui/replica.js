@@ -15,7 +15,7 @@ import { NOTE_START, project } from './project.js';
 /** An item of a lens answer as the row the projector folds facts into. */
 const itemRow = (i) => ({
   id: i.id, type: i.type, title: i.title, body: i.body ?? '', status: i.status, visibility: i.visibility,
-  owner: i.owner ?? null, is_open: i.open, props: { ...(i.fields ?? {}) }, created_at: i.created_at, updated_at: i.updated_at, archived_at: null,
+  owner: i.owner ?? null, is_open: i.open, props: { ...(i.fields ?? {}), ...(i.island && { island: i.island }) }, created_at: i.created_at, updated_at: i.updated_at, archived_at: null,
   // A run's session is worked out by the server from its events, not folded from facts: kept as the answer gave it.
   ...(i.session && { session: i.session }),
 });
@@ -51,6 +51,8 @@ export class Replica {
     this.pos = pos;
     this.lens = answer.lens;
     this.viewer = answer.viewer;
+    // The islands' names, as the answer gave them: a drawing names each island's border by them.
+    this.islands = answer.islands;
   }
 
   /** The ids the tail reads facts on: every item and link held. */
@@ -68,6 +70,8 @@ export class Replica {
       ...(r.body && { body: r.body.length > NOTE_START && !this.whole?.has(id) ? `${r.body.slice(0, NOTE_START)}…` : r.body }),
       visibility: r.visibility, status: r.status, ...(this.kinds.phase?.(r.type, r.status) && { phase: this.kinds.phase(r.type, r.status) }), open: r.is_open, owner: r.owner, created_at: r.created_at, updated_at: r.updated_at,
       ...(Object.keys(fields).length && { fields }),
+      // The island it lives on, on a map with islands on: a field kept on the item, not shown, read by a drawing for its borders.
+      ...(typeof r.props?.island === 'string' && { island: r.props.island }),
       ...(r.session && { session: r.session }),
       ...this.why.get(id),
       ...this.placed?.get(id),
@@ -81,7 +85,7 @@ export class Replica {
     const links = [...this.links.values()]
       .filter((r) => !r.valid_to && shown.has(r.from_id) && shown.has(r.to_id))
       .map((r) => ({ id: r.id, type: r.type, ...(this.kinds.flavour?.(r.type)?.length && { is: this.kinds.flavour(r.type) }), from: r.from_id, to: r.to_id, ...(Object.keys(r.props ?? {}).length && { props: r.props }) }));
-    return { ...(this.lens && { lens: this.lens }), ...(this.viewer && { viewer: this.viewer }), items, links };
+    return { ...(this.lens && { lens: this.lens }), ...(this.viewer && { viewer: this.viewer }), ...(this.islands && { islands: this.islands }), items, links };
   }
 
   /**

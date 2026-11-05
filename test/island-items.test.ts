@@ -101,6 +101,11 @@ test('the term island <island> is what lives on it, by id or name', async () => 
   assert.deepEqual(titles(await flatRead(l, { filter: { find: [`island ${a}`, `island ${b}`] } })), ['Billing', 'Interview', 'Invoice run', 'Pay the rent'], 'a view of several');
   assert.deepEqual(titles(await flatRead(l, { filter: { find: ['task'], only: [`island ${b}`] } })), ['Billing'], 'in Only');
   assert.deepEqual(titles(await flatRead(l, { filter: { find: ['task'], not: [`island ${b}`] } })), ['Pay the rent'], 'and in Not');
+  // The answer hands on where each lives and each island's name, for a drawing to draw their borders (task e_auw7hb3v).
+  const both = await flatRead(l, { filter: { find: [`island ${a}`, `island ${b}`] } });
+  assert.deepEqual(Object.fromEntries(both.items.map((i) => [i.title, i.island])), { Billing: b, Interview: b, 'Invoice run': a, 'Pay the rent': a });
+  assert.deepEqual([...(both.islands ?? [])].sort((p, q) => p.title!.localeCompare(q.title!)), [{ id: a, title: 'Billing' }, { id: b, title: 'Hiring' }]);
+  assert.ok(!('fields' in both.items[0] && 'island' in (both.items[0].fields ?? {})), 'kept on the item, not among its shown fields');
 });
 
 test('with islands off, nothing is asked and no item has an island', async () => {

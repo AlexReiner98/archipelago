@@ -35,7 +35,7 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
     (Array.isArray(d.item.choices) ? d.item.choices : []).forEach((option, k) => {
       if (taken.has(option)) return;
       const id = `${d.id}:${k}`;
-      nodes.set(id, { id, stub: true, shape: 'end', item: { id: d.id, title: option, open: true, status: 'a scenario', state: QUIET } });
+      nodes.set(id, { id, stub: true, shape: 'end', item: { id: d.id, title: option, open: true, status: 'a scenario', state: QUIET, ...(d.item.island && { island: d.item.island }) } });
       edges.push({ a: d.id, b: id, says: option });
     });
   }
