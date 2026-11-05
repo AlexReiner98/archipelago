@@ -2,7 +2,8 @@
 // everyone, within a scope or across the map. Every reason is read from the root relations and the capabilities, so
 // no way of working is named here: what waits on someone (waits_on), what holds others up and what is blocked
 // (depends_on, waits_on, needs), what is due (bound), what is unsettled (settles), what nobody has touched, what is
-// under way (a session on it), what is ready to take up, and what an agent settled that the owner has not confirmed.
+// under way (a session on it), what is ready to take up, what an agent settled that the owner has not confirmed, and
+// what reads a finding that has moved since (a link that crosses, to a type that promises fields: src/moved.ts).
 // A pack adds reasons of its own as data (a view of form "attention"): items of a type whose fields hold some values.
 
 import { pastBounds } from './bounds.ts';
@@ -11,9 +12,10 @@ import { toConfirm } from './confirm.ts';
 import { parts } from './manifest.ts';
 import type { Archipelago } from './pelago.ts';
 import { isKernel, notKernel } from './head.ts';
+import { movedReadings, readersOf } from './moved.ts';
 import { scopeOf } from './places.ts';
 
-export const REASONS = ['waits_on', 'to_confirm', 'holding_up', 'due', 'unsettled', 'blocked', 'stale', 'under_way', 'ready'] as const;
+export const REASONS = ['waits_on', 'to_confirm', 'holding_up', 'due', 'moved', 'unsettled', 'blocked', 'stale', 'under_way', 'ready'] as const;
 export type Reason = (typeof REASONS)[number];
 
 /** Days without a change, or a word that it is still true, before open work is said to be stale. */
@@ -58,10 +60,10 @@ export interface Read {
   graph?: BlockGraph;
 }
 
-/** What needs a person now, by the reasons only they act on: it waits on them, it is theirs to confirm, it is due, or it is theirs to settle. Of what a lens read, when it is given. */
+/** What needs a person now, by the reasons only they act on: it waits on them, it is theirs to confirm, it is due, what it reads has moved, or it is theirs to settle. Of what a lens read, when it is given. */
 export async function needsOf(l: Archipelago, person: string | null, read?: Read): Promise<Set<string>> {
   if (!person) return new Set();
-  const { items } = await attention(l, { person, reasons: ['waits_on', 'to_confirm', 'due', 'unsettled'], limit: 100_000 }, read);
+  const { items } = await attention(l, { person, reasons: ['waits_on', 'to_confirm', 'due', 'moved', 'unsettled'], limit: 100_000 }, read);
   return new Set(items.map((i) => i.id));
 }
 
@@ -128,6 +130,12 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   const { due, under } = await pastBounds(l, input.days ?? 7, [...live.keys()]);
   for (const d of due) if (live.get(d.id) && theirs(live.get(d.id)!)) add(live.get(d.id), 'due', { on: d.due, overdue: d.overdue });
   for (const u of under) if (live.get(u.id) && theirs(live.get(u.id)!)) add(live.get(u.id), 'due', { value: u.value, limit: u.limit });
+
+  // Moved: what it reads has changed since it was last changed or said still true, until whoever tends it does either.
+  if (wanted.has('moved')) {
+    const moved = await movedReadings(l, [...live.values()].filter(theirs).map((e) => e.id));
+    for (const [id, readings] of moved) for (const m of readings) add(live.get(id), 'moved', { ...m });
+  }
 
   // Unsettled: a question whose type says how it settles, and whose word settles it.
   for (const e of live.values()) {
@@ -222,6 +230,11 @@ async function rowsFor(l: Archipelago, me: string | null, isOwner: boolean, scop
        union select ${cols} from entity where is_open and archived_at is null and id in (select from_id from relation where to_id = $1 and type = any($3::text[]) and valid_to is null)`,
       [me, isOwner, reg.relationFamily('waits_on'), kept],
     );
+    if (wanted.has('moved')) {
+      const known = new Set(rows.map((r) => r.id));
+      const readers = (await readersOf(l, me, isOwner)).filter((id) => !known.has(id));
+      if (readers.length) rows.push(...(await l.db.query<Row>(`select ${cols} from entity where id = any($1::text[]) and ${notSystem}`, [readers])).rows);
+    }
     if (!wanted.has('holding_up')) return rows;
     // What theirs holds up: whatever waits on it, step by step back along the links that block.
     const { rows: held } = await l.db.query<Row>(
