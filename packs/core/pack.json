@@ -18,6 +18,7 @@
     },
     {
       "id": "aim",
+      "capabilities": { "owned": true },
       "altitude": "workspace",
       "title": "Aim",
       "kind": true,
@@ -32,6 +33,7 @@
     },
     {
       "id": "work",
+      "capabilities": { "owned": true, "actionable": true },
       "altitude": "step",
       "title": "Work",
       "kind": true,
@@ -48,6 +50,7 @@
     },
     {
       "id": "question",
+      "capabilities": { "owned": true, "actionable": true },
       "altitude": "step",
       "title": "Question",
       "kind": true,
@@ -62,6 +65,7 @@
     },
     {
       "id": "record",
+      "capabilities": { "owned": true },
       "altitude": "step",
       "title": "Record",
       "kind": true,
@@ -76,6 +80,7 @@
     },
     {
       "id": "occurrence",
+      "capabilities": { "owned": true },
       "altitude": "step",
       "title": "Occurrence",
       "kind": true,

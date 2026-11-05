@@ -41,6 +41,21 @@ export function headOf(merged: Record<string, FieldDef>, statuses: { open: strin
   return { fields, columns };
 }
 
+/**
+ * The column fields a type keeps in its row that its kind does not give it. A type of no kind has status, confidence
+ * and source for its statuses (lifecycle); any type has an owner when it is owned, and only then.
+ */
+export function ownHead(kinded: boolean, owned: boolean): Record<string, FieldDef> {
+  return {
+    ...(!kinded && {
+      status: { type: 'enum', column: true, description: 'Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item\'s row.' },
+      confidence: { type: 'number', column: true, description: '0 to 1: how sure the author is that this is true. Kept in the item\'s row.' },
+      source: { type: 'string', column: true, system: true, description: 'Where its facts came from: the source of the change that made it, or of its op. Kept in the item\'s row.' },
+    }),
+    ...(owned && { owner: { type: 'string', column: true, description: 'Id of the person or agent responsible. Kept in the item\'s row.' } }),
+  };
+}
+
 /** What is wrong with the fields a type declares: a column only on a kind and of the four, large only on the system kind. */
 export function checkFieldDecls(type: ResolvedType, def: TypeDef | undefined, extra: Record<string, FieldDef> = {}): string[] {
   const problems: string[] = [];
@@ -51,6 +66,7 @@ export function checkFieldDecls(type: ResolvedType, def: TypeDef | undefined, ex
     if (field.large && !type.system) problems.push(`field "${name}" is declared large, which only a type of the system kind may be`);
   }
   if (def?.kind && !type.columns.status) problems.push('a kind declares the status field ("column": true)');
+  if (def?.kind && def.fields?.owner && !type.capabilities.owned) problems.push('a kind with an owner is owned (capability "owned")');
   return problems;
 }
 

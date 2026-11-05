@@ -1,5 +1,5 @@
-// Capabilities: what the kernel computes from a type, declared by the type with the field each reads. There are
-// six and packs cannot add a seventh. A flavour inherits its parent's; a sibling does not. Each is checked against
+// Capabilities: what the kernel computes from a type, declared by the type with the field each reads. The kernel
+// knows the ones listed in CAPABILITIES and packs cannot add another. A flavour inherits its parent's; a sibling does not. Each is checked against
 // the type's own fields when its pack loads, so a capability naming a field the type lacks stops the pack.
 
 import type { FieldDef } from './packs.ts';
@@ -92,9 +92,13 @@ export interface Capabilities {
   settles?: Settles;
   watch?: Watch;
   accounts?: Accounts;
+  /** Someone answers for it: it has an owner, kept in its row (src/head.ts, ownHead). */
+  owned?: true;
+  /** Something to do or answer: what attention counts as ready, holding up or unowned. */
+  actionable?: true;
 }
 
-export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch', 'accounts'] as const;
+export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch', 'accounts', 'owned', 'actionable'] as const;
 
 const DATES = ['date', 'datetime'];
 
@@ -159,6 +163,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     for (const s of [watch.up, watch.down, ...(watch.also ?? []), ...(watch.idle ? [watch.idle] : [])]) if (!statuses.includes(s)) problems.push(`watch names "${s}", which is no status of it`);
     has('watch.commit', watch.commit, ['string']);
   }
+  for (const flag of ['owned', 'actionable'] as const) if (caps[flag] !== undefined && caps[flag] !== true) problems.push(`${flag} is true, or left out`);
   if (accounts) has('accounts', accounts.field, ['string']);
   if (accounts?.accounted) has('accounts.accounted', accounts.accounted, ['boolean']);
   return problems;

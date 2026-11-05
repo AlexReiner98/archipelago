@@ -54,10 +54,10 @@ test('every relation extends one of the thirteen roots', () => {
   assert.ok(reg.relationFamily('lives_in').includes('lives_in'));
 });
 
-test('a pack cannot leave a type without a kind, declare a kind, or stretch a root', () => {
+test('a pack may leave a type without a kind, but cannot declare a kind or stretch a root', () => {
   const pack = (types: PackFile['types'], links: PackFile['links'] = []): PackFile => ({ id: 'x', version: '1', title: 'X', requires: ['core'], types, links });
   const statuses = { open: ['open'], closed: ['done'] };
-  assert.throws(() => new Registry(packsWith(pack([{ id: 'x.thing', title: 'T', description: '', statuses }]))), /must extend one of the kinds: actor, aim/);
+  assert.equal(new Registry(packsWith(pack([{ id: 'x.thing', title: 'T', description: '', statuses }]))).type('x.thing')!.kind, undefined, 'a kind is a starter type (test/kindless.test.ts)');
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.kind', title: 'K', description: '', kind: true, statuses }]))), /only the core pack declares kinds/);
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.tier', title: 'S', description: '', extends: 'system', statuses }]))), /cannot be of the system kind/);
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.lens', title: 'L', description: '', extends: 'lens' }]))), /kernel's own/);
