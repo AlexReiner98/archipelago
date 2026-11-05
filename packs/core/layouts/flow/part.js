@@ -34,7 +34,7 @@ export function costOf(d, size, z) {
 
 /** One connected part: places by item, and each visible link's points. `block` is an item's size with what hangs on it, `box` its own. */
 export function drawPart(list, links, block, box, z, trial) {
-  const { g, s, t, number, outerAt } = downward(links, list, z, trial), next = new Map();
+  const { g, s, t, number, outerAt } = downward(links, list, z, { ...trial, madeAt: (v) => box(v).made }), next = new Map();
   for (const k of g.owner.keys()) {
     const [a, b] = k.split('|');
     (next.get(a) ?? next.set(a, new Set()).get(a)).add(b);
