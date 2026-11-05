@@ -4,7 +4,7 @@
 import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts';
 import { bodyAfter } from './ops.ts'; import { mergeRefusals } from './merge.ts';
 import { currentNames, typesAfter } from './type-items.ts'; import { privateDependencies } from './private-deps.ts';
-import { publicTypes, type Entity, type Op } from './pelago-types.ts';
+import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts';
 import type { Archipelago } from './pelago.ts';
 
 /** Validate ops against the schema and the current map. Throws listing every problem. */
@@ -28,9 +28,11 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
     if (!found) errors.push(`${where}: no entity "${id}"`);
     return found;
   };
-  const checkOwner = async (owner: string, where: string) => {
+  // Saying an owner makes an owned_by link (src/owner-link.ts), so it is checked as that link op is: both ends.
+  const checkOwner = async (item: string | undefined, owner: string, where: string) => {
     const type = await typeOf(owner, where);
-    if (type && !reg.isA(type, 'person') && !reg.isA(type, 'agent')) errors.push(`${where}: owner must be a person or agent, not ${type}`);
+    const problem = item && type ? reg.checkRelation(OWNED_BY, item, type) : undefined;
+    if (problem) errors.push(`${where}: ${problem}`);
   };
 
   // A kept view that walks part_of either way for more than a step climbs to what holds its start and draws all of it.
@@ -48,7 +50,7 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
       case 'create': {
         if (!op.title?.trim()) errors.push(`${where}: title is required`);
         errors.push(...reg.check(op.type, op.status, op.props ?? {}).map((p) => `${where}: ${p}`));
-        if (op.owner) await checkOwner(op.owner, where);
+        if (op.owner) await checkOwner(reg.type(op.type) && op.type, op.owner, where);
         const type = reg.type(op.type);
         if (!type) break; if (type.retired) errors.push(`${where}: ${op.type} is retired here: no new item is made of it`);
         if (op.visibility === 'public' && !type.public) errors.push(`${where}: a ${op.type} cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
@@ -80,7 +82,7 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
         } catch (e) {
           errors.push(`${where}: "${target.title}": ${(e as Error).message}`);
         }
-        if (op.owner) await checkOwner(op.owner, where);
+        if (op.owner) await checkOwner(target.type, op.owner, where);
         climbs(target.type, op.props, where);
         break;
       }
