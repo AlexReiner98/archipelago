@@ -31,7 +31,10 @@ export const statusesOf = (typeId) => {
   return s ? [...s.open, ...s.closed] : [];
 };
 export const isClosed = (typeId, status) => types.get(typeId)?.statuses.closed.includes(status) ?? false;
+/** Whether a type is the ancestor or a flavour of it; given a link end that names a capability (has:owned), whether it declares it. */
 export const isA = (typeId, ancestor) => {
+  const cap = /^has:(.+)$/.exec(ancestor)?.[1];
+  if (cap) return types.get(typeId)?.capabilities?.[cap] !== undefined;
   for (let t = typeId; t; t = types.get(t)?.flavour_of) if (t === ancestor) return true;
   return false;
 };

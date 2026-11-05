@@ -54,7 +54,7 @@ test('every relation extends one of the thirteen roots', () => {
   assert.ok(reg.relationFamily('lives_in').includes('lives_in'));
 });
 
-test('a pack may leave a type without a kind, but cannot declare a kind or stretch a root', () => {
+test('a pack may leave a type or a link type without a kind or root, but cannot declare one or stretch a root', () => {
   const pack = (types: PackFile['types'], links: PackFile['links'] = []): PackFile => ({ id: 'x', version: '1', title: 'X', requires: ['core'], types, links });
   const statuses = { open: ['open'], closed: ['done'] };
   assert.equal(new Registry(packsWith(pack([{ id: 'x.thing', title: 'T', description: '', statuses }]))).type('x.thing')!.kind, undefined, 'a kind is a starter type (test/kindless.test.ts)');
@@ -62,7 +62,8 @@ test('a pack may leave a type without a kind, but cannot declare a kind or stret
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.tier', title: 'S', description: '', extends: 'system', statuses }]))), /cannot carry the kernel flag/);
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.lens', title: 'L', description: '', extends: 'lens' }]))), /kernel's own/);
   const rel = { title: 'r', inverse: 'r', description: '', from: ['*'], to: ['*'] };
-  assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel }]))), /must extend one of the root relations/);
+  assert.equal(new Registry(packsWith(pack([], [{ id: 'x.r', ...rel }]))).relations.get('x.r')!.root, 'x.r', 'one that extends nothing is its own root (test/link-ends.test.ts)');
+  assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel, extends: 'x.none' }]))), /extends unknown "x.none"/);
   assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel, root: true }]))), /only the core pack declares root/);
   // waits_on runs only to actors, so what extends it cannot run to a task.
   assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel, to: ['task'], extends: 'waits_on' }]))), /goes to task, which "waits_on" does not/);

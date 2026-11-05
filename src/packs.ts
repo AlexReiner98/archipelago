@@ -3,7 +3,7 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
+import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts'; import { capabilityOf, holds, unknownEnd, within } from './link-ends.ts';
 import { checkDeclared, KERNEL_VERBS, presetsOf, screensOf, stylesOf, toolName, type ActionDef, type TreeDef, type VerbDef, type ViewDef } from './declared.ts';
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts';
@@ -249,20 +249,17 @@ export class Registry {
       for (const b of t.belongs_with ?? [])
         if (!relations.has(b.relation) || !['out', 'in'].includes(b.direction)) throw new Error(`Type "${t.id}" goes with what "${b.relation}" links it to: that needs a relation the packs define, and a direction, out or in`);
     for (const rel of relations.values()) {
-      for (const end of [...rel.from, ...rel.to]) {
-        if (end !== '*' && !types.has(end)) throw new Error(`Relation "${rel.id}" refers to unknown type "${end}"`);
-      }
+      for (const end of [...rel.from, ...rel.to]) { const why = unknownEnd(end, (id) => types.has(id)); if (why) throw new Error(`Relation "${rel.id}" refers to ${why}`); }
     }
-    // Every relation extends a root, and joins only what its root may join.
-    const fits = (allowed: string[], end: string) => allowed.some((a) => a === '*' || (end !== '*' && types.get(end)!.lineage.includes(a)));
+    // A relation that extends nothing is its own root; one that extends another joins only what that one may join.
     const rootOf = (rel: RelationDef, trail: string[]): string => {
-      if (rel.root) return rel.id;
-      if (rel.extends && rel.extends === rel.id) throw new Error(`Relation "${rel.id}" extends itself`);
+      if (rel.root || !rel.extends) return rel.id;
+      if (rel.extends === rel.id) throw new Error(`Relation "${rel.id}" extends itself`);
       if (trail.includes(rel.id)) throw new Error(`Relation cycle: ${[...trail, rel.id].join(' -> ')}`);
-      const parent = rel.extends ? declared.get(rel.extends) : undefined; if (rel.extends === BASE_LINK) throw new Error(`Relation "${rel.id}" cannot be a flavour of ${BASE_LINK}, which means nothing more than that its ends relate: extend the root it means`);
-      if (!parent) throw new Error(`Relation "${rel.id}" must extend one of the root relations${rel.extends ? `, not unknown "${rel.extends}"` : ''}`);
+      const parent = declared.get(rel.extends); if (rel.extends === BASE_LINK) throw new Error(`Relation "${rel.id}" cannot be a flavour of ${BASE_LINK}, which means nothing more than that its ends relate: extend the root it means`);
+      if (!parent) throw new Error(`Relation "${rel.id}" extends unknown "${rel.extends}"`);
       for (const [side, ends] of [['from', rel.from], ['to', rel.to]] as const) {
-        const bad = ends.find((end) => !fits(parent[side], end));
+        const bad = ends.find((end) => !within(end, parent[side], (id) => types.get(id)));
         if (bad) throw new Error(`Relation "${rel.id}" goes ${side} ${bad}, which "${parent.id}" does not`);
       }
       return rootOf(parent, [...trail, rel.id]);
@@ -316,7 +313,8 @@ export class Registry {
    */
   keep(kept: { types: ResolvedType[]; relations: ResolvedRelation[] }): void {
     this.kept = kept;
-    for (const t of kept.types) if (!this.types.has(t.id)) this.types.set(t.id, { ...t, dormant: true });
+    // One kept before owned was a capability says it by its owner column: links from it are allowed as they were.
+    for (const t of kept.types) if (!this.types.has(t.id)) this.types.set(t.id, { ...t, capabilities: { ...(t.columns?.owner && { owned: true }), ...t.capabilities }, dormant: true });
     for (const r of kept.relations) if (!this.relations.has(r.id)) this.relations.set(r.id, { ...r, dormant: true });
   }
 
@@ -344,8 +342,9 @@ export class Registry {
     return roots.map(this.canonical).flatMap(family);
   }
 
+  /** Whether a type is the ancestor or a flavour of it; given a capability end (has:owned), whether it declares that capability. */
   isA(typeId: string, ancestor: string): boolean {
-    return this.types.get(this.canonical(typeId))?.lineage.includes(this.canonical(ancestor)) ?? false;
+    return ancestor !== '*' && holds(capabilityOf(ancestor) ? ancestor : this.canonical(ancestor), this.types.get(this.canonical(typeId)));
   }
 
   /** What a picture says a thing is: its type nearest the kind (root) and its kind. */
@@ -370,9 +369,9 @@ export class Registry {
     return [...new Set(on.flatMap((t) => this.family(t)))];
   }
 
-  /** The type and every flavour of it. */
+  /** The type and every flavour of it; for a capability end (has:owned), every type that declares it. */
   family(typeId: string): string[] {
-    return [...this.types.values()].filter((t) => t.lineage.includes(this.canonical(typeId))).map((t) => t.id);
+    return [...this.types.values()].filter((t) => this.isA(t.id, typeId)).map((t) => t.id);
   }
 
   isOpen(typeId: string, status: string): boolean {
