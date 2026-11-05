@@ -1,7 +1,7 @@
 // Planning a change: its ops checked against the schema and the map as it is now, before anything is written. The
 // write path (src/pelago.ts) asks it before a change is judged and again before it is applied.
 
-import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts';
+import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts'; import { typedProblems } from './fields.ts';
 import { bodyAfter } from './ops.ts'; import { mergeRefusals } from './merge.ts';
 import { currentNames, typesAfter } from './type-items.ts'; import { privateDependencies } from './private-deps.ts';
 import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts'; import { islandRefusals } from './island-items.ts';
@@ -54,7 +54,7 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
         const type = reg.type(op.type);
         if (!type) break; if (type.retired) errors.push(`${where}: ${op.type} is retired here: no new item is made of it`);
         if (op.visibility === 'public' && !type.public) errors.push(`${where}: a ${op.type} cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
-        errors.push(...[...checkWritten(reg, op.type, op.props ?? {}), ...undeclaredColumns(type, op)].map((p) => `${where}: ${p}`));
+        errors.push(...[...checkWritten(reg, op.type, op.props ?? {}), ...typedProblems(op.type, type.fields, op.props ?? {}), ...undeclaredColumns(type, op)].map((p) => `${where}: ${p}`));
         if (op.ref) {
           if (refs.has(op.ref)) errors.push(`${where}: ref "${op.ref}" is used twice`);
           refs.set(op.ref, op.type);
@@ -74,7 +74,7 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
       case 'update': {
         const target = await existing(op.id, where);
         if (!target) break;
-        errors.push(...[...reg.check(target.type, op.status, op.props ?? {}), ...undeclaredColumns(reg.type(target.type), op)].map((p) => `${where}: ${p}`));
+        errors.push(...[...reg.check(target.type, op.status, op.props ?? {}), ...typedProblems(target.type, reg.type(target.type)?.fields ?? {}, op.props ?? {}, target.props), ...undeclaredColumns(reg.type(target.type), op)].map((p) => `${where}: ${p}`));
         if (op.visibility === 'public' && !reg.type(target.type)?.public) errors.push(`${where}: "${target.title}" is a ${target.type}, which cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
         if (op.title !== undefined && !op.title.trim()) errors.push(`${where}: title cannot be empty`);
         try {

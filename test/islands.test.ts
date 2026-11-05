@@ -46,9 +46,9 @@ function packsWith(...more: Manifest[]): string {
 
 const core = () => readManifest(readFileSync(join(ROOT, 'packs', 'core', 'pack.json'), 'utf8'), 'core').manifest;
 
-test('the shared set is core’s list: the eight starter types, task and decision', () => {
+test('the shared set is core’s list: the eight starter types, task, decision and finding', () => {
   const shared = sharedOf([core()]);
-  assert.deepEqual([...shared.types].sort(), ['actor', 'aim', 'decision', 'occurrence', 'place', 'question', 'record', 'system', 'task', 'work']);
+  assert.deepEqual([...shared.types].sort(), ['actor', 'aim', 'decision', 'finding', 'occurrence', 'place', 'question', 'record', 'system', 'task', 'work']);
   assert.ok(!shared.types.has('note'), 'note is not shared');
   assert.ok(shared.links.has('bears_on') && shared.links.has('depends_on'), 'the kernel’s link types are what a link extends');
   assert.throws(() => readManifest(JSON.stringify({ id: 'x', version: '1', title: 'X', shared: ['task'] }), 'x'), /only the kernel's pack declares it/);

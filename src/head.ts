@@ -75,6 +75,7 @@ export function checkFieldDecls(type: ResolvedType, def: TypeDef | undefined, ex
     if (field.column && !isColumn) problems.push(`field "${name}" cannot be kept in a column: only ${columnNames.join(', ')} are`);
     else if (isColumn && !(def && !def.extends && field.column && !extra[name])) problems.push(`field "${name}" is one a starter type declares, kept in the item's row`);
     if (field.large && !type.system) problems.push(`field "${name}" is declared large, which only a type with the kernel flag may be`);
+    if (field.typed_by && (field.type !== 'json' || def?.fields?.[field.typed_by]?.type !== 'enum')) problems.push(`field "${name}" is typed by "${field.typed_by}": it is json, and that is an enum field of the same type`);
   }
   if (def && !def.extends && def.fields?.owner && !type.capabilities.owned) problems.push('a starter type with an owner is owned (capability "owned")');
   return problems;

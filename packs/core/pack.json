@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "title": "Core",
   "description": "The starter types (the seven of the work, and system), task and decision (the shared set every pack may build on), the root links every link type extends, and the system tier.",
-  "shared": ["actor", "aim", "work", "question", "record", "occurrence", "place", "system", "task", "decision"],
+  "shared": ["actor", "aim", "work", "question", "record", "occurrence", "place", "system", "task", "decision", "finding"],
   "types": [
     {
       "id": "actor",
@@ -186,6 +186,18 @@
         "outcome": { "type": "string", "description": "What was chosen.", "shown": true },
         "rationale": { "type": "string", "description": "Why." },
         "decided_on": { "type": "date" }
+      }
+    },
+    {
+      "id": "finding",
+      "extends": "record",
+      "title": "Finding",
+      "description": "What an island has found, published for others to read: its name is the title, what it means is the note (a unit or currency said there), and its value is one of a simple type, true as of a date. Its readers read it (reads); a new value keeps the old one in the log.",
+      "statuses": { "open": ["current"], "closed": ["superseded", "withdrawn"] },
+      "fields": {
+        "value": { "type": "json", "typed_by": "value_type", "shown": true, "description": "The value: text, a number, true or false, or a date like 2026-11-05, as value_type says." },
+        "value_type": { "type": "enum", "values": ["text", "number", "boolean", "date"], "shown": true, "description": "What sort of value it is: text, number, boolean or date." },
+        "as_of": { "type": "date", "shown": true, "description": "When the value was true: the day it was found or measured." }
       }
     },
     {
@@ -870,6 +882,16 @@
       "to": ["*"],
       "description": "Relies on it to work, without waiting on it: a part that calls another, an app a team runs. Unlike depends on, it blocks nothing.",
       "moved_from": ["software.uses"]
+    },
+    {
+      "id": "reads",
+      "extends": "uses",
+      "crosses": true,
+      "title": "reads",
+      "inverse": "is read by",
+      "from": ["*"],
+      "to": ["finding"],
+      "description": "Relies on a finding's value, from this island or another: the one link that crosses between islands. Its readers are who is told when the finding moves; when it was made, with the finding's history, says which value was read."
     },
     {
       "id": "tagged",

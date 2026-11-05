@@ -35,3 +35,24 @@ export function checkValue(field: FieldDef, value: unknown): string | undefined 
       return undefined;
   }
 }
+
+/** The types a field declared `typed_by` another may be said to hold there: the simple types of a program (text for a string). */
+export const SIMPLE_TYPES: Record<string, FieldDef['type']> = { text: 'string', number: 'number', boolean: 'boolean', date: 'date' };
+
+/** Why a field typed by another does not hold a value of the type that one names, with the item as it will be: what it
+ * holds already (`held`) and what this op sets (`props`, null clearing). Asked only of what the op touches. */
+export function typedProblems(typeId: string, fields: Record<string, FieldDef>, props: Record<string, unknown>, held: Record<string, unknown> = {}): string[] {
+  const problems: string[] = [];
+  for (const [key, field] of Object.entries(fields)) {
+    const by = field.typed_by;
+    if (!by || !(key in props || by in props)) continue;
+    const value = key in props ? props[key] : held[key];
+    const named = by in props ? props[by] : held[by];
+    if (value === null || value === undefined) continue;
+    const type = typeof named === 'string' ? SIMPLE_TYPES[named] : undefined;
+    if (!type) { problems.push(`${typeId}.${key} needs ${by}, one of: ${Object.keys(SIMPLE_TYPES).join(', ')}`); continue; }
+    const problem = checkValue({ type }, value);
+    if (problem) problems.push(`${typeId}.${key} is said to be ${named} (${by}), and ${problem}`);
+  }
+  return problems;
+}
