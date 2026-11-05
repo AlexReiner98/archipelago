@@ -14,6 +14,7 @@ import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';
 import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH, SHARE_PUBLISHABLE } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
 import { ITEM_KIND } from './head.ts';
+import { ISLAND_INDEX } from './island-items.ts';
 import { SEARCH_ANY, SEARCH_INDEX } from './search.ts';
 import { LOG } from './log.ts';
 import { ACTIVITY, PRE_LOG_ACTIVITY } from './eventlog.ts';
@@ -70,6 +71,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 29, name: 'a token a person granted a client by signing in', sql: TOKEN_GRANT },
   { version: 30, name: 'search finds an item with any of the words', sql: SEARCH_ANY },
   { version: 31, name: 'an agent reads whether holds are off', sql: HOLDS_OFF_READ },
+  { version: 32, name: 'what lives on an island', sql: ISLAND_INDEX },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

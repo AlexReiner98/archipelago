@@ -4,6 +4,10 @@
 
 export const ORDER = 'depends_on', NEAR = 'part_of';
 /** What an item says of its state when the answer says nothing (the flat lens's does not). */
+/** An item's type and what it is a flavour of, nearest first, as the answer gives it (`is`). */
+export const lineageOf = (i) => [i?.type, ...(Array.isArray(i?.is) ? i.is : [])].filter(Boolean);
+/** Whether an item is of a type, or a flavour of it (a task is work). */
+export const isOf = (i, type) => lineageOf(i).includes(type);
 export const QUIET = { blocked: false, waits_on: [], sessions: 0, needs_you: false };
 
 /** The highest and the lowest of many numbers, which Math.max(...list) cannot take past the stack's size. */
@@ -26,8 +30,23 @@ export function flatten({ items, links = [], undrawn = [] }) {
   // A link that is there is drawn before one held for the owner between the same two (a held unlink marks it).
   for (const l of [...links].sort((a, b) => Number(a.pending?.op === 'link') - Number(b.pending?.op === 'link'))) add(l.type ?? l.kind, l.from, l.to, l.says ?? l.props?.says, l.pending);
   for (const i of items) if (i.inside) add(NEAR, i.id, i.inside);
-  return { items: items.map((i) => ({ ...i, state: i.state ?? QUIET, choices: i.choices ?? i.fields?.choices })), links: out };
+  const first = madeFirst(items), rank = new Map(first.map((i, k) => [i.id, k]));
+  // A link by its older end, then its newer, as ./topology.js orders them: of the links from one item, one to what was
+  // just made comes after the rest.
+  const [newer, older] = [(l) => Math.max(rank.get(l.from), rank.get(l.to)), (l) => Math.min(rank.get(l.from), rank.get(l.to))];
+  out.sort((p, q) => older(p) - older(q) || newer(p) - newer(q));
+  return { items: first.map((i) => ({ ...i, state: i.state ?? QUIET, choices: i.choices ?? i.fields?.choices })), links: out };
 }
+
+/**
+ * The items in the order they were made (each one's `created_at`, as the answer gives it), ties by id: wherever the
+ * flow has a free choice of order it takes this one, so a new item goes last and moves little (task e_6z86je33). What
+ * has no made time yet (a create held for the owner) comes after what has. The answer's own order has no say.
+ */
+export const madeFirst = (items) => {
+  const at = (i) => (typeof i.created_at === 'string' ? i.created_at : i.created_at ? new Date(i.created_at).toISOString() : '~'); // after every date
+  return [...items].sort((p, q) => (at(p) < at(q) ? -1 : at(p) > at(q) ? 1 : p.id < q.id ? -1 : p.id > q.id ? 1 : 0));
+};
 
 /** An answer with only what its steps show, if it has steps: a box never shown has no say in where the rest stand. */
 export const shownOnly = (answer) => {

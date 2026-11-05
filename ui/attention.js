@@ -2,7 +2,7 @@
 // at the top, muted. The same rows on Home, for you, and on an item's page, for what is that item's.
 
 import { api, h } from './base.js';
-import { ago, chip, link } from './words.js';
+import { ago, chip, link, when } from './words.js';
 
 /** The order Needs you is read in, kept for this browser: the strongest reason first, or the latest change first. */
 const ORDER_KEY = 'pelago-needs-order';
@@ -20,6 +20,7 @@ const MARKS = {
   to_confirm: (r) => ['to confirm', 'warn', `An agent settled it: ${r.answer ?? ''}${r.basis ? `\n${r.basis}` : ''}`],
   holding_up: (r) => [`holds up ${r.count}`, 'warn', 'Other work cannot move until this does'],
   due: (r) => (r.on ? [r.overdue ? `overdue ${r.on}` : `due ${r.on}`, r.overdue ? 'bad' : 'warn', 'By its due date'] : [`${r.value} of ${r.limit}`, 'warn', 'Under its limit']),
+  moved: (r) => [`${r.title} moved`, 'warn', `${(r.moved ?? []).map((m) => `${m.field}: ${JSON.stringify(m.from)} → ${JSON.stringify(m.to)}`).join('\n')}${r.on ? `\n${when(r.on)}` : ''}`],
   unsettled: (r) => [r.by === 'evidence' ? 'to test' : 'to decide', '', r.by === 'evidence' ? 'Settled by evidence' : 'Settled by someone’s word'],
   blocked: (r) => ['blocked', 'closed', `Waiting on: ${(r.by ?? []).join(', ')}${r.held_by ? `, held by ${r.held_by.join(', ')}` : ''}`],
   stale: (r) => [`${r.days} d untouched`, 'closed', 'Nobody has changed it, or said it is still true'],
@@ -53,6 +54,7 @@ const ASKS = [
   ['unsettled', (r) => [r.by === 'evidence' ? 'Test' : 'Decide']],
   ['waits_on', (r) => ['Do', r.for]],
   ['due', (r) => [r.overdue ? 'Overdue' : 'Due']],
+  ['moved', (r) => ['Recheck', r.title]],
   ['holding_up', () => ['Unblock']],
 ];
 const sentence = (text) => text && text.charAt(0).toUpperCase() + text.slice(1);

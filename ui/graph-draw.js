@@ -258,7 +258,7 @@ export function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
     const box = n.bar
       ? s(
           'g',
-          { class: `rm-node g-node bar group-${groupOf(n.kind)}${state}${n.guess ? ' guess' : ''}${n.loose ? ' loose' : ''}${n.gate ? ' gate' : ''}`, transform: `translate(${n.x},${n.y})` },
+          { class: `rm-node g-node bar group-${groupOf(n.starter)}${state}${n.guess ? ' guess' : ''}${n.loose ? ' loose' : ''}${n.gate ? ' gate' : ''}`, transform: `translate(${n.x},${n.y})` },
           hint,
           n.gate ? s('path', { class: 'box', d: `M0,${n.h / 2} L7,${n.h / 2 - 7} L14,${n.h / 2} L7,${n.h / 2 + 7} z` }) : s('rect', { class: 'box', width: n.w, height: n.h, rx: 3 }),
           ...n.fills.map((f) => s('rect', { class: f.over ? 'over' : 'used', x: f.x, y: 1, width: Math.min(f.w, n.w - f.x), height: n.h - 2 })),
@@ -270,7 +270,7 @@ export function drawGraph({ nodes, edges, byId, focus, axis }, prefs) {
         )
       : s(
           'g',
-          { class: `rm-node g-node group-${groupOf(n.kind)}${state}`, transform: `translate(${n.x},${n.y})` },
+          { class: `rm-node g-node group-${groupOf(n.starter)}${state}`, transform: `translate(${n.x},${n.y})` },
           hint,
           s('rect', { class: 'box', width: n.w, height: n.h, rx: 7 }),
           s('rect', { class: 'stripe', x: 0, y: 8, width: 3, height: n.h - 16, rx: 1.5 }),

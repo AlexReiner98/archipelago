@@ -1,6 +1,6 @@
 // The type table: every type and relation the workspace has used, kept in its database. When a workspace opens,
 // what the packs define now is written there as active; what is there and no pack defines any more turns dormant,
-// and the registry takes it back in, so the items of a removed pack keep their kind, statuses, fields and
+// and the registry takes it back in, so the items of a removed pack keep their starter, statuses, fields and
 // capabilities. A definition that changed (a pack upgraded, or added back after a while) is logged with what changed.
 // A type that took another over (moved_from) takes its items once the old one is defined by no pack; a relation, its links.
 
@@ -59,7 +59,8 @@ export async function syncTypes(given: Archipelago): Promise<{ activated: string
   const { rows } = await l.db.query<Row>(`select id, what, pack, state, def from type_def`);
   const kept = new Map(rows.map((r) => [r.id, r]));
   const live: Row[] = [
-    ...[...reg.types.values()].filter((t) => !t.dormant).map((def) => ({ id: def.id, what: 'type' as const, pack: def.pack, state: 'active' as const, def })),
+    // Stored with `kind`, its starter: what the database fills an item's kind column from (src/head.ts, ITEM_KIND).
+    ...[...reg.types.values()].filter((t) => !t.dormant).map((def) => ({ id: def.id, what: 'type' as const, pack: def.pack, state: 'active' as const, def: { ...def, kind: def.starter } })),
     ...[...reg.relations.values()].filter((r) => !r.dormant).map((def) => ({ id: def.id, what: 'relation' as const, pack: def.pack, state: 'active' as const, def })),
   ];
   const now = new Set(live.map((r) => r.id));

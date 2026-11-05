@@ -6,12 +6,12 @@
 
 import type { Entry, Fact } from './log.ts';
 import type { Q } from './db.ts';
-import { itemStep, isLink, linkStep, MOVED, runs, type Kinds } from './project.ts';
+import { itemStep, isLink, linkStep, MOVED, runs, type TypesRead } from './project.ts';
 import { joined, regather } from './closure.ts';
 import { mentioned } from './mentions.ts';
 
 // The pure part, one file the page runs too (src/project.ts): kept importable from here, where it always was.
-export { isLink, kindsOf, MOVED, type Kinds } from './project.ts';
+export { isLink, typesOf, MOVED, type TypesRead } from './project.ts';
 
 type Props = Record<string, unknown>;
 
@@ -26,7 +26,7 @@ export const FORGET_ROWS = [`update entity set owner = null where owner = $1`, `
   `delete from part_closure where ancestor = $1 or descendant = $1`, `delete from mention where from_id = $1 or to_id = $1`];
 
 /** One run of facts on an item, folded (src/project.ts) and written into entity. */
-async function item(tx: Q, reg: Kinds, at: string, moved: boolean, id: string, run: Fact[]) {
+async function item(tx: Q, reg: TypesRead, at: string, moved: boolean, id: string, run: Fact[]) {
   const { rows } = await tx.query<{ type: string; status: string }>(`select type, status from entity where id = $1`, [id]);
   const step = itemStep(reg, at, id, run, rows[0]);
   if ('skip' in step) return;
@@ -55,7 +55,7 @@ async function item(tx: Q, reg: Kinds, at: string, moved: boolean, id: string, r
 }
 
 /** One run of facts on a link, folded (src/project.ts) and written into relation, with what is inside what after it. */
-async function link(tx: Q, reg: Kinds, at: string, id: string, run: Fact[]) {
+async function link(tx: Q, reg: TypesRead, at: string, id: string, run: Fact[]) {
   const { rows } = await tx.query<{ id: string; type: string; from_id: string }>(`select id, type, from_id from relation where id = $1`, [id]);
   const was = rows[0];
   const step = linkStep(at, id, run, Boolean(was));
@@ -82,7 +82,7 @@ async function link(tx: Q, reg: Kinds, at: string, id: string, run: Fact[]) {
  * Facts said at a moment, projected into entity and relation in order. moved: a pack moved a type or a kind, and
  * the items' time stays. The write path calls it op by op, so each op reads what the ones before it did.
  */
-export async function projectFacts(tx: Q, reg: Kinds, at: string, facts: Fact[], moved = false): Promise<void> {
+export async function projectFacts(tx: Q, reg: TypesRead, at: string, facts: Fact[], moved = false): Promise<void> {
   for (const run of runs(facts)) {
     const id = run[0][1];
     // A link's id says it is one: an item may have a field called link of its own.
@@ -114,7 +114,7 @@ export async function projectDecision(tx: Q, e: Entry): Promise<void> {
 }
 
 /** One entry of any stream, projected: its facts, then what it says of the review queue. */
-export async function projectEntry(tx: Q, reg: Kinds, e: Entry): Promise<void> {
+export async function projectEntry(tx: Q, reg: TypesRead, e: Entry): Promise<void> {
   if (e.stream === 'facts') await projectFacts(tx, reg, e.at, e.facts, MOVED.includes(e.action as string));
   await projectDecision(tx, e);
 }
@@ -130,7 +130,7 @@ export const inOrder = (a: Entry, b: Entry) =>
  * Every projection made again from the log: the tables emptied, then each entry of both streams projected in the
  * order it was appended. Run on a copy of the log (the test does); src/rebuild.ts does it in the background.
  */
-export async function rebuild(tx: Q, reg: Kinds, all: Entry[]): Promise<void> {
+export async function rebuild(tx: Q, reg: TypesRead, all: Entry[]): Promise<void> {
   for (const table of PROJECTED) await tx.query(`delete from ${table}`);
   for (const e of [...all].sort(inOrder)) await projectEntry(tx, reg, e);
 }

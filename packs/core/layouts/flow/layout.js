@@ -10,7 +10,7 @@ import { assemble, shelfOf } from './assemble.js';
 import { count } from './count.js';
 import { directions } from './direction.js';
 import { finisher } from './finish.js';
-import { flatten, ORDER } from './graph.js';
+import { flatten, isOf, ORDER } from './graph.js';
 import { hangsOf, partsOf } from './hangs.js';
 import { pair } from './polyline.js';
 import { drawnPart, linksOf } from './search.js';
@@ -86,8 +86,8 @@ function drawnOut({ items: given, links: told = [], undrawn = [], headless = ['p
   const z = lengthsOf(sizes), { gap } = z, margin = sizes.flow_margin, stepSize = (id) => nodes.get(id);
   // A link from an item to an actor (waits on, owned by) is drawn from the actor to the item, as the order is drawn from
   // what is depended on: the person first, the head on what they act on (the owner, 4 Nov 2026). `flipped` says so.
-  const kindOf = new Map(items.map((i) => [i.id, i.kind]));
-  const toActor = (l) => kindOf.get(l.to) === 'actor' && kindOf.get(l.from) !== 'actor';
+  const actor = new Set(items.filter((i) => isOf(i, 'actor')).map((i) => i.id));
+  const toActor = (l) => actor.has(l.to) && !actor.has(l.from);
   const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ ...(toActor(l) ? { a: l.to, b: l.from, flipped: true } : { a: l.from, b: l.to }), type: l.type, ...(l.pending && { pending: l.pending }) }));
   const chains = edges.map((e) => ({ ...e, key: `${e.a} ${e.b}`, path: [e.a, e.b], dashed: potential.has(e.b) }));
   const every = [...chains, ...ties], twins = routesOf(every);

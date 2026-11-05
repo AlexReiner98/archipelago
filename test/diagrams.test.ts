@@ -55,7 +55,7 @@ test('the XML escapes what it is given and refuses an edge to nothing', () => {
 
 test('every type is drawn under what it extends, down to the kinds, and an unknown parent is refused', () => {
   const packs: PackFile[] = [
-    { id: 'core', types: [{ id: 'work', kind: true }, { id: 'question', kind: true }, { id: 'system', kind: true }, { id: 'lens', extends: 'system' }], links: [{ id: 'relates_to', root: true }, { id: 'about', root: true }] },
+    { id: 'core', types: [{ id: 'work' }, { id: 'question' }, { id: 'system' }, { id: 'lens', extends: 'system' }], links: [{ id: 'relates_to', root: true }, { id: 'about', root: true }] },
     { id: 'work', requires: ['core'], types: [{ id: 'task', extends: 'work', capabilities: { bound: {}, where: {} } }], links: [{ id: 'based_on', extends: 'relates_to', from: ['*'], to: ['task'] }] },
     { id: 'lab', requires: ['core', 'work'], types: [{ id: 'lab.trial', extends: 'task' }, { of: 'task', fields: { cost: {} } }] },
   ];

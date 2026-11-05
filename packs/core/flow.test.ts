@@ -13,15 +13,15 @@ import { count } from './layouts/flow/count.js';
 import { layout } from './layouts/flow/layout.js';
 
 const state = { blocked: false, waits_on: [], sessions: 0 };
-const item = (id: string, kind = 'work', extra: Record<string, unknown> = {}) => ({ id, kind, inside: 'r', title: `Step ${id}`, place: 0, open: true, status: 'todo', state, ...extra });
+const item = (id: string, type = 'work', extra: Record<string, unknown> = {}) => ({ id, type, inside: 'r', title: `Step ${id}`, place: 0, open: true, status: 'todo', state, ...extra });
 /** b depends on a: a leads to b. */
 const dep = (b: string, a: string, says?: string) => ({ kind: 'depends_on', from: b, to: a, ...(says && { says }) });
 const measure = (text: string, px: number) => text.length * px * 0.55;
 // Laid out by the house style's lengths, as the page lays it out (packs/core/pack.json).
 const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
-const run = (items: any[], links: any[]) => layout({ items: [{ ...item('r', 'aim'), inside: null }, ...items], links, measure, sizes: house.sizes, shapes: { kind: house.kind_shapes } });
+const run = (items: any[], links: any[]) => layout({ items: [{ ...item('r', 'aim'), inside: null }, ...items], links, measure, sizes: house.sizes, shapes: { type: house.type_shapes } });
 /** A flat lens's answer: items with no inside, place or state; links each with its type. */
-const flat = (id: string, extra: Record<string, unknown> = {}) => ({ id, kind: 'work', type: 'task', title: `Step ${id}`, open: true, status: 'todo', ...extra });
+const flat = (id: string, extra: Record<string, unknown> = {}) => ({ id, type: 'task', is: ['work'], title: `Step ${id}`, open: true, status: 'todo', ...extra });
 const link = (type: string, from: string, to: string) => ({ id: `r_${from}${to}`, type, from, to });
 
 /**
@@ -37,7 +37,7 @@ function timed<T>(f: () => T): [T, number] {
 
 const wires = (g: any) => [...g.chains, ...g.ties].map((w: any) => w.points);
 /** What is drawn from `items` with nothing above them: `run` puts one item over all the rest. */
-const alone = (items: any[], links: any[], extra: Record<string, unknown> = {}) => layout({ items: items.map((i) => ({ ...i, inside: null })), links, measure, sizes: house.sizes, shapes: { kind: house.kind_shapes }, ...extra });
+const alone = (items: any[], links: any[], extra: Record<string, unknown> = {}) => layout({ items: items.map((i) => ({ ...i, inside: null })), links, measure, sizes: house.sizes, shapes: { type: house.type_shapes }, ...extra });
 
 function checks(g: any) {
   const steps = g.all;
@@ -128,7 +128,9 @@ test('a large answer is laid out within the budget', () => {
   const items = Array.from({ length: n }, (_, k) => item(`s${k}`));
   const links = items.slice(1).flatMap((_, k) => [dep(`s${k + 1}`, `s${k}`), ...(k > 2 ? [dep(`s${k + 1}`, `s${k - 3}`)] : [])]);
   const [g, took] = timed(() => run(items, links));
-  assert.ok(took < 3000, `laid out in ${Math.round(took)} ms of work`);
+  // 3300 since 5 Nov 2026: main ran near 3000 on CI, and a free choice of order by when made (task e_6z86je33) gives the
+  // wires about a tenth more to route here (shape.js), about 1.04 s of work on a laptop against 0.94 before.
+  assert.ok(took < 3300, `laid out in ${Math.round(took)} ms of work`);
   checks(g);
 });
 
@@ -177,7 +179,7 @@ test('a chain too long to fold into a comb is drawn', () => {
 });
 
 test('nothing to draw is an empty picture', () => {
-  const g = layout({ items: [], links: [], measure, sizes: house.sizes, shapes: { kind: house.kind_shapes } });
+  const g = layout({ items: [], links: [], measure, sizes: house.sizes, shapes: { type: house.type_shapes } });
   assert.equal(g.all.length, 0);
   assert.ok(g.width <= house.sizes.flow_margin, 'nothing but the margin');
 });
@@ -192,9 +194,9 @@ test('the item a picture is of is a step like any other, tied to what is part of
 });
 
 test("a flat lens's answer is drawn: every item a step, part_of a tie, depends_on the order, nothing nested", () => {
-  const items = [flat('p', { type: 'project' }), flat('a'), flat('b'), flat('c'), flat('d'), flat('q', { kind: 'question' }), flat('t', { kind: 'aim', type: 'tag' })];
+  const items = [flat('p', { type: 'project' }), flat('a'), flat('b'), flat('c'), flat('d'), flat('q', { type: 'question', is: [] }), flat('t', { type: 'tag', is: ['aim'] })];
   const links = [link('part_of', 'a', 'p'), link('part_of', 'b', 'p'), link('part_of', 'c', 'p'), link('depends_on', 'b', 'a'), link('depends_on', 'c', 'b'), link('link', 'q', 'c'), link('tagged', 'd', 't')];
-  const g = layout({ items, links, undrawn: ['tagged'], measure, sizes: house.sizes, shapes: { kind: house.kind_shapes } });
+  const g = layout({ items, links, undrawn: ['tagged'], measure, sizes: house.sizes, shapes: { type: house.type_shapes } });
   checks(g);
   assert.deepEqual([...g.nodes.values()].map((n: any) => n.id).sort(), ['a', 'b', 'c', 'd', 'p', 'q', 't'], 'every item a step');
   assert.deepEqual(g.chains.map((c: any) => c.key), ['a b', 'b c'], 'the order');
@@ -217,7 +219,7 @@ test('many leaves of one, in no order, fold beside it, each tie a line of its ow
 
 test('leaves lean to the shape asked for: down a narrow pane, across a wide one', () => {
   const leaves = Array.from({ length: 13 }, (_, k) => item(`l${k}`, 'question'));
-  const at = (aspect: number) => layout({ items: [{ ...item('r'), inside: null }, ...leaves], links: [], measure, sizes: house.sizes, shapes: { kind: house.kind_shapes }, aspect });
+  const at = (aspect: number) => layout({ items: [{ ...item('r'), inside: null }, ...leaves], links: [], measure, sizes: house.sizes, shapes: { type: house.type_shapes }, aspect });
   const [narrow, wide] = [at(0.5), at(2)];
   checks(narrow);
   checks(wide);
@@ -227,7 +229,7 @@ test('leaves lean to the shape asked for: down a narrow pane, across a wide one'
 
 test('what is tied to nothing is a step of its own, set apart from the rest', () => {
   const top = (id: string, extra: Record<string, unknown> = {}) => ({ ...item(id), inside: null, ...extra });
-  const g = layout({ items: [top('a'), top('b'), top('c'), top('p', { kind: 'actor' })], links: [dep('b', 'a'), { kind: 'waits_on', from: 'b', to: 'p' }], measure, sizes: house.sizes, shapes: { kind: house.kind_shapes } });
+  const g = layout({ items: [top('a'), top('b'), top('c'), top('p', { type: 'actor' })], links: [dep('b', 'a'), { kind: 'waits_on', from: 'b', to: 'p' }], measure, sizes: house.sizes, shapes: { type: house.type_shapes } });
   checks(g);
   assert.ok(g.nodes.has('c') && g.nodes.has('p'), 'started on the canvas and not yet wired up, it is drawn; one waited on too');
   assert.ok(g.ties.some((t: any) => t.type === 'waits_on' && t.a === 'p' && t.b === 'b' && t.flipped), 'waits_on is a tie, drawn from the person to what waits on them');
@@ -242,7 +244,7 @@ test('a large map wraps its wide layers into rows: it comes out about the page\'
     for (let k = 0; k < 9; k++) (items.push(flat(`p${p}.${k}`)), links.push(link('part_of', `p${p}.${k}`, `p${p}`)));
   }
   assert.ok(items.length > 60);
-  const g = layout({ items, links, measure, sizes: house.sizes, shapes: { kind: house.kind_shapes } });
+  const g = layout({ items, links, measure, sizes: house.sizes, shapes: { type: house.type_shapes } });
   assert.ok(g.width / g.height < 4, `${Math.round(g.width)} wide by ${Math.round(g.height)} tall`);
   assert.ok(g.y.get('p0') > g.y.get('top') && g.y.get('p7') > g.y.get('top'), 'what is part of something sits under it');
   assert.ok(Math.abs(g.y.get('p0.0') - g.y.get('p0')) < g.height / 2, 'and keeps near it');

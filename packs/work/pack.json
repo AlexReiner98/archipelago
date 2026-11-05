@@ -2,7 +2,7 @@
   "id": "work",
   "version": "0.1.0",
   "title": "Work",
-  "description": "Projects and the work in them: tasks, decisions, issues, meetings, ideas, notes, files, documents and procedures, and what ties them to the people they are for. On in every workspace unless the owner turns it off.",
+  "description": "Projects and the work in them: issues, meetings, ideas, notes, files, documents and procedures, and what ties them to the people they are for. On in every workspace unless the owner turns it off.",
   "requires": ["core"],
   "types": [
     {
@@ -20,38 +20,6 @@
         "hub_at": { "type": "number", "description": "How many open things an item in this project holds before it is a hub: an item with views of its own, owed them when it has none. 12 when not set. While a project is being shaped, set 1: nearly everything in it is then a hub." },
         "recheck_days": { "type": "number", "description": "How often, in days, an agent re-checks this project's oldest open items against its repository. Weekly when not set; 0 turns it off." },
         "rechecked_at": { "type": "datetime", "description": "When an agent last re-checked this project's oldest items.", "system": true }
-      }
-    },
-    {
-      "id": "task",
-      "moved_from": ["work.task"],
-      "capabilities": { "bound": { "field": "due", "limit": "today" }, "where": { "link": "lives_in" } },
-      "extends": "work",
-      "title": "Task",
-      "description": "A piece of work someone can do. A commitment is a task with an owed_to relation.",
-      "statuses": { "open": ["todo", "doing", "waiting"], "closed": ["done", "dropped"] },
-      "fields": {
-        "due": { "type": "date" },
-        "priority": { "type": "enum", "values": ["low", "normal", "high", "urgent"] },
-        "recurrence": { "type": "string", "description": "How often it repeats, in plain words or an RRULE." },
-        "tokens_estimated": { "type": "number", "description": "How many tokens an agent expects this to take, one number: input and output together, not counting cached re-reads. Whoever plans it or picks it up says; it can be corrected." },
-        "tokens_used": { "type": "number", "description": "Tokens spent on it so far, measured from the sessions that worked on it.", "system": true }
-      }
-    },
-    {
-      "id": "decision",
-      "moved_from": ["work.decision"],
-      "capabilities": { "bound": { "field": "due", "limit": "today" }, "settles": { "by": "word", "whose": "owner", "choices": "options", "chosen": "outcome", "why": "rationale", "on": "decided_on" } },
-      "extends": "question",
-      "title": "Decision",
-      "description": "Something decided, or still open, with its reasoning. The title is the question.",
-      "statuses": { "open": ["open"], "closed": ["decided", "reversed"] },
-      "fields": {
-        "due": { "type": "date" },
-        "options": { "type": "json", "description": "The choices being weighed, as a list of short strings, e.g. [\"Hosted API\", \"Local model\"].", "shown": true },
-        "outcome": { "type": "string", "description": "What was chosen.", "shown": true },
-        "rationale": { "type": "string", "description": "Why." },
-        "decided_on": { "type": "date" }
       }
     },
     {

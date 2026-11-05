@@ -15,9 +15,9 @@ export function schemaBrief(registry: Registry) {
     packs: registry.packs.map((p) => p.id),
     types: types.map((t) => ({
       id: t.id,
-      kind: t.kind ?? 'system',
+      ...(t.starter !== t.id && { starter: t.starter }),
       statuses: `${t.statuses.open.join(' ')} / ${t.statuses.closed.join(' ')}`,
-      // owner and confidence first, where its kind declares them: the head's other fields a writer sets.
+      // owner and confidence first, where its starter declares them: the head's other fields a writer sets.
       fields: Object.entries({ ...t.columns, ...t.fields }).filter(([name, f]) => !f.system && name !== 'status').map(([name, f]) => field(name, f as FieldDef)).join('; ') || undefined,
     })),
     relations: Object.fromEntries(relations.map((r) => [r.id, `${r.from.join(' ')} -> ${r.to.join(' ')}`])),
@@ -28,7 +28,7 @@ export function schemaBrief(registry: Registry) {
 
 /** One type, relation or pack whole, as the full description has it. */
 export function schemaOf<T extends { types: { id: string; pack: string }[]; relations: { id: string; pack: string }[] }>(described: T, name: string) {
-  // A type or relation by that name comes first: "work" is a kind before it is a pack.
+  // A type or relation by that name comes first: "work" is a type before it is a pack.
   const named = (x: { id: string }) => x.id === name;
   const byId = described.types.some(named) || described.relations.some(named);
   const match = byId ? named : (x: { pack: string }) => x.pack === name;

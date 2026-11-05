@@ -131,7 +131,7 @@ test("an agent's change reaches a store holding a flat lens's answer, with no le
     { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
   ]);
   const { Replica } = (await pageModules()).replica;
-  const kinds = { ...l.registry, isOpen: (t: string, s: string) => l.registry.isOpen(t, s), type: (t: string) => l.registry.type(t), relationFamily: (...r: string[]) => r, shown: (t: string, k: string) => Boolean(l.registry.type(t)?.fields?.[k]?.shown), phase: (t: string, st: string) => l.registry.type(t)?.statuses.phases?.[st], flavour: (k: string) => { const out: string[] = []; for (let r = l.registry.relations.get(k); r?.extends && !out.includes(r.extends); r = l.registry.relations.get(r.extends)) out.push(r.extends); return out; } };
+  const kinds = { ...l.registry, isOpen: (t: string, s: string) => l.registry.isOpen(t, s), type: (t: string) => l.registry.type(t), relationFamily: (...r: string[]) => r, shown: (t: string, k: string) => Boolean(l.registry.type(t)?.fields?.[k]?.shown), phase: (t: string, st: string) => l.registry.type(t)?.statuses.phases?.[st], lineage: (t: string) => l.registry.type(t)?.lineage.slice(1) ?? [], flavour: (k: string) => { const out: string[] = []; for (let r = l.registry.relations.get(k); r?.extends && !out.includes(r.extends); r = l.registry.relations.get(r.extends)) out.push(r.extends); return out; } };
   const lens = { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } };
   const read = () => callTool(l, human, 'view', { name: 'flat', params: lens }) as Promise<any>;
   const tail = (input: Record<string, unknown>) => callTool(l, human, 'tail', input) as Promise<any>;

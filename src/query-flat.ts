@@ -9,9 +9,11 @@
 // row-level security keeps what they may not see out of the seeds, the walk and the links alike.
 
 import { SYSTEM } from './head.ts';
+import { ISLAND, onIslands } from './island-items.ts';
 import type { Archipelago } from './pelago.ts';
 import { checkedAfter, holding, wordConditions, type Narrowing, type Word } from './query-only.ts';
 import { heldIds } from './query-held.ts';
+import { movedIds } from './moved.ts';
 import { endsOf, readTerm, sayTerm, setOf, type Term } from './query-terms.ts';
 import { rankSql, searchIds, slipsOf } from './search.ts';
 import { markOf, sessionStates } from './session-state.ts';
@@ -103,7 +105,7 @@ export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLe
 }
 
 interface Row {
-  id: string; kind: string | null; type: string; title: string; body: string;
+  id: string; type: string; title: string; body: string;
   visibility: string; status: string; is_open: boolean; owner: string | null;
   props: Record<string, unknown>; created_at: Date; updated_at: Date;
 }
@@ -179,10 +181,11 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   const seedOf = async (term: Term, most: number): Promise<string[]> => {
     if (term.sort === 'id') return hidden ? [] : holds((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${[saidNot ? keep(2) : 'e.archived_at is null', ...numbered(terms, saidNot ? 2 + leftOut.length : 2)].join(' and ')}`, [[term.id], ...(saidNot ? leftOut : []), ...narrowing])).rows.map((r) => r.id));
     if (term.sort === 'type') return holds(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [l.registry.family(term.type), most]));
-    if (term.sort === 'held') return holds(await seed((k) => `select e.id from entity e where e.id = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [await heldIds(l), most]));
-    if (term.sort !== 'link' && term.sort !== 'related' && term.sort !== 'in') return [];
+    if (term.sort === 'held' || term.sort === 'moved') return holds(await seed((k) => `select e.id from entity e where e.id = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [term.sort === 'held' ? await heldIds(l) : await movedIds(l), most]));
+    if (term.sort !== 'link' && term.sort !== 'related' && term.sort !== 'in' && term.sort !== 'island') return [];
     const at = await endsOf(l, term, me);
     if (!at.length) return [];
+    if (term.sort === 'island') return holds(await seed((k) => `select e.id from entity e where ${onIslands('$1')} and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
     if (term.sort === 'in') return holds(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
     if (term.sort === 'related') return holds(await seed((k) => `select e.id from relation r join entity e on e.id = case when r.from_id = any($1::text[]) then r.to_id else r.from_id end where (r.from_id = any($1::text[]) or r.to_id = any($1::text[])) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
     const [near, far] = term.back ? ['to_id', 'from_id'] : ['from_id', 'to_id'];
@@ -216,11 +219,11 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   // The seeds, each narrowed: ids first, then what a link term finds, what is related, what is in an item, what the
   // text finds, the newest of each type named.
   for (const t of finds) if (t.sort === 'id') add(await seedOf(t, 1), 'id', [t]);
-  for (const t of finds) if (t.sort === 'held') add(await seedOf(t, reach()), 'id', [t]);
+  for (const t of finds) if (t.sort === 'held' || t.sort === 'moved') add(await seedOf(t, reach()), 'id', [t]);
   for (const t of finds) if ((t.sort === 'link' || t.sort === 'related') && room() > 0) add(await seedOf(t, reach()), 'link', [t]);
   // What is in an item, at any depth, read from the part_of closure (decision e_tvsdqjeq), the newest first; in an item
   // the viewer cannot see, nothing is.
-  for (const t of finds) if (t.sort === 'in' && room() > 0) add(await seedOf(t, reach()), 'in', [t]);
+  for (const t of finds) if ((t.sort === 'in' || t.sort === 'island') && room() > 0) add(await seedOf(t, reach()), 'in', [t]);
   // The text is the search read's own (src/search.ts): the words in any form in the title or note, or as typed anywhere
   // in the title, the best match first; only when that finds nothing, titles with a word close to what was typed.
   // How many it found in all is kept (`matched`), counted over what the viewer may see and the filter keeps; an item
@@ -267,7 +270,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
 
   const cut = sent.size > lens.limit;
   const kept = [...sent].slice(0, lens.limit);
-  const { rows } = await l.db.query<Row>(`select id, kind, type, title, case when id = any($2::text[]) then body else left(body, ${NOTE_START + 1}) end as body, visibility, status, is_open, owner, ${l.props}, created_at, updated_at from entity where id = any($1::text[])`, [kept, whole ? kept.slice(0, NOTES_WHOLE_MOST) : []]);
+  const { rows } = await l.db.query<Row>(`select id, type, title, case when id = any($2::text[]) then body else left(body, ${NOTE_START + 1}) end as body, visibility, status, is_open, owner, ${l.props}, created_at, updated_at from entity where id = any($1::text[])`, [kept, whole ? kept.slice(0, NOTES_WHOLE_MOST) : []]);
   const wholeIds = new Set(whole ? kept.slice(0, NOTES_WHOLE_MOST) : []);
   const byId = new Map(rows.map((r) => [r.id, r]));
   const items = kept.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
@@ -283,6 +286,11 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   // Each run sent says where its session stands (src/session-state.ts), read for all of them at once.
   const runTypes = new Set(l.registry.family('run'));
   const states = await sessionStates(l, items.filter((e) => runTypes.has(e.type)).map((e) => e.id));
+  // Where each lives, on a map with islands on (src/island-items.ts), and each island's name, in the order they come: a
+  // drawing draws each island's border from them (task e_auw7hb3v). Read for those sent alone.
+  const islandOf = (e: Row) => (l.registry.onIslands && typeof e.props?.[ISLAND] === 'string' ? (e.props[ISLAND] as string) : undefined);
+  const islandIds = [...new Set(items.flatMap((e) => islandOf(e) ?? []))];
+  const named = new Map(islandIds.length ? (await l.db.query<{ id: string; title: string }>(`select id, title from entity where id = any($1::text[])`, [islandIds])).rows.map((r) => [r.id, r.title]) : []);
   // An end said by name goes back in the lens as its id.
   lens.find = finds.map(sayTerm);
   lens.only = onlys.map(sayTerm);
@@ -295,7 +303,10 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
       const type = l.registry.type(e.type), defs = type?.fields ?? {};
       const fields = Object.fromEntries(Object.entries(e.props ?? {}).filter(([key, value]) => defs[key]?.shown && value != null));
       return {
-        id: e.id, kind: e.kind, type: e.type, title: e.title,
+        id: e.id, type: e.type,
+        // What its type is a flavour of, nearest first (task: work), as a link says it: a drawing reads shapes and colours by it.
+        ...(type && type.lineage.length > 1 && { is: type.lineage.slice(1) }),
+        title: e.title,
         // The start of the note, for a hover: the whole of it is on the item's page (or here, asked for whole).
         ...(e.body && { body: e.body.length > NOTE_START && !wholeIds.has(e.id) ? `${e.body.slice(0, NOTE_START)}…` : e.body }),
         // Where it stands in its course (src/phases.ts), so every drawing reads one phase and keeps no registry.
@@ -303,6 +314,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
         ...(states.has(e.id) && { session: markOf(states.get(e.id)!) }),
         created_at: e.created_at, updated_at: e.updated_at,
         ...(Object.keys(fields).length && { fields }),
+        ...(islandOf(e) && { island: islandOf(e) }),
         ...(spans && { time: filed!.filed.get(e.id) ?? spans.get(e.id) ?? [] }),
         ...(filed?.lane.has(e.id) && { lane: filed.lane.get(e.id) }),
         ...(filed?.stream.has(e.id) && { stream: filed.stream.get(e.id) }),
@@ -311,6 +323,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
     }),
     // A link that extends another says what it is a flavour of (`is`, nearest first), so a drawing treats it as its root.
     links: relations.map((r) => ({ id: r.id, type: r.type, ...(flavourOf(l, r.type).length && { is: flavourOf(l, r.type) }), from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
+    ...(islandIds.length && { islands: islandIds.map((id) => ({ id, ...(named.has(id) && { title: named.get(id) }) })) }),
     ...(filed && { lanes: filed.lanes, streams: filed.streams }),
     ...(cut && { cut: true }),
     ...(matched !== undefined && { matched }),

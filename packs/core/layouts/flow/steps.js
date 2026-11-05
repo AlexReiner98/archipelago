@@ -1,7 +1,7 @@
 // The steps of a picture: each item a box of its size, as the flow sizes them, the order's wires between them, and a choice
 // nothing follows yet as a step of its own. Pure: an answer in, steps and wires out.
 
-import { acyclic, ORDER, QUIET, reduced } from './graph.js';
+import { acyclic, lineageOf, ORDER, QUIET, reduced } from './graph.js';
 import { lines } from './lines.js';
 
 const need = (set, name) => {
@@ -9,20 +9,22 @@ const need = (set, name) => {
   return set[name];
 };
 
-/** The outlines a step may have: in the house style, one for each kind (decision e_u8aytubm). */
+/** The outlines a step may have: in the house style, one for each of core's starter types (decision e_u8aytubm). */
 export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab'];
+/** The type in an item's lineage nearest it that the style gives an outline (`shapes.type`), if any. */
+export const shapedBy = (i, shapes = {}) => lineageOf(i).find((t) => SHAPES.includes(shapes.type?.[t]));
 /** How far each outline cuts into its box, by the size the style names for it: none for a box, diamond, pill or sheet. */
 const BEVEL = { cut: 'flow_cut', hexagon: 'flow_point', flag: 'flow_point', tab: 'flow_tab' };
 
 /**
  * Each item a step with its size, as the flow sizes them; a choice nothing follows yet is a step of its own. Its outline
- * is its kind's, as the style says (`shapes.kind`), or its type's where the style gives the type one (`shapes.type`).
+ * is the one the style gives its type (`shapes.type`), else the nearest type it is a flavour of that has one, else a box.
  */
 export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
   const [MAX_TEXT, TEXT, STUB_TEXT, DIAMOND_PAD, DIAMOND_H, END_PAD, END_H, BOX_PAD, BOX_H, SHEET_H] = ['flow_max_text', 'flow_text', 'flow_stub_text', 'flow_diamond_pad', 'flow_diamond_height', 'flow_end_pad', 'flow_end_height', 'flow_box_pad', 'flow_box_height', 'flow_sheet_height'].map((n) => need(sizes, n));
-  const named = (shape) => (SHAPES.includes(shape) ? shape : undefined);
-  const shapeOf = (i) => named(shapes.type?.[i.type]) ?? named(shapes.kind?.[i.kind]) ?? 'box';
+  const shapeOf = (i) => shapes.type?.[shapedBy(i, shapes)] ?? 'box';
   const nodes = new Map();
+  // The items come made first (./graph.js): a place the answer gives (a run's, ./session.js) goes before that.
   for (const i of [...items].sort((a, b) => (a.place ?? 0) - (b.place ?? 0))) nodes.set(i.id, { id: i.id, item: i, shape: shapeOf(i) });
   const seen = new Set();
   let edges = [];
@@ -34,7 +36,7 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
     (Array.isArray(d.item.choices) ? d.item.choices : []).forEach((option, k) => {
       if (taken.has(option)) return;
       const id = `${d.id}:${k}`;
-      nodes.set(id, { id, stub: true, shape: 'end', item: { id: d.id, title: option, open: true, status: 'a scenario', state: QUIET } });
+      nodes.set(id, { id, stub: true, shape: 'end', item: { id: d.id, title: option, open: true, status: 'a scenario', state: QUIET, ...(d.item.island && { island: d.item.island }) } });
       edges.push({ a: d.id, b: id, says: option });
     });
   }
@@ -56,5 +58,8 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
     if (BEVEL[n.shape]) n.bevel = need(sizes, BEVEL[n.shape]);
     if (n.shape === 'hexagon' || n.shape === 'flag') n.w += n.bevel * (n.shape === 'hexagon' ? 2 : 1);
   }
+  // Each step's place in the order it was made, a choice not followed after every item: what a free choice goes by.
+  let made = 0;
+  for (const n of nodes.values()) n.made = made++;
   return { nodes, edges, potential };
 }

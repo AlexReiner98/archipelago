@@ -20,7 +20,7 @@ const measure = (t: string, px: number) => t.length * px * 0.55;
 const { count } = await import(pathToFileURL(join(laid, 'count.js')).href);
 
 const state = { blocked: false, waits_on: [], sessions: 0, needs_you: false };
-const item = (id: string, kind = 'work') => ({ id, kind, type: 'task', title: `Step ${id}`, open: true, status: 'todo', state, fields: {} });
+const item = (id: string, kind = 'work') => ({ id, type: 'task', is: [kind], title: `Step ${id}`, open: true, status: 'todo', state, fields: {} });
 const link = (type: string, from: string, to: string) => ({ id: `r_${type}${from}${to}`, type, from, to });
 
 /**

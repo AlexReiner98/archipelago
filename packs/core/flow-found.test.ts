@@ -16,7 +16,7 @@ for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id ===
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 const measure = (t: string, px: number) => t.length * px * 0.55;
 const state = { blocked: false, waits_on: [], sessions: 0, needs_you: false };
-const item = (id: string, title: string, why: Record<string, unknown>) => ({ id, kind: 'work', type: 'task', title, open: true, status: 'todo', state, ...why });
+const item = (id: string, title: string, why: Record<string, unknown>) => ({ id, type: 'task', is: ['work'], title, open: true, status: 'todo', state, ...why });
 const draw = (items: any[]) => picture({ answer: { items, links: [{ type: 'part_of', from: 'e_roofzzzz', to: 'e_sitezzzz' }] }, style: house, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene;
 /** The ids of the steps drawn dimmed. */
 function dimmed(scene: unknown): string[] {

@@ -80,8 +80,8 @@ test('the kernel names no pack', () => {
 // bare name too. What was counted on that day is words that are also some pack's type name (a capability, a view, a
 // verb's action): no new one may be added.
 const NAMES_PACK_TYPES: Record<string, number> = {
-  'src/agent-run.ts': 1, 'src/altitude.ts': 1, 'src/attention.ts': 1, 'src/brief.ts': 1, 'src/capabilities.ts': 2, 'src/confirm.ts': 1, 'src/declared.ts': 3,
-  'src/diagram-types.ts': 1, 'src/documents.ts': 1, 'src/eventlog.ts': 1, 'src/launcher.ts': 1, 'src/query-presets.ts': 1, 'src/query-saved.ts': 1, 'src/looks.ts': 1,
+  'src/agent-run.ts': 1, 'src/altitude.ts': 1, 'src/attention.ts': 1, 'src/capabilities.ts': 2, 'src/confirm.ts': 1, 'src/declared.ts': 3,
+  'src/diagram-types.ts': 1, 'src/documents.ts': 1, 'src/eventlog.ts': 1, 'src/launcher.ts': 1, 'src/query-saved.ts': 1, 'src/looks.ts': 1,
   'src/manifest.ts': 1, 'src/outside.ts': 1, 'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2, 'src/pg.ts': 1,
   'src/public-document.ts': 1, 'src/public.ts': 2, 'src/replay.ts': 1, 'src/rules.ts': 1, 'src/saved-views.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2,
   'src/session-hook.ts': 4, 'src/surface.ts': 2, 'src/tail.ts': 1, 'src/tool-reads.ts': 2, 'src/ui-files.ts': 2, 'src/workspace-share.ts': 1,
@@ -95,6 +95,15 @@ test("the kernel names no pack's type by its bare name", () => {
   });
   const named = count(kernelFiles, new RegExp(`['"\`](?:${ids.join('|')})['"\`]`, 'g'));
   assert.deepEqual(ratchet(named, NAMES_PACK_TYPES), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
+});
+
+// The kernel reads no kind (the owner, e_w46v6jf9): core's eight are starter types, and what an item is comes from its type
+// (its starter, lineage, capabilities). The kind column is written from the starter, the `kind <k>` term read through the type;
+// left: the database's own fill of the column, a released schema step that is never edited (src/head.ts, ITEM_KIND).
+const READS_KINDS: Record<string, number> = { 'src/head.ts': 1 };
+const KIND_READ = /\bkindsOf\b|\.kinds\(\)|\b(?:type|get)\([^)]*\)\??\.kind\b|\b(?:type|def|parent|resolved|item|entity)\??\.kind\b|\bkind\s*(?:[!=]==?|<>)\s*['"](?:actor|aim|work|question|record|occurrence|place|system)['"]|\be\.kind\s*(?:=|<>|!=)\s|def->>'kind'/g;
+test('the kernel reads no kind', () => {
+  assert.deepEqual(ratchet(count(kernelFiles, KIND_READ), READS_KINDS), [], "Read the type: its starter, its lineage (registry.isA) or a capability it declares, never an item's kind.");
 });
 
 // 3. Writes to items and relations go through the write path (src/pelago.ts, its apply loop in src/change-apply.ts):
@@ -419,7 +428,7 @@ const LENGTHS_IN_DRAWINGS: Record<string, number> = {
   'architecture/boats.js': 3, 'architecture/deep.js': 32, 'architecture/index.js': 28, 'architecture/islands.js': 18, 'architecture/layout.js': 9, 'architecture/moves.js': 6,
   'architecture/route.js': 8, 'architecture/says.js': 3, 'architecture/sides.js': 1, 'architecture/story.js': 3, 'flow/combs.js': 1, 'flow/direction.js': 1, 'flow/faults.js': 4,
   'flow/index.js': 15, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/search.js': 1,
-  'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 6, 'flow/wrap.js': 2, 'grid/index.js': 8, 'grid/look.js': 1,
+  'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 4, 'flow/wrap.js': 2, 'grid/index.js': 8, 'grid/look.js': 1,
   'pages/index.js': 5, 'time/index.js': 30, 'packs/plan/layouts/meters/index.js': 10,
 };
 const BARE = /(?<![\w.$#])\d+(?:\.\d+)?(?![\w.])/g;

@@ -115,8 +115,8 @@ test("a change a pack's action makes may touch only what the pack declares or re
   assert.equal(kept.status, 'applied', 'its own type is inside its reach');
   const head = (await entries(l.db)).find((e) => e.id === kept.changeset)!;
   assert.deepEqual(head.pack, { id: 'reacher', manifest: l.registry.hashes.get('reacher'), action: 'reacher.keep' }, 'the entry names the pack, its manifest and the action');
-  const task = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: 'Survey' }] })) as { created: Record<string, string> };
-  await assert.rejects(callTool(l, human, 'reacher_rename', { id: task.created.t, title: 'Renamed' }), /The reacher pack touched "Survey", a task it neither declares nor requires/);
+  const task = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'project', title: 'Survey' }] })) as { created: Record<string, string> };
+  await assert.rejects(callTool(l, human, 'reacher_rename', { id: task.created.t, title: 'Renamed' }), /The reacher pack touched "Survey", a project it neither declares nor requires/);
   assert.equal((await l.entity(task.created.t))!.title, 'Survey', 'refused whole');
 
   // A field another pack adds is that pack's: work requires core only, so time's rate on a company is outside it.

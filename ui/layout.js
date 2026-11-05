@@ -17,6 +17,7 @@ import { surfaceOf } from './surface.js';
 import { saidDrawn } from './look.js';
 import { relations, types as registry, typeTitle } from './words.js';
 import { panZoom } from './pan-zoom.js';
+import { transition } from './transition.js';
 
 /**
  * Each drawing's modules, by its hash: a lens answer leaves out those the page already has (`have`). The last few
@@ -278,6 +279,7 @@ ${JSON.stringify(input)}`;
 
   // The marks, in the frame every picture has.
   function mount(scene) {
+    transition(host, keys, style);
     if (scene.message) return host.replaceChildren(h('div', { class: 'empty' }, String(scene.message)));
     const redraw = () => !ended && port.postMessage({ type: 'restyle', style: plain({ ...style, drawing: undefined, code: undefined }) });
     host.redraw = redraw;

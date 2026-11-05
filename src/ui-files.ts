@@ -6,7 +6,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { join } from 'node:path';
 
 /** The app's own modules, each a part of the page (ui/app.js imports them), served at /<name>.js. */
-const APP_MODULES = ['doc-ref', 'base', 'words', 'body', 'forms', 'home', 'held', 'held-card', 'item-held', 'canvas', 'pinch', 'query-bar', 'find', 'find-choices', 'menu-place', 'draft', 'note-count', 'item', 'item-doc', 'item-read', 'item-links', 'item-sections', 'screens', 'attention', 'nav', 'graph', 'graph-draw', 'query', 'query-base', 'list', 'style-code', 'pan-zoom', 'gate', 'proof', 'roadmap', 'live', 'settle', 'week', 'time', 'workspace', 'workspace-cards', 'model-card', 'connections-card', 'members-card', 'styles-card', 'themes-card', 'agents-card', 'connect-agent', 'plates', 'theme', 'token-piece', 'token-ask', 'turns', 'canvases', 'diagram', 'start', 'plan-card', 'doc-lens', 'marks', 'reader-frame', 'view-frame', 'sheet-follow', 'layout', 'layout-tip', 'tip', 'surface', 'replica', 'ghosts', 'canvas-wires', 'signup', 'authorize', 'text', 'fields', 'field-edit', 'look', 'look-marks', 'panes', 'pane-drag', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'tab-count', 'tab-life', 'pane-land', 'pane-web', 'picker-rank', 'term-pick', 'look-switch', 'canvas-menu', 'only-words', 'term-kinds'];
+const APP_MODULES = ['doc-ref', 'base', 'words', 'body', 'forms', 'home', 'held', 'held-card', 'item-held', 'canvas', 'pinch', 'query-bar', 'find', 'find-choices', 'menu-place', 'draft', 'note-count', 'item', 'item-doc', 'item-read', 'item-links', 'item-sections', 'screens', 'attention', 'nav', 'graph', 'graph-draw', 'query', 'query-base', 'list', 'style-code', 'pan-zoom', 'gate', 'proof', 'roadmap', 'live', 'settle', 'week', 'time', 'workspace', 'workspace-cards', 'model-card', 'connections-card', 'members-card', 'styles-card', 'themes-card', 'agents-card', 'connect-agent', 'plates', 'theme', 'token-piece', 'token-ask', 'turns', 'canvases', 'diagram', 'start', 'plan-card', 'doc-lens', 'marks', 'reader-frame', 'view-frame', 'sheet-follow', 'layout', 'layout-tip', 'tip', 'surface', 'replica', 'changes', 'traces', 'ghosts', 'canvas-wires', 'signup', 'authorize', 'text', 'fields', 'field-edit', 'look', 'look-marks', 'panes', 'pane-drag', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'tab-count', 'tab-life', 'pane-land', 'pane-web', 'picker-rank', 'term-pick', 'look-switch', 'canvas-menu', 'only-words', 'term-kinds'];
 
 export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
@@ -30,6 +30,8 @@ export const UI_FILES: Record<string, string> = {
   '/packs.js': 'packs.js',
   '/query-light.js': 'query-light.js',
   '/lit-by.js': 'lit-by.js',
+  // A scene mounted again moves into place, its marks matched by key (ui/layout.js mounts, ui/transition.js plays).
+  '/transition.js': 'transition.js',
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
   '/draw.html': 'draw.html',
   '/draw.js': 'draw.js',

@@ -24,14 +24,23 @@ export async function loadSchema() {
 export const typeTitle = (id) => types.get(id)?.title ?? id;
 /** A type as a choice in a list: its title, and its pack's name only where another type has the same title. */
 export const typeChoice = (t) => `${t.title}${(state.schema?.types ?? []).some((o) => o.id !== t.id && !o.dormant && o.title === t.title) ? ` (${t.pack})` : ''}`;
-/** What a new item is when nothing says which: the first type of work that can be estimated (a task, where the work pack is on). */
-export const workType = () => (state.schema?.types ?? []).find((t) => !t.dormant && t.kind === 'work' && t.flavour_of === 'work' && t.fields?.tokens_estimated)?.id ?? 'work';
+/** What a new item is when nothing says which: the first type of work that can be estimated (a task). */
+export const workType = () => (state.schema?.types ?? []).find((t) => !t.dormant && t.capabilities?.plannable && t.flavour_of === 'work' && t.fields?.tokens_estimated)?.id ?? 'work';
+/** The starter type a type comes from: the last of its lineage, a type that extends nothing. */
+export const starterOf = (typeId) => {
+  let t = typeId;
+  for (const seen = new Set(); types.get(t)?.flavour_of && !seen.has(t); t = types.get(t).flavour_of) seen.add(t);
+  return t;
+};
 export const statusesOf = (typeId) => {
   const s = types.get(typeId)?.statuses;
   return s ? [...s.open, ...s.closed] : [];
 };
 export const isClosed = (typeId, status) => types.get(typeId)?.statuses.closed.includes(status) ?? false;
+/** Whether a type is the ancestor or a flavour of it; given a link end that names a capability (has:owned), whether it declares it. */
 export const isA = (typeId, ancestor) => {
+  const cap = /^has:(.+)$/.exec(ancestor)?.[1];
+  if (cap) return types.get(typeId)?.capabilities?.[cap] !== undefined;
   for (let t = typeId; t; t = types.get(t)?.flavour_of) if (t === ancestor) return true;
   return false;
 };

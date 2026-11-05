@@ -1,5 +1,5 @@
 // A lens answer drawn as a flat graph on one plane, where depth is never drawn (e_ktdensts): every item a step showing its
-// name in its kind's outline (the style's kind_shapes: in the house style work a box, a question a diamond, an
+// name in its type's outline (the style's type_shapes, read through what the type is a flavour of: in the house style work a box, a question a diamond, an
 // occurrence a pill, a record a sheet with a wavy foot, the system's own a box with cut corners, an actor a hexagon, an
 // aim a flag, a place a box with a tab), where it stands in its course a dot (hollow, half or full, none for what only
 // stands: ./state.js), and colour only for what waits on you and what is in trouble (e_rnyqarfe), the order
@@ -18,12 +18,15 @@
 // item faint, a link dashed, an edit marked on its step), each with a badge keyed `held:<proposal>` that the page
 // answers a click on by putting the change to the person; a link the person just drew (`mine`) is dashed until it is.
 
-import { shownOnly } from './graph.js';
+import { lineageOf, shownOnly } from './graph.js';
 import { layout } from './layout.js';
 import { css } from './look.js';
+import { css as islandCss, islandMarks } from './islands.js';
+import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
 import { drawn } from './polyline.js';
+import { shapedBy } from './steps.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
@@ -35,7 +38,7 @@ import { cut } from './lines.js';
 const HEX = /^#[0-9a-f]{3,8}$/i;
 /** The link type the order's wires are, for their colour. */
 const ORDER_TYPE = 'depends_on';
-/** What the key calls each kind's outline, and the order its rows go in. */
+/** What the key calls the outline of each of core's starter types, and the order its rows go in. */
 const KIND_WORDS = { work: 'Work', question: 'Question', occurrence: 'Event', record: 'Record', system: 'System', actor: 'Person', aim: 'Aim', place: 'Place' };
 const KEY_ORDER = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'end'];
 /** What the key calls each phase, in its order; what only stands has no dot and no row. */
@@ -117,14 +120,14 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const pane = width > 0 && height > 0 ? width / height : ASPECT;
   const aspect = ASPECT * (pane / ASPECT) ** FOLLOW;
   const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
-  const shapes = { kind: record(style.kind_shapes), type: record(style.type_shapes) };
+  const shapes = { type: record(style.type_shapes) };
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
   answer = { ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) };
-  const g = layout({ items: answer.items, links: answer.links ?? [], undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes });
-  const steps = g.all.filter((n) => !n.dummy);
-  if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
-  const size = { width: g.width, height: g.height };
+  const run = (part) => layout({ items: part.items, links: part.links, undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes });
+  // A picture of more than one island is an archipelago (./archipelago.js): each island laid out alone, a sea between.
+  const parts = !story && islandsOf(answer.items).length > 1 ? islandModels({ items: answer.items, links: answer.links ?? [], run }) : null;
+  let g = parts ? null : run({ items: answer.items, links: answer.links ?? [] });
 
   // Where each step stands, read from what is drawn (./state.js): its phase, whether it waits on you, whether it is held up.
   const states = standing({ items: answer.items, links: answer.links ?? [], viewer: answer.viewer, lit: litStates(sessions) });
@@ -160,8 +163,14 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   // A wire is broken where it passes under another; one that is drawn in as a story plays stays whole.
   const line = (w) => drawn(w.points, story ? [] : w.gaps, z('break_half'));
   // A held change's badge: where the person decides it, on the step's corner or a wire's middle. One per mark.
+  // What is held is of the grammar every island shares: the badge says so in a tip of its own, not in a legend.
   let badges = 0;
-  const badge = (pending, [bx, by]) => titled(m('g', { key: `held:${pending.proposal}:${++badges}`, on: ['click'], class: 'lf-held', transform: `translate(${bx} ${by})` }, m('circle', { cx: 0, cy: 0, r: z('held_badge') }), m('text', { x: 0, y: 0 }, '?')), `Held for you${pending.reason ? `: ${pending.reason}` : ''}`);
+  const heldTips = new Map();
+  const badge = (pending, [bx, by]) => {
+    const key = `held:${pending.proposal}:${++badges}`;
+    heldTips.set(key, m('div', { class: 'lf-tip' }, m('b', {}, 'Held for you'), pending.reason && m('span', {}, pending.reason)));
+    return titled(m('g', { key, on: ['click', 'enter', 'leave'], class: 'lf-held', transform: `translate(${bx} ${by})` }, m('circle', { cx: 0, cy: 0, r: z('held_badge') }), m('text', { x: 0, y: 0 }, '?')), `Held for you${pending.reason ? `: ${pending.reason}` : ''}`);
+  };
   const held = (pending) => Boolean(pending?.proposal);
   /** Where a wire's badge goes: the middle of its middle stretch. */
   const middleOf = (points) => {
@@ -190,7 +199,8 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     }
     return out;
   };
-  const linkColours = coloursOf([...new Set([...(g.chains.length ? [ORDER_TYPE] : []), ...g.ties.map((t) => t.type)])].sort(), named, hues);
+  const models = parts ? parts.groups.map((p) => p.model) : [g];
+  const linkColours = coloursOf([...new Set([...(models.some((k) => k.chains.length) ? [ORDER_TYPE] : []), ...models.flatMap((k) => k.ties.map((t) => t.type)), ...(parts?.cross ?? []).map((l) => l.type ?? l.kind)])].sort(), named, hues);
   const colourRules = new Set();
   /** A colour is a class with a rule of its own: a drawing sets no style on a mark. */
   const colourClass = (hex, prefix, variable) => {
@@ -210,6 +220,57 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     return cls;
   };
   const partOf = (id) => (hexOf.has(shownAs.of.get(id)) ? placeClass(hexOf.get(shownAs.of.get(id))) : '');
+  /** A run's session drawn in its dot's place: its state's mark, as the style says (./session.js). */
+  const marked = (i) => sessions.get(sessionOf(i)?.state);
+
+  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/layouts.md): each outline by
+  // the types drawn in it (core's starter types by their words), each phase's dot, and the two colours, where the picture has them.
+  // A row's mark is drawn in a box of its own: G is where its middle is, how wide and tall a step is in it, and a dot's size.
+  const G = { x: 11, y: 7, w: 20, h: 11, r: 4 };
+  const mark = (inner, label) => ({ glyph: m('svg', { width: z('key_width'), height: z('key_height'), viewBox: '0 0 22 14' }, inner), label });
+  const words = (name) => ((w) => w.charAt(0).toUpperCase() + w.slice(1))(String(name).replaceAll('_', ' '));
+  const kindWord = (i) => ((t) => KIND_WORDS[t] ?? words(t))(shapedBy(i, shapes) ?? lineageOf(i).at(-1) ?? 'item');
+  // A story's key has the phases its steps give too.
+  const stepPhases = story ? answer.steps.flatMap((s) => Object.values(s.fields ?? {}).map((f) => f?.phase).filter((p) => typeof p === 'string')) : [];
+  /**
+   * The rows for what these steps and wires use: of the whole picture, or of one island (`local`). An island's legend
+   * holds only its vocabulary, its types and link types (principle e_jxtawgq7: capabilities are a grammar every island
+   * shares, so no legend explains them): the phase dot, a session's state, held up, waits on you, a finding crossing and
+   * what is held for you leave it, each told in a tip on the mark itself.
+   */
+  const keyRows = ({ st, chains, ties, breaks, heldHere, local = false }) => {
+    const drawnAs = new Map();
+    for (const n of st) (drawnAs.get(n.shape) ?? drawnAs.set(n.shape, new Set()).get(n.shape)).add(n.stub ? 'Possible end' : kindWord(n.item));
+    const uses = (test) => !local && st.some(test);
+    const phases = new Set(local ? [] : [...st.filter((n) => !n.stub && (story || !marked(n.item))).map((n) => stateOf(n.item).phase), ...stepPhases].filter((p) => markOf(p) !== 'none'));
+    return [
+      [...drawnAs.keys()].sort((a, b) => KEY_ORDER.indexOf(a) - KEY_ORDER.indexOf(b)).map((shape) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), [...drawnAs.get(shape)].join(', '))),
+      Object.keys(PHASE_WORDS).filter((p) => phases.has(p)).map((p) => mark(dot(`ph-${p} ${markOf(p)}${p === 'trouble' ? ' trouble' : ''}`, markOf(p), G.x, G.y, G.r), PHASE_WORDS[p])),
+      !story && STATES.filter((s) => uses((n) => !n.stub && marked(n.item) && sessionOf(n.item).state === s)).map((s) => mark(stateMark(m, s, sessions.get(s), G.x, G.y, G.r), STATE_WORDS[s])),
+      uses((n) => !n.stub && heldUp(n.item)) && mark(dot('trouble hollow', 'hollow', G.x, G.y, G.r), 'Held up'),
+      uses((n) => !n.stub && yours(n.item)) && mark(m('g', { class: 'lf-step you' }, outline('box', G.x, G.y, G.w, G.h, CORNER)), 'Waits on you'),
+      shownAs.places.filter((p) => st.some((n) => !n.stub && shownAs.of.get(n.id) === p.id)).map((p) => mark(m('g', { class: `lf-step placed ${placeClass(p.hex)}` }, outline('box', G.x, G.y, G.w, G.h, CORNER)), p.within ? `${p.title}, in ${p.within}` : p.title)),
+      chains.length > 0 && mark(m('path', { d: 'M1 7H21', class: `lf-wire${kind(ORDER_TYPE)}` }), 'Leads to'),
+      chains.some((c) => c.dashed) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire dashed' }), 'If chosen'),
+      breaks && mark(m('path', { d: 'M1 7H21M11 0V4M11 10V14', class: 'lf-wire' }), 'Passes under'),
+      // A tie of each type in the colour it is drawn in: its own, or that of what waits on you; "you" said only where both are drawn.
+      ((rows) => rows.map((row) => {
+        const [type, you] = row.split('\n'), cls = `${kind(type)}${you}`, both = rows.includes(`${type}\n`) && rows.includes(`${type}\n you`);
+        return mark(headless.has(type) ? m('path', { d: 'M1 7H21', class: `lf-tie${type === 'part_of' ? ' near' : ''}${cls}` }) : m('g', {}, m('path', { d: 'M1 7H17', class: `lf-tie headed${cls}` }), m('path', { d: 'M21 7L13 3V11Z', class: `lf-head${cls}` })), you && both ? `${linkName(type)} you` : linkName(type));
+      }))([...new Set(ties.map((t) => `${t.type}\n${local ? '' : onYou(t)}`))].sort()),
+      !local && heldHere && mark(m('path', { d: 'M1 7H21', class: 'lf-wire held' }), 'Held for you'),
+    ].flat().filter(Boolean);
+  };
+  // On an archipelago each island carries its own legend, inside it (the owner, 5 Nov 2026): its types and the link
+  // types of its own wires. A link that leaves it is a finding crossing, of the shared grammar, told at its gates.
+  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })]));
+  const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
+  const nameWidth = (id) => z('island_name_x') + measure(String((answer.islands ?? []).find((i) => i.id === id)?.title ?? ''), z('island_text'), 'region');
+  if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, crossings: z('island_crossings_most') });
+  const steps = g.all.filter((n) => !n.dummy);
+  if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
+  const size = { width: g.width, height: g.height };
+
   const tieLayer = g.ties.map((t, n) => {
     const cls = `${kind(t.type)}${onYou(t)}${pend(t.pending)}`;
     const path = m('path', { key: `n:${n}`, d: line(t), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${headless.has(t.type) ? '' : ' headed'}${cls}`, ...drawIn, ...hidden });
@@ -230,9 +291,22 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     return [left - z('dot_gap'), g.y.get(n.id)];
   };
   const dotAt = (n, phase = stateOf(n.item).phase) => dot(dotClass(n.item, phase), markOf(phase), ...dotPlace(n), z('dot'));
-  /** A run's session drawn in its dot's place: its state's mark, as the style says (./session.js). */
-  const marked = (i) => sessions.get(sessionOf(i)?.state);
   const sessionDot = (n) => marked(n.item) && stateMark(m, sessionOf(n.item).state, marked(n.item), ...dotPlace(n), z('dot'));
+  // Where a step stands is of the grammar every island shares: its dot says so in a tip of its own, over a ring wider
+  // than the dot to hover (`p:<id>`), so an island's legend need not.
+  const dotTips = new Map();
+  const dotWords = (i) => {
+    if (marked(i)) return STATE_WORDS[sessionOf(i).state];
+    const phase = stateOf(i).phase;
+    return [PHASE_WORDS[phase] ?? words(phase), heldUp(i) && 'Held up'].filter(Boolean).join(', ');
+  };
+  const hoverDot = (n) => {
+    const mark = sessionDot(n) || dotAt(n);
+    if (!mark) return null;
+    const key = `p:${n.id}`;
+    dotTips.set(key, m('div', { class: 'lf-tip' }, m('b', {}, dotWords(n.item)), m('span', {}, n.item.said ?? n.item.title)));
+    return m('g', { key, on: ['enter', 'leave'], class: 'lf-mark' }, m('circle', { cx: dotPlace(n)[0], cy: dotPlace(n)[1], r: 2 * z('dot'), class: 'lf-hit' }), mark);
+  };
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
@@ -244,7 +318,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     const body = [
       outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
-      !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : sessionDot(n) || dotAt(n)),
+      !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : hoverDot(n)),
       // Its name in the lines the layout gave it (./lines.js): a second line under the first, the two about the middle.
       n.lines?.length > 1
         ? m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, ...n.lines.map((line, k) => m('tspan', { x: left, dy: k ? n.line : (-(n.lines.length - 1) * n.line) / 2 }, fit(line, room, n.stub ? STUB_TEXT : TEXT))))
@@ -276,38 +350,11 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     const text = saysText(c), w = saysWide(c), [lx, ly] = saysAt(g, c), sh = z('says_height');
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
-  const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, stepLayer, saysLayer, [...stepBadges.values()], linkBadges.map((b) => b.mark));
-
-  // The key: what each mark this picture uses means, one to a row (the page draws it, docs/layouts.md): each outline by
-  // the kinds (or types) drawn in it, each phase's dot, and the two colours, where the picture has them.
-  const words = (name) => ((w) => w.charAt(0).toUpperCase() + w.slice(1))(String(name).replaceAll('_', ' '));
-  const kindWord = (i) => (shapes.type[i.type] ? words(i.type) : KIND_WORDS[i.kind] ?? words(i.kind ?? 'item'));
-  const drawnAs = new Map();
-  for (const n of steps) (drawnAs.get(n.shape) ?? drawnAs.set(n.shape, new Set()).get(n.shape)).add(n.stub ? 'Possible end' : kindWord(n.item));
-  // A row's mark is drawn in a box of its own: G is where its middle is, how wide and tall a step is in it, and a dot's size.
-  const G = { x: 11, y: 7, w: 20, h: 11, r: 4 };
-  const mark = (inner, label) => ({ glyph: m('svg', { width: z('key_width'), height: z('key_height'), viewBox: '0 0 22 14' }, inner), label });
-  const uses = (test) => steps.some(test);
-  // A story's key has the phases its steps give too.
-  const stepPhases = story ? answer.steps.flatMap((s) => Object.values(s.fields ?? {}).map((f) => f?.phase).filter((p) => typeof p === 'string')) : [];
-  const phases = new Set([...steps.filter((n) => !n.stub && (story || !marked(n.item))).map((n) => stateOf(n.item).phase), ...stepPhases].filter((p) => markOf(p) !== 'none'));
-  const key = [
-    [...drawnAs.keys()].sort((a, b) => KEY_ORDER.indexOf(a) - KEY_ORDER.indexOf(b)).map((shape) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), [...drawnAs.get(shape)].join(', '))),
-    Object.keys(PHASE_WORDS).filter((p) => phases.has(p)).map((p) => mark(dot(`ph-${p} ${markOf(p)}${p === 'trouble' ? ' trouble' : ''}`, markOf(p), G.x, G.y, G.r), PHASE_WORDS[p])),
-    !story && STATES.filter((s) => uses((n) => !n.stub && marked(n.item) && sessionOf(n.item).state === s)).map((s) => mark(stateMark(m, s, sessions.get(s), G.x, G.y, G.r), STATE_WORDS[s])),
-    uses((n) => !n.stub && heldUp(n.item)) && mark(dot('trouble hollow', 'hollow', G.x, G.y, G.r), 'Held up'),
-    uses((n) => !n.stub && yours(n.item)) && mark(m('g', { class: 'lf-step you' }, outline('box', G.x, G.y, G.w, G.h, CORNER)), 'Waits on you'),
-    shownAs.places.filter((p) => steps.some((n) => !n.stub && shownAs.of.get(n.id) === p.id)).map((p) => mark(m('g', { class: `lf-step placed ${placeClass(p.hex)}` }, outline('box', G.x, G.y, G.w, G.h, CORNER)), p.within ? `${p.title}, in ${p.within}` : p.title)),
-    g.chains.length > 0 && mark(m('path', { d: 'M1 7H21', class: `lf-wire${kind(ORDER_TYPE)}` }), 'Leads to'),
-    g.chains.some((c) => c.dashed) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire dashed' }), 'If chosen'),
-    g.breaks.length > 0 && mark(m('path', { d: 'M1 7H21M11 0V4M11 10V14', class: 'lf-wire' }), 'Passes under'),
-    // A tie of each type in the colour it is drawn in: its own, or that of what waits on you; "you" said only where both are drawn.
-    ((rows) => rows.map((row) => {
-      const [type, you] = row.split('\n'), cls = `${kind(type)}${you}`, both = rows.includes(`${type}\n`) && rows.includes(`${type}\n you`);
-      return mark(headless.has(type) ? m('path', { d: 'M1 7H21', class: `lf-tie${type === 'part_of' ? ' near' : ''}${cls}` }) : m('g', {}, m('path', { d: 'M1 7H17', class: `lf-tie headed${cls}` }), m('path', { d: 'M21 7L13 3V11Z', class: `lf-head${cls}` })), you && both ? `${linkName(type)} you` : linkName(type));
-    }))([...new Set(g.ties.map((t) => `${t.type}\n${onYou(t)}`))].sort()),
-    (stepBadges.size > 0 || linkBadges.length > 0) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire held' }), 'Held for you'),
-  ].flat().filter(Boolean);
+  // On an archipelago each island a region round what lives on it, under everything, and a gate where a link crosses its shore (./islands.js).
+  const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, measure, fit: (text, width, px) => fit(text, width, px), isHex: (h) => HEX.test(String(h)) });
+  const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, isles.layer, tieLayer, wireLayer, stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark));
+  // The picture's key; on an archipelago none, each island carrying its own.
+  const key = parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 });
 
   // What stays lit, as the style says: the rest dimmed. Where the lens's words found some of what is drawn and not all,
   // what they found is lit.
@@ -321,11 +368,14 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     ...g.chains.flatMap((c, n) => [`w:${n}`, `h:${n}`].map((key) => ({ key, toggle: { lit: Boolean(id) && (c.a === id || c.b === id) } }))),
     ...g.ties.flatMap((t, n) => (headless.has(t.type) ? [`n:${n}`] : [`n:${n}`, `nh:${n}`]).map((key) => ({ key, toggle: { lit: Boolean(id) && (t.a === id || t.b === id) } }))),
   ];
-  /** A step's tip: its title, and the start of its note. */
+  /** A step's tip: its title, that it waits on you where it does (a colour no legend explains), and the start of its note. */
   const tipFor = (key) => {
     const i = g.nodes.get(key.slice(2)).item, note = held(i.pending) ? `Held for you${i.pending.reason ? `: ${i.pending.reason}` : ''}` : opening(i);
-    return m('div', { class: 'lf-tip' }, m('b', {}, i.said ?? i.title), (i.named ?? note) && m('span', {}, i.named ?? note));
+    return m('div', { class: 'lf-tip' }, m('b', {}, i.said ?? i.title), yours(i) && m('span', { class: 'lf-tip-you' }, 'Waits on you'), (i.named ?? note) && m('span', {}, i.named ?? note));
   };
+  /** The tip of a shared mark (a dot, a held badge, a gate), by its key; none for any other. */
+  const markTips = [dotTips, heldTips, isles.tips];
+  const markTip = (key) => markTips.find((tips) => tips.has(key))?.get(key);
   // Opened from an item's page, the picture is brought to that item; else to the step nearest its top left.
   const start = g.nodes.has(style.here) ? style.here : steps.filter((n) => !n.stub).reduce((p, q) => (g.y.get(q.id) - q.h / 2 < g.y.get(p.id) - p.h / 2 || (g.y.get(q.id) - q.h / 2 === g.y.get(p.id) - p.h / 2 && g.x.get(q.id) < g.x.get(p.id)) ? q : p), steps[0])?.id;
   // Told as a story: each step of the graph shown as the story's steps bring it, on the stage of story.js.
@@ -348,11 +398,18 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     size.width = width;
   }
   return {
-    scene: { css: [css, sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
+    scene: { css: [css, ...(parts ? [islandCss, ...isles.rules] : []), sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: player?.end,
     on(event) {
       const { name, key } = event;
       if (player?.hears(key)) return player.on(event);
+      // A shared mark's tip, over the step's while the pointer is on the mark; off it, back to the step it is on, if any.
+      if (!story && markTip(String(key))) {
+        if (name === 'enter') return [{ tip: { key, mark: markTip(String(key)) } }];
+        if (name !== 'leave') return [];
+        const on = String(key).startsWith('p:') ? `s:${String(key).slice(2)}` : null;
+        return on && tipped.has(on) ? [{ tip: { key: on, mark: tipFor(on) } }] : [{ tip: null }];
+      }
       if (name === 'leave') return [...light(null), ...(story ? [] : [{ tip: null }])];
       if (!keyed.has(key)) return [];
       return [...light(keyed.get(key)), ...(!story && tipped.has(key) ? [{ tip: { key, mark: tipFor(key) } }] : [])];

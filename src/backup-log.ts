@@ -10,7 +10,7 @@
 
 import type { Q } from './db.ts';
 import type { Entry, Fact } from './log.ts';
-import { inOrder, kindsOf, loadRows, projectEntry, projectedRows, PROJECTED, type Rows } from './replay.ts';
+import { inOrder, typesOf, loadRows, projectEntry, projectedRows, PROJECTED, type Rows } from './replay.ts';
 import { projectsApart } from './closure.ts';
 import { openAll } from './seal.ts';
 import { openTables } from './backup-seal.ts';
@@ -48,7 +48,7 @@ const isDigest = (v: unknown) => typeof v === 'object' && v !== null && '$h' in 
  * it started (the snapshot's id, or 'start') and how many items were left out for want of a key.
  */
 export async function projectBackup(tx: Q, tables: Record<string, Row[]>, snapshot: Row | undefined, vault?: VaultDump): Promise<{ rows: Rows; from: string; left_out: number }> {
-  const kinds = kindsOf((tables.type_def ?? []) as { id: string; def: { kind?: string; statuses?: { open?: string[] } } }[]);
+  const kinds = typesOf((tables.type_def ?? []) as { id: string; def: { lineage?: string[]; statuses?: { open?: string[] } } }[]);
   const all = entriesOf(tables).sort(inOrder);
   let start: { rows: Rows; at: { facts: number; pending: number }; id: string; left_out: number } | undefined;
   if (snapshot) {

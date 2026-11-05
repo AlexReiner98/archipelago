@@ -1,9 +1,11 @@
 import { api, h, hooks, main, route, state } from './base.js';
+import { changeSet } from './changes.js';
 import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
+import { trace } from './traces.js';
 import { lookMode } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
 import { front, landsIn, poppedTab } from './tabs.js';
-import { relations, types } from './words.js';
+import { relations, starterOf, types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
 
@@ -87,10 +89,11 @@ const canvasViews = () => document.querySelectorAll('#canvas > .pane > .pane-can
 /** What the projector asks of the types, read from the schema the page loaded; and which fields a lens sends. */
 export const kinds = {
   isOpen: (type, status) => types.get(type)?.statuses?.open?.includes(status) ?? true,
-  type: (id) => types.get(id),
+  starterOf: (id) => (types.has(id) ? starterOf(id) : null),
   relationFamily: (...roots) => roots,
   shown: (type, field) => Boolean(types.get(type)?.fields?.[field]?.shown),
   phase: (type, status) => types.get(type)?.statuses?.phases?.[status],
+  lineage: (type) => { const out = []; for (let t = types.get(type)?.flavour_of; t && !out.includes(t); t = types.get(t)?.flavour_of) out.push(t); return out; },
   flavour: (link) => { const out = []; for (let r = relations.get(link); r?.extends && !out.includes(r.extends); r = relations.get(r.extends)) out.push(r.extends); return out; },
 };
 
@@ -161,7 +164,10 @@ export async function checkTail() {
     // Only an answer that read the facts moves a store: one that says only where the log stands would skip them.
     if (beat.entries) for (const store of stores) {
       try {
+        // What the facts changed of what the store held, worked out before they are folded in: traced until seen (ui/traces.js).
+        const set = changeSet(store, kinds, beat.entries, { after: store.pos, gone: beat.gone });
         store.apply(beat);
+        trace(set).catch(() => {});
       } catch (err) {
         console.error(err);
       }

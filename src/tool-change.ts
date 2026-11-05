@@ -111,7 +111,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
             let type = o.op === 'create' ? l.registry.type(o.type ?? '') : undefined;
             if (o.op === 'create') {
               after = o.body?.length ?? 0;
-              if (o.body) noted.push({ at: i + 1, op: o.op, body: o.body, work: type?.kind === 'work', parts: all.some((p) => p.op === 'link' && p.type === 'part_of' && !!o.ref && p.to === o.ref) });
+              if (o.body) noted.push({ at: i + 1, op: o.op, body: o.body, work: Boolean(type?.capabilities.plannable), parts: all.some((p) => p.op === 'link' && p.type === 'part_of' && !!o.ref && p.to === o.ref) });
             } else if (o.op === 'update' && (o.body !== undefined || o.append !== undefined || o.replace)) {
               const target = await l.entity(o.id!);
               if (!target || !(type = l.registry.type(target.type))) continue;
@@ -123,7 +123,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
                 continue; // what is wrong with the op is said by the change itself
               }
               after = text.length;
-              if (type.kind === 'work' && sections(text) >= PLAN_SECTIONS && sections(text) > sections(target.body)) {
+              if (type.capabilities.plannable && sections(text) >= PLAN_SECTIONS && sections(text) > sections(target.body)) {
                 const parts = (await l.db.query(`select 1 from relation where to_id = $1 and type = 'part_of' and valid_to is null limit 1`, [target.id])).rows.length > 0;
                 noted.push({ at: i + 1, op: o.op, body: text, work: true, parts: parts || all.some((p) => p.op === 'link' && p.type === 'part_of' && p.to === target.id) });
               }

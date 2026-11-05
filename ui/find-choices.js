@@ -19,7 +19,7 @@ export const MODES = ['Find', 'Only', 'Not', 'Walk', 'Limit', 'View', 'Style'];
 const MEANS = { Find: 'What adds to the view', Only: 'What must all hold of what Find finds', Not: 'What is left out of everything', Walk: 'The links followed from what Find finds', Limit: 'The most items drawn', View: 'A saved view to open', Style: 'A layout for this view, or a style on the map' };
 
 const has = (name, q) => String(name ?? '').toLowerCase().includes(q.toLowerCase());
-const typeList = (q, most) => [...types.values()].filter((t) => !t.system && t.kind !== 'system' && has(t.title, q)).slice(0, most);
+const typeList = (q, most) => [...types.values()].filter((t) => !t.system && has(t.title, q)).slice(0, most);
 const linkList = (q, most) => [...relations.values()].filter((r) => !r.id.startsWith('sys.') && r.id !== 'tagged' && has(r.title ?? r.id, q)).slice(0, most);
 /**
  * Items found by name. A name's last words that name a type (one or two, as typed or with an s: "archipelago project",
@@ -30,7 +30,7 @@ const typeNamed = (q) => {
   for (const n of [2, 1]) {
     if (words.length <= n) continue;
     const said = words.slice(-n).join(' ').toLowerCase();
-    const t = [...types.values()].find((x) => !x.system && x.kind !== 'system' && [x.title.toLowerCase(), `${x.title.toLowerCase()}s`].includes(said));
+    const t = [...types.values()].find((x) => !x.system && [x.title.toLowerCase(), `${x.title.toLowerCase()}s`].includes(said));
     if (t) return { q: words.slice(0, -n).join(' '), type: t.id };
   }
   return { q };
@@ -108,7 +108,7 @@ export async function choicesFor(mode, q, c) {
     const leftOut = notOf(f).includes('kind system');
     const items = hits.filter((e) => !isA(e.type, KEPT_VIEW)).flatMap((e) => {
       const what = typeTitle(e.type);
-      if (leftOut && types.get(e.type)?.kind === 'system') return mode === 'Find' ? [{ kind: 'Item', label: e.title, note: what, title: `Open ${e.title} (${what})`, page: e.id }] : [];
+      if (leftOut && types.get(e.type)?.system) return mode === 'Find' ? [{ kind: 'Item', label: e.title, note: what, title: `Open ${e.title} (${what})`, page: e.id }] : [];
       if (e.type === 'tag') return [{ kind: 'Tag', label: `#${e.title}`, note: '', title: `Items tagged ${e.title}`, ...adds(`tagged ${e.id}`) }];
       return [
         { kind: 'In', label: e.title, note: what, title: `All that is in ${e.title} (${what}), at any depth`, ...adds(`in ${e.id}`) },

@@ -3,11 +3,12 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts';
+import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts'; import { capabilityOf, holds, unknownEnd, within } from './link-ends.ts';
 import { checkDeclared, KERNEL_VERBS, presetsOf, screensOf, stylesOf, toolName, type ActionDef, type TreeDef, type VerbDef, type ViewDef } from './declared.ts';
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts';
-import { checkFieldDecls, headOf, SYSTEM, type ColumnField } from './head.ts';
+import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
+import { islandsOff } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 import { isServerPack, parts, readManifest, withoutAbsent, type Manifest } from './manifest.ts';
@@ -23,9 +24,10 @@ export interface FieldDef {
   default?: unknown;
   /** Maintained by the system; shown but not offered for editing. */
   system?: boolean;
-  /** Sent with the item in a lens answer, so a style can draw by it (a kind to colour, an amount, a date). */
+  /** Sent with the item in a lens answer, so a style can draw by it (a type to colour, an amount, a date). */
   shown?: boolean;
-  /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a kind (src/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (src/css-check.ts). */ css?: boolean; /** Holds code (a module, a stylesheet): drawn as a code block, folded. */ code?: boolean;
+  /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a starter type (src/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (src/css-check.ts). */ css?: boolean; /** Holds code (a module, a stylesheet): drawn as a code block, folded. */ code?: boolean;
+  /** Of type json, holding a value of the simple type another field of the item names (src/fields.ts SIMPLE_TYPES): checked on write with the two together. */ typed_by?: string;
 }
 
 export interface Statuses {
@@ -38,8 +40,6 @@ export interface TypeDef {
   title: string;
   description: string;
   extends?: string;
-  /** One of the kinds every other type extends: the seven of the work, and system for the app's own. Only the core pack declares them. */
-  kind?: boolean;
   statuses?: Statuses;
   fields?: Record<string, FieldDef>;
   /** What is made for a reader or a customer (a document, a file, a release): named under the title of what it is part of. A flavour inherits it. */
@@ -69,7 +69,7 @@ export interface RelationDef {
   inverse: string;
   from: string[];
   to: string[];
-  description: string; offers_close?: boolean; /* closing its source offers to close its target (src/close-offer.ts) */ moved_from?: string[]; retired?: boolean; // Relations whose links are this one's now, moved once no pack defines them; retired, as a type is.
+  description: string; /** May join items on two islands: the one kind of tie that crosses (a reading of a finding). */ crosses?: boolean; offers_close?: boolean; /* closing its source offers to close its target (src/close-offer.ts) */ moved_from?: string[]; retired?: boolean; // Relations whose links are this one's now, moved once no pack defines them; retired, as a type is.
 }
 
 /** A pack file as the registry reads it: the manifest (src/manifest.ts). */
@@ -80,16 +80,16 @@ export interface ResolvedType {
   pack: string;
   title: string;
   description: string;
-  /** This type first, then each ancestor, its kind last. */
+  /** This type first, then each ancestor, the starter type it comes from last. */
   lineage: string[];
-  /** The kind it falls back to: the last of its lineage. Undefined only for a workspace's own type left to the type table. */
-  kind: string | undefined;
-  /** The type nearest its kind: what it is, said without the kind (task for an experiment). */
+  /** The starter type it comes from: the last of its lineage, a type that extends nothing (core's eight, or a pack's own). The item's `kind` column holds it. */
+  starter: string;
+  /** The type nearest its starter: what it is, said without the starter (task for an experiment). */
   base: string;
-  /** Of the system kind: the app's own configuration, which views of the work leave out. */
+  /** The kernel's own (the kernel flag, src/capabilities.ts): the app's configuration, which views of the work leave out. */
   system: boolean;
   statuses: Statuses;
-  /** The fields kept in props, and those kept in the item's row (status and the rest a kind declares). */
+  /** The fields kept in props, and those kept in the item's row (status and the rest its starter declares). */
   fields: Record<string, FieldDef>; columns: Partial<Record<ColumnField, FieldDef>>;
   deliverable: boolean; altitude?: Altitude;
   public: boolean;
@@ -131,7 +131,7 @@ export class Registry {
   /** Warnings said once: a pack file using the keys of the shape before the manifest. */
   private warned = new Set<string>();
   /** Packs the owner turned off in this workspace. */
-  private turnedOff: string[] = [];
+  private turnedOff: string[] = []; /** Whether this workspace holds its packs to the island rules (src/islands.ts). */ private islands = false; /** Whether this workspace has islands on: its items live on islands (src/island-items.ts). */ get onIslands() { return this.islands; }
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
@@ -168,6 +168,7 @@ export class Registry {
     // Load in dependency order what is on and has what it requires; the rest waits or is off.
     const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK).map((id) => [id, 'not enabled on this server']));
     for (const id of this.turnedOff) off.set(id, 'turned off here');
+    if (this.islands) for (const [id, why] of islandsOff([...found.values()].filter((p) => !off.has(p.id) || KERNEL_PACKS.includes(p.id)), LOCAL_PACK)) off.set(id, why);
     const { ordered: loaded, states } = orderPacks(found, off, LOCAL_PACK);
     // What a pack names of a pack it uses is registered only while that one is active (src/manifest.ts, uses).
     const declaredBy = new Map([...found.values()].flatMap((p) => [...parts(p).types, ...parts(p).relations].map((t) => [t.id, p.id] as const)));
@@ -180,7 +181,6 @@ export class Registry {
     for (const pack of ordered) {
       for (const type of parts(pack).types) {
         if (raw.has(type.id)) throw new Error(`Type "${type.id}" is defined twice`);
-        if (type.kind && pack.id !== 'core') throw new Error(`Type "${type.id}": only the core pack declares kinds`);
         raw.set(type.id, { ...type, pack: pack.id });
       }
       for (const rel of parts(pack).relations) {
@@ -208,10 +208,7 @@ export class Registry {
       if (!def) throw new Error(`Unknown type "${id}"${trail.length ? ` (extended by "${trail.at(-1)}")` : ''}`);
       if (trail.includes(id)) throw new Error(`Type cycle: ${[...trail, id].join(' -> ')}`);
       const parent = def.extends ? resolve(def.extends, [...trail, id]) : undefined;
-      if (def.extends && def.kind) throw new Error(`Type "${id}" is a kind and extends nothing`);
-      const kind = def.kind ? id : parent?.kind;
-      if (!kind) throw new Error(`Type "${id}" in pack "${def.pack}" must extend one of the kinds: ${[...raw.values()].filter((t) => t.kind && t.id !== SYSTEM).map((t) => t.id).join(', ')}`);
-      if (kind === SYSTEM && !KERNEL_PACKS.includes(def.pack)) throw new Error(`Type "${id}" in pack "${def.pack}" cannot be of the system kind: that is the kernel's own`);
+      const kernel = Boolean(def.capabilities?.kernel ?? parent?.capabilities.kernel); if (kernel && !KERNEL_PACKS.includes(def.pack)) throw new Error(`Type "${id}" in pack "${def.pack}" cannot carry the kernel flag: that is the kernel's own`);
       const statuses = def.statuses ?? parent?.statuses;
       if (!statuses?.open.length) throw new Error(`Type "${id}" needs at least one open status`);
       const resolved: ResolvedType = {
@@ -220,11 +217,12 @@ export class Registry {
         title: def.title,
         description: def.description,
         lineage: [id, ...(parent?.lineage ?? [])],
-        kind,
-        base: !parent || parent.id === parent.kind ? id : parent.base,
-        system: kind === SYSTEM,
+        starter: parent?.starter ?? id,
+        base: !parent || parent.id === parent.starter ? id : parent.base,
+        system: kernel,
         statuses: { ...statuses, phases: phasesOf(statuses, [def.statuses?.phases, parent?.statuses.phases]) },
-        ...headOf({ ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id) }, statuses),
+        // A type that extends nothing keeps in its row the columns it declares, or the common ones (src/head.ts, ownHead).
+        ...headOf({ ...ownHead(Boolean(parent?.columns.status ?? def.fields?.status?.column), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id), ...(this.islands && livesOnIsland({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])] }) && { [ISLAND]: ISLAND_FIELD }) }, statuses),
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
         public: def.public ?? parent?.public ?? false,
         ...((def.altitude ?? parent?.altitude) && { altitude: altitudeOf(id, def.altitude ?? parent?.altitude) }),
@@ -249,20 +247,17 @@ export class Registry {
       for (const b of t.belongs_with ?? [])
         if (!relations.has(b.relation) || !['out', 'in'].includes(b.direction)) throw new Error(`Type "${t.id}" goes with what "${b.relation}" links it to: that needs a relation the packs define, and a direction, out or in`);
     for (const rel of relations.values()) {
-      for (const end of [...rel.from, ...rel.to]) {
-        if (end !== '*' && !types.has(end)) throw new Error(`Relation "${rel.id}" refers to unknown type "${end}"`);
-      }
+      for (const end of [...rel.from, ...rel.to]) { const why = unknownEnd(end, (id) => types.has(id)); if (why) throw new Error(`Relation "${rel.id}" refers to ${why}`); }
     }
-    // Every relation extends a root, and joins only what its root may join.
-    const fits = (allowed: string[], end: string) => allowed.some((a) => a === '*' || (end !== '*' && types.get(end)!.lineage.includes(a)));
+    // A relation that extends nothing is its own root; one that extends another joins only what that one may join.
     const rootOf = (rel: RelationDef, trail: string[]): string => {
-      if (rel.root) return rel.id;
-      if (rel.extends && rel.extends === rel.id) throw new Error(`Relation "${rel.id}" extends itself`);
+      if (rel.root || !rel.extends) return rel.id;
+      if (rel.extends === rel.id) throw new Error(`Relation "${rel.id}" extends itself`);
       if (trail.includes(rel.id)) throw new Error(`Relation cycle: ${[...trail, rel.id].join(' -> ')}`);
-      const parent = rel.extends ? declared.get(rel.extends) : undefined; if (rel.extends === BASE_LINK) throw new Error(`Relation "${rel.id}" cannot be a flavour of ${BASE_LINK}, which means nothing more than that its ends relate: extend the root it means`);
-      if (!parent) throw new Error(`Relation "${rel.id}" must extend one of the root relations${rel.extends ? `, not unknown "${rel.extends}"` : ''}`);
+      const parent = declared.get(rel.extends); if (rel.extends === BASE_LINK) throw new Error(`Relation "${rel.id}" cannot be a flavour of ${BASE_LINK}, which means nothing more than that its ends relate: extend the root it means`);
+      if (!parent) throw new Error(`Relation "${rel.id}" extends unknown "${rel.extends}"`);
       for (const [side, ends] of [['from', rel.from], ['to', rel.to]] as const) {
-        const bad = ends.find((end) => !fits(parent[side], end));
+        const bad = ends.find((end) => !within(end, parent[side], (id) => types.get(id)));
         if (bad) throw new Error(`Relation "${rel.id}" goes ${side} ${bad}, which "${parent.id}" does not`);
       }
       return rootOf(parent, [...trail, rel.id]);
@@ -311,31 +306,33 @@ export class Registry {
   }
 
   /**
-   * Take in definitions the workspace kept whose packs are not loaded, as dormant: their items keep kind, statuses,
+   * Take in definitions the workspace kept whose packs are not loaded, as dormant: their items keep starter, statuses,
    * fields and capabilities. One that a pack defines again is the pack's.
    */
   keep(kept: { types: ResolvedType[]; relations: ResolvedRelation[] }): void {
     this.kept = kept;
-    for (const t of kept.types) if (!this.types.has(t.id)) this.types.set(t.id, { ...t, dormant: true });
+    // One kept before owned was a capability says it by its owner column: links from it are allowed as they were.
+    for (const t of kept.types) if (!this.types.has(t.id)) this.types.set(t.id, { ...t, starter: t.starter ?? t.lineage?.at(-1) ?? t.id, capabilities: { ...(t.columns?.owner && { owned: true }), ...t.capabilities }, dormant: true });
     for (const r of kept.relations) if (!this.relations.has(r.id)) this.relations.set(r.id, { ...r, dormant: true });
   }
 
   type(id: string): ResolvedType | undefined { return this.types.get(id); }
+  /** The starter type a type comes from (the item's kind column); null for a type nothing defines. */ starterOf = (id: string): string | null => this.types.get(id)?.starter ?? null;
   /** The name a type or link type has now, given one it had before (work.task is task). */ canonical = (id: string): string => this.renamed.get(id) ?? id;
 
   /** Turn packs off in this workspace (the rest on), and load again if that changed anything. The kernel's packs stay on. Says what was newly turned off, or undefined when nothing changed. */
-  turnOff(packs: string[]): string[] | undefined {
+  turnOff(packs: string[], islands = this.islands): string[] | undefined {
     const next = packs.filter((p) => !KERNEL_PACKS.includes(p));
     const newly = next.filter((p) => !this.turnedOff.includes(p));
-    if (!newly.length && next.length === this.turnedOff.length) return undefined;
-    this.turnedOff = next;
+    if (!newly.length && next.length === this.turnedOff.length && islands === this.islands) return undefined;
+    this.turnedOff = next; this.islands = islands;
     this.reload();
     return newly;
   }
 
-  /** The kinds, in the core pack's order: the seven of the work, then system. */
-  kinds(): ResolvedType[] {
-    return [...this.types.values()].filter((t) => t.kind === t.id);
+  /** The starter types: those that extend nothing, in the packs' order (core's eight first). */
+  starters(): ResolvedType[] {
+    return [...this.types.values()].filter((t) => t.starter === t.id);
   }
 
   /** A relation and every relation extending it: what the kernel computes from a root holds for all of them. */
@@ -344,14 +341,15 @@ export class Registry {
     return roots.map(this.canonical).flatMap(family);
   }
 
+  /** Whether a type is the ancestor or a flavour of it; given a capability end (has:owned), whether it declares that capability. */
   isA(typeId: string, ancestor: string): boolean {
-    return this.types.get(this.canonical(typeId))?.lineage.includes(this.canonical(ancestor)) ?? false;
+    return ancestor !== '*' && holds(capabilityOf(ancestor) ? ancestor : this.canonical(ancestor), this.types.get(this.canonical(typeId)));
   }
 
-  /** What a picture says a thing is: its type nearest the kind (root) and its kind. */
-  ancestry(typeId: string): { root: string; kind: string | null } {
+  /** What a picture says a thing is: its type nearest the starter (root) and its starter. */
+  ancestry(typeId: string): { root: string; starter: string } {
     const type = this.types.get(typeId);
-    return { root: type?.base ?? typeId, kind: type?.kind ?? null };
+    return { root: type?.base ?? typeId, starter: type?.starter ?? typeId };
   }
 
   /** How many may hold an item at once: Infinity for any number, undefined when it cannot be held. */
@@ -370,9 +368,9 @@ export class Registry {
     return [...new Set(on.flatMap((t) => this.family(t)))];
   }
 
-  /** The type and every flavour of it. */
+  /** The type and every flavour of it; for a capability end (has:owned), every type that declares it. */
   family(typeId: string): string[] {
-    return [...this.types.values()].filter((t) => t.lineage.includes(this.canonical(typeId))).map((t) => t.id);
+    return [...this.types.values()].filter((t) => this.isA(t.id, typeId)).map((t) => t.id);
   }
 
   isOpen(typeId: string, status: string): boolean {
@@ -431,8 +429,8 @@ export class Registry {
     const problems: string[] = [];
     if (!/^local\.[a-z][a-z0-9_]*$/.test(def.id)) problems.push(`new type id must look like "local.my_type", got "${def.id}"`);
     if (this.types.has(def.id)) problems.push(`type "${def.id}" already exists`);
-    const kinds = this.kinds().filter((t) => !t.system).map((t) => t.id).join(', ');
-    if (!def.extends) problems.push(`a new type extends one of the kinds (${kinds}) or a type of one`);
+    const starters = this.starters().filter((t) => !t.system && !t.dormant).map((t) => t.id).join(', ');
+    if (!def.extends) problems.push(`a new type extends one of the starter types (${starters}) or a type of one`);
     else if (!this.types.has(def.extends)) problems.push(`cannot extend unknown type "${def.extends}"`);
     else if (this.types.get(def.extends)!.system) problems.push(`cannot extend "${def.extends}", which is the kernel's own`);
     return problems;
@@ -459,7 +457,7 @@ export class Registry {
   /** Take in the types and link types kept on the map; one that does not load leaves the registry as it was, and says why. */
   takeItems(items: TypeItem[]): void { const was = this.items; this.items = items; try { this.reload(); } catch (err) { this.items = was; this.reload(); throw err; } }
   /** A registry like this one with these type items in place of its own: what a change that makes or changes one is checked against. */
-  trial(items: TypeItem[]): Registry { const r = new Registry(this.dir, this.only, this.local); r.turnedOff = this.turnedOff; r.kept = this.kept; r.takeItems(items); return r; }
+  trial(items: TypeItem[]): Registry { const r = new Registry(this.dir, this.only, this.local); r.turnedOff = this.turnedOff; r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
   /** Take up the types defined here by another server on the same database. Returns whether any were new. */
   followLocal(defs: TypeDef[]): boolean {
     const added = defs.filter((t) => !this.local.some((l) => l.id === t.id));
@@ -472,7 +470,7 @@ export class Registry {
   describe() {
     return {
       packs: this.packs.map((p) => ({ id: p.id, version: p.version, title: p.title, description: p.description })),
-      // The head every item has; status, owner, confidence and source are each type's columns, as its kind declares them.
+      // The head every item has; status, owner, confidence and source are each type's columns, as its starter declares them.
       common_fields: { title: 'Required. A short name.', body: 'Free-form markdown detail.', visibility: 'private (default) or shared.' },
       types: [...this.types.values()].map((t) => ({
         id: t.id,
@@ -480,12 +478,12 @@ export class Registry {
         title: t.title,
         description: t.description,
         flavour_of: t.lineage[1],
-        kind: t.kind,
+        starter: t.starter,
         statuses: t.statuses,
         fields: t.fields,
         columns: t.columns,
         ...(t.deliverable && { deliverable: true }), ...(t.altitude && { altitude: t.altitude }),
-        ...(t.public && { public: true }),
+        ...(t.public && { public: true }), ...(t.system && { system: true }),
         ...(t.belongs_with && { belongs_with: t.belongs_with }),
         ...(Object.keys(t.capabilities).length && { capabilities: t.capabilities }),
         ...(t.dormant && { dormant: true }), ...(t.retired && { retired: true }),
