@@ -69,6 +69,9 @@ function lengthsOf(sizes) {
   };
 }
 
+/** How far apart two things on two islands stand (flow_island_shore): only where the picture holds more than one, as only then is each island's border drawn. */
+const shoreOf = (items, sizes) => (new Set(items.map((i) => i.island).filter(Boolean)).size > 1 ? sizes.flow_island_shore : 0);
+
 /** How many times a finished picture's wires cross. */
 const crossed = ({ chains, ties }) => count([...chains, ...ties].map((w) => w.points)).crossings;
 
@@ -100,7 +103,7 @@ function drawnOut({ items: given, links: told = [], undrawn = [], headless = ['p
   // Two links between one pair of boxes are drawn from one sketch, and each is then a wire like any other.
   for (const [k, of] of twins) if (routes.has(of)) routes.set(k, { ...routes.get(of), points: routes.get(of).points.map((p) => [...p]) });
   staging?.('bars and combs', routes);
-  const lengths = { nodes, x, y, routes, section: sizes.flow_section_gap, gap, margin, aspect, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: gap / 2, join: z.join }, firstWires = new Map([...routes].map(([k, r]) => [k, r.points]));
+  const lengths = { nodes, x, y, routes, section: sizes.flow_section_gap, gap, margin, aspect, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: gap / 2, join: z.join, shore: shoreOf(items, sizes) }, firstWires = new Map([...routes].map(([k, r]) => [k, r.points]));
   const before = { x: new Map(x), y: new Map(y), sizes: new Map([...nodes].map(([id, n]) => [id, [n.w, n.h]])) };
   if (routes.size <= z.shape_most) {
     const lines = linesOf(routes);

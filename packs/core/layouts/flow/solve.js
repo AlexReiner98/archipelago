@@ -152,7 +152,7 @@ function sides(group, axis) {
 const byTie = (p, q) => (p.tie ?? 0) - (q.tie ?? 0) || (p.far ?? 0) - (q.far ?? 0);
 
 /** One pass along `axis`, 0 across and 1 down. */
-function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart, told, pins }) {
+function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart, shore = 0, told, pins }) {
   const other = 1 - axis, stretches = [], places = [];
   const number = (value) => (places.push(value), places.length - 1);
   for (const b of boxes) ((b.low = number(b.at[axis] - b.size[axis] / 2)), (b.high = number(b.at[axis] + b.size[axis] / 2)));
@@ -177,14 +177,17 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
     const b = lines.box.get(line), inset = Math.min(corner, b.size[axis] / 3);
     arcs.push([b.low, s.n, inset], [s.n, b.high, inset]);
   }
+  // Two things on two islands stand at least a shore apart, so each island's border has room round it (./islands.js).
+  const islandOf = (t) => (t.line ? t.line.island : t.island);
+  const across = (p, q, d) => (shore && islandOf(p) && islandOf(q) && islandOf(p) !== islandOf(q) ? Math.max(d, shore) : d);
   // Each thing keeps its distance from what it can see on the low side: what stands behind that is kept off by the chain.
   const facing = (p, q) => {
-    if (p.line && q.line) return [p.n, q.n, p.line === q.line ? 0 : wire];
-    if (p.line) return p.own.includes(q.id) ? null : [p.n, q.low, p.line.a === q.id || p.line.b === q.id ? run : room];
-    if (q.line) return q.own.includes(p.id) ? null : [p.high, q.n, q.line.a === p.id || q.line.b === p.id ? run : room];
+    if (p.line && q.line) return [p.n, q.n, p.line === q.line ? 0 : across(p, q, wire)];
+    if (p.line) return p.own.includes(q.id) ? null : [p.n, q.low, p.line.a === q.id || p.line.b === q.id ? run : across(p, q, room)];
+    if (q.line) return q.own.includes(p.id) ? null : [p.high, q.n, q.line.a === p.id || q.line.b === p.id ? run : across(p, q, room)];
     // Two boxes that overlap are parted on the axis that takes least: on the other they stand side by side, in no order.
     const on = (ax) => (p.size[ax] + q.size[ax]) / 2 - Math.abs(p.at[ax] - q.at[ax]);
-    return on(axis) > on(other) ? null : [p.high, q.low, lines.joined?.has(pair(p.id, q.id)) ? join : apart];
+    return on(axis) > on(other) ? null : [p.high, q.low, across(p, q, lines.joined?.has(pair(p.id, q.id)) ? join : apart)];
   };
   const placed = [...stretches, ...boxes.map((b) => Object.assign(b, { key: b.at[axis], lo: b.at[other] - b.size[other] / 2, hi: b.at[other] + b.size[other] / 2 }))];
   for (const s of stretches) s.key = s.at;
@@ -244,13 +247,15 @@ function squared(points) {
 }
 
 /** Every box and line placed, `rounds` passes each way. `routes` by link, `nodes` by item, with `x` and `y` their middles, are changed in place. */
-export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, join, rounds = 2 }) {
-  const boxes = [...x.keys()].map((id) => ({ id, at: [x.get(id), y.get(id)], size: [nodes.get(id).w, nodes.get(id).h], named: [nodes.get(id).w, nodes.get(id).h] }));
-  const lines = [...routes].map(([k, r]) => { const [p, q] = k.split('|'); return { route: r, a: r.from, b: r.from === p ? q : p, points: squared(r.points) }; }).filter((l) => l.points.length > 1);
+export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, join, shore, rounds = 2 }) {
+  // The island each box lives on, and each line whose two ends live on one (a line between two islands is on neither).
+  const islandOf = (id) => nodes.get(id)?.item?.island;
+  const boxes = [...x.keys()].map((id) => ({ id, island: islandOf(id), at: [x.get(id), y.get(id)], size: [nodes.get(id).w, nodes.get(id).h], named: [nodes.get(id).w, nodes.get(id).h] }));
+  const lines = [...routes].map(([k, r]) => { const [p, q] = k.split('|'), b = r.from === p ? q : p; return { route: r, a: r.from, b, island: islandOf(r.from) === islandOf(b) ? islandOf(b) : undefined, points: squared(r.points) }; }).filter((l) => l.points.length > 1);
   lines.box = new Map(boxes.map((b) => [b.id, b]));
   lines.joined = new Set(routes.keys());
   const told = { freed: 0, rings: 0 };
-  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, join, told });
+  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, join, shore, told });
   const margin = Math.min(...boxes.map((b) => b.at[0] - b.size[0] / 2), ...lines.flatMap((l) => l.points.map((c) => c[0]))), top = Math.min(...boxes.map((b) => b.at[1] - b.size[1] / 2), ...lines.flatMap((l) => l.points.map((c) => c[1])));
   for (const b of boxes) {
     x.set(b.id, b.at[0] - margin + apart);

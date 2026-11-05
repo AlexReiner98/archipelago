@@ -9,7 +9,7 @@
 // row-level security keeps what they may not see out of the seeds, the walk and the links alike.
 
 import { SYSTEM } from './head.ts';
-import { onIslands } from './island-items.ts';
+import { ISLAND, onIslands } from './island-items.ts';
 import type { Archipelago } from './pelago.ts';
 import { checkedAfter, holding, wordConditions, type Narrowing, type Word } from './query-only.ts';
 import { heldIds } from './query-held.ts';
@@ -285,6 +285,11 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   // Each run sent says where its session stands (src/session-state.ts), read for all of them at once.
   const runTypes = new Set(l.registry.family('run'));
   const states = await sessionStates(l, items.filter((e) => runTypes.has(e.type)).map((e) => e.id));
+  // Where each lives, on a map with islands on (src/island-items.ts), and each island's name, in the order they come: a
+  // drawing draws each island's border from them (task e_auw7hb3v). Read for those sent alone.
+  const islandOf = (e: Row) => (l.registry.onIslands && typeof e.props?.[ISLAND] === 'string' ? (e.props[ISLAND] as string) : undefined);
+  const islandIds = [...new Set(items.flatMap((e) => islandOf(e) ?? []))];
+  const named = new Map(islandIds.length ? (await l.db.query<{ id: string; title: string }>(`select id, title from entity where id = any($1::text[])`, [islandIds])).rows.map((r) => [r.id, r.title]) : []);
   // An end said by name goes back in the lens as its id.
   lens.find = finds.map(sayTerm);
   lens.only = onlys.map(sayTerm);
@@ -308,6 +313,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
         ...(states.has(e.id) && { session: markOf(states.get(e.id)!) }),
         created_at: e.created_at, updated_at: e.updated_at,
         ...(Object.keys(fields).length && { fields }),
+        ...(islandOf(e) && { island: islandOf(e) }),
         ...(spans && { time: filed!.filed.get(e.id) ?? spans.get(e.id) ?? [] }),
         ...(filed?.lane.has(e.id) && { lane: filed.lane.get(e.id) }),
         ...(filed?.stream.has(e.id) && { stream: filed.stream.get(e.id) }),
@@ -316,6 +322,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
     }),
     // A link that extends another says what it is a flavour of (`is`, nearest first), so a drawing treats it as its root.
     links: relations.map((r) => ({ id: r.id, type: r.type, ...(flavourOf(l, r.type).length && { is: flavourOf(l, r.type) }), from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
+    ...(islandIds.length && { islands: islandIds.map((id) => ({ id, ...(named.has(id) && { title: named.get(id) }) })) }),
     ...(filed && { lanes: filed.lanes, streams: filed.streams }),
     ...(cut && { cut: true }),
     ...(matched !== undefined && { matched }),
