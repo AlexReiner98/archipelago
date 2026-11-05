@@ -1,6 +1,7 @@
-// The flow draws each island as a region round what lives on it, where a picture holds more than one (task
-// e_auw7hb3v): named in the key and over its top left step, in the style's island_hues, laid out a shore apart so no
-// island's land reaches a step of another. A picture of one island draws no border.
+// The flow draws a picture of more than one island as an archipelago (task e_auw7hb3v; the owner, 5 Nov 2026): each
+// island a region round what lives on it, laid out alone so no two overlap, named, with its own legend inside it and
+// none in the corner; a link between islands crosses the sea, with a gate on each shore naming what crosses. A picture
+// of one island draws no border.
 
 import assert from 'node:assert/strict';
 import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -44,28 +45,47 @@ const keyed = (svg: any, key: string) => marks(svg, (m) => m[1]?.key === key)[0]
 const rectsIn = (mark: any) => marks(mark, (m) => m[0] === 'rect').map((m) => Object.fromEntries(['x', 'y', 'width', 'height'].map((k) => [k, Number(m[1][k])])));
 const meet = (a: any, b: any) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
-test('a picture of two islands draws each as a region, named in the key and on it', () => {
+const landOf = (svg: any, id: string) => rectsIn(marks(keyed(svg, `i:${id}`), (m) => m[1]?.class === 'lf-land')[0]);
+const stepBox = (svg: any, id: string) => rectsIn(keyed(svg, `s:${id}`))[0] ?? (() => { throw new Error(`no box for ${id}`); })();
+const ISLES = ['e_grantsis', 'e_lablabis'];
+const ON: Record<string, string[]> = { e_grantsis: ['e_writezzz', 'e_budgetzz', 'e_sendzzzz'], e_lablabis: ['e_runzzzzz'] };
+
+test('a picture of two islands draws each as a region, named, in its colour', () => {
   const scene = draw(answer);
-  const [grants, lab] = ['e_grantsis', 'e_lablabis'].map((id) => keyed(scene.svg, `i:${id}`));
+  const [grants, lab] = ISLES.map((id) => keyed(scene.svg, `i:${id}`));
   assert.ok(grants && lab, 'each island is a mark of its own');
   const [g0, g1] = house.island_hues.map((h: string) => `lf-i-${h.slice(1).toLowerCase()}`);
   assert.ok(grants[1].class.includes(g0) && lab[1].class.includes(g1), 'each in its colour, in the order the answer names them');
   assert.ok(scene.css.includes(`.${g0} { --lf-island: ${house.island_hues[0]}; }`), 'the colour is a rule, not a style on the mark');
-  const labels = scene.key.map((e: any) => e.label);
-  assert.ok(labels.includes('Grants') && labels.includes('Lab'), `the key names each island: ${labels.join(', ')}`);
-  assert.ok(JSON.stringify(grants).includes('"Grants"'), 'the region carries its name');
   assert.ok(marks(grants, (m) => m[0] === 'a' && m[1].href === '#/e/e_grantsis').length === 1, 'the name opens the island');
-  // The regions are drawn first, under every wire and step.
-  assert.equal(scene.svg[2][1].key, 'i:e_grantsis');
+  assert.equal(scene.svg[2][1].key, 'i:e_grantsis', 'the regions are drawn first, under every wire and step');
 });
 
-test('no island\'s land reaches a step that lives on another, and the actor is on none', () => {
+test('no two islands overlap, and each holds its own steps and no other’s', () => {
+  const svg = draw(answer).svg;
+  for (const r of landOf(svg, ISLES[0])) for (const q of landOf(svg, ISLES[1])) assert.ok(!meet(r, q), 'Grants’ land meets Lab’s');
+  for (const id of ISLES) {
+    for (const s of ON[id]) assert.ok(landOf(svg, id).some((r) => meet(r, stepBox(svg, s))), `${s} is on its island`);
+    for (const s of ON[ISLES.find((k) => k !== id)!]) assert.ok(!landOf(svg, id).some((r) => meet(r, stepBox(svg, s))), `${s} is not on ${id}`);
+  }
+});
+
+test('each island carries its own legend and the corner has none', () => {
   const scene = draw(answer);
-  const stepBox = (id: string) => rectsIn(keyed(scene.svg, `s:${id}`))[0] ?? (() => { throw new Error(`no box for ${id}`); })();
-  const land = (id: string) => rectsIn(marks(keyed(scene.svg, `i:${id}`), (m) => m[1]?.class === 'lf-land')[0]);
-  for (const r of land('e_grantsis')) for (const id of ['e_runzzzzz']) assert.ok(!meet(r, stepBox(id)), `Grants' land reaches ${id}`);
-  for (const r of land('e_lablabis')) for (const id of ['e_writezzz', 'e_budgetzz', 'e_sendzzzz']) assert.ok(!meet(r, stepBox(id)), `Lab's land reaches ${id}`);
-  for (const id of ['e_writezzz', 'e_budgetzz', 'e_sendzzzz']) assert.ok(land('e_grantsis').some((r) => meet(r, stepBox(id))), `${id} is on Grants' land`);
+  assert.deepEqual(scene.key, [], 'no key in the corner');
+  const said = (id: string) => marks(keyed(scene.svg, `i:${id}`), (m) => m[1]?.class === 'lf-island-key').map((m) => m.at(-1).at(-1));
+  assert.ok(said('e_grantsis').includes('Work') && said('e_grantsis').includes('Reads') && said('e_grantsis').includes('Crosses here'), said('e_grantsis').join(', '));
+  assert.ok(said('e_lablabis').includes('Record'), 'Lab’s says what a record is');
+  assert.ok(!said('e_grantsis').includes('Record'), 'Grants’ says only what it draws');
+});
+
+test('a finding read across crosses the sea, with a gate on each shore naming it', () => {
+  const svg = draw({ ...answer, items: answer.items.map((i) => (i.id === 'e_costzzzz' ? { ...i, fields: { value: 42 } } : i)) }).svg;
+  const gates = marks(svg, (m) => String(m[1]?.key ?? '').startsWith('gate:'));
+  assert.equal(gates.length, 2, 'one where it leaves Lab, one where it enters Grants');
+  for (const g of gates) assert.ok(JSON.stringify(g).includes('Cost per sample: 42'), 'each names what crosses, and its value');
+  const wire = marks(svg, (m) => m[0] === 'path' && String(m[1]?.class ?? '').includes('lf-tie') && /^n:/.test(m[1].key ?? '')).find((m) => m[1].class.includes('headed') && gates.length);
+  assert.ok(wire, 'the crossing is a tie');
 });
 
 test('a picture of one island, or of none, draws no border', () => {
@@ -74,5 +94,6 @@ test('a picture of one island, or of none, draws no border', () => {
     const scene = draw(a);
     assert.equal(marks(scene.svg, (m) => String(m[1]?.class ?? '').includes('lf-island')).length, 0);
     assert.ok(!scene.css.includes('lf-shore'), 'nor its rules');
+    assert.ok(scene.key.length > 0, 'and keeps its key');
   }
 });
