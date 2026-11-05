@@ -1,5 +1,7 @@
 import { api, h, hooks, main, route, state } from './base.js';
+import { changeSet } from './changes.js';
 import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
+import { trace } from './traces.js';
 import { lookMode } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
 import { front, landsIn, poppedTab } from './tabs.js';
@@ -162,7 +164,10 @@ export async function checkTail() {
     // Only an answer that read the facts moves a store: one that says only where the log stands would skip them.
     if (beat.entries) for (const store of stores) {
       try {
+        // What the facts changed of what the store held, worked out before they are folded in: traced until seen (ui/traces.js).
+        const set = changeSet(store, kinds, beat.entries, { after: store.pos, gone: beat.gone });
         store.apply(beat);
+        trace(set).catch(() => {});
       } catch (err) {
         console.error(err);
       }

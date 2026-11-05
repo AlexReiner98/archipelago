@@ -6,9 +6,9 @@
 // lens read.
 
 import type { Q } from './db.ts';
-import type { Fact } from './log.ts';
+import type { Entry, Fact } from './log.ts';
 import { MOVED } from './project.ts';
-import { openSaid } from './seal.ts';
+import { openEntries, openSaid } from './seal.ts';
 
 /** Entries read in one call at most: a page further behind asks again from where the answer stops (`more`). */
 const ENTRIES = 500;
@@ -19,7 +19,7 @@ export interface FactsAfter {
   /** The last entry read: the next read asks from here. */
   pos: number;
   /** The entries in order that said something of what is held, each with only those facts. */
-  entries: { pos: number; at: string; moved?: true; facts: Fact[] }[];
+  entries: { pos: number; at: string; moved?: true; facts: Fact[]; by?: By }[];
   /** What is held and was named in these entries that the viewer cannot see now: forgotten, or made private to someone else. */
   gone: string[];
   /** How many items were made in these entries that the viewer may see, held or not: a list may hold a new one. */
@@ -34,6 +34,20 @@ export async function headPos(db: Q): Promise<number> {
   return rows[0].pos ?? 0;
 }
 
+/**
+ * Who made an entry and why, as its reader may read it: the actor's item and name, the session it was made in (its
+ * word, which picks its hue, and what its chat is called), on whose authority, and the reason, opened.
+ */
+export interface By {
+  actor?: string;
+  name?: string;
+  run?: string;
+  word?: string;
+  session?: string;
+  of?: 'human' | 'agent';
+  reason?: string;
+}
+
 type Said = { pos: number; n: number; op: '+' | '-'; id: string; field: string; value: unknown; meta: Record<string, unknown> | null };
 
 /** The facts after `after` on the ids held, as the viewer may see them. A read that names nothing is refused: it would read the whole log. */
@@ -43,8 +57,8 @@ export async function factsAfter(db: Q, input: { after: number; ids: string[]; l
   if (ids.length > HELD_MOST) throw new Error(`A read of the log names ${HELD_MOST} ids at most; this one names ${ids.length}.`);
   const limit = Math.min(input.limit ?? ENTRIES, ENTRIES);
   // The entries after the position, bounded by its time too, so the partitions before it are not read.
-  const { rows: window } = await db.query<{ pos: number; at: Date; action: string | null }>(
-    `select pos::int as pos, at, head->>'action' as action from log_entry where stream = 'facts' and pos > $1
+  const { rows: window } = await db.query<{ pos: number; at: Date; action: string | null; head: Record<string, unknown> }>(
+    `select pos::int as pos, at, head->>'action' as action, jsonb_build_object('id', head->'id', 'actor', head->'actor', 'run', head->'run', 'authority', head->'authority', 'reason', head->'reason', 'keys', head->'keys') as head from log_entry where stream = 'facts' and pos > $1
        and at >= coalesce((select at from log_entry where stream = 'facts' and pos = $1), '-infinity') order by pos limit $2`,
     [input.after, limit + 1],
   );
@@ -81,10 +95,36 @@ export async function factsAfter(db: Q, input: { after: number; ids: string[]; l
     const fact = (r.op === '-' ? ['-', r.id, r.field] : r.meta ? ['+', r.id, r.field, r.value, r.meta] : ['+', r.id, r.field, r.value]) as Fact;
     by.set(r.pos, [...(by.get(r.pos) ?? []), fact]);
   }
-  const entries = window
-    .filter((e) => by.has(e.pos))
-    .map((e) => ({ pos: e.pos, at: new Date(e.at).toISOString(), ...(MOVED.includes(e.action ?? '') && { moved: true as const }), facts: by.get(e.pos)! }));
+  const kept = window.filter((e) => by.has(e.pos));
+  const said = await byOf(db, kept.map((e) => ({ ...e.head, stream: 'facts', pos: e.pos, facts: by.get(e.pos)! }) as unknown as Entry));
+  const entries = kept.map((e, i) => ({ pos: e.pos, at: new Date(e.at).toISOString(), ...(MOVED.includes(e.action ?? '') && { moved: true as const }), facts: by.get(e.pos)!, ...(said[i] && { by: said[i] }) }));
   return { pos: last.pos, entries, gone: named.filter((id) => !visible.has(id) && held.has(id)), made: born[0].n, ...(more && { more: true as const }) };
+}
+
+/** Who made each entry and why (By), its reason and basis opened as the entry's reader may read them. */
+async function byOf(db: Q, heads: Entry[]): Promise<(By | undefined)[]> {
+  if (!heads.length) return [];
+  const opened = await openEntries(db, heads);
+  const ids = [...new Set(opened.flatMap((e) => [(e.actor as { id?: string } | undefined)?.id, e.run as string | undefined]).filter((id): id is string => typeof id === 'string' && id.startsWith('e_')))];
+  const { rows } = ids.length
+    ? await db.query<{ id: string; title: string; word: string | null }>(`select id, title, props->>'name' as word from entity where id = any($1::text[])`, [ids])
+    : { rows: [] };
+  const named = new Map(rows.map((r) => [r.id, r]));
+  return opened.map((e) => {
+    const actor = (e.actor as { id?: string } | undefined)?.id;
+    const run = typeof e.run === 'string' ? e.run : undefined;
+    const authority = e.authority as { of?: 'human' | 'agent' } | null | undefined;
+    const out: By = {
+      ...(actor && { actor }),
+      ...(actor && named.get(actor) && { name: named.get(actor)!.title }),
+      ...(run && { run }),
+      ...(run && named.get(run)?.word && { word: named.get(run)!.word! }),
+      ...(run && named.get(run) && { session: named.get(run)!.title }),
+      ...(authority?.of && { of: authority.of }),
+      ...(typeof e.reason === 'string' && { reason: e.reason }),
+    };
+    return Object.keys(out).length ? out : undefined;
+  });
 }
 
 /**

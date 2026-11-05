@@ -29,6 +29,8 @@ const upFrom = function* (el) {
 function titled(el) {
   for (const e of upFrom(el)) {
     if (e === box || e.classList?.contains('drawing-tip')) return null;
+    // A trace (ui/traces.js) says who changed the mark and why: that, while it lasts, before what the mark says of itself.
+    if (e.dataset?.trace) return { el: e, said: e.dataset.trace, trace: true };
     if (e.hasAttribute('title')) return e.getAttribute('title') ? { el: e, said: e.getAttribute('title') } : null;
     const title = svgTitle(e);
     if (title) return title.textContent ? { el: e, said: title.textContent } : null;
@@ -106,8 +108,8 @@ function over(ev) {
   at = found;
   if (found?.el === was) return;
   hide();
-  if (!found || quiet?.contains(found.el)) return;
-  const mark = entered(ev.target, ev.relatedTarget);
+  if (!found || (quiet?.contains(found.el) && !found.trace)) return;
+  const mark = !found.trace && entered(ev.target, ev.relatedTarget);
   if (mark) awaited = { mark, found, open };
   else say(found, open);
 }
@@ -128,7 +130,7 @@ export function quietTip(el) {
   quiet = el;
   if (el && awaited && el.contains(awaited.found.el)) awaited = null;
   // The title stays off while the drawing's tip says it, and is put back when the pointer leaves, as ever.
-  if (el && at && el.contains(at.el) && box?.matches(':popover-open')) box.hidePopover();
+  if (el && at && !at.trace && el.contains(at.el) && box?.matches(':popover-open')) box.hidePopover();
 }
 
 /** The drawing has answered for `mark`: if it said nothing there, what the title says is shown after all. */
