@@ -90,3 +90,21 @@ test('an owner is a person or an agent', async () => {
   const { t, u } = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'A task' }, { op: 'create', ref: 'u', type: 'task', title: 'Another' }]);
   await assert.rejects(l.change(human, { ops: [{ op: 'link', type: 'owned_by', from: t, to: u }], reason: 'no' }));
 });
+
+test('an owner is checked as the owned_by link it makes: both ends, with the link op’s words', async () => {
+  const l = await fresh();
+  const { ann, ben } = await people(l);
+  const said = async (ops: unknown[]) => {
+    try { await l.change(human, { ops: ops as never, reason: 'test' }); } catch (e) { return (e as Error).message; }
+    assert.fail('the change was not refused');
+  };
+  const linked = await said([{ op: 'link', type: 'owned_by', from: ben, to: ann }]);
+  assert.match(linked, /"owned_by" must start from .+, not person/);
+  const words = linked.slice(linked.indexOf('"owned_by"'));
+  assert.ok((await said([{ op: 'update', id: ben, owner: ann }])).includes(words), 'an update says it as the link op does');
+  assert.ok((await said([{ op: 'create', type: 'person', title: 'Cy', owner: ann }])).includes(words), 'a create says it as the link op does');
+  const { t } = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'A task' }]);
+  assert.match(await said([{ op: 'update', id: t, owner: t }]), /"owned_by" must point to person or agent, not task/);
+  await make(l, [{ op: 'update', id: t, owner: ann }]);
+  assert.deepEqual(await owners(l, t).then(({ column, links }) => ({ column, links })), { column: ann, links: [ann] }, 'a valid owner still writes');
+});
