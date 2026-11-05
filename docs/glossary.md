@@ -131,6 +131,12 @@ code: `#sheet` in `ui/index.html`, routed by `ui/app.js`.
 `tag` type, tied by a `tagged` link, any number to an item. A query filters by
 one (`tagged <tag>`); the house style draws no wire for it.
 
+**finding.** What an island has found, published for others to read: an item
+of core's `finding` type, its title the name, its note what it means, its
+`value` of the simple type `value_type` says (text, number, boolean, date),
+checked on write, true `as_of` a date. A reader ties itself to one with a
+`reads` link, the one link that crosses between islands (`crosses`).
+
 **place.** Where a drawing's layout puts an item: never set by hand (the
 owner, 3 Nov 2026), never meaning anything. The `places` stream that once
 kept hand places is retired: nothing appends to it, and what is left of it

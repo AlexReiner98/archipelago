@@ -27,6 +27,7 @@ export interface FieldDef {
   /** Sent with the item in a lens answer, so a style can draw by it (a type to colour, an amount, a date). */
   shown?: boolean;
   /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a starter type (src/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (src/css-check.ts). */ css?: boolean; /** Holds code (a module, a stylesheet): drawn as a code block, folded. */ code?: boolean;
+  /** Of type json, holding a value of the simple type another field of the item names (src/fields.ts SIMPLE_TYPES): checked on write with the two together. */ typed_by?: string;
 }
 
 export interface Statuses {
@@ -68,7 +69,7 @@ export interface RelationDef {
   inverse: string;
   from: string[];
   to: string[];
-  description: string; offers_close?: boolean; /* closing its source offers to close its target (src/close-offer.ts) */ moved_from?: string[]; retired?: boolean; // Relations whose links are this one's now, moved once no pack defines them; retired, as a type is.
+  description: string; /** May join items on two islands: the one kind of tie that crosses (a reading of a finding). */ crosses?: boolean; offers_close?: boolean; /* closing its source offers to close its target (src/close-offer.ts) */ moved_from?: string[]; retired?: boolean; // Relations whose links are this one's now, moved once no pack defines them; retired, as a type is.
 }
 
 /** A pack file as the registry reads it: the manifest (src/manifest.ts). */
