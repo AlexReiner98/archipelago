@@ -15,7 +15,7 @@ const laid = mkdtempSync(join(tmpdir(), 'pages-'));
 for (const [name, file] of Object.entries(core.layouts.find((d: any) => d.id === 'core.pages').modules as Record<string, string>)) copyFileSync(join(import.meta.dirname, file), join(laid, name));
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 
-const item = (id: string, title: string, body = '') => ({ id, kind: 'record', type: 'document', title, body, open: true, status: 'draft' });
+const item = (id: string, title: string, body = '') => ({ id, type: 'document', is: ['record'], title, body, open: true, status: 'draft' });
 const draw = (items: any[], here?: string, order?: string, published?: boolean) => picture({ answer: { items, links: [] }, style: { here, order, published } }, {}).scene;
 /** Every mark of a scene, flattened. */
 const marks = (mark: any): any[] => (Array.isArray(mark) && typeof mark[0] === 'string' ? [mark, ...mark.slice(2).flatMap(marks)] : []);

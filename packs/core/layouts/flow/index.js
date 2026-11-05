@@ -1,5 +1,5 @@
 // A lens answer drawn as a flat graph on one plane, where depth is never drawn (e_ktdensts): every item a step showing its
-// name in its kind's outline (the style's kind_shapes: in the house style work a box, a question a diamond, an
+// name in its type's outline (the style's type_shapes, read through what the type is a flavour of: in the house style work a box, a question a diamond, an
 // occurrence a pill, a record a sheet with a wavy foot, the system's own a box with cut corners, an actor a hexagon, an
 // aim a flag, a place a box with a tab), where it stands in its course a dot (hollow, half or full, none for what only
 // stands: ./state.js), and colour only for what waits on you and what is in trouble (e_rnyqarfe), the order
@@ -18,12 +18,13 @@
 // item faint, a link dashed, an edit marked on its step), each with a badge keyed `held:<proposal>` that the page
 // answers a click on by putting the change to the person; a link the person just drew (`mine`) is dashed until it is.
 
-import { shownOnly } from './graph.js';
+import { lineageOf, shownOnly } from './graph.js';
 import { layout } from './layout.js';
 import { css } from './look.js';
 import { addClass, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
 import { drawn } from './polyline.js';
+import { shapedBy } from './steps.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
@@ -35,7 +36,7 @@ import { cut } from './lines.js';
 const HEX = /^#[0-9a-f]{3,8}$/i;
 /** The link type the order's wires are, for their colour. */
 const ORDER_TYPE = 'depends_on';
-/** What the key calls each kind's outline, and the order its rows go in. */
+/** What the key calls the outline of each of core's starter types, and the order its rows go in. */
 const KIND_WORDS = { work: 'Work', question: 'Question', occurrence: 'Event', record: 'Record', system: 'System', actor: 'Person', aim: 'Aim', place: 'Place' };
 const KEY_ORDER = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'end'];
 /** What the key calls each phase, in its order; what only stands has no dot and no row. */
@@ -117,7 +118,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const pane = width > 0 && height > 0 ? width / height : ASPECT;
   const aspect = ASPECT * (pane / ASPECT) ** FOLLOW;
   const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
-  const shapes = { kind: record(style.kind_shapes), type: record(style.type_shapes) };
+  const shapes = { type: record(style.type_shapes) };
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
   answer = { ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) };
@@ -279,9 +280,9 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, tieLayer, wireLayer, stepLayer, saysLayer, [...stepBadges.values()], linkBadges.map((b) => b.mark));
 
   // The key: what each mark this picture uses means, one to a row (the page draws it, docs/layouts.md): each outline by
-  // the kinds (or types) drawn in it, each phase's dot, and the two colours, where the picture has them.
+  // the types drawn in it (core's starter types by their words), each phase's dot, and the two colours, where the picture has them.
   const words = (name) => ((w) => w.charAt(0).toUpperCase() + w.slice(1))(String(name).replaceAll('_', ' '));
-  const kindWord = (i) => (shapes.type[i.type] ? words(i.type) : KIND_WORDS[i.kind] ?? words(i.kind ?? 'item'));
+  const kindWord = (i) => ((t) => KIND_WORDS[t] ?? words(t))(shapedBy(i, shapes) ?? lineageOf(i).at(-1) ?? 'item');
   const drawnAs = new Map();
   for (const n of steps) (drawnAs.get(n.shape) ?? drawnAs.set(n.shape, new Set()).get(n.shape)).add(n.stub ? 'Possible end' : kindWord(n.item));
   // A row's mark is drawn in a box of its own: G is where its middle is, how wide and tall a step is in it, and a dot's size.

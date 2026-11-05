@@ -5,7 +5,7 @@
 // (place_hues), given in the order the places come; with none, a place is a step like any other. The place the
 // picture was opened from stays a step. Pure: an answer in, the items to draw and each part's place out.
 
-import { flatten, NEAR } from './graph.js';
+import { flatten, isOf, NEAR } from './graph.js';
 
 /**
  * The items left to draw, the place each part is coloured by (`of`: part id to place id) and the places so shown, in
@@ -15,7 +15,7 @@ export function placesAsColours({ items, links = [] }, hues, keep = new Set()) {
   if (!hues.length) return { items, of: new Map(), places: [] };
   const flat = flatten({ items, links });
   const byId = new Map(flat.items.map((i) => [i.id, i]));
-  const isPlace = (id) => byId.get(id)?.kind === 'place';
+  const isPlace = (id) => isOf(byId.get(id), 'place');
   // A part is coloured by the first place it is part of; a link held for the owner stays a tie, drawn as a ghost.
   const placeOf = new Map();
   for (const l of flat.links) if (l.type === NEAR && !l.pending && isPlace(l.from) && isPlace(l.to) && !keep.has(l.to) && !placeOf.has(l.from)) placeOf.set(l.from, l.to);

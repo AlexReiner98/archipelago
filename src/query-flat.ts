@@ -295,7 +295,10 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
       const type = l.registry.type(e.type), defs = type?.fields ?? {};
       const fields = Object.fromEntries(Object.entries(e.props ?? {}).filter(([key, value]) => defs[key]?.shown && value != null));
       return {
-        id: e.id, kind: e.kind, type: e.type, title: e.title,
+        id: e.id, kind: e.kind, type: e.type,
+        // What its type is a flavour of, nearest first (task: work), as a link says it: a drawing reads shapes and colours by it.
+        ...(type && type.lineage.length > 1 && { is: type.lineage.slice(1) }),
+        title: e.title,
         // The start of the note, for a hover: the whole of it is on the item's page (or here, asked for whole).
         ...(e.body && { body: e.body.length > NOTE_START && !wholeIds.has(e.id) ? `${e.body.slice(0, NOTE_START)}…` : e.body }),
         // Where it stands in its course (src/phases.ts), so every drawing reads one phase and keeps no registry.

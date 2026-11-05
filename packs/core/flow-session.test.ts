@@ -25,10 +25,10 @@ const STATES = ['waiting', 'your_move', 'blocked', 'working', 'quiet', 'idle'];
 const LONG = 'Should the sessions view keep a run beside its parent, or beside the task it works on, when the two differ?';
 /** A run in `state`, its line said, working on its task. */
 const run = (state: string, k: number) => ({
-  id: `e_run${k}zzzz`, kind: 'occurrence', type: 'run', title: `Run ${state}`, open: true, status: 'running',
+  id: `e_run${k}zzzz`, type: 'run', is: ['occurrence'], title: `Run ${state}`, open: true, status: 'running',
   session: { state, line: state === 'waiting' ? LONG : `Line of ${state}`, since: `2026-11-03T0${k}:00:00Z`, ...(state === 'waiting' && { for: 'input' }) },
 });
-const task = (k: number) => ({ id: `e_task${k}zzz`, kind: 'work', type: 'task', title: `Task ${k}`, open: true, status: 'todo' });
+const task = (k: number) => ({ id: `e_task${k}zzz`, type: 'task', is: ['work'], title: `Task ${k}`, open: true, status: 'todo' });
 const runs = STATES.map(run);
 const answer = {
   // Given in the reverse of the order of attention, so the order drawn is the drawing's own.

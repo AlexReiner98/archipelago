@@ -269,6 +269,6 @@ export function withoutAbsent(m: Manifest, active: (pack: string) => boolean, de
     return emptied(s.on, on) ? [] : [{ ...s, on }];
   });
   const named = (x: string | string[] | undefined) => (x === undefined ? [] : Array.isArray(x) ? x : [x]);
-  const rules = (m.rules ?? []).filter((r) => ![...named(r.when?.type), ...named(r.when?.kind), ...named(r.type)].some(gone));
+  const rules = (m.rules ?? []).filter((r) => ![...named(r.when?.type), ...named(r.type)].some(gone));
   return { ...m, types, links, views, actions, styles, rules };
 }

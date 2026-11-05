@@ -25,7 +25,7 @@ const linkRow = (r) => ({ id: r.id, type: r.type, from_id: r.from, to_id: r.to, 
 const blank = () => ({ items: { added: [], changed: [], removed: [] }, links: { added: [], changed: [], removed: [] }, missing: [] });
 
 export class Replica {
-  /** kinds: what the projector asks of the types (isOpen, type, relationFamily), shown(type, field) for the fields a lens sends, and phase(type, status) and flavour(link) as the server's answer gives them. */
+  /** kinds: what the projector asks of the types (isOpen, type, relationFamily), shown(type, field) for the fields a lens sends, phase(type, status), flavour(link) and lineage(type) as the server's answer gives them. */
   constructor(kinds) {
     this.kinds = kinds;
     this.items = new Map();
@@ -64,7 +64,7 @@ export class Replica {
     if (!r || r.archived_at) return undefined;
     const fields = Object.fromEntries(Object.entries(r.props ?? {}).filter(([k, v]) => v != null && this.kinds.shown?.(r.type, k) !== false));
     return {
-      id: r.id, kind: r.kind, type: r.type, title: r.title,
+      id: r.id, kind: r.kind, type: r.type, ...(this.kinds.lineage?.(r.type)?.length && { is: this.kinds.lineage(r.type) }), title: r.title,
       ...(r.body && { body: r.body.length > NOTE_START && !this.whole?.has(id) ? `${r.body.slice(0, NOTE_START)}…` : r.body }),
       visibility: r.visibility, status: r.status, ...(this.kinds.phase?.(r.type, r.status) && { phase: this.kinds.phase(r.type, r.status) }), open: r.is_open, owner: r.owner, created_at: r.created_at, updated_at: r.updated_at,
       ...(Object.keys(fields).length && { fields }),

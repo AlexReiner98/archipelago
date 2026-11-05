@@ -4,6 +4,10 @@
 
 export const ORDER = 'depends_on', NEAR = 'part_of';
 /** What an item says of its state when the answer says nothing (the flat lens's does not). */
+/** An item's type and what it is a flavour of, nearest first, as the answer gives it (`is`). */
+export const lineageOf = (i) => [i?.type, ...(Array.isArray(i?.is) ? i.is : [])].filter(Boolean);
+/** Whether an item is of a type, or a flavour of it (a task is work). */
+export const isOf = (i, type) => lineageOf(i).includes(type);
 export const QUIET = { blocked: false, waits_on: [], sessions: 0, needs_you: false };
 
 /** The highest and the lowest of many numbers, which Math.max(...list) cannot take past the stack's size. */
