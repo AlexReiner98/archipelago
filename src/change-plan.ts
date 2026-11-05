@@ -4,7 +4,7 @@
 import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts';
 import { bodyAfter } from './ops.ts'; import { mergeRefusals } from './merge.ts';
 import { currentNames, typesAfter } from './type-items.ts'; import { privateDependencies } from './private-deps.ts';
-import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts';
+import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts'; import { islandRefusals } from './island-items.ts';
 import type { Archipelago } from './pelago.ts';
 
 /** Validate ops against the schema and the current map. Throws listing every problem. */
@@ -122,6 +122,7 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
         break;
     }
   }
+  errors.push(...(await islandRefusals(map, reg, ops)));
   if (!errors.length) errors.push(...(await privateDependencies(map, ops)));
   if (errors.length) throw new Error(`Change rejected:\n- ${errors.join('\n- ')}`);
   return { warnings };

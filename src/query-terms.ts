@@ -3,6 +3,7 @@
 // what is done with that set: Find adds it, Only keeps what is in it, Not takes it away.
 //
 //   held (what changes held for me touch) · text <words> · type <t> (or the type alone) · kind <k> · id <item> · in <item> · related <item> · <link> <item> ·
+//   island <island> (what lives on it, src/island-items.ts) ·
 //   <link>< <item> (what the item links to) · owner me|<person> · and Only's words (src/query-only.ts)
 //
 // An end is an id or a name. A word's set can only be checked of items in hand, so a word is no term of Find.
@@ -13,6 +14,7 @@ import { searchIds } from './search.ts';
 import { OWNED_BY } from './owner-link.ts';
 import { heldIds } from './query-held.ts';
 import { kernelTypes, SYSTEM } from './head.ts';
+import { ISLAND, onIslands } from './island-items.ts';
 
 export type Term =
   | { sort: 'text'; said: string }
@@ -21,12 +23,13 @@ export type Term =
   | { sort: 'id'; id: string }
   | { sort: 'in'; end: string }
   | { sort: 'related'; end: string }
+  | { sort: 'island'; end: string }
   | { sort: 'held' }
   | { sort: 'link'; link: string; end: string; back: boolean; owner?: boolean }
   | { sort: 'word'; word: Word; said: string };
 
 const KIND = /^kind\s+(.+)$/i;
-const SAID = /^(text|type|id|in|related|owner)\s+(.+)$/i;
+const SAID = /^(text|type|id|in|related|island|owner)\s+(.+)$/i;
 const LINK = /^(\S+?)(<?)\s+(.+)$/;
 
 /** One term as written; a term that reads as nothing is refused, in the words of the part it stands in. */
@@ -43,6 +46,7 @@ export function readTerm(l: Archipelago, raw: unknown, part: string): Term {
     if (said === 'id') return { sort: 'id', id: rest };
     if (said === 'in') return { sort: 'in', end: rest };
     if (said === 'related') return { sort: 'related', end: rest };
+    if (said === 'island') return { sort: 'island', end: rest };
     if (said === 'owner') return { sort: 'link', link: OWNED_BY, end: rest, back: false, owner: true };
     if (!l.registry.types.has(l.registry.canonical(rest))) throw new Error(`filter.${part}: unknown type "${rest}"`);
     return { sort: 'type', type: rest };
@@ -52,7 +56,7 @@ export function readTerm(l: Archipelago, raw: unknown, part: string): Term {
   const [, link, back, end] = LINK.exec(s) ?? [];
   if (link && l.registry.relations.has(l.registry.canonical(link))) return { sort: 'link', link, end, back: back === '<' };
   if (l.registry.types.has(l.registry.canonical(s))) return { sort: 'type', type: s };
-  throw new Error(`filter.${part}: "${s}" is no term: held, text <words>, a type, kind <k>, id <item>, in <item>, related <item>, <link type> <item>, owner <person>, or one of Only's words (done, blocked, status <s>, no owner, over estimate, changed since|before <7d|date>, made since|before <7d|date>, by owner, by agent)`);
+  throw new Error(`filter.${part}: "${s}" is no term: held, text <words>, a type, kind <k>, id <item>, in <item>, related <item>, island <island>, <link type> <item>, owner <person>, or one of Only's words (done, blocked, status <s>, no owner, over estimate, changed since|before <7d|date>, made since|before <7d|date>, by owner, by agent)`);
 }
 
 /** A term as words again, its end now the id it was found to be. */
@@ -63,6 +67,7 @@ export function sayTerm(t: Term): string {
   if (t.sort === 'id') return `id ${t.id}`;
   if (t.sort === 'in') return `in ${t.end}`;
   if (t.sort === 'related') return `related ${t.end}`;
+  if (t.sort === 'island') return `island ${t.end}`;
   if (t.sort === 'held') return 'held';
   if (t.sort === 'word') return t.said;
   return t.owner ? `owner ${t.end}` : `${t.link}${t.back ? '<' : ''} ${t.end}`;
@@ -74,7 +79,7 @@ export async function endsOf(l: Archipelago, t: Extract<Term, { end: string }>, 
   if ((await l.db.query('select id from entity where id = $1 and archived_at is null', [t.end])).rows.length) return [t.end];
   if (/^e_[a-z0-9]{8}$/.test(t.end)) return [];
   const def = t.sort === 'link' ? l.registry.relations.get(l.registry.canonical(t.link))! : null;
-  const takes = def ? (t.sort === 'link' && t.back ? def.from : def.to) : ['*'];
+  const takes = def ? (t.sort === 'link' && t.back ? def.from : def.to) : t.sort === 'island' ? [ISLAND] : ['*'];
   const types = takes.includes('*') ? null : takes.flatMap((x) => l.registry.family(x));
   const { rows } = await l.db.query<{ id: string; type: string }>(`select id, type from entity where lower(title) = lower($1) and archived_at is null${types ? ' and type = any($3::text[])' : ''} order by updated_at desc, id limit $2`, [t.end, 5, ...(types ? [types] : [])]);
   if (rows.length > 1) throw new Error(`filter: "${sayTerm(t)}": ${rows.length > 4 ? 'many items are' : `${rows.length} items are`} named "${t.end}" (${rows.map((r) => `${r.id}, a ${r.type}`).join('; ')}): name the one meant by its id`);
@@ -92,6 +97,7 @@ export async function setOf(l: Archipelago, t: Exclude<Term, { sort: 'word' }>, 
   if (t.sort === 'id') return { cond: 'e.id = $?', param: t.id };
   if (t.sort === 'held') return { cond: 'e.id = any($?::text[])', param: await heldIds(l) };
   const at = await endsOf(l, t, me);
+  if (t.sort === 'island') return { cond: onIslands('$?'), param: at };
   if (t.sort === 'in') return { cond: 'exists (select 1 from part_closure c where c.descendant = e.id and c.ancestor = any($?::text[]))', param: at };
   if (t.sort === 'related') return { cond: 'exists (select 1 from relation r where r.valid_to is null and ((r.from_id = e.id and r.to_id = any($?::text[])) or (r.to_id = e.id and r.from_id = any($?::text[]))))', param: at };
   const [near, far] = t.back ? ['to_id', 'from_id'] : ['from_id', 'to_id'];

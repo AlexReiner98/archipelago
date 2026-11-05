@@ -9,6 +9,7 @@
 // row-level security keeps what they may not see out of the seeds, the walk and the links alike.
 
 import { SYSTEM } from './head.ts';
+import { onIslands } from './island-items.ts';
 import type { Archipelago } from './pelago.ts';
 import { checkedAfter, holding, wordConditions, type Narrowing, type Word } from './query-only.ts';
 import { heldIds } from './query-held.ts';
@@ -180,9 +181,10 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
     if (term.sort === 'id') return hidden ? [] : holds((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${[saidNot ? keep(2) : 'e.archived_at is null', ...numbered(terms, saidNot ? 2 + leftOut.length : 2)].join(' and ')}`, [[term.id], ...(saidNot ? leftOut : []), ...narrowing])).rows.map((r) => r.id));
     if (term.sort === 'type') return holds(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [l.registry.family(term.type), most]));
     if (term.sort === 'held') return holds(await seed((k) => `select e.id from entity e where e.id = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [await heldIds(l), most]));
-    if (term.sort !== 'link' && term.sort !== 'related' && term.sort !== 'in') return [];
+    if (term.sort !== 'link' && term.sort !== 'related' && term.sort !== 'in' && term.sort !== 'island') return [];
     const at = await endsOf(l, term, me);
     if (!at.length) return [];
+    if (term.sort === 'island') return holds(await seed((k) => `select e.id from entity e where ${onIslands('$1')} and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
     if (term.sort === 'in') return holds(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
     if (term.sort === 'related') return holds(await seed((k) => `select e.id from relation r join entity e on e.id = case when r.from_id = any($1::text[]) then r.to_id else r.from_id end where (r.from_id = any($1::text[]) or r.to_id = any($1::text[])) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
     const [near, far] = term.back ? ['to_id', 'from_id'] : ['from_id', 'to_id'];
@@ -220,7 +222,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   for (const t of finds) if ((t.sort === 'link' || t.sort === 'related') && room() > 0) add(await seedOf(t, reach()), 'link', [t]);
   // What is in an item, at any depth, read from the part_of closure (decision e_tvsdqjeq), the newest first; in an item
   // the viewer cannot see, nothing is.
-  for (const t of finds) if (t.sort === 'in' && room() > 0) add(await seedOf(t, reach()), 'in', [t]);
+  for (const t of finds) if ((t.sort === 'in' || t.sort === 'island') && room() > 0) add(await seedOf(t, reach()), 'in', [t]);
   // The text is the search read's own (src/search.ts): the words in any form in the title or note, or as typed anywhere
   // in the title, the best match first; only when that finds nothing, titles with a word close to what was typed.
   // How many it found in all is kept (`matched`), counted over what the viewer may see and the filter keeps; an item

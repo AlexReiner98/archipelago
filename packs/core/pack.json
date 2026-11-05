@@ -288,6 +288,16 @@
       }
     },
     {
+      "id": "island",
+      "extends": "system",
+      "title": "Island",
+      "description": "A cluster of work that speaks one pack's vocabulary and the shared set, below a project or across projects. On a map with islands on, every item but the kernel's own and actors lives on exactly one island (its field island), its type the island's pack's or of the shared set, and no link joins items on two islands: findings are how islands meet. The query term island <island> is what lives on it.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "pack": { "type": "string", "description": "The pack it speaks, by id (core for the shared set alone), fixed once the island is made." }
+      }
+    },
+    {
       "id": "instruction",
       "extends": "system",
       "title": "Instruction",

@@ -36,7 +36,8 @@ take one list of terms (`src/query-terms.ts`, e_4y5x454z), each a set of items
 written as words: `text <words>`, `type <t>`, `kind <k>`, `id <item>`,
 `in <item>` (all that is part of it at any depth, from the part_of closure,
 e_tvsdqjeq), `related <item>` (any link to it, either way), `<link> <item>`
-(`tagged e_x`; `<link>< <item>` what it links to), `owner <person>`, and
+(`tagged e_x`; `<link>< <item>` what it links to), `owner <person>`,
+`island <island>` (what lives on it, on a map with islands on), and
 words that can only be checked of what is found: `done`, `blocked`,
 `status <s>`, `no owner`, `over estimate`, `changed since 7d`,
 `made since <date>`, `made before <date>` (a since and a before are a range;
