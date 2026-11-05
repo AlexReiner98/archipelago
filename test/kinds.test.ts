@@ -59,7 +59,7 @@ test('a pack may leave a type without a kind, but cannot declare a kind or stret
   const statuses = { open: ['open'], closed: ['done'] };
   assert.equal(new Registry(packsWith(pack([{ id: 'x.thing', title: 'T', description: '', statuses }]))).type('x.thing')!.kind, undefined, 'a kind is a starter type (test/kindless.test.ts)');
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.kind', title: 'K', description: '', kind: true, statuses }]))), /only the core pack declares kinds/);
-  assert.throws(() => new Registry(packsWith(pack([{ id: 'x.tier', title: 'S', description: '', extends: 'system', statuses }]))), /cannot be of the system kind/);
+  assert.throws(() => new Registry(packsWith(pack([{ id: 'x.tier', title: 'S', description: '', extends: 'system', statuses }]))), /cannot carry the kernel flag/);
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.lens', title: 'L', description: '', extends: 'lens' }]))), /kernel's own/);
   const rel = { title: 'r', inverse: 'r', description: '', from: ['*'], to: ['*'] };
   assert.throws(() => new Registry(packsWith(pack([], [{ id: 'x.r', ...rel }]))), /must extend one of the root relations/);

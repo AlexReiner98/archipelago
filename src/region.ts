@@ -5,6 +5,7 @@
 // reads what it walks to, and nothing inside it. Read by the brief and by a pack's read around an item.
 
 import type { Archipelago } from './pelago.ts';
+import { notKernel } from './head.ts';
 
 export interface Row {
   id: string;
@@ -75,7 +76,7 @@ export const KINDS_LIMIT = 2000;
  * `more` is how many of those types were not read.
  */
 export async function scanKinds(l: Archipelago, known: { types: string[]; fold: string[]; by: string; over: string[] | null; time?: { from: string; to: string } }) {
-  const keep = [known.fold.includes('closed') && 'is_open', known.fold.includes('system') && "(kind is null or kind <> 'system')"].filter(Boolean).join(' and ');
+  const keep = [known.fold.includes('closed') && 'is_open', known.fold.includes('system') && notKernel(l.registry)].filter(Boolean).join(' and ');
   // On a time axis a session falls where it ran: only those that ran in the window are read.
   const runs = known.time ? known.types.filter((t) => l.registry.isA(t, 'run')) : [];
   const params: unknown[] = [known.types.filter((t) => !runs.includes(t)), runs, ...(runs.length ? [known.time!.to, known.time!.from] : [])];

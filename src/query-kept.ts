@@ -1,7 +1,7 @@
 // What the map keeps for looking at it: kept views (lens items) and styles, with what each is about; the hubs that need views of
 // their own; and where a lens or a style is seen at work.
 
-import { SYSTEM } from './head.ts';
+import { isKernel } from './head.ts';
 import { scopeOf } from './places.ts';
 import type { Archipelago } from './pelago.ts';
 
@@ -47,7 +47,7 @@ export async function hubs(l: Archipelago, within?: string) {
   );
   const above = await hubAtAbove(l, within);
   const read = { entities, relations };
-  const byId = new Map(read.entities.filter((e) => e.is_open && e.kind !== SYSTEM).map((e) => [e.id, e]));
+  const byId = new Map(read.entities.filter((e) => e.is_open && !isKernel(l.registry, e.type)).map((e) => [e.id, e]));
   const parts = read.relations.filter((r) => r.type === 'part_of');
   const up = new Map<string, string>();
   const kids = new Map<string, string[]>();

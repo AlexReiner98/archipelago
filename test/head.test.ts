@@ -34,7 +34,7 @@ test('the kinds declare status, owner, confidence and source; a flavour inherits
 test('a pack cannot declare a head field, a column, or a large field on the work', () => {
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.t', extends: 'work', title: 'T', description: '', fields: { owner: { type: 'string' } } }]))), /field "owner" is one a kind declares/);
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.t', extends: 'work', title: 'T', description: '', fields: { due: { type: 'date', column: true } } }]))), /cannot be kept in a column/);
-  assert.throws(() => new Registry(packsWith(pack([{ id: 'x.t', extends: 'work', title: 'T', description: '', fields: { blob: { type: 'json', large: true } } }]))), /only a type of the system kind/);
+  assert.throws(() => new Registry(packsWith(pack([{ id: 'x.t', extends: 'work', title: 'T', description: '', fields: { blob: { type: 'json', large: true } } }]))), /only a type with the kernel flag/);
 });
 
 test('every item has its kind in its row: written with it, or filled by the database when a row comes without one', async () => {

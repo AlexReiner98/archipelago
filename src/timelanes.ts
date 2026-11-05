@@ -5,7 +5,7 @@
 // sub-project or feature, so the work in one part of a project shares a colour apart from the rest. Work loose in
 // the outermost item, holding nothing, counts toward that item; work in nothing, toward itself (a session's) or nothing.
 
-import { SYSTEM } from './head.ts';
+import { notKernel } from './head.ts';
 import type { Archipelago } from './pelago.ts';
 import type { Span } from './timeaxis.ts';
 
@@ -19,7 +19,7 @@ interface Placed {
 /** A span as the answer sends it: what it was on, by name, and what it counts toward. */
 export type FiledSpan = Span & { on_title?: string; stream?: string | null };
 
-const KEPT = (e: string) => `${e}.archived_at is null and (${e}.kind is null or ${e}.kind <> '${SYSTEM}')`;
+const KEPT = (l: Archipelago, e: string) => `${e}.archived_at is null and ${notKernel(l.registry, `${e}.type`)}`;
 
 /**
  * The group each of these counts toward: what it sits in just under the outermost item (by how many items each holder
@@ -29,14 +29,14 @@ const KEPT = (e: string) => `${e}.archived_at is null and (${e}.kind is null or 
 async function groups(l: Archipelago, ids: string[]): Promise<Map<string, string>> {
   const { rows } = await l.db.query<{ id: string; at: string; depth: number }>(
     `select c.descendant as id, c.ancestor as at,
-       (select count(*) from part_closure p join entity a on a.id = p.ancestor where p.descendant = c.ancestor and ${KEPT('a')})::int as depth
+       (select count(*) from part_closure p join entity a on a.id = p.ancestor where p.descendant = c.ancestor and ${KEPT(l, 'a')})::int as depth
      from part_closure c join entity e on e.id = c.ancestor
-     where c.descendant = any($1::text[]) and ${KEPT('e')}
+     where c.descendant = any($1::text[]) and ${KEPT(l, 'e')}
      order by e.title, c.ancestor`,
     [ids],
   );
   const { rows: holding } = await l.db.query<{ id: string }>(
-    `select distinct c.ancestor as id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${KEPT('e')}`,
+    `select distinct c.ancestor as id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${KEPT(l, 'e')}`,
     [ids],
   );
   const holds = new Set(holding.map((r) => r.id));

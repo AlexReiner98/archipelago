@@ -3,7 +3,7 @@
 // without a root, the roots to choose from. No lens.
 
 import { blockGraph } from './blocking.ts';
-import { SYSTEM } from './head.ts';
+import { notKernel, SYSTEM } from './head.ts';
 import { holders } from './inside.ts';
 import type { Archipelago } from './pelago.ts';
 import { scanKinds } from './region.ts';
@@ -35,7 +35,7 @@ async function under(l: Archipelago, root: string, kinds: string[]): Promise<Ite
   }
   // What the system keeps is not climbed through; the root is read whatever it is.
   const { rows } = await l.db.query<{ id: string; type: string; title: string; status: string; is_open: boolean }>(
-    `select id, type, title, status, is_open from entity where archived_at is null and id = any($1::text[]) and (id = $2 or kind is null or kind <> '${SYSTEM}')`,
+    `select id, type, title, status, is_open from entity where archived_at is null and id = any($1::text[]) and (id = $2 or ${notKernel(l.registry)})`,
     [[...seen], root],
   );
   if (!rows.some((e) => e.id === root)) throw new Error(`No item "${root}"`);

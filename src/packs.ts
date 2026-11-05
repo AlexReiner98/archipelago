@@ -7,7 +7,7 @@ import { capacityOf, checkCapabilities, type Capabilities } from './capabilities
 import { checkDeclared, KERNEL_VERBS, presetsOf, screensOf, stylesOf, toolName, type ActionDef, type TreeDef, type VerbDef, type ViewDef } from './declared.ts';
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts';
-import { checkFieldDecls, headOf, ownHead, SYSTEM, type ColumnField } from './head.ts';
+import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 import { isServerPack, parts, readManifest, withoutAbsent, type Manifest } from './manifest.ts';
@@ -86,7 +86,7 @@ export interface ResolvedType {
   kind: string | undefined;
   /** The type nearest its kind: what it is, said without the kind (task for an experiment). */
   base: string;
-  /** Of the system kind: the app's own configuration, which views of the work leave out. */
+  /** The kernel's own (the kernel flag, src/capabilities.ts): the app's configuration, which views of the work leave out. */
   system: boolean;
   statuses: Statuses;
   /** The fields kept in props, and those kept in the item's row (status and the rest a kind declares). */
@@ -210,7 +210,7 @@ export class Registry {
       const parent = def.extends ? resolve(def.extends, [...trail, id]) : undefined;
       if (def.extends && def.kind) throw new Error(`Type "${id}" is a kind and extends nothing`);
       const kind = def.kind ? id : parent?.kind;
-      if (kind === SYSTEM && !KERNEL_PACKS.includes(def.pack)) throw new Error(`Type "${id}" in pack "${def.pack}" cannot be of the system kind: that is the kernel's own`);
+      const kernel = Boolean(def.capabilities?.kernel ?? parent?.capabilities.kernel); if (kernel && !KERNEL_PACKS.includes(def.pack)) throw new Error(`Type "${id}" in pack "${def.pack}" cannot carry the kernel flag: that is the kernel's own`);
       const statuses = def.statuses ?? parent?.statuses;
       if (!statuses?.open.length) throw new Error(`Type "${id}" needs at least one open status`);
       const resolved: ResolvedType = {
@@ -221,7 +221,7 @@ export class Registry {
         lineage: [id, ...(parent?.lineage ?? [])],
         kind,
         base: !parent || parent.id === parent.kind ? id : parent.base,
-        system: kind === SYSTEM,
+        system: kernel,
         statuses: { ...statuses, phases: phasesOf(statuses, [def.statuses?.phases, parent?.statuses.phases]) },
         // A kind is a starter type: one of no kind keeps in its row what it declares (src/head.ts, ownHead).
         ...headOf({ ...ownHead(Boolean(kind), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id) }, statuses),
@@ -485,7 +485,7 @@ export class Registry {
         fields: t.fields,
         columns: t.columns,
         ...(t.deliverable && { deliverable: true }), ...(t.altitude && { altitude: t.altitude }),
-        ...(t.public && { public: true }),
+        ...(t.public && { public: true }), ...(t.system && { system: true }),
         ...(t.belongs_with && { belongs_with: t.belongs_with }),
         ...(Object.keys(t.capabilities).length && { capabilities: t.capabilities }),
         ...(t.dormant && { dormant: true }), ...(t.retired && { retired: true }),

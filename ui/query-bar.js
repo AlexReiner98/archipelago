@@ -199,7 +199,7 @@ export function drawQuery(lens, view, go, lead) {
         drop && h('button', { type: 'button', class: 'q-x', title: 'Take it out', 'aria-label': `Take out ${said}`, onclick: drop }, '×')),
     };
   };
-  const typeChoices = () => [...types.values()].filter((t) => !t.system && t.kind !== 'system');
+  const typeChoices = () => [...types.values()].filter((t) => !t.system);
   // What Find and Only add: a kind, then the thing (decision e_45sgrfqd, ui/term-kinds.js); nothing written is guessed.
   const kinds = (part) => ({
     add: (term) => go(added(lens, { [part]: term })),

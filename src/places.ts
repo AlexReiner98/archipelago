@@ -3,6 +3,7 @@
 // keys name. Which packs ship such places the kernel does not know: with none, a session is tied to no place.
 
 import type { Entity, Archipelago } from './pelago.ts';
+import { notKernel } from './head.ts';
 
 const norm = (path: string) => path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
 
@@ -102,7 +103,7 @@ export const SCOPE = `with recursive scope(id) as (
 export async function scopeOf(l: Archipelago, id: string, open = false, among?: string[]): Promise<Set<string>> {
   const { rows } = await l.db.query<{ id: string }>(
     open
-      ? `${SCOPE} select s.id from scope s join entity e on e.id = s.id where s.id = $1 or (e.is_open and e.archived_at is null and (e.kind is null or e.kind <> 'system'))`
+      ? `${SCOPE} select s.id from scope s join entity e on e.id = s.id where s.id = $1 or (e.is_open and e.archived_at is null and ${notKernel(l.registry, 'e.type')})`
       : `${SCOPE} select id from scope${among ? ' where id = any($3::text[])' : ''}`,
     [id, livesIn(l), ...(among ? [among] : [])],
   );

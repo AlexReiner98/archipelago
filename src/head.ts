@@ -10,8 +10,17 @@
 
 import type { FieldDef, ResolvedType, TypeDef } from './packs.ts';
 
-/** The kind of the app's own configuration (views, styles, screens, runs), which views of the work leave out. */
+/** The word for the app's own configuration (views, styles, screens, runs): core's kind of it, and the query term `kind system`, read as the kernel flag. */
 export const SYSTEM = 'system';
+
+/** The kernel's own types: those carrying the kernel flag (src/capabilities.ts), kept types included. Views of the work leave their items out. */
+export const kernelTypes = (reg: { types: Map<string, ResolvedType> }) => [...reg.types.values()].filter((t) => t.system).map((t) => t.id);
+
+/** SQL that holds of an item whose type (in `column`) is not the kernel's own. Type ids are a pack's or `local.` names. */
+export const notKernel = (reg: { types: Map<string, ResolvedType> }, column = 'type') => `${column} <> all(array[${kernelTypes(reg).map((t) => `'${t.replace(/'/g, "''")}'`).join(',')}]::text[])`;
+
+/** Whether an item of this type is the kernel's own. */
+export const isKernel = (reg: { types: Map<string, ResolvedType> }, type: string) => reg.types.get(type)?.system === true;
 
 /** The head: what every item has, whatever its kind. */
 export const HEAD = ['id', 'kind', 'type', 'title', 'body', 'visibility', 'created_at', 'updated_at', 'archived_at'] as const;
@@ -56,14 +65,14 @@ export function ownHead(kinded: boolean, owned: boolean): Record<string, FieldDe
   };
 }
 
-/** What is wrong with the fields a type declares: a column only on a kind and of the four, large only on the system kind. */
+/** What is wrong with the fields a type declares: a column only on a kind and of the four, large only on a type with the kernel flag. */
 export function checkFieldDecls(type: ResolvedType, def: TypeDef | undefined, extra: Record<string, FieldDef> = {}): string[] {
   const problems: string[] = [];
   for (const [name, field] of Object.entries({ ...def?.fields, ...extra })) {
     const isColumn = (columnNames as string[]).includes(name);
     if (field.column && !isColumn) problems.push(`field "${name}" cannot be kept in a column: only ${columnNames.join(', ')} are`);
     else if (isColumn && !(def?.kind && field.column && !extra[name])) problems.push(`field "${name}" is one a kind declares, kept in the item's row`);
-    if (field.large && !type.system) problems.push(`field "${name}" is declared large, which only a type of the system kind may be`);
+    if (field.large && !type.system) problems.push(`field "${name}" is declared large, which only a type with the kernel flag may be`);
   }
   if (def?.kind && !type.columns.status) problems.push('a kind declares the status field ("column": true)');
   if (def?.kind && def.fields?.owner && !type.capabilities.owned) problems.push('a kind with an owner is owned (capability "owned")');

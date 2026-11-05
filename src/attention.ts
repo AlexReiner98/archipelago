@@ -10,7 +10,7 @@ import { BlockGraph, blockGraph, heldResources } from './blocking.ts';
 import { toConfirm } from './confirm.ts';
 import { parts } from './manifest.ts';
 import type { Archipelago } from './pelago.ts';
-import { SYSTEM } from './head.ts';
+import { isKernel, notKernel } from './head.ts';
 import { scopeOf } from './places.ts';
 
 export const REASONS = ['waits_on', 'to_confirm', 'holding_up', 'due', 'unsettled', 'blocked', 'stale', 'under_way', 'ready'] as const;
@@ -86,7 +86,7 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
     : await rowsFor(l, me, me !== null && me === owner, scope, wanted, weighed.flatMap((d) => l.registry.family(d.of)));
   const reg = l.registry;
   // Only what is work or a question to someone: not people, places, records of the past, or the system's own.
-  const live = new Map(rows.filter((e) => e.kind !== SYSTEM && (!scope || scope.has(e.id))).map((e) => [e.id, e]));
+  const live = new Map(rows.filter((e) => !isKernel(reg, e.type) && (!scope || scope.has(e.id))).map((e) => [e.id, e]));
   // Someone's: owned by them, or owned by nobody when they are the workspace's owner.
   const theirs = (e: Row) => me === null || e.owner === me || (e.owner === null && me === owner);
   const found = new Map<string, { row: Row; reasons: Record<string, unknown>[] }>();
@@ -210,7 +210,7 @@ const EVERYONE = ['to_confirm'];
  */
 async function rowsFor(l: Archipelago, me: string | null, isOwner: boolean, scope: Set<string> | null, wanted: Set<string>, declared: string[]): Promise<Row[]> {
   const cols = `id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at`;
-  const notSystem = `(kind is null or kind <> '${SYSTEM}')`;
+  const notSystem = notKernel(l.registry);
   if (scope) return (await l.db.query<Row>(`select ${cols} from entity where id = any($1::text[]) and is_open and archived_at is null and ${notSystem}`, [[...scope]])).rows;
   if (me !== null) {
     // What nobody owns is the owner's: of it, only what a reason asked for can be (what is actionable; for what is

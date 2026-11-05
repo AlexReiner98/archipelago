@@ -109,8 +109,9 @@
       "id": "system",
       "title": "System",
       "kind": true,
-      "description": "The app's own configuration, kept as items: views, styles, screens, runs, sources, notifications, automations. Views of the work leave it out unless asked. Only the kernel's packs declare types of it.",
+      "description": "The app's own configuration, kept as items: views, styles, screens, runs, sources, notifications, automations. Views of the work leave it out unless asked: its types carry the kernel flag. Only the kernel's packs declare types of it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
+      "capabilities": { "kernel": true },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
         "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." }

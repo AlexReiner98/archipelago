@@ -4,7 +4,7 @@
 
 import { blockGraph } from './blocking.ts';
 import type { ViewDef } from './declared.ts';
-import { SYSTEM } from './head.ts';
+import { notKernel } from './head.ts';
 import type { Archipelago } from './pelago.ts';
 
 /** The fields one value of a param stands for, as the preset declares them. */
@@ -32,7 +32,7 @@ async function nodesOf(l: Archipelago, ids: string[], keep = ''): Promise<Node[]
  */
 async function near(l: Archipelago, focus: string, over: unknown, fold: string[], steps: number) {
   const types = Array.isArray(over) ? (over as string[]) : null;
-  const keep = ['e.archived_at is null', fold.includes('closed') && 'e.is_open', fold.includes('system') && `(e.kind is null or e.kind <> '${SYSTEM}')`].filter(Boolean).join(' and ');
+  const keep = ['e.archived_at is null', fold.includes('closed') && 'e.is_open', fold.includes('system') && notKernel(l.registry, 'e.type')].filter(Boolean).join(' and ');
   const seen = new Set([focus]);
   for (let level = [focus], n = 0; level.length && n < steps; n++) {
     const way = (from: string, to: string) => `select r.${to} as id from relation r join unnest($1::text[]) s(id) on s.id = r.${from} join entity e on e.id = r.${to} where r.valid_to is null${types ? ' and r.type = any($2::text[])' : ''} and ${keep}`;
@@ -104,7 +104,7 @@ async function newest(l: Archipelago, over: unknown, fold: string[]) {
     const { rows } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = $1 and valid_to is null order by valid_from desc limit ${NEWEST_LINKS}`, [type]);
     for (const r of rows) ends.add(r.from_id).add(r.to_id);
   }
-  const keep = [fold.includes('closed') && 'is_open', fold.includes('system') && `(kind is null or kind <> '${SYSTEM}')`].filter(Boolean).join(' and ');
+  const keep = [fold.includes('closed') && 'is_open', fold.includes('system') && notKernel(l.registry)].filter(Boolean).join(' and ');
   return { lens: { over: Array.isArray(over) ? (over as string[]) : ('all' as const) }, items: await nodesOf(l, [...ends], keep) };
 }
 
