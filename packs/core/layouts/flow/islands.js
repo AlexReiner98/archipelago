@@ -3,7 +3,7 @@
 // each island carries its own legend). The places are ./archipelago.js's; this draws them. The region is land on the
 // one plane, never a box holding boxes (depth is never drawn): the union of its padded steps, its own wires, its name's
 // room and its legend's, its shore in the island's colour (the style's island_hues, else its hues) and its land a tint
-// of it, under every wire. Named at its top left, its legend (what each mark in it means) at its foot. Where a link
+// of it, under every wire. Named at its top left, its legend (its own types and link types) beside its steps. Where a link
 // between two islands crosses a shore is a gate: a mark on the shore naming what crosses (a finding, and its value).
 // Layer: marks. Pure: the composed model and each island's legend rows in, marks and colour rules out.
 
@@ -12,7 +12,7 @@
  * `legends` holds each island's rows ({ glyph, label }); `isHex` says what is a colour.
  */
 export function islandMarks({ g, legends, islands = [], style, z, m, titled, measure, fit, isHex }) {
-  if (!g.islands?.length) return { layer: [], gates: [], rules: [] };
+  if (!g.islands?.length) return { layer: [], gates: [], rules: [], tips: new Map() };
   const given = Array.isArray(style.island_hues) && style.island_hues.length ? style.island_hues : Array.isArray(style.hues) ? style.hues : [];
   const hues = given.filter(isHex);
   const named = new Map(islands.map((i) => [i.id, i.title]));
@@ -42,24 +42,29 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, mea
   });
   // A gate on each shore a link between islands crosses: a bar across the wire in its island's colour. What crosses
   // (what the link points to, and its value) is named once, in the sea between the two, cut to the room there.
+  // A finding crossing is of the grammar every island shares, so no legend says what a gate is: each gate and the name
+  // in the sea answers a hover with a tip (`tips`, by the mark's key) saying what crosses and which way.
   const [GATE_H, GATE_PAD, GATE_TEXT, BAR, MOST] = ['island_gate_height', 'island_gate_pad', 'island_gate_text', 'island_gate_bar', 'island_gate_most'].map(z);
+  const tips = new Map();
+  const tip = (key, said, what) => tips.set(key, m('div', { class: 'lf-tip' }, m('b', {}, said), m('span', {}, what)));
   const gates = g.ties.filter((t) => t.crossing && t.gates.length).flatMap((t, n) => {
     const to = g.nodes.get(t.b)?.item, value = to?.fields?.value;
     const said = `${to?.title ?? ''}${value !== undefined && value !== null && typeof value !== 'object' ? `: ${value}` : ''}`;
+    const [reader, source] = [t.a, t.b].map((id) => named.get(g.nodes.get(id)?.item?.island));
     const bars = t.gates.map((gate, k) => {
       const [gx, gy] = gate.at, half = BAR / 2, d = gate.way[0] ? `M${gx} ${gy - half}V${gy + half}` : `M${gx - half} ${gy}H${gx + half}`;
-      return titled(m('path', { key: `gate:${n}:${k}`, d, class: `lf-gate-bar ${classes.get(gate.island) ?? ''}` }), `${said}\n${k ? 'Goes out here' : 'Comes in here'}`);
+      const key = `gate:${n}:${k}`;
+      tip(key, said, k ? `A finding read across: it leaves ${source ?? 'its island'} here` : `A finding read across: it comes into ${reader ?? 'this island'} here`);
+      return titled(m('path', { key, on: ['enter', 'leave'], d, class: `lf-gate-bar ${classes.get(gate.island) ?? ''}` }), `${said}\n${k ? 'Goes out here' : 'Comes in here'}`);
     });
     const l = t.label, text = l && fit(said, Math.min(l.across ? l.room - 2 * GATE_PAD : MOST, MOST) - 2 * GATE_PAD, GATE_TEXT);
     if (!text || text.length < 2) return bars;
     const w = measure(text, GATE_TEXT) + 2 * GATE_PAD;
-    return [...bars, titled(m('g', { key: `cross:${n}`, class: 'lf-gate' }, m('rect', { x: l.at[0] - w / 2, y: l.at[1] - GATE_H / 2, width: w, height: GATE_H, rx: GATE_H / 2 }), m('text', { x: l.at[0], y: l.at[1] }, text)), said)];
+    tip(`cross:${n}`, said, `A finding read across, from ${source ?? 'one island'} into ${reader ?? 'another'}`);
+    return [...bars, titled(m('g', { key: `cross:${n}`, on: ['enter', 'leave'], class: 'lf-gate' }, m('rect', { x: l.at[0] - w / 2, y: l.at[1] - GATE_H / 2, width: w, height: GATE_H, rx: GATE_H / 2 }), m('text', { x: l.at[0], y: l.at[1] }, text)), said)];
   });
-  return { layer, gates, rules: [...rules] };
+  return { layer, gates, rules: [...rules], tips };
 }
-
-/** A gate as the key draws it, in a box of the key's size (`G`: its middle and how big): a wire through a bar. */
-export const gateGlyph = (m, G) => m('g', {}, m('path', { d: `M${G.x - G.w / 2} ${G.y}H${G.x + G.w / 2}`, class: 'lf-tie headed' }), m('path', { d: `M${G.x} ${G.y - G.r - 1}V${G.y + G.r + 1}`, class: 'lf-gate-bar' }));
 
 export const css = `
 /* An island: its shore the union's outline in its colour, its land a tint of it over the sea, under every wire. */

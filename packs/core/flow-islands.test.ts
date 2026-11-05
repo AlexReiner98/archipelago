@@ -70,13 +70,57 @@ test('no two islands overlap, and each holds its own steps and no other’s', ()
   }
 });
 
+const legendOf = (scene: any, id: string): string[] => marks(keyed(scene.svg, `i:${id}`), (m) => m[1]?.class === 'lf-island-key').map((m) => m.at(-1).at(-1));
+/** What every island shares (principle e_jxtawgq7): never in an island's legend. */
+const SHARED = ['Not started', 'Under way', 'Finished', 'Ended', 'Trouble', 'Held up', 'Waits on you', 'Held for you', 'Crosses here', 'Reads'];
+
 test('each island carries its own legend and the corner has none', () => {
   const scene = draw(answer);
   assert.deepEqual(scene.key, [], 'no key in the corner');
-  const said = (id: string) => marks(keyed(scene.svg, `i:${id}`), (m) => m[1]?.class === 'lf-island-key').map((m) => m.at(-1).at(-1));
-  assert.ok(said('e_grantsis').includes('Work') && said('e_grantsis').includes('Reads') && said('e_grantsis').includes('Crosses here'), said('e_grantsis').join(', '));
-  assert.ok(said('e_lablabis').includes('Record'), 'Lab’s says what a record is');
-  assert.ok(!said('e_grantsis').includes('Record'), 'Grants’ says only what it draws');
+  assert.ok(legendOf(scene, 'e_grantsis').includes('Work') && legendOf(scene, 'e_grantsis').includes('Leads to'), legendOf(scene, 'e_grantsis').join(', '));
+  assert.ok(legendOf(scene, 'e_lablabis').includes('Record'), 'Lab’s says what a record is');
+  assert.ok(!legendOf(scene, 'e_grantsis').includes('Record'), 'Grants’ says only what it draws');
+});
+
+test('an island’s legend holds only its vocabulary: the shared marks are told in a tip on the mark', () => {
+  const you = 'e_alexzzzz';
+  const a = {
+    ...answer, viewer: you,
+    items: answer.items.map((i) => (i.id === 'e_runzzzzz' ? { ...i, phase: 'trouble' } : i.id === 'e_writezzz' ? { ...i, phase: 'under_way', pending: { proposal: 'e_heldheld', op: 'update', reason: 'A test' } } : i)),
+    links: [...answer.links, { type: 'waits_on', from: 'e_budgetzz', to: you }],
+  };
+  const scene = draw(a);
+  for (const id of ISLES) for (const word of SHARED) assert.ok(!legendOf(scene, id).includes(word), `${id}’s legend says “${word}”: ${legendOf(scene, id).join(', ')}`);
+  const { on } = picture({ answer: a, style: house, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} });
+  const tipOf = (key: string) => {
+    const tip = on({ name: 'enter', key }).find((p: any) => p.tip)?.tip;
+    assert.ok(tip, `${key} answers a hover with a tip`);
+    return JSON.stringify(tip.mark);
+  };
+  // The phase dot, and trouble, each said on the dot.
+  assert.ok(keyed(scene.svg, 'p:e_writezzz')?.[1].on.includes('enter'), 'the dot is a mark of its own to hover');
+  assert.ok(tipOf('p:e_writezzz').includes('Under way'));
+  assert.ok(tipOf('p:e_runzzzzz').includes('Trouble'));
+  // Off the dot, the tip goes back to the step it is on.
+  assert.equal(on({ name: 'leave', key: 'p:e_writezzz' }).find((p: any) => p.tip)?.tip?.key, 's:e_writezzz');
+  // What waits on you is said in its step's tip.
+  assert.ok(tipOf('s:e_budgetzz').includes('Waits on you'));
+  assert.ok(tipOf('s:e_sendzzzz').includes('Waits on you') && !tipOf('s:e_costzzzz').includes('Waits on you'), 'and only there');
+  // What is held for you, on its badge.
+  const badge = marks(scene.svg, (m) => String(m[1]?.key ?? '').startsWith('held:e_heldheld'))[0];
+  assert.ok(badge?.[1].on.includes('click') && badge[1].on.includes('enter'), 'the badge still decides on a click, and tells on a hover');
+  assert.ok(tipOf(badge[1].key).includes('Held for you') && tipOf(badge[1].key).includes('A test'));
+  // A finding crossing, on each gate and on its name in the sea.
+  const gates = marks(scene.svg, (m) => /^(gate|cross):/.test(String(m[1]?.key ?? '')));
+  assert.ok(gates.length >= 2);
+  for (const g of gates) assert.ok(tipOf(g[1].key).includes('A finding read across'), g[1].key);
+  assert.ok(tipOf('gate:0:0').includes('Grants') && tipOf('gate:0:1').includes('Lab'), 'each gate names the island it comes into or leaves');
+});
+
+test('a picture of one island keeps the shared marks in its key', () => {
+  const one = { ...answer, items: answer.items.filter((i) => i.island !== 'e_lablabis').map((i) => (i.id === 'e_writezzz' ? { ...i, phase: 'under_way' } : i)) };
+  const words = draw(one).key.map((r: any) => r.label);
+  assert.ok(words.includes('Under way') && words.includes('Not started'), words.join(', '));
 });
 
 test('a finding read across crosses the sea, with a gate on each shore naming it', () => {

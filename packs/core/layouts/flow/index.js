@@ -21,7 +21,7 @@
 import { lineageOf, shownOnly } from './graph.js';
 import { layout } from './layout.js';
 import { css } from './look.js';
-import { css as islandCss, gateGlyph, islandMarks } from './islands.js';
+import { css as islandCss, islandMarks } from './islands.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
@@ -163,8 +163,14 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   // A wire is broken where it passes under another; one that is drawn in as a story plays stays whole.
   const line = (w) => drawn(w.points, story ? [] : w.gaps, z('break_half'));
   // A held change's badge: where the person decides it, on the step's corner or a wire's middle. One per mark.
+  // What is held is of the grammar every island shares: the badge says so in a tip of its own, not in a legend.
   let badges = 0;
-  const badge = (pending, [bx, by]) => titled(m('g', { key: `held:${pending.proposal}:${++badges}`, on: ['click'], class: 'lf-held', transform: `translate(${bx} ${by})` }, m('circle', { cx: 0, cy: 0, r: z('held_badge') }), m('text', { x: 0, y: 0 }, '?')), `Held for you${pending.reason ? `: ${pending.reason}` : ''}`);
+  const heldTips = new Map();
+  const badge = (pending, [bx, by]) => {
+    const key = `held:${pending.proposal}:${++badges}`;
+    heldTips.set(key, m('div', { class: 'lf-tip' }, m('b', {}, 'Held for you'), pending.reason && m('span', {}, pending.reason)));
+    return titled(m('g', { key, on: ['click', 'enter', 'leave'], class: 'lf-held', transform: `translate(${bx} ${by})` }, m('circle', { cx: 0, cy: 0, r: z('held_badge') }), m('text', { x: 0, y: 0 }, '?')), `Held for you${pending.reason ? `: ${pending.reason}` : ''}`);
+  };
   const held = (pending) => Boolean(pending?.proposal);
   /** Where a wire's badge goes: the middle of its middle stretch. */
   const middleOf = (points) => {
@@ -226,12 +232,17 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const kindWord = (i) => ((t) => KIND_WORDS[t] ?? words(t))(shapedBy(i, shapes) ?? lineageOf(i).at(-1) ?? 'item');
   // A story's key has the phases its steps give too.
   const stepPhases = story ? answer.steps.flatMap((s) => Object.values(s.fields ?? {}).map((f) => f?.phase).filter((p) => typeof p === 'string')) : [];
-  /** The rows for what these steps and wires use: of the whole picture, or of one island (`across`: links leave it). */
-  const keyRows = ({ st, chains, ties, breaks, heldHere, across = false }) => {
+  /**
+   * The rows for what these steps and wires use: of the whole picture, or of one island (`local`). An island's legend
+   * holds only its vocabulary, its types and link types (principle e_jxtawgq7: capabilities are a grammar every island
+   * shares, so no legend explains them): the phase dot, a session's state, held up, waits on you, a finding crossing and
+   * what is held for you leave it, each told in a tip on the mark itself.
+   */
+  const keyRows = ({ st, chains, ties, breaks, heldHere, local = false }) => {
     const drawnAs = new Map();
     for (const n of st) (drawnAs.get(n.shape) ?? drawnAs.set(n.shape, new Set()).get(n.shape)).add(n.stub ? 'Possible end' : kindWord(n.item));
-    const uses = (test) => st.some(test);
-    const phases = new Set([...st.filter((n) => !n.stub && (story || !marked(n.item))).map((n) => stateOf(n.item).phase), ...stepPhases].filter((p) => markOf(p) !== 'none'));
+    const uses = (test) => !local && st.some(test);
+    const phases = new Set(local ? [] : [...st.filter((n) => !n.stub && (story || !marked(n.item))).map((n) => stateOf(n.item).phase), ...stepPhases].filter((p) => markOf(p) !== 'none'));
     return [
       [...drawnAs.keys()].sort((a, b) => KEY_ORDER.indexOf(a) - KEY_ORDER.indexOf(b)).map((shape) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), [...drawnAs.get(shape)].join(', '))),
       Object.keys(PHASE_WORDS).filter((p) => phases.has(p)).map((p) => mark(dot(`ph-${p} ${markOf(p)}${p === 'trouble' ? ' trouble' : ''}`, markOf(p), G.x, G.y, G.r), PHASE_WORDS[p])),
@@ -246,16 +257,13 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
       ((rows) => rows.map((row) => {
         const [type, you] = row.split('\n'), cls = `${kind(type)}${you}`, both = rows.includes(`${type}\n`) && rows.includes(`${type}\n you`);
         return mark(headless.has(type) ? m('path', { d: 'M1 7H21', class: `lf-tie${type === 'part_of' ? ' near' : ''}${cls}` }) : m('g', {}, m('path', { d: 'M1 7H17', class: `lf-tie headed${cls}` }), m('path', { d: 'M21 7L13 3V11Z', class: `lf-head${cls}` })), you && both ? `${linkName(type)} you` : linkName(type));
-      }))([...new Set(ties.map((t) => `${t.type}\n${onYou(t)}`))].sort()),
-      across && mark(gateGlyph(m, G), 'Crosses here'),
-      heldHere && mark(m('path', { d: 'M1 7H21', class: 'lf-wire held' }), 'Held for you'),
+      }))([...new Set(ties.map((t) => `${t.type}\n${local ? '' : onYou(t)}`))].sort()),
+      !local && heldHere && mark(m('path', { d: 'M1 7H21', class: 'lf-wire held' }), 'Held for you'),
     ].flat().filter(Boolean);
   };
-  // On an archipelago each island carries its own legend, inside it (the owner, 5 Nov 2026): its rows, with the links that leave it.
-  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => {
-    const touching = parts.cross.filter((l) => parts.where.get(l.from) === p.id || parts.where.get(l.to) === p.id).map((l) => ({ type: l.type ?? l.kind, a: l.from, b: l.to }));
-    return [p.id, keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: [...p.model.ties, ...touching], breaks: p.model.breaks.length > 0, heldHere: p.items.some((i) => held(i.pending)), across: touching.length > 0 })];
-  }));
+  // On an archipelago each island carries its own legend, inside it (the owner, 5 Nov 2026): its types and the link
+  // types of its own wires. A link that leaves it is a finding crossing, of the shared grammar, told at its gates.
+  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
   const nameWidth = (id) => z('island_name_x') + measure(String((answer.islands ?? []).find((i) => i.id === id)?.title ?? ''), z('island_text'), 'region');
   if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, crossings: z('island_crossings_most') });
@@ -284,6 +292,21 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   };
   const dotAt = (n, phase = stateOf(n.item).phase) => dot(dotClass(n.item, phase), markOf(phase), ...dotPlace(n), z('dot'));
   const sessionDot = (n) => marked(n.item) && stateMark(m, sessionOf(n.item).state, marked(n.item), ...dotPlace(n), z('dot'));
+  // Where a step stands is of the grammar every island shares: its dot says so in a tip of its own, over a ring wider
+  // than the dot to hover (`p:<id>`), so an island's legend need not.
+  const dotTips = new Map();
+  const dotWords = (i) => {
+    if (marked(i)) return STATE_WORDS[sessionOf(i).state];
+    const phase = stateOf(i).phase;
+    return [PHASE_WORDS[phase] ?? words(phase), heldUp(i) && 'Held up'].filter(Boolean).join(', ');
+  };
+  const hoverDot = (n) => {
+    const mark = sessionDot(n) || dotAt(n);
+    if (!mark) return null;
+    const key = `p:${n.id}`;
+    dotTips.set(key, m('div', { class: 'lf-tip' }, m('b', {}, dotWords(n.item)), m('span', {}, n.item.said ?? n.item.title)));
+    return m('g', { key, on: ['enter', 'leave'], class: 'lf-mark' }, m('circle', { cx: dotPlace(n)[0], cy: dotPlace(n)[1], r: 2 * z('dot'), class: 'lf-hit' }), mark);
+  };
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
@@ -295,7 +318,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     const body = [
       outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
-      !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : sessionDot(n) || dotAt(n)),
+      !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : hoverDot(n)),
       // Its name in the lines the layout gave it (./lines.js): a second line under the first, the two about the middle.
       n.lines?.length > 1
         ? m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, ...n.lines.map((line, k) => m('tspan', { x: left, dy: k ? n.line : (-(n.lines.length - 1) * n.line) / 2 }, fit(line, room, n.stub ? STUB_TEXT : TEXT))))
@@ -345,11 +368,14 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     ...g.chains.flatMap((c, n) => [`w:${n}`, `h:${n}`].map((key) => ({ key, toggle: { lit: Boolean(id) && (c.a === id || c.b === id) } }))),
     ...g.ties.flatMap((t, n) => (headless.has(t.type) ? [`n:${n}`] : [`n:${n}`, `nh:${n}`]).map((key) => ({ key, toggle: { lit: Boolean(id) && (t.a === id || t.b === id) } }))),
   ];
-  /** A step's tip: its title, and the start of its note. */
+  /** A step's tip: its title, that it waits on you where it does (a colour no legend explains), and the start of its note. */
   const tipFor = (key) => {
     const i = g.nodes.get(key.slice(2)).item, note = held(i.pending) ? `Held for you${i.pending.reason ? `: ${i.pending.reason}` : ''}` : opening(i);
-    return m('div', { class: 'lf-tip' }, m('b', {}, i.said ?? i.title), (i.named ?? note) && m('span', {}, i.named ?? note));
+    return m('div', { class: 'lf-tip' }, m('b', {}, i.said ?? i.title), yours(i) && m('span', { class: 'lf-tip-you' }, 'Waits on you'), (i.named ?? note) && m('span', {}, i.named ?? note));
   };
+  /** The tip of a shared mark (a dot, a held badge, a gate), by its key; none for any other. */
+  const markTips = [dotTips, heldTips, isles.tips];
+  const markTip = (key) => markTips.find((tips) => tips.has(key))?.get(key);
   // Opened from an item's page, the picture is brought to that item; else to the step nearest its top left.
   const start = g.nodes.has(style.here) ? style.here : steps.filter((n) => !n.stub).reduce((p, q) => (g.y.get(q.id) - q.h / 2 < g.y.get(p.id) - p.h / 2 || (g.y.get(q.id) - q.h / 2 === g.y.get(p.id) - p.h / 2 && g.x.get(q.id) < g.x.get(p.id)) ? q : p), steps[0])?.id;
   // Told as a story: each step of the graph shown as the story's steps bring it, on the stage of story.js.
@@ -377,6 +403,13 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     on(event) {
       const { name, key } = event;
       if (player?.hears(key)) return player.on(event);
+      // A shared mark's tip, over the step's while the pointer is on the mark; off it, back to the step it is on, if any.
+      if (!story && markTip(String(key))) {
+        if (name === 'enter') return [{ tip: { key, mark: markTip(String(key)) } }];
+        if (name !== 'leave') return [];
+        const on = String(key).startsWith('p:') ? `s:${String(key).slice(2)}` : null;
+        return on && tipped.has(on) ? [{ tip: { key: on, mark: tipFor(on) } }] : [{ tip: null }];
+      }
       if (name === 'leave') return [...light(null), ...(story ? [] : [{ tip: null }])];
       if (!keyed.has(key)) return [];
       return [...light(keyed.get(key)), ...(!story && tipped.has(key) ? [{ tip: { key, mark: tipFor(key) } }] : [])];
