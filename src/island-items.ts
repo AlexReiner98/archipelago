@@ -39,6 +39,25 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
   const cut = ops.flatMap((op) => (op.op === 'unlink' ? [op.relation] : [])); // links this change takes away
   const crosses = [...reg.relations.values()].filter((r) => (r as { crosses?: boolean }).crosses).map((r) => r.id); // the link types that may join two islands
   const fits = (t: ResolvedType, pack: string) => t.pack === pack || shared.has(t.id);
+  const refs = new Set(ops.flatMap((op, i) => (op.op === 'create' ? [op.ref ?? `#${i + 1}`] : [])));
+  /** An island as props.island names it, as the key this check reads: an island made in this change is named {ref}, which the apply loop turns into its id. */
+  const islandKey = (value: unknown): unknown => {
+    const braced = typeof value === 'string' ? /^\{([^{}\s]+)\}$/.exec(value) : null;
+    return braced && refs.has(braced[1]) ? braced[1] : value;
+  };
+  /** Why props.island cannot be kept as it is written: a bare ref would be kept as it is, naming no island. */
+  const bare = (where: string, value: unknown) =>
+    typeof value === 'string' && refs.has(value) ? `${where}: props.island names the island made in this change as {${value}}, not ${value}` : undefined;
+
+  // What this change makes and where it moves things, read first: a link is judged by where both its ends are once the
+  // whole change is applied, so three linked items moved together to one island are not refused one at a time.
+  for (const [i, op] of ops.entries()) {
+    if (op.op === 'create') made.set(op.ref ?? `#${i + 1}`, { type: op.type, props: { ...op.props, island: islandKey(op.props?.island) }, title: op.title });
+    else if (op.op === 'update' && op.props?.island !== undefined) {
+      const before = await map.entity(op.id);
+      if (before) moved.set(op.id, { island: islandKey(op.props.island) as string, title: before.title });
+    }
+  }
 
   /** The pack an island speaks, or why the id names no island. */
   const packOf = async (key: string): Promise<{ pack?: string; why?: string }> => {
@@ -73,20 +92,18 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
       const type = reg.type(op.type);
       if (!type) continue;
       const props = op.props ?? {};
-      made.set(op.ref ?? `#${i + 1}`, { type: op.type, props, title: op.title });
       if (reg.isA(op.type, ISLAND) && !reg.packs.some((p) => p.id === props.pack)) problem(`${where}: an island speaks a pack active here (props.pack): ${reg.packs.map((p) => p.id).join(', ')}`);
-      if (livesOnIsland(type)) problem(await placing(where, type, props.island));
+      if (livesOnIsland(type)) problem(bare(where, props.island) ?? (await placing(where, type, islandKey(props.island))));
     } else if (op.op === 'update' && op.props) {
       const before = await map.entity(op.id);
       const type = before && reg.type(before.type);
       if (!before || !type) continue;
       if (reg.isA(type.id, ISLAND) && op.props.pack !== undefined && op.props.pack !== before.props.pack) problem(`${where}: an island’s pack is fixed once it is made`);
       if (!livesOnIsland(type) || op.props.island === undefined || op.props.island === before.props.island) continue;
-      const placed = await placing(where, type, op.props.island);
+      const placed = bare(where, op.props.island) ?? (await placing(where, type, islandKey(op.props.island)));
       if (placed) { problem(placed); continue; }
-      const here: Where = { island: op.props.island as string, title: before.title };
-      moved.set(op.id, here);
-      // What it is linked to stays where it is: a move that would leave a link joining two islands is refused.
+      const here = moved.get(op.id)!;
+      // What it is linked to stays where this change leaves it: a move that would leave a link joining two islands is refused.
       const { rows } = await map.db.query<{ other: string }>(`select case when from_id = $1 then to_id else from_id end as other from relation where (from_id = $1 or to_id = $1) and valid_to is null and id <> all($2::text[]) and type <> all($3::text[])`, [op.id, cut, crosses]);
       for (const { other } of rows) { const there = await whereIs(other); if (there) problem(crossing(where, here, there)); }
     } else if ((op.op === 'link' && !crosses.includes(op.type)) || op.op === 'merge') {

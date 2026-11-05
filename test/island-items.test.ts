@@ -84,6 +84,34 @@ test('no link joins items on two islands, by link, move or merge', async () => {
   assert.equal((await l.entity(z))!.props.island, a2, 'with nothing tying it, an item moves');
 });
 
+test('an island made in the same change is named {ref}, and linked items move together (issue e_cctzam6z)', async () => {
+  const l = await islandMap();
+  await refused(l, [{ op: 'create', ref: 'h', type: 'island', title: 'Billing', props: { pack: 'plain' } }, { op: 'create', type: 'task', title: 'Bare', props: { island: 'h' } }], /names the island made in this change as \{h\}, not h/);
+  const { h, t } = await make(l, [
+    { op: 'create', ref: 'h', type: 'island', title: 'Billing', props: { pack: 'plain' } },
+    { op: 'create', ref: 't', type: 'task', title: 'Braced', props: { island: '{h}' } },
+  ]);
+  assert.equal((await l.entity(t))!.props.island, h, 'kept as the island’s id');
+  const { a, b } = await make(l, [
+    { op: 'create', ref: 'a', type: 'island', title: 'From', props: { pack: 'plain' } },
+    { op: 'create', ref: 'b', type: 'island', title: 'To', props: { pack: 'plain' } },
+  ]);
+  const { x, y, z, w } = await make(l, [
+    { op: 'create', ref: 'x', type: 'task', title: 'One', props: { island: a } },
+    { op: 'create', ref: 'y', type: 'task', title: 'Two', props: { island: a } },
+    { op: 'create', ref: 'z', type: 'task', title: 'Three', props: { island: a } },
+    { op: 'create', ref: 'w', type: 'task', title: 'Stays', props: { island: a } },
+    { op: 'link', type: 'depends_on', from: 'x', to: 'y' },
+    { op: 'link', type: 'depends_on', from: 'y', to: 'z' },
+    { op: 'link', type: 'depends_on', from: 'z', to: 'w' },
+  ]);
+  await refused(l, [{ op: 'update', id: x, props: { island: b } }, { op: 'update', id: y, props: { island: b } }, { op: 'update', id: z, props: { island: b } }], /"Three" lives on the island .* and "Stays"/);
+  await make(l, [{ op: 'update', id: w, props: { island: b } }, { op: 'update', id: x, props: { island: b } }, { op: 'update', id: y, props: { island: b } }, { op: 'update', id: z, props: { island: b } }]);
+  for (const id of [x, y, z, w]) assert.equal((await l.entity(id))!.props.island, b, 'moved together, ties and all');
+  const { n } = await make(l, [{ op: 'create', ref: 'n', type: 'island', title: 'New', props: { pack: 'plain' } }, { op: 'update', id: x, props: { island: '{n}' } }, { op: 'update', id: y, props: { island: '{n}' } }, { op: 'unlink', relation: (await l.db.query<{ id: string }>(`select id from relation where from_id = $1 and to_id = $2`, [y, z])).rows[0].id }]);
+  assert.equal((await l.entity(y))!.props.island, n, 'onto an island made in the same change');
+});
+
 test('the term island <island> is what lives on it, by id or name', async () => {
   const l = await islandMap();
   const { a, b } = await make(l, [
