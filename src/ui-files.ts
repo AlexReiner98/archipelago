@@ -30,6 +30,8 @@ export const UI_FILES: Record<string, string> = {
   '/packs.js': 'packs.js',
   '/query-light.js': 'query-light.js',
   '/lit-by.js': 'lit-by.js',
+  // A scene mounted again moves into place, its marks matched by key (ui/layout.js mounts, ui/transition.js plays).
+  '/transition.js': 'transition.js',
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
   '/draw.html': 'draw.html',
   '/draw.js': 'draw.js',
