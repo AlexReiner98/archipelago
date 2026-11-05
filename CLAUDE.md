@@ -130,7 +130,7 @@ reply ending, commits accounted for) is `docs/agents.md`.
 - **Visibility is enforced by the database** (row level security in
   `src/db.ts`). Do not add application-side visibility filters; if something
   must cross the privacy line, add a narrow `security definer` function.
-- **Types live in pack files** under `packs/`, each a manifest of fifteen keys
+- **Types live in pack files** under `packs/`, each a manifest of sixteen keys
   (`docs/packs.md`, read by `src/manifest.ts`). Fields the system maintains are
   marked `"system": true`.
 - **An item is a small head and its fields** (`src/head.ts`). The head is id,

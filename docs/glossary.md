@@ -140,7 +140,7 @@ goes in a day.
 node, a dashed wire, a badge. In the code: `ui/ghosts.js`.
 
 **pack.** A folder under `packs/` with a `pack.json`, its manifest of
-fifteen keys (`docs/packs.md`): the types, links, rules, views, actions,
+sixteen keys (`docs/packs.md`): the types, links, rules, views, actions,
 handlers, drawings and styles of one way of working, and what it may reach.
 Which packs a workspace has is a fact in its log. In the code:
 `src/manifest.ts` reads a manifest, `src/packs.ts` loads them. Replaces

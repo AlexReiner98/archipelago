@@ -14,6 +14,8 @@ import { newId } from './db.ts';
 import { env } from './env.ts';
 import { append, type Fact } from './log.ts';
 import { decideAct, listActs, setPackSecret } from './outside.ts';
+import { notKernel } from './head.ts';
+import { ISLANDS } from './islands.ts';
 import { KERNEL_PACKS } from './packorder.ts';
 import { LOCAL_PACK, type PackFile } from './packs.ts';
 import { hostFor } from './packtools.ts';
@@ -48,6 +50,31 @@ export async function packsOff(l: Archipelago): Promise<string[]> {
   if (said.size) return l.registry.found.map((p) => p.id).filter((id) => id !== LOCAL_PACK && !KERNEL_PACKS.includes(id) && said.get(id)?.op !== '+');
   const { rows } = await l.db.query<{ value: unknown }>(`select value from setting where key = $1`, [PACKS_OFF]);
   return Array.isArray(rows[0]?.value) ? (rows[0].value as string[]) : [];
+}
+
+/** Whether this workspace holds its packs to the island rules (src/islands.ts): off unless the owner set it. */
+export async function islandsOn(l: Archipelago): Promise<boolean> {
+  const { rows } = await l.db.query<{ value: unknown }>(`select value from setting where key = $1`, [ISLANDS]);
+  return rows[0]?.value === true;
+}
+
+/**
+ * Hold this workspace's packs to the island rules, or let them go. It is turned on only on a map with nothing on it
+ * yet beyond who is in it and the kernel's own: on a map with work, the packs it refuses would leave that work dormant.
+ */
+export async function setIslands(l: Archipelago, actor: Actor, on: boolean) {
+  if (actor.kind !== 'human') throw new Error('Holding the packs to the island rules is the owner’s.');
+  if (on && !(await islandsOn(l))) {
+    const { rows } = await l.db.query(`select 1 from entity where type <> all($1::text[]) and ${notKernel(l.registry)} limit 1`, [l.registry.family('actor')]);
+    if (rows.length) throw new Error('The island rules are set on a new workspace, before anything is put on it: this one already has items.');
+  }
+  await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [ISLANDS, JSON.stringify(on)]);
+  await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `${ISLANDS} set to ${on}` });
+  await l.record('settings', actorId(actor), [['+', 'setting', ISLANDS, on]]);
+  l.registry.turnOff(await packsOff(l), on);
+  if (on) hostFor(l.registry).stop();
+  await syncTypes(l);
+  toolsChanged(l.workspace);
 }
 
 /** Append a change set of pack facts, as who made it. */
@@ -192,7 +219,7 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   const pack = l.registry.found.find((p) => p.id === input.pack)!;
   const fact: Fact = input.on ? present(l, pack, await keptManifests(l)) : ['-', packFact(input.pack), 'pack'];
   await appendPacks(l, actorId(actor), input.on ? 'pack.on' : 'pack.off', `${input.on ? 'Added' : 'Took out'} the ${input.pack} pack`, [fact]);
-  l.registry.turnOff(list);
+  l.registry.turnOff(list, await islandsOn(l));
   if (!input.on) hostFor(l.registry).stop();
   const synced = await syncTypes(l);
   await l.log(l.db, { actor: actorId(actor), action: input.on ? 'pack.on' : 'pack.off', reason: `${input.on ? 'Turned on' : 'Turned off'} the ${input.pack} pack`, detail: { pack: input.pack, ...synced } });
@@ -205,7 +232,7 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
  * already synced there, so here the registry loads again, its process stops, and the agents connected here are told.
  */
 export async function followPacks(l: Archipelago): Promise<boolean> {
-  const newly = l.registry.turnOff(await packsOff(l));
+  const newly = l.registry.turnOff(await packsOff(l), await islandsOn(l));
   if (!newly) return false;
   if (newly.length) hostFor(l.registry).stop();
   toolsChanged(l.workspace);

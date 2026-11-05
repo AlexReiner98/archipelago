@@ -2,7 +2,7 @@
 
 A pack is one folder under `packs/` with a `pack.json`, its manifest, and a
 `handler.js` when it runs code. The manifest says what the pack declares, in
-fifteen keys and no others (Rule 8 of the target model; `src/manifest.ts`
+sixteen keys and no others (Rule 8 of the target model; `src/manifest.ts`
 reads it, `test/structure.test.ts` refuses any other key).
 
 ## The keys
@@ -20,6 +20,7 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `handlers` | Code run by itself: `{ event }`, `{ schedule, every_minutes, at_start }` or `{ webhook, records }`. |
 | `layouts`, `styles` | The code views are drawn by, and the presets of the map's own configuration: how things look, and (an entry with `type: "instruction"`, its words in `body`) what agents are told (`src/instructions.ts`), and (an entry with `type: "lens"`, its props a flat query and a style: `filter`, `walk`, `limit`, `style`) a view the pack ships, listed in the bar's picker and on Home until the owner saves their own version of it (`props.preset`). A style preset on nothing is used on every page; with `over: "workspace"` it lies over the workspace's own style; with `over: "chosen"` (a theme) only once the owner keeps a version of it. |
 | `reach` | What it may reach beyond the map: `hosts`, `secrets`, `webhooks`, `via`, `runs`, and `server`. |
+| `shared` | Core's alone: the shared set, the type ids every pack on an island map may build on (below). |
 
 A **server pack** is a pack whose reach includes `server` (`acts`, `entries`,
 `pages`, `connect`, `aliases`, `agreements`). There is no other kind of
@@ -63,6 +64,27 @@ pack (`pack` in the entry's header, with its manifest and the action), and
 core's rule `pack_reach` refuses one that writes outside its reach. What a
 pack names of a pack it uses (fields added to its types, links to them,
 screens and actions on them) is registered only while that pack is active.
+
+## On an island map
+
+A workspace with the setting `islands` on (`workspace_set`; off unless set,
+and set only on a new workspace) holds its packs to the island rules
+(`src/islands.ts`; decisions e_pp5mu6xd and e_rf6q3q34). A pack that breaks
+one is off there, and its state says which.
+
+- **Vocabulary, views, instructions.** The file holds only `id`, `version`,
+  `title`, `description`, `requires`, `types`, `links`, `rules`, `views` and
+  `styles`. Of `views`, only what the kernel draws (trees, screens,
+  attention); of `styles`, only instructions and lenses, no looks.
+- **The shared set alone.** `requires` names core and no other pack, `uses`
+  is not there, no `types` entry has `of`, and its types, link ends and rules
+  name only its own types, the shared set (core's `shared`: the eight starter
+  types, task and decision), a capability or `*`. Its links extend core's or
+  its own.
+- A shared type no pack taken there declares (task and decision, while work
+  is not taken) cannot be built on: a pack that does waits.
+
+Core, the kernel's pack, is never judged.
 
 ## In time
 

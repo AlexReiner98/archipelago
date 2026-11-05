@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "title": "Core",
   "description": "The starter types (the seven of the work, and system), the root links every link type extends, and the system tier.",
+  "shared": ["actor", "aim", "work", "question", "record", "occurrence", "place", "system", "task", "decision"],
   "types": [
     {
       "id": "actor",

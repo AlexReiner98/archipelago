@@ -18,7 +18,7 @@ import { dueForDeletion, setEnded } from './ended.ts';
 import { Archipelago, type Policy } from './pelago.ts';
 import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
 import { beginApplying } from './rules.ts';
-import { followPacks, packsOff, syncPacks } from './packstate.ts';
+import { followPacks, islandsOn, packsOff, syncPacks } from './packstate.ts';
 import { hostFor } from './packtools.ts';
 import { syncTypes } from './typetable.ts';
 import { onTypesChanged, typeItems } from './type-items.ts';
@@ -254,7 +254,7 @@ export class Workspaces {
       const begins = !backup && !(await db.query(`select 1 from log_entry limit 1`)).rows.length;
       // The packs the owner turned off here stay off; what they made is dormant.
       await syncPacks(pelago); // which packs are present, and as which manifests, is a fact on the log
-      pelago.registry.turnOff(await packsOff(pelago));
+      pelago.registry.turnOff(await packsOff(pelago), await islandsOn(pelago));
       await takeTypeItems(pelago);
       await syncTypes(pelago);
       if (begins) await pelago.record('settings', 'system', await beginApplying(db));

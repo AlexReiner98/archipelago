@@ -8,6 +8,7 @@ import { checkDeclared, KERNEL_VERBS, presetsOf, screensOf, stylesOf, toolName, 
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts';
 import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
+import { islandsOff } from './islands.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 import { isServerPack, parts, readManifest, withoutAbsent, type Manifest } from './manifest.ts';
@@ -129,7 +130,7 @@ export class Registry {
   /** Warnings said once: a pack file using the keys of the shape before the manifest. */
   private warned = new Set<string>();
   /** Packs the owner turned off in this workspace. */
-  private turnedOff: string[] = [];
+  private turnedOff: string[] = []; /** Whether this workspace holds its packs to the island rules (src/islands.ts). */ private islands = false;
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
@@ -166,6 +167,7 @@ export class Registry {
     // Load in dependency order what is on and has what it requires; the rest waits or is off.
     const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK).map((id) => [id, 'not enabled on this server']));
     for (const id of this.turnedOff) off.set(id, 'turned off here');
+    if (this.islands) for (const [id, why] of islandsOff([...found.values()].filter((p) => !off.has(p.id) || KERNEL_PACKS.includes(p.id)), LOCAL_PACK)) off.set(id, why);
     const { ordered: loaded, states } = orderPacks(found, off, LOCAL_PACK);
     // What a pack names of a pack it uses is registered only while that one is active (src/manifest.ts, uses).
     const declaredBy = new Map([...found.values()].flatMap((p) => [...parts(p).types, ...parts(p).relations].map((t) => [t.id, p.id] as const)));
@@ -318,11 +320,11 @@ export class Registry {
   /** The name a type or link type has now, given one it had before (work.task is task). */ canonical = (id: string): string => this.renamed.get(id) ?? id;
 
   /** Turn packs off in this workspace (the rest on), and load again if that changed anything. The kernel's packs stay on. Says what was newly turned off, or undefined when nothing changed. */
-  turnOff(packs: string[]): string[] | undefined {
+  turnOff(packs: string[], islands = this.islands): string[] | undefined {
     const next = packs.filter((p) => !KERNEL_PACKS.includes(p));
     const newly = next.filter((p) => !this.turnedOff.includes(p));
-    if (!newly.length && next.length === this.turnedOff.length) return undefined;
-    this.turnedOff = next;
+    if (!newly.length && next.length === this.turnedOff.length && islands === this.islands) return undefined;
+    this.turnedOff = next; this.islands = islands;
     this.reload();
     return newly;
   }
@@ -454,7 +456,7 @@ export class Registry {
   /** Take in the types and link types kept on the map; one that does not load leaves the registry as it was, and says why. */
   takeItems(items: TypeItem[]): void { const was = this.items; this.items = items; try { this.reload(); } catch (err) { this.items = was; this.reload(); throw err; } }
   /** A registry like this one with these type items in place of its own: what a change that makes or changes one is checked against. */
-  trial(items: TypeItem[]): Registry { const r = new Registry(this.dir, this.only, this.local); r.turnedOff = this.turnedOff; r.kept = this.kept; r.takeItems(items); return r; }
+  trial(items: TypeItem[]): Registry { const r = new Registry(this.dir, this.only, this.local); r.turnedOff = this.turnedOff; r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
   /** Take up the types defined here by another server on the same database. Returns whether any were new. */
   followLocal(defs: TypeDef[]): boolean {
     const added = defs.filter((t) => !this.local.some((l) => l.id === t.id));
