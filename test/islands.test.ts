@@ -86,13 +86,17 @@ test('a pack with a handler is refused on an island map and taken without it', (
   assert.equal(reg.states.get('hooked')?.state, 'active', 'off again, it is taken as before');
 });
 
-test('a pack on task waits while no pack taken declares it', () => {
-  const reg = new Registry(packsWith(island('ontask', { types: [{ id: 'ontask_step', title: 'Step', extends: 'task' } as never] })));
-  assert.equal(reg.states.get('ontask')?.state, 'active', 'setting off');
+test('core declares the shared set, so a pack on task and decision is taken without Work', () => {
+  const on = { types: [{ id: 'ontask_step', title: 'Step', extends: 'task' } as never, { id: 'ontask_call', title: 'Call', extends: 'decision' } as never] };
+  const reg = new Registry(packsWith(island('ontask', on)));
+  for (const id of ['task', 'decision', 'question']) assert.equal(reg.type(id)!.pack, 'core', `${id} is core’s`);
   reg.turnOff([], true);
   assert.equal(reg.states.get('work')?.state, 'off', 'work carries looks and note: not taken');
-  assert.equal(reg.states.get('ontask')?.state, 'off');
-  assert.match(reg.states.get('ontask')!.why!, /task is in the shared set, but no pack taken here declares it/);
+  assert.equal(reg.states.get('ontask')?.state, 'active');
+  assert.ok(reg.types.has('task') && reg.types.has('decision') && reg.types.has('ontask_step'), 'task and decision stay with Work off');
+  assert.ok(!reg.types.has('project'), 'Work’s own types go with it');
+  const without = { ...core(), types: core().types!.filter((t) => (t as { id?: string }).id !== 'decision') };
+  assert.throws(() => readManifest(JSON.stringify(without), 'core'), /shared names decision: the shared set is of the types this pack declares/);
 });
 
 test('the island rules are set on a new workspace only, by the owner', async () => {

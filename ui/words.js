@@ -24,7 +24,7 @@ export async function loadSchema() {
 export const typeTitle = (id) => types.get(id)?.title ?? id;
 /** A type as a choice in a list: its title, and its pack's name only where another type has the same title. */
 export const typeChoice = (t) => `${t.title}${(state.schema?.types ?? []).some((o) => o.id !== t.id && !o.dormant && o.title === t.title) ? ` (${t.pack})` : ''}`;
-/** What a new item is when nothing says which: the first type of work that can be estimated (a task, where the work pack is on). */
+/** What a new item is when nothing says which: the first type of work that can be estimated (a task). */
 export const workType = () => (state.schema?.types ?? []).find((t) => !t.dormant && t.capabilities?.plannable && t.flavour_of === 'work' && t.fields?.tokens_estimated)?.id ?? 'work';
 /** The starter type a type comes from: the last of its lineage, a type that extends nothing. */
 export const starterOf = (typeId) => {

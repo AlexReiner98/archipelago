@@ -27,7 +27,7 @@ export interface Shared {
   links: Set<string>;
 }
 
-/** The shared set as the kernel's packs declare it. */
+/** The shared set as the kernel's packs declare it: types core itself declares (task and decision moved there from Work, the owner, 5 Nov 2026, e_rf6q3q34), so a pack on an island map always finds them. */
 export function sharedOf(kernel: Manifest[]): Shared {
   return { types: new Set(kernel.flatMap((m) => m.shared ?? [])), links: new Set(kernel.flatMap((m) => parts(m).relations.map((r) => r.id))) };
 }
@@ -69,15 +69,6 @@ export function islandsOff(found: Iterable<Manifest>, local: string): Map<string
     if (m.id === local) continue;
     const problems = islandProblems(m, shared);
     if (problems.length) off.set(m.id, `not taken on an island map: ${problems.join('; ')}`);
-  }
-  // A type of the shared set that no pack taken here declares (task, while work is not taken) cannot be built on.
-  const declared = new Set(all.filter((m) => m.id !== local && !off.has(m.id)).flatMap((m) => parts(m).types.map((t) => t.id)));
-  for (const m of all) {
-    if (m.id === local || off.has(m.id) || KERNEL_PACKS.includes(m.id)) continue;
-    const p = parts(m);
-    const names = [...p.types.map((t) => t.extends), ...p.relations.flatMap((r) => [...r.from, ...r.to])];
-    const missing = [...new Set(names.filter((n): n is string => Boolean(n) && shared.types.has(n!) && !declared.has(n!)))];
-    if (missing.length) off.set(m.id, `waits on an island map: ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} in the shared set, but no pack taken here declares ${missing.length === 1 ? 'it' : 'them'}`);
   }
   return off;
 }

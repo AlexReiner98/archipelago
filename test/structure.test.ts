@@ -80,8 +80,8 @@ test('the kernel names no pack', () => {
 // bare name too. What was counted on that day is words that are also some pack's type name (a capability, a view, a
 // verb's action): no new one may be added.
 const NAMES_PACK_TYPES: Record<string, number> = {
-  'src/agent-run.ts': 1, 'src/altitude.ts': 1, 'src/attention.ts': 1, 'src/brief.ts': 1, 'src/capabilities.ts': 2, 'src/confirm.ts': 1, 'src/declared.ts': 3,
-  'src/diagram-types.ts': 1, 'src/documents.ts': 1, 'src/eventlog.ts': 1, 'src/launcher.ts': 1, 'src/query-presets.ts': 1, 'src/query-saved.ts': 1, 'src/looks.ts': 1,
+  'src/agent-run.ts': 1, 'src/altitude.ts': 1, 'src/attention.ts': 1, 'src/capabilities.ts': 2, 'src/confirm.ts': 1, 'src/declared.ts': 3,
+  'src/diagram-types.ts': 1, 'src/documents.ts': 1, 'src/eventlog.ts': 1, 'src/launcher.ts': 1, 'src/query-saved.ts': 1, 'src/looks.ts': 1,
   'src/manifest.ts': 1, 'src/outside.ts': 1, 'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2, 'src/pg.ts': 1,
   'src/public-document.ts': 1, 'src/public.ts': 2, 'src/replay.ts': 1, 'src/rules.ts': 1, 'src/saved-views.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2,
   'src/session-hook.ts': 4, 'src/surface.ts': 2, 'src/tail.ts': 1, 'src/tool-reads.ts': 2, 'src/ui-files.ts': 2, 'src/workspace-share.ts': 1,
