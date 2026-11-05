@@ -96,9 +96,11 @@ export interface Capabilities {
   owned?: true;
   /** Something to do or answer: what attention counts as ready, holding up or unowned. */
   actionable?: true;
+  /** Work to be planned and done, not a question to answer: what is estimated, rolled up and published as a product. */
+  plannable?: true;
 }
 
-export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch', 'accounts', 'owned', 'actionable'] as const;
+export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch', 'accounts', 'owned', 'actionable', 'plannable'] as const;
 
 const DATES = ['date', 'datetime'];
 
@@ -163,7 +165,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     for (const s of [watch.up, watch.down, ...(watch.also ?? []), ...(watch.idle ? [watch.idle] : [])]) if (!statuses.includes(s)) problems.push(`watch names "${s}", which is no status of it`);
     has('watch.commit', watch.commit, ['string']);
   }
-  for (const flag of ['owned', 'actionable'] as const) if (caps[flag] !== undefined && caps[flag] !== true) problems.push(`${flag} is true, or left out`);
+  for (const flag of ['owned', 'actionable', 'plannable'] as const) if (caps[flag] !== undefined && caps[flag] !== true) problems.push(`${flag} is true, or left out`);
   if (accounts) has('accounts', accounts.field, ['string']);
   if (accounts?.accounted) has('accounts.accounted', accounts.accounted, ['boolean']);
   return problems;

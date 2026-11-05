@@ -33,7 +33,7 @@
     },
     {
       "id": "work",
-      "capabilities": { "owned": true, "actionable": true },
+      "capabilities": { "owned": true, "actionable": true, "plannable": true },
       "altitude": "step",
       "title": "Work",
       "kind": true,

@@ -114,8 +114,9 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   const rootTitles = await titles([...new Set([...rootsOf.values()].flat())]);
   const holding = new Map<string, number>();
   for (const roots of rootsOf.values()) for (const r of roots) holding.set(r, (holding.get(r) ?? 0) + 1);
-  // Only work or a question holds others up: a person who is waited on is said so by waits_on.
-  for (const [id, n] of holding) if (live.get(id) && theirs(live.get(id)!) && ['work', 'question'].includes(live.get(id)!.kind ?? '')) add(live.get(id), 'holding_up', { count: n });
+  // Only what is actionable holds others up: a person who is waited on is said so by waits_on.
+  const actionable = (e: Row) => Boolean(reg.type(e.type)?.capabilities.actionable);
+  for (const [id, n] of holding) if (live.get(id) && theirs(live.get(id)!) && actionable(live.get(id)!)) add(live.get(id), 'holding_up', { count: n });
   // A resource held by others says who holds it (as the asker may see them: a private session is not named).
   const holders = blockedIds.length ? await heldResources(l) : [];
   for (const id of blockedIds) {
@@ -145,14 +146,14 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   );
   for (const a of at) if (live.get(a.target) && theirs(live.get(a.target)!)) add(live.get(a.target), 'under_way', { sessions: a.n });
 
-  // Stale: work or a question nobody has changed, or said is still true, for a while. Ready: work that can be
-  // estimated and taken up, with nothing in its way.
+  // Stale: what is actionable and nobody has changed, or said is still true, for a while. Ready: work to plan that
+  // can be estimated and taken up, with nothing in its way.
   const cutoff = Date.now() - staleDays * 86_400_000;
   for (const e of live.values()) {
-    const kind = e.kind;
-    if (!theirs(e) || (kind !== 'work' && kind !== 'question')) continue;
+    if (!theirs(e) || !actionable(e)) continue;
+    const type = reg.type(e.type);
     if (new Date(e.updated_at).getTime() <= cutoff) add(e, 'stale', { days: Math.floor((Date.now() - new Date(e.updated_at).getTime()) / 86_400_000) });
-    if (kind === 'work' && reg.type(e.type)?.fields.tokens_estimated && !graph.isBlocked(e.id)) add(e, 'ready');
+    if (type?.capabilities.plannable && type.fields.tokens_estimated && !graph.isBlocked(e.id)) add(e, 'ready');
   }
 
   // What a pack declares deserves it: its items whose fields hold the values it names, with its mark and its ask.
@@ -212,14 +213,13 @@ async function rowsFor(l: Archipelago, me: string | null, isOwner: boolean, scop
   const notSystem = `(kind is null or kind <> '${SYSTEM}')`;
   if (scope) return (await l.db.query<Row>(`select ${cols} from entity where id = any($1::text[]) and is_open and archived_at is null and ${notSystem}`, [[...scope]])).rows;
   if (me !== null) {
-    // What nobody owns is the owner's: of it, only what a reason asked for can be (work and questions; for what is
+    // What nobody owns is the owner's: of it, only what a reason asked for can be (what is actionable; for what is
     // due, unsettled or waits on them alone, only what has a bound or settles), never every open item.
     const reg = l.registry;
-    const kept = [...reg.having('bound'), ...reg.having('settles'), ...declared];
     const broad = ['blocked', 'holding_up', 'stale', 'ready', 'under_way'].some((r) => wanted.has(r));
-    const unowned = broad ? `(kind in ('work', 'question') or type = any($4::text[]))` : `type = any($4::text[])`;
+    const kept = [...(broad ? reg.having('actionable') : []), ...reg.having('bound'), ...reg.having('settles'), ...declared];
     const { rows } = await l.db.query<Row>(
-      `select ${cols} from entity where is_open and archived_at is null and ${notSystem} and (owner = $1 or ($2 and owner is null and ${unowned}))
+      `select ${cols} from entity where is_open and archived_at is null and ${notSystem} and (owner = $1 or ($2 and owner is null and type = any($4::text[])))
        union select ${cols} from entity where is_open and archived_at is null and id in (select from_id from relation where to_id = $1 and type = any($3::text[]) and valid_to is null)`,
       [me, isOwner, reg.relationFamily('waits_on'), kept],
     );

@@ -17,7 +17,7 @@ export async function publicPage(l: Archipelago, product: string, build?: string
   const { rows } = await pub.db.query<Entity>(`select id, type, title, status from entity where id = $1 and visibility = 'public' and archived_at is null`, [product]);
   const root = rows[0];
   const type = root && l.registry.type(root.type);
-  if (!type?.public || type.kind !== 'work') return null;
+  if (!type?.public || !type.capabilities.plannable) return null;
   // Everything public that belongs to it, through whatever lies between that is not.
   const under = new Set([root.id, ...(await pub.db.query<{ id: string }>(`select pelago_public_under($1) as id`, [root.id])).rows.map((r) => r.id)]);
   // Its proof and changelog are the software pack's to say, read as anyone reads them.

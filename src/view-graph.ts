@@ -115,7 +115,7 @@ async function newest(l: Archipelago, over: unknown, fold: string[]) {
  */
 async function rolledTokens(l: Archipelago, nodes: string[]) {
   // Only work is counted: what can be estimated, and what such things are part of. And the nodes, for when each was made.
-  const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || l.registry.isA(type, 'work');
+  const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || Boolean(l.registry.type(type)?.capabilities.plannable);
   // Everything that is part of the nodes, a level at a time: all a roll-up of them reads.
   const parts: { from_id: string; to_id: string }[] = [];
   const seen = new Set(nodes);
