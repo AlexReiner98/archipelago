@@ -394,7 +394,8 @@ Types live in files under `packs/`, one folder per pack:
   types of them (person, company, agent, goal, area, tag, event, resource), the
   system's own (lens, style, screen, type, link type, and the primitives
   source, connection, run, notification and automation) and the root links,
-  which name kinds at their ends. It is the one pack always on.
+  which name kinds or capabilities at their ends (`owned_by` goes from
+  `has:owned`, whatever declares owned). It is the one pack always on.
 - `work`: project, task, decision, issue, meeting,
   idea, note, file, document and procedure, as `task` and so on.
 - `science`: investigation, hypothesis, experiment and result, with tests, supports,
