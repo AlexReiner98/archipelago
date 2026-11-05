@@ -15,7 +15,18 @@ const TIGHTEN = 3;
 
 const ties = (p, q, r, s) => (p < r && r < q && q < s) || (r < p && p < s && s < q);
 
-/** Items in an order where all the order's links run forward, each as near as it can be to what it is joined to. */
+/** A number in [0, 1) for a try and two numbers: the same for the same item or link however many others there are. */
+const keyed = (k, a, b) => {
+  let h = Math.imul(k + 1, 0x9e3779b1) ^ Math.imul(a + 1, 0x85ebca77) ^ Math.imul(b + 1, 0xc2b2ae3d);
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+};
+
+/**
+ * Items in an order where all the order's links run forward, each as near as it can be to what it is joined to; of
+ * equals, the one first in `items` (made first, as ./topology.js sends them). `noise(v)` leans each item its own way.
+ */
 function lineUp(items, links, noise) {
   const near = new Map(items.map((v) => [v, new Set()])), after = new Map(items.map((v) => [v, []])), waits = new Map(items.map((v) => [v, 0]));
   for (const [u, v, order] of links) {
@@ -23,14 +34,14 @@ function lineUp(items, links, noise) {
     near.get(v).add(u);
     if (order) (after.get(u).push(v), waits.set(v, waits.get(v) + 1));
   }
-  const at = new Map(), line = [], ready = new Set(items.filter((v) => !waits.get(v)));
+  const first = new Map(items.map((v, k) => [v, k])), at = new Map(), line = [], ready = new Set(items.filter((v) => !waits.get(v)));
   while (ready.size) {
     let best, most = -Infinity;
     for (const v of ready) {
       let last = -1;
       for (const w of near.get(v)) if (at.has(w)) last = Math.max(last, at.get(w));
-      const score = last * 100 - [...near.get(v)].filter((w) => !at.has(w)).length + noise() * 3;
-      if (score > most) ((most = score), (best = v));
+      const score = last * 100 - [...near.get(v)].filter((w) => !at.has(w) && first.get(w) < first.get(v)).length + noise(v) * 3;
+      if (score > most || (score === most && first.get(v) < first.get(best))) ((most = score), (best = v));
     }
     ready.delete(best);
     at.set(best, line.length);
@@ -43,7 +54,7 @@ function lineUp(items, links, noise) {
   return line;
 }
 
-/** The links that fit on the two sides of `line`, the order's first and short ones before long, and those that do not. */
+/** The links that fit on the two sides of `line`, the order's first and short ones before long, and those that do not. `noise(l)` picks a side where both fit. */
 function pages(line, links, noise) {
   const at = new Map(line.map((v, k) => [v, k])), sides = [[], []], left = [];
   const ranked = links.map((l) => ({ l, p: Math.min(at.get(l[0]), at.get(l[1])), q: Math.max(at.get(l[0]), at.get(l[1])) }));
@@ -51,7 +62,7 @@ function pages(line, links, noise) {
   for (const arc of ranked) {
     const free = [0, 1].filter((k) => !sides[k].some((o) => ties(arc.p, arc.q, o.p, o.q)));
     if (!free.length) { left.push(arc.l); continue; }
-    const k = free.length > 1 ? (noise() < 0.5 ? 0 : 1) : free[0];
+    const k = free.length > 1 ? (noise(arc.l) < 0.5 ? 0 : 1) : free[0];
     sides[k].push(arc);
   }
   return { at, sides, left };
@@ -104,7 +115,9 @@ function facesOf(line, sides) {
 }
 
 /** One order of the items, tried through to the graph it makes. Only what the order touches goes on the line. */
-function attempt(links, items, lean, noise) {
+function attempt(links, items, k) {
+  // Each try's leanings are keyed to the item or link they lean, so one more item leaves every other's as it was.
+  const rank = new Map(items.map((v, i) => [v, i])), lean = k ? (v) => keyed(k, rank.get(v), -1) : () => 0, noise = (l) => keyed(k, rank.get(l[0]), rank.get(l[1]));
   const inOrder = new Set(links.filter((l) => l[2]).flatMap((l) => [l[0], l[1]]));
   const here = inOrder.size > 2 ? new Set(items.filter((v) => inOrder.has(v))) : new Set(items);
   const onLine = links.filter(([u, v]) => here.has(u) && here.has(v)), later = links.filter(([u, v]) => !here.has(u) || !here.has(v));
@@ -147,11 +160,10 @@ function attempt(links, items, lean, noise) {
  * Each order tried is judged by the crossings it comes to, not by how many links it keeps, and the best is tightened.
  */
 export function embed(links, items) {
-  let seed = 7, best = null;
-  const noise = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+  let best = null;
   const tries = Math.max(4, Math.min(TRIES, Math.ceil(WORK / Math.max(1, links.length * links.length))));
   for (let k = 0; k < tries && (!best || best.cost > 0); k++) {
-    const made = attempt(links, items, k ? noise : () => 0, noise), cost = made.tally.crossings + made.tally.ghosts.length / 10;
+    const made = attempt(links, items, k), cost = made.tally.crossings + made.tally.ghosts.length / 10;
     if (!best || cost < best.cost) best = { ...made, cost };
   }
   best.tighten();
