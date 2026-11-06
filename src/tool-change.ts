@@ -14,7 +14,7 @@ import { undo } from './undo.ts';
 import { resolveRun } from './sessions.ts';
 import { covering } from './withdraw.ts';
 import { holdsOff } from './rules.ts';
-import { type Noted, PLAN_SECTIONS, planAsText, sections } from './plan-note.ts';
+import { type Noted, PLAN_SECTIONS, sections, structureAsText, tiedInChange, type TieTypes } from './plan-note.ts';
 import { closeOffers } from './close-offer.ts';
 
 // Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
@@ -51,7 +51,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       'The only way to change the map: a list of ops with a reason. ' +
       'A create\u2019s ref lets later ops link to it, and a title or note in the same change names what it makes as {ref}. Give the source the facts came from. ' +
       'To add to a note or change a passage, send append or replace, not the whole body. An update of only the id says it is still true. ' +
-      'A plan is a task per step, linked, never one long note. ' +
+      'A plan or findings are items with a view, not one note. ' +
       'Checked as a whole, then applied or held as a proposal for a human, by policy. A refused change is kept for a few minutes under a name the refusal gives: send retry and fixes (the ops that were wrong, by number), not all of it again. ' +
       'Closing a decision or hypothesis is held for the human, unless the workspace applies agents\u2019 changes: then a decision must carry props.outcome and props.rationale, and is put to the owner later (attention, to_confirm).',
     input: {
@@ -105,13 +105,15 @@ export const WRITE_TOOLS: Record<string, Tool> = {
           // A note every session adds to (a handoff) is read whole by every session after it. Its type may hold it to a length
           // an agent can only keep by rewriting it (note_max); one that is already over may always be made shorter.
           const all = input.ops as { op: string; ref?: string; type?: string; to?: string; id?: string; body?: string; append?: string; replace?: { find: string; with: string } }[];
+          const tie: TieTypes = l.registry.relationFamily('part_of', 'about', 'bears_on');
+          const holds = (t: ReturnType<typeof l.registry.type>) => !!t && !t.system && !t.deliverable;
           for (const [i, o] of all.entries()) {
             let before = 0;
             let after = 0;
             let type = o.op === 'create' ? l.registry.type(o.type ?? '') : undefined;
             if (o.op === 'create') {
               after = o.body?.length ?? 0;
-              if (o.body) noted.push({ at: i + 1, op: o.op, body: o.body, work: Boolean(type?.capabilities.plannable), parts: all.some((p) => p.op === 'link' && p.type === 'part_of' && !!o.ref && p.to === o.ref) });
+              if (o.body && holds(type)) noted.push({ at: i + 1, op: o.op, body: o.body, ties: tiedInChange(all, o.ref, tie) });
             } else if (o.op === 'update' && (o.body !== undefined || o.append !== undefined || o.replace)) {
               const target = await l.entity(o.id!);
               if (!target || !(type = l.registry.type(target.type))) continue;
@@ -123,9 +125,12 @@ export const WRITE_TOOLS: Record<string, Tool> = {
                 continue; // what is wrong with the op is said by the change itself
               }
               after = text.length;
-              if (type.capabilities.plannable && sections(text) >= PLAN_SECTIONS && sections(text) > sections(target.body)) {
-                const parts = (await l.db.query(`select 1 from relation where to_id = $1 and type = 'part_of' and valid_to is null limit 1`, [target.id])).rows.length > 0;
-                noted.push({ at: i + 1, op: o.op, body: text, work: true, parts: parts || all.some((p) => p.op === 'link' && p.type === 'part_of' && p.to === target.id) });
+              if (holds(type) && sections(text) >= PLAN_SECTIONS && sections(text) > sections(target.body)) {
+                const { rows } = await l.db.query<{ n: number }>(
+                  `select count(*)::int as n from relation where to_id = $1 and type = any($2::text[]) and valid_to is null`,
+                  [target.id, tie],
+                );
+                noted.push({ at: i + 1, op: o.op, body: text, ties: (rows[0]?.n ?? 0) + tiedInChange(all, target.id, tie) });
               }
             }
             if (type?.noteMax && after > type.noteMax.chars && after > before) long.push(`op ${i + 1} (${o.op}): the ${type.title.toLowerCase()} note would be ${after} characters: ${type.noteMax.chars} at most.${type.noteMax.say ? ` ${type.noteMax.say}` : ''}`);
@@ -169,9 +174,9 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       const offers = await closeOffers(l.db, l.registry, input.ops as { op: string; id?: string; status?: string }[]);
       if (offers) result = { ...result, still_open: offers };
       // With holds off (src/rules.ts, HOLDS_OFF), the answer says so: no rule held it, and none will until the owner turns them on.
-      // A plan put in as one long note is said back, so the steps are laid out as items (src/plan-note.ts).
-      const plan = planAsText(noted);
-      if (plan) result = { ...result, plan };
+      // A structure put in as one long note (a plan, findings, options) is said back, so its pieces are laid out as items (src/plan-note.ts).
+      const structure = structureAsText(noted);
+      if (structure) result = { ...result, structure };
       if (actor.kind === 'agent' && result.status !== 'proposed' && (await holdsOff(l.db))) return { ...result, holds: 'off' };
       return result;
     },
