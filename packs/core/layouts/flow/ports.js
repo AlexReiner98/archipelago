@@ -161,15 +161,23 @@ export function apart(model, { ports, extras, pad }) {
 
 /**
  * A first sketch from a port at `at` on `side` of the box `rect` to the point `to` on that box's side: out of the port
- * across its side to `ring` beyond the box, then round it the shorter way to the point level with `to`.
+ * across its side to `ring` beyond the box, then round it the shorter way to the point level with `to`. The ring is
+ * further out the further the port stands along its side from where the wire heads (round a corner, or on along `on`,
+ * the rest of its way), up to twice as far, so the wires that leave one side together lie in the order that crosses none.
  */
-function around(at, side, rect, ring, to) {
-  const r = { l: rect.l - ring, t: rect.t - ring, r: rect.r + ring, b: rect.b + ring };
-  const order = ['top', 'right', 'bottom', 'left'], corner = { top: [r.r, r.t], right: [r.r, r.b], bottom: [r.l, r.b], left: [r.l, r.t] };
-  const onRing = (s, q) => (s === 'top' ? [q[0], r.t] : s === 'bottom' ? [q[0], r.b] : s === 'left' ? [r.l, q[1]] : [r.r, q[1]]);
+function around(at, side, rect, ring, to, on = []) {
+  const order = ['top', 'right', 'bottom', 'left'];
   const near = { top: Math.abs(to[1] - rect.t), bottom: Math.abs(to[1] - rect.b), left: Math.abs(to[0] - rect.l), right: Math.abs(to[0] - rect.r) };
   const end = Object.keys(near).reduce((s, k) => (near[k] < near[s] ? k : s), 'top');
   const N = order.length, from = order.indexOf(side), steps = (order.indexOf(end) - from + N) % N, way = steps <= N / 2 ? 1 : -1;
+  // Where along its side the wire heads: the corner it goes round (clockwise or not), or, on its own side, its end.
+  const along = side === 'top' || side === 'bottom' ? 0 : 1, length = along ? rect.b - rect.t : rect.r - rect.l;
+  const clockwise = { top: rect.r, right: rect.b, bottom: rect.l, left: rect.t }, back = { top: rect.l, right: rect.t, bottom: rect.r, left: rect.b };
+  const heads = steps === 0 ? (on.find((p) => Math.abs(p[along] - to[along]) > 0.5) ?? to)[along] : way > 0 ? clockwise[side] : back[side];
+  ring *= 1 + Math.min(1, Math.abs(at[along] - heads) / (length || 1));
+  const r = { l: rect.l - ring, t: rect.t - ring, r: rect.r + ring, b: rect.b + ring };
+  const corner = { top: [r.r, r.t], right: [r.r, r.b], bottom: [r.l, r.b], left: [r.l, r.t] };
+  const onRing = (s, q) => (s === 'top' ? [q[0], r.t] : s === 'bottom' ? [q[0], r.b] : s === 'left' ? [r.l, q[1]] : [r.r, q[1]]);
   const path = [at, onRing(side, at)];
   // Clockwise each side ends at its corner; the other way each starts at the previous side's.
   for (let k = 0, s = from; k < (way > 0 ? steps : N - steps); k++, s = (s + way + N) % N) path.push(corner[order[way > 0 ? s : (s + N - 1) % N]]);
@@ -190,7 +198,7 @@ export function holdPorts({ nodes, x, y, routes, ties, held, rewire, run }) {
     const ends = rewire[t.type], r = routes.get(t.route);
     if (!ends || !port.has(ends[0]) || !port.has(ends[1]) || !r) continue;
     const drawn = r.from === t.a ? r.points : [...r.points].reverse(), [pa, pb] = ends.map((id) => port.get(id));
-    const into = [around(at(pa), pa.side, rectOf(pa.on), run, drawn[0]), around(at(pb), pb.side, rectOf(pb.on), run, drawn.at(-1))];
+    const into = [around(at(pa), pa.side, rectOf(pa.on), run, drawn[0], drawn), around(at(pb), pb.side, rectOf(pb.on), run, drawn.at(-1), [...drawn].reverse())];
     routes.set(t.route, { from: t.a, points: [...into[0], ...drawn.slice(1, -1), ...into[1].reverse()], ends: [pa.at, pb.at], sides: [pa.side, pb.side] });
   }
 }
