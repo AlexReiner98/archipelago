@@ -36,7 +36,7 @@ export async function laneSetup(l: Archipelago) {
   return make(l, [
     { op: 'create', ref: 'repo', type: 'repo', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } },
     { op: 'create', ref: 'proj', type: 'project', title: 'Apex' },
-    { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' },
+    { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Live lane' },
     { op: 'create', ref: 'rule', type: 'decision', title: 'One live lane.', status: 'decided', props: { outcome: 'Only one session drives the CAD app.' } },
     { op: 'create', ref: 'live', type: 'task', title: 'Capture probe' },
     { op: 'create', ref: 'offline', type: 'task', title: 'Write unit tests' },
@@ -48,7 +48,7 @@ export async function laneSetup(l: Archipelago) {
     { op: 'link', type: 'part_of', from: 'gated', to: 'proj' },
     { op: 'link', type: 'depends_on', from: 'gated', to: 'q' },
     { op: 'link', type: 'needs', from: 'live', to: 'lane' },
-    { op: 'link', type: 'governed_by', from: 'lane', to: 'rule' },
+    { op: 'link', type: 'about', from: 'lane', to: 'rule' },
   ]);
 }
 

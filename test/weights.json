@@ -20,7 +20,7 @@
   "packs/github/github.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/github/heard.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/github_app/github_app.test.ts": { "pglite": 0, "postgres": 0 },
-  "packs/money/money.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/time/costs.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/plan/meters.test.ts": { "pglite": 0, "postgres": 0.1 },
   "packs/reader/reader.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/science/science.test.ts": { "pglite": 0, "postgres": 0 },

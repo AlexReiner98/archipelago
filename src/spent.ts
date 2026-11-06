@@ -1,6 +1,6 @@
 // What agents spent: measured from their runs, which are the kernel's own record of every session. A run that says
 // what it cost is counted in dollars; one that reports only tokens (a session on a subscription) is counted in
-// tokens. What else the work costs (hosting, a subscription) is a pack's to keep: the money pack's costs view adds
+// tokens. What else the work costs (hosting, a subscription) is a pack's to keep: the time pack's costs view adds
 // its payments to this.
 
 import type { Entity, Archipelago } from './pelago.ts';

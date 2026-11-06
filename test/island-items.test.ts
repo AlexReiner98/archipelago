@@ -10,6 +10,7 @@ import { openDb } from '../src/db.ts';
 import { Registry } from '../src/packs.ts';
 import { setIslands } from '../src/packstate.ts';
 import { Archipelago, type Op } from '../src/pelago.ts';
+import { linkOnLegend, typeOnLegend } from '../src/island-items.ts';
 import { flatRead } from '../src/query-flat.ts';
 import { syncTypes } from '../src/typetable.ts';
 import { human, make } from './map.ts';
@@ -45,13 +46,13 @@ test('an item names its island, and its type is the island’s pack’s or of th
   assert.equal((await l.entity(a))!.props.pack, 'plain', 'an island is the kernel’s own: it lives on none');
   await refused(l, [{ op: 'create', type: 'plain_thing', title: 'Nowhere' }], /a plain_thing lives on an island here: name it in props\.island/);
   await refused(l, [{ op: 'create', type: 'plain_thing', title: 'Abroad', props: { island: b } }], /plain_thing is plain’s, and the island .* speaks other/);
-  await refused(l, [{ op: 'create', type: 'goal', title: 'Not shared', props: { island: a } }], /goal is core’s/);
+  await refused(l, [{ op: 'create', type: 'event', title: 'Not shared', props: { island: a } }], /event is core’s/);
   await refused(l, [{ op: 'create', type: 'plain_thing', title: 'On a task', props: { island: 'e_nothere' } }], /"e_nothere" is no island/);
   await refused(l, [{ op: 'create', type: 'island', title: 'Of nothing', props: { pack: 'nope' } }], /an island speaks a pack active here/);
   const { t, s, g, p } = await make(l, [
     { op: 'create', ref: 't', type: 'plain_thing', title: 'Invoice run', props: { island: a } },
     { op: 'create', ref: 's', type: 'task', title: 'Shared task', props: { island: b } },
-    { op: 'create', ref: 'g', type: 'goal', title: 'Core goal', props: { island: c } },
+    { op: 'create', ref: 'g', type: 'event', title: 'Core event', props: { island: c } },
     { op: 'create', ref: 'p', type: 'person', title: 'Ann' },
   ]);
   assert.equal((await l.entity(t))!.props.island, a);
@@ -140,4 +141,12 @@ test('with islands off, nothing is asked and no item has an island', async () =>
   const l = await islandMap(false);
   await make(l, [{ op: 'create', type: 'plain_thing', title: 'Anywhere' }]);
   await refused(l, [{ op: 'create', type: 'task', title: 'Placed', props: { island: 'e_whatever' } }], /task has no field "island"/);
+});
+
+test("core's legend on an island is task, decision, finding and event, and the links an island's work is drawn with", () => {
+  const reg = new Registry(join(import.meta.dirname, '..', 'packs'));
+  const types = [...reg.types.values()].filter((t) => t.pack === 'core' && typeOnLegend(t)).map((t) => t.id).sort();
+  const links = [...reg.relations.values()].filter((r) => r.pack === 'core' && linkOnLegend(r)).map((r) => r.id).sort();
+  assert.deepEqual(types, ['decision', 'event', 'finding', 'task']);
+  assert.deepEqual(links, ['about', 'bears_on', 'depends_on', 'involves', 'link', 'lives_in', 'needs', 'owned_by', 'part_of', 'produced', 'reads', 'serves', 'uses', 'waits_on']);
 });

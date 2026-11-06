@@ -6,7 +6,8 @@
   "requires": ["core"],
   "types": [
     {
-      "id": "social_post",
+      "id": "post",
+      "moved_from": ["social_post"],
       "extends": "work",
       "title": "Post",
       "description": "One post on one channel, written by a person by hand: an agent sets it out empty (what it is for, where it goes, its tagged link). Its tag is the ?ref= its link carries (linkedin-26w46-1: the channel, the year and week, its number that week), so each visit and trial is counted onto the post that brought it. It goes_out_on its channel, and waits_on whoever writes it.",
@@ -32,6 +33,8 @@
     },
     {
       "id": "channel",
+      "moved_from": ["traffic_source"],
+      "moved_statuses": { "traffic_source": { "counting": "available", "dropped": "retired" } },
       "extends": "place",
       "title": "Channel",
       "description": "Where posts go out (linkedin, x) or visits come through with no post's tag (an agent such as chatgpt, a search engine, a site that linked here). Titled with its name; what came under no post's tag is counted onto it, so each channel is measured beside its posts.",
@@ -47,7 +50,8 @@
       }
     },
     {
-      "id": "talk",
+      "id": "conversation",
+      "moved_from": ["talk"],
       "extends": "occurrence",
       "title": "Conversation",
       "description": "Someone who replied or wrote and said the problem they have. It came_out_of the post that began it, or the channel it came through. Its title is the person and the problem in a few words; its note holds what was said.",
@@ -61,6 +65,8 @@
     },
     {
       "id": "channel_month",
+      "moved_from": ["channel_reading"],
+      "moved_statuses": { "channel_reading": { "recorded": "current" } },
       "extends": "finding",
       "title": "Channel month",
       "description": "A month of the channels written down once it is over: each channel's posts, visits, trials begun and paid, conversations and hours, and which met the strategy's bar. A finding, so another island may read it across; written by the operator that counts, about each post it counted.",
@@ -82,17 +88,18 @@
       "extends": "lives_in",
       "title": "goes out on",
       "inverse": "carries",
-      "from": ["social_post"],
+      "from": ["post"],
       "to": ["channel"],
       "description": "The post goes out on this channel: what the channels view reads its posts from."
     },
     {
       "id": "came_out_of",
+      "moved_from": ["came_from"],
       "extends": "about",
       "title": "came out of",
       "inverse": "began",
-      "from": ["talk"],
-      "to": ["social_post", "channel"],
+      "from": ["conversation"],
+      "to": ["post", "channel"],
       "description": "The conversation came out of this post, or the channel it came through with no post: what a post's count of conversations is read from."
     }
   ],
@@ -101,7 +108,7 @@
       "form": "screen",
       "id": "outreach.length",
       "title": "Length",
-      "on": ["social_post"],
+      "on": ["post"],
       "pieces": [
         {
           "piece": "count",
@@ -125,7 +132,7 @@
       "type": "lens",
       "title": "Posts and what each brought",
       "props": {
-        "filter": { "find": ["type social_post"], "only": ["status posted"], "not": [] },
+        "filter": { "find": ["type post"], "only": ["status posted"], "not": [] },
         "walk": { "over": [], "steps": 0 },
         "limit": 200,
         "style": { "shape": "list", "show": ["status", "channel", "posted", "visits", "asked", "begun", "paid", "replies", "conversations"] }
@@ -147,7 +154,7 @@
       "type": "lens",
       "title": "Posts to write",
       "props": {
-        "filter": { "find": ["type social_post"], "only": ["status to_write", "status ready"], "not": [] },
+        "filter": { "find": ["type post"], "only": ["status to_write", "status ready"], "not": [] },
         "walk": { "over": [], "steps": 0 },
         "style": { "shape": "list", "show": ["status", "channel", "tag"] }
       }
@@ -170,7 +177,7 @@
       "id": "outreach.talk",
       "type": "instruction",
       "title": "Record a conversation",
-      "body": "When a reply or message says the problem someone has, record it with change: a talk titled with the person and the problem in a few words, its person, problem and began, linked came_out_of the post that began it (or the channel, when no post did). What was said goes in its note, in their words.",
+      "body": "When a reply or message says the problem someone has, record it with change: a conversation titled with the person and the problem in a few words, its person, problem and began, linked came_out_of the post that began it (or the channel, when no post did). What was said goes in its note, in their words.",
       "props": { "for": ["guide:social"], "order": 20 }
     }
   ]

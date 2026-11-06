@@ -92,7 +92,7 @@ What nobody accounts for reaches the owner, whoever made it (the owner, 26
 Oct 2026: held to account in the loop, nothing to set up on GitHub). Each
 push the GitHub App hears keeps its commits; an hour on, the GitHub pack's
 schedule `github.commits` makes a `commit` with `accounted: false`
-for each that still has none, and the software pack's attention reason
+for each that still has none, and the code pack's attention reason
 `unaccounted` (joining `waits_on`) puts it before the owner. An hour, because
 a session that pushes partway through a reply accounts at the reply's end:
 the owner hears only of what nobody did. Accounting for one is setting

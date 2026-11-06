@@ -21,7 +21,7 @@ canvas as a flat graph", with its decisions.
   drawn (decision "Depth is never drawn"). The plane has no edge; zoom is
   scale and how much text shows.
 - **A query says what is on it.** A filter (three lists of the same terms,
-  such as a type, words, `tagged e_x` or `waits_on me`: Find adds what each
+  such as a type, words, `about e_x` or `waits_on me`: Find adds what each
   finds, Only keeps what is in each, Not takes it away), a walk along the
   link types named for some steps, and a limit. It is kept in the address
   (`#/v?<lens>`, or `#/e/<id>?<lens>` with an item's page over it) and

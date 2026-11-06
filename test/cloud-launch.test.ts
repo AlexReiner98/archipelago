@@ -72,7 +72,7 @@ test('a hosted server launches in the cloud on the workspace’s account, and en
     { op: 'create', ref: 'proj', type: 'project', title: 'Site' },
     { op: 'create', ref: 'post', type: 'task', title: 'Run the weekly posting' },
     { op: 'create', ref: 'loose', type: 'task', title: 'Plan the week' },
-    { op: 'create', ref: 'lane', type: 'resource', title: 'Posting lane' },
+    { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Posting lane' },
     { op: 'link', type: 'lives_in', from: 'proj', to: 'repo' },
     { op: 'link', type: 'part_of', from: 'post', to: 'proj' },
     { op: 'link', type: 'needs', from: 'post', to: 'lane' },

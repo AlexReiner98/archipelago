@@ -1,4 +1,4 @@
-// The money pack's costs view, tested without a database: the kernel's spent view and the cost items are fixtures.
+// The time pack's costs view, tested without a database: the kernel's spent view and the cost items are fixtures.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -20,7 +20,7 @@ function ctxOver(items: Record<string, unknown>[]) {
 }
 
 test('what the work costs: agents as the kernel measured them, and each regular payment by its share of the period', async () => {
-  const { answer } = await handler['money.costs'](
+  const { answer } = await handler['time.costs'](
     { days: 30 },
     ctxOver([
       { id: 'host', type: 'cost', title: 'Hosting', props: { amount: 25, since: LONG_AGO, vendor: 'Render' } },

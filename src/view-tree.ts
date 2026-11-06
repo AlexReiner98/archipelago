@@ -69,17 +69,20 @@ async function tops(l: Archipelago, kinds: string[]): Promise<Item[]> {
 
 /**
  * The tree meant when none is named: the only one there is, or else the only one the root can stand in (its type
- * among the tree's roots or branches), or with no root the only one whose roots have items on the map.
+ * among the tree's roots or branches), or with no root the only one whose roots have items on the map. Where a root
+ * stands in several (a feature, a branch of two roadmaps), the one of them whose roots have items on the map.
  */
 async function treeFor(l: Archipelago, root: string | undefined, isA: (type: string, kinds: string[]) => boolean) {
   const defs = [...l.registry.trees.values()];
   if (defs.length <= 1) return defs[0];
   const type = root ? (await l.entity(root))?.type : undefined;
+  const used = async (d: (typeof defs)[number]) => anyOf(l, [...l.registry.types.keys()].filter((t) => isA(t, d.roots)));
   const kept = [];
-  for (const d of defs) {
-    if (type ? isA(type, [...d.roots, ...d.branches]) : await anyOf(l, [...l.registry.types.keys()].filter((t) => isA(t, d.roots)))) kept.push(d);
-  }
-  return kept.length === 1 ? kept[0] : undefined;
+  for (const d of defs) if (type ? isA(type, [...d.roots, ...d.branches]) : await used(d)) kept.push(d);
+  if (kept.length <= 1 || !type) return kept.length === 1 ? kept[0] : undefined;
+  const rooted = [];
+  for (const d of kept) if (await used(d)) rooted.push(d);
+  return rooted.length === 1 ? rooted[0] : undefined;
 }
 
 /** Whether any item of these types is on the map, archived ones aside. */

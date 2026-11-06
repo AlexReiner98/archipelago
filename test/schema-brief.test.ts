@@ -42,8 +42,8 @@ test('a type, a relation or a pack is given whole on asking, and a name that is 
   assert.ok(task.types[0]!.fields.recurrence!.description, 'each field explained');
   const rel = (await callTool(l, agent, 'schema', { type: 'depends_on' })) as { relations: { description: string }[] };
   assert.match(rel.relations[0]!.description, /cannot finish/);
-  const pack = (await callTool(l, agent, 'schema', { type: 'software' })) as { types: { pack: string }[] };
-  assert.ok(pack.types.length > 1 && pack.types.every((t) => t.pack === 'software'));
+  const pack = (await callTool(l, agent, 'schema', { type: 'code' })) as { types: { pack: string }[] };
+  assert.ok(pack.types.length > 1 && pack.types.every((t) => t.pack === 'code'));
   const kind = (await callTool(l, agent, 'schema', { type: 'work' })) as { types: { id: string }[] };
   assert.deepEqual(kind.types.map((t) => t.id), ['work'], 'a kind by its name before a pack of that name');
   await assert.rejects(callTool(l, agent, 'schema', { type: 'no.such' }), /No type, relation or pack/);

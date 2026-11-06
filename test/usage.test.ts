@@ -33,10 +33,10 @@ test('a member reads their workspace’s use and what it is made of, and nothing
   await act('workspace.limit', { workspace: ws.id, plan: 'Solo', manage: 'https://seller.example/billing', storage: 500e6, sessions: 5, requests: 300, looks: 30, members: 3 });
 
   // The owner keeps a large private item; the member a shared one.
-  const made = await call('/api/change', owner, { reason: 'test', ops: [{ op: 'create', ref: 'x', type: 'resource', title: SECRET, visibility: 'private', body: 'Terms. '.repeat(3000) }] });
+  const made = await call('/api/change', owner, { reason: 'test', ops: [{ op: 'create', ref: 'x', type: 'place', props: { exclusive: true }, title: SECRET, visibility: 'private', body: 'Terms. '.repeat(3000) }] });
   assert.ok(made.result, made.error);
   const big = made.result.created.x;
-  const mine = (await call('/api/change', member, { reason: 'test', ops: [{ op: 'create', ref: 'x', type: 'goal', title: 'Kim’s task', visibility: 'shared', body: 'Do it.' }] })).result.created.x;
+  const mine = (await call('/api/change', member, { reason: 'test', ops: [{ op: 'create', ref: 'x', type: 'event', title: 'Kim’s task', visibility: 'shared', body: 'Do it.' }] })).result.created.x;
 
   const read = async (token: string) => (await call('/api/view', token, { name: 'usage' })).result;
   const seen = await read(member);
@@ -63,7 +63,7 @@ test('a member reads their workspace’s use and what it is made of, and nothing
   const own = largest.find((p: any) => p.use.item === mine);
   assert.equal(own?.title, 'Kim’s task', 'what the member can see is named, and opens its page');
   const types = parts.filter((p: any) => p.use.list === 'By type');
-  assert.ok(types.some((p: any) => p.title === 'Resource') && types.some((p: any) => p.title === 'Goal'), 'by type, with the types’ names');
+  assert.ok(types.some((p: any) => p.title === 'Place') && types.some((p: any) => p.title === 'Event'), 'by type, with the types’ names');
 
   // Requests this minute, by who asked: a person by name, an agent as its person’s agents; never the token.
   await call('/agent/query', agent, { name: 'schema' });

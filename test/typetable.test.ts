@@ -76,19 +76,19 @@ test('a pack removed under live items leaves them dormant: editable by a person,
 });
 
 test('a type a pack took over takes its items with it, once, when no pack defines the old one', async () => {
-  // A map made while the money pack named its type money.cost, before a type was named by what it is.
+  // A map made while its pack named the type money.cost, before a type was named by what it is.
   const before = mkdtempSync(join(tmpdir(), 'pelago-moved-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), before, { recursive: true });
-  const file = join(before, 'money', 'pack.json');
-  const money = JSON.parse(readFileSync(file, 'utf8').replaceAll('"cost"', '"money.cost"'));
-  delete money.types[0].moved_from;
-  writeFileSync(file, JSON.stringify(money));
+  const file = join(before, 'time', 'pack.json');
+  const time = JSON.parse(readFileSync(file, 'utf8').replaceAll('"cost"', '"money.cost"'));
+  delete time.types.find((t: { id: string }) => t.id === 'money.cost').moved_from;
+  writeFileSync(file, JSON.stringify(time));
   const db = await openDb();
   const old = new Archipelago(db, new Registry(before));
   await syncTypes(old);
   const made = (await old.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'host', type: 'money.cost', title: 'Hosting', props: { amount: 25 } }, { op: 'create', ref: 'gone', type: 'money.cost', title: 'Old host', status: 'ended', props: { amount: 7 } }] })) as { created: Record<string, string> };
 
-  // Opened with the packs as they are now: the items are the money pack's, with all they had.
+  // Opened with the packs as they are now: the items are the time pack's cost, with all they had.
   const dir = mkdtempSync(join(tmpdir(), 'pelago-moved-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
   const now = new Archipelago(db, new Registry(dir));
@@ -144,4 +144,24 @@ test('a relation a pack took over takes its links with it, and the work at risk 
   assert.match(brief.text, /## Assumes\n- People read the blog \(refuted\)/);
   const again = (await now.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'x', type: 'inquiry.hypothesis', title: 'x' }] })) as { created: Record<string, string> };
   assert.equal((await now.entity(again.created.x))!.type, 'hypothesis', 'the old name still reads as the new one');
+});
+
+test('a type that takes another over says what its statuses are here, and the items move with them', async () => {
+  // A map made while a pack declared part, before component took it over: a part that works is a component that is up.
+  const before = mkdtempSync(join(tmpdir(), 'pelago-moved-'));
+  cpSync(join(import.meta.dirname, '..', 'packs'), before, { recursive: true });
+  const file = join(before, 'code', 'pack.json');
+  const code = JSON.parse(readFileSync(file, 'utf8'));
+  code.types.find((t: { id: string }) => t.id === 'component').moved_from = [];
+  code.types.push({ id: 'part', extends: 'place', title: 'Part', description: 'A part of a mechanism.', statuses: { open: ['sketched', 'works', 'broken'], closed: ['retired'] } });
+  writeFileSync(file, JSON.stringify(code));
+  const db = await openDb();
+  const old = new Archipelago(db, new Registry(before));
+  await syncTypes(old);
+  const made = (await old.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'part', title: 'Hook', status: 'works' }, { op: 'create', ref: 'b', type: 'part', title: 'Gone', status: 'retired' }] })) as { created: Record<string, string> };
+
+  const now = new Archipelago(db, new Registry(join(import.meta.dirname, '..', 'packs')));
+  assert.deepEqual((await syncTypes(now)).moved, { part: 2 });
+  const [a, b] = [(await now.entity(made.created.a))!, (await now.entity(made.created.b))!];
+  assert.deepEqual([a.type, a.status, a.is_open, b.type, b.status, b.is_open], ['component', 'up', true, 'component', 'retired', false]);
 });

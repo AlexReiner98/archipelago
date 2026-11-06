@@ -837,7 +837,7 @@
      "id": "<lane>",
      "status": "available",
      "title": "Live lane",
-     "type": "resource"
+     "type": "place"
     }
    ],
    "part_of": [
@@ -883,11 +883,11 @@
     "title": "Sign the package",
     "type": "task"
    },
-   "text": "# Sign the package\nTask, todo. Archipelago id: <sign>\n\nPart of: Installer > Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Which certificate? (decision, open)\n\n## Needs\n- Live lane: available (exclusive: claim it before use, release it after)\n\n## Is governed by\n- One live lane. (decided) Only one session drives the CAD app.\n\n## Is linked to\n- Is the cert enough? (open)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <sign>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <sign>, end its message with the line \"Closes: <sign>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
+   "text": "# Sign the package\nTask, todo. Archipelago id: <sign>\n\nPart of: Installer > Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Which certificate? (decision, open)\n\n## Needs\n- Live lane: available (exclusive: claim it before use, release it after)\n\n## Is about\n- One live lane. (decided) Only one session drives the CAD app.\n\n## Is linked to\n- Is the cert enough? (open)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <sign>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <sign>, end its message with the line \"Closes: <sign>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
    "ties": [
     {
      "id": "<rule>",
-     "relation": "governed_by",
+     "relation": "about",
      "status": "decided",
      "title": "One live lane.",
      "type": "decision"
@@ -1332,7 +1332,7 @@
      "created": "<time>",
      "id": "<release>",
      "open": true,
-     "root": "event",
+     "root": "release",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
@@ -1494,11 +1494,11 @@
      "created": "<time>",
      "id": "<lane>",
      "open": true,
-     "root": "resource",
+     "root": "place",
      "starter": "place",
      "status": "available",
      "title": "Live lane",
-     "type": "resource"
+     "type": "place"
     }
    ],
    "preset": "all"
@@ -1663,7 +1663,7 @@
      "created": "<time>",
      "id": "<release>",
      "open": true,
-     "root": "event",
+     "root": "release",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
@@ -1904,7 +1904,7 @@
      "created": "<time>",
      "id": "<release>",
      "open": true,
-     "root": "event",
+     "root": "release",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
@@ -2014,11 +2014,11 @@
      "created": "<time>",
      "id": "<lane>",
      "open": true,
-     "root": "resource",
+     "root": "place",
      "starter": "place",
      "status": "available",
      "title": "Live lane",
-     "type": "resource"
+     "type": "place"
     },
     {
      "blocked": false,
@@ -2151,11 +2151,11 @@
      "created": "<time>",
      "id": "<lane>",
      "open": true,
-     "root": "resource",
+     "root": "place",
      "starter": "place",
      "status": "available",
      "title": "Live lane",
-     "type": "resource"
+     "type": "place"
     },
     {
      "blocked": false,
@@ -2204,7 +2204,7 @@
      "created": "<time>",
      "id": "<release>",
      "open": true,
-     "root": "event",
+     "root": "release",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
@@ -2426,7 +2426,7 @@
      "created": "<time>",
      "id": "<release>",
      "open": true,
-     "root": "event",
+     "root": "release",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
@@ -3115,11 +3115,11 @@
      "created": "<time>",
      "id": "<lane>",
      "open": true,
-     "root": "resource",
+     "root": "place",
      "starter": "place",
      "status": "available",
      "title": "Live lane",
-     "type": "resource"
+     "type": "place"
     },
     {
      "blocked": false,
@@ -3243,7 +3243,7 @@
      "created": "<time>",
      "id": "<release>",
      "open": true,
-     "root": "event",
+     "root": "release",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
@@ -3338,11 +3338,11 @@
      "created": "<time>",
      "id": "<lane>",
      "open": true,
-     "root": "resource",
+     "root": "place",
      "starter": "place",
      "status": "available",
      "title": "Live lane",
-     "type": "resource"
+     "type": "place"
     },
     {
      "blocked": false,
@@ -3411,7 +3411,7 @@
      "created": "<time>",
      "id": "<release>",
      "open": true,
-     "root": "event",
+     "root": "release",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
