@@ -33,7 +33,7 @@ const SHOP: PackFile = {
   id: 'shop', version: '1', title: 'Shop', requires: ['core'],
   types: [
     { id: 'shop.stock', title: 'Stock', description: '', extends: 'place', fields: { on_hand: { type: 'number' }, reorder_at: { type: 'number' } }, capabilities: { bound: { field: 'on_hand', below: 'reorder_at' } } },
-    { id: 'shop.room', title: 'Room', description: '', extends: 'resource', fields: { seats: { type: 'number' } }, capabilities: { capacity: { field: 'seats' } } },
+    { id: 'shop.room', title: 'Room', description: '', extends: 'place', fields: { seats: { type: 'number' } }, capabilities: { capacity: { field: 'seats' } } },
   ],
 };
 

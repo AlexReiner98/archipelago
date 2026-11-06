@@ -15,7 +15,9 @@ import { askView } from '../src/askview.ts';
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
 const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place', 'system'];
-const ROOTS = ['part_of', 'depends_on', 'defers', 'waits_on', 'needs', 'holds', 'involves', 'serves', 'lives_in', 'about', 'bears_on', 'supersedes', 'link', 'uses', 'produced'];
+const ROOTS = ['part_of', 'depends_on', 'waits_on', 'needs', 'holds', 'involves', 'serves', 'lives_in', 'about', 'bears_on', 'link', 'uses', 'produced'];
+/** The kernel's own that stand on a starter of the work: a connection to the outside and a document another workspace shares, which live on no island. */
+const KERNEL_OF_WORK = ['connection', 'shared_document'];
 const SYSTEM = ['lens', 'style', 'instruction', 'screen', 'type', 'link_type', 'source', 'run', 'notification', 'automation', 'island'];
 const human: Actor = { kind: 'human', name: 'test' };
 
@@ -36,6 +38,7 @@ test('every shipped type comes from one of core’s starter types, the system ti
   for (const type of reg.types.values()) {
     assert.ok(KINDS.includes(type.starter), `${type.id} comes from one of core's starter types`);
     if (type.id === 'system' || SYSTEM.includes(type.id)) assert.ok(type.starter === 'system' && type.system, `${type.id} comes from system`);
+    else if (KERNEL_OF_WORK.includes(type.id)) assert.ok(type.starter !== 'system' && type.system, `${type.id} is the kernel's, on a starter of the work`);
     else assert.ok(type.starter !== 'system' && !type.system, `${type.id} is of the work`);
   }
   assert.equal(reg.type('experiment')!.starter, 'work');

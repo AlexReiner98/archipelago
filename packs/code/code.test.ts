@@ -26,7 +26,7 @@ test('each type extends the shared set or one of its own, and adds to no other p
   for (const t of code.types) {
     assert.ok(!('of' in t), `${t.id} adds to no other type`);
     assert.ok(fine(t.extends), `${t.id} extends ${t.extends}`);
-    assert.match(t.id, /^code_[a-z_]+$/, 'named apart from the software pack’s');
+    assert.ok(!/^code_/.test(t.id), `${t.id} takes the bare name: the software pack declares none now`);
   }
 });
 

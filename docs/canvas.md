@@ -36,7 +36,7 @@ take one list of terms (`src/query-terms.ts`, e_4y5x454z), each a set of items
 written as words: `text <words>`, `type <t>`, `kind <k>`, `id <item>`,
 `in <item>` (all that is part of it at any depth, from the part_of closure,
 e_tvsdqjeq), `related <item>` (any link to it, either way), `<link> <item>`
-(`tagged e_x`; `<link>< <item>` what it links to), `owner <person>`,
+(`waits_on me`; `<link>< <item>` what it links to), `owner <person>`,
 `island <island>` (what lives on it, on a map with islands on), and
 words that can only be checked of what is found: `done`, `blocked`,
 `status <s>`, `no owner`, `over estimate`, `changed since 7d`,
@@ -52,9 +52,7 @@ follows the link types named, each out (→, `depends_on>`), in (←,
 `depends_on<`) or either way (↔, as a view kept before ways were said), for
 some steps, a click on its arrow in the bar turning it (e_gue6cg6q); Limit
 caps it. A filter that includes nothing is refused, so no canvas reads the
-whole map. Words typed in find are a Find term, the filter's text; tags are
-a core `tag` type and a `tagged` link, found by and, in the house style, not
-drawn. A query may instead name a view whose answer is items and links
+whole map. Words typed in find are a Find term, the filter's text. A query may instead name a view whose answer is items and links
 (`view`, in the address `?view=usage`), drawn in place of what a filter
 finds: the plan pack's Usage canvas draws core's `usage` view, asked by the
 page as an agent asks it (the owner, 29 Oct 2026, e_7frmyj2q). It is not a

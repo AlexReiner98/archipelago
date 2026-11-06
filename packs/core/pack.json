@@ -21,7 +21,7 @@
       "capabilities": { "owned": true },
       "altitude": "workspace",
       "title": "Aim",
-      "description": "Why work exists: what serves points at, such as a goal or an area. A starter type of the work: a pack's type may extend it, or extend nothing.",
+      "description": "Why work exists: what work is for, such as a goal or a principle (a pack names its own). A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["active"], "closed": ["achieved", "retired"], "phases": { "achieved": "finished" } },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -90,10 +90,13 @@
     },
     {
       "id": "place",
+      "moved_from": ["resource"],
+      "capabilities": { "capacity": { "field": "exclusive" } },
       "title": "Place",
-      "description": "Exists somewhere, physical or not; work lives in it or uses it: a resource, a repository, a file. A starter type of the work: a pack's type may extend it, or extend nothing.",
-      "statuses": { "open": ["available"], "closed": ["retired"] },
+      "description": "Exists somewhere, physical or not; work lives in it or uses it: a repository, a file, a machine, a licence. One that says exclusive is a resource: work that needs it claims it, one holder at a time when exclusive is true. A starter type of the work: a pack's type may extend it, or extend nothing.",
+      "statuses": { "open": ["available", "unavailable"], "closed": ["retired"], "phases": { "unavailable": "trouble" } },
       "fields": {
+        "exclusive": { "type": "boolean", "description": "Said of a resource: true, only one holder at a time and everything else that needs it is blocked; false, any number. Left out, it is no resource and nothing holds it." },
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
         "confidence": { "type": "number", "column": true, "description": "0 to 1: how sure the author is that this is true. Kept in the item's row." },
         "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." }
@@ -135,34 +138,12 @@
       "fields": { "kind": { "type": "string", "description": "What sort of agent, e.g. claude-code." } }
     },
     {
-      "id": "goal",
-      "extends": "aim",
-      "title": "Goal",
-      "description": "An outcome that projects and tasks serve.",
-      "statuses": { "open": ["active", "paused"], "closed": ["achieved", "dropped"], "phases": { "active": "under_way" } },
-      "fields": { "target_date": { "type": "date" }, "measure": { "type": "string", "description": "How you will know it is achieved." } }
-    },
-    {
-      "id": "area",
-      "extends": "aim",
-      "title": "Area",
-      "description": "An ongoing responsibility with no end date.",
-      "statuses": { "open": ["active"], "closed": ["retired"] }
-    },
-    {
-      "id": "tag",
-      "extends": "aim",
-      "title": "Tag",
-      "description": "What items belong with, named in a word or two: an item is tagged with any number of them (tagged), and a query's filter selects by it (tagged <tag>).",
-      "statuses": { "open": ["active"], "closed": ["retired"] }
-    },
-    {
       "id": "task",
       "moved_from": ["work.task"],
       "capabilities": { "bound": { "field": "due", "limit": "today" }, "where": { "link": "lives_in" } },
       "extends": "work",
       "title": "Task",
-      "description": "A piece of work someone can do. A commitment is a task with an owed_to relation.",
+      "description": "A piece of work someone can do. A commitment is a task that involves who it is owed to.",
       "statuses": { "open": ["todo", "doing", "waiting"], "closed": ["done", "dropped"] },
       "fields": {
         "due": { "type": "date" },
@@ -211,17 +192,6 @@
       "fields": { "at": { "type": "datetime" }, "ends": { "type": "datetime" }, "location": { "type": "string" }, "recurrence": { "type": "string" } }
     },
     {
-      "id": "resource",
-      "capabilities": { "capacity": { "field": "exclusive" } },
-      "extends": "place",
-      "title": "Resource",
-      "description": "Something limited or exclusive that work needs: a machine, a licence, a budget, a live app.",
-      "statuses": { "open": ["available", "unavailable"], "closed": ["retired"], "phases": { "unavailable": "trouble" } },
-      "fields": {
-        "exclusive": { "type": "boolean", "default": true, "description": "If true, only one holder at a time; everything else that needs it is blocked." }
-      }
-    },
-    {
       "id": "lens",
       "extends": "system",
       "title": "View",
@@ -253,7 +223,7 @@
         "lit": { "type": "enum", "values": ["all", "you", "blocked"], "description": "What stays lit as it opens." },
         "published": { "type": "boolean", "description": "pages: show what is published beside each draft. Left out, each draft alone." },
         "order": { "type": "enum", "values": ["reading", "found", "title"], "description": "pages: the order of its rows. reading: as a reader meets the site (the front page, the header by menu, then what each page points at in the order it does, the rest by title, the footer last); found: as the query finds them; title: by name. reading unless said." },
-        "undrawn": { "type": "json", "description": "The link types drawn as no wire, as a list, e.g. [\"tagged\"]: the items are still drawn and still filtered by them. An empty list draws every link the layout draws." },
+        "undrawn": { "type": "json", "description": "The link types drawn as no wire, as a list, e.g. [\"about\"]: the items are still drawn and still filtered by them. An empty list draws every link the layout draws." },
         "link_colours": { "type": "json", "description": "A colour for each link type, by its name, as hex colours: the flow draws each wire and tie in its own, and a type not named here takes one of link_hues, the same each time unless another type in the picture has it." },
         "type_shapes": { "type": "json", "description": "The outline each type is drawn in, by type: box, diamond, pill, sheet, cut (a box with cut corners), hexagon, flag or tab, e.g. {\"question\": \"diamond\"}. A type not named takes the outline of the nearest type it is a flavour of that is named, else a box." },
         "held_up": { "type": "enum", "values": ["none", "trouble"], "description": "Whether a step held up by an open step it depends on has its dot in the trouble colour (trouble), or is drawn as its phase alone, the order's wire saying the rest (none)." },
@@ -406,7 +376,8 @@
       "moved_from": [
         "sys.connection"
       ],
-      "extends": "resource",
+      "extends": "place",
+      "capabilities": { "kernel": true },
       "title": "Connection",
       "description": "An external tool, such as an MCP server. Status says whether it is reachable right now.",
       "fields": {
@@ -670,6 +641,7 @@
         "sys.shared_document"
       ],
       "extends": "record",
+      "capabilities": { "kernel": true },
       "public": true,
       "title": "Shared document",
       "deliverable": true,
@@ -738,32 +710,13 @@
       "description": "The source cannot move until this actor (a person, a company, an agent) has answered or acted. Say what is awaited in the relation's props.for, as what they are to do, in a few words, said to them: \"Choose the pack's name\", not \"choosing the name\". Drives the blockers view; remove the link once they have."
     },
     {
-      "id": "ships",
-      "moved_from": ["software.ships"],
-      "extends": "produced",
-      "title": "ships",
-      "inverse": "ships in",
-      "from": ["occurrence"],
-      "to": ["*"],
-      "description": "What the event brings out: open work under it that neither it waits for nor it goes ahead without is left to sort. Drives the gate view."
-    },
-    {
-      "id": "defers",
-      "root": true,
-      "title": "goes ahead without",
-      "inverse": "can follow",
-      "from": ["occurrence"],
-      "to": ["*"],
-      "description": "The event was planned with this in sight and does not wait for it: it can follow. What the event does wait for is depends_on. Drives the gate view."
-    },
-    {
       "id": "part_of",
       "root": true,
       "title": "is part of",
       "inverse": "contains",
       "from": ["*"],
       "to": ["*"],
-      "description": "Hierarchy: a task in a project, a project in an area."
+      "description": "Hierarchy: a task in a project, a project in a larger one."
     },
     {
       "id": "serves",
@@ -772,10 +725,11 @@
       "inverse": "is served by",
       "from": ["*"],
       "to": ["aim"],
-      "description": "Why the work exists."
+      "description": "Why the work exists: the goal, principle or tenet it is for."
     },
     {
       "id": "involves",
+      "moved_from": ["owed_to", "requested_by"],
       "root": true,
       "title": "involves",
       "inverse": "is involved in",
@@ -785,6 +739,7 @@
     },
     {
       "id": "works_at",
+      "kernel": true,
       "extends": "part_of",
       "title": "works at",
       "inverse": "employs",
@@ -794,6 +749,7 @@
     },
     {
       "id": "about",
+      "moved_from": ["supersedes", "based_on", "governed_by", "reduces"],
       "root": true,
       "title": "is about",
       "inverse": "is described by",
@@ -808,19 +764,21 @@
       "inverse": "is needed by",
       "from": ["*"],
       "to": ["place"],
-      "description": "The work cannot run without this place, one with a capacity (a resource). Drives the blockers view."
+      "description": "The work cannot run without this place; one that says exclusive (a resource) is claimed before use. Drives the blockers view."
     },
     {
       "id": "holds",
+      "kernel": true,
       "root": true,
       "title": "holds",
       "inverse": "is held by",
       "from": ["*"],
       "to": ["place"],
-      "description": "Current occupancy of a place with a capacity (a resource). Created by claim, ended by release."
+      "description": "Current occupancy of a place that says exclusive (a resource). Created by claim, ended by release."
     },
     {
       "id": "started_from",
+      "kernel": true,
       "extends": "about",
       "title": "was started from",
       "inverse": "started",
@@ -830,6 +788,7 @@
     },
     {
       "id": "produced",
+      "moved_from": ["earns"],
       "root": true,
       "title": "produced",
       "inverse": "was produced by",
@@ -855,15 +814,6 @@
       "from": ["*"],
       "to": ["question"],
       "description": "Evidence on a question: a result, a test or a finding that helps settle it."
-    },
-    {
-      "id": "supersedes",
-      "root": true,
-      "title": "supersedes",
-      "inverse": "is superseded by",
-      "from": ["*"],
-      "to": ["*"],
-      "description": "Replaces an older version."
     },
     {
       "id": "link",
@@ -896,16 +846,8 @@
       "description": "Relies on a finding's value, from this island or another: the one link that crosses between islands. Its readers are who is told when the finding moves; when it was made, with the finding's history, says which value was read."
     },
     {
-      "id": "tagged",
-      "extends": "about",
-      "title": "is tagged",
-      "inverse": "tags",
-      "from": ["*"],
-      "to": ["tag"],
-      "description": "What the item belongs with: any number of tags to an item. A query's filter selects by it (tagged <tag id or name>); the house style draws no wire for it (undrawn)."
-    },
-    {
       "id": "works_on",
+      "kernel": true,
       "moved_from": [
         "sys.works_on"
       ],
@@ -1416,13 +1358,12 @@
       "title": "House style",
       "props": {
         "shape": "list",
-        "undrawn": ["tagged"],
         "headless": ["part_of"],
         "island_hues": ["#2e7d4f", "#2f5fb3", "#a86a12", "#6f43b0", "#0f7c86", "#b5489a", "#4f8a2b", "#5b6b9a"],
         "place_hues": ["#2f5fb3", "#46785c", "#0f7c86", "#b5489a", "#4f8a2b", "#5b6b9a", "#6f43b0", "#8a8f2a"],
         "key": "shown",
         "ranges": [1, 3],
-        "link_colours": { "depends_on": "#59636e", "part_of": "#2e7d4f", "waits_on": "#5b6b9a", "link": "#6f43b0", "about": "#0f7c86", "tagged": "#7a6a1c" },
+        "link_colours": { "depends_on": "#59636e", "part_of": "#2e7d4f", "waits_on": "#5b6b9a", "link": "#6f43b0", "about": "#0f7c86" },
         "type_shapes": { "work": "box", "question": "diamond", "occurrence": "pill", "record": "sheet", "system": "cut", "actor": "hexagon", "aim": "flag", "place": "tab" },
         "held_up": "none",
         "phase_marks": { "not_started": "hollow", "under_way": "half", "finished": "full", "ended": "full", "trouble": "full", "standing": "none" },

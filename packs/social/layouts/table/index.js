@@ -4,7 +4,7 @@
 // to paid), and a dot for the bar the strategy sets (style.table.bar: so many conversations a month in under so many
 // hours). A post's counts fall in the month it went out (`posted`); a conversation in the month it was had (its `began`,
 // else when it was recorded); an hour in the month it was logged. A source's counts are undated, so its row is all of
-// them. It reads the flat query's answer: posts and sources, the conversations linked came_from them and the time
+// them. It reads the flat query's answer: posts and sources, the conversations linked came_out_of them and the time
 // entries part_of them. Laid out by the page, not drawn to a size; its look is ./look.js.
 
 import { css } from './look.js';
@@ -72,7 +72,7 @@ export function sums(answer, sourceType) {
   for (const k of answer.links ?? []) {
     const from = byId.get(k.from), to = byId.get(k.to);
     if (!from || !to || !counted(to)) continue;
-    if (k.type === 'came_from') {
+    if (k.type === 'came_out_of') {
       const c = cell(to, monthOf(from.fields?.began) ?? monthOf(from.fields?.date) ?? monthOf(from.created_at) ?? posted(to));
       if (c) c.conversations += 1;
       linkedConversations.set(to.id, (linkedConversations.get(to.id) ?? 0) + 1);
@@ -97,7 +97,7 @@ export function sums(answer, sourceType) {
 /** The table. `style.table` says the source type, the channels' names and the bar. */
 export function picture({ answer, style = {} }) {
   const said = style.table ?? {};
-  const sourceType = typeof said.source_type === 'string' ? said.source_type : 'traffic_source';
+  const sourceType = typeof said.source_type === 'string' ? said.source_type : 'channel';
   const names = said.channel_names && typeof said.channel_names === 'object' ? said.channel_names : {};
   const bar = said.bar && typeof said.bar === 'object' ? { conversations: num(said.bar.conversations), hours: num(said.bar.hours) } : null;
   const { months, sources } = sums(answer, sourceType);

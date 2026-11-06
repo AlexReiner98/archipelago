@@ -148,12 +148,13 @@ export class Archipelago {
   /**
    * Move every item of a type (or link of a relation) no pack defines any more to the one that took it over
    * (moved_from): a one-time migration as a pack takes it out of another, logged as one event. All else stays. The
-   * screens (on) and the views kept on the map (their lens) that name the old one name the new one.
+   * screens (on) and the views kept on the map (their lens) that name the old one name the new one. An item whose
+   * status the new type names otherwise takes its status there (statuses: the old status to the new one).
    */
-  async retype(from: string, to: string, what: 'entity' | 'relation' = 'entity'): Promise<number> {
+  async retype(from: string, to: string, what: 'entity' | 'relation' = 'entity', statuses: Record<string, string> = {}): Promise<number> {
     return this.db.transaction(async (tx) => {
-      const { rows } = await tx.query<{ id: string; from_id?: string; to_id?: string }>(
-        what === 'entity' ? `select id from entity where type = $1 -- index entity_type` : `select id, from_id, to_id from relation where type = $1`,
+      const { rows } = await tx.query<{ id: string; status?: string; from_id?: string; to_id?: string }>(
+        what === 'entity' ? `select id, status from entity where type = $1 -- index entity_type` : `select id, from_id, to_id from relation where type = $1`,
         [from],
       );
       // What names it in its settings: a screen in on, a view kept on the map in its lens (src/query-names.ts).
@@ -162,7 +163,7 @@ export class Archipelago {
       const named = held.map((r) => ({ id: r.id, props: this.registry.isA(r.type, 'lens') ? renamedQuery(r.props, from, to, what) : on(r.props) })).filter((r) => Object.keys(r.props).length);
       const settings = named.length ? { settings: named.map((r) => r.id) } : {};
       const reason = `Every ${from} is a ${to} now: its pack took the ${what === 'entity' ? 'type' : 'relation'} over.`;
-      const facts = rows.flatMap((r): Fact[] => (what === 'entity' ? [['+', r.id, 'type', to]] : [['+', r.id, 'link', [to, r.from_id, r.to_id]]]));
+      const facts = rows.flatMap((r): Fact[] => (what === 'entity' ? [['+', r.id, 'type', to], ...(r.status && statuses[r.status] ? [['+', r.id, 'status', statuses[r.status]] as Fact] : [])] : [['+', r.id, 'link', [to, r.from_id, r.to_id]]]));
       for (const r of named) for (const [k, v] of Object.entries(r.props)) facts.push(['+', r.id, k, v]);
       if (facts.length) await this.moved(tx, 'type.moved', reason, facts);
       if (rows.length || named.length) await this.log(tx, { actor: 'system', action: 'type.moved', reason, detail: { from, to, items: rows.map((r) => r.id), ...settings } });

@@ -21,6 +21,12 @@ export const ISLAND_FIELD: FieldDef = { type: 'string', description: 'The island
 /** Whether items of a type live on an island: all but the kernel's own (the kernel flag) and actors. */
 export const livesOnIsland = (t: { system: boolean; lineage: string[] }) => !t.system && !t.lineage.includes('actor');
 
+/** Whether a type is named in an island's legend: one that lives on an island and extends a starter, never a starter by itself (the grammar packs build on), nor what is retired or gone. A drawing adds a starter only where an item uses it bare. */
+export const typeOnLegend = (t: { system: boolean; lineage: string[]; retired?: boolean; dormant?: boolean }) => livesOnIsland(t) && t.lineage.length > 1 && !t.retired && !t.dormant;
+
+/** Whether a link type is named in an island's legend: never the kernel's own (a claim, a session's work, a tie between actors), nor what is retired or gone. */
+export const linkOnLegend = (r: { kernel?: boolean; retired?: boolean; dormant?: boolean }) => !r.kernel && !r.retired && !r.dormant;
+
 /** Step 32 (src/migrate.ts): what lives on an island, read by the query term `island <island>`. */
 export const ISLAND_INDEX = `create index if not exists entity_island on entity ((props->>'island')) where (props->>'island') is not null;`;
 

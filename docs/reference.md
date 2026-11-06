@@ -390,20 +390,29 @@ and what bites in the repository's files, kept as instructions `for`
 
 Types live in files under `packs/`, one folder per pack:
 
-- `core`: the seven kinds of the work and the system kind, the common
-  types of them (person, company, agent, goal, area, tag, event, resource), the
-  system's own (lens, style, screen, type, link type, and the primitives
-  source, connection, run, notification and automation) and the root links,
-  which name kinds or capabilities at their ends (`owned_by` goes from
-  `has:owned`, whatever declares owned). It is the one pack always on.
-- `work`: project, task, decision, issue, meeting,
-  idea, note, file, document and procedure, as `task` and so on.
-- `science`: investigation, hypothesis, experiment and result, with tests, supports,
-  refutes, assumes and explains.
-- `money`: what is paid regularly (`cost`).
-- `software`: application, repo, feature, bug, release, proof question, test,
-  test result, pull request, environment, spec, handoff.
-- `time`: time entries, routines and invoices.
+- `core`: the starter types (the kinds of the work and the system kind), the
+  four every island speaks (task, decision, finding, event), actors (person,
+  company, agent), the system's own (lens, style, screen, type, link type, and
+  the primitives source, connection, run, notification and automation) and the
+  root links, which name kinds or capabilities at their ends (`owned_by` goes
+  from `has:owned`, whatever declares owned). A place that says `exclusive` is
+  a resource. It is the one pack always on.
+- `work`: project, issue, goal, idea, note, file and document, with
+  addresses.
+- `science`: investigation, hypothesis, experiment and result, with tests,
+  supports, refutes and assumes.
+- `code`: what software is made of: product, feature, bug, release, repo,
+  commit, component, environment and pull request, with settles, fixes,
+  calls, ships and defers. Taken on an island map.
+- `software`: what runs code over it: the handoff, the release gate, proof
+  on each build, rechecks, the changelog, and diagrams.
+- `proof`: proof questions, tests and their results, and the rules and
+  actions a principle rests on.
+- `design`: studies, concepts, tenets, research, elements and write-ups.
+- `outreach`: posts, channels, conversations and each channel's month;
+  `social` counts visits and trials onto them.
+- `time`: meetings, time entries, routines, invoices and what
+  is paid regularly (`cost`).
 - `funding`: funding programs, tied to the work they could pay for.
 - `local`: a workspace's own types, `local.<name>`.
 

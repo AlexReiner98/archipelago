@@ -22,7 +22,7 @@ const stored = async (l: Archipelago) => JSON.stringify((await l.db.query(`selec
 async function setup(l: Archipelago) {
   const made = await make(l, [
     { op: 'create', ref: 'run', type: 'run', title: 'A run' },
-    { op: 'create', ref: 'res', type: 'resource', title: 'The lane' },
+    { op: 'create', ref: 'res', type: 'place', props: { exclusive: true }, title: 'The lane' },
     { op: 'create', ref: 'task', type: 'task', title: 'Hold it' },
   ]);
   await l.record('sessions', 'agent:test', [['+', made.run, 'story', [{ n: 1, said: 'Quill called' }]], ['+', made.run, 'status', 'running']], 'Quill asked for it');

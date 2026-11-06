@@ -22,7 +22,7 @@ function ctxOver(items: Post[], trails: Record<string, { id: string; is: string[
 }
 
 const post = (id: string, tag: string, props: Record<string, unknown> = {}) => ({ id, type: 'post', props: { tag, ...props } });
-const source = (id: string, tag: string, props: Record<string, unknown> = {}) => ({ id, type: 'traffic_source', props: { tag, ...props } });
+const source = (id: string, tag: string, props: Record<string, unknown> = {}) => ({ id, type: 'channel', props: { tag, ...props } });
 const deliver = (payload: unknown, ctx: ReturnType<typeof ctxOver>) => handler['social.count']({ payload, headers: {} }, ctx);
 
 test('a trial begun under a post’s tag counts one more on that post, and says so in the log', async () => {
@@ -84,14 +84,15 @@ test('visits that are not a count change nothing', async () => {
   assert.equal(ctx.reads.length, 0, 'a count that is not one reads nothing');
 });
 
-test('the pack declares the visit fields, a source, and hears both counts', async () => {
+test('its words (the outreach pack’s) keep the visit fields on a post and a channel, and it hears both counts', async () => {
   const { readFileSync } = await import('node:fs');
   const pack = JSON.parse(readFileSync(new URL('./pack.json', import.meta.url), 'utf8'));
-  const fields = pack.types.find((t: { id: string }) => t.id === 'post').fields;
+  const words = JSON.parse(readFileSync(new URL('../outreach/pack.json', import.meta.url), 'utf8'));
+  const fields = words.types.find((t: { id: string }) => t.id === 'post').fields;
   assert.deepEqual(fields.visits, { ...fields.visits, type: 'number', shown: true, system: true });
   for (const f of ['first_visit', 'last_visit']) assert.deepEqual([fields[f].type, fields[f].system], ['date', true]);
   assert.equal(fields.posted.shown, true);
-  const kept = pack.types.find((t: { id: string }) => t.id === 'traffic_source').fields;
+  const kept = words.types.find((t: { id: string }) => t.id === 'channel').fields;
   for (const f of ['tag', 'visits', 'first_visit', 'last_visit', 'asked', 'begun', 'paid', 'ended']) assert.deepEqual(kept[f], f === 'tag' ? { ...fields.tag, description: kept.tag.description } : fields[f], f);
   assert.deepEqual(pack.handlers.find((h: { webhook: string }) => h.webhook === 'social.count').records, ['signup.counted', 'visit.counted']);
 });
@@ -103,9 +104,9 @@ test('a tag no post has makes one source, part of the project the posts are in',
   const done = await deliver({ tag: 'chatgpt.com', n: 1, day: '2026-11-12' }, ctxOver([], {}));
   assert.equal(done.answer.recorded, false, 'a dot is not in a tag: the seller reads chatgpt.com as chatgpt');
   const made = await deliver({ tag: 'chatgpt', n: 1, day: '2026-11-12' }, ctx);
-  assert.deepEqual(ctx.reads.slice(0, 2).map((q) => q.items), [{ type: 'post', where: { tag: 'chatgpt' } }, { type: 'traffic_source', where: { tag: 'chatgpt' } }]);
+  assert.deepEqual(ctx.reads.slice(0, 2).map((q) => q.items), [{ type: 'post', where: { tag: 'chatgpt' } }, { type: 'channel', where: { tag: 'chatgpt' } }]);
   assert.deepEqual(made.changes[0].ops, [
-    { op: 'create', ref: 'source', type: 'traffic_source', title: 'chatgpt', status: 'counting', props: { tag: 'chatgpt', visits: 1, first_visit: '2026-11-12', last_visit: '2026-11-12' } },
+    { op: 'create', ref: 'source', type: 'channel', title: 'chatgpt', status: 'available', props: { tag: 'chatgpt', visits: 1, first_visit: '2026-11-12', last_visit: '2026-11-12' } },
     { op: 'link', type: 'part_of', from: 'source', to: 'e_social01' },
   ]);
   assert.deepEqual(made.changes[0].authority, { of: 'agent', basis: 'The seller counted it under the tag chatgpt' });
@@ -128,7 +129,7 @@ test('a post’s tag still goes to the post, and a source with no post to stand 
   assert.equal(onto.changes[0].ops[0].id, 'e_post0001');
   assert.equal(ctx.reads.length, 1, 'a post with the tag is the end of it');
   const alone = await deliver({ tag: 'google', what: 'begun' }, ctxOver([]));
-  assert.deepEqual(alone.changes[0].ops, [{ op: 'create', ref: 'source', type: 'traffic_source', title: 'google', status: 'counting', props: { tag: 'google', begun: 1 } }]);
+  assert.deepEqual(alone.changes[0].ops, [{ op: 'create', ref: 'source', type: 'channel', title: 'google', status: 'available', props: { tag: 'google', begun: 1 } }]);
 });
 
 // A conversation a post began, made by the pack's action: the count is read from the links that are there.
@@ -137,25 +138,25 @@ const conversationOver = (items: Record<string, { type: string; title: string; p
   zone: 'America/Toronto',
   read: async (q: Record<string, any>) => {
     if (q.get !== undefined) return items[q.get] ? { id: q.get, props: {}, ...items[q.get], is: [items[q.get].type] } : null;
-    if (q.related !== undefined) return q.relation === 'came_from' && q.direction === 'in' ? cameFrom.map((id) => ({ id, type: 'conversation' })) : [];
+    if (q.related !== undefined) return q.relation === 'came_out_of' && q.direction === 'in' ? cameFrom.map((id) => ({ id, type: 'conversation' })) : [];
     return [];
   },
 });
 const converse = (input: Record<string, unknown>, ctx: ReturnType<typeof conversationOver>) => (handler as any)['social.conversation'](input, ctx);
 
-test('a conversation from a post is linked came_from it, and the post counts the ones there and this one', async () => {
+test('a conversation from a post is linked came_out_of it, and the post counts the ones there and this one', async () => {
   const ctx = conversationOver({ e_post0001: { type: 'post', title: 'Launch', props: { channel: 'linkedin' } } }, ['e_conv0001', 'e_conv0002']);
   const done = await converse({ from: 'e_post0001', person: 'Sam', problem: 'Agents forget what was decided' }, ctx);
   assert.deepEqual(done.ops, [
     { op: 'create', ref: 'c', type: 'conversation', title: 'Sam: Agents forget what was decided', status: 'open', body: '', props: { person: 'Sam', problem: 'Agents forget what was decided', began: '2026-11-04', channel: 'linkedin' } },
-    { op: 'link', type: 'came_from', from: 'c', to: 'e_post0001' },
+    { op: 'link', type: 'came_out_of', from: 'c', to: 'e_post0001' },
     { op: 'update', id: 'e_post0001', props: { conversations: 3 } },
   ]);
   assert.equal(done.answer.conversations, 3);
 });
 
 test('a conversation from a source counts nothing on it; a long problem makes a short title; nothing to come from is refused', async () => {
-  const ctx = conversationOver({ e_src00001: { type: 'traffic_source', title: 'Newsletter' } }, []);
+  const ctx = conversationOver({ e_src00001: { type: 'channel', title: 'Newsletter' } }, []);
   const done = await converse({ from: 'e_src00001', person: 'Ana', problem: 'x'.repeat(200), channel: 'email' }, ctx);
   assert.equal(done.ops.length, 2);
   assert.equal(done.ops[0].title.length, 60);

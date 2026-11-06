@@ -9,7 +9,7 @@ import { append, verify } from '../src/log.ts';
 test('an exclusive resource taken by many at once has one holder', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' },
+    { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Live lane' },
     ...[1, 2, 3, 4, 5, 6].map((n) => ({ op: 'create' as const, ref: `t${n}`, type: 'task', title: `Task ${n}` })),
   ]);
   // Every connection open first, so the claims run side by side rather than one per connection as each opens.

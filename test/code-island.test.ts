@@ -31,19 +31,21 @@ test('the island rules take it, and each type comes from a starter as the work i
   const reg = island();
   assert.equal(reg.states.get('code')?.state, 'active', String(reg.states.get('code')?.why));
   for (const id of ['software', 'work']) assert.equal(reg.states.get(id)?.state, 'off', `${id} is not on an island map`);
-  const own = ['code_product', 'code_feature', 'code_bug', 'code_release', 'code_repository', 'code_commit', 'code_component', 'code_part', 'code_environment'];
-  assert.deepEqual(own.map((id) => reg.type(id)?.starter), ['work', 'work', 'work', 'occurrence', 'place', 'record', 'place', 'place', 'place']);
-  assert.ok(reg.type('code_repository')!.capabilities.where?.address, 'a repository is found by its remote');
-  assert.equal(reg.type('code_commit')!.capabilities.accounts?.field, 'sha');
+  const own = ['product', 'feature', 'bug', 'release', 'repo', 'commit', 'component', 'environment', 'pull_request'];
+  assert.deepEqual(own.map((id) => reg.type(id)?.starter), ['work', 'work', 'work', 'occurrence', 'place', 'record', 'place', 'place', 'work']);
+  assert.ok(own.every((id) => reg.type(id)?.pack === 'code'), 'each is the code pack’s');
+  assert.ok(reg.type('repo')!.capabilities.where?.address, 'a repository is found by its remote');
+  assert.equal(reg.type('commit')!.capabilities.accounts?.field, 'sha');
   const root = (id: string) => reg.relations.get(id)?.root;
-  assert.deepEqual(['code_settles', 'code_fixes', 'code_calls'].map(root), ['about', 'about', 'uses']);
+  assert.deepEqual(['settles', 'fixes', 'calls', 'ships', 'defers'].map(root), ['about', 'about', 'uses', 'produced', 'about']);
   assert.ok(reg.trees.has('code.roadmap'));
 });
 
-test('beside the software pack, on a map without islands, both are active and never clash', () => {
+test('on a map without islands the software pack runs over its words, and declares none of its own', () => {
   const reg = new Registry(PACKS);
-  for (const id of ['code', 'software']) assert.equal(reg.states.get(id)?.state, 'active', id);
-  assert.ok(reg.types.has('code_feature') && reg.types.has('feature') && reg.relations.has('code_settles') && reg.relations.has('settles'));
+  for (const id of ['code', 'software', 'proof']) assert.equal(reg.states.get(id)?.state, 'active', id);
+  assert.deepEqual([reg.type('feature')?.pack, reg.relations.get('settles')?.pack, reg.type('test')?.pack], ['code', 'code', 'proof']);
+  assert.deepEqual([...reg.types.values()].filter((t) => t.pack === 'software').map((t) => t.id), ['diagram']);
 });
 
 test('a software island holds a product, a feature, its tasks and a release', async () => {
@@ -57,34 +59,34 @@ test('a software island holds a product, a feature, its tasks and a release', as
   const { isle } = await make(l, [{ op: 'create', ref: 'isle', type: 'island', title: 'Apex', props: { pack: 'code' } }]);
   const on = (ops: any[]) => ops.map((op) => (op.op === 'create' ? { ...op, props: { ...op.props, island: isle } } : op));
   const ids = await make(l, on([
-    { op: 'create', ref: 'repo', type: 'code_repository', title: 'Apex repo', props: { remote: 'https://github.com/example/apex' } },
-    { op: 'create', ref: 'prod', type: 'code_product', title: 'Apex', status: 'active' },
-    { op: 'create', ref: 'feat', type: 'code_feature', title: 'Sun study', status: 'building', props: { order: 1 } },
-    { op: 'create', ref: 'later', type: 'code_feature', title: 'Shadow export', status: 'planned', props: { order: 2 } },
+    { op: 'create', ref: 'repo', type: 'repo', title: 'Apex repo', props: { remote: 'https://github.com/example/apex' } },
+    { op: 'create', ref: 'prod', type: 'product', title: 'Apex', status: 'active' },
+    { op: 'create', ref: 'feat', type: 'feature', title: 'Sun study', status: 'building', props: { order: 1 } },
+    { op: 'create', ref: 'later', type: 'feature', title: 'Shadow export', status: 'planned', props: { order: 2 } },
     { op: 'create', ref: 'calc', type: 'task', title: 'Compute the sun path', status: 'done' },
     { op: 'create', ref: 'draw', type: 'task', title: 'Draw the shadows', status: 'doing' },
-    { op: 'create', ref: 'bug', type: 'code_bug', title: 'Noon is off by an hour', props: { repro: 'Toronto, 21 June' } },
-    { op: 'create', ref: 'rel', type: 'code_release', title: 'Apex 0.2', props: { version: '0.2.0' } },
+    { op: 'create', ref: 'bug', type: 'bug', title: 'Noon is off by an hour', props: { repro: 'Toronto, 21 June' } },
+    { op: 'create', ref: 'rel', type: 'release', title: 'Apex 0.2', props: { version: '0.2.0' } },
     { op: 'link', type: 'lives_in', from: 'prod', to: 'repo' },
     { op: 'link', type: 'part_of', from: 'feat', to: 'prod' },
     { op: 'link', type: 'part_of', from: 'later', to: 'prod' },
     { op: 'link', type: 'part_of', from: 'calc', to: 'feat' },
     { op: 'link', type: 'part_of', from: 'draw', to: 'feat' },
     { op: 'link', type: 'part_of', from: 'bug', to: 'feat' },
-    { op: 'link', type: 'code_fixes', from: 'draw', to: 'bug' },
+    { op: 'link', type: 'fixes', from: 'draw', to: 'bug' },
     { op: 'link', type: 'depends_on', from: 'rel', to: 'feat' },
     { op: 'link', type: 'defers', from: 'rel', to: 'later' },
   ]));
   // A commit accounted for as the instructions say: in its repository, settling what it did.
   const { c } = await make(l, on([
-    { op: 'create', ref: 'c', type: 'code_commit', title: 'Compute the sun path', props: { sha: 'a'.repeat(40) } },
+    { op: 'create', ref: 'c', type: 'commit', title: 'Compute the sun path', props: { sha: 'a'.repeat(40) } },
     { op: 'link', type: 'lives_in', from: 'c', to: ids.repo },
-    { op: 'link', type: 'code_settles', from: 'c', to: ids.calc },
+    { op: 'link', type: 'settles', from: 'c', to: ids.calc },
   ]));
   assert.equal((await l.entity(c))!.props.sha, 'a'.repeat(40));
 
-  // The software pack is off here, so its feature is no type to make.
-  await assert.rejects(l.change(human, { reason: 'test', ops: on([{ op: 'create', type: 'feature', title: 'Old vocabulary' }]) }), /feature/);
+  // The work pack is off here, so its project is no type to make on the island.
+  await assert.rejects(l.change(human, { reason: 'test', ops: on([{ op: 'create', type: 'project', title: 'Old vocabulary' }]) }), /project/);
 
   const tree = (await callTool(l, human, 'view', { name: 'tree', params: { root: ids.prod, tree: 'code.roadmap' } })) as any;
   const text = JSON.stringify(tree);

@@ -1,4 +1,4 @@
-// The flow drawing honours the style's undrawn: a link type it names (core's house style names tagged) draws no tie,
+// The flow drawing honours the style's undrawn: a link type it names (a style may name tagged) draws no tie,
 // so an item tagged and nothing else is a step on its own, apart from its tag; a style can turn it back on.
 
 import assert from 'node:assert/strict';
@@ -29,10 +29,10 @@ const drawn = (style: any) => JSON.stringify(picture({ answer, style, reduced: t
 const steps = (style: any) => drawn(style).match(/"key":"s:e_[a-z]+"/g)!.map((k) => k.slice(9, -1)).sort();
 const ties = (style: any) => (drawn(style).match(/"key":"n:\d+"/g) ?? []).length;
 
-test('the house style draws no tagged tie: what is tagged and nothing else is a step on its own', () => {
-  assert.deepEqual(house.undrawn, ['tagged']);
-  assert.ok(steps(house).includes('e_loosezzz') && steps(house).includes('e_tagzzzzz'), 'the tagged item and its tag are steps');
-  assert.equal(ties(house), 2, 'what is part of the process is tied to it; the tag ties nothing');
+test('a style that draws no tagged tie: what is tagged and nothing else is a step on its own', () => {
+  const quiet = { ...house, undrawn: ['tagged'] };
+  assert.ok(steps(quiet).includes('e_loosezzz') && steps(quiet).includes('e_tagzzzzz'), 'the tagged item and its tag are steps');
+  assert.equal(ties(quiet), 2, 'what is part of the process is tied to it; the tag ties nothing');
 });
 
 test('a style that draws every link ties the tagged item to its tag', () => {
