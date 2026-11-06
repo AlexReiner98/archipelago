@@ -21,6 +21,8 @@ const bounds = (rects, points = []) => ({
 });
 const rectOf = (at, size) => ({ l: at[0] - size[0] / 2, t: at[1] - size[1] / 2, r: at[0] + size[0] / 2, b: at[1] + size[1] / 2 });
 const boxOf = (nodes, x, y, id) => rectOf([x.get(id), y.get(id)], [nodes.get(id).w, nodes.get(id).h]);
+/** What a port is wired to: one item, or each of several (the readers in one island of one finding, who share its port). */
+const tosOf = (p) => [].concat(p.to);
 
 /** What an island's first layout (`raw`, the flow's own places) takes up: its steps and its wires. */
 export const insideOf = (raw) => bounds([...raw.x.keys()].map((id) => boxOf(raw.nodes, raw.x, raw.y, id)), [...raw.routes.values()].flatMap((r) => r.points));
@@ -62,7 +64,7 @@ export function portItems(items, links, ports, extras) {
   for (const p of ports.filter((q) => ORDERED.includes(q.side))) {
     const term = TERMINAL[p.side];
     if (!ends.includes(term)) ends.push(term);
-    wires.push(...(p.side === 'top' ? [{ type: PORT_LINK, from: term, to: p.id }, { type: PORT_LINK, from: p.id, to: p.to }] : [{ type: PORT_LINK, from: p.to, to: p.id }, { type: PORT_LINK, from: p.id, to: term }]));
+    wires.push(...(p.side === 'top' ? [{ type: PORT_LINK, from: term, to: p.id }, ...tosOf(p).map((to) => ({ type: PORT_LINK, from: p.id, to }))] : [...tosOf(p).map((to) => ({ type: PORT_LINK, from: to, to: p.id })), { type: PORT_LINK, from: p.id, to: term }]));
   }
   // The rise and the fall joined, so the numbering can take them for its top and its foot; and an item wired to ports of
   // one side alone, a dead end in the order, given the end it lacks, so it stands between the two like any other. These
@@ -70,7 +72,7 @@ export function portItems(items, links, ports, extras) {
   if (ends.length === 2) {
     wires.push({ type: PORT_LINK, from: RISE, to: FALL });
     const own = new Set(links.flatMap((l) => [l.from, l.to])), sides = new Map();
-    for (const p of ports.filter((q) => ORDERED.includes(q.side))) (sides.get(p.to) ?? sides.set(p.to, new Set()).get(p.to)).add(p.side);
+    for (const p of ports.filter((q) => ORDERED.includes(q.side))) for (const to of tosOf(p)) (sides.get(to) ?? sides.set(to, new Set()).get(to)).add(p.side);
     for (const [id, on] of sides) if (!own.has(id) && on.size === 1) wires.push(on.has('top') ? { type: PORT_LINK, from: id, to: FALL } : { type: PORT_LINK, from: RISE, to: id });
   }
   return { items: [...items, ...boxes, ...ends.map((id) => ({ id, type: 'port~', title: '', size: [1, 1] }))], links: [...links, ...wires] };
@@ -114,7 +116,7 @@ export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad, r
   }
   for (const side of Object.keys(SIDES).filter((s) => !ORDERED.includes(s))) {
     const [axis, out] = SIDES[side], other = 1 - axis, on = ports.filter((p) => p.side === side);
-    const want = (p) => boxed(p.to).at[other];
+    const want = (p) => tosOf(p).reduce((s, to) => s + boxed(to).at[other], 0) / tosOf(p).length;
     let end = -Infinity;
     for (const p of on.sort((u, v) => want(u) - want(v))) {
       const n = nodes.get(p.id), half = (other ? n.h : n.w) / 2, at = [];
@@ -125,13 +127,15 @@ export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad, r
     }
   }
   for (const p of ports) {
-    const [axis, out] = SIDES[p.side], n = nodes.get(p.id), at = [x.get(p.id), y.get(p.id)], to = boxed(p.to);
+    const [axis, out] = SIDES[p.side], n = nodes.get(p.id), at = [x.get(p.id), y.get(p.id)];
     Object.assign(n, { edge: [axis, out], small: p.small });
     inward.set(p.id, [axis, -out]);
     if (!placed.has(p.id)) continue;
-    const route = p.id < p.to ? `${p.id}|${p.to}` : `${p.to}|${p.id}`;
-    routes.set(route, { from: p.id, points: sketch(at, axis, to, run) });
-    ties.push({ a: p.id, b: p.to, type: PORT_LINK, route });
+    for (const id of tosOf(p)) {
+      const route = p.id < id ? `${p.id}|${id}` : `${id}|${p.id}`;
+      routes.set(route, { from: p.id, points: sketch(at, axis, boxed(id), run) });
+      ties.push({ a: p.id, b: id, type: PORT_LINK, route });
+    }
   }
   inward.placed = placed;
   return inward;
@@ -145,9 +149,11 @@ export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad, r
 export function apart(model, { ports, extras, pad }) {
   const portIds = new Set(ports.map((p) => p.id)), own = new Set([...portIds, ...extras.map((e) => e.id)]);
   const { nodes, x, y } = model, ported = new Map();
+  // Each port's wire from it to its item; a port wired to several has one to each (`lines`, by item), the first its `points`.
   for (const t of model.ties) if (t.type === PORT_LINK) {
-    const id = portIds.has(t.a) ? t.a : t.b;
-    ported.set(id, { at: [x.get(id), y.get(id)], points: t.a === id ? t.points : [...t.points].reverse() });
+    const id = portIds.has(t.a) ? t.a : t.b, points = t.a === id ? t.points : [...t.points].reverse();
+    const p = ported.get(id) ?? ported.set(id, { at: [x.get(id), y.get(id)], points, lines: new Map() }).get(id);
+    p.lines.set(t.a === id ? t.b : t.a, points);
   }
   const placed = Object.fromEntries(extras.map((e) => [e.id.slice(1), boxOf(nodes, x, y, e.id)]));
   const kept = (m) => new Map([...m].filter(([id]) => !own.has(id)));
@@ -155,7 +161,8 @@ export function apart(model, { ports, extras, pad }) {
   const inside = bounds([...steps, ...extras.map((e) => e.id)].map((id) => boxOf(nodes, x, y, id)), [...model.chains, ...ties, ...ported.values()].flatMap((w) => w.points));
   const edge = {};
   for (const p of ports) edge[p.side] = ported.get(p.id)?.at[SIDES[p.side][0]];
-  const frame = { l: edge.left ?? inside.l - pad, t: edge.top ?? inside.t - pad, r: edge.right ?? inside.r + pad, b: edge.bottom ?? inside.b + pad };
+  // A side with ports is on their line, unless a step stands out past it: the frame holds every step.
+  const frame = { l: Math.min(edge.left ?? Infinity, inside.l - pad), t: Math.min(edge.top ?? Infinity, inside.t - pad), r: Math.max(edge.right ?? -Infinity, inside.r + pad), b: Math.max(edge.bottom ?? -Infinity, inside.b + pad) };
   return { ...model, nodes: kept(nodes), x: kept(x), y: kept(y), all: model.all.filter((n) => !own.has(n.id)), ties, ported, placed, frame };
 }
 

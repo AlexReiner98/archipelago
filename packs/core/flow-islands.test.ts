@@ -82,6 +82,16 @@ test('each island carries its own legend and the corner has none', () => {
   assert.ok(!legendOf(scene, 'e_grantsis').includes('Record'), 'Grants’ says only what it draws');
 });
 
+test('an island that says its pack names, of it, only what is in use on it', () => {
+  const pack = {
+    title: 'Core',
+    types: [{ id: 'aim', title: 'Aim' }, { id: 'task', title: 'Task' }, { id: 'finding', title: 'Finding' }],
+    links: [{ id: 'owned_by', title: 'owned by' }, { id: 'depends_on', title: 'depends on' }, { id: 'reads', title: 'reads' }],
+  };
+  const scene = draw({ ...answer, islands: answer.islands.map((i) => ({ ...i, pack })) });
+  assert.deepEqual(legendOf(scene, 'e_grantsis'), ['Task', 'depends on'], 'its items are tasks, its own links depends on: no aim, no finding, no owned by, and the read across is told at its gate');
+});
+
 test('an island’s legend holds only its vocabulary: the shared marks are told in a tip on the mark', () => {
   const you = 'e_alexzzzz';
   const a = {
