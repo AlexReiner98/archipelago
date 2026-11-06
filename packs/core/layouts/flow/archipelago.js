@@ -50,22 +50,32 @@ function sideOf(box, p) {
   return { side, share: Math.min(1, Math.max(0, (p[along] - (along ? cy - h / 2 : cx - w / 2)) / (along ? h : w))) };
 }
 
-/** A sea wire from its sketch at sea, its ends moved onto its ports: each end runs across its side, the first bend slid along with it. */
-function onPorts(points, ends) {
-  const p = points.map((q) => [...q]);
-  const fix = (k, next, end) => {
-    const along = 1 - SIDES[end.side][0];
-    p[k] = [...end.at];
-    if (p.length > 2) p[next][along] = end.at[along];
-  };
-  fix(0, 1, ends[0]);
-  fix(p.length - 1, p.length - 2, ends[1]);
-  // Two ends that meet no bend between them run out of each side and meet halfway.
-  if (p.length === 2 && p[0][0] !== p[1][0] && p[0][1] !== p[1][1]) {
-    const axis = SIDES[ends[0].side][0], mid = (p[0][axis] + p[1][axis]) / 2, at = (u, v) => (axis ? [u, v] : [v, u]);
-    return axis ? [p[0], at(p[0][0], mid), at(p[1][0], mid), p[1]] : [p[0], at(mid, p[0][1]), at(mid, p[1][1]), p[1]];
-  }
-  return p;
+/**
+ * A wire's way from a port at `at` on `side` of an island's `frame` to `to`, where the sea's wire meets the island's box,
+ * `ring` out from the frame: out of the port across its side, then round the island in its own margin of sea, the
+ * shorter way, to the point nearest `to`, and out to it. The sea's own route beyond is kept as the sea laid it.
+ */
+function inMargin(at, side, frame, ring, to) {
+  const r = { l: frame.l - ring, t: frame.t - ring, r: frame.r + ring, b: frame.b + ring };
+  const order = ['top', 'right', 'bottom', 'left'], corner = { top: [r.r, r.t], right: [r.r, r.b], bottom: [r.l, r.b], left: [r.l, r.t] };
+  const onRing = (s, p) => (s === 'top' ? [p[0], r.t] : s === 'bottom' ? [p[0], r.b] : s === 'left' ? [r.l, p[1]] : [r.r, p[1]]);
+  const near = { top: Math.abs(to[1] - r.t), bottom: Math.abs(to[1] - r.b), left: Math.abs(to[0] - r.l), right: Math.abs(to[0] - r.r) };
+  const end = Object.keys(near).reduce((s, k) => (near[k] < near[s] ? k : s), 'top');
+  const N = order.length, from = order.indexOf(side), steps = (order.indexOf(end) - from + N) % N, way = steps <= N / 2 ? 1 : -1;
+  const path = [at, onRing(side, at)];
+  // Clockwise each side ends at its corner; the other way each starts at the previous side's.
+  for (let k = 0, s = from; k < (way > 0 ? steps : N - steps); k++, s = (s + way + N) % N) path.push(corner[order[way > 0 ? s : (s + N - 1) % N]]);
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+  path.push(onRing(end, [clamp(to[0], r.l, r.r), clamp(to[1], r.t, r.b)]), to);
+  return path;
+}
+
+/** A sea wire from its sketch at sea, each end brought from its port round its island to where the sketch meets it. */
+function onPorts(points, ends, ring) {
+  // Each from its port's outer edge: its middle stands on the island's side.
+  const outer = (e) => { const [axis, out] = SIDES[e.side], p = [...e.at]; p[axis] += (out * e.size[axis]) / 2; return p; };
+  const [a, b] = ends.map((e, k) => inMargin(outer(e), e.side, e.frame, ring, k ? points.at(-1) : points[0]));
+  return [...a, ...points.slice(1, -1), ...[...b].reverse()];
 }
 
 /**
@@ -90,7 +100,9 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   const islandOf = (id) => where.get(id) ?? null;
   const reads = cross.filter((l) => byId.get(islandOf(l.from))?.raw.x.has(l.from) && byId.get(islandOf(l.to))?.raw.x.has(l.to));
   // The sea: each island a box of its frame and a sea round it, each link between two a link of its own.
-  const size = (b) => [b.frame.r - b.frame.l + SEA, b.frame.b - b.frame.t + SEA];
+  // Each side's margin of sea: half the sea, how far its ports reach out, and a wire's room for each wire that leaves by it.
+  const margin = (b) => { const m = { top: SEA / 2, bottom: SEA / 2, left: SEA / 2, right: SEA / 2 }; for (const [side, n] of b.leaving ?? []) m[side] += n * blocks[0].raw.z.turn + (b.reach.get(side) ?? 0); return m; };
+  const size = (b) => { const m = margin(b); return [b.frame.r - b.frame.l + m.left + m.right, b.frame.b - b.frame.t + m.top + m.bottom]; };
   const first = (b) => b.items.map((i) => i.created_at).filter(Boolean).sort()[0];
   // The side each end of each wire leaves its island by, as the sea first says: by the wire's number and its end.
   let sea, wires;
@@ -133,12 +145,21 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   for (const b of blocks) b.base = b.frame;
   place();
   wireIslands();
+  for (const b of blocks) {
+    // How many wires leave by each side, and how far a port there reaches out into the sea.
+    (b.leaving = new Map()), (b.reach = new Map());
+    for (const w of wires) for (const e of w.ends) if (e.block === b) {
+      b.leaving.set(e.side, (b.leaving.get(e.side) ?? 0) + 1);
+      b.reach.set(e.side, Math.max(b.reach.get(e.side) ?? 0, e.size[SIDES[e.side][0]] / 2));
+    }
+  }
   place();
   // Where each island stands: its frame's middle on its box's.
   for (const b of blocks) {
     const [cx, cy] = boxOf(b);
-    b.dx = cx - (b.frame.l + b.frame.r) / 2;
-    b.dy = cy - (b.frame.t + b.frame.b) / 2;
+    const m = margin(b);
+    b.dx = cx - (m.right - m.left) / 2 - (b.frame.l + b.frame.r) / 2;
+    b.dy = cy - (m.bottom - m.top) / 2 - (b.frame.t + b.frame.b) / 2;
   }
   for (const b of blocks) {
     b.model = b.ported ?? b.model;
@@ -160,17 +181,21 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   // The sea set again round its ports: islands and ports held where they stand, every wire at sea placed by the solve.
   const portAt = (e) => { const p = e.block.ported?.ported.get(e.id); return p ? move(e.block)(p.at) : null; };
   const held = new Map(), lines = [];
-  for (const b of blocks) { const [cx, cy, w, h] = boxOf(b); held.set(`\u0000isle:${seaId(b.id)}`, { id: `\u0000isle:${seaId(b.id)}`, at: [cx, cy], size: [w - SEA, h - SEA], named: [w - SEA, h - SEA] }); }
+  for (const b of blocks) {
+    const f = b.frame, at = [(f.l + f.r) / 2 + b.dx, (f.t + f.b) / 2 + b.dy], wh = [f.r - f.l, f.b - f.t];
+    held.set(`\u0000isle:${seaId(b.id)}`, { id: `\u0000isle:${seaId(b.id)}`, at, size: wh, named: [...wh] });
+  }
   for (const w of wires) {
     const at = w.ends.map(portAt);
     if (at.some((p) => !p)) continue;
     w.ends.forEach((e, k) => held.set(e.id, { id: e.id, at: [...at[k]], size: [...e.size], named: [...e.size], port: e.small, gate: true }));
-    w.line = { a: w.ends[0].id, b: w.ends[1].id, points: onPorts(w.sketch, w.ends.map((e, k) => ({ side: e.side, at: at[k] }))) };
+    w.line = { a: w.ends[0].id, b: w.ends[1].id, points: onPorts(w.sketch, w.ends.map((e, k) => ({ side: e.side, at: at[k], size: e.size, frame: { l: e.block.frame.l + e.block.dx, t: e.block.frame.t + e.block.dy, r: e.block.frame.r + e.block.dx, b: e.block.frame.b + e.block.dy } })), SEA / 4) };
     lines.push(w.line);
   }
   // Each wire's way chosen again between its ports, as inside an island: out of each port across its side, crossing least.
   const zs = blocks[0].raw.z, inward = new Map(wires.flatMap((w) => w.ends.map((e) => [e.id, SIDES[e.side]])));
-  shape(new Map([...held.values()].map((b) => { const isle = !inward.has(b.id), cut = isle ? zs.room + 1 : 0; return [b.id, { x: b.at[0], y: b.at[1], w: b.size[0] - 2 * cut, h: b.size[1] - 2 * cut }]; })), lines, { room: zs.room, run: zs.run, corner: zs.corner, wire: zs.turn, ports: zs.ports, rounds: zs.rounds, cost_cross: zs.shape_cross, cost_bend: zs.cost_bend, cost_side: zs.cost_side, work: zs.shape_work, inward });
+  const home = new Map(wires.flatMap((w) => w.ends.map((e) => [e.id, `\u0000isle:${seaId(e.block.id)}`])));
+  shape(new Map([...held.values()].map((b) => [b.id, { x: b.at[0], y: b.at[1], w: b.size[0], h: b.size[1] }])), lines, { room: zs.room, run: zs.run, corner: zs.corner, wire: zs.turn, ports: zs.ports, rounds: zs.rounds, cost_cross: zs.shape_cross, cost_bend: zs.cost_bend, cost_side: zs.cost_side, work: zs.shape_work, inward, home });
   // At sea a wire keeps the sea's distance from an island, half the sea between two, and its own from the wire beside it.
   settle({ boxes: [...held.values()], lines, held: new Set(held.keys()), ...keeps(zs), room: SEA / 2, rounds: 2 });
   // Each link across: in from its reader to the reader's port, over the sea, and in from the finding's port to the finding.
