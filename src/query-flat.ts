@@ -292,7 +292,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   const islandIds = [...new Set(items.flatMap((e) => islandOf(e) ?? []))];
   // Each island's name, and the pack it speaks, whose vocabulary a drawing names in the island's legend.
   const isles = islandIds.length ? (await l.db.query<{ id: string; title: string; pack: string | null }>(`select id, title, props->>'pack' as pack from entity where id = any($1::text[])`, [islandIds])).rows : [];
-  const named = new Map(isles.map((r) => [r.id, r.title])), packOf = new Map(isles.map((r) => [r.id, r.pack && islandPack(l.registry, r.pack)]));
+  const named = new Map(isles.map((r) => [r.id, r.title])), packOf = new Map(isles.map((r) => [r.id, r.pack ? islandPack(l.registry, r.pack) : undefined]));
   // An end said by name goes back in the lens as its id.
   lens.find = finds.map(sayTerm);
   lens.only = onlys.map(sayTerm);
