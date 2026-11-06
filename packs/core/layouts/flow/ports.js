@@ -148,6 +148,6 @@ export function holdPorts({ nodes, x, y, routes, ties, held, rewire, run }) {
     if (!ends || !port.has(ends[0]) || !port.has(ends[1]) || !r) continue;
     const drawn = r.from === t.a ? r.points : [...r.points].reverse(), [pa, pb] = ends.map((id) => port.get(id));
     const into = [around(at(pa), pa.side, rectOf(pa.on), run, drawn[0]), around(at(pb), pb.side, rectOf(pb.on), run, drawn.at(-1))];
-    routes.set(t.route, { from: t.a, points: [...into[0], ...drawn.slice(1, -1), ...into[1].reverse()], ends: [pa.at, pb.at] });
+    routes.set(t.route, { from: t.a, points: [...into[0], ...drawn.slice(1, -1), ...into[1].reverse()], ends: [pa.at, pb.at], sides: [pa.side, pb.side] });
   }
 }

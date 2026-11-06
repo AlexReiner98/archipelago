@@ -88,7 +88,8 @@ const roomOn = (b, side, wire, corner) => {
  * keeps from a box it passes, `run` from a port to its first corner, `corner` from a box's corner, `wire` from a wire beside it;
  * `ports` how many places along a side are tried, `rounds` how many times the wires are gone over, the costs what a
  * crossing, a bend and an end too many on a side are worth in length, and `work` how many meetings of two wires may be tried.
- * `inward` by box is [axis, sign] for a box a wire may leave only one way (a port on an island's side: into the island).
+ * `inward` by box is [axis, sign] for a box a wire may leave only one way (a port on an island's side: into the island);
+ * a wire's own `at` (a point for each end) and `leave` (the way out of each) hold where it ends on its boxes.
  */
 export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, cost_cross, cost_bend, cost_side, work: budget = Infinity, through = cost_cross / 2, inward = new Map() }) {
   let work = 0;
@@ -150,7 +151,7 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
   };
   /** The ways a line that meets others can step past them: a stretch of it moved to just beyond each wire that runs beside it. */
   const past = (l, w) => {
-    const out = [], a = rects.get(w.a), b = rects.get(w.b);
+    const out = [], [a, b] = endsOf(w);
     for (let i = 1; i < l.length; i++) {
       const [p, q] = [l[i - 1], l[i]], ax = p[0] === q[0] ? 0 : 1, box = i === 1 ? a : i === l.length - 1 ? b : null, tos = new Set();
       for (const v of beside(l)) if (v !== w) for (let j = 1; j < v.points.length; j++) if (v.points[j - 1][ax] === v.points[j][ax]) for (const by of [-wire, wire]) tos.add(v.points[j][ax] + by);
@@ -181,9 +182,11 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
     return n * cost_side;
   };
   const plain = (l) => (l.length - 2) * cost_bend + lengthOf(l);
+  // Where a wire's end is held at a point on its box (`at`, a port at sea), its ways start there and leave as `leave` says.
+  const endsOf = (w) => [0, 1].map((k) => (w.at?.[k] ? { id: k ? w.b : w.a, lo: w.at[k], hi: w.at[k], mid: w.at[k] } : rects.get(k ? w.b : w.a)));
   /** Whether a line leaves each box that has one way out by that way. */
-  const faces = (l, w) => [[w.a, l[0], l[1]], [w.b, l.at(-1), l.at(-2)]].every(([id, p, q]) => {
-    const way = inward.get(id);
+  const faces = (l, w) => [[w.a, l[0], l[1], 0], [w.b, l.at(-1), l.at(-2), 1]].every(([id, p, q, k]) => {
+    const way = w.leave?.[k] ?? inward.get(id);
     return !way || (p[1 - way[0]] === q[1 - way[0]] && (q[way[0]] - p[way[0]]) * way[1] > 0);
   });
   for (let round = 0; round < rounds; round++) {
@@ -191,7 +194,7 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
       // Past what a picture can take on a page, the rest keep the lines they came with: the solve parts those as well.
       if (w.stays) continue;
       if (work > budget) return work;
-      const a = rects.get(w.a), b = rects.get(w.b);
+      const [a, b] = endsOf(w);
       bump(w, -1);
       file(w, -1);
       const was = w.points, tried = [...shorn(was, a, b), ...shorn(was, a, b).flatMap((l) => shorn(tidy(l), a, b)), ...ways(a, b, { corner, run, ports })].map((l) => { const line = tidy(l); return { l: line, plain: plain(line) }; }).sort((p, q) => p.plain - q.plain);

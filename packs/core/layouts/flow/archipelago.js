@@ -121,6 +121,9 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
     using.forEach((w, j) => {
       const e = w.ends.find((v) => v.id === id), at = [p.at[0] - middle(b)[0], p.at[1] - middle(b)[1]];
       at[along] += (j - (using.length - 1) / 2) * turn;
+      // On the side of the island's box at sea, in line with its port: what stands out of the frame is part of that box.
+      const [axis, out] = SIDES[e.side], box = outline(b);
+      at[axis] = (out < 0 ? (axis ? box.t : box.l) : axis ? box.b : box.r) - middle(b)[axis];
       held.push({ id: `${id}#${w.k}`, on: seaId(b.id), at, side: e.side });
     });
   }

@@ -16,7 +16,7 @@ import { pair } from './polyline.js';
 import { drawnPart, linksOf } from './search.js';
 import { shape } from './shape.js';
 import { solve, solveSections } from './solve.js';
-import { apart, holdPorts, portItems, setPorts } from './ports.js';
+import { apart, holdPorts, portItems, setPorts, SIDES } from './ports.js';
 import { stepsOf } from './steps.js';
 
 /** How many finished pictures are kept: enough for a picture of islands, each laid out twice, and the sea twice. */
@@ -117,7 +117,8 @@ function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = [
   const before = { x: new Map(x), y: new Map(y), sizes: new Map([...nodes].map(([id, n]) => [id, [n.w, n.h]])) };
   if (routes.size <= z.shape_most) {
     const lines = linesOf(routes);
-    for (const l of lines) if (l.r.ends) l.stays = true;
+    // A wire whose ends are held (at sea, at its ports) is shaped from those points, out of each the way its port faces.
+    for (const l of lines) if (l.r.ends) Object.assign(l, { at: l.r.ends.map((e, k) => [x.get(k ? l.b : l.a) + e[0], y.get(k ? l.b : l.a) + e[1]]), leave: l.r.sides.map((s) => SIDES[s]) });
     shapeWires({ nodes, x, y, lines, z, inward });
     for (const l of lines) l.r.points = l.points;
   }
