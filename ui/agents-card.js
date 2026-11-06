@@ -27,8 +27,9 @@ export function tokenRow(t, { me, personName, then, fail }) {
 }
 
 /** What is connected, and the older way in, folded: a token, for Claude Code's hooks or a client that cannot sign in. */
-export function tokensCard({ tokens, row, then, fail, say }) {
-  const name = h('input', { type: 'text', placeholder: 'Name (claude-code)', style: 'flex: 1; min-width: 0' });
+export function tokensCard({ tokens, row, then, fail, say, workspace }) {
+  // Named on the button and in the box that shows the token: one browser may be signed in to two workspaces.
+  const name = h('input', { type: 'text', placeholder: 'Name (claude-code)', style: 'flex: 1 1 0; min-width: 0' });
   // A new agent token ends by itself unless it is said not to. One within an item is made on that item's page.
   const life = h('select', { title: 'When the token stops working by itself' }, [[90, '90 days'], [30, '30 days'], [365, 'A year'], [0, 'Never expires']].map(([days, label]) => h('option', { value: days }, label)));
   const token = (fallback) => ({ kind: 'agent', name: name.value.trim() || fallback, ...(Number(life.value) > 0 && { expires_days: Number(life.value) }) });
@@ -46,8 +47,8 @@ export function tokensCard({ tokens, row, then, fail, say }) {
         { class: 'toolbar', style: 'padding: var(--space-6) 0; flex-wrap: nowrap' },
         name,
         life,
-        h('button', { style: 'white-space: nowrap', title: 'A command that sets up Claude Code in a project, with sessions on the map', onclick: () => make('claude-code', connectBox) }, 'Claude Code setup'),
-        menu('⋯', [['Token only', () => make('agent', (made) => secretBox(`Token for ${made.name}`, made.token))]]),
+        h('button', { class: 'gist', style: 'white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis', title: `Claude Code setup: a command that sets up Claude Code in a project, with sessions on the map of ${workspace.name} (${workspace.id})`, onclick: () => make('claude-code', (made) => connectBox(made, workspace)) }, `Set up in ${workspace.name}`),
+        menu('⋯', [[`Token only, for ${workspace.name}`, () => make('agent', (made) => secretBox(`Token for ${made.name}, in ${workspace.name}`, made.token, workspace))]]),
       ),
     ),
   );

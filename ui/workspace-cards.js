@@ -1,18 +1,18 @@
 // The Workspace screen's cards for the workspace itself and what is outside it: the owner, connecting an agent, backups
 // and importing, GitHub's webhook, the server's packs and the workspace's own settings. Each setting is one row.
 
-import { api, ask, drawingsChanged, h } from './base.js';
+import { api, ask, drawingsChanged, h, state } from './base.js';
 import { hint, link, menu, when } from './words.js';
 import { plate, plates } from './plates.js';
 
 // ---- Workspace -----------------------------------------------------------
 
-/** Show a new token's secret once, with a way to copy it. */
-export function secretBox(label, token) {
+/** Show a new token's secret once, with a way to copy it, and for a token, the workspace it acts in. */
+export function secretBox(label, token, workspace) {
   return h(
     'div',
     { class: 'secret' },
-    h('div', {}, h('strong', {}, label)),
+    h('div', { class: 'gist', title: workspace ? `It acts in the workspace ${workspace.name} (${workspace.id}) alone` : label }, h('strong', {}, label)),
     h('code', {}, token),
     h('div', { class: 'toolbar' }, h('button', { onclick: (e) => navigator.clipboard.writeText(token).then(() => (e.target.textContent = 'Copied')) }, 'Copy'), h('span', { class: 'muted small' }, 'Shown once. It is not stored and cannot be shown again.')),
   );
@@ -23,7 +23,7 @@ export function secretBox(label, token) {
 // .mcp.json reads them is connected. A setting kept inside Claude Code's own
 // files can be overwritten by a running session; the machine's environment
 // cannot.
-export function connectBox(made) {
+export function connectBox(made, workspace = state.workspace) {
   // One command, copied and run in the project's folder on the machine the agent will work on. It carries the
   // address and the token in, the setup script keeps them for that machine, and the same script sets the project up.
   // The same command the server gives a session whose project is behind (setupCommand in src/connect.ts).
@@ -39,7 +39,7 @@ export function connectBox(made) {
       h(
         'div',
         { class: 'toolbar' },
-        h('strong', { class: 'grow' }, `Connect Claude Code as "${made.name}"`),
+        h('strong', { class: 'grow gist', title: workspace && `The token acts in the workspace ${workspace.name} (${workspace.id}) alone` }, `Connect Claude Code as "${made.name}"${workspace ? ` to ${workspace.name}` : ''}`),
         h('span', { class: 'switch', title: 'The machine the agent will work on' }, [['windows', 'Windows'], ['unix', 'Mac or Linux']].map(([key, label]) => h('button', { class: os === key ? 'on' : '', onclick: () => draw(key) }, label))),
       ),
       h('div', { class: 'muted small' }, `1. On that machine, in ${os === 'windows' ? 'PowerShell' : 'a terminal'}, in the project's folder. Then quit Claude Code completely and open it in that folder.`),
@@ -77,7 +77,7 @@ export const base64 = (blob) =>
 // server says what the file would add and change, and does it only on a yes.
 // Opened from the Backups row's menu: choosing the file starts it.
 function importer(done) {
-  const file = h('input', { type: 'file', accept: '.gz', hidden: true });
+  const file = fileInput('.gz');
   const result = h('div');
   const say = (cls, text) => result.replaceChildren(h('div', { class: `${cls} gist`, style: 'padding: var(--space-4) 0', title: text }, text));
   const list = (titles, n) => (titles.length ? `: ${titles.slice(0, 5).join(', ')}${n > 5 ? ', \u2026' : ''}` : '');
@@ -136,6 +136,8 @@ function importer(done) {
 export const card = (title, tip, ...body) => h('section', { class: 'card wide' }, h('header', {}, h('h2', { class: tip ? 'hinted' : '', title: tip ?? '' }, title)), ...body);
 /** A row that never wraps: what does not fit is cut, the whole of it in the tooltip. */
 export const line = (...kids) => h('li', { class: 'one' }, ...kids);
+/** A hidden chooser of a backup file, opened by a menu's entry. */
+export const fileInput = (accept) => h('input', { type: 'file', accept, hidden: true });
 
 // GitHub tells this workspace when a repository is pushed to: through the GitHub App (its row above, on the same
 // card), or a webhook added by hand, whose secret is made here and shown once, with where to put it. One row: whether
@@ -239,6 +241,22 @@ export function visibilityRow(info, redraw, fail) {
     h('span', { class: 'grow', title: 'Who sees what is made here, unless its author says otherwise' }, 'New things are'),
     h('select', { onchange: (e) => api('workspace_set', { default_visibility: e.target.value }).then(redraw, fail) }, [['private', 'Private unless shared'], ['shared', 'Shared unless private']].map(([v, label]) => h('option', { value: v, selected: v === info.default_visibility }, label))),
   );
+}
+
+/**
+ * Whether the packs here are held to the island rules (workspace_set islands): a row of the Map section, offered only
+ * while nothing is on the map yet (workspace_info started), since the packs it would refuse would leave work dormant.
+ */
+export function islandsRow(info, redraw, fail) {
+  if (info.started) return null;
+  const on = h('input', { type: 'checkbox', checked: Boolean(info.islands) });
+  const name = h('span', { class: 'grow', title: 'Each pack is an island: it is taken only if its file holds its vocabulary, views and instructions and it builds on the shared set alone, and every item lives on one island. Islands meet only through findings. Set on a new map, before anything is on it.' }, 'Islands');
+  on.onchange = async () => {
+    const want = on.checked;
+    if (want && !(await ask({ title: 'Hold this map to the island rules?', message: 'Packs that do not keep to them are turned off, and every item made from now on lives on an island. It can be set only while the map is empty.', action: 'Turn on' }))) return void (on.checked = false);
+    api('workspace_set', { islands: want }).then(redraw, (err) => ((on.checked = !want), (name.title = err.message), fail(err)));
+  };
+  return line(name, on);
 }
 
 /** Which other workspaces on this server may notify this one: a row of the Connections card, changed in its menu. */
