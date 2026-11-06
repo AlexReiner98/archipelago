@@ -1,7 +1,8 @@
 // The sea is one more level of the flow (design e_87x2us2b, the owner, 6 Nov 2026): a read across is three wires joined at
 // two ports, each wire's end at sea held where its island put its port, and no wire routed by anything but the flow's own
-// layers. Checked on the whole model of a picture of three islands: where each read crosses, that no two wires share a
-// stretch, that a finding's reads that leave by one port share the wire in to it, and that where any two wires cross, one
+// layers. Checked on the whole model of a picture of four islands: where each read crosses, that no two wires share a
+// stretch, that a finding's reads that leave by one port share the wire in to it, that its readers on one island share
+// one port and one wire across the sea, and that where any two wires cross, one
 // passes under.
 
 import assert from 'node:assert/strict';
@@ -20,18 +21,18 @@ const [{ layout }, { compose, islandModels }, { count }] = await Promise.all([lo
 
 const measure = (t: string, px: number) => t.length * px * 0.55;
 const item = (id: string, title: string, island?: string, kind = 'work') => ({ id, type: kind === 'record' ? 'finding' : 'task', is: [kind], title, open: true, ...(island && { island }) });
-const [A, B, C] = ['e_islandaa', 'e_islandbb', 'e_islandcc'];
+const [A, B, C, D] = ['e_islandaa', 'e_islandbb', 'e_islandcc', 'e_islanddd'];
 const items = [
   item('e_costzzzz', 'Cost per sample', A, 'record'), item('e_yieldzzz', 'Yield per run', A, 'record'), item('e_trialzzz', 'Run the trial', A),
   item('e_budgetzz', 'Set the budget', B), item('e_bidzzzzz', 'Write the bid', B), item('e_sendzzzz', 'Send it', B),
-  item('e_planzzzz', 'Plan the season', C), item('e_alexzzzz', 'Alex', undefined, 'actor'),
+  item('e_planzzzz', 'Plan the season', C), item('e_shipzzzz', 'Ship the kit', D), item('e_alexzzzz', 'Alex', undefined, 'actor'),
 ];
 const links = [
   { type: 'depends_on', from: 'e_costzzzz', to: 'e_trialzzz' }, { type: 'depends_on', from: 'e_yieldzzz', to: 'e_trialzzz' },
   { type: 'depends_on', from: 'e_bidzzzzz', to: 'e_budgetzz' }, { type: 'depends_on', from: 'e_sendzzzz', to: 'e_bidzzzzz' },
-  // Reads across: one finding read from two islands, and one island reading the other's two findings.
+  // Reads across: one finding read from three islands, twice from one of them, and one island reading the other's two findings.
   { type: 'reads', from: 'e_budgetzz', to: 'e_costzzzz' }, { type: 'reads', from: 'e_bidzzzzz', to: 'e_yieldzzz' },
-  { type: 'reads', from: 'e_planzzzz', to: 'e_costzzzz' }, { type: 'reads', from: 'e_sendzzzz', to: 'e_costzzzz' },
+  { type: 'reads', from: 'e_planzzzz', to: 'e_costzzzz' }, { type: 'reads', from: 'e_sendzzzz', to: 'e_costzzzz' }, { type: 'reads', from: 'e_shipzzzz', to: 'e_costzzzz' },
   { type: 'waits_on', from: 'e_sendzzzz', to: 'e_alexzzzz' },
 ];
 const run = (part: any) => layout({ ...part, undrawn: [], headless: house.headless, measure, sizes: house.sizes, aspect: 1.6, shapes: { type: house.type_shapes ?? {} } });
@@ -45,13 +46,16 @@ const onLine = (line: number[][], p: number[]) => line.some((q, i) => i > 0 && (
   return p[0] >= lo[0] - 0.5 && p[0] <= hi[0] + 0.5 && p[1] >= lo[1] - 0.5 && p[1] <= hi[1] + 0.5 && (Math.abs(r[0] - q[0]) < 0.5 || Math.abs(r[1] - q[1]) < 0.5);
 })());
 
+/** Whether `p` lies on the bar of `gate`: on its shore, within its span. */
+const onBar = (p: number[], gate: any) => { const along = gate.way[0] ? 1 : 0; return Math.abs(p[along] - gate.at[along]) <= gate.span / 2 + 0.5 && Math.abs(p[1 - along] - gate.at[1 - along]) <= 0.5; };
+
 test('sea: each read across is one wire from its reader, through its port, to its finding or the port it shares', () => {
-  assert.equal(crossing.length, 5, 'every link between two groups crosses');
+  assert.equal(crossing.length, 5, 'every link between two groups crosses, and the two reads of one finding from one island as one');
   for (const t of crossing.filter((v: any) => v.gates.length)) {
     const [reader, finding] = t.gates;
-    assert.ok(onLine(t.points, reader.at), `${t.a} passes through its port`);
-    const end = t.points.at(-1), along = finding.way[0] ? 1 : 0, n = g.nodes.get(t.b);
-    if (t.toPort) assert.ok(Math.abs(end[along] - finding.at[along]) <= finding.span / 2 + 0.5 && Math.abs(end[1 - along] - finding.at[1 - along]) <= 0.5, `${t.a} ends on the port of ${t.b}`);
+    assert.ok(t.fromPort ? onBar(t.points[0], reader) : onLine(t.points, reader.at), `${t.a} passes through its port`);
+    const end = t.points.at(-1), n = g.nodes.get(t.b);
+    if (t.toPort) assert.ok(onBar(end, finding), `${t.a} ends on the port of ${t.b}`);
     else assert.ok(Math.abs(end[0] - g.x.get(t.b)) <= n.w / 2 + 0.5 && Math.abs(end[1] - g.y.get(t.b)) <= n.h / 2 + 0.5, `${t.a} ends on ${t.b}`);
     assert.ok(onLine(t.points, finding.at) || t.toPort, `${t.a} passes through the port of ${t.b}`);
   }
@@ -71,6 +75,19 @@ test('sea: a finding’s reads that leave by one port share one wire in to it, f
     assert.ok(reads.every((t: any) => t.b === w.b), 'every read on the port is of its finding');
     assert.ok(Math.abs(w.points[0][0] - gate.at[0]) <= 0.5 && Math.abs(w.points[0][1] - gate.at[1]) <= 0.5, `the wire in starts on ${id}`);
   }
+});
+
+test('sea: a finding’s readers on one island share one port and one wire across the sea', () => {
+  const over = crossing.filter((t: any) => t.b === 'e_costzzzz' && t.fromPort);
+  assert.equal(over.length, 1, 'Set the budget and Send it read Cost per sample across one wire');
+  const [t] = over, gate = t.gates[0], ins = g.ties.filter((v: any) => v.toPort === t.fromPort && !v.crossing);
+  assert.deepEqual(ins.map((v: any) => v.a).sort(), ['e_budgetzz', 'e_sendzzzz'], 'each reader has its own wire to the port');
+  for (const v of ins) {
+    const n = g.nodes.get(v.a), [p, end] = [v.points[0], v.points.at(-1)];
+    assert.ok(Math.abs(p[0] - g.x.get(v.a)) <= n.w / 2 + 0.5 && Math.abs(p[1] - g.y.get(v.a)) <= n.h / 2 + 0.5, `${v.a} starts on its step`);
+    assert.ok(onBar(end, gate), `${v.a} ends on the port`);
+  }
+  assert.ok(ins.every((v: any) => Math.abs(v.points.at(-1)[0] - t.points[0][0]) > 0.5 || Math.abs(v.points.at(-1)[1] - t.points[0][1]) > 0.5), 'the wire across leaves the port clear of every reader’s');
 });
 
 test('sea: where any two wires cross, one passes under, at sea as inside', () => {

@@ -18,8 +18,12 @@ const load = (name: string) => import(pathToFileURL(join(laid, name)).href);
 const [{ layout }, { compose, islandModels }, { count }, { nameOf }] = await Promise.all([load('layout.js'), load('archipelago.js'), load('count.js'), load('islands.js')]);
 const { result: answer } = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'layouts', 'flow-islands.json'), 'utf8'));
 
-/** What each fault may count, at most: lower a ceiling when a change brings its count down, never raise one. */
-const CEILING: Record<string, number> = { 'loose ends': 0, outside: 0, overlapping: 0, through: 0, shared: 0, jogs: 5, unbridged: 0, crossings: 101 };
+/**
+ * What each fault may count, at most: lower a ceiling when a change brings its count down, never raise one. Jogs were
+ * raised once, 5 to 8, when a finding's readers on one island came to share one wire across the sea (crossings 101 to
+ * 40), on the owner's word (6 Nov 2026): the jogs are ports a few px off their side's line.
+ */
+const CEILING: Record<string, number> = { 'loose ends': 0, outside: 0, overlapping: 0, through: 0, shared: 0, jogs: 8, unbridged: 0, crossings: 40 };
 
 const z = (name: string) => house.sizes[`flow_${name}`], measure = (t: string, px: number) => String(t).length * px * 0.55;
 /** The shapes a page lays the picture out to: tall, the house's, and wide. Each fault is counted in all three. */
