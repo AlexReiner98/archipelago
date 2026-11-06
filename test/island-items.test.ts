@@ -133,7 +133,7 @@ test('the term island <island> is what lives on it, by id or name', async () => 
   // The answer hands on where each lives and each island's name, for a drawing to draw their borders (task e_auw7hb3v).
   const both = await flatRead(l, { filter: { find: [`island ${a}`, `island ${b}`] } });
   assert.deepEqual(Object.fromEntries(both.items.map((i) => [i.title, i.island])), { Billing: b, Interview: b, 'Invoice run': a, 'Pay the rent': a });
-  assert.deepEqual([...(both.islands ?? [])].sort((p, q) => p.title!.localeCompare(q.title!)), [{ id: a, title: 'Billing' }, { id: b, title: 'Hiring' }]);
+  assert.deepEqual([...(both.islands ?? [])].sort((p, q) => p.title!.localeCompare(q.title!)).map(({ id, title }) => ({ id, title })), [{ id: a, title: 'Billing' }, { id: b, title: 'Hiring' }]);
   assert.ok(!('fields' in both.items[0] && 'island' in (both.items[0].fields ?? {})), 'kept on the item, not among its shown fields');
 });
 
@@ -141,6 +141,17 @@ test('with islands off, nothing is asked and no item has an island', async () =>
   const l = await islandMap(false);
   await make(l, [{ op: 'create', type: 'plain_thing', title: 'Anywhere' }]);
   await refused(l, [{ op: 'create', type: 'task', title: 'Placed', props: { island: 'e_whatever' } }], /task has no field "island"/);
+});
+
+test('a flat answer says the pack each island speaks, and all of its vocabulary', async () => {
+  const l = await islandMap();
+  const { a } = await make(l, [{ op: 'create', ref: 'a', type: 'island', title: 'Billing', props: { pack: 'plain' } }]);
+  await make(l, [{ op: 'create', type: 'plain_thing', title: 'Invoice run', props: { island: a } }]);
+  const answer = await flatRead(l, { filter: { find: [`island ${a}`] } });
+  const pack = answer.islands?.find((i: { id: string }) => i.id === a)?.pack;
+  assert.equal(pack?.id, 'plain');
+  assert.ok(pack.types.some((t: { id: string }) => t.id === 'plain_thing'), 'its own types');
+  assert.ok(!pack.types.some((t: { id: string }) => t.id === 'task'), 'and none of another pack’s');
 });
 
 test("core's legend on an island is task, decision, finding and event, and the links an island's work is drawn with", () => {

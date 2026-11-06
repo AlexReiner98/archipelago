@@ -10,11 +10,11 @@ const need = (set, name) => {
 };
 
 /** The outlines a step may have: in the house style, one for each of core's starter types (decision e_u8aytubm). */
-export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab'];
+export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket'];
 /** The type in an item's lineage nearest it that the style gives an outline (`shapes.type`), if any. */
 export const shapedBy = (i, shapes = {}) => lineageOf(i).find((t) => SHAPES.includes(shapes.type?.[t]));
 /** How far each outline cuts into its box, by the size the style names for it: none for a box, diamond, pill or sheet. */
-const BEVEL = { cut: 'flow_cut', hexagon: 'flow_point', flag: 'flow_point', tab: 'flow_tab' };
+const BEVEL = { cut: 'flow_cut', hexagon: 'flow_point', flag: 'flow_point', tab: 'flow_tab', ticket: 'flow_notch' };
 
 /**
  * Each item a step with its size, as the flow sizes them; a choice nothing follows yet is a step of its own. Its outline
@@ -47,6 +47,8 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
   open.forEach((d) => markOn(d.id));
   const LINE = sizes.flow_line_height ?? TEXT * 1.25;
   for (const n of nodes.values()) {
+    // A box of a level above (an island on the sea) is as big as what is laid out inside it, and has no name of its own here.
+    if (Array.isArray(n.item.size)) { [n.w, n.h] = n.item.size; n.lines = []; n.line = LINE; continue; }
     const px = n.stub ? STUB_TEXT : TEXT;
     n.lines = n.shape === 'end' ? [n.item.title] : lines(n.item.title, MAX_TEXT, (t) => measure(t, px));
     n.line = LINE;
@@ -56,7 +58,7 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
     else [n.w, n.h] = [text + BOX_PAD, (n.shape === 'sheet' ? SHEET_H : BOX_H) + more];
     // A pointed end takes room beside the name: one for a flag, both for a hexagon.
     if (BEVEL[n.shape]) n.bevel = need(sizes, BEVEL[n.shape]);
-    if (n.shape === 'hexagon' || n.shape === 'flag') n.w += n.bevel * (n.shape === 'hexagon' ? 2 : 1);
+    if (n.shape === 'hexagon' || n.shape === 'flag' || n.shape === 'ticket') n.w += n.bevel * (n.shape === 'flag' ? 1 : 2);
   }
   // Each step's place in the order it was made, a choice not followed after every item: what a free choice goes by.
   let made = 0;
