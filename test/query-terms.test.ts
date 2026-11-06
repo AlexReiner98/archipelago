@@ -68,7 +68,7 @@ test("Only's plain words: each must hold of every seed, and the walk is not narr
     { op: 'create', ref: 'sam', type: 'person', title: 'Sam' },
     { op: 'create', ref: 'mine', type: 'task', title: 'Mine', owner: me, status: 'doing', props: { tokens_estimated: 100, tokens_used: 500 } },
     { op: 'create', ref: 'hers', type: 'task', title: 'Sams', owner: 'sam', props: { tokens_estimated: 100, tokens_used: 50 } },
-    { op: 'create', ref: 'lane', type: 'resource', title: 'Lane', status: 'unavailable' },
+    { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Lane', status: 'unavailable' },
     { op: 'create', ref: 'live', type: 'task', title: 'Needs the lane' },
     { op: 'link', type: 'part_of', from: 'mine', to: made.p },
     { op: 'link', type: 'part_of', from: 'hers', to: made.p },
@@ -110,19 +110,19 @@ test("Only's plain words: each must hold of every seed, and the walk is not narr
 test('a name is never guessed: one item so named is answered by its id, two are refused', async () => {
   const { l, made } = await project();
   const more = await make(l, [
-    { op: 'create', ref: 'u', type: 'tag', title: 'Urgent' },
+    { op: 'create', ref: 'u', type: 'goal', title: 'Urgent' },
     { op: 'create', ref: 'sam', type: 'person', title: 'Sam' },
     { op: 'create', ref: 'sam2', type: 'person', title: 'sam' },
     { op: 'create', ref: 'bo', type: 'person', title: 'Bo' },
-    { op: 'link', type: 'tagged', from: made.a, to: 'u' },
+    { op: 'link', type: 'serves', from: made.a, to: 'u' },
   ]);
   await make(l, [{ op: 'update', id: made.o, owner: more.bo }]);
-  const tagged = await flatRead(l, { filter: { find: ['tagged urgent'] } });
-  assert.deepEqual([titles(tagged), tagged.lens.find], [['Find in'], [`tagged ${more.u}`]], 'the end named is said back by its id');
+  const served = await flatRead(l, { filter: { find: ['serves urgent'] } });
+  assert.deepEqual([titles(served), served.lens.find], [['Find in'], [`serves ${more.u}`]], 'the end named is said back by its id');
   const owned = await flatRead(l, { filter: { find: [`id ${made.o}`, `id ${made.a}`], only: ['owner Bo'] } });
   assert.deepEqual([titles(owned), owned.lens.only], [['Elsewhere'], [`owner ${more.bo}`]]);
-  await make(l, [{ op: 'create', type: 'tag', title: 'URGENT' }]);
-  await assert.rejects(flatRead(l, { filter: { find: ['tagged Urgent'] } }), /2 items are named "Urgent".*by its id/);
+  await make(l, [{ op: 'create', type: 'goal', title: 'URGENT' }]);
+  await assert.rejects(flatRead(l, { filter: { find: ['serves Urgent'] } }), /2 items are named "Urgent".*by its id/);
   await assert.rejects(flatRead(l, { filter: { find: [`in ${made.p}`], only: ['owner Sam'] } }), /2 items are named "Sam".*by its id/);
   assert.deepEqual(titles(await flatRead(l, { filter: { find: [`in ${made.p}`], only: [`owner ${more.sam}`] } })), [], 'by its id, the one meant');
 });
@@ -131,16 +131,16 @@ test('the same terms in every part: Find adds, Only keeps, Not takes away', asyn
   const { l, made } = await project();
   const more = await make(l, [
     { op: 'create', ref: 'ann', type: 'person', title: 'Ann' },
-    { op: 'create', ref: 't', type: 'tag', title: 'Urgent' },
+    { op: 'create', ref: 't', type: 'goal', title: 'Urgent' },
     { op: 'link', type: 'waits_on', from: made.a, to: 'ann' },
-    { op: 'link', type: 'tagged', from: made.o, to: 't' },
+    { op: 'link', type: 'serves', from: made.o, to: 't' },
     { op: 'update', id: made.o, owner: 'ann' },
   ]);
   const all = 'type task';
   assert.deepEqual(titles(await flatRead(l, { filter: { find: ['related Ann'] } })), ['Elsewhere', 'Find in'], 'related in Find: any link, the owner\'s too');
   assert.deepEqual(titles(await flatRead(l, { filter: { find: [all], only: ['related Ann'] } })), ['Elsewhere', 'Find in'], 'in Only');
   assert.ok(!titles(await flatRead(l, { filter: { find: [all], not: ['related Ann'] } })).includes('Find in'), 'in Not');
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: [all], only: ['tagged Urgent'] } })), ['Elsewhere'], 'a link in Only');
+  assert.deepEqual(titles(await flatRead(l, { filter: { find: [all], only: ['serves Urgent'] } })), ['Elsewhere'], 'a link in Only');
   assert.deepEqual(titles(await flatRead(l, { filter: { find: [all], only: ['text elsewhere'] } })), ['Elsewhere'], 'words in Only');
   assert.ok(!titles(await flatRead(l, { filter: { find: [all], not: ['text elsewhere'] } })).includes('Elsewhere'), 'words in Not');
   assert.ok(!titles(await flatRead(l, { filter: { find: [all], not: ['owner Ann'] } })).includes('Elsewhere'), 'an owner in Not');

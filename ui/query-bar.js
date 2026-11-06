@@ -111,11 +111,11 @@ function without(lens, part, value) {
   return { ...lens, filter: f };
 }
 
-/** A link term in words: a tag by its name with a #, any other link by its title and its end's name. */
+/** A link term in words: the link's title and its end's name. */
 function termWords(term, redraw) {
   const [, link, end] = /^(\S+)\s+(.+)$/.exec(term) ?? [null, term, ''];
   const endName = end === 'me' ? 'me' : isId(end) ? nameOf(end, redraw) : end;
-  return link === 'tagged' ? `#${endName}` : `${linkTitle(link)} ${endName}`;
+  return `${linkTitle(link)} ${endName}`;
 }
 
 /** What sort of term a term is, as the bar marks and orders them. */
@@ -125,9 +125,9 @@ function sortOf(t) {
   if (t === 'held') return 'held';
   if (t === 'moved') return 'moved';
   if (['text', 'type', 'kind', 'id', 'in', 'related', 'owner'].includes(head)) return head;
-  return /^tagged /.test(t) ? 'marked' : 'link';
+  return 'link';
 }
-const ORDER = ['held', 'moved', 'text', 'type', 'kind', 'marked', 'link', 'owner', 'related', 'id', 'in', 'word'];
+const ORDER = ['held', 'moved', 'text', 'type', 'kind', 'link', 'owner', 'related', 'id', 'in', 'word'];
 const inOrder = (list) => [...list].sort((a, b) => ORDER.indexOf(sortOf(a)) - ORDER.indexOf(sortOf(b)));
 const MARK = { held: 'q-narrow', moved: 'q-narrow', text: 'q-text', type: 'q-type', kind: 'q-type', marked: 'q-tag', link: 'q-link', owner: 'q-link', related: 'q-link', id: 'q-id', in: 'q-in', word: 'q-narrow' };
 const MEANT = { held: 'What changes held for you would touch', moved: 'What reads a finding that moved since it was last changed or said still true', text: 'Words in titles and notes', type: 'Items of this type', kind: 'Items of this kind', marked: 'Items with this tag', link: 'Items with this link', owner: 'What this person owns', related: 'What has any link to this item, either way', id: 'This item', in: 'All that is in this item, at any depth', word: 'What is so' };
@@ -206,8 +206,7 @@ export function drawQuery(lens, view, go, lead) {
   const kinds = (part) => ({
     add: (term) => go(added(lens, { [part]: term })),
     typeGroups: (pick) => groupsOf(ranked(typeChoices(), here.types, near.uses?.types), (t) => ({ label: t.title, title: t.description ?? t.title, pick: () => pick(t) })),
-    linkGroups: (pick) => groupsOf(ranked([...relations.values()].filter((r) => !r.id.startsWith('sys.') && r.id !== 'tagged'), here.links, near.uses?.links), (r) => ({ label: r.title ?? r.id, title: r.description ?? r.title, ...pick(r) })),
-    hasTags: relations.has('tagged'),
+    linkGroups: (pick) => groupsOf(ranked([...relations.values()].filter((r) => !r.id.startsWith('sys.')), here.links, near.uses?.links), (r) => ({ label: r.title ?? r.id, title: r.description ?? r.title, ...pick(r) })),
     most: numberOf(state.style, 'term_find_most'),
     have: part === 'not' ? not : (f[part] ?? []),
     label: part === 'not' ? 'Not' : 'Only',

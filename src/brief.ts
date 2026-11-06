@@ -103,7 +103,7 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
     lines.push('', '## Needs');
     for (const n of needs) {
       const holder = held.find((h) => h.to_id === n.id);
-      lines.push(`- ${n.title}: ${n.status}${holder ? `, held by ${holder.title}` : ''}${l.registry.capacity(n) === Infinity ? '' : ' (exclusive: claim it before use, release it after)'}`);
+      lines.push(`- ${n.title}: ${n.status}${holder ? `, held by ${holder.title}` : ''}${(l.registry.capacity(n) ?? Infinity) === Infinity ? '' : ' (exclusive: claim it before use, release it after)'}`);
     }
   }
   for (const rel of new Set(ties.map((t) => t.rel))) {
@@ -127,7 +127,7 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
     repo: repo && { ...slim(repo), path: repo.props.path, address: at?.address },
     blocked_by: blockedBy,
     root_blockers: roots.map((id) => names.get(id)),
-    needs: needs.map((n) => ({ ...slim(n), exclusive: l.registry.capacity(n) !== Infinity, held_by: held.find((h) => h.to_id === n.id)?.title })),
+    needs: needs.map((n) => ({ ...slim(n), exclusive: (l.registry.capacity(n) ?? Infinity) !== Infinity, held_by: held.find((h) => h.to_id === n.id)?.title })),
     ties: ties.map(({ rel, e }) => ({ relation: rel, ...slim(e) })),
     ...(traps.length > 0 && { traps: traps.map(({ id, title, files }) => ({ id, title, files })) }),
     text: lines.join('\n'),

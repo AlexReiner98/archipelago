@@ -6,7 +6,7 @@
 import { findRepo, pushes, repoWork } from './repo.js';
 
 /** The kinds of thing that are true or not of the world, and so go stale: work, questions and problems. */
-export const GOES_STALE = ['task', 'decision', 'issue', 'hypothesis', 'feature'];
+export const GOES_STALE = ['task', 'decision', 'issue', 'bug', 'hypothesis', 'feature'];
 /** How far back a handoff looks for what has happened when no session here has ended, unless it is given since. */
 const HANDOFF_DAYS = 7;
 

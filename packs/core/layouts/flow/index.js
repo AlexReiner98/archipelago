@@ -111,7 +111,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     while (t.length > 1 && measure(`${t}…`, px, role) > width) t = t.slice(0, -1);
     return `${t}…`;
   };
-  // The link types the style draws no wire for (undrawn: core's house style, tagged) tie nothing here either.
+  // The link types the style draws no wire for (undrawn, as a style says) tie nothing here either.
   // The shape it is laid out toward: the pane's, as far as the style says to follow it (flow_aspect_follow, 0 not at
   // all, 1 wholly, more to lean further), from the shape it takes when the pane's is not known (flow_aspect).
   const [ASPECT, FOLLOW] = ['flow_aspect', 'flow_aspect_follow'].map((name) => {

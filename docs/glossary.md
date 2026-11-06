@@ -127,10 +127,6 @@ code: `ui/canvas.js`; a kept view is an item of core's system type `lens`
 item's page (or a new item, the Workspace page, a screen, For you). In the
 code: `#sheet` in `ui/index.html`, routed by `ui/app.js`.
 
-**tag.** What items belong with, named in a word or two: an item of core's
-`tag` type, tied by a `tagged` link, any number to an item. A query filters by
-one (`tagged <tag>`); the house style draws no wire for it.
-
 **finding.** What an island has found, published for others to read: an item
 of core's `finding` type, its title the name, its note what it means, its
 `value` of the simple type `value_type` says (text, number, boolean, date),

@@ -20,7 +20,7 @@ const MEANS = { Find: 'What adds to the view', Only: 'What must all hold of what
 
 const has = (name, q) => String(name ?? '').toLowerCase().includes(q.toLowerCase());
 const typeList = (q, most) => [...types.values()].filter((t) => !t.system && has(t.title, q)).slice(0, most);
-const linkList = (q, most) => [...relations.values()].filter((r) => !r.id.startsWith('sys.') && r.id !== 'tagged' && has(r.title ?? r.id, q)).slice(0, most);
+const linkList = (q, most) => [...relations.values()].filter((r) => !r.id.startsWith('sys.') && has(r.title ?? r.id, q)).slice(0, most);
 /**
  * Items found by name. A name's last words that name a type (one or two, as typed or with an s: "archipelago project",
  * "roof tasks") narrow the search to that type, the rest the name; each choice says its type, so what was read is in sight.
@@ -109,7 +109,6 @@ export async function choicesFor(mode, q, c) {
     const items = hits.filter((e) => !isA(e.type, KEPT_VIEW)).flatMap((e) => {
       const what = typeTitle(e.type);
       if (leftOut && types.get(e.type)?.system) return mode === 'Find' ? [{ kind: 'Item', label: e.title, note: what, title: `Open ${e.title} (${what})`, page: e.id }] : [];
-      if (e.type === 'tag') return [{ kind: 'Tag', label: `#${e.title}`, note: '', title: `Items tagged ${e.title}`, ...adds(`tagged ${e.id}`) }];
       return [
         { kind: 'In', label: e.title, note: what, title: `All that is in ${e.title} (${what}), at any depth`, ...adds(`in ${e.id}`) },
         { kind: 'Item', label: e.title, note: what, title: `${e.title} (${what}) alone`, ...adds(`id ${e.id}`) },

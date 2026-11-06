@@ -10,24 +10,24 @@ import { human, agent, fresh, make } from './map.ts';
 
 test('flavours inherit fields and statuses, and are found through the parent', async () => {
   const l = await fresh();
-  const bug = l.registry.type('bug')!;
-  assert.deepEqual(bug.lineage, ['bug', 'issue', 'work']);
-  assert.ok(bug.fields.severity, 'inherits issue.severity');
-  assert.ok(bug.fields.repro, 'adds its own field');
-  assert.deepEqual(bug.statuses, l.registry.type('issue')!.statuses);
+  const experiment = l.registry.type('experiment')!;
+  assert.deepEqual(experiment.lineage, ['experiment', 'task', 'work']);
+  assert.ok(experiment.fields.priority, 'inherits task.priority');
+  assert.ok(experiment.fields.method, 'adds its own field');
+  assert.deepEqual(experiment.statuses, l.registry.type('task')!.statuses);
 
   await make(l, [
-    { op: 'create', type: 'bug', title: 'Crash on load', props: { severity: 'high' } },
-    { op: 'create', type: 'issue', title: 'Slow builds' },
+    { op: 'create', type: 'experiment', title: 'Shadows at noon', props: { priority: 'high' } },
+    { op: 'create', type: 'task', title: 'Slow builds' },
   ]);
-  assert.equal((await l.search({ type: 'issue' })).length, 2);
-  assert.equal((await l.search({ type: 'bug' })).length, 1);
+  assert.equal((await l.search({ type: 'task' })).length, 2);
+  assert.equal((await l.search({ type: 'experiment' })).length, 1);
 });
 
 test('a flavour can override an inherited default', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'lane', type: 'resource', title: 'Lane' },
+    { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Lane' },
     { op: 'create', ref: 'conn', type: 'connection', title: 'Conn' },
   ]);
   assert.equal((await l.entity(made.lane))!.props.exclusive, true);
@@ -135,9 +135,9 @@ test('policy can let agents apply some ops directly, or forbid them', async () =
 
 test('possible duplicates are flagged, across flavours', async () => {
   const l = await fresh();
-  await make(l, [{ op: 'create', type: 'issue', title: 'Mask misregistration' }]);
-  const result = await l.change(agent, { ops: [{ op: 'create', type: 'bug', title: 'mask misregistration' }], reason: 'test' });
-  assert.match(result.warnings[0], /possible duplicate of existing issue "Mask misregistration"/);
+  await make(l, [{ op: 'create', type: 'task', title: 'Mask misregistration' }]);
+  const result = await l.change(agent, { ops: [{ op: 'create', type: 'experiment', title: 'mask misregistration' }], reason: 'test' });
+  assert.match(result.warnings[0], /possible duplicate of existing task "Mask misregistration"/);
 });
 
 test('a view that walks part_of either way past a step is warned it climbs; one way, it is not', async () => {

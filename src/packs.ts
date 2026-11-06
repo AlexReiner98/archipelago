@@ -54,6 +54,8 @@ export interface TypeDef {
   /** How long its note may grow by an agent's hand, and what to tell one that goes over: a note every session reads whole is kept short. A flavour inherits it. */
   note_max?: NoteMax;
   moved_from?: string[]; retired?: boolean; // Types whose items are this one's now, moved once no pack defines them (cost became cost); retired: the owner's version is (src/type-overlay.ts).
+  /** By a type it was moved from, what each of that type's statuses is here, when the two lists differ: said once, as the items move (part's works is component's up). */
+  moved_statuses?: Record<string, Record<string, string>>;
 }
 
 export type NoteMax = { chars: number; say?: string };
@@ -69,7 +71,7 @@ export interface RelationDef {
   inverse: string;
   from: string[];
   to: string[];
-  description: string; /** May join items on two islands: the one kind of tie that crosses (a reading of a finding). */ crosses?: boolean; offers_close?: boolean; /* closing its source offers to close its target (src/close-offer.ts) */ moved_from?: string[]; retired?: boolean; // Relations whose links are this one's now, moved once no pack defines them; retired, as a type is.
+  description: string; /** May join items on two islands: the one kind of tie that crosses (a reading of a finding). */ crosses?: boolean; /** Kept by the kernel (a claim, a session's work, a tie between actors), never an island's vocabulary. Only the kernel's packs say it. */ kernel?: boolean; offers_close?: boolean; /* closing its source offers to close its target (src/close-offer.ts) */ moved_from?: string[]; retired?: boolean; // Relations whose links are this one's now, moved once no pack defines them; retired, as a type is.
 }
 
 /** A pack file as the registry reads it: the manifest (src/manifest.ts). */
@@ -95,7 +97,7 @@ export interface ResolvedType {
   public: boolean;
   belongs_with?: BelongsWith[];
   capabilities: Capabilities;
-  noteMax?: NoteMax; movedFrom?: string[];
+  noteMax?: NoteMax; movedFrom?: string[]; movedStatuses?: Record<string, Record<string, string>>;
   /** Kept from the type table: its pack is gone, its items are not. */ dormant?: boolean; /** No new item is made of it: the owner retired it. */ retired?: boolean;
 }
 
@@ -185,7 +187,7 @@ export class Registry {
       }
       for (const rel of parts(pack).relations) {
         if (relations.has(rel.id)) throw new Error(`Relation "${rel.id}" is defined twice`);
-        if (rel.root && pack.id !== 'core') throw new Error(`Relation "${rel.id}": only the core pack declares root relations`);
+        if ((rel.root || rel.kernel) && !KERNEL_PACKS.includes(pack.id)) throw new Error(`Relation "${rel.id}": only the core pack declares ${rel.root ? 'root relations' : 'the kernel’s own'}`);
         declared.set(rel.id, rel);
         relations.set(rel.id, { ...rel, pack: pack.id, root: rel.id });
       }
@@ -229,7 +231,7 @@ export class Registry {
         ...((def.belongs_with ?? parent?.belongs_with)?.length && { belongs_with: def.belongs_with ?? parent?.belongs_with }),
         capabilities: { ...parent?.capabilities, ...def.capabilities },
         ...((def.note_max ?? parent?.noteMax) && { noteMax: def.note_max ?? parent?.noteMax }),
-        ...(def.moved_from?.length && { movedFrom: def.moved_from }), ...(def.retired && { retired: true }),
+        ...(def.moved_from?.length && { movedFrom: def.moved_from }), ...(def.moved_statuses && { movedStatuses: def.moved_statuses }), ...(def.retired && { retired: true }),
       };
       types.set(id, resolved);
       return resolved;

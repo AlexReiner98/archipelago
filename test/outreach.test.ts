@@ -32,36 +32,35 @@ test('on an island map it is taken, and today’s social is not', () => {
   const reg = onIslands();
   assert.equal(reg.states.get('outreach')?.state, 'active');
   assert.equal(reg.states.get('social')?.state, 'off', 'social keeps its handler and builds on work');
-  const starters = { social_post: 'work', channel: 'place', talk: 'occurrence', channel_month: 'record' };
+  const starters = { post: 'work', channel: 'place', conversation: 'occurrence', channel_month: 'record' };
   for (const [id, starter] of Object.entries(starters)) assert.equal(reg.types.get(id)?.starter, starter, id);
   assert.ok(reg.types.get('channel_month')!.lineage.includes('finding'), 'a month is a finding, read across by another island');
   assert.equal(reg.relations.get('goes_out_on')?.root, 'lives_in');
   assert.equal(reg.relations.get('came_out_of')?.root, 'about');
-  assert.ok(!reg.types.has('post'), 'social’s post is gone with it');
 });
 
-test('beside today’s social, with the island rules off, both are taken and share no name', () => {
+test('with the island rules off, social runs over its words and declares none of its own', () => {
   const reg = new Registry(PACKS);
   assert.equal(reg.states.get('social')?.state, 'active');
   assert.equal(reg.states.get('outreach')?.state, 'active');
-  assert.equal(reg.types.get('post')?.pack, 'social');
-  assert.equal(reg.types.get('social_post')?.pack, 'outreach');
+  for (const id of ['post', 'channel', 'conversation', 'channel_month']) assert.equal(reg.types.get(id)?.pack, 'outreach', id);
+  assert.deepEqual([...reg.types.values()].filter((t) => t.pack === 'social'), []);
 });
 
 test('the counts are kept for the operator: system fields on posts, channels and months', () => {
   const reg = onIslands();
   const counted = ['visits', 'first_visit', 'last_visit', 'asked', 'begun', 'paid', 'ended'];
-  for (const type of ['social_post', 'channel']) {
+  for (const type of ['post', 'channel']) {
     const fields = reg.types.get(type)!.fields;
     for (const f of counted) assert.equal(fields[f]?.system, true, `${type}.${f}`);
   }
-  assert.equal(reg.types.get('social_post')!.fields.conversations.system, true);
-  for (const f of ['replies', 'impressions', 'reactions', 'reposts', 'tag', 'channel', 'posted']) assert.ok(!reg.types.get('social_post')!.fields[f].system, `social_post.${f} is typed in`);
+  assert.equal(reg.types.get('post')!.fields.conversations.system, true);
+  for (const f of ['replies', 'impressions', 'reactions', 'reposts', 'tag', 'channel', 'posted']) assert.ok(!reg.types.get('post')!.fields[f].system, `post.${f} is typed in`);
   for (const f of ['month', 'posts', 'visits', 'begun', 'paid', 'conversations', 'hours', 'met']) assert.equal(reg.types.get('channel_month')!.fields[f]?.system, true, `channel_month.${f}`);
 });
 
 test('a post set out empty, and one that went out, check as the write path checks them', () => {
-  const fields = onIslands().types.get('social_post')!.fields;
+  const fields = onIslands().types.get('post')!.fields;
   const problems = (props: Record<string, unknown>) => Object.entries(props).flatMap(([k, v]) => (fields[k] ? (checkValue(fields[k], v) ?? []) : [`${k} is not declared`]));
   assert.deepEqual(problems({ channel: 'linkedin', tag: 'linkedin-26w46-1' }), []);
   assert.deepEqual(problems({ channel: 'x', posted: '2026-11-05', url: 'https://x.com/a/status/1', replies: 4, impressions: 900 }), []);
@@ -73,8 +72,8 @@ test('its views are drawn by the kernel: a post’s length by its channel, and l
   const m = read('outreach');
   const screen = m.views!.find((v) => v.id === 'outreach.length') as { form: string; on: string[]; pieces: { piece: string; by: string; limits: Record<string, unknown> }[] };
   assert.equal(screen.form, 'screen');
-  assert.deepEqual(screen.on, ['social_post']);
-  const channels = onIslands().types.get('social_post')!.fields.channel.values!;
+  assert.deepEqual(screen.on, ['post']);
+  const channels = onIslands().types.get('post')!.fields.channel.values!;
   for (const c of Object.keys(screen.pieces[0].limits)) assert.ok(channels.includes(c), `${c} is a channel a post may name`);
   const lenses = (m.styles ?? []).filter((s) => s.type === 'lens');
   assert.deepEqual(lenses.map((s) => s.title), ['Posts and what each brought', 'Channels and what each brought', 'Posts to write']);

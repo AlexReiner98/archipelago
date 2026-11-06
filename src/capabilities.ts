@@ -186,14 +186,14 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
   return problems;
 }
 
-/** How many may hold one item at once: a number, Infinity for any number, or undefined when it cannot be held. */
+/** How many may hold one item at once: a number, Infinity for any number, or undefined when it cannot be held (a place that says nothing of it is no resource). */
 export function capacityOf(caps: Capabilities | undefined, props: Record<string, unknown>): number | undefined {
   const capacity = caps?.capacity;
   if (capacity === undefined) return undefined;
   if (typeof capacity === 'number') return capacity;
   const value = props[capacity.field];
   if (typeof value === 'number') return value;
-  return value === false ? Infinity : 1;
+  return value === false ? Infinity : value === undefined ? undefined : 1;
 }
 
 /** Hours since midnight from a time of day: 17.5 from "17:30"; undefined for anything else. */

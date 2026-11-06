@@ -12,6 +12,12 @@ import { instructionsFor } from './instructions.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { resolveRun, sessionEnd, sessionStart } from './sessions.ts';
 
+/** What may be held, as a read names it: the types with a capacity, the fields those say it in (a place that says nothing of it is no resource), and whether one says it as a number, so every item of it may be. */
+const holdableBy = (l: Archipelago) => {
+  const types = l.registry.having('capacity'), caps = types.map((t) => l.registry.type(t)?.capabilities.capacity);
+  return [types, [...new Set(caps.flatMap((c) => (typeof c === 'object' ? [c.field] : [])))], caps.some((c) => typeof c === 'number')];
+};
+
 /**
  * A Claude Code SessionStart hook: register the session and return the text
  * to put in front of the model, so it starts knowing what the map knows.
@@ -64,8 +70,8 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
     );
   // The commits in this checkout that no one has accounted for are put to the session as unconfirmed answers are.
   if (repo) lines.push(...((u) => (u.length ? ['', ...u] : []))(await unaccountedText(l, sentCommits(input.commits), repo.id)));
-  const [heldNow, { rows: holdable }] = await Promise.all([heldResources(l), l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null`, [l.registry.having('capacity')])]);
-  for (const res of holdable.filter((one) => l.registry.capacity(one) !== Infinity)) {
+  const [heldNow, { rows: holdable }] = await Promise.all([heldResources(l), l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null and (props ?| $2::text[] or $3) -- index entity_type`, holdableBy(l))]);
+  for (const res of holdable.filter((one) => (l.registry.capacity(one) ?? Infinity) !== Infinity)) {
     const held = heldNow.find((h) => h.resource === res.id);
     lines.push('', `Exclusive resource "${res.title}" (${res.id}) is ${held ? `HELD by ${held.held_by_title}: do not use it` : 'free'}. Claim it with the pelago assign tool, action claim (holder ${started.run}), before using it, and give it back with revise, action release, after.`);
   }

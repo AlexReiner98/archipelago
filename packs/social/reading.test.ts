@@ -20,12 +20,12 @@ const ANSWER = {
     talk('e_t3', '2026-11-22'),
     hours('e_h1', '2026-11-04', 4),
     hours('e_h2', '2026-11-20', 2.5),
-    { id: 'e_src', type: 'traffic_source', title: 'chatgpt', status: 'counting', created_at: '2026-11-04T12:00:00Z', fields: { tag: 'chatgpt', visits: 7 } },
+    { id: 'e_src', type: 'channel', title: 'chatgpt', status: 'available', created_at: '2026-11-04T12:00:00Z', fields: { tag: 'chatgpt', visits: 7 } },
   ],
   links: [
-    { type: 'came_from', from: 'e_t1', to: 'e_li1' },
-    { type: 'came_from', from: 'e_t2', to: 'e_li1' },
-    { type: 'came_from', from: 'e_t3', to: 'e_li2' },
+    { type: 'came_out_of', from: 'e_t1', to: 'e_li1' },
+    { type: 'came_out_of', from: 'e_t2', to: 'e_li1' },
+    { type: 'came_out_of', from: 'e_t3', to: 'e_li2' },
     { type: 'part_of', from: 'e_h1', to: 'e_li1' },
     { type: 'part_of', from: 'e_h2', to: 'e_li2' },
   ],
@@ -53,7 +53,7 @@ test('the schedule writes last month’s reading once, part of the posts’ proj
   const ctx = (had: boolean) => ({
     now: '2026-12-01T06:00:00Z',
     read: async (q: Record<string, any>) => {
-      if (q.items?.type === 'channel_reading') return had ? [{ id: 'e_r', props: { month: '2026-11' } }] : [];
+      if (q.items?.type === 'channel_month') return had ? [{ id: 'e_r', props: { month: '2026-11' } }] : [];
       if (q.view === 'flat') return ANSWER;
       if (q.items?.type === 'post') return [{ id: 'e_li1' }];
       if (q.trail) return [{ id: 'e_proj', is: ['project'] }];
@@ -63,7 +63,7 @@ test('the schedule writes last month’s reading once, part of the posts’ proj
   const done = await handler['social.reading']({}, ctx(false));
   made.push(...done.changes[0].ops);
   assert.deepEqual(done.answer, { month: '2026-11', made: true });
-  assert.equal((made[0] as any).type, 'channel_reading');
+  assert.equal((made[0] as any).type, 'channel_month');
   assert.deepEqual(made.slice(1, 2), [{ op: 'link', type: 'part_of', from: 'r', to: 'e_proj' }]);
   assert.equal(made.filter((o: any) => o.type === 'about').length, 3);
   assert.equal((await handler['social.reading']({}, ctx(true))).answer.made, false, 'never twice');

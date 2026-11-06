@@ -17,7 +17,7 @@ export const lowest = (list) => list.reduce((m, v) => (v < m ? v : m), Infinity)
 /**
  * A lens answer as a flat graph: items, and links each with its type. The flat lens's answer is that already; the
  * older lens's names its links' types `kind` and says what an item is part of as its `inside`, read here as part_of.
- * The link types the style draws no wire for (`undrawn`: core's house style, tagged) are left out.
+ * The link types the style draws no wire for (`undrawn`, as a style says) are left out.
  */
 export function flatten({ items, links = [], undrawn = [] }) {
   const ids = new Set(items.map((i) => i.id)), skip = new Set(undrawn), seen = new Set(), out = [];

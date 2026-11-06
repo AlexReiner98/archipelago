@@ -54,7 +54,7 @@ export async function count(input, ctx) {
   if (!c) return { answer: { recorded: false, reason: REFUSED } };
   const [post] = await ctx.read({ items: { type: 'post', where: { tag: c.tag } }, fields: c.fields });
   // A tag no post has is a source's: an agent, a search engine, a site, or a tag mistyped.
-  const [item] = post ? [post] : await ctx.read({ items: { type: 'traffic_source', where: { tag: c.tag } }, fields: c.fields });
+  const [item] = post ? [post] : await ctx.read({ items: { type: 'channel', where: { tag: c.tag } }, fields: c.fields });
   if (item) {
     const props = added(c, item.props);
     return {
@@ -70,7 +70,7 @@ export async function count(input, ctx) {
     changes: [
       {
         ops: [
-          { op: 'create', ref: 'source', type: 'traffic_source', title: c.tag, status: 'counting', props },
+          { op: 'create', ref: 'source', type: 'channel', title: c.tag, status: 'available', props },
           ...(project ? [{ op: 'link', type: 'part_of', from: 'source', to: project }] : []),
         ],
         reason: `${reasonOf(c)}: a source no post has`,

@@ -234,7 +234,7 @@ test('nothing can depend on a private item from outside it, and a held resource 
     { op: 'create', ref: 'priv', type: 'task', title: 'Private prep' },
     { op: 'create', ref: 'priv2', type: 'task', title: 'Private follow-up' },
     { op: 'create', ref: 'base', type: 'task', title: 'Shared base', visibility: 'shared' },
-    { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane', visibility: 'shared' },
+    { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Live lane', visibility: 'shared' },
     { op: 'create', ref: 'live', type: 'task', title: 'Live work', visibility: 'shared' },
     { op: 'link', type: 'depends_on', from: 'priv2', to: 'priv' },
     { op: 'link', type: 'depends_on', from: 'priv', to: 'base' },

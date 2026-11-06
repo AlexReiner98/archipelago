@@ -22,7 +22,8 @@ function packsWith(extra: PackFile): string {
 test('the types with the kernel flag are the types of the system kind', async () => {
   const l = await fresh();
   const flagged = kernelTypes(l.registry).sort();
-  const ofKind = [...l.registry.types.values()].filter((t) => t.starter === 'system').map((t) => t.id).sort();
+  // The system kind's types, and the two of the kernel's own that stand on a starter of the work (a connection, a shared document).
+  const ofKind = [...l.registry.types.values()].filter((t) => t.starter === 'system' || ['connection', 'shared_document'].includes(t.id)).map((t) => t.id).sort();
   assert.ok(flagged.length > 5, 'views, styles, runs and the rest');
   assert.deepEqual(flagged, ofKind);
   assert.deepEqual(l.registry.having('kernel').sort(), ofKind, 'the flag is a capability, inherited by flavours');

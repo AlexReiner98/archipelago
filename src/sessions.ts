@@ -85,7 +85,7 @@ export async function sessionStart(
     );
     for (const res of needed) {
       try {
-        if (l.registry.capacity(res) === Infinity && res.status === 'available') continue;
+        if ((l.registry.capacity(res) ?? Infinity) === Infinity && res.status === 'available') continue;
         await l.claim(actor, { resource: res.id, holder: run, for: task.id, reason: `Needed for "${task.title}"` });
         claimed.push(res.title);
       } catch (err) {

@@ -49,7 +49,7 @@ test('a dependency cycle does not hang the views', async () => {
 test('an exclusive resource has one holder, and blocks other work that needs it', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'lane', type: 'resource', title: 'Live CAD lane' },
+    { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Live CAD lane' },
     { op: 'create', ref: 'run1', type: 'run', title: 'Session one' },
     { op: 'create', ref: 'run2', type: 'run', title: 'Session two' },
     { op: 'create', ref: 'live1', type: 'task', title: 'Capture parity probe' },
