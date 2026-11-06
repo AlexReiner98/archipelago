@@ -275,8 +275,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
   const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region');
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
-  const labelWidth = (l) => { const said = saidOf(answer.items.find((i) => i.id === l.to)); return said ? Math.min(measure(said, z('island_gate_text')), z('island_gate_most') - 2 * z('island_gate_pad')) + 2 * z('island_gate_pad') : 0; };
-  if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), labels: labelWidth, sizes: style.sizes });
+  if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes });
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
@@ -285,7 +284,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     const cls = `${kind(t.type)}${onYou(t)}${pend(t.pending)}`;
     const path = m('path', { key: `n:${n}`, d: line(t), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${headless.has(t.type) ? '' : ' headed'}${cls}`, ...drawIn, ...hidden });
     // A read that ends on a finding's name has no head of its own: the wire from the name to the finding carries it.
-    return headless.has(t.type) || t.label ? path : [path, m('path', { key: `nh:${n}`, d: tieHead(t), class: `lf-head${cls}`, ...hidden })];
+    return headless.has(t.type) || t.toPort ? path : [path, m('path', { key: `nh:${n}`, d: tieHead(t), class: `lf-head${cls}`, ...hidden })];
   });
   const wireLayer = g.chains.map((c, n) => {
     return [m('path', { key: `w:${n}`, d: line(c), class: `lf-wire${kind(ORDER_TYPE)}${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden }), m('path', { key: `h:${n}`, d: head(c.points), class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}`, ...hidden })];
@@ -318,6 +317,9 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     dotTips.set(key, m('div', { class: 'lf-tip' }, m('b', {}, dotWords(n.item)), m('span', {}, n.item.said ?? n.item.title)));
     return m('g', { key, on: ['enter', 'leave'], class: 'lf-mark' }, m('circle', { cx: dotPlace(n)[0], cy: dotPlace(n)[1], r: 2 * z('dot'), class: 'lf-hit' }), mark);
   };
+  // On an archipelago each island a region round what lives on it, under everything, and a gate where a link crosses its
+  // shore; a finding read across outlined in its island's colour (./islands.js).
+  const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)) });
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
@@ -325,7 +327,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : z('text_x'));
     const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
     const ghost = !n.stub && i.pending?.op === 'create';
-    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held'].filter(Boolean).join(' ');
+    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && isles.found.get(n.id)].filter(Boolean).join(' ');
     const body = [
       outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
@@ -361,8 +363,6 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     const text = saysText(c), w = saysWide(c), [lx, ly] = saysAt(g, c), sh = z('says_height');
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
-  // On an archipelago each island a region round what lives on it, under everything, and a gate where a link crosses its shore (./islands.js).
-  const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, outline: (shape, x, y, w, h) => outline(shape, x, y, w, h, z('island_gate_corner'), z('notch')), fit: (text, width, px) => fit(text, width, px), isHex: (h) => HEX.test(String(h)) });
   const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, isles.layer, tieLayer, wireLayer, stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark));
   // The picture's key; on an archipelago none, each island carrying its own.
   const key = parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 });
