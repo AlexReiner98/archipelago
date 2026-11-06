@@ -103,8 +103,8 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
     const gated = ends.every((b) => b.shore);
     return {
       l, k, gated, ends: ends.map((b, e) => {
-        const { side } = sideOf(boxOf(b), e ? sketch.at(-1) : sketch[0]), shared = Boolean(e && gated);
-        return { block: b, side, to: e ? l.to : l.from, id: shared ? `\u0000find:${l.to}:${side}` : `\u0000port:${k}:${e}`, size: [PORT, PORT], shared };
+        const { side, share } = sideOf(boxOf(b), e ? sketch.at(-1) : sketch[0]), shared = Boolean(e && gated);
+        return { block: b, side, to: e ? l.to : l.from, id: shared ? `\u0000find:${l.to}:${side}` : `\u0000port:${k}:${e}`, size: [PORT, PORT], shared, share };
       }),
     };
   });
@@ -122,7 +122,7 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   // Then each island laid out again with its ports free on those sides, its name and its legend boxes of it, so its own
   // wires and those to its ports are laid out at once, by the same layers.
   for (const b of blocks) {
-    const ports = [...new Map(wires.flatMap((w) => w.ends.filter((e) => e.block === b)).map((e) => [e.id, { id: e.id, side: e.side, to: e.to, size: e.size, small: true }])).values()];
+    const ports = [...new Map(wires.flatMap((w) => w.ends.filter((e) => e.block === b)).map((e) => [e.id, { id: e.id, side: e.side, to: e.to, size: e.size, small: true, share: e.share }])).values()];
     const box = (r) => [r.r - r.l, r.b - r.t];
     // Its header is one box, its name over its legend, so the two stand together wherever the solve puts it.
     const [nw, nh] = b.first.named ? box(b.first.named) : [0, 0], [kw, kh] = b.first.keyed ? box(b.first.keyed) : [0, 0], under = nh && kh ? GAP : 0;

@@ -19,13 +19,25 @@ export function linksOf(list, every, ways) {
   return part;
 }
 
-/** How one part is drawn. `total` is how many items are in the core. */
-export function drawnPart(list, part, { block, stepSize, ways, z, total }) {
+/** Each two ports on one side that stand the other way round from how their wires come to it at sea (`along`, by id). */
+function against(places, along) {
+  const on = [...along].filter(([id]) => places.has(id));
+  let n = 0;
+  for (let i = 0; i < on.length; i++) for (let j = i + 1; j < on.length; j++) {
+    const [[p, [ps, pa]], [q, [qs, qa]]] = [on[i], on[j]];
+    if (ps === qs && (places.get(p)[0] - places.get(q)[0]) * (pa - qa) < 0) n++;
+  }
+  return n;
+}
+
+/** How one part is drawn. `total` is how many items are in the core; an island's part tries every way, and is judged by its ports' order too. */
+export function drawnPart(list, part, { block, stepSize, ways, z, total, along = new Map() }) {
   let drawn;
   if (list.length >= 3 && part.length >= 2) {
-    for (const trial of list.length <= z.trial_most && total <= z.trial_total ? TRIALS.slice(0, z.trials) : TRIALS.slice(0, 1)) {
+    const ported = list.some((id) => along.has(id));
+    for (const trial of ported ? TRIALS : list.length <= z.trial_most && total <= z.trial_total ? TRIALS.slice(0, z.trials) : TRIALS.slice(0, 1)) {
       try {
-        const made = drawPart(list, part, block, stepSize, z, trial), cost = costOf(made, stepSize, z);
+        const made = drawPart(list, part, block, stepSize, z, trial), cost = costOf(made, stepSize, z) + against(made.places, along) * z.cost_cross;
         if (!drawn || cost < drawn.cost) drawn = { ...made, cost };
       } catch (e) { console.warn?.(`The bars fell back: ${e.message}`); }
     }

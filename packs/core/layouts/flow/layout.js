@@ -103,7 +103,9 @@ function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = [
   const a = new Map([...nodes.keys()].map((id) => [id, new Set()]));
   for (const w of every) if (w.a !== w.b && a.has(w.a) && a.has(w.b)) (a.get(w.a).add(w.b), a.get(w.b).add(w.a));
   const ways = directions(chains, ties, headless), hangs = hangsOf({ a, ways, nodes, sizes, gap, z, aspect, chains: asWires }), { core, block } = hangs;
-  const how = { block, stepSize, ways, z, total: core.length };
+  // An island's ports, by side, with where along it their wires come at sea: its drawings are judged by that order too.
+  const along = new Map(ports.filter((p) => p.share !== undefined).map((p) => [p.id, [p.side, p.share]]));
+  const how = { block, stepSize, ways, z, total: core.length, along };
   const shelves = partsOf(core, a).map((list) => shelfOf(drawnPart(list, linksOf(list, every, ways), how), block));
   const { x, y, routes } = assemble(shelves, { ...hangs, stepSize, gap, margin, aspect });
   // Two links between one pair of boxes are drawn from one sketch, and each is then a wire like any other.
