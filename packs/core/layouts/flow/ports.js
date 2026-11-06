@@ -21,9 +21,6 @@ const bounds = (rects, points = []) => ({
 const rectOf = (at, size) => ({ l: at[0] - size[0] / 2, t: at[1] - size[1] / 2, r: at[0] + size[0] / 2, b: at[1] + size[1] / 2 });
 const boxOf = (nodes, x, y, id) => rectOf([x.get(id), y.get(id)], [nodes.get(id).w, nodes.get(id).h]);
 
-/** The lengths a solve of the flow keeps, from its own. */
-export const keeps = (z) => ({ wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: z.gap / 2, join: z.join });
-
 /**
  * An island's frame, from its first layout (`raw`, the flow's own places): its steps and wires, its name's room over them at
  * the left (`name` wide), its legend (`legend`, { w, h }) a column at their right, all `pad` inside the frame. Answers with

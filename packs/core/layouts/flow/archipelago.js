@@ -7,6 +7,7 @@
 // inside the other. A finding is named on its port where it leaves its island. What lives on no island (a person) is a
 // group of its own, with no shore. Layer: metrics. Pure: the answer and a layout in, one model of the whole picture out.
 
+import { bridged } from './finish.js';
 import { frameOf, SIDES } from './ports.js';
 
 /** The islands an answer's items live on, in the order they come. */
@@ -71,7 +72,9 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   // The sea is one more level, laid out by the flow's own layers: each island a box of its frame, a sea apart, and each
   // link between two islands a link of its own. Given `held` ports, each link is a wire between two of them.
   const first = (b) => b.items.map((i) => i.created_at).filter(Boolean).sort()[0];
-  const frameSize = (b) => [b.frame.r - b.frame.l, b.frame.b - b.frame.t];
+  // At sea an island is its frame and what stands out of it, its ports and the names on them: no wire crosses either.
+  const outline = (b) => b.box ?? b.frame, frameSize = (b) => [outline(b).r - outline(b).l, outline(b).b - outline(b).t];
+  const middle = (b) => [(outline(b).l + outline(b).r) / 2, (outline(b).t + outline(b).b) / 2];
   const seaLevel = (held) => run({
     combed: true, apart: SEA,
     items: blocks.map((b) => ({ id: seaId(b.id), type: 'island', title: '', size: frameSize(b), ...(first(b) && { created_at: first(b) }) })),
@@ -102,6 +105,10 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
     const extras = [b.first.named && { id: '\u0000name', size: box(b.first.named) }, b.first.keyed && { id: '\u0000legend', size: box(b.first.keyed) }].filter(Boolean);
     b.ported = ports.length ? run({ items: b.items, links: b.links, ports, extras }) : null;
     if (b.ported) ({ frame: b.frame, model: b.model } = { frame: b.ported.frame, model: b.ported });
+    if (b.ported) {
+      const sizeOf = new Map(ports.map((p) => [p.id, p.size])), r = [b.frame, ...[...b.ported.ported].map(([id, p]) => ({ l: p.at[0] - sizeOf.get(id)[0] / 2, t: p.at[1] - sizeOf.get(id)[1] / 2, r: p.at[0] + sizeOf.get(id)[0] / 2, b: p.at[1] + sizeOf.get(id)[1] / 2 }))];
+      b.box = { l: Math.min(...r.map((q) => q.l)), t: Math.min(...r.map((q) => q.t)), r: Math.max(...r.map((q) => q.r)), b: Math.max(...r.map((q) => q.b)) };
+    }
     if (b.ported) ({ named: b.named, keyed: b.keyed } = b.ported.placed);
   }
   // Then the sea again, each port held where its island put it: the islands placed and every wire at sea laid out by the
@@ -112,7 +119,7 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   for (const b of blocks) for (const [id, p] of b.ported?.ported ?? []) {
     const using = wires.filter((w) => w.ends.some((e) => e.id === id)), along = 1 - SIDES[using[0].ends.find((e) => e.id === id).side][0];
     using.forEach((w, j) => {
-      const e = w.ends.find((v) => v.id === id), at = [p.at[0] - (b.frame.l + b.frame.r) / 2, p.at[1] - (b.frame.t + b.frame.b) / 2];
+      const e = w.ends.find((v) => v.id === id), at = [p.at[0] - middle(b)[0], p.at[1] - middle(b)[1]];
       at[along] += (j - (using.length - 1) / 2) * turn;
       held.push({ id: `${id}#${w.k}`, on: seaId(b.id), at, side: e.side });
     });
@@ -121,11 +128,11 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   // Where each island stands: its frame's middle on its box's.
   for (const b of blocks) {
     const [cx, cy] = boxOf(b);
-    b.dx = cx - (b.frame.l + b.frame.r) / 2;
-    b.dy = cy - (b.frame.t + b.frame.b) / 2;
+    b.dx = cx - middle(b)[0];
+    b.dy = cy - middle(b)[1];
   }
   // One model: every place moved by its island's.
-  const nodes = new Map(), x = new Map(), y = new Map(), chains = [], ties = [], all = [], breaks = [], potential = new Set();
+  const nodes = new Map(), x = new Map(), y = new Map(), chains = [], ties = [], all = [], potential = new Set();
   const move = (b) => (p) => [p[0] + b.dx, p[1] + b.dy];
   for (const b of blocks) {
     const m = b.model, to = move(b);
@@ -135,7 +142,6 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
     const moved = (w) => ({ ...w, points: w.points.map(to), ...(w.gaps && { gaps: w.gaps.map(to) }) });
     chains.push(...m.chains.map(moved));
     ties.push(...m.ties.map(moved));
-    breaks.push(...m.breaks.map((k) => ({ ...k, at: to(k.at) })));
   }
   // Each link across: in from its reader to the reader's port, over the sea, and in from the finding's port to the finding.
   const portAt = (e) => move(e.block)(e.block.ported.ported.get(e.id).at);
@@ -162,8 +168,10 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
     return { id: b.id, land: [land], name, entries: b.legend.at.map(([ex, ey]) => [lx + ex, ly + ey]), steps: new Set(b.items.map((i) => i.id)) };
   });
   const extent = [...shores.map((s) => [s.land[0].r, s.land[0].b]), ...[...x.keys()].map((id) => [x.get(id) + nodes.get(id).w / 2, y.get(id) + nodes.get(id).h / 2]), ...routed.flatMap((t) => t.points)];
+  // Where any two wires cross, inside an island or at sea, one passes under, as in any picture.
+  const drawn = bridged({ chains, ties });
   return {
-    nodes, all, chains, ties, breaks, potential, x, y,
+    nodes, all, chains: drawn.chains, ties: drawn.ties, breaks: drawn.breaks, potential, x, y,
     width: Math.max(...extent.map((p) => p[0])) + M, height: Math.max(...extent.map((p) => p[1])) + M,
     islands: shores,
   };

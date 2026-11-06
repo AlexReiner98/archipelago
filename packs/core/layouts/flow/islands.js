@@ -68,13 +68,13 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, fit
     // promises moves, when the page runs it along that line (ui/transition.js), in the finding's island's colour.
     const pulse = t.sea && t.gates.length === 2 ? [m('path', { key: `pulse:${t.b}:${t.a}`, pulse: JSON.stringify([value ?? null, to?.fields?.as_of ?? null]), d: `M${[...t.sea].reverse().map((p) => p.join(' ')).join('L')}`, class: `lf-pulse ${classes.get(t.gates[1].island) ?? ''}`, 'aria-hidden': 'true' })] : [];
     // Where it leaves its island it is named: its port there is its name, sized to it and placed by the solve, drawn
-    // once for all the reads that leave by it.
+    // once for all the reads that leave by it, as a box like any other: wires keep off it as off a step.
     const l = t.label, text = l && !drawnNames.has(l.id) && fit(said, Math.min(l.w, MOST) - 2 * GATE_PAD, GATE_TEXT);
     if (!text || text.length < 2) return [...pulse, ...bars];
     drawnNames.add(l.id);
     const w = l.w, key = `gate:${n}:1`;
     tip(key, said, `A finding read across: it leaves ${source ?? 'its island'} here, for ${reader ?? 'another'}`);
-    return [...pulse, ...bars, titled(m('g', { key, on: ['enter', 'leave'], class: `lf-gate ${classes.get(t.gates[1].island) ?? ''}` }, m('rect', { x: l.at[0] - w / 2, y: l.at[1] - GATE_H / 2, width: w, height: GATE_H, rx: GATE_H / 2 }), m('text', { x: l.at[0], y: l.at[1] }, text)), said)];
+    return [...pulse, ...bars, titled(m('g', { key, on: ['enter', 'leave'], class: `lf-gate ${classes.get(t.gates[1].island) ?? ''}` }, m('rect', { x: l.at[0] - w / 2, y: l.at[1] - GATE_H / 2, width: w, height: GATE_H, rx: z('island_gate_corner') }), m('text', { x: l.at[0], y: l.at[1] }, text)), said)];
   });
   return { layer, gates, rules: [...rules], tips };
 }

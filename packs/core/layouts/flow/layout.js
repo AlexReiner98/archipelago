@@ -19,8 +19,8 @@ import { solve, solveSections } from './solve.js';
 import { apart, holdPorts, portItems, setPorts } from './ports.js';
 import { stepsOf } from './steps.js';
 
-/** How many finished pictures are kept. */
-const KEPT = 8;
+/** How many finished pictures are kept: enough for a picture of islands, each laid out twice, and the sea twice. */
+const KEPT = 64;
 
 /** For a bench: told each stage's lines as it ends, by link. */
 let staging = null;
@@ -41,9 +41,9 @@ export function layout(args) {
 }
 
 /** Each line's way chosen, the boxes at `x` and `y`. */
-function shapeWires({ nodes, x, y, lines, z, through, inward, home }) {
+function shapeWires({ nodes, x, y, lines, z, through, inward }) {
   const boxes = new Map([...x.keys()].map((id) => [id, { x: x.get(id), y: y.get(id), w: nodes.get(id).w, h: nodes.get(id).h, pointed: nodes.get(id).shape === 'diamond' }]));
-  shape(boxes, lines, { room: z.room, run: z.run, corner: z.corner, wire: z.turn, ports: z.ports, rounds: z.rounds, cost_cross: z.shape_cross, cost_bend: z.cost_bend, cost_side: z.cost_side, work: z.shape_work, through, inward, home });
+  shape(boxes, lines, { room: z.room, run: z.run, corner: z.corner, wire: z.turn, ports: z.ports, rounds: z.rounds, cost_cross: z.shape_cross, cost_bend: z.cost_bend, cost_side: z.cost_side, work: z.shape_work, through, inward });
 }
 
 /** The routes as lines, each from its `from`. */

@@ -193,9 +193,8 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
   // Each thing keeps its distance from what it can see on the low side: what stands behind that is kept off by the chain.
   const facing = (p, q) => {
     if (p.line && q.line) return [p.n, q.n, p.line === q.line ? 0 : wire];
-    // A wire keeps off a port it passes (`gate`, where a wire crosses a frame) as off another wire.
-    if (p.line) return p.own.includes(q.id) ? null : [p.n, q.low, q.gate ? wire : p.line.a === q.id || p.line.b === q.id ? run : room];
-    if (q.line) return q.own.includes(p.id) ? null : [p.high, q.n, p.gate ? wire : q.line.a === p.id || q.line.b === p.id ? run : room];
+    if (p.line) return p.own.includes(q.id) ? null : [p.n, q.low, p.line.a === q.id || p.line.b === q.id ? run : room];
+    if (q.line) return q.own.includes(p.id) ? null : [p.high, q.n, q.line.a === p.id || q.line.b === p.id ? run : room];
     // Two on one edge stand on its line, so are parted along it alone, a wire apart: each has a wire leaving it.
     if (p.edge && q.edge && p.edge[0] === q.edge[0] && p.edge[1] === q.edge[1]) return axis === p.edge[0] ? null : [p.high, q.low, wire];
     // Two boxes that overlap are parted on the axis that takes least: on the other they stand side by side, in no order.
@@ -294,16 +293,14 @@ export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, joi
 
 /**
  * The picture set again round pins: every box in `held` stays where it stands, and the rest, boxes and wires, each as near
- * where it stands as its distances from all that let it; with no `held`, every place solved afresh. `boxes` are { id, at,
- * size, named }, with `edge` ([axis, way]) for a box that stands beyond the rest on its way, `edging` from them, and
- * `port` for one whose wires meet in its middle; `lines` are { k, a, b, points }, changed in place. Says how many
- * distances could not be kept.
+ * where it stands as its distances from all that let it. `boxes` are { id, at, size, named } and `lines` { k, a, b, points },
+ * changed in place. Says how many distances could not be kept.
  */
-export function settle({ boxes, lines, held, wire, room, run, corner, apart, join, rounds, edging }) {
+export function settle({ boxes, lines, held, wire, room, run, corner, apart, join, rounds }) {
   const told = { freed: 0, squeezed: 0, rings: 0 };
   lines.box = new Map(boxes.map((b) => [b.id, b]));
   lines.joined = new Set(lines.map((l) => pair(l.a, l.b)));
-  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, join, told, pins: held, edging });
+  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, join, told, pins: held });
   return told;
 }
 

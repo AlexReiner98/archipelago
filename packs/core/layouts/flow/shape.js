@@ -88,10 +88,9 @@ const roomOn = (b, side, wire, corner) => {
  * keeps from a box it passes, `run` from a port to its first corner, `corner` from a box's corner, `wire` from a wire beside it;
  * `ports` how many places along a side are tried, `rounds` how many times the wires are gone over, the costs what a
  * crossing, a bend and an end too many on a side are worth in length, and `work` how many meetings of two wires may be tried.
- * `inward` by box is [axis, sign] for a box a wire may leave only one way (a port on an island's side: into the island),
- * and `home` by box the box it stands on the side of (a port's island), which a wire leaving it may touch as it leaves.
+ * `inward` by box is [axis, sign] for a box a wire may leave only one way (a port on an island's side: into the island).
  */
-export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, cost_cross, cost_bend, cost_side, work: budget = Infinity, through = cost_cross / 2, inward = new Map(), home = new Map() }) {
+export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, cost_cross, cost_bend, cost_side, work: budget = Infinity, through = cost_cross / 2, inward = new Map() }) {
   let work = 0;
   const rects = new Map([...boxes].map(([id, b]) => [id, { id, lo: [b.x - b.w / 2, b.y - b.h / 2], hi: [b.x + b.w / 2, b.y + b.h / 2], mid: [b.x, b.y], pointed: b.pointed }]));
   const CELL = Math.max(1, ...[...rects.values()].map((b) => b.hi[0] - b.lo[0])), columns = new Map(), lines = wires.filter((w) => w.points.length > 1).map((w) => Object.assign(w, { points: tidy(w.points) }));
@@ -118,7 +117,7 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
     for (let i = 1; i < l.length; i++) {
       const [p, q] = [l[i - 1], l[i]], left = Math.min(p[0], q[0]), right = Math.max(p[0], q[0]), top = Math.min(p[1], q[1]), low = Math.max(p[1], q[1]);
       for (const s of near(left - keep, right + keep)) {
-        const off = ((s.id === w.a || s.id === home.get(w.a)) && i === 1) || ((s.id === w.b || s.id === home.get(w.b)) && i === l.length - 1) ? -1 : keep;
+        const off = (s.id === w.a && i === 1) || (s.id === w.b && i === l.length - 1) ? -1 : keep;
         if (right > s.lo[0] - off && left < s.hi[0] + off && low > s.lo[1] - off && top < s.hi[1] + off) return false;
       }
     }
