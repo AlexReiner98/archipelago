@@ -181,10 +181,11 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
   // Each thing keeps its distance from what it can see on the low side: what stands behind that is kept off by the chain.
   const facing = (p, q) => {
     if (p.line && q.line) return [p.n, q.n, p.line === q.line ? 0 : wire];
-    if (p.line) return p.own.includes(q.id) ? null : [p.n, q.low, p.line.a === q.id || p.line.b === q.id ? run : room];
-    if (q.line) return q.own.includes(p.id) ? null : [p.high, q.n, q.line.a === p.id || q.line.b === p.id ? run : room];
-    // Two on one edge stand on its line, so are parted along it alone.
-    if (p.edge && q.edge && p.edge[0] === q.edge[0] && p.edge[1] === q.edge[1]) return axis === p.edge[0] ? null : [p.high, q.low, apart];
+    // A wire keeps off a port it passes (`gate`, where a wire crosses a frame) as off another wire.
+    if (p.line) return p.own.includes(q.id) ? null : [p.n, q.low, q.gate ? wire : p.line.a === q.id || p.line.b === q.id ? run : room];
+    if (q.line) return q.own.includes(p.id) ? null : [p.high, q.n, p.gate ? wire : q.line.a === p.id || q.line.b === p.id ? run : room];
+    // Two on one edge stand on its line, so are parted along it alone, a wire apart: each has a wire leaving it.
+    if (p.edge && q.edge && p.edge[0] === q.edge[0] && p.edge[1] === q.edge[1]) return axis === p.edge[0] ? null : [p.high, q.low, wire];
     // Two boxes that overlap are parted on the axis that takes least: on the other they stand side by side, in no order.
     const on =(ax) => (p.size[ax] + q.size[ax]) / 2 - Math.abs(p.at[ax] - q.at[ax]);
     return on(axis) > on(other) ? null : [p.high, q.low, lines.joined?.has(pair(p.id, q.id)) ? join : apart];
@@ -270,8 +271,9 @@ export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, joi
   for (const b of boxes) {
     x.set(b.id, b.at[0] - margin + apart);
     y.set(b.id, b.at[1] - top + apart);
-    nodes.get(b.id).w = b.size[0];
-    nodes.get(b.id).h = b.size[1];
+    // Where the drawing asked for more than could be kept, a box still keeps its own size.
+    nodes.get(b.id).w = Math.max(b.size[0], b.named[0]);
+    nodes.get(b.id).h = Math.max(b.size[1], b.named[1]);
   }
   // A wire whose boxes now touch is one point: it stays a line of two, as every line is.
   for (const l of lines) l.route.points = bent(l.points.length > 1 ? l.points : [l.points[0], l.points[0]]).map(([p, q]) => [p - margin + apart, q - top + apart]);

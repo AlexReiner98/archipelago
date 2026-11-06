@@ -31,7 +31,7 @@ const kept = new Map();
 
 /** The layout of an answer, worked out once for each answer and kept. */
 export function layout(args) {
-  const { items, links, undrawn, headless, sizes, aspect, shapes, ports, extras } = args, key = JSON.stringify([items, links, undrawn, headless, sizes, aspect, shapes, ports, extras]);
+  const { items, links, undrawn, headless, sizes, aspect, shapes, ports, extras, combed } = args, key = JSON.stringify([items, links, undrawn, headless, sizes, aspect, shapes, ports, extras, combed]);
   const hit = kept.get(key) ?? laidOut(args);
   kept.delete(key);
   kept.set(key, hit);
@@ -77,7 +77,9 @@ const crossed = ({ chains, ties }) => count([...chains, ...ties].map((w) => w.po
 /** Every picture is drawn the same two ways, its headed links as wires and as comb leaves, and the finished picture that crosses less kept, as wires where they tie. */
 function laidOut(args) {
   // Past what the style gives the search, a picture is drawn the one way, which takes the less room.
-  if (args.items.length > args.sizes.flow_trial_total) return drawnOut({ ...args, chains: false });
+  // Past what the style gives the search, a picture is drawn the one way, which takes the less room; and so is a level
+  // whose boxes hang beside what they meet (`combed`: the islands on the sea).
+  if (args.combed || args.items.length > args.sizes.flow_trial_total) return drawnOut({ ...args, chains: false });
   const [wired, combed] = [true, false].map((chains) => drawnOut({ ...args, chains }));
   return crossed(wired({})) <= crossed(combed({})) ? wired : combed;
 }
@@ -104,7 +106,9 @@ function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = [
   // Two links between one pair of boxes are drawn from one sketch, and each is then a wire like any other.
   for (const [k, of] of twins) if (routes.has(of)) routes.set(k, { ...routes.get(of), points: routes.get(of).points.map((p) => [...p]) });
   staging?.('bars and combs', routes);
-  const inward = ported ? setPorts({ nodes, x, y, routes, ports, extras, gap: sizes.flow_island_legend_gap, pad }) : undefined;
+  // A port's wire joins the island after its topology: the island keeps the parts it was laid out in, and the shape and
+  // the solve take the port's wire with all the rest.
+  const inward = ported ? setPorts({ nodes, x, y, routes, ties, ports, extras, gap: sizes.flow_island_legend_gap, pad }) : undefined;
   const lengths = { nodes, x, y, routes, section: sizes.flow_section_gap, gap, margin, aspect, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: gap / 2, join: z.join }, firstWires = new Map([...routes].map(([k, r]) => [k, r.points]));
   const before = { x: new Map(x), y: new Map(y), sizes: new Map([...nodes].map(([id, n]) => [id, [n.w, n.h]])) };
   if (routes.size <= z.shape_most) {

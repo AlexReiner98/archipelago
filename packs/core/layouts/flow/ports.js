@@ -49,38 +49,50 @@ function sketch(at, axis, to) {
 
 /**
  * The items and links an island is laid out by again: its own, each port an item of its size (`ports` are { id, side, to,
- * size, small }) linked to what it is wired to, what is read above what reads it as everywhere, and its name and legend
- * (`extras`, { id, size }) items of their own.
+ * size, small }), and its name and legend (`extras`, { id, size }) items of their own. A port's wire is not a link of the
+ * topology: it is put in after it (`setPorts`), so ports do not join parts of the island that stand apart.
  */
 export function portItems(items, links, ports, extras) {
   const boxes = [...ports.map((p) => ({ id: p.id, type: 'port~', title: '', size: p.size })), ...extras.map((e) => ({ id: e.id, type: 'port~', title: '', size: e.size }))];
-  const wires = ports.map((p) => (p.side === 'top' ? { type: PORT_LINK, from: p.id, to: p.to } : { type: PORT_LINK, from: p.to, to: p.id }));
-  return { items: [...items, ...boxes], links: [...links, ...wires] };
+  return { items: [...items, ...boxes], links };
 }
 
 /**
  * Where the first sketch has them, set the ports and the name and legend where they go: the name over the steps at the
  * left, the legend a column at their right, each port beyond all of it on its side, beside what it is wired to, its wire
- * sketched in across the side. Each port's node is marked for the solve (`edge`, `small`). Answers with the way each port's
- * wire must leave it, for the shape layer.
+ * sketched in across the side, a tie of its own (`ties`). Each port's node is marked for the solve (`edge`, `small`).
+ * Answers with the way each port's wire must leave it, for the shape layer.
  */
-export function setPorts({ nodes, x, y, routes, ports, extras, gap, pad }) {
+export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad }) {
   const own = new Set([...ports.map((p) => p.id), ...extras.map((e) => e.id)]);
   const ids = [...x.keys()].filter((id) => !own.has(id));
   const inside = bounds(ids.map((id) => boxOf(nodes, x, y, id)), [...routes].filter(([k]) => !k.split('|').some((id) => own.has(id))).flatMap(([, r]) => r.points));
   const put = (id, l, t) => (x.set(id, l + nodes.get(id).w / 2), y.set(id, t + nodes.get(id).h / 2));
   for (const e of extras) e.id.endsWith('name') ? put(e.id, inside.l, inside.t - gap - e.size[1]) : put(e.id, inside.r + gap, inside.t);
-  const all = bounds([...ids, ...extras.map((e) => e.id)].map((id) => boxOf(nodes, x, y, id)));
-  const inward = new Map();
+  // Beyond every box and every wire already drawn, so the sketch already has each port outermost, as the solve will.
+  const all = bounds([inside, ...extras.map((e) => boxOf(nodes, x, y, e.id))]);
+  const inward = new Map(), boxed = (id) => ({ at: [x.get(id), y.get(id)], size: [nodes.get(id).w, nodes.get(id).h] });
+  // Along each side, each port first beside what it is wired to, then the side's ports set apart in that order, so no
+  // two stand on one another and the solve starts from a drawing it can keep.
+  for (const side of Object.keys(SIDES)) {
+    const [axis, out] = SIDES[side], other = 1 - axis, on = ports.filter((p) => p.side === side);
+    const want = (p) => boxed(p.to).at[other];
+    let end = -Infinity;
+    for (const p of on.sort((u, v) => want(u) - want(v))) {
+      const n = nodes.get(p.id), half = (other ? n.h : n.w) / 2, at = [];
+      at[axis] = (out < 0 ? (axis ? all.t : all.l) : axis ? all.b : all.r) + out * (pad + (axis ? n.h : n.w) / 2);
+      at[other] = Math.max(want(p), (other ? all.t : all.l) + half, end + gap + half);
+      end = at[other] + half;
+      (x.set(p.id, at[0]), y.set(p.id, at[1]));
+    }
+  }
   for (const p of ports) {
-    const [axis, out] = SIDES[p.side], other = 1 - axis, n = nodes.get(p.id), size = [n.w, n.h], at = [];
-    at[axis] = (out < 0 ? (axis ? all.t : all.l) : axis ? all.b : all.r) + out * (pad + size[axis] / 2);
-    const to = { at: [x.get(p.to), y.get(p.to)], size: [nodes.get(p.to).w, nodes.get(p.to).h] }, lo = other ? all.t : all.l, hi = other ? all.b : all.r;
-    at[other] = Math.min(Math.max(to.at[other], lo + size[other] / 2), hi - size[other] / 2);
-    (x.set(p.id, at[0]), y.set(p.id, at[1]));
+    const [axis, out] = SIDES[p.side], n = nodes.get(p.id), at = [x.get(p.id), y.get(p.id)], to = boxed(p.to);
     Object.assign(n, { edge: [axis, out], small: p.small });
     inward.set(p.id, [axis, -out]);
-    for (const [k, r] of routes) if (k.split('|').includes(p.id)) Object.assign(r, { from: p.id, points: sketch(at, axis, to) });
+    const route = p.id < p.to ? `${p.id}|${p.to}` : `${p.to}|${p.id}`;
+    routes.set(route, { from: p.id, points: sketch(at, axis, to) });
+    ties.push({ a: p.id, b: p.to, type: PORT_LINK, route });
   }
   return inward;
 }
