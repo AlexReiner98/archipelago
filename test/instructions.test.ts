@@ -51,6 +51,13 @@ test('an instruction preset is checked as a style preset is: its words in body, 
   assert.ok(bad.some((p) => /words in body/.test(p)) && bad.some((p) => /"preset" is not a field/.test(p)) && bad.some((p) => /"shape" is not a field/.test(p)) && bad.some((p) => /a style, an instruction or a canvas/.test(p)), bad.join('\n'));
   // A pack's canvas is a flat lens and a style: one that finds nothing is refused.
   assert.ok(bad.some((p) => /lens "core.z": a canvas's props are a flat lens/.test(p)), bad.join('\n'));
+  // A view of one item is on the types it is of and says where the item goes; a view of the map says neither.
+  types.set('lens', l.registry.type('lens')!);
+  types.set('project', l.registry.type('project')!);
+  const of = (style: Record<string, unknown>) => checkDeclared(pack([{ id: 'core.v', type: 'lens', title: 'V', ...style }]), types, [], false).filter((p) => /a view of one item/.test(p));
+  assert.equal(of({ props: { filter: { find: ['in {here}'] } } }).length, 1, 'an item with no type to be of');
+  assert.equal(of({ on: ['project'], props: { filter: { find: ['type task'] } } }).length, 1, 'a type with no item in it');
+  assert.deepEqual(of({ on: ['project'], props: { filter: { find: ['in {here}'] } } }), []);
 });
 
 test('the session-start text is read from the instructions on the map', async () => {

@@ -3,7 +3,8 @@
 // behind draws that, with this item lit. Rare actions are in one menu; the page names no pack's type.
 
 import { api, ask, h, part, state, tell } from './base.js';
-import { drawIn, goQuery, queryNow } from './canvas.js';
+import { drawIn, goQuery, openHere, queryNow } from './canvas.js';
+import { viewsOn } from './canvases.js';
 import { draftOf } from './draft.js';
 import { documentMenu, figureOf, homeOf, readDocument } from './item-doc.js';
 import { heldBand, heldOn } from './item-held.js';
@@ -128,8 +129,9 @@ export async function entity(id, here) {
   };
   const walkSaid = along.map((t) => t.replace(/[<>]$/, '')).map((t) => relations.get(t)?.title ?? t).join(', ');
   // What its type's screens give it to do: the first in sight, beside Walk from it, any more in the menu.
-  const buttons = e.archived_at ? [] : buttonsOn(data);
-  const press = (b) => (b.draw ? drawIn(drawnBy(b.draw, id)) : act(toolOf(b.action)));
+  // And the views packs ship of an item of its type (ui/canvases.js), each drawn on the canvas up.
+  const buttons = e.archived_at ? [] : [...buttonsOn(data), ...viewsOn(e.type, id).map((v) => ({ label: v.title, tip: `Draw its ${v.title.toLowerCase()} on the canvas`, at: v.at }))];
+  const press = (b) => (b.at ? openHere(b.at) : b.draw ? drawIn(drawnBy(b.draw, id)) : act(toolOf(b.action)));
 
   redraw.inPlace = inPlace;
   // Its title and note, written in place and saved as one change (ui/draft.js).

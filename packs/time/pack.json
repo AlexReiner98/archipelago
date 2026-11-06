@@ -155,15 +155,7 @@
         "additionalProperties": false
       }
     },
-    { "form": "screen", "id": "time.today", "title": "Today", "at": "home", "pieces": [{ "piece": "view", "view": "time.today" }] },
-    { "form": "screen", "id": "time.week", "title": "Time", "nav": true, "pieces": [{ "piece": "page", "page": "time" }] },
-    {
-      "form": "screen",
-      "id": "time.invoices",
-      "title": "Invoices",
-      "on": ["company"],
-      "pieces": [{ "piece": "picture", "lens": { "filter": { "find": ["part_of {here}"] } }, "only": ["invoice"], "style": { "shape": "list", "show": ["status"] } }]
-    }
+    { "form": "screen", "id": "time.week", "title": "Time", "nav": true, "pieces": [{ "piece": "page", "page": "time" }] }
   ],
   "actions": [
     {
@@ -217,5 +209,5 @@
       }
     }
   ],
-  "styles": [{ "id": "time.calendar", "type": "lens", "title": "Time", "props": { "filter": { "find": ["type time_entry", "type routine", "type run"], "not": [] }, "walk": { "over": [], "steps": 0 }, "time": { "from": "-5d", "to": "1d" }, "style": { "shape": "time" } } }, { "id": "time.invoice_page", "title": "An invoice's page", "on": ["invoice"], "props": { "page": { "head": "invoice" } } }]
+  "styles": [{ "id": "time.calendar", "type": "lens", "title": "Time", "props": { "filter": { "find": ["type time_entry", "type routine", "type run"], "not": [] }, "walk": { "over": [], "steps": 0 }, "time": { "from": "-5d", "to": "1d" }, "style": { "shape": "time" } } }, { "id": "time.today", "type": "lens", "title": "Today", "props": { "filter": { "find": ["type time_entry", "type routine"], "not": [] }, "walk": { "over": [], "steps": 0 }, "time": { "from": "today", "to": "1d" }, "style": { "shape": "time" } } }, { "id": "time.invoices", "type": "lens", "title": "Invoices", "on": ["company"], "props": { "filter": { "find": ["part_of {here}"], "only": ["type invoice"] }, "walk": { "over": [], "steps": 0 }, "style": { "shape": "list", "show": ["status"] } } }, { "id": "time.invoice_page", "title": "An invoice's page", "on": ["invoice"], "props": { "page": { "head": "invoice" } } }]
 }

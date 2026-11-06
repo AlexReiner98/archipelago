@@ -1,7 +1,7 @@
 // Screens: what a pack shows on the page of every item of a kind or type, as one column of pieces the kernel draws.
-// The packs declare them in pack.json (`screens`); the kernel knows only the pieces: a tree, a gate, proof, usage,
-// a figure, a document read whole, rows from a pack's view, a pack action's form, a short note. An action a pack
-// offers on a kind or type is offered on the page of each such item too.
+// The packs declare them in pack.json (`screens`); the kernel knows only the pieces: a figure, a document read whole,
+// rows from a pack's view, a pack action's form, a short note. An action a pack offers on a kind or type is offered on
+// the page of each such item too. What a pack shows of one item (a roadmap, a gate) is a view of it: ui/canvases.js.
 
 import { api, h, state } from './base.js';
 import { renderBody } from './body.js';
@@ -11,23 +11,18 @@ import { canvasesPiece } from './canvases.js';
 import { drawDiagram } from './diagram.js';
 import { heldPiece } from './held.js';
 import { startPiece } from './start.js';
-import { gate } from './gate.js';
-import { proofPart } from './proof.js';
 import { flatView } from './query.js';
 import { keptView } from './canvases.js';
-import { roadmap } from './roadmap.js';
 import { time } from './time.js';
 import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
 import { turnsPiece } from './turns.js';
-import { RAN, ago, chip, isA, label, link, pill, tokensText, unfolded } from './words.js';
+import { chip, isA, label, link, pill, unfolded } from './words.js';
 
 /** The screens shown on an item of this type, in the order the packs load. */
 export const screensFor = (typeId) => (state.schema?.screens ?? []).filter((s) => s.on?.some((t) => isA(typeId, t)));
 /** The pieces of those screens, each with the screen it is part of. */
 const piecesFor = (typeId) => screensFor(typeId).flatMap((s) => s.pieces.map((p) => ({ ...p, screen: s })));
-/** The tree a screen draws on an item of this type, if one does. */
-export const treeFor = (typeId) => piecesFor(typeId).find((p) => p.piece === 'tree')?.tree;
 /** Whether an item of this type is read whole, its text with what it brings in, in place of its note. */
 export const readWhole = (typeId) => piecesFor(typeId).some((p) => p.piece === 'document');
 /** Whether an item of this type keeps a figure, shown with its note. */
@@ -104,34 +99,6 @@ export function actionForm(tool, id, done) {
 const viewRow = (row) =>
   h('li', { class: 'row-top' }, row && typeof row === 'object' && row.id ? [row.type && chip(row.type), h('span', { class: 'grow', title: row.title ?? '' }, link(row)), row.status && row.type && pill(row.type, row.status)] : h('span', { class: 'grow', title: String(row) }, String(row)));
 
-/** What the agents working in a repository have used: the sync agent in GitHub Actions, and sessions on a machine. */
-async function usage(host, id) {
-  const used = await api('view', { name: 'agent_usage', params: { repo: id } }).catch(() => null);
-  if (!used?.runs.length || !host.isConnected) return host.remove();
-  host.replaceWith(
-    fold(id, 'usage', 'Tokens used here', `${tokensText(Object.values(used.month).reduce((sum, u) => sum + u.tokens, 0))} in 30 days`, false, [
-      h(
-        'div',
-        { class: 'toolbar fold-bar usage-sums', title: 'The last 30 days, by where the agents ran' },
-        Object.entries(used.month).map(([where, u]) =>
-          h('span', { class: 'fact' }, h('span', { class: 'muted' }, `${RAN[where] ?? where} `), h('strong', {}, tokensText(u.tokens)), h('span', { class: 'muted' }, ` in ${u.runs} run${u.runs === 1 ? '' : 's'}${u.cost_usd > 0 ? ` · $${u.cost_usd.toFixed(2)}` : ''}`)),
-        ),
-      ),
-      used.runs.map((run) =>
-        h(
-          'div',
-          { class: 'change line' },
-          h('span', { class: 'chip' }, RAN[run.surface] ?? run.surface),
-          h('span', { class: 'gist', title: run.title }, h('a', { href: `#/e/${run.id}` }, run.title)),
-          run.status === 'failed' && h('span', { class: 'pill bad' }, 'failed'),
-          h('span', { class: 'muted small' }, `${tokensText(run.tokens)}${run.cost_usd ? ` · $${run.cost_usd.toFixed(2)}` : ''}`),
-          ago(run.at),
-        ),
-      ),
-    ]),
-  );
-}
-
 /** Rows from a pack's view of this item. */
 async function rows(host, id, p) {
   const tool = (state.schema?.pack_tools ?? []).find((t) => t.view === p.view);
@@ -152,13 +119,6 @@ async function rows(host, id, p) {
  * afterwards (`later`), once it is on the page.
  */
 const PIECES = {
-  tree: (ctx, p) => ({ node: h('div', { id: 'roadmap', 'data-root': ctx.id, 'data-tree': p.tree }), later: () => roadmap(ctx.id) }),
-  gate: (ctx) => !ctx.e?.archived_at && { node: h('div', { id: 'gate', 'data-root': ctx.id }), later: () => gate(ctx.id) },
-  proof: (ctx) => !ctx.e?.archived_at && { node: h('div', { id: 'proof', 'data-root': ctx.id }), later: () => proofPart(ctx.id, true) },
-  usage: (ctx) => {
-    const node = h('div');
-    return { node, later: () => usage(node, ctx.id) };
-  },
   view: (ctx, p) => {
     const node = h('div');
     return { node, later: () => rows(node, ctx.id, p) };
@@ -267,7 +227,7 @@ const draw = (ctx, p) => (Object.hasOwn(PIECES, p.piece) ? PIECES[p.piece](ctx, 
 const PAGES = { time };
 
 /** A piece that draws something of an item has nothing to draw on a screen of its own. */
-const OF_ITEM = ['tree', 'gate', 'proof', 'usage', 'fields', 'token', 'button', 'count', 'turns'];
+const OF_ITEM = ['fields', 'token', 'button', 'count', 'turns'];
 
 /** The column a screen of its own draws: its pieces, with no item. */
 export function drawScreen(screen, redraw) {
@@ -286,7 +246,6 @@ const settle = (drawn) => ({
   after: () => Promise.all(drawn.map((d) => Promise.resolve(d.later?.()).catch((err) => d.node.isConnected && d.node.replaceChildren(h('div', { class: 'error' }, err.message))))),
 });
 
-/** The column of pieces the screens on this item draw, and what to run once it is on the page. */
 /** The packs an item uses: those of its type and what it is a flavour of, and of what it is linked to and by what. */
 function packsUsed(data) {
   const types = new Map((state.schema?.types ?? []).map((t) => [t.id, t]));
@@ -324,11 +283,3 @@ export const sectionsOn = (data) =>
 const SECTIONS = ['turns'];
 /** The count a screen on this item declares: it stands at the foot of its note while it is written (ui/note-count.js). */
 export const countOn = (data) => piecesOn(data).find((p) => p.piece === 'count');
-
-export function drawScreens(ctx) {
-  const drawn = piecesOn(ctx.data)
-    .filter((p) => p.piece !== 'button' && p.piece !== 'count')
-    .map((p) => draw(ctx, p))
-    .filter(Boolean);
-  return settle(drawn);
-}

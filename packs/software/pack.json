@@ -370,29 +370,6 @@
       "order": "order",
       "active": ["building", "doing"]
     },
-    {
-      "form": "screen",
-      "id": "software.releases",
-      "title": "Releases",
-      "at": "home",
-      "pieces": [{ "piece": "picture", "lens": { "filter": { "find": ["type release"], "not": ["done", "kind system"] } }, "style": { "shape": "list" } }]
-    },
-    { "form": "screen", "id": "software.gate", "title": "Gate", "on": ["event"], "pieces": [{ "piece": "gate" }] },
-    {
-      "form": "screen",
-      "id": "software.roadmap",
-      "title": "Roadmap",
-      "on": ["project"],
-      "pieces": [{ "piece": "tree", "tree": "software.roadmap" }]
-    },
-    {
-      "form": "screen",
-      "id": "software.proof",
-      "title": "How we know",
-      "on": ["project", "feature", "proof"],
-      "pieces": [{ "piece": "proof" }]
-    },
-    { "form": "screen", "id": "software.usage", "title": "Tokens used here", "on": ["repo"], "pieces": [{ "piece": "usage" }] },
     { "form": "screen", "id": "software.drawn", "title": "What it drew", "on": ["test_result", "commit"], "pieces": [{ "piece": "figure" }] },
     { "form": "screen", "id": "software.diagram", "title": "The diagram", "on": ["diagram"], "pieces": [{ "piece": "diagram" }] }
   ],
@@ -412,6 +389,11 @@
     }
   ],
   "styles": [
+    { "id": "software.releases", "type": "lens", "title": "Releases", "props": { "filter": { "find": ["type release"], "not": ["done", "kind system"] }, "walk": { "over": [], "steps": 0 }, "style": { "shape": "list" } } },
+    { "id": "software.roadmap", "type": "lens", "title": "Roadmap", "on": ["project"], "props": { "filter": { "find": ["in {here}"], "only": ["type feature"] }, "walk": { "over": ["depends_on"], "steps": 1 }, "style": { "shape": "flow" } } },
+    { "id": "software.gate", "type": "lens", "title": "Gate", "on": ["event"], "props": { "filter": { "find": ["id {here}"] }, "walk": { "over": ["depends_on", "defers"], "steps": 1 }, "style": { "shape": "flow" } } },
+    { "id": "software.proof", "type": "lens", "title": "How we know", "on": ["project", "feature", "proof"], "props": { "filter": { "find": ["id {here}", "in {here}", "about {here}"], "only": ["type proof"] }, "walk": { "over": ["answers<"], "steps": 1 }, "style": { "shape": "flow" } } },
+    { "id": "software.usage", "type": "lens", "title": "Sessions here", "on": ["repo"], "props": { "filter": { "find": ["lives_in {here}"], "only": ["type run"] }, "walk": { "over": [], "steps": 0 }, "time": { "from": "-30d", "to": "1d" }, "style": { "shape": "time" } } },
     {
       "id": "software.public_colours",
       "title": "A product's public page colours",
