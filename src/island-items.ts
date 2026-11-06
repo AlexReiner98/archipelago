@@ -118,12 +118,13 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
 /** What an island speaks, as a drawing names it in the island's legend: its pack, and every type that lives on an island and link type the pack declares. */
 export type IslandPack = { id: string; title: string; types: { id: string; title: string; is?: string[] }[]; links: { id: string; title: string }[] };
 
-/** The vocabulary of the pack `id`, from the registry: none of the kernel's own types, nor an actor, nor what is retired. */
+/** The vocabulary of the pack `id`, from the registry: none of the kernel's own types or links, nor a starter type, nor an actor, nor what is retired. */
 export function islandPack(registry: Registry, id: string): IslandPack | undefined {
   const pack = registry.packs.find((p) => p.id === id);
   if (!pack) return undefined;
-  const types = [...registry.types.values()].filter((t) => t.pack === id && livesOnIsland(t) && !t.retired && !t.dormant);
-  const links = [...registry.relations.values()].filter((r) => r.pack === id && !r.retired && !r.dormant);
+  // A starter type is the grammar every island shares, and a link the kernel keeps for itself names nothing of the island.
+  const types = [...registry.types.values()].filter((t) => t.pack === id && livesOnIsland(t) && t.lineage.length > 1 && !t.retired && !t.dormant);
+  const links = [...registry.relations.values()].filter((r) => r.pack === id && !(r as { kernel?: boolean }).kernel && !r.retired && !r.dormant);
   return {
     id, title: pack.title,
     types: types.map((t) => ({ id: t.id, title: t.title, ...(t.lineage.length > 1 && { is: t.lineage.slice(1) }) })),
