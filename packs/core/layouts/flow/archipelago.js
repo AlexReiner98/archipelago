@@ -167,7 +167,7 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
     const [a, c] = [w.l.from, w.l.to], over = t.points, named = w.ends[1];
     // Reads of one finding that leave by one name share the wire in to it: drawn once, the rest each their own.
     const points = joined([...inner(w.ends[0]).reverse(), ...over, ...(named.small ? inner(named) : [])]);
-    if (!named.small && !shared.has(named.id)) (shared.add(named.id), ties.push({ a, b: c, type: w.l.type ?? w.l.kind, headAt: 'end', points: inner(named), ...(w.l.pending && { pending: w.l.pending }) }));
+    if (!named.small && !shared.has(named.id)) (shared.add(named.id), ties.push({ a, b: c, fromName: named.id, type: w.l.type ?? w.l.kind, headAt: 'end', points: inner(named), ...(w.l.pending && { pending: w.l.pending }) }));
     const way = (e) => SIDES[e.side][0] ? [0, SIDES[e.side][1]] : [SIDES[e.side][1], 0];
     const gates = w.gated ? w.ends.map((e) => ({ island: e.block.id, at: portAt(e), way: way(e), ...(!e.small && { port: e.id }) })) : [];
     const label = !named.small && { id: named.id, at: portAt(named), w: named.size[0] };
