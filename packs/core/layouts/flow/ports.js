@@ -7,6 +7,7 @@
 // frame is drawn round what the solve left, its sides with ports on their line. Layer: metrics, before the shape: it sets
 // where each port first stands. Pure: places in, places out.
 
+import { FALL, RISE } from './graph.js';
 /** Each side of a frame: the axis a wire crosses it on, and which way is out. */
 export const SIDES = { top: [1, -1], bottom: [1, 1], left: [0, -1], right: [0, 1] };
 
@@ -55,8 +56,21 @@ function sketch(at, axis, to, run) {
  */
 export function portItems(items, links, ports, extras) {
   const boxes = [...ports.map((p) => ({ id: p.id, type: 'port~', title: '', size: p.size })), ...extras.map((e) => ({ id: e.id, type: 'port~', title: '', size: e.size }))];
-  return { items: [...items, ...boxes], links };
+  // A port on the top or foot is part of the island's order: under a rise every top port stands over its step, and over a
+  // fall every foot port under its own, so the topology gives each port's wire a column of its own out to that side.
+  const ends = [], wires = [];
+  for (const p of ports.filter((q) => ORDERED.includes(q.side))) {
+    const term = TERMINAL[p.side];
+    if (!ends.includes(term)) ends.push(term);
+    wires.push(...(p.side === 'top' ? [{ type: PORT_LINK, from: term, to: p.id }, { type: PORT_LINK, from: p.id, to: p.to }] : [{ type: PORT_LINK, from: p.to, to: p.id }, { type: PORT_LINK, from: p.id, to: term }]));
+  }
+  // The rise and the fall joined, so the numbering can take them for its top and its foot.
+  if (ends.length === 2) wires.push({ type: PORT_LINK, from: RISE, to: FALL });
+  return { items: [...items, ...boxes, ...ends.map((id) => ({ id, type: 'port~', title: '', size: [1, 1] }))], links: [...links, ...wires] };
 }
+
+/** The sides whose ports the topology orders, and the end each is laid out under or over. */
+const ORDERED = ['top', 'bottom'], TERMINAL = { top: RISE, bottom: FALL };
 
 /**
  * Where the first sketch has them, set the ports and the island's header where they go: the header over the steps at the
@@ -76,7 +90,21 @@ export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad, r
   const inward = new Map(), boxed = (id) => ({ at: [x.get(id), y.get(id)], size: [nodes.get(id).w, nodes.get(id).h] });
   // Along each side, each port first beside what it is wired to, then the side's ports set apart in that order, so no
   // two stand on one another and the solve starts from a drawing it can keep.
-  for (const side of Object.keys(SIDES)) {
+  // What the topology ordered stands where it put it; the rise and the fall go, with their wires.
+  const terms = new Set(Object.values(TERMINAL));
+  for (const id of terms) (x.delete(id), y.delete(id));
+  for (const k of [...routes.keys()]) if (k.split('|').some((id) => terms.has(id))) routes.delete(k);
+  for (let i = ties.length - 1; i >= 0; i--) if (terms.has(ties[i].a) || terms.has(ties[i].b)) ties.splice(i, 1);
+  const placed = new Set(ports.filter((p) => !ORDERED.includes(p.side)).map((p) => p.id));
+  // A port the topology ordered keeps its column, and stands past everything on its side, the header too: its wire,
+  // straight down its column, only grows longer.
+  for (const p of ports.filter((q) => ORDERED.includes(q.side))) {
+    const [axis, out] = SIDES[p.side], n = nodes.get(p.id), at = [x.get(p.id), y.get(p.id)];
+    at[axis] = (out < 0 ? (axis ? all.t : all.l) : axis ? all.b : all.r) + out * (pad + (axis ? n.h : n.w) / 2);
+    (x.set(p.id, at[0]), y.set(p.id, at[1]));
+    for (const [k, r] of routes) if (k.split('|').includes(p.id)) r.points = r.points.map((q, i, all_) => (i === 0 && r.from === p.id) || (i === all_.length - 1 && r.from !== p.id) ? [...at] : q);
+  }
+  for (const side of Object.keys(SIDES).filter((s) => !ORDERED.includes(s))) {
     const [axis, out] = SIDES[side], other = 1 - axis, on = ports.filter((p) => p.side === side);
     const want = (p) => boxed(p.to).at[other];
     let end = -Infinity;
@@ -92,10 +120,12 @@ export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad, r
     const [axis, out] = SIDES[p.side], n = nodes.get(p.id), at = [x.get(p.id), y.get(p.id)], to = boxed(p.to);
     Object.assign(n, { edge: [axis, out], small: p.small });
     inward.set(p.id, [axis, -out]);
+    if (!placed.has(p.id)) continue;
     const route = p.id < p.to ? `${p.id}|${p.to}` : `${p.to}|${p.id}`;
     routes.set(route, { from: p.id, points: sketch(at, axis, to, run) });
     ties.push({ a: p.id, b: p.to, type: PORT_LINK, route });
   }
+  inward.placed = placed;
   return inward;
 }
 

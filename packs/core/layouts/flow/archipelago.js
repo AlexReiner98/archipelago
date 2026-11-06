@@ -42,9 +42,10 @@ function band(widths, room, gap, row) {
 /** The sea's name for a group: what lives on no island is a box too. */
 const seaId = (id) => id ?? 'none~';
 
-/** Which side of `box` (its middle and size) the point `p` stands on, and how far along that side, as a share of it. */
+/** Which of the top and foot of `box` (its middle and size) the point `p` is nearer, and how far along it, as a share of it. */
 function sideOf(box, p) {
-  const [cx, cy, w, h] = box, d = { top: Math.abs(p[1] - (cy - h / 2)), bottom: Math.abs(p[1] - (cy + h / 2)), left: Math.abs(p[0] - (cx - w / 2)), right: Math.abs(p[0] - (cx + w / 2)) };
+  // An island's ports stand on its top and its foot, where its own order lays them out (./ports.js): the one nearer.
+  const [cx, cy, w, h] = box, d = { top: Math.abs(p[1] - (cy - h / 2)), bottom: Math.abs(p[1] - (cy + h / 2)) };
   const side = Object.keys(d).reduce((s, k) => (d[k] < d[s] ? k : s), 'top'), along = 1 - SIDES[side][0];
   return { side, share: Math.min(1, Math.max(0, (p[along] - (along ? cy - h / 2 : cx - w / 2)) / (along ? h : w))) };
 }

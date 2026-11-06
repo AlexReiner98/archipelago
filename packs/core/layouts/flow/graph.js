@@ -3,6 +3,8 @@
 // a change held for the owner (or a link just drawn, `mine`), drawn as a ghost (docs/layouts.md). Pure.
 
 export const ORDER = 'depends_on', NEAR = 'part_of';
+/** An island's rise and fall (./ports.js): what its top ports hang from and its foot ports lead to, its numbering's own top and foot. */
+export const RISE = '\u0000rise', FALL = '\u0000fall';
 /** What an item says of its state when the answer says nothing (the flat lens's does not). */
 /** An item's type and what it is a flavour of, nearest first, as the answer gives it (`is`). */
 export const lineageOf = (i) => [i?.type, ...(Array.isArray(i?.is) ? i.is : [])].filter(Boolean);

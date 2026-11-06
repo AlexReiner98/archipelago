@@ -4,6 +4,7 @@
 // edge across one of its faces. What is left to do is walk the items, order first, keeping every step a true numbering:
 // what is done so far stays joined, and so does what is left. Pure: a graph in, its numbering out.
 
+import { FALL, RISE } from './graph.js';
 import { pair } from './polyline.js';
 
 
@@ -42,9 +43,10 @@ function cuts(near, left, root, parting, at, low) {
 
 /**
  * Number the items from `s` to `t`, each joined to one before it and one after. Of the items that may come next, the one
- * that leaves least of what it wants before it undone (`wants`, [a, b, weight]), then the highest by `level`.
+ * that leaves least of what it wants before it undone (`wants`, [a, b, weight]), then the highest by `level`. What is
+ * `early` comes before the rest while it can, and what is `late` after them.
  */
-function walkDown(near, s, t, wants, deep) {
+function walkDown(near, s, t, wants, deep, early = new Set(), late = new Set()) {
   const names = [...near.keys()], n = names.length, index = new Map(names.map((v, k) => [v, k])), around = names.map((v) => [...near.get(v)].map((w) => index.get(w)));
   const before = names.map(() => []), left = new Uint8Array(n).fill(1), touched = new Uint8Array(n), parting = new Uint8Array(n), at = new Int32Array(n), low = new Int32Array(n);
   const level = new Array(n).fill(-Infinity), rank = names.map((v) => deep.get(v)), number = new Map([[s, 0]]), [start, foot] = [index.get(s), index.get(t)];
@@ -56,8 +58,12 @@ function walkDown(near, s, t, wants, deep) {
   for (let more = n - 2; more > 0; more--) {
     cuts(around, left, foot, parting, at, low);
     let best = -1, least = Infinity, high = Infinity;
+    // An island's top ports come first, under its rise, and its foot ports and fall last, over nothing but the foot.
+    const can = (v) => left[v] && touched[v] && v !== foot && !parting[v], all = [...Array(n).keys()].filter(can);
+    const soon = all.filter((v) => early.has(names[v])), rest = all.filter((v) => !late.has(names[v]));
+    const choice = new Set(soon.length ? soon : rest.length ? rest : all);
     for (let v = 0; v < n; v++) {
-      if (!left[v] || !touched[v] || v === foot || parting[v]) continue;
+      if (!choice.has(v)) continue;
       let cost = 0;
       for (const [a, weight] of before[v]) if (left[a]) cost += weight;
       const l = rise(v);
@@ -255,12 +261,17 @@ function ways(g, outerAt, x, y) {
 export function numbered(g, nth = 0, most = Infinity) {
   const longest = g.faces.map((_, i) => i).sort((p, q) => g.faces[q].length - g.faces[p].length || p - q), outerAt = longest[Math.min(nth, longest.length - 1)], outer = g.faces[outerAt];
   const orders = g.wires.filter((w) => w.link?.[2]), size = g.owner.size * new Set([...g.owner.keys()].flatMap((k) => k.split('|'))).size;
-  const places = outer.flatMap((v, i) => [[v, outer[(i + 1) % outer.length]], [outer[(i + 1) % outer.length], v]]);
+  const every = outer.flatMap((v, i) => [[v, outer[(i + 1) % outer.length]], [outer[(i + 1) % outer.length], v]]);
+  // An island's rise is the top and its fall the foot, where the outer face lets them be: its ports then stand outermost.
+  const fixed = every.filter(([x, y]) => (!outer.includes(RISE) || x === RISE) && (!outer.includes(FALL) || y === FALL)), places = fixed.length ? fixed : every;
+  // What a rise or a fall is wired to is an island's port on its top or its foot.
+  const beside = (end) => new Set(g.wires.filter((w) => w.visible && w.link?.includes(end)).map((w) => (w.link[0] === end ? w.link[1] : w.link[0])).filter((v) => v !== RISE && v !== FALL));
+  const early = beside(RISE), late = new Set([...beside(FALL), FALL]);
   const tries = orders.length ? Math.max(1, Math.min(places.length, most, Math.ceil(WORK / size))) : 1;
   let best = null, least = Infinity;
   for (let k = 0; k < tries; k++) {
     const [x, y] = places[Math.floor((k * places.length) / tries)], laid = ways(g, outerAt, x, y);
-    const number = walkDown(laid.near, TOP, FOOT, laid.wants, laid.deep);
+    const number = walkDown(laid.near, TOP, FOOT, laid.wants, laid.deep, early, late);
     const up = orders.filter((w) => w.path.some((v, i) => i && number.get(w.path[i - 1]) > number.get(v))).reduce((sum, w) => sum + (w.link[2] > 1 ? 1 : WEAK), 0);
     const score = up * OVER + reach(g, number, laid.near);
     if (score < least) ((least = score), (best = { ...laid, number }));
