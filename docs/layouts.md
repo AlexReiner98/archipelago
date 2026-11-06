@@ -114,9 +114,9 @@ A picture of more than one island is the same layout run at two levels, an islan
 
 | Pass | Level | What it lays out | What it gives the next |
 | --- | --- | --- | --- |
-| 1 | Island | Each island alone, as any picture | Its frame: steps, its name over them, its legend beside them |
+| 1 | Island | Each island alone, as any picture | Its frame: steps, and at their left its name over its legend, down columns as tall as the steps (at most `flow_island_legend_columns`) |
 | 2 | Sea | Each island a box of its frame, a sea apart (`flow_island_sea`), each read across a link of its own | Whether each read leaves and comes in by its island's top or its foot |
-| 3 | Island | Each island again, its ports part of its order, and its name and legend as boxes | Where each port stands, and its frame round all of it |
+| 3 | Island | Each island again, its ports part of its order, and its name and legend one box the solve keeps at the top left (`first`: left of every box and wire, none higher), where no port is | Where each port stands, and its frame round all of it |
 | 4 | Sea | The islands again, each read a wire whose ends are held where pass 3 put its ports | Where each island stands, and every wire at sea |
 
 What a port is, at each level:

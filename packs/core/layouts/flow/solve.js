@@ -29,8 +29,9 @@ function ordered(n, arcs) {
 
 /**
  * `arcs` with those that close a ring left out, as few as can be found: where nothing is free to go next, what has least
- * still waiting goes, and its waiting arcs with it. `told.rings` counts them. An order read off a drawing can fail when a
- * line has come apart, and a drawing must still draw.
+ * still waiting goes, and its waiting arcs with it, but one that holds a wire's end on its box (`end`) while another can
+ * go. `told.rings` counts them. An order read off a drawing can fail when a line has come apart, and a drawing must
+ * still draw.
  */
 function unringed(n, arcs, told) {
   const into = Array.from({ length: n }, () => []), out = Array.from({ length: n }, () => []), degree = new Array(n).fill(0), gone = new Set(), done = new Array(n).fill(false);
@@ -40,7 +41,11 @@ function unringed(n, arcs, told) {
   for (let k = 0; k < n; k++) {
     if (k === queue.length) {
       let v = -1;
-      for (let u = 0; u < n; u++) if (!done[u] && !queue.includes(u) && (v < 0 || degree[u] < degree[v])) v = u;
+      const ends = (u) => into[u].some((a) => arcs[a].end && !done[arcs[a][0]]);
+      for (const spare of [true, false]) {
+        for (let u = 0; u < n; u++) if (!done[u] && !queue.includes(u) && !(spare && ends(u)) && (v < 0 || degree[u] < degree[v])) v = u;
+        if (v >= 0) break;
+      }
       for (const a of into[v]) if (!done[arcs[a][0]]) (gone.add(a), told.rings++);
       degree[v] = 0;
       queue.push(v);
@@ -188,7 +193,7 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
     }
     // A port is where a wire passes through a box's side: its wires meet in its middle.
     const inset = b.port ? b.size[axis] / 2 : Math.min(corner, b.size[axis] / 3);
-    arcs.push([b.low, s.n, inset], [s.n, b.high, inset]);
+    arcs.push(Object.assign([b.low, s.n, inset], { end: true }), Object.assign([s.n, b.high, inset], { end: true }));
   }
   // Each thing keeps its distance from what it can see on the low side: what stands behind that is kept off by the chain.
   const facing = (p, q) => {
@@ -231,6 +236,12 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
     for (const b of boxes) if (!b.edge) fixed.push(out ? [e.high, b.low, edging] : [b.high, e.low, edging]);
     for (const s of stretches) if (!s.own.includes(e.id)) fixed.push(out ? [e.high, s.n, room] : [s.n, e.low, room]);
   }
+  // A box that goes `first` (an island's header) stands left of every other box and wire but those on an edge, and
+  // none stands higher.
+  for (const f of boxes.filter((b) => b.first)) {
+    for (const b of boxes) if (b !== f && !b.edge && !b.first) fixed.push(axis ? [f.low, b.low, 0] : [f.high, b.low, edging]);
+    if (!axis) for (const s of stretches) if (!s.own.includes(f.id)) fixed.push([f.high, s.n, room]);
+  }
   const at = pins ? within(places, new Set(boxes.filter((b) => pins.has(b.id)).flatMap((b) => [b.low, b.high])), arcs, told) : freely(places, arcs, boxes, told, fixed);
   for (const way of [-1, 1]) {
     const on = edged.filter((e) => e.edge[1] === way), line = way < 0 ? Math.min(...on.map((e) => at[e.low])) : Math.max(...on.map((e) => at[e.high]));
@@ -272,7 +283,7 @@ function squared(points) {
 
 /** Every box and line placed, `rounds` passes each way. `routes` by link, `nodes` by item, with `x` and `y` their middles, are changed in place. */
 export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, join, rounds = 2, edging }) {
-  const boxes = [...x.keys()].map((id) => { const n = nodes.get(id); return { id, at: [x.get(id), y.get(id)], size: [n.w, n.h], named: [n.w, n.h], ...(n.edge && { edge: n.edge, port: n.small }) }; });
+  const boxes = [...x.keys()].map((id) => { const n = nodes.get(id); return { id, at: [x.get(id), y.get(id)], size: [n.w, n.h], named: [n.w, n.h], ...(n.edge && { edge: n.edge, port: n.small }), ...(n.first && { first: true }) }; });
   const lines = [...routes].map(([k, r]) => { const [p, q] = k.split('|'); return { route: r, a: r.from, b: r.from === p ? q : p, points: squared(r.points), ...(r.ends && { ends: r.ends }) }; }).filter((l) => l.points.length > 1);
   lines.box = new Map(boxes.map((b) => [b.id, b]));
   lines.joined = new Set(routes.keys());

@@ -26,17 +26,16 @@ export function islandModels({ items, links, run }) {
   return { groups, cross, where, run };
 }
 
-/** Entries of the given widths set out in lines no wider than `room`: each one's place, and the band's size. */
-function band(widths, room, gap, row) {
-  const at = [];
-  let x = 0, y = 0, wide = 0;
-  for (const w of widths) {
-    if (x > 0 && x + w > room) (x = 0), (y += row);
-    at.push([x, y]);
-    x += w + gap;
-    wide = Math.max(wide, x - gap);
-  }
-  return { at, w: wide, h: widths.length ? y + row : 0 };
+/** Entries of the given widths set out down columns no taller than `room`, a row each: each one's place, and the size of all. */
+function columns(widths, room, gap, row) {
+  const at = [], per = Math.max(1, Math.floor(room / row));
+  let x = 0, wide = 0;
+  widths.forEach((w, k) => {
+    if (k && k % per === 0) (x += wide + gap), (wide = 0);
+    at.push([x, (k % per) * row]);
+    wide = Math.max(wide, w);
+  });
+  return { at, w: widths.length ? x + wide : 0, h: Math.min(widths.length, per) * row };
 }
 
 /** The sea's name for a group: what lives on no island is a box too. */
@@ -68,9 +67,12 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   const z = (name) => sizes[`flow_island_${name}`];
   const [PAD, NAME, SEA, GAP, ROW, PORT] = ['pad', 'name_room', 'sea', 'legend_gap', 'legend_row', 'port'].map(z);
   const M = sizes.flow_margin;
-  // The first pass: each island alone, to its frame.
+  // The first pass: each island alone, to its frame. Its legend stands in a column under its name down the island's left
+  // side, where no port is and so no wire crosses it (the owner, 6 Nov 2026): as tall as its steps, in no more than
+  // `legend_columns` columns.
   const blocks = groups.map((g) => {
-    const shore = g.id !== null, widths = shore ? legends.get(g.id) ?? [] : [], legend = band(widths, Math.max(insideOf(g.model.raw).r - insideOf(g.model.raw).l, z('legend_wide'), ...widths), GAP, ROW);
+    const shore = g.id !== null, widths = shore ? legends.get(g.id) ?? [] : [], inside = insideOf(g.model.raw);
+    const legend = columns(widths, Math.max(inside.b - inside.t, ROW * Math.ceil(widths.length / z('legend_columns'))), GAP, ROW);
     const raw = g.model.raw;
     const framed = frameOf(raw, { name: shore ? names.get(g.id) ?? 0 : 0, legend, pad: PAD, room: NAME, gap: GAP });
     return { ...g, shore, legend, raw, ...framed, first: framed };

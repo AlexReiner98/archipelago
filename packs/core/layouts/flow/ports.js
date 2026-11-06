@@ -26,14 +26,14 @@ const boxOf = (nodes, x, y, id) => rectOf([x.get(id), y.get(id)], [nodes.get(id)
 export const insideOf = (raw) => bounds([...raw.x.keys()].map((id) => boxOf(raw.nodes, raw.x, raw.y, id)), [...raw.routes.values()].flatMap((r) => r.points));
 
 /**
- * An island's frame, from its first layout: its steps and wires, under a header of its name (`name` wide) over its legend
- * (`legend`, { w, h }), both at the left, all `pad` inside the frame. Answers with the frame and where the name and the
+ * An island's frame, from its first layout: its steps and wires, beside a header at their left of its name (`name` wide)
+ * over its legend (`legend`, { w, h }), all `pad` inside the frame. Answers with the frame and where the name and the
  * legend stand, in the island's own places.
  */
 export function frameOf(raw, { name = 0, legend, pad, room, gap }) {
-  const inside = insideOf(raw);
-  const keyed = legend?.h ? { l: inside.l, t: inside.t - gap - legend.h, r: inside.l + legend.w, b: inside.t - gap } : null;
-  const top = keyed ? keyed.t : inside.t, named = name ? { l: inside.l, t: top - room, r: inside.l + name, b: top } : null;
+  const inside = insideOf(raw), wide = Math.max(name, legend?.w ?? 0), l = inside.l - gap - wide;
+  const named = name ? { l, t: inside.t, r: l + name, b: inside.t + room } : null, under = named ? named.b : inside.t;
+  const keyed = legend?.h ? { l, t: under, r: l + legend.w, b: under + legend.h } : null;
   const all = bounds([inside, ...[named, keyed].filter(Boolean)]);
   return { frame: { l: all.l - pad, t: all.t - pad, r: all.r + pad, b: all.b + pad }, named, keyed };
 }
@@ -83,8 +83,9 @@ export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad, r
   const ids = [...x.keys()].filter((id) => !own.has(id));
   const inside = bounds(ids.map((id) => boxOf(nodes, x, y, id)), [...routes].filter(([k]) => !k.split('|').some((id) => own.has(id))).flatMap(([, r]) => r.points));
   const put = (id, l, t) => (x.set(id, l + nodes.get(id).w / 2), y.set(id, t + nodes.get(id).h / 2));
-  // The header (its name over its legend) over the steps, at the left.
-  for (const e of extras) put(e.id, inside.l, inside.t - gap - e.size[1]);
+  // The header (its name over its legend) beside the steps at their left, level with their top, where the solve keeps
+  // it (`first`): the ports are on the top and the foot, so no wire need cross it.
+  for (const e of extras) (put(e.id, inside.l - gap - e.size[0], inside.t), (nodes.get(e.id).first = true));
   // Beyond every box and every wire already drawn, so the sketch already has each port outermost, as the solve will.
   const all = bounds([inside, ...extras.map((e) => boxOf(nodes, x, y, e.id))]);
   const inward = new Map(), boxed = (id) => ({ at: [x.get(id), y.get(id)], size: [nodes.get(id).w, nodes.get(id).h] });
