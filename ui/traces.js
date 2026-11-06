@@ -21,7 +21,7 @@ let seen = {};
 let me;
 let asking;
 const actorOf = (a) => (typeof a === 'string' ? a : a?.kind ? `${a.kind}:${a.name}` : undefined);
-const whoami = () =>
+export const whoami = () =>
   (asking ??= fetch('/whoami', { headers: authHeaders() })
     .then((r) => (r.ok ? r.json() : {}))
     .catch(() => ({}))
@@ -55,7 +55,7 @@ function save() {
 }
 
 /** Who made a change, as a person reads it: the session by its word, else the actor's name. */
-function whoSaid(by) {
+export function whoSaid(by) {
   if (by?.word) return `Session ${by.word}`;
   if (by?.name) return by.name;
   const raw = by?.actor ?? '';

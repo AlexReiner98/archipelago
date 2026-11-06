@@ -150,3 +150,29 @@ export async function eventsAfter(db: Q, input: { seq?: number; ids: string[] })
   const { rows } = await db.query<{ id: string }>(`select distinct target_id as id from event where seq > $1 and target_id = any($2::text[])`, [input.seq, input.ids]);
   return { seq: top[0].seq, ids: rows.map((r) => r.id) };
 }
+
+/**
+ * What the ids held were up to a position: every fact said of them at or before `pos`, in order, as the viewer may
+ * read them now (an id they cannot see is left out), for the page to fold with its projector into the rows as they
+ * stood then. What a page caught up from where its reader last looked starts from (ui/catch-up.js). Bounded by the ids.
+ */
+export async function factsUpTo(db: Q, input: { pos: number; ids: string[] }): Promise<{ pos: number; entries: { pos: number; at: string; facts: Fact[] }[] }> {
+  const ids = [...new Set(input.ids ?? [])];
+  if (!ids.length) return { pos: input.pos, entries: [] };
+  if (ids.length > HELD_MOST) throw new Error(`A read of the log names ${HELD_MOST} ids at most; this one names ${ids.length}.`);
+  const { rows: seen } = await db.query<{ id: string }>(`select id from entity where id = any($1::text[]) union all select id from relation where id = any($1::text[])`, [ids]);
+  const visible = seen.map((r) => r.id);
+  if (!visible.length) return { pos: input.pos, entries: [] };
+  const { rows } = await db.query<Said & { at: Date }>(
+    `select pos::int as pos, n, op, id, field, value, meta, at from log_fact where stream = 'facts' and id = any($1::text[]) and pos <= $2 order by pos, n -- index log_fact_history`,
+    [visible, input.pos],
+  );
+  const opened = await openSaid(db, rows);
+  const out: { pos: number; at: string; facts: Fact[] }[] = [];
+  for (const r of opened) {
+    const fact = (r.op === '-' ? ['-', r.id, r.field] : r.meta ? ['+', r.id, r.field, r.value, r.meta] : ['+', r.id, r.field, r.value]) as Fact;
+    if (out.at(-1)?.pos === r.pos) out.at(-1)!.facts.push(fact);
+    else out.push({ pos: r.pos, at: new Date(r.at).toISOString(), facts: [fact] });
+  }
+  return { pos: input.pos, entries: out };
+}

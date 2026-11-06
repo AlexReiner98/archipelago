@@ -8,6 +8,7 @@
 
 import { api, hooks, idsOf, state } from './base.js';
 import { wiresOn } from './canvas-wires.js';
+import { catchUp } from './catch-up.js';
 import { canvasSwitch } from './canvases.js';
 import { numberOf } from './query-base.js';
 import { FOCUS, addressOf, flatView } from './query.js';
@@ -133,6 +134,8 @@ export function canvasIn(host, pane) {
       view.addEventListener('lens-answer', () => at?.view === view && current === c && barNow());
       if (current === c) barNow();
       host.replaceChildren(view);
+      // The first canvas a page draws is caught up from where its reader last looked (ui/catch-up.js).
+      view.ready?.then(() => catchUp(view.store)).catch(() => {});
     },
     mark(here) {
       if (!at || at.here === here) return;
