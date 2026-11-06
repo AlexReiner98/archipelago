@@ -15,7 +15,7 @@ import { seen as standsAt } from './seeing.ts';
 import { backupNow, needAdmin } from './tool-config.ts';
 import { op } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
-import { eventsAfter, factsAfter, HELD_MOST, headPos } from './tail.ts';
+import { eventsAfter, factsAfter, HELD_MOST, headPos, ISLANDS_MOST } from './tail.ts';
 import { typeItemsIn, typesTaken } from './type-items.ts';
 
 /** Moves when any file of the web UI is saved (the projector it runs too), so an open page knows to load itself again. */
@@ -25,26 +25,27 @@ const uiStamp = () => Math.max(...readdirSync(UI_DIR).map((file) => statSync(joi
 export const HUMAN_TOOLS: Record<string, Tool> = {
   tail: {
     description:
-      'What the page follows: the facts after `after` (a position in the fact stream) on the `ids` it holds, as the viewer may see them, for it to project (src/tail.ts); ' +
+      'What the page follows: the facts after `after` (a position in the fact stream) on the `ids` it holds and on what lives on the `islands` its views touch, as the viewer may see them, for it to project (src/tail.ts); ' +
       'which of them other events touched after `seq` (an event number); and the review queue, the agents and the UI as they stand. Without `after`, only where things stand.',
     humanOnly: true,
     input: {
       after: z.number().int().nonnegative().optional().describe('The `pos` of the last answer: the facts after it are said.'),
       seq: z.number().int().nonnegative().optional().describe('The `seq` of the last answer: what other events after it touched is said.'),
       ids: z.array(z.string()).max(HELD_MOST).optional().describe('The items and links the page holds. Facts are read only on these, the links made touching them, and what those bring.'),
+      islands: z.array(z.string()).max(ISLANDS_MOST).optional().describe('The islands the page’s views touch, by id: facts on what lives on them are read too, so a view hears what may change what its query finds.'),
       page: z
         .object({ page: z.string().max(40), on: z.boolean(), where: z.string().max(2000).optional(), tab: z.object({ chat: z.string().max(40), own: z.boolean() }).optional(), lands: z.array(z.string().max(60)).max(24).optional() })
         .optional()
         .describe('The page asking, whether a show can land in it, and where it stands (its address after "#/"): an agent’s show says how many pages can take it, and an agent is told what the owner is looking at, and whether its show lands in the tab in sight (lands: the sessions whose shows go there).'),
     },
-    run: async (l, _actor, { after, seq, ids = [], page }) => {
+    run: async (l, _actor, { after, seq, ids = [], islands = [], page }) => {
       if (page) await looked((await wholeMap(l)).db, l, { page: page.page, on: page.on });
       if (page?.where !== undefined) await standsAt((await wholeMap(l)).db, l, page.page, page.where, page.tab, page.lands);
       const [queue, { told, ...seen }, pos] = await Promise.all([l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending' -- index proposal_status`), presence((await wholeMap(l)).db, l), headPos(l.db)]);
       const stand = { queue: `${queue.rows[0].n}.${told}`, ...seen, ui: uiStamp() };
       const events = await eventsAfter(l.db, { seq, ids });
       if (after === undefined) return { ...stand, pos, seq: events.seq };
-      const facts = ids.length ? await factsAfter(l.db, { after, ids }) : { pos, entries: [], gone: [], made: 0 };
+      const facts = ids.length ? await factsAfter(l.db, { after, ids, islands }) : { pos, entries: [], gone: [], made: 0 };
       return { ...stand, ...facts, seq: events.seq, events: events.ids };
     },
   },
