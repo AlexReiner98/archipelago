@@ -158,11 +158,24 @@ export function apart(model, { ports, extras, pad }) {
   const placed = Object.fromEntries(extras.map((e) => [e.id.slice(1), boxOf(nodes, x, y, e.id)]));
   const kept = (m) => new Map([...m].filter(([id]) => !own.has(id)));
   const ties = model.ties.filter((t) => t.type !== PORT_LINK), steps = [...kept(x).keys()];
-  const inside = bounds([...steps, ...extras.map((e) => e.id)].map((id) => boxOf(nodes, x, y, id)), [...model.chains, ...ties, ...ported.values()].flatMap((w) => w.points));
-  const edge = {};
-  for (const p of ports) edge[p.side] = ported.get(p.id)?.at[SIDES[p.side][0]];
-  // A side with ports is on their line, unless a step stands out past it: the frame holds every step.
-  const frame = { l: Math.min(edge.left ?? Infinity, inside.l - pad), t: Math.min(edge.top ?? Infinity, inside.t - pad), r: Math.max(edge.right ?? -Infinity, inside.r + pad), b: Math.max(edge.bottom ?? -Infinity, inside.b + pad) };
+  // What the island holds apart from its ports: its steps, header and own wires. A side with ports is on its outermost
+  // port's line, or `pad` past what it holds where something stands out past that line.
+  const inside = bounds([...steps, ...extras.map((e) => e.id)].map((id) => boxOf(nodes, x, y, id)), [...model.chains, ...ties].flatMap((w) => w.points));
+  const NAME = { left: 'l', top: 't', right: 'r', bottom: 'b' }, frame = { l: inside.l - pad, t: inside.t - pad, r: inside.r + pad, b: inside.b + pad };
+  for (const p of ports) {
+    const at = ported.get(p.id)?.at, [axis, out] = SIDES[p.side], k = NAME[p.side];
+    if (at) frame[k] = out < 0 ? Math.min(frame[k], at[axis]) : Math.max(frame[k], at[axis]);
+  }
+  // Every port on its side's line: one short of it moves out to it, its wires running on straight to where it now stands.
+  for (const p of ports) {
+    const q = ported.get(p.id), [axis] = SIDES[p.side];
+    if (!q || Math.abs(q.at[axis] - frame[NAME[p.side]]) < 0.5) continue;
+    q.at = [...q.at];
+    q.at[axis] = frame[NAME[p.side]];
+    const reach = (l) => { const s = [...l[0]]; s[axis] = q.at[axis]; return [s, ...l]; };
+    q.points = reach(q.points);
+    for (const [id, l] of q.lines) q.lines.set(id, reach(l));
+  }
   return { ...model, nodes: kept(nodes), x: kept(x), y: kept(y), all: model.all.filter((n) => !own.has(n.id)), ties, ported, placed, frame };
 }
 

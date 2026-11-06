@@ -148,10 +148,12 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
       const box = (id) => steps.find((s) => s.id === id), crowded = (id) => steps.some((s) => s.id !== id && meets([box(id).l, box(id).t], [box(id).r, box(id).b], s));
       const found = mine.flatMap((w) => [...(trial.ported.get(w.ends[0].id)?.lines ?? [])].filter(([id, l]) => (box(id) && crowded(id)) || l.some((p, i) => i && steps.some((s) => s.id !== id && meets(l[i - 1], p, s)))).map(([id]) => [w, id]))[0];
       if (!found) break;
-      const [w] = found, [own, ...rest] = [...new Set(bundles[w.k].map((l) => l.from))].map((id) => bundles[w.k].filter((l) => l.from === id));
-      bundles[w.k] = own;
-      wires[w.k] = wireOf(own, w.k, w.sketch);
-      for (const ls of rest) (bundles.push(ls), wires.push(wireOf(ls, bundles.length - 1, w.sketch)));
+      // Only that reader goes apart; the rest still share their wire.
+      const [w, id] = found;
+      bundles.push(bundles[w.k].filter((l) => l.from === id));
+      bundles[w.k] = bundles[w.k].filter((l) => l.from !== id);
+      wires[w.k] = wireOf(bundles[w.k], w.k, w.sketch);
+      wires.push(wireOf(bundles.at(-1), bundles.length - 1, w.sketch));
     }
   }
   // A port two or more bundles of a finding's reads leave by is shared: a bar along its side, each landing on it a wire
@@ -173,16 +175,37 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
       const p = b.ported.ported.get(e.id), [axis] = SIDES[e.side], along = 1 - axis;
       if (!p) continue;
       for (const [id, l] of p.lines) {
-        const [p0, p1, p2, p3, ...more] = l;
-        if (!p3 || Math.abs(p1[along] - p0[along]) > 0.5 || Math.abs(p2[axis] - p1[axis]) > 0.5 || Math.abs(p3[along] - p2[along]) > 0.5) continue;
+        const [p0, p1, p2, p3, ...more] = tidy(l.map((q) => [...q]));
+        const others0 = [...p.lines].filter(([o]) => o !== id).map(([, o]) => o), rest0 = [...drawn, ...all.filter((o) => o !== l)];
+        // A wire that runs a little along the shore from its landing before it turns in: it lands where it turns, or
+        // turns in at its landing.
+        if (p2 && Math.abs(p1[axis] - p0[axis]) < 0.5 && Math.abs(p1[along] - p0[along]) > 0.5 && Math.abs(p1[along] - p0[along]) < RUN && Math.abs(p2[along] - p1[along]) < 0.5) {
+          const turned = [...p0];
+          turned[axis] = p2[axis];
+          const tries = [
+            !others0.some((o) => Math.abs(o[0][along] - p1[along]) < turn / 2 - 0.5) && [p1, p2, ...(p3 ? [p3, ...more] : [])],
+            p3 && Math.abs(p3[axis] - p2[axis]) < 0.5 && !rest0.some((o) => touch([p0, turned, p3], o)) && [p0, turned, p3, ...more],
+          ];
+          const kept = tries.find(Boolean);
+          if (kept) (p.lines.set(id, kept), (all[all.indexOf(l)] = kept));
+          continue;
+        }
+        if (!p3 ||Math.abs(p1[along] - p0[along]) > 0.5 || Math.abs(p2[axis] - p1[axis]) > 0.5 || Math.abs(p3[along] - p2[along]) > 0.5) continue;
         const step = Math.abs(p2[along] - p1[along]);
         if (step < 0.5 || step >= RUN) continue;
+        // Either the landing moves along the bar to where the wire comes down, or, where that is another's, the wire
+        // comes down to the landing where it is: the bend after the step moves over.
+        const others = [...p.lines].filter(([o]) => o !== id).map(([, o]) => o), rest = [...drawn, ...all.filter((o) => o !== l)];
         const at = [...p0];
         at[along] = p2[along];
-        const others = [...p.lines].filter(([o]) => o !== id).map(([, o]) => o);
-        if (others.some((o) => Math.abs(o[0][along] - at[along]) < turn / 2 - 0.5)) continue;
-        if ([...drawn, ...all.filter((o) => o !== l)].some((o) => touch([at, p2], o))) continue;
-        const kept = [at, p3, ...more];
+        const bend = [...p3];
+        bend[along] = p0[along];
+        const tries = [
+          !others.some((o) => Math.abs(o[0][along] - at[along]) < turn / 2 - 0.5) && !rest.some((o) => touch([at, p2], o)) && [at, p3, ...more],
+          more[0] && Math.abs(more[0][axis] - p3[axis]) < 0.5 && !rest.some((o) => touch([p0, bend, more[0]], o)) && [p0, bend, ...more],
+        ];
+        const kept = tries.find(Boolean);
+        if (!kept) continue;
         p.lines.set(id, kept);
         all[all.indexOf(l)] = kept;
       }
@@ -278,7 +301,17 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   for (const w of wires) {
     const t = sea.ties.find((v) => v.type === `sea:${w.k}`);
     if (!t) continue;
-    const [a, c] = [w.l.from, w.l.to], over = t.points, [into, out] = w.ends, type = w.l.type ?? w.l.kind, held = w.l.pending && { pending: w.l.pending };
+    const [a, c] = [w.l.from, w.l.to], [into, out] = w.ends, type = w.l.type ?? w.l.kind, held = w.l.pending && { pending: w.l.pending };
+    // The wire at sea leaves each end straight out of its port's side, in line with where the wire inside comes to it:
+    // a few px apart along the shore, the first stretch moves over to it, so the two meet at a right angle.
+    const over = t.points.map((p) => [...p]);
+    const meet = (line, e, to) => {
+      const along = 1 - SIDES[e.side][0], [p, q] = line;
+      if (!q || Math.abs(p[along] - to[along]) < 0.5 || Math.abs(p[along] - to[along]) > turn || Math.abs(p[along] - q[along]) > 0.5) return;
+      p[along] = q[along] = to[along];
+    };
+    if (!into.bundled) meet(over, into, inner(into, a)[0]);
+    if (!out.shared) meet([...over].reverse(), out, inner(out, c)[0]);
     // A bundle's readers each come to its bar by a wire of their own, carried on to the shore where the one wire at sea
     // leaves it; the head is that wire's, at the finding.
     if (into.bundled) for (const r of w.readers) {
