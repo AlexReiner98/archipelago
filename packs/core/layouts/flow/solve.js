@@ -228,8 +228,8 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
   const edged = boxes.filter((b) => b.edge?.[0] === axis);
   for (const e of edged) {
     const out = e.edge[1] < 0;
-    for (const b of boxes) if (!b.edge) arcs.push(out ? [e.high, b.low, edging] : [b.high, e.low, edging]);
-    for (const s of stretches) if (!s.own.includes(e.id)) arcs.push(out ? [e.high, s.n, room] : [s.n, e.low, room]);
+    for (const b of boxes) if (!b.edge) fixed.push(out ? [e.high, b.low, edging] : [b.high, e.low, edging]);
+    for (const s of stretches) if (!s.own.includes(e.id)) fixed.push(out ? [e.high, s.n, room] : [s.n, e.low, room]);
   }
   const at = pins ? within(places, new Set(boxes.filter((b) => pins.has(b.id)).flatMap((b) => [b.low, b.high])), arcs, told) : freely(places, arcs, boxes, told, fixed);
   for (const way of [-1, 1]) {

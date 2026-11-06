@@ -9,6 +9,7 @@
 
 import { bridged } from './finish.js';
 import { frameOf, insideOf, SIDES } from './ports.js';
+import { tidy } from './polyline.js';
 
 /** The islands an answer's items live on, in the order they come. */
 export const islandsOf = (items) => [...new Set(items.map((i) => i.island).filter(Boolean))];
@@ -46,6 +47,13 @@ function sideOf(box, p) {
   const [cx, cy, w, h] = box, d = { top: Math.abs(p[1] - (cy - h / 2)), bottom: Math.abs(p[1] - (cy + h / 2)), left: Math.abs(p[0] - (cx - w / 2)), right: Math.abs(p[0] - (cx + w / 2)) };
   const side = Object.keys(d).reduce((s, k) => (d[k] < d[s] ? k : s), 'top'), along = 1 - SIDES[side][0];
   return { side, share: Math.min(1, Math.max(0, (p[along] - (along ? cy - h / 2 : cx - w / 2)) / (along ? h : w))) };
+}
+
+/** Three wires joined into one line: where two meet in line, within half a pixel, they run on as one stretch. */
+function joined(points) {
+  const out = points.map((p) => [...p]);
+  for (let i = 1; i < out.length; i++) for (const axis of [0, 1]) if (Math.abs(out[i][axis] - out[i - 1][axis]) < 0.5) out[i][axis] = out[i - 1][axis];
+  return tidy(out);
 }
 
 /**
@@ -158,7 +166,7 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
     if (!t) continue;
     const [a, c] = [w.l.from, w.l.to], over = t.points, named = w.ends[1];
     // Reads of one finding that leave by one name share the wire in to it: drawn once, the rest each their own.
-    const points = [...inner(w.ends[0]).reverse(), ...over, ...(named.small ? inner(named) : [])];
+    const points = joined([...inner(w.ends[0]).reverse(), ...over, ...(named.small ? inner(named) : [])]);
     if (!named.small && !shared.has(named.id)) (shared.add(named.id), ties.push({ a, b: c, type: w.l.type ?? w.l.kind, headAt: 'end', points: inner(named), ...(w.l.pending && { pending: w.l.pending }) }));
     const way = (e) => SIDES[e.side][0] ? [0, SIDES[e.side][1]] : [SIDES[e.side][1], 0];
     const gates = w.gated ? w.ends.map((e) => ({ island: e.block.id, at: portAt(e), way: way(e), ...(!e.small && { port: e.id }) })) : [];

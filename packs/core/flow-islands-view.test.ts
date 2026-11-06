@@ -19,7 +19,7 @@ const [{ layout }, { compose, islandModels }, { count }, { nameOf, saidOf }] = a
 const { result: answer } = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'layouts', 'flow-islands.json'), 'utf8'));
 
 /** What each fault may count, at most: lower a ceiling when a change brings its count down, never raise one. */
-const CEILING: Record<string, number> = { outside: 5, overlapping: 1, through: 3, 'through a name': 0, shared: 0, jogs: 11, unbridged: 0, crossings: 85 };
+const CEILING: Record<string, number> = { outside: 0, overlapping: 0, through: 1, 'through a name': 0, shared: 0, jogs: 1, unbridged: 0, crossings: 76 };
 
 const z = (name: string) => house.sizes[`flow_${name}`], measure = (t: string, px: number) => String(t).length * px * 0.55;
 const run = (part: any) => layout({ ...part, undrawn: house.undrawn ?? [], headless: house.headless, measure, sizes: house.sizes, aspect: 1.6, shapes: { type: house.type_shapes ?? {} } });
