@@ -15,7 +15,8 @@ import { hangsOf, partsOf } from './hangs.js';
 import { pair } from './polyline.js';
 import { drawnPart, linksOf } from './search.js';
 import { shape } from './shape.js';
-import { solveSections } from './solve.js';
+import { solve, solveSections } from './solve.js';
+import { apart, portItems, setPorts } from './ports.js';
 import { stepsOf } from './steps.js';
 
 /** How many finished pictures are kept. */
@@ -30,18 +31,19 @@ const kept = new Map();
 
 /** The layout of an answer, worked out once for each answer and kept. */
 export function layout(args) {
-  const { items, links, undrawn, headless, sizes, aspect, shapes } = args, key = JSON.stringify([items, links, undrawn, headless, sizes, aspect, shapes]);
+  const { items, links, undrawn, headless, sizes, aspect, shapes, ports, extras } = args, key = JSON.stringify([items, links, undrawn, headless, sizes, aspect, shapes, ports, extras]);
   const hit = kept.get(key) ?? laidOut(args);
   kept.delete(key);
   kept.set(key, hit);
   if (kept.size > KEPT) kept.delete(kept.keys().next().value);
-  return hit();
+  // What the finished picture was drawn from, for a level above to set it again round its ports (./ports.js).
+  return Object.assign(hit(), { raw: hit.raw });
 }
 
 /** Each line's way chosen, the boxes at `x` and `y`. */
-function shapeWires({ nodes, x, y, lines, z, through }) {
+function shapeWires({ nodes, x, y, lines, z, through, inward }) {
   const boxes = new Map([...x.keys()].map((id) => [id, { x: x.get(id), y: y.get(id), w: nodes.get(id).w, h: nodes.get(id).h, pointed: nodes.get(id).shape === 'diamond' }]));
-  shape(boxes, lines, { room: z.room, run: z.run, corner: z.corner, wire: z.turn, ports: z.ports, rounds: z.rounds, cost_cross: z.shape_cross, cost_bend: z.cost_bend, cost_side: z.cost_side, work: z.shape_work, through });
+  shape(boxes, lines, { room: z.room, run: z.run, corner: z.corner, wire: z.turn, ports: z.ports, rounds: z.rounds, cost_cross: z.shape_cross, cost_bend: z.cost_bend, cost_side: z.cost_side, work: z.shape_work, through, inward });
 }
 
 /** The routes as lines, each from its `from`. */
@@ -80,7 +82,9 @@ function laidOut(args) {
   return crossed(wired({})) <= crossed(combed({})) ? wired : combed;
 }
 
-function drawnOut({ items: given, links: told = [], undrawn = [], headless = ['part_of'], measure, sizes, shapes, aspect = 1.6, chains: asWires }) {
+function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = ['part_of'], measure, sizes, shapes, aspect = 1.6, chains: asWires, ports = [], extras = [] }) {
+  // An island laid out again with its ports (./ports.js): each port, and its name and legend, a box of its own.
+  const ported = ports.length > 0, pad = sizes.flow_island_pad, { items: given, links: told } = ported ? portItems(asked, linked, ports, extras) : { items: asked, links: linked };
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes, shapes });
   const z = lengthsOf(sizes), { gap } = z, margin = sizes.flow_margin, stepSize = (id) => nodes.get(id);
@@ -100,23 +104,27 @@ function drawnOut({ items: given, links: told = [], undrawn = [], headless = ['p
   // Two links between one pair of boxes are drawn from one sketch, and each is then a wire like any other.
   for (const [k, of] of twins) if (routes.has(of)) routes.set(k, { ...routes.get(of), points: routes.get(of).points.map((p) => [...p]) });
   staging?.('bars and combs', routes);
+  const inward = ported ? setPorts({ nodes, x, y, routes, ports, extras, gap: sizes.flow_island_legend_gap, pad }) : undefined;
   const lengths = { nodes, x, y, routes, section: sizes.flow_section_gap, gap, margin, aspect, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: gap / 2, join: z.join }, firstWires = new Map([...routes].map(([k, r]) => [k, r.points]));
   const before = { x: new Map(x), y: new Map(y), sizes: new Map([...nodes].map(([id, n]) => [id, [n.w, n.h]])) };
   if (routes.size <= z.shape_most) {
     const lines = linesOf(routes);
-    shapeWires({ nodes, x, y, lines, z });
+    shapeWires({ nodes, x, y, lines, z, inward });
     for (const l of lines) l.r.points = l.points;
   }
   staging?.('shape', routes);
+  // With ports, the island is one section: its frame is round all of it.
+  const solved = (all) => (ported ? solve({ ...all, edging: pad }) : solveSections(all));
   try {
-    solveSections(lengths);
+    solved(lengths);
   } catch (e) {
     // A sketch the solve cannot order is drawn from the first wires, which it always can.
     console.warn?.(`The shape fell back: ${e.message}`);
     for (const [id, at] of before.x) (x.set(id, at), y.set(id, before.y.get(id)), Object.assign(nodes.get(id), { w: before.sizes.get(id)[0], h: before.sizes.get(id)[1] }));
     for (const [k, r] of routes) r.points = firstWires.get(k);
-    solveSections(lengths);
+    solved(lengths);
   }
   staging?.('solve', routes);
-  return finisher({ nodes, potential, chains, ties, x, y, routes, margin, stepSize });
+  const done = finisher({ nodes, potential, chains, ties, x, y, routes, margin, stepSize }), out = ported ? () => apart(done(), { ports, extras, pad }) : done;
+  return Object.assign(out, { raw: { nodes, potential, chains, ties, x, y, routes, margin, stepSize, z } });
 }

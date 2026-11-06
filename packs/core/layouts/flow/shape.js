@@ -88,8 +88,9 @@ const roomOn = (b, side, wire, corner) => {
  * keeps from a box it passes, `run` from a port to its first corner, `corner` from a box's corner, `wire` from a wire beside it;
  * `ports` how many places along a side are tried, `rounds` how many times the wires are gone over, the costs what a
  * crossing, a bend and an end too many on a side are worth in length, and `work` how many meetings of two wires may be tried.
+ * `inward` by box is [axis, sign] for a box a wire may leave only one way (a port on an island's side: into the island).
  */
-export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, cost_cross, cost_bend, cost_side, work: budget = Infinity, through = cost_cross / 2 }) {
+export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, cost_cross, cost_bend, cost_side, work: budget = Infinity, through = cost_cross / 2, inward = new Map() }) {
   let work = 0;
   const rects = new Map([...boxes].map(([id, b]) => [id, { id, lo: [b.x - b.w / 2, b.y - b.h / 2], hi: [b.x + b.w / 2, b.y + b.h / 2], mid: [b.x, b.y], pointed: b.pointed }]));
   const CELL = Math.max(1, ...[...rects.values()].map((b) => b.hi[0] - b.lo[0])), columns = new Map(), lines = wires.filter((w) => w.points.length > 1).map((w) => Object.assign(w, { points: tidy(w.points) }));
@@ -180,6 +181,11 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
     return n * cost_side;
   };
   const plain = (l) => (l.length - 2) * cost_bend + lengthOf(l);
+  /** Whether a line leaves each box that has one way out by that way. */
+  const faces = (l, w) => [[w.a, l[0], l[1]], [w.b, l.at(-1), l.at(-2)]].every(([id, p, q]) => {
+    const way = inward.get(id);
+    return !way || (p[1 - way[0]] === q[1 - way[0]] && (q[way[0]] - p[way[0]]) * way[1] > 0);
+  });
   for (let round = 0; round < rounds; round++) {
     for (const w of [...lines].sort((p, q) => q.points.length - p.points.length || lengthOf(q.points) - lengthOf(p.points))) {
       // Past what a picture can take on a page, the rest keep the lines they came with: the solve parts those as well.
@@ -199,7 +205,7 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
         const cost = alone + over(l, w);
         if (cost >= least) continue;
         const all = cost + met(l, w, least - cost);
-        if (all < least && clear(l, w)) ((least = all), (best = l));
+        if (all < least && clear(l, w) && faces(l, w)) ((least = all), (best = l));
       }
       w.points = best;
       bump(w, 1);

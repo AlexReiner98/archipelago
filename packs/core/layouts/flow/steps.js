@@ -47,6 +47,8 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
   open.forEach((d) => markOn(d.id));
   const LINE = sizes.flow_line_height ?? TEXT * 1.25;
   for (const n of nodes.values()) {
+    // A box of a level above (an island on the sea) is as big as what is laid out inside it, and has no name of its own here.
+    if (Array.isArray(n.item.size)) { [n.w, n.h] = n.item.size; n.lines = []; n.line = LINE; continue; }
     const px = n.stub ? STUB_TEXT : TEXT;
     n.lines = n.shape === 'end' ? [n.item.title] : lines(n.item.title, MAX_TEXT, (t) => measure(t, px));
     n.line = LINE;

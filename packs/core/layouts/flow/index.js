@@ -21,7 +21,7 @@
 import { lineageOf, shownOnly } from './graph.js';
 import { layout } from './layout.js';
 import { css } from './look.js';
-import { css as islandCss, islandMarks } from './islands.js';
+import { css as islandCss, islandMarks, saidOf } from './islands.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
@@ -124,7 +124,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
   answer = { ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) };
-  const run = (part) => layout({ items: part.items, links: part.links, undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes });
+  const run = (part) => layout({ items: part.items, links: part.links, ...(part.ports && { ports: part.ports, extras: part.extras }), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes });
   // A picture of more than one island is an archipelago (./archipelago.js): each island laid out alone, a sea between.
   const parts = !story && islandsOf(answer.items).length > 1 ? islandModels({ items: answer.items, links: answer.links ?? [], run }) : null;
   let g = parts ? null : run({ items: answer.items, links: answer.links ?? [] });
@@ -266,7 +266,9 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
   const nameWidth = (id) => z('island_name_x') + measure(String((answer.islands ?? []).find((i) => i.id === id)?.title ?? ''), z('island_text'), 'region');
-  if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, crossings: z('island_crossings_most') });
+  // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
+  const labelWidth = (l) => { const said = saidOf(answer.items.find((i) => i.id === l.to)); return said ? Math.min(measure(said, z('island_gate_text')), z('island_gate_most') - 2 * z('island_gate_pad')) + 2 * z('island_gate_pad') : 0; };
+  if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), labels: labelWidth, sizes: style.sizes });
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
@@ -351,7 +353,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
   // On an archipelago each island a region round what lives on it, under everything, and a gate where a link crosses its shore (./islands.js).
-  const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, measure, fit: (text, width, px) => fit(text, width, px), isHex: (h) => HEX.test(String(h)) });
+  const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, fit: (text, width, px) => fit(text, width, px), isHex: (h) => HEX.test(String(h)) });
   const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, isles.layer, tieLayer, wireLayer, stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark));
   // The picture's key; on an archipelago none, each island carrying its own.
   const key = parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 });

@@ -152,7 +152,7 @@ function sides(group, axis) {
 const byTie = (p, q) => (p.tie ?? 0) - (q.tie ?? 0) || (p.far ?? 0) - (q.far ?? 0);
 
 /** One pass along `axis`, 0 across and 1 down. */
-function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart, told, pins }) {
+function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart, told, pins, edging = apart }) {
   const other = 1 - axis, stretches = [], places = [];
   const number = (value) => (places.push(value), places.length - 1);
   for (const b of boxes) ((b.low = number(b.at[axis] - b.size[axis] / 2)), (b.high = number(b.at[axis] + b.size[axis] / 2)));
@@ -174,7 +174,8 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
   for (const b of boxes) arcs.push([b.low, b.high, b.named[axis]]);
   // A wire's end stands on its box, inside its corners.
   for (const s of stretches) for (const line of s.own) {
-    const b = lines.box.get(line), inset = Math.min(corner, b.size[axis] / 3);
+    // A port is where a wire passes through a box's side: its wires meet in its middle.
+    const b = lines.box.get(line), inset = b.port ? b.size[axis] / 2 : Math.min(corner, b.size[axis] / 3);
     arcs.push([b.low, s.n, inset], [s.n, b.high, inset]);
   }
   // Each thing keeps its distance from what it can see on the low side: what stands behind that is kept off by the chain.
@@ -182,8 +183,10 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
     if (p.line && q.line) return [p.n, q.n, p.line === q.line ? 0 : wire];
     if (p.line) return p.own.includes(q.id) ? null : [p.n, q.low, p.line.a === q.id || p.line.b === q.id ? run : room];
     if (q.line) return q.own.includes(p.id) ? null : [p.high, q.n, q.line.a === p.id || q.line.b === p.id ? run : room];
+    // Two on one edge stand on its line, so are parted along it alone.
+    if (p.edge && q.edge && p.edge[0] === q.edge[0] && p.edge[1] === q.edge[1]) return axis === p.edge[0] ? null : [p.high, q.low, apart];
     // Two boxes that overlap are parted on the axis that takes least: on the other they stand side by side, in no order.
-    const on = (ax) => (p.size[ax] + q.size[ax]) / 2 - Math.abs(p.at[ax] - q.at[ax]);
+    const on =(ax) => (p.size[ax] + q.size[ax]) / 2 - Math.abs(p.at[ax] - q.at[ax]);
     return on(axis) > on(other) ? null : [p.high, q.low, lines.joined?.has(pair(p.id, q.id)) ? join : apart];
   };
   const placed = [...stretches, ...boxes.map((b) => Object.assign(b, { key: b.at[axis], lo: b.at[other] - b.size[other] / 2, hi: b.at[other] + b.size[other] / 2 }))];
@@ -208,7 +211,19 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
     const left = from < to && seen[from].lo < it.lo ? [{ lo: seen[from].lo, hi: it.lo, it: seen[from].it }] : [], right = from < to && seen[to - 1].hi > it.hi ? [{ lo: it.hi, hi: seen[to - 1].hi, it: seen[to - 1].it }] : [];
     seen.splice(from, to - from, ...left, { lo: it.lo, hi: it.hi, it }, ...right);
   }
+  // A box on an edge (`edge`: [axis, way], a port on an island's frame) stands beyond every other box by `edging` and
+  // every wire by `room`, on its way; and all on one edge stand on one line, the outermost.
+  const edged = boxes.filter((b) => b.edge?.[0] === axis);
+  for (const e of edged) {
+    const out = e.edge[1] < 0;
+    for (const b of boxes) if (!b.edge) arcs.push(out ? [e.high, b.low, edging] : [b.high, e.low, edging]);
+    for (const s of stretches) if (!s.own.includes(e.id)) arcs.push(out ? [e.high, s.n, room] : [s.n, e.low, room]);
+  }
   const at = pins ? within(places, new Set(boxes.filter((b) => pins.has(b.id)).flatMap((b) => [b.low, b.high])), arcs, told) : freely(places, arcs, boxes, told);
+  for (const way of [-1, 1]) {
+    const on = edged.filter((e) => e.edge[1] === way), line = way < 0 ? Math.min(...on.map((e) => at[e.low])) : Math.max(...on.map((e) => at[e.high]));
+    for (const e of on) { const by = line - at[way < 0 ? e.low : e.high]; (at[e.low] += by), (at[e.high] += by); }
+  }
   for (const b of boxes) {
     const [low, high] = [at[b.low], at[b.high]];
     b.at[axis] = (low + high) / 2;
@@ -244,13 +259,13 @@ function squared(points) {
 }
 
 /** Every box and line placed, `rounds` passes each way. `routes` by link, `nodes` by item, with `x` and `y` their middles, are changed in place. */
-export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, join, rounds = 2 }) {
-  const boxes = [...x.keys()].map((id) => ({ id, at: [x.get(id), y.get(id)], size: [nodes.get(id).w, nodes.get(id).h], named: [nodes.get(id).w, nodes.get(id).h] }));
+export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, join, rounds = 2, edging }) {
+  const boxes = [...x.keys()].map((id) => { const n = nodes.get(id); return { id, at: [x.get(id), y.get(id)], size: [n.w, n.h], named: [n.w, n.h], ...(n.edge && { edge: n.edge, port: n.small }) }; });
   const lines = [...routes].map(([k, r]) => { const [p, q] = k.split('|'); return { route: r, a: r.from, b: r.from === p ? q : p, points: squared(r.points) }; }).filter((l) => l.points.length > 1);
   lines.box = new Map(boxes.map((b) => [b.id, b]));
   lines.joined = new Set(routes.keys());
   const told = { freed: 0, rings: 0 };
-  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, join, told });
+  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, join, told, edging });
   const margin = Math.min(...boxes.map((b) => b.at[0] - b.size[0] / 2), ...lines.flatMap((l) => l.points.map((c) => c[0]))), top = Math.min(...boxes.map((b) => b.at[1] - b.size[1] / 2), ...lines.flatMap((l) => l.points.map((c) => c[1])));
   for (const b of boxes) {
     x.set(b.id, b.at[0] - margin + apart);
@@ -265,14 +280,16 @@ export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, joi
 
 /**
  * The picture set again round pins: every box in `held` stays where it stands, and the rest, boxes and wires, each as near
- * where it stands as its distances from all that let it. `boxes` are { id, at, size, named } and `lines` { k, a, b, points },
- * changed in place. Says how many distances could not be kept.
+ * where it stands as its distances from all that let it; with no `held`, every place solved afresh. `boxes` are { id, at,
+ * size, named }, with `edge` ([axis, way]) for a box that stands beyond the rest on its way, `edging` from them, and
+ * `port` for one whose wires meet in its middle; `lines` are { k, a, b, points }, changed in place. Says how many
+ * distances could not be kept.
  */
-export function settle({ boxes, lines, held, wire, room, run, corner, apart, join, rounds }) {
+export function settle({ boxes, lines, held, wire, room, run, corner, apart, join, rounds, edging }) {
   const told = { freed: 0, squeezed: 0, rings: 0 };
   lines.box = new Map(boxes.map((b) => [b.id, b]));
   lines.joined = new Set(lines.map((l) => pair(l.a, l.b)));
-  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, join, told, pins: held });
+  for (let round = 0; round < rounds; round++) for (const axis of [0, 1]) pass(axis, { lines, boxes, wire, room, run, corner, apart, join, told, pins: held, edging });
   return told;
 }
 
