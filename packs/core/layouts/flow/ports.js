@@ -37,13 +37,15 @@ export function frameOf(raw, { name = 0, legend, pad, room, gap }) {
   return { frame: { l: all.l - pad, t: all.t - pad, r: all.r + pad, b: all.b + pad }, named, keyed };
 }
 
-/** A first sketch from a port at `at`, across its side on `axis`, to the box `to`: in across the side, then along to it. */
-function sketch(at, axis, to) {
-  const other = 1 - axis, near = to.at[axis] - (Math.sign(to.at[axis] - at[axis]) * to.size[axis]) / 2;
+/**
+ * A first sketch from a port at `at`, across its side on `axis`, to the box `to`: out of the port, along a channel `run`
+ * clear of the box's near side, and into that side at its middle. It turns there, so where the port stands along its side
+ * is not tied to where the box does (a wire run straight in would tie the two, and the solve could keep only one).
+ */
+function sketch(at, axis, to, run) {
+  const other = 1 - axis, way = Math.sign(at[axis] - to.at[axis]) || 1, near = to.at[axis] + (way * to.size[axis]) / 2, channel = near + way * run;
   const point = (u, v) => { const p = []; p[axis] = u; p[other] = v; return p; };
-  if (Math.abs(at[other] - to.at[other]) < to.size[other] / 2) return [point(at[axis], at[other]), point(near, at[other])];
-  const side = to.at[other] - (Math.sign(to.at[other] - at[other]) * to.size[other]) / 2;
-  return [point(at[axis], at[other]), point(to.at[axis], at[other]), point(to.at[axis], side)];
+  return [point(at[axis], at[other]), point(channel, at[other]), point(channel, to.at[other]), point(near, to.at[other])];
 }
 
 /**
@@ -62,7 +64,7 @@ export function portItems(items, links, ports, extras) {
  * sketched in across the side, a tie of its own (`ties`). Each port's node is marked for the solve (`edge`, `small`).
  * Answers with the way each port's wire must leave it, for the shape layer.
  */
-export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad }) {
+export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad, run }) {
   const own = new Set([...ports.map((p) => p.id), ...extras.map((e) => e.id)]);
   const ids = [...x.keys()].filter((id) => !own.has(id));
   const inside = bounds(ids.map((id) => boxOf(nodes, x, y, id)), [...routes].filter(([k]) => !k.split('|').some((id) => own.has(id))).flatMap(([, r]) => r.points));
@@ -91,7 +93,7 @@ export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad })
     Object.assign(n, { edge: [axis, out], small: p.small });
     inward.set(p.id, [axis, -out]);
     const route = p.id < p.to ? `${p.id}|${p.to}` : `${p.to}|${p.id}`;
-    routes.set(route, { from: p.id, points: sketch(at, axis, to) });
+    routes.set(route, { from: p.id, points: sketch(at, axis, to, run) });
     ties.push({ a: p.id, b: p.to, type: PORT_LINK, route });
   }
   return inward;

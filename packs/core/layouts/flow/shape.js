@@ -89,7 +89,8 @@ const roomOn = (b, side, wire, corner) => {
  * `ports` how many places along a side are tried, `rounds` how many times the wires are gone over, the costs what a
  * crossing, a bend and an end too many on a side are worth in length, and `work` how many meetings of two wires may be tried.
  * `inward` by box is [axis, sign] for a box a wire may leave only one way (a port on an island's side: into the island);
- * a wire's own `at` (a point for each end) and `leave` (the way out of each) hold where it ends on its boxes.
+ * a wire's own `at` (a point for each end) and `leave` (the way out of each) hold where it ends on its boxes, and `turns`
+ * that it turns at least once (a port's wire: where its port stands along its side is then not tied to where its step does).
  */
 export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, cost_cross, cost_bend, cost_side, work: budget = Infinity, through = cost_cross / 2, inward = new Map() }) {
   let work = 0;
@@ -188,7 +189,7 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
   const faces = (l, w) => [[w.a, l[0], l[1], 0], [w.b, l.at(-1), l.at(-2), 1]].every(([id, p, q, k]) => {
     const way = w.leave?.[k] ?? inward.get(id);
     return !way || (p[1 - way[0]] === q[1 - way[0]] && (q[way[0]] - p[way[0]]) * way[1] > 0);
-  });
+  }) && !(l.length === 2 && w.turns);
   for (let round = 0; round < rounds; round++) {
     for (const w of [...lines].sort((p, q) => q.points.length - p.points.length || lengthOf(q.points) - lengthOf(p.points))) {
       // Past what a picture can take on a page, the rest keep the lines they came with: the solve parts those as well.
@@ -202,7 +203,7 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
       const standing = clear(was, w, 0), slid = standing ? [] : aside(was, w).map((l) => { const line = tidy(l); return { l: line, plain: plain(line) }; });
       const beyond = round < rounds - 1 || (standing && met(was, w, cost_cross) < cost_cross) ? [] : past(was, w).map((l) => { const line = tidy(l); return { l: line, plain: plain(line) }; });
       if (slid.length || beyond.length) tried.push(...slid, ...beyond), tried.sort((p, q) => p.plain - q.plain);
-      let best = was, least = plain(was) + met(was, w, Infinity) + over(was, w) + (standing ? 0 : through);
+      let best = was, least = plain(was) + met(was, w, Infinity) + over(was, w) + (standing ? 0 : through) + (faces(was, w) ? 0 : through);
       for (const { l, plain: alone } of tried) {
         if (alone >= least) break;
         const cost = alone + over(l, w);

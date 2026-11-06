@@ -111,12 +111,14 @@ function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = [
   staging?.('bars and combs', routes);
   // A port's wire joins the island after its topology: the island keeps the parts it was laid out in, and the shape and
   // the solve take the port's wire with all the rest.
-  const inward = ported ? setPorts({ nodes, x, y, routes, ties, ports, extras, gap: sizes.flow_island_legend_gap, pad }) : undefined;
+  const inward = ported ? setPorts({ nodes, x, y, routes, ties, ports, extras, gap: sizes.flow_island_legend_gap, pad, run: z.run }) : undefined;
   if (holding) holdPorts({ nodes, x, y, routes, ties, held, rewire, run: z.run });
   const lengths = { nodes, x, y, routes, section: sizes.flow_section_gap, gap, margin, aspect, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: away ?? gap / 2, join: z.join }, firstWires = new Map([...routes].map(([k, r]) => [k, r.points]));
   const before = { x: new Map(x), y: new Map(y), sizes: new Map([...nodes].map(([id, n]) => [id, [n.w, n.h]])) };
   if (routes.size <= z.shape_most) {
     const lines = linesOf(routes);
+    // A port's wire turns before its step, so the port is free along its side (./ports.js).
+    if (inward) for (const l of lines) if (inward.has(l.a) || inward.has(l.b)) l.turns = true;
     // A wire whose ends are held (at sea, at its ports) is shaped from those points, out of each the way its port faces.
     for (const l of lines) if (l.r.ends) Object.assign(l, { at: l.r.ends.map((e, k) => [x.get(k ? l.b : l.a) + e[0], y.get(k ? l.b : l.a) + e[1]]), leave: l.r.sides.map((s) => SIDES[s]) });
     shapeWires({ nodes, x, y, lines, z, inward });
