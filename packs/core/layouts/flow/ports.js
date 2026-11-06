@@ -64,8 +64,15 @@ export function portItems(items, links, ports, extras) {
     if (!ends.includes(term)) ends.push(term);
     wires.push(...(p.side === 'top' ? [{ type: PORT_LINK, from: term, to: p.id }, { type: PORT_LINK, from: p.id, to: p.to }] : [{ type: PORT_LINK, from: p.to, to: p.id }, { type: PORT_LINK, from: p.id, to: term }]));
   }
-  // The rise and the fall joined, so the numbering can take them for its top and its foot.
-  if (ends.length === 2) wires.push({ type: PORT_LINK, from: RISE, to: FALL });
+  // The rise and the fall joined, so the numbering can take them for its top and its foot; and an item wired to ports of
+  // one side alone, a dead end in the order, given the end it lacks, so it stands between the two like any other. These
+  // go with the rise and the fall once the topology is laid out (`setPorts`).
+  if (ends.length === 2) {
+    wires.push({ type: PORT_LINK, from: RISE, to: FALL });
+    const own = new Set(links.flatMap((l) => [l.from, l.to])), sides = new Map();
+    for (const p of ports.filter((q) => ORDERED.includes(q.side))) (sides.get(p.to) ?? sides.set(p.to, new Set()).get(p.to)).add(p.side);
+    for (const [id, on] of sides) if (!own.has(id) && on.size === 1) wires.push(on.has('top') ? { type: PORT_LINK, from: id, to: FALL } : { type: PORT_LINK, from: RISE, to: id });
+  }
   return { items: [...items, ...boxes, ...ends.map((id) => ({ id, type: 'port~', title: '', size: [1, 1] }))], links: [...links, ...wires] };
 }
 
