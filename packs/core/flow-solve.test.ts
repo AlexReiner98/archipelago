@@ -107,3 +107,24 @@ test('solve: a stretch out by a hair is along its axis', () => {
   const [r] = lines(g.routes);
   assert.equal(r.points[0][0], r.points.at(-1)[0]);
 });
+
+test('solve: a wire end held on its box stands at that point, and the box keeps its size', () => {
+  // A wire straight down from a to b, its ends held 40 left of a's middle and 50 right of b's: b moves, the ends stay.
+  const g = picture({ a: [100, 20, 200, 40], b: [100, 300, 200, 40] }, [['a', 'b', [[60, 40], [60, 280]]]]);
+  const r = [...g.routes.values()][0] as any;
+  r.ends = [[-40, 0], [50, 0]];
+  solve({ ...g, ...sizes });
+  const [first, last] = [r.points[0], r.points.at(-1)];
+  assert.ok(Math.abs(first[0] - (g.x.get('a')! - 40)) < 1e-6, `held on a: ${first[0]} against ${g.x.get('a')! - 40}`);
+  assert.ok(Math.abs(last[0] - (g.x.get('b')! + 50)) < 1e-6, `held on b: ${last[0]} against ${g.x.get('b')! + 50}`);
+  assert.deepEqual([g.nodes.get('a')!.w, g.nodes.get('b')!.w], [200, 200], 'neither box is stretched to keep them');
+});
+
+test('solve: ports on an edge stand beyond everything on it, on one line', () => {
+  // Two ports on the top edge, each wired down to the box below: both above it by the edging, level with each other.
+  const g = picture({ c: [100, 200, 200, 40], p: [60, 120, 6, 6], q: [140, 100, 6, 6] }, [['p', 'c', [[60, 123], [60, 180]]], ['q', 'c', [[140, 103], [140, 180]]]]);
+  for (const id of ['p', 'q']) Object.assign(g.nodes.get(id)!, { edge: [1, -1], small: true });
+  solve({ ...g, ...sizes, edging: 14 });
+  assert.equal(g.y.get('p'), g.y.get('q'), 'on one line');
+  assert.ok(g.y.get('c')! - 20 - (g.y.get('p')! + 3) >= 14 - 1e-6, 'beyond the box by the edging');
+});
