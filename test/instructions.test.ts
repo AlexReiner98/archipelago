@@ -74,7 +74,7 @@ test('the session-start text is read from the instructions on the map', async ()
   const far = await hookSessionStart(l, { session_id: 'i2', cwd: 'C:\\elsewhere' });
   assert.match(far, /how many tokens/, 'elsewhere the preset is said');
   const view = (await VIEWS.instructions.run(l, { about: repo })) as { said: { id: string; preset?: string }[] };
-  assert.deepEqual(view.said.map((s) => s.preset), ['core.estimate', 'core.report_in', 'core.draw_answers', 'software.build_first', 'software.drawing_on_map', 'science.hours']);
+  assert.deepEqual(view.said.map((s) => s.preset), ['core.estimate', 'core.report_in', 'core.draw_answers', 'software.build_first', 'software.drawing_on_map', 'science.hours', 'design.tending']);
   assert.equal(view.said[0].id, made.v);
   assert.match(again, /Before your first edit to a file, lay the build out on the map/, 'the software pack says to agree a build first');
   // A guide is said only when asked for, and the drawing instruction names where.
