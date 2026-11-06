@@ -118,3 +118,39 @@ export function apart(model, { ports, extras, pad }) {
   const frame = { l: edge.left ?? inside.l - pad, t: edge.top ?? inside.t - pad, r: edge.right ?? inside.r + pad, b: edge.bottom ?? inside.b + pad };
   return { ...model, nodes: kept(nodes), x: kept(x), y: kept(y), all: model.all.filter((n) => !own.has(n.id)), ties, ported, placed, frame };
 }
+
+/**
+ * A first sketch from a port at `at` on `side` of the box `rect` to the point `to` on that box's side: out of the port
+ * across its side to `ring` beyond the box, then round it the shorter way to the point level with `to`.
+ */
+function around(at, side, rect, ring, to) {
+  const r = { l: rect.l - ring, t: rect.t - ring, r: rect.r + ring, b: rect.b + ring };
+  const order = ['top', 'right', 'bottom', 'left'], corner = { top: [r.r, r.t], right: [r.r, r.b], bottom: [r.l, r.b], left: [r.l, r.t] };
+  const onRing = (s, q) => (s === 'top' ? [q[0], r.t] : s === 'bottom' ? [q[0], r.b] : s === 'left' ? [r.l, q[1]] : [r.r, q[1]]);
+  const near = { top: Math.abs(to[1] - rect.t), bottom: Math.abs(to[1] - rect.b), left: Math.abs(to[0] - rect.l), right: Math.abs(to[0] - rect.r) };
+  const end = Object.keys(near).reduce((s, k) => (near[k] < near[s] ? k : s), 'top');
+  const N = order.length, from = order.indexOf(side), steps = (order.indexOf(end) - from + N) % N, way = steps <= N / 2 ? 1 : -1;
+  const path = [at, onRing(side, at)];
+  // Clockwise each side ends at its corner; the other way each starts at the previous side's.
+  for (let k = 0, s = from; k < (way > 0 ? steps : N - steps); k++, s = (s + way + N) % N) path.push(corner[order[way > 0 ? s : (s + N - 1) % N]]);
+  return [...path, onRing(end, to)];
+}
+
+/**
+ * Ports held on boxes, at a level above an island (`held`: { id, on, at, side }, `at` the port's middle from its box's).
+ * Each link of a type `rewire` names ({ type: [from, to] }, ports) is a wire whose ends the solve holds at those two
+ * ports (its route's `ends`), sketched as the layout first drew it between the boxes, each end brought round its box
+ * from its port. The shape leaves it as sketched: where it ends is not the shape's to choose.
+ */
+export function holdPorts({ nodes, x, y, routes, ties, held, rewire, run }) {
+  const port = new Map(held.map((p) => [p.id, p]));
+  const rectOf = (id) => ({ l: x.get(id) - nodes.get(id).w / 2, t: y.get(id) - nodes.get(id).h / 2, r: x.get(id) + nodes.get(id).w / 2, b: y.get(id) + nodes.get(id).h / 2 });
+  const at = (p) => [x.get(p.on) + p.at[0], y.get(p.on) + p.at[1]];
+  for (const t of ties) {
+    const ends = rewire[t.type], r = routes.get(t.route);
+    if (!ends || !port.has(ends[0]) || !port.has(ends[1]) || !r) continue;
+    const drawn = r.from === t.a ? r.points : [...r.points].reverse(), [pa, pb] = ends.map((id) => port.get(id));
+    const into = [around(at(pa), pa.side, rectOf(pa.on), run, drawn[0]), around(at(pb), pb.side, rectOf(pb.on), run, drawn.at(-1))];
+    routes.set(t.route, { from: t.a, points: [...into[0], ...drawn.slice(1, -1), ...into[1].reverse()], ends: [pa.at, pb.at] });
+  }
+}

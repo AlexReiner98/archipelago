@@ -109,8 +109,11 @@ function within(places, held, given, told) {
   return fitted(places, held, arcs, order, SQUEEZE.at(-1), true);
 }
 
-/** Every number free: the least that keeps every arc, boxes rigid where they can be, leaning neither way. */
-function freely(places, given, boxes, told) {
+/**
+ * Every number free: the least that keeps every arc, boxes rigid where they can be, leaning neither way. `fixed` arcs are
+ * kept whatever order the drawing reads (a port held at its place on a box): only if nothing else gives way do they.
+ */
+function freely(places, given, boxes, told, fixed = []) {
   const arcs = ordered(places.length, given) ? given : unringed(places.length, given, told), order = ordered(places.length, arcs);
   // A box is as big as its name and what lands on it need, and no bigger: that much and it stands rigid, so what stands
   // beside its ports moves the box and never stretches it.
@@ -121,15 +124,16 @@ function freely(places, given, boxes, told) {
   arcs.sort((p, q) => spot[p[0]] - spot[q[0]]);
   let first;
   for (;;) {
-    const tried = least(places.length, [...arcs, ...rigid.values()]);
+    const tried = least(places.length, [...arcs, ...rigid.values(), ...fixed]);
     if (tried.at) { first = tried.at; break; }
     // What cannot stand rigid gives way: a box whose ports are held further apart than it measures.
     let freed = 0;
     for (const [b] of rigid) if (tried.moved.has(b.low) || tried.moved.has(b.high)) (rigid.delete(b), freed++);
+    if (!freed && fixed.length) { (fixed = []), (told.loose = (told.loose ?? 0) + 1); continue; }
     if (!freed) throw new Error('The solve cannot keep every distance');
     told.freed += freed;
   }
-  const all = [...arcs, ...rigid.values()];
+  const all = [...arcs, ...rigid.values(), ...fixed];
   // As far toward the low side as can be, and as far toward the high: halfway keeps every distance, and leans neither way.
   const end = Math.max(...first), back = least(places.length, all.map(([p, q, l]) => [q, p, l]).sort((p, q) => spot[q[0]] - spot[p[0]])).at;
   return back ? first.map((v, k) => (v + end - back[k]) / 2) : first;
@@ -172,10 +176,18 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
   for (const s of stretches) s.n = number(s.at);
   const arcs = [];
   for (const b of boxes) arcs.push([b.low, b.high, b.named[axis]]);
-  // A wire's end stands on its box, inside its corners.
-  for (const s of stretches) for (const line of s.own) {
+  // A wire's end stands on its box, inside its corners; or, where the line holds it (`ends`, a port's middle from the
+  // box's: at sea, where its island put the port), at that point, the box keeping its size. Kept whatever the order.
+  const fixed = [];
+  for (const s of stretches) for (const id of s.own) {
+    const b = lines.box.get(id), end = s.i === 1 && id === s.line.a ? 0 : 1, held = s.line.ends?.[end];
+    if (held) {
+      const d = b.named[axis] / 2 + held[axis];
+      fixed.push([b.low, s.n, d], [s.n, b.low, -d], [b.high, b.low, -b.named[axis]]);
+      continue;
+    }
     // A port is where a wire passes through a box's side: its wires meet in its middle.
-    const b = lines.box.get(line), inset = b.port ? b.size[axis] / 2 : Math.min(corner, b.size[axis] / 3);
+    const inset = b.port ? b.size[axis] / 2 : Math.min(corner, b.size[axis] / 3);
     arcs.push([b.low, s.n, inset], [s.n, b.high, inset]);
   }
   // Each thing keeps its distance from what it can see on the low side: what stands behind that is kept off by the chain.
@@ -220,7 +232,7 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
     for (const b of boxes) if (!b.edge) arcs.push(out ? [e.high, b.low, edging] : [b.high, e.low, edging]);
     for (const s of stretches) if (!s.own.includes(e.id)) arcs.push(out ? [e.high, s.n, room] : [s.n, e.low, room]);
   }
-  const at = pins ? within(places, new Set(boxes.filter((b) => pins.has(b.id)).flatMap((b) => [b.low, b.high])), arcs, told) : freely(places, arcs, boxes, told);
+  const at = pins ? within(places, new Set(boxes.filter((b) => pins.has(b.id)).flatMap((b) => [b.low, b.high])), arcs, told) : freely(places, arcs, boxes, told, fixed);
   for (const way of [-1, 1]) {
     const on = edged.filter((e) => e.edge[1] === way), line = way < 0 ? Math.min(...on.map((e) => at[e.low])) : Math.max(...on.map((e) => at[e.high]));
     for (const e of on) { const by = line - at[way < 0 ? e.low : e.high]; (at[e.low] += by), (at[e.high] += by); }
@@ -262,7 +274,7 @@ function squared(points) {
 /** Every box and line placed, `rounds` passes each way. `routes` by link, `nodes` by item, with `x` and `y` their middles, are changed in place. */
 export function solve({ nodes, x, y, routes, wire, room, run, corner, apart, join, rounds = 2, edging }) {
   const boxes = [...x.keys()].map((id) => { const n = nodes.get(id); return { id, at: [x.get(id), y.get(id)], size: [n.w, n.h], named: [n.w, n.h], ...(n.edge && { edge: n.edge, port: n.small }) }; });
-  const lines = [...routes].map(([k, r]) => { const [p, q] = k.split('|'); return { route: r, a: r.from, b: r.from === p ? q : p, points: squared(r.points) }; }).filter((l) => l.points.length > 1);
+  const lines = [...routes].map(([k, r]) => { const [p, q] = k.split('|'); return { route: r, a: r.from, b: r.from === p ? q : p, points: squared(r.points), ...(r.ends && { ends: r.ends }) }; }).filter((l) => l.points.length > 1);
   lines.box = new Map(boxes.map((b) => [b.id, b]));
   lines.joined = new Set(routes.keys());
   const told = { freed: 0, rings: 0 };

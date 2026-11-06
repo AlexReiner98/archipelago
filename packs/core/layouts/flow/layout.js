@@ -16,7 +16,7 @@ import { pair } from './polyline.js';
 import { drawnPart, linksOf } from './search.js';
 import { shape } from './shape.js';
 import { solve, solveSections } from './solve.js';
-import { apart, portItems, setPorts } from './ports.js';
+import { apart, holdPorts, portItems, setPorts } from './ports.js';
 import { stepsOf } from './steps.js';
 
 /** How many finished pictures are kept. */
@@ -31,7 +31,7 @@ const kept = new Map();
 
 /** The layout of an answer, worked out once for each answer and kept. */
 export function layout(args) {
-  const { items, links, undrawn, headless, sizes, aspect, shapes, ports, extras, combed } = args, key = JSON.stringify([items, links, undrawn, headless, sizes, aspect, shapes, ports, extras, combed]);
+  const { items, links, undrawn, headless, sizes, aspect, shapes, ports, extras, combed, held, rewire, apart } = args, key = JSON.stringify([items, links, undrawn, headless, sizes, aspect, shapes, ports, extras, combed, held, rewire, apart]);
   const hit = kept.get(key) ?? laidOut(args);
   kept.delete(key);
   kept.set(key, hit);
@@ -41,9 +41,9 @@ export function layout(args) {
 }
 
 /** Each line's way chosen, the boxes at `x` and `y`. */
-function shapeWires({ nodes, x, y, lines, z, through, inward }) {
+function shapeWires({ nodes, x, y, lines, z, through, inward, home }) {
   const boxes = new Map([...x.keys()].map((id) => [id, { x: x.get(id), y: y.get(id), w: nodes.get(id).w, h: nodes.get(id).h, pointed: nodes.get(id).shape === 'diamond' }]));
-  shape(boxes, lines, { room: z.room, run: z.run, corner: z.corner, wire: z.turn, ports: z.ports, rounds: z.rounds, cost_cross: z.shape_cross, cost_bend: z.cost_bend, cost_side: z.cost_side, work: z.shape_work, through, inward });
+  shape(boxes, lines, { room: z.room, run: z.run, corner: z.corner, wire: z.turn, ports: z.ports, rounds: z.rounds, cost_cross: z.shape_cross, cost_bend: z.cost_bend, cost_side: z.cost_side, work: z.shape_work, through, inward, home });
 }
 
 /** The routes as lines, each from its `from`. */
@@ -84,9 +84,12 @@ function laidOut(args) {
   return crossed(wired({})) <= crossed(combed({})) ? wired : combed;
 }
 
-function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = ['part_of'], measure, sizes, shapes, aspect = 1.6, chains: asWires, ports = [], extras = [] }) {
-  // An island laid out again with its ports (./ports.js): each port, and its name and legend, a box of its own.
-  const ported = ports.length > 0, pad = sizes.flow_island_pad, { items: given, links: told } = ported ? portItems(asked, linked, ports, extras) : { items: asked, links: linked };
+function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = ['part_of'], measure, sizes, shapes, aspect = 1.6, chains: asWires, ports = [], extras = [], held = [], rewire = {}, apart: away }) {
+  // A level with ports (./ports.js): an island's free on its frame, with its name and legend boxes of their own; or, at
+  // sea, each held on its island, the links between islands wires between ports. Both are laid out by the same layers.
+  const ported = ports.length > 0, holding = held.length > 0, pad = sizes.flow_island_pad;
+  const withPorts = ported ? portItems(asked, linked, ports, extras) : { items: asked, links: linked };
+  const given = withPorts.items, told = withPorts.links;
   const { items, links } = flatten({ items: given, links: told, undrawn });
   const { nodes, edges, potential } = stepsOf({ items, links, measure, sizes, shapes });
   const z = lengthsOf(sizes), { gap } = z, margin = sizes.flow_margin, stepSize = (id) => nodes.get(id);
@@ -109,16 +112,18 @@ function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = [
   // A port's wire joins the island after its topology: the island keeps the parts it was laid out in, and the shape and
   // the solve take the port's wire with all the rest.
   const inward = ported ? setPorts({ nodes, x, y, routes, ties, ports, extras, gap: sizes.flow_island_legend_gap, pad }) : undefined;
-  const lengths = { nodes, x, y, routes, section: sizes.flow_section_gap, gap, margin, aspect, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: gap / 2, join: z.join }, firstWires = new Map([...routes].map(([k, r]) => [k, r.points]));
+  if (holding) holdPorts({ nodes, x, y, routes, ties, held, rewire, run: z.run });
+  const lengths = { nodes, x, y, routes, section: sizes.flow_section_gap, gap, margin, aspect, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: away ?? gap / 2, join: z.join }, firstWires = new Map([...routes].map(([k, r]) => [k, r.points]));
   const before = { x: new Map(x), y: new Map(y), sizes: new Map([...nodes].map(([id, n]) => [id, [n.w, n.h]])) };
   if (routes.size <= z.shape_most) {
     const lines = linesOf(routes);
+    for (const l of lines) if (l.r.ends) l.stays = true;
     shapeWires({ nodes, x, y, lines, z, inward });
     for (const l of lines) l.r.points = l.points;
   }
   staging?.('shape', routes);
   // With ports, the island is one section: its frame is round all of it.
-  const solved = (all) => (ported ? solve({ ...all, edging: pad }) : solveSections(all));
+  const solved = (all) => (ported || holding ? solve({ ...all, edging: pad }) : solveSections(all));
   try {
     solved(lengths);
   } catch (e) {

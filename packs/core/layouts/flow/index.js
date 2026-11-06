@@ -124,7 +124,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
   answer = { ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) };
-  const run = (part) => layout({ items: part.items, links: part.links, ...(part.ports && { ports: part.ports, extras: part.extras }), ...(part.combed && { combed: true }), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes });
+  const run = (part) => layout({ items: part.items, links: part.links, ...Object.fromEntries(['ports', 'extras', 'combed', 'held', 'rewire', 'apart'].filter((k) => part[k] !== undefined).map((k) => [k, part[k]])), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes });
   // A picture of more than one island is an archipelago (./archipelago.js): each island laid out alone, a sea between.
   const parts = !story && islandsOf(answer.items).length > 1 ? islandModels({ items: answer.items, links: answer.links ?? [], run }) : null;
   let g = parts ? null : run({ items: answer.items, links: answer.links ?? [] });
