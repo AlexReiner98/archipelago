@@ -1,6 +1,6 @@
 // The canvas as a replica of the log, in a real browser (skipped where there is no Chrome): an agent's change to an
 // item drawn reaches the open canvas through the facts the page tails, and is drawn without the lens being read again;
-// a link made to something the canvas does not hold reads the lens again, so the walk can reach it.
+// a link made that the walk may follow reads the lens again, so the server says what it reaches.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -41,10 +41,10 @@ test("in a browser, an agent's change reaches an open canvas without a lens read
     const probe = `(() => { const v = document.querySelector('#canvas .pane-canvas > .lens-wrap'); const s = v?.store; return JSON.stringify({ has: Boolean(v), store: Boolean(s), pos: s?.pos, titles: s ? [...s.items.values()].map((r) => r.title) : null, drawn: [...document.querySelectorAll('#canvas svg a')].map((a) => a.textContent) }); })()`;
     assert.ok(await until(drawn('Renamed step')), `the new title is drawn: ${await page.evaluate(probe)} ${page.logs().join('\n')}`);
     assert.equal(await page.evaluate('window.flatReads'), 0, 'drawn from the facts, with no lens read');
-    // An item made in the same change as its link to what is drawn comes with the facts: still no lens read.
+    // An item made and linked to what is drawn may change what the walk finds: the lens is read again, the server judging.
     await agentChange([{ op: 'create', ref: 'c', type: 'task', title: 'Third step' }, { op: 'link', type: 'depends_on', from: 'c', to: made.a }]);
     assert.ok(await until(drawn('Third step')), `a new item linked in is drawn: ${await page.evaluate(probe)} ${page.logs().join('\n')}`);
-    assert.equal(await page.evaluate('window.flatReads'), 0, 'what came with its link needs no lens read');
+    assert.ok((await page.evaluate<number>('window.flatReads')) >= 1, 'what a query finds is asked of the server');
     // A link to an item that was there all along, not held: the lens is read again, and the walk reaches it.
     await agentChange([{ op: 'link', type: 'depends_on', from: made.d, to: made.a }]);
     assert.ok(await until(drawn('Elsewhere')), `what a new link reaches is drawn: ${await page.evaluate(probe)} ${page.logs().join('\n')}`);

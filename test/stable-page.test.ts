@@ -86,7 +86,7 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
   }
 });
 
-test("in a browser, an agent's change reaches a store holding a flat lens's answer, with no lens read", { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test("in a browser, an agent's change reaches a view of the store with no lens read, and what may move its answer asks again", { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   await call('/api/workspace_set', undefined, { agent_changes: 'apply' });
   const change = async (ops: unknown[]) => {
@@ -117,17 +117,20 @@ test("in a browser, an agent's change reaches a store holding a flat lens's answ
       // Every lens read from here on is counted.
       window.reads = 0;
       const fetched = window.fetch;
-      window.fetch = (url, init) => ((String(url).includes('/api/view') && (window.reads += 1)), fetched(url, init));
+      window.fetch = (url, init) => ((String(init?.body ?? '').includes('"name":"flat"') && (window.reads += 1)), fetched(url, init));
     })()`);
     assert.equal(await page.evaluate(`window.store.answer().items.length`), 2);
+    await change([{ op: 'update', id: made.a, title: 'A flat lens' }]);
+    assert.ok(await until(`window.store.item('${made.a}')?.title === 'A flat lens'`), 'the change reaches the store');
+    const renamed = await page.evaluate<{ reads: number; asked: boolean; changed: string[] }>(`({ reads: window.reads, asked: window.heard.some((c) => c.ask), changed: window.heard.flatMap((c) => c.items.changed) })`);
+    assert.deepEqual(renamed, { reads: 0, asked: false, changed: [made.a] }, 'with no lens read, the listener told what changed');
+    // A new task linked under it may change what the walk finds: the server is asked, not the store.
     const more = await change([
-      { op: 'update', id: made.a, title: 'A flat lens' },
       { op: 'create', ref: 'r', type: 'task', title: 'Replica' },
       { op: 'link', type: 'part_of', from: 'r', to: made.p },
     ]);
-    assert.ok(await until(`window.store.item('${made.a}')?.title === 'A flat lens' && window.store.item('${more.r}')?.title === 'Replica'`), 'the change reaches the store');
-    const seen = await page.evaluate<{ reads: number; links: number; added: string[] }>(`({ reads: window.reads, links: window.store.answer().links.length, added: window.heard.flatMap((c) => c.items.added) })`);
-    assert.deepEqual(seen, { reads: 0, links: 2, added: [more.r] }, 'with no lens read, the new task and its link in the store, the listener told');
+    assert.ok(await until(`window.heard.some((c) => c.ask)`), 'the view is told to ask again');
+    assert.equal(await page.evaluate(`window.store.item('${more.r}')`), undefined, 'what the view finds is the server’s to say');
   } finally {
     await page.close();
   }

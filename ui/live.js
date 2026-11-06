@@ -1,6 +1,6 @@
 import { api, h, hooks, main, route, state } from './base.js';
 import { changeSet } from './changes.js';
-import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
+import { follow as keepCurrent, Store, View } from './replica.js';
 import { trace } from './traces.js';
 import { lookMode } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
@@ -10,8 +10,8 @@ import { relations, starterOf, types } from './words.js';
 // ---- live updates --------------------------------------------------------
 
 // The page reads the log forward (`tail`, src/tail.ts): the facts after where it stands on
-// what it holds. A store that holds a lens's answer (ui/replica.js) projects them itself; the
-// sheet learns which of its items they touched. The page is drawn again, in place,
+// what it holds. The page's one store (ui/replica.js), shared by every view open on it, projects
+// them itself; the sheet learns which of its items they touched. The page is drawn again, in place,
 // only when one of them is on it, unless that would throw away something half done
 // (typed text, ticked boxes, an open question, a graph being explored); then a notice
 // offers the refresh instead. A change elsewhere on the map leaves the page still.
@@ -97,19 +97,23 @@ export const kinds = {
   flavour: (link) => { const out = []; for (let r = relations.get(link); r?.extends && !out.includes(r.extends); r = relations.get(r.extends)) out.push(r.extends); return out; },
 };
 
+/** The page's one store of items and links by id, shared by every view (the owner, 5 Nov 2026, e_5cdm9bfg). */
+export const store = new Store(kinds);
+
 /**
- * A store holding what `read` answers (a flat lens's answer), kept current from the log from then on: where the log
- * stands is read first, so nothing said while the lens is read is missed. Stop with `unfollow` (ui/replica.js).
+ * A view of what `read` answers (a flat lens's answer), its rows in the page's one store and kept current from the log
+ * from then on: where the log stands is read first, so nothing said while the lens is read is missed. Stop with
+ * `unfollow` (ui/replica.js).
  */
 export async function replicate(read) {
   // A look draws once and is closed: it is kept current from nothing (and tail is the owner's page's, not an agent's).
   const { pos, queue } = lookMode ? {} : await api('tail', {});
-  const store = new Replica(kinds);
+  const view = new View(store);
   const [answer, held] = await Promise.all([read(), heldNow()]);
-  store.hold(answer, pos);
+  view.hold(answer, pos);
   store.holdChanges(held);
   heard.queue ??= queue;
-  return keepCurrent(store);
+  return keepCurrent(view);
 }
 /** The changes held for the owner, as this viewer may see them; none where they may not. */
 const heldNow = () => api('proposals').catch(() => []);
@@ -118,15 +122,13 @@ const heard = { queue: undefined };
 /** Read the log and what is held again now, not at the next beat: after the person decided or made something here. */
 export async function heldAgain() {
   await checkTail();
-  const held = await heldNow();
-  for (const store of kept) store.holdChanges(held);
+  store.holdChanges(await heldNow());
 }
-/** The queue moved (a change held, applied or declined): every store reads what is held again. */
-async function queueMoved(queue, stores) {
-  if (queue === heard.queue || !stores.length) return;
+/** The queue moved (a change held, applied or declined): the store reads what is held again. */
+async function queueMoved(queue) {
+  if (queue === heard.queue || !store.views.size) return;
   heard.queue = queue;
-  const held = await heldNow();
-  for (const store of stores) store.holdChanges(held);
+  store.holdChanges(await heldNow());
 }
 
 /** Whether what changed (the items facts and events touched, and whether the held changes or a story moved) bears on the page in view. */
@@ -155,24 +157,25 @@ export async function checkTail() {
   let touched;
   let more = false;
   try {
-    // From the furthest back of the page and its stores, on everything any of them holds.
-    const stores = [...kept];
-    const at = [state.pos, ...stores.map((s) => s.pos)].filter((pos) => pos !== undefined);
+    // From the furthest back of the page and its store, on everything it holds and the islands its views touch.
+    const following = store.views.size > 0;
+    const at = [state.pos, ...(following ? [store.pos] : [])].filter((pos) => pos !== undefined);
     const from = at.length ? Math.min(...at) : undefined;
-    const ids = [...new Set([...shownIds(), ...stores.flatMap((s) => s.ids())])];
-    const beat = await api('tail', { ...(from === undefined ? { page: thisPage() } : { after: from, seq: state.seq, ids, page: thisPage() }) });
-    // Only an answer that read the facts moves a store: one that says only where the log stands would skip them.
-    if (beat.entries) for (const store of stores) {
+    const ids = [...new Set([...shownIds(), ...(following ? store.ids() : [])])];
+    const islands = following ? store.islands() : [];
+    const beat = await api('tail', { ...(from === undefined ? { page: thisPage() } : { after: from, seq: state.seq, ids, ...(islands.length && { islands }), page: thisPage() }) });
+    // Only an answer that read the facts moves the store: one that says only where the log stands would skip them.
+    if (beat.entries && following) {
       try {
-        // What the facts changed of what the store held, worked out before they are folded in: traced until seen (ui/traces.js).
-        const set = changeSet(store, kinds, beat.entries, { after: store.pos, gone: beat.gone });
+        // What the facts changed of what the store held, worked out before they are folded in, once: traced until seen (ui/traces.js).
+        const set = changeSet(store, kinds, store.fresh(beat.entries), { after: store.pos, gone: beat.gone });
         store.apply(beat);
         trace(set).catch(() => {});
       } catch (err) {
         console.error(err);
       }
     }
-    queueMoved(beat.queue, stores).catch(() => {});
+    queueMoved(beat.queue).catch(() => {});
     touched = state.pos === undefined ? undefined : touchedBy(beat, state.pos);
     now = `${beat.pos}.${beat.seq}.${beat.queue}`;
     state.pos = beat.pos;
