@@ -21,9 +21,9 @@ function drawn(value: unknown) {
   const g = {
     nodes: new Map([[finding.id, { item: finding }], [reader.id, { item: reader }]]),
     islands: [{ id: 'e_islanda1', land, name: [0, 0], entries: [] }, { id: 'e_islandb1', land: [{ l: 0, t: 200, r: 100, b: 260 }], name: [0, 200], entries: [] }],
-    ties: [{ a: reader.id, b: finding.id, crossing: true, points: [[50, 200], [50, 130], [50, 60]], gates: [{ island: 'e_islandb1', at: [50, 196], way: [0, -1], k: 1 }, { island: 'e_islanda1', at: [50, 64], way: [0, 1], k: 1 }], sea: [[50, 196], [50, 130], [50, 64]], label: { at: [50, 130], across: false, room: 132 } }],
+    ties: [{ a: reader.id, b: finding.id, crossing: true, points: [[50, 200], [50, 130], [50, 60]], gates: [{ island: 'e_islandb1', at: [50, 196], way: [0, -1], k: 1 }, { island: 'e_islanda1', at: [50, 64], way: [0, 1], k: 1 }], sea: [[50, 196], [50, 130], [50, 64]], label: { id: 'e_name0001', at: [50, 64], w: 132 } }],
   };
-  return islandMarks({ g, legends: new Map(), islands: [{ id: 'e_islanda1', title: 'Money' }, { id: 'e_islandb1', title: 'Beta' }], style: { hues: ['#2b7a78', '#c06c84'] }, z: (name: string) => sizes[`flow_${name}`], m, titled: (mark: unknown) => mark, measure: (t: string) => t.length * 6, fit: (t: string) => t, isHex: (h: string) => /^#[0-9a-f]{3,8}$/i.test(h) });
+  return islandMarks({ g, legends: new Map(), islands: [{ id: 'e_islanda1', title: 'Money' }, { id: 'e_islandb1', title: 'Beta' }], style: { hues: ['#2b7a78', '#c06c84'] }, z: (name: string) => sizes[`flow_${name}`], m, titled: (mark: unknown) => mark, outline: (shape: string, x: number, y: number, w: number, h: number) => m('path', { d: `${shape} ${x} ${y} ${w} ${h}` }), fit: (t: string) => t, isHex: (h: string) => /^#[0-9a-f]{3,8}$/i.test(h) });
 }
 
 test('a finding read across has a pulse from its gate to its reader’s, keyed by the two, carrying what it promises', () => {
