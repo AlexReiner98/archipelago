@@ -193,7 +193,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `pan-zoom.js` | the infinite plane |
 | `pinch.js` | two fingers on it |
 | `canvas-wires.js` | a held change's badge clicked, opening where it is decided |
-| `live.js`, `replica.js`, `ghosts.js` | tailing the log; the store; held changes drawn into it |
+| `live.js`, `replica.js`, `membership.js`, `ghosts.js` | tailing the log; the one store, keyed by item, shared by views; when a view asks again; held changes drawn into it |
 | `panes.js`, `pane-drag.js`, `pane-address.js` | more than one canvas at once: panes alike side by side in a tab, dragged; the address and back and forward the pane in focus's |
 | `tabs.js`, `tab-bar.js`, `pane-route.js`, `pane-land.js` | tabs at the top, one per session at work, popped out and back; where an agent's step lands |
 | `item.js` and the sheet's parts | the item's page (being settled) |

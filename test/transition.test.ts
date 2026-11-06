@@ -11,12 +11,12 @@ import { stagesOf } from '../ui/transition.js';
 const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'core', 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house');
 const numbers = house.props?.numbers ?? house.numbers;
 
-type Row = { box: number[]; wire?: boolean; path?: string | null; holds?: boolean; within?: string | null };
+type Row = { box: number[]; wire?: boolean; path?: string | null; holds?: boolean; within?: string | null; pulse?: string };
 const marks = (rows: Record<string, Row>) => new Map(Object.entries(rows).map(([k, r]) => [k, { wire: false, path: null, holds: false, within: null, ...r }]));
 const box = (x: number, y: number, w = 100, h = 30) => [x, y, w, h];
 
 test('the house style names every number the page moves by', () => {
-  for (const name of ['motion_leave', 'motion_move', 'motion_arrive', 'motion_movers_most', 'motion_marks_most', 'motion_still_within']) assert.equal(typeof numbers[name], 'number', name);
+  for (const name of ['motion_leave', 'motion_move', 'motion_arrive', 'motion_movers_most', 'motion_marks_most', 'motion_still_within', 'motion_pulse']) assert.equal(typeof numbers[name], 'number', name);
 });
 
 test('what leaves, stays and arrives is matched by key, in three stages one after the other', () => {
@@ -89,4 +89,25 @@ test('what most marks went by together is the frame moving: it moves back as one
   assert.deepEqual(plan.times.move, [0, numbers.motion_move]);
   // A picture whose frame cannot be moved (laid out by the page) moves each mark.
   assert.equal(stagesOf(before, after, numbers, false, false).move.length, 3);
+});
+
+test('a pulse runs when its words change, after what moves, and even where the rest is cut', () => {
+  const still = { 's:a': { box: box(0, 0) } };
+  const was = marks({ ...still, 'pulse:f:r': { box: box(0, 50, 200, 2), wire: true, path: 'M0 50H200', pulse: '[400]' } as Row });
+  const now = (said: string, rows: Record<string, Row> = still) => marks({ ...rows, 'pulse:f:r': { box: box(0, 50, 200, 2), wire: true, path: 'M0 50H200', pulse: said } as Row });
+  // Nothing else changed: the rest is still, and the pulse runs at once.
+  const alone = stagesOf(was, now('[450]'), numbers);
+  assert.equal(alone.cut, 'still');
+  assert.deepEqual(alone.pulse, ['pulse:f:r']);
+  assert.deepEqual(alone.times.pulse, [0, numbers.motion_pulse]);
+  // Its words the same: nothing runs, and a pulse is never faded, moved or drawn in.
+  const same = stagesOf(was, now('[400]', { 's:a': { box: box(0, 0) }, 's:b': { box: box(0, 90) } }), numbers);
+  assert.deepEqual([same.pulse, same.arrive, same.draw], [[], ['s:b'], []]);
+  assert.deepEqual(stagesOf(marks(still), now('[450]'), numbers).arrive, [], 'a pulse that comes is not seen');
+  // With what moves: it runs after the move.
+  const moved = stagesOf(was, now('[450]', { 's:a': { box: box(0, 0) }, 's:b': { box: box(0, 90) } }), numbers);
+  assert.deepEqual(moved.pulse, ['pulse:f:r']);
+  assert.deepEqual(moved.times.pulse, [moved.times.arrive[0], numbers.motion_pulse]);
+  // Less motion asked for: nothing runs.
+  assert.deepEqual(stagesOf(was, now('[450]'), numbers, true).pulse, []);
 });
