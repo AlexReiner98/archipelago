@@ -8,7 +8,7 @@
 // group of its own, with no shore. Layer: metrics. Pure: the answer and a layout in, one model of the whole picture out.
 
 import { bridged } from './finish.js';
-import { frameOf, SIDES } from './ports.js';
+import { frameOf, insideOf, SIDES } from './ports.js';
 
 /** The islands an answer's items live on, in the order they come. */
 export const islandsOf = (items) => [...new Set(items.map((i) => i.island).filter(Boolean))];
@@ -61,7 +61,7 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   const M = sizes.flow_margin;
   // The first pass: each island alone, to its frame.
   const blocks = groups.map((g) => {
-    const shore = g.id !== null, widths = shore ? legends.get(g.id) ?? [] : [], legend = band(widths, Math.max(0, ...widths), GAP, ROW);
+    const shore = g.id !== null, widths = shore ? legends.get(g.id) ?? [] : [], legend = band(widths, Math.max(insideOf(g.model.raw).r - insideOf(g.model.raw).l, z('legend_wide'), ...widths), GAP, ROW);
     const raw = g.model.raw;
     const framed = frameOf(raw, { name: shore ? names.get(g.id) ?? 0 : 0, legend, pad: PAD, room: NAME, gap: GAP });
     return { ...g, shore, legend, raw, ...framed, first: framed };
@@ -102,14 +102,17 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   for (const b of blocks) {
     const ports = [...new Map(wires.flatMap((w) => w.ends.filter((e) => e.block === b)).map((e) => [e.id, { id: e.id, side: e.side, to: e.to, size: e.size, small: e.small }])).values()];
     const box = (r) => [r.r - r.l, r.b - r.t];
-    const extras = [b.first.named && { id: '\u0000name', size: box(b.first.named) }, b.first.keyed && { id: '\u0000legend', size: box(b.first.keyed) }].filter(Boolean);
+    // Its header is one box, its name over its legend, so the two stand together wherever the solve puts it.
+    const [nw, nh] = b.first.named ? box(b.first.named) : [0, 0], [kw, kh] = b.first.keyed ? box(b.first.keyed) : [0, 0], under = nh && kh ? GAP : 0;
+    const extras = nh || kh ? [{ id: '\u0000header', size: [Math.max(nw, kw), nh + under + kh] }] : [];
     b.ported = ports.length ? run({ items: b.items, links: b.links, ports, extras }) : null;
     if (b.ported) ({ frame: b.frame, model: b.model } = { frame: b.ported.frame, model: b.ported });
     if (b.ported) {
       const sizeOf = new Map(ports.map((p) => [p.id, p.size])), r = [b.frame, ...[...b.ported.ported].map(([id, p]) => ({ l: p.at[0] - sizeOf.get(id)[0] / 2, t: p.at[1] - sizeOf.get(id)[1] / 2, r: p.at[0] + sizeOf.get(id)[0] / 2, b: p.at[1] + sizeOf.get(id)[1] / 2 }))];
       b.box = { l: Math.min(...r.map((q) => q.l)), t: Math.min(...r.map((q) => q.t)), r: Math.max(...r.map((q) => q.r)), b: Math.max(...r.map((q) => q.b)) };
     }
-    if (b.ported) ({ named: b.named, keyed: b.keyed } = b.ported.placed);
+    const head = b.ported?.placed.header;
+    if (head) [b.named, b.keyed] = [nh ? { l: head.l, t: head.t, r: head.l + nw, b: head.t + nh } : null, kh ? { l: head.l, t: head.t + nh + under, r: head.l + kw, b: head.b } : null];
   }
   // Then the sea again, each port held where its island put it: the islands placed and every wire at sea laid out by the
   // same layers as inside, out of its port and between them.

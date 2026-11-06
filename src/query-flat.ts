@@ -9,7 +9,7 @@
 // row-level security keeps what they may not see out of the seeds, the walk and the links alike.
 
 import { SYSTEM } from './head.ts';
-import { ISLAND, onIslands } from './island-items.ts';
+import { ISLAND, islandPack, onIslands } from './island-items.ts';
 import type { Archipelago } from './pelago.ts';
 import { checkedAfter, holding, wordConditions, type Narrowing, type Word } from './query-only.ts';
 import { heldIds } from './query-held.ts';
@@ -290,7 +290,9 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   // drawing draws each island's border from them (task e_auw7hb3v). Read for those sent alone.
   const islandOf = (e: Row) => (l.registry.onIslands && typeof e.props?.[ISLAND] === 'string' ? (e.props[ISLAND] as string) : undefined);
   const islandIds = [...new Set(items.flatMap((e) => islandOf(e) ?? []))];
-  const named = new Map(islandIds.length ? (await l.db.query<{ id: string; title: string }>(`select id, title from entity where id = any($1::text[])`, [islandIds])).rows.map((r) => [r.id, r.title]) : []);
+  // Each island's name, and the pack it speaks, whose vocabulary a drawing names in the island's legend.
+  const isles = islandIds.length ? (await l.db.query<{ id: string; title: string; pack: string | null }>(`select id, title, props->>'pack' as pack from entity where id = any($1::text[])`, [islandIds])).rows : [];
+  const named = new Map(isles.map((r) => [r.id, r.title])), packOf = new Map(isles.map((r) => [r.id, r.pack && islandPack(l.registry, r.pack)]));
   // An end said by name goes back in the lens as its id.
   lens.find = finds.map(sayTerm);
   lens.only = onlys.map(sayTerm);
@@ -323,7 +325,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
     }),
     // A link that extends another says what it is a flavour of (`is`, nearest first), so a drawing treats it as its root.
     links: relations.map((r) => ({ id: r.id, type: r.type, ...(flavourOf(l, r.type).length && { is: flavourOf(l, r.type) }), from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
-    ...(islandIds.length && { islands: islandIds.map((id) => ({ id, ...(named.has(id) && { title: named.get(id) }) })) }),
+    ...(islandIds.length && { islands: islandIds.map((id) => ({ id, ...(named.has(id) && { title: named.get(id) }), ...(packOf.get(id) && { pack: packOf.get(id) }) })) }),
     ...(filed && { lanes: filed.lanes, streams: filed.streams }),
     ...(cut && { cut: true }),
     ...(matched !== undefined && { matched }),

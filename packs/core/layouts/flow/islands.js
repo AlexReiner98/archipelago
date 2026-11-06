@@ -8,6 +8,9 @@
 // When the finding moves, a pulse runs from its gate across the sea to each reader's (task e_fqhbp4yq).
 // Layer: marks. Pure: the composed model and each island's legend rows in, marks and colour rules out.
 
+/** An island's name as its header says it: its title, and the pack it speaks. */
+export const nameOf = (i) => `${i?.title ?? ''}${i?.pack?.title ? ` · ${i.pack.title}` : ''}`;
+
 /** What a link across names: what it points to, and its value. */
 export function saidOf(to) {
   const value = to?.fields?.value;
@@ -22,7 +25,7 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, out
   if (!g.islands?.length) return { layer: [], gates: [], rules: [], tips: new Map() };
   const given = Array.isArray(style.island_hues) && style.island_hues.length ? style.island_hues : Array.isArray(style.hues) ? style.hues : [];
   const hues = given.filter(isHex);
-  const named = new Map(islands.map((i) => [i.id, i.title]));
+  const named = new Map(islands.map((i) => [i.id, nameOf(i)]));
   const rules = new Set(), classes = new Map();
   g.islands.forEach((isle, k) => {
     const hex = hues.length ? hues[k % hues.length] : null;

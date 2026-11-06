@@ -21,16 +21,18 @@ const bounds = (rects, points = []) => ({
 const rectOf = (at, size) => ({ l: at[0] - size[0] / 2, t: at[1] - size[1] / 2, r: at[0] + size[0] / 2, b: at[1] + size[1] / 2 });
 const boxOf = (nodes, x, y, id) => rectOf([x.get(id), y.get(id)], [nodes.get(id).w, nodes.get(id).h]);
 
+/** What an island's first layout (`raw`, the flow's own places) takes up: its steps and its wires. */
+export const insideOf = (raw) => bounds([...raw.x.keys()].map((id) => boxOf(raw.nodes, raw.x, raw.y, id)), [...raw.routes.values()].flatMap((r) => r.points));
+
 /**
- * An island's frame, from its first layout (`raw`, the flow's own places): its steps and wires, its name's room over them at
- * the left (`name` wide), its legend (`legend`, { w, h }) a column at their right, all `pad` inside the frame. Answers with
- * the frame and where the name and the legend stand, in the island's own places.
+ * An island's frame, from its first layout: its steps and wires, under a header of its name (`name` wide) over its legend
+ * (`legend`, { w, h }), both at the left, all `pad` inside the frame. Answers with the frame and where the name and the
+ * legend stand, in the island's own places.
  */
 export function frameOf(raw, { name = 0, legend, pad, room, gap }) {
-  const boxes = [...raw.x.keys()].map((id) => boxOf(raw.nodes, raw.x, raw.y, id));
-  const inside = bounds(boxes, [...raw.routes.values()].flatMap((r) => r.points));
-  const named = name ? { l: inside.l, t: inside.t - room, r: inside.l + name, b: inside.t } : null;
-  const keyed = legend?.h ? { l: inside.r + gap, t: inside.t, r: inside.r + gap + legend.w, b: inside.t + legend.h } : null;
+  const inside = insideOf(raw);
+  const keyed = legend?.h ? { l: inside.l, t: inside.t - gap - legend.h, r: inside.l + legend.w, b: inside.t - gap } : null;
+  const top = keyed ? keyed.t : inside.t, named = name ? { l: inside.l, t: top - room, r: inside.l + name, b: top } : null;
   const all = bounds([inside, ...[named, keyed].filter(Boolean)]);
   return { frame: { l: all.l - pad, t: all.t - pad, r: all.r + pad, b: all.b + pad }, named, keyed };
 }
@@ -55,8 +57,8 @@ export function portItems(items, links, ports, extras) {
 }
 
 /**
- * Where the first sketch has them, set the ports and the name and legend where they go: the name over the steps at the
- * left, the legend a column at their right, each port beyond all of it on its side, beside what it is wired to, its wire
+ * Where the first sketch has them, set the ports and the island's header where they go: the header over the steps at the
+ * left, each port beyond all of it on its side, beside what it is wired to, its wire
  * sketched in across the side, a tie of its own (`ties`). Each port's node is marked for the solve (`edge`, `small`).
  * Answers with the way each port's wire must leave it, for the shape layer.
  */
@@ -65,7 +67,8 @@ export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad })
   const ids = [...x.keys()].filter((id) => !own.has(id));
   const inside = bounds(ids.map((id) => boxOf(nodes, x, y, id)), [...routes].filter(([k]) => !k.split('|').some((id) => own.has(id))).flatMap(([, r]) => r.points));
   const put = (id, l, t) => (x.set(id, l + nodes.get(id).w / 2), y.set(id, t + nodes.get(id).h / 2));
-  for (const e of extras) e.id.endsWith('name') ? put(e.id, inside.l, inside.t - gap - e.size[1]) : put(e.id, inside.r + gap, inside.t);
+  // The header (its name over its legend) over the steps, at the left.
+  for (const e of extras) put(e.id, inside.l, inside.t - gap - e.size[1]);
   // Beyond every box and every wire already drawn, so the sketch already has each port outermost, as the solve will.
   const all = bounds([inside, ...extras.map((e) => boxOf(nodes, x, y, e.id))]);
   const inward = new Map(), boxed = (id) => ({ at: [x.get(id), y.get(id)], size: [nodes.get(id).w, nodes.get(id).h] });
@@ -106,7 +109,7 @@ export function apart(model, { ports, extras, pad }) {
     const id = portIds.has(t.a) ? t.a : t.b;
     ported.set(id, { at: [x.get(id), y.get(id)], points: t.a === id ? t.points : [...t.points].reverse() });
   }
-  const placed = Object.fromEntries(extras.map((e) => [e.id.endsWith('name') ? 'named' : 'keyed', boxOf(nodes, x, y, e.id)]));
+  const placed = Object.fromEntries(extras.map((e) => [e.id.slice(1), boxOf(nodes, x, y, e.id)]));
   const kept = (m) => new Map([...m].filter(([id]) => !own.has(id)));
   const ties = model.ties.filter((t) => t.type !== PORT_LINK), steps = [...kept(x).keys()];
   const inside = bounds([...steps, ...extras.map((e) => e.id)].map((id) => boxOf(nodes, x, y, id)), [...model.chains, ...ties, ...ported.values()].flatMap((w) => w.points));

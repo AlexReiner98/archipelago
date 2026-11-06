@@ -21,7 +21,7 @@
 import { lineageOf, shownOnly } from './graph.js';
 import { layout } from './layout.js';
 import { css } from './look.js';
-import { css as islandCss, islandMarks, saidOf } from './islands.js';
+import { css as islandCss, islandMarks, nameOf, saidOf } from './islands.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
@@ -265,9 +265,15 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   };
   // On an archipelago each island carries its own legend, inside it (the owner, 5 Nov 2026): its types and the link
   // types of its own wires. A link that leaves it is a finding crossing, of the shared grammar, told at its gates.
-  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })]));
+  // An island that says its pack (the answer's `islands`) names all of it: every type and link type it speaks.
+  const packRows = (pack) => [
+    ...pack.types.map((t) => ((shape) => mark(m('g', { class: 'lf-step' }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), t.title))(shapes.type?.[shapedBy({ type: t.id, is: t.is }, shapes)] ?? 'box')),
+    ...pack.links.map((r) => mark(r.id === ORDER_TYPE ? m('path', { d: 'M1 7H21', class: `lf-wire${kind(r.id)}` }) : headless.has(r.id) ? m('path', { d: 'M1 7H21', class: `lf-tie${r.id === 'part_of' ? ' near' : ''}${kind(r.id)}` }) : m('g', {}, m('path', { d: 'M1 7H17', class: `lf-tie headed${kind(r.id)}` }), m('path', { d: 'M21 7L13 3V11Z', class: `lf-head${kind(r.id)}` })), r.title)),
+  ];
+  const packOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.pack;
+  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, packOf(p.id) ? packRows(packOf(p.id)) : keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
-  const nameWidth = (id) => z('island_name_x') + measure(String((answer.islands ?? []).find((i) => i.id === id)?.title ?? ''), z('island_text'), 'region');
+  const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region');
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
   const labelWidth = (l) => { const said = saidOf(answer.items.find((i) => i.id === l.to)); return said ? Math.min(measure(said, z('island_gate_text')), z('island_gate_most') - 2 * z('island_gate_pad')) + 2 * z('island_gate_pad') : 0; };
   if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), labels: labelWidth, sizes: style.sizes });
