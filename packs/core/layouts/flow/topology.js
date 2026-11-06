@@ -57,7 +57,7 @@ export const against = (g, number) => g.wires.filter((w) => w.link?.[2] > 1 && w
  * crossings; where that leaves order wires up, the embedding made for the order (./upward.js) is tried in its place. A
  * part too large for the search's trials starts from that embedding, and is numbered only if the embedding fails.
  */
-export function downward(links, list, z, { ties = 0, nth = 0, embedded = false, madeAt } = {}) {
+export function downward(links, list, z, { ties = 0, nth = 0, embedded = false, madeAt, lines = [], mirror = false } = {}) {
   // By when each was made (`madeAt`, a step's place in that order: ./steps.js), so the picture does not change with the
   // order the answer came in and what was made first goes first: a link by its older end, then its newer, so of the
   // links from one step, one to a new step comes after the rest. Without it, by name. Ties in another fixed order keep
@@ -78,7 +78,7 @@ export function downward(links, list, z, { ties = 0, nth = 0, embedded = false, 
     const made = embed(sorted, ids);
     if (!made.unthreaded && !against(made, made.number)) return asFound(made);
   }
-  const g = planarize(sorted, ids), found = { g, ...numbered(g, nth, big ? Infinity : z.number_tries) }, up = against(g, found.number);
+  const g = planarize(sorted, ids, { lines, mirror }), found = { g, ...numbered(g, nth, big ? Infinity : z.number_tries) }, up = against(g, found.number);
   // The search gives only small parts a trial of the embedding: the first trial of a larger one tries it here.
   if (!up || ported || !(embedded || (fits && list.length > z.embed_most && !ties && !nth))) return found;
   const made = embed(sorted, ids);

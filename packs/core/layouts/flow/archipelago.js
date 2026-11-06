@@ -121,8 +121,24 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   }
   // Then each island laid out again with its ports free on those sides, its name and its legend boxes of it, so its own
   // wires and those to its ports are laid out at once, by the same layers.
-  for (const b of blocks) {
-    const ports = [...new Map(wires.flatMap((w) => w.ends.filter((e) => e.block === b)).map((e) => [e.id, { id: e.id, side: e.side, to: e.to, size: e.size, small: true, share: e.share }])).values()];
+  // The island with the most ports first, by the sea's sketch; each after it orders its ports by where those they are wired
+  // to already stand, so the two ends of a bundle agree.
+  const portsOf = (b) => new Set(wires.flatMap((w) => w.ends.filter((e) => e.block === b).map((e) => e.id))).size;
+  const sharesOf = (b) => {
+    const sum = new Map();
+    for (const w of wires) w.ends.forEach((e, k) => {
+      const o = w.ends[1 - k], at = o.block.ported?.ported.get(o.id)?.at;
+      if (e.block !== b || !at) return;
+      const along = 1 - SIDES[e.side][0], [ox, oy] = boxOf(o.block), [bx, by, bw, bh] = boxOf(b), mid = middle(o.block);
+      const abs = (along ? oy : ox) + at[along] - mid[along], share = (abs - ((along ? by : bx) - (along ? bh : bw) / 2)) / (along ? bh : bw);
+      const s0 = sum.get(e.id) ?? [0, 0];
+      sum.set(e.id, [s0[0] + share, s0[1] + 1]);
+    });
+    return sum;
+  };
+  for (const b of [...blocks].sort((p, q) => portsOf(q) - portsOf(p))) {
+    const known = sharesOf(b);
+    const ports = [...new Map(wires.flatMap((w) => w.ends.filter((e) => e.block === b)).map((e) => [e.id, { id: e.id, side: e.side, to: e.to, size: e.size, small: true, share: known.has(e.id) ? known.get(e.id)[0] / known.get(e.id)[1] : e.share }])).values()];
     const box = (r) => [r.r - r.l, r.b - r.t];
     // Its header is one box, its name over its legend, so the two stand together wherever the solve puts it.
     const [nw, nh] = b.first.named ? box(b.first.named) : [0, 0], [kw, kh] = b.first.keyed ? box(b.first.keyed) : [0, 0], under = nh && kh ? GAP : 0;
@@ -142,7 +158,10 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   // port, spread across it a wire apart, off its middle.
   const held = [];
   for (const b of blocks) for (const [id, p] of b.ported?.ported ?? []) {
-    const using = wires.filter((w) => w.ends.some((e) => e.id === id)), along = 1 - SIDES[using[0].ends.find((e) => e.id === id).side][0];
+    const along = 1 - SIDES[wires.find((w) => w.ends.some((e) => e.id === id)).ends.find((e) => e.id === id).side][0];
+    // On a bar, each read in the order its other end stands along the same way, so the reads leave it without crossing.
+    const far = (w) => { const o = w.ends.find((e) => e.id !== id), at = o.block.ported?.ported.get(o.id)?.at; return at ? boxOf(o.block)[along] + at[along] - middle(o.block)[along] : boxOf(o.block)[along]; };
+    const using = wires.filter((w) => w.ends.some((e) => e.id === id)).sort((p, q) => far(p) - far(q));
     using.forEach((w, j) => {
       const e = w.ends.find((v) => v.id === id), at = [p.at[0] - middle(b)[0], p.at[1] - middle(b)[1]];
       at[along] += (j - ((using.length > 1 ? slots(using.length) : 1) - 1) / 2) * turn;

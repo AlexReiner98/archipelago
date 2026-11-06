@@ -299,9 +299,14 @@ function join(kept, items, order) {
  * faces. A wire is { path, visible, link }, its path from u to v through the points where it crosses; `owner` says which
  * wire holds each stretch between two neighbours.
  */
-export function planarize(links, items) {
+export function planarize(links, items, { lines = [], mirror = false } = {}) {
   const { kept, left } = keptPlanar(links);
-  const edges = kept.map(([u, v]) => [u, v]), hidden = join(edges, items, links.filter((l) => l[2]));
+  // `lines` (an island's ports, a line for each side, in the sea's order) hold their order: each next two joined by an
+  // invisible edge where it stays planar, so the rise and the fall turn through them in that order. `mirror` draws the
+  // embedding the other way round, which no order of edges can ask for.
+  const edges = kept.map(([u, v]) => [u, v]), held = [];
+  for (const line of lines) for (let k = 1; k < line.length; k++) if (isPlanar([...edges, ...held, [line[k - 1], line[k]]])) held.push([line[k - 1], line[k]]);
+  const hidden = [...held, ...join([...edges, ...held], items, links.filter((l) => l[2]))];
   const wires = [], owner = new Map();
   const add = (path, visible, link) => {
     const w = { path, visible, link };
@@ -310,8 +315,9 @@ export function planarize(links, items) {
   };
   kept.forEach((l) => add([l[0], l[1]], true, l));
   for (const [u, v, leads] of hidden) if (!owner.has(pair(u, v))) (add([u, v], false, null), (wires.at(-1).leads = leads));
-  const list = faces([...owner.keys()].map((k) => k.split('|')));
-  if (!list) throw new Error('The kept part is not planar');
+  const found = faces([...owner.keys()].map((k) => k.split('|')));
+  if (!found) throw new Error('The kept part is not planar');
+  const list = mirror ? found.map((f) => [...f].reverse()) : found;
   const { through, tally } = threader(list, owner, add, { number: new Map() });
   through(left);
   return { faces: list, wires, owner, ...tally };
