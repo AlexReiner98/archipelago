@@ -103,7 +103,9 @@ function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = [
   const a = new Map([...nodes.keys()].map((id) => [id, new Set()]));
   for (const w of every) if (w.a !== w.b && a.has(w.a) && a.has(w.b)) (a.get(w.a).add(w.b), a.get(w.b).add(w.a));
   const ways = directions(chains, ties, headless), hangs = hangsOf({ a, ways, nodes, sizes, gap, z, aspect, chains: asWires }), { core, block } = hangs;
-  const how = { block, stepSize, ways, z, total: core.length };
+  // An island's ports, by side, with where along it their wires come at sea: its drawings are judged by that order too.
+  const along = new Map(ports.filter((p) => p.share !== undefined).map((p) => [p.id, [p.side, p.share]]));
+  const how = { block, stepSize, ways, z, total: core.length, along };
   const shelves = partsOf(core, a).map((list) => shelfOf(drawnPart(list, linksOf(list, every, ways), how), block));
   const { x, y, routes } = assemble(shelves, { ...hangs, stepSize, gap, margin, aspect });
   // Two links between one pair of boxes are drawn from one sketch, and each is then a wire like any other.
@@ -118,7 +120,7 @@ function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = [
   if (routes.size <= z.shape_most) {
     const lines = linesOf(routes);
     // A port's wire turns before its step, so the port is free along its side (./ports.js).
-    if (inward) for (const l of lines) if (inward.has(l.a) || inward.has(l.b)) l.turns = true;
+    if (inward) for (const l of lines) if (inward.placed.has(l.a) || inward.placed.has(l.b)) l.turns = true;
     // A wire whose ends are held (at sea, at its ports) is shaped from those points, out of each the way its port faces.
     for (const l of lines) if (l.r.ends) Object.assign(l, { at: l.r.ends.map((e, k) => [x.get(k ? l.b : l.a) + e[0], y.get(k ? l.b : l.a) + e[1]]), leave: l.r.sides.map((s) => SIDES[s]) });
     shapeWires({ nodes, x, y, lines, z, inward });

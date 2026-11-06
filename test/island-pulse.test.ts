@@ -20,10 +20,10 @@ function drawn(value: unknown) {
   const land = [{ l: 0, t: 0, r: 100, b: 60 }];
   const g = {
     nodes: new Map([[finding.id, { item: finding }], [reader.id, { item: reader }]]),
-    islands: [{ id: 'e_islanda1', land, name: [0, 0], entries: [] }, { id: 'e_islandb1', land: [{ l: 0, t: 200, r: 100, b: 260 }], name: [0, 200], entries: [] }],
-    ties: [{ a: reader.id, b: finding.id, crossing: true, points: [[50, 200], [50, 130], [50, 60]], gates: [{ island: 'e_islandb1', at: [50, 196], way: [0, -1], k: 1 }, { island: 'e_islanda1', at: [50, 64], way: [0, 1], k: 1 }], sea: [[50, 196], [50, 130], [50, 64]], label: { id: 'e_name0001', at: [50, 64], w: 132 } }],
+    islands: [{ id: 'e_islanda1', land, name: [0, 0], entries: [], steps: new Set([finding.id]) }, { id: 'e_islandb1', land: [{ l: 0, t: 200, r: 100, b: 260 }], name: [0, 200], entries: [], steps: new Set([reader.id]) }],
+    ties: [{ a: reader.id, b: finding.id, crossing: true, points: [[50, 200], [50, 130], [50, 60]], gates: [{ island: 'e_islandb1', at: [50, 196], way: [0, -1], k: 1 }, { island: 'e_islanda1', at: [50, 64], way: [0, 1], k: 1 }], sea: [[50, 196], [50, 130], [50, 64]] }],
   };
-  return islandMarks({ g, legends: new Map(), islands: [{ id: 'e_islanda1', title: 'Money' }, { id: 'e_islandb1', title: 'Beta' }], style: { hues: ['#2b7a78', '#c06c84'] }, z: (name: string) => sizes[`flow_${name}`], m, titled: (mark: unknown) => mark, outline: (shape: string, x: number, y: number, w: number, h: number) => m('path', { d: `${shape} ${x} ${y} ${w} ${h}` }), fit: (t: string) => t, isHex: (h: string) => /^#[0-9a-f]{3,8}$/i.test(h) });
+  return islandMarks({ g, legends: new Map(), islands: [{ id: 'e_islanda1', title: 'Money' }, { id: 'e_islandb1', title: 'Beta' }], style: { hues: ['#2b7a78', '#c06c84'] }, z: (name: string) => sizes[`flow_${name}`], m, titled: (mark: unknown) => mark, isHex: (h: string) => /^#[0-9a-f]{3,8}$/i.test(h) });
 }
 
 test('a finding read across has a pulse from its gate to its reader’s, keyed by the two, carrying what it promises', () => {
@@ -37,6 +37,12 @@ test('a finding read across has a pulse from its gate to its reader’s, keyed b
   assert.equal(attrs.pulse, JSON.stringify([6, '2026-11-05']));
   assert.match(String(attrs.class), /lf-pulse lf-island lf-i-2b7a78/, 'in the colour of the finding’s island');
   assert.notEqual(all(drawn(5).gates).find(([, a]) => a.key === attrs.key)?.[1].pulse, attrs.pulse, 'a moved value changes what it carries');
+});
+
+test('a finding read across is outlined in its island’s colour, and its reader is not', () => {
+  const { found } = drawn(6);
+  assert.match(String(found.get('e_finding1')), /lf-found lf-island lf-i-2b7a78/);
+  assert.equal(found.has('e_reader01'), false);
 });
 
 test('the pulse’s look is the style’s', () => {

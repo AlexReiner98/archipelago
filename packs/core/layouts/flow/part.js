@@ -1,6 +1,7 @@
 // One connected part drawn from its topology: columns and rows by the longest path, a box over its wires, and a way for each
 // wire. Layers: shape and metrics, not yet apart. Pure: a part's links in, places and lines out.
 
+import { FALL, RISE } from './graph.js';
 import { count } from './count.js';
 import { wrongEnd } from './faults.js';
 import { pair } from './polyline.js';
@@ -110,6 +111,14 @@ export function drawPart(list, links, block, box, z, trial) {
     const [a, b] = k.split('|'), [u, v] = number.get(a) < number.get(b) ? [a, b] : [b, a];
     // An invisible edge only keeps the two in order.
     yArcs.push([u, v, size(u).h + (g.owner.get(k).visible ? Math.max(z.row, z.join, z.run * 2) + ((tracks.get(`${u} 1`) ?? 0) + (tracks.get(`${v} -1`) ?? 0)) * z.turn : z.turn)]);
+  }
+  // An island's top ports stand over every item and its foot ports under every one, as the numbering took them first and
+  // last: each port's wire then reaches the frame clear.
+  const beside = (end) => new Set(links.filter((l) => l.includes(end)).map((l) => (l[0] === end ? l[1] : l[0])).filter((v) => v !== RISE && v !== FALL));
+  const tops = beside(RISE), foots = beside(FALL), terms = new Set([RISE, FALL]);
+  for (const v of rows) if (!ghost(v) && !terms.has(v) && !tops.has(v) && !foots.has(v)) {
+    for (const p of tops) if (number.get(p) < number.get(v)) yArcs.push([p, v, size(p).h + z.turn]);
+    for (const p of foots) if (number.get(v) < number.get(p)) yArcs.push([v, p, size(v).h + z.turn]);
   }
   const y = longest(rows, yArcs);
   const turned = new Map(), points = new Map();

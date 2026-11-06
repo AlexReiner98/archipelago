@@ -1,7 +1,8 @@
 // The sea is one more level of the flow (design e_87x2us2b, the owner, 6 Nov 2026): a read across is three wires joined at
 // two ports, each wire's end at sea held where its island put its port, and no wire routed by anything but the flow's own
 // layers. Checked on the whole model of a picture of three islands: where each read crosses, that no two wires share a
-// stretch, that no wire crosses a finding's name, and that where any two wires cross, one passes under.
+// stretch, that a finding's reads that leave by one port share the wire in to it, and that where any two wires cross, one
+// passes under.
 
 import assert from 'node:assert/strict';
 import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -33,9 +34,8 @@ const links = [
   { type: 'reads', from: 'e_planzzzz', to: 'e_costzzzz' }, { type: 'reads', from: 'e_sendzzzz', to: 'e_costzzzz' },
   { type: 'waits_on', from: 'e_sendzzzz', to: 'e_alexzzzz' },
 ];
-const LABEL = 90;
 const run = (part: any) => layout({ ...part, undrawn: [], headless: house.headless, measure, sizes: house.sizes, aspect: 1.6, shapes: { type: house.type_shapes ?? {} } });
-const g = compose(islandModels({ items, links, run }), { legends: new Map(), names: new Map(), labels: () => LABEL, sizes: house.sizes });
+const g = compose(islandModels({ items, links, run }), { legends: new Map(), names: new Map(), sizes: house.sizes });
 const crossing = g.ties.filter((t: any) => t.crossing);
 const all = [...g.chains, ...g.ties];
 
@@ -45,15 +45,15 @@ const onLine = (line: number[][], p: number[]) => line.some((q, i) => i > 0 && (
   return p[0] >= lo[0] - 0.5 && p[0] <= hi[0] + 0.5 && p[1] >= lo[1] - 0.5 && p[1] <= hi[1] + 0.5 && (Math.abs(r[0] - q[0]) < 0.5 || Math.abs(r[1] - q[1]) < 0.5);
 })());
 
-test('sea: each read across is one wire from its reader, through its port, to the finding’s name', () => {
+test('sea: each read across is one wire from its reader, through its port, to its finding or the port it shares', () => {
   assert.equal(crossing.length, 5, 'every link between two groups crosses');
   for (const t of crossing.filter((v: any) => v.gates.length)) {
     const [reader, finding] = t.gates;
     assert.ok(onLine(t.points, reader.at), `${t.a} passes through its port`);
-    assert.ok(t.label, `${t.b} is named where it leaves its island`);
-    const [x, y] = t.label.at, end = t.points.at(-1);
-    assert.ok(Math.abs(end[0] - x) <= LABEL / 2 + 0.5 && Math.abs(end[1] - y) <= house.sizes.flow_island_gate_height / 2 + 0.5, `${t.a} ends on the name of ${t.b}`);
-    assert.deepEqual(finding.at, t.label.at, 'the finding’s gate is its name');
+    const end = t.points.at(-1), along = finding.way[0] ? 1 : 0, n = g.nodes.get(t.b);
+    if (t.toPort) assert.ok(Math.abs(end[along] - finding.at[along]) <= finding.span / 2 + 0.5 && Math.abs(end[1 - along] - finding.at[1 - along]) <= 0.5, `${t.a} ends on the port of ${t.b}`);
+    else assert.ok(Math.abs(end[0] - g.x.get(t.b)) <= n.w / 2 + 0.5 && Math.abs(end[1] - g.y.get(t.b)) <= n.h / 2 + 0.5, `${t.a} ends on ${t.b}`);
+    assert.ok(onLine(t.points, finding.at) || t.toPort, `${t.a} passes through the port of ${t.b}`);
   }
 });
 
@@ -61,18 +61,15 @@ test('sea: no two wires share a stretch, inside an island or at sea', () => {
   assert.equal(count(all.map((w: any) => w.points)).shared, 0);
 });
 
-test('sea: no wire crosses a finding’s name', () => {
-  const H = house.sizes.flow_island_gate_height / 2, names = [...new Map(crossing.filter((t: any) => t.label).map((t: any) => [t.label.id, t.label])).values()] as any[];
-  assert.ok(names.length >= 2, 'the two findings read across are named');
-  for (const n of names) {
-    const r = { l: n.at[0] - n.w / 2 + 0.5, r: n.at[0] + n.w / 2 - 0.5, t: n.at[1] - H + 0.5, b: n.at[1] + H - 0.5 };
-    const inside = (p: number[]) => p[0] > r.l && p[0] < r.r && p[1] > r.t && p[1] < r.b;
-    for (const w of all) for (let i = 1; i < w.points.length; i++) {
-      const [p, q] = [w.points[i - 1], w.points[i]];
-      if (inside(p) || inside(q)) continue;
-      const through = Math.max(p[0], q[0]) > r.l && Math.min(p[0], q[0]) < r.r && Math.max(p[1], q[1]) > r.t && Math.min(p[1], q[1]) < r.b;
-      assert.ok(!through, `${w.a} to ${w.b} passes through the name ${n.id}`);
-    }
+test('sea: a finding’s reads that leave by one port share one wire in to it, from that port to the finding', () => {
+  const ports = new Set(crossing.filter((t: any) => t.toPort).map((t: any) => t.toPort)), ins = g.ties.filter((t: any) => t.fromPort);
+  assert.ok(ports.size >= 1, 'the finding read twice by one side leaves by one port');
+  for (const id of ports) {
+    const own = ins.filter((t: any) => t.fromPort === id);
+    assert.equal(own.length, 1, `one wire in from ${id}`);
+    const [w] = own, reads = crossing.filter((t: any) => t.toPort === id), gate = reads[0].gates[1];
+    assert.ok(reads.every((t: any) => t.b === w.b), 'every read on the port is of its finding');
+    assert.ok(Math.abs(w.points[0][0] - gate.at[0]) <= 0.5 && Math.abs(w.points[0][1] - gate.at[1]) <= 0.5, `the wire in starts on ${id}`);
   }
 });
 

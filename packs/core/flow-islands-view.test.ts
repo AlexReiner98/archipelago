@@ -15,11 +15,11 @@ const house = { ...pack.styles.find((s: any) => s.id === 'core.house').props, sh
 const laid = mkdtempSync(join(tmpdir(), 'flow-islands-view-'));
 for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.flow').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
 const load = (name: string) => import(pathToFileURL(join(laid, name)).href);
-const [{ layout }, { compose, islandModels }, { count }, { nameOf, saidOf }] = await Promise.all([load('layout.js'), load('archipelago.js'), load('count.js'), load('islands.js')]);
+const [{ layout }, { compose, islandModels }, { count }, { nameOf }] = await Promise.all([load('layout.js'), load('archipelago.js'), load('count.js'), load('islands.js')]);
 const { result: answer } = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'layouts', 'flow-islands.json'), 'utf8'));
 
 /** What each fault may count, at most: lower a ceiling when a change brings its count down, never raise one. */
-const CEILING: Record<string, number> = { 'loose ends': 6, outside: 0, overlapping: 0, through: 3, 'through a name': 0, shared: 0, jogs: 11, unbridged: 0, crossings: 259 };
+const CEILING: Record<string, number> = { 'loose ends': 0, outside: 0, overlapping: 0, through: 0, shared: 0, jogs: 7, unbridged: 0, crossings: 239 };
 
 const z = (name: string) => house.sizes[`flow_${name}`], measure = (t: string, px: number) => String(t).length * px * 0.55;
 /** The shapes a page lays the picture out to: tall, the house's, and wide. Each fault is counted in all three. */
@@ -29,8 +29,7 @@ const run = (part: any) => layout({ ...part, undrawn: house.undrawn ?? [], headl
 const entry = (title: string) => z('key_width') + z('island_legend_mark_gap') + measure(title, z('island_legend_text'));
 const legends = new Map(answer.islands.map((i: any) => [i.id, [...(i.pack?.types ?? []), ...(i.pack?.links ?? [])].map((t: any) => entry(t.title))]));
 const names = new Map(answer.islands.map((i: any) => [i.id, z('island_name_x') + measure(nameOf(i), z('island_text'))]));
-const labels = (l: any) => Math.min(measure(saidOf(answer.items.find((i: any) => i.id === l.to)), z('island_gate_text')), z('island_gate_most') - 2 * z('island_gate_pad')) + 2 * z('island_gate_pad');
-const laidOut = () => compose(islandModels({ items: answer.items, links: answer.links, run }), { legends, names, labels, sizes: house.sizes });
+const laidOut = () => compose(islandModels({ items: answer.items, links: answer.links, run }), { legends, names, sizes: house.sizes });
 let g = laidOut();
 
 type Rect = { l: number; t: number; r: number; b: number };
@@ -45,21 +44,19 @@ function faults() {
   const steps = g.all.filter((n: any) => !n.dummy).map((n: any) => n.id), wires = [...g.chains, ...g.ties];
   const landOf = new Map(g.islands.flatMap((i: any) => [...i.steps].map((id) => [id, i.land[0]])));
   const outside = steps.filter((id: string) => landOf.has(id) && !(([b, f]) => b.l >= f.l && b.r <= f.r && b.t >= f.t && b.b <= f.b)([boxOf(id), landOf.get(id)])).length;
-  let overlapping = 0, through = 0, onName = 0, jogs = 0;
+  let overlapping = 0, through = 0, jogs = 0;
   for (let i = 0; i < steps.length; i++) for (let j = i + 1; j < steps.length; j++) if (meet(boxOf(steps[i]), boxOf(steps[j]))) overlapping++;
-  const named = [...new Map(g.ties.filter((t: any) => t.label).map((t: any) => [t.label.id, t.label])).values()].map((n: any) => ({ l: n.at[0] - n.w / 2, t: n.at[1] - z('island_gate_height') / 2, r: n.at[0] + n.w / 2, b: n.at[1] + z('island_gate_height') / 2 }));
   for (const w of wires) for (let k = 1; k < w.points.length; k++) {
     const [p, q] = [w.points[k - 1], w.points[k]];
     for (const id of steps) if (id !== w.a && id !== w.b && stretchMeets(p, q, boxOf(id))) through++;
-    for (const n of named) if (stretchMeets(p, q, n)) onName++;
     // A jog: a stretch between two bends shorter than a wire's run from a port, where nothing asks it to be.
     if (k > 1 && k < w.points.length - 1 && len(p, q) > 0.5 && len(p, q) < z('port_run')) jogs++;
   }
-  // A loose end: a wire's end more than a hair off its own box (a read across ends on a finding's name, not its box).
+  // A loose end: a wire's end more than a hair off its own box (a read across ends on its finding's port, where it shares the wire in).
   const off = (p: number[], r: Rect) => Math.max(r.l - p[0], p[0] - r.r, r.t - p[1], p[1] - r.b, 0);
-  const loose = wires.reduce((n: number, w: any) => n + [[w.fromName ? null : w.a, w.points[0]], [w.crossing && w.label ? null : w.b, w.points.at(-1)]].filter(([id, p]) => id && g.x.has(id) && off(p, boxOf(id)) > 1).length, 0);
+  const loose = wires.reduce((n: number, w: any) => n + [[w.fromPort ? null : w.a, w.points[0]], [w.toPort ? null : w.b, w.points.at(-1)]].filter(([id, p]) => id && g.x.has(id) && off(p, boxOf(id)) > 1).length, 0);
   const c = count(wires.map((w: any) => w.points));
-  return { 'loose ends': loose, outside, overlapping, through, 'through a name': onName, shared: c.shared, jogs, unbridged: c.crossings - g.breaks.length, crossings: c.crossings };
+  return { 'loose ends': loose, outside, overlapping, through, shared: c.shared, jogs, unbridged: c.crossings - g.breaks.length, crossings: c.crossings };
 }
 
 test('islands view: no fault counts more than it did', () => {

@@ -1,6 +1,7 @@
 // The planar graph of a part: what crosses what, how its faces lie, and the numbering that runs it down the page. Layer:
 // topology. It holds no position. Pure: links in, a graph out.
 
+import { FALL, RISE } from './graph.js';
 import { numbered } from './numbering.js';
 import { pair } from './polyline.js';
 import { planarize } from './thread.js';
@@ -70,14 +71,16 @@ export function downward(links, list, z, { ties = 0, nth = 0, embedded = false, 
   const ids = madeAt ? [...list].sort((p, q) => madeOf.get(p) - madeOf.get(q)) : [...list].sort(), sorted = [...links].sort((p, q) => Number(q[2]) - Number(p[2]) || name(p, q));
   const asFound = (made) => ({ g: made, s: made.s, t: made.t, number: made.number, outerAt: made.outerAt });
   // A part past the trials has one way to be drawn, and numbering it takes longer than the rest of the picture.
-  const big = list.length > z.trial_most, order = sorted.some((l) => l[2] > 1), fits = list.length <= z.embed_big;
+  // An island's ports are numbered first and last under its rise and over its fall, which the embedding knows nothing of.
+  const ported = list.includes(RISE) || list.includes(FALL);
+  const big = list.length > z.trial_most, order = sorted.some((l) => l[2] > 1), fits = !ported && list.length <= z.embed_big;
   if (big && order && fits) {
     const made = embed(sorted, ids);
     if (!made.unthreaded && !against(made, made.number)) return asFound(made);
   }
   const g = planarize(sorted, ids), found = { g, ...numbered(g, nth, big ? Infinity : z.number_tries) }, up = against(g, found.number);
   // The search gives only small parts a trial of the embedding: the first trial of a larger one tries it here.
-  if (!up || !(embedded || (fits && list.length > z.embed_most && !ties && !nth))) return found;
+  if (!up || ported || !(embedded || (fits && list.length > z.embed_most && !ties && !nth))) return found;
   const made = embed(sorted, ids);
   return against(made, made.number) < up && made.crossings <= g.crossings + up * z.embed_cost ? asFound(made) : found;
 }
