@@ -2,6 +2,7 @@ import { api, h, hooks, main, route, state } from './base.js';
 import { changeSet } from './changes.js';
 import { follow as keepCurrent, followed as kept, Replica } from './replica.js';
 import { trace } from './traces.js';
+import { looked } from './catch-up.js';
 import { lookMode } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
 import { front, landsIn, poppedTab } from './tabs.js';
@@ -156,7 +157,8 @@ export async function checkTail() {
   let more = false;
   try {
     // From the furthest back of the page and its stores, on everything any of them holds.
-    const stores = [...kept];
+    // A store being played from where its reader last looked is left alone until it ends (ui/catch-up.js).
+    const stores = [...kept].filter((s) => !s.playing);
     const at = [state.pos, ...stores.map((s) => s.pos)].filter((pos) => pos !== undefined);
     const from = at.length ? Math.min(...at) : undefined;
     const ids = [...new Set([...shownIds(), ...stores.flatMap((s) => s.ids())])];
@@ -176,6 +178,7 @@ export async function checkTail() {
     touched = state.pos === undefined ? undefined : touchedBy(beat, state.pos);
     now = `${beat.pos}.${beat.seq}.${beat.queue}`;
     state.pos = beat.pos;
+    looked(beat.pos);
     state.seq = beat.seq;
     more = Boolean(beat.more);
     // The page's own files changed on the server: load them, unless that would

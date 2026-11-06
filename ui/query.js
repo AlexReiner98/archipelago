@@ -289,7 +289,8 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
       if (host.store !== store) return;
       if (!host.isConnected) return unfollow(store);
       // On a time axis an item changed may fall elsewhere: where is the server's to work out, so the lens is read again.
-      if (changed.missing.length || (lens.time && changed.items.changed.length)) return load(true);
+      // Not while it is played from where its reader last looked (ui/catch-up.js): it ends as the map is.
+      if (!store.playing && (changed.missing.length || (lens.time && changed.items.changed.length))) return load(true);
       draw({ ...raw, ...store.answer() }, { ...raw, ...store.drawn() }, true);
     });
     draw({ ...raw, ...store.answer() }, { ...raw, ...store.drawn() }, refreshing);
