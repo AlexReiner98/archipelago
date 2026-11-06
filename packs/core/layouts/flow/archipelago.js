@@ -150,7 +150,8 @@ function shoreOf(points, inside, step) {
 
 /**
  * The whole picture: each group's model moved to its place, merged into one model as the flow's layout answers, with
- * the links between islands as ties routed through the sea (each with its `gates`), and `islands`: each one's place,
+ * the links between islands as ties routed through the sea (each with its `gates`, and `sea`: its line from the gate
+ * of the reader's island to the gate of the finding's), and `islands`: each one's place,
  * the rects of its land, where its name and each entry of its legend go. `legends` gives each island's entries' widths, `names` how wide its name is.
  */
 export function compose({ groups, cross, where }, { legends, names = new Map(), sizes, crossings }) {
@@ -231,15 +232,16 @@ export function compose({ groups, cross, where }, { legends, names = new Map(), 
     // A gate only where it crosses from one island to another: a person lives on none, and a wait on them is no finding.
     const gates = [ia, ic].map((id, k) => (landOf.has(ia) && landOf.has(ic) ? { island: id, ...shoreOf(k ? [...points].reverse() : points, inLand(landOf.get(id)), 1) } : null)).filter((g) => g?.at);
     // What crosses is named once, in the sea: on the longest stretch between the two gates.
-    let label = null;
+    let label = null, sea = null;
     if (gates.length === 2) {
-      const [out, into] = gates, n = points.length, sea = [out.at, ...points.slice(out.k, n - into.k), into.at];
+      const [out, into] = gates, n = points.length;
+      sea = [out.at, ...points.slice(out.k, n - into.k), into.at];
       for (let k = 1; k < sea.length; k++) {
         const [p, q] = [sea[k - 1], sea[k]], room = Math.abs(q[0] - p[0]) + Math.abs(q[1] - p[1]);
         if (!label || room > label.room) label = { at: [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], across: p[1] === q[1], room };
       }
     }
-    const tie = { a, b: c, type: l.type ?? l.kind, headAt: 'end', points, crossing: true, gates, ...(label && { label }), ...(l.pending && { pending: l.pending }) };
+    const tie = { a, b: c, type: l.type ?? l.kind, headAt: 'end', points, crossing: true, gates, ...(label && { label }), ...(sea && { sea }), ...(l.pending && { pending: l.pending }) };
     routed.push(tie);
     ties.push(tie);
   }

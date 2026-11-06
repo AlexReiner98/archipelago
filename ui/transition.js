@@ -8,6 +8,11 @@
 // The drawing knows nothing of it: it answers with keyed marks as it always has. Every timing and count is a number
 // on the style (core's house style names them, `motion_*`). Past a few movers it cuts, as it does on less motion
 // asked for, on a picture of too many marks, and on one that shares no mark with what was there.
+//
+// A mark may say it is a pulse (its `pulse`, words the page keeps on it, ui/marks.js): unseen, it is never faded or
+// moved, and when its words change while its key stays, a dash of its own stroke runs along its line, start to end,
+// after what moves has moved (a finding's move carried to its readers, task e_fqhbp4yq). It runs even where the rest
+// is cut for too much, never where less motion is asked for.
 
 /** The keyed marks a host last mounted, by host: what the next scene there is matched against. */
 const lastKeys = new WeakMap();
@@ -28,14 +33,19 @@ export function stagesOf(before, after, numbers, reduced = false, framed = true)
     if (typeof v !== 'number') throw new Error(`The style names no number "${name}": the house style (packs/core/pack.json) names every one the page moves by`);
     return v;
   };
-  const none = (cut) => ({ cut, frame: null, leave: [], move: [], arrive: [], draw: [], times: null });
+  const none = (cut, pulse = []) => ({ cut, frame: null, leave: [], move: [], arrive: [], draw: [], pulse, times: pulse.length ? { pulse: [0, n('motion_pulse')] } : null });
   if (reduced) return none('reduced');
   if (!before.size || !after.size) return none('new');
-  if (before.size + after.size > n('motion_marks_most')) return none('marks');
+  // A pulse whose words changed runs; one that stays the same, comes or goes is not seen.
+  const isPulse = (row) => typeof row?.pulse === 'string';
+  const pulse = [...after].filter(([key, now]) => isPulse(now) && isPulse(before.get(key)) && before.get(key).pulse !== now.pulse).map(([key]) => key);
+  before = new Map([...before].filter(([, row]) => !isPulse(row)));
+  after = new Map([...after].filter(([, row]) => !isPulse(row)));
+  if (before.size + after.size > n('motion_marks_most')) return none('marks', pulse);
   const within = n('motion_still_within');
   const near = (a, b) => Math.abs(a - b) <= within;
   const shared = [...after.keys()].filter((k) => before.has(k));
-  if (!shared.length) return none('new');
+  if (!shared.length) return none('new', pulse);
   const leave = [], move = [], arrive = [], draw = [];
   // How far each mark that stays, of the same size, went on the screen. What most of them went by together is the
   // picture's frame moving (it was fitted or panned again around a picture of another size): the frame moves back
@@ -75,14 +85,14 @@ export function stagesOf(before, after, numbers, reduced = false, framed = true)
     leave.push(key);
   }
   // Cut, it still says what would have moved.
-  if (move.length > n('motion_movers_most')) return { ...none('many'), move };
+  if (move.length > n('motion_movers_most')) return { ...none('many', pulse), move };
   const shifted = !(near(fx, 0) && near(fy, 0)) ? { dx: fx, dy: fy } : null;
-  if (!leave.length && !move.length && !arrive.length && !draw.length && !shifted) return none('still');
+  if (!leave.length && !move.length && !arrive.length && !draw.length && !shifted) return none('still', pulse);
   // Each stage starts when the one before it has ended; a stage with nothing in it takes no time.
   const out = leave.length ? n('motion_leave') : 0;
   const moving = move.length || shifted ? n('motion_move') : 0;
-  const times = { leave: [0, out], move: [out, moving], arrive: [out + moving, n('motion_arrive')] };
-  return { cut: null, frame: shifted, leave, move, arrive, draw, times };
+  const times = { leave: [0, out], move: [out, moving], arrive: [out + moving, n('motion_arrive')], pulse: [out + moving, n('motion_pulse')] };
+  return { cut: null, frame: shifted, leave, move, arrive, draw, pulse, times };
 }
 
 /** How far most of these went together, to the nearest pixel; none where no two went alike. */
@@ -113,7 +123,7 @@ function measured(host, keys) {
     while (up && up !== host && !els.has(up)) up = up.parentElement;
     const within = up && up !== host ? els.get(up) : null;
     const r = el.getBoundingClientRect(), wire = isWire(el);
-    rows.set(key, { el, box: [r.x, r.y, r.width, r.height], wire, path: wire ? el.getAttribute('d') ?? el.getAttribute('points') : null, holds: false, within });
+    rows.set(key, { el, box: [r.x, r.y, r.width, r.height], wire, path: wire ? el.getAttribute('d') ?? el.getAttribute('points') : null, holds: false, within, pulse: el.dataset?.pulse ?? null });
   }
   for (const row of rows.values()) if (row.within !== null && rows.has(row.within)) rows.get(row.within).holds = true;
   return rows;
@@ -159,7 +169,7 @@ export function transition(host, keys, style) {
     host.dataset.transition = plan.cut ?? 'played';
     // What it found, for whoever looks at the page (a test, the console).
     host.transitionPlan = plan;
-    if (plan.cut) return;
+    if (plan.cut) return void (plan.pulse.length && playing.set(host, ended(pulses(plan, after))));
     playing.set(host, play(host, plan, before, after, places));
   });
 }
@@ -211,6 +221,25 @@ function play(host, plan, before, after, places) {
       : [{ opacity: 0 }, { opacity: 1 }];
     running.push(el.animate(frames, { duration: inFor, delay: inAt, easing: ease, fill: 'backwards' }));
   }
+  running.push(...pulses(plan, after));
+  return ended(running, kept);
+}
+
+/** Each pulse of a plan run along its line: a dash of its own stroke's dash (the whole line, where it has none). */
+function pulses(plan, after) {
+  if (!plan.pulse.length) return [];
+  const [at, runs] = plan.times.pulse;
+  return plan.pulse.map((key) => {
+    const { el } = after.get(key);
+    const length = typeof el.getTotalLength === 'function' ? el.getTotalLength() : 0;
+    const dash = Number.parseFloat(getComputedStyle(el).strokeDasharray) || length;
+    const along = `${dash} ${length + dash}`;
+    return el.animate([{ opacity: 1, strokeDasharray: along, strokeDashoffset: dash }, { opacity: 1, strokeDasharray: along, strokeDashoffset: -length }], { duration: runs, delay: at, easing: 'ease-in-out' });
+  });
+}
+
+/** What plays, ended by the next scene: every animation cancelled, what was kept to fade taken off the page. */
+function ended(running, kept = []) {
   const end = () => {
     for (const a of running) a.cancel();
     for (const k of kept) k.remove();

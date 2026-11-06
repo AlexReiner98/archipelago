@@ -5,6 +5,7 @@
 // room and its legend's, its shore in the island's colour (the style's island_hues, else its hues) and its land a tint
 // of it, under every wire. Named at its top left, its legend (its own types and link types) beside its steps. Where a link
 // between two islands crosses a shore is a gate: a mark on the shore naming what crosses (a finding, and its value).
+// When the finding moves, a pulse runs from its gate across the sea to each reader's (task e_fqhbp4yq).
 // Layer: marks. Pure: the composed model and each island's legend rows in, marks and colour rules out.
 
 /**
@@ -57,11 +58,14 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, mea
       tip(key, said, k ? `A finding read across: it leaves ${source ?? 'its island'} here` : `A finding read across: it comes into ${reader ?? 'this island'} here`);
       return titled(m('path', { key, on: ['enter', 'leave'], d, class: `lf-gate-bar ${classes.get(gate.island) ?? ''}` }), `${said}\n${k ? 'Goes out here' : 'Comes in here'}`);
     });
+    // Its pulse: the line through the sea from the finding's gate to the reader's, unseen until what the finding
+    // promises moves, when the page runs it along that line (ui/transition.js), in the finding's island's colour.
+    const pulse = t.sea && t.gates.length === 2 ? [m('path', { key: `pulse:${t.b}:${t.a}`, pulse: JSON.stringify([value ?? null, to?.fields?.as_of ?? null]), d: `M${[...t.sea].reverse().map((p) => p.join(' ')).join('L')}`, class: `lf-pulse ${classes.get(t.gates[1].island) ?? ''}`, 'aria-hidden': 'true' })] : [];
     const l = t.label, text = l && fit(said, Math.min(l.across ? l.room - 2 * GATE_PAD : MOST, MOST) - 2 * GATE_PAD, GATE_TEXT);
-    if (!text || text.length < 2) return bars;
+    if (!text || text.length < 2) return [...pulse, ...bars];
     const w = measure(text, GATE_TEXT) + 2 * GATE_PAD;
     tip(`cross:${n}`, said, `A finding read across, from ${source ?? 'one island'} into ${reader ?? 'another'}`);
-    return [...bars, titled(m('g', { key: `cross:${n}`, on: ['enter', 'leave'], class: 'lf-gate' }, m('rect', { x: l.at[0] - w / 2, y: l.at[1] - GATE_H / 2, width: w, height: GATE_H, rx: GATE_H / 2 }), m('text', { x: l.at[0], y: l.at[1] }, text)), said)];
+    return [...pulse, ...bars, titled(m('g', { key: `cross:${n}`, on: ['enter', 'leave'], class: 'lf-gate' }, m('rect', { x: l.at[0] - w / 2, y: l.at[1] - GATE_H / 2, width: w, height: GATE_H, rx: GATE_H / 2 }), m('text', { x: l.at[0], y: l.at[1] }, text)), said)];
   });
   return { layer, gates, rules: [...rules], tips };
 }
@@ -80,5 +84,7 @@ export const css = `
 .lf-gate-bar { fill: none; stroke: var(--lf-island, var(--ln-text)); stroke-width: var(--ln-flow-island-gate-stroke); stroke-linecap: round; }
 .lf-gate rect { fill: var(--ln-land); stroke: var(--lf-island, var(--ln-line)); stroke-width: var(--ln-flow-stroke-lit); }
 .lf-gate text { fill: var(--ln-text); font-size: var(--ln-flow-island-gate-text); font-family: var(--ln-font); text-anchor: middle; dominant-baseline: central; }
+/* A pulse: a dash of the finding's island's colour, unseen but while the page runs it to a reader. */
+.lf-pulse { fill: none; stroke: var(--lf-island, var(--ln-text)); stroke-width: var(--ln-flow-island-pulse-stroke); stroke-dasharray: var(--ln-flow-island-pulse-dash); stroke-linecap: round; opacity: 0; pointer-events: none; }
 [data-text=none] :is(.lf-island-name, .lf-island-key, .lf-gate) { display: none; }
 `;
