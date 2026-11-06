@@ -44,26 +44,6 @@
       "from": ["program"],
       "to": ["*"],
       "description": "This program can only be used once the target is done or in hand, e.g. a loan that pays to carry out a plan. Say how in props.says."
-    },
-    {
-      "id": "reduces",
-      "moved_from": ["funding.reduces"],
-      "extends": "about",
-      "title": "is figured after",
-      "inverse": "reduces",
-      "from": ["program"],
-      "to": ["program"],
-      "description": "Money from the target counts as assistance against this one: it is subtracted before this is figured. Say how in props.says."
-    },
-    {
-      "id": "earns",
-      "moved_from": ["funding.earns"],
-      "extends": "produced",
-      "title": "also earns",
-      "inverse": "is earned by",
-      "from": ["program"],
-      "to": ["program"],
-      "description": "Money spent under this program also earns the target, e.g. a payment to a college that earns a tax credit. Say how in props.says."
     }
   ]
 }

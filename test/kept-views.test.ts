@@ -1,7 +1,7 @@
 // What still drew from the old lens, drawn from flat lenses (task e_vtvhebut), in a real browser (skipped where there
-// is no Chrome): a document's kept view, opened as a canvas, drawn flat; and the pictures the packs' screens draw on Home
-// (the software pack's Releases). An item's page is bare (task e_cbjpfd2f; the owner, 26 Oct 2026: bare means bare):
-// a company's page draws no pack's screen. A document's sheet reads it as it will publish, its view drawn (the owner,
+// is no Chrome): a document's kept view, opened as a canvas, drawn flat; and a picture an owner's screen draws on Home
+// (Releases). An item's page is bare (task e_cbjpfd2f; the owner, 26 Oct 2026: bare means bare): a company's page
+// draws no pack's screen, and offers the view the time pack ships of it (its invoices), drawn on the canvas. A document's sheet reads it as it will publish, its view drawn (the owner,
 // 27 Oct 2026).
 
 import assert from 'node:assert/strict';
@@ -44,8 +44,8 @@ test('in a browser, a document’s kept view is drawn as a canvas, the packs’ 
       { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', status: 'current', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of', 'calls'], steps: 3 }, style: { shape: 'architecture' } } },
       { op: 'link', type: 'about', from: 'l', to: made.p },
       { op: 'create', ref: 'd', type: 'document', title: 'How it works', body: `Opening words.\n\n{l}\n\nClosing words.` },
-      // Home is the owner's to fill: Releases put on it.
-      { op: 'create', type: 'screen', title: 'Releases', status: 'current', props: { preset: 'software.releases', home: true } },
+      // Home is the owner's to fill: a screen of their own drawing the open releases put on it.
+      { op: 'create', type: 'screen', title: 'Releases', status: 'current', props: { pieces: [{ piece: 'picture', lens: { filter: { find: ['type release'], not: ['done', 'kind system'] } }, style: { shape: 'list' } }], home: true } },
     ],
   });
   const page = await open(`${base}/#/e/${kept.d}`);
@@ -64,7 +64,7 @@ test('in a browser, a document’s kept view is drawn as a canvas, the packs’ 
     await page.go(`${base}/#/v?canvas=${kept.l}`);
     assert.ok(await until(`${linked('#canvas', made.a)} && ${linked('#canvas', made.b)} && ${linked('#canvas', made.e)}`), `the view is drawn as a canvas: ${page.logs().join('\n')}`);
 
-    // Home: the software pack's Releases, the open ones.
+    // Home: the owner's Releases, the open ones.
     await page.go(`${base}/#/v?find=id+${made.p}`);
     await page.go(`${base}/#/you`);
     assert.ok(await until(linked('.lens-card', made.r)), `Releases drawn on Home: ${page.logs().join('\n')}`);
@@ -74,6 +74,12 @@ test('in a browser, a document’s kept view is drawn as a canvas, the packs’ 
     await page.go(`${base}/#/e/${made.co}`);
     assert.ok(await until(`(document.querySelector('#sheet')?.textContent ?? '').includes('Client Co')`), `the company's page: ${page.logs().join('\n')}`);
     assert.ok(!(await page.evaluate<boolean>(`Boolean(document.querySelector('#sheet .lens-card'))`)), 'no pack screen on a bare page');
+    // What the time pack shows of a company is a view of it, offered in its head: drawn on the canvas, its invoice in it.
+    const invoices = `[...document.querySelectorAll('#sheet .sheet-marks button')].find((b) => b.textContent === 'Invoices')`;
+    assert.ok(await until(`Boolean(${invoices})`), 'its view offered on its page');
+    await page.evaluate(`${invoices}.click()`);
+    assert.ok(await until(linked('#canvas', made.inv)), `its invoices drawn on the canvas: ${page.logs().join('\n')}`);
+    assert.ok(!(await page.evaluate<boolean>(linked('#canvas', made.job))), 'and not its other work');
   } finally {
     await page.close();
   }

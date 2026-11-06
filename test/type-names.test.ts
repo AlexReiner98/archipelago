@@ -7,8 +7,9 @@ import { fresh, make } from './map.ts';
 
 test('a type and a link type are named by what they are, whichever pack ships them', async () => {
   const l = await fresh();
-  assert.equal(l.registry.type('task')!.pack, 'work');
-  assert.equal(l.registry.type('commit')!.pack, 'software');
+  assert.equal(l.registry.type('task')!.pack, 'core', 'task is of the shared set, in core (e_rf6q3q34)');
+  assert.equal(l.registry.type('project')!.pack, 'work');
+  assert.equal(l.registry.type('commit')!.pack, 'code');
   assert.equal(l.registry.type('time_entry')!.pack, 'time');
   assert.equal(l.registry.relations.get('calls')!.root, 'uses');
   assert.equal(l.registry.relations.get('lives_in')!.pack, 'core', "software.lives_in folded into core's");

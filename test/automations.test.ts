@@ -20,7 +20,7 @@ test('an agent can notify the human; a stale session raises one notification', a
   let unread = (await VIEWS.notifications.run(l, {})) as any[];
   assert.deepEqual([unread[0].title, unread[0].level, unread[0].from, unread[0].about_title], ['Blocked on a certificate', 'warning', 'agent:test', 'Ship it']);
 
-  const lane = (await make(l, [{ op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' }])).lane;
+  const lane = (await make(l, [{ op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Live lane' }])).lane;
   const { run } = await sessionStart(l, agent, { title: 'Quiet one' });
   await l.claim(agent, { resource: lane, holder: run, reason: 'busy' });
   const silent = (id: string, hours: number) => l.db.query(`update entity set props = props || jsonb_build_object('last_seen', $2::text) where id = $1`, [id, new Date(Date.now() - hours * 3_600_000).toISOString()]);
@@ -182,7 +182,7 @@ test('a refused change is kept and corrected by its one wrong op; history says a
   const l = await fresh();
   const ops = [
     { op: 'create', ref: 'a', type: 'task', title: 'Draw the plan' },
-    { op: 'create', ref: 'b', type: 'issue', title: 'The plan is drawn twice', props: { repro: 'Open it twice' } },
+    { op: 'create', ref: 'b', type: 'task', title: 'The plan is drawn twice', props: { method: 'Open it twice' } },
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
   ];
   // The refusal names the flavour that has the field, and the name the change is kept under.
@@ -190,17 +190,17 @@ test('a refused change is kept and corrected by its one wrong op; history says a
     () => assert.fail('an issue has no repro'),
     (e: Error) => e.message,
   );
-  assert.match(said, /op 2 \(create\): issue has no field "repro".*bug, a flavour of issue, has it/);
+  assert.match(said, /op 2 \(create\): task has no field "method".*experiment, a flavour of task, has it/);
   const name = /kept for 10 minutes as "(k_\w+)"/.exec(said)![1];
   // A fix that is wrong again is refused again, under the same name.
   await assert.rejects(callTool(l, agent, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], title: 'x'.repeat(61) } }] }), new RegExp(`the title is 61 characters[^]*as "${name}"`));
   await assert.rejects(callTool(l, agent, 'change', { retry: name, fixes: [{ at: 9, op: null }] }), /no op 9/);
   // The name finds it, whatever the session calls itself this time.
-  const sent = (await callTool(l, { ...agent, name: 'test/claude-code:elsewhere' }, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], type: 'bug' } }] })) as any;
+  const sent = (await callTool(l, { ...agent, name: 'test/claude-code:elsewhere' }, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], type: 'experiment' } }] })) as any;
   assert.equal(sent.status, 'proposed');
   const held = (await l.proposals()).at(-1)!;
   assert.equal(held.reason, 'A plan to draw');
-  assert.deepEqual(held.ops.map((o: any) => o.type), ['task', 'bug', 'depends_on']);
+  assert.deepEqual(held.ops.map((o: any) => o.type), ['task', 'experiment', 'depends_on']);
   // Once it has gone through it is no longer kept; nor is it anyone else's to send.
   await assert.rejects(callTool(l, agent, 'change', { retry: name }), /No refused change is kept/);
   await assert.rejects(callTool(l, agent, 'change', { reason: 'nothing' }), /needs ops/);
@@ -269,7 +269,7 @@ test('the graph view returns a preset of the whole map, or one entity\'s neighbo
   const made = await make(l, [
     { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
     { op: 'create', ref: 'a', type: 'task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'bug', title: 'B' },
+    { op: 'create', ref: 'b', type: 'experiment', title: 'B' },
     { op: 'create', ref: 'c', type: 'task', title: 'C', status: 'done' },
     { op: 'create', ref: 'lonely', type: 'note', title: 'Lonely' },
     { op: 'create', ref: 'far', type: 'task', title: 'Far' },
@@ -285,7 +285,7 @@ test('the graph view returns a preset of the whole map, or one entity\'s neighbo
   assert.deepEqual(blocking.edges.map((e: any) => e.type), ['depends_on']);
   const a = blocking.nodes.find((n: any) => n.title === 'A');
   assert.deepEqual([a.blocked, a.root], [true, 'task']);
-  assert.equal(blocking.nodes.find((n: any) => n.title === 'B').root, 'issue', 'a flavour reports its root type');
+  assert.equal(blocking.nodes.find((n: any) => n.title === 'B').root, 'task', 'a flavour reports its root type');
 
   assert.deepEqual(titles(await ask(l, 'graph', { relations: 'all', include_closed: true })), ['A', 'B', 'C', 'Far', 'Proj']);
   assert.deepEqual(titles(await ask(l, 'graph', { focus: made.far, depth: 1 })), ['Far', 'Proj']);

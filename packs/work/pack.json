@@ -2,7 +2,7 @@
   "id": "work",
   "version": "0.1.0",
   "title": "Work",
-  "description": "Projects and the work in them: tasks, decisions, issues, meetings, ideas, notes, files, documents and procedures, and what ties them to the people they are for. On in every workspace unless the owner turns it off.",
+  "description": "Projects and the work in them: issues, meetings, ideas, notes, files, documents and procedures, and what ties them to the people they are for. On in every workspace unless the owner turns it off.",
   "requires": ["core"],
   "types": [
     {
@@ -23,38 +23,6 @@
       }
     },
     {
-      "id": "task",
-      "moved_from": ["work.task"],
-      "capabilities": { "bound": { "field": "due", "limit": "today" }, "where": { "link": "lives_in" } },
-      "extends": "work",
-      "title": "Task",
-      "description": "A piece of work someone can do. A commitment is a task with an owed_to relation.",
-      "statuses": { "open": ["todo", "doing", "waiting"], "closed": ["done", "dropped"] },
-      "fields": {
-        "due": { "type": "date" },
-        "priority": { "type": "enum", "values": ["low", "normal", "high", "urgent"] },
-        "recurrence": { "type": "string", "description": "How often it repeats, in plain words or an RRULE." },
-        "tokens_estimated": { "type": "number", "description": "How many tokens an agent expects this to take, one number: input and output together, not counting cached re-reads. Whoever plans it or picks it up says; it can be corrected." },
-        "tokens_used": { "type": "number", "description": "Tokens spent on it so far, measured from the sessions that worked on it.", "system": true }
-      }
-    },
-    {
-      "id": "decision",
-      "moved_from": ["work.decision"],
-      "capabilities": { "bound": { "field": "due", "limit": "today" }, "settles": { "by": "word", "whose": "owner", "choices": "options", "chosen": "outcome", "why": "rationale", "on": "decided_on" } },
-      "extends": "question",
-      "title": "Decision",
-      "description": "Something decided, or still open, with its reasoning. The title is the question.",
-      "statuses": { "open": ["open"], "closed": ["decided", "reversed"] },
-      "fields": {
-        "due": { "type": "date" },
-        "options": { "type": "json", "description": "The choices being weighed, as a list of short strings, e.g. [\"Hosted API\", \"Local model\"].", "shown": true },
-        "outcome": { "type": "string", "description": "What was chosen.", "shown": true },
-        "rationale": { "type": "string", "description": "Why." },
-        "decided_on": { "type": "date" }
-      }
-    },
-    {
       "id": "issue",
       "moved_from": ["work.issue"],
       "capabilities": { "where": { "link": "lives_in" } },
@@ -70,23 +38,12 @@
       }
     },
     {
-      "id": "meeting",
-      "moved_from": ["work.meeting"],
-      "extends": "event",
-      "title": "Meeting",
-      "description": "An event with participants (use the involves relation)."
-    },
-    {
-      "id": "procedure",
-      "moved_from": ["work.procedure"],
-      "extends": "record",
-      "title": "Procedure",
-      "description": "How something is done: a checklist, playbook or rule. One a machine can run is a function.",
-      "statuses": { "open": ["draft", "current"], "closed": ["retired"], "phases": { "retired": "ended" } },
-      "fields": {
-        "executable": { "type": "boolean", "default": false },
-        "entrypoint": { "type": "string", "description": "For executable procedures: the command, skill or script." }
-      }
+      "id": "goal",
+      "extends": "aim",
+      "title": "Goal",
+      "description": "An outcome that projects and tasks serve.",
+      "statuses": { "open": ["active", "paused"], "closed": ["achieved", "dropped"], "phases": { "active": "under_way" } },
+      "fields": { "target_date": { "type": "date" }, "measure": { "type": "string", "description": "How you will know it is achieved." } }
     },
     {
       "id": "file",
@@ -108,7 +65,8 @@
     },
     {
       "id": "note",
-      "moved_from": ["work.note"],
+      "moved_from": ["work.note", "procedure"],
+      "moved_statuses": { "procedure": { "draft": "current", "retired": "stale" } },
       "extends": "record",
       "title": "Note",
       "description": "Free-form knowledge that does not fit another type.",
@@ -133,26 +91,6 @@
   ],
   "links": [
     {
-      "id": "owed_to",
-      "moved_from": ["work.owed_to"],
-      "extends": "involves",
-      "title": "is owed to",
-      "inverse": "is owed",
-      "from": ["task"],
-      "to": ["person", "company"],
-      "description": "Makes a task a commitment to someone."
-    },
-    {
-      "id": "requested_by",
-      "moved_from": ["work.requested_by"],
-      "extends": "involves",
-      "title": "was requested by",
-      "inverse": "requested",
-      "from": ["*"],
-      "to": ["person", "company", "agent"],
-      "description": "Who asked for it."
-    },
-    {
       "id": "addresses",
       "moved_from": ["work.addresses"],
       "extends": "about",
@@ -162,26 +100,6 @@
       "to": ["issue"],
       "offers_close": true,
       "description": "Work meant to fix or reduce the issue. Closing the work offers to close the issue, while it is open."
-    },
-    {
-      "id": "based_on",
-      "moved_from": ["work.based_on"],
-      "extends": "about",
-      "title": "is based on",
-      "inverse": "informs",
-      "from": ["*"],
-      "to": ["*"],
-      "description": "A decision or plan rests on this result or source."
-    },
-    {
-      "id": "governed_by",
-      "moved_from": ["work.governed_by"],
-      "extends": "about",
-      "title": "is governed by",
-      "inverse": "governs",
-      "from": ["*"],
-      "to": ["procedure", "decision"],
-      "description": "The rule or procedure that applies."
     }
   ],
   "views": [

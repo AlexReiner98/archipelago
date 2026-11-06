@@ -12,6 +12,12 @@ import { instructionsFor } from './instructions.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { resolveRun, sessionEnd, sessionStart } from './sessions.ts';
 
+/** What may be held, as a read names it: the types with a capacity, the fields those say it in (a place that says nothing of it is no resource), and whether one says it as a number, so every item of it may be. */
+const holdableBy = (l: Archipelago) => {
+  const types = l.registry.having('capacity'), caps = types.map((t) => l.registry.type(t)?.capabilities.capacity);
+  return [types, [...new Set(caps.flatMap((c) => (typeof c === 'object' ? [c.field] : [])))], caps.some((c) => typeof c === 'number')];
+};
+
 /**
  * A Claude Code SessionStart hook: register the session and return the text
  * to put in front of the model, so it starts knowing what the map knows.
@@ -21,7 +27,7 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   // session that started it, if it knows one, is kept only when the map has it, so a hook never fails to register.
   const said = { source: typeof input.source === 'string' ? input.source : undefined, title: typeof input.title === 'string' ? input.title : undefined, parent: typeof input.parent === 'string' && input.parent && (await resolveRun(l, input.parent)) ? input.parent : undefined };
   const started = await sessionStart(l, { kind: 'agent', name: 'claude-code' }, { session_id: input.session_id, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined, surface: 'claude-code', ...said });
-  const lines = [`This session is registered in Archipelago, the owner's map of work and dependencies, as run ${started.run}, called "${(await l.entity(started.run))?.title}" after this chat.`];
+  const lines = [`This session is registered in Archipelago, the owner's map of work and dependencies, as run ${started.run}, called "${(await l.entity(started.run))?.title}" after this chat, on the workspace "${started.workspace.name}" (${started.workspace.id}).`];
   const repo = 'repo' in started ? started.repo : undefined;
   if (repo) lines.push(`Repository: ${repo.title} (${repo.id}).`);
   // Where the work there stands is the place's pack's to say: a repository's, the software pack's views.
@@ -64,8 +70,8 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
     );
   // The commits in this checkout that no one has accounted for are put to the session as unconfirmed answers are.
   if (repo) lines.push(...((u) => (u.length ? ['', ...u] : []))(await unaccountedText(l, sentCommits(input.commits), repo.id)));
-  const [heldNow, { rows: holdable }] = await Promise.all([heldResources(l), l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null`, [l.registry.having('capacity')])]);
-  for (const res of holdable.filter((one) => l.registry.capacity(one) !== Infinity)) {
+  const [heldNow, { rows: holdable }] = await Promise.all([heldResources(l), l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null and (props ?| $2::text[] or $3) -- index entity_type`, holdableBy(l))]);
+  for (const res of holdable.filter((one) => (l.registry.capacity(one) ?? Infinity) !== Infinity)) {
     const held = heldNow.find((h) => h.resource === res.id);
     lines.push('', `Exclusive resource "${res.title}" (${res.id}) is ${held ? `HELD by ${held.held_by_title}: do not use it` : 'free'}. Claim it with the pelago assign tool, action claim (holder ${started.run}), before using it, and give it back with revise, action release, after.`);
   }

@@ -58,6 +58,9 @@ export function configurePlan(given: Partial<typeof site>): void {
   read.clear();
 }
 
+/** What a workspace is called, as the server keeps it: its id where the server says nothing or cannot be asked, since a name never stops what asks it. */
+export const workspaceName = (workspace: string): Promise<string> => site.nameOf(workspace).catch(() => workspace);
+
 const read = new Map<string, { at: number; value: Limits | undefined }>();
 /** A workspace's limits, as the server says them. */
 export async function limitOf(workspace: string): Promise<Limits | undefined> {

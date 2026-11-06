@@ -1,7 +1,7 @@
 // What the map keeps for looking at it: kept views (lens items), styles and layouts, with what each is about; the hubs that need views of
 // their own; and where a lens or a style is seen at work.
 
-import { SYSTEM } from './head.ts';
+import { isKernel } from './head.ts';
 import { scopeOf } from './places.ts';
 import type { Archipelago } from './pelago.ts';
 
@@ -42,8 +42,8 @@ export const HUB_AT = 12;
 export async function hubs(l: Archipelago, within?: string) {
   if (!within) throw new Error('hubs reads within an item or a place (within): across the whole map it would read every item.');
   const scope = [...(await scopeOf(l, within, true))];
-  const { rows: entities } = await l.db.query<{ id: string; type: string; title: string; kind: string | null; is_open: boolean; props: Record<string, unknown> }>(
-    `select id, type, title, kind, is_open, jsonb_build_object('hub_at', props -> 'hub_at') as props from entity where id = any($1::text[]) and archived_at is null`,
+  const { rows: entities } = await l.db.query<{ id: string; type: string; title: string; is_open: boolean; props: Record<string, unknown> }>(
+    `select id, type, title, is_open, jsonb_build_object('hub_at', props -> 'hub_at') as props from entity where id = any($1::text[]) and archived_at is null`,
     [scope],
   );
   const { rows: relations } = await l.db.query<{ type: string; from_id: string; to_id: string }>(
@@ -52,7 +52,7 @@ export async function hubs(l: Archipelago, within?: string) {
   );
   const above = await hubAtAbove(l, within);
   const read = { entities, relations };
-  const byId = new Map(read.entities.filter((e) => e.is_open && e.kind !== SYSTEM).map((e) => [e.id, e]));
+  const byId = new Map(read.entities.filter((e) => e.is_open && !isKernel(l.registry, e.type)).map((e) => [e.id, e]));
   const parts = read.relations.filter((r) => r.type === 'part_of');
   const up = new Map<string, string>();
   const kids = new Map<string, string[]>();

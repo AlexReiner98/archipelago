@@ -56,12 +56,18 @@ export const against = (g, number) => g.wires.filter((w) => w.link?.[2] > 1 && w
  * crossings; where that leaves order wires up, the embedding made for the order (./upward.js) is tried in its place. A
  * part too large for the search's trials starts from that embedding, and is numbered only if the embedding fails.
  */
-export function downward(links, list, z, { ties = 0, nth = 0, embedded = false } = {}) {
-  // By name, so the picture does not change with the order the answer came in. Ties in another fixed order keep another
-  // planar part, for the search in `best`.
+export function downward(links, list, z, { ties = 0, nth = 0, embedded = false, madeAt } = {}) {
+  // By when each was made (`madeAt`, a step's place in that order: ./steps.js), so the picture does not change with the
+  // order the answer came in and what was made first goes first: a link by its older end, then its newer, so of the
+  // links from one step, one to a new step comes after the rest. Without it, by name. Ties in another fixed order keep
+  // another planar part, for the search in `best`: by when made, the newer ends the other way.
+  // Each link's ends by when made, worked out once: the sort asks for them at every comparison.
+  const madeOf = madeAt && new Map(list.map((v) => [v, madeAt(v)])), endsOf = new Map();
+  const ends = (l) => { let e = endsOf.get(l); if (!e) { const [a, b] = [madeOf.get(l[0]) ?? madeAt(l[0]), madeOf.get(l[1]) ?? madeAt(l[1])]; endsOf.set(l, (e = [Math.max(a, b), Math.min(a, b)])); } return e; };
+  const byMade = (p, q) => { const [a, b] = [ends(p), ends(q)]; return a[1] - b[1] || (a[0] - b[0]) * (ties & 1 ? -1 : 1); };
   const keyOf = (l) => { const k = pair(l[0], l[1]); return ties === 1 ? [...k].reverse().join('') : ties === 2 ? k.slice(k.indexOf('|')) + k : k; };
-  const name = (p, q) => (keyOf(p) < keyOf(q) ? -1 : 1);
-  const ids = [...list].sort(), sorted = [...links].sort((p, q) => Number(q[2]) - Number(p[2]) || name(p, q) * (ties === 3 ? -1 : 1));
+  const name = madeAt ? byMade : (p, q) => (keyOf(p) < keyOf(q) ? -1 : 1) * (ties === 3 ? -1 : 1);
+  const ids = madeAt ? [...list].sort((p, q) => madeOf.get(p) - madeOf.get(q)) : [...list].sort(), sorted = [...links].sort((p, q) => Number(q[2]) - Number(p[2]) || name(p, q));
   const asFound = (made) => ({ g: made, s: made.s, t: made.t, number: made.number, outerAt: made.outerAt });
   // A part past the trials has one way to be drawn, and numbering it takes longer than the rest of the picture.
   const big = list.length > z.trial_most, order = sorted.some((l) => l[2] > 1), fits = list.length <= z.embed_big;

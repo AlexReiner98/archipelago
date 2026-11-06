@@ -43,7 +43,6 @@ export interface RuleDef {
     op?: OneOrMany;
     /** What it is written to, flavours included. A merge is matched by either item. */
     type?: OneOrMany;
-    kind?: OneOrMany;
     /** A capability the type has, by name, or with what it must declare: { "settles": { "by": "word" } }. */
     capability?: string | Record<string, Record<string, unknown>>;
     /** Fields the change sets, whatever to. */
@@ -173,7 +172,8 @@ export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): stri
     }
     const then = rule.then;
     if (then !== 'hold' && then !== 'refuse' && !(typeof then === 'object' && Array.isArray(then.require))) problems.push(`${at}: then is hold, refuse or { require: [fields] }`);
-    for (const t of [...(list(rule.when?.type) ?? []), ...(list(rule.when?.kind) ?? [])]) if (!known(t)) problems.push(`${at}: no type "${t}"`);
+    if (rule.when && 'kind' in rule.when) problems.push(`${at}: when names a type or a capability, not a kind`);
+    for (const t of list(rule.when?.type) ?? []) if (!known(t)) problems.push(`${at}: no type "${t}"`);
     if (rule.when?.compare !== undefined && !COMPARE.test(rule.when.compare)) problems.push(`${at}: compare reads like "total > 500"`);
     if (rule.when?.reach !== undefined && rule.when.reach !== 'outside') problems.push(`${at}: reach is "outside", for what a pack writes outside its reach`);
     if (rule.lifted !== undefined && !LIFTS.includes(rule.lifted)) problems.push(`${at}: lifted is one of ${LIFTS.join(', ')}`);
@@ -209,7 +209,7 @@ function applies(rule: RuleDef, reg: Registry, who: Who, w: Written, targets: Ta
   }
   const types = w.op === 'create' && w.type ? [w.type] : targets.map((t) => t.type);
   const of = (wanted: string[] | undefined) => !wanted || types.some((t) => wanted.some((x) => reg.isA(t, x)));
-  if (!of(list(when.type)) || !of(list(when.kind))) return false;
+  if (!of(list(when.type))) return false;
   if (when.capability && !types.some((t) => capable(reg, t, when.capability!))) return false;
   if (when.fields && !when.fields.some((f) => w.props && f in w.props)) return false;
   if (when.visibility && !(w.visibility && list(when.visibility)!.includes(w.visibility))) return false;

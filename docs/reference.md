@@ -390,25 +390,35 @@ and what bites in the repository's files, kept as instructions `for`
 
 Types live in files under `packs/`, one folder per pack:
 
-- `core`: the seven kinds of the work and the system kind, the common
-  types of them (person, company, agent, goal, area, tag, event, resource), the
-  system's own (lens, style, screen, type, link type, and the primitives
-  source, connection, run, notification and automation) and the root links,
-  which name kinds at their ends. It is the one pack always on.
-- `work`: project, task, decision, issue, meeting,
-  idea, note, file, document and procedure, as `task` and so on.
-- `science`: investigation, hypothesis, experiment and result, with tests, supports,
-  refutes, assumes and explains.
-- `money`: what is paid regularly (`cost`).
-- `software`: application, repo, feature, bug, release, proof question, test,
-  test result, pull request, environment, spec, handoff.
-- `time`: time entries, routines and invoices.
+- `core`: the starter types (the kinds of the work and the system kind), the
+  four every island speaks (task, decision, finding, event), actors (person,
+  company, agent), the system's own (lens, style, screen, type, link type, and
+  the primitives source, connection, run, notification and automation) and the
+  root links, which name kinds or capabilities at their ends (`owned_by` goes
+  from `has:owned`, whatever declares owned). A place that says `exclusive` is
+  a resource. It is the one pack always on.
+- `work`: project, issue, goal, idea, note, file and document, with
+  addresses.
+- `science`: investigation, hypothesis, experiment and result, with tests,
+  supports, refutes and assumes.
+- `code`: what software is made of: product, feature, bug, release, repo,
+  commit, component, environment and pull request, with settles, fixes,
+  calls, ships and defers. Taken on an island map.
+- `software`: what runs code over it: the handoff, the release gate, proof
+  on each build, rechecks, the changelog, and diagrams.
+- `proof`: proof questions, tests and their results, and the rules and
+  actions a principle rests on.
+- `design`: studies, concepts, tenets, research, elements and write-ups.
+- `outreach`: posts, channels, conversations and each channel's month;
+  `social` counts visits and trials onto them.
+- `time`: meetings, time entries, routines, invoices and what
+  is paid regularly (`cost`).
 - `funding`: funding programs, tied to the work they could pay for.
 - `local`: a workspace's own types, `local.<name>`.
 
 A new workspace starts with `core` alone; the owner adds the rest.
 
-Each pack is described by its `pack.json`, a manifest of fifteen keys
+Each pack is described by its `pack.json`, a manifest of sixteen keys
 ([docs/packs.md](packs.md)): what it declares, which packs it requires or
 uses, and what it may reach beyond the map. Adding or taking out a pack is a
 fact in the workspace's log, and everything it registers (its types, tools,
@@ -822,19 +832,34 @@ change that:
 - **Workspaces: one database per customer.** Each workspace has its own
   database, its own locally defined types and its own automation runner.
   Nothing is shared, so there is no filter to get wrong. The operator creates
-  one and receives its first human token, in the web UI (Workspace screen,
-  **Installation**, with the operator secret) or with a request:
+  one and receives its first human token, in the web UI or with a request.
+  In the web UI: signed in to the default workspace as its admin, open the
+  Workspace screen, **Packs**, and the **Workspaces** card. Type the operator
+  secret there (the page keeps it in its memory alone, never stored, so a
+  reload asks again), give an id and a name, and press **Make workspace**:
+  its owner token is shown once. The request does the same from the
+  server's own machine, or from anywhere the page's address is:
 
   ```bash
   curl -X POST http://127.0.0.1:3100/operator/workspaces -H "content-type: application/json" -H "Authorization: Bearer <operator secret>" -d '{"id":"acme","name":"Acme Architects"}'
   ```
 
   The operator secret can create and list workspaces, and issue a workspace a
-  new owner token when its owner has lost theirs ("New owner token" on the
-  same card); it cannot read any workspace's map.
+  new owner token when its owner has lost theirs ("New owner token" in a
+  workspace's menu on the same card); it cannot read any workspace's map.
+
+  **Islands** are set by the new workspace's owner, signed in with that
+  token, before anything is put on it: the Workspace screen, **Map**, the
+  **Islands** switch in Settings (`workspace_set` with `islands: true`). The
+  switch is offered only while the map is empty.
+
+  **Which workspace a token is for.** The token maker names the workspace it
+  makes a token for, on its button and in the box that shows the token once,
+  and an agent's `capture` `session_start` answers with `workspace` (its id
+  and name): check it before writing.
 
   **A workspace from a backup file.** Choose a backup file on the same card
-  before pressing Create (or send its bytes in base64 as `"backup"` in the
+  (its menu, **From a backup file**) before pressing Make workspace (or send its bytes in base64 as `"backup"` in the
   request above) and the new workspace starts as the map in that file:
   everything in it, the types it defined for itself, and its owner, whose
   token is the one handed back. This is how a map moves from one server to

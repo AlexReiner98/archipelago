@@ -4,9 +4,12 @@
 // the end of its line. Around one item, its neighbours are grouped under the link that ties each to it.
 
 import { h } from './base.js';
-import { BLOCKING, isOf } from './graph.js';
 import { queryTree, litCount, litSwitch, sizeOf } from './query-base.js';
 import { isClosed, relations, titles, typeTitle } from './words.js';
+
+/** What holds a thing up: these links, or one that extends them. */
+const BLOCKING = ['depends_on', 'waits_on', 'needs', 'holds'];
+const isOf = (list, type) => list.includes(type) || list.includes(relations.get(type)?.root);
 
 /** The columns a row may have, in the order they are drawn; a style's `show` picks among them. */
 const COLUMNS = ['type', 'status', 'waits', 'sessions'];

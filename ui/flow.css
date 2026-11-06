@@ -44,3 +44,8 @@
 /* Where a layout's code opened (drawings_open) puts a panel of its own: over its picture, in the page; only what it puts there takes the pointer. */
 .code-panel { position: absolute; inset: 0; pointer-events: none; }
 .code-panel > * { pointer-events: auto; }
+/* A trace: a mark a change touched, in its maker's hue, until it is seen (ui/traces.js); seen, it fades as the style says. */
+:is(svg *).traced { filter: drop-shadow(0 0 var(--border-3) var(--trace-hue, var(--accent))) drop-shadow(0 0 var(--border-2) var(--trace-hue, var(--accent))); transition: filter var(--trace-fade, 0s) ease-out; }
+:is(svg *).traced.trace-seen { filter: drop-shadow(0 0 0 transparent) drop-shadow(0 0 0 transparent); }
+.traced:not(svg *) { box-shadow: inset var(--border-4) 0 0 var(--trace-hue, var(--accent)); background: color-mix(in srgb, var(--trace-hue, var(--accent)) 24%, transparent); transition: box-shadow var(--trace-fade, 0s) ease-out, background var(--trace-fade, 0s) ease-out; }
+.traced.trace-seen:not(svg *) { box-shadow: inset 0 0 0 transparent; background: transparent; }

@@ -10,6 +10,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ActionDef, LayoutDef, HearDef, HostDef, ReasonDef, ScheduleDef, ScreenDef, StyleDef, TreeDef, VerbDef, ViaDef, ViewDef, WebhookDef } from './declared.ts';
+import { KERNEL_PACKS } from './packorder.ts';
 import type { FieldDef, RelationDef, TypeDef } from './packs.ts';
 import type { RuleDef } from './rules.ts';
 import type { ServerHost, ServerReach } from './server-packs.ts';
@@ -63,10 +64,12 @@ export interface Manifest {
   layouts?: LayoutDef[];
   styles?: StyleDef[];
   reach?: ReachDef;
+  /** The shared set every pack on an island map may build on, by type id: the kernel's pack alone declares it (src/islands.ts). */
+  shared?: string[];
 }
 
 /** The keys of a manifest, and of its reach. */
-export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'styles', 'reach'] as const;
+export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'styles', 'reach', 'shared'] as const;
 export const REACH_KEYS = ['hosts', 'secrets', 'webhooks', 'via', 'runs', 'server'] as const;
 export const SERVER_KEYS = ['acts', 'entries', 'pages', 'connect', 'aliases', 'agreements'] as const;
 
@@ -150,6 +153,8 @@ function keyProblems(m: Raw): string[] {
     if (h.records !== undefined && !h.webhook) problems.push('only a webhook\'s handler says what it records');
   }
   for (const v of arr<Raw>(m.views)) if (v.form !== undefined && v.form !== 'tree' && v.form !== 'screen' && v.form !== 'attention') problems.push(`view "${String(v.id)}": form is tree, screen or attention, or left out for a read`);
+  if (m.shared !== undefined && (!KERNEL_PACKS.includes(String(m.id)) || !Array.isArray(m.shared) || m.shared.some((t) => typeof t !== 'string'))) problems.push('shared is a list of type ids, and only the kernel\'s pack declares it');
+  else if (Array.isArray(m.shared)) { const own = new Set(arr<Raw>(m.types).map((t) => t.id)); const not = m.shared.filter((t) => !own.has(t)); if (not.length) problems.push(`shared names ${not.join(', ')}: the shared set is of the types this pack declares`); }
   for (const t of arr<Raw>(m.types)) if (t.of !== undefined && (t.id !== undefined || typeof t.fields !== 'object')) problems.push(`type entry of "${String(t.of)}" adds fields to another pack's type: of and fields only`);
   return problems;
 }
@@ -269,6 +274,6 @@ export function withoutAbsent(m: Manifest, active: (pack: string) => boolean, de
     return emptied(s.on, on) ? [] : [{ ...s, on }];
   });
   const named = (x: string | string[] | undefined) => (x === undefined ? [] : Array.isArray(x) ? x : [x]);
-  const rules = (m.rules ?? []).filter((r) => ![...named(r.when?.type), ...named(r.when?.kind), ...named(r.type)].some(gone));
+  const rules = (m.rules ?? []).filter((r) => ![...named(r.when?.type), ...named(r.type)].some(gone));
   return { ...m, types, links, views, actions, styles, rules };
 }

@@ -8,7 +8,7 @@ import { livesIn, livesInFor, placeFor } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
 import { cutTitle, mintName, saidTitle, sessionLabelled, sessionTitle } from './session-name.ts';
-import { commitRule } from './commit-rule.ts'; import { openTargets } from './close-offer.ts'; import { roomForSession } from './plan.ts'; import { wholeMap } from './outbox.ts'; import { took } from './presence.ts';
+import { commitRule } from './commit-rule.ts'; import { openTargets } from './close-offer.ts'; import { roomForSession, workspaceName } from './plan.ts'; import { wholeMap } from './outbox.ts'; import { took } from './presence.ts';
 import { VIEWS } from './views.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts'; import { unaccountedBy } from './commits.ts';
 import { hookRunHere, isChat, resolveRun, sessionsAwake, takeUp } from './chat-run.ts'; import { parentOps, parentRun } from './session-parent.ts';
 export { resolveRun, sessionPrompted, sessionsAwake } from './chat-run.ts';
@@ -55,7 +55,7 @@ export async function sessionStart(
       await nameIfUnnamed(l, actor, existing);
       await sessionLabelled(l, existing, input.title, actorId(actor));
       // Its repository is said again: the hook tells a resumed session where things stand, as it told it at first.
-      return { run: existing.id, name: ((await l.entity(existing.id))?.props.name as string | undefined) ?? existing.title, status: 'running', resumed: true, reopened, repo: (await placeFor(l, input)) ?? undefined };
+      return { run: existing.id, name: ((await l.entity(existing.id))?.props.name as string | undefined) ?? existing.title, workspace: { id: l.workspace, name: await workspaceName(l.workspace) }, status: 'running', resumed: true, reopened, repo: (await placeFor(l, input)) ?? undefined };
     }
   }
   const task = input.task ? await l.entity(input.task) : undefined;
@@ -85,7 +85,7 @@ export async function sessionStart(
     );
     for (const res of needed) {
       try {
-        if (l.registry.capacity(res) === Infinity && res.status === 'available') continue;
+        if ((l.registry.capacity(res) ?? Infinity) === Infinity && res.status === 'available') continue;
         await l.claim(actor, { resource: res.id, holder: run, for: task.id, reason: `Needed for "${task.title}"` });
         claimed.push(res.title);
       } catch (err) {
@@ -98,6 +98,8 @@ export async function sessionStart(
   return {
     run,
     name,
+    // The map this session writes to, first: a token made in the wrong workspace is plain before anything is written.
+    workspace: { id: l.workspace, name: await workspaceName(l.workspace) },
     took_over: before?.id,
     status: blocked.length ? 'waiting' : 'running',
     repo: repo && { id: repo.id, title: repo.title },

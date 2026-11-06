@@ -3,7 +3,7 @@
 // within the item are listed here too, each with when it was last used, and revocable; all of them stay listed on
 // the Workspace screen.
 
-import { api, ask, authHeaders, h } from './base.js';
+import { api, ask, authHeaders, h, state } from './base.js';
 import { ago, unfolded, when } from './words.js';
 import { connectBox, secretBox } from './workspace-cards.js';
 
@@ -56,7 +56,7 @@ export async function tokenPiece(host, e, fold, made) {
     );
   host.replaceChildren(
     fold(e.id, 'tokens', 'Tokens for this', tokens.length || '', Boolean(made), [
-      made && (made.may === 'report' ? secretBox(`For ${made.name}: POST ${location.origin}/agent/report, with this as Authorization: Bearer`, made.token) : connectBox(made)),
+      made && (made.may === 'report' ? secretBox(`For ${made.name}: POST ${location.origin}/agent/report, with this as Authorization: Bearer`, made.token, state.workspace) : connectBox(made)),
       tokens.length > 0 && h('ul', { class: 'rows' }, tokens.map(row)),
       h('div', { class: 'toolbar fold-bar' }, name, may, h('button', { class: 'primary', title: 'A token that writes only within this, shown once', onclick: make }, 'Make a token for this')),
       error,

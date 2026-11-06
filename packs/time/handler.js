@@ -4,6 +4,7 @@
 
 import { draftInvoice, log, payInvoice, timesheet, voidInvoice } from './money.js';
 import { todayRows } from './today.js';
+import { costs } from './costs.js';
 import { week } from './week.js';
 
 export default {
@@ -14,4 +15,5 @@ export default {
   'time.invoice_draft': draftInvoice,
   'time.invoice_paid': payInvoice,
   'time.invoice_void': voidInvoice,
+  'time.costs': async (input, ctx) => ({ answer: await costs(input, ctx) }),
 };

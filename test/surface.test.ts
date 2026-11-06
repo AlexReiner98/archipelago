@@ -18,7 +18,7 @@ const OLD = [
   'tell', 'run_report', 'picture_put', 'picture', 'session_end', 'notify', 'check_connections', 'rechecked', 'import_audit', 'packs', 'acts',
   'document', 'publish', 'publish_all', 'publish_plan', 'publish_ask', 'published', 'share_figure', 'backup_download', 'confirmed', 'restart',
   'health_report', 'software_test_report', 'software_handoff', 'software_gate', 'software_repo_work', 'software_recheck', 'software_proof',
-  'software_changelog', 'software_agent_usage', 'money_costs', 'reader_recheck', 'time_log', 'time_invoice_draft',
+  'software_changelog', 'software_agent_usage', 'time_costs', 'reader_recheck', 'time_log', 'time_invoice_draft',
   'time_invoice_paid', 'time_invoice_void', 'time_today', 'time_timesheet', 'time_week',
 ];
 

@@ -2,13 +2,13 @@
   "id": "core",
   "version": "0.1.0",
   "title": "Core",
-  "description": "The kinds every type extends (the seven of the work, and system), the root links every link type extends, and the system tier.",
+  "description": "The starter types (the seven of the work, and system), task and decision (the shared set every pack may build on), the root links every link type extends, and the system tier.",
+  "shared": ["actor", "aim", "work", "question", "record", "occurrence", "place", "system", "task", "decision", "finding"],
   "types": [
     {
       "id": "actor",
       "title": "Actor",
-      "kind": true,
-      "description": "Holds authority, owns work and is waited on: a person, a company, an agent. One of the seven kinds of the work; every type extends one of them or the system kind.",
+      "description": "Holds authority, owns work and is waited on: a person, a company, an agent. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["active"], "closed": ["inactive"] },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -18,10 +18,10 @@
     },
     {
       "id": "aim",
+      "capabilities": { "owned": true },
       "altitude": "workspace",
       "title": "Aim",
-      "kind": true,
-      "description": "Why work exists: what serves points at, such as a goal or an area. One of the seven kinds of the work; every type extends one of them or the system kind.",
+      "description": "Why work exists: what work is for, such as a goal or a principle (a pack names its own). A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["active"], "closed": ["achieved", "retired"], "phases": { "achieved": "finished" } },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -32,10 +32,10 @@
     },
     {
       "id": "work",
+      "capabilities": { "owned": true, "actionable": true, "plannable": true },
       "altitude": "step",
       "title": "Work",
-      "kind": true,
-      "description": "Open until finished; it blocks and is blocked: a task, a project, an issue. One of the seven kinds of the work; every type extends one of them or the system kind.",
+      "description": "Open until finished; it blocks and is blocked: a task, a project, an issue. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["todo", "doing"], "closed": ["done", "dropped"] },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -48,10 +48,10 @@
     },
     {
       "id": "question",
+      "capabilities": { "owned": true, "actionable": true },
       "altitude": "step",
       "title": "Question",
-      "kind": true,
-      "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. One of the seven kinds of the work; every type extends one of them or the system kind.",
+      "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["open"], "closed": ["settled", "dropped"], "phases": { "open": "not_started", "settled": "finished" } },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -62,10 +62,10 @@
     },
     {
       "id": "record",
+      "capabilities": { "owned": true },
       "altitude": "step",
       "title": "Record",
-      "kind": true,
-      "description": "Explains, and is replaced by a newer one: a note, a result, a procedure, a document. One of the seven kinds of the work; every type extends one of them or the system kind.",
+      "description": "Explains, and is replaced by a newer one: a note, a result, a procedure, a document. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["current"], "closed": ["superseded"] },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -76,10 +76,10 @@
     },
     {
       "id": "occurrence",
+      "capabilities": { "owned": true },
       "altitude": "step",
       "title": "Occurrence",
-      "kind": true,
-      "description": "Happens at a time, and can be a gate: an event, a meeting, a release. One of the seven kinds of the work; every type extends one of them or the system kind.",
+      "description": "Happens at a time, and can be a gate: an event, a meeting, a release. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["upcoming"], "closed": ["happened", "cancelled"], "phases": { "upcoming": "not_started", "happened": "finished" } },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -90,11 +90,13 @@
     },
     {
       "id": "place",
+      "moved_from": ["resource"],
+      "capabilities": { "capacity": { "field": "exclusive" } },
       "title": "Place",
-      "kind": true,
-      "description": "Exists somewhere, physical or not; work lives in it or uses it: a resource, a repository, a file. One of the seven kinds of the work; every type extends one of them or the system kind.",
-      "statuses": { "open": ["available"], "closed": ["retired"] },
+      "description": "Exists somewhere, physical or not; work lives in it or uses it: a repository, a file, a machine, a licence. One that says exclusive is a resource: work that needs it claims it, one holder at a time when exclusive is true. A starter type of the work: a pack's type may extend it, or extend nothing.",
+      "statuses": { "open": ["available", "unavailable"], "closed": ["retired"], "phases": { "unavailable": "trouble" } },
       "fields": {
+        "exclusive": { "type": "boolean", "description": "Said of a resource: true, only one holder at a time and everything else that needs it is blocked; false, any number. Left out, it is no resource and nothing holds it." },
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
         "confidence": { "type": "number", "column": true, "description": "0 to 1: how sure the author is that this is true. Kept in the item's row." },
         "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." }
@@ -103,9 +105,9 @@
     {
       "id": "system",
       "title": "System",
-      "kind": true,
-      "description": "The app's own configuration, kept as items: views, styles, screens, runs, sources, notifications, automations. Views of the work leave it out unless asked. Only the kernel's packs declare types of it.",
+      "description": "The app's own configuration, kept as items: views, styles, screens, runs, sources, notifications, automations. Views of the work leave it out unless asked: its types carry the kernel flag. Only the kernel's packs declare types of it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
+      "capabilities": { "kernel": true },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
         "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." }
@@ -136,26 +138,49 @@
       "fields": { "kind": { "type": "string", "description": "What sort of agent, e.g. claude-code." } }
     },
     {
-      "id": "goal",
-      "extends": "aim",
-      "title": "Goal",
-      "description": "An outcome that projects and tasks serve.",
-      "statuses": { "open": ["active", "paused"], "closed": ["achieved", "dropped"], "phases": { "active": "under_way" } },
-      "fields": { "target_date": { "type": "date" }, "measure": { "type": "string", "description": "How you will know it is achieved." } }
+      "id": "task",
+      "moved_from": ["work.task"],
+      "capabilities": { "bound": { "field": "due", "limit": "today" }, "where": { "link": "lives_in" } },
+      "extends": "work",
+      "title": "Task",
+      "description": "A piece of work someone can do. A commitment is a task that involves who it is owed to.",
+      "statuses": { "open": ["todo", "doing", "waiting"], "closed": ["done", "dropped"] },
+      "fields": {
+        "due": { "type": "date" },
+        "priority": { "type": "enum", "values": ["low", "normal", "high", "urgent"] },
+        "recurrence": { "type": "string", "description": "How often it repeats, in plain words or an RRULE." },
+        "tokens_estimated": { "type": "number", "description": "How many tokens an agent expects this to take, one number: input and output together, not counting cached re-reads. Whoever plans it or picks it up says; it can be corrected." },
+        "tokens_used": { "type": "number", "description": "Tokens spent on it so far, measured from the sessions that worked on it.", "system": true }
+      }
     },
     {
-      "id": "area",
-      "extends": "aim",
-      "title": "Area",
-      "description": "An ongoing responsibility with no end date.",
-      "statuses": { "open": ["active"], "closed": ["retired"] }
+      "id": "decision",
+      "moved_from": ["work.decision"],
+      "capabilities": { "bound": { "field": "due", "limit": "today" }, "settles": { "by": "word", "whose": "owner", "choices": "options", "chosen": "outcome", "why": "rationale", "on": "decided_on" } },
+      "extends": "question",
+      "title": "Decision",
+      "description": "Something decided, or still open, with its reasoning. The title is the question.",
+      "statuses": { "open": ["open"], "closed": ["decided", "reversed"] },
+      "fields": {
+        "due": { "type": "date" },
+        "options": { "type": "json", "description": "The choices being weighed, as a list of short strings, e.g. [\"Hosted API\", \"Local model\"].", "shown": true },
+        "outcome": { "type": "string", "description": "What was chosen.", "shown": true },
+        "rationale": { "type": "string", "description": "Why." },
+        "decided_on": { "type": "date" }
+      }
     },
     {
-      "id": "tag",
-      "extends": "aim",
-      "title": "Tag",
-      "description": "What items belong with, named in a word or two: an item is tagged with any number of them (tagged), and a query's filter selects by it (tagged <tag>).",
-      "statuses": { "open": ["active"], "closed": ["retired"] }
+      "id": "finding",
+      "extends": "record",
+      "capabilities": { "promised": { "fields": ["value", "as_of"] } },
+      "title": "Finding",
+      "description": "What an island has found, published for others to read: its name is the title, what it means is the note (a unit or currency said there), and its value is one of a simple type, true as of a date. Its readers read it (reads); a new value keeps the old one in the log.",
+      "statuses": { "open": ["current"], "closed": ["superseded", "withdrawn"] },
+      "fields": {
+        "value": { "type": "json", "typed_by": "value_type", "shown": true, "description": "The value: text, a number, true or false, or a date like 2026-11-05, as value_type says." },
+        "value_type": { "type": "enum", "values": ["text", "number", "boolean", "date"], "shown": true, "description": "What sort of value it is: text, number, boolean or date." },
+        "as_of": { "type": "date", "shown": true, "description": "When the value was true: the day it was found or measured." }
+      }
     },
     {
       "id": "event",
@@ -165,17 +190,6 @@
       "description": "Something that happens at a time: a deadline, a launch, an appointment.",
       "statuses": { "open": ["upcoming", "in_progress"], "closed": ["happened", "cancelled"] },
       "fields": { "at": { "type": "datetime" }, "ends": { "type": "datetime" }, "location": { "type": "string" }, "recurrence": { "type": "string" } }
-    },
-    {
-      "id": "resource",
-      "capabilities": { "capacity": { "field": "exclusive" } },
-      "extends": "place",
-      "title": "Resource",
-      "description": "Something limited or exclusive that work needs: a machine, a licence, a budget, a live app.",
-      "statuses": { "open": ["available", "unavailable"], "closed": ["retired"], "phases": { "unavailable": "trouble" } },
-      "fields": {
-        "exclusive": { "type": "boolean", "default": true, "description": "If true, only one holder at a time; everything else that needs it is blocked." }
-      }
     },
     {
       "id": "lens",
@@ -209,16 +223,16 @@
         "lit": { "type": "enum", "values": ["all", "you", "blocked"], "description": "What stays lit as it opens." },
         "published": { "type": "boolean", "description": "pages: show what is published beside each draft. Left out, each draft alone." },
         "order": { "type": "enum", "values": ["reading", "found", "title"], "description": "pages: the order of its rows. reading: as a reader meets the site (the front page, the header by menu, then what each page points at in the order it does, the rest by title, the footer last); found: as the query finds them; title: by name. reading unless said." },
-        "undrawn": { "type": "json", "description": "The link types drawn as no wire, as a list, e.g. [\"tagged\"]: the items are still drawn and still filtered by them. An empty list draws every link the layout draws." },
+        "undrawn": { "type": "json", "description": "The link types drawn as no wire, as a list, e.g. [\"about\"]: the items are still drawn and still filtered by them. An empty list draws every link the layout draws." },
         "link_colours": { "type": "json", "description": "A colour for each link type, by its name, as hex colours: the flow draws each wire and tie in its own, and a type not named here takes one of link_hues, the same each time unless another type in the picture has it." },
-        "kind_shapes": { "type": "json", "description": "The outline each kind is drawn in, by kind: box, diamond, pill, sheet, cut (a box with cut corners), hexagon, flag or tab, e.g. {\"system\": \"cut\"}. A kind not named is a box. One outline says one kind in every picture." },
-        "type_shapes": { "type": "json", "description": "An outline for a type over its kind's, by type, from the same eight, e.g. {\"run\": \"pill\"}. Left out, a type is drawn in its kind's." },
+        "type_shapes": { "type": "json", "description": "The outline each type is drawn in, by type: box, diamond, pill, sheet, cut (a box with cut corners), hexagon, flag, tab or ticket (a box with a notch in each end), e.g. {\"question\": \"diamond\"}. A type not named takes the outline of the nearest type it is a flavour of that is named, else a box." },
         "held_up": { "type": "enum", "values": ["none", "trouble"], "description": "Whether a step held up by an open step it depends on has its dot in the trouble colour (trouble), or is drawn as its phase alone, the order's wire saying the rest (none)." },
         "phase_marks": { "type": "json", "description": "How a step's dot says where it stands, by phase (not_started, under_way, finished, ended, trouble, standing): hollow, half, full or none. A phase not named is hollow." },
         "session_marks": { "type": "json", "description": "How the flow draws a run's session state (waiting, your_move, blocked, working, quiet, idle, done), by state: { shape, hue, lit }. shape: disc, ring, half, square, diamond or triangle; hue: one of the theme's colours by name (you, blocked, session, warn, muted, done...); lit: drawn as what waits on you, and laid out first. A run whose state is named shows its line in place of its title." },
         "link_hues": { "type": "json", "description": "The colours a link type not named in link_colours takes, as hex colours: by its name, stepping past one another type in the same picture has. hues when not set." },
         "key": { "type": "enum", "values": ["shown", "hidden"], "description": "Whether a picture's key is drawn: what each mark it uses means, as its layout says (the scene's key), always in sight on the canvas. shown unless said." },
         "headless": { "type": "json", "description": "The link types whose ties are drawn with no head, as a list, e.g. [\"part_of\"]: every other tie has a head where its link points." },
+        "island_hues": { "type": "json", "description": "The colours islands take, in the order a picture's answer names them, as hex colours: where a picture holds items of more than one island, the flow draws each as a region round what lives on it, its shore in its colour and its land a tint of it, and names it in the key. hues when not set." },
         "place_hues": { "type": "json", "description": "The colours places take, in order, as hex colours: the flow then draws no step for a place that holds parts (items of the place kind) in the picture, outlines each of its parts in its colour and names it in the key. Left out or empty, a place is a step tied to its parts." },
         "layout": { "type": "enum", "values": ["calendar", "bars"], "description": "time: a calendar of days, hours running down (calendar), or each lane a row of bars across the days (bars, a Gantt chart). calendar unless said." },
         "ranges": { "type": "json", "description": "time: the numbers of days a reader can choose to draw of the view's window, each a choice over the picture beside All, e.g. [1, 3, 7]. A range as long as the window or longer is not offered." },
@@ -266,6 +280,16 @@
         "modules": { "type": "json", "large": true, "code": true, "description": "The owner's version of a layout a pack ships (with preset, the layout’s id): its modules by name, each a JavaScript module's text, standing in for the pack's module of that name. The layout runs as code does, in a worker inside a sandboxed frame, and answers with marks (SVG and HTML as data) the page checks before it draws them. Written by an agent, it waits for the human to approve it." },
         "settings": { "type": "json", "description": "The style fields it draws with, such as text or colors, as a style holds them: under the view's own, which say otherwise." },
         "preset": { "type": "string", "description": "The id of the pack's drawing this is the owner's version of (a layout in a pack's layouts).", "system": true }
+      }
+    },
+    {
+      "id": "island",
+      "extends": "system",
+      "title": "Island",
+      "description": "A cluster of work that speaks one pack's vocabulary and the shared set, below a project or across projects. On a map with islands on, every item but the kernel's own and actors lives on exactly one island (its field island), its type the island's pack's or of the shared set, and no link joins items on two islands: findings are how islands meet. The query term island <island> is what lives on it.",
+      "statuses": { "open": ["current"], "closed": ["retired"] },
+      "fields": {
+        "pack": { "type": "string", "description": "The pack it speaks, by id (core for the shared set alone), fixed once the island is made." }
       }
     },
     {
@@ -363,7 +387,8 @@
       "moved_from": [
         "sys.connection"
       ],
-      "extends": "resource",
+      "extends": "place",
+      "capabilities": { "kernel": true },
       "title": "Connection",
       "description": "An external tool, such as an MCP server. Status says whether it is reachable right now.",
       "fields": {
@@ -627,6 +652,7 @@
         "sys.shared_document"
       ],
       "extends": "record",
+      "capabilities": { "kernel": true },
       "public": true,
       "title": "Shared document",
       "deliverable": true,
@@ -672,7 +698,7 @@
       "extends": "involves",
       "title": "owned by",
       "inverse": "owns",
-      "from": ["aim", "work", "question", "record", "occurrence"],
+      "from": ["has:owned"],
       "to": ["person", "agent"],
       "description": "Who is responsible for it: one person or agent, and a new link takes the place of the one before. Saying owner on an item makes this link; the row keeps its end as an index."
     },
@@ -695,32 +721,13 @@
       "description": "The source cannot move until this actor (a person, a company, an agent) has answered or acted. Say what is awaited in the relation's props.for, as what they are to do, in a few words, said to them: \"Choose the pack's name\", not \"choosing the name\". Drives the blockers view; remove the link once they have."
     },
     {
-      "id": "ships",
-      "moved_from": ["software.ships"],
-      "extends": "produced",
-      "title": "ships",
-      "inverse": "ships in",
-      "from": ["occurrence"],
-      "to": ["*"],
-      "description": "What the event brings out: open work under it that neither it waits for nor it goes ahead without is left to sort. Drives the gate view."
-    },
-    {
-      "id": "defers",
-      "root": true,
-      "title": "goes ahead without",
-      "inverse": "can follow",
-      "from": ["occurrence"],
-      "to": ["*"],
-      "description": "The event was planned with this in sight and does not wait for it: it can follow. What the event does wait for is depends_on. Drives the gate view."
-    },
-    {
       "id": "part_of",
       "root": true,
       "title": "is part of",
       "inverse": "contains",
       "from": ["*"],
       "to": ["*"],
-      "description": "Hierarchy: a task in a project, a project in an area."
+      "description": "Hierarchy: a task in a project, a project in a larger one."
     },
     {
       "id": "serves",
@@ -729,10 +736,11 @@
       "inverse": "is served by",
       "from": ["*"],
       "to": ["aim"],
-      "description": "Why the work exists."
+      "description": "Why the work exists: the goal, principle or tenet it is for."
     },
     {
       "id": "involves",
+      "moved_from": ["owed_to", "requested_by"],
       "root": true,
       "title": "involves",
       "inverse": "is involved in",
@@ -742,6 +750,7 @@
     },
     {
       "id": "works_at",
+      "kernel": true,
       "extends": "part_of",
       "title": "works at",
       "inverse": "employs",
@@ -751,6 +760,7 @@
     },
     {
       "id": "about",
+      "moved_from": ["supersedes", "based_on", "governed_by", "reduces"],
       "root": true,
       "title": "is about",
       "inverse": "is described by",
@@ -765,19 +775,21 @@
       "inverse": "is needed by",
       "from": ["*"],
       "to": ["place"],
-      "description": "The work cannot run without this place, one with a capacity (a resource). Drives the blockers view."
+      "description": "The work cannot run without this place; one that says exclusive (a resource) is claimed before use. Drives the blockers view."
     },
     {
       "id": "holds",
+      "kernel": true,
       "root": true,
       "title": "holds",
       "inverse": "is held by",
       "from": ["*"],
       "to": ["place"],
-      "description": "Current occupancy of a place with a capacity (a resource). Created by claim, ended by release."
+      "description": "Current occupancy of a place that says exclusive (a resource). Created by claim, ended by release."
     },
     {
       "id": "started_from",
+      "kernel": true,
       "extends": "about",
       "title": "was started from",
       "inverse": "started",
@@ -787,6 +799,7 @@
     },
     {
       "id": "produced",
+      "moved_from": ["earns"],
       "root": true,
       "title": "produced",
       "inverse": "was produced by",
@@ -814,15 +827,6 @@
       "description": "Evidence on a question: a result, a test or a finding that helps settle it."
     },
     {
-      "id": "supersedes",
-      "root": true,
-      "title": "supersedes",
-      "inverse": "is superseded by",
-      "from": ["*"],
-      "to": ["*"],
-      "description": "Replaces an older version."
-    },
-    {
       "id": "link",
       "root": true,
       "title": "is linked to",
@@ -843,16 +847,18 @@
       "moved_from": ["software.uses"]
     },
     {
-      "id": "tagged",
-      "extends": "about",
-      "title": "is tagged",
-      "inverse": "tags",
+      "id": "reads",
+      "extends": "uses",
+      "crosses": true,
+      "title": "reads",
+      "inverse": "is read by",
       "from": ["*"],
-      "to": ["tag"],
-      "description": "What the item belongs with: any number of tags to an item. A query's filter selects by it (tagged <tag id or name>); the house style draws no wire for it (undrawn)."
+      "to": ["finding"],
+      "description": "Relies on a finding's value, from this island or another: the one link that crosses between islands. Its readers are who is told when the finding moves; when it was made, with the finding's history, says which value was read."
     },
     {
       "id": "works_on",
+      "kernel": true,
       "moved_from": [
         "sys.works_on"
       ],
@@ -1168,14 +1174,14 @@
       "shape": "data",
       "lens": {},
       "answer": "flat",
-      "description": "The query: a filter, a walk and a limit, answered as items and the links among them; the page names its parts Find, Only, Not, Walk and Limit. The filter is { find, only, not }, three lists of the same terms, each a set of items written as words: text <words> (the search read's own: words in any form in titles and notes, or as typed in a title, else titles nearly what was typed; the best match first, and matched says how many they found in all), type <t> (flavours included), id <item>, in <item> (what is part of it, at any depth, not the item itself), related <item> (any link to it, either way), <link type> <item> (\"tagged Urgent\", \"waits_on me\": what has that link to it), <link type>< <item> (what it links to), owner me|<person>, kind <k>, and the words that can only be checked of what is found: done, blocked (depends on something open, waits on someone, or needs a resource not free, as attention says), status <s>, no owner, over estimate (tokens used over tokens estimated), changed since|before <7d|date>, made since|before <7d|date> (a since and a before together are a range, a date its day in the workspace's zone), by owner and by agent (on whose authority its status was last set). An item is an id or a name. find adds its sets to pick the seeds, and takes neither kind nor those words; only keeps the seeds in every set, types being one set; not takes its sets away from everything, an item named by id and what the walk reaches included, and the walk does not pass through what it takes away: kind system unless not is given. A filter whose find holds nothing is refused. The walk follows the link types named (over, or \"all\"), each the way it is written: \"depends_on>\" out along the link (what an item depends on), \"depends_on<\" in to it (what depends on the item), \"depends_on\" either way. A part links to what holds it, so from a project \"part_of<\" walks down (what is in it) and \"part_of>\" up (what it is in); \"part_of\" either way climbs to the parent and comes back down through all of it; for steps steps (1 when over is named; at most 6). The limit is the most items sent (500; at most 2000), seeds first, and cut says it cut. Each item is its head (id, kind, type, title, the start of its note (with notes \"whole\", the whole of it, for the first 100 sent, named in whole), visibility, status, open, owner, times) the fields its type marks shown, and why it is there: found (the sorts of term that found it: text, type, id, link, in) and terms (those terms, as the query says them) or step (the step of the walk that reached it); each link its id, type, from, to and props. With preview ({ part: find, only or not, terms, ids }), it answers only { preview }: for each term, at most 80, the items find would add it finds, or which of ids (what is drawn) only or not would leave out. With time ({ from, to }: dates, today, or days from today as -6d or 7d), a window it finds nothing more by: each item says where it falls in it (time, its spans; a session where it was at work) whose lane it is in (lane: the person who holds it, what no one holds the workspace owner's, each session its own) and what it counts toward (stream: the outermost item its work sits in; a session's spans each their own, with on_title), the lanes and streams in order (lanes, streams), for a layout along a time axis. Params: filter ({ find, only, not }), walk ({ over, steps }), limit, time, notes."
+      "description": "The query: a filter, a walk and a limit, answered as items and the links among them; the page names its parts Find, Only, Not, Walk and Limit. The filter is { find, only, not }, three lists of the same terms, each a set of items written as words: text <words> (the search read's own: words in any form in titles and notes, or as typed in a title, else titles nearly what was typed; the best match first, and matched says how many they found in all), type <t> (flavours included), held (what a change held for you would touch), moved (what reads a finding that moved since it was last changed or said still true), id <item>, in <item> (what is part of it, at any depth, not the item itself), related <item> (any link to it, either way), <link type> <item> (\"tagged Urgent\", \"waits_on me\": what has that link to it), <link type>< <item> (what it links to), owner me|<person>, kind <k>, and the words that can only be checked of what is found: done, blocked (depends on something open, waits on someone, or needs a resource not free, as attention says), status <s>, no owner, over estimate (tokens used over tokens estimated), changed since|before <7d|date>, made since|before <7d|date> (a since and a before together are a range, a date its day in the workspace's zone), by owner and by agent (on whose authority its status was last set). An item is an id or a name. find adds its sets to pick the seeds, and takes neither kind nor those words; only keeps the seeds in every set, types being one set; not takes its sets away from everything, an item named by id and what the walk reaches included, and the walk does not pass through what it takes away: kind system unless not is given. A filter whose find holds nothing is refused. The walk follows the link types named (over, or \"all\"), each the way it is written: \"depends_on>\" out along the link (what an item depends on), \"depends_on<\" in to it (what depends on the item), \"depends_on\" either way. A part links to what holds it, so from a project \"part_of<\" walks down (what is in it) and \"part_of>\" up (what it is in); \"part_of\" either way climbs to the parent and comes back down through all of it; for steps steps (1 when over is named; at most 6). The limit is the most items sent (500; at most 2000), seeds first, and cut says it cut. Each item is its head (id, kind, type, title, the start of its note (with notes \"whole\", the whole of it, for the first 100 sent, named in whole), visibility, status, open, owner, times) the fields its type marks shown, and why it is there: found (the sorts of term that found it: text, type, id, link, in) and terms (those terms, as the query says them) or step (the step of the walk that reached it); each link its id, type, from, to and props. With preview ({ part: find, only or not, terms, ids }), it answers only { preview }: for each term, at most 80, the items find would add it finds, or which of ids (what is drawn) only or not would leave out. With time ({ from, to }: dates, today, or days from today as -6d or 7d), a window it finds nothing more by: each item says where it falls in it (time, its spans; a session where it was at work) whose lane it is in (lane: the person who holds it, what no one holds the workspace owner's, each session its own) and what it counts toward (stream: the outermost item its work sits in; a session's spans each their own, with on_title), the lanes and streams in order (lanes, streams), for a layout along a time axis. Params: filter ({ find, only, not }), walk ({ over, steps }), limit, time, notes."
     },
     {
       "id": "core.attention",
       "shape": "data",
       "lens": {},
       "answer": "attention",
-      "description": "What deserves attention, and why: each item with its reasons, the strongest first. Reasons: waits_on (someone must answer or act), to_confirm (an agent settled it and the owner has not confirmed), holding_up (others are blocked by it), due (its bound is near or past), unsettled (a question not yet settled, and how it settles), blocked (and what has to move first), stale (nobody has changed or confirmed it for stale_days), under_way (a session is on it), ready (work nothing blocks). Each item says what it sits in at the top (top). Params: person (\"me\", or an id: only what is theirs), within (an item or place: only what is its): one of the two, since weighing every open item would read the whole map (for everyone, only to_confirm), reasons (some of the above), days (due within, 7), stale_days (14), order (latest: what changed most recently first), limit (100). With to_confirm, the answer has to_confirm.upto for the confirmed tool."
+      "description": "What deserves attention, and why: each item with its reasons, the strongest first. Reasons: waits_on (someone must answer or act), to_confirm (an agent settled it and the owner has not confirmed), holding_up (others are blocked by it), due (its bound is near or past), moved (a finding it reads has changed since it was last changed or said still true: which, from what to what, when; an update of only its id clears it), unsettled (a question not yet settled, and how it settles), blocked (and what has to move first), stale (nobody has changed or confirmed it for stale_days), under_way (a session is on it), ready (work nothing blocks). Each item says what it sits in at the top (top). Params: person (\"me\", or an id: only what is theirs), within (an item or place: only what is its): one of the two, since weighing every open item would read the whole map (for everyone, only to_confirm), reasons (some of the above), days (due within, 7), stale_days (14), order (latest: what changed most recently first), limit (100). With to_confirm, the answer has to_confirm.upto for the confirmed tool."
     },
     {
       "id": "core.graph",
@@ -1218,7 +1224,7 @@
         { "piece": "start", "title": "Start here" },
         { "piece": "token_ask" },
         { "piece": "held", "title": "Held for you" },
-        { "piece": "attention", "title": "Your move", "person": "me", "reasons": ["waits_on", "to_confirm", "due", "unsettled"], "limit": 5 }
+        { "piece": "attention", "title": "Your move", "person": "me", "reasons": ["waits_on", "to_confirm", "due", "moved", "unsettled"], "limit": 5 }
       ]
     },
     {
@@ -1226,7 +1232,7 @@
       "id": "needs",
       "title": "Needs you",
       "on": ["work", "aim"],
-      "pieces": [{ "piece": "attention", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "unsettled"] }]
+      "pieces": [{ "piece": "attention", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "moved", "unsettled"] }]
     },
     {
       "form": "screen",
@@ -1355,7 +1361,7 @@
       }
     },
     { "id": "core.flow", "title": "Flow", "shape": "flow",
-      "modules": { "solve.js": "layouts/flow/solve.js", "polyline.js": "layouts/flow/polyline.js", "direction.js": "layouts/flow/direction.js", "topology.js": "layouts/flow/topology.js", "part.js": "layouts/flow/part.js", "search.js": "layouts/flow/search.js", "shelves.js": "layouts/flow/shelves.js", "assemble.js": "layouts/flow/assemble.js", "hangs.js": "layouts/flow/hangs.js", "finish.js": "layouts/flow/finish.js", "index.js": "layouts/flow/index.js", "layout.js": "layouts/flow/layout.js", "steps.js": "layouts/flow/steps.js", "faults.js": "layouts/flow/faults.js", "thread.js": "layouts/flow/thread.js", "numbering.js": "layouts/flow/numbering.js", "upward.js": "layouts/flow/upward.js", "combs.js": "layouts/flow/combs.js", "planar.js": "layouts/flow/planar.js", "count.js": "layouts/flow/count.js", "lines.js": "layouts/flow/lines.js", "graph.js": "layouts/flow/graph.js", "shapes.js": "layouts/flow/shapes.js", "look.js": "layouts/flow/look.js", "story.js": "layouts/flow/story.js", "places.js": "layouts/flow/places.js", "state.js": "layouts/flow/state.js", "session.js": "layouts/flow/session.js", "marks.js": "layouts/architecture/marks.js", "play.js": "layouts/architecture/play.js", "story-look.js": "layouts/architecture/story-look.js", "shape.js": "layouts/flow/shape.js", "index.js": "layouts/flow/index.js", "lr.js": "layouts/flow/lr.js", "wrap.js": "layouts/flow/wrap.js" } }
+      "modules": { "solve.js": "layouts/flow/solve.js", "polyline.js": "layouts/flow/polyline.js", "direction.js": "layouts/flow/direction.js", "topology.js": "layouts/flow/topology.js", "part.js": "layouts/flow/part.js", "search.js": "layouts/flow/search.js", "shelves.js": "layouts/flow/shelves.js", "assemble.js": "layouts/flow/assemble.js", "hangs.js": "layouts/flow/hangs.js", "finish.js": "layouts/flow/finish.js", "index.js": "layouts/flow/index.js", "layout.js": "layouts/flow/layout.js", "steps.js": "layouts/flow/steps.js", "faults.js": "layouts/flow/faults.js", "thread.js": "layouts/flow/thread.js", "numbering.js": "layouts/flow/numbering.js", "upward.js": "layouts/flow/upward.js", "combs.js": "layouts/flow/combs.js", "planar.js": "layouts/flow/planar.js", "count.js": "layouts/flow/count.js", "lines.js": "layouts/flow/lines.js", "graph.js": "layouts/flow/graph.js", "shapes.js": "layouts/flow/shapes.js", "look.js": "layouts/flow/look.js", "story.js": "layouts/flow/story.js", "places.js": "layouts/flow/places.js", "islands.js": "layouts/flow/islands.js", "archipelago.js": "layouts/flow/archipelago.js", "ports.js": "layouts/flow/ports.js", "state.js": "layouts/flow/state.js", "session.js": "layouts/flow/session.js", "marks.js": "layouts/architecture/marks.js", "play.js": "layouts/architecture/play.js", "story-look.js": "layouts/architecture/story-look.js", "shape.js": "layouts/flow/shape.js", "index.js": "layouts/flow/index.js", "lr.js": "layouts/flow/lr.js", "wrap.js": "layouts/flow/wrap.js" } }
   ],
   "styles": [
     {
@@ -1363,13 +1369,13 @@
       "title": "House style",
       "props": {
         "shape": "list",
-        "undrawn": ["tagged"],
         "headless": ["part_of"],
+        "island_hues": ["#2e7d4f", "#2f5fb3", "#a86a12", "#6f43b0", "#0f7c86", "#b5489a", "#4f8a2b", "#5b6b9a"],
         "place_hues": ["#2f5fb3", "#46785c", "#0f7c86", "#b5489a", "#4f8a2b", "#5b6b9a", "#6f43b0", "#8a8f2a"],
         "key": "shown",
         "ranges": [1, 3],
-        "link_colours": { "depends_on": "#59636e", "part_of": "#2e7d4f", "waits_on": "#5b6b9a", "link": "#6f43b0", "about": "#0f7c86", "tagged": "#7a6a1c" },
-        "kind_shapes": { "work": "box", "question": "diamond", "occurrence": "pill", "record": "sheet", "system": "cut", "actor": "hexagon", "aim": "flag", "place": "tab" },
+        "link_colours": { "depends_on": "#59636e", "part_of": "#2e7d4f", "waits_on": "#5b6b9a", "link": "#6f43b0", "about": "#0f7c86" },
+        "type_shapes": { "work": "box", "question": "diamond", "occurrence": "pill", "record": "sheet", "system": "cut", "actor": "hexagon", "aim": "flag", "place": "tab", "finding": "ticket" },
         "held_up": "none",
         "phase_marks": { "not_started": "hollow", "under_way": "half", "finished": "full", "ended": "full", "trouble": "full", "standing": "none" },
         "lit": "all",
@@ -1384,8 +1390,8 @@
         "type": { "region": { "face": "chart", "weight": 400, "case": "upper", "track": "0.14em" }, "water": { "face": "chart", "style": "italic" }, "wordmark": { "face": "chart", "weight": 400, "case": "upper", "track": "0.33em" } },
         "hues": ["#2e7d4f", "#2f5fb3", "#a86a12", "#6f43b0", "#59636e", "#0f7c86", "#b23a48", "#7a6a1c"],
         "link_hues": ["#2e7d4f", "#2f5fb3", "#6f43b0", "#59636e", "#0f7c86", "#7a6a1c", "#c0507a", "#4f8a2b", "#3a7bd5", "#2a9d8f", "#8a8f2a", "#b5489a", "#5b6b9a", "#46785c"],
-        "sizes": { "rule": 1, "dot": 8, "dot_ring": 1.5, "small_text": 12, "tiny_text": 11, "legend_text": 12, "legend_width": 200, "pill_pad_y": 1, "pill_pad_x": 7, "here_ring": 2, "swatch": 12, "swatch_radius": 3, "stage_least": 320, "stage": "68vh", "stage_most": 760, "legend_inset": 10, "legend_gap": 3, "legend_pad_y": 7, "legend_pad_x": 10, "legend_mark_gap": 8, "list_pad_top": 6, "list_pad_bottom": 10, "list_column_gap": 12, "list_row": 30, "list_group_row": 34, "list_side": 14, "list_indent": 22, "list_name_gap": 8, "list_dot_before": 6, "list_dot_after": 4, "list_fold": 18, "list_lane_indent": 26, "list_count_gap": 4, "list_count": 18, "list_column_most": "18ch", "list_status": "11ch", "list_waits": "14ch", "list_field": "13ch", "list_field_narrow": "6ch", "list_sessions": 10, "list_narrow_at": 640, "grid_pad": 10, "grid_gap": 6, "grid_head_pad_y": 7, "grid_head_pad_x": 10, "grid_row_pad_y": 8, "grid_card_gap": 2, "grid_card_pad_left": 11, "grid_card_pad_right": 9, "grid_stripe": 4, "grid_edge_mix": "55%", "grid_tint": "13%", "grid_tint_hover": "22%", "grid_swatch_mix": "30%", "grid_detail_text": "0.92em", "grid_mark_gap": 4, "grid_mark_text": "0.85em", "grid_legend_gap": 14, "grid_legend_pad_y": 8, "grid_legend_pad_x": 12, "grid_row_head": 120, "grid_lane": 170, "pages_width": 480, "pages_gap": 20, "pages_pad": 14, "pages_title": 18, "pages_block_gap": 8, "pages_least": 160, "flow_layer_gap": 84, "flow_line_height": 16, "flow_node_gap": 16, "flow_margin": 24, "flow_max_text": 140,  "flow_text": 13, "flow_stub_text": 12,  "flow_diamond_pad": 96, "flow_diamond_height": 60, "flow_end_pad": 30, "flow_end_height": 30, "flow_box_pad": 42, "flow_box_height": 34, "flow_sheet_height": 40, "flow_corner": 6, "flow_head_half": 4.5, "flow_head_length": 9, "flow_wire_room": 12, "flow_joined_room": 28, "flow_port_run": 18, "flow_port_corner": 14, "flow_wire_gap": 12, "flow_wire_column": 24, "flow_section_gap": 96,  "flow_slide_sweeps": 24, "flow_reroute_ports": 5,  "flow_reroute_rounds": 2, "flow_trials": 3, "flow_number_tries": 3, "flow_trial_total": 300,  "flow_trial_most": 100, "flow_cost_up": 1000000, "flow_cost_crossing": 1000, "flow_shape_crossing": 100000, "flow_shape_most": 1500, "flow_cost_bend": 200, "flow_cost_side": 300, "flow_cost_wrong_side": 300, "flow_embed_most": 30, "flow_embed_big": 300, "flow_hub_most": 32, "flow_comb_bus": 6, "flow_key_width": 22, "flow_key_height": 14, "flow_shape_work": 3000000, "flow_embed_crossings": 2, "flow_break_half": 5,  "flow_stub_text_x": 15, "flow_text_x": 27, "flow_text_after": 11, "flow_dot_gap": 12, "flow_dot": 4.5, "flow_sheet_lift": 2,  "flow_badge": 8, "flow_says_most": 200, "flow_says_text": 11.5, "flow_says_pad": 7, "flow_says_aside": 6, "flow_says_height": 20, "flow_flag_lift": 5,  "flow_legend_room": 20, "flow_key_least": 480, "flow_stroke": 1.25, "flow_stroke_lit": 2, "flow_stroke_hover": 3, "flow_lit_mix": "50%", "flow_dot_ring": 1.5, "flow_cut": 10, "flow_point": 10, "flow_tab": 5, "flow_you_tint": "28%", "flow_badge_text": 10.5, "flow_dash_scenario": "5 4", "flow_dash_choice": "6 5", "flow_dash_held": "2 4", "flow_held_badge": 6, "flow_held_text": 9, "time_head_text": 11, "time_hour_text": 10, "time_lane_dash": "2 3", "time_letter": 6.5, "time_least_block": 6, "time_day_start": 8, "time_day_end": 18, "time_gutter": 38, "time_hour": 34, "time_hour_least": 14, "time_day_key_gap": 14, "time_day_key_row": 14, "time_day_key_chip": 8, "time_fit_room": 4, "time_lane_named_from": 28, "time_chip": 18, "time_head_named": 36, "time_head": 22, "time_key_most": "28ch", "time_key_stripe": 10, "time_key_pad": 6, "time_key_gap": "4px 14px", "time_bar_label_most": 220, "time_bar_row": 24, "time_bar_day_every": 70, "arch_layer_gap": 48, "arch_row_most": 0, "arch_node_gap": 18, "arch_col_gap": 36, "arch_margin": 24, "arch_max_text": 150, "arch_track": 8, "arch_slot": 10, "arch_lead_out": 12, "arch_lead_in": 20, "arch_head": 26, "arch_pad": 12, "arch_text": 13, "arch_place_text": 12, "arch_place_name_pad": 20, "arch_diamond_pad": 90, "arch_diamond_height": 56, "arch_store_pad": 44, "arch_store_height": 44, "arch_box_pad": 44, "arch_box_height": 34, "arch_says_text": 10.5, "arch_corner": 6, "arch_lid": 6, "arch_place_corner": 10, "arch_place_name_room": 34, "arch_place_name_inset": 4, "arch_place_name_height": 18, "arch_place_dot_x": 14, "arch_dot_small": 4, "arch_place_text_x": 24, "arch_says_most": 120, "arch_says_pad": 6, "arch_says_height": 16, "arch_text_x": 28, "arch_text_after": 12, "arch_dot_gap": 12, "arch_dot": 4.5, "arch_badge_in": 4, "arch_badge": 8, "arch_stroke_down": 1.75, "arch_stroke_warn": 1.5, "arch_dash_dot": "2 2", "arch_dash_place": "6 4", "arch_hit": 9, "arch_says_stroke": 0.75, "arch_story_least": 760, "arch_island_pad": 14, "arch_island_rise": 5, "arch_island_gap": 60, "arch_island_tint": "24%", "arch_deep_high": 62, "arch_deep_floor": 28, "arch_deep_route": 1.4, "arch_deep_name_lift": 14, "arch_deep_boat": 15, "arch_board_unit": 150, "arch_board_bar": 24, "arch_board_gap": 14, "arch_board_pad": 10, "arch_board_head": 34, "arch_board_card": 150, "arch_board_card_high": 26, "arch_deep_berth": 16, "story_chat": 280 },
-        "numbers": {  "dim": 0.32, "find_count_most": 12, "find_check_most": 80, "find_count_shown": 200, "home_limit": 50, "thumb_wait": 20000, "zoom_step": 1.25, "plane_zoom_least": 0.02, "plane_zoom_most": 4, "plane_open_least": 0.62, "plane_text_least": 4, "plane_more_from": 7, "plane_margin": 0.25, "plane_wheel": 0.0015, "plane_drag_from": 4, "plane_fit_pad": 16, "plane_reshape_ratio": 1.25, "plane_reshape_after": 250, "sheet_follow_line": 0.33, "sheet_follow_after": 120, "sheet_follow_still": 400, "reader_settles": 150, "reader_settles_by": 2500,  "flow_ghost": 0.55, "flow_unlit": 0.25, "time_bar_label_share": 0.3, "arch_place_fill": 0.55, "arch_planned_wire": 0.8, "arch_standby": 0.4, "flow_aspect": 1.6, "flow_aspect_follow": 1, "arch_story_gone_hold": 900, "arch_story_gone_fade": 700, "arch_story_move": 1300, "arch_story_new_for": 3200, "arch_story_draw": 900, "arch_story_read_base": 700, "arch_story_read_per_char": 26, "arch_story_beat_least": 3200, "arch_story_beat_after": 1800, "arch_story_typing": 900, "arch_story_chapter_pause": 500, "arch_story_jump": 1000, "arch_story_start": 400, "arch_story_lines_kept": 12, "arch_story_quick": 650, "arch_story_quick_move": 450, "arch_story_milestone": 2400, "story_shown_grow": 6, "arch_island_bow": 0.16, "arch_island_wobble": 0.12, "arch_island_arc": 1.3, "arch_island_squash": 0.75, "arch_deep_fov": 24, "arch_deep_angle": 48, "arch_deep_near": 0.94, "arch_deep_sail": 1700, "arch_deep_fly_pitch": 18, "arch_deep_fly_up": 2.2, "arch_deep_fly": 5200, "arch_deep_card_in": 1400, "arch_deep_card_after": 2200, "arch_deep_fold": 1300, "arch_deep_rise": 2600, "arch_story_deep_cover": 650, "note_title_most": 90, "note_opening_most": 320, "note_opening_cut": 240, "note_sentence_least": 80, "note_sentence_most": 300, "fact_most": 32, "field_fold_at": 140, "find_choice_items": 3, "pane_steps_kept": 30, "picker_around_from": 100, "picker_around_most": 400, "only_since_short": 1, "only_since_days": 7, "only_since_long": 30, "term_find_most": 12, "quiet_after": 30, "quiet_end_after": 1440 },
+        "sizes": { "rule": 1, "dot": 8, "dot_ring": 1.5, "small_text": 12, "tiny_text": 11, "legend_text": 12, "legend_width": 200, "pill_pad_y": 1, "pill_pad_x": 7, "here_ring": 2, "swatch": 12, "swatch_radius": 3, "stage_least": 320, "stage": "68vh", "stage_most": 760, "legend_inset": 10, "legend_gap": 3, "legend_pad_y": 7, "legend_pad_x": 10, "legend_mark_gap": 8, "list_pad_top": 6, "list_pad_bottom": 10, "list_column_gap": 12, "list_row": 30, "list_group_row": 34, "list_side": 14, "list_indent": 22, "list_name_gap": 8, "list_dot_before": 6, "list_dot_after": 4, "list_fold": 18, "list_lane_indent": 26, "list_count_gap": 4, "list_count": 18, "list_column_most": "18ch", "list_status": "11ch", "list_waits": "14ch", "list_field": "13ch", "list_field_narrow": "6ch", "list_sessions": 10, "list_narrow_at": 640, "grid_pad": 10, "grid_gap": 6, "grid_head_pad_y": 7, "grid_head_pad_x": 10, "grid_row_pad_y": 8, "grid_card_gap": 2, "grid_card_pad_left": 11, "grid_card_pad_right": 9, "grid_stripe": 4, "grid_edge_mix": "55%", "grid_tint": "13%", "grid_tint_hover": "22%", "grid_swatch_mix": "30%", "grid_detail_text": "0.92em", "grid_mark_gap": 4, "grid_mark_text": "0.85em", "grid_legend_gap": 14, "grid_legend_pad_y": 8, "grid_legend_pad_x": 12, "grid_row_head": 120, "grid_lane": 170, "pages_width": 480, "pages_gap": 20, "pages_pad": 14, "pages_title": 18, "pages_block_gap": 8, "pages_least": 160, "flow_layer_gap": 84, "flow_line_height": 16, "flow_node_gap": 16, "flow_margin": 24, "flow_max_text": 140,  "flow_text": 13, "flow_stub_text": 12,  "flow_diamond_pad": 96, "flow_diamond_height": 60, "flow_end_pad": 30, "flow_end_height": 30, "flow_box_pad": 42, "flow_box_height": 34, "flow_sheet_height": 40, "flow_corner": 6, "flow_head_half": 4.5, "flow_head_length": 9, "flow_wire_room": 12, "flow_joined_room": 28, "flow_port_run": 18, "flow_port_corner": 14, "flow_wire_gap": 12, "flow_wire_column": 24, "flow_section_gap": 96,  "flow_slide_sweeps": 24, "flow_reroute_ports": 5,  "flow_reroute_rounds": 2, "flow_trials": 3, "flow_number_tries": 3, "flow_trial_total": 300,  "flow_trial_most": 100, "flow_cost_up": 1000000, "flow_cost_crossing": 1000, "flow_shape_crossing": 100000, "flow_shape_most": 1500, "flow_cost_bend": 200, "flow_cost_side": 300, "flow_cost_wrong_side": 300, "flow_embed_most": 30, "flow_embed_big": 300, "flow_hub_most": 32, "flow_comb_bus": 6, "flow_key_width": 22, "flow_key_height": 14, "flow_shape_work": 3000000, "flow_embed_crossings": 2, "flow_break_half": 5,  "flow_stub_text_x": 15, "flow_text_x": 27, "flow_text_after": 11, "flow_dot_gap": 12, "flow_dot": 4.5, "flow_sheet_lift": 2,  "flow_badge": 8, "flow_says_most": 200, "flow_says_text": 11.5, "flow_says_pad": 7, "flow_says_aside": 6, "flow_says_height": 20, "flow_flag_lift": 5,  "flow_legend_room": 20, "flow_key_least": 480, "flow_stroke": 1.25, "flow_stroke_lit": 2, "flow_stroke_hover": 3, "flow_lit_mix": "50%", "flow_dot_ring": 1.5, "flow_cut": 10, "flow_notch": 5, "flow_point": 10, "flow_tab": 5, "flow_you_tint": "28%", "flow_island_pad": 14, "flow_island_sea": 72, "flow_island_port": 6, "flow_island_name_room": 18, "flow_island_legend_row": 18, "flow_island_legend_gap": 14, "flow_island_legend_wide": 420, "flow_island_legend_mark_gap": 6, "flow_island_legend_text": 11, "flow_island_gate_height": 18, "flow_island_gate_corner": 3, "flow_island_gate_pad": 7, "flow_island_gate_text": 11, "flow_island_gate_bar": 14, "flow_island_gate_stroke": 3, "flow_island_gate_most": 180, "flow_island_pulse_stroke": 4, "flow_island_pulse_dash": 40, "flow_island_corner": 12, "flow_island_stroke": 1.25, "flow_island_tint": "14%", "flow_island_text": 10, "flow_island_name_x": 10, "flow_badge_text": 10.5, "flow_dash_scenario": "5 4", "flow_dash_choice": "6 5", "flow_dash_held": "2 4", "flow_held_badge": 6, "flow_held_text": 9, "time_head_text": 11, "time_hour_text": 10, "time_lane_dash": "2 3", "time_letter": 6.5, "time_least_block": 6, "time_day_start": 8, "time_day_end": 18, "time_gutter": 38, "time_hour": 34, "time_hour_least": 14, "time_day_key_gap": 14, "time_day_key_row": 14, "time_day_key_chip": 8, "time_fit_room": 4, "time_lane_named_from": 28, "time_chip": 18, "time_head_named": 36, "time_head": 22, "time_key_most": "28ch", "time_key_stripe": 10, "time_key_pad": 6, "time_key_gap": "4px 14px", "time_bar_label_most": 220, "time_bar_row": 24, "time_bar_day_every": 70, "arch_layer_gap": 48, "arch_row_most": 0, "arch_node_gap": 18, "arch_col_gap": 36, "arch_margin": 24, "arch_max_text": 150, "arch_track": 8, "arch_slot": 10, "arch_lead_out": 12, "arch_lead_in": 20, "arch_head": 26, "arch_pad": 12, "arch_text": 13, "arch_place_text": 12, "arch_place_name_pad": 20, "arch_diamond_pad": 90, "arch_diamond_height": 56, "arch_store_pad": 44, "arch_store_height": 44, "arch_box_pad": 44, "arch_box_height": 34, "arch_says_text": 10.5, "arch_corner": 6, "arch_lid": 6, "arch_place_corner": 10, "arch_place_name_room": 34, "arch_place_name_inset": 4, "arch_place_name_height": 18, "arch_place_dot_x": 14, "arch_dot_small": 4, "arch_place_text_x": 24, "arch_says_most": 120, "arch_says_pad": 6, "arch_says_height": 16, "arch_text_x": 28, "arch_text_after": 12, "arch_dot_gap": 12, "arch_dot": 4.5, "arch_badge_in": 4, "arch_badge": 8, "arch_stroke_down": 1.75, "arch_stroke_warn": 1.5, "arch_dash_dot": "2 2", "arch_dash_place": "6 4", "arch_hit": 9, "arch_says_stroke": 0.75, "arch_story_least": 760, "arch_island_pad": 14, "arch_island_rise": 5, "arch_island_gap": 60, "arch_island_tint": "24%", "arch_deep_high": 62, "arch_deep_floor": 28, "arch_deep_route": 1.4, "arch_deep_name_lift": 14, "arch_deep_boat": 15, "arch_board_unit": 150, "arch_board_bar": 24, "arch_board_gap": 14, "arch_board_pad": 10, "arch_board_head": 34, "arch_board_card": 150, "arch_board_card_high": 26, "arch_deep_berth": 16, "story_chat": 280 },
+        "numbers": {  "dim": 0.32, "motion_leave": 200, "motion_move": 420, "motion_arrive": 300, "motion_movers_most": 6, "motion_marks_most": 4000, "motion_still_within": 0.5, "motion_pulse": 1100, "find_count_most": 12, "find_check_most": 80, "find_count_shown": 200, "home_limit": 50, "thumb_wait": 20000, "zoom_step": 1.25, "plane_zoom_least": 0.02, "plane_zoom_most": 4, "plane_open_least": 0.62, "plane_text_least": 4, "plane_more_from": 7, "plane_margin": 0.25, "plane_wheel": 0.0015, "plane_drag_from": 4, "plane_fit_pad": 16, "plane_reshape_ratio": 1.25, "plane_reshape_after": 250, "sheet_follow_line": 0.33, "sheet_follow_after": 120, "sheet_follow_still": 400, "reader_settles": 150, "reader_settles_by": 2500,  "flow_ghost": 0.55, "flow_unlit": 0.25, "time_bar_label_share": 0.3, "arch_place_fill": 0.55, "arch_planned_wire": 0.8, "arch_standby": 0.4, "flow_aspect": 1.6, "flow_aspect_follow": 1, "arch_story_gone_hold": 900, "arch_story_gone_fade": 700, "arch_story_move": 1300, "arch_story_new_for": 3200, "arch_story_draw": 900, "arch_story_read_base": 700, "arch_story_read_per_char": 26, "arch_story_beat_least": 3200, "arch_story_beat_after": 1800, "arch_story_typing": 900, "arch_story_chapter_pause": 500, "arch_story_jump": 1000, "arch_story_start": 400, "arch_story_lines_kept": 12, "arch_story_quick": 650, "arch_story_quick_move": 450, "arch_story_milestone": 2400, "story_shown_grow": 6, "arch_island_bow": 0.16, "arch_island_wobble": 0.12, "arch_island_arc": 1.3, "arch_island_squash": 0.75, "arch_deep_fov": 24, "arch_deep_angle": 48, "arch_deep_near": 0.94, "arch_deep_sail": 1700, "arch_deep_fly_pitch": 18, "arch_deep_fly_up": 2.2, "arch_deep_fly": 5200, "arch_deep_card_in": 1400, "arch_deep_card_after": 2200, "arch_deep_fold": 1300, "arch_deep_rise": 2600, "arch_story_deep_cover": 650, "note_title_most": 90, "note_opening_most": 320, "note_opening_cut": 240, "note_sentence_least": 80, "note_sentence_most": 300, "fact_most": 32, "field_fold_at": 140, "find_choice_items": 3, "pane_steps_kept": 30, "picker_around_from": 100, "picker_around_most": 400, "only_since_short": 1, "only_since_days": 7, "only_since_long": 30, "term_find_most": 12, "quiet_after": 30, "quiet_end_after": 1440, "trace_seen_after": 1200, "trace_fade": 700, "trace_kept_days": 30, "trace_frame_wait": 250, "catch_up_start": 500, "catch_up_step": 1600, "catch_up_entries_most": 2000 },
         "page": { "picture": true, "notes": "open", "ties": "open", "history": "closed" },
         "notes": { "callouts": { "note": "accent", "tip": "ok", "important": "accent", "warning": "warn", "caution": "bad" }, "measure": "measure" },
         "dots": { "islands": { "field": "status", "names": { "todo": "To do", "doing": "Doing", "done": "Done" }, "order": ["todo", "doing", "done"], "colours": { "todo": "closed", "doing": "warn", "done": "ok" } } },
@@ -1407,6 +1413,7 @@
     { "id": "core.sessions", "type": "lens", "title": "Sessions", "props": { "filter": { "find": ["type run"], "not": ["done"] }, "walk": { "over": ["works_on>", "started_from>"], "steps": 1 }, "style": { "shape": "flow" } } },
     { "id": "core.sessions_look", "title": "A session's state", "props": { "session_marks": { "waiting": { "shape": "disc", "hue": "you", "lit": true }, "your_move": { "shape": "diamond", "hue": "you", "lit": true }, "blocked": { "shape": "square", "hue": "blocked" }, "working": { "shape": "half", "hue": "session" }, "quiet": { "shape": "ring", "hue": "warn" }, "idle": { "shape": "ring", "hue": "muted" }, "done": { "shape": "disc", "hue": "done" } } } },
     { "id": "core.waiting", "type": "lens", "title": "Waiting on you", "props": { "filter": { "find": ["waits_on me"] }, "walk": { "over": [], "steps": 0 } } },
+    { "id": "core.moved", "type": "lens", "title": "Findings moved", "props": { "filter": { "find": ["moved"] }, "walk": { "over": ["reads>"], "steps": 1 }, "style": { "shape": "flow" } } },
     { "id": "core.plan_flow", "type": "instruction", "title": "A plan is items and links", "body": "A plan, a build or anything with steps goes on the map as items first, never as one long note: each step a task, part_of its hub, its order as depends_on, who must act as waits_on, and a flow view about the hub (a lens linked about it, its style shape flow). A step's note holds only what that step alone needs, short; the hub's note says why and what done is.", "props": { "for": ["working_rules"], "order": 75 } },
     { "id": "core.waits_on", "type": "instruction", "title": "Say who is waited on with a link", "body": "A person who has to answer or act is waits_on (what for in props.for), removed once they have; other work is depends_on; a resource is needs, and an exclusive one is taken with assign, action claim, and given back with revise, action release.", "props": { "for": ["working_rules"], "order": 80 } }
   ]

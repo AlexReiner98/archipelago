@@ -183,7 +183,7 @@ test('a brief gathers a task\'s context, blockers, needs and rules', async () =>
   const brief = (await ask(l, 'brief', { task: made.live })) as any;
   assert.equal(brief.repo.path, 'C:\\code\\Apex');
   assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', 'Other session']]);
-  assert.deepEqual(brief.ties.map((r: any) => [r.relation, r.title]), [['governed_by', 'One live lane.']]);
+  assert.deepEqual(brief.ties.map((r: any) => [r.relation, r.title]), [['about', 'One live lane.']]);
   for (const part of ['# Capture probe', 'Part of: Apex', 'held by Other session', 'Only one session drives the CAD app.']) {
     assert.ok(brief.text.includes(part), `expected "${part}" in:\n${brief.text}`);
   }

@@ -13,7 +13,7 @@ import { picture } from './layouts/architecture/index.js';
 import { partBoxes, saysSpots } from './layouts/architecture/says.js';
 
 const state = { blocked: false, waits_on: [], sessions: 0 };
-const item = (id: string, inside = 'r', status = 'up', extra: Record<string, unknown> = {}) => ({ id, kind: 'place', inside, title: `Part ${id}`, place: 0, open: status !== 'retired', status, state, ...extra });
+const item = (id: string, inside = 'r', status = 'up', extra: Record<string, unknown> = {}) => ({ id, type: 'part', is: ['place'], inside, title: `Part ${id}`, place: 0, open: status !== 'retired', status, state, ...extra });
 /** a calls b. */
 const call = (a: string, b: string, extra: Record<string, unknown> = {}) => ({ kind: 'depends_on', from: a, to: b, ...extra });
 const measure = (text: string, px: number) => text.length * px * 0.55;
@@ -135,7 +135,7 @@ test('with steps, a wire that would turn twice goes in at the side of what it ca
 });
 
 test('what sits in a part, wired to nothing, is a mark on it', () => {
-  const g = run([item('a'), item('b'), { ...item('t', 'a', 'todo'), kind: 'work' }], [call('a', 'b')]);
+  const g = run([item('a'), item('b'), { ...item('t', 'a', 'todo'), type: 'task', is: ['work'] }], [call('a', 'b')]);
   assert.equal(g.nodes.has('t'), false);
   assert.deepEqual(g.nodes.get('a').notes.map((i: any) => i.id), ['t']);
 });

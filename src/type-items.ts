@@ -71,7 +71,7 @@ export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
   const misnamed = named.filter((i) => typeof i.props.name === 'string' && !i.props.preset && !/^local\.[a-z][a-z0-9_]*$/.test(i.props.name));
   if (misnamed.length) throw new Error(`Change rejected:\n- the types it makes or changes: ${misnamed.map((i) => `"${String(i.props.name)}" must be named "local.<name>"`).join('; ')}`);
   const unresolved = named.filter((i) => typeof i.props.name === 'string' && !i.props.preset && !(i.type === LINK_ITEM ? trial.relations.has(i.props.name) : trial.type(i.props.name)));
-  if (unresolved.length) throw new Error(`Change rejected:\n- the types it makes or changes: ${unresolved.map((i) => `"${String(i.props.name)}" extends no kind or type there is`).join('; ')}`);
+  if (unresolved.length) throw new Error(`Change rejected:\n- the types it makes or changes: ${unresolved.map((i) => `"${String(i.props.name)}" extends no type there is`).join('; ')}`);
   return trial;
 }
 

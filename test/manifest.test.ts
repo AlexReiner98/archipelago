@@ -115,8 +115,8 @@ test("a change a pack's action makes may touch only what the pack declares or re
   assert.equal(kept.status, 'applied', 'its own type is inside its reach');
   const head = (await entries(l.db)).find((e) => e.id === kept.changeset)!;
   assert.deepEqual(head.pack, { id: 'reacher', manifest: l.registry.hashes.get('reacher'), action: 'reacher.keep' }, 'the entry names the pack, its manifest and the action');
-  const task = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: 'Survey' }] })) as { created: Record<string, string> };
-  await assert.rejects(callTool(l, human, 'reacher_rename', { id: task.created.t, title: 'Renamed' }), /The reacher pack touched "Survey", a task it neither declares nor requires/);
+  const task = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'project', title: 'Survey' }] })) as { created: Record<string, string> };
+  await assert.rejects(callTool(l, human, 'reacher_rename', { id: task.created.t, title: 'Renamed' }), /The reacher pack touched "Survey", a project it neither declares nor requires/);
   assert.equal((await l.entity(task.created.t))!.title, 'Survey', 'refused whole');
 
   // A field another pack adds is that pack's: work requires core only, so time's rate on a company is outside it.
@@ -176,6 +176,35 @@ test('a pack renamed takes the place of the one the owner added: inquiry is scie
   assert.ok(!now.registry.type('hypothesis')!.dormant && now.registry.type('investigation'), 'its types live, and the new ones with them');
   assert.equal((await now.entity(h.created.h))!.type, 'hypothesis');
   assert.deepEqual(await syncPacks(now), [], 'once');
+});
+
+test('a pack that took over words a pack the owner added held is added with them: software’s feature is code’s now', async () => {
+  // A map that had the software pack while it still declared feature and test, before code and proof held them.
+  const before = packsWith();
+  const code = JSON.parse(readFileSync(join(before, 'code', 'pack.json'), 'utf8'));
+  const proof = JSON.parse(readFileSync(join(before, 'proof', 'pack.json'), 'utf8'));
+  const software = JSON.parse(readFileSync(join(before, 'software', 'pack.json'), 'utf8'));
+  for (const id of ['code', 'proof']) rmSync(join(before, id), { recursive: true });
+  const kept = (pack: { types: { id: string }[] }, id: string) => ({ ...pack.types.find((t) => t.id === id)!, moved_from: undefined, moved_statuses: undefined, belongs_with: undefined });
+  writeFileSync(join(before, 'software', 'pack.json'), JSON.stringify({ id: 'software', version: '0.0.1', title: software.title, description: software.description, requires: ['core', 'work'], types: [kept(code, 'feature'), kept(proof, 'test')] }));
+  for (const id of ['github', 'reader']) rmSync(join(before, id), { recursive: true });
+  const old = await mapOf(before);
+  await syncPacks(old);
+  await syncTypes(old);
+  assert.ok(!(await packsOff(old)).includes('software'), 'the owner has software');
+  const f = (await old.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'f', type: 'feature', title: 'Sun study', status: 'building' }] })) as { created: Record<string, string> };
+
+  const reg = new Registry(packsWith());
+  registries.push(reg);
+  const now = new Archipelago(old.db, reg);
+  const added = (await syncPacks(now)).filter((x) => x[0] === '+' && /pack:(code|proof|outreach|design)$/.test(x[1])).map((x) => x[1]).sort();
+  assert.deepEqual(added, ['pack:code', 'pack:proof'], 'the packs that hold its words now, and no other new one');
+  now.registry.turnOff(await packsOff(now));
+  await syncTypes(now);
+  assert.equal(now.registry.type('feature')?.pack, 'code');
+  assert.equal(now.registry.states.get('software')?.state, 'active', 'software runs over them, as before');
+  assert.deepEqual([(await now.entity(f.created.f))!.type, (await now.entity(f.created.f))!.status], ['feature', 'building']);
+  assert.deepEqual((await syncPacks(now)).filter((x) => /pack:(code|proof)$/.test(x[1])), [], 'once');
 });
 
 test('a new workspace starts with the kernel alone, and a pack the log never added waits for the owner', async () => {

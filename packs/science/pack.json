@@ -91,16 +91,6 @@
       "from": ["*"],
       "to": ["hypothesis"],
       "description": "The source only makes sense if the hypothesis holds. Flagged at risk when it is refuted."
-    },
-    {
-      "id": "explains",
-      "moved_from": ["inquiry.explains"],
-      "extends": "about",
-      "title": "would explain",
-      "inverse": "may be explained by",
-      "from": ["hypothesis"],
-      "to": ["issue"],
-      "description": "A suspected cause."
     }
   ],
   "views": [
@@ -133,13 +123,6 @@
     },
     {
       "form": "screen",
-      "id": "science.undermined",
-      "title": "Resting on what was refuted",
-      "at": "home",
-      "pieces": [{ "piece": "view", "view": "science.undermined" }]
-    },
-    {
-      "form": "screen",
       "id": "science.record",
       "title": "Record",
       "nav": true,
@@ -148,6 +131,7 @@
     { "form": "screen", "id": "science.figure", "title": "Figure", "on": ["experiment"], "pieces": [{ "piece": "figure" }] }
   ],
   "styles": [
+    { "id": "science.undermined", "type": "lens", "title": "Resting on what was refuted", "props": { "filter": { "find": ["type hypothesis"], "only": ["status refuted"] }, "walk": { "over": ["assumes<"], "steps": 1 }, "style": { "shape": "flow" } } },
     {
       "id": "science.hours",
       "type": "instruction",

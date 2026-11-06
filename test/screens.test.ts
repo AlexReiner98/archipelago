@@ -29,7 +29,7 @@ test('a pack offers a screen for the nav; the owner puts it there, takes it out 
   const l = await map();
   const week = (await one(l, 'time.week'))!;
   assert.deepEqual([week.pack, week.offered, week.nav, week.pieces], ['time', true, undefined, [{ piece: 'page', page: 'time' }]]);
-  assert.deepEqual((await one(l, 'time.invoices'))!.on, ['company'], 'a screen on every company');
+  assert.equal(await one(l, 'time.invoices'), undefined, "a company's invoices are a view of it now, not a screen");
 
   const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'screen', title: 'Time', status: 'current', props: { preset: 'time.week', nav: 1 } }] })) as { created: Record<string, string> };
   const id = made.created.s;
@@ -67,26 +67,16 @@ test("the owner's own screen and their version of a preset", () => {
   ]);
 });
 
-test("a pack's screen for Home is offered there, and is on it only once the owner puts it there", async () => {
+test("a screen is on Home only once the owner puts it there", async () => {
   const l = await map();
-  const onHome = async () => (await screens(l)).filter((s) => s.at === 'home').map((s) => s.id);
-  assert.deepEqual(await onHome(), ['home'], "Home is the owner's move: the core pack's screen alone");
-  assert.equal((await one(l, 'time.today'))!.idle, true, 'a pack nothing is held of yet says so');
-  await l.change(human, {
-    reason: 'test',
-    ops: [
-      { op: 'create', type: 'hypothesis', title: 'H', status: 'untested' },
-      { op: 'create', type: 'release', title: 'R', status: 'upcoming' },
-      { op: 'create', type: 'time_entry', title: 'T', status: 'logged', props: { date: '2026-10-17', hours: 1 } },
-    ],
-  });
-  assert.deepEqual(await onHome(), ['home'], "used, a pack's screen is still only offered");
-  assert.deepEqual([(await one(l, 'time.today'))!.homeable, (await one(l, 'time.today'))!.at, (await one(l, 'time.today'))!.idle], [true, undefined, undefined]);
-
-  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'screen', title: 'Today', status: 'current', props: { preset: 'time.today', home: true } }] })) as { created: Record<string, string> };
-  assert.deepEqual(await onHome(), ['home', 'time.today'], 'put on Home by the owner');
+  const onHome = async () => (await screens(l)).filter((s) => s.at === 'home').map((s) => s.title);
+  assert.deepEqual(await onHome(), ['For you'], "Home is the owner's move: the core pack's screen alone");
+  // What the packs offered for Home (Today, Releases, what rests on the refuted) are views now, listed with the others.
+  assert.equal(await one(l, 'time.today'), undefined);
+  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'screen', title: 'Mine', status: 'current', props: { pieces: [{ piece: 'note', text: 'Hi' }], home: true } }] })) as { created: Record<string, string> };
+  assert.deepEqual(await onHome(), ['For you', 'Mine'], 'put on Home by the owner');
   await l.change(human, { reason: 'test', ops: [{ op: 'update', id: made.created.s, props: { home: false } }] });
-  assert.deepEqual(await onHome(), ['home'], 'and taken off again');
+  assert.deepEqual(await onHome(), ['For you'], 'and taken off again');
 });
 
 test("the owner's own screen is on Home only when they put it there", () => {

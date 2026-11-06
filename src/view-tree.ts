@@ -3,7 +3,7 @@
 // without a root, the roots to choose from. No lens.
 
 import { blockGraph } from './blocking.ts';
-import { SYSTEM } from './head.ts';
+import { notKernel, SYSTEM } from './head.ts';
 import { holders } from './inside.ts';
 import type { Archipelago } from './pelago.ts';
 import { scanKinds } from './region.ts';
@@ -35,7 +35,7 @@ async function under(l: Archipelago, root: string, kinds: string[]): Promise<Ite
   }
   // What the system keeps is not climbed through; the root is read whatever it is.
   const { rows } = await l.db.query<{ id: string; type: string; title: string; status: string; is_open: boolean }>(
-    `select id, type, title, status, is_open from entity where archived_at is null and id = any($1::text[]) and (id = $2 or kind is null or kind <> '${SYSTEM}')`,
+    `select id, type, title, status, is_open from entity where archived_at is null and id = any($1::text[]) and (id = $2 or ${notKernel(l.registry)})`,
     [[...seen], root],
   );
   if (!rows.some((e) => e.id === root)) throw new Error(`No item "${root}"`);
@@ -68,15 +68,36 @@ async function tops(l: Archipelago, kinds: string[]): Promise<Item[]> {
 }
 
 /**
+ * The tree meant when none is named: the only one there is, or else the only one the root can stand in (its type
+ * among the tree's roots or branches), or with no root the only one whose roots have items on the map. Where a root
+ * stands in several (a feature, a branch of two roadmaps), the one of them whose roots have items on the map.
+ */
+async function treeFor(l: Archipelago, root: string | undefined, isA: (type: string, kinds: string[]) => boolean) {
+  const defs = [...l.registry.trees.values()];
+  if (defs.length <= 1) return defs[0];
+  const type = root ? (await l.entity(root))?.type : undefined;
+  const used = async (d: (typeof defs)[number]) => anyOf(l, [...l.registry.types.keys()].filter((t) => isA(t, d.roots)));
+  const kept = [];
+  for (const d of defs) if (type ? isA(type, [...d.roots, ...d.branches]) : await used(d)) kept.push(d);
+  if (kept.length <= 1 || !type) return kept.length === 1 ? kept[0] : undefined;
+  const rooted = [];
+  for (const d of kept) if (await used(d)) rooted.push(d);
+  return rooted.length === 1 ? rooted[0] : undefined;
+}
+
+/** Whether any item of these types is on the map, archived ones aside. */
+const anyOf = async (l: Archipelago, types: string[]) => (await l.db.query(`select 1 from entity where type = any($1::text[]) and archived_at is null limit 1 -- index entity_type`, [types])).rows.length > 0;
+
+/**
  * A tree a pack declares over "is part of", read from what is part of one root: its branches in order,
  * the work under each, progress rolled up from that work, and where work is happening now. Without a root, the
  * roots there are to choose from.
  */
 export async function tree(l: Archipelago, params: Record<string, unknown>) {
   const defs = l.registry.trees;
-  const t = params.tree ? defs.get(String(params.tree)) : defs.size === 1 ? [...defs.values()][0] : undefined;
-  if (!t) throw new Error(`tree must be one of: ${[...defs.keys()].join(', ')}`);
   const isA = (type: string, kinds: string[]) => kinds.some((kind) => l.registry.isA(type, kind));
+  const t = params.tree ? defs.get(String(params.tree)) : await treeFor(l, params.root === undefined ? undefined : String(params.root), isA);
+  if (!t) throw new Error(`tree must be one of: ${[...defs.keys()].join(', ')}`);
   const about = { id: t.id, title: t.title };
   const root = params.root === undefined ? undefined : String(params.root);
   const answer = { items: root ? await under(l, root, [...t.roots, ...t.branches, ...t.work]) : await tops(l, [...t.roots, ...t.branches]) };

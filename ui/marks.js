@@ -4,7 +4,8 @@
 // is no script, no style attribute and no event handler, and its stylesheet is kept to its own host (cssFor).
 //
 // A mark is [tag, attributes, ...what is in it], a string being text. Two attributes are not drawn: `key`, the name
-// a patch uses for it, and `on`, the events the drawing is told of (enter, leave, click). A mark says the item it
+// a patch uses for it, and `on`, the events the drawing is told of (enter, leave, click); a third, `pulse`, is kept on
+// the mark as words, for the page to run it along its line when they change (ui/transition.js). A mark says the item it
 // stands for with `item` (an id), which a link to the item says too: the page lights marks by it (ui/query-light.js),
 // whatever drew them. Two tags are the page's own, made from an item's id alone: `reader`, a document as its reader
 // meets it (ui/reader-frame.js), and `view`, a kept view drawn as it is kept (ui/view-frame.js).
@@ -38,6 +39,8 @@ const fail = (why) => {
 function attribute(el, name, value) {
   const text = String(value);
   if (name === 'item') return void (ITEM_ID.test(text) ? (el.dataset.item = text) : fail(`the item "${text.slice(0, 80)}"`));
+  // What a pulse carries (ui/transition.js): words only, kept on the mark, never drawn.
+  if (name === 'pulse') return void (el.dataset.pulse = text);
   if (!ATTRS.has(name)) fail(`the attribute "${name}"`);
   if (name === 'href' && !ITEM.test(text)) fail(`a link to "${text.slice(0, 80)}"`);
   if (name === 'href') el.dataset.item = text.slice(4);
