@@ -2,6 +2,7 @@
 // leave wires up. Layer: shape, by what it chooses. Pure: a part in, its drawing out.
 
 import { costOf, drawPart } from './part.js';
+import { FALL, RISE } from './graph.js';
 import { pair } from './polyline.js';
 
 /** The ways a part may be drawn, a fixed order of its ties and which face is outer, the likeliest first: the style says how many. */
@@ -30,12 +31,26 @@ function against(places, along) {
   return n;
 }
 
+/** The ports of a part, a line for each side, in the order their wires come at sea: each next two are held so in its embedding (./thread.js). */
+function linedUp(list, along, part) {
+  const bySide = new Map(), itemOf = new Map();
+  for (const [a, b] of part) for (const [p, q] of [[a, b], [b, a]]) if (along.has(p) && q !== RISE && q !== FALL) itemOf.set(p, q);
+  for (const id of list) if (along.has(id)) (bySide.get(along.get(id)[0]) ?? bySide.set(along.get(id)[0], []).get(along.get(id)[0])).push(id);
+  // The ports of one item side by side, where its ports come on average: they cannot stand apart without its wires crossing.
+  const share = (id) => along.get(id)[1], mean = new Map();
+  for (const ids of bySide.values()) for (const id of ids) { const m = mean.get(itemOf.get(id)) ?? [0, 0]; mean.set(itemOf.get(id), [m[0] + share(id), m[1] + 1]); }
+  const key = (id) => mean.get(itemOf.get(id))[0] / mean.get(itemOf.get(id))[1];
+  return [...bySide.values()].map((ids) => ids.sort((p, q) => key(p) - key(q) || String(itemOf.get(p)).localeCompare(String(itemOf.get(q))) || share(p) - share(q)));
+}
+
 /** How one part is drawn. `total` is how many items are in the core; an island's part tries every way, and is judged by its ports' order too. */
 export function drawnPart(list, part, { block, stepSize, ways, z, total, along = new Map() }) {
   let drawn;
   if (list.length >= 3 && part.length >= 2) {
-    const ported = list.some((id) => along.has(id));
-    for (const trial of ported ? TRIALS : list.length <= z.trial_most && total <= z.trial_total ? TRIALS.slice(0, z.trials) : TRIALS.slice(0, 1)) {
+    const ported = list.some((id) => along.has(id)), lines = ported ? linedUp(list, along, part) : [];
+    // A part with ports tries each way with them held in the sea's order, and each mirrored.
+    const trials = ported ? [false, true].flatMap((mirror) => TRIALS.map((t) => ({ ...t, lines, mirror }))) : list.length <= z.trial_most && total <= z.trial_total ? TRIALS.slice(0, z.trials) : TRIALS.slice(0, 1);
+    for (const trial of trials) {
       try {
         const made = drawPart(list, part, block, stepSize, z, trial), cost = costOf(made, stepSize, z) + against(made.places, along) * z.cost_cross;
         if (!drawn || cost < drawn.cost) drawn = { ...made, cost };

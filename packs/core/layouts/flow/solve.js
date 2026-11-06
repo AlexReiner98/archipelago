@@ -134,7 +134,14 @@ function freely(places, given, boxes, told, fixed = []) {
     // What cannot stand rigid gives way: a box whose ports are held further apart than it measures.
     let freed = 0;
     for (const [b] of rigid) if (tried.moved.has(b.low) || tried.moved.has(b.high)) (rigid.delete(b), freed++);
-    if (!freed && fixed.length) { (fixed = []), (told.loose = (told.loose ?? 0) + 1); continue; }
+    // Where the held ends cannot all be kept, the one whose letting go keeps the rest; failing that, every one goes.
+    if (!freed && fixed.length) {
+      const holds = [...new Set(fixed.map((a) => a.hold).filter((h) => h !== undefined))];
+      const one = holds.find((h) => least(places.length, [...arcs, ...rigid.values(), ...fixed.filter((a) => a.hold !== h)]).at);
+      fixed = one === undefined ? [] : fixed.filter((a) => a.hold !== one);
+      told.loose = (told.loose ?? 0) + 1;
+      continue;
+    }
     if (!freed) throw new Error('The solve cannot keep every distance');
     told.freed += freed;
   }
@@ -188,7 +195,8 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
     const b = lines.box.get(id), end = s.i === 1 && id === s.line.a ? 0 : 1, held = s.line.ends?.[end];
     if (held) {
       const d = b.named[axis] / 2 + held[axis];
-      fixed.push([b.low, s.n, d], [s.n, b.low, -d], [b.high, b.low, -b.named[axis]]);
+      const hold = fixed.length;
+      fixed.push(...[[b.low, s.n, d], [s.n, b.low, -d], [b.high, b.low, -b.named[axis]]].map((a) => Object.assign(a, { hold })));
       continue;
     }
     // A port is where a wire passes through a box's side: its wires meet in its middle.
