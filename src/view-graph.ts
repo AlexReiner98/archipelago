@@ -4,7 +4,7 @@
 
 import { blockGraph } from './blocking.ts';
 import type { ViewDef } from './declared.ts';
-import { SYSTEM } from './head.ts';
+import { notKernel } from './head.ts';
 import type { Archipelago } from './pelago.ts';
 
 /** The fields one value of a param stands for, as the preset declares them. */
@@ -17,7 +17,7 @@ function chosen(def: ViewDef, param: string, value: string): Record<string, unkn
 /** Each kind of link a preset names, with every kind of link that extends it. */
 const family = (l: Archipelago, over: unknown) => (Array.isArray(over) ? l.registry.relationFamily(...over.map(String)) : over);
 
-type Node = { id: string; type: string; root: string; kind: string | null; title: string; status: string; open: boolean; blocked: boolean };
+type Node = { id: string; type: string; root: string; starter: string; title: string; status: string; open: boolean; blocked: boolean };
 
 /** The items a graph is drawn from (those `keep` keeps, a condition on them), with whether each is blocked. */
 async function nodesOf(l: Archipelago, ids: string[], keep = ''): Promise<Node[]> {
@@ -32,7 +32,7 @@ async function nodesOf(l: Archipelago, ids: string[], keep = ''): Promise<Node[]
  */
 async function near(l: Archipelago, focus: string, over: unknown, fold: string[], steps: number) {
   const types = Array.isArray(over) ? (over as string[]) : null;
-  const keep = ['e.archived_at is null', fold.includes('closed') && 'e.is_open', fold.includes('system') && `(e.kind is null or e.kind <> '${SYSTEM}')`].filter(Boolean).join(' and ');
+  const keep = ['e.archived_at is null', fold.includes('closed') && 'e.is_open', fold.includes('system') && notKernel(l.registry, 'e.type')].filter(Boolean).join(' and ');
   const seen = new Set([focus]);
   for (let level = [focus], n = 0; level.length && n < steps; n++) {
     const way = (from: string, to: string) => `select r.${to} as id from relation r join unnest($1::text[]) s(id) on s.id = r.${from} join entity e on e.id = r.${to} where r.valid_to is null${types ? ' and r.type = any($2::text[])' : ''} and ${keep}`;
@@ -87,7 +87,7 @@ export async function graph(l: Archipelago, def: ViewDef, params: Record<string,
     truncated: order.length > GRAPH_LIMIT ? { shown: GRAPH_LIMIT, of: order.length } : undefined,
     nodes: nodes.map((i) => {
       const t = tokens.of(i.id);
-      return { id: i.id, type: i.type, root: i.root, kind: i.kind, title: i.title, status: i.status, open: i.open, created: t?.created, blocked: i.blocked, ...(t?.work && { work: true, tokens: t.tokens, estimated: t.estimated, order: t.order }) };
+      return { id: i.id, type: i.type, root: i.root, starter: i.starter, title: i.title, status: i.status, open: i.open, created: t?.created, blocked: i.blocked, ...(t?.work && { work: true, tokens: t.tokens, estimated: t.estimated, order: t.order }) };
     }),
     edges: links.filter((r) => kept.has(r.from_id) && kept.has(r.to_id)).map((r) => ({ id: r.id, type: r.type, from: r.from_id, to: r.to_id })),
   };
@@ -104,7 +104,7 @@ async function newest(l: Archipelago, over: unknown, fold: string[]) {
     const { rows } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = $1 and valid_to is null order by valid_from desc limit ${NEWEST_LINKS}`, [type]);
     for (const r of rows) ends.add(r.from_id).add(r.to_id);
   }
-  const keep = [fold.includes('closed') && 'is_open', fold.includes('system') && `(kind is null or kind <> '${SYSTEM}')`].filter(Boolean).join(' and ');
+  const keep = [fold.includes('closed') && 'is_open', fold.includes('system') && notKernel(l.registry)].filter(Boolean).join(' and ');
   return { lens: { over: Array.isArray(over) ? (over as string[]) : ('all' as const) }, items: await nodesOf(l, [...ends], keep) };
 }
 
@@ -115,7 +115,7 @@ async function newest(l: Archipelago, over: unknown, fold: string[]) {
  */
 async function rolledTokens(l: Archipelago, nodes: string[]) {
   // Only work is counted: what can be estimated, and what such things are part of. And the nodes, for when each was made.
-  const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || l.registry.isA(type, 'work');
+  const work = (type: string) => Boolean(l.registry.type(type)?.fields.tokens_estimated) || Boolean(l.registry.type(type)?.capabilities.plannable);
   // Everything that is part of the nodes, a level at a time: all a roll-up of them reads.
   const parts: { from_id: string; to_id: string }[] = [];
   const seen = new Set(nodes);

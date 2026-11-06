@@ -5,7 +5,7 @@
 // nothing from outside and sends nothing anywhere. No code but this file
 // runs in it.
 //
-// The style's code runs in a worker this page starts, and draws on a canvas
+// The layout's code runs in a worker this page starts, and draws on a canvas
 // handed to it. A worker has no page: no elements, no frames or windows to
 // make, no WebRTC, nothing typed can reach it. It is told what to draw (a
 // lens answer, the style's fields, the page's colours) and where the pointer
@@ -36,7 +36,7 @@ const say = (message) => parent.postMessage(message, '*');
 const fail = (err) => say({ type: 'error', message: String(err?.message ?? err).slice(0, 300) });
 
 /**
- * What runs in the worker, around the style's code. Written as a function and handed over as its text; opened, run in
+ * What runs in the worker, around the layout's code. Written as a function and handed over as its text; opened, run in
  * this window instead, over a channel (`port`), given the canvas and the body it draws in (`given`).
  */
 function inside(home, port, given) {

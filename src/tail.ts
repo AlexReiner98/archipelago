@@ -1,25 +1,28 @@
 // The log read forward by a page that holds part of the map (ui/replica.js): the facts after a position, on the
-// items and links it holds, the links made touching them, and what such a link brought that was made with it. What
+// items and links it holds, on what lives on the islands its views touch, the links made touching them, and what such
+// a link brought that was made with it. What
 // the viewer may see is what today's tables show them (row-level security): facts on anything else are left out,
 // and what they held and can no longer see is named as gone. Sealed values are opened for the viewer. The page
 // projects the facts itself, with the projector the server runs (src/project.ts), so a change reaches it without a
 // lens read.
 
 import type { Q } from './db.ts';
-import type { Fact } from './log.ts';
+import type { Entry, Fact } from './log.ts';
 import { MOVED } from './project.ts';
-import { openSaid } from './seal.ts';
+import { openEntries, openSaid } from './seal.ts';
 
 /** Entries read in one call at most: a page further behind asks again from where the answer stops (`more`). */
 const ENTRIES = 500;
 /** Ids a page may hold and name in one call. */
 export const HELD_MOST = 5000;
+/** Islands a page may follow in one call. */
+export const ISLANDS_MOST = 200;
 
 export interface FactsAfter {
   /** The last entry read: the next read asks from here. */
   pos: number;
   /** The entries in order that said something of what is held, each with only those facts. */
-  entries: { pos: number; at: string; moved?: true; facts: Fact[] }[];
+  entries: { pos: number; at: string; moved?: true; facts: Fact[]; by?: By }[];
   /** What is held and was named in these entries that the viewer cannot see now: forgotten, or made private to someone else. */
   gone: string[];
   /** How many items were made in these entries that the viewer may see, held or not: a list may hold a new one. */
@@ -34,17 +37,36 @@ export async function headPos(db: Q): Promise<number> {
   return rows[0].pos ?? 0;
 }
 
+/**
+ * Who made an entry and why, as its reader may read it: the actor's item and name, the session it was made in (its
+ * word, which picks its hue, and what its chat is called), on whose authority, and the reason, opened.
+ */
+export interface By {
+  actor?: string;
+  name?: string;
+  run?: string;
+  word?: string;
+  session?: string;
+  of?: 'human' | 'agent';
+  reason?: string;
+}
+
 type Said = { pos: number; n: number; op: '+' | '-'; id: string; field: string; value: unknown; meta: Record<string, unknown> | null };
 
-/** The facts after `after` on the ids held, as the viewer may see them. A read that names nothing is refused: it would read the whole log. */
-export async function factsAfter(db: Q, input: { after: number; ids: string[]; limit?: number }): Promise<FactsAfter> {
+/**
+ * The facts after `after` on the ids held and on what lives on the `islands` followed (on a map with islands on), as
+ * the viewer may see them. A read that names nothing is refused: it would read the whole log.
+ */
+export async function factsAfter(db: Q, input: { after: number; ids: string[]; islands?: string[]; limit?: number }): Promise<FactsAfter> {
   const ids = [...new Set(input.ids ?? [])];
+  const islands = [...new Set(input.islands ?? [])];
+  if (islands.length > ISLANDS_MOST) throw new Error(`A read of the log follows ${ISLANDS_MOST} islands at most; this one names ${islands.length}.`);
   if (!ids.length) throw new Error('A read of the log names the ids it holds (ids): one that names none would read all of it.');
   if (ids.length > HELD_MOST) throw new Error(`A read of the log names ${HELD_MOST} ids at most; this one names ${ids.length}.`);
   const limit = Math.min(input.limit ?? ENTRIES, ENTRIES);
   // The entries after the position, bounded by its time too, so the partitions before it are not read.
-  const { rows: window } = await db.query<{ pos: number; at: Date; action: string | null }>(
-    `select pos::int as pos, at, head->>'action' as action from log_entry where stream = 'facts' and pos > $1
+  const { rows: window } = await db.query<{ pos: number; at: Date; action: string | null; head: Record<string, unknown> }>(
+    `select pos::int as pos, at, head->>'action' as action, jsonb_build_object('id', head->'id', 'actor', head->'actor', 'run', head->'run', 'authority', head->'authority', 'reason', head->'reason', 'keys', head->'keys') as head from log_entry where stream = 'facts' and pos > $1
        and at >= coalesce((select at from log_entry where stream = 'facts' and pos = $1), '-infinity') order by pos limit $2`,
     [input.after, limit + 1],
   );
@@ -52,18 +74,22 @@ export async function factsAfter(db: Q, input: { after: number; ids: string[]; l
   if (more) window.pop();
   if (!window.length) return { pos: input.after, entries: [], gone: [], made: 0 };
   const last = window.at(-1)!;
-  // The facts of those entries on what is held; on each link made touching it; and on what such a link reaches that
-  // was made in the same entries (an agent's new task, linked to a project on the page).
+  // The facts of those entries on what is held, and on what lives on an island followed (made on it in these entries,
+  // or on it now); on each link made touching any of it; and on what such a link reaches that was made in the same
+  // entries (an agent's new task, linked to a project on the page).
   const { rows } = await db.query<Said>(
     `with w as (select pos::int as pos, n, op, id, field, value, meta from log_fact
                 where stream = 'facts' and pos > $1 and pos <= $2 and at >= $3 and at <= $4),
-          links as (select distinct id from w where field = 'link' and op = '+' and (value->>1 = any($5::text[]) or value->>2 = any($5::text[]))),
+          isle as (select id from w where field = 'island' and op = '+' and w.value #>> '{}' = any($6::text[])
+                   union select e.id from entity e where e.id in (select id from w) and e.props->>'island' = any($6::text[])),
+          held as (select unnest($5::text[]) as id union select id from isle),
+          links as (select distinct id from w where field = 'link' and op = '+' and (value->>1 in (select id from held) or value->>2 in (select id from held))),
           ends as (select w.value->>1 as id from w join links using (id) where w.field = 'link' and w.op = '+'
                    union select w.value->>2 from w join links using (id) where w.field = 'link' and w.op = '+'),
           made as (select distinct w.id from w join ends using (id) where w.field = 'type' and w.op = '+'),
-          scope as (select unnest($5::text[]) as id union select id from links union select id from made)
+          scope as (select id from held union select id from links union select id from made)
      select w.* from w join scope using (id) order by w.pos, w.n`,
-    [input.after, last.pos, new Date(window[0].at).toISOString(), new Date(last.at).toISOString(), ids],
+    [input.after, last.pos, new Date(window[0].at).toISOString(), new Date(last.at).toISOString(), ids, islands],
   );
   // What the viewer may see now, as today's tables show them (row-level security), of what these facts name; and
   // how many items made in these entries they may see.
@@ -81,10 +107,36 @@ export async function factsAfter(db: Q, input: { after: number; ids: string[]; l
     const fact = (r.op === '-' ? ['-', r.id, r.field] : r.meta ? ['+', r.id, r.field, r.value, r.meta] : ['+', r.id, r.field, r.value]) as Fact;
     by.set(r.pos, [...(by.get(r.pos) ?? []), fact]);
   }
-  const entries = window
-    .filter((e) => by.has(e.pos))
-    .map((e) => ({ pos: e.pos, at: new Date(e.at).toISOString(), ...(MOVED.includes(e.action ?? '') && { moved: true as const }), facts: by.get(e.pos)! }));
+  const kept = window.filter((e) => by.has(e.pos));
+  const said = await byOf(db, kept.map((e) => ({ ...e.head, stream: 'facts', pos: e.pos, facts: by.get(e.pos)! }) as unknown as Entry));
+  const entries = kept.map((e, i) => ({ pos: e.pos, at: new Date(e.at).toISOString(), ...(MOVED.includes(e.action ?? '') && { moved: true as const }), facts: by.get(e.pos)!, ...(said[i] && { by: said[i] }) }));
   return { pos: last.pos, entries, gone: named.filter((id) => !visible.has(id) && held.has(id)), made: born[0].n, ...(more && { more: true as const }) };
+}
+
+/** Who made each entry and why (By), its reason and basis opened as the entry's reader may read them. */
+async function byOf(db: Q, heads: Entry[]): Promise<(By | undefined)[]> {
+  if (!heads.length) return [];
+  const opened = await openEntries(db, heads);
+  const ids = [...new Set(opened.flatMap((e) => [(e.actor as { id?: string } | undefined)?.id, e.run as string | undefined]).filter((id): id is string => typeof id === 'string' && id.startsWith('e_')))];
+  const { rows } = ids.length
+    ? await db.query<{ id: string; title: string; word: string | null }>(`select id, title, props->>'name' as word from entity where id = any($1::text[])`, [ids])
+    : { rows: [] };
+  const named = new Map(rows.map((r) => [r.id, r]));
+  return opened.map((e) => {
+    const actor = (e.actor as { id?: string } | undefined)?.id;
+    const run = typeof e.run === 'string' ? e.run : undefined;
+    const authority = e.authority as { of?: 'human' | 'agent' } | null | undefined;
+    const out: By = {
+      ...(actor && { actor }),
+      ...(actor && named.get(actor) && { name: named.get(actor)!.title }),
+      ...(run && { run }),
+      ...(run && named.get(run)?.word && { word: named.get(run)!.word! }),
+      ...(run && named.get(run) && { session: named.get(run)!.title }),
+      ...(authority?.of && { of: authority.of }),
+      ...(typeof e.reason === 'string' && { reason: e.reason }),
+    };
+    return Object.keys(out).length ? out : undefined;
+  });
 }
 
 /**
@@ -97,4 +149,30 @@ export async function eventsAfter(db: Q, input: { seq?: number; ids: string[] })
   if (input.seq === undefined || !input.ids.length) return { seq: top[0].seq, ids: [] };
   const { rows } = await db.query<{ id: string }>(`select distinct target_id as id from event where seq > $1 and target_id = any($2::text[])`, [input.seq, input.ids]);
   return { seq: top[0].seq, ids: rows.map((r) => r.id) };
+}
+
+/**
+ * What the ids held were up to a position: every fact said of them at or before `pos`, in order, as the viewer may
+ * read them now (an id they cannot see is left out), for the page to fold with its projector into the rows as they
+ * stood then. What a page caught up from where its reader last looked starts from (ui/catch-up.js). Bounded by the ids.
+ */
+export async function factsUpTo(db: Q, input: { pos: number; ids: string[] }): Promise<{ pos: number; entries: { pos: number; at: string; facts: Fact[] }[] }> {
+  const ids = [...new Set(input.ids ?? [])];
+  if (!ids.length) return { pos: input.pos, entries: [] };
+  if (ids.length > HELD_MOST) throw new Error(`A read of the log names ${HELD_MOST} ids at most; this one names ${ids.length}.`);
+  const { rows: seen } = await db.query<{ id: string }>(`select id from entity where id = any($1::text[]) union all select id from relation where id = any($1::text[])`, [ids]);
+  const visible = seen.map((r) => r.id);
+  if (!visible.length) return { pos: input.pos, entries: [] };
+  const { rows } = await db.query<Said & { at: Date }>(
+    `select pos::int as pos, n, op, id, field, value, meta, at from log_fact where stream = 'facts' and id = any($1::text[]) and pos <= $2 order by pos, n -- index log_fact_history`,
+    [visible, input.pos],
+  );
+  const opened = await openSaid(db, rows);
+  const out: { pos: number; at: string; facts: Fact[] }[] = [];
+  for (const r of opened) {
+    const fact = (r.op === '-' ? ['-', r.id, r.field] : r.meta ? ['+', r.id, r.field, r.value, r.meta] : ['+', r.id, r.field, r.value]) as Fact;
+    if (out.at(-1)?.pos === r.pos) out.at(-1)!.facts.push(fact);
+    else out.push({ pos: r.pos, at: new Date(r.at).toISOString(), facts: [fact] });
+  }
+  return { pos: input.pos, entries: out };
 }

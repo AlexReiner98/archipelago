@@ -1,5 +1,5 @@
 // What every drawing of a lens shares: the answer as a tree, what stays lit and the switch for it, and the
-// colours and sizes a style may set. The drawings (flow, list, a style's own code) import this; query.js picks one.
+// colours and sizes a style may set. The drawings (flow, list, a layout's code) import this; query.js picks one.
 
 import { h } from './base.js';
 import { typeVars } from './theme.js';

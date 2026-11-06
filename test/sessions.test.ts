@@ -183,7 +183,7 @@ test('a brief gathers a task\'s context, blockers, needs and rules', async () =>
   const brief = (await ask(l, 'brief', { task: made.live })) as any;
   assert.equal(brief.repo.path, 'C:\\code\\Apex');
   assert.deepEqual(brief.needs.map((n: any) => [n.title, n.held_by]), [['Live lane', 'Other session']]);
-  assert.deepEqual(brief.ties.map((r: any) => [r.relation, r.title]), [['governed_by', 'One live lane.']]);
+  assert.deepEqual(brief.ties.map((r: any) => [r.relation, r.title]), [['about', 'One live lane.']]);
   for (const part of ['# Capture probe', 'Part of: Apex', 'held by Other session', 'Only one session drives the CAD app.']) {
     assert.ok(brief.text.includes(part), `expected "${part}" in:\n${brief.text}`);
   }
@@ -431,11 +431,11 @@ test('a held change says what it would make', async () => {
 
 test('a list tells an agent of a long field and a hub\'s links without reading them whole', async () => {
   const l = await fresh();
-  const ops = [{ op: 'create', ref: 'hub', type: 'project', title: 'Hub' }, { op: 'create', ref: 'look', type: 'style', title: 'Long look', props: { code: 'x'.repeat(3000) } }, ...Array.from({ length: 25 }, (_, k) => ({ op: 'create', ref: `t${k}`, type: 'task', title: `Task ${k}` })), ...Array.from({ length: 25 }, (_, k) => ({ op: 'link', type: 'part_of', from: `t${k}`, to: 'hub' }))];
+  const ops = [{ op: 'create', ref: 'hub', type: 'project', title: 'Hub' }, { op: 'create', ref: 'look', type: 'layout', title: 'Long look', props: { code: 'x'.repeat(3000) } }, ...Array.from({ length: 25 }, (_, k) => ({ op: 'create', ref: `t${k}`, type: 'task', title: `Task ${k}` })), ...Array.from({ length: 25 }, (_, k) => ({ op: 'link', type: 'part_of', from: `t${k}`, to: 'hub' }))];
   const { created } = (await callTool(l, human, 'change', { reason: 'test', ops })) as any;
-  const [found] = (await callTool(l, agent, 'search', { q: 'Long look', type: 'style' })) as any[];
+  const [found] = (await callTool(l, agent, 'search', { q: 'Long look', type: 'layout' })) as any[];
   assert.match(String(found.props.code), /3000 characters/);
-  assert.equal(((await callTool(l, agent, 'search', { q: 'Long look', type: 'style', full: true })) as any[])[0].props.code.length, 3000);
+  assert.equal(((await callTool(l, agent, 'search', { q: 'Long look', type: 'layout', full: true })) as any[])[0].props.code.length, 3000);
   const got = (await callTool(l, agent, 'get', { id: created.hub })) as any;
   assert.equal(got.incoming.length, 20);
   assert.equal(got.links_cut.incoming.by_type.part_of, 25);

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { callTool } from '../src/tools.ts';
 import { fresh, human, make } from './map.ts';
 
-test('saved views name each kept picture by its style, says what it is of, and puts the pinned first, and names the project it is in', async () => {
+test('saved views name each kept picture by its own title, say what it is of, put the pinned first, and names the project it is in', async () => {
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'proj', type: 'project', title: 'Archipelago', status: 'active' },
@@ -21,7 +21,7 @@ test('saved views name each kept picture by its style, says what it is of, and p
   const { pictures, more } = (await callTool(l, human, 'view', { name: 'saved_views', params: {} })) as { pictures: Record<string, unknown>[]; more: number };
   assert.deepEqual(pictures, [
     { lens: made.board, title: 'Kanban board', pinned: true },
-    { lens: made.wired, title: 'The stack as architecture', shape: 'architecture', of: { id: made.stack, title: 'Sovereign AI stack', type: 'component' }, project: { id: made.proj, title: 'Archipelago' }, pinned: false },
+    { lens: made.wired, title: 'The stack as wired', shape: 'architecture', of: { id: made.stack, title: 'Sovereign AI stack', type: 'component' }, project: { id: made.proj, title: 'Archipelago' }, pinned: false },
   ]);
   assert.equal(more, 0);
   const one = (await callTool(l, human, 'view', { name: 'saved_views', params: { limit: 1 } })) as { pictures: unknown[]; more: number };
@@ -43,7 +43,7 @@ test('a view a document brings in says which document, and an archived document 
   assert.equal((await read()).find((p) => p.lens === view)?.document, undefined);
 });
 
-test('a saved view is named and shaped by the style it names itself, over one kept about it', async () => {
+test('a saved view is named by its own title and shaped by the style it names itself, over one kept about it', async () => {
   const l = await fresh();
   const { grid } = await make(l, [{ op: 'create', ref: 'grid', type: 'style', title: 'The grid', props: { shape: 'grid' } }]);
   const made = await make(l, [
@@ -53,5 +53,5 @@ test('a saved view is named and shaped by the style it names itself, over one ke
     { op: 'create', ref: 'w', type: 'lens', title: 'Flow of work', props: { filter: { find: ['type task'] }, style: { shape: 'flow' } } },
   ]);
   const { pictures } = (await callTool(l, human, 'view', { name: 'saved_views', params: {} })) as { pictures: Record<string, unknown>[] };
-  assert.deepEqual(new Map(pictures.map((p) => [p.lens, [p.title, p.shape]])), new Map([[made.v, ['The grid', 'grid']], [made.w, ['Flow of work', 'flow']]]));
+  assert.deepEqual(new Map(pictures.map((p) => [p.lens, [p.title, p.shape]])), new Map([[made.v, ['Work', 'grid']], [made.w, ['Flow of work', 'flow']]]));
 });

@@ -144,8 +144,6 @@ export interface ReasonDef {
 /** One piece of a screen, drawn by the kernel: what it draws and from what. */
 export interface PieceDef {
   piece: keyof typeof PIECES;
-  /** For a tree: the tree it draws. */
-  tree?: string;
   /** For rows from a view: the pack's view. */
   view?: string;
   /** For rows from a view: the input the item's id goes in. */
@@ -242,13 +240,13 @@ export interface ScreenDef {
 }
 
 /**
- * The pieces the kernel draws, each with what it must be told. A tree, a gate, proof, usage and a document draw the
- * kernel's views of the item; a figure is the picture it keeps; a diagram, the boxes and wires its props.diagram holds; rows and a form are the pack's own view and action.
+ * The pieces the kernel draws, each with what it must be told. A document draws the kernel's view of the item (a
+ * pack's view of an item, its roadmap or gate say, is a lens preset `on` its type: ui/canvases.js); a figure is the picture it keeps; a diagram, the boxes and wires its props.diagram holds; rows and a form are the pack's own view and action.
  * A button stands in the page's head, not its column: it opens the pack's action's form, or draws the canvas up as it says.
  * A count stands under the note while it is written: how long it is, against the limit its field's value picks.
  * Turns are a run's, along time: each turn a row, its beats among them.
  */
-export const PIECES = { tree: ['tree'], gate: [], proof: [], usage: [], figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [], button: ['label', 'tip'], count: [], turns: [] } as const;
+export const PIECES = { figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [], button: ['label', 'tip'], count: [], turns: [] } as const;
 
 /** The pages the kernel still draws itself, which a screen can hold as a piece until a pack draws them from pieces. */
 export const PAGES = ['time'];
@@ -342,7 +340,6 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       const needs: readonly string[] | undefined = PIECES[piece.piece];
       if (!needs) problems.push(`${at}: "${piece.piece}" is not a piece: one of ${Object.keys(PIECES).join(', ')}`);
       for (const key of needs ?? []) if (!piece[key as keyof PieceDef]) problems.push(`${at}: a ${piece.piece} piece names its ${key}`);
-      if (piece.tree && !parts(pack).trees.some((tree) => tree.id === piece.tree)) problems.push(`${at}: the pack declares no tree "${piece.tree}"`);
       if (piece.view && !parts(pack).views.some((v) => v.id === piece.view && v.shape === 'rows')) problems.push(`${at}: the pack declares no view "${piece.view}" of rows`);
       if (piece.action && !parts(pack).actions.some((a) => a.id === piece.action)) problems.push(`${at}: the pack declares no action "${piece.action}"`);
       if (piece.piece === 'button' && !piece.action === !piece.draw) problems.push(`${at}: a button does one thing: its pack's action, or draw`);
@@ -361,6 +358,8 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
     const styleFields = types.get(style.type ?? 'style')?.fields ?? {};
     if (style.type !== undefined && !['style', 'instruction', 'lens'].includes(style.type)) problems.push(`${at}: a preset is a style, an instruction or a canvas (lens)`);
     if (style.type === 'lens' && typeof style.props?.view !== 'string' && (typeof style.props?.filter !== 'object' || !style.props.filter)) problems.push(`${at}: a canvas's props are a flat lens and a style: { filter, walk, limit, style }, or the view it draws and a style: { view, style }`);
+    // A view of one item says where the item goes ({here}), and the types it is a view of.
+    if (style.type === 'lens' && JSON.stringify(style.props ?? {}).includes('{here}') !== Boolean(style.on?.length)) problems.push(`${at}: a view of one item is on the types it is of and says where the item goes, as {here}; a view of the map is on none`);
     if (style.type === 'instruction' ? typeof style.body !== 'string' || !style.body.trim() : style.body !== undefined) problems.push(`${at}: an instruction says its words in body, and only an instruction has one`);
     if (!own(style.id)) problems.push(`${at} must be named "${pack.id}.<name>"`);
     if (!style.title || !style.props || typeof style.props !== 'object') problems.push(`${at} needs a title and its props`);

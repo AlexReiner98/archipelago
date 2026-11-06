@@ -15,7 +15,7 @@ import { layout } from './layouts/flow/layout.js';
 
 const house = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const measure = (t: string, px: number) => t.length * px * 0.5;
-const item = (id: string, kind = 'work') => ({ id, title: id, kind, open: true });
+const item = (id: string, type = 'work') => ({ id, title: id, type, open: true });
 const tie = (from: string, to: string, type = 'part_of') => ({ type, from, to });
 const run = (items: any[], links: any[]) => layout({ items, links, measure, sizes: house.sizes });
 

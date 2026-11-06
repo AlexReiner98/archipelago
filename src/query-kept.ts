@@ -1,25 +1,30 @@
-// What the map keeps for looking at it: kept views (lens items) and styles, with what each is about; the hubs that need views of
+// What the map keeps for looking at it: kept views (lens items), styles and layouts, with what each is about; the hubs that need views of
 // their own; and where a lens or a style is seen at work.
 
-import { SYSTEM } from './head.ts';
+import { isKernel } from './head.ts';
 import { scopeOf } from './places.ts';
 import type { Archipelago } from './pelago.ts';
 
 export interface Kept {
   id: string;
+  /** Its type: a layout's fields draw as its code and settings (src/styles.ts). Left out, a style or a view. */
+  type?: string;
   title: string;
   props: Record<string, unknown>;
   about: string[];
 }
 
-/** Every lens or style kept on the map, with what each is about; and one named outright, retired or not. */
-export async function keptOf(l: Archipelago, type: 'lens' | 'style', named: unknown): Promise<Kept[]> {
-  const { rows } = await l.db.query<{ id: string; title: string; props: Record<string, unknown> }>(
-    `select id, title, ${l.props} from entity where type = any($1::text[]) and archived_at is null and (is_open or id = $2) order by updated_at, id`,
-    [l.registry.family(type), typeof named === 'string' ? named : null],
+type Looks = 'lens' | 'style' | 'layout';
+
+/** Every lens, style or layout (of the types given) kept on the map, with what each is about; and one named outright, retired or not. */
+export async function keptOf(l: Archipelago, type: Looks | Looks[], named: unknown): Promise<Kept[]> {
+  const types = (Array.isArray(type) ? type : [type]).flatMap((t) => l.registry.family(t));
+  const { rows } = await l.db.query<{ id: string; type: string; title: string; props: Record<string, unknown> }>(
+    `select id, type, title, ${l.props} from entity where type = any($1::text[]) and archived_at is null and (is_open or id = $2) order by updated_at, id`,
+    [types, typeof named === 'string' ? named : null],
   );
   // One archived is left out, and what named it falls back; only a name never kept is refused.
-  if (typeof named === 'string' && !rows.some((r) => r.id === named) && !(await l.entity(named))) throw new Error(`No ${type} "${named}"`);
+  if (typeof named === 'string' && !rows.some((r) => r.id === named) && !(await l.entity(named))) throw new Error(`No ${[type].flat().join(' or ')} "${named}"`);
   const { rows: links } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'about' and valid_to is null and from_id = any($1::text[])`, [rows.map((r) => r.id)]);
   return rows.map((r) => ({ ...r, about: links.filter((link) => link.from_id === r.id).map((link) => link.to_id) }));
 }
@@ -37,8 +42,8 @@ export const HUB_AT = 12;
 export async function hubs(l: Archipelago, within?: string) {
   if (!within) throw new Error('hubs reads within an item or a place (within): across the whole map it would read every item.');
   const scope = [...(await scopeOf(l, within, true))];
-  const { rows: entities } = await l.db.query<{ id: string; type: string; title: string; kind: string | null; is_open: boolean; props: Record<string, unknown> }>(
-    `select id, type, title, kind, is_open, jsonb_build_object('hub_at', props -> 'hub_at') as props from entity where id = any($1::text[]) and archived_at is null`,
+  const { rows: entities } = await l.db.query<{ id: string; type: string; title: string; is_open: boolean; props: Record<string, unknown> }>(
+    `select id, type, title, is_open, jsonb_build_object('hub_at', props -> 'hub_at') as props from entity where id = any($1::text[]) and archived_at is null`,
     [scope],
   );
   const { rows: relations } = await l.db.query<{ type: string; from_id: string; to_id: string }>(
@@ -47,7 +52,7 @@ export async function hubs(l: Archipelago, within?: string) {
   );
   const above = await hubAtAbove(l, within);
   const read = { entities, relations };
-  const byId = new Map(read.entities.filter((e) => e.is_open && e.kind !== SYSTEM).map((e) => [e.id, e]));
+  const byId = new Map(read.entities.filter((e) => e.is_open && !isKernel(l.registry, e.type)).map((e) => [e.id, e]));
   const parts = read.relations.filter((r) => r.type === 'part_of');
   const up = new Map<string, string>();
   const kids = new Map<string, string[]>();
@@ -92,11 +97,11 @@ async function hubAtAbove(l: Archipelago, id: string): Promise<number> {
   return rows.length ? Number(rows[0].hub_at) : HUB_AT;
 }
 
-/** Where on the page a kept view or a style is seen at work: the view itself, or the picture of what a style is about, or of the whole map. Nothing for any other item. */
+/** Where on the page a kept view, a style or a layout is seen at work: the view itself, or the picture of what a style or layout is about, or of the whole map. Nothing for any other item. */
 export async function pictureOf(l: Archipelago, id: string): Promise<string | undefined> {
   const item = await l.entity(id);
   if (item && l.registry.isA(item.type, 'lens')) return `v?canvas=${id}`;
-  if (!item || !l.registry.isA(item.type, 'style')) return undefined;
+  if (!item || !(l.registry.isA(item.type, 'style') || l.registry.isA(item.type, 'layout'))) return undefined;
   const { rows } = await l.db.query<{ to_id: string }>(`select to_id from relation where type = 'about' and from_id = $1 and valid_to is null order by id limit 1`, [id]);
   return rows.length ? `graph?from=${rows[0].to_id}` : 'graph?lens';
 }

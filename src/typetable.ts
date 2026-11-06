@@ -1,6 +1,6 @@
 // The type table: every type and relation the workspace has used, kept in its database. When a workspace opens,
 // what the packs define now is written there as active; what is there and no pack defines any more turns dormant,
-// and the registry takes it back in, so the items of a removed pack keep their kind, statuses, fields and
+// and the registry takes it back in, so the items of a removed pack keep their starter, statuses, fields and
 // capabilities. A definition that changed (a pack upgraded, or added back after a while) is logged with what changed.
 // A type that took another over (moved_from) takes its items once the old one is defined by no pack; a relation, its links.
 
@@ -8,6 +8,7 @@ import { Archipelago } from './pelago.ts';
 import type { ResolvedRelation, ResolvedType } from './packs.ts';
 import { moveQueries, termQueries } from './query-saved.ts';
 import { moveStyles } from './style-move.ts';
+import { moveLayouts } from './layout-move.ts';
 import { linkOwners } from './owner-link.ts';
 import { newId } from './db.ts';
 
@@ -59,7 +60,8 @@ export async function syncTypes(given: Archipelago): Promise<{ activated: string
   const { rows } = await l.db.query<Row>(`select id, what, pack, state, def from type_def`);
   const kept = new Map(rows.map((r) => [r.id, r]));
   const live: Row[] = [
-    ...[...reg.types.values()].filter((t) => !t.dormant).map((def) => ({ id: def.id, what: 'type' as const, pack: def.pack, state: 'active' as const, def })),
+    // Stored with `kind`, its starter: what the database fills an item's kind column from (src/head.ts, ITEM_KIND).
+    ...[...reg.types.values()].filter((t) => !t.dormant).map((def) => ({ id: def.id, what: 'type' as const, pack: def.pack, state: 'active' as const, def: { ...def, kind: def.starter } })),
     ...[...reg.relations.values()].filter((r) => !r.dormant).map((def) => ({ id: def.id, what: 'relation' as const, pack: def.pack, state: 'active' as const, def })),
   ];
   const now = new Set(live.map((r) => r.id));
@@ -88,11 +90,12 @@ export async function syncTypes(given: Archipelago): Promise<{ activated: string
   await termQueries(l); // views kept in the filter's old words, said in its terms (a migration, run once)
   // A type a pack took over brings its items with it, once no pack defines the old one (a migration, run once).
   const moved: Record<string, number> = {};
-  for (const t of reg.types.values()) for (const old of t.dormant ? [] : (t.movedFrom ?? [])) if (!now.has(old) && (moved[old] = await l.retype(old, t.id)) === 0) delete moved[old];
+  for (const t of reg.types.values()) for (const old of t.dormant ? [] : (t.movedFrom ?? [])) if (!now.has(old) && (moved[old] = await l.retype(old, t.id, 'entity', t.movedStatuses?.[old])) === 0) delete moved[old];
   for (const r of reg.relations.values()) for (const old of r.dormant ? [] : (r.moved_from ?? [])) if (!now.has(old) && (moved[old] = await l.retype(old, r.id, 'relation')) === 0) delete moved[old];
   await l.fillKinds(); // each item's kind in its row, now the type table is whole
   await moveQueries(l); // views kept before the flat lens, translated into flat lenses (a migration, run once)
   await moveStyles(l); // styles made for one view, moved into it (a migration, run once)
+  await moveLayouts(l); // styles with code, layouts now (a migration, run once; after moveStyles, which reads code on a style)
   await linkOwners(l, () => newId('r')); // each owner said as a link (a migration, run once)
   const asleep = rows.filter((r) => !now.has(r.id));
   reg.keep({

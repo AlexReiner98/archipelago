@@ -34,8 +34,10 @@ export function wireState(link, a, b) {
   if (ends.includes('standby')) return 'standby';
   return 'wired';
 }
-/** A part's outline, by its role where its type sends one, else by its kind. */
-const shapeOf = (i) => (['data', 'storage', 'database', 'queue'].includes(i.role) ? 'store' : ['client', 'person', 'user'].includes(i.role) || i.kind === 'actor' ? 'pill' : i.kind === 'question' ? 'diamond' : 'box');
+/** Whether an item is of a type, or a flavour of it (`is`, as the answer gives it): a task is work. */
+const isOf = (i, type) => i.type === type || (Array.isArray(i.is) && i.is.includes(type));
+/** A part's outline, by its role where its type sends one, else by the core type it is a flavour of. */
+const shapeOf = (i) => (['data', 'storage', 'database', 'queue'].includes(i.role) ? 'store' : ['client', 'person', 'user'].includes(i.role) || isOf(i, 'actor') ? 'pill' : isOf(i, 'question') ? 'diamond' : 'box');
 
 /** The parts (each with its place x, y and size w, h), the places that hold them, the wires and the whole size. */
 /**
@@ -94,7 +96,7 @@ export function layout({ items, links, rootId, measure, sizes, prior, steady = B
   // ---- Wires: a calls b when a link goes from a to b (a depends on b, needs it, sends to it). One a pair: a link
   // back the other way makes it a wire both ways (both). Between two pieces of work, a dependency is drawn the way
   // the work goes: from what is needed to what needs it.
-  const flow = (l) => (l.kind === 'depends_on' && nodes.get(l.from).item.kind === 'work' && nodes.get(l.to).item.kind === 'work' ? [l.to, l.from] : [l.from, l.to]);
+  const flow = (l) => (l.kind === 'depends_on' && isOf(nodes.get(l.from).item, 'work') && isOf(nodes.get(l.to).item, 'work') ? [l.to, l.from] : [l.from, l.to]);
   let edges = [];
   const seen = new Map();
   for (const l of links) {
@@ -112,7 +114,7 @@ export function layout({ items, links, rootId, measure, sizes, prior, steady = B
   // uses the system (a client, a person), it is turned back there: they stay at the top and the rest falls from them.
   const user = (id) => {
     const i = nodes.get(id).item;
-    return ['client', 'person', 'user'].includes(i.role ?? i.fields?.role) || i.kind === 'actor';
+    return ['client', 'person', 'user'].includes(i.role ?? i.fields?.role) || isOf(i, 'actor');
   };
   const leads = (from, to) => {
     const been = new Set([from]), next = [from];

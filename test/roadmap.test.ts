@@ -94,14 +94,15 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
   assert.deepEqual(found, [['P', 5, 2, 1], ['Early', 2, 2, 0]], 'while a project is shaped, most of what is in it is a hub');
   await assert.rejects(ask(l, 'hubs', {}), /within an item or a place/, 'across the whole map, hubs are not read');
 
-  // Code in a style runs in the browser of whoever looks: an agent that writes it proposes it, whatever else agents may do unreviewed.
+  // Code runs in the browser of whoever looks (a layout's, a style's page CSS): an agent that writes it proposes it, whatever else agents may do unreviewed.
   const free = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', merge: 'auto' });
   const plain = await free.change(agent, { reason: 'a colour', ops: [{ op: 'update', id: drawn.ws, props: { radius: 4 } }] });
-  const coded = await free.change(agent, { reason: 'a drawing', ops: [{ op: 'update', id: drawn.ws, props: { code: 'export default () => {}' } }] });
-  const born = await free.change(agent, { reason: 'a drawing', ops: [{ op: 'create', type: 'style', title: 'Mine', props: { code: 'export default () => {}' } }] });
+  const coded = await free.change(agent, { reason: 'a page', ops: [{ op: 'update', id: drawn.ws, props: { page_css: 'h2 { color: red }' } }] });
+  await assert.rejects(free.change(agent, { reason: 'a drawing', ops: [{ op: 'update', id: drawn.ws, props: { code: 'export default () => {}' } }] }), /style has no field "code"/, 'a style holds no code: a layout does');
+  const born = await free.change(agent, { reason: 'a drawing', ops: [{ op: 'create', type: 'layout', title: 'Mine', props: { code: 'export default () => {}' } }] });
   const folded = await free.change(agent, { reason: 'fold', ops: [{ op: 'merge', keep: drawn.ws, drop: drawn.spare }] });
   assert.deepEqual([plain.status, coded.status, born.status, folded.status], ['applied', 'proposed', 'proposed', 'proposed']);
-  assert.equal((await run()).style.code, undefined, 'and until the human approves it, the picture is drawn without it');
+  assert.equal((await run()).style.page_css, undefined, 'and until the human approves it, the page is drawn without it');
   assert.deepEqual([await pictureOf(l, drawn.ps), await pictureOf(l, drawn.ws), await pictureOf(l, kept.road), await pictureOf(l, made.a)], [`graph?from=${made.p}`, 'graph?lens', `v?canvas=${kept.road}`, undefined], 'a style is seen at work in the picture it is about, a kept view as itself');
 });
 

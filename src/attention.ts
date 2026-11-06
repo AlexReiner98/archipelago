@@ -2,7 +2,8 @@
 // everyone, within a scope or across the map. Every reason is read from the root relations and the capabilities, so
 // no way of working is named here: what waits on someone (waits_on), what holds others up and what is blocked
 // (depends_on, waits_on, needs), what is due (bound), what is unsettled (settles), what nobody has touched, what is
-// under way (a session on it), what is ready to take up, and what an agent settled that the owner has not confirmed.
+// under way (a session on it), what is ready to take up, what an agent settled that the owner has not confirmed, and
+// what reads a finding that has moved since (a link that crosses, to a type that promises fields: src/moved.ts).
 // A pack adds reasons of its own as data (a view of form "attention"): items of a type whose fields hold some values.
 
 import { pastBounds } from './bounds.ts';
@@ -10,17 +11,17 @@ import { BlockGraph, blockGraph, heldResources } from './blocking.ts';
 import { toConfirm } from './confirm.ts';
 import { parts } from './manifest.ts';
 import type { Archipelago } from './pelago.ts';
-import { SYSTEM } from './head.ts';
+import { isKernel, notKernel } from './head.ts';
+import { movedReadings, readersOf } from './moved.ts';
 import { scopeOf } from './places.ts';
 
-export const REASONS = ['waits_on', 'to_confirm', 'holding_up', 'due', 'unsettled', 'blocked', 'stale', 'under_way', 'ready'] as const;
+export const REASONS = ['waits_on', 'to_confirm', 'holding_up', 'due', 'moved', 'unsettled', 'blocked', 'stale', 'under_way', 'ready'] as const;
 export type Reason = (typeof REASONS)[number];
 
 /** Days without a change, or a word that it is still true, before open work is said to be stale. */
 export const STALE_DAYS = 14;
 
 interface Row {
-  kind: string | null;
   id: string;
   type: string;
   title: string;
@@ -52,17 +53,17 @@ export interface Input {
  * links among them. Attention then reads no items or links of its own: what it answers is the state of what was read.
  */
 export interface Read {
-  entities: { id: string; type: string; kind: string | null; title: string; status: string; owner: string | null; is_open: boolean; props: Record<string, unknown>; updated_at: Date }[];
+  entities: { id: string; type: string; title: string; status: string; owner: string | null; is_open: boolean; props: Record<string, unknown>; updated_at: Date }[];
   /** Those that say what waits on what as the map keeps them, the rest by id. */
   relations: { type: string; from_id: string; to_id: string; for: string | null }[];
   /** What blocks what, when the lens has read it already. */
   graph?: BlockGraph;
 }
 
-/** What needs a person now, by the reasons only they act on: it waits on them, it is theirs to confirm, it is due, or it is theirs to settle. Of what a lens read, when it is given. */
+/** What needs a person now, by the reasons only they act on: it waits on them, it is theirs to confirm, it is due, what it reads has moved, or it is theirs to settle. Of what a lens read, when it is given. */
 export async function needsOf(l: Archipelago, person: string | null, read?: Read): Promise<Set<string>> {
   if (!person) return new Set();
-  const { items } = await attention(l, { person, reasons: ['waits_on', 'to_confirm', 'due', 'unsettled'], limit: 100_000 }, read);
+  const { items } = await attention(l, { person, reasons: ['waits_on', 'to_confirm', 'due', 'moved', 'unsettled'], limit: 100_000 }, read);
   return new Set(items.map((i) => i.id));
 }
 
@@ -82,11 +83,11 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   const staleDays = input.stale_days ?? STALE_DAYS;
 
   const rows: Row[] = read
-    ? read.entities.filter((e) => e.is_open).map(({ id, type, kind, title, status, owner, is_open, props, updated_at }) => ({ id, type, kind, title, status, owner, is_open, due: typeof props.due === 'string' ? props.due : props.due == null ? null : String(props.due), updated_at }))
+    ? read.entities.filter((e) => e.is_open).map(({ id, type, title, status, owner, is_open, props, updated_at }) => ({ id, type, title, status, owner, is_open, due: typeof props.due === 'string' ? props.due : props.due == null ? null : String(props.due), updated_at }))
     : await rowsFor(l, me, me !== null && me === owner, scope, wanted, weighed.flatMap((d) => l.registry.family(d.of)));
   const reg = l.registry;
   // Only what is work or a question to someone: not people, places, records of the past, or the system's own.
-  const live = new Map(rows.filter((e) => e.kind !== SYSTEM && (!scope || scope.has(e.id))).map((e) => [e.id, e]));
+  const live = new Map(rows.filter((e) => !isKernel(reg, e.type) && (!scope || scope.has(e.id))).map((e) => [e.id, e]));
   // Someone's: owned by them, or owned by nobody when they are the workspace's owner.
   const theirs = (e: Row) => me === null || e.owner === me || (e.owner === null && me === owner);
   const found = new Map<string, { row: Row; reasons: Record<string, unknown>[] }>();
@@ -114,8 +115,9 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   const rootTitles = await titles([...new Set([...rootsOf.values()].flat())]);
   const holding = new Map<string, number>();
   for (const roots of rootsOf.values()) for (const r of roots) holding.set(r, (holding.get(r) ?? 0) + 1);
-  // Only work or a question holds others up: a person who is waited on is said so by waits_on.
-  for (const [id, n] of holding) if (live.get(id) && theirs(live.get(id)!) && ['work', 'question'].includes(live.get(id)!.kind ?? '')) add(live.get(id), 'holding_up', { count: n });
+  // Only what is actionable holds others up: a person who is waited on is said so by waits_on.
+  const actionable = (e: Row) => Boolean(reg.type(e.type)?.capabilities.actionable);
+  for (const [id, n] of holding) if (live.get(id) && theirs(live.get(id)!) && actionable(live.get(id)!)) add(live.get(id), 'holding_up', { count: n });
   // A resource held by others says who holds it (as the asker may see them: a private session is not named).
   const holders = blockedIds.length ? await heldResources(l) : [];
   for (const id of blockedIds) {
@@ -128,6 +130,12 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   const { due, under } = await pastBounds(l, input.days ?? 7, [...live.keys()]);
   for (const d of due) if (live.get(d.id) && theirs(live.get(d.id)!)) add(live.get(d.id), 'due', { on: d.due, overdue: d.overdue });
   for (const u of under) if (live.get(u.id) && theirs(live.get(u.id)!)) add(live.get(u.id), 'due', { value: u.value, limit: u.limit });
+
+  // Moved: what it reads has changed since it was last changed or said still true, until whoever tends it does either.
+  if (wanted.has('moved')) {
+    const moved = await movedReadings(l, [...live.values()].filter(theirs).map((e) => e.id));
+    for (const [id, readings] of moved) for (const m of readings) add(live.get(id), 'moved', { ...m });
+  }
 
   // Unsettled: a question whose type says how it settles, and whose word settles it.
   for (const e of live.values()) {
@@ -145,14 +153,14 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   );
   for (const a of at) if (live.get(a.target) && theirs(live.get(a.target)!)) add(live.get(a.target), 'under_way', { sessions: a.n });
 
-  // Stale: work or a question nobody has changed, or said is still true, for a while. Ready: work that can be
-  // estimated and taken up, with nothing in its way.
+  // Stale: what is actionable and nobody has changed, or said is still true, for a while. Ready: work to plan that
+  // can be estimated and taken up, with nothing in its way.
   const cutoff = Date.now() - staleDays * 86_400_000;
   for (const e of live.values()) {
-    const kind = e.kind;
-    if (!theirs(e) || (kind !== 'work' && kind !== 'question')) continue;
+    if (!theirs(e) || !actionable(e)) continue;
+    const type = reg.type(e.type);
     if (new Date(e.updated_at).getTime() <= cutoff) add(e, 'stale', { days: Math.floor((Date.now() - new Date(e.updated_at).getTime()) / 86_400_000) });
-    if (kind === 'work' && reg.type(e.type)?.fields.tokens_estimated && !graph.isBlocked(e.id)) add(e, 'ready');
+    if (type?.capabilities.plannable && type.fields.tokens_estimated && !graph.isBlocked(e.id)) add(e, 'ready');
   }
 
   // What a pack declares deserves it: its items whose fields hold the values it names, with its mark and its ask.
@@ -169,8 +177,8 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   // What was settled is closed: whether it is within is asked of the whole scope, for those few.
   const settledWithin = confirm && input.within ? await scopeOf(l, input.within, false, confirm.questions.map((q) => q.id)) : null;
   for (const q of confirm?.questions ?? []) {
-    const row = { id: q.id, type: '', kind: null, title: q.title, status: '', owner: null, is_open: false, due: null, updated_at: q.settled } as Row;
-    const { rows: [e] } = await l.db.query<Row>(`select id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at from entity where id = $1`, [q.id]);
+    const row = { id: q.id, type: '', title: q.title, status: '', owner: null, is_open: false, due: null, updated_at: q.settled } as Row;
+    const { rows: [e] } = await l.db.query<Row>(`select id, type, title, status, owner, is_open, props->>'due' as due, updated_at from entity where id = $1`, [q.id]);
     if (!settledWithin || settledWithin.has(q.id)) add(e ?? row, 'to_confirm', { answer: q.answer, on: q.on, seq: q.seq, settled: q.settled, by: q.by, ...(q.basis && { basis: q.basis }) });
   }
 
@@ -183,7 +191,7 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   const newer = (a: { row: Row }, b: { row: Row }) => +new Date(b.row.updated_at) - +new Date(a.row.updated_at);
   const items = [...found.values()]
     .sort((a, b) => (input.order === 'latest' && newer(a, b)) || rank(a.reasons) - rank(b.reasons) || place(a.row.id) - place(b.row.id) || String(a.row.due ?? '9').localeCompare(String(b.row.due ?? '9')) || +new Date(b.row.updated_at) - +new Date(a.row.updated_at))
-    .map(({ row, reasons }) => ({ id: row.id, type: row.type, kind: row.kind ?? null, title: row.title, status: row.status, owner: row.owner, open: row.is_open, due: row.due, changed: row.updated_at, reasons }));
+    .map(({ row, reasons }) => ({ id: row.id, type: row.type, title: row.title, status: row.status, owner: row.owner, open: row.is_open, due: row.due, changed: row.updated_at, reasons }));
   const counts = Object.fromEntries([...wanted].map((r) => [r, items.filter((i) => i.reasons.some((x) => x.why === r)).length]));
   const limit = input.limit ?? 100;
   // What each sits in at the top, for those sent: the outermost thing it is part of, for a page that groups by it.
@@ -208,21 +216,25 @@ const EVERYONE = ['to_confirm'];
  * on them. For everyone across the map, only reasons the log answers: weighing every open item would read them all.
  */
 async function rowsFor(l: Archipelago, me: string | null, isOwner: boolean, scope: Set<string> | null, wanted: Set<string>, declared: string[]): Promise<Row[]> {
-  const cols = `id, type, kind, title, status, owner, is_open, props->>'due' as due, updated_at`;
-  const notSystem = `(kind is null or kind <> '${SYSTEM}')`;
+  const cols = `id, type, title, status, owner, is_open, props->>'due' as due, updated_at`;
+  const notSystem = notKernel(l.registry);
   if (scope) return (await l.db.query<Row>(`select ${cols} from entity where id = any($1::text[]) and is_open and archived_at is null and ${notSystem}`, [[...scope]])).rows;
   if (me !== null) {
-    // What nobody owns is the owner's: of it, only what a reason asked for can be (work and questions; for what is
+    // What nobody owns is the owner's: of it, only what a reason asked for can be (what is actionable; for what is
     // due, unsettled or waits on them alone, only what has a bound or settles), never every open item.
     const reg = l.registry;
-    const kept = [...reg.having('bound'), ...reg.having('settles'), ...declared];
     const broad = ['blocked', 'holding_up', 'stale', 'ready', 'under_way'].some((r) => wanted.has(r));
-    const unowned = broad ? `(kind in ('work', 'question') or type = any($4::text[]))` : `type = any($4::text[])`;
+    const kept = [...(broad ? reg.having('actionable') : []), ...reg.having('bound'), ...reg.having('settles'), ...declared];
     const { rows } = await l.db.query<Row>(
-      `select ${cols} from entity where is_open and archived_at is null and ${notSystem} and (owner = $1 or ($2 and owner is null and ${unowned}))
+      `select ${cols} from entity where is_open and archived_at is null and ${notSystem} and (owner = $1 or ($2 and owner is null and type = any($4::text[])))
        union select ${cols} from entity where is_open and archived_at is null and id in (select from_id from relation where to_id = $1 and type = any($3::text[]) and valid_to is null)`,
       [me, isOwner, reg.relationFamily('waits_on'), kept],
     );
+    if (wanted.has('moved')) {
+      const known = new Set(rows.map((r) => r.id));
+      const readers = (await readersOf(l, me, isOwner)).filter((id) => !known.has(id));
+      if (readers.length) rows.push(...(await l.db.query<Row>(`select ${cols} from entity where id = any($1::text[]) and ${notSystem}`, [readers])).rows);
+    }
     if (!wanted.has('holding_up')) return rows;
     // What theirs holds up: whatever waits on it, step by step back along the links that block.
     const { rows: held } = await l.db.query<Row>(

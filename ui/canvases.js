@@ -11,6 +11,7 @@ import { addressOf, flatView, stepsOf } from './query.js';
 import { filterSaid, fitBar } from './query-bar.js';
 import { canvasMenu } from './canvas-menu.js';
 import { lookSwitch, styleDelete } from './look-switch.js';
+import { thumbOf } from './thumbs.js';
 import { ARROW, isA, typeTitle, wayOf } from './words.js';
 
 const TYPE = 'lens';
@@ -26,7 +27,8 @@ export function savedCanvases(fresh = false) {
       const said = new Map((views?.pictures ?? []).map((p) => [p.lens, p]));
       const marked = rows.map((r) => ({ ...r, ofItem: Boolean(said.get(r.id)?.of && !said.get(r.id).pinned), inDocument: Boolean(said.get(r.id)?.document) }));
       const kept = new Set(rows.map((r) => r.props?.preset).filter(Boolean));
-      const offered = (state.schema?.canvases ?? []).filter((p) => !kept.has(p.id)).map((p) => ({ id: p.id, title: p.title, preset: true, props: { ...p.props, preset: p.id } }));
+      // A pack's view of one item (`on` its types) is offered on that item's page alone (viewsOn).
+      const offered = (state.schema?.canvases ?? []).filter((p) => !kept.has(p.id) && !p.on?.length).map((p) => ({ id: p.id, title: p.title, preset: true, props: { ...p.props, preset: p.id } }));
       return [...marked, ...offered].sort((a, b) => Number(b.props?.pinned === true) - Number(a.props?.pinned === true) || a.title.localeCompare(b.title));
     });
   return known;
@@ -50,9 +52,25 @@ const upOf = (all, lens, style) => (style.canvas ? all.find((c) => c.id === styl
 
 /** A view a pack ships, opened by its address: its own settings (a list's columns), which the address does not carry. */
 export const presetSettings = (lens) => {
-  const preset = (state.schema?.canvases ?? []).find((p) => addressOf(viewParts({ ...p, preset: true, props: p.props }).lens) === addressOf(lens));
+  const at = addressOf(lens);
+  // A view of one item is its address with that item where it says {here}.
+  const fits = (p) => new RegExp(`^${addressOf(viewParts({ ...p, preset: true, props: p.props }).lens).replace(/[.*+?^$()|[\]\\]/g, '\\$&').replaceAll(encodeURIComponent('{here}'), 'e_[a-z0-9]+')}$`).test(at);
+  const preset = (state.schema?.canvases ?? []).find(fits);
   return preset ? settingsOf({ props: preset.props }) : {};
 };
+
+/**
+ * The views packs ship of an item of this type (a preset `on` it): each its title and the address it opens at, the
+ * item where its query says {here}. Its page offers them, so a project's roadmap is a view, not a screen.
+ */
+export const viewsOn = (typeId, id) =>
+  (state.schema?.canvases ?? [])
+    .filter((p) => p.on?.some((t) => isA(typeId, t)))
+    .map((p) => {
+      const props = JSON.parse(JSON.stringify(p.props).replaceAll('{here}', id));
+      const { lens, style } = viewParts({ preset: true, props });
+      return { id: p.id, title: p.title, at: `#/v?${addressOf(lens, style)}` };
+    });
 
 /** Open a saved canvas named with no lens beside it: its lens and style put in the address, in place of the one asked. */
 export async function openCanvas(id) {
@@ -211,6 +229,7 @@ const row = (c, now) =>
   h(
     'li',
     { class: 'row-top nowrap-row' },
+    thumbOf({ id: c.id, ...viewParts(c) }),
     h('a', { class: 'gist', href: canvasAt(c), title: c.title }, c.title),
     h('span', { class: 'muted small gist', title: lensWords(viewParts(c).lens) }, lensWords(viewParts(c).lens)),
     c.props?.pinned === true && h('span', { class: 'pill', title: 'Pinned' }, 'pinned'),

@@ -119,6 +119,12 @@ test('each workspace is its own database: tokens, data and local types do not cr
   const typeIds = async (token: string) => ((await call('/api/schema', token)).result.types as any[]).map((t) => t.id);
   assert.ok((await typeIds(theirs)).includes('local.site_visit'));
   assert.ok(!(await typeIds(mine)).includes('local.site_visit'));
+  // An agent's first answer names the map its token acts in, so a token made in the wrong workspace is plain at once.
+  const agent = (await createToken((await workspaces.get('acme')).pelago.db, 'acme', { kind: 'agent', name: 'claude-code' })).token;
+  const begun = await call('/agent/capture', agent, { action: 'session_start', params: { title: 'Which map is this' } });
+  assert.deepEqual(begun.result.workspace, { id: 'acme', name: 'Acme Architects' });
+  assert.deepEqual((await call('/agent/capture', agent, { action: 'session_start', params: { title: 'Again', session_id: 'same-chat' } })).result.workspace, { id: 'acme', name: 'Acme Architects' });
+  assert.deepEqual((await call('/agent/capture', agent, { action: 'session_start', params: { session_id: 'same-chat' } })).result.workspace.id, 'acme', 'a resumed session names it too');
 });
 
 test('inside a workspace, private things are hidden from other members by the database', async () => {
@@ -228,7 +234,7 @@ test('nothing can depend on a private item from outside it, and a held resource 
     { op: 'create', ref: 'priv', type: 'task', title: 'Private prep' },
     { op: 'create', ref: 'priv2', type: 'task', title: 'Private follow-up' },
     { op: 'create', ref: 'base', type: 'task', title: 'Shared base', visibility: 'shared' },
-    { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane', visibility: 'shared' },
+    { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Live lane', visibility: 'shared' },
     { op: 'create', ref: 'live', type: 'task', title: 'Live work', visibility: 'shared' },
     { op: 'link', type: 'depends_on', from: 'priv2', to: 'priv' },
     { op: 'link', type: 'depends_on', from: 'priv', to: 'base' },
@@ -283,7 +289,7 @@ test('a workspace receives notifications only from workspaces its admin accepts'
 
   const set = await call('/api/workspace_set', theirs, { accepts_from: ['default'] });
   const { reply_rules, ...settings } = set.result;
-  assert.deepEqual(settings, { id: 'acme', default_visibility: 'private', agent_changes: 'apply', accepts_from: ['default'], agent_backups: false, agent_publish: false, agent_code: false, drawings_open: false, holds_off: false, lifted: { reply_account_commits: false, reply_draw_answers: false, reply_record_findings: false } });
+  assert.deepEqual(settings, { id: 'acme', default_visibility: 'private', agent_changes: 'apply', accepts_from: ['default'], agent_backups: false, agent_publish: false, agent_code: false, drawings_open: false, islands: false, holds_off: false, lifted: { reply_account_commits: false, reply_draw_answers: false, reply_record_findings: false } });
   assert.deepEqual(reply_rules.map((r: { rule: string; off: boolean }) => [r.rule, r.off]), [['core.draw_answers', false], ['core.record_findings', false], ['software.account_commits', false]]);
   assert.deepEqual((await send(mine, 'acme')).result, { delivered_to: 'acme' });
 

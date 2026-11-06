@@ -19,7 +19,7 @@ export async function gate(input, ctx) {
   if (!input.event) {
     const relatedTo = (id, relation) => ctx.read({ related: id, relation, fields: [] });
     const events = [];
-    for (const e of (await ctx.read({ items: { type: 'event' }, fields: ['at'] })).filter((x) => x.is_open)) {
+    for (const e of (await ctx.read({ items: { type: 'occurrence' }, fields: ['at'] })).filter((x) => x.is_open)) {
       const [held, deferred, shipped] = await Promise.all([relatedTo(e.id, 'depends_on'), relatedTo(e.id, 'defers'), relatedTo(e.id, 'ships')]);
       if (held.length || deferred.length || shipped.length) events.push({ ...slim(e), at: e.props.at ?? null, holding: held.length });
     }
@@ -31,7 +31,7 @@ export async function gate(input, ctx) {
   const byId = new Map(around.map((e) => [e.id, e]));
   const event = byId.get(input.event);
   if (!event) throw new Error(`No item "${input.event}"`);
-  if (!isA(event, 'event')) throw new Error(`gate needs an event (a release, a launch, a deadline); "${event.title}" is a ${event.type}`);
+  if (!isA(event, 'occurrence')) throw new Error(`gate needs an event (a release, a launch, a deadline); "${event.title}" is a ${event.type}`);
   // What an item links to by one kind of link (ships with its flavours), each with the link that says so.
   const linked = (id, relation) => links.filter((k) => k.from === id && (relation === 'ships' ? k.is.includes('ships') : k.type === relation) && byId.has(k.to)).map((k) => ({ ...byId.get(k.to), link: k.id }));
   const kids = new Map();

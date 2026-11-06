@@ -16,7 +16,7 @@ for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id ===
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 const measure = (t: string, px: number) => t.length * px * 0.55;
 const state = { blocked: false, waits_on: [], sessions: 0, needs_you: false };
-const item = (id: string, title: string, kind = 'place') => ({ id, kind, type: 'part', title, place: 0, open: true, status: 'works', state, fields: {} });
+const item = (id: string, title: string, kind = 'place') => ({ id, type: 'part', is: [kind], title, place: 0, open: true, status: 'works', state, fields: {} });
 const answer = {
   items: [item('e_hostzzzz', 'Machine'), item('e_cloudzzz', 'Cloud'), item('e_hookzzzz', 'Hook'), item('e_toolzzzz', 'Tool'), item('e_storezzz', 'Store'), item('e_taskzzzz', 'A task', 'work')],
   links: [

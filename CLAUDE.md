@@ -130,39 +130,43 @@ reply ending, commits accounted for) is `docs/agents.md`.
 - **Visibility is enforced by the database** (row level security in
   `src/db.ts`). Do not add application-side visibility filters; if something
   must cross the privacy line, add a narrow `security definer` function.
-- **Types live in pack files** under `packs/`, each a manifest of fifteen keys
+- **Types live in pack files** under `packs/`, each a manifest of sixteen keys
   (`docs/packs.md`, read by `src/manifest.ts`). Fields the system maintains are
   marked `"system": true`.
 - **An item is a small head and its fields** (`src/head.ts`). The head is id,
   kind, type, title, body, visibility and its times; everything else is a
-  field its kind or type declares, checked on write, and an undeclared one is
+  field its type declares, checked on write, and an undeclared one is
   refused. Status, owner, confidence and source are such fields, declared by
-  the kinds in `packs/core/pack.json` and kept in columns of the row (the owner
+  the starter types (core's eight in `packs/core/pack.json`, types that extend
+  nothing) and kept in columns of the row (the owner
   is an `owned_by` link, its column an index the write path keeps the same; for the
-  indexes, row-level security and the foreign keys). Read an item's kind from
-  its row (`kind`). A value over 4000 characters needs a field declared
-  `"large": true`, which only a system-kind type may have. What a pack adds to the page of an item of a kind
-  or type is a screen there too (a view of `form: "screen"`: pieces the kernel draws, listed in
+  indexes, row-level security and the foreign keys). The kernel reads no kind:
+  what an item is comes from its type (its `starter`, lineage, capabilities);
+  the `kind` column only holds the starter, and `test/structure.test.ts`
+  refuses a read of it. A value over 4000 characters needs a field declared
+  `"large": true`, which only a type with the kernel flag may have. What a pack adds to the page of an item of a
+  type is a screen there too (a view of `form: "screen"`: pieces the kernel draws, listed in
   `src/declared.ts`); the item page (`ui/item.js`) names no pack's type.
 - **The UI has no build step and no framework.** Plain files in `ui/`.
 - **Dependencies stay at four** (`@electric-sql/pglite`,
   `@modelcontextprotocol/sdk`, `zod`, and since 18 Oct 2026 `pg`, for a
   Postgres server; model calls are plain fetch, in `src/model.ts`) unless the owner agrees to another. One library is kept as a file, not a
   dependency: `ui/three.module.min.js` (three.js 0.160, MIT, since 13 Oct
-  2026 at the owner's asking), offered to a style's own drawing code and to
+  2026 at the owner's asking), offered to a layout's drawing code and to
   a drawing that paints on a surface (`ui/surface.js`, since 23 Oct 2026, for
   the landing page's relief), loaded only when one asks for it, in the
   sandbox. The app's own pages do not use it.
-- **A style's code runs behind two walls, and only there.** A style item may
-  carry a drawing module (`code`). It runs in a worker inside the sandboxed
+- **A layout's code runs behind two walls, and only there.** A layout item
+  (core's `layout` type, apart from `style` since 4 Nov 2026) carries a drawing
+  module (`code`). It runs in a worker inside the sandboxed
   frame `ui/draw.html`, never in the app's page; an agent that writes one
   proposes it, whatever the workspace lets agents do unreviewed. Do not give
   that code a page to touch, a way to the network, or anything typed. After
   changing `ui/draw.js`, `ui/draw.html`, `ui/marks.js`, `ui/surface.js` or the frame's policy in
-  `src/server.ts`, run a hostile style against it in a real browser (the
+  `src/server.ts`, run a hostile layout against it in a real browser (the
   browser pane will not load a sandboxed frame; to see drawings there, start a dev server with `PELAGO_UNSANDBOXED=1`, which drops that wall and keeps the worker); `test/layouts.test.ts`
-  does, in headless Chrome. The owner can take both walls down for a style's
-  own code, per workspace (`drawings_open`, the owner, 3 Nov 2026,
+  does, in headless Chrome. The owner can take both walls down for a layout's
+  code, per workspace (`drawings_open`, the owner, 3 Nov 2026,
   e_eezrwza2): it then runs in an unsandboxed frame of the page's origin,
   `draw.html?open=1`, as the person looking (`docs/layouts.md`, "The walls").
   Off is the default, and with it off nothing above changes; never turn it

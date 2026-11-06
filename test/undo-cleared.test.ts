@@ -30,7 +30,7 @@ test('undo of clearing a style\'s shape brings the shape back', async () => {
 
 /** A style as every item on the live map made before 24 Oct 2026 is: a row the log never said. */
 async function beforeTheLog(l: Archipelago) {
-  const kind = l.registry.type('style')?.kind ?? null;
+  const kind = l.registry.type('style')?.starter ?? null;
   await l.db.query(`insert into entity (id, type, kind, title, status, is_open, visibility, props) values ('e_beforelog', 'style', $1, 'House style', 'current', true, 'shared', $2)`, [kind, { shape: 'list', gap: 10 }]);
   return 'e_beforelog';
 }

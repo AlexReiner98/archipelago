@@ -42,10 +42,10 @@ test('a {ref} in props is the id of what the change makes, at any depth', async 
 test('a rule lifted by a setting is named in the answer as what let the change through', async () => {
   const l = await fresh();
   await callTool(l, owner, 'workspace_set', { agent_changes: 'apply', agent_code: true });
-  const made = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'style', title: 'Coded', props: { code: 'export default () => []' } }] })) as { status: string; let_through?: { rule: string; by: string }[] };
+  const made = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Coded', props: { code: 'export default () => []' } }] })) as { status: string; let_through?: { rule: string; by: string }[] };
   assert.equal(made.status, 'applied');
   assert.ok(made.let_through?.some((r) => r.rule === 'code_runs' && r.by === 'agent_code'), JSON.stringify(made.let_through));
   await callTool(l, owner, 'workspace_set', { agent_code: false });
-  const held = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'style', title: 'Coded again', props: { code: 'export default () => []' } }] })) as { status: string; held_by?: { rule: string } };
+  const held = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Coded again', props: { code: 'export default () => []' } }] })) as { status: string; held_by?: { rule: string } };
   assert.deepEqual([held.status, held.held_by?.rule], ['proposed', 'code_runs']);
 });

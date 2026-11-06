@@ -1,7 +1,8 @@
 // The page as a replica of the log: the projector the page runs (src/project.ts, as the server serves it, its types
 // stripped) makes the same rows from the log as the server's tables hold, row for row; the server reads the facts
-// after a position only on what the caller holds, as the viewer may see them; and a store holding a flat lens's
-// answer (ui/replica.js) is brought up to date by an agent's change without the lens being read again.
+// after a position only on what the caller holds and the islands it follows, as the viewer may see them; and the
+// page's one store (ui/replica.js), shared by every view, folds an agent's change in once, tells every view holding
+// what changed, and tells a view whose query may find something else to ask the server again (ui/membership.js).
 
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -10,6 +11,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
 import { KEPT_FIELDS } from '../src/operational.ts';
+import { setIslands } from '../src/packstate.ts';
 import { Archipelago } from '../src/pelago.ts';
 import { factsAfter, headPos } from '../src/tail.ts';
 import { callTool } from '../src/tools.ts';
@@ -17,16 +19,33 @@ import { uiFile } from '../src/ui-files.ts';
 import { undo } from '../src/undo.ts';
 import { agent, all, fresh, human, make } from './map.ts';
 
-/** The page's two modules as the server serves them, loaded from a folder of their own as the browser would load them. */
+/** The page's modules as the server serves them, loaded from a folder of their own as the browser would load them. */
 async function pageModules() {
   const dir = mkdtempSync(join(tmpdir(), 'pelago-replica-'));
   writeFileSync(join(dir, 'package.json'), '{"type":"module"}');
-  for (const f of ['project.js', 'ghosts.js', 'replica.js']) writeFileSync(join(dir, f), (await uiFile(f, null)).body as string);
+  for (const f of ['project.js', 'ghosts.js', 'membership.js', 'replica.js']) writeFileSync(join(dir, f), (await uiFile(f, null)).body as string);
   return {
     project: await import(pathToFileURL(join(dir, 'project.js')).href),
     replica: await import(pathToFileURL(join(dir, 'replica.js')).href),
+    membership: await import(pathToFileURL(join(dir, 'membership.js')).href),
   };
 }
+
+/** What the page's projector and views ask of the types, as ui/live.js answers it from the schema. */
+const kindsOf = (l: Archipelago) => ({
+  ...l.registry,
+  isOpen: (t: string, s: string) => l.registry.isOpen(t, s),
+  type: (t: string) => l.registry.type(t),
+  relationFamily: (...r: string[]) => r,
+  shown: (t: string, k: string) => Boolean(l.registry.type(t)?.fields?.[k]?.shown),
+  phase: (t: string, st: string) => l.registry.type(t)?.statuses.phases?.[st],
+  lineage: (t: string) => l.registry.type(t)?.lineage.slice(1) ?? [],
+  flavour: (k: string) => {
+    const out: string[] = [];
+    for (let r = l.registry.relations.get(k); r?.extends && !out.includes(r.extends); r = l.registry.relations.get(r.extends)) out.push(r.extends);
+    return out;
+  },
+});
 
 type Row = Record<string, any>;
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v);
@@ -120,7 +139,7 @@ test('the facts after a position are read only on what is held, as the viewer ma
   assert.ok(owners.entries.some((e) => e.facts.some((f) => f[2] === 'title' && f[3] === 'Mine now')), 'its owner reads it, opened');
 });
 
-test("an agent's change reaches a store holding a flat lens's answer, with no lens read", async () => {
+test("an agent's change reaches a view of the store with no lens read; what may move its answer asks again", async () => {
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'p', type: 'project', title: 'Canvas' },
@@ -130,16 +149,16 @@ test("an agent's change reaches a store holding a flat lens's answer, with no le
     { op: 'link', type: 'part_of', from: 'b', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
   ]);
-  const { Replica } = (await pageModules()).replica;
-  const kinds = { ...l.registry, isOpen: (t: string, s: string) => l.registry.isOpen(t, s), type: (t: string) => l.registry.type(t), relationFamily: (...r: string[]) => r, shown: (t: string, k: string) => Boolean(l.registry.type(t)?.fields?.[k]?.shown), phase: (t: string, st: string) => l.registry.type(t)?.statuses.phases?.[st], flavour: (k: string) => { const out: string[] = []; for (let r = l.registry.relations.get(k); r?.extends && !out.includes(r.extends); r = l.registry.relations.get(r.extends)) out.push(r.extends); return out; } };
+  const { Store, View } = (await pageModules()).replica;
   const lens = { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } };
   const read = () => callTool(l, human, 'view', { name: 'flat', params: lens }) as Promise<any>;
   const tail = (input: Record<string, unknown>) => callTool(l, human, 'tail', input) as Promise<any>;
 
-  const store = new Replica(kinds);
-  store.hold(await read(), (await tail({})).pos);
+  const store = new Store(kindsOf(l));
+  const view = store.keep(new View(store));
+  view.hold(await read(), (await tail({})).pos);
   const heard: any[] = [];
-  store.on((changed: unknown) => heard.push(changed));
+  view.on((changed: unknown) => heard.push(changed));
 
   // An agent renames a task, adds one under the project, and ends a link: approved, as under `npm start`.
   const asked = (await l.change(agent, {
@@ -156,20 +175,123 @@ test("an agent's change reaches a store holding a flat lens's answer, with no le
   assert.equal((await loose.change(agent, { reason: 'Archive it', ops: [{ op: 'archive', id: made.b }] })).status, 'applied');
 
   const changed = store.apply(await tail({ after: store.pos, ids: store.ids() }));
-  const c = [...store.items.keys()].find((id: string) => store.items.get(id).title === 'Replica');
-  assert.equal(store.item(made.a).title, 'A flat lens');
-  assert.equal(store.item(made.a).status, 'doing');
-  assert.equal(store.item(c)?.title, 'Replica', 'the new task, brought by its link');
-  assert.equal(store.item(made.b), undefined, 'the archived task leaves the answer');
-  assert.deepEqual([changed.items.added, changed.items.changed.includes(made.a), changed.items.removed], [[c], true, [made.b]]);
+  assert.equal(view.item(made.a).title, 'A flat lens');
+  assert.equal(view.item(made.a).status, 'doing');
+  assert.equal(view.item(made.b), undefined, 'the archived task leaves the answer');
+  assert.deepEqual([changed.items.changed.includes(made.a), changed.items.removed], [true, [made.b]]);
   assert.equal(heard.length, 1, 'listeners are told once');
+  assert.equal(heard[0].ask, true, 'a new task linked under the project may be found by the walk: the view asks again');
+  assert.equal(view.answer().items.some((i: any) => i.title === 'Replica'), false, 'the store never judges what the query finds');
+  assert.ok(![...store.items.values()].some((r: any) => r.title === 'Replica'), 'what no view holds is not kept');
 
-  // What the store holds is what reading the lens again gives. Why each item is there (found, step) is the answer's,
-  // not the log's: one the log brought has none until the lens is read again, so it is not compared.
+  // Asked again, the view holds what the server finds: the store's rows, current, and the answer's own new ones.
+  const pos = (await tail({})).pos;
   const again = await read();
+  view.hold(again, pos);
   // As the page has both: over the wire, times are strings.
-  const bare = ({ found, step, ...i }: any) => i;
-  const pick = (a: any) => JSON.parse(JSON.stringify({ items: [...a.items].map(bare).sort(byId), links: [...a.links].sort(byId) }));
-  assert.deepEqual(pick(store.answer()), pick(again));
-  assert.deepEqual([store.item(made.p).found, store.item(made.a).step], [['id'], 1], 'what it held keeps why it was there, through the changes');
+  const pick = (a: any) => JSON.parse(JSON.stringify({ items: [...a.items].sort(byId), links: [...a.links].sort(byId) }));
+  assert.deepEqual(pick(view.answer()), pick(again));
+  assert.deepEqual([view.item(made.p).found, view.item(made.a).step], [['id'], 1], 'what it holds keeps why it was there');
+});
+
+test('two views share one store: a fact folds in once and both are told; each asks again only for what its query reads', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'project', title: 'Panes' },
+    { op: 'create', ref: 'a', type: 'task', title: 'Shared item' },
+    { op: 'create', ref: 'b', type: 'task', title: 'Only in the walk' },
+    { op: 'create', ref: 'x', type: 'task', title: 'Not in either' },
+    { op: 'link', type: 'part_of', from: 'a', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'b', to: 'p' },
+  ]);
+  const { Store, View, follow, unfollow } = (await pageModules()).replica;
+  const tail = (input: Record<string, unknown>) => callTool(l, human, 'tail', input) as Promise<any>;
+  const flat = (lens: unknown) => callTool(l, human, 'view', { name: 'flat', params: lens }) as Promise<any>;
+  const store = new Store(kindsOf(l));
+  const open = async (lens: unknown) => {
+    const pos = (await tail({})).pos;
+    const view = follow(new View(store));
+    view.hold(await flat(lens), pos);
+    const heard: any[] = [];
+    view.on((c: unknown) => heard.push(c));
+    return { view, heard };
+  };
+  const walk = await open({ filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } });
+  const one = await open({ filter: { find: [`id ${made.a}`] } });
+  assert.equal(store.items.size, 3, 'the item both hold is held once');
+  const beat = async () => store.apply(await tail({ after: store.pos, ids: store.ids() }));
+
+  // The shared item renamed: one fold, both told, both drawing the same row.
+  await make(l, [{ op: 'update', id: made.a, title: 'Seen in both' }]);
+  const changed = await beat();
+  assert.deepEqual(changed.items.changed, [made.a], 'folded in once');
+  assert.deepEqual([walk.heard.length, one.heard.length], [1, 1], 'both views are told');
+  assert.deepEqual([walk.view.item(made.a).title, one.view.item(made.a).title], ['Seen in both', 'Seen in both']);
+  assert.deepEqual([walk.heard[0].ask, one.heard[0].ask], [false, false], 'a title no query here reads asks nothing');
+
+  // What only the walk holds: only it is told.
+  await make(l, [{ op: 'update', id: made.b, title: 'Walked' }]);
+  await beat();
+  assert.deepEqual([walk.heard.length, one.heard.length], [2, 1], 'a view is told only of what it holds');
+  assert.equal(one.view.item(made.b), undefined, 'and draws only its own items');
+
+  // A link from the shared item to one outside: the walk follows part_of only, the other walks nothing.
+  await make(l, [{ op: 'link', type: 'depends_on', from: made.a, to: made.x }]);
+  await beat();
+  assert.deepEqual([walk.heard.length, one.heard.length], [2, 1], 'a link neither query reads changes neither answer, nor what either draws');
+  await make(l, [{ op: 'link', type: 'part_of', from: made.x, to: made.p }]);
+  await beat();
+  assert.deepEqual([walk.heard.at(-1)?.ask, one.heard.length], [true, 1], 'a link the walk follows asks it again; the other hears nothing');
+
+  // A view closed lets go of what only it held; the shared item stays for the other.
+  unfollow(walk.view);
+  assert.deepEqual([...store.items.keys()], [made.a], 'only what an open view holds is kept');
+  await make(l, [{ op: 'update', id: made.a, status: 'doing' }]);
+  await beat();
+  assert.deepEqual([one.view.item(made.a).status, walk.heard.length], ['doing', 3], 'the open view still hears; the closed one does not');
+});
+
+test('a view whose query reads a field asks again when it moves; one made anywhere asks a query across the map', async () => {
+  const { mayMove, reads } = (await pageModules()).membership;
+  const items = new Set(['e_aaaaaaaa']);
+  const status = { lens: { filter: { find: ['type task'], only: ['status doing'] } }, items };
+  const named = { lens: { filter: { find: ['id e_aaaaaaaa'] } }, items };
+  const fact = (field: string, op = '+') => [{ id: 'e_aaaaaaaa', field, op }];
+  assert.equal(mayMove(status, fact('status')), true, 'a status its Only names');
+  assert.equal(mayMove(status, fact('title')), false, 'not a title it does not read');
+  assert.equal(mayMove(named, fact('status')), false, 'an id names no field');
+  assert.equal(mayMove(named, fact('archived', '-')), true, 'brought back from the archive, it is asked again');
+  assert.equal(mayMove(status, [], 1), true, 'a type term may find what was made anywhere');
+  assert.equal(mayMove(named, [], 1), false, 'an id term finds nothing new');
+  const isle = { lens: { filter: { find: ['island e_iiiiiiii'] } }, items, islands: ['e_iiiiiiii'] };
+  assert.equal(mayMove(isle, [], 1), false, 'one looking at an island hears only what is made there');
+  assert.equal(mayMove(isle, [{ id: 'e_bbbbbbbb', field: 'type', op: '+', made: true, island: 'e_iiiiiiii' }]), true);
+  assert.equal(mayMove(isle, [{ id: 'e_bbbbbbbb', field: 'type', op: '+', made: true, island: 'e_jjjjjjjj' }]), false);
+  const r = reads({ filter: { find: ['id e_aaaaaaaa', 'text replica'], not: ['done'] }, walk: { over: ['depends_on<'], steps: 2 } });
+  assert.deepEqual([[...r.anchors], [...r.fields].sort(), [...r.links], r.unanchored], [['e_aaaaaaaa'], ['body', 'status', 'title'], ['depends_on'], true]);
+});
+
+test('the tail follows the islands a page names: what lives on them is read, held or not', async () => {
+  const l = await fresh();
+  await setIslands(l, human, true);
+  const { a, b } = await make(l, [
+    { op: 'create', ref: 'a', type: 'island', title: 'Followed', props: { pack: 'core' } },
+    { op: 'create', ref: 'b', type: 'island', title: 'Elsewhere', props: { pack: 'core' } },
+  ]);
+  const { held, on, off } = await make(l, [
+    { op: 'create', ref: 'held', type: 'task', title: 'Held', props: { island: a } },
+    { op: 'create', ref: 'on', type: 'task', title: 'On it, not held', props: { island: a } },
+    { op: 'create', ref: 'off', type: 'task', title: 'On another', props: { island: b } },
+  ]);
+  const start = await headPos(l.db);
+  const { n } = await make(l, [
+    { op: 'update', id: on, status: 'doing' },
+    { op: 'update', id: off, status: 'doing' },
+    { op: 'create', ref: 'n', type: 'task', title: 'Made on it', props: { island: a } },
+  ]);
+  const named = async (islands?: string[]) => new Set((await factsAfter(l.db, { after: start, ids: [held], islands })).entries.flatMap((e) => e.facts.map((f) => f[1])));
+  const followed = await named([a]);
+  assert.ok(followed.has(on) && followed.has(n), 'what lives on the island followed, changed or made');
+  assert.ok(!followed.has(off), 'not what lives on another');
+  assert.equal((await named()).size, 0, 'with no island named, as with islands off: only what is held');
 });

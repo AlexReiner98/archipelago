@@ -13,8 +13,11 @@ import { askedLately } from './replies.ts';
 import { atSetting, AT_MAX, countsTo, isAt, onReply } from './reply-rules.ts';
 import { HOLDS_OFF, holdsOff, liftsOn } from './rules.ts';
 import type { Tool } from './tools.ts';
+import { notKernel } from './head.ts';
+import { ISLANDS } from './islands.ts';
+import { islandsOn, setIslands } from './packstate.ts';
 
-/** The setting that runs a style's code with no sandbox: in the page's own origin, with the network, files, fonts and links. */
+/** The setting that runs a layout's code with no sandbox: in the page's own origin, with the network, files, fonts and links. */
 export const DRAWINGS_OPEN = 'drawings_open';
 
 /** The settings that turn off a rule on a reply's end, one for each such rule the packs here declare. */
@@ -27,7 +30,7 @@ const settings = async (l: Archipelago) => {
   const { rows } = names.length ? await l.db.query<{ key: string; value: unknown }>(`select key, value from setting where key = any($1::text[])`, [[...names, ...ats]]) : { rows: [] };
   const lifted = Object.fromEntries(names.map((name) => [name, rows.some((r) => r.key === name && r.value === true)]));
   const set = new Map(rows.filter((r) => ats.includes(r.key) && isAt(r.value)).map((r) => [r.key, r.value as number]));
-  return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups, agent_publish, agent_code, drawings_open: await drawingsOpen(l), [HOLDS_OFF]: await holdsOff(l.db), ...(names.length && { lifted, reply_rules: await replyRules(l, lifted, set) }) };
+  return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), accepts_from: await acceptedSenders(l), agent_backups, agent_publish, agent_code, drawings_open: await drawingsOpen(l), [ISLANDS]: await islandsOn(l), [HOLDS_OFF]: await holdsOff(l.db), ...(names.length && { lifted, reply_rules: await replyRules(l, lifted, set) }) };
 };
 
 /** Whether the owner has turned the sandbox off for drawings here: read whole, since every member's page draws by it (ui/style-code.js). */
@@ -55,14 +58,14 @@ async function planUse(l: Archipelago, limits: Limits) {
 
 export const WORKSPACE_TOOLS: Record<string, Tool> = {
   workspace_info: {
-    description: 'This workspace’s settings: its id, its owner (null until one is set with init), the default visibility of new things, whether agents’ changes are applied as they are made or held for a human, whether agents may download backups or publish documents, whether a style’s code runs without the sandbox (drawings_open), whether holds are off (holds_off), which workspaces it accepts notifications from, and on a workspace sold on a plan, its limits (member_limit) and how much of each it uses (use).',
+    description: 'This workspace’s settings: its id, its owner (null until one is set with init), the default visibility of new things, whether agents’ changes are applied as they are made or held for a human, whether agents may download backups or publish documents, whether a layout’s code runs without the sandbox (drawings_open), whether holds are off (holds_off), whether its packs are held to the island rules (islands), which workspaces it accepts notifications from, and on a workspace sold on a plan, its limits (member_limit) and how much of each it uses (use).',
     humanOnly: true,
     input: {},
     run: async (l) => {
       const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on e.id = s.value #>> '{}' where s.key = 'me'`);
       const limits = await limitOf(l.workspace);
       // Whether anything has been put here yet beyond who is in it and how the app is set up.
-      const started = (await l.db.query(`select 1 from entity where kind <> all($1::text[]) and archived_at is null limit 1`, [['actor', 'system']])).rows.length > 0;
+      const started = (await l.db.query(`select 1 from entity where type <> all($1::text[]) and ${notKernel(l.registry)} and archived_at is null limit 1`, [l.registry.family('actor')])).rows.length > 0;
       return { ...(await settings(l)), started, owner: rows[0] ?? null, member_limit: limits ? { ...limits, ...(limits.until && { days_left: daysLeft(limits.until) }) } : null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
     },
   },
@@ -76,15 +79,17 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       agent_backups: z.boolean().optional().describe('Whether agents may download the whole workspace as a backup file (backup_download), private items included.'),
       agent_publish: z.boolean().optional().describe('Whether agents may publish documents here (publish, publish_all), each publish logged with its authority. Taking one down stays a human’s.'),
       agent_code: z.boolean().optional().describe('Whether agents’ changes to the code a drawing or a style runs (modules, code) take effect as they make them, instead of waiting for a human. That code runs in the sandbox unless drawings_open is on; each change is logged and undoable.'),
-      drawings_open: z.boolean().optional().describe('Whether a style’s own code runs without the sandbox, for everyone who looks here: in the page’s origin, as the person looking, with the network, files, fonts and links, and its panel in the page where an agent driving the browser can read it. Off unless set.'),
+      drawings_open: z.boolean().optional().describe('Whether a layout’s code runs without the sandbox, for everyone who looks here: in the page’s origin, as the person looking, with the network, files, fonts and links, and its panel in the page where an agent driving the browser can read it. Off unless set.'),
       holds_off: z.boolean().optional().describe('Whether every change applies as it is made, whatever rule would hold it: settling, code, what is public, forget (which cannot be undone) included. A wait the change or its token asked for still holds. Off unless set.'),
+      islands: z.boolean().optional().describe('Whether packs here are held to the island rules: a pack is taken only if its file holds vocabulary, views and instructions and it builds on the shared set alone. Set on a new workspace, before anything is put on it. Off unless set.'),
       name: z.string().trim().min(1).max(60).optional().describe('What this workspace is called. Its id and addresses stay as they are.'),
       lifted: z.record(z.string(), z.boolean()).optional().describe('Turn a rule on a session’s reply ending off (true) or on again (false), by the setting it names (its lifted, such as reply_draw): workspace_info lists them.'),
       asks_at: z.record(z.string(), z.number().int().min(1).max(AT_MAX)).optional().describe('For a rule on a reply’s end that counts (workspace_info: its counts and at), how many the reply must do before it asks, by the rule’s lifted.'),
     },
     run: async (l, actor, input) => {
       if (!actor.admin) throw new Error('Only a workspace admin can change workspace settings.');
-      const { lifted, asks_at, name, ...rest } = input as Record<string, unknown> & { lifted?: Record<string, boolean>; asks_at?: Record<string, number>; name?: string };
+      const { lifted, asks_at, name, islands, ...rest } = input as Record<string, unknown> & { lifted?: Record<string, boolean>; asks_at?: Record<string, number>; name?: string; islands?: boolean };
+      if (islands !== undefined) await setIslands(l, actor, islands);
       if (name) {
         await renameWorkspace(l.workspace, name);
         await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `The workspace is called "${name}" now` });

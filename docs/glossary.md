@@ -76,8 +76,11 @@ system kind may do: a drawing's code, a story's steps, a stylesheet.
 it: a filter, of terms that add seeds and terms
 that must all hold of them, a walk along links and a limit;
 `src/query-flat.ts`) and a **layout** (how it is arranged), with the settings of that layout, all held in the view. A **style**
-says how things look (`src/styles.ts`) and is about nothing; a style with code
-of its own is a layout kept on the map. What the map stores keeps its older
+says how things look (`src/styles.ts`) and is about nothing, and holds no code.
+A **layout** kept on the map is an item of its own type, `layout` (decision
+e_nv3rfcge, 4 Nov 2026): its code, or the owner's version of a pack's drawing
+(`preset` and `modules`), with the settings it draws with (`settings`); it
+draws only where a view names it or on the pictures of what it is about. What the map stores keeps its older
 names, so the log reads as written: a view is an item of type `lens`, a layout
 is its `shape`, a page is sent it as `drawing`, and locals in the code holding
 one of those stay `lens`. A view is an item, so it is kept on
@@ -99,7 +102,8 @@ they see. A published page keeps the colours it was published with.
 architecture): shipped by a pack (`layouts` in its pack file), run in the
 sandbox (`ui/draw.html`), answering with marks the page checks
 (`docs/layouts.md`). Replaces *shape* where a shape meant this; the field
-that names it is still `shape`.
+that names it is still `shape`. A layout item's `code` is a drawing too,
+written on the map rather than shipped.
 
 **Find, Only, Not, Walk, Limit.** The parts of a query, by the words the
 query bar and an agent's answer give them (decision e_drt4g872). **Find** is
@@ -127,9 +131,11 @@ code: `ui/canvas.js`; a kept view is an item of core's system type `lens`
 item's page (or a new item, the Workspace page, a screen, For you). In the
 code: `#sheet` in `ui/index.html`, routed by `ui/app.js`.
 
-**tag.** What items belong with, named in a word or two: an item of core's
-`tag` type, tied by a `tagged` link, any number to an item. A query filters by
-one (`tagged <tag>`); the house style draws no wire for it.
+**finding.** What an island has found, published for others to read: an item
+of core's `finding` type, its title the name, its note what it means, its
+`value` of the simple type `value_type` says (text, number, boolean, date),
+checked on write, true `as_of` a date. A reader ties itself to one with a
+`reads` link, the one link that crosses between islands (`crosses`).
 
 **place.** Where a drawing's layout puts an item: never set by hand (the
 owner, 3 Nov 2026), never meaning anything. The `places` stream that once
@@ -140,7 +146,7 @@ goes in a day.
 node, a dashed wire, a badge. In the code: `ui/ghosts.js`.
 
 **pack.** A folder under `packs/` with a `pack.json`, its manifest of
-fifteen keys (`docs/packs.md`): the types, links, rules, views, actions,
+sixteen keys (`docs/packs.md`): the types, links, rules, views, actions,
 handlers, drawings and styles of one way of working, and what it may reach.
 Which packs a workspace has is a fact in its log. In the code:
 `src/manifest.ts` reads a manifest, `src/packs.ts` loads them. Replaces

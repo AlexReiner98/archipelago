@@ -63,11 +63,11 @@ test('a pushed commit nobody accounted for is the owner’s attention, by the re
 
 test('a reason a pack declares names a reason of its own, a type and its fields, and the kernel reason it joins', async () => {
   const l = await fresh();
-  const software = l.registry.packs.find((p) => p.id === 'software')!;
-  assert.deepEqual(parts(software).reasons.map((r) => r.reason), ['unaccounted']);
-  const wrong = { ...software, views: [...(software.views ?? []), { form: 'attention' as const, id: 'software.bad', reason: 'due', description: 'x', of: 'software.nothing', where: { nope: true }, joins: 'sometimes' }] };
+  const code = l.registry.packs.find((p) => p.id === 'code')!;
+  assert.deepEqual(parts(code).reasons.map((r) => r.reason), ['unaccounted']);
+  const wrong = { ...code, views: [...(code.views ?? []), { form: 'attention' as const, id: 'code.bad', reason: 'due', description: 'x', of: 'code.nothing', where: { nope: true }, joins: 'sometimes' }] };
   const problems = checkDeclared(wrong, l.registry.types, [], true).join('\n');
   assert.match(problems, /reason is a name of its own/);
-  assert.match(problems, /unknown type "software.nothing"/);
+  assert.match(problems, /unknown type "code.nothing"/);
   assert.match(problems, /joins one of/);
 });

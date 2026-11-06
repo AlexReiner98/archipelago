@@ -21,7 +21,7 @@ const z = (n: string) => house.sizes[`arch_${n}`];
 const num = (n: string) => house.numbers[n];
 
 const ROOT = 'e_rootzzzz';
-const item = (id: string, title: string, extra: Record<string, unknown> = {}) => ({ id, type: 'task', kind: 'work', title, status: 'done', open: false, inside: ROOT, place: 0, fields: {}, size: { work: 0 }, state: { blocked: false, waits_on: [], sessions: 0, needs_you: false }, within: { items: 0 }, ...extra });
+const item = (id: string, title: string, extra: Record<string, unknown> = {}) => ({ id, type: 'task', is: ['work'], title, status: 'done', open: false, inside: ROOT, place: 0, fields: {}, size: { work: 0 }, state: { blocked: false, waits_on: [], sessions: 0, needs_you: false }, within: { items: 0 }, ...extra });
 const [SKETCH, WRITE, MARKS, TRY, SHIP, OLD] = ['e_sketchzz', 'e_writezzz', 'e_markszzz', 'e_tryzzzzz', 'e_shipzzzz', 'e_oldzzzzz'];
 const plan = [SKETCH, WRITE, MARKS, TRY, SHIP];
 const status = (o: Record<string, string>) => Object.fromEntries(Object.entries(o).map(([id, s]) => [id, { status: s }]));
@@ -200,7 +200,7 @@ test('whoever a step names as the owner of work is a boat, never an island of it
     { look: 'islands', fields: { [WRITE]: { status: 'doing', owner: AGENT } } },
     { fields: { [WRITE]: { status: 'done' } } },
   ];
-  const sailing = { ...answer, items: [...answer.items, item(AGENT, 'Your agent', { type: 'agent', kind: 'actor', status: 'active', open: true, inside: ROOT })], steps };
+  const sailing = { ...answer, items: [...answer.items, item(AGENT, 'Your agent', { type: 'agent', is: ['actor'], status: 'active', open: true, inside: ROOT })], steps };
   const sent: any[] = [];
   picture({ answer: sailing, style: house, reduced: true }, { measure, patch: (l: any[]) => sent.push(...l), frame: () => Promise.resolve(0), open: () => {} });
   // Never drawn as an island or a box of its own, in the islands look.

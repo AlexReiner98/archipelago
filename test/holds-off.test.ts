@@ -35,7 +35,7 @@ test('with holds off, what a rule would hold applies, and the answer says holds 
   assert.equal(verdict.outcome, 'apply');
   assert.equal(verdict.holds_off, true);
   assert.ok(verdict.spared[0].some((r) => r.rule === 'public'), 'the rule it passed over is kept in what was spared');
-  const made = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'style', title: 'Coded', props: { code: 'export default () => []' } }] })) as { status: string; holds: string };
+  const made = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Coded', props: { code: 'export default () => []' } }] })) as { status: string; holds: string };
   assert.equal(made.status, 'applied');
   assert.equal(made.holds, 'off');
   const forgot = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'forget', id: t }] })) as { status: string };

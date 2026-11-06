@@ -67,13 +67,15 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
   // What the task rests on beyond structure (a rule that governs it, an issue it addresses, a question it assumes), by
   // the kind of link. From what holds it or what it needs, only questions and records: the rules and the decisions.
   const kinds = l.registry.relationFamily('link', 'about', 'bears_on').filter((t) => t !== 'produced');
+  // A question: something to answer, not work to plan.
+  const question = (type: string) => { const c = l.registry.type(type)?.capabilities; return Boolean(c?.actionable && !c.plannable); };
   const tiedBy = new Map<string, { rel: string; near: boolean; e: Row }>();
   for (const r of out(kinds, [...ids, ...needs.map((n) => n.id)])) {
     const key = `${r.type} ${r.to_id}`;
     const near = r.from_id === task.id;
     if (!tiedBy.has(key) || near) tiedBy.set(key, { rel: r.type, near, e: byId.get(r.to_id)! });
   }
-  const ties = [...tiedBy.values()].sort((a, b) => a.rel.localeCompare(b.rel) || a.e.id.localeCompare(b.e.id)).filter((t) => t.near || ['question', 'record'].some((k) => l.registry.isA(t.e.type, k)));
+  const ties = [...tiedBy.values()].sort((a, b) => a.rel.localeCompare(b.rel) || a.e.id.localeCompare(b.e.id)).filter((t) => t.near || question(t.e.type) || l.registry.isA(t.e.type, 'record'));
   // A tie with no outcome says what it is in its note: read for those alone.
   const bare = ties.filter((t) => !t.e.props.outcome).map((t) => t.e.id);
   const notes = new Map(bare.length ? (await l.db.query<{ id: string; body: string }>(`select id, body from entity where id = any($1::text[])`, [bare])).rows.map((r) => [r.id, r.body]) : []);
@@ -101,7 +103,7 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
     lines.push('', '## Needs');
     for (const n of needs) {
       const holder = held.find((h) => h.to_id === n.id);
-      lines.push(`- ${n.title}: ${n.status}${holder ? `, held by ${holder.title}` : ''}${l.registry.capacity(n) === Infinity ? '' : ' (exclusive: claim it before use, release it after)'}`);
+      lines.push(`- ${n.title}: ${n.status}${holder ? `, held by ${holder.title}` : ''}${(l.registry.capacity(n) ?? Infinity) === Infinity ? '' : ' (exclusive: claim it before use, release it after)'}`);
     }
   }
   for (const rel of new Set(ties.map((t) => t.rel))) {
@@ -125,7 +127,7 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
     repo: repo && { ...slim(repo), path: repo.props.path, address: at?.address },
     blocked_by: blockedBy,
     root_blockers: roots.map((id) => names.get(id)),
-    needs: needs.map((n) => ({ ...slim(n), exclusive: l.registry.capacity(n) !== Infinity, held_by: held.find((h) => h.to_id === n.id)?.title })),
+    needs: needs.map((n) => ({ ...slim(n), exclusive: (l.registry.capacity(n) ?? Infinity) !== Infinity, held_by: held.find((h) => h.to_id === n.id)?.title })),
     ties: ties.map(({ rel, e }) => ({ relation: rel, ...slim(e) })),
     ...(traps.length > 0 && { traps: traps.map(({ id, title, files }) => ({ id, title, files })) }),
     text: lines.join('\n'),

@@ -2,9 +2,16 @@
   "id": "time",
   "version": "0.1.0",
   "title": "Time",
-  "description": "Hours worked, each tied to the work it was for, and invoices made from them. A client company says who bills it, its rate, terms and whether HST is charged.",
+  "description": "Hours worked, each tied to the work it was for, invoices made from them, and what is paid regularly (a cost). A client company says who bills it, its rate, terms and whether HST is charged.",
   "requires": ["core", "work"],
   "types": [
+    {
+      "id": "meeting",
+      "moved_from": ["work.meeting"],
+      "extends": "event",
+      "title": "Meeting",
+      "description": "An event with participants (use the involves relation)."
+    },
     {
       "id": "time_entry",
       "moved_from": ["time.entry"],
@@ -22,6 +29,7 @@
         "rate": { "type": "number", "description": "An hourly rate for this entry only, when it is not the client's." }
       }
     },
+    {"id": "cost", "moved_from": ["money.cost"], "capabilities": {"when": {"start": "since", "end": "until"}}, "extends": "occurrence", "title": "Cost", "description": "Something paid for regularly: hosting, a subscription, a licence, a domain. What agents spend per token is not kept here: it is measured from their runs.", "statuses": {"open": ["paying"], "closed": ["ended"], "phases": {"paying": "standing"}}, "fields": {"amount": {"type": "number", "description": "What is paid each time, in the currency below. Left out when nobody has said: it is then shown as not priced."}, "currency": {"type": "string", "default": "USD"}, "every": {"type": "enum", "values": ["month", "year"], "default": "month"}, "since": {"type": "date", "description": "The first day it was paid for. Left out: the day it was written down."}, "until": {"type": "date", "description": "The last day it is paid for, when that is known."}, "vendor": {"type": "string", "description": "Who is paid."}, "url": {"type": "url", "description": "Where the bill or the plan can be looked at."}}},
     {
       "id": "routine",
       "moved_from": ["time.routine"],
@@ -126,6 +134,7 @@
     }
   ],
   "views": [
+    {"id": "time.costs", "shape": "data", "limit_ms": 30000, "description": "What the work costs: what agents spent over the last days (dollars where a run says what it cost, tokens where it does not, by where they ran), each regular payment (a cost item: hosting, a subscription) with its share of the period, the total, and the rate per month. Nothing is guessed: a payment with no amount is named as not priced. Params: days (default 30).", "input": {"type": "object", "properties": {"days": {"type": "number", "description": "The period, in days back from today: 30 unless given."}, "full": {"type": "boolean", "description": "true for the answer whole, as the screen has it."}}, "additionalProperties": false}},
     {
       "id": "time.today",
       "shape": "rows",
@@ -155,15 +164,7 @@
         "additionalProperties": false
       }
     },
-    { "form": "screen", "id": "time.today", "title": "Today", "at": "home", "pieces": [{ "piece": "view", "view": "time.today" }] },
-    { "form": "screen", "id": "time.week", "title": "Time", "nav": true, "pieces": [{ "piece": "page", "page": "time" }] },
-    {
-      "form": "screen",
-      "id": "time.invoices",
-      "title": "Invoices",
-      "on": ["company"],
-      "pieces": [{ "piece": "picture", "lens": { "filter": { "find": ["part_of {here}"] } }, "only": ["invoice"], "style": { "shape": "list", "show": ["status"] } }]
-    }
+    { "form": "screen", "id": "time.week", "title": "Time", "nav": true, "pieces": [{ "piece": "page", "page": "time" }] }
   ],
   "actions": [
     {
@@ -217,5 +218,5 @@
       }
     }
   ],
-  "styles": [{ "id": "time.calendar", "type": "lens", "title": "Time", "props": { "filter": { "find": ["type time_entry", "type routine", "type run"], "not": [] }, "walk": { "over": [], "steps": 0 }, "time": { "from": "-5d", "to": "1d" }, "style": { "shape": "time" } } }, { "id": "time.invoice_page", "title": "An invoice's page", "on": ["invoice"], "props": { "page": { "head": "invoice" } } }]
+  "styles": [{ "id": "time.calendar", "type": "lens", "title": "Time", "props": { "filter": { "find": ["type time_entry", "type routine", "type run"], "not": [] }, "walk": { "over": [], "steps": 0 }, "time": { "from": "-5d", "to": "1d" }, "style": { "shape": "time" } } }, { "id": "time.today", "type": "lens", "title": "Today", "props": { "filter": { "find": ["type time_entry", "type routine"], "not": [] }, "walk": { "over": [], "steps": 0 }, "time": { "from": "today", "to": "1d" }, "style": { "shape": "time" } } }, { "id": "time.invoices", "type": "lens", "title": "Invoices", "on": ["company"], "props": { "filter": { "find": ["part_of {here}"], "only": ["type invoice"] }, "walk": { "over": [], "steps": 0 }, "style": { "shape": "list", "show": ["status"] } } }, { "id": "time.invoice_page", "title": "An invoice's page", "on": ["invoice"], "props": { "page": { "head": "invoice" } } }]
 }

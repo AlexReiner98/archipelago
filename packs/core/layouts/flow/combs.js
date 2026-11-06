@@ -44,7 +44,8 @@ export function comb(n, kids, size, z, sideOf = () => 1, way = 1, rest = way, { 
     const b = comb(id, kids, size, z, sideOf, way, way, how), back = comb(id, kids, size, z, sideOf, -way, way, how);
     const lead = back.items.length ? back.h + z.row : 0;
     return { id, b, back, lead, s, port, w: Math.max(s.w, port + b.w, port + back.w), h: lead + s.h + (b.items.length ? z.row + b.h : 0) + z.row };
-  }).sort((p, q) => q.h * q.w - p.h * p.w);
+  // The kids in the order they were made (a step's `made`, ./steps.js), so a new one hangs last and moves none before it.
+  }).sort((p, q) => (p.s.made ?? 0) - (q.s.made ?? 0));
   if (!under.length) return { items: [], wires: new Map(), w: 0, h: 0 };
   if (alone && under.length === 1 && !under[0].b.items.length && !under[0].back.items.length) {
     const [c] = under;
@@ -54,7 +55,7 @@ export function comb(n, kids, size, z, sideOf = () => 1, way = 1, rest = way, { 
     const [c] = under, reach = Math.max(z.join ?? z.row, z.row);
     return { items: [{ id: c.id, x: c.s.w / 2 - pad, y: reach + c.s.h / 2 }], wires: new Map([[c.id, [[0, 0], [0, reach]]]]), w: c.s.w - pad, h: reach + c.s.h };
   }
-  const area = under.reduce((s, c) => s + (c.w + z.col) * c.h, 0), tall = Math.max(under[0].h, Math.sqrt(area / aspect));
+  const area = under.reduce((s, c) => s + (c.w + z.col) * c.h, 0), tall = Math.max(...under.map((c) => c.h), Math.sqrt(area / aspect));
   const spines = [], stub = z.stub ?? z.col / 2;
   for (const c of under) {
     let at = spines.find((p) => (near ? p.rh : Math.min(p.lh, p.rh)) + c.h <= tall);

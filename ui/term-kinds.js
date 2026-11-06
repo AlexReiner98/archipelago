@@ -20,11 +20,10 @@ const itemSearch = (add, term, most, type) => ({
   })),
 });
 
-/** The kinds every part takes. `c` is what the bar knows: add(term); typeGroups(pick) and linkGroups(pick), the choices of each in groups by where they are used; hasTags, whether the map has tags; most, how many items a search shows. */
+/** The kinds every part takes. `c` is what the bar knows: add(term); typeGroups(pick) and linkGroups(pick), the choices of each in groups by where they are used; most, how many items a search shows. */
 const shared = (c) => [
   { label: 'Words', title: 'Words in titles and notes', next: () => ({ label: 'Words', typed: { placeholder: 'Words', title: 'In titles and notes, in any form', pick: (w) => (c.add(`text ${w}`), true) } }) },
   { label: 'Type', title: 'Items of a type', next: () => ({ label: 'Type', groups: c.typeGroups((t) => c.add(`type ${t.id}`)) }) },
-  c.hasTags && { label: 'Tag', title: 'Items with a tag', next: () => ({ label: 'Tag', search: { ...itemSearch(c.add, (id) => `tagged ${id}`, c.most, 'tag'), placeholder: 'A tag’s name' } }) },
   { label: 'Link', title: 'Items with a link to an item, or to me', next: () => ({ label: 'Link', groups: c.linkGroups((r) => ({ next: () => linkEnd(c, r) })) }) },
   { label: 'Related', title: 'Items with any link to an item, either way', next: () => ({ label: 'Related', search: itemSearch(c.add, (id) => `related ${id}`, c.most) }) },
   { label: 'Owner', title: 'What someone owns', next: () => ({ label: 'Owner', groups: [{ label: '', items: [{ label: 'me', title: 'What is mine', pick: () => c.add('owner me') }] }], search: { ...itemSearch(c.add, (id) => `owner ${id}`, c.most, 'actor'), placeholder: 'A person’s name' } }) },

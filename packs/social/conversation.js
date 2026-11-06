@@ -1,5 +1,5 @@
 // A conversation a post began: someone who replied or wrote and said the problem they have. It is made from the post's
-// page in one step, linked came_from the post (or the source it came through), and the post's count of conversations
+// page in one step, linked came_out_of the post (or the source it came through), and the post's count of conversations
 // is read again from those links each time, so it is the number of conversations that say they came from it.
 
 const isA = (item, type) => Boolean(item?.is?.includes(type));
@@ -20,17 +20,17 @@ export async function conversation(input, ctx) {
   const problem = String(input.problem ?? '').trim();
   if (!person || !problem) throw new Error('A conversation names the person and the problem they said.');
   const from = input.from ? await ctx.read({ get: input.from }) : null;
-  if (!from || from.archived_at || !(isA(from, 'post') || isA(from, 'traffic_source'))) throw new Error(`No post or source "${input.from}" for the conversation to have come from: give its id.`);
+  if (!from || from.archived_at || !(isA(from, 'post') || isA(from, 'channel'))) throw new Error(`No post or source "${input.from}" for the conversation to have come from: give its id.`);
   const channel = input.channel ?? from.props?.channel;
   const began = input.date ?? dayIn(ctx.zone, ctx.now);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(began)) throw new Error('date must look like 2026-11-04');
-  const before = await ctx.read({ related: from.id, relation: 'came_from', direction: 'in', types: ['conversation'] });
+  const before = await ctx.read({ related: from.id, relation: 'came_out_of', direction: 'in', types: ['conversation'] });
   const n = before.length + 1;
   const counted = isA(from, 'post');
   return {
     ops: [
       { op: 'create', ref: 'c', type: 'conversation', title: titleOf(person, problem), status: 'open', body: input.note ?? '', props: { person, problem, began, ...(channel && { channel }) } },
-      { op: 'link', type: 'came_from', from: 'c', to: from.id },
+      { op: 'link', type: 'came_out_of', from: 'c', to: from.id },
       ...(counted ? [{ op: 'update', id: from.id, props: { conversations: n } }] : []),
     ],
     reason: `A conversation with ${person}, from ${from.title}`,

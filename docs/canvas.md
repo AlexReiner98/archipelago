@@ -36,7 +36,8 @@ take one list of terms (`src/query-terms.ts`, e_4y5x454z), each a set of items
 written as words: `text <words>`, `type <t>`, `kind <k>`, `id <item>`,
 `in <item>` (all that is part of it at any depth, from the part_of closure,
 e_tvsdqjeq), `related <item>` (any link to it, either way), `<link> <item>`
-(`tagged e_x`; `<link>< <item>` what it links to), `owner <person>`, and
+(`waits_on me`; `<link>< <item>` what it links to), `owner <person>`,
+`island <island>` (what lives on it, on a map with islands on), and
 words that can only be checked of what is found: `done`, `blocked`,
 `status <s>`, `no owner`, `over estimate`, `changed since 7d`,
 `made since <date>`, `made before <date>` (a since and a before are a range;
@@ -51,9 +52,7 @@ follows the link types named, each out (→, `depends_on>`), in (←,
 `depends_on<`) or either way (↔, as a view kept before ways were said), for
 some steps, a click on its arrow in the bar turning it (e_gue6cg6q); Limit
 caps it. A filter that includes nothing is refused, so no canvas reads the
-whole map. Words typed in find are a Find term, the filter's text; tags are
-a core `tag` type and a `tagged` link, found by and, in the house style, not
-drawn. A query may instead name a view whose answer is items and links
+whole map. Words typed in find are a Find term, the filter's text. A query may instead name a view whose answer is items and links
 (`view`, in the address `?view=usage`), drawn in place of what a filter
 finds: the plan pack's Usage canvas draws core's `usage` view, asked by the
 page as an agent asks it (the owner, 29 Oct 2026, e_7frmyj2q). It is not a
@@ -106,12 +105,13 @@ A pack ships views as presets (a `styles` entry of `type: "lens"`,
 decision e_x8bghuce): the picker and Home list each until the owner saves
 their own version, which names it (`preset`) and stands in its place.
 Four things make a view (decision e_47pjkbxb): a query says what is on it (the
-query above), a layout how it is arranged (a drawing a pack ships, or a style
-with code kept on the map), a style how it looks, and the view is a name for
+query above), a layout how it is arranged (a drawing a pack ships, or a layout
+item kept on the map, core's `layout` type), a style how it looks, and the view is a name for
 a query and a layout with its settings, which it holds itself (`style` on the
 item): nothing reaches into it by a link, and a style is about nothing. Looks
 stack in one line: the packs', the workspace's, the view's, then a person's own
-colours. What moved from the styles made for one view is `src/style-move.ts`.
+colours. What moved from the styles made for one view is `src/style-move.ts`;
+how the styles with code became layouts is `src/layout-move.ts`.
 A layout is the pane's: editing the query keeps it, opening a saved view
 brings its own. The view band switches it (`ui/look-switch.js`), which lists
 layouts and nothing else. A change in a pane is a draft: Save is marked and
@@ -192,7 +192,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `pan-zoom.js` | the infinite plane |
 | `pinch.js` | two fingers on it |
 | `canvas-wires.js` | a held change's badge clicked, opening where it is decided |
-| `live.js`, `replica.js`, `ghosts.js` | tailing the log; the store; held changes drawn into it |
+| `live.js`, `replica.js`, `membership.js`, `ghosts.js` | tailing the log; the one store, keyed by item, shared by views; when a view asks again; held changes drawn into it |
 | `panes.js`, `pane-drag.js`, `pane-address.js` | more than one canvas at once: panes alike side by side in a tab, dragged; the address and back and forward the pane in focus's |
 | `tabs.js`, `tab-bar.js`, `pane-route.js`, `pane-land.js` | tabs at the top, one per session at work, popped out and back; where an agent's step lands |
 | `item.js` and the sheet's parts | the item's page (being settled) |
@@ -205,7 +205,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `src/query-flat.ts` | the flat query (core view `flat`) |
 | `src/query-saved.ts` | kept views: their picture, `shown_in`, the move from old views |
 | `src/styles.ts` | the style a page or view is drawn in (core view `style`) |
-| `src/layouts.ts` | which drawing a style names, and the owner's version of it |
+| `src/layouts.ts` | which drawing a style names, and the owner's version of it (a layout with its `preset`) |
 | `src/tail.ts`, `src/project.ts` | facts after a position; the pure projector (served as `/project.js`) |
 | `src/pelago.ts`, `src/rules.ts` | the one write path, and what decides it |
 | `packs/core/layouts/flow/` | the flow drawing: `graph.js` flattens, `layout.js` orders, `free.js` keeps places, `index.js` answers marks |

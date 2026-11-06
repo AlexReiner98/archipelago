@@ -3,7 +3,7 @@
 
 import { applyTheme } from './theme.js';
 
-export const state = { schema: undefined, stamp: undefined, pos: undefined, seq: undefined, dirty: false, selfDrawn: false, trying: null };
+export const state = { workspace: undefined, schema: undefined, stamp: undefined, pos: undefined, seq: undefined, dirty: false, selfDrawn: false, trying: null };
 export const hooks = {};
 export const route = (pulse) => hooks.route(pulse);
 
@@ -47,7 +47,7 @@ export const notOf = (filter) => filter?.not ?? ['kind system'];
 // drop it, for a browser that loads no sandboxed frame (the desktop app's pane); the worker inside is still a wall.
 export const frameSandbox = () => (document.documentElement.dataset.drawSandbox === 'off' ? null : 'allow-scripts');
 
-// Whether the owner turned the sandbox off for a style's code here (workspace_info drawings_open): read once a page, and
+// Whether the owner turned the sandbox off for a layout's code here (workspace_info drawings_open): read once a page, and
 // again once the setting is changed. Anything but a yes keeps the sandbox.
 let opened;
 export const drawingsOpen = () => (opened ??= api('workspace_info').then((info) => info?.drawings_open === true, () => false));
@@ -316,6 +316,7 @@ export async function showIdentity() {
     const me = await res.json();
     if (me.auth !== 'tokens') return slot.replaceChildren();
     known.remember(me.workspace);
+    state.workspace = me.workspace; // a token made here names it (ui/workspace-cards.js)
     // Which workspace this is, where it cannot be missed: under the name at the top, and on the tab.
     // A workspace that has ended says so under its name on every page: until when, and where its backup is.
     const ended = me.actor.kind === 'human' ? await api('workspace_info').then((info) => info.ended, () => null) : null;

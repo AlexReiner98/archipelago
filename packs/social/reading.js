@@ -8,8 +8,8 @@ import { projectOfPosts } from './count.js';
 
 /** What the channels view reads: posts that went out and sources, with the conversations and hours tied to them. */
 export const QUERY = {
-  filter: { find: ['type post', 'type traffic_source'], only: [], not: ['status dropped', 'status to_write', 'status ready'] },
-  walk: { over: ['came_from<', 'part_of<'], steps: 1 },
+  filter: { find: ['type post', 'type channel'], only: [], not: ['status dropped', 'status retired', 'status to_write', 'status ready'] },
+  walk: { over: ['came_out_of<', 'part_of<'], steps: 1 },
   limit: 300,
 };
 
@@ -35,7 +35,7 @@ const meets = (r) => r.conversations >= BAR.conversations && r.hours < BAR.hours
 
 /** The reading of one month from the channels table's answer: its title, note and totals, or null when nothing went out. */
 export function readingOf(answer, month) {
-  const rows = sums(answer, 'traffic_source').months.find((m) => m.month === month)?.rows ?? [];
+  const rows = sums(answer, 'channel').months.find((m) => m.month === month)?.rows ?? [];
   if (!rows.length) return null;
   const total = rows.reduce((t, r) => ({ posts: t.posts + r.posts.length, visits: t.visits + r.visits, begun: t.begun + r.begun, paid: t.paid + r.paid, conversations: t.conversations + r.conversations, hours: t.hours + r.hours }), { posts: 0, visits: 0, begun: 0, paid: 0, conversations: 0, hours: 0 });
   const met = rows.filter(meets).map((r) => r.channel);
@@ -57,7 +57,7 @@ export function readingOf(answer, month) {
 
 export async function reading(_input, ctx) {
   const month = monthBefore(ctx.now);
-  const [had] = await ctx.read({ items: { type: 'channel_reading', where: { month } }, fields: ['month'] });
+  const [had] = await ctx.read({ items: { type: 'channel_month', where: { month } }, fields: ['month'] });
   if (had) return { answer: { month, made: false, reason: 'Written already.' } };
   const r = readingOf(await ctx.read({ view: 'flat', params: QUERY }), month);
   if (!r) return { answer: { month, made: false, reason: 'Nothing went out that month.' } };
@@ -66,7 +66,7 @@ export async function reading(_input, ctx) {
     changes: [
       {
         ops: [
-          { op: 'create', ref: 'r', type: 'channel_reading', title: r.title, status: 'recorded', body: r.body, props: r.props },
+          { op: 'create', ref: 'r', type: 'channel_month', title: r.title, status: 'current', body: r.body, props: r.props },
           ...(project ? [{ op: 'link', type: 'part_of', from: 'r', to: project }] : []),
           ...r.posts.map((id) => ({ op: 'link', type: 'about', from: 'r', to: id })),
         ],

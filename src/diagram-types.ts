@@ -1,4 +1,4 @@
-// Type inheritance as diagrams, from the pack files: every type and what it extends, down to the seven kinds, with
+// Type inheritance as diagrams, from the pack files: every type and what it extends, down to the starter types, with
 // the capabilities each declares and the fields other packs add to it; the relation types and what they extend,
 // with what each may join; and the packs, with what each requires. Handed the pack files as parsed JSON.
 
@@ -10,7 +10,7 @@ export interface PackFile {
   title?: string;
   requires?: string[];
   /** Its own types, and the fields it adds to another pack's (an entry with of). */
-  types?: Array<{ id?: string; of?: string; fields?: Record<string, unknown>; title?: string; extends?: string; kind?: boolean; capabilities?: Record<string, unknown>; statuses?: { open?: string[]; closed?: string[] } }>;
+  types?: Array<{ id?: string; of?: string; fields?: Record<string, unknown>; title?: string; extends?: string; capabilities?: Record<string, unknown>; statuses?: { open?: string[]; closed?: string[] } }>;
   links?: Array<{ id: string; title?: string; extends?: string; root?: boolean; from?: string[]; to?: string[] }>;
   actions?: unknown[];
   views?: Array<{ form?: string }>;
@@ -65,25 +65,25 @@ function forest(nodes: Node[], roots: string[], colour: (pack: string) => { fill
   return { vertices, edges, height: row * ROW };
 }
 
-function typeNodes(packs: PackFile[]): { nodes: Node[]; kinds: string[] } {
+function typeNodes(packs: PackFile[]): { nodes: Node[]; starters: string[] } {
   const added = new Map<string, string[]>();
   for (const p of packs) for (const [t, e] of (p.types ?? []).flatMap((t) => (t.of ? [[t.of, t] as const] : []))) {
     (added.get(t) ?? added.set(t, []).get(t)!).push(`${p.id} (${Object.keys(e.fields ?? {}).join(', ')})`);
   }
-  const nodes: Node[] = [], kinds: string[] = [];
+  const nodes: Node[] = [], starters: string[] = [];
   for (const p of packs) for (const t of own(p)) {
     const caps = Object.keys(t.capabilities ?? {});
     const statuses = [...(t.statuses?.open ?? []), '|', ...(t.statuses?.closed ?? [])].join(' ');
-    const lines = [`<b>${html(t.title ?? t.id)}</b> <font color="${t.kind ? '#cccccc' : '#777777'}">${html(t.id)}</font>`];
+    const lines = [`<b>${html(t.title ?? t.id)}</b> <font color="${!t.extends ? '#cccccc' : '#777777'}">${html(t.id)}</font>`];
     if (caps.length) lines.push(`<i>${html(caps.join(' · '))}</i>`);
     if (added.has(t.id)) lines.push(`<font color="#777777">+ fields from ${html(added.get(t.id)!.map((a) => a.split(' ')[0]).join(', '))}</font>`);
     const tooltip = [`${t.id}, from the ${p.id} pack.`, t.statuses ? `Statuses: ${statuses}.` : '', caps.length ? `Capabilities: ${caps.join(', ')}.` : '', added.has(t.id) ? `Fields added by ${added.get(t.id)!.join('; ')}.` : ''].filter(Boolean).join(' ');
-    nodes.push({ id: t.id, pack: p.id, parent: t.extends, label: lines.join('<br>'), tooltip, root: t.kind });
-    if (t.kind) kinds.push(t.id);
+    nodes.push({ id: t.id, pack: p.id, parent: t.extends, label: lines.join('<br>'), tooltip, root: !t.extends });
+    if (!t.extends) starters.push(t.id);
   }
   const known = new Set(nodes.map((n) => n.id));
   for (const n of nodes) if (n.parent && !known.has(n.parent)) throw new Error(`${n.id} extends ${n.parent}, which no pack defines`);
-  return { nodes, kinds };
+  return { nodes, starters };
 }
 
 function packLegend(packs: PackFile[], colour: (pack: string) => { fill: string; stroke: string }, x: number, extra: Array<[string, string]>): Vertex[] {
@@ -92,10 +92,10 @@ function packLegend(packs: PackFile[], colour: (pack: string) => { fill: string;
 
 function inheritance(packs: PackFile[]): Page {
   const colour = colours(packs);
-  const { nodes, kinds } = typeNodes(packs);
-  const tree = forest(nodes, kinds, colour, 't');
+  const { nodes, starters } = typeNodes(packs);
+  const tree = forest(nodes, starters, colour, 't');
   const width = Math.max(...tree.vertices.map((v) => v.x + v.w), 4 * COL);
-  const vertices = [...tree.vertices, ...packLegend(packs, colour, width + 60, [['#666666', 'open arrow: extends (dark box: one of the kinds)'], ['#777777', 'italic: the capabilities a type declares']])];
+  const vertices = [...tree.vertices, ...packLegend(packs, colour, width + 60, [['#666666', 'open arrow: extends (dark box: a starter type, which extends nothing)'], ['#777777', 'italic: the capabilities a type declares']])];
   return { id: 'types-inheritance', name: 'Types: inheritance', vertices, edges: tree.edges };
 }
 

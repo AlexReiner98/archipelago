@@ -19,10 +19,10 @@ function packsWith(extra: PackFile): string {
 }
 const pack = (types: PackFile['types']): PackFile => ({ id: 'x', version: '1', title: 'X', requires: ['core'], types });
 
-test('the kinds declare status, owner, confidence and source; a flavour inherits them', async () => {
+test('the starter types declare status, owner, confidence and source; a flavour inherits them', async () => {
   const l = await fresh();
   const has = (type: string) => Object.keys(l.registry.type(type)!.columns).sort();
-  for (const kind of l.registry.kinds()) assert.ok(kind.columns.status && kind.columns.source, `${kind.id} declares status and source`);
+  for (const s of l.registry.starters()) assert.ok(s.columns.status && s.columns.source, `${s.id} declares status and source`);
   assert.deepEqual(has('task'), ['confidence', 'owner', 'source', 'status']);
   assert.deepEqual(has('person'), ['confidence', 'source', 'status']);
   assert.deepEqual(has('lens'), ['source', 'status']);
@@ -32,9 +32,9 @@ test('the kinds declare status, owner, confidence and source; a flavour inherits
 });
 
 test('a pack cannot declare a head field, a column, or a large field on the work', () => {
-  assert.throws(() => new Registry(packsWith(pack([{ id: 'x.t', extends: 'work', title: 'T', description: '', fields: { owner: { type: 'string' } } }]))), /field "owner" is one a kind declares/);
+  assert.throws(() => new Registry(packsWith(pack([{ id: 'x.t', extends: 'work', title: 'T', description: '', fields: { owner: { type: 'string' } } }]))), /field "owner" is one a starter type declares/);
   assert.throws(() => new Registry(packsWith(pack([{ id: 'x.t', extends: 'work', title: 'T', description: '', fields: { due: { type: 'date', column: true } } }]))), /cannot be kept in a column/);
-  assert.throws(() => new Registry(packsWith(pack([{ id: 'x.t', extends: 'work', title: 'T', description: '', fields: { blob: { type: 'json', large: true } } }]))), /only a type of the system kind/);
+  assert.throws(() => new Registry(packsWith(pack([{ id: 'x.t', extends: 'work', title: 'T', description: '', fields: { blob: { type: 'json', large: true } } }]))), /only a type with the kernel flag/);
 });
 
 test('every item has its kind in its row: written with it, or filled by the database when a row comes without one', async () => {
@@ -56,7 +56,7 @@ test('an undeclared field, a head field its kind lacks, and a large value on the
     { op: 'create', ref: 't', type: 'task', title: 'Pour the slab' },
     { op: 'create', ref: 'b', type: 'bug', title: 'The slab cracks' },
     { op: 'create', ref: 'p', type: 'person', title: 'Sam' },
-    { op: 'create', ref: 's', type: 'style', title: 'A drawing' },
+    { op: 'create', ref: 's', type: 'layout', title: 'A drawing' },
   ]);
   await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: t, props: { colour: 'red' } }] }), /task has no field "colour"/);
   await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: p, owner: p }] }), /person has no field "owner"/);

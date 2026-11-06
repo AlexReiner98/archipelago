@@ -27,7 +27,7 @@ test('in a browser, a code style opened from Home starts, with room to draw and 
     ops: [
       { op: 'create', ref: 'a', type: 'work', title: 'Seed' },
       { op: 'create', ref: 'c', type: 'lens', title: 'Coded', status: 'current', props: { filter: { find: ['type work'] } } },
-      { op: 'create', ref: 's', type: 'style', title: 'Sized', status: 'current', props: { code: CODE } },
+      { op: 'create', ref: 's', type: 'layout', title: 'Sized', status: 'current', props: { code: CODE } },
     ],
   })).result.created as Record<string, string>;
   await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.c, props: { style: { style: made.s } } }] });

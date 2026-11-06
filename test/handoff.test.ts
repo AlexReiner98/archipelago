@@ -37,7 +37,7 @@ test('a handoff is read off the map, and nobody writes it down: the open work an
   ]);
   await hookSessionEnd(l, { session_id: 'h0', reason: 'exit' });
   // A note kept as a handoff before there were none is not read.
-  await make(l, [{ op: 'create', ref: 'old', type: 'handoff', title: 'Apex handoff', body: 'Next\nRun the probe.' }, { op: 'link', type: 'lives_in', from: 'old', to: made.repo }]);
+  await make(l, [{ op: 'create', ref: 'old', type: 'note', title: 'Apex handoff', body: 'Next\nRun the probe.' }, { op: 'link', type: 'lives_in', from: 'old', to: made.repo }]);
 
   const stand = (await callTool(l, human, 'view', { name: 'handoff', params: { repo: 'apex repo', since: mark } })) as any;
   assert.equal('note' in stand, false);
@@ -61,14 +61,6 @@ test('a handoff is read off the map, and nobody writes it down: the open work an
   assert.match(await hookSessionStart(l, { session_id: 'h1', cwd: String.raw`C:\code\Apex` }), /Where things stand: view "handoff" with repo e_\w+\. Since the last session here to end, Session in Apex repo, began \(\d{4}-\d\d-\d\d \d\d:\d\d UTC\): 1 push, 1 item settled, 1 item opened, 1 session ended\. And 1 item nobody has seen working \(unseen\)\./);
   assert.equal(((await callTool(l, human, 'view', { name: 'handoff', params: { repo: made.repo, since: new Date(Date.now() + 60_000).toISOString() } })) as any).since_then.settled.length, 0, 'counted from another moment when asked');
 
-  // A note of a type held to a length (an old handoff) cannot be grown past it by an agent, only rewritten.
-  const part = 'Next, and why\n' + 'Run the probe on a real model. '.repeat(40);
-  const note = (await l.db.query<{ id: string }>(`select id from entity where type = 'handoff'`)).rows[0].id;
-  const grow = () => callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: note, append: part }] });
-  for (let i = 0; i < 4; i++) await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, append: part }] });
-  await assert.rejects(grow(), /the handoff note would be \d+ characters: 3000 at most[^]*Rewrite it whole/);
-  const shorter = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: note, body: 'Next, and why\nRun the probe on a real model.' }] })) as any;
-  assert.ok(['applied', 'proposed'].includes(shorter.status));
 });
 
 test('a note can name what the same change makes, and an agent can ask for its change to be held', async () => {
@@ -195,7 +187,7 @@ test('launching runs a headless session on a task, holding the lane and recordin
   const made = await make(l, [
     { op: 'create', ref: 'repo', type: 'repo', title: 'Repo', props: { path: dir } },
     { op: 'create', ref: 'proj', type: 'project', title: 'Proj' },
-    { op: 'create', ref: 'lane', type: 'resource', title: 'Live lane' },
+    { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Live lane' },
     { op: 'create', ref: 'live', type: 'task', title: 'Capture probe' },
     { op: 'create', ref: 'homeless', type: 'task', title: 'No repo' },
     { op: 'link', type: 'lives_in', from: 'proj', to: 'repo' },

@@ -39,13 +39,13 @@ test('a reply that names the problem becomes a conversation from the post, and t
   assert.equal(c.entity.type, 'conversation');
   assert.ok(c.entity.title.length <= 60, c.entity.title);
   assert.deepEqual(c.entity.props, { person: 'Sam Lee', problem: 'Our agents lose track of what was decided last week', began: '2026-11-04', channel: 'linkedin' });
-  assert.ok(c.outgoing.some((r) => r.type === 'came_from' && r.id === made.p));
+  assert.ok(c.outgoing.some((r) => r.type === 'came_out_of' && r.id === made.p));
   assert.equal((await props(l, made.p)).conversations, 1);
 
   // One linked by hand is counted too: the count is read from the links each time.
   await make(l, [
     { op: 'create', ref: 'h', type: 'conversation', title: 'Ana: no one sees the plan', props: { person: 'Ana', problem: 'No one sees the plan' } },
-    { op: 'link', type: 'came_from', from: 'h', to: made.p },
+    { op: 'link', type: 'came_out_of', from: 'h', to: made.p },
   ]);
   assert.equal((await say({ person: 'Kim', problem: 'Hand-offs between sessions', channel: 'dm' })).answer.conversations, 3);
   assert.equal((await props(l, made.p)).conversations, 3);

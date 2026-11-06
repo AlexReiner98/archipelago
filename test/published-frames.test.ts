@@ -68,7 +68,7 @@ test('a published picture keeps its first frame, its page carries its data, and 
 test('a picture drawn by the owner’s version of a drawing is drawn only in the sandbox', async () => {
   const { call, base } = await serve('off');
   const look = 'export const css = `.ar-part { cursor: help; }`;\n';
-  const { d, l } = await published(call, [{ op: 'create', type: 'style', title: 'Architecture, mine', status: 'current', props: { preset: 'core.architecture', modules: { 'look.js': look } } }]);
+  const { d, l } = await published(call, [{ op: 'create', type: 'layout', title: 'Architecture, mine', status: 'current', props: { preset: 'core.architecture', modules: { 'look.js': look } } }]);
   const data = await (await fetch(`${base}/p/default/${d}/data`)).json();
   assert.equal(data.lenses[l].first, undefined);
   assert.equal((await (await fetch(`${base}${data.lenses[l].style.drawing.src}`)).json())['look.js'], look);

@@ -113,7 +113,7 @@ export const VIEWS: Record<string, View> = {
     run: changedSince,
   },
   spent: {
-    description: 'What agents spent over the last days, read from their runs: dollars where a run says what it cost, tokens where it does not, by where they ran. The money pack\u2019s costs view adds what is paid regularly. Params: days (default 30).',
+    description: 'What agents spent over the last days, read from their runs: dollars where a run says what it cost, tokens where it does not, by where they ran. The time pack\u2019s costs view adds what is paid regularly. Params: days (default 30).',
     run: spent,
   },
   usage: {

@@ -176,7 +176,7 @@ function withDrawings(l: Archipelago, doc: Record<string, unknown> | null) {
   const given = Object.fromEntries(
     Object.entries(lenses).map(([id, frozen]) => {
       const style = frozen.style ?? {};
-      // One whose style has code of its own is drawn by its shape's drawing here, as the page drew it by its shape before.
+      // One drawn by a layout's code is drawn by its shape's drawing here, as the page drew it by its shape before.
       if (style.drawing) return [id, frozen];
       // A picture on a time axis was drawn along it, unless it was a grid or a flow.
       const shape = frozen.lens?.time && !['grid', 'flow'].includes(String(style.shape)) ? 'time' : String(style.shape);

@@ -20,11 +20,10 @@ test('held changes are drawn where they would land, and only there', () => {
       { id: 'p_edit', ops: [{ op: 'update', id: 'e_bbbbbbbb', title: 'B2' }, { op: 'update', id: 'e_zzzzzzzz', title: 'gone' }] },
     ],
     holds,
-    () => 'work',
   );
   assert.deepEqual(g.items.map((i: { id: string }) => i.id), ['p_make:x', 'p_make:y']);
   assert.deepEqual(g.items[0].pending, { proposal: 'p_make', op: 'create' });
-  assert.equal(g.items[0].kind, 'work');
+  assert.equal(g.items[0].type, 'task');
   assert.deepEqual(g.links.map((l: { from: string; to: string }) => `${l.from}>${l.to}`), ['e_aaaaaaaa>e_bbbbbbbb', 'p_make:x>p_make:y', 'p_make:y>e_aaaaaaaa']);
   assert.deepEqual(g.links[0].pending, { proposal: 'p_link', by: 'robot', reason: 'a link', op: 'link' });
   assert.deepEqual([...g.marks.keys()], ['e_bbbbbbbb']);
@@ -43,6 +42,6 @@ test('held changes are drawn where they would land, and only there', () => {
 test('on a canvas of what is held, a new item tied to nothing drawn is drawn too', () => {
   const p = [{ id: 'p_loose', ops: [{ op: 'create', ref: 'x', type: 'task', title: 'X' }, { op: 'create', type: 'task', title: 'No ref' }] }];
   assert.deepEqual(ghostsOf(p, holds).items, []);
-  const g = ghostsOf(p, holds, () => 'work', true);
+  const g = ghostsOf(p, holds, true);
   assert.deepEqual(g.items.map((i: { id: string }) => i.id), ['p_loose:x', 'p_loose:#1']);
 });

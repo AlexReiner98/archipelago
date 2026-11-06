@@ -80,5 +80,6 @@ test('nothing is a flavour of the plain link, and uses blocks nothing', async ()
   const l = await fresh();
   await assert.rejects(make(l, [{ op: 'create', type: 'link_type', title: 'Touches', props: { name: 'local.touches', extends: 'link' } }]), /cannot be a flavour of link/);
   assert.ok(!l.registry.relationFamily('depends_on', 'waits_on', 'needs').includes('calls'), 'a call is no block');
-  assert.deepEqual(l.registry.relationFamily('uses'), ['uses', 'calls']);
+  assert.deepEqual(l.registry.relationFamily('uses').sort(), ['calls', 'reads', 'uses']);
+  assert.ok(!l.registry.relationFamily('depends_on', 'waits_on', 'needs').includes('reads'), 'a reading is no block');
 });

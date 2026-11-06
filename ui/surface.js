@@ -1,5 +1,5 @@
 // A surface: a canvas the page lays over a drawing's picture when its scene asks for one (`surface: { key }`), for
-// pixels the drawing paints in its worker, in the sandbox, as a style's own code paints (three.js is offered to it
+// pixels the drawing paints in its worker, in the sandbox, as a layout's code paints (three.js is offered to it
 // there). The drawing paints on a canvas of its own in the worker and sends each finished frame as an image; the page
 // shows it here. Nothing but pixels crosses: what comes is checked to be an image, and nothing of the page goes back
 // but the surface's size and the page's colours. It lies exactly over the picture, takes no pointer, and is shown or

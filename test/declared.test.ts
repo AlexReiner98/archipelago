@@ -76,10 +76,12 @@ test('a declared action with no handler, or of no verb, stops its pack from load
 
 test('screens are declared in pack files, checked when the pack loads, and listed in the schema', async () => {
   const l = await map();
-  type Described = { screens: { id: string; pack: string; on: string[]; pieces: { piece: string; tree?: string }[] }[]; pack_tools: { tool: string; on?: string[]; item?: string; input?: unknown }[]; types: { id: string; public?: boolean }[] };
+  type Described = { screens: { id: string; pack: string; on: string[]; pieces: { piece: string }[] }[]; canvases: { id: string; pack: string; on?: string[]; props: { filter: { find: string[] } } }[]; pack_tools: { tool: string; on?: string[]; item?: string; input?: unknown }[]; types: { id: string; public?: boolean }[] };
   const schema = l.registry.describe() as unknown as Described;
-  const roadmap = schema.screens.find((s) => s.id === 'software.roadmap')!;
-  assert.deepEqual([roadmap.pack, roadmap.on, roadmap.pieces], ['software', ['project'], [{ piece: 'tree', tree: 'software.roadmap' }]]);
+  // What a pack shows of one item is a view of it, not a screen: a lens preset on its type, the item where it says {here}.
+  const roadmap = schema.canvases.find((c) => c.id === 'software.roadmap')!;
+  assert.deepEqual([roadmap.pack, roadmap.on, roadmap.props.filter.find], ['software', ['project'], ['in {here}']]);
+  assert.ok(!schema.screens.some((s) => ['software.roadmap', 'software.gate', 'software.proof', 'software.usage', 'software.releases', 'time.today', 'time.invoices', 'science.undermined'].includes(s.id)), 'the screens their views replace are gone');
   // What a page needs to draw a pack action's form: what it is on and its input.
   const plan = schema.pack_tools.find((t) => t.tool === 'demo_plan_visit')!;
   assert.deepEqual(plan.on, ['work']);
@@ -92,13 +94,13 @@ test('screens are declared in pack files, checked when the pack loads, and liste
     writeFileSync(join(dir, 'demo', 'pack.json'), JSON.stringify({ id: 'demo', version: '1', title: 'D', requires: ['core'], views: screens.map((v) => ({ form: 'screen', ...(v as object) })) }));
     return () => new Registry(dir);
   };
-  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['nothing'], pieces: [{ piece: 'gate' }] }]), /is on unknown type "nothing"/);
+  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['nothing'], pieces: [{ piece: 'figure' }] }]), /is on unknown type "nothing"/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'chart' }] }]), /"chart" is not a piece/);
-  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'tree' }] }]), /a tree piece names its tree/);
+  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'tree' }] }]), /"tree" is not a piece/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'view', view: 'demo.none' }] }]), /declares no view "demo.none" of rows/);
-  assert.throws(bad([{ id: 's', title: 'S', on: ['task'], pieces: [{ piece: 'gate' }] }]), /must be named "demo.<name>"/);
+  assert.throws(bad([{ id: 's', title: 'S', on: ['task'], pieces: [{ piece: 'figure' }] }]), /must be named "demo.<name>"/);
   // A button says its word, its tooltip and one thing it does, by a pack's action or how it draws the canvas.
-  assert.deepEqual(schema.screens.find((s) => s.id === 'core.style_apply')!.on, ['style']);
+  assert.deepEqual(schema.screens.find((s) => s.id === 'core.style_apply')!.on, ['style', 'layout']);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', tip: 'T', draw: { shape: 'list' } }] }]), /a button piece names its label/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', label: 'L', draw: { shape: 'list' } }] }]), /a button piece names its tip/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', label: 'L', tip: 'T' }] }]), /a button does one thing/);

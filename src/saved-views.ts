@@ -1,6 +1,6 @@
 // Saved views: every picture kept on the map, named, with what it is a picture of, so a person finds it without
-// knowing which item it hangs on (docs/ui-strategy.md). A picture is a kept lens; a style kept about that lens
-// names it (the one it names itself first, as the page draws it), as the way it is drawn is what a person remembers. Pinned ones first, then the newest.
+// knowing which item it hangs on (docs/ui-strategy.md). A picture is a kept lens, named by its own title; the shape
+// it is drawn in comes from the style or layout it names, else one kept about it. Pinned ones first, then the newest.
 
 import { keptOf } from './query-kept.ts';
 import { bringersIn } from './query-saved.ts';
@@ -9,7 +9,7 @@ import type { Archipelago } from './pelago.ts';
 export interface Picture {
   /** The lens: the picture opens with it, from what it is of. */
   lens: string;
-  /** Its name: the style's that draws it, else the lens's. */
+  /** Its name: the lens's own title. */
   title: string;
   /** The shape it is drawn in, when a style says. */
   shape?: string;
@@ -23,7 +23,7 @@ export interface Picture {
 }
 
 export async function savedViews(l: Archipelago, input: { limit?: number } = {}): Promise<{ pictures: Picture[]; more: number }> {
-  const [lenses, styles] = await Promise.all([keptOf(l, 'lens', undefined), keptOf(l, 'style', undefined)]);
+  const [lenses, styles] = await Promise.all([keptOf(l, 'lens', undefined), keptOf(l, ['style', 'layout'], undefined)]);
   const ofIds = [...new Set(lenses.flatMap((x) => x.about))];
   const { rows } = ofIds.length ? await l.db.query<{ id: string; title: string; type: string }>(`select id, title, type from entity where id = any($1::text[]) and archived_at is null`, [ofIds]) : { rows: [] };
   const items = new Map(rows.map((r) => [r.id, r]));
@@ -41,10 +41,10 @@ export async function savedViews(l: Archipelago, input: { limit?: number } = {})
       const named = styles.find((s) => s.id === own.style);
       const style = named ?? styles.find((s) => s.about.includes(x.id));
       const of = x.about.map((id) => items.get(id)).find(Boolean);
-      // A style it names lies over its own settings, and one with code draws no shape.
+      // A style it names lies over its own settings, and a layout with code draws no shape.
       const shape = named ? (typeof named.props.code === 'string' ? undefined : (named.props.shape ?? own.shape)) : (own.shape ?? style?.props.shape);
       const document = documents.get(x.id);
-      return { lens: x.id, title: style?.title || x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), ...(document && { document }), pinned: x.props.pinned === true };
+      return { lens: x.id, title: x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), ...(document && { document }), pinned: x.props.pinned === true };
     })
     .sort((a, b) => Number(b.pinned) - Number(a.pinned));
   const limit = input.limit ?? 100;
