@@ -18,7 +18,7 @@ export function saidOf(to) {
  * The islands' marks: `layer` (drawn first, under the wires), `gates` (drawn over them) and the colour `rules` they read.
  * `legends` holds each island's rows ({ glyph, label }); `isHex` says what is a colour.
  */
-export function islandMarks({ g, legends, islands = [], style, z, m, titled, fit, isHex }) {
+export function islandMarks({ g, legends, islands = [], style, z, m, titled, outline, fit, isHex }) {
   if (!g.islands?.length) return { layer: [], gates: [], rules: [], tips: new Map() };
   const given = Array.isArray(style.island_hues) && style.island_hues.length ? style.island_hues : Array.isArray(style.hues) ? style.hues : [];
   const hues = given.filter(isHex);
@@ -68,13 +68,14 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, fit
     // promises moves, when the page runs it along that line (ui/transition.js), in the finding's island's colour.
     const pulse = t.sea && t.gates.length === 2 ? [m('path', { key: `pulse:${t.b}:${t.a}`, pulse: JSON.stringify([value ?? null, to?.fields?.as_of ?? null]), d: `M${[...t.sea].reverse().map((p) => p.join(' ')).join('L')}`, class: `lf-pulse ${classes.get(t.gates[1].island) ?? ''}`, 'aria-hidden': 'true' })] : [];
     // Where it leaves its island it is named: its port there is its name, sized to it and placed by the solve, drawn
-    // once for all the reads that leave by it, as a box like any other: wires keep off it as off a step.
+    // once for all the reads that leave by it, in a finding's outline (a ticket), and opens the finding as its step does:
+    // wires keep off it as off a step.
     const l = t.label, text = l && !drawnNames.has(l.id) && fit(said, Math.min(l.w, MOST) - 2 * GATE_PAD, GATE_TEXT);
     if (!text || text.length < 2) return [...pulse, ...bars];
     drawnNames.add(l.id);
     const w = l.w, key = `gate:${n}:1`;
     tip(key, said, `A finding read across: it leaves ${source ?? 'its island'} here, for ${reader ?? 'another'}`);
-    return [...pulse, ...bars, titled(m('g', { key, on: ['enter', 'leave'], class: `lf-gate ${classes.get(t.gates[1].island) ?? ''}` }, m('rect', { x: l.at[0] - w / 2, y: l.at[1] - GATE_H / 2, width: w, height: GATE_H, rx: z('island_gate_corner') }), m('text', { x: l.at[0], y: l.at[1] }, text)), said)];
+    return [...pulse, ...bars, titled(m('a', { key, on: ['enter', 'leave'], href: `#/e/${t.b}`, class: `lf-gate ${classes.get(t.gates[1].island) ?? ''}` }, outline('ticket', l.at[0], l.at[1], w, GATE_H), m('text', { x: l.at[0], y: l.at[1] }, text)), said)];
   });
   return { layer, gates, rules: [...rules], tips };
 }
@@ -90,7 +91,7 @@ export const css = `
 .lf-island-key text { fill: var(--ln-muted); font-size: var(--ln-flow-island-legend-text); font-family: var(--ln-font); dominant-baseline: central; }
 /* A gate: a bar on the shore in the island's colour; what crosses named in the sea. */
 .lf-gate-bar { fill: none; stroke: var(--lf-island, var(--ln-text)); stroke-width: var(--ln-flow-island-gate-stroke); stroke-linecap: round; }
-.lf-gate rect { fill: var(--ln-land); stroke: var(--lf-island, var(--ln-line)); stroke-width: var(--ln-flow-stroke-lit); }
+.lf-gate .lf-shape { fill: var(--ln-land); stroke: var(--lf-island, var(--ln-line)); stroke-width: var(--ln-flow-stroke-lit); }
 .lf-gate text { fill: var(--ln-text); font-size: var(--ln-flow-island-gate-text); font-family: var(--ln-font); text-anchor: middle; dominant-baseline: central; }
 /* A pulse: a dash of the finding's island's colour, unseen but while the page runs it to a reader. */
 .lf-pulse { fill: none; stroke: var(--lf-island, var(--ln-text)); stroke-width: var(--ln-flow-island-pulse-stroke); stroke-dasharray: var(--ln-flow-island-pulse-dash); stroke-linecap: round; opacity: 0; pointer-events: none; }

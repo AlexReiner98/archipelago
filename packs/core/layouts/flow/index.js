@@ -40,7 +40,7 @@ const HEX = /^#[0-9a-f]{3,8}$/i;
 const ORDER_TYPE = 'depends_on';
 /** What the key calls the outline of each of core's starter types, and the order its rows go in. */
 const KIND_WORDS = { work: 'Work', question: 'Question', occurrence: 'Event', record: 'Record', system: 'System', actor: 'Person', aim: 'Aim', place: 'Place' };
-const KEY_ORDER = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'end'];
+const KEY_ORDER = ['box', 'diamond', 'pill', 'sheet', 'ticket', 'cut', 'hexagon', 'flag', 'tab', 'end'];
 /** What the key calls each phase, in its order; what only stands has no dot and no row. */
 const PHASE_WORDS = { not_started: 'Not started', under_way: 'Under way', finished: 'Finished', ended: 'Ended', trouble: 'Trouble' };
 /** A link type as the key says it: its name without its pack, in words ("could_fund" is "Could fund"). */
@@ -65,6 +65,8 @@ function outline(shape, x, y, w, hgt, rx, cut = 0) {
   // A place: a tab over the left third of its top.
   if (shape === 'tab') return m('path', { d: `M${l} ${t}H${l + w / 3}L${l + w / 3 + cut} ${t + cut}H${r}V${b}H${l}Z`, class: 'lf-shape' });
   if (shape === 'diamond') return m('path', { d: `M${x} ${t}L${r} ${y}L${x} ${b}L${l} ${y}Z`, class: 'lf-shape' });
+  // A finding: a ticket, a notch in each end, what is handed from one island to another.
+  if (shape === 'ticket') return m('path', { d: `M${l} ${t}H${r}V${y - cut}A${cut} ${cut} 0 0 0 ${r} ${y + cut}V${b}H${l}V${y + cut}A${cut} ${cut} 0 0 0 ${l} ${y - cut}Z`, class: 'lf-shape' });
   if (shape === 'pill' || shape === 'end') return m('rect', { x: l, y: t, width: w, height: hgt, rx: hgt / 2, class: 'lf-shape' });
   // A document: a sheet whose foot is a wave.
   if (shape === 'sheet') return m('path', { d: `M${l} ${t}H${r}V${b - 5}C${r - w / 4} ${b - 13} ${x + w / 8} ${b + 5} ${x} ${b - 3}C${x - w / 8} ${b - 11} ${l + w / 4} ${b + 5} ${l} ${b - 3}Z`, class: 'lf-shape' });
@@ -289,7 +291,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const linkBadges = wiresIn(g).map((l, n) => [l, n]).filter(([l]) => held(l.pending) && !madeBy(l.a, l.pending) && !madeBy(l.b, l.pending)).map(([l, n]) => ({ n, mark: badge(l.pending, middleOf(l.points)) }));
   /** A step's dot where it is drawn: of its own phase, or of the phase a story's step gives it then. */
   const dotPlace = (n) => {
-    const X = g.x.get(n.id), point = n.shape === 'hexagon' ? n.bevel : 0;
+    const X = g.x.get(n.id), point = n.shape === 'hexagon' || n.shape === 'ticket' ? n.bevel : 0;
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + z('text_x');
     return [left - z('dot_gap'), g.y.get(n.id)];
   };
@@ -313,7 +315,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
-    const point = n.shape === 'hexagon' ? n.bevel : 0, ends = n.shape === 'hexagon' ? 2 * n.bevel : n.shape === 'flag' ? n.bevel : 0;
+    const point = n.shape === 'hexagon' || n.shape === 'ticket' ? n.bevel : 0, ends = n.shape === 'hexagon' || n.shape === 'ticket' ? 2 * n.bevel : n.shape === 'flag' ? n.bevel : 0;
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : z('text_x'));
     const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
     const ghost = !n.stub && i.pending?.op === 'create';
@@ -354,7 +356,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
   // On an archipelago each island a region round what lives on it, under everything, and a gate where a link crosses its shore (./islands.js).
-  const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, fit: (text, width, px) => fit(text, width, px), isHex: (h) => HEX.test(String(h)) });
+  const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, outline: (shape, x, y, w, h) => outline(shape, x, y, w, h, z('island_gate_corner'), z('notch')), fit: (text, width, px) => fit(text, width, px), isHex: (h) => HEX.test(String(h)) });
   const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, isles.layer, tieLayer, wireLayer, stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark));
   // The picture's key; on an archipelago none, each island carrying its own.
   const key = parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 });
