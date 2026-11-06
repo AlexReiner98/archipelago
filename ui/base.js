@@ -3,7 +3,7 @@
 
 import { applyTheme } from './theme.js';
 
-export const state = { schema: undefined, stamp: undefined, pos: undefined, seq: undefined, dirty: false, selfDrawn: false, trying: null };
+export const state = { workspace: undefined, schema: undefined, stamp: undefined, pos: undefined, seq: undefined, dirty: false, selfDrawn: false, trying: null };
 export const hooks = {};
 export const route = (pulse) => hooks.route(pulse);
 
@@ -316,6 +316,7 @@ export async function showIdentity() {
     const me = await res.json();
     if (me.auth !== 'tokens') return slot.replaceChildren();
     known.remember(me.workspace);
+    state.workspace = me.workspace; // a token made here names it (ui/workspace-cards.js)
     // Which workspace this is, where it cannot be missed: under the name at the top, and on the tab.
     // A workspace that has ended says so under its name on every page: until when, and where its backup is.
     const ended = me.actor.kind === 'human' ? await api('workspace_info').then((info) => info.ended, () => null) : null;

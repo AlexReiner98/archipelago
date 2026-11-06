@@ -119,6 +119,12 @@ test('each workspace is its own database: tokens, data and local types do not cr
   const typeIds = async (token: string) => ((await call('/api/schema', token)).result.types as any[]).map((t) => t.id);
   assert.ok((await typeIds(theirs)).includes('local.site_visit'));
   assert.ok(!(await typeIds(mine)).includes('local.site_visit'));
+  // An agent's first answer names the map its token acts in, so a token made in the wrong workspace is plain at once.
+  const agent = (await createToken((await workspaces.get('acme')).pelago.db, 'acme', { kind: 'agent', name: 'claude-code' })).token;
+  const begun = await call('/agent/capture', agent, { action: 'session_start', params: { title: 'Which map is this' } });
+  assert.deepEqual(begun.result.workspace, { id: 'acme', name: 'Acme Architects' });
+  assert.deepEqual((await call('/agent/capture', agent, { action: 'session_start', params: { title: 'Again', session_id: 'same-chat' } })).result.workspace, { id: 'acme', name: 'Acme Architects' });
+  assert.deepEqual((await call('/agent/capture', agent, { action: 'session_start', params: { session_id: 'same-chat' } })).result.workspace.id, 'acme', 'a resumed session names it too');
 });
 
 test('inside a workspace, private things are hidden from other members by the database', async () => {
