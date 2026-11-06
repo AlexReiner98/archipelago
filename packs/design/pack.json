@@ -1,0 +1,158 @@
+{
+  "id": "design",
+  "version": "0.1.0",
+  "title": "Design",
+  "description": "Design and research work: studies around a question, the concepts and alternatives they weigh, the research they rest on (what is settled, how others do it, what changed, what was found, sketches), the tenets held to, the elements the design is made of, and its write-up. Built on core's shared set alone, for a design island.",
+  "requires": ["core"],
+  "types": [
+    {
+      "id": "study",
+      "extends": "work",
+      "title": "Study",
+      "description": "Research around one question: its concepts, notes, alternatives and elements are part of it (part_of), and its views are how it is read. Its note says why the question matters now; the question itself, in a line, is asks.",
+      "statuses": { "open": ["framing", "studying"], "closed": ["concluded", "dropped"], "phases": { "framing": "not_started", "studying": "under_way", "concluded": "finished", "dropped": "ended" } },
+      "fields": {
+        "asks": { "type": "string", "shown": true, "description": "The question the study answers, in a line, e.g. \"How does a person see what changed?\"." }
+      }
+    },
+    {
+      "id": "concept",
+      "extends": "question",
+      "title": "Concept",
+      "description": "A position the design might take, explored until it is adopted or dropped. Lead its note with the position in a sentence; what it rests on is a rests_on link, what it goes against a goes_against link.",
+      "statuses": { "open": ["raw", "exploring"], "closed": ["adopted", "dropped"], "phases": { "raw": "not_started", "exploring": "under_way", "adopted": "finished", "dropped": "ended" } }
+    },
+    {
+      "id": "alternative",
+      "extends": "question",
+      "title": "Alternative",
+      "description": "One answer a decision weighs, linked alternative_for that decision, with its case for and against under ## For and ## Against. Chosen or set aside when the decision is made, never before.",
+      "statuses": { "open": ["weighed"], "closed": ["chosen", "set_aside"], "phases": { "weighed": "under_way", "chosen": "finished", "set_aside": "ended" } }
+    },
+    {
+      "id": "tenet",
+      "extends": "aim",
+      "title": "Tenet",
+      "description": "What the design holds to, in a sentence or two of point and intent. What upholds it serves it (serves); it is retired when it stops holding.",
+      "statuses": { "open": ["active"], "closed": ["retired"], "phases": { "active": "standing", "retired": "ended" } }
+    },
+    {
+      "id": "fundamental",
+      "extends": "record",
+      "title": "Fundamental",
+      "description": "What research or the medium has settled, that a design must hold to: a finding of perception, a limit of the browser, a law of layout. Its note gives the point and what it asks of the design; the work it rests on is cites.",
+      "statuses": { "open": ["current"], "closed": ["superseded"], "phases": { "current": "standing", "superseded": "ended" } },
+      "fields": {
+        "cites": { "type": "string", "shown": true, "description": "The work it rests on, in a few words, e.g. \"Misue et al., 1995\"." }
+      }
+    },
+    {
+      "id": "precedent",
+      "extends": "record",
+      "title": "Precedent",
+      "description": "How another system answers the same question, and what we take from it. Its note leads with what we take; a table of several systems is one precedent.",
+      "statuses": { "open": ["current"], "closed": ["superseded"], "phases": { "current": "standing", "superseded": "ended" } },
+      "fields": {
+        "url": { "type": "url", "description": "Where the system or its account is read." }
+      }
+    },
+    {
+      "id": "shift",
+      "extends": "record",
+      "title": "Shift",
+      "description": "An assumption that changed: what was assumed, what holds now, and what it changes in the design. Each element or concept it undoes rests_on it.",
+      "statuses": { "open": ["current"], "closed": ["superseded"], "phases": { "current": "standing", "superseded": "ended" } },
+      "fields": {
+        "assumed": { "type": "string", "shown": true, "description": "What was assumed, in a line." },
+        "now": { "type": "string", "shown": true, "description": "What holds now, in a line, with the decision that says so by its id." }
+      }
+    },
+    {
+      "id": "observation",
+      "extends": "record",
+      "title": "Observation",
+      "description": "Something measured or seen in what exists: a count, a probe, a reading of the code. A value another island needs is published as a finding; this is the design's own account of it.",
+      "statuses": { "open": ["current"], "closed": ["superseded"], "phases": { "current": "standing", "superseded": "ended" } },
+      "fields": {
+        "measured_on": { "type": "date", "shown": true, "description": "When it was measured or seen: an observation holds as of then." }
+      }
+    },
+    {
+      "id": "sketch",
+      "extends": "record",
+      "title": "Sketch",
+      "description": "A shape worked out to be judged: how something could be, or what each piece of a surface is for, in a table or a figure. It decides nothing; a decision or concept that takes it up rests_on it.",
+      "statuses": { "open": ["draft", "current"], "closed": ["superseded"], "phases": { "draft": "under_way", "current": "standing", "superseded": "ended" } }
+    },
+    {
+      "id": "element",
+      "extends": "work",
+      "title": "Element",
+      "description": "A part the design is made of, shaped here and built elsewhere. It depends_on the elements and decisions it needs, rests_on the research it stands on, and serves the tenets it upholds. Shaped when its design is settled enough to build.",
+      "statuses": { "open": ["proposed", "shaping"], "closed": ["shaped", "dropped"], "phases": { "proposed": "not_started", "shaping": "under_way", "shaped": "finished", "dropped": "ended" } }
+    },
+    {
+      "id": "writeup",
+      "extends": "record",
+      "title": "Write-up",
+      "description": "The study for a reader, made of the map: its note is the text, and a line holding only an item's id brings that item in at that place, as a section with its title and note. Read whole on its page.",
+      "statuses": { "open": ["draft", "ready"], "closed": ["final", "superseded", "withdrawn"], "phases": { "draft": "under_way", "ready": "standing", "final": "finished", "superseded": "ended", "withdrawn": "ended" } },
+      "fields": {
+        "for": { "type": "string", "description": "Who it is written for, e.g. \"the owner, before the port\"." }
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": "rests_on",
+      "extends": "about",
+      "title": "rests on",
+      "inverse": "holds up",
+      "from": ["concept", "alternative", "element", "tenet", "sketch", "writeup", "study"],
+      "to": ["*"],
+      "description": "This design stands on the target: research (a fundamental, precedent, shift, observation or sketch) or a decision already made. Taken away, it would need thinking again."
+    },
+    {
+      "id": "alternative_for",
+      "extends": "bears_on",
+      "title": "is an alternative for",
+      "inverse": "weighs",
+      "from": ["alternative"],
+      "to": ["question"],
+      "description": "This alternative is one answer the target decision or question weighs."
+    },
+    {
+      "id": "goes_against",
+      "extends": "about",
+      "title": "goes against",
+      "inverse": "is gone against by",
+      "from": ["concept", "alternative", "element", "sketch"],
+      "to": ["decision"],
+      "description": "This goes against a decision already made. Say what it crosses in props.says, e.g. \"draws depth, which the flat canvas forbids\"."
+    }
+  ],
+  "views": [
+    { "form": "screen", "id": "design.reading", "title": "Reading", "on": ["writeup"], "pieces": [{ "piece": "document" }] }
+  ],
+  "styles": [
+    {
+      "id": "design.tending",
+      "type": "instruction",
+      "title": "Tend a design island",
+      "body": "On a design island, every note is of a named kind: a fundamental (what research has settled, with cites), a precedent (how others do it), a shift (an assumption that changed: assumed, now), an observation (what was measured, measured_on) or a sketch (a shape to be judged). A position is a concept; an answer a decision weighs is an alternative, linked alternative_for it; a part to build is an element. Tie what a design stands on with rests_on, research to what it informs with bears_on, and anything that crosses a settled decision with goes_against. Put each item in its study (part_of). When an assumption changes, record a shift and move what rests on it. A value another island needs is published as a finding, never linked across.",
+      "props": { "for": ["session_start"], "order": 65 }
+    },
+    {
+      "id": "design.open",
+      "type": "lens",
+      "title": "Design: what is still open",
+      "props": { "filter": { "find": ["decision", "concept", "alternative"], "not": ["done"] }, "walk": { "over": ["bears_on<", "alternative_for<", "rests_on>"], "steps": 1 }, "style": { "shape": "flow" } }
+    },
+    {
+      "id": "design.grounds",
+      "type": "lens",
+      "title": "Design: what each element rests on",
+      "props": { "filter": { "find": ["element"], "not": ["done"] }, "walk": { "over": ["rests_on>", "depends_on>"], "steps": 1 }, "style": { "shape": "flow" } }
+    }
+  ]
+}
