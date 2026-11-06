@@ -56,7 +56,7 @@ test('an undeclared field, a head field its kind lacks, and a large value on the
     { op: 'create', ref: 't', type: 'task', title: 'Pour the slab' },
     { op: 'create', ref: 'b', type: 'bug', title: 'The slab cracks' },
     { op: 'create', ref: 'p', type: 'person', title: 'Sam' },
-    { op: 'create', ref: 's', type: 'style', title: 'A drawing' },
+    { op: 'create', ref: 's', type: 'layout', title: 'A drawing' },
   ]);
   await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: t, props: { colour: 'red' } }] }), /task has no field "colour"/);
   await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: p, owner: p }] }), /person has no field "owner"/);

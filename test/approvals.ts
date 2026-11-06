@@ -63,6 +63,7 @@ const task = (ref = 't', extra: Partial<Op> = {}): Op => ({ op: 'create', ref, t
 const decision: Op = { op: 'create', ref: 'd', type: 'decision', title: 'Which way?' };
 const hypothesis: Op = { op: 'create', ref: 'h', type: 'hypothesis', title: 'It is faster' };
 const style = (ref = 's'): Op => ({ op: 'create', ref, type: 'style', title: `Style ${ref}` });
+const layout = (ref = 's'): Op => ({ op: 'create', ref, type: 'layout', title: `Layout ${ref}` });
 const doc: Op = { op: 'create', ref: 'doc', type: 'document', title: 'Guide' };
 const automation: Op = { op: 'create', ref: 'a', type: 'automation', title: 'Nightly', status: 'paused', props: { trigger: 'daily', at: '03:00', action: 'notify', message: 'hi' } };
 
@@ -76,7 +77,7 @@ const CASES: Record<string, Case> = {
   'create decision open': { ops: () => [decision] },
   'create decision decided': { ops: () => [{ ...decision, status: 'decided', props: { outcome: 'this', rationale: 'that' } }] },
   'create style': { ops: () => [style()] },
-  'create style with code': { ops: () => [{ ...style(), props: { code: 'export default () => []' } }] },
+  'create layout with code': { ops: () => [{ ...layout(), props: { code: 'export default () => []' } }] },
   'create screen': { ops: () => [{ op: 'create', type: 'screen', title: 'Board' }] },
   'create automation': { ops: () => [automation] },
   'update task title': { given: [task()], ops: (i) => [{ op: 'update', id: i.t, title: 'Renamed' }] },
@@ -93,7 +94,7 @@ const CASES: Record<string, Case> = {
   'settle hypothesis': { given: [hypothesis], ops: (i) => [{ op: 'update', id: i.h, status: 'supported' }] },
   'settle hypothesis, said': { given: [hypothesis], authority: said, ops: (i) => [{ op: 'update', id: i.h, status: 'supported' }] },
   'update style title': { given: [style()], ops: (i) => [{ op: 'update', id: i.s, title: 'Calmer' }] },
-  'update style code': { given: [style()], ops: (i) => [{ op: 'update', id: i.s, props: { code: 'export default () => []' } }] },
+  'update layout code': { given: [layout()], ops: (i) => [{ op: 'update', id: i.s, props: { code: 'export default () => []' } }] },
   'update style page_css': { given: [style()], ops: (i) => [{ op: 'update', id: i.s, props: { page_css: 'h2 { color: red }' } }] },
   'update automation': { given: [automation], ops: (i) => [{ op: 'update', id: i.a, title: 'Weekly' }] },
   'archive automation': { given: [automation], ops: (i) => [{ op: 'archive', id: i.a }] },

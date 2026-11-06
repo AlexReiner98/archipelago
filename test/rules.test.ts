@@ -60,7 +60,7 @@ test('a rule requires fields, refuses by type, and keeps values unique within a 
 test('a pack without its rules loosens what they added, and nothing else', async () => {
   const l = await map([{ ...SHOP, rules: [] }]);
   assert.equal((await change(l, agent, [{ op: 'create', type: 'shop.order', title: 'Oven', props: { total: 900 } }])).status, 'applied');
-  assert.equal((await change(l, agent, [{ op: 'create', type: 'style', title: 'Loud', props: { code: 'export default () => {}' } }])).status, 'proposed', "core's rules stand");
+  assert.equal((await change(l, agent, [{ op: 'create', type: 'layout', title: 'Loud', props: { code: 'export default () => {}' } }])).status, 'proposed', "core's rules stand");
 });
 
 test('a rule that names what is not there stops its pack from loading', async () => {
@@ -79,7 +79,7 @@ test('a held change names the rule that held it, in its answer and on the propos
   assert.equal(kept.held_by.rule, 'big');
   // Under review, the most particular rule is named: the one about code, not the one every agent's change is under.
   const strict = new Archipelago(l.db, l.registry);
-  const code = (await change(strict, agent, [{ op: 'create', type: 'style', title: 'Loud', props: { code: 'export default () => {}' } }])) as { held_by: { rule: string } };
+  const code = (await change(strict, agent, [{ op: 'create', type: 'layout', title: 'Loud', props: { code: 'export default () => {}' } }])) as { held_by: { rule: string } };
   assert.equal(code.held_by.rule, 'code_runs');
   const plain = (await change(strict, agent, [{ op: 'create', type: 'task', title: 'Plain' }])) as { held_by: { rule: string } };
   assert.equal(plain.held_by.rule, 'agent_changes');
@@ -97,7 +97,7 @@ test('a setting lifts only a rule its pack declared liftable', async () => {
 test('a drawing asks in data: inside the types its style writes it applies, anything else waits for the person', async () => {
   const l = await map();
   const made = (await change(l, human, [
-    { op: 'create', ref: 's', type: 'style', title: 'Shop drawing', props: { code: 'export default () => {}', writes: ['shop.order'] } },
+    { op: 'create', ref: 's', type: 'layout', title: 'Shop drawing', props: { code: 'export default () => {}', writes: ['shop.order'] } },
     { op: 'create', ref: 'plain', type: 'style', title: 'No code' },
     { op: 'create', ref: 'task', type: 'work.task', title: 'Count stock' },
   ])) as { created: Record<string, string> };
@@ -112,7 +112,7 @@ test('a drawing asks in data: inside the types its style writes it applies, anyt
   assert.equal(((await asked([{ op: 'link', type: 'relates_to', from: task, to: s }])) as { status: string }).status, 'proposed', 'a link waits');
   assert.equal(((await asked([{ op: 'update', id: s, props: { writes: ['work.task'] } }])) as { held_by?: { rule: string } }).held_by?.rule !== undefined, true, 'what a drawing may write is not its own to widen');
   await assert.rejects(asked([{ op: 'merge', keep: task, drop: plain }]), /may ask to create/);
-  await assert.rejects(asked([{ op: 'create', type: 'shop.order', title: 'Oil' }], human, plain), /no style with code/);
+  await assert.rejects(asked([{ op: 'create', type: 'shop.order', title: 'Oil' }], human, plain), /no layout with code/);
   await assert.rejects(asked([{ op: 'create', type: 'shop.order', title: 'Oil' }], agent), /sent by the page/);
   assert.equal((await change(l, human, [{ op: 'update', id: task, title: 'Count it all' }])).status, 'applied', 'the person, not through a drawing, waits for nobody');
 });

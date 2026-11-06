@@ -73,7 +73,7 @@ export function storyPart(data) {
 // A lens says what is in a picture (the flat lens: a filter, a walk and a limit) and the server answers it with data
 // of one shape (the `flat` view). A style says how that data looks, and is only ever read here: which shape, and what
 // stays lit. The kernel draws the list; the core pack's drawings draw flow, a process map, and architecture, a
-// system's parts, where they run and their wires. Any other look is a style with code of its own, written for the
+// system's parts, where they run and their wires. Any other look is a layout with code, written for the
 // project by its people or agents.
 
 /** What a person chose for a picture is kept in their browser, by what it is a picture of. */
@@ -245,7 +245,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     const drawn = chosen.drawing && (chosen.drawing.shape ?? chosen.shape) === chosen.shape;
     const coded = typeof chosen.code === 'string' && chosen.code.trim();
     (coded ? drawCode : drawn ? drawWith : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.list))(body, asDrawn(shown), chosen, keep, place, look.coder);
-    // A drawing or a style's code says when it has drawn; a shape drawn here has drawn now.
+    // A drawing or a layout's code says when it has drawn; a shape drawn here has drawn now.
     if (!coded && !drawn) saidDrawn(body, 'drawn');
   };
   const load = async (refreshing = false) => {

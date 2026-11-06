@@ -81,7 +81,7 @@ test('a new workspace still keeps from its agents what the core rules keep', asy
   const { pelago: l } = await at.create('acme', 'Acme');
   const made = async (ops: Op[]) => (await l.change(agent, { ops, reason: 'the core rules' })).status;
   assert.equal(await made([{ op: 'create', type: 'document', title: 'Guide', visibility: 'public' }]), 'proposed', 'what is public');
-  assert.equal(await made([{ op: 'create', type: 'style', title: 'Loud', props: { code: 'export default () => []' } }]), 'proposed', 'code that runs');
+  assert.equal(await made([{ op: 'create', type: 'layout', title: 'Loud', props: { code: 'export default () => []' } }]), 'proposed', 'code that runs');
   assert.equal(await made([{ op: 'create', type: 'screen', title: 'Board' }]), 'proposed', 'screens');
   assert.equal(await made([{ op: 'create', type: 'automation', title: 'Nightly', status: 'paused', props: { trigger: 'daily', at: '03:00', action: 'notify', message: 'hi' } }]), 'proposed', 'automations');
   await assert.rejects(mayDo(l.db, l.registry, false, 'publish'), /Publishing is the owner/);

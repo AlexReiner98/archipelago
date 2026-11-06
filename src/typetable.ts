@@ -8,6 +8,7 @@ import { Archipelago } from './pelago.ts';
 import type { ResolvedRelation, ResolvedType } from './packs.ts';
 import { moveQueries, termQueries } from './query-saved.ts';
 import { moveStyles } from './style-move.ts';
+import { moveLayouts } from './layout-move.ts';
 import { linkOwners } from './owner-link.ts';
 import { newId } from './db.ts';
 
@@ -94,6 +95,7 @@ export async function syncTypes(given: Archipelago): Promise<{ activated: string
   await l.fillKinds(); // each item's kind in its row, now the type table is whole
   await moveQueries(l); // views kept before the flat lens, translated into flat lenses (a migration, run once)
   await moveStyles(l); // styles made for one view, moved into it (a migration, run once)
+  await moveLayouts(l); // styles with code, layouts now (a migration, run once; after moveStyles, which reads code on a style)
   await linkOwners(l, () => newId('r')); // each owner said as a link (a migration, run once)
   const asleep = rows.filter((r) => !now.has(r.id));
   reg.keep({

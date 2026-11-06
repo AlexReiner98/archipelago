@@ -4,9 +4,11 @@
 // Layers, the nearest last, each field of a nearer one over the same field of those before it:
 //   a preset on nothing (the workspace's), a style kept about nothing, a preset on nothing that says it lies over it,
 //   a preset on the item's kind or type, a style kept on it,
-//   a style kept about the item, one about the view drawn, one named outright.
-// A layer that names a shape and has no code, or says code: null, clears the code of those beneath it: a style named
-// outright draws as it says, whatever a style about the project draws.
+//   a style or layout kept about the item, the view's own, one named outright.
+// A layout (core's layout type) is code: it draws only about the item or named outright, never as the workspace's, and
+// its settings are a layer like a style's fields. A style holds no code: one written before the layout type has it
+// left out. A layer that names a shape and has no code, or says code: null, clears the code of those beneath it: a
+// style named outright draws as it says, whatever a layout about the project draws.
 // A style kept with a preset's id (preset) is the owner's version of that preset: its fields over the preset's, in
 // the preset's place; retired, the preset is not used. Read each time, so a change shows on the next look.
 // A preset that says it is chosen (over: "chosen", a theme) is used only once the owner keeps a version of it, and
@@ -44,11 +46,23 @@ export interface StyleAsk {
   try?: string;
 }
 
-/** The owner's versions of presets, open or retired: retired, the preset is not used. */
-async function versionsOf(l: Archipelago): Promise<Version[]> {
-  const { rows } = await l.db.query<Version>(`select id, title, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null and props ->> 'preset' is not null order by updated_at, id`, [l.registry.family('style')]);
+/** The owner's versions of presets, open or retired: retired, the preset is not used. A style's of the packs' style presets, a layout's of their drawings. */
+async function versionsOf(l: Archipelago, type: 'style' | 'layout' = 'style'): Promise<Version[]> {
+  const { rows } = await l.db.query<Version>(`select id, title, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null and props ->> 'preset' is not null order by updated_at, id`, [l.registry.family(type)]);
   return rows;
 }
+
+/** What a layout draws with, as a layer: its settings, and its code. */
+const layoutLayer = (props: Record<string, unknown>): Record<string, unknown> => ({
+  ...(props.settings && typeof props.settings === 'object' && !Array.isArray(props.settings) ? ownStyle(props.settings) : {}),
+  ...(typeof props.code === 'string' && { code: props.code }),
+});
+
+/** What a style draws with, as a layer: never code, which only a layout holds. */
+const styleLayer = (props: Record<string, unknown>): Record<string, unknown> => {
+  const { code: _code, modules: _modules, writes: _writes, ...rest } = props;
+  return rest;
+};
 
 const fields = (props: Record<string, unknown>) => Object.fromEntries(Object.entries(props).filter(([key, value]) => value != null && key !== 'preset' && key !== 'on'));
 const listed = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
@@ -59,7 +73,7 @@ export const ownStyle = (own: unknown): Record<string, unknown> => {
   return settings;
 };
 
-/** The style a picture or page is drawn in, and what went into it, the nearest last. `kept` is every open style on the map, with what each is about. */
+/** The style a picture or page is drawn in, and what went into it, the nearest last. `kept` is every open style and layout on the map, with what each is about. */
 export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, given?: Version[]): Promise<{ style: Record<string, unknown>; used: { id: string; title: string; preset?: string }[]; coder?: string }> {
   const presets: Preset[] = stylesOf(l.registry.packs);
   const versions = given ?? (await versionsOf(l));
@@ -83,16 +97,21 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, give
   }
   for (const one of kept) {
     if (one.props.preset != null) continue;
+    // A layout draws only where it is named, or on the pictures of what it is about: never as the workspace's, nor on kinds.
+    if (one.type !== undefined && l.registry.isA(one.type, 'layout')) {
+      const weight = one.id === ask.named ? 6 : ask.hub !== undefined && one.about.includes(ask.hub.id) ? 4 : -1;
+      if (weight >= 0) layers.push({ weight, id: one.id, title: one.title, props: layoutLayer(one.props) });
+      continue;
+    }
     const on = listed(one.props.on);
-    // A style with code of its own is a layout: it draws only where it is named, never as the workspace's.
-    const weight = one.id === ask.named ? 6 : ask.hub !== undefined && one.about.includes(ask.hub.id) ? 4 : on.length ? (onIt(on) ? 3 : -1) : one.about.length || typeof one.props.code === 'string' ? -1 : 1;
-    if (weight >= 0) layers.push({ weight, id: one.id, title: one.title, props: one.props });
+    const weight = one.id === ask.named ? 6 : ask.hub !== undefined && one.about.includes(ask.hub.id) ? 4 : on.length ? (onIt(on) ? 3 : -1) : one.about.length ? -1 : 1;
+    if (weight >= 0) layers.push({ weight, id: one.id, title: one.title, props: styleLayer(one.props) });
     if (ask.person !== undefined && one.about.includes(ask.person) && one.props.theme != null) layers.push({ weight: 7, id: one.id, title: one.title, props: { theme: one.props.theme } });
   }
   if (ask.own) layers.push({ weight: 5, id: 'view', title: 'This view', props: ask.own });
   layers.sort((a, b) => a.weight - b.weight);
   let style: Record<string, unknown> = {};
-  // The style whose code draws, when one has code: what a change its drawing asks for names (src/layout-changes.ts).
+  // The layout whose code draws, when one has code: what a change its drawing asks for names (src/layout-changes.ts).
   let coder: string | undefined;
   for (const layer of layers) {
     // A nearer style that names a shape and has no code of its own, or says code: null, is drawn as it says: the code beneath it is cleared.
@@ -106,7 +125,7 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, give
 
 /** A picture's style with the drawing it is drawn by, if a pack draws its shape: its modules left out when the page has them (`have`, hashes). */
 export async function drawn(l: Archipelago, style: Record<string, unknown>, have: unknown): Promise<Record<string, unknown>> {
-  const drawing = layoutFor(l.registry, style, await versionsOf(l), Array.isArray(have) ? have.map(String) : []);
+  const drawing = layoutFor(l.registry, style, await versionsOf(l, 'layout'), Array.isArray(have) ? have.map(String) : []);
   return drawing ? { ...style, drawing } : style;
 }
 
@@ -138,7 +157,7 @@ export async function pageStyle(l: Archipelago, input: { of?: unknown; style?: u
   const tried = typeof input.try === 'string' ? input.try : undefined;
   // A view kept on the map holds its own layout and settings, over every style but one named outright.
   const own = view === undefined ? undefined : ownStyle((await l.entity(view))?.props.style);
-  const read = await styleFor(l, await keptOf(l, 'style', named), { ...(item && { hub: item }), ...(own && { own }), ...(named && { named }), ...(person && { person }), ...(tried && { try: tried }) });
+  const read = await styleFor(l, await keptOf(l, ['style', 'layout'], named), { ...(item && { hub: item }), ...(own && { own }), ...(named && { named }), ...(person && { person }), ...(tried && { try: tried }) });
   // The shape the reader chose for this view (the view band's switch) over that, so its drawing comes with it.
   if (typeof input.shape === 'string' && input.shape) {
     read.style.shape = input.shape;

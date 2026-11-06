@@ -100,7 +100,7 @@ test('screens are declared in pack files, checked when the pack loads, and liste
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'view', view: 'demo.none' }] }]), /declares no view "demo.none" of rows/);
   assert.throws(bad([{ id: 's', title: 'S', on: ['task'], pieces: [{ piece: 'figure' }] }]), /must be named "demo.<name>"/);
   // A button says its word, its tooltip and one thing it does, by a pack's action or how it draws the canvas.
-  assert.deepEqual(schema.screens.find((s) => s.id === 'core.style_apply')!.on, ['style']);
+  assert.deepEqual(schema.screens.find((s) => s.id === 'core.style_apply')!.on, ['style', 'layout']);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', tip: 'T', draw: { shape: 'list' } }] }]), /a button piece names its label/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', label: 'L', draw: { shape: 'list' } }] }]), /a button piece names its tip/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', label: 'L', tip: 'T' }] }]), /a button does one thing/);

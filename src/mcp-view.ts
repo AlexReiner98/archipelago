@@ -6,7 +6,7 @@
 // The resource holds no data and no token. It is told of the call by the host, and it asks the server, by
 // the host, for a look (src/looks.ts): the server's own browser draws it in the sandbox, as the agent sees the map, and
 // the page mounts the marks that come back (ui/look-marks.js), or the picture of a drawing that has none. No drawing's
-// code runs in the host's frame: it could not (no worker, no second origin), and a style's code runs behind its two
+// code runs in the host's frame: it could not (no worker, no second origin), and a layout's code runs behind its two
 // walls or not at all. The drawing is static, as a published page's still frame is.
 //
 // The server keeps no session, so it cannot ask what a client said it supports before listing its tools, as the

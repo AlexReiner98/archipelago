@@ -11,6 +11,7 @@ import { addressOf, flatView, stepsOf } from './query.js';
 import { filterSaid, fitBar } from './query-bar.js';
 import { canvasMenu } from './canvas-menu.js';
 import { lookSwitch, styleDelete } from './look-switch.js';
+import { thumbOf } from './thumbs.js';
 import { ARROW, isA, typeTitle, wayOf } from './words.js';
 
 const TYPE = 'lens';
@@ -228,6 +229,7 @@ const row = (c, now) =>
   h(
     'li',
     { class: 'row-top nowrap-row' },
+    thumbOf({ id: c.id, ...viewParts(c) }),
     h('a', { class: 'gist', href: canvasAt(c), title: c.title }, c.title),
     h('span', { class: 'muted small gist', title: lensWords(viewParts(c).lens) }, lensWords(viewParts(c).lens)),
     c.props?.pinned === true && h('span', { class: 'pill', title: 'Pinned' }, 'pinned'),

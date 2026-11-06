@@ -1,6 +1,6 @@
 // Drawings: the code a picture is drawn by, shipped by a pack and changed on the map. A pack declares each in its
 // pack.json (`layouts`: the shape it draws and its modules, files in the pack's folder, entered at index.js); a
-// style kept with a drawing's id as its preset is the owner's version, whose `modules` stand in for the pack's file
+// layout kept with a drawing's id as its preset is the owner's version, whose `modules` stand in for the pack's file
 // by file. The page runs it in the sandbox (ui/layout.js); the kernel draws no shape itself once a drawing draws it.
 //
 // A drawing goes to the page with its hash, and its modules only when the page does not have them yet (`have`).
@@ -43,7 +43,7 @@ const hashOf = (modules: Record<string, string>) => createHash('sha256').update(
 
 /**
  * The drawing a style is drawn by: its shape's, as the pack ships it under the owner's version of it (`versions`:
- * styles kept with a preset). A style with code of its own is drawn by that, and a shape no pack draws by the kernel.
+ * layouts kept with a drawing's id as preset). A style whose layout has code is drawn by that, and a shape no pack draws by the kernel.
  */
 export function layoutFor(
   packs: { dir: string; packs: { id: string; layouts?: LayoutDef[] }[] },

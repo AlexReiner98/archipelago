@@ -47,7 +47,7 @@ export const notOf = (filter) => filter?.not ?? ['kind system'];
 // drop it, for a browser that loads no sandboxed frame (the desktop app's pane); the worker inside is still a wall.
 export const frameSandbox = () => (document.documentElement.dataset.drawSandbox === 'off' ? null : 'allow-scripts');
 
-// Whether the owner turned the sandbox off for a style's code here (workspace_info drawings_open): read once a page, and
+// Whether the owner turned the sandbox off for a layout's code here (workspace_info drawings_open): read once a page, and
 // again once the setting is changed. Anything but a yes keeps the sandbox.
 let opened;
 export const drawingsOpen = () => (opened ??= api('workspace_info').then((info) => info?.drawings_open === true, () => false));

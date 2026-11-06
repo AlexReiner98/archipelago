@@ -33,7 +33,7 @@ test('in a browser, a style’s code reaches nothing in the sandbox, and with th
     ops: [
       { op: 'create', ref: 'a', type: 'work', title: 'Seed' },
       { op: 'create', ref: 'c', type: 'lens', title: 'Reaching', status: 'current', props: { filter: { find: ['type work'] } } },
-      { op: 'create', ref: 's', type: 'style', title: 'Reacher', status: 'current', props: { code: REACH } },
+      { op: 'create', ref: 's', type: 'layout', title: 'Reacher', status: 'current', props: { code: REACH } },
     ],
   })).result.created as Record<string, string>;
   await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.c, props: { style: { style: made.s } } }] });

@@ -18,7 +18,7 @@ const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'plac
 const ROOTS = ['part_of', 'depends_on', 'waits_on', 'needs', 'holds', 'involves', 'serves', 'lives_in', 'about', 'bears_on', 'link', 'uses', 'produced'];
 /** The kernel's own that stand on a starter of the work: a connection to the outside and a document another workspace shares, which live on no island. */
 const KERNEL_OF_WORK = ['connection', 'shared_document'];
-const SYSTEM = ['lens', 'style', 'instruction', 'screen', 'type', 'link_type', 'source', 'run', 'notification', 'automation', 'island'];
+const SYSTEM = ['lens', 'style', 'layout', 'instruction', 'screen', 'type', 'link_type', 'source', 'run', 'notification', 'automation', 'island'];
 const human: Actor = { kind: 'human', name: 'test' };
 
 /** A copy of the shipped packs, with one more pack beside them when given. */
