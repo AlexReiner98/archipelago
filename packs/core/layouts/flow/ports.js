@@ -161,7 +161,8 @@ export function apart(model, { ports, extras, pad }) {
   const inside = bounds([...steps, ...extras.map((e) => e.id)].map((id) => boxOf(nodes, x, y, id)), [...model.chains, ...ties, ...ported.values()].flatMap((w) => w.points));
   const edge = {};
   for (const p of ports) edge[p.side] = ported.get(p.id)?.at[SIDES[p.side][0]];
-  const frame = { l: edge.left ?? inside.l - pad, t: edge.top ?? inside.t - pad, r: edge.right ?? inside.r + pad, b: edge.bottom ?? inside.b + pad };
+  // A side with ports is on their line, unless a step stands out past it: the frame holds every step.
+  const frame = { l: Math.min(edge.left ?? Infinity, inside.l - pad), t: Math.min(edge.top ?? Infinity, inside.t - pad), r: Math.max(edge.right ?? -Infinity, inside.r + pad), b: Math.max(edge.bottom ?? -Infinity, inside.b + pad) };
   return { ...model, nodes: kept(nodes), x: kept(x), y: kept(y), all: model.all.filter((n) => !own.has(n.id)), ties, ported, placed, frame };
 }
 

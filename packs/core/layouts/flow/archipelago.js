@@ -144,7 +144,9 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
       const trial = run({ items: b.items, links: b.links, ports: portsFor(b), extras: headerOf(b).extras });
       const steps = [...trial.x.keys()].filter((id) => !trial.nodes.get(id).dummy).map((id) => { const n = trial.nodes.get(id); return { id, l: trial.x.get(id) - n.w / 2, r: trial.x.get(id) + n.w / 2, t: trial.y.get(id) - n.h / 2, b: trial.y.get(id) + n.h / 2 }; });
       const meets = (p, q, s) => Math.max(p[0], q[0]) > s.l && Math.min(p[0], q[0]) < s.r && Math.max(p[1], q[1]) > s.t && Math.min(p[1], q[1]) < s.b;
-      const found = mine.flatMap((w) => [...(trial.ported.get(w.ends[0].id)?.lines ?? [])].filter(([id, l]) => l.some((p, i) => i && steps.some((s) => s.id !== id && meets(l[i - 1], p, s)))).map(([id]) => [w, id]))[0];
+      // Or whose readers the solve could not part: one stands on another step.
+      const box = (id) => steps.find((s) => s.id === id), crowded = (id) => steps.some((s) => s.id !== id && meets([box(id).l, box(id).t], [box(id).r, box(id).b], s));
+      const found = mine.flatMap((w) => [...(trial.ported.get(w.ends[0].id)?.lines ?? [])].filter(([id, l]) => (box(id) && crowded(id)) || l.some((p, i) => i && steps.some((s) => s.id !== id && meets(l[i - 1], p, s)))).map(([id]) => [w, id]))[0];
       if (!found) break;
       const [w] = found, [own, ...rest] = [...new Set(bundles[w.k].map((l) => l.from))].map((id) => bundles[w.k].filter((l) => l.from === id));
       bundles[w.k] = own;
@@ -266,7 +268,12 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   const portAt = (e) => move(e.block)(e.block.ported.ported.get(e.id).at);
   const inner = (e, id) => { const p = e.block.ported.ported.get(e.id); return (p.lines.get(id) ?? p.points).map(move(e.block)); };
   // A shared port is where its wires meet, on its outer edge: its bar is drawn there, and the wire on starts there.
-  const shoreAt = (e) => { const [axis, out] = SIDES[e.side], p = portAt(e); p[axis] += (out * e.size[axis]) / 2; return p; };
+  // That is on its island's side at sea, in line with the port: the port's outer edge, or past it where a step stands out.
+  const shoreAt = (e) => {
+    const [axis, out] = SIDES[e.side], p = portAt(e), box = outline(e.block);
+    p[axis] = (out < 0 ? (axis ? box.t : box.l) : axis ? box.b : box.r) + (axis ? e.block.dy : e.block.dx);
+    return p;
+  };
   const routed = [], shared = new Set();
   for (const w of wires) {
     const t = sea.ties.find((v) => v.type === `sea:${w.k}`);

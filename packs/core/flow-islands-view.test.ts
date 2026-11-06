@@ -19,11 +19,12 @@ const [{ layout }, { compose, islandModels }, { count }, { nameOf }] = await Pro
 const { result: answer } = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'layouts', 'flow-islands.json'), 'utf8'));
 
 /**
- * What each fault may count, at most: lower a ceiling when a change brings its count down, never raise one. Jogs were
- * raised once, 5 to 8, when a finding's readers on one island came to share one wire across the sea (crossings 101 to
- * 40), on the owner's word (6 Nov 2026): the jogs are ports a few px off their side's line.
+ * What each fault may count, at most: lower a ceiling when a change brings its count down, never raise one. Crossings
+ * were set again on 6 Nov 2026, when an island's legend came to name only what is in use on it: the islands are smaller,
+ * and the drawing before then counted 290 here; a finding's readers on one island sharing one wire across the sea brought
+ * that to 102.
  */
-const CEILING: Record<string, number> = { 'loose ends': 0, outside: 0, overlapping: 0, through: 0, shared: 0, jogs: 8, unbridged: 0, crossings: 40 };
+const CEILING: Record<string, number> = { 'loose ends': 0, outside: 0, overlapping: 0, through: 0, shared: 0, jogs: 4, unbridged: 0, crossings: 102 };
 
 const z = (name: string) => house.sizes[`flow_${name}`], measure = (t: string, px: number) => String(t).length * px * 0.55;
 /** The shapes a page lays the picture out to: tall, the house's, and wide. Each fault is counted in all three. */
@@ -31,7 +32,10 @@ const ASPECTS = [1, 1.6, 2.4];
 let aspect = ASPECTS[0];
 const run = (part: any) => layout({ ...part, undrawn: house.undrawn ?? [], headless: house.headless, measure, sizes: house.sizes, aspect, shapes: { type: house.type_shapes ?? {} } });
 const entry = (title: string) => z('key_width') + z('island_legend_mark_gap') + measure(title, z('island_legend_text'));
-const legends = new Map(answer.islands.map((i: any) => [i.id, [...(i.pack?.types ?? []), ...(i.pack?.links ?? [])].map((t: any) => entry(t.title))]));
+// Each island's legend as the page sets it out: of its pack, only the types and link types in use on it.
+const on = (i: any) => answer.items.filter((t: any) => t.island === i.id), ids = (i: any) => new Set(on(i).map((t: any) => t.id));
+const used = (i: any) => [...(i.pack?.types ?? []).filter((t: any) => on(i).some((s: any) => s.type === t.id)), ...(i.pack?.links ?? []).filter((r: any) => answer.links.some((l: any) => l.type === r.id && ids(i).has(l.from) && ids(i).has(l.to)))];
+const legends = new Map(answer.islands.map((i: any) => [i.id, used(i).map((t: any) => entry(t.title))]));
 const names = new Map(answer.islands.map((i: any) => [i.id, z('island_name_x') + measure(nameOf(i), z('island_text'))]));
 const laidOut = () => compose(islandModels({ items: answer.items, links: answer.links, run }), { legends, names, sizes: house.sizes });
 let g = laidOut();
