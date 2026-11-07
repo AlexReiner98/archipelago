@@ -286,8 +286,10 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
       if (!who.human || (who.drawing && rule.when?.drawing)) held.push(ruled(rule));
     } else if (rule.then === 'refuse') refused.push(said(rule, `"${title}": refused by ${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`));
     else if (typeof rule.then === 'object') {
+      // A field the item's head holds (its body) is read from the op too.
       const props = { ...targets[0]?.props, ...w.props };
-      const missing = rule.then.require.filter((f) => props[f] == null || props[f] === '');
+      const value = (f: string) => props[f] ?? (w as unknown as Record<string, unknown>)[f];
+      const missing = rule.then.require.filter((f) => value(f) == null || String(value(f)).trim() === '');
       if (missing.length) refused.push(said(rule, `"${title}": needs ${missing.join(', ')}`));
     }
   }

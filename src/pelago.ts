@@ -5,7 +5,7 @@ import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, type Policy 
 import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.ts'; import { authorityOf } from './authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
 import { once } from './merge.ts'; import { readEvents, type EventQuery } from './eventlog.ts';
-import type { Registry } from './packs.ts'; import { currentNames } from './type-items.ts';
+import type { Registry } from './packs.ts'; import { currentNames } from './type-items.ts'; import { noTwins } from './view-twins.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
 import { KEPT_FIELDS } from './operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from './streams.ts';
 import { search, type SearchInput } from './search.ts'; import { layoutOf } from './layout-changes.ts';
@@ -83,6 +83,7 @@ export class Archipelago {
   async change(actor: Actor, input: ChangeInput, measured = false) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
     currentNames(this.registry, input.ops); await stillWritable(this.workspace); await roomToStore(this.workspace); await mayWrite(this, actor, input.ops, measured);
+    if (actor.kind !== 'human' && !input.pack) await noTwins(this, input.ops);
     const { warnings } = await this.plan(input.ops);
     const me = actorId(actor);
     const claimed = input.authority;

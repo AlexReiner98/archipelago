@@ -7,14 +7,14 @@ import { agent, fresh, human, make } from './map.ts';
 
 test('a view or layout is made working, and only the owner’s word keeps it or retires a kept one', async () => {
   const l = await fresh();
-  const { mine } = await make(l, [{ op: 'create', ref: 'mine', type: 'lens', title: 'Mine', status: 'kept', props: { filter: { find: ['type task'] } } }]);
+  const { mine } = await make(l, [{ op: 'create', ref: 'mine', type: 'lens', title: 'Mine', status: 'kept', props: { filter: { find: ['type decision'] } } }]);
   assert.equal((await l.entity(mine))?.status, 'kept');
-  const theirs = await l.change(agent, { ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'An agent’s', props: { filter: { find: ['type task'] } } }], reason: 'test' });
+  const theirs = await l.change(agent, { ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'An agent’s', body: 'Every task.', props: { filter: { find: ['type task'] } } }], reason: 'test' });
   assert.equal((theirs as { status: string }).status, 'proposed'); // held for the owner, as any agent's change here, not refused
-  await assert.rejects(l.change(agent, { ops: [{ op: 'create', type: 'lens', title: 'Kept unasked', status: 'kept', props: { filter: { find: ['type task'] } } }], reason: 'test' }), /kept only on the owner's word/);
+  await assert.rejects(l.change(agent, { ops: [{ op: 'create', type: 'lens', title: 'Kept unasked', body: 'Every task.', status: 'kept', props: { filter: { find: ['type task'] } } }], reason: 'test' }), /kept only on the owner's word/);
   await assert.rejects(l.change(agent, { ops: [{ op: 'create', type: 'layout', title: 'Kept unasked', status: 'kept', props: { code: 'export default () => {}' } }], reason: 'test', authority: { of: 'agent', basis: 'I like it' } }), /kept only on the owner's word/);
   await assert.rejects(l.change(agent, { ops: [{ op: 'update', id: mine, status: 'retired' }], reason: 'test' }), /retires it only on their word/);
-  const told = await l.change(agent, { ops: [{ op: 'create', type: 'lens', title: 'Kept as told', status: 'kept', props: { filter: { find: ['type task'] } } }], reason: 'test', authority: { of: 'human', basis: 'Alex, in chat: keep it' } });
+  const told = await l.change(agent, { ops: [{ op: 'create', type: 'lens', title: 'Kept as told', body: 'Every task.', status: 'kept', props: { filter: { find: ['type task'] } } }], reason: 'test', authority: { of: 'human', basis: 'Alex, in chat: keep it' } });
   assert.notEqual((told as { status: string }).status, 'rejected');
 });
 
@@ -80,4 +80,24 @@ test('pins go: the ids a view held by hand are id terms of its filter, and pinne
   const props = (await l.entity(made.v))?.props as Record<string, unknown>;
   assert.deepEqual([props.filter, 'pins' in props, 'pinned' in props], [{ find: ['type decision', `id ${made.t}`] }, false, false]);
   assert.deepEqual(await movePins(l), []); // once
+});
+
+test('an agent’s view says what it shows, and one already there is reused, not made twice', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 't', type: 'task', title: 'A task' },
+    { op: 'create', ref: 'v', type: 'lens', title: 'What is left?', body: 'The steps still open.', props: { filter: { find: ['id {t}'], only: ['open'] }, walk: { over: ['part_of<'], steps: 1 } } },
+    { op: 'link', type: 'about', from: 'v', to: 't' },
+  ]);
+  const view = (title: string, props: Record<string, unknown>, body?: string) => ({ op: 'create', ref: 'n', type: 'lens', title, ...(body && { body }), props }) as const;
+  const query = { filter: { only: ['open'], find: [`id ${made.t}`] }, walk: { steps: 1, over: ['part_of<'] } };
+  await assert.rejects(l.change(agent, { ops: [view('Another question', { filter: { find: ['type task'] } })], reason: 'test' }), /its note's first line says what it shows/);
+  // The same query about the same item, its keys in another order: that view, named.
+  await assert.rejects(l.change(agent, { ops: [view('Under another name', query, 'The same.'), { op: 'link', type: 'about', from: 'n', to: made.t }], reason: 'test' }), (err: Error) => err.message.includes(`"What is left?" (${made.v}) is that view already`));
+  await assert.rejects(l.change(agent, { ops: [view('what is left?', { filter: { find: ['type task'] } }, 'Another query, the same name.'), { op: 'link', type: 'about', from: 'n', to: made.t }], reason: 'test' }), /is that view already/);
+  // About something else, or about nothing, it is a view of its own.
+  const own = await l.change(agent, { ops: [view('What is left?', query, 'The workspace’s.')], reason: 'test' });
+  assert.notEqual((own as { status: string }).status, 'rejected');
+  // A person saving the same is not stopped: the bar keeps a name once already.
+  await make(l, [view('What is left?', query, 'Mine.'), { op: 'link', type: 'about', from: 'n', to: made.t }]);
 });

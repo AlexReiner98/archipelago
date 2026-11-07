@@ -143,10 +143,10 @@ test('possible duplicates are flagged, across flavours', async () => {
 test('a view that walks part_of either way past a step is warned it climbs; one way, it is not', async () => {
   const l = await fresh();
   const filter = { find: ['id e_aaaaaaaa'] };
-  const both = await l.change(agent, { ops: [{ op: 'create', type: 'lens', title: 'Climbs', props: { filter, walk: { over: ['part_of', 'depends_on'], steps: 2 } } }], reason: 'test' });
+  const both = await l.change(agent, { ops: [{ op: 'create', type: 'lens', title: 'Climbs', body: 'Two steps out.', props: { filter, walk: { over: ['part_of', 'depends_on'], steps: 2 } } }], reason: 'test' });
   assert.ok(both.warnings.some((w) => /part_of either way for 2 steps.*part_of</.test(w)), both.warnings.join('\n'));
   for (const walk of [{ over: ['part_of<', 'depends_on'], steps: 2 }, { over: ['part_of'], steps: 1 }]) {
-    const one = await l.change(agent, { ops: [{ op: 'create', type: 'lens', title: `Down ${walk.steps}`, props: { filter, walk } }], reason: 'test' });
+    const one = await l.change(agent, { ops: [{ op: 'create', type: 'lens', title: `Down ${walk.steps}`, body: 'Steps down.', props: { filter, walk } }], reason: 'test' });
     assert.ok(!one.warnings.some((w) => /climbs/.test(w)), one.warnings.join('\n'));
   }
 });
