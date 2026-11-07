@@ -36,7 +36,7 @@ test('in a browser, a saved canvas is opened from Home and switched to from the 
     await page.go(`${base}/#/you`);
     assert.ok(await until(`Boolean(document.querySelector('.canvases .old-views'))`), 'the views of items are folded');
     assert.ok(!(await page.evaluate<boolean>(`[...document.querySelectorAll('.canvases > .rows a')].some((a) => a.textContent === 'A view of it')`)), 'not among the workspace’s own');
-    await page.evaluate(`(() => { const d = document.querySelector('.canvases .old-views'); d.open = true; [...d.querySelectorAll('a')].find((a) => a.textContent === 'A view of it').click(); })()`);
+    await page.evaluate(`(() => { const ds = [...document.querySelectorAll('.canvases .old-views')]; ds.forEach((d) => (d.open = true)); ds.flatMap((d) => [...d.querySelectorAll('a')]).find((a) => a.textContent === 'A view of it').click(); })()`);
     assert.ok(await until(`${picked} === 'A view of it'`), `opened as a canvas: ${page.logs().join(' | ')}`);
     assert.ok(await until(drawn(made.a)));
 

@@ -27,7 +27,7 @@ export function savedCanvases(fresh = false) {
       const said = new Map((views?.pictures ?? []).map((p) => [p.lens, p]));
       // A working view about what has closed is retired with it (src/saved-views.ts).
       const ended = new Set(views?.ended ?? []);
-      const marked = rows.filter((r) => !ended.has(r.id)).map((r) => ({ ...r, ofItem: Boolean(said.get(r.id)?.of), inDocument: Boolean(said.get(r.id)?.document) }));
+      const marked = rows.filter((r) => !ended.has(r.id)).map((r) => ({ ...r, ofItem: Boolean(said.get(r.id)?.of), project: said.get(r.id)?.project ?? null, inDocument: Boolean(said.get(r.id)?.document) }));
       const kept = new Set(rows.map((r) => r.props?.preset).filter(Boolean));
       // A pack's view of one item (`on` its types) is offered on that item's page alone (viewsOn).
       const offered = (state.schema?.canvases ?? []).filter((p) => !kept.has(p.id) && !p.on?.length).map((p) => ({ id: p.id, title: p.title, preset: true, props: { ...p.props, preset: p.id } }));
@@ -38,6 +38,21 @@ export function savedCanvases(fresh = false) {
 
 /** The views a person picks from: not those a document brings in, unless up (`up`, an id). */
 const pickable = (all, up) => all.filter((c) => !c.inDocument || c.id === up);
+
+/**
+ * The views in their groups (task e_v3crze82): the workspace's own first (about nothing, and the packs'), then those of
+ * each project by its name, then those of items in no project. Each group keeps the order the views came in.
+ */
+const groupsOf = (views) => {
+  const groups = new Map([['', { title: 'Workspace', views: [] }]]);
+  for (const c of views) {
+    const key = !c.ofItem ? '' : c.project?.id ?? '~';
+    if (!groups.has(key)) groups.set(key, { title: !c.ofItem ? 'Workspace' : c.project?.title ?? 'Other items', views: [] });
+    groups.get(key).views.push(c);
+  }
+  const [workspace, ...rest] = [...groups.values()];
+  return [workspace, ...rest.sort((a, b) => Number(a.title === 'Other items') - Number(b.title === 'Other items') || a.title.localeCompare(b.title))];
+};
 
 /** What a saved canvas draws: its filter, its walk and its limit; and its style, with its own id. */
 export function viewParts(item) {
@@ -207,7 +222,7 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
       // Not saved, it is named as its tab and its pane are: by what its filter finds.
       !current && !isHome && h('option', { value: '', selected: true }, filterSaid(lens.filter, () => {}) || 'View'),
       h('option', { value: '#/', selected: isHome && !current }, 'Home'),
-      pickable(all, current?.id).map((c) => h('option', { value: canvasAt(c), selected: c === current }, `${c.title}${c === current && changed ? ' •' : ''}`)),
+      groupsOf(pickable(all, current?.id)).filter((g) => g.views.length).map((g) => h('optgroup', { label: g.title }, g.views.map((c) => h('option', { value: canvasAt(c), selected: c === current }, `${c.title}${c === current && changed ? ' •' : ''}`)))),
     );
     // In a browser's order: back and forward, then the canvas up, as its address, and its style, with Save beside them, Split, and the canvas's menu at the end.
     const own = hooks.paneButtons?.() ?? [];
@@ -248,14 +263,16 @@ export async function canvasesPiece(host, title) {
   if (!host.isConnected) return;
   const now = up;
   const listed = pickable(all, now);
-  const [own, items] = [listed.filter((c) => !c.ofItem), listed.filter((c) => c.ofItem)];
+  const [workspace, ...projects] = groupsOf(listed);
   host.replaceChildren(
     h(
       'section',
       { class: 'card wide canvases', style: 'margin-bottom: var(--space-8); min-width: 0' },
       h('header', {}, h('h2', {}, title)),
-      own.length ? h('ul', { class: 'rows' }, own.map((c) => row(c, now))) : h('div', { class: 'empty', title: 'Save in the bar keeps what is up as a view' }, 'None saved yet.'),
-      items.length > 0 && h('details', { class: 'old-views' }, h('summary', { class: 'muted small', title: 'Views kept about one item' }, `Views of items (${items.length})`), h('ul', { class: 'rows' }, items.map((c) => row(c, now)))),
+      h('div', { class: 'muted small', title: 'Views about nothing: the workspace’s own' }, workspace.title),
+      workspace.views.length ? h('ul', { class: 'rows' }, workspace.views.map((c) => row(c, now))) : h('div', { class: 'empty', title: 'Save in the bar keeps what is up as a view' }, 'None saved yet.'),
+      // Those of each project, folded, the one holding the view up open.
+      projects.map((g) => h('details', { class: 'old-views', ...(g.views.some((c) => c.id === now) && { open: true }) }, h('summary', { class: 'muted small', title: `Views kept about ${g.title} and what is in it` }, `${g.title} (${g.views.length})`), h('ul', { class: 'rows' }, g.views.map((c) => row(c, now))))),
     ),
   );
 }
