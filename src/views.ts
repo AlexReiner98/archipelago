@@ -130,7 +130,7 @@ export const VIEWS: Record<string, View> = {
   },
   session_measures: { description: 'What sessions’ turns tell over a range: those waiting on their person now and since when (waiting), turns and tokens per item worked on (per_item), open sessions with an hour of turns and no test passed or commit since (stalled). Params: since, until (ISO; a week to now), stall_minutes (60).', run: async (l, input) => (await import('./session-measures.ts')).sessionMeasures(l, input) }, // read when asked: it reaches src/sessions.ts, which reads these views
   saved_views: {
-    description: 'Every view kept on the map (a query, named by the style that draws it), with what it is a view of and its life (working, an agent’s; kept, on the owner’s word): pinned first, then the kept, then the newest. A working view about items that have all closed is retired with them: left out, its id in ended. Params: limit (100).',
+    description: 'Every view kept on the map (a query, named by the style that draws it), with what it is a view of and its life (working, an agent’s; kept, on the owner’s word): the kept first, then the newest. A working view about items that have all closed is retired with them: left out, its id in ended. Params: limit (100).',
     run: (l, input) => savedViews(l, input as { limit?: number }),
   },
   style: {

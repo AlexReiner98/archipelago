@@ -4,7 +4,7 @@
 // names it. The bar switches between them and keeps what is up as one; Home lists them, one line each.
 // The views kept before the flat lens were translated into such canvases when the workspace opened
 // (src/query-saved.ts); a view kept about an item is listed on Home under the views of items, folded, and one a
-// document brings in is a part of that page, in neither list unless it is pinned or up.
+// document brings in is a part of that page, in neither list unless it is up.
 
 import { api, ask, h, hooks, idsOf, state, tell, wordsOf, withIds } from './base.js';
 import { addressOf, flatView, stepsOf } from './query.js';
@@ -16,7 +16,7 @@ import { ARROW, isA, typeTitle, wayOf } from './words.js';
 
 const TYPE = 'lens';
 /**
- * The saved canvases, pinned first, then by name: so a switch keeps its order as they change. The packs' canvases
+ * The saved canvases, the kept first, then by name: so a switch keeps its order as they change. The packs' canvases
  * (presets, decision e_x8bghuce) are among them, each until the owner keeps a version of it (props.preset), which
  * stands in its place; a preset kept is not on the map, so it has no id of its own to open by (`preset` says so).
  */
@@ -27,22 +27,22 @@ export function savedCanvases(fresh = false) {
       const said = new Map((views?.pictures ?? []).map((p) => [p.lens, p]));
       // A working view about what has closed is retired with it (src/saved-views.ts).
       const ended = new Set(views?.ended ?? []);
-      const marked = rows.filter((r) => !ended.has(r.id)).map((r) => ({ ...r, ofItem: Boolean(said.get(r.id)?.of && !said.get(r.id).pinned), inDocument: Boolean(said.get(r.id)?.document) }));
+      const marked = rows.filter((r) => !ended.has(r.id)).map((r) => ({ ...r, ofItem: Boolean(said.get(r.id)?.of), inDocument: Boolean(said.get(r.id)?.document) }));
       const kept = new Set(rows.map((r) => r.props?.preset).filter(Boolean));
       // A pack's view of one item (`on` its types) is offered on that item's page alone (viewsOn).
       const offered = (state.schema?.canvases ?? []).filter((p) => !kept.has(p.id) && !p.on?.length).map((p) => ({ id: p.id, title: p.title, preset: true, props: { ...p.props, preset: p.id } }));
-      return [...marked, ...offered].sort((a, b) => Number(b.props?.pinned === true) - Number(a.props?.pinned === true) || Number(a.status === 'working') - Number(b.status === 'working') || a.title.localeCompare(b.title));
+      return [...marked, ...offered].sort((a, b) => Number(a.status === 'working') - Number(b.status === 'working') || a.title.localeCompare(b.title));
     });
   return known;
 }
 
-/** The views a person picks from: not those a document brings in, unless pinned or up (`up`, an id). */
-const pickable = (all, up) => all.filter((c) => !c.inDocument || c.props?.pinned === true || c.id === up);
+/** The views a person picks from: not those a document brings in, unless up (`up`, an id). */
+const pickable = (all, up) => all.filter((c) => !c.inDocument || c.id === up);
 
-/** What a saved canvas draws: its filter with its pins, its walk and its limit; and its style, with its own id. */
+/** What a saved canvas draws: its filter, its walk and its limit; and its style, with its own id. */
 export function viewParts(item) {
   const p = item.props ?? {};
-  const filter = withIds(p.filter ?? {}, Array.isArray(p.pins) ? p.pins : []);
+  const filter = p.filter ?? {};
   const lens = { ...(p.view && { view: p.view }), filter, walk: p.walk ?? { over: [], steps: 0 }, ...(p.limit && { limit: p.limit }), ...(p.time && { time: p.time }) };
   return { lens, style: { ...(p.style ?? {}), ...(!item.preset && { canvas: item.id }) } };
 }
@@ -141,7 +141,7 @@ async function save(lens, style, current, open, fresh = false) {
   const props = { filter, walk, limit: limit ?? null, time: time ?? null, style: { ...settingsOf(current), ...keptStyle(style) }, ...(current?.preset && title === current.title && { preset: current.id }) };
   const same = all.find((c) => !c.preset && c.title.toLowerCase() === title.toLowerCase());
   const made = same
-    ? await api('change', { ops: [{ op: 'update', id: same.id, status: 'kept', props: { ...props, pins: null } }], reason: 'Saved from the query bar' })
+    ? await api('change', { ops: [{ op: 'update', id: same.id, status: 'kept', props }], reason: 'Saved from the query bar' })
     : await api('change', { ops: [{ op: 'create', ref: 'canvas', type: TYPE, title, status: 'kept', props }], reason: 'Saved from the query bar' });
   const id = same?.id ?? made.created?.canvas;
   savedCanvases(true);
@@ -238,7 +238,6 @@ const row = (c, now) =>
     thumbOf({ id: c.id, ...viewParts(c) }),
     h('a', { class: 'gist', href: canvasAt(c), title: c.title }, c.title),
     h('span', { class: 'muted small gist', title: lensWords(viewParts(c).lens) }, lensWords(viewParts(c).lens)),
-    c.props?.pinned === true && h('span', { class: 'pill', title: 'Pinned' }, 'pinned'),
     working(c) && h('span', { class: 'muted small', title: 'Working: an agent’s view, retired with what it is about unless you keep it' }, 'working'),
     c.id === now && h('span', { class: 'pill ok', title: 'The view up now' }, 'up'),
   );

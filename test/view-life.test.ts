@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { callTool } from '../src/tools.ts';
-import { lifeOf, moveLives } from '../src/view-life.ts';
+import { lifeOf, moveLives, movePins, pinsMoved } from '../src/view-life.ts';
 import { agent, fresh, human, make } from './map.ts';
 
 test('a view or layout is made working, and only the owner’s word keeps it or retires a kept one', async () => {
@@ -44,7 +44,7 @@ test('the views kept before their life are sorted once: pinned or a layout kept,
   const made = await make(l, [
     { op: 'create', ref: 'open', type: 'task', title: 'Open' },
     { op: 'create', ref: 'shut', type: 'task', title: 'Shut', status: 'done' },
-    { op: 'create', ref: 'p', type: 'lens', title: 'Pinned', props: { pinned: true, filter: { find: ['type task'] } } },
+    { op: 'create', ref: 'p', type: 'lens', title: 'Pinned', props: { filter: { find: ['type task'] } } },
     { op: 'create', ref: 'o', type: 'lens', title: 'Of the open', props: { filter: { find: ['type task'] } } },
     { op: 'create', ref: 's', type: 'lens', title: 'Of the shut', props: { filter: { find: ['type task'] } } },
     { op: 'create', ref: 'n', type: 'lens', title: 'Of nothing', props: { filter: { find: ['type task'] } } },
@@ -55,8 +55,29 @@ test('the views kept before their life are sorted once: pinned or a layout kept,
   const ids = [made.p, made.o, made.s, made.n, made.y];
   // As a workspace kept them before: each current (the status they had, set in place to stand for that past).
   await l.db.query(`update entity set status = 'current' where id = any($1::text[])`, [ids]);
+  await l.db.query(`update entity set props = props || '{"pinned": true}'::jsonb where id = $1`, [made.p]);
   assert.deepEqual(await moveLives(l), { kept: 2, working: 2, retired: 1 });
   const status = async (id: string) => (await l.entity(id))?.status;
   assert.deepEqual(await Promise.all(ids.map(status)), ['kept', 'working', 'retired', 'working', 'kept']);
   assert.deepEqual(await moveLives(l), {}); // once
+});
+
+test('pins go: the ids a view held by hand are id terms of its filter, and pinned is taken off', async () => {
+  assert.deepEqual(pinsMoved('v', { filter: { find: ['type task', 'id a'], not: ['done'] }, pins: ['a', 'b'], pinned: true }), [
+    ['+', 'v', 'filter', { find: ['type task', 'id a', 'id b'], not: ['done'] }],
+    ['-', 'v', 'pins'],
+    ['-', 'v', 'pinned'],
+  ]);
+  assert.deepEqual(pinsMoved('v', { filter: { find: ['type task'] } }), []);
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 't', type: 'task', title: 'Held by hand' },
+    { op: 'create', ref: 'v', type: 'lens', title: 'With pins', status: 'kept', props: { filter: { find: ['type decision'] } } },
+  ]);
+  // As a view kept them before: set in place to stand for that past.
+  await l.db.query(`update entity set props = props || jsonb_build_object('pins', jsonb_build_array($2::text), 'pinned', true) where id = $1`, [made.v, made.t]);
+  assert.deepEqual(await movePins(l), [made.v]);
+  const props = (await l.entity(made.v))?.props as Record<string, unknown>;
+  assert.deepEqual([props.filter, 'pins' in props, 'pinned' in props], [{ find: ['type decision', `id ${made.t}`] }, false, false]);
+  assert.deepEqual(await movePins(l), []); // once
 });

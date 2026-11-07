@@ -1,7 +1,6 @@
 // Saved views: every picture kept on the map, named, with what it is a picture of, so a person finds it without
 // knowing which item it hangs on (docs/ui-strategy.md). A picture is a kept lens, named by its own title; the shape
-// it is drawn in comes from the style or layout it names, else one kept about it. Pinned ones first, then the kept,
-// then the newest. A working view lives as long as what it is about: once all of that has closed, it is retired with
+// it is drawn in comes from the style or layout it names, else one kept about it. The kept first, then the newest. A working view lives as long as what it is about: once all of that has closed, it is retired with
 // it, and left out (task e_gkv58kqb).
 
 import { keptOf } from './query-kept.ts';
@@ -21,7 +20,6 @@ export interface Picture {
   project?: { id: string; title: string };
   /** The document that brings it in: it is a part of that page, read there, and not one of the views a person picks from. */
   document?: { id: string; title: string };
-  pinned: boolean;
   /** Its life: working (an agent's, until the owner keeps it) or kept (on the owner's word). */
   life: 'working' | 'kept';
 }
@@ -41,7 +39,7 @@ export async function savedViews(l: Archipelago, input: { limit?: number } = {})
     ? await l.db.query<{ lens: string; id: string; title: string }>(`select m.to_id as lens, e.id, e.title from mention m join entity e on e.id = m.from_id where m.to_id = any($1::text[]) and e.type = any($2::text[]) and e.archived_at is null order by e.id`, [lenses.map((x) => x.id), bringersIn(l)])
     : { rows: [] };
   const documents = new Map(held.map((r) => [r.lens, { id: r.id, title: r.title }]));
-  // keptOf answers oldest first; saved views read newest first, the pinned above the rest.
+  // keptOf answers oldest first; saved views read newest first, the kept above the rest.
   const pictures = lenses
     .reverse()
     .map((x): Picture => {
@@ -54,9 +52,9 @@ export async function savedViews(l: Archipelago, input: { limit?: number } = {})
       // A style it names lies over its own settings, and a layout with code draws no shape.
       const shape = named ? (typeof named.props.code === 'string' ? undefined : (named.props.shape ?? own.shape)) : (own.shape ?? style?.props.shape);
       const document = documents.get(x.id);
-      return { lens: x.id, title: x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), ...(document && { document }), pinned: x.props.pinned === true, life: kept.has(x.id) ? 'kept' : 'working' };
+      return { lens: x.id, title: x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), ...(document && { document }), life: kept.has(x.id) ? 'kept' : 'working' };
     })
-    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || Number(b.life === 'kept') - Number(a.life === 'kept'));
+    .sort((a, b) => Number(b.life === 'kept') - Number(a.life === 'kept'));
   const limit = input.limit ?? 100;
   return { pictures: pictures.slice(0, limit), more: Math.max(0, pictures.length - limit), ...(ended.length && { ended }) };
 }

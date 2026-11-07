@@ -48,3 +48,33 @@ export async function moveLives(l: Archipelago): Promise<Record<string, number>>
   for (const b of before) counts[lifeOf(b)] = (counts[lifeOf(b)] ?? 0) + 1;
   return counts;
 }
+
+/**
+ * Pins go (task e_uqzth53z): the ids a view held by hand are terms of its filter now (id ...), so it draws what it
+ * drew, and pinned, which its life has read (kept), is taken off. Pure: a view's props in, its facts out.
+ */
+export function pinsMoved(id: string, props: Record<string, unknown>): Fact[] {
+  const facts: Fact[] = [];
+  const pins = Array.isArray(props.pins) ? props.pins.filter((p): p is string => typeof p === 'string' && p !== '') : [];
+  if (pins.length) {
+    const filter = (props.filter && typeof props.filter === 'object' ? props.filter : {}) as { find?: string[] };
+    const find = [...(filter.find ?? [])];
+    for (const pin of pins) if (!find.includes(`id ${pin}`)) find.push(`id ${pin}`);
+    facts.push(['+', id, 'filter', { ...filter, find }]);
+  }
+  for (const field of ['pins', 'pinned']) if (field in props) facts.push(['-', id, field]);
+  return facts;
+}
+
+/** The migration, after the lives are sorted (it reads pinned): returns the views it moved. */
+export async function movePins(l: Archipelago): Promise<string[]> {
+  if (!l.registry.types.has('lens')) return [];
+  const { rows } = await l.db.query<{ id: string; props: Record<string, unknown> }>(
+    `select id, props from entity where type = any($1::text[]) and props ?| array['pins', 'pinned'] order by id -- index entity_type`,
+    [l.registry.family('lens')],
+  );
+  const facts = rows.flatMap((r) => pinsMoved(r.id, r.props));
+  if (!facts.length) return [];
+  await l.db.transaction((tx) => l.moved(tx, 'lens.moved', 'Pins go: the ids a view held by hand are id terms of its filter, and pinned is its life now (kept)', facts));
+  return rows.map((r) => r.id);
+}

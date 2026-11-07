@@ -14,7 +14,7 @@ test('a view kept on the map is drawn from its flat lens, with its pins, and can
     { op: 'link', type: 'part_of', from: 'irap', to: 'p' },
   ]);
   Object.assign(made, await make(l, [
-    { op: 'create', ref: 'v', type: 'lens', title: 'Funding map', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 }, pins: [made.other], style: { shape: 'list' } } },
+    { op: 'create', ref: 'v', type: 'lens', title: 'Funding map', props: { filter: { find: [`id ${made.p}`, `id ${made.other}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'list' } } },
     { op: 'link', type: 'about', from: 'v', to: made.p },
   ]));
   const { keptPicture } = await import('../src/query-saved.ts');

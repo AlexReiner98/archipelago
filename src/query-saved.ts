@@ -20,10 +20,10 @@ const KEPT = 'lens';
 type Props = Record<string, unknown>;
 const list = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string' && v !== '') : []);
 
-/** The flat lens a kept view draws: its filter with its pins and what its steps name, its walk, its limit and its window of time. */
+/** The flat lens a kept view draws: its filter with what its steps name, its walk, its limit and its window of time. */
 export function viewQuery(props: Props) {
   const filter = { ...((props.filter ?? {}) as Props) };
-  const ids = [...list(props.pins), ...stepIds(props.steps)].map((id) => `id ${id}`);
+  const ids = stepIds(props.steps).map((id) => `id ${id}`);
   if (ids.length) filter.find = [...new Set([...list(filter.find), ...ids])];
   return { filter, walk: props.walk ?? { over: [], steps: 0 }, ...(typeof props.limit === 'number' && { limit: props.limit }), ...(props.time != null && { time: props.time }) };
 }
