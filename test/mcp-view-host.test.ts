@@ -57,7 +57,7 @@ test('in a browser, the page draws a flow from the look it asks the host for, fo
       { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
     ],
   })).result.created as Record<string, string>;
-  const view = (await call('/api/change', owner, { reason: 'test', ops: [{ op: 'create', ref: 'f', type: 'lens', title: 'The steps', status: 'current', props: { filter: { find: [`id ${made.a}`] }, walk: { over: ['depends_on'], steps: 1 } } }] })).result.created.f as string;
+  const view = (await call('/api/change', owner, { reason: 'test', ops: [{ op: 'create', ref: 'f', type: 'lens', title: 'The steps', props: { filter: { find: [`id ${made.a}`] }, walk: { over: ['depends_on'], steps: 1 } } }] })).result.created.f as string;
   const html = ((await client.readResource({ uri: 'ui://pelago/view' })).contents[0] as { text: string }).text;
 
   const page = await open(`${base}/health`);

@@ -24,7 +24,7 @@ export async function system(call: (path: string, token?: string, body?: unknown
   const kept = await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', status: 'current', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of', 'calls'], steps: 3 }, style: { shape: 'architecture' } } },
+      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of', 'calls'], steps: 3 }, style: { shape: 'architecture' } } },
       { op: 'link', type: 'about', from: 'l', to: made.p },
       { op: 'create', ref: 's', type: 'style', title: 'As architecture', status: 'current', props: { shape: 'architecture' } },
       { op: 'link', type: 'about', from: 's', to: made.p },

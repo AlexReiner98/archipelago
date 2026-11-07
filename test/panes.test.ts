@@ -34,8 +34,8 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
   const views = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'f', type: 'lens', title: 'The first', status: 'current', props: { filter: { find: [`id ${made.a}`] }, walk: { over: [], steps: 0 } } },
-      { op: 'create', ref: 'g', type: 'lens', title: 'The second', status: 'current', props: { filter: { find: [`id ${made.b}`] }, walk: { over: [], steps: 0 } } },
+      { op: 'create', ref: 'f', type: 'lens', title: 'The first', props: { filter: { find: [`id ${made.a}`] }, walk: { over: [], steps: 0 } } },
+      { op: 'create', ref: 'g', type: 'lens', title: 'The second', props: { filter: { find: [`id ${made.b}`] }, walk: { over: [], steps: 0 } } },
     ],
   })).result.created as Record<string, string>;
   const page = await open(`${base}/`);

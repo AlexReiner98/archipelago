@@ -55,7 +55,7 @@ test('in a browser, a saved canvas is opened from Home and switched to from the 
 
     // A view made, then changed, after the page read the saved views opens as saved, not as new or changed since (bump e_4j6xvm82).
     const saved = `(() => { const b = [...document.querySelectorAll('#query .q-save')].find((x) => x.getAttribute('aria-label') === 'Save this view'); return b?.disabled === true && b.textContent === 'Save'; })()`;
-    const late = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'l', type: 'lens', title: 'Made since', props: { filter: { find: [`id ${made.q}`] }, walk: { over: ['part_of'], steps: 1 } } }] })).result.created.l as string;
+    const late = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'l', type: 'lens', title: 'Made since', status: 'kept', props: { filter: { find: [`id ${made.q}`] }, walk: { over: ['part_of'], steps: 1 } } }] })).result.created.l as string;
     await page.go(`${base}/#/v?canvas=${late}`);
     assert.ok(await until(`${picked} === 'Made since'`), 'named in the bar');
     assert.ok(await until(saved), 'saved, as it was made');

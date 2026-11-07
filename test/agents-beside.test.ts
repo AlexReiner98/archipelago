@@ -24,8 +24,8 @@ test('in a browser, agents at work never move the reader’s pane; a show lands 
   const views = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'f', type: 'lens', title: 'The agent’s view', status: 'current', props: { filter: { find: [`id ${made.b}`] }, walk: { over: [], steps: 0 } } },
-      { op: 'create', ref: 'g', type: 'lens', title: 'The other’s view', status: 'current', props: { filter: { find: [`id ${made.c}`] }, walk: { over: [], steps: 0 } } },
+      { op: 'create', ref: 'f', type: 'lens', title: 'The agent’s view', props: { filter: { find: [`id ${made.b}`] }, walk: { over: [], steps: 0 } } },
+      { op: 'create', ref: 'g', type: 'lens', title: 'The other’s view', props: { filter: { find: [`id ${made.c}`] }, walk: { over: [], steps: 0 } } },
     ],
   })).result.created as Record<string, string>;
   const page = await open(`${base}/#/v?find=id+${made.a}`);

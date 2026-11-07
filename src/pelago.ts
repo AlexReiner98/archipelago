@@ -88,7 +88,7 @@ export class Archipelago {
     const claimed = input.authority;
     const authority = authorityOf(actor.kind === 'human', me, claimed);
     // Whether it applies, waits or is refused is the rules' to say (src/rules.ts), and the answer names the rule.
-    const who = { human: actor.kind === 'human', reading: measured, may: actor.may, asked: input.hold, said: Boolean(claimed), pack: input.pack, ...(await layoutOf(this, actor, input)) };
+    const who = { human: actor.kind === 'human', reading: measured, may: actor.may, asked: input.hold, said: Boolean(claimed), ownerSaid: claimed?.of === 'human' && Boolean(claimed.basis?.trim()), pack: input.pack, ...(await layoutOf(this, actor, input)) };
     const verdict = await decide(this.db, this.registry, who, input.ops, this.policy);
     if (verdict.outcome === 'refuse') throw new Error(`Change rejected:\n${verdict.refused.map((r) => `- ${r}`).join('\n')}`);
     // A question an agent settled, where the owner lets it, is put to them by the next session they talk to.

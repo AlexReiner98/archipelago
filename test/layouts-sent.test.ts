@@ -26,18 +26,18 @@ test('a picture is sent the drawing its shape is drawn by, once, and the owner�
 
   // The owner's version changes one module; the rest are the pack's.
   const look = 'export const css = `.ar-part { cursor: help; }`;\n';
-  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Architecture, mine', status: 'current', props: { preset: 'core.architecture', modules: { 'look.js': look } } }] });
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Architecture, mine', props: { preset: 'core.architecture', modules: { 'look.js': look } } }] });
   const mine = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [first.hash] } })).result.style.drawing;
   assert.notEqual(mine.hash, first.hash);
   assert.equal(mine.modules['look.js'], look);
   assert.equal(mine.modules['index.js'], first.modules['index.js']);
 
   // An agent's version waits for the human: it is code that runs in whoever looks.
-  const asked = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Architecture, the agent’s', status: 'current', props: { modules: { 'look.js': look } } }] });
+  const asked = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Architecture, the agent’s', props: { modules: { 'look.js': look } } }] });
   assert.equal(asked.result.status, 'proposed');
   // Unless the owner lets agents change drawings here: it runs in the sandbox either way.
   assert.equal((await call('/api/workspace_set', undefined, { agent_code: true, agent_changes: 'apply' })).result.agent_code, true);
-  const made = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Architecture, the agent’s again', status: 'current', props: { modules: { 'look.js': look } } }] });
+  const made = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Architecture, the agent’s again', props: { modules: { 'look.js': look } } }] });
   assert.equal(made.result.status, 'applied');
   // What else is held is held still: a change to what anyone sees is the human's.
   const shown = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'update', id: p, visibility: 'public' }] });

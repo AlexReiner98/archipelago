@@ -29,8 +29,8 @@ test('in a browser, a drawing gets a text field and asks for changes, which the 
     reason: 'test',
     ops: [
       { op: 'create', ref: 'a', type: 'work.task', title: 'Seed' },
-      { op: 'create', ref: 'c', type: 'lens', title: 'Asked', status: 'current', props: { filter: { find: ['type work.task'] } } },
-      { op: 'create', ref: 's', type: 'layout', title: 'Asking', status: 'current', props: { code: CODE, writes: ['work.task'] } },
+      { op: 'create', ref: 'c', type: 'lens', title: 'Asked', props: { filter: { find: ['type work.task'] } } },
+      { op: 'create', ref: 's', type: 'layout', title: 'Asking', props: { code: CODE, writes: ['work.task'] } },
     ],
   })).result.created as Record<string, string>;
   await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.c, props: { style: { style: made.s } } }] });

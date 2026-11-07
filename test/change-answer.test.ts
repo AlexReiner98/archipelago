@@ -30,7 +30,7 @@ test('a {ref} in props is the id of what the change makes, at any depth', async 
     reason: 'test',
     ops: [
       { op: 'create', ref: 'p', type: 'project', title: 'Garden' },
-      { op: 'create', ref: 'v', type: 'lens', title: 'The garden', status: 'current', props: { filter: { find: ['in {p}', 'id {p}'] }, walk: { over: [], steps: 0 } } },
+      { op: 'create', ref: 'v', type: 'lens', title: 'The garden', props: { filter: { find: ['in {p}', 'id {p}'] }, walk: { over: [], steps: 0 } } },
     ],
   }) as { created: Record<string, string> };
   const lens = (await l.entity(done.created.v))!;
