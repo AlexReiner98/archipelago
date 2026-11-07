@@ -8,6 +8,7 @@
 // where each port first stands. Pure: places in, places out.
 
 import { FALL, RISE } from './graph.js';
+import { tidy } from './polyline.js';
 /** Each side of a frame: the axis a wire crosses it on, and which way is out. */
 export const SIDES = { top: [1, -1], bottom: [1, 1], left: [0, -1], right: [0, 1] };
 
@@ -185,10 +186,11 @@ export function apart(model, { ports, extras, pad }) {
  * further out the further the port stands along its side from where the wire heads (round a corner, or on along `on`,
  * the rest of its way), up to twice as far, so the wires that leave one side together lie in the order that crosses none.
  */
-function around(at, side, rect, ring, to, on = []) {
+function around(at, side, rect, ring, to, on = [], came = null) {
   const order = ['top', 'right', 'bottom', 'left'];
   const near = { top: Math.abs(to[1] - rect.t), bottom: Math.abs(to[1] - rect.b), left: Math.abs(to[0] - rect.l), right: Math.abs(to[0] - rect.r) };
-  const end = Object.keys(near).reduce((s, k) => (near[k] < near[s] ? k : s), 'top');
+  // The side the wire comes to: the one it was seen to come in by, else the one `to` is nearest.
+  const end = came ?? Object.keys(near).reduce((s, k) => (near[k] < near[s] ? k : s), 'top');
   const N = order.length, from = order.indexOf(side), steps = (order.indexOf(end) - from + N) % N, way = steps <= N / 2 ? 1 : -1;
   // Where along its side the wire heads: the corner it goes round (clockwise or not), or, on its own side, its end.
   const along = side === 'top' || side === 'bottom' ? 0 : 1, length = along ? rect.b - rect.t : rect.r - rect.l;
@@ -205,10 +207,41 @@ function around(at, side, rect, ring, to, on = []) {
 }
 
 /**
+ * The line from its first point up to where it first comes within `ring` of `rect`, and the side of the box it comes in
+ * by there: what of a sketch lies past there runs to an end on the box that a port has taken the place of.
+ */
+function reaching(line, rect, ring) {
+  const r = { l: rect.l - ring, t: rect.t - ring, r: rect.r + ring, b: rect.b + ring };
+  const inside = (p) => p[0] >= r.l && p[0] <= r.r && p[1] >= r.t && p[1] <= r.b;
+  if (inside(line[0])) return null;
+  for (let i = 1; i < line.length; i++) {
+    const [p, q] = [line[i - 1], line[i]], axis = Math.abs(p[0] - q[0]) > 0.5 ? 0 : 1, lo = axis ? r.t : r.l, hi = axis ? r.b : r.r;
+    const fixed = 1 - axis, [from, to] = [p[axis], q[axis]];
+    if (p[fixed] < (fixed ? r.t : r.l) || p[fixed] > (fixed ? r.b : r.r) || Math.max(from, to) < lo || Math.min(from, to) > hi) continue;
+    const enter = [...p];
+    enter[axis] = to > from ? lo : hi;
+    return { line: [...line.slice(0, i), enter], side: axis ? (to > from ? 'top' : 'bottom') : to > from ? 'left' : 'right' };
+  }
+  return null;
+}
+
+/** Where between them two boxes' sides face each other across a gap, `a`'s side toward `b`'s: the gap's middle, or null. */
+function facing(sa, a, sb, b) {
+  const edge = { top: a.t, bottom: a.b, left: a.l, right: a.r }[sa], other = { top: b.t, bottom: b.b, left: b.l, right: b.r }[sb];
+  const pairs = { bottom: 'top', top: 'bottom', right: 'left', left: 'right' };
+  if (pairs[sa] !== sb) return null;
+  const toward = sa === 'bottom' || sa === 'right' ? other > edge : other < edge;
+  return toward ? (edge + other) / 2 : null;
+}
+
+/**
  * Ports held on boxes, at a level above an island (`held`: { id, on, at, side }, `at` the port's middle from its box's).
  * Each link of a type `rewire` names ({ type: [from, to] }, ports) is a wire whose ends the solve holds at those two
  * ports (its route's `ends`), sketched as the layout first drew it between the boxes, each end brought round its box
- * from its port. The shape leaves it as sketched: where it ends is not the shape's to choose.
+ * from its port. The sketch first ended on whichever side of the box it met; its port may be on another. So each end
+ * is brought round from where the sketch first comes near its box, and what the sketch drew past there is not kept:
+ * kept, it ran on to the old end and the way round came back over it, a loop. The shape leaves it as sketched: where it
+ * ends is not the shape's to choose.
  */
 export function holdPorts({ nodes, x, y, routes, ties, held, rewire, run }) {
   const port = new Map(held.map((p) => [p.id, p]));
@@ -218,7 +251,22 @@ export function holdPorts({ nodes, x, y, routes, ties, held, rewire, run }) {
     const ends = rewire[t.type], r = routes.get(t.route);
     if (!ends || !port.has(ends[0]) || !port.has(ends[1]) || !r) continue;
     const drawn = r.from === t.a ? r.points : [...r.points].reverse(), [pa, pb] = ends.map((id) => port.get(id));
-    const into = [around(at(pa), pa.side, rectOf(pa.on), run, drawn[0], drawn), around(at(pb), pb.side, rectOf(pb.on), run, drawn.at(-1), [...drawn].reverse())];
-    routes.set(t.route, { from: t.a, points: [...into[0], ...drawn.slice(1, -1), ...into[1].reverse()], ends: [pa.at, pb.at], sides: [pa.side, pb.side] });
+    // Cut where the sketch first comes as near its box as the way round may stand (up to twice the run): the far box
+    // first, then, from there back, the near one.
+    const toB = reaching(drawn, rectOf(pb.on), 2 * run), toA = toB && reaching([...toB.line].reverse(), rectOf(pa.on), 2 * run);
+    const line = toA && toA.line.length > 1 ? [...toA.line].reverse() : null;
+    // Two boxes nearer than the way round from each, their ports facing across the gap: the wire meets in its middle,
+    // for each way round would pass the other's.
+    const gap = !line && facing(pa.side, rectOf(pa.on), pb.side, rectOf(pb.on));
+    if (gap) {
+      const [p, q] = [at(pa), at(pb)], axis = pa.side === 'top' || pa.side === 'bottom' ? 1 : 0, [m, n] = [[...p], [...q]];
+      m[axis] = n[axis] = gap;
+      routes.set(t.route, { from: t.a, points: tidy([p, m, n, q]), ends: [pa.at, pb.at], sides: [pa.side, pb.side] });
+      continue;
+    }
+    const into = line
+      ? [around(at(pa), pa.side, rectOf(pa.on), run, line[0], line, toA.side), around(at(pb), pb.side, rectOf(pb.on), run, line.at(-1), [...line].reverse(), toB.side)]
+      : [around(at(pa), pa.side, rectOf(pa.on), run, drawn[0], drawn), around(at(pb), pb.side, rectOf(pb.on), run, drawn.at(-1), [...drawn].reverse())];
+    routes.set(t.route, { from: t.a, points: tidy([...into[0], ...(line ?? drawn.slice(1, -1)), ...into[1].reverse()]), ends: [pa.at, pb.at], sides: [pa.side, pb.side] });
   }
 }

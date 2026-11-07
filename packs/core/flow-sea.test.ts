@@ -105,3 +105,27 @@ test('sea: no island stands on another, and each holds its own steps', () => {
     assert.ok(x > land.l && x < land.r && y > land.t && y < land.b, `${id} stands on its island`);
   }
 });
+
+/** Whether two stretches that are not next to each other on one line meet anywhere: a line that crosses itself. */
+const crossesItself = (line: number[][]) => line.some((_, i) => line.some((__, j) => {
+  if (j < i + 2 || !line[i + 1] || !line[j + 1]) return false;
+  const [a, b, c, d] = [line[i], line[i + 1], line[j], line[j + 1]];
+  return [0, 1].every((k) => Math.max(Math.min(a[k], b[k]), Math.min(c[k], d[k])) <= Math.min(Math.max(a[k], b[k]), Math.max(c[k], d[k])));
+}));
+
+test('sea: a wire whose sketch ends on another side of its island than its port comes to the port without a loop', async () => {
+  // The sea's first sketch ends on the island's left; its port is on the top. Brought round to the port, the wire must
+  // not run on to the old end and turn back (the loops on "How is Archipelago built", 7 Nov 2026).
+  const { holdPorts } = await load('ports.js');
+  const nodes = new Map([['A', { w: 200, h: 200 }], ['B', { w: 100, h: 100 }]]), x = new Map([['A', 0], ['B', 400]]), y = new Map([['A', 0], ['B', 300]]);
+  const routes = new Map([['A|B', { from: 'A', points: [[100, 0], [330, 0], [330, 300], [350, 300]] }]]);
+  holdPorts({ nodes, x, y, routes, ties: [{ type: 'sea:0', route: 'A|B', a: 'A' }], run: house.sizes.flow_port_run,
+    held: [{ id: 'pa', on: 'A', at: [0, 100], side: 'bottom' }, { id: 'pb', on: 'B', at: [0, -50], side: 'top' }], rewire: { 'sea:0': ['pa', 'pb'] } });
+  const line = routes.get('A|B').points;
+  assert.deepEqual([line[0], line.at(-1)], [[0, 100], [400, 250]], 'it still runs from port to port');
+  assert.ok(!crossesItself(line), `no loop: ${JSON.stringify(line)}`);
+});
+
+test('sea: no wire crosses itself, inside an island or at sea', () => {
+  for (const w of all) assert.ok(!crossesItself(w.points), `${w.a} → ${w.b} crosses itself`);
+});
