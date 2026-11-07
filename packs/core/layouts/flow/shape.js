@@ -74,6 +74,13 @@ function meeting(a, b) {
   return { crossed, along };
 }
 
+/** The least and most of a line's points on each axis, [x, y, x, y]. */
+function extentOf(l) {
+  const e = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [x, y] of l) (e[0] = Math.min(e[0], x)), (e[1] = Math.min(e[1], y)), (e[2] = Math.max(e[2], x)), (e[3] = Math.max(e[3], y));
+  return e;
+}
+
 /** Which side of its box a line's end stands on, as `${id} ${axis the side lies along} ${which way it faces}`. */
 const sideOf = (id, p, q) => { const ax = p[0] === q[0] ? 0 : 1; return `${id} ${ax} ${Math.sign(q[1 - ax] - p[1 - ax])}`; };
 
@@ -87,13 +94,17 @@ const roomOn = (b, side, wire, corner) => {
  * `boxes` by id are { x, y, w, h, pointed }, `wires` { a, b, points }, those that `stays` not looked at. `room` is what a wire
  * keeps from a box it passes, `run` from a port to its first corner, `corner` from a box's corner, `wire` from a wire beside it;
  * `ports` how many places along a side are tried, `rounds` how many times the wires are gone over, the costs what a
- * crossing, a bend and an end too many on a side are worth in length, and `work` how many meetings of two wires may be tried.
+ * crossing, a bend and an end too many on a side are worth in length, `work` how many meetings of two wires may be tried,
+ * and `most` how many stretches of two wires may be held against one another in all (the picture's budget, ./effort.js).
+ * Answers with that many, what was spent.
  * `inward` by box is [axis, sign] for a box a wire may leave only one way (a port on an island's side: into the island);
  * a wire's own `at` (a point for each end) and `leave` (the way out of each) hold where it ends on its boxes, and `turns`
  * that it turns at least once (a port's wire: where its port stands along its side is then not tied to where its step does).
  */
-export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, cost_cross, cost_bend, cost_side, work: budget = Infinity, through = cost_cross / 2, inward = new Map() }) {
-  let work = 0;
+export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, cost_cross, cost_bend, cost_side, work: budget = Infinity, most = Infinity, through = cost_cross / 2, inward = new Map() }) {
+  let work = 0, spent = 0;
+  // Each line's extent, worked out once while it stands: nothing here moves a point of a line in place.
+  const extents = new WeakMap(), extent = (l) => extents.get(l) ?? extents.set(l, extentOf(l)).get(l);
   const rects = new Map([...boxes].map(([id, b]) => [id, { id, lo: [b.x - b.w / 2, b.y - b.h / 2], hi: [b.x + b.w / 2, b.y + b.h / 2], mid: [b.x, b.y], pointed: b.pointed }]));
   const CELL = Math.max(1, ...[...rects.values()].map((b) => b.hi[0] - b.lo[0])), columns = new Map(), lines = wires.filter((w) => w.points.length > 1).map((w) => Object.assign(w, { points: tidy(w.points) }));
   for (const r of rects.values()) for (let c = Math.floor(r.lo[0] / CELL); c <= Math.floor(r.hi[0] / CELL); c++) (columns.get(c) ?? columns.set(c, []).get(c)).push(r);
@@ -166,8 +177,14 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
   /** What a line's meetings with the others cost: wires of one box may run together, for the solve to part. */
   const met = (l, w, most) => {
     let cost = 0;
+    const [x0, y0, x1, y1] = extent(l);
     for (const v of beside(l)) {
       if (v === w) continue;
+      // Lines whose extents do not touch meet nowhere.
+      const [p0, q0, p1, q1] = extent(v.points);
+      spent++;
+      if (p0 > x1 || p1 < x0 || q0 > y1 || q1 < y0) continue;
+      spent += l.length * v.points.length;
       const { crossed, along } = meeting(l, v.points);
       cost += crossed * cost_cross + along * (v.a === w.a || v.a === w.b || v.b === w.a || v.b === w.b ? cost_bend : cost_cross);
       if (cost >= most) return cost;
@@ -194,7 +211,7 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
     for (const w of [...lines].sort((p, q) => q.points.length - p.points.length || lengthOf(q.points) - lengthOf(p.points))) {
       // Past what a picture can take on a page, the rest keep the lines they came with: the solve parts those as well.
       if (w.stays) continue;
-      if (work > budget) return work;
+      if (work > budget || spent > most) return spent;
       const [a, b] = endsOf(w);
       bump(w, -1);
       file(w, -1);
@@ -216,5 +233,5 @@ export function shape(boxes, wires, { room, run, corner, wire, ports, rounds, co
       file(w, 1);
     }
   }
-  return work;
+  return spent;
 }

@@ -26,6 +26,7 @@ export const SLOW: Record<string, string> = {
   'test/layouts-architecture.test.ts': 'browser',
   'test/layouts-flow.test.ts': 'browser',
   'test/layouts-open.test.ts': 'browser',
+  'test/layouts-queued.test.ts': 'browser',
   'test/find-query.test.ts': 'browser',
   'test/kept-views.test.ts': 'browser',
   'test/looks.test.ts': 'browser',
@@ -67,6 +68,8 @@ export const SLOW: Record<string, string> = {
   'test/approvals-dev-2.test.ts': 'table',
   'test/approvals-mixed-1.test.ts': 'table',
   'test/approvals-mixed-2.test.ts': 'table',
+  // A flow of a few hundred items drawn whole through its budget, three times over and timed: about ten seconds.
+  'packs/core/flow-time.test.ts': 'timed',
 };
 
 const walk = (dir: string): string[] =>
