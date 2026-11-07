@@ -67,7 +67,7 @@ Each module says its layer in its first comment (`Layer: metrics.`). A layer rea
 
 | Layer | Holds | Flow's modules |
 | --- | --- | --- |
-| Graph | Steps, links and which way each runs, combs, and the small things every layer says of lines | `graph`, `steps`, `lines`, `direction`, `combs`, `hangs`, `places`, `polyline`, `shapes` |
+| Graph | Steps, links and which way each runs, combs, the picture's budget, and the small things every layer says of lines | `graph`, `steps`, `lines`, `direction`, `combs`, `hangs`, `places`, `polyline`, `shapes`, `effort` |
 | Topology | Who crosses whom, the faces, the order of wires round each box | `topology`, `planar`, `lr`, `thread`, `numbering`, `upward`, `count` |
 | Shape | Each wire's turns, and which drawing of a part is kept | `search`, `shape`, `faults` |
 | Metrics | Every coordinate | `solve`, `shelves`, `wrap`, `assemble`, `pins`, `finish`, `layout`, `ports`, `archipelago` |
@@ -105,6 +105,10 @@ Every wire is its own line: no two wires share a stretch, a comb's among them, a
 ### One path
 
 Every picture is drawn the same way, whatever its size: a planar drawing of each part, `shape`, then `solve`. Nothing sets a wire for good ahead of them. Each picture is drawn twice, its headed links as wires of the core and as leaves of combs, and the one that crosses less is kept, as wires where they tie; past `flow_trial_total` items it is drawn as combs alone, for the time a page has.
+
+### One budget
+
+A picture of any size draws well inside the page's twelve seconds: what makes it look better than it must spends from one budget per picture, `flow_picture_work` (`flow/effort.js`). That is each trial of a part past the first (`flow_part_work` for each item times link), the second drawing of a level (it costs what the first did), the wires' shaping (each two stretches of wires held against one another) and each split of a bundle at sea. Once it is spent, each takes its plain way: one trial, combs alone, the first wires, the bundle as it is. Work is counted, never timed, so a picture is the same on every machine and each time it is asked. A layout kept from another picture is used again only where it would come out the same from what is left, and spends what it spent then; one this picture has already had is free. Measured in headless Chrome (`node scripts/flow-bench.ts <answer>`), 7 Nov 2026: the view that stopped, 67 items and 147 links on three islands, is drawn as before in 3.6 seconds (4.2 before); three times its size in 5 (10 or more before), and six times in 5. `packs/core/flow-time.test.ts` keeps it so.
 
 Where two wires cross, one passes under: the line drawn has a gap there (`flow_break_half`), a tie under a wire of the order, else what runs up or down under what runs across. A picture that plays keeps its wires whole, for they are drawn in.
 
@@ -161,7 +165,7 @@ The landing page's story (14 steps) is checked in `packs/core/story.test.ts`: no
 
 A surface does not open them: the drawing paints on a canvas of its own in its worker, and only images come to the page, checked to be images; the page's canvas takes no pointer and lies inside the picture.
 
-The drawing runs in a worker inside one sandboxed frame (`ui/draw.html`, `ui/draw.js`): an origin of its own, a policy that sends nothing anywhere, no page. Each picture talks to its worker over a channel of its own. A drawing that does not answer for 12 seconds is stopped. `test/layouts.test.ts` tries all of this against a real browser.
+The drawing runs in a worker inside one sandboxed frame (`ui/draw.html`, `ui/draw.js`): an origin of its own, a policy that sends nothing anywhere, no page. Each picture talks to its worker over a channel of its own. A drawing that does not answer for 12 seconds is stopped. A picture it finishes is an answer, so pictures queued one behind another are each given the twelve seconds (`test/layouts-queued.test.ts`). `test/layouts.test.ts` tries all of this against a real browser.
 
 **The owner may take the walls down for a layout's code** (the owner, 3 Nov 2026, decision e_eezrwza2): the workspace setting `drawings_open` ("Drawings unsandboxed" on the Workspace page, off unless set). With it on, the page frames `/draw.html?open=1` with no `sandbox`, which the server sends with no policy but `frame-ancestors 'self'` (`src/page-policies.ts`), and `ui/draw.js` runs the code in that frame's window instead of a worker: the page's own origin, as the person looking, with the network, web fonts, files (a picker, a download) and links (`open` takes an `https` address too). It is handed the canvas itself and `root`, an element of the app's page laid over the picture (`.code-panel`), for a panel of its own, which an agent driving the browser reads as it reads the page; `sandboxed` says which it is. A drawing a pack ships (marks, `ui/layout.js`) stays walled in either way, and so does every style with the setting off. The ping that stops a silent worker does not run: the code shares the page's thread. `test/layouts-open.test.ts` runs the same code both ways in a real browser.
 

@@ -8,6 +8,7 @@
 
 import { assemble, shelfOf } from './assemble.js';
 import { count } from './count.js';
+import { charge, measured, spendAgain, stillHolds } from './effort.js';
 import { directions } from './direction.js';
 import { finisher } from './finish.js';
 import { flatten, isOf, ORDER } from './graph.js';
@@ -29,21 +30,28 @@ export const stages = (fn) => (staging = fn);
 /** Pictures already pulled tight, the newest last: going back to a lens, or dropping a step, costs next to nothing. */
 const kept = new Map();
 
-/** The layout of an answer, worked out once for each answer and kept. */
+/**
+ * The layout of an answer, worked out once for each answer and kept. `effort` (./effort.js) is the picture's budget: a
+ * layout this picture has already had is free, and one kept from another picture is used again only where it would come
+ * out the same from what is left, spending what it spent then, so a picture spends alike drawn afresh or again.
+ */
 export function layout(args) {
-  const { items, links, undrawn, headless, sizes, aspect, shapes, ports, extras, combed, held, rewire, apart } = args, key = JSON.stringify([items, links, undrawn, headless, sizes, aspect, shapes, ports, extras, combed, held, rewire, apart]);
-  const hit = kept.get(key) ?? laidOut(args);
+  const { items, links, undrawn, headless, sizes, aspect, shapes, ports, extras, combed, held, rewire, apart, effort } = args, key = JSON.stringify([items, links, undrawn, headless, sizes, aspect, shapes, ports, extras, combed, held, rewire, apart]);
+  const was = kept.get(key), had = was && effort && was.piece.by === effort, fits = had || (was && stillHolds(was.piece, effort));
+  if (fits && !had) spendAgain(effort, was.piece);
+  const made = fits ? null : measured(effort, () => laidOut(args)), hit = fits ? was.hit : made.out;
+  if (fits) was.piece.by = effort;
   kept.delete(key);
-  kept.set(key, hit);
+  kept.set(key, fits ? was : { hit, piece: { ...made, by: effort } });
   if (kept.size > KEPT) kept.delete(kept.keys().next().value);
   // What the finished picture was drawn from, for a level above to set it again round its ports (./ports.js).
   return Object.assign(hit(), { raw: hit.raw });
 }
 
 /** Each line's way chosen, the boxes at `x` and `y`. */
-function shapeWires({ nodes, x, y, lines, z, through, inward }) {
+function shapeWires({ nodes, x, y, lines, z, through, inward, most = Infinity }) {
   const boxes = new Map([...x.keys()].map((id) => [id, { x: x.get(id), y: y.get(id), w: nodes.get(id).w, h: nodes.get(id).h, pointed: nodes.get(id).shape === 'diamond' }]));
-  shape(boxes, lines, { room: z.room, run: z.run, corner: z.corner, wire: z.turn, ports: z.ports, rounds: z.rounds, cost_cross: z.shape_cross, cost_bend: z.cost_bend, cost_side: z.cost_side, work: z.shape_work, through, inward });
+  return shape(boxes, lines, { room: z.room, run: z.run, corner: z.corner, wire: z.turn, ports: z.ports, rounds: z.rounds, cost_cross: z.shape_cross, cost_bend: z.cost_bend, cost_side: z.cost_side, work: z.shape_work, most, through, inward });
 }
 
 /** The routes as lines, each from its `from`. */
@@ -67,7 +75,7 @@ function lengthsOf(sizes) {
   return {
     row: sizes.flow_layer_gap / 2, col: sizes.flow_wire_column, turn: Math.max(gap / 3, sizes.flow_wire_gap), gap,
     room: sizes.flow_wire_room, join: sizes.flow_joined_room, run: sizes.flow_port_run, corner: sizes.flow_port_corner,
-    trials: sizes.flow_trials, trial_most: sizes.flow_trial_most, cost_up: sizes.flow_cost_up, cost_cross: sizes.flow_cost_crossing, shape_cross: sizes.flow_shape_crossing, shape_most: sizes.flow_shape_most, shape_work: sizes.flow_shape_work, cost_bend: sizes.flow_cost_bend, cost_side: sizes.flow_cost_side, ports: sizes.flow_reroute_ports, rounds: sizes.flow_reroute_rounds, cost_wrong: sizes.flow_cost_wrong_side, embed_most: sizes.flow_embed_most, embed_big: sizes.flow_embed_big, hub_most: sizes.flow_hub_most, embed_cost: sizes.flow_embed_crossings, slide_sweeps: sizes.flow_slide_sweeps, number_tries: sizes.flow_number_tries, trial_total: sizes.flow_trial_total,
+    trials: sizes.flow_trials, trial_most: sizes.flow_trial_most, cost_up: sizes.flow_cost_up, cost_cross: sizes.flow_cost_crossing, shape_cross: sizes.flow_shape_crossing, shape_most: sizes.flow_shape_most, shape_work: sizes.flow_shape_work, cost_bend: sizes.flow_cost_bend, cost_side: sizes.flow_cost_side, ports: sizes.flow_reroute_ports, rounds: sizes.flow_reroute_rounds, cost_wrong: sizes.flow_cost_wrong_side, embed_most: sizes.flow_embed_most, embed_big: sizes.flow_embed_big, hub_most: sizes.flow_hub_most, embed_cost: sizes.flow_embed_crossings, slide_sweeps: sizes.flow_slide_sweeps, number_tries: sizes.flow_number_tries, trial_total: sizes.flow_trial_total, part_work: sizes.flow_part_work,
   };
 }
 
@@ -76,15 +84,17 @@ const crossed = ({ chains, ties }) => count([...chains, ...ties].map((w) => w.po
 
 /** Every picture is drawn the same two ways, its headed links as wires and as comb leaves, and the finished picture that crosses less kept, as wires where they tie. */
 function laidOut(args) {
-  // Past what the style gives the search, a picture is drawn the one way, which takes the less room.
   // Past what the style gives the search, a picture is drawn the one way, which takes the less room; and so is a level
-  // whose boxes hang beside what they meet (`combed`: the islands on the sea).
+  // whose boxes hang beside what they meet (`combed`: the islands on the sea), and one the picture's budget has no room
+  // left for drawing twice: the second drawing costs what the first did.
   if (args.combed || args.items.length > args.sizes.flow_trial_total) return drawnOut({ ...args, chains: false });
-  const [wired, combed] = [true, false].map((chains) => drawnOut({ ...args, chains }));
+  const { out: combed, cost } = measured(args.effort, () => drawnOut({ ...args, chains: false }));
+  if (args.effort && args.effort.left < cost) return (args.effort.cuts++, combed);
+  const wired = drawnOut({ ...args, chains: true });
   return crossed(wired({})) <= crossed(combed({})) ? wired : combed;
 }
 
-function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = ['part_of'], measure, sizes, shapes, aspect = 1.6, chains: asWires, ports = [], extras = [], held = [], rewire = {}, apart: away }) {
+function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = ['part_of'], measure, sizes, shapes, aspect = 1.6, chains: asWires, ports = [], extras = [], held = [], rewire = {}, apart: away, effort }) {
   // A level with ports (./ports.js): an island's free on its frame, with its name and legend boxes of their own; or, at
   // sea, each held on its island, the links between islands wires between ports. Both are laid out by the same layers.
   const ported = ports.length > 0, holding = held.length > 0, pad = sizes.flow_island_pad;
@@ -105,7 +115,7 @@ function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = [
   const ways = directions(chains, ties, headless), hangs = hangsOf({ a, ways, nodes, sizes, gap, z, aspect, chains: asWires }), { core, block } = hangs;
   // An island's ports, by side, with where along it their wires come at sea: its drawings are judged by that order too.
   const along = new Map(ports.filter((p) => p.share !== undefined).map((p) => [p.id, [p.side, p.share]]));
-  const how = { block, stepSize, ways, z, total: core.length, along };
+  const how = { block, stepSize, ways, z, total: core.length, along, effort };
   const shelves = partsOf(core, a).map((list) => shelfOf(drawnPart(list, linksOf(list, every, ways), how), block));
   const { x, y, routes } = assemble(shelves, { ...hangs, stepSize, gap, margin, aspect });
   // Two links between one pair of boxes are drawn from one sketch, and each is then a wire like any other.
@@ -117,13 +127,15 @@ function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = [
   if (holding) holdPorts({ nodes, x, y, routes, ties, held, rewire, run: z.run });
   const lengths = { nodes, x, y, routes, section: sizes.flow_section_gap, gap, margin, aspect, wire: z.turn, room: z.room, run: z.run, corner: z.corner, apart: away ?? gap / 2, join: z.join }, firstWires = new Map([...routes].map(([k, r]) => [k, r.points]));
   const before = { x: new Map(x), y: new Map(y), sizes: new Map([...nodes].map(([id, n]) => [id, [n.w, n.h]])) };
-  if (routes.size <= z.shape_most) {
+  // Shaping the wires is what a picture can best go without: the solve parts the first wires as well.
+  const shaping = routes.size <= z.shape_most && (!effort || effort.left > 0 || (effort.cuts++, false));
+  if (shaping) {
     const lines = linesOf(routes);
     // A port's wire turns before its step, so the port is free along its side (./ports.js).
     if (inward) for (const l of lines) if (inward.placed.has(l.a) || inward.placed.has(l.b)) l.turns = true;
     // A wire whose ends are held (at sea, at its ports) is shaped from those points, out of each the way its port faces.
     for (const l of lines) if (l.r.ends) Object.assign(l, { at: l.r.ends.map((e, k) => [x.get(k ? l.b : l.a) + e[0], y.get(k ? l.b : l.a) + e[1]]), leave: l.r.sides.map((s) => SIDES[s]) });
-    shapeWires({ nodes, x, y, lines, z, inward });
+    charge(effort, shapeWires({ nodes, x, y, lines, z, inward, most: effort?.left ?? Infinity }));
     for (const l of lines) l.r.points = l.points;
   }
   staging?.('shape', routes);

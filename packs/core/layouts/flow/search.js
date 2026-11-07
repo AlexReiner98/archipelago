@@ -2,6 +2,7 @@
 // leave wires up. Layer: shape, by what it chooses. Pure: a part in, its drawing out.
 
 import { costOf, drawPart } from './part.js';
+import { charge, spend } from './effort.js';
 import { FALL, RISE } from './graph.js';
 import { pair } from './polyline.js';
 
@@ -43,21 +44,28 @@ function linedUp(list, along, part) {
   return [...bySide.values()].map((ids) => ids.sort((p, q) => key(p) - key(q) || String(itemOf.get(p)).localeCompare(String(itemOf.get(q))) || share(p) - share(q)));
 }
 
-/** How one part is drawn. `total` is how many items are in the core; an island's part tries every way, and is judged by its ports' order too. */
-export function drawnPart(list, part, { block, stepSize, ways, z, total, along = new Map() }) {
+/**
+ * How one part is drawn. `total` is how many items are in the core; an island's part tries every way, and is judged by its
+ * ports' order too. Each trial past the first spends from the picture's budget (`effort`, ./effort.js) what a trial of a
+ * part this size costs, and none is tried that it has no room for.
+ */
+export function drawnPart(list, part, { block, stepSize, ways, z, total, along = new Map(), effort }) {
   let drawn;
   if (list.length >= 3 && part.length >= 2) {
     const ported = list.some((id) => along.has(id)), lines = ported ? linedUp(list, along, part) : [];
-    // A part with ports tries each way with them held in the sea's order, and each mirrored.
-    const trials = ported ? [false, true].flatMap((mirror) => TRIALS.map((t) => ({ ...t, lines, mirror }))) : list.length <= z.trial_most && total <= z.trial_total ? TRIALS.slice(0, z.trials) : TRIALS.slice(0, 1);
-    for (const trial of trials) {
+    // A part with ports tries each way with them held in the sea's order, and each mirrored, the likeliest first.
+    const trials = ported ? TRIALS.flatMap((t) => [false, true].map((mirror) => ({ ...t, lines, mirror }))) : list.length <= z.trial_most && total <= z.trial_total ? TRIALS.slice(0, z.trials) : TRIALS.slice(0, 1);
+    const price = list.length * part.length * (z.part_work ?? 0);
+    for (const [k, trial] of trials.entries()) {
+      if (k && !spend(effort, price)) break;
+      if (!k) charge(effort, price);
       try {
         const made = drawPart(list, part, block, stepSize, z, trial), cost = costOf(made, stepSize, z) + against(made.places, along) * z.cost_cross;
         if (!drawn || cost < drawn.cost) drawn = { ...made, cost };
       } catch (e) { console.warn?.(`The bars fell back: ${e.message}`); }
     }
     // Only where every trial left order wires up is the slower embedding made for the order tried.
-    if (drawn?.up && list.length <= z.embed_most) {
+    if (drawn?.up && list.length <= z.embed_most && spend(effort, price)) {
       try {
         const made = drawPart(list, part, block, stepSize, z, { embedded: true }), cost = costOf(made, stepSize, z);
         if (cost < drawn.cost) drawn = { ...made, cost };

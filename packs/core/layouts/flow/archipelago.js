@@ -65,7 +65,7 @@ function joined(points) {
  * each one's frame as its land, where its name and each entry of its legend go. `legends` gives each island's entries'
  * widths, and `names` how wide its name is.
  */
-export function compose({ groups, cross, where, run }, { legends, names = new Map(), sizes }) {
+export function compose({ groups, cross, where, run }, { legends, names = new Map(), sizes, effort }) {
   const z = (name) => sizes[`flow_island_${name}`];
   const [PAD, NAME, SEA, GAP, ROW, PORT] = ['pad', 'name_room', 'sea', 'legend_gap', 'legend_row', 'port'].map(z);
   const M = sizes.flow_margin;
@@ -121,11 +121,24 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
         const { side, share } = sideOf(boxOf(b), e ? sketch.at(-1) : sketch[0]), shared = Boolean(e && gated), bundled = !e && readers.length > 1;
         const size = [PORT, PORT];
         if (bundled) size[1 - SIDES[side][0]] += (slots(readers.length) - 1) * turn;
-        return { block: b, side, to: e ? l.to : bundled ? readers : l.from, id: shared ? `\u0000find:${l.to}:${side}` : `\u0000port:${k}:${e}`, size, shared, bundled, share };
+        return { block: b, side, to: e ? l.to : bundled ? readers : l.from, id: shared ? `\u0000find:${l.to}:${side}` : `\u0000port:${k}:${e}`, size, shared, bundled, share, ...(shared && { shares: `\u0000find:${l.to}:${side}` }) };
       }),
     };
   };
   const wires = bundles.map((ls, k) => wireOf(ls, k));
+  // A port two or more bundles of a finding's reads leave by is shared: a bar along its side, each landing on it a wire
+  // apart and none in line with the wire in, which leaves from its middle. A finding read once by a side has a port of
+  // its own. Worked out again from the wires as they stand, before each island is laid out, so a trial asks for what the
+  // last pass will.
+  const land = () => {
+    const landing = new Map(), ends = wires.map((w) => w.ends[1]).filter((e) => e.shares);
+    for (const e of ends) landing.set(e.shares, (landing.get(e.shares) ?? 0) + 1);
+    for (const w of wires) {
+      const e = w.ends[1], many = landing.get(e.shares) >= 2;
+      if (!e.shares) continue;
+      Object.assign(e, { shared: many, id: many ? e.shares : `\u0000port:${w.k}:1`, size: [PORT, PORT].map((s, i) => (many && i === 1 - SIDES[e.side][0] ? s + (slots(landing.get(e.shares)) - 1) * turn : s)) });
+    }
+  };
   // Each island's ports and its header, as it is laid out again: `known` says where along its side each port's wires
   // come at sea, where the islands laid out before it have said.
   const box = (r) => [r.r - r.l, r.b - r.t];
@@ -135,12 +148,14 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
   };
   const portsFor = (b, known = new Map()) => [...new Map(wires.flatMap((w) => w.ends.filter((e) => e.block === b)).map((e) => [e.id, { id: e.id, side: e.side, to: e.to, size: e.size, small: true, share: known.has(e.id) ? known.get(e.id)[0] / known.get(e.id)[1] : e.share }])).values()];
   // A trial: each island with a bundle laid out once. A reader whose wire to the bundle's bar would come through another
-  // step (one reader stood over another) reads apart, a wire of its own, and the island is tried again.
+  // step (one reader stood over another) reads apart, a wire of its own, and the island is tried again, while the
+  // picture's budget has room (./effort.js): past it, the bundle is kept as it is.
   for (const b of blocks) {
     // Each split leaves the bundle a reader's own read, so this ends.
     for (;;) {
       const mine = wires.filter((w) => w.ends[0].bundled && w.ends[0].block === b);
-      if (!mine.length) break;
+      if (!mine.length || (effort && effort.left <= 0 && (effort.cuts++, true))) break;
+      land();
       const trial = run({ items: b.items, links: b.links, ports: portsFor(b), extras: headerOf(b).extras });
       const steps = [...trial.x.keys()].filter((id) => !trial.nodes.get(id).dummy).map((id) => { const n = trial.nodes.get(id); return { id, l: trial.x.get(id) - n.w / 2, r: trial.x.get(id) + n.w / 2, t: trial.y.get(id) - n.h / 2, b: trial.y.get(id) + n.h / 2 }; });
       const meets = (p, q, s) => Math.max(p[0], q[0]) > s.l && Math.min(p[0], q[0]) < s.r && Math.max(p[1], q[1]) > s.t && Math.min(p[1], q[1]) < s.b;
@@ -156,16 +171,7 @@ export function compose({ groups, cross, where, run }, { legends, names = new Ma
       wires.push(wireOf(bundles.at(-1), bundles.length - 1, w.sketch));
     }
   }
-  // A port two or more bundles of a finding's reads leave by is shared: a bar along its side, each landing on it a wire
-  // apart and none in line with the wire in, which leaves from its middle. A finding read once by a side has a port of its own.
-  const landing = new Map();
-  for (const e of wires.flatMap((w) => w.ends)) if (e.shared) landing.set(e.id, (landing.get(e.id) ?? 0) + 1);
-  for (const w of wires) {
-    const e = w.ends[1];
-    if (!e.shared) continue;
-    if (landing.get(e.id) < 2) Object.assign(e, { shared: false, id: `\u0000port:${w.k}:1` });
-    else e.size = e.size.map((s, i) => (i === 1 - SIDES[e.side][0] ? s + (slots(landing.get(e.id)) - 1) * turn : s));
-  }
+  land();
   // A reader's wire that steps aside just before its bundle's bar comes straight on to the bar instead, where that is
   // a wire clear of the others on it and touches no other wire: the bar is as long as its wires need (`reach`).
   const RUN = sizes.flow_port_run;
