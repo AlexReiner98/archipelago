@@ -115,6 +115,10 @@
             else if (said.type === 'end') (drawn?.end?.(), (ended = true), port.close());
           } catch (err) {
             send({ type: 'error', message: text(err) });
+          } finally {
+            // A picture finished is the worker answering: pictures queued one after another are not a drawing that
+            // has stopped, and the count of pings unanswered starts again from each.
+            if (said.type === 'start') post({ type: 'pong' });
           }
         });
       };

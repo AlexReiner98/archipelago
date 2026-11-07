@@ -133,12 +133,21 @@ function ways(g, outerAt, x, y) {
     deep = null;
     return true;
   };
+  /** Which faces each stretch lies on, by pair, worked out again only once the faces have changed. */
+  let sides = null;
+  const besideOf = () => {
+    if (sides) return sides;
+    sides = new Map();
+    faces.forEach((f, i) => { for (const [a, b] of edgesOf(f)) (sides.get(pair(a, b)) ?? sides.set(pair(a, b), []).get(pair(a, b))).push(i); });
+    return sides;
+  };
   /** An invisible edge across a face, from `a` to `b`. */
   const chord = (a, b) => {
     const hold = faces.findIndex((f) => f.includes(a) && f.includes(b));
     if (hold < 0 || near.get(a).has(b)) return false;
     const f = faces[hold], [m, k] = [f.indexOf(a), f.indexOf(b)].sort((p, q) => p - q);
     faces.splice(hold, 1, f.slice(m, k + 1), [...f.slice(k), ...f.slice(0, m + 1)]);
+    sides = null;
     tie(a, b);
     hidden.push([a, b]);
     return lead(a, b);
@@ -200,11 +209,8 @@ function ways(g, outerAt, x, y) {
   const edgesOf = (f) => f.map((a, k) => [a, f[(k + 1) % f.length]]);
   /** The nearest face that holds an item `fits`, and the ties passed under on the way there. */
   const route = (v, fits) => {
-    const seen = new Set(), queue = [], beside = new Map();
-    faces.forEach((f, i) => {
-      for (const [a, b] of edgesOf(f)) (beside.get(pair(a, b)) ?? beside.set(pair(a, b), []).get(pair(a, b))).push(i);
-      if (f.includes(v)) (seen.add(i), queue.push({ i, under: [] }));
-    });
+    const seen = new Set(), queue = [], beside = besideOf();
+    faces.forEach((f, i) => { if (f.includes(v)) (seen.add(i), queue.push({ i, under: [] })); });
     for (let k = 0; k < queue.length; k++) {
       const { i, under } = queue[k], f = faces[i], found = under.length ? f.filter((u) => u !== v && fits(u) && !under.some(([a, b]) => a === u || b === u)) : [];
       if (found.length) return { under, found };
@@ -224,6 +230,7 @@ function ways(g, outerAt, x, y) {
       const [p, q] = [f[k], f[(k + 1) % f.length]];
       if (pair(p, q) === pair(a, b)) { f.splice(k + 1, 0, d); break; }
     }
+    sides = null;
     near.get(a).delete(b), near.get(b).delete(a);
     tie(a, d), tie(d, b);
     for (const [p, q] of [[a, b], [b, a]]) if (after.get(p)?.delete(q)) (before.get(q).delete(p), (deep = null));
