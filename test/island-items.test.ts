@@ -154,6 +154,23 @@ test('a flat answer says the pack each island speaks, and all of its vocabulary'
   assert.ok(!pack.types.some((t: { id: string }) => t.id === 'task'), 'and none of another pack’s');
 });
 
+test('a flat answer names, after its pack, every other type and link type in use on the island (the owner, 7 Nov 2026)', async () => {
+  const l = await islandMap();
+  const { a } = await make(l, [{ op: 'create', ref: 'a', type: 'island', title: 'Billing', props: { pack: 'plain' } }]);
+  const { t, p } = await make(l, [
+    { op: 'create', ref: 'p', type: 'plain_thing', title: 'Invoice run', props: { island: a } },
+    { op: 'create', ref: 't', type: 'task', title: 'Send the invoices', props: { island: a } },
+  ]);
+  await make(l, [{ op: 'link', type: 'depends_on', from: t, to: p }]);
+  const pack = (await flatRead(l, { filter: { find: [`island ${a}`] } })).islands?.find((i: { id: string }) => i.id === a)?.pack;
+  assert.ok(pack, 'the island says its pack');
+  const types = pack.types.map((x: { id: string }) => x.id), links = pack.links.map((x: { id: string }) => x.id);
+  assert.equal(types[0], 'plain_thing', 'its pack’s own come first');
+  assert.ok(types.includes('task'), `core’s task, in use on it: ${types.join(', ')}`);
+  assert.ok(!types.includes('decision'), 'what no item on it is, is not named');
+  assert.ok(links.includes('depends_on'), `the link in use within it: ${links.join(', ')}`);
+});
+
 test("core's legend on an island is task, decision, finding and event, and the links an island's work is drawn with", () => {
   const reg = new Registry(join(import.meta.dirname, '..', 'packs'));
   const types = [...reg.types.values()].filter((t) => t.pack === 'core' && typeOnLegend(t)).map((t) => t.id).sort();
