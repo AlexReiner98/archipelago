@@ -4,7 +4,8 @@
 // it, and left out (task e_gkv58kqb).
 
 import { keptOf } from './query-kept.ts';
-import { bringersIn } from './query-saved.ts';
+import { bringersIn, viewQuery } from './query-saved.ts';
+import { readFlat } from './query-flat.ts';
 import type { Archipelago } from './pelago.ts';
 
 export interface Picture {
@@ -20,6 +21,8 @@ export interface Picture {
   project?: { id: string; title: string };
   /** The document that brings it in: it is a part of that page, read there, and not one of the views a person picks from. */
   document?: { id: string; title: string };
+  /** Why it cannot draw here, when it cannot: a term this map has no type for, a layout it names that is not on it. */
+  cannot?: string;
   /** Its note's first line: what it shows. */
   note?: string;
   /** Its life: working (an agent's, until the owner keeps it) or kept (on the owner's word). */
@@ -38,6 +41,21 @@ export async function savedViews(l: Archipelago, input: { limit?: number } = {})
   // A working view about items that have all closed (or gone) is retired with them.
   const ended = all.filter((x) => !kept.has(x.id) && x.about.length > 0 && x.about.every((id) => !items.get(id)?.is_open)).map((x) => x.id);
   const lenses = all.filter((x) => !ended.includes(x.id));
+  // The layouts the views name that the map has: one named and gone draws nothing.
+  const asked = [...new Set(lenses.map((x) => (x.props.style as Record<string, unknown> | undefined)?.style).filter((s): s is string => typeof s === 'string'))];
+  const { rows: there } = asked.length ? await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and archived_at is null`, [asked]) : { rows: [] };
+  const layouts = new Set(there.map((r) => r.id));
+  const cannotOf = (props: Record<string, unknown>): string | undefined => {
+    const style = (props.style as Record<string, unknown> | undefined)?.style;
+    if (typeof style === 'string' && !layouts.has(style)) return `its layout ${style} is not on this map`;
+    if (typeof props.view === 'string') return undefined;
+    try {
+      readFlat(l, viewQuery(props));
+    } catch (err) {
+      return (err as Error).message;
+    }
+    return undefined;
+  };
   const projectOf = await projects(l, ofIds);
   const { rows: held } = lenses.length
     ? await l.db.query<{ lens: string; id: string; title: string }>(`select m.to_id as lens, e.id, e.title from mention m join entity e on e.id = m.from_id where m.to_id = any($1::text[]) and e.type = any($2::text[]) and e.archived_at is null order by e.id`, [lenses.map((x) => x.id), bringersIn(l)])
@@ -56,7 +74,7 @@ export async function savedViews(l: Archipelago, input: { limit?: number } = {})
       // A style it names lies over its own settings, and a layout with code draws no shape.
       const shape = named ? (typeof named.props.code === 'string' ? undefined : (named.props.shape ?? own.shape)) : (own.shape ?? style?.props.shape);
       const document = documents.get(x.id);
-      return { lens: x.id, title: x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), ...(document && { document }), ...(notes.has(x.id) && { note: notes.get(x.id) }), life: kept.has(x.id) ? 'kept' : 'working' };
+      return { lens: x.id, title: x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), ...(document && { document }), ...(notes.has(x.id) && { note: notes.get(x.id) }), ...((cannot) => cannot && { cannot })(cannotOf(x.props)), life: kept.has(x.id) ? 'kept' : 'working' };
     })
     .sort((a, b) => Number(b.life === 'kept') - Number(a.life === 'kept'));
   const limit = input.limit ?? 100;

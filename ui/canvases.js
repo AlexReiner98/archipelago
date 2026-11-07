@@ -28,11 +28,11 @@ export function savedCanvases(fresh = false) {
       const said = new Map((views?.pictures ?? []).map((p) => [p.lens, p]));
       // A working view about what has closed is retired with it (src/saved-views.ts).
       const ended = new Set(views?.ended ?? []);
-      const marked = rows.filter((r) => !ended.has(r.id)).map((r) => ({ ...r, ofItem: Boolean(said.get(r.id)?.of), of: said.get(r.id)?.of ?? null, project: said.get(r.id)?.project ?? null, note: said.get(r.id)?.note ?? null, inDocument: Boolean(said.get(r.id)?.document) }));
+      const marked = rows.filter((r) => !ended.has(r.id)).map((r) => ({ ...r, ofItem: Boolean(said.get(r.id)?.of), of: said.get(r.id)?.of ?? null, project: said.get(r.id)?.project ?? null, note: said.get(r.id)?.note ?? null, cannot: said.get(r.id)?.cannot ?? null, inDocument: Boolean(said.get(r.id)?.document) }));
       const kept = new Set(rows.map((r) => r.props?.preset).filter(Boolean));
       // A pack's view of one item (`on` its types) is offered on that item's page alone (viewsOn).
       const offered = (state.schema?.canvases ?? []).filter((p) => !kept.has(p.id) && !p.on?.length).map((p) => ({ id: p.id, title: p.title, preset: true, props: { ...p.props, preset: p.id } }));
-      return [...marked, ...offered].sort((a, b) => Number(a.status === 'working') - Number(b.status === 'working') || a.title.localeCompare(b.title));
+      return [...marked, ...offered].sort((a, b) => Number(a.status === 'working') - Number(b.status === 'working') || a.title.localeCompare(b.title, undefined, { numeric: true }));
     });
   return known;
 }
@@ -52,7 +52,7 @@ const groupsOf = (views) => {
     groups.get(key).views.push(c);
   }
   const [workspace, ...rest] = [...groups.values()];
-  return [workspace, ...rest.sort((a, b) => Number(a.title === 'Other items') - Number(b.title === 'Other items') || a.title.localeCompare(b.title))];
+  return [workspace, ...rest.sort((a, b) => Number(a.title === 'Other items') - Number(b.title === 'Other items') || a.title.localeCompare(b.title, undefined, { numeric: true }))];
 };
 
 /** What a saved canvas draws: its filter, its walk and its limit; and its style, with its own id. */
@@ -244,6 +244,7 @@ const row = (c, now) =>
     h('a', { class: 'gist', href: canvasAt(c), title: c.title }, c.title),
     h('span', { class: 'muted small gist', title: lensWords(viewParts(c).lens) }, lensWords(viewParts(c).lens)),
     working(c) && h('span', { class: 'muted small', title: 'Working: an agent’s view, retired with what it is about unless you keep it' }, 'working'),
+    c.cannot && h('span', { class: 'muted small', title: `It cannot draw here: ${c.cannot}` }, 'cannot draw'),
     c.id === now && h('span', { class: 'pill ok', title: 'The view up now' }, 'up'),
   );
 

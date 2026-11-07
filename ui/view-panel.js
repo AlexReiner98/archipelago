@@ -41,7 +41,9 @@ const SCOPES = [
  * opens; `parts(c)`: its lens and style, for its thumbnail; `open(href)`: go there.
  */
 export function viewPicker({ all, current, label, title, changed, item, isHome, at, parts, open }) {
-  const button = h('button', { type: 'button', class: 'q-pick q-view-pick', title, 'aria-haspopup': 'dialog', 'data-title': current?.title ?? (isHome ? 'Home' : '') }, `${label}${changed ? ' •' : ''} ▾`);
+  const button = h('button', { type: 'button', class: 'q-pick q-view-pick', title, 'aria-haspopup': 'dialog', 'data-title': current?.title ?? (isHome ? 'Home' : '') },
+    // The name is cut short where the bar is short of room; the whole of it is the tooltip.
+    h('span', { class: 'q-pick-text' }, `${label}${changed ? ' •' : ''}`), h('span', { 'aria-hidden': 'true' }, '▾'));
   const near = nearOf(item);
   button.addEventListener('click', async () => {
     if (panel.matches(':popover-open')) return panel.hidePopover();
@@ -54,7 +56,7 @@ export function viewPicker({ all, current, label, title, changed, item, isHome, 
       h('button', { type: 'button', class: `view-row${c === current ? ' up' : ''}`, 'data-title': c.title, title: c.note ? `${c.title}: ${c.note}` : c.title, onclick: () => (panel.hidePopover(), open(at(c))) },
         thumbOf({ id: c.id, ...parts(c) }),
         h('span', { class: 'gist' }, c.title),
-        c.updated_at && h('span', { class: 'muted small' }, ago(c.updated_at)),
+        c.cannot ? h('span', { class: 'muted small', title: `It cannot draw here: ${c.cannot}` }, 'cannot draw') : c.updated_at && h('span', { class: 'muted small' }, ago(c.updated_at)),
       );
     const draw = () => {
       const words = find.value.trim().toLowerCase();
