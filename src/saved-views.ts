@@ -20,6 +20,8 @@ export interface Picture {
   project?: { id: string; title: string };
   /** The document that brings it in: it is a part of that page, read there, and not one of the views a person picks from. */
   document?: { id: string; title: string };
+  /** Its note's first line: what it shows. */
+  note?: string;
   /** Its life: working (an agent's, until the owner keeps it) or kept (on the owner's word). */
   life: 'working' | 'kept';
 }
@@ -29,7 +31,9 @@ export async function savedViews(l: Archipelago, input: { limit?: number } = {})
   const ofIds = [...new Set(all.flatMap((x) => x.about))];
   const { rows } = ofIds.length ? await l.db.query<{ id: string; title: string; type: string; is_open: boolean }>(`select id, title, type, is_open from entity where id = any($1::text[]) and archived_at is null`, [ofIds]) : { rows: [] };
   const items = new Map(rows.map((r) => [r.id, r]));
-  const { rows: lives } = all.length ? await l.db.query<{ id: string; status: string }>(`select id, status from entity where id = any($1::text[])`, [all.map((x) => x.id)]) : { rows: [] };
+  const { rows: lives } = all.length ? await l.db.query<{ id: string; status: string; note: string | null }>(`select id, status, left(split_part(btrim(body), E'
+', 1), 200) as note from entity where id = any($1::text[])`, [all.map((x) => x.id)]) : { rows: [] };
+  const notes = new Map(lives.filter((r) => r.note).map((r) => [r.id, r.note!]));
   const kept = new Set(lives.filter((r) => r.status === 'kept').map((r) => r.id));
   // A working view about items that have all closed (or gone) is retired with them.
   const ended = all.filter((x) => !kept.has(x.id) && x.about.length > 0 && x.about.every((id) => !items.get(id)?.is_open)).map((x) => x.id);
@@ -52,7 +56,7 @@ export async function savedViews(l: Archipelago, input: { limit?: number } = {})
       // A style it names lies over its own settings, and a layout with code draws no shape.
       const shape = named ? (typeof named.props.code === 'string' ? undefined : (named.props.shape ?? own.shape)) : (own.shape ?? style?.props.shape);
       const document = documents.get(x.id);
-      return { lens: x.id, title: x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), ...(document && { document }), life: kept.has(x.id) ? 'kept' : 'working' };
+      return { lens: x.id, title: x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), ...(document && { document }), ...(notes.has(x.id) && { note: notes.get(x.id) }), life: kept.has(x.id) ? 'kept' : 'working' };
     })
     .sort((a, b) => Number(b.life === 'kept') - Number(a.life === 'kept'));
   const limit = input.limit ?? 100;

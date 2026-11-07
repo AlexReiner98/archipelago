@@ -18,14 +18,15 @@ function open(anchor, more) {
   list.replaceChildren(
     item('Fit', 'Bring all of the view into sight on every change; off, it moves only when you move it', () => now.toggle('fit'), Boolean(now.settings.fit)),
     ...(more.some(Boolean) ? [h('hr')] : []),
-    ...more.filter(Boolean).map((m) => item(m.text, m.title, m.act, undefined, m.danger)),
+    // What the band hands over whole (the layout up, as its switch) stands as it is.
+    ...more.filter(Boolean).map((m) => m.element ?? item(m.text, m.title, m.act, undefined, m.danger)),
   );
   if (!list.matches(':popover-open')) list.showPopover();
   // By the ⋯, its right edge on the ⋯'s, kept in sight.
   placeBy(list, anchor, { end: true });
 }
 
-/** The ⋯ and its menu; `more` are what the band adds for what is up (Delete style, ui/look-switch.js). */
+/** The ⋯ and its menu; `more` are what the band adds for what is up (the layout switch, Delete style, ui/look-switch.js). */
 export function canvasMenu(more = []) {
   const button = h('button', { type: 'button', class: 'q-save q-band-menu', title: 'More for this view', 'aria-label': 'More for this view', 'aria-haspopup': 'menu' }, '⋯');
   button.addEventListener('click', () => (list.matches(':popover-open') ? list.hidePopover() : open(button, more)));

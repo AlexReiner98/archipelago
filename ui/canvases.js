@@ -12,6 +12,7 @@ import { filterSaid, fitBar } from './query-bar.js';
 import { canvasMenu } from './canvas-menu.js';
 import { lookSwitch, styleDelete } from './look-switch.js';
 import { thumbOf } from './thumbs.js';
+import { viewPicker } from './view-panel.js';
 import { ARROW, isA, typeTitle, wayOf } from './words.js';
 
 const TYPE = 'lens';
@@ -27,7 +28,7 @@ export function savedCanvases(fresh = false) {
       const said = new Map((views?.pictures ?? []).map((p) => [p.lens, p]));
       // A working view about what has closed is retired with it (src/saved-views.ts).
       const ended = new Set(views?.ended ?? []);
-      const marked = rows.filter((r) => !ended.has(r.id)).map((r) => ({ ...r, ofItem: Boolean(said.get(r.id)?.of), project: said.get(r.id)?.project ?? null, inDocument: Boolean(said.get(r.id)?.document) }));
+      const marked = rows.filter((r) => !ended.has(r.id)).map((r) => ({ ...r, ofItem: Boolean(said.get(r.id)?.of), of: said.get(r.id)?.of ?? null, project: said.get(r.id)?.project ?? null, note: said.get(r.id)?.note ?? null, inDocument: Boolean(said.get(r.id)?.document) }));
       const kept = new Set(rows.map((r) => r.props?.preset).filter(Boolean));
       // A pack's view of one item (`on` its types) is offered on that item's page alone (viewsOn).
       const offered = (state.schema?.canvases ?? []).filter((p) => !kept.has(p.id) && !p.on?.length).map((p) => ({ id: p.id, title: p.title, preset: true, props: { ...p.props, preset: p.id } }));
@@ -192,14 +193,6 @@ const saveMark = () => drawnMark('M2.5 2.5h9l2 2v9h-11z', 'M5 2.5v3.5h5v-3.5', '
 const binMark = () => drawnMark('M2.5 4h11', 'M6 4v-1.5h4v1.5', 'M4 4l.8 9.5h6.4l.8-9.5', 'M6.7 6.5v4.5', 'M9.3 6.5v4.5');
 /** The canvas picker's mark: three items and the links between them. */
 const canvasMark = () => drawnMark(dot(4, 12), dot(12, 4), dot(12, 12), 'M5.5 10.5l5-5', 'M6 12h4');
-/** The style picker's mark: a palette with its paints, and a brush beside it. */
-const styleMark = () =>
-  drawnMark(
-    'M6.5 1.5a5.5 5.5 0 1 0 0 11c.7 0 1.1-.4 1.1-1s-.5-.8-.5-1.4.5-1 1.1-1h.8a3 3 0 0 0 3-3c0-2.6-2.4-4.6-5.5-4.6z',
-    dot(3.9, 7.2, 0.6), dot(5, 4.4, 0.6), dot(8, 4, 0.6),
-    'M15.4 6l-3.2 5.8',
-    'M12.2 11.8c-.8 0-1.4.6-1.4 1.3 0 .5-.3.8-.8 1 1.5.4 2.9-.4 2.9-1.6',
-  );
 
 /** The saved canvas the canvas draws now, if one is: Home marks it. */
 let up = null;
@@ -216,20 +209,17 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
   listed.then((all) => {
     const current = upOf(all, lens, style);
     const changed = current && edited(current, lens, style);
-    const pick = h(
-      'select',
-      { class: 'q-pick', 'aria-label': 'Saved views', title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not saved: Save keeps it', onchange: (ev) => ev.target.value && open(ev.target.value) },
-      // Not saved, it is named as its tab and its pane are: by what its filter finds.
-      !current && !isHome && h('option', { value: '', selected: true }, filterSaid(lens.filter, () => {}) || 'View'),
-      h('option', { value: '#/', selected: isHome && !current }, 'Home'),
-      groupsOf(pickable(all, current?.id)).filter((g) => g.views.length).map((g) => h('optgroup', { label: g.title }, g.views.map((c) => h('option', { value: canvasAt(c), selected: c === current }, `${c.title}${c === current && changed ? ' •' : ''}`)))),
-    );
+    // Not saved, it is named as its tab and its pane are: by what its filter finds. The item up is what the view is
+    // about, else the first item its filter names.
+    const label = current ? current.title : isHome ? 'Home' : filterSaid(lens.filter, () => {}) || 'View';
+    const item = current?.of?.id ?? (lens.filter?.find ?? []).map((t) => /^id (e_[a-z0-9]+)$/.exec(t)?.[1]).find(Boolean) ?? null;
+    const pick = viewPicker({ all: pickable(all, current?.id), current, label, changed, item, isHome, at: canvasAt, parts: viewParts, open, title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not saved: Save keeps it' });
     // In a browser's order: back and forward, then the canvas up, as its address, and its style, with Save beside them, Split, and the canvas's menu at the end.
     const own = hooks.paneButtons?.() ?? [];
     const travel = own.filter((b) => b.classList.contains('q-travel'));
     // Each picker marked before it, its tooltip saying what it is.
     const named = (mark, title) => h('span', { class: 'q-label q-pick-label', title, 'aria-hidden': 'true' }, mark);
-    part.replaceChildren(...travel, named(canvasMark(), 'View: the saved view up'), pick, named(styleMark(), 'Layout: how this view is arranged'), lookSwitch(lens, style, open), h('button', { type: 'button', class: 'q-save q-word', title: current ? (changed ? `Save the changes to “${current.title}”` : working(current) ? `Keep “${current.title}”: an agent’s view, retired with what it is about until you keep it` : `“${current.title}” is kept`) : 'Save this view', 'aria-label': 'Save this view', ...(current && !changed && !current.preset && !working(current) && { disabled: true }), onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, changed ? 'Save •' : working(current) ? 'Keep' : 'Save')), ...(current && !current.preset ? [h('button', { type: 'button', class: 'q-save q-delete', title: `Delete “${current.title}”`, 'aria-label': 'Delete this saved view', onclick: () => drop(lens, style, current, open) }, binMark())] : []), ...own.filter((b) => !travel.includes(b)), canvasMenu([current && { text: 'Save as new view', title: 'Keep what is up as a view of its own', act: () => save(lens, style, current, open, true) }, styleDelete(lens, style, open)]));
+    part.replaceChildren(...travel, named(canvasMark(), 'View: the saved view up'), pick, h('button', { type: 'button', class: 'q-save q-word', title: current ? (changed ? `Save the changes to “${current.title}”` : working(current) ? `Keep “${current.title}”: an agent’s view, retired with what it is about until you keep it` : `“${current.title}” is kept`) : 'Save this view', 'aria-label': 'Save this view', ...(current && !changed && !current.preset && !working(current) && { disabled: true }), onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, changed ? 'Save •' : working(current) ? 'Keep' : 'Save')), ...(current && !current.preset ? [h('button', { type: 'button', class: 'q-save q-delete', title: `Delete “${current.title}”`, 'aria-label': 'Delete this saved view', onclick: () => drop(lens, style, current, open) }, binMark())] : []), ...own.filter((b) => !travel.includes(b)), canvasMenu([{ element: h('label', { class: 'q-look-row', title: 'Layout: how this view is arranged' }, h('span', { class: 'muted' }, 'Layout'), lookSwitch(lens, style, open)) }, current && { text: 'Save as new view', title: 'Keep what is up as a view of its own', act: () => save(lens, style, current, open, true) }, styleDelete(lens, style, open)]));
     fitBar();
   });
   return part;
