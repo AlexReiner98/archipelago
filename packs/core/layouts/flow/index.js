@@ -127,8 +127,9 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const sessions = sessionMarks(style);
   answer = { ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) };
   const run = (part) => layout({ items: part.items, links: part.links, ...Object.fromEntries(['ports', 'extras', 'combed', 'held', 'rewire', 'apart'].filter((k) => part[k] !== undefined).map((k) => [k, part[k]])), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes });
-  // A picture of more than one island is an archipelago (./archipelago.js): each island laid out alone, a sea between.
-  const parts = !story && islandsOf(answer.items).length > 1 ? islandModels({ items: answer.items, links: answer.links ?? [], run }) : null;
+  // A picture of items on islands is an archipelago (./archipelago.js): each island laid out alone, a sea between. One
+  // island is framed too, with its own legend in place of the key (task e_5rh5ysut).
+  const parts = !story && islandsOf(answer.items).length > 0 ? islandModels({ items: answer.items, links: answer.links ?? [], run }) : null;
   let g = parts ? null : run({ items: answer.items, links: answer.links ?? [] });
 
   // Where each step stands, read from what is drawn (./state.js): its phase, whether it waits on you, whether it is held up.

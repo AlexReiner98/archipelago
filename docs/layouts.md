@@ -110,7 +110,7 @@ Where two wires cross, one passes under: the line drawn has a gap there (`flow_b
 
 ### Levels and ports
 
-A picture of more than one island is the same layout run at two levels, an island and the sea, with no router of its own (design e_87x2us2b, the owner, 6 Nov 2026). A level is boxes and the wires among them; a wire that leaves its level is two wires joined at a port on its box's side. `flow/archipelago.js` runs four passes:
+A picture of items on islands, one or more (a single island is framed too, with its legend in place of the corner key: task e_5rh5ysut, the owner, 7 Nov 2026), is the same layout run at two levels, an island and the sea, with no router of its own (design e_87x2us2b, the owner, 6 Nov 2026). A level is boxes and the wires among them; a wire that leaves its level is two wires joined at a port on its box's side. `flow/archipelago.js` runs four passes:
 
 | Pass | Level | What it lays out | What it gives the next |
 | --- | --- | --- | --- |

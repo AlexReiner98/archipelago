@@ -292,7 +292,13 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   const islandIds = [...new Set(items.flatMap((e) => islandOf(e) ?? []))];
   // Each island's name, and the pack it speaks, whose vocabulary a drawing names in the island's legend.
   const isles = islandIds.length ? (await l.db.query<{ id: string; title: string; pack: string | null }>(`select id, title, props->>'pack' as pack from entity where id = any($1::text[])`, [islandIds])).rows : [];
-  const named = new Map(isles.map((r) => [r.id, r.title])), packOf = new Map(isles.map((r) => [r.id, r.pack ? islandPack(l.registry, r.pack) : undefined]));
+  // What is in use on each island in this picture: the types of its items, and the link types of the links within it.
+  const onIsle = new Map(items.flatMap((e) => (islandOf(e) ? [[e.id, islandOf(e)!] as const] : [])));
+  const usedOn = (isle: string) => ({
+    types: items.filter((e) => onIsle.get(e.id) === isle).map((e) => e.type),
+    links: relations.filter((r) => onIsle.get(r.from_id) === isle && onIsle.get(r.to_id) === isle).map((r) => r.type),
+  });
+  const named = new Map(isles.map((r) => [r.id, r.title])), packOf = new Map(isles.map((r) => [r.id, r.pack ? islandPack(l.registry, r.pack, usedOn(r.id)) : undefined]));
   // An end said by name goes back in the lens as its id.
   lens.find = finds.map(sayTerm);
   lens.only = onlys.map(sayTerm);

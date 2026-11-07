@@ -124,12 +124,21 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
 /** What an island speaks, as a drawing names it in the island's legend: its pack, and every type that lives on an island and link type the pack declares. */
 export type IslandPack = { id: string; title: string; types: { id: string; title: string; is?: string[] }[]; links: { id: string; title: string }[] };
 
-/** The vocabulary of the pack `id`, from the registry: none of the kernel's own types or links, nor a starter type, nor an actor, nor what is retired. */
-export function islandPack(registry: Registry, id: string): IslandPack | undefined {
+/**
+ * The vocabulary of the pack `id`, from the registry: none of the kernel's own types or links, nor a starter type, nor an
+ * actor, nor what is retired. With `used` (what is on the island in the picture), every other type and link type in use
+ * there is named after the pack's own: core's shared task or depends on, a starter used bare (the owner, 7 Nov 2026:
+ * every type in use is on the legend).
+ */
+export function islandPack(registry: Registry, id: string, used?: { types: Iterable<string>; links: Iterable<string> }): IslandPack | undefined {
   const pack = registry.packs.find((p) => p.id === id);
   if (!pack) return undefined;
-  const types = [...registry.types.values()].filter((t) => t.pack === id && typeOnLegend(t));
-  const links = [...registry.relations.values()].filter((r) => r.pack === id && linkOnLegend(r));
+  const ownTypes = [...registry.types.values()].filter((t) => t.pack === id && typeOnLegend(t));
+  const ownLinks = [...registry.relations.values()].filter((r) => r.pack === id && linkOnLegend(r));
+  const usedTypes = [...new Set(used?.types ?? [])].map((t) => registry.types.get(t)).filter((t) => t !== undefined && !ownTypes.includes(t) && livesOnIsland(t) && !t.retired && !t.dormant);
+  const usedLinks = [...new Set(used?.links ?? [])].map((r) => registry.relations.get(r)).filter((r) => r !== undefined && !ownLinks.includes(r) && linkOnLegend(r));
+  const types = [...ownTypes, ...(usedTypes as typeof ownTypes)];
+  const links = [...ownLinks, ...(usedLinks as typeof ownLinks)];
   return {
     id, title: pack.title,
     types: types.map((t) => ({ id: t.id, title: t.title, ...(t.lineage.length > 1 && { is: t.lineage.slice(1) }) })),

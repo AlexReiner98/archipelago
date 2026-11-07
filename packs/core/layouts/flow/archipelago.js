@@ -1,4 +1,4 @@
-// A picture of more than one island, set out as an archipelago (task e_auw7hb3v; one wiring system, inside islands and
+// A picture of items on islands, one or more, set out as an archipelago (task e_auw7hb3v; one wiring system, inside islands and
 // out: design e_87x2us2b, the owner, 6 Nov 2026). Every level is the flow's own layout, ports and all, and nothing is
 // routed outside it: each island alone, to its frame; the sea, each island a box of its frame and each link between two a
 // link of its own, which says the side each wire leaves its island by; each island again with its ports free on those
