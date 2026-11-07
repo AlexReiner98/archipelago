@@ -7,6 +7,9 @@ import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
 
+/** The layout switch, in the view band's menu (task e_xvz8g89r): the menu opened afresh, so the switch is the bar's now. */
+const look = `(() => { const m = [...document.querySelectorAll('.tab-menu')].find((x) => !x.classList.contains('view-panel')); if (m?.matches(':popover-open')) m.hidePopover(); document.querySelector('#query .q-band-menu')?.click(); return m?.querySelector('.q-look') ?? null; })()`;
+
 const browser = chrome();
 
 test('in a browser, find opens a style’s page and Apply draws the canvas in it', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
@@ -35,8 +38,8 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
   // Its page shut and the switch back on the house's, as a person does.
   const shut = async () => {
     await page.evaluate(`document.body.dataset.sheet === 'open' && document.getElementById('sheet-close').click()`);
-    await until(`document.body.dataset.sheet !== 'open' && Boolean(document.querySelector('#query .q-look'))`);
-    await page.evaluate(`(() => { const s = document.querySelector('#query .q-look'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await until(`document.body.dataset.sheet !== 'open' && Boolean(document.querySelector('#query .q-band-menu'))`);
+    await page.evaluate(`(() => { const s = ${look}; s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   };
   try {
     assert.ok(await until(`Boolean(document.querySelector('#find-lens .q-sum'))`), `the canvas is up: ${page.logs().join('\n')}`);
@@ -56,7 +59,7 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
       assert.ok(await until(onPage(made.s)), `its page opens: ${await page.evaluate('location.hash')} ${page.logs().join('\n')}`);
       assert.equal(await page.evaluate(`${hash}.get('find')`), `id ${made.t}`, 'over the lens as it was');
       assert.ok(!(await page.evaluate(applied(made.s))), 'with nothing applied');
-      assert.equal(await page.evaluate(`document.querySelector('#query .q-look').value`), '', 'the switch still says the house’s');
+      assert.equal(await page.evaluate(`${look}.value`), '', 'the switch still says the house’s');
 
       // Apply stands in the page's head, says what it does, and draws the canvas in the style as the switch does.
       assert.ok(await until(`${button}?.textContent === 'Use here'`), 'the style’s page offers Apply');
@@ -65,8 +68,8 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
       await page.evaluate(`${button}.click()`);
       assert.ok(await until(applied(made.s)), `Apply draws the canvas in it: ${await page.evaluate('location.hash')}`);
       assert.equal(await page.evaluate(`${hash}.get('find')`), `id ${made.t}`, 'the lens kept');
-      assert.ok(await until(`document.querySelector('#query .q-look').value === 'style:${made.s}'`), 'and the switch says so');
-      assert.equal(await page.evaluate(`document.querySelector('#query .q-look').selectedOptions[0].textContent`), 'Harbour blueprint');
+      assert.ok(await until(`${look}.value === 'style:${made.s}'`), 'and the switch says so');
+      assert.equal(await page.evaluate(`${look}.selectedOptions[0].textContent`), 'Harbour blueprint');
 
       await shut();
       assert.ok(await until(`!${applied(made.s)} && document.body.dataset.sheet !== 'open'`), 'back to the canvas');
@@ -83,19 +86,19 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
       ],
     })).result.created as Record<string, string>;
     await page.evaluate(`location.reload()`);
-    const options = `[...document.querySelectorAll('#query .q-look option')].map((o) => o.textContent)`;
+    const options = `((s) => (s ? [...s.options].map((o) => o.textContent) : []))(${look})`;
     assert.ok(await until(`${options}.includes('Board layout')`), 'the switch offers a layout kept on the map');
     assert.ok(!(await page.evaluate(`${options}.includes('Slab section look')`)), 'and no style');
-    assert.equal(await page.evaluate(`document.querySelector('#query .q-look').selectedOptions[0].textContent`), 'Default', 'and a layout draws only where it is chosen');
+    assert.equal(await page.evaluate(`${look}.selectedOptions[0].textContent`), 'Default', 'and a layout draws only where it is chosen');
     await type('style slab');
     assert.ok(await until(`Boolean(${choice('Style', 'Slab section look')})`), `find still lists it: ${await page.evaluate(`${list}.textContent`)}`);
     await take('Style', 'Slab section look');
     assert.ok(await until(onPage(own.o)), 'its page opens');
     assert.ok(await until(`${button}?.textContent === 'Use here'`), 'with Use here');
     await page.evaluate(`${button}.click()`);
-    assert.ok(await until(`document.querySelector('#query .q-look')?.value === 'style:${own.o}'`), 'and the switch says what is drawn');
+    assert.ok(await until(`${look}?.value === 'style:${own.o}'`), 'and the switch says what is drawn');
     await page.evaluate(`location.reload()`);
-    assert.ok(await until(`document.querySelector('#query .q-look')?.selectedOptions[0]?.textContent === 'Slab section look'`), 'by its name, after a reload too');
+    assert.ok(await until(`${look}?.selectedOptions[0]?.textContent === 'Slab section look'`), 'by its name, after a reload too');
     await shut();
 
     // The word "style " lists styles too, each opening its page; a drawing is no item, so only it draws at once.

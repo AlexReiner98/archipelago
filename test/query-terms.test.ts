@@ -167,7 +167,7 @@ test('a preview says what a term would change, reading nothing else', async () =
 
 test('words keep to Not, however many terms it has', async () => {
   const { l } = await project();
-  await make(l, [{ op: 'create', type: 'lens', title: 'Find in a view', status: 'current', props: { filter: { find: ['type task'] } } }]);
+  await make(l, [{ op: 'create', type: 'lens', title: 'Find in a view', props: { filter: { find: ['type task'] } } }]);
   const titled = async (not?: string[]) => titles(await flatRead(l, { filter: { find: ['text find'], ...(not && { not }) } }));
   assert.ok(!(await titled()).includes('Find in a view'), 'the default Not leaves out what the system keeps');
   assert.ok((await titled([])).includes('Find in a view'), 'with nothing left out, it is found');

@@ -28,7 +28,10 @@ test('in a browser, a saved canvas is opened from Home and switched to from the 
     assert.ok(await until(`${picked} === 'The other one'`), 'named in the bar');
     // As a chip, or in the folded line when the bar is narrow (560 px, as set above).
     assert.ok(await until(`[...document.querySelectorAll('#find .q-id, #find .q-more')].some((c) => (c.textContent + c.title).includes('Another project'))`), 'its lens in the bar');
-    await page.evaluate(`(() => { const s = document.querySelector('#query .q-pick'); s.value = [...s.options].find((o) => o.textContent === 'Saved at 1280').value; s.dispatchEvent(new Event('change')); })()`);
+    // From the switcher's panel, its scope All.
+    await page.evaluate(`document.querySelector('#query .q-pick').click()`);
+    assert.ok(await until(`Boolean(document.querySelector('.view-panel:popover-open .view-scopes button'))`), 'the panel opens');
+    await page.evaluate(`(() => { [...document.querySelectorAll('.view-scopes button')].find((b) => b.textContent.startsWith('All')).click(); [...document.querySelectorAll('.view-panel .view-row')].find((r) => r.dataset.title === 'Saved at 1280').click(); })()`);
     assert.ok(await until(drawn(made.a)), 'switched from the bar');
     assert.ok(await until(`${picked} === 'Saved at 1280'`));
 
@@ -36,7 +39,7 @@ test('in a browser, a saved canvas is opened from Home and switched to from the 
     await page.go(`${base}/#/you`);
     assert.ok(await until(`Boolean(document.querySelector('.canvases .old-views'))`), 'the views of items are folded');
     assert.ok(!(await page.evaluate<boolean>(`[...document.querySelectorAll('.canvases > .rows a')].some((a) => a.textContent === 'A view of it')`)), 'not among the workspace’s own');
-    await page.evaluate(`(() => { const d = document.querySelector('.canvases .old-views'); d.open = true; [...d.querySelectorAll('a')].find((a) => a.textContent === 'A view of it').click(); })()`);
+    await page.evaluate(`(() => { const ds = [...document.querySelectorAll('.canvases .old-views')]; ds.forEach((d) => (d.open = true)); ds.flatMap((d) => [...d.querySelectorAll('a')]).find((a) => a.textContent === 'A view of it').click(); })()`);
     assert.ok(await until(`${picked} === 'A view of it'`), `opened as a canvas: ${page.logs().join(' | ')}`);
     assert.ok(await until(drawn(made.a)));
 
@@ -45,7 +48,8 @@ test('in a browser, a saved canvas is opened from Home and switched to from the 
     await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'document', title: 'A page', body: `Words.\n\n${held}` }] });
     await page.go(`${base}/#/you`);
     assert.ok(await until(`Boolean(document.querySelector('.canvases .old-views'))`));
-    const listed = `[...document.querySelectorAll('.canvases a'), ...document.querySelectorAll('#query .q-pick option')].map((a) => a.textContent)`;
+    // On Home, and in the switcher's panel, its scope All.
+    const listed = `(() => { const p = document.querySelector('.view-panel'); if (!p.matches(':popover-open')) document.querySelector('#query .q-pick').click(); [...p.querySelectorAll('.view-scopes button')].find((b) => b.textContent.startsWith('All'))?.click(); return [...document.querySelectorAll('.canvases a'), ...p.querySelectorAll('.view-row')].map((a) => a.dataset.title ?? a.textContent); })()`;
     assert.ok(!(await page.evaluate<string[]>(listed)).includes('A page’s picture'), 'not on Home');
     await page.go(`${base}/#/v?canvas=${other}`);
     assert.ok(await until(`${picked} === 'The other one'`));
@@ -55,7 +59,7 @@ test('in a browser, a saved canvas is opened from Home and switched to from the 
 
     // A view made, then changed, after the page read the saved views opens as saved, not as new or changed since (bump e_4j6xvm82).
     const saved = `(() => { const b = [...document.querySelectorAll('#query .q-save')].find((x) => x.getAttribute('aria-label') === 'Save this view'); return b?.disabled === true && b.textContent === 'Save'; })()`;
-    const late = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'l', type: 'lens', title: 'Made since', props: { filter: { find: [`id ${made.q}`] }, walk: { over: ['part_of'], steps: 1 } } }] })).result.created.l as string;
+    const late = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'l', type: 'lens', title: 'Made since', status: 'kept', props: { filter: { find: [`id ${made.q}`] }, walk: { over: ['part_of'], steps: 1 } } }] })).result.created.l as string;
     await page.go(`${base}/#/v?canvas=${late}`);
     assert.ok(await until(`${picked} === 'Made since'`), 'named in the bar');
     assert.ok(await until(saved), 'saved, as it was made');

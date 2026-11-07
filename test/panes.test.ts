@@ -34,8 +34,8 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
   const views = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'f', type: 'lens', title: 'The first', status: 'current', props: { filter: { find: [`id ${made.a}`] }, walk: { over: [], steps: 0 } } },
-      { op: 'create', ref: 'g', type: 'lens', title: 'The second', status: 'current', props: { filter: { find: [`id ${made.b}`] }, walk: { over: [], steps: 0 } } },
+      { op: 'create', ref: 'f', type: 'lens', title: 'The first', props: { filter: { find: [`id ${made.a}`] }, walk: { over: [], steps: 0 } } },
+      { op: 'create', ref: 'g', type: 'lens', title: 'The second', props: { filter: { find: [`id ${made.b}`] }, walk: { over: [], steps: 0 } } },
     ],
   })).result.created as Record<string, string>;
   const page = await open(`${base}/`);
@@ -83,7 +83,7 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     await page.evaluate(`${nth(0)}.querySelector('svg a[href="#/e/${made.a}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
     await until('the pane stops at the sheet', () => page.evaluate<boolean>(`document.body.dataset.sheet === 'open' && Math.abs(${nth(0)}.querySelector('.pane-canvas').getBoundingClientRect().right - (innerWidth - document.getElementById('sheet').offsetWidth)) < 2`));
     await page.evaluate(`document.getElementById('sheet-close').click()`);
-    await until('the pane has the page again', () => page.evaluate<boolean>(`document.body.dataset.sheet !== 'open' && ${nth(0)}.getBoundingClientRect().width > 1200`));
+    await until('the pane has the page again', () => page.evaluate<boolean>(`document.body.dataset.sheet !== 'open' && ${nth(0)}.getBoundingClientRect().width > 1200 && document.getElementById('sheet').getBoundingClientRect().left >= innerWidth - 1`));
 
     // By hand: split, and each pane is its own. A press in the second makes it the one the bar, find and the address act on.
     await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);

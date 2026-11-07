@@ -26,7 +26,7 @@ export async function savedCanvasPage() {
   };
   const drawn = (id: string) => `Boolean(document.querySelector('#canvas svg a[href="#/e/${id}"]'))`;
   const canvasUp = () => page.evaluate<string | null>(`new URLSearchParams(location.hash.split('?')[1] ?? '').get('canvas')`);
-  const picked = `document.querySelector('#query .q-pick')?.selectedOptions[0]?.textContent`;
+  const picked = `document.querySelector('#query .q-pick')?.dataset.title`;
   const canvases = async () => (await call('/api/search', undefined, { type: 'lens', limit: 50 })).result as { id: string; title: string; props: Record<string, any> }[];
   const width = (w: number) => page.send('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 1, mobile: false });
   /** A canvas of the project and its parts, kept as the bar keeps one saved at `at` px: what a pass before this one left. */

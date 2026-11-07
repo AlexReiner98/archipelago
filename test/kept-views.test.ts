@@ -41,7 +41,7 @@ test('in a browser, a document’s kept view is drawn as a canvas, the packs’ 
   const kept = await change({
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', status: 'current', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of', 'calls'], steps: 3 }, style: { shape: 'architecture' } } },
+      { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of', 'calls'], steps: 3 }, style: { shape: 'architecture' } } },
       { op: 'link', type: 'about', from: 'l', to: made.p },
       { op: 'create', ref: 'd', type: 'document', title: 'How it works', body: `Opening words.\n\n{l}\n\nClosing words.` },
       // Home is the owner's to fill: a screen of their own drawing the open releases put on it.

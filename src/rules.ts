@@ -60,6 +60,8 @@ export interface RuleDef {
     may?: string;
     /** Whether the change says on whose authority it is made. */
     said?: boolean;
+    /** Whether it says it is made on the owner's word: authority of human, with where they said so. */
+    owner_said?: boolean;
     /** Whether a rule holds this op: false for what is checked only of an op that takes effect at once. */
     held?: boolean;
     /** Whether a pack's action or handler makes the change. */
@@ -132,6 +134,8 @@ export interface Who {
   asked?: boolean;
   /** The change says on whose authority it is made. */
   said?: boolean;
+  /** It says it is made on the owner's word (authority of human, with a basis). */
+  ownerSaid?: boolean;
   /** The pack whose action or handler makes the change. */
   pack?: string;
   /** The drawing that asked for it: its style, and the types it declares it writes. A rule holds it though a person sends it. */
@@ -199,6 +203,7 @@ function applies(rule: RuleDef, reg: Registry, who: Who, w: Written, targets: Ta
   if (when.asked !== undefined && Boolean(who.asked) !== when.asked) return false;
   if (when.may !== undefined && who.may !== when.may) return false;
   if (when.said !== undefined && Boolean(who.said) !== when.said) return false;
+  if (when.owner_said !== undefined && Boolean(who.ownerSaid) !== when.owner_said) return false;
   if (when.held !== undefined && held !== when.held) return false;
   if (when.pack !== undefined && Boolean(who.pack) !== when.pack) return false;
   if (when.drawing !== undefined && Boolean(who.drawing) !== when.drawing) return false;
@@ -215,10 +220,13 @@ function applies(rule: RuleDef, reg: Registry, who: Who, w: Written, targets: Ta
   if (when.visibility && !(w.visibility && list(when.visibility)!.includes(w.visibility))) return false;
   const target = targets[0];
   if (when.status) {
-    if (!target || w.status === undefined || w.status === target.status) return false;
+    // A create has no status it comes from: one made with a status is matched by it, where the rule says nothing of from.
+    const made = !target && w.op === 'create' && w.type !== undefined && w.status !== undefined && when.status.from === undefined;
+    if (!made && (!target || w.status === undefined || w.status === target.status)) return false;
+    const type = target?.type ?? w.type!;
     const fits = (wanted: string[] | undefined, status: string) =>
-      !wanted || wanted.some((s) => s === status || (s === 'open' && reg.isOpen(target.type, status)) || (s === 'closed' && !reg.isOpen(target.type, status)));
-    if (!fits(list(when.status.from), target.status) || !fits(list(when.status.to), w.status)) return false;
+      !wanted || wanted.some((s) => s === status || (s === 'open' && reg.isOpen(type, status)) || (s === 'closed' && !reg.isOpen(type, status)));
+    if ((!made && !fits(list(when.status.from), target!.status)) || !fits(list(when.status.to), w.status!)) return false;
   }
   if (when.compare) {
     const [, field, op, right] = COMPARE.exec(when.compare)!;
@@ -278,8 +286,10 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
       if (!who.human || (who.drawing && rule.when?.drawing)) held.push(ruled(rule));
     } else if (rule.then === 'refuse') refused.push(said(rule, `"${title}": refused by ${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`));
     else if (typeof rule.then === 'object') {
+      // A field the item's head holds (its body) is read from the op too.
       const props = { ...targets[0]?.props, ...w.props };
-      const missing = rule.then.require.filter((f) => props[f] == null || props[f] === '');
+      const value = (f: string) => props[f] ?? (w as unknown as Record<string, unknown>)[f];
+      const missing = rule.then.require.filter((f) => value(f) == null || String(value(f)).trim() === '');
       if (missing.length) refused.push(said(rule, `"${title}": needs ${missing.join(', ')}`));
     }
   }

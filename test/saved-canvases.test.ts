@@ -15,7 +15,7 @@ const browser = chrome();
 test('an agent makes and changes a saved canvas through change, and report show opens it', async () => {
   const l = await fresh();
   const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'project', title: 'P' }]);
-  const asked = { reason: 'test: a canvas of P', ops: [{ op: 'create' as const, ref: 'c', type: 'lens', title: 'P and its parts', props: { filter: { find: [`id ${p}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'flow' } } }] };
+  const asked = { reason: 'test: a canvas of P', ops: [{ op: 'create' as const, ref: 'c', type: 'lens', title: 'P and its parts', body: 'P and what it holds.', props: { filter: { find: [`id ${p}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'flow' } } }] };
   const made = (await callTool(l, agent, 'change', asked)) as { status: string; created?: Record<string, string>; proposal?: string };
   // Held for a person, as every agent's change is until the owner lets them apply: approved, it is made.
   const id = made.created?.c ?? ((await l.change(human, asked)) as { created: Record<string, string> }).created.c;

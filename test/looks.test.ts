@@ -78,10 +78,10 @@ test('in a browser, a look is the view as drawn: a flow, a style’s own code, a
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'f', type: 'lens', title: 'The steps', status: 'current', props: lens },
-      { op: 'create', ref: 'c', type: 'lens', title: 'The steps, painted', status: 'current', props: lens },
+      { op: 'create', ref: 'f', type: 'lens', title: 'The steps', props: lens },
+      { op: 'create', ref: 'c', type: 'lens', title: 'The steps, painted', props: lens },
       // It paints only after a wait, as code that loads or lays out first does: the look waits for it.
-      { op: 'create', ref: 's', type: 'layout', title: 'Painted', status: 'current', props: { code: "export default async function draw({ canvas }) { await new Promise((r) => setTimeout(r, 1500)); const c = canvas.getContext('2d'); c.fillStyle = '#ff00ff'; c.fillRect(0, 0, canvas.width, canvas.height); }" } },
+      { op: 'create', ref: 's', type: 'layout', title: 'Painted', props: { code: "export default async function draw({ canvas }) { await new Promise((r) => setTimeout(r, 1500)); const c = canvas.getContext('2d'); c.fillStyle = '#ff00ff'; c.fillRect(0, 0, canvas.width, canvas.height); }" } },
     ],
   })).result.created as Record<string, string>;
   await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.c, props: { style: { style: made.s } } }] });
@@ -157,7 +157,7 @@ test('in a browser, a look of another workspace’s view draws it, and a documen
       { op: 'create', ref: 's', type: 'style', title: 'Nowhere', status: 'current', props: { faces: { text: "'Nowhere Zq', serif" } } },
     ],
   })).result.created as Record<string, string>;
-  made.v = (await call('/api/change', owner, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'Acme’s view', status: 'current', props: { filter: { find: [`id ${made.a}`] } } }] })).result.created.v;
+  made.v = (await call('/api/change', owner, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'Acme’s view', props: { filter: { find: [`id ${made.a}`] } } }] })).result.created.v;
   const look = (params: Record<string, unknown>) => call('/agent/query', agent, { name: 'look', params }).then((r) => r.result ?? r);
   const view = await look({ entity: made.v });
   assert.equal(view.state, 'drawn', JSON.stringify({ ...view, image: undefined }));

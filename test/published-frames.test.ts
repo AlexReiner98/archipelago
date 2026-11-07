@@ -24,7 +24,7 @@ async function published(call: (path: string, token?: string, body?: unknown) =>
         { op: 'link', type: 'part_of', from: 'a', to: 'e' },
         { op: 'link', type: 'part_of', from: 'b', to: 'e' },
         { op: 'link', type: 'calls', from: 'a', to: 'b' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', visibility: 'shared', status: 'current', props: { filter: { find: ['type project', 'type environment', 'type component'] }, style: { shape: 'architecture' } } },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', visibility: 'shared', props: { filter: { find: ['type project', 'type environment', 'type component'] }, style: { shape: 'architecture' } } },
         { op: 'link', type: 'about', from: 'l', to: 'p' },
         { op: 'link', type: 'part_of', from: 'l', to: 'd' },
         ...extra,
@@ -68,7 +68,7 @@ test('a published picture keeps its first frame, its page carries its data, and 
 test('a picture drawn by the owner’s version of a drawing is drawn only in the sandbox', async () => {
   const { call, base } = await serve('off');
   const look = 'export const css = `.ar-part { cursor: help; }`;\n';
-  const { d, l } = await published(call, [{ op: 'create', type: 'layout', title: 'Architecture, mine', status: 'current', props: { preset: 'core.architecture', modules: { 'look.js': look } } }]);
+  const { d, l } = await published(call, [{ op: 'create', type: 'layout', title: 'Architecture, mine', props: { preset: 'core.architecture', modules: { 'look.js': look } } }]);
   const data = await (await fetch(`${base}/p/default/${d}/data`)).json();
   assert.equal(data.lenses[l].first, undefined);
   assert.equal((await (await fetch(`${base}${data.lenses[l].style.drawing.src}`)).json())['look.js'], look);
