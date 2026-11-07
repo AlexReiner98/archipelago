@@ -1,7 +1,7 @@
-// The flow draws a picture of more than one island as an archipelago (task e_auw7hb3v; the owner, 5 Nov 2026): each
+// The flow draws a picture of items on islands, one or more, as an archipelago (task e_auw7hb3v; the owner, 5 Nov 2026): each
 // island a region round what lives on it, laid out alone so no two overlap, named, with its own legend inside it and
 // none in the corner; a link between islands crosses the sea, with a gate on each shore naming what crosses. A picture
-// of one island draws no border.
+// of one island is framed the same way (task e_5rh5ysut); a picture of none draws no border.
 
 import assert from 'node:assert/strict';
 import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -127,10 +127,12 @@ test('an island’s legend holds only its vocabulary: the shared marks are told 
   assert.ok(tipOf('gate:0:0').includes('Grants') && tipOf('gate:0:1').includes('Lab'), 'each gate names the island it comes into or leaves');
 });
 
-test('a picture of one island keeps the shared marks in its key', () => {
-  const one = { ...answer, items: answer.items.filter((i) => i.island !== 'e_lablabis').map((i) => (i.id === 'e_writezzz' ? { ...i, phase: 'under_way' } : i)) };
-  const words = draw(one).key.map((r: any) => r.label);
-  assert.ok(words.includes('Under way') && words.includes('Not started'), words.join(', '));
+test('a picture of one island is framed, with its own legend and none in the corner (task e_5rh5ysut)', () => {
+  const one = { ...answer, items: answer.items.filter((i) => i.island !== 'e_lablabis') };
+  const scene = draw(one);
+  assert.ok(marks(scene.svg, (m) => String(m[1]?.class ?? '').includes('lf-island')).length > 0, 'its island is drawn as a region');
+  assert.ok(legendOf(scene, 'e_grantsis').includes('Work'), `its legend names what it draws: ${legendOf(scene, 'e_grantsis').join(', ')}`);
+  assert.equal(scene.key.length, 0, 'the corner key gives way to the island’s legend');
 });
 
 test('a finding read across crosses the sea, with a gate on each shore naming it', () => {
@@ -142,12 +144,9 @@ test('a finding read across crosses the sea, with a gate on each shore naming it
   assert.ok(wire, 'the crossing is a tie');
 });
 
-test('a picture of one island, or of none, draws no border', () => {
-  const one = { ...answer, items: answer.items.filter((i) => i.island !== 'e_lablabis') };
-  for (const a of [one, { ...answer, islands: undefined, items: answer.items.map(({ island, ...i }) => i) }]) {
-    const scene = draw(a);
-    assert.equal(marks(scene.svg, (m) => String(m[1]?.class ?? '').includes('lf-island')).length, 0);
-    assert.ok(!scene.css.includes('lf-shore'), 'nor its rules');
-    assert.ok(scene.key.length > 0, 'and keeps its key');
-  }
+test('a picture of no island draws no border', () => {
+  const scene = draw({ ...answer, islands: undefined, items: answer.items.map(({ island, ...i }) => i) });
+  assert.equal(marks(scene.svg, (m) => String(m[1]?.class ?? '').includes('lf-island')).length, 0);
+  assert.ok(!scene.css.includes('lf-shore'), 'nor its rules');
+  assert.ok(scene.key.length > 0, 'and keeps its key');
 });
