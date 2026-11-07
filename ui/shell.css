@@ -190,6 +190,10 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #query .tightest .q-pick-label { display: none; }
 #query .tightest .q-split { display: none; }
 #query .q-pick { field-sizing: content; min-width: 0; border: 0; background: none; font-size: var(--text-3); font-weight: 600; max-width: var(--select-least); text-overflow: ellipsis; }
+/* The view picker (ui/view-panel.js): its name shrinks first and is cut short, so it never runs under Save. */
+#query .q-view-pick { display: inline-flex; align-items: center; gap: var(--space-3); flex: 0 1 auto; overflow: hidden; white-space: nowrap; color: var(--text); cursor: pointer; }
+#query .q-view-pick > .q-pick-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#query .q-view-pick > :last-child { flex: none; }
 #more > summary:hover { color: var(--text); background: var(--accent-soft); }
 #listening { flex: none; color: var(--ok); font-size: var(--text-3); white-space: nowrap; }
 #listening::before { content: "● "; }

@@ -16,7 +16,7 @@ test('saved views name each kept picture by its own title, say what it is of, pu
     { op: 'create', ref: 'arch', type: 'style', title: 'The stack as architecture', status: 'current', props: { shape: 'architecture' } },
     { op: 'link', type: 'about', from: 'wired', to: 'stack' },
     { op: 'link', type: 'about', from: 'arch', to: 'wired' },
-    { op: 'create', ref: 'board', type: 'lens', title: 'Kanban board', status: 'kept' },
+    { op: 'create', ref: 'board', type: 'lens', title: 'Kanban board', status: 'kept', props: { filter: { find: ['type task'] } } },
   ]);
   const { pictures, more } = (await callTool(l, human, 'view', { name: 'saved_views', params: {} })) as { pictures: Record<string, unknown>[]; more: number };
   assert.deepEqual(pictures, [
@@ -54,4 +54,20 @@ test('a saved view is named by its own title and shaped by the style it names it
   ]);
   const { pictures } = (await callTool(l, human, 'view', { name: 'saved_views', params: {} })) as { pictures: Record<string, unknown>[] };
   assert.deepEqual(new Map(pictures.map((p) => [p.lens, [p.title, p.shape]])), new Map([[made.v, ['Work', 'grid']], [made.w, ['Flow of work', 'flow']]]));
+});
+
+test('a view that cannot draw here says why: a type the map lacks, a layout that is not on it', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'ok', type: 'lens', title: 'Draws', props: { filter: { find: ['type task'] } } },
+    { op: 'create', ref: 'odd', type: 'lens', title: 'A gone type', props: { filter: { find: ['type task'] } } },
+    { op: 'create', ref: 'lay', type: 'lens', title: 'A gone layout', props: { filter: { find: ['type decision'] }, style: { style: 'e_nothere1' } } },
+  ]);
+  // As a view kept on another map was brought here: a type this map has no pack for, set in place.
+  await l.db.query(`update entity set props = jsonb_set(props, '{filter}', '{"find": ["type no_such_type"]}') where id = $1`, [made.odd]);
+  const { pictures } = (await callTool(l, human, 'view', { name: 'saved_views', params: {} })) as { pictures: { lens: string; cannot?: string }[] };
+  const of = (id: string) => pictures.find((p) => p.lens === id)?.cannot;
+  assert.equal(of(made.ok), undefined);
+  assert.match(of(made.odd) ?? '', /unknown type "no_such_type"/);
+  assert.match(of(made.lay) ?? '', /its layout e_nothere1 is not on this map/);
 });

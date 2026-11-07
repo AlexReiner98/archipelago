@@ -1,0 +1,17 @@
+{
+  "id": "ridges",
+  "version": "0.1.0",
+  "title": "Ridges",
+  "description": "The ridges design tool: the presets its drawing saves, each a whole setup of palettes, dials, seed and frame. The drawing itself is a layout kept on the map.",
+  "requires": ["core"],
+  "types": [
+    {
+      "id": "ridges_setup",
+      "extends": "record",
+      "title": "Ridges preset",
+      "description": "A saved setup of the ridges design tool, as its Presets menu keeps it: the item's name is the preset's name, its setup the whole of it.",
+      "statuses": { "open": ["current"], "closed": ["superseded"], "phases": { "current": "standing", "superseded": "ended" } },
+      "fields": { "setup": { "type": "json", "shown": true, "description": "The whole setup as the ridges drawing saved it: palettes, dials, seed, frame, name, letter, emblem. Loaded from the Presets menu of the Ridges drawing." } }
+    }
+  ]
+}
