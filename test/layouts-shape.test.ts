@@ -12,6 +12,8 @@ import { minCostFlow } from '../packs/core/layouts/shape/flow.js';
 import { sidesOf } from '../packs/core/layouts/shape/sides.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { shape } from '../packs/core/layouts/shape/index.js';
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { tension } from '../packs/core/layouts/shape/turns.js';
 
 type P = [number, number];
 
@@ -32,6 +34,20 @@ test('flow: a least on an arc is carried, and a circulation costs what its least
 test('flow: a need nothing can meet is said, not hidden', () => {
   assert.throws(() => minCostFlow(2, [2, -2], [{ from: 0, to: 1, cap: 1 }]), /unmet/);
   assert.throws(() => minCostFlow(2, [1, -2], []), /balance/);
+});
+
+test('tension: the turns at each node that cost least, as every way of turning them would find', () => {
+  // Small graphs, every cost w · max(0, |c + λ(to) - λ(from)| - s), against all turns from -6 to 6.
+  let seed = 7;
+  const rnd = (n: number) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  for (let t = 0; t < 150; t++) {
+    const n = 2 + rnd(2 + 1), terms = Array.from({ length: 1 + rnd(2 * 2 + 2) }, () => ({ from: rnd(n), to: rnd(n), c: rnd(9) - 2 * 2, w: 1 + rnd(2 + 1), s: rnd(2) }));
+    const cost = (l: number[]) => terms.reduce((sum, x) => sum + x.w * Math.max(0, Math.abs(x.c + l[x.to] - l[x.from]) - x.s), 0);
+    let best = Infinity;
+    const all = (l: number[]): void => { if (l.length === n) { best = Math.min(best, cost(l)); return; } for (let v = -6; v <= 6; v++) all([...l, v]); };
+    all([0]);
+    assert.equal(cost(tension(n, terms)), best);
+  }
 });
 
 test('sides: the order out of the foot, into the head, a turned wire on the right, the rest where they fit', () => {
@@ -130,6 +146,16 @@ for (const [name, emb] of Object.entries(CASES)) {
     assert.equal(s.against, false, `${name}: no rule broken`);
   });
 }
+
+test('shape: no wire doubles back, two turns one way, where its boxes do not force it', () => {
+  for (const [name, emb] of Object.entries(CASES)) {
+    // A turned wire leaves and comes in on the right, so its boxes force it round.
+    for (const w of shape(emb).wires.filter((x: any) => !x.reversed)) {
+      const p = w.points as P[], heads = p.slice(1).map((q, i) => (q[0] > p[i][0] ? 1 : q[0] < p[i][0] ? 2 + 1 : q[1] > p[i][1] ? 2 : 0));
+      assert.ok(!heads.some((h, i) => i >= 2 && (h + 2) % (2 * 2) === heads[i - 2]), `${name}: ${w.id} doubles back`);
+    }
+  }
+});
 
 test('shape: a trunk is a T, its branches level across its upright stem', () => {
   const s = shape(CASES.trunk), wire = (id: string) => s.wires.find((w: any) => w.id === id).points as P[];

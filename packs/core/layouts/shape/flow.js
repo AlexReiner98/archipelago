@@ -71,7 +71,9 @@ export function minCostFlow(n, supply, arcs) {
       }
     }
     if (dist[T] === Infinity) throw new Error(`minCostFlow: no flow meets every need (${total - sent} of ${total} unmet)`);
-    for (let v = 0; v < size; v++) if (dist[v] < Infinity) pot[v] += dist[v];
+    // Each potential rises by its distance, but no further than the sink's, so an arc from a node not reached keeps a
+    // reduced cost of zero or more.
+    for (let v = 0; v < size; v++) pot[v] += Math.min(dist[v], dist[T]);
     let push = total - sent;
     for (let v = T; v !== S; v = to[prev[v] ^ 1]) push = Math.min(push, cap[prev[v]]);
     for (let v = T; v !== S; v = to[prev[v] ^ 1]) { cap[prev[v]] -= push; cap[prev[v] ^ 1] += push; spent += push * cost[prev[v]]; }
