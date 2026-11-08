@@ -72,6 +72,12 @@ function checkSketch(name: string, emb: any, s: any) {
     const [p, q] = [box(boxes[i]), box(boxes[j])];
     assert.ok(p.x1 <= q.x0 || q.x1 <= p.x0 || p.y1 <= q.y0 || q.y1 <= p.y0, `${name}: ${boxes[i].id} stands on ${boxes[j].id}`);
   }
+  // A box is no wider than its busiest side needs, twice over: a wire that would stretch it queues beside it instead.
+  for (const n of boxes) {
+    const r = box(n), ends = s.wires.filter((w: any) => w.type !== 'unseen').flatMap((w: any) => [w.from === n.id && w.points[0], w.to === n.id && w.points.at(-1)]).filter(Boolean);
+    const busiest = Math.max(1, ...[r.y0, r.y1].map((y) => ends.filter((p: P) => p[1] === y).length));
+    assert.ok(n.w <= busiest * 2 + 2, `${name}: ${n.id} is ${n.w} wide for ${busiest} wires on a side`);
+  }
   // Wires meet only at a crossing or a junction they both pass through.
   const points = new Set(s.nodes.filter((n: any) => n.kind === 'cross' || n.kind === 'junction').map((n: any) => `${n.x},${n.y}`));
   for (let i = 0; i < s.wires.length; i++) for (let j = i + 1; j < s.wires.length; j++) {
