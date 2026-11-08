@@ -39,10 +39,15 @@ function lineUp(items, links, noise, ends = { first: [], last: [] }) {
   const first = new Map(items.map((v, k) => [v, k])), at = new Map(), line = [], ready = new Set(items.filter((v) => !waits.get(v)));
   const firstAt = new Map(ends.first.map((v, k) => [v, k])), lastAt = new Map(ends.last.map((v, k) => [v, k]));
   const byEnd = (at, pool) => [...pool].filter((v) => at.has(v)).sort((p, q) => at.get(p) - at.get(q))[0];
+  // What a port is tied to stands near its side: tied to one of the first, it is taken as soon as it is ready; tied to
+  // one of the last, only once nothing else is but the last themselves.
+  const tiedTo = (at) => new Set(items.filter((v) => !firstAt.has(v) && !lastAt.has(v) && [...near.get(v)].some((w) => at.has(w))));
+  const [high, low] = [tiedTo(firstAt), tiedTo(lastAt)];
+  const soonest = (pool) => pool.sort((p, q) => first.get(p) - first.get(q))[0];
   while (ready.size) {
-    let best = byEnd(firstAt, ready), most = -Infinity;
-    const rest = [...ready].filter((v) => !lastAt.has(v));
-    if (best === undefined && !rest.length) best = byEnd(lastAt, ready);
+    let best = byEnd(firstAt, ready) ?? soonest([...ready].filter((v) => high.has(v) && !low.has(v))), most = -Infinity;
+    const rest = [...ready].filter((v) => !lastAt.has(v) && !low.has(v));
+    if (best === undefined && !rest.length) best = soonest([...ready].filter((v) => low.has(v) && !lastAt.has(v))) ?? byEnd(lastAt, ready);
     if (best === undefined) for (const v of rest) {
       let last = -1, older = 0;
       const mine = first.get(v);
