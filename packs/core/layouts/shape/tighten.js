@@ -28,7 +28,7 @@ function squeeze(g, real, drawn, pos, other, level, pulled) {
   const necked = new Map();
   g.stretches.forEach((s, i) => {
     if (!real[i] || (s.h % 2 === 1) !== level) return;
-    const [lo, hi] = s.neck === undefined ? [Infinity, -Infinity] : span.get(s.neck);
+    const [lo, hi] = (s.neck !== undefined && span.get(s.neck)) || [Infinity, -Infinity];
     if (s.neck !== undefined) necked.set(line[s.a], s.from);
     things.push([line[s.a], Math.min(other[s.a], other[s.b], lo), Math.max(other[s.a], other[s.b], hi)]);
   });

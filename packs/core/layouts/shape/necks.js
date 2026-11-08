@@ -30,6 +30,18 @@ export function necks(emb, F, H, g, x, y) {
       k = next;
     }
   };
+  /** Where a neck from box v along edge k goes: if the wire runs straight to a port of the box's own island, on the
+   *  edge beyond it at sea, so the port moves in with the box and the island keeps to what it holds. */
+  const seaward = (k, v) => {
+    const e = emb.edges[k], port = F.nodeAt.get(F.nodeAt.get(e.from) === v ? e.to : e.from), n = emb.nodes[port];
+    if (H.turns[k].length || n.kind !== 'port' || n.island !== emb.nodes[v].island) return [k, v];
+    const [w, i] = wireAt.get(e.id) ?? [];
+    const beyond = w && [w.edges[i - 1], w.edges[i + 1]].map((id) => (id === undefined ? undefined : F.edgeAt.get(id)))
+      .find((q) => q !== undefined && [emb.edges[q].from, emb.edges[q].to].some((id) => F.nodeAt.get(id) === port));
+    if (beyond === undefined) return [k, v];
+    const far = emb.nodes[F.nodeAt.get(F.nodeAt.get(emb.edges[beyond].from) === port ? emb.edges[beyond].to : emb.edges[beyond].from)];
+    return far.kind === 'port' || far.island == null ? [beyond, port] : [k, v];
+  };
   const byBox = new Map();
   g.what.forEach((w, p) => {
     if (w.side === undefined || w.edge === undefined || emb.unseen?.has(emb.edges[w.edge].id)) return;
@@ -55,10 +67,11 @@ export function necks(emb, F, H, g, x, y) {
         const edge = emb.edges[e.k], t = (e.side + 1) % QUARTERS === dir ? 1 : -1;
         if (edge.from === edge.to) continue;
         // A neck whose step back meets the wire turning on the same way would double it back: it is not given.
-        const atFrom = edge.from === emb.nodes[v].id;
-        if (turnAfter(e.k, v) === -t) continue;
-        H.turns[e.k] = atFrom ? [t, -t, ...H.turns[e.k]] : [...H.turns[e.k], t, -t];
+        const [k, from] = seaward(e.k, v), atFrom = F.nodeAt.get(emb.edges[k].from) === from;
+        if (turnAfter(k, from) === -t) continue;
+        H.turns[k] = atFrom ? [t, -t, ...H.turns[k]] : [...H.turns[k], t, -t];
         H.jogs.set(`${v} ${e.k}`, dir);
+        if (from !== v) H.jogs.set(`${from} ${k}`, dir);
         H.bends += 2;
         added++;
       }
