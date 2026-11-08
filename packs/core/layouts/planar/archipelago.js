@@ -44,9 +44,10 @@ export function compose({ where, items, links, args }, { legends, names = new Ma
   const heads = new Map([...keys].map(([id, key]) => [id, (names.get(id) ? ROOM : 0) + (key.h ? key.h + GAP : 0)]));
   const a = laidOut({ ...args, items, links }, { islandOf: (id) => where.get(id) ?? null, heads });
   const shores = a.islands.map((i) => {
-    const [l, t, r, b] = i.rect, key = keys.get(i.id) ?? { at: [] }, named = names.get(i.id);
+    // The name and legend stand in the top left of the highest band of its land.
+    const top = [...i.land].sort((p, q) => p.t - q.t || p.l - q.l)[0], [l, t] = [top.l, top.t], key = keys.get(i.id) ?? { at: [] }, named = names.get(i.id);
     return {
-      id: i.id, land: [{ l, t, r, b }], name: named ? [l + PAD - sizes.flow_island_name_x, t + PAD + ROOM / 2] : [l, t],
+      id: i.id, land: i.land, name: named ? [l + PAD - sizes.flow_island_name_x, t + PAD + ROOM / 2] : [l, t],
       entries: key.at.map(([ex, ey]) => [l + PAD + ex, t + PAD + (named ? ROOM : 0) + ey]), steps: new Set(items.filter((it) => where.get(it.id) === i.id).map((it) => it.id)),
     };
   });

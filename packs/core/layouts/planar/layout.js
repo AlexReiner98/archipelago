@@ -30,6 +30,29 @@ function linksOf(m, headless) {
 }
 
 /**
+ * What a loop at right angles holds, as rectangles: cut across at every height a corner stands at, each band's inside
+ * read off the upright stretches it meets (in, out, in...), and a band joined to the one above where they hold the same.
+ */
+function landOf(lines) {
+  const uprights = lines.flatMap((ps) => ps.slice(1).map((q, k) => [ps[k], q]).filter(([p, q]) => Math.abs(p[0] - q[0]) < 0.5 && Math.abs(p[1] - q[1]) > 0.5));
+  const ys = [...new Set(lines.flat().map((p) => Math.round(p[1] * 2) / 2))].sort((p, q) => p - q), out = [];
+  let open = [];
+  for (let k = 0; k + 1 < ys.length; k++) {
+    const mid = (ys[k] + ys[k + 1]) / 2, xs = uprights.filter(([p, q]) => Math.min(p[1], q[1]) < mid && Math.max(p[1], q[1]) > mid).map(([p]) => p[0]).sort((p, q) => p - q);
+    const spans = [];
+    for (let j = 0; j + 1 < xs.length; j += 2) spans.push([xs[j], xs[j + 1]]);
+    const next = [];
+    for (const [l, r] of spans) {
+      const same = open.find((o) => Math.abs(o.l - l) < 0.5 && Math.abs(o.r - r) < 0.5);
+      if (same) (same.b = ys[k + 1], next.push(same));
+      else { const band = { l, t: ys[k], r, b: ys[k + 1] }; out.push(band); next.push(band); }
+    }
+    open = next;
+  }
+  return out;
+}
+
+/**
  * The whole picture of `args` (as the flow's layout is given them): `islandOf(id)` where a step lives, `heads(island)`
  * how tall its name and legend stand over what it holds. Answers the kit's graph, the relaxed places, the model's
  * `x`, `y`, `nodes`, `chains` and `ties`, and each island's frame and ports.
@@ -70,7 +93,12 @@ export function laidOut(args, { islandOf = () => null, heads = new Map() } = {})
     const type = list[0]?.wire.type ?? w.type;
     (kind === 'chain' ? chains : ties).push({ a, b, type, points: line, stop: !m.nodes.has(a), ...(!headed && { toPort: true }) });
   }
-  const islands = r.islands.map((i) => ({ id: i.id, rect: [i.rect[0] + M, i.rect[1] + M, i.rect[2] + M, i.rect[3] + M] }));
+  // An island's border is a loop at right angles, not a box: its land is the loop cut into rectangles.
+  const islands = r.islands.map((i) => {
+    const loop = r.wires.filter((w) => w.type === 'border' && w.id.startsWith(`border ${i.id} `)).map((w) => w.points.map(to));
+    const rect = [i.rect[0] + M, i.rect[1] + M, i.rect[2] + M, i.rect[3] + M];
+    return { id: i.id, rect, land: loop.length ? landOf(loop) : [{ l: rect[0], t: rect[1], r: rect[2], b: rect[3] }] };
+  });
   return { m, nodes, x, y, chains, ties, islands, ports: r.ports, told: r.told };
 }
 
