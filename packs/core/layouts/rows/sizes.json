@@ -1,0 +1,16 @@
+{
+  "sizes": {
+    "rows_line_gap": 10,
+    "rows_indent": 24,
+    "rows_block_gap": 32,
+    "rows_lane": 10,
+    "rows_track": 10,
+    "rows_street_pad": 14,
+    "rows_street_least": 36,
+    "rows_straight": 0.5,
+    "rows_column_most": 420
+  },
+  "numbers": {
+    "rows_straighten": 4
+  }
+}
