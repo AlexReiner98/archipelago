@@ -54,18 +54,72 @@ function kept(at, arcs, passes, near) {
   return arcs.filter(([p, q, l]) => at[p] + l > at[q] + near).length;
 }
 
+/** The arcs that close a loop of the pushes behind each number (`from`: the arc that last pushed it), or null. */
+function loopIn(n, from) {
+  const mark = new Array(n).fill(0);
+  for (let s = 0; s < n; s++) {
+    if (mark[s]) continue;
+    let v = s;
+    while (v !== undefined && !mark[v]) ((mark[v] = s + 1), (v = from[v]?.[0]));
+    if (v === undefined || mark[v] !== s + 1) continue;
+    const loop = [];
+    let u = v;
+    do ((loop.push(from[u]), (u = from[u][0]))); while (u !== v);
+    return loop;
+  }
+  return null;
+}
+
+/**
+ * The distances with none that contradict: where a loop of them asks a number to stand past itself (a shape whose
+ * island holds less than it should, say), a box's cap in that loop is loosened first (the box grows to what the order needs), else the longest
+ * distance of the order (a bound only where the loop holds nothing else), so the push at the end stays near and nothing runs off. Answers what is kept, how many distances were let go and how many caps.
+ */
+export function untangled(n, order, bounds, near, caps = []) {
+  const at = new Array(n).fill(0), from = new Array(n), out = new Set(), arcs = [...caps, ...order, ...bounds], bound = new Set(bounds), cap = new Set(caps);
+  for (let moved = true; moved; ) {
+    moved = false;
+    for (const e of arcs) if (!out.has(e) && at[e[0]] + e[2] > at[e[1]] + near) ((at[e[1]] = at[e[0]] + e[2]), (from[e[1]] = e), (moved = true));
+    const loop = moved && loopIn(n, from);
+    if (!loop) continue;
+    const capped = loop.filter((e) => cap.has(e)), ours = loop.filter((e) => !bound.has(e)), among = capped.length ? capped : ours.length ? ours : loop;
+    const drop = among.reduce((p, q) => (q[2] > p[2] ? q : p));
+    out.add(drop);
+    for (const e of loop) from[e[1]] = undefined;
+  }
+  const keep = (list) => list.filter((e) => !out.has(e)), kept = [...keep(caps), ...keep(order), ...keep(bounds)];
+  // A cap let go comes back as wide as the order makes the box, no wider: the longest way from its low side to its high.
+  const loosened = caps.filter((e) => out.has(e)).map(([hi, lo]) => {
+    const far = new Array(n).fill(-Infinity);
+    far[lo] = 0;
+    for (let moved = true; moved; ) {
+      moved = false;
+      for (const [p, q, l] of kept) if (far[p] + l > far[q] + near) ((far[q] = far[p] + l), (moved = true));
+    }
+    const e = [hi, lo, -far[hi]];
+    kept.push(e);
+    return e;
+  });
+  return { order: keep(order), bounds: keep(bounds), caps: [...keep(caps), ...loosened], dropped: out.size - loosened.length, uncapped: loosened.length };
+}
+
 /**
  * Both axes relaxed together. `axes[a]` is { n, start, stretches, centred, rigid, order, bounds }: how many numbers, where the
  * grid puts each, the stretches along the axis ([p, q, by]: q stands `by` from p when the stretch is nothing long), the
  * ends drawn to their sides' middles (`centred`, alike), each box drawn to its size (`rigid`), and the distances. `z` holds the weights (`pull`, `center`,
  * `rigid`, `even`, `hold`), the `step`, how many `rounds` and `sweeps`, the move under which it is `still`, how short a
- * distance may be left (`near`), and how often a round is told (`every`). Answers each axis's numbers and what could
- * not be kept.
+ * distance may be left (`near`), and how often a round is told (`every`). Answers each axis's numbers, what could
+ * not be kept, and how many distances contradicted others and were let go (`dropped`), and how many boxes the order makes longer than their size (`uncapped`).
  */
-export function relaxed(axes, z, round = () => {}) {
+export function relaxed(given, z, round = () => {}) {
+  const told = { rounds: 0, short: 0, unkept: 0, dropped: 0, uncapped: 0 };
+  const axes = given.map((ax) => {
+    const u = untangled(ax.n, ax.order, ax.bounds, z.near, ax.caps ?? []);
+    ((told.dropped += u.dropped), (told.uncapped += u.uncapped));
+    return { ...ax, order: u.order, bounds: [...u.bounds, ...u.caps] };
+  });
   const at = axes.map((ax) => [...ax.start]), costs = axes.map((ax) => costOf(ax.n, ax, ax.start, z));
   const arcs = axes.map((ax) => [...ax.order, ...ax.bounds]);
-  const told = { rounds: 0, short: 0, unkept: 0 };
   // The grid as given is told first, then the same given room: the relaxation starts from there.
   round(0, at, 'grid');
   at.forEach((v, a) => giveWay(v, arcs[a], z.sweeps, z.near));

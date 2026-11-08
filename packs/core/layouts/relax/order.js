@@ -52,7 +52,7 @@ function arc(ax, from, to, length) {
 
 /**
  * Every least distance on axis `a`: `order` (each pair that sees one another, in the shape's order) and `bounds` (a
- * box at least its size, a wire's end inside its box's corners, a port inside its island's side). Each is [from root,
+ * box at least its size, a wire's end inside its box's corners, a port inside its island's side), and `caps` (a box at most its size). Each is [from root,
  * to root, length].
  */
 export function orderOn(read, a, z) {
@@ -85,11 +85,18 @@ export function orderOn(read, a, z) {
     const [lo, hi] = o[a] < q[a] ? [`w:${w.id}:${k - 1}`, `w:${w.id}:${k}`] : [`w:${w.id}:${k}`, `w:${w.id}:${k - 1}`];
     bound(lo, hi, off ? off * z.run : z.wire);
   });
-  for (const n of read.nodes.values()) if (isBox(n)) bound(`b:${n.id}:0`, `b:${n.id}:1`, n.size[a]);
+  // A box is as long as its words and the ends on its sides need (atoms.js's `grown`), and no longer: the cap, let go of
+  // only where the order cannot be kept inside it. A wire that does not line up takes its slack in its own stretches.
+  const caps = [];
+  for (const n of read.nodes.values()) if (isBox(n)) {
+    bound(`b:${n.id}:0`, `b:${n.id}:1`, n.size[a]);
+    const e = arc(ax, `b:${n.id}:1`, `b:${n.id}:0`, -n.size[a]);
+    if (e) caps.push(e);
+  }
   for (const r of ax.ranges) (bound(r.lo, r.end, r.inset), bound(r.end, r.hi, r.inset));
   for (const p of read.ports) {
-    if ((p.side === 'left' || p.side === 'right' ? 1 : 0) !== a) continue;
+    if (!p.on || (p.side === 'left' || p.side === 'right' ? 1 : 0) !== a) continue;
     (bound(`i:${p.island}:0`, `n:${p.id}`, z.pad), bound(`n:${p.id}`, `i:${p.island}:1`, z.pad));
   }
-  return { order, bounds };
+  return { order, bounds, caps };
 }

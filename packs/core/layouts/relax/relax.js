@@ -38,7 +38,7 @@ function axisOf(read, a, z) {
   for (const key of ax.keys()) { const [r] = ax.find(key); if (!index.has(r)) index.set(r, index.size); }
   const start = new Array(index.size);
   for (const [r, k] of index) start[k] = startOf(read, wires, r, a, z.unit);
-  const { order, bounds } = orderOn(read, a, z), at = (arcs) => arcs.map(([p, q, l]) => [index.get(p), index.get(q), l]);
+  const { order, bounds, caps } = orderOn(read, a, z), at = (arcs) => arcs.map(([p, q, l]) => [index.get(p), index.get(q), l]);
   const stretches = [];
   for (const w of read.wires) w.points.forEach((q, k) => {
     if (!k || w.points[k - 1][a] === q[a]) return;
@@ -52,7 +52,7 @@ function axisOf(read, a, z) {
   const centred = ax.ranges.flatMap((r) => [...pull(r.lo, r.end, r.size / 2), ...pull(r.end, r.hi, r.size / 2)]);
   const rigid = [...read.nodes.values()].filter(isBox).flatMap((n) => pull(`b:${n.id}:0`, `b:${n.id}:1`, n.size[a]));
   const value = (key, v) => { const [r, o] = ax.find(key); return v[index.get(r)] + o; };
-  return { n: index.size, start, stretches, centred, rigid, order: at(order), bounds: at(bounds), value };
+  return { n: index.size, start, stretches, centred, rigid, order: at(order), bounds: at(bounds), caps: at(caps), value };
 }
 
 /** The places of every node, wire, island and port, from the numbers `at` of both axes. */
@@ -84,7 +84,7 @@ function atOrigin(p) {
 /**
  * The shape relaxed: `shape` as step 2 gives it, `size(node)` each node's drawn [w, h], `sizes` the style's, `heads` each
  * island's head height. Answers `nodes`, `wires`, `islands` and `ports` placed (from 0, 0), and `told` (how many rounds,
- * how short the last left a distance, how many could not be kept, and ends the shape put on no side of their box).
+ * how short the last left a distance, how many could not be kept, how many contradicted others and were let go, and ends the shape put on no side of their box).
  */
 export function relax(shape, { size, sizes, heads }) {
   const z = lengthsOf(sizes, heads), read = atoms(shape, { size, corner: z.corner, wire: z.wire });

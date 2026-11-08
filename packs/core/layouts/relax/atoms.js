@@ -124,10 +124,12 @@ export function atoms(shape, { size, corner, wire }) {
       }
     });
   }
-  // A port stands on its island's side: on the axis across that side, the side's number.
+  // A port stands on its island's side: on the axis across that side, the side's number. One the shape put on no side,
+  // or off the side it names, is a free point.
   for (const p of ports) {
-    const a = p.side === 'left' || p.side === 'right' ? 0 : 1, hi = p.side === 'right' || p.side === 'bottom' ? 1 : 0;
-    axes[a].join(`i:${p.island}:${hi}`, `n:${p.id}`);
+    const a = p.side === 'left' || p.side === 'right' ? 0 : 1, hi = p.side === 'right' || p.side === 'bottom' ? 1 : 0, i = islands.get(p.island);
+    p.on = !!p.side && !!p.node && !!i && Math.abs(p.node[['x', 'y'][a]] - i.rect[a + 2 * hi]) < TOUCH;
+    if (p.on) axes[a].join(`i:${p.island}:${hi}`, `n:${p.id}`);
   }
   // Two wires on one line along one another share that stretch: a trunk, one number.
   for (const a of [0, 1]) {
