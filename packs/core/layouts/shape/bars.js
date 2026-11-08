@@ -20,7 +20,7 @@ export function barred(emb) {
     const mids = branches.slice(1, k - 1), split = Math.floor(mids.length / 2);
     const path = [...mids.slice(0, split).map((b, i) => `${n.id} @${i}`), n.id, ...mids.slice(split).map((b, i) => `${n.id} @${split + i}`)];
     const hangs = [...mids.slice(0, split), null, ...mids.slice(split)];
-    const bar = path.slice(1).map((to, i) => ({ id: `${n.id} bar ${i}`, from: path[i], to, wire: `${n.id} bar`, dir: 'none' }));
+    const bar = path.slice(1).map((to, i) => ({ id: `${n.id} bar ${i}`, from: path[i], to, wire: `${n.id} bar`, dir: 'none', bar: true }));
     for (const b of bar) { edges.push(b); byId.set(b.id, b); }
     const own = (id, p) => { const e = byId.get(id); if (e.from === n.id) e.from = p; else e.to = p; };
     path.forEach((p, i) => {
