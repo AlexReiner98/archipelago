@@ -2,6 +2,7 @@
 // Each island is a block, side by side in the order the model lists them (what is on no island last); inside one, each
 // item on the row of its layer (./order.js) and along it in the order it was made. Pure: the model and its order in,
 // each item's centre out.
+// Layer: metrics.
 
 /** The islands' ids in the model's order, then null for what is on none, each with its items made first. */
 export function blocksOf({ items, islands = [] }) {

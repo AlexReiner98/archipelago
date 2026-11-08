@@ -1,7 +1,8 @@
 // The cola layout (task e_x7kwbu3e): a model laid out by constrained stress and wired at right angles, in four steps,
 // each a module of its own with a snapshot for the explainer: the order (./order.js), the places (./start.js,
 // ./place.js), the wires (./route.js) and the frames (./frame.js). The model is the shared kit's: items { id, w, h, island, made }, links
-// { id, from, to, type, order }, islands. WebCola is handed in (`cola`); `stage(name, snapshot)` keeps each step.
+// { id, from, to, type, order }, islands. WebCola is handed in (`cola`); `stage(name, snapshot)` keeps each step; `frameOf(id, w, h)` frames an island (the kit's band).
+// Layer: metrics.
 
 import { orderOf } from './order.js';
 import { startOf } from './start.js';
@@ -24,13 +25,13 @@ export function lengthsOf(sizes) {
 const copy = (v) => JSON.parse(JSON.stringify(v));
 
 /** Places and wires: { boxes, islands, width, height, wires, dropped }. */
-export function colaLayout(model, sizes, cola, stage = () => {}) {
+export function colaLayout(model, sizes, cola, stage = () => {}, frameOf = undefined) {
   const z = lengthsOf(sizes);
   const order = orderOf(model);
   stage('order', { kept: copy(order.kept), dropped: order.dropped.map((l) => l.id), layer: Object.fromEntries(order.layer) });
   const start = startOf(model, order.layer, { gap: z.gap, rise: z.rise, sea: z.sea });
   stage('start', { boxes: model.items.map((it) => ({ id: it.id, ...start.get(it.id), w: it.w, h: it.h })) });
-  const places = placeOf(model, order, start, z, cola);
+  const places = placeOf(model, order, start, z, cola, frameOf);
   stage('placed', copy(places));
   const wires = routeOf(model, places, z, cola);
   stage('routed', { wires: copy(wires) });

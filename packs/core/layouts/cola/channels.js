@@ -2,6 +2,7 @@
 // of the wires kept but made safe. Two wires that share only a point share no stretch, and are not ordered (WebCola reads
 // past the ends of such a pair and fails); where one end of a shared stretch is a path's end, the other end decides,
 // and where neither can, the earlier wire goes left. Then each stretch's wires are nudged `gap` apart, across it.
+// Layer: metrics.
 
 /** For each pair of paths (lists of grid points) that share a stretch, which goes left of the other: a lookup (l, r). */
 export function sidesOf(paths, cola) {

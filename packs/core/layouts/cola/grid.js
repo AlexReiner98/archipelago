@@ -4,9 +4,28 @@
 // middle, and every island frame a line `room` outside each side: so there is always a lane round a box. A point of the
 // grid inside a box, or within half its room of it, is closed. Each wire then takes the cheapest way on it: its length, and `bend`
 // for each turn. Pure: boxes and frames in, paths of shared points out.
+// Layer: metrics.
 
-/** A sorted list of distinct numbers. */
-const lines = (values) => [...new Set(values.map((v) => Math.round(v * 100) / 100))].sort((a, b) => a - b);
+/**
+ * The lines through , sorted, those nearer than  made one (at the middle of what they gather): two wires
+ * on lines a hair apart would run on one another, where on one line they are parted into channels.
+ */
+function lines(values, merge) {
+  const sorted = [...values].sort((a, b) => a - b), out = [];
+  for (let k = 0; k < sorted.length;) {
+    let n = k;
+    while (n + 1 < sorted.length && sorted[n + 1] - sorted[k] < merge) n++;
+    out.push((sorted[k] + sorted[n]) / 2);
+    k = n + 1;
+  }
+  return out;
+}
+
+/** The index of the line in sorted `list` nearest `v`. */
+function near(list, v) {
+  const k = at(list, v);
+  return k > 0 && (k === list.length || v - list[k - 1] < list[k] - v) ? k - 1 : k;
+}
 
 /** The first index in sorted `list` at or after `v`. */
 function at(list, v) {
@@ -16,9 +35,9 @@ function at(list, v) {
 }
 
 /** The grid: its lines `xs` and `ys`, which points are closed, and a point object per open crossing, shared by every path. */
-export function gridOf(boxes, frames, room) {
-  const xs = lines([...boxes.flatMap((b) => [b.x - b.w / 2 - room, b.x, b.x + b.w / 2 + room]), ...frames.flatMap((f) => [f.l - room, f.r + room])]);
-  const ys = lines([...boxes.flatMap((b) => [b.y - b.h / 2 - room, b.y, b.y + b.h / 2 + room]), ...frames.flatMap((f) => [f.t - room, f.b + room])]);
+export function gridOf(boxes, frames, room, merge) {
+  const xs = lines([...boxes.flatMap((b) => [b.x - b.w / 2 - room, b.x, b.x + b.w / 2 + room]), ...frames.flatMap((f) => [f.l - room, f.r + room])], merge);
+  const ys = lines([...boxes.flatMap((b) => [b.y - b.h / 2 - room, b.y, b.y + b.h / 2 + room]), ...frames.flatMap((f) => [f.t - room, f.b + room])], merge);
   const closed = new Uint8Array(xs.length * ys.length);
   for (const b of boxes) {
     const i0 = at(xs, b.x - b.w / 2 - room / 2), i1 = at(xs, b.x + b.w / 2 + room / 2), j0 = at(ys, b.y - b.h / 2 - room / 2), j1 = at(ys, b.y + b.h / 2 + room / 2);
@@ -78,10 +97,10 @@ export function cheapest(grid, starts, ends, open, bend) {
 
 /** Where a wire may leave or come into a box: the middle of each side its room out, with the direction it goes. */
 export function doorsOf(grid, box, room, sides) {
-  const { xs, ys } = grid, i = at(xs, box.x), j = at(ys, box.y);
+  const { xs, ys } = grid, i = near(xs, box.x), j = near(ys, box.y);
   const all = {
-    bottom: { i, j: at(ys, box.y + box.h / 2 + room), d: DOWN }, top: { i, j: at(ys, box.y - box.h / 2 - room), d: UP },
-    right: { i: at(xs, box.x + box.w / 2 + room), j, d: RIGHT }, left: { i: at(xs, box.x - box.w / 2 - room), j, d: LEFT },
+    bottom: { i, j: near(ys, box.y + box.h / 2 + room), d: DOWN }, top: { i, j: near(ys, box.y - box.h / 2 - room), d: UP },
+    right: { i: near(xs, box.x + box.w / 2 + room), j, d: RIGHT }, left: { i: near(xs, box.x - box.w / 2 - room), j, d: LEFT },
   };
   return sides.map((s) => ({ ...all[s], side: s }));
 }

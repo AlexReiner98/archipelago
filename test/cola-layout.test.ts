@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 // @ts-ignore: a pack's drawing code, plain JavaScript
-import { colaLayout } from '../packs/core/layouts/cola/index.js';
+import { colaLayout } from '../packs/core/layouts/cola/cola.js';
 // @ts-ignore
 import { orderOf } from '../packs/core/layouts/cola/order.js';
 // @ts-ignore
@@ -78,7 +78,7 @@ test('channels: two wires that share a stretch are parted, those that share a po
 });
 
 test('the same model rests the same in another process: no seed left free', () => {
-  const code = `import cola from './ui/cola.module.min.js'; import { colaLayout } from './packs/core/layouts/cola/index.js';
+  const code = `import cola from './ui/cola.module.min.js'; import { colaLayout } from './packs/core/layouts/cola/cola.js';
     const m = ${JSON.stringify(model())}; const sizes = ${JSON.stringify(sizes)};
     process.stdout.write(JSON.stringify(colaLayout(m, sizes, cola)));`;
   const there = execFileSync(process.execPath, ['--input-type=module', '-e', code], { cwd: join(import.meta.dirname, '..'), encoding: 'utf8' });

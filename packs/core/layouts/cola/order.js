@@ -1,6 +1,7 @@
 // The order a cola picture keeps (task e_x7kwbu3e): each order link (depends_on) a flow constraint, what is depended on
 // above what depends on it. A cycle cannot be kept: the links are taken oldest first (by when the later of their two
 // ends was made, then by id), and one that would close a cycle is dropped and said so. Pure: the model in, the order out.
+// Layer: graph.
 
 /** Whether `to` is reached from `from` along `below` (each id's list of what is kept below it). */
 function reaches(below, from, to) {
