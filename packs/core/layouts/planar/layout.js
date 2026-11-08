@@ -82,7 +82,8 @@ export function laidOut(args, { islandOf = () => null, heads = new Map() } = {})
     const gates = [...passes].map((id) => portAt.get(id)).filter(Boolean).map((p) => ({ island: p.island, at: to([p.x, p.y]), span: sizes.flow_island_port, way: p.side === 'top' || p.side === 'bottom' ? [0, 1] : [1, 0] }));
     if (known) {
       const { wire, kind } = known, forward = from === wire.a || to_ === wire.b, line = forward ? points : [...points].reverse();
-      const reaches = (forward ? to_ : from) === wire.b, out = { ...wire, points: line, ...(!reaches && { toPort: true }), ...(w.reversed && kind === 'chain' && { dashed: true }), ...(gates.length && kind === 'tie' && { crossing: true, gates }) };
+      // A branch of a trunk starts or ends at its junction, not its item: that end stays where the trunk meets it.
+      const reaches = (forward ? to_ : from) === wire.b, leaves = (forward ? from : to_) === wire.a, out = { ...wire, points: line, ...(!reaches && { toPort: true }), ...(!leaves && { stop: true }), ...(w.reversed && kind === 'chain' && { dashed: true }), ...(gates.length && kind === 'tie' && { crossing: true, gates }) };
       (kind === 'chain' ? chains : ties).push(out);
       continue;
     }
