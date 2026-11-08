@@ -1,24 +1,39 @@
 // The relaxation (step 3, task e_7et8f4uv) played round by round: a shape in step 2's format relaxed, every round it
 // tells kept, and one page written that plays them, the grid's sketch first. For the owner to watch how a picture is
 // made before it is drawn in the page.
-//   node scripts/relax-animate.ts [sketch name | shape.json] [out.html]
+//   node scripts/relax-animate.ts [sketch name | <view>.sketch.json] [out.html]
+// A sketch step 2 wrote (runs/shape/<view>.sketch.json) is sized by the kit's model of the flow replay of the same
+// view (runs/flow-replay/<view>.json, in this checkout or the main one), as step 1 read it.
 
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { execSync } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import * as sketches from '../test/relax-sketches.ts';
-import { setOut } from '../test/wired.ts';
+import { drawings, setOut } from '../test/wired.ts';
 
-const RELAX = { pack: 'core', id: 'relax', modules: { 'relax.js': 'layouts/relax/relax.js', 'atoms.js': 'layouts/relax/atoms.js', 'order.js': 'layouts/relax/order.js', 'solve.js': 'layouts/relax/solve.js', 'stage.js': 'layouts/kit/stage.js' } };
+const strips = drawings.find((d) => d.id === 'core.strips')!;
+const RELAX = { pack: 'core', id: 'relax', modules: { ...strips.modules, 'relax.js': 'layouts/relax/relax.js', 'atoms.js': 'layouts/relax/atoms.js', 'order.js': 'layouts/relax/order.js', 'solve.js': 'layouts/relax/solve.js' } };
 const ROOT = join(import.meta.dirname, '..');
-const sizes = JSON.parse(readFileSync(join(ROOT, 'packs/core/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props.sizes;
+const house = JSON.parse(readFileSync(join(ROOT, 'packs/core/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props, sizes = house.sizes;
 // RELAX="unit=20,hold=0.2" tries other sizes of the relaxation than the house style's.
 for (const kv of (process.env.RELAX ?? '').split(',').filter(Boolean)) { const [k, v] = kv.split('='); sizes[`relax_${k}`] = Number(v); }
 const [what = 'map', out = join(ROOT, 'runs', 'relax.html')] = process.argv.slice(2);
 const shape = what.endsWith('.json') ? JSON.parse(readFileSync(what, 'utf8')) : (sketches as any)[what]();
-const size = (n: any) => (n.w ? [n.w * 30, 34] : [0, 0]);
+const view = basename(what).replace(/\.sketch\.json$/, ''), common = join(execSync('git rev-parse --path-format=absolute --git-common-dir', { cwd: ROOT }).toString().trim(), '..');
+const replay = [join(ROOT, 'runs', 'flow-replay', `${view}.json`), join(common, 'runs', 'flow-replay', `${view}.json`)].find((p) => what.endsWith('.json') && existsSync(p));
+/** Titles by id, for the drawing, where the view's replay names them. */
+const titles = new Map<string, string>();
 
 const rounds: any[] = await setOut(RELAX, async (url) => {
   const { relax } = await import(url('relax.js')), { stages } = await import(url('stage.js'));
+  let size = (n: any) => (n.w ? [n.w * 30, 34] : [0, 0]);
+  if (replay) {
+    // Each step as the flow sizes it, measured roughly as step 1 measured it.
+    const { model } = await import(url('model.js')), { answer, style } = JSON.parse(readFileSync(replay, 'utf8')).input;
+    const m = model({ items: answer.items, links: answer.links ?? [], undrawn: style.undrawn ?? [], headless: style.headless ?? [], measure: (t: string, px: number) => String(t).length * px * 0.55, sizes: { ...sizes, ...style.sizes } });
+    for (const i of answer.items) titles.set(i.id, i.title);
+    size = (n: any) => (m.nodes.has(n.id) ? [m.nodes.get(n.id).w, m.nodes.get(n.id).h] : n.kind === 'item' ? [n.w * 30, 34] : [0, 0]);
+  }
   const told: any[] = [];
   stages((name: string, s: any) => name === 'relax' && told.push(s));
   const done = relax(shape, { size, sizes });
@@ -27,7 +42,13 @@ const rounds: any[] = await setOut(RELAX, async (url) => {
   return told;
 });
 
-const page = `<title>Relaxation rounds</title>
+const lens = replay ? JSON.parse(readFileSync(replay, 'utf8')).lens : null;
+// NAME="How is Archipelago built" names the view, which its replay keeps only by id.
+const heading = replay ? `${process.env.NAME ?? lens ?? view}: the relaxation, round by round` : 'Step 3: the relaxation, round by round';
+const said = replay
+  ? `Step 2's shape of this view (its grid keeps each stretch's way and the order of everything) relaxed in one solve: wires pulled short, ends toward the middles of their sides, boxes grown only where what passes them needs it, islands a sea apart. Every distance is kept and no crossing changes.`
+  : 'A hand-made shape on a grid (a ring with a wire up, a trunk, a dense box, two islands joined through ports) relaxed in one solve: wires pulled short, ends toward the middles of their sides, every distance and the order of what sees what kept.';
+const page = `<title>${replay ? `${process.env.NAME ?? view}, relaxed` : 'Relaxation rounds'}</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
 /* One drawing, a bar of controls over it: a sketch on a grid relaxed round by round. */
@@ -49,12 +70,13 @@ svg { display: block; width: 100%; height: auto; min-width: 560px }
 .wire { fill: none; stroke: var(--line); stroke-width: 1.25 } .up { stroke-dasharray: 5 4 }
 .isle { fill: var(--isle); stroke: var(--shore) } text { font: 11px var(--ui); fill: var(--ink) }
 </style>
-<h1>Step 3: the relaxation, round by round</h1>
-<p>A hand-made shape on a grid (a ring with a wire up, a trunk, a dense box, two islands joined through ports) relaxed in one solve: wires pulled short, ends toward the middles of their sides, every distance and the order of what sees what kept.</p>
+<h1>${heading}</h1>
+<p>${said}</p>
 <div id="bar"><button id="play">Play</button><input id="at" type="range" min="0" max="${rounds.length - 1}" value="0" aria-label="Round"><span id="n"></span></div>
 <div class="frame"><svg id="s"></svg></div>
 <script>
 const R = ${JSON.stringify(rounds)};
+const T = ${JSON.stringify(Object.fromEntries(titles))};
 const W = Math.max(...R.flatMap(r => [...r.nodes.map(n => n.x + n.w / 2), ...r.islands.map(i => i.rect[2]), ...r.wires.flatMap(w => w.points.map(p => p[0]))])) + 40;
 const H = Math.max(...R.flatMap(r => [...r.nodes.map(n => n.y + n.h / 2), ...r.islands.map(i => i.rect[3]), ...r.wires.flatMap(w => w.points.map(p => p[1]))])) + 40;
 const s = document.getElementById('s'); s.setAttribute('viewBox', \`-20 -20 \${W} \${H}\`);
@@ -62,7 +84,7 @@ function draw(k) {
   const r = R[k]; document.getElementById('n').textContent = { grid: 'the grid', room: 'room given', relax: \`round \${r.round}\`, kept: \`round \${r.round}, every distance kept\` }[r.phase];
   s.innerHTML = r.islands.map(i => \`<rect class="isle" x="\${i.rect[0]}" y="\${i.rect[1]}" width="\${i.rect[2]-i.rect[0]}" height="\${i.rect[3]-i.rect[1]}" rx="12"/><text x="\${i.rect[0]+8}" y="\${i.rect[1]+14}">\${i.id}</text>\`).join('')
     + r.wires.map(w => \`<polyline class="wire\${w.reversed ? ' up' : ''}" points="\${w.points.map(p => p.join(',')).join(' ')}"/>\`).join('')
-    + r.nodes.map(n => n.w ? \`<rect class="box" x="\${n.x-n.w/2}" y="\${n.y-n.h/2}" width="\${n.w}" height="\${n.h}" rx="6"/><text x="\${n.x}" y="\${n.y+4}" text-anchor="middle">\${n.id}</text>\` : \`<circle class="\${n.kind === 'port' ? 'port' : 'dot'}" cx="\${n.x}" cy="\${n.y}" r="3"/>\`).join('');
+    + r.nodes.map(n => n.w ? \`<rect class="box" x="\${n.x-n.w/2}" y="\${n.y-n.h/2}" width="\${n.w}" height="\${n.h}" rx="6"/><text x="\${n.x}" y="\${n.y+4}" text-anchor="middle">\${(T[n.id] ?? n.id).slice(0, Math.max(3, Math.floor(n.w / 6.5)))}</text>\` : \`<circle class="\${n.kind === 'port' ? 'port' : 'dot'}" cx="\${n.x}" cy="\${n.y}" r="3"/>\`).join('');
 }
 const at = document.getElementById('at'); at.oninput = () => draw(+at.value);
 let timer = null;

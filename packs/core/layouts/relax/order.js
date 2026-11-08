@@ -3,19 +3,21 @@
 // along the axis finds what each thing sees on its low side; what stands behind that is kept off by the chain. So the
 // relaxation can move every number and still never changes a side, a crossing or a bend. Layer: metrics. Pure.
 
-import { TOUCH } from './atoms.js';
+import { isBox, TOUCH } from './atoms.js';
 
 /** Everything that stands at a place on axis `a`, with its extent across: boxes, stretches across `a`, island sides. */
 function things(read, a) {
   const b = 1 - a, c = ['x', 'y'], out = [];
-  for (const n of read.nodes.values()) if (n.size[0] || n.size[1]) out.push({ key: `n:${n.id}`, kind: 'box', box: n, at: n[c[a]], lo: n[c[b]] - n.w / 2 * !b - n.h / 2 * b, hi: n[c[b]] + n.w / 2 * !b + n.h / 2 * b, half: n.size[a] / 2 });
+  const half = (n, ax) => (ax ? n.h : n.w) / 2;
+  // A box stands at its low side: the stretches that land on it stand inside it, after it, and so never hide it.
+  for (const n of read.nodes.values()) if (isBox(n)) out.push({ low: `b:${n.id}:0`, high: `b:${n.id}:1`, kind: 'box', box: n, at: n[c[a]] - half(n, a), lo: n[c[b]] - half(n, b), hi: n[c[b]] + half(n, b) });
   for (const w of read.wires) w.points.forEach((q, k) => {
     const o = w.points[k - 1];
     if (!k || o[a] !== q[a]) return;
     const own = [k === 1 && w.ends[0], k === w.points.length - 1 && w.ends[1]].filter(Boolean);
-    out.push({ key: `w:${w.id}:${k}`, kind: 'wire', wire: w, own, at: q[a], lo: Math.min(o[b], q[b]), hi: Math.max(o[b], q[b]), half: 0 });
+    out.push({ low: `w:${w.id}:${k}`, high: `w:${w.id}:${k}`, kind: 'wire', wire: w, own, at: q[a], lo: Math.min(o[b], q[b]), hi: Math.max(o[b], q[b]) });
   });
-  for (const i of read.islands.values()) for (const hi of [0, 1]) out.push({ key: `i:${i.id}:${hi}`, kind: hi ? 'hi' : 'lo', island: i, at: i.rect[a + 2 * hi], lo: i.rect[b], hi: i.rect[b + 2], half: 0 });
+  for (const i of read.islands.values()) for (const hi of [0, 1]) out.push({ low: `i:${i.id}:${hi}`, high: `i:${i.id}:${hi}`, kind: hi ? 'hi' : 'lo', island: i, at: i.rect[a + 2 * hi], lo: i.rect[b], hi: i.rect[b + 2] });
   return out;
 }
 
@@ -42,15 +44,16 @@ function distance(p, q, a, z) {
   return s.wire.ends.includes(box) ? z.run : z.room;
 }
 
-/** Arcs [from, to, length] between roots: the number `to` stands at least `length` past `from`. */
-function arc(ax, p, q, length) {
-  const [rp, op] = ax.find(p.key), [rq, oq] = ax.find(q.key);
-  return rp === rq ? null : [rp, rq, op + p.half + length + q.half - oq];
+/** An arc [from, to, length] between roots: the key `to` stands at least `length` past the key `from`; null if one number. */
+function arc(ax, from, to, length) {
+  const [rp, op] = ax.find(from), [rq, oq] = ax.find(to);
+  return rp === rq ? null : [rp, rq, op + length - oq];
 }
 
 /**
  * Every least distance on axis `a`: `order` (each pair that sees one another, in the shape's order) and `bounds` (a
- * wire's end inside its box's corners, a port inside its island's side). Each is [from root, to root, length].
+ * box at least its size, a wire's end inside its box's corners, a port inside its island's side). Each is [from root,
+ * to root, length].
  */
 export function orderOn(read, a, z) {
   const ax = read.axes[a], order = [], bounds = [];
@@ -60,7 +63,7 @@ export function orderOn(read, a, z) {
   for (const it of placed) {
     const [lo, hi] = [it.lo - TOUCH, it.hi + TOUCH], met = new Set(seen.filter((s) => s.hi >= lo && s.lo <= hi).map((s) => s.it));
     for (const p of met) {
-      const d = p.at === it.at && p.kind === 'wire' && it.kind === 'wire' ? null : distance(p, it, a, z), e = d === null ? null : arc(ax, p, it, d);
+      const d = p.at === it.at && p.kind === 'wire' && it.kind === 'wire' ? null : distance(p, it, a, z), e = d === null ? null : arc(ax, p.high, it.low, d);
       if (e) order.push(e);
     }
     const kept = [];
@@ -74,25 +77,19 @@ export function orderOn(read, a, z) {
   }
   // Each stretch along the axis keeps its way and a least length: `run` off a box, so a wire leaves it before it turns,
   // twice that between two, and `wire` between two bends, so no bend is lost.
+  const bound = (from, to, length) => { const e = arc(ax, from, to, length); if (e) bounds.push(e); };
   for (const w of read.wires) w.points.forEach((q, k) => {
     const o = w.points[k - 1];
     if (!k || o[a] === q[a]) return;
-    const off = [k === 1 && w.ends[0]?.size[a], k === w.points.length - 1 && w.ends[1]?.size[a]].filter(Boolean).length;
+    const off = [k === 1 && isBox(w.ends[0]), k === w.points.length - 1 && isBox(w.ends[1])].filter(Boolean).length;
     const [lo, hi] = o[a] < q[a] ? [`w:${w.id}:${k - 1}`, `w:${w.id}:${k}`] : [`w:${w.id}:${k}`, `w:${w.id}:${k - 1}`];
-    const [rl, ol] = ax.find(lo), [rh, oh] = ax.find(hi);
-    if (rl !== rh) bounds.push([rl, rh, ol + (off ? off * z.run : z.wire) - oh]);
+    bound(lo, hi, off ? off * z.run : z.wire);
   });
-  for (const r of ax.ranges) {
-    const [rb, ob] = ax.find(r.box), [re, oe] = ax.find(r.end);
-    if (rb === re) continue;
-    bounds.push([rb, re, ob - r.half + r.inset - oe], [re, rb, oe - (ob + r.half - r.inset)]);
-  }
+  for (const n of read.nodes.values()) if (isBox(n)) bound(`b:${n.id}:0`, `b:${n.id}:1`, n.size[a]);
+  for (const r of ax.ranges) (bound(r.lo, r.end, r.inset), bound(r.end, r.hi, r.inset));
   for (const p of read.ports) {
-    const along = p.side === 'left' || p.side === 'right' ? 1 : 0;
-    if (along !== a) continue;
-    const [r0, o0] = ax.find(`i:${p.island}:0`), [r1, o1] = ax.find(`i:${p.island}:1`), [rp, op] = ax.find(`n:${p.id}`);
-    if (r0 !== rp) bounds.push([r0, rp, o0 + z.pad - op]);
-    if (r1 !== rp) bounds.push([rp, r1, op + z.pad - o1]);
+    if ((p.side === 'left' || p.side === 'right' ? 1 : 0) !== a) continue;
+    (bound(`i:${p.island}:0`, `n:${p.id}`, z.pad), bound(`n:${p.id}`, `i:${p.island}:1`, z.pad));
   }
   return { order, bounds };
 }

@@ -6,8 +6,8 @@
 // `room` given, a `relax` round, every distance `kept`), so the relaxation can be watched. Layer: metrics. Pure but for the one listener.
 
 /** The cost's terms on one axis: pulls between two roots ([p, q, by, weight]: q - p toward by) and holds toward a place. */
-function costOf(n, { stretches, centred, order }, start, w) {
-  const pulls = [...stretches.map(([p, q, by]) => [p, q, by, w.pull]), ...centred.map(([p, q, by]) => [p, q, by, w.center]), ...order.map(([p, q, l]) => [p, q, l, w.even])];
+function costOf(n, { stretches, centred, rigid, order }, start, w) {
+  const pulls = [...stretches.map(([p, q, by]) => [p, q, by, w.pull]), ...centred.map(([p, q, by]) => [p, q, by, w.center]), ...rigid.map(([p, q, by]) => [p, q, by, w.rigid]), ...order.map(([p, q, l]) => [p, q, l, w.even])];
   return { pulls, holds: start.map((v) => [v, w.hold]), n };
 }
 
@@ -55,10 +55,10 @@ function kept(at, arcs, passes, near) {
 }
 
 /**
- * Both axes relaxed together. `axes[a]` is { n, start, stretches, centred, order, bounds }: how many numbers, where the
+ * Both axes relaxed together. `axes[a]` is { n, start, stretches, centred, rigid, order, bounds }: how many numbers, where the
  * grid puts each, the stretches along the axis ([p, q, by]: q stands `by` from p when the stretch is nothing long), the
- * ends drawn to their sides' middles (`centred`, alike), and the distances. `z` holds the weights (`pull`, `center`,
- * `even`, `hold`), the `step`, how many `rounds` and `sweeps`, the move under which it is `still`, how short a
+ * ends drawn to their sides' middles (`centred`, alike), each box drawn to its size (`rigid`), and the distances. `z` holds the weights (`pull`, `center`,
+ * `rigid`, `even`, `hold`), the `step`, how many `rounds` and `sweeps`, the move under which it is `still`, how short a
  * distance may be left (`near`), and how often a round is told (`every`). Answers each axis's numbers and what could
  * not be kept.
  */
