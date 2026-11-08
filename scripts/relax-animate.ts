@@ -27,17 +27,37 @@ const rounds: any[] = await setOut(RELAX, async (url) => {
   return told;
 });
 
-const page = `<!doctype html><meta charset="utf-8"><title>Relaxation</title>
-<style>body{font:13px system-ui;margin:16px;background:#fbfaf7;color:#222}svg{background:#fff;border:1px solid #ddd}
-.box{fill:#fff;stroke:#333}.dot{fill:#c33}.port{fill:#36c}.wire{fill:none;stroke:#555;stroke-width:1.25}.up{stroke-dasharray:5 4}
-.isle{fill:#e8f1ea;stroke:#9bb8a2}text{font-size:11px;fill:#333}#bar{display:flex;gap:12px;align-items:center;margin-bottom:8px}</style>
-<div id="bar"><button id="play">Play</button><input id="at" type="range" min="0" max="${rounds.length - 1}" value="0" style="width:420px"><span id="n"></span></div>
-<svg id="s"></svg>
+const page = `<title>Relaxation rounds</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* One drawing, a bar of controls over it: a sketch on a grid relaxed round by round. */
+:root { --bg: #f6f7f5; --paper: #ffffff; --ink: #1f2623; --muted: #66706b; --line: #4d5852; --isle: #e3eee6; --shore: #93b29c; --port: #2f6fb5; --knot: #b9452f;
+  --ui: system-ui, -apple-system, "Segoe UI", sans-serif; --mono: ui-monospace, "Cascadia Mono", Menlo, monospace }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #151917; --paper: #1d2320; --ink: #e4ebe7; --muted: #94a19a; --line: #b3c0b9; --isle: #233129; --shore: #4f7a5d; --port: #6fa6e8; --knot: #e57b63; color-scheme: dark } }
+:root[data-theme="dark"] { --bg: #151917; --paper: #1d2320; --ink: #e4ebe7; --muted: #94a19a; --line: #b3c0b9; --isle: #233129; --shore: #4f7a5d; --port: #6fa6e8; --knot: #e57b63; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--ui); padding-block: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+h1 { font-size: 17px; margin: 0 0 4px; text-wrap: balance }
+p { margin: 0 0 12px; color: var(--muted); max-width: 65ch }
+#bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 10px }
+#at { flex: 1 1 240px; min-width: 0; accent-color: var(--port) }
+#n { font: 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 22ch }
+button { font: inherit; padding: 4px 14px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 4px; cursor: pointer }
+button:focus-visible, #at:focus-visible { outline: 2px solid var(--port); outline-offset: 2px }
+.frame { overflow-x: auto; background: var(--paper); border: 1px solid var(--shore) }
+svg { display: block; width: 100%; height: auto; min-width: 560px }
+.box { fill: var(--paper); stroke: var(--ink) } .dot { fill: var(--knot) } .port { fill: var(--port) }
+.wire { fill: none; stroke: var(--line); stroke-width: 1.25 } .up { stroke-dasharray: 5 4 }
+.isle { fill: var(--isle); stroke: var(--shore) } text { font: 11px var(--ui); fill: var(--ink) }
+</style>
+<h1>Step 3: the relaxation, round by round</h1>
+<p>A hand-made shape on a grid (a ring with a wire up, a trunk, a dense box, two islands joined through ports) relaxed in one solve: wires pulled short, ends toward the middles of their sides, every distance and the order of what sees what kept.</p>
+<div id="bar"><button id="play">Play</button><input id="at" type="range" min="0" max="${rounds.length - 1}" value="0" aria-label="Round"><span id="n"></span></div>
+<div class="frame"><svg id="s"></svg></div>
 <script>
 const R = ${JSON.stringify(rounds)};
 const W = Math.max(...R.flatMap(r => [...r.nodes.map(n => n.x + n.w / 2), ...r.islands.map(i => i.rect[2]), ...r.wires.flatMap(w => w.points.map(p => p[0]))])) + 40;
 const H = Math.max(...R.flatMap(r => [...r.nodes.map(n => n.y + n.h / 2), ...r.islands.map(i => i.rect[3]), ...r.wires.flatMap(w => w.points.map(p => p[1]))])) + 40;
-const s = document.getElementById('s'); s.setAttribute('viewBox', \`-20 -20 \${W} \${H}\`); s.setAttribute('width', Math.min(W, 1400));
+const s = document.getElementById('s'); s.setAttribute('viewBox', \`-20 -20 \${W} \${H}\`);
 function draw(k) {
   const r = R[k]; document.getElementById('n').textContent = { grid: 'the grid', room: 'room given', relax: \`round \${r.round}\`, kept: \`round \${r.round}, every distance kept\` }[r.phase];
   s.innerHTML = r.islands.map(i => \`<rect class="isle" x="\${i.rect[0]}" y="\${i.rect[1]}" width="\${i.rect[2]-i.rect[0]}" height="\${i.rect[3]-i.rect[1]}" rx="12"/><text x="\${i.rect[0]+8}" y="\${i.rect[1]+14}">\${i.id}</text>\`).join('')
