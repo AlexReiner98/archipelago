@@ -72,6 +72,12 @@ function checkSketch(name: string, emb: any, s: any) {
     const [p, q] = [box(boxes[i]), box(boxes[j])];
     assert.ok(p.x1 <= q.x0 || q.x1 <= p.x0 || p.y1 <= q.y0 || q.y1 <= p.y0, `${name}: ${boxes[i].id} stands on ${boxes[j].id}`);
   }
+  // A box is no wider than its busiest side needs, twice over: a wire that would stretch it queues beside it instead.
+  for (const n of boxes) {
+    const r = box(n), ends = s.wires.filter((w: any) => w.type !== 'unseen').flatMap((w: any) => [w.from === n.id && w.points[0], w.to === n.id && w.points.at(-1)]).filter(Boolean);
+    const busiest = Math.max(1, ...[r.y0, r.y1].map((y) => ends.filter((p: P) => p[1] === y).length));
+    assert.ok(n.w <= busiest * 2 + 2, `${name}: ${n.id} is ${n.w} wide for ${busiest} wires on a side`);
+  }
   // Wires meet only at a crossing or a junction they both pass through.
   const points = new Set(s.nodes.filter((n: any) => n.kind === 'cross' || n.kind === 'junction').map((n: any) => `${n.x},${n.y}`));
   for (let i = 0; i < s.wires.length; i++) for (let j = i + 1; j < s.wires.length; j++) {
@@ -91,7 +97,11 @@ function checkSketch(name: string, emb: any, s: any) {
     if (first.dir === 'up' && from.kind === 'item') assert.equal(start[0], box(from).x1, `${name}: ${w.id} leaves the right of ${from.id}`);
     if (last.dir === 'up' && to.kind === 'item') assert.equal(end[0], box(to).x1, `${name}: ${w.id} comes into the right of ${to.id}`);
   }
-  // Each island a rectangle round its items, crossed once by each wire, at a port on its side.
+  // Islands stand apart, each a rectangle round its items, crossed once by each wire, at a port on its side.
+  for (let i = 0; i < s.islands.length; i++) for (let j = i + 1; j < s.islands.length; j++) {
+    const [p, q] = [s.islands[i].rect, s.islands[j].rect];
+    assert.ok(p[2] < q[0] || q[2] < p[0] || p[3] < q[1] || q[3] < p[1], `${name}: ${s.islands[i].id} overlaps ${s.islands[j].id}`);
+  }
   for (const island of s.islands) {
     const [x0, y0, x1, y1] = island.rect;
     for (const n of boxes.filter((b: any) => emb.nodes.find((e: any) => e.id === b.id).island === island.id)) {

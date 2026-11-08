@@ -38,7 +38,7 @@ export function shaped(emb, F, S, H) {
       corners.push(c);
       loop.push({ p: c, side });
       for (const e of order.filter((x) => x.h === side)) {
-        const p = g.point({ node: v, id: node.id, side, edge: e.k });
+        const p = g.point({ node: v, id: node.id, side, edge: e.k, jog: H.jogs?.get(`${v} ${e.k}`) });
         at.set(`${v} ${e.k}`, p);
         loop.push({ p, side });
       }
@@ -49,13 +49,16 @@ export function shaped(emb, F, S, H) {
   emb.edges.forEach((e, k) => {
     const meta = emb.unseen?.has(e.id) ? { edge: k, unseen: true } : { edge: k }, d = k * 2, a = end(F.tail[d], k), b = end(F.head[d], k), points = [a];
     let h = H.out[d];
-    for (const t of H.turns[k]) {
+    // The step aside in a neck (./necks.js) is told which box it queues beside.
+    const n = H.turns[k].length, neck = (i) => (i === 1 && H.jogs?.has(`${F.tail[d]} ${k}`) ? F.tail[d] : i === n - 1 && H.jogs?.has(`${F.head[d]} ${k}`) ? F.head[d] : undefined);
+    const as = (i) => (neck(i) === undefined ? meta : { ...meta, neck: neck(i) });
+    for (const [i, t] of H.turns[k].entries()) {
       const p = g.point({ bend: k });
-      g.join(points.at(-1), p, h, meta);
+      g.join(points.at(-1), p, h, as(i));
       points.push(p);
       h = (h + t + QUARTERS) % QUARTERS;
     }
-    g.join(points.at(-1), b, h, meta);
+    g.join(points.at(-1), b, h, as(n));
     points.push(b);
     chain.push(points);
   });

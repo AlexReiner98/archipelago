@@ -12,10 +12,14 @@ import { facesOf } from './faces.js';
 import { shaped } from './ortho.js';
 import { refine } from './refine.js';
 import { tighten } from './tighten.js';
+import { necks } from './necks.js';
 import { headings } from './turns.js';
 
 /** The sides of a rectangle, by name, as the sketch gives a port's. */
 const SIDE_NAMES = ['top', 'right', 'bottom', 'left'];
+
+/** How many times boxes are given necks and the grid read again. */
+const ROUNDS = 2;
 
 /** A line's points with every point that does not turn it taken out. */
 function corners(points) {
@@ -42,9 +46,17 @@ export function shape(given) {
   const along = outer.find((d) => !wide.has(given.nodes[F0.tail[d]].id) && !wide.has(given.nodes[F0.head[d]].id));
   const unseen = new Set(given.wires.filter((w) => w.type === 'unseen').flatMap((w) => w.edges));
   const emb = { ...barred(given), unseen, ...(along !== undefined && { outerDart: { edge: given.edges[along >> 1].id, from: given.nodes[F0.tail[along]].id } }) };
-  const F = facesOf(emb), S = orthogonal(emb, F), H = headings(emb, F, S), { g, chain, cage } = shaped(emb, F, S, H);
-  refine(g, chain);
-  const first = compact(g), { x, y } = tighten(g, first.x, first.y), at = (p) => [x[p], y[p]];
+  const F = facesOf(emb), S = orthogonal(emb, F), H = headings(emb, F, S);
+  // Read the grid, give a neck to each wire that stretches its box, and read it again, until none does.
+  let g, chain, cage, x, y;
+  for (let round = 0; ; round++) {
+    ({ g, chain, cage } = shaped(emb, F, S, H));
+    refine(g, chain);
+    const first = compact(g);
+    ({ x, y } = tighten(g, first.x, first.y));
+    if (round === ROUNDS || !necks(emb, H, g, x, y)) break;
+  }
+  const at = (p) => [x[p], y[p]];
   const pointOf = new Map(g.what.map((w, p) => [w, p]).filter(([w]) => w.node !== undefined && w.corner === undefined && w.side === undefined).map(([w, p]) => [w.node, p]));
   const nodes = emb.nodes.map((n, v) => {
     if (cage.has(v)) {
@@ -82,5 +94,5 @@ export function shape(given) {
       ports.push({ id, island: island.id, side: SIDE_NAMES[side] ?? null, at: side % 2 === 0 ? n.x : n.y });
     }
   });
-  return { nodes, wires, islands, ports, bends: H.bends, against: S.against };
+  return { nodes, wires, islands, ports, bends: H.bends, against: S.against || H.bent > 0 };
 }

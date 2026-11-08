@@ -15,7 +15,8 @@ const run = (n) => Array.from({ length: Math.abs(n) }, () => Math.sign(n));
 
 /**
  * The heading every dart leaves its tail with (`out`, N E S W as 0 to 3), the turns along every edge from its `from`
- * (`turns`), and how many there are on wires (`bends`).
+ * (`turns`), how many there are on wires (`bends`), and how many border edges turn otherwise than the shape had them
+ * (`bent`), which leaves an island no rectangle.
  */
 export function headings(emb, F, S) {
   const { tail, head, leaving, faceOf, faces, outerOf } = F, D = tail.length;
@@ -37,17 +38,18 @@ export function headings(emb, F, S) {
     orient(v, k, side);
     queue.push(v);
   }
+  /** Turn the node across edge k from v as the shape has it, and if that node is on an island's border, the whole
+   *  border with it: a border is turned round as one, so where two boxes disagree which way is up it falls on a wire
+   *  between them, never on a border, which must stay a rectangle. */
+  const follow = (v, k, onlyBorder) => {
+    const d = leaving(v, k), u = head[d];
+    if (out[d ^ 1] >= 0 || (onlyBorder && !S.border.has(k))) return;
+    orient(u, k, (out[d] + (d % 2 === 0 ? nA[k] : -nA[k]) + 2 + QUARTERS * QUARTERS) % QUARTERS);
+    queue.push(u);
+    for (const kk of S.ringOf[u]) if (S.border.has(kk)) follow(u, kk, true);
+  };
   const reach = () => {
-    for (let q = 0; q < queue.length; q++) {
-      const v = queue[q];
-      for (const k of S.ringOf[v]) {
-        const d = leaving(v, k), u = head[d];
-        if (out[d ^ 1] >= 0) continue;
-        const along = d % 2 === 0 ? nA[k] : -nA[k];
-        orient(u, k, (out[d] + along + 2 + QUARTERS * QUARTERS) % QUARTERS);
-        queue.push(u);
-      }
-    }
+    for (let q = 0; q < queue.length; q++) for (const k of S.ringOf[queue[q]]) follow(queue[q], k, false);
   };
   reach();
   for (let d = 0; d < D; d++) if (out[d] < 0) { orient(tail[d], d >> 1, 0); queue.push(tail[d]); reach(); }
@@ -79,11 +81,12 @@ export function headings(emb, F, S) {
   });
   const { flow } = minCostFlow(faces.length, supply, arcs);
   const turns = [];
-  let bends = 0;
+  let bends = 0, bent = 0;
   emb.edges.forEach((e, k) => {
     const a = at[k], n = base[k] + (a === null ? 0 : QUARTERS * (flow[a] + flow[a + 1] - flow[a + 2] - flow[a + 2 + 1]));
     turns.push(run(n));
     if (!S.border.has(k) && !emb.unseen?.has(e.id)) bends += Math.abs(n);
+    if (S.border.has(k) && n !== nA[k]) bent++;
   });
-  return { out, turns, bends };
+  return { out, turns, bends, bent };
 }
