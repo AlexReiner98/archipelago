@@ -95,7 +95,29 @@ test('a box the shape draws wider than it is comes back to its own size', async 
   const { out } = await relaxed(shape, (n: any) => [n.id === 'w' ? 120 : 90, 34]);
   checked(shape, out);
   assert.ok(Math.abs(out.nodes.find((n: any) => n.id === 'w').w - 120) < 1, 'it is as wide as it is');
-  assert.ok(out.told.snug > 0, 'and was drawn in');
+  assert.equal(out.told.uncapped, 0, 'nothing makes it longer');
+});
+
+test('a box the order holds open grows to what it needs, no further', async () => {
+  // Wires off both ends of a box sized 60 run down to boxes either side of a third: the order makes it wider, only so.
+  const shape: Shape = {
+    nodes: [
+      { id: 'w', kind: 'item', x: 10, y: 0, w: 20, h: 2 }, { id: 'l', kind: 'item', x: 1, y: 6, w: 2, h: 2 },
+      { id: 'm', kind: 'item', x: 10, y: 6, w: 4, h: 2 }, { id: 'r', kind: 'item', x: 19, y: 6, w: 2, h: 2 },
+    ],
+    wires: [
+      { id: 'wl', link: 'l_wl', type: 'depends_on', reversed: false, points: [[1, 1], [1, 5]], from: 'w', to: 'l' },
+      { id: 'wr', link: 'l_wr', type: 'depends_on', reversed: false, points: [[19, 1], [19, 5]], from: 'w', to: 'r' },
+    ],
+    islands: [], ports: [],
+  };
+  const { out } = await relaxed(shape, (n: any) => [n.id === 'w' ? 60 : 90, 34]);
+  checked(shape, out);
+  const w = out.nodes.find((n: any) => n.id === 'w');
+  assert.equal(out.told.uncapped, 1, 'its cap is loosened, told');
+  assert.ok(w.w > 60 && w.w < 20 * sizes.relax_unit, `wider than its size, narrower than the grid drew it (${Math.round(w.w)})`);
+  const ends = out.wires.map((x: any) => x.points[0][0]).sort((p: number, q: number) => p - q);
+  assert.ok(Math.abs(w.x - w.w / 2 - (ends[0] - sizes.flow_port_corner)) < 1 && Math.abs(w.x + w.w / 2 - (ends[1] + sizes.flow_port_corner)) < 1, 'its sides a corner past its ends');
 });
 
 test('a shape that contradicts itself is let go of, not run off with', async () => {
