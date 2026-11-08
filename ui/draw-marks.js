@@ -68,6 +68,8 @@
         // A surface, if its scene asked for one (ui/surface.js): a canvas here to paint, shown over its picture frame by
         // frame (show), its size as it changes, the page's colours and three.js. Null where there is none.
         surface: () => (surface ??= new Promise((resolve) => ((gotSurface = resolve), send({ type: 'surface?' })))),
+        // WebCola (ui/cola.module.min.js), loaded only when a layout asks for it: core's cola layout.
+        cola: () => import(`${home}/cola.js`).then((made) => made.default),
       };
       let surface, gotSurface;
       const sized = [];
