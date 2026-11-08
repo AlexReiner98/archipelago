@@ -54,7 +54,7 @@ export function shape(given) {
     refine(g, chain);
     const first = compact(g);
     ({ x, y } = tighten(g, first.x, first.y));
-    if (round === ROUNDS || !necks(emb, H, g, x, y)) break;
+    if (round === ROUNDS || !necks(emb, F, H, g, x, y)) break;
   }
   const at = (p) => [x[p], y[p]];
   const pointOf = new Map(g.what.map((w, p) => [w, p]).filter(([w]) => w.node !== undefined && w.corner === undefined && w.side === undefined).map(([w, p]) => [w.node, p]));

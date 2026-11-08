@@ -11,8 +11,25 @@ import { QUARTERS } from './sides.js';
  * and whose `jogs` says which ends have one and which way it runs; `g` the graph, `x` and `y` its places. Answers how
  * many necks were given.
  */
-export function necks(emb, H, g, x, y) {
+export function necks(emb, F, H, g, x, y) {
   H.jogs ??= new Map();
+  const wireAt = new Map();
+  for (const w of emb.wires ?? []) w.edges.forEach((id, i) => wireAt.set(id, [w, i]));
+  /** The first turn a wire makes walking away from box v along edge k: on an edge, or at a node it passes. */
+  const turnAfter = (k, v) => {
+    for (let here = v; ;) {
+      const e = emb.edges[k], forward = F.nodeAt.get(e.from) === here, ts = forward ? H.turns[k] : H.turns[k].map((t) => -t).reverse();
+      if (ts.length) return ts[0];
+      const there = F.nodeAt.get(forward ? e.to : e.from), [w, i] = wireAt.get(e.id) ?? [];
+      const on = (q) => q !== undefined && [emb.edges[q].from, emb.edges[q].to].some((id) => F.nodeAt.get(id) === there);
+      const next = w && [w.edges[i - 1], w.edges[i + 1]].map((id) => (id === undefined ? undefined : F.edgeAt.get(id))).find(on);
+      if (next === undefined) return 0;
+      const t = (H.out[F.leaving(there, next)] - H.out[F.leaving(there, k)] - 2 + QUARTERS * 2) % QUARTERS;
+      if (t) return t === QUARTERS - 1 ? -1 : t === 1 ? 1 : 0;
+      here = there;
+      k = next;
+    }
+  };
   const byBox = new Map();
   g.what.forEach((w, p) => {
     if (w.side === undefined || w.edge === undefined || emb.unseen?.has(emb.edges[w.edge].id)) return;
@@ -37,7 +54,10 @@ export function necks(emb, H, g, x, y) {
         const ahead = at[e.p] > hi, dir = axis === 0 ? (ahead ? 1 : QUARTERS - 1) : (ahead ? 2 : 0);
         const edge = emb.edges[e.k], t = (e.side + 1) % QUARTERS === dir ? 1 : -1;
         if (edge.from === edge.to) continue;
-        H.turns[e.k] = edge.from === emb.nodes[v].id ? [t, -t, ...H.turns[e.k]] : [...H.turns[e.k], t, -t];
+        // A neck whose step back meets the wire turning on the same way would double it back: it is not given.
+        const atFrom = edge.from === emb.nodes[v].id;
+        if (turnAfter(e.k, v) === -t) continue;
+        H.turns[e.k] = atFrom ? [t, -t, ...H.turns[e.k]] : [...H.turns[e.k], t, -t];
         H.jogs.set(`${v} ${e.k}`, dir);
         H.bends += 2;
         added++;
