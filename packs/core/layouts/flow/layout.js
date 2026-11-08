@@ -17,7 +17,7 @@ import { pair } from './polyline.js';
 import { drawnPart, linksOf } from './search.js';
 import { shape } from './shape.js';
 import { solve, solveSections } from './solve.js';
-import { apart, holdPorts, portItems, setPorts, SIDES } from './ports.js';
+import { apart, holdPorts, jogUnder, portItems, setPorts, SIDES } from './ports.js';
 import { stepsOf } from './steps.js';
 
 /** How many finished pictures are kept: enough for a picture of islands, each laid out twice, and the sea twice. */
@@ -139,6 +139,7 @@ function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = [
     for (const l of lines) l.r.points = l.points;
   }
   staging?.('shape', routes);
+  if (inward) jogUnder(routes, inward, { nodes, x, y, run: z.run, wire: z.turn });
   // With ports, the island is one section: its frame is round all of it.
   const solved = (all) => (ported || holding ? solve({ ...all, edging: pad }) : solveSections(all));
   try {
