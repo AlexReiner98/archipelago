@@ -29,22 +29,6 @@ const asLink = (w) => Object.assign(w.firm ? [w.top, w.foot, w.order ? FIRM.orde
 /** What passing a wire costs: a border dear, a seen wire one, an unseen one little. */
 const cost = (w) => (w?.link?.border !== undefined ? SHORE : w?.visible ? SEEN : UNSEEN);
 
-/** The rotation round each node, from faces that each keep their inside on one side: each node's neighbours in turn. */
-export function rotations(faces) {
-  const next = new Map();
-  for (const f of faces) f.forEach((v, k) => {
-    const a = f[(k - 1 + f.length) % f.length], b = f[(k + 1) % f.length];
-    (next.get(v) ?? next.set(v, new Map()).get(v)).set(a, b);
-  });
-  const out = new Map();
-  for (const [v, after] of next) {
-    const ring = [], start = after.keys().next().value;
-    for (let at = start; !ring.includes(at) && at !== undefined; at = after.get(at)) ring.push(at);
-    out.set(v, ring);
-  }
-  return out;
-}
-
 /** One try, the `k`th: the line leaning its own way, the two sides filled, the rest threaded. */
 function attempt({ ids, wires, placeOf, made, islands, tighten }, k, oneWay) {
   const index = new Map(), idx = (v) => index.get(v) ?? index.set(v, index.size).get(v);
@@ -98,7 +82,7 @@ function measured({ g, number }) {
 /**
  * The embedding of the kit's graph `m` (./model.js): `headless` the link types with no head, `islandOf(id)` where a
  * step lives (null at sea). Answers `wires` (each with its way, `turned`, `trunk` and its `path` through the points
- * where it crosses), `junctions`, `faces`, `rotation` (each node's neighbours in turn), `number` (the numbering, top
+ * where it crosses), `junctions`, `faces` (as sets: a face may run either way round), `number` (the numbering, top
  * first, with `s` and `t`), `outer` (the outer face's place in `faces`), `crossings` (points where two wires cross),
  * `ports` (each island's, in turn round its border), `borders` (each island's border, every point in turn) and
  * `counts`. Without `trunks` no wires share one; without `oneWay` what is left out is threaded the shortest way.
@@ -133,7 +117,7 @@ export function embedding(m, { headless = [], islandOf = () => null, trunks: joi
   const portAt = new Map(best.ports.map((p) => [p.at, p]));
   const ports = new Map([...borders].map(([island, ring]) => [island, ring.filter((v) => portAt.has(v))]));
   const out = {
-    wires: best.ways.map((w) => ({ ...w, path: pathOf.get(w.id) ?? [] })), junctions, faces: g.faces, rotation: rotations(g.faces), owner: g.owner,
+    wires: best.ways.map((w) => ({ ...w, path: pathOf.get(w.id) ?? [] })), junctions, faces: g.faces, owner: g.owner,
     number: best.number, s: best.s, t: best.t, outer: best.outerAt, line: best.line, crossings: best.crossings, ports, portAt, borders, place: where,
     counts: {
       steps: steps.length, wires: wires.length, turned: best.ways.filter((w) => w.turned).length, byIslands: best.ways.filter((w) => w.byIslands).length,

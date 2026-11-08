@@ -46,3 +46,41 @@ export function visibility(e) {
   }));
   return { row, column, span };
 }
+
+/**
+ * Each node's neighbours clockwise on the page (y down), read off the drawing `vis` (of `visibility`): what is above
+ * from left to right, then what is below from right to left. The drawing is planar, so this is the embedding's own.
+ */
+export function clockwise(e, { row, column }) {
+  const near = new Map(), col = (a, b) => column.get(a < b ? `${a}|${b}` : `${b}|${a}`);
+  for (const key of e.owner.keys()) {
+    const [a, b] = key.split('|');
+    (near.get(a) ?? near.set(a, []).get(a)).push(b);
+    (near.get(b) ?? near.set(b, []).get(b)).push(a);
+  }
+  return new Map([...near].map(([v, list]) => {
+    const above = list.filter((w) => row.get(w) < row.get(v)).sort((p, q) => col(v, p) - col(v, q));
+    const below = list.filter((w) => row.get(w) > row.get(v)).sort((p, q) => col(v, q) - col(v, p));
+    return [v, [...above, ...below]];
+  }));
+}
+
+/** The faces of a rotation, each walked the same way round, and which is outer: of the two by the line's ends `s` and `t`, the larger on the drawing. */
+export function traced(rotation, { s, t }, { row, span }) {
+  const used = new Set(), faces = [];
+  for (const [u, ring] of rotation) for (const v of ring) {
+    if (used.has(`${u} ${v}`)) continue;
+    const face = [];
+    for (let [a, b] = [u, v]; !used.has(`${a} ${b}`); ) {
+      used.add(`${a} ${b}`);
+      face.push(a);
+      const round = rotation.get(b);
+      [a, b] = [b, round[(round.indexOf(a) - 1 + round.length) % round.length]];
+    }
+    faces.push(face);
+  }
+  const mid = (v) => (span.get(v)[0] + span.get(v)[1]) / 2;
+  const area = (f) => Math.abs(f.reduce((sum, v, k) => { const w = f[(k + 1) % f.length]; return sum + mid(v) * row.get(w) - mid(w) * row.get(v); }, 0));
+  const byEnds = faces.map((f, k) => k).filter((k) => faces[k].some((v, j) => (v === s && faces[k][(j + 1) % faces[k].length] === t) || (v === t && faces[k][(j + 1) % faces[k].length] === s)));
+  return { faces, outer: byEnds.reduce((best, k) => (best < 0 || area(faces[k]) > area(faces[best]) ? k : best), -1) };
+}

@@ -3,7 +3,8 @@
 // Each replay (scripts/flow-replay.ts, kept under runs/flow-replay/<name>.json) is the exact answer a page drew. Its
 // graph is made with the layouts' kit, planarized whole (packs/core/layouts/planarize/), and drawn as a
 // visibility drawing: each island's border a loop, crossings as dots, ports as squares on the border, turned wires red.
-// Writes runs/planarize/<name>.svg, an index.html with the counts beside the flow's, and with --png a picture of each.
+// Writes runs/planarize/<name>.svg, <name>.embedding.json (step 2's input), an index.html with the counts beside the
+// flow's, and with --png a picture of each.
 
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,7 +28,7 @@ mkdirSync(out, { recursive: true });
 const dir = mkdtempSync(join(tmpdir(), 'planarize-'));
 for (const folder of ['flow', 'kit', 'planarize']) for (const f of readdirSync(join(LAYOUTS, folder))) if (f.endsWith('.js')) cpSync(join(LAYOUTS, folder, f), join(dir, f));
 const mod = (name: string) => import(pathToFileURL(join(dir, name)).href);
-const { model } = await mod('model.js'), { embedding } = await mod('embedding.js'), { visibility } = await mod('plain.js'), { count } = await mod('count.js');
+const { model } = await mod('model.js'), { embedding } = await mod('embedding.js'), { visibility } = await mod('plain.js'), { count } = await mod('count.js'), { asInput } = await mod('format.js');
 
 /** The wires of a scene the flow drew, each one line, its bridges closed, and how many places they cross. */
 function flowCrossings(scene: any) {
@@ -107,8 +108,11 @@ for (const name of wanted) {
   const ports = Object.entries(c.ports).map(([i, n]) => `${islandName(i)}: ${n}`).join('; ') || 'none';
   const picture = drawn(e, m, `${name} (${kept.lens}): ${c.crossings} crossings, ${c.turned} turned, ${c.trunks} trunks; flow today ${flow.crossings} crossings`);
   writeFileSync(join(out, `${name}.svg`), picture.svg);
+  // Step 2's input (task e_7vp7udzk), and whether it is one planar piece (Euler: nodes - edges + faces = 2).
+  const input = asInput(e, m), euler = input.nodes.length - input.edges.length + input.faces.length;
+  writeFileSync(join(out, `${name}.embedding.json`), JSON.stringify(input));
   sizes.set(name, picture.size);
-  told.push({ name, lens: kept.lens, ...c, ms, flow, orderOnly });
+  told.push({ name, lens: kept.lens, ...c, ms, flow, orderOnly, euler });
   rows.push(`<tr><td>${name}<br><small>${kept.lens}</small></td><td>${c.steps}</td><td>${c.wires}</td><td>${flow.crossings}</td><td><b>${c.crossings}</b></td><td>${orderOnly}</td><td>${c.turned}</td><td>${c.byIslands}</td><td>${c.ties}</td><td>${c.trunks}</td><td>${c.up}</td><td>${c.twice}</td><td>${esc(ports)}</td><td>${ms}</td></tr>`);
   console.log(JSON.stringify(told.at(-1)));
 }

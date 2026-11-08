@@ -93,5 +93,35 @@ test('embedding: a graph that cannot be drawn flat crosses at points of its own'
   const e = embedding(await graph(items, links), { sizes: house.sizes, headless: house.headless });
   assert.ok(e.counts.crossings >= 1);
   assert.equal(e.counts.up, 0);
-  for (const c of e.crossings) assert.equal(e.rotation.get(c).length, 4, 'a crossing has four neighbours in turn');
+  for (const c of e.crossings) assert.equal([...e.owner.keys()].filter((k: string) => k.split('|').includes(c)).length, 2 * 2, 'a crossing joins two wires, each passing');
+});
+
+test('format: the embedding as step 2 takes it, faces and rotation agreeing, borders clockwise', async () => {
+  const { embedding } = await mod('embedding.js');
+  const { asInput } = await mod('format.js');
+  const { visibility } = await mod('plain.js');
+  const items = [...['a1', 'a2', 'a3'].map((id) => item(id, 'A')), ...['b1', 'b2'].map((id) => item(id, 'B')), item('s')];
+  const links = [link('depends_on', 'a2', 'a1'), link('depends_on', 'a3', 'a1'), link('depends_on', 'b2', 'b1'), link('depends_on', 'b1', 'a2'),
+    link('about', 'a3', 'b2'), link('about', 's', 'a1'), link('calls', 'b1', 's'), link('depends_on', 'b2', 'a3')];
+  const m = await graph(items, links), e = embedding(m, { sizes: house.sizes, headless: house.headless, islandOf: (id: string) => m.nodes.get(id)?.item?.island ?? null });
+  const g = asInput(e, m), edge = new Map<string, any>(g.edges.map((x: any) => [x.id, x]));
+  const kinds = new Set(g.nodes.map((n: any) => n.kind));
+  for (const k of ['item', 'border', 'port']) assert.ok(kinds.has(k), `a node of kind ${k}`);
+  for (const w of g.wires) for (let i = 1; i < w.edges.length; i++) assert.equal(edge.get(w.edges[i - 1]).to, edge.get(w.edges[i]).from, `${w.id}'s edges run on in order`);
+  for (const w of g.wires.filter((x: any) => x.type === 'depends_on')) assert.equal(edge.get(w.edges[0]).dir, w.reversed ? 'up' : 'down');
+  assert.equal(g.nodes.length - g.edges.length + g.faces.length, 2, 'Euler: the rotation is a planar embedding of one piece');
+  // Walking a face, each next edge is the one after it round the node they share.
+  const ends = (id: string): string[] => [edge.get(id).from, edge.get(id).to];
+  for (const f of g.faces) f.forEach((id: string, k: number) => {
+    const next = f[(k + 1) % f.length], at = ends(id).find((v) => ends(next).includes(v))!, ring = g.rotation[at];
+    const step = (ring.indexOf(id) - ring.indexOf(next) + ring.length) % ring.length;
+    assert.ok(ring.length < 3 || step === 1 || step === ring.length - 1, `faces turn by the rotation at ${at}: ${id} then ${next} in ${ring.join(', ')}`);
+  });
+  // Each border turns clockwise on the plain drawing (y down): its signed area is positive.
+  const { row, span } = visibility(e), mid = (v: string) => (span.get(v)[0] + span.get(v)[1]) / 2;
+  for (const island of g.islands) {
+    const p = island.border.map((v: string) => [mid(v), row.get(v)]);
+    const area = p.reduce((sum: number, a: number[], k: number) => { const b = p[(k + 1) % p.length]; return sum + a[0] * b[1] - b[0] * a[1]; }, 0);
+    assert.ok(area > 0, `${island.id} turns clockwise`);
+  }
 });
