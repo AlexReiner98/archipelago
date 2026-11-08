@@ -1,8 +1,8 @@
 // What the relaxation moves (step 3, task e_7et8f4uv), read off the shape step 2 gives (its format on task e_7vp7udzk):
 // on each axis, every box's two sides (so a box can grow to what passes it), every stretch of a wire that stands across
-// that axis, every island's two sides and every point (a cross, a junction, a port), each a number. What must stand
+// that axis and every point (a cross, a junction, a port), each a number. What must stand
 // together is one number with an offset: a wire's points on one stretch, a wire's end and the side of its box it leaves
-// by, a port and its island's side, two wires that share a stretch (a trunk). Layer: metrics. Pure: the shape in, the numbers and what each thing is out.
+// by, two wires that share a stretch (a trunk). Layer: metrics. Pure: the shape in, the numbers and what each thing is out.
 
 /** A union of keys, each kept as its root and its offset from it. */
 function joiner() {
@@ -89,7 +89,6 @@ export function atoms(shape, { size, corner, wire }) {
   const wires = shape.wires.filter((w) => !UNDRAWN.includes(w.type)).map((w) => ({ ...w, points: tidied(w.points) })).filter((w) => w.points.length > 1);
   const axes = [0, 1].map(() => ({ ...joiner(), ranges: [], refused: 0 }));
   for (const n of nodes.values()) for (const ax of axes) for (const key of keysOf(n)) ax.add(key);
-  for (const i of islands.values()) for (const ax of axes) (ax.add(`i:${i.id}:0`), ax.add(`i:${i.id}:1`));
   for (const w of wires) {
     const p = w.points;
     // The link names its two items (`type from to`); an end is on one of them, or else on what holds its point.
@@ -124,12 +123,11 @@ export function atoms(shape, { size, corner, wire }) {
       }
     });
   }
-  // A port stands on its island's side: on the axis across that side, the side's number. One the shape put on no side,
-  // or off the side it names, is a free point.
+  // A port stands on its island's side (./shores.js joins it to the band it meets). One the shape put on no side, or off
+  // the side it names, is a free point.
   for (const p of ports) {
     const a = p.side === 'left' || p.side === 'right' ? 0 : 1, hi = p.side === 'right' || p.side === 'bottom' ? 1 : 0, i = islands.get(p.island);
     p.on = !!p.side && !!p.node && !!i && Math.abs(p.node[['x', 'y'][a]] - i.rect[a + 2 * hi]) < TOUCH;
-    if (p.on) axes[a].join(`i:${p.island}:${hi}`, `n:${p.id}`);
   }
   // Two wires on one line along one another share that stretch: a trunk, one number.
   for (const a of [0, 1]) {

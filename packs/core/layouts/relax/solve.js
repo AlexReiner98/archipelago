@@ -5,10 +5,11 @@
 // distance; the last round keeps each one exactly. Each round is told (`round(r, numbers, phase)`: the `grid`, its
 // `room` given, a `relax` round, every distance `kept`), so the relaxation can be watched. Layer: metrics. Pure but for the one listener.
 
-/** The cost's terms on one axis: pulls between two roots ([p, q, by, weight]: q - p toward by) and holds toward a place. */
-function costOf(n, { stretches, centred, rigid, order }, start, w) {
-  const pulls = [...stretches.map(([p, q, by]) => [p, q, by, w.pull]), ...centred.map(([p, q, by]) => [p, q, by, w.center]), ...rigid.map(([p, q, by]) => [p, q, by, w.rigid]), ...order.map(([p, q, l]) => [p, q, l, w.even])];
-  return { pulls, holds: start.map((v) => [v, w.hold]), n };
+/** The cost's terms on one axis: pulls between two roots ([p, q, by, weight]: q - p toward by) and holds toward a place;
+ *  a shore (`loose`) is held nowhere and drawn in to what it holds (`tight`) as a wire is drawn short. */
+function costOf(n, { stretches, centred, rigid, order, tight = [], loose = new Set() }, start, w) {
+  const pulls = [...stretches.map(([p, q, by]) => [p, q, by, w.pull]), ...centred.map(([p, q, by]) => [p, q, by, w.center]), ...rigid.map(([p, q, by]) => [p, q, by, w.rigid]), ...order.map(([p, q, l]) => [p, q, l, w.even]), ...tight.map(([p, q, l]) => [p, q, l, w.pull])];
+  return { pulls, holds: start.map((v, k) => [v, loose.has(k) ? 0 : w.hold]), n };
 }
 
 /** One step down the cost, each number by its own share (a damped Jacobi step), `step` of the way. */
