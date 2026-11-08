@@ -6,12 +6,11 @@
 
 import { atoms, isBox } from './atoms.js';
 import { orderOn } from './order.js';
-import { shoresOf } from './shores.js';
 import { relaxed } from './solve.js';
 import { stage } from './stage.js';
 
 /** Every size the relaxation reads, by the name the style gives it. */
-const NAMES = ['relax_unit', 'relax_step_shore', 'relax_pull', 'relax_even', 'relax_hold', 'relax_center', 'relax_rigid', 'relax_step', 'relax_rounds', 'relax_sweeps', 'relax_still', 'relax_every', 'relax_near'];
+const NAMES = ['relax_unit', 'relax_pull', 'relax_even', 'relax_hold', 'relax_center', 'relax_rigid', 'relax_step', 'relax_rounds', 'relax_sweeps', 'relax_still', 'relax_every', 'relax_near'];
 
 /** The distances and weights, from the style; `heads` gives an island's name and legend height over what it holds. */
 export function lengthsOf(sizes, heads = new Map()) {
@@ -20,7 +19,7 @@ export function lengthsOf(sizes, heads = new Map()) {
   return {
     apart: sizes.flow_node_gap, wire: Math.max(sizes.flow_node_gap / 3, sizes.flow_wire_gap), room: sizes.flow_wire_room, run: sizes.flow_port_run, corner: sizes.flow_port_corner,
     pad: sizes.flow_island_pad, sea: sizes.flow_island_sea, shore: sizes.flow_island_sea / 2, head: (id) => heads.get(id) ?? sizes.flow_island_name_room,
-    unit: z('unit'), shoreStep: z('step_shore'), pull: z('pull'), even: z('even'), hold: z('hold'), center: z('center'), rigid: z('rigid'), step: z('step'), rounds: z('rounds'), sweeps: z('sweeps'), still: z('still'), every: z('every'), near: z('near'),
+    unit: z('unit'), pull: z('pull'), even: z('even'), hold: z('hold'), center: z('center'), rigid: z('rigid'), step: z('step'), rounds: z('rounds'), sweeps: z('sweeps'), still: z('still'), every: z('every'), near: z('near'),
   };
 }
 
@@ -30,7 +29,7 @@ function startOf(read, wires, key, a, unit) {
   if (kind === 'n') return unit * read.nodes.get(key.slice(2))[c];
   if (kind === 'b') return unit * read.nodes.get(id)[c] + ((k ? 1 : -1) * read.nodes.get(id).size[a]) / 2;
   if (kind === 'w') return unit * wires.get(id).points[k][a];
-  return unit * read.shores.start[a].get(key);
+  return unit * read.islands.get(id).rect[a + 2 * k];
 }
 
 /** The numbers of one axis: each root its index, where it starts, the stretches along it and the distances. */
@@ -39,7 +38,7 @@ function axisOf(read, a, z) {
   for (const key of ax.keys()) { const [r] = ax.find(key); if (!index.has(r)) index.set(r, index.size); }
   const start = new Array(index.size);
   for (const [r, k] of index) start[k] = startOf(read, wires, r, a, z.unit);
-  const { order, bounds, caps, tight } = orderOn(read, a, z), at = (arcs) => arcs.map(([p, q, l]) => [index.get(p), index.get(q), l]);
+  const { order, bounds, caps } = orderOn(read, a, z), at = (arcs) => arcs.map(([p, q, l]) => [index.get(p), index.get(q), l]);
   const stretches = [];
   for (const w of read.wires) w.points.forEach((q, k) => {
     if (!k || w.points[k - 1][a] === q[a]) return;
@@ -53,9 +52,7 @@ function axisOf(read, a, z) {
   const centred = ax.ranges.flatMap((r) => [...pull(r.lo, r.end, r.size / 2), ...pull(r.end, r.hi, r.size / 2)]);
   const rigid = [...read.nodes.values()].filter(isBox).flatMap((n) => pull(`b:${n.id}:0`, `b:${n.id}:1`, n.size[a]));
   const value = (key, v) => { const [r, o] = ax.find(key); return v[index.get(r)] + o; };
-  // A shore is held nowhere: it stands where what it holds puts it.
-  const loose = new Set(read.shores.islands.flatMap((i) => [...i.x.flat(), ...i.y]).map((key) => index.get(ax.find(key)[0])));
-  return { n: index.size, start, stretches, centred, rigid, order: at(order), bounds: at(bounds), caps: at(caps), tight: at(tight), loose, value };
+  return { n: index.size, start, stretches, centred, rigid, order: at(order), bounds: at(bounds), caps: at(caps), value };
 }
 
 /** The places of every node, wire, island and port, from the numbers `at` of both axes. */
@@ -68,10 +65,7 @@ function placesOf(read, axes, at) {
       return { id: n.id, kind: n.kind, x: (l + r) / 2, y: (t + b) / 2, w: r - l, h: b - t };
     }),
     wires: read.wires.map((w) => ({ id: w.id, link: w.link, type: w.type, reversed: w.reversed, points: w.points.map((_, k) => [v(`w:${w.id}:${k}`, 0), v(`w:${w.id}:${k}`, 1)]) })),
-    islands: read.shores.islands.map((i) => {
-      const land = i.bands.map((_, k) => ({ l: v(i.x[k][0], 0), t: v(i.y[k], 1), r: v(i.x[k][1], 0), b: v(i.y[k + 1], 1) }));
-      return { id: i.id, rect: [Math.min(...land.map((s) => s.l)), land[0].t, Math.max(...land.map((s) => s.r)), land.at(-1).b], land };
-    }),
+    islands: [...read.islands.values()].map((i) => ({ id: i.id, rect: [v(`i:${i.id}:0`, 0), v(`i:${i.id}:0`, 1), v(`i:${i.id}:1`, 0), v(`i:${i.id}:1`, 1)] })),
     ports: read.ports.map((p) => ({ id: p.id, island: p.island, side: p.side, x: v(`n:${p.id}`, 0), y: v(`n:${p.id}`, 1) })),
   };
 }
@@ -83,18 +77,17 @@ function atOrigin(p) {
   const [dx, dy] = [Math.min(...xs), Math.min(...ys)];
   return {
     nodes: p.nodes.map((n) => ({ ...n, x: n.x - dx, y: n.y - dy })), wires: p.wires.map((w) => ({ ...w, points: w.points.map(([x, y]) => [x - dx, y - dy]) })),
-    islands: p.islands.map((i) => ({ ...i, rect: [i.rect[0] - dx, i.rect[1] - dy, i.rect[2] - dx, i.rect[3] - dy], land: i.land.map((s) => ({ l: s.l - dx, t: s.t - dy, r: s.r - dx, b: s.b - dy })) })), ports: p.ports.map((q) => ({ ...q, x: q.x - dx, y: q.y - dy })),
+    islands: p.islands.map((i) => ({ ...i, rect: [i.rect[0] - dx, i.rect[1] - dy, i.rect[2] - dx, i.rect[3] - dy] })), ports: p.ports.map((q) => ({ ...q, x: q.x - dx, y: q.y - dy })),
   };
 }
 
 /**
  * The shape relaxed: `shape` as step 2 gives it, `size(node)` each node's drawn [w, h], `sizes` the style's, `heads` each
- * island's head height. Answers `nodes`, `wires`, `islands` (each its `rect` and its `land`, a rectangle a band) and `ports` placed (from 0, 0), and `told` (how many rounds,
+ * island's head height. Answers `nodes`, `wires`, `islands` and `ports` placed (from 0, 0), and `told` (how many rounds,
  * how short the last left a distance, how many could not be kept, how many contradicted others and were let go, and ends the shape put on no side of their box).
  */
 export function relax(shape, { size, sizes, heads }) {
   const z = lengthsOf(sizes, heads), read = atoms(shape, { size, corner: z.corner, wire: z.wire });
-  read.shores = shoresOf(read, z.shoreStep);
   const axes = [0, 1].map((a) => axisOf(read, a, z));
   const { at, told } = relaxed(axes, z, (r, now, phase) => stage('relax', { round: r, phase, ...atOrigin(placesOf(read, axes, now)) }));
   return { ...atOrigin(placesOf(read, axes, at)), told: { ...told, refused: read.axes[0].refused + read.axes[1].refused } };

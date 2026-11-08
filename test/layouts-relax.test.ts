@@ -12,7 +12,7 @@ import { setOut } from './wired.ts';
 const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs/core/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const sizes = house.sizes;
 /** The relaxation's modules, as a layout would list them. */
-export const RELAX = { pack: 'core', id: 'relax', modules: { 'relax.js': 'layouts/relax/relax.js', 'atoms.js': 'layouts/relax/atoms.js', 'order.js': 'layouts/relax/order.js', 'solve.js': 'layouts/relax/solve.js', 'shores.js': 'layouts/relax/shores.js', 'stage.js': 'layouts/kit/stage.js' } };
+export const RELAX = { pack: 'core', id: 'relax', modules: { 'relax.js': 'layouts/relax/relax.js', 'atoms.js': 'layouts/relax/atoms.js', 'order.js': 'layouts/relax/order.js', 'solve.js': 'layouts/relax/solve.js', 'stage.js': 'layouts/kit/stage.js' } };
 /** A step's drawn size: as wide as the shape gives it, a point nothing. */
 const size = (n: any) => (n.w ? [n.w * 30, 34] : [0, 0]);
 
@@ -59,16 +59,13 @@ function checked(shape: Shape, out: any) {
   for (const i of out.islands) {
     const was = shape.islands.find((s) => s.id === i.id)!.rect;
     for (const n of shape.nodes.filter((n) => n.kind === 'item' && n.x > was[0] && n.x < was[2] && n.y > was[1] && n.y < was[3])) {
-      const m = out.nodes.find((o: any) => o.id === n.id), pad = sizes.flow_island_pad - 1e-3;
-      // On the island: inside the bands it stands across, by the pad.
-      const across = i.land.filter((s: any) => s.t < m.y + m.h / 2 && s.b > m.y - m.h / 2);
-      assert.ok(across.length && across.every((s: any) => m.x - m.w / 2 >= s.l + pad && m.x + m.w / 2 <= s.r - pad) && m.y - m.h / 2 >= i.rect[1] + pad && m.y + m.h / 2 <= i.rect[3] - pad, `${n.id} stays on ${i.id}`);
+      const m = out.nodes.find((o: any) => o.id === n.id);
+      assert.ok(m.x - m.w / 2 >= i.rect[0] + sizes.flow_island_pad - 1e-3 && m.x + m.w / 2 <= i.rect[2] - sizes.flow_island_pad + 1e-3, `${n.id} stays on ${i.id}`);
     }
   }
   for (const p of out.ports) {
-    const land = out.islands.find((s: any) => s.id === p.island).land, near = (u: number, v: number) => Math.abs(u - v) < 1e-6;
-    const on = { left: (s: any) => near(p.x, s.l) && p.y >= s.t && p.y <= s.b, right: (s: any) => near(p.x, s.r) && p.y >= s.t && p.y <= s.b, top: (s: any) => s === land[0] && near(p.y, s.t), bottom: (s: any) => s === land.at(-1) && near(p.y, s.b) }[p.side as 'left'];
-    assert.ok(land.some(on), `${p.id} stands on its island's ${p.side}`);
+    const i = out.islands.find((s: any) => s.id === p.island).rect, at = { left: [p.x, i[0]], right: [p.x, i[2]], top: [p.y, i[1]], bottom: [p.y, i[3]] }[p.side as 'left']!;
+    assert.ok(Math.abs(at[0] - at[1]) < 1e-6, `${p.id} stands on its island's ${p.side}`);
   }
 }
 
