@@ -38,12 +38,16 @@ export function islandOf(items, links, z, stage = () => {}, homeOf = () => '') {
   const crossing = plans.filter((p) => p.rows.length).sort((p, q) => p.rows.at(-1) - q.rows.at(-1) || p.rows[0] - q.rows[0]);
   const listed = new Set();
   for (const p of crossing) for (const r of p.rows) if (!listed.has(way(p, r))) (listed.add(way(p, r)), table[r].push({ id: way(p, r), w: 0, way: true }));
-  // Where along its entry each end stands: the middle of an item that leaves by its top or foot, else its lane.
+  // Where along its entry each end stands: its share of the side it leaves an item's top or foot by, else its lane.
+  let share = new Map();
   const relX = (e, p, end) => {
     const s = shapes.get(where.get(e.item).block), at = s.at.get(e.item);
-    return e.side === 'right' ? s.lane.get(p.merge[end] ?? `${p.id}:${end}`) : at.x + itemsById.get(e.item).w / 2;
+    return e.side === 'right' ? s.lane.get(p.merge[end] ?? `${p.id}:${end}`) : at.x + itemsById.get(e.item).w * (share.get(`${p.id}:${end}`) ?? 1 / 2);
   };
   const entryOf = (e) => where.get(e.item).block;
+  // Placed twice: once with every end at its side's middle, to see the order the ends of one side go in, then again
+  // with each at its share of the side, so what is straightened is where the wires leave.
+  const lay = () => {
   const ties = [];
   for (const p of plans) {
     if (p.bracket) continue;
@@ -71,11 +75,15 @@ export function islandOf(items, links, z, stage = () => {}, homeOf = () => '') {
     return { x: x.get(b) + at.x, y: at.y, w: i.w, h: i.h };
   };
   const wires = plans.filter((p) => !p.bracket).map((p) => {
-    const geo = (e, end) => (e.port ? { side: 'port', row: rows, x: x.get(way(p, rows)) } : { side: e.side, row: where.get(e.item).row, box: boxOf(e.item), x: x.get(entryOf(e)) + relX(e, p, end) });
+    const geo = (e, end) => (e.port ? { side: 'port', row: rows, x: x.get(way(p, rows)) } : { side: e.side, item: e.item, row: where.get(e.item).row, box: boxOf(e.item), x: x.get(entryOf(e)) + relX(e, p, end) });
     const [a, b] = [geo(p.a, 'a'), geo(p.b, 'b')];
     return { id: p.id, plan: p, a, b, street: p.a.street, merge: p.merge, stops: [a.x, ...p.rows.map((r) => x.get(way(p, r))), b.x] };
   });
-  spread(wires);
+  return { x, wires };
+  };
+  share = spread(lay().wires);
+  const { x, wires } = lay();
+  dodged(wires, z.track);
   const heights = table.map((list, r) => Math.max(0, ...list.filter((e) => !e.way).map((e) => shapes.get(e.id).h)));
   if (ports) heights[rows] = 0;
   const streets = streetsOf(heights, wires, z);
@@ -92,26 +100,56 @@ export function islandOf(items, links, z, stage = () => {}, homeOf = () => '') {
   stage('wires', { wires: drawn.map((w) => ({ id: w.id, points: w.points })) });
   return {
     w: width, h: streets.bottom, places, parts,
-    wires: drawn.map((w) => ({ id: w.id, link: w.plan.link, type: w.plan.type, kind: w.plan.kind, head: w.plan.head, points: w.points })),
+    wires: drawn.map((w) => ({ id: w.id, link: w.plan.link, type: w.plan.type, kind: w.plan.kind, head: w.plan.head, start: w.plan.a.item, points: w.points })),
     ports: drawn.filter((w) => w.plan.kind === 'out').map((w) => ({ id: w.id, key: w.plan.b.key, x: w.points.at(-1)[0], other: w.plan.b.other })),
   };
 }
 
-/** Ends that leave by one item's top or foot share that side, each its own point (merged ones one), spread in order. */
+/**
+ * A wire that drops into an item's top moves along it, off any other wire's line in that street: a line that comes
+ * down to its track there would otherwise run on, or beside, the one that goes on down. All of one merge move as one.
+ */
+function dodged(wires, apart) {
+  const up = new Map(), tops = new Map();
+  const add = (street, x, item) => (up.get(street) ?? up.set(street, []).get(street)).push({ x, item });
+  for (const w of wires) {
+    const last = w.stops.length - 1;
+    if (w.a.side !== 'top') add(w.street, w.stops[0], w.a.item);
+    for (let k = 1; k < last; k++) add(w.street + k, w.stops[k], null);
+    const group = `${w.b.item} ${w.merge.b ?? w.id}`;
+    if (w.b.side === 'top') (tops.get(group) ?? tops.set(group, []).get(group)).push(w);
+    else if (w.b.side !== 'port') add(w.street + last - 1, w.stops[last], w.b.item);
+  }
+  for (const [group, list] of tops) {
+    const g = list[0].b, item = g.item, street = list[0].street + list[0].stops.length - 2;
+    // Every other line in the street, and the other groups' drops into this item.
+    const others = [...tops].filter(([k, l]) => k !== group && l[0].b.item === item).map(([, l]) => ({ x: l[0].b.x, item: null }));
+    const near = [...(up.get(street) ?? []).filter((u) => u.item !== item), ...others];
+    const room = (x) => Math.min(Infinity, ...near.map((u) => Math.abs(u.x - x)));
+    if (room(g.x) >= apart) continue;
+    // The point along its middle half that stands furthest from every other line, in steps of half the spacing.
+    const [lo, hi] = [g.box.x + g.box.w / 4, g.box.x + (g.box.w * 3) / 4];
+    let best = g.x;
+    for (let at = lo; at <= hi; at += apart / 2) if (room(at) > room(best)) best = at;
+    for (const w of list) (w.b.x = best), (w.stops[w.stops.length - 1] = best);
+  }
+}
+
+/** Ends that leave by one item's top or foot share that side, each its own point (merged ones one), spread in order: each end's share of the side, by wire and end. */
 function spread(wires) {
+  const share = new Map();
   const sides = new Map();
   for (const w of wires) for (const [end, near] of [['a', 1], ['b', -2]]) {
     const g = w[end];
     if (g.side !== 'top' && g.side !== 'bottom') continue;
-    const key = `${g.box.x} ${g.box.y} ${g.row} ${g.side}`, group = w.merge[end] ?? `${w.id}:${end}`;
+    const key = `${g.item} ${g.side}`, group = w.merge[end] ?? `${w.id}:${end}`;
     (sides.get(key) ?? sides.set(key, []).get(key)).push({ w, end, group, toward: w.stops.at(near) });
   }
   for (const list of sides.values()) {
     const groups = [...new Set(list.sort((p, q) => p.toward - q.toward).map((e) => e.group))];
     for (const e of list) {
-      const g = e.w[e.end], k = groups.indexOf(e.group), x = g.box.x + (g.box.w * (k + 1)) / (groups.length + 1);
-      g.x = x;
-      e.w.stops[e.end === 'a' ? 0 : e.w.stops.length - 1] = x;
+      share.set(`${e.w.id}:${e.end}`, (groups.indexOf(e.group) + 1) / (groups.length + 1));
     }
   }
+  return share;
 }

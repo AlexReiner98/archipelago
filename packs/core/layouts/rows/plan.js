@@ -2,7 +2,7 @@
 // it leaves by, which street (the room between two rows) it runs in, and which rows it crosses on waypoints. A block
 // alone leaves by its top or foot; an item among parts leaves by its right side into the gutter beside its column and
 // down to the street below its row; a block's head takes what comes from above on its top. Two items in one column are
-// joined in their gutter (a bracket). The order's wires into one item merge, and so do those out of one. A link to
+// joined in their gutter (a bracket). Wires of a type into one item merge. A link to
 // another island leaves by a port on the island's foot. Pure.
 
 /** Where each item stands in its block: its block, row, column (-1 for the head) and whether it is alone. */
@@ -57,9 +57,8 @@ export function plansOf({ links, where, back, rows, islandOf = () => '' }) {
       continue;
     }
     const a = endAt(A, 'down', where), b = wa.row === wb.row ? endAt(B, 'down', where) : endAt(B, 'up', where);
-    // The order's wires out of one item merge, and every wire of a type into one item.
-    const into = head === 'a' ? { a: `in:${l.type}:${A}` } : { b: `in:${l.type}:${B}` };
-    const merge = kind === 'order' ? { a: `out:${A}`, b: `in:${l.type}:${B}` } : into;
+    // Every wire of a type into one item merges with the others: one hub each, as the kit's bundle cuts them.
+    const merge = head === 'a' ? { a: `in:${l.type}:${A}` } : { b: `in:${l.type}:${B}` };
     // Wires that merge into one item share their waypoints too: one line down the rows, not one each.
     const shared = merge[head], ways = range(a.street, b.street);
     plans.push({ id: l.id, link: l, type: l.type, kind, head, a, b, rows: ways, merge: shared && ways.length ? { ...merge, ways: shared } : merge, ...(shared && ways.length && { way: shared }) });

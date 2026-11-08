@@ -20,7 +20,9 @@ export function packed(intervals, apart = 0) {
   const before = new Map(list.map((r) => [r.key, new Set()]));
   for (const p of list) for (const q of list) {
     if (p === q) continue;
-    for (const e of q.ends) if (e.at > p.lo && e.at < p.hi) (e.near ? before.get(p.key).add(q.key) : before.get(q.key).add(p.key));
+    // An end on p's own end counts too where p turns the other way there: one would run down the other's line.
+    const meets = (e) => (e.at > p.lo && e.at < p.hi) || p.ends.some((f) => f.at === e.at && f.near !== e.near);
+    for (const e of q.ends) if (meets(e)) (e.near ? before.get(p.key).add(q.key) : before.get(q.key).add(p.key));
   }
   const track = new Map();
   let count = 0;

@@ -6,9 +6,7 @@ import { test } from 'node:test';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { blocksOf, wholesOf } from './layouts/rows/blocks.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { lengthsOf, rowsOf } from './layouts/rows/index.js';
-// @ts-expect-error a drawing's modules are plain JavaScript
-import { modelOf } from './layouts/rows/model.js';
+import { lengthsOf, rowsOf } from './layouts/rows/rows.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { placed } from './layouts/rows/place.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
@@ -23,8 +21,8 @@ import { streetsOf } from './layouts/rows/streets.js';
 import { packed } from './layouts/rows/tracks.js';
 
 const Z = lengthsOf(
-  { rows_line_gap: 10, rows_indent: 24, rows_block_gap: 32, rows_lane: 10, rows_track: 10, rows_street_pad: 14, rows_street_least: 36, rows_straight: 0.5, rows_column_most: 200, flow_island_pad: 14, flow_island_name_room: 18, flow_island_sea: 72 },
-  { rows_straighten: 4, flow_aspect: 1.6 },
+  { rows_line_gap: 10, rows_indent: 24, rows_block_gap: 32, rows_lane: 10, rows_track: 10, rows_street_pad: 14, rows_street_least: 36, rows_straight: 0.5, rows_column_most: 200, rows_straighten: 4, flow_island_pad: 14, flow_island_name_room: 18, flow_island_sea: 72 },
+  1.6,
 );
 const item = (id: string, made: number, island = 's') => ({ id, w: 100, h: 30, island, made: String(made).padStart(3, '0') });
 const link = (from: string, to: string, type = 'depends_on') => ({ id: `${type} ${from} ${to}`, from, to, type, order: type === 'depends_on' });
@@ -113,20 +111,12 @@ test('streets and route: a street is as tall as its tracks, and every wire turns
 });
 
 test('the whole: islands framed, no two boxes overlap, every wire at right angles, every step told', () => {
-  const measure = (t: string) => t.length * 7;
-  const sizes = { flow_max_text: 140, flow_text: 13, flow_box_pad: 42, flow_box_height: 34, flow_line_height: 16 };
-  const answer = {
-    items: [
-      ...['a', 'b', 'c', 'd', 'e'].map((id, k) => ({ id, title: `Item ${id}`, island: 'one', created_at: `2026-11-0${k + 1}` })),
-      ...['x', 'y', 'z'].map((id, k) => ({ id, title: `Item ${id}`, island: 'two', created_at: `2026-11-0${k + 1}` })),
-    ],
-    links: [
-      { id: 'l1', type: 'depends_on', from: 'b', to: 'a' }, { id: 'l2', type: 'depends_on', from: 'c', to: 'b' }, { id: 'l3', type: 'part_of', from: 'e', to: 'd' },
-      { id: 'l4', type: 'about', from: 'e', to: 'a' }, { id: 'l5', type: 'reads', from: 'x', to: 'a' }, { id: 'l6', type: 'reads', from: 'y', to: 'a' }, { id: 'l7', type: 'depends_on', from: 'z', to: 'y' },
-    ],
+  const made = (k: number) => String(k).padStart(2, '0');
+  const model = {
+    items: [...['a', 'b', 'c', 'd', 'e'].map((id, k) => ({ ...item(id, k, 'one'), made: made(k) })), ...['x', 'y', 'z'].map((id, k) => ({ ...item(id, k, 'two'), made: made(k) }))],
+    links: [link('b', 'a'), link('c', 'b'), link('e', 'd', 'part_of'), link('e', 'a', 'about'), link('x', 'a', 'reads'), link('y', 'a', 'reads'), link('z', 'y')],
     islands: [{ id: 'one', title: 'One' }, { id: 'two', title: 'Two' }],
   };
-  const model = modelOf(answer, { measure, sizes });
   const told: string[] = [];
   const pic = rowsOf(model, Z, (name: string) => told.push(name));
   assert.equal(pic.islands.length, 2);
