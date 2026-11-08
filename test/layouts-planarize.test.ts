@@ -125,3 +125,28 @@ test('format: the embedding as step 2 takes it, faces and rotation agreeing, bor
     assert.ok(area > 0, `${island.id} turns clockwise`);
   }
 });
+
+test('format: a border runs clockwise with its island on the right, with ports or none', async () => {
+  const { embedding } = await mod('embedding.js');
+  const { asInput } = await mod('format.js');
+  const cases = [
+    { items: ['a', 'b', 'c'].map((id) => item(id, 'A')), links: [link('depends_on', 'b', 'a'), link('depends_on', 'c', 'a')] },
+    { items: [...['a', 'b'].map((id) => item(id, 'A')), item('s')], links: [link('depends_on', 'b', 'a'), link('about', 's', 'b'), link('calls', 'a', 's')] },
+  ];
+  for (const { items, links } of cases) {
+    const m = await graph(items, links), e = embedding(m, { sizes: house.sizes, headless: house.headless, islandOf: (id: string) => m.nodes.get(id)?.item?.island ?? null });
+    const g = asInput(e, m), edge = new Map<string, any>(g.edges.map((x: any) => [x.id, x]));
+    const between = (a: string, b: string) => g.edges.find((x: any) => (x.from === a && x.to === b) || (x.from === b && x.to === a)).id;
+    for (const island of g.islands) {
+      const [a, b] = island.border, step = between(a, b);
+      // The face holding the stretch a to b walked from a to b, on its right.
+      const face = g.faces.find((f: string[]) => f.some((id, k) => {
+        if (id !== step) return false;
+        const next = edge.get(f[(k + 1) % f.length]);
+        return next.from === b || next.to === b;
+      }));
+      const held = new Set(face.flatMap((id: string) => [edge.get(id).from, edge.get(id).to]));
+      assert.ok(items.some((i: any) => i.island === island.id && held.has(i.id)), `${island.id}: the face on the right of its border is inside`);
+    }
+  }
+});

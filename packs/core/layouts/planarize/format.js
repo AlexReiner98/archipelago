@@ -45,6 +45,11 @@ export function asInput(e, m) {
   });
   const rotation = Object.fromEntries([...round].map(([v, ring]) => [v, ring.map((w) => edgeOf.get(pair(v, w)))]));
   const faces = walked.map((f) => f.map((v, k) => edgeOf.get(pair(v, f[(k + 1) % f.length]))));
-  const islands = [...e.borders].map(([id, ring]) => ({ id, border: [ring[0], ...ring.slice(1).reverse()] }));
+  // A face is walked with itself on the right, as a loop is walked clockwise round its inside: a border runs clockwise
+  // when the face on the right of its first stretch holds what lives on its island.
+  const rightOf = new Map();
+  walked.forEach((f) => f.forEach((v, k) => rightOf.set(`${v} ${f[(k + 1) % f.length]}`, f)));
+  const inside = (f, island) => (f ?? []).some((v) => e.place.get(v) === island && !isBorder(v));
+  const islands = [...e.borders].map(([id, ring]) => ({ id, border: inside(rightOf.get(`${ring[0]} ${ring[1]}`), id) ? ring : [ring[0], ...ring.slice(1).reverse()] }));
   return { nodes, edges, wires, rotation, faces, outer, islands };
 }
