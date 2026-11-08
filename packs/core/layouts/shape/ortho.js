@@ -50,8 +50,8 @@ export function shaped(emb, F, S, H) {
     const meta = emb.unseen?.has(e.id) ? { edge: k, unseen: true } : { edge: k }, d = k * 2, a = end(F.tail[d], k), b = end(F.head[d], k), points = [a];
     let h = H.out[d];
     // The step aside in a neck (./necks.js) is told which box it queues beside.
-    const n = H.turns[k].length, neck = (i) => (i === 1 && H.jogs?.has(`${F.tail[d]} ${k}`) ? F.tail[d] : i === n - 1 && H.jogs?.has(`${F.head[d]} ${k}`) ? F.head[d] : undefined);
-    const as = (i) => (neck(i) === undefined ? meta : { ...meta, neck: neck(i) });
+    const n = H.turns[k].length, atTail = (i) => i === 1 && H.jogs?.has(`${F.tail[d]} ${k}`), atHead = (i) => i === n - 1 && H.jogs?.has(`${F.head[d]} ${k}`);
+    const as = (i) => (atTail(i) ? { ...meta, neck: F.tail[d], from: H.out[d] } : atHead(i) ? { ...meta, neck: F.head[d], from: H.out[d ^ 1] } : meta);
     for (const [i, t] of H.turns[k].entries()) {
       const p = g.point({ bend: k });
       g.join(points.at(-1), p, h, as(i));
