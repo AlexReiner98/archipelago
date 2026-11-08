@@ -55,9 +55,10 @@ const roundFace = (f, a, b) => {
  * `add(path, visible, link)` makes a wire. With `onward(link)`, that link only ever goes on through `number`, so it runs
  * from u to v the way the numbers do; with `oneWay`, every other link does too, from whichever end comes first, so no
  * wire turns back and any can be taken out again. The stretch `keep` is never crossed. It keeps count in `tally`: { ghosts, crossings,
- * unthreaded }.
+ * unthreaded }. `cost(w)` is what passing wire `w` costs: by default 1 where it is seen and little where it is not; `tag`
+ * names its points apart from another threader's on the same graph.
  */
-export function threader(list, owner, add, { number, keep, onward = () => false, oneWay = false }) {
+export function threader(list, owner, add, { number, keep, onward = () => false, oneWay = false, cost: price = (w) => (w?.visible ? 1 : HIDDEN), tag = '' }) {
   const tally = { ghosts: [], crossings: 0, unthreaded: 0 }, at = (v) => number.get(v), around = new Map(), seats = seating(list), { name } = seats;
   let made = 0;
   const tie = (a, b) => {
@@ -80,7 +81,7 @@ export function threader(list, owner, add, { number, keep, onward = () => false,
       while (open.length) {
         const f = nextOf(open, dist);
         f.forEach((a, k) => {
-          const e = name(a, f[(k + 1) % f.length]), cost = dist.get(f) + (owner.get(e)?.visible ? 1 : HIDDEN);
+          const e = name(a, f[(k + 1) % f.length]), cost = dist.get(f) + price(owner.get(e));
           if (e === keep) return;
           for (const n of seats.of(e)) if (n !== f && (!dist.has(n) || cost < dist.get(n))) (dist.set(n, cost), open.push(n));
         });
@@ -121,7 +122,7 @@ export function threader(list, owner, add, { number, keep, onward = () => false,
         return { steps, rooms };
       }
       f.forEach((a, k) => {
-        const e = name(a, f[(k + 1) % f.length]), cost = dist.get(f) + (owner.get(e)?.visible ? 1 : HIDDEN);
+        const e = name(a, f[(k + 1) % f.length]), cost = dist.get(f) + price(owner.get(e));
         if (e === keep) return;
         const h = strict ? past(e, reach.get(f), u, v) : reach.get(f);
         if (h === null) return;
@@ -146,7 +147,7 @@ export function threader(list, owner, add, { number, keep, onward = () => false,
     }
     let run = strict ? at(u) : -Infinity;
     for (let k = 0; k < steps.length; k++) {
-      const e = steps[k], [a, b] = e.split('|'), d = `ghost${made++}`, w = owner.get(e), lo = Math.max(run, Math.min(at(a), at(b)));
+      const e = steps[k], [a, b] = e.split('|'), d = `ghost${tag}${made++}`, w = owner.get(e), lo = Math.max(run, Math.min(at(a), at(b)));
       // Never on a number something already has: a face tells its top from its foot by them.
       number.set(d, lo + (Math.min(under[k], Math.max(at(a), at(b))) - lo) * (0.4 + 0.2 * ((made * GOLD) % 1)));
       run = strict ? at(d) : run;
@@ -297,9 +298,9 @@ function join(kept, items, order) {
  * `links` is a list of [u, v], heaviest first: the graph as { faces, wires, owner, ghosts, crossings }. The heaviest planar
  * part is kept, invisible edges join it into one biconnected piece and the links left out are threaded through its
  * faces. A wire is { path, visible, link }, its path from u to v through the points where it crosses; `owner` says which
- * wire holds each stretch between two neighbours.
+ * wire holds each stretch between two neighbours. A link marked `hidden` is kept unseen; `cost` is as the threader takes it.
  */
-export function planarize(links, items, { lines = [], mirror = false } = {}) {
+export function planarize(links, items, { lines = [], mirror = false, cost } = {}) {
   const { kept, left } = keptPlanar(links);
   // `lines` (an island's ports, a line for each side, in the sea's order) hold their order: each next two joined by an
   // invisible edge where it stays planar, so the rise and the fall turn through them in that order. `mirror` draws the
@@ -313,12 +314,12 @@ export function planarize(links, items, { lines = [], mirror = false } = {}) {
     wires.push(w);
     for (let i = 1; i < path.length; i++) owner.set(pair(path[i - 1], path[i]), w);
   };
-  kept.forEach((l) => add([l[0], l[1]], true, l));
+  kept.forEach((l) => add([l[0], l[1]], !l.hidden, l));
   for (const [u, v, leads] of hidden) if (!owner.has(pair(u, v))) (add([u, v], false, null), (wires.at(-1).leads = leads));
   const found = faces([...owner.keys()].map((k) => k.split('|')));
   if (!found) throw new Error('The kept part is not planar');
   const list = mirror ? found.map((f) => [...f].reverse()) : found;
-  const { through, tally } = threader(list, owner, add, { number: new Map() });
+  const { through, tally } = threader(list, owner, add, { number: new Map(), cost });
   through(left);
   return { faces: list, wires, owner, ...tally };
 }
