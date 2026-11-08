@@ -9,12 +9,14 @@
 // solves take turns until neither gains: the other nodes with the boxes held, then whole turns of four everywhere.
 // Layer: shape. Pure: the shape in, headings and turns out.
 
+import { ashore } from './angles.js';
 import { minCostFlow } from './flow.js';
 import { QUARTERS } from './sides.js';
 
-/** What a turn on a wire costs; a bend in a trunk's bar, drawn straight where it can be; a wire doubling back, each turn one way past the first along any run of it; and a
+/** What a turn on a wire costs; one more inside an island, which it costs room there and none at sea; a bend in a
+ *  trunk's bar, drawn straight where it can be; a wire doubling back, each turn one way past the first along any run of it; and a
  *  turn on a border off the network's own, which must keep its rectangle. */
-const BEND = 1, BACK = 2 + 1, BAR = 1e1, BORDER = 1e3;
+const BEND = 1e1, ASHORE = 1, BACK = 3e1, BAR = 1e2, BORDER = 1e4;
 
 /** Turns as a list, -1 left and 1 right: `n` of them, all one way. */
 const run = (n) => Array.from({ length: Math.abs(n) }, () => Math.sign(n));
@@ -91,7 +93,7 @@ function frame(F, S, nA) {
 /** Every cost: each edge's turns, and along every wire each run of edges and the nodes between turning once at most. */
 function costs(emb, F, S, nA, h0) {
   const vOf = (id) => F.nodeAt.get(id);
-  const terms = emb.edges.map((e, k) => ({ from: vOf(e.from), to: vOf(e.to), base: S.border.has(k) ? 0 : nA[k], w: S.border.has(k) ? BORDER : emb.unseen?.has(e.id) ? 0 : e.bar ? BAR : BEND, s: 0 }));
+  const terms = emb.edges.map((e, k) => ({ from: vOf(e.from), to: vOf(e.to), base: S.border.has(k) ? 0 : nA[k], w: S.border.has(k) ? BORDER : emb.unseen?.has(e.id) ? 0 : e.bar ? BAR : BEND + (ashore(emb, e) ? ASHORE : 0), s: 0 }));
   for (const w of emb.wires ?? []) {
     if (w.type === 'unseen' || w.type === 'border') continue;
     const ks = w.edges.map((id) => F.edgeAt.get(id)), first = emb.edges[ks[0]];

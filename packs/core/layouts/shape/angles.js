@@ -9,9 +9,16 @@
 import { minCostFlow } from './flow.js';
 import { QUARTERS, sidesOf, wanted } from './sides.js';
 
-/** What a bend in a wire costs; a corner of a border not at one of its nodes; a turn against the rules, which only an
- *  embedding that leaves no other way pays. */
-const BEND = 1e1, CORNER = 1, AGAINST = 1e4;
+/** What a bend in a wire costs; one more for a bend inside an island, which costs the island room where one at sea
+ *  costs nothing; a corner of a border not at one of its nodes; a turn against the rules, which only an embedding
+ *  that leaves no other way pays. */
+const BEND = 1e1, ASHORE = 1, CORNER = 1, AGAINST = 1e4;
+
+/** Whether edge e runs inside an island: either end stands in one, other than on its border. */
+export const ashore = (emb, e) => [e.from, e.to].some((id) => {
+  const n = emb.nodes.find((x) => x.id === id);
+  return n && n.kind !== 'port' && n.kind !== 'border' && n.island != null;
+});
 
 /**
  * The orthogonal shape of `emb`, its faces `F` (./faces.js). Answers { angle, lefts, rights, anchored, bends }: `angle[d]`
@@ -95,10 +102,11 @@ export function orthogonal(emb, F) {
   for (let d = 0; d < D; d++) if (angle[d] >= 0) supply[faceOf[d]] += angle[d];
 
   // A bend on edge k, convex in face f, carries a quarter from f to the face across.
+  const isle = emb.edges.map((e) => ashore(emb, e));
   const bendArcs = emb.edges.map((e, k) => {
     const f = faceOf[k * 2], g = faceOf[k * 2 + 1];
     if (f === g) return null;
-    const inside = insideOf.get(k), bend = emb.unseen?.has(e.id) ? 0 : BEND, cost = (face) => (inside === undefined ? bend : face === inside ? CORNER : AGAINST);
+    const inside = insideOf.get(k), bend = emb.unseen?.has(e.id) ? 0 : BEND + (isle[k] ? ASHORE : 0), cost = (face) => (inside === undefined ? bend : face === inside ? CORNER : AGAINST);
     const at = arcs.length;
     arcs.push({ from: f, to: g, cost: cost(f) }, { from: g, to: f, cost: cost(g) });
     return at;
