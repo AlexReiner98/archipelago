@@ -88,7 +88,7 @@ export function orderOn(read, a, z) {
   for (const n of read.nodes.values()) if (isBox(n)) bound(`b:${n.id}:0`, `b:${n.id}:1`, n.size[a]);
   for (const r of ax.ranges) (bound(r.lo, r.end, r.inset), bound(r.end, r.hi, r.inset));
   for (const p of read.ports) {
-    if ((p.side === 'left' || p.side === 'right' ? 1 : 0) !== a) continue;
+    if (!p.on || (p.side === 'left' || p.side === 'right' ? 1 : 0) !== a) continue;
     (bound(`i:${p.island}:0`, `n:${p.id}`, z.pad), bound(`n:${p.id}`, `i:${p.island}:1`, z.pad));
   }
   return { order, bounds };

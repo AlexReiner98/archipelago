@@ -84,7 +84,7 @@ function atOrigin(p) {
 /**
  * The shape relaxed: `shape` as step 2 gives it, `size(node)` each node's drawn [w, h], `sizes` the style's, `heads` each
  * island's head height. Answers `nodes`, `wires`, `islands` and `ports` placed (from 0, 0), and `told` (how many rounds,
- * how short the last left a distance, how many could not be kept, and ends the shape put on no side of their box).
+ * how short the last left a distance, how many could not be kept, how many contradicted others and were let go, and ends the shape put on no side of their box).
  */
 export function relax(shape, { size, sizes, heads }) {
   const z = lengthsOf(sizes, heads), read = atoms(shape, { size, corner: z.corner, wire: z.wire });
