@@ -24,9 +24,10 @@ const { result: answer } = JSON.parse(readFileSync(join(import.meta.dirname, '..
  * and the drawing before then counted 290 here; a finding's readers on one island sharing one wire across the sea brought
  * that to 102, and ports kept on their shore with a bundle split only by the reader that cannot share it, to 77. The
  * owner raised it to 90 on 7 Nov 2026, when an island with ports came to be laid out so its order runs down (task
- * e_bw9tyvay): its wires to ports no longer climb into their steps, for some more crossings here.
+ * e_bw9tyvay): its wires to ports no longer climb into their steps, for some more crossings here. A bundle's readers
+ * kept apart on their port's bar as it moves out past the steps brought it back to 77.
  */
-const CEILING: Record<string, number> = { 'loose ends': 0, outside: 0, overlapping: 0, through: 0, shared: 0, jogs: 0, unbridged: 0, crossings: 90 };
+const CEILING: Record<string, number> = { 'loose ends': 0, outside: 0, overlapping: 0, through: 0, shared: 0, jogs: 0, unbridged: 0, crossings: 77 };
 
 const z = (name: string) => house.sizes[`flow_${name}`], measure = (t: string, px: number) => String(t).length * px * 0.55;
 /** The shapes a page lays the picture out to: tall, the house's, and wide. Each fault is counted in all three. */
