@@ -49,6 +49,13 @@ export function sidesOf(list, outerAt, number, s, t) {
   return { left, right, LEFT, RIGHT };
 }
 
+/** What a part with ports must start and end with: its rise and top ports, its foot ports and fall, each side in its order. */
+function portEnds(links, lines, mirror) {
+  const tied = (end) => new Set(links.filter((l) => l[0] === end || l[1] === end).map((l) => (l[0] === end ? l[1] : l[0])));
+  const [tops, foots] = [tied(RISE), tied(FALL)], ports = lines.flat(), side = mirror ? [...ports].reverse() : ports;
+  return { first: [RISE, ...side.filter((p) => tops.has(p))], last: [...side.filter((p) => foots.has(p)), FALL] };
+}
+
 /** How many headed order wires run against `number`. */
 export const against = (g, number) => g.wires.filter((w) => w.link?.[2] > 1 && w.path.some((v, i) => i && number.get(w.path[i - 1]) > number.get(v))).length;
 
@@ -71,16 +78,17 @@ export function downward(links, list, z, { ties = 0, nth = 0, embedded = false, 
   const ids = madeAt ? [...list].sort((p, q) => madeOf.get(p) - madeOf.get(q)) : [...list].sort(), sorted = [...links].sort((p, q) => Number(q[2]) - Number(p[2]) || name(p, q));
   const asFound = (made) => ({ g: made, s: made.s, t: made.t, number: made.number, outerAt: made.outerAt });
   // A part past the trials has one way to be drawn, and numbering it takes longer than the rest of the picture.
-  // An island's ports are numbered first and last under its rise and over its fall, which the embedding knows nothing of.
-  const ported = list.includes(RISE) || list.includes(FALL);
-  const big = list.length > z.trial_most, order = sorted.some((l) => l[2] > 1), fits = !ported && list.length <= z.embed_big;
+  // An island's ports come first and last, under its rise and over its fall, in the order their wires come at sea (`lines`,
+  // mirrored as the trial is): the numbering and the embedding both take them so.
+  const ported = list.includes(RISE) || list.includes(FALL), held = ported ? portEnds(sorted, lines, mirror) : undefined;
+  const big = list.length > z.trial_most, order = sorted.some((l) => l[2] > 1), fits = list.length <= z.embed_big;
   if (big && order && fits) {
-    const made = embed(sorted, ids);
+    const made = embed(sorted, ids, held);
     if (!made.unthreaded && !against(made, made.number)) return asFound(made);
   }
   const g = planarize(sorted, ids, { lines, mirror }), found = { g, ...numbered(g, nth, big ? Infinity : z.number_tries) }, up = against(g, found.number);
   // The search gives only small parts a trial of the embedding: the first trial of a larger one tries it here.
-  if (!up || ported || !(embedded || (fits && list.length > z.embed_most && !ties && !nth))) return found;
-  const made = embed(sorted, ids);
+  if (!up || !(embedded || (fits && list.length > z.embed_most && !ties && !nth))) return found;
+  const made = embed(sorted, ids, held);
   return against(made, made.number) < up && made.crossings <= g.crossings + up * z.embed_cost ? asFound(made) : found;
 }

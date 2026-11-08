@@ -26,8 +26,10 @@ const keyed = (k, a, b) => {
 /**
  * Items in an order where all the order's links run forward, each as near as it can be to what it is joined to; of
  * equals, the one first in `items` (made first, as ./topology.js sends them). `noise(v)` leans each item its own way.
+ * `ends` holds what must come first and last, each in its own order (an island's rise and top ports, its foot ports
+ * and fall): one of the first is taken whenever it is ready, and one of the last only once nothing else is.
  */
-function lineUp(items, links, noise) {
+function lineUp(items, links, noise, ends = { first: [], last: [] }) {
   const near = new Map(items.map((v) => [v, new Set()])), after = new Map(items.map((v) => [v, []])), waits = new Map(items.map((v) => [v, 0]));
   for (const [u, v, order] of links) {
     near.get(u).add(v);
@@ -35,9 +37,13 @@ function lineUp(items, links, noise) {
     if (order) (after.get(u).push(v), waits.set(v, waits.get(v) + 1));
   }
   const first = new Map(items.map((v, k) => [v, k])), at = new Map(), line = [], ready = new Set(items.filter((v) => !waits.get(v)));
+  const firstAt = new Map(ends.first.map((v, k) => [v, k])), lastAt = new Map(ends.last.map((v, k) => [v, k]));
+  const byEnd = (at, pool) => [...pool].filter((v) => at.has(v)).sort((p, q) => at.get(p) - at.get(q))[0];
   while (ready.size) {
-    let best, most = -Infinity;
-    for (const v of ready) {
+    let best = byEnd(firstAt, ready), most = -Infinity;
+    const rest = [...ready].filter((v) => !lastAt.has(v));
+    if (best === undefined && !rest.length) best = byEnd(lastAt, ready);
+    if (best === undefined) for (const v of rest) {
       let last = -1, older = 0;
       const mine = first.get(v);
       for (const w of near.get(v)) if (at.has(w)) last = Math.max(last, at.get(w)); else if (first.get(w) < mine) older++;
@@ -116,7 +122,7 @@ function facesOf(line, sides) {
 }
 
 /** One order of the items, tried through to the graph it makes. Only what the order touches goes on the line. */
-function attempt(links, items, k) {
+function attempt(links, items, k, ends) {
   // Each try's leanings are keyed to the item or link they lean, so one more item leaves every other's as it was.
   // Each item's leaning is worked out once a try: the line asks it again for every item still waiting.
   const rank = new Map(items.map((v, i) => [v, i])), leaning = new Map(items.map((v, i) => [v, k ? keyed(k, i, -1) : 0]));
@@ -124,7 +130,7 @@ function attempt(links, items, k) {
   const inOrder = new Set(links.filter((l) => l[2]).flatMap((l) => [l[0], l[1]]));
   const here = inOrder.size > 2 ? new Set(items.filter((v) => inOrder.has(v))) : new Set(items);
   const onLine = links.filter(([u, v]) => here.has(u) && here.has(v)), later = links.filter(([u, v]) => !here.has(u) || !here.has(v));
-  const line = lineUp([...here], onLine, lean), { sides, at, left } = pages(line, onLine, noise), last = line.length - 1, number = new Map(at);
+  const line = lineUp([...here], onLine, lean, ends), { sides, at, left } = pages(line, onLine, noise), last = line.length - 1, number = new Map(at);
   const lost = left.filter((l) => l[2]).length, reach = sides.flat().reduce((sum, a) => sum + a.q - a.p, 0), { hidden, stHere } = close(line, sides);
   const [s, t] = [line[0], line[last]], wires = [], owner = new Map();
   const add = (path, visible, link) => {
@@ -162,11 +168,11 @@ function attempt(links, items, k) {
  * crossings }, with `number` for each item and point, its first and last `s` and `t`, and `outerAt`, the outer face.
  * Each order tried is judged by the crossings it comes to, not by how many links it keeps, and the best is tightened.
  */
-export function embed(links, items) {
+export function embed(links, items, ends) {
   let best = null;
   const tries = Math.max(4, Math.min(TRIES, Math.ceil(WORK / Math.max(1, links.length * links.length))));
   for (let k = 0; k < tries && (!best || best.cost > 0); k++) {
-    const made = attempt(links, items, k), cost = made.tally.crossings + made.tally.ghosts.length / 10;
+    const made = attempt(links, items, k, ends), cost = made.tally.crossings + made.tally.ghosts.length / 10;
     if (!best || cost < best.cost) best = { ...made, cost };
   }
   best.tighten();
