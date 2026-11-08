@@ -141,6 +141,13 @@ test('shape: a ring broken at one wire runs that wire up on the right', () => {
   assert.ok(up.at(-1)![1] < up[0][1], 'it ends above where it starts');
 });
 
+test('shape: each wire names the nodes it runs from and to, its points in that order', () => {
+  const s = shape(CASES.crossed), wb = s.wires.find((w: any) => w.id === 'wb'), box = (id: string) => s.nodes.find((n: any) => n.id === id);
+  assert.deepEqual([wb.from, wb.to], ['B', 'C']);
+  assert.equal(wb.points[0][1], box('B').y + box('B').h / 2, 'it starts on the foot of B');
+  assert.equal(wb.points.at(-1)[1], box('C').y - box('C').h / 2, 'it ends on the head of C');
+});
+
 test('shape: two islands, one wire crossing each border straight at its port', () => {
   const s = shape(CASES.islands);
   assert.deepEqual(s.ports.map((p: any) => [p.id, p.side]), [['P1', 'bottom'], ['P2', 'top']]);

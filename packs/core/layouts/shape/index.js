@@ -58,13 +58,13 @@ export function shape(given) {
   const wires = (emb.wires ?? []).map((w) => {
     const ks = w.edges.map(edgeOf), ends = (k) => [emb.edges[k].from, emb.edges[k].to];
     let here = ks.length > 1 && ends(ks[1]).includes(emb.edges[ks[0]].from) ? emb.edges[ks[0]].to : emb.edges[ks[0]].from;
-    const points = [];
+    const points = [], from = here;
     for (const k of ks) {
       const forward = emb.edges[k].from === here, c = forward ? chain[k] : [...chain[k]].reverse();
       points.push(...c.map(at));
       here = forward ? emb.edges[k].to : emb.edges[k].from;
     }
-    return { id: w.id, link: w.link, type: w.type, reversed: !!w.reversed, points: corners(points) };
+    return { id: w.id, link: w.link, type: w.type, reversed: !!w.reversed, from, to: here, points: corners(points) };
   });
   const islands = (emb.islands ?? []).map((island) => {
     const loop = new Set(island.border), pts = [];
