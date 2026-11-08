@@ -12,9 +12,9 @@
 import { minCostFlow } from './flow.js';
 import { QUARTERS } from './sides.js';
 
-/** What a turn on a wire costs; a wire doubling back, each turn one way past the first along any run of it; and a
+/** What a turn on a wire costs; a bend in a trunk's bar, drawn straight where it can be; a wire doubling back, each turn one way past the first along any run of it; and a
  *  turn on a border off the network's own, which must keep its rectangle. */
-const BEND = 1, BACK = 2 + 1, BORDER = 1e3;
+const BEND = 1, BACK = 2 + 1, BAR = 1e1, BORDER = 1e3;
 
 /** Turns as a list, -1 left and 1 right: `n` of them, all one way. */
 const run = (n) => Array.from({ length: Math.abs(n) }, () => Math.sign(n));
@@ -91,7 +91,7 @@ function frame(F, S, nA) {
 /** Every cost: each edge's turns, and along every wire each run of edges and the nodes between turning once at most. */
 function costs(emb, F, S, nA, h0) {
   const vOf = (id) => F.nodeAt.get(id);
-  const terms = emb.edges.map((e, k) => ({ from: vOf(e.from), to: vOf(e.to), base: S.border.has(k) ? 0 : nA[k], w: S.border.has(k) ? BORDER : emb.unseen?.has(e.id) ? 0 : BEND, s: 0 }));
+  const terms = emb.edges.map((e, k) => ({ from: vOf(e.from), to: vOf(e.to), base: S.border.has(k) ? 0 : nA[k], w: S.border.has(k) ? BORDER : emb.unseen?.has(e.id) ? 0 : e.bar ? BAR : BEND, s: 0 }));
   for (const w of emb.wires ?? []) {
     if (w.type === 'unseen' || w.type === 'border') continue;
     const ks = w.edges.map((id) => F.edgeAt.get(id)), first = emb.edges[ks[0]];
@@ -132,7 +132,7 @@ export function headings(emb, F, S) {
     const [k, side] = sides.entries().next().value ?? [];
     if (k !== undefined) held.set(v, mod(side - h0[leaving(v, k)]));
   }
-  const terms = costs(emb, F, S, nA, h0), turn = emb.nodes.map((_, v) => held.get(v) ?? 0);
+  const vOf = (id) => F.nodeAt.get(id), terms = costs(emb, F, S, nA, h0), turn = emb.nodes.map((_, v) => held.get(v) ?? 0);
   const val = (e) => e.base + turn[e.to] - turn[e.from];
   const price = () => terms.reduce((sum, e) => sum + e.w * Math.max(0, Math.abs(val(e)) - e.s), 0);
   const index = new Map();
@@ -152,8 +152,17 @@ export function headings(emb, F, S) {
     }
   };
   settle();
-  // Where a wire still doubles back, each node along it is tried turned each other way with the whole turns found
-  // again, for a gain neither solve finds alone (a junction turned and a box lifted with it).
+  // A trunk's bar turns as one: its nodes are tried together.
+  const barOf = emb.nodes.map((_, v) => [v]);
+  emb.edges.forEach((e) => {
+    if (!e.bar) return;
+    const [a, b] = [barOf[vOf(e.from)], barOf[vOf(e.to)]];
+    if (a === b) return;
+    a.push(...b);
+    for (const u of b) barOf[u] = a;
+  });
+  // Where a wire still doubles back, each node along it (with its bar) is tried turned each other way with the whole
+  // turns found again, for a gain neither solve finds alone (a junction turned and a box lifted with it).
   for (let gained = true; gained;) {
     gained = false;
     const doubled = terms.filter((e) => e.w && Math.abs(val(e)) > e.s + 1);
@@ -162,7 +171,7 @@ export function headings(emb, F, S) {
       let better = false;
       for (let t = 1; t < QUARTERS && !better; t++) {
         turn.splice(0, N, ...before);
-        turn[v] += t;
+        for (const u of barOf[v]) turn[u] += t;
         lift();
         better = price() < was;
       }
