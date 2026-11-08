@@ -25,11 +25,11 @@ function squeeze(g, real, drawn, pos, other, level, pulled) {
     const [lo, hi] = span.get(w.node) ?? [Infinity, -Infinity];
     span.set(w.node, [Math.min(lo, other[v]), Math.max(hi, other[v])]);
   });
-  const necked = new Set();
+  const necked = new Map();
   g.stretches.forEach((s, i) => {
     if (!real[i] || (s.h % 2 === 1) !== level) return;
     const [lo, hi] = s.neck === undefined ? [Infinity, -Infinity] : span.get(s.neck);
-    if (s.neck !== undefined) necked.add(line[s.a]);
+    if (s.neck !== undefined) necked.set(line[s.a], s.from);
     things.push([line[s.a], Math.min(other[s.a], other[s.b], lo), Math.max(other[s.a], other[s.b], hi)]);
   });
   // A loose point stands on its box's side wherever its box puts it: it is in nothing's way and takes no place of its
@@ -43,9 +43,9 @@ function squeeze(g, real, drawn, pos, other, level, pulled) {
     const q = beyond(s.b, s.h), ahead = s.h === 1 || s.h === 2;
     add(line[ahead ? s.a : q], line[ahead ? q : s.a]);
   });
-  // A neck's line comes before what stands level with it, so it never shares that row.
-  const placeOf = new Map(), half = 1 / 2;
-  for (const v of placed) placeOf.set(line[v], pos[v] - (necked.has(line[v]) ? half : 0));
+  // A neck's line stands nearer its box than what is level with it, so it never shares that row.
+  const placeOf = new Map(), half = 1 / 2, before = level ? 0 : QUARTERS - 1;
+  for (const v of placed) placeOf.set(line[v], pos[v] + (necked.has(line[v]) ? (necked.get(line[v]) === before ? half : -half) : 0));
   things.sort((a, b) => a[1] - b[1]);
   for (let i = 0; i < things.length; i++) {
     for (let j = i + 1; j < things.length && things[j][1] <= things[i][2]; j++) {
@@ -58,9 +58,9 @@ function squeeze(g, real, drawn, pos, other, level, pulled) {
   const lines = [...placeOf.keys()].sort((a, b) => placeOf.get(a) - placeOf.get(b) || a - b), next = new Map();
   for (const l of lines) next.set(l, 0);
   for (const l of lines) for (const q of after.get(l) ?? []) next.set(q, Math.max(next.get(q), next.get(l) + 1));
-  // A box's near side, and the necks that queue before it, are drawn up to what follows them, so the box is as narrow as
-  // its wires let it be.
-  const pull = new Set(drawn.filter(pulled).map((v) => line[v]));
+  // A box's near side, the necks that queue before it, and the steps aside of necks that leave its near side are drawn
+  // up to what follows them, so the box is as narrow as its wires let it be and a neck stays by its box.
+  const pull = new Set([...drawn.filter(pulled).map((v) => line[v]), ...[...necked].filter(([, from]) => from === before).map(([l]) => l)]);
   for (const l of [...lines].reverse()) {
     const later = [...(after.get(l) ?? [])].map((q) => next.get(q));
     if (pull.has(l) && later.length) next.set(l, Math.min(...later) - 1);
