@@ -20,7 +20,7 @@ const ROOT = join(import.meta.dirname, '..');
 const MAX_LINES = 500;
 const CODE = /\.(ts|js|mjs|css|html)$/;
 /** Vendored as a file at the owner's asking (CLAUDE.md), not written here. */
-const VENDORED = ['ui/three.module.min.js'];
+const VENDORED = ['ui/three.module.min.js', 'ui/cola.module.min.js'];
 
 const walk = (dir: string): string[] =>
   !existsSync(join(ROOT, dir))
