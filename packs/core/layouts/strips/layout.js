@@ -39,7 +39,9 @@ function extentOf(ids, nodes, x, y, lines) {
  * `ties`, `ports` (each outside end's line, from its step out to where it leaves) and `extent`.
  */
 export function arrange(args) {
-  const { sizes } = args, m = model(args), outside = args.outside ?? [];
+  const { sizes } = args, outside = args.outside ?? [];
+  for (const name of ['strips_row_gap', 'strips_hub', 'strips_wrap_from']) if (typeof sizes?.[name] !== 'number') throw new Error(`The style names no size "${name}": the house style (packs/core/pack.json) names every one strips uses`);
+  const m = model(args);
   stage('order', { order: m.order });
   const whole = strip(m, { sizes });
   const wires = [...m.chains.map((w) => ({ ...w, kind: 'chain' })), ...m.ties.map((w) => ({ ...w, kind: 'tie' }))].filter((w) => m.rank.has(w.a) && m.rank.has(w.b));
