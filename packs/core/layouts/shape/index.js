@@ -94,5 +94,5 @@ export function shape(given) {
       ports.push({ id, island: island.id, side: SIDE_NAMES[side] ?? null, at: side % 2 === 0 ? n.x : n.y });
     }
   });
-  return { nodes, wires, islands, ports, bends: H.bends, against: S.against };
+  return { nodes, wires, islands, ports, bends: H.bends, against: S.against || H.bent > 0 };
 }
