@@ -33,6 +33,8 @@ export const css = `
 .lf-tie.near { stroke-dasharray: none; }
 /* A tie with a head says which way its link points, as a wire does: solid, the head in its colour. */
 .lf-tie.headed { stroke-dasharray: none; }
+/* A link that runs up its drawing's order (the strips layout): dashed, whatever its type. */
+.lf-tie.dashed { stroke-dasharray: var(--ln-flow-dash-choice); }
 .lf-tie.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-hover); stroke-dasharray: none; }
 /* While a step is hovered, what is not tied to it fades, so its own wires and ties stand out. */
 .lighting :is(.lf-wire, .lf-tie, .lf-head):not(.lit) { opacity: var(--ln-flow-unlit); }
