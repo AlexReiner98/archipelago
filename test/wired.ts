@@ -131,7 +131,7 @@ export const ranks = (file: string) => (saysLayer(file) ?? owedLayer(file) ?? ''
 
 /** `use` run with a drawing's modules set out as the page loads them, by the names in `modules`: `url(name)` is how to import one. */
 export async function setOut<T>({ pack, modules }: Layout, use: (url: (name: string) => string) => T | Promise<T>): Promise<T> {
-  const dir = mkdtempSync(join(tmpdir(), 'wired-'));
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-wired-'));
   try {
     writeFileSync(join(dir, 'package.json'), '{"type":"module"}');
     for (const [name, file] of Object.entries(modules)) cpSync(join(ROOT, 'packs', pack, file), join(dir, name));

@@ -14,7 +14,7 @@ import { pathToFileURL } from 'node:url';
 
 const pack = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
 const house = { ...pack.styles.find((s: any) => s.id === 'core.house').props, shape: 'flow' };
-const laid = mkdtempSync(join(tmpdir(), 'flow-sea-'));
+const laid = mkdtempSync(join(tmpdir(), 'pelago-flow-sea-'));
 for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.flow').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
 const load = (name: string) => import(pathToFileURL(join(laid, name)).href);
 const [{ layout }, { compose, islandModels }, { count }] = await Promise.all([load('layout.js'), load('archipelago.js'), load('count.js')]);
