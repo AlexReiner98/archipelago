@@ -113,7 +113,10 @@ export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad, r
     const [axis, out] = SIDES[p.side], n = nodes.get(p.id), at = [x.get(p.id), y.get(p.id)];
     at[axis] = (out < 0 ? (axis ? all.t : all.l) : axis ? all.b : all.r) + out * (pad + (axis ? n.h : n.w) / 2);
     (x.set(p.id, at[0]), y.set(p.id, at[1]));
-    for (const [k, r] of routes) if (k.split('|').includes(p.id)) r.points = r.points.map((q, i, all_) => (i === 0 && r.from === p.id) || (i === all_.length - 1 && r.from !== p.id) ? [...at] : q);
+    // Its wires' ends go out with it, each where it landed along the port (a bundle's readers land apart on its bar), so
+    // the last stretch stays straight.
+    const half = (axis ? n.w : n.h) / 2, onto = (q) => { const e = [...at]; e[1 - axis] = Math.min(Math.max(q[1 - axis], at[1 - axis] - half), at[1 - axis] + half); return e; };
+    for (const [k, r] of routes) if (k.split('|').includes(p.id)) r.points = r.points.map((q, i, all_) => (i === 0 && r.from === p.id) || (i === all_.length - 1 && r.from !== p.id) ? onto(q) : q);
   }
   for (const side of Object.keys(SIDES).filter((s) => !ORDERED.includes(s))) {
     const [axis, out] = SIDES[side], other = 1 - axis, on = ports.filter((p) => p.side === side);
