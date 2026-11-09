@@ -17,7 +17,7 @@ test('in a browser, a saved canvas is opened from Home and switched to from the 
     await width(560);
     await keptBefore(1280);
 
-    // An agent's canvas of another project; switched between from the bar.
+    // An agent's canvas of another task; switched between from the bar.
     const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: 'The other one', props: { filter: { find: [`id ${made.q}`] }, walk: { over: [], steps: 0 } } }] })).result.created.c as string;
     await page.go(`${base}/#/v?find=id+${made.q}`);
     await page.go(`${base}/#/you`);
@@ -27,7 +27,7 @@ test('in a browser, a saved canvas is opened from Home and switched to from the 
     assert.equal(await canvasUp(), other);
     assert.ok(await page.until(`${picked} === 'The other one'`), 'named in the bar');
     // As a chip, or in the folded line when the bar is narrow (560 px, as set above).
-    assert.ok(await page.until(`[...document.querySelectorAll('#find .q-id, #find .q-more')].some((c) => (c.textContent + c.title).includes('Another project'))`), 'its lens in the bar');
+    assert.ok(await page.until(`[...document.querySelectorAll('#find .q-id, #find .q-more')].some((c) => (c.textContent + c.title).includes('Another task'))`), 'its lens in the bar');
     // From the switcher's panel, its scope All.
     await page.evaluate(`document.querySelector('#query .q-pick').click()`);
     assert.ok(await page.until(`Boolean(document.querySelector('.view-panel:popover-open .view-scopes button'))`), 'the panel opens');
@@ -45,7 +45,7 @@ test('in a browser, a saved canvas is opened from Home and switched to from the 
 
     // A view a document brings in is a part of that page: in neither list, and named in the bar only while it is up.
     const held = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'A page’s picture', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } } }, { op: 'link', type: 'about', from: 'v', to: made.p }] })).result.created.v as string;
-    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'document', title: 'A page', body: `Words.\n\n${held}` }] });
+    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'page', title: 'A page', body: `Words.\n\n${held}` }] });
     await page.go(`${base}/#/you`);
     assert.ok(await page.until(`Boolean(document.querySelector('.canvases .old-views'))`));
     // On Home, and in the switcher's panel, its scope All.

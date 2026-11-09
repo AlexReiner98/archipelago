@@ -8,7 +8,15 @@ import { checkDeclared } from '../src/declared.ts';
 import { said, filled, globNames } from '../src/instructions.ts';
 import { hookSessionStart } from '../src/session-hook.ts';
 import { VIEWS } from '../src/views.ts';
-import { fresh, laneSetup, make } from './map.ts';
+import { Registry, type PackFile } from '../src/packs.ts';
+import { fresh, freshWith, make, packsWith } from './map.ts';
+
+// A place a session is found in by its folder, a pack's as a repository is, and a guide the pack says only when asked.
+const CHECKOUT = {
+  id: 'checkouts', version: '1', title: 'Checkouts', requires: ['core'],
+  types: [{ id: 'checkout', extends: 'place', title: 'Checkout', description: 'A folder work is done in.', capabilities: { where: { folder: 'path' } }, fields: { path: { type: 'string' } } }],
+  styles: [{ id: 'checkouts.guide', type: 'instruction', title: 'Drawing a checkout', body: 'Draw a checkout as a folder.', props: { for: ['guide:checkout_code'] } }],
+} as PackFile;
 
 const presets = [
   { id: 'core.one', type: 'instruction', title: 'One', body: 'Say one.', props: { for: ['session_start'], order: 10 } },
@@ -53,16 +61,16 @@ test('an instruction preset is checked as a style preset is: its words in body, 
   assert.ok(bad.some((p) => /lens "core.z": a canvas's props are a flat lens/.test(p)), bad.join('\n'));
   // A view of one item is on the types it is of and says where the item goes; a view of the map says neither.
   types.set('lens', l.registry.type('lens')!);
-  types.set('project', l.registry.type('project')!);
+  types.set('aim', l.registry.type('aim')!);
   const of = (style: Record<string, unknown>) => checkDeclared(pack([{ id: 'core.v', type: 'lens', title: 'V', ...style }]), types, [], false).filter((p) => /a view of one item/.test(p));
   assert.equal(of({ props: { filter: { find: ['in {here}'] } } }).length, 1, 'an item with no type to be of');
-  assert.equal(of({ on: ['project'], props: { filter: { find: ['type task'] } } }).length, 1, 'a type with no item in it');
-  assert.deepEqual(of({ on: ['project'], props: { filter: { find: ['in {here}'] } } }), []);
+  assert.equal(of({ on: ['aim'], props: { filter: { find: ['type task'] } } }).length, 1, 'a type with no item in it');
+  assert.deepEqual(of({ on: ['aim'], props: { filter: { find: ['in {here}'] } } }), []);
 });
 
 test('the session-start text is read from the instructions on the map', async () => {
-  const l = await fresh();
-  await laneSetup(l);
+  const l = await freshWith(new Registry(packsWith(CHECKOUT), ['core', 'checkouts']));
+  await make(l, [{ op: 'create', type: 'checkout', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } }]);
   const text = await hookSessionStart(l, { session_id: 'i1', cwd: 'C:\\code\\Apex' });
   const run = /as run (e_\w+)/.exec(text)?.[1];
   assert.match(text, /give it one: how many tokens/);
@@ -81,15 +89,13 @@ test('the session-start text is read from the instructions on the map', async ()
   const far = await hookSessionStart(l, { session_id: 'i2', cwd: 'C:\\elsewhere' });
   assert.match(far, /how many tokens/, 'elsewhere the preset is said');
   const view = (await VIEWS.instructions.run(l, { about: repo })) as { said: { id: string; preset?: string }[] };
-  assert.deepEqual(view.said.map((s) => s.preset), ['software.where_it_stands', 'core.estimate', 'core.report_in', 'core.draw_answers', 'software.build_first', 'software.drawing_on_map', 'code.tending', 'outreach.prose', 'code.commits', 'science.hours', 'design.tending', 'work.hub_at', 'software.traps']);
-  assert.equal(view.said[1].id, made.v);
-  assert.match(again, /Before your first edit to a file, lay the build out on the map/, 'the software pack says to agree a build first');
-  // A guide is said only when asked for, and the drawing instruction names where.
-  assert.match(again, /params for guide:style_code/);
-  const guide = (await VIEWS.instructions.run(l, { for: 'guide:style_code' })) as { said: { preset?: string; text: string }[] };
-  assert.deepEqual(guide.said.map((s) => s.preset), ['software.style_code']);
-  assert.match(guide.said[0].text, /export default function draw\(\{ canvas, answer, style/);
-  assert.doesNotMatch(again, /export default function draw/);
+  assert.deepEqual(view.said.map((s) => s.preset), ['core.estimate', 'core.report_in', 'core.draw_answers']);
+  assert.equal(view.said[0].id, made.v);
+  // A guide is said only when asked for.
+  const guide = (await VIEWS.instructions.run(l, { for: 'guide:checkout_code' })) as { said: { preset?: string; text: string }[] };
+  assert.deepEqual(guide.said.map((s) => s.preset), ['checkouts.guide']);
+  assert.match(guide.said[0].text, /Draw a checkout as a folder/);
+  assert.doesNotMatch(again, /Draw a checkout as a folder/);
 });
 
 test('each working rule is said once: in the rules file a project is handed, from its preset, and nowhere else', async () => {

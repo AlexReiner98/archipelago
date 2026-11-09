@@ -29,13 +29,13 @@ test('a {ref} in props is the id of what the change makes, at any depth', async 
   const done = await l.change(human, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'p', type: 'project', title: 'Garden' },
+      { op: 'create', ref: 'p', type: 'aim', title: 'Garden' },
       { op: 'create', ref: 'v', type: 'lens', title: 'The garden', props: { filter: { find: ['in {p}', 'id {p}'] }, walk: { over: [], steps: 0 } } },
     ],
   }) as { created: Record<string, string> };
   const lens = (await l.entity(done.created.v))!;
   assert.deepEqual((lens.props.filter as { find: string[] }).find, [`in ${done.created.p}`, `id ${done.created.p}`]);
-  const later = await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'q', type: 'project', title: 'Orchard' }, { op: 'update', id: lens.id, props: { filter: { find: ['in {q}', '{nobody}'] } } }] }) as { created: Record<string, string> };
+  const later = await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'q', type: 'aim', title: 'Orchard' }, { op: 'update', id: lens.id, props: { filter: { find: ['in {q}', '{nobody}'] } } }] }) as { created: Record<string, string> };
   assert.deepEqual(((await l.entity(lens.id))!.props.filter as { find: string[] }).find, [`in ${later.created.q}`, '{nobody}'], 'a brace that names no ref is left alone');
 });
 

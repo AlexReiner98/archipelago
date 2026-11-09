@@ -500,9 +500,7 @@ it.
 ## GitHub: an agent reads each push
 
 The server hears nothing from GitHub: the GitHub pack, the GitHub App and the
-server's push reader went in Nov 2026. A commit is accounted for when a session
-records it on the map, a commit item with its sha linked `settles` to what it
-finished, in the same change that closes it. An agent in the repository reads
+server's push reader went in Nov 2026. An agent in the repository reads
 the pushes it did not make.
 
 A call the server makes to an address someone gave it (a connection checked,

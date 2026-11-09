@@ -52,7 +52,7 @@ test("a token limited to some work may call a pack's action on that work only", 
   const made = (await l.change(human, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'r', type: 'repo', title: 'Repo' },
+      { op: 'create', ref: 'r', type: 'place', title: 'Yard' },
       { op: 'create', ref: 't', type: 'task', title: 'Survey' },
       { op: 'create', ref: 'in', type: 'task', title: 'Survey here' },
       { op: 'link', type: 'lives_in', from: 'in', to: 'r' },
@@ -76,18 +76,14 @@ test('a declared action with no handler, or of no verb, stops its pack from load
 
 test('screens are declared in pack files, checked when the pack loads, and listed in the schema', async () => {
   const l = await map();
-  type Described = { screens: { id: string; pack: string; on: string[]; pieces: { piece: string }[] }[]; canvases: { id: string; pack: string; on?: string[]; props: { filter: { find: string[] } } }[]; pack_tools: { tool: string; on?: string[]; item?: string; input?: unknown }[]; types: { id: string; public?: boolean }[] };
+  type Described = { screens: { id: string; pack: string; on: string[]; pieces: { piece: string }[] }[]; canvases: { id: string; pack: string; on?: string[]; props: { filter: { find: string[] } } }[]; pack_tools: { tool: string; on?: string[]; item?: string; input?: unknown }[]; types: { id: string; pack: string; public?: boolean }[] };
   const schema = l.registry.describe() as unknown as Described;
-  // What a pack shows of one item is a view of it, not a screen: a lens preset on its type, the item where it says {here}.
-  const roadmap = schema.canvases.find((c) => c.id === 'software.roadmap')!;
-  assert.deepEqual([roadmap.pack, roadmap.on, roadmap.props.filter.find], ['software', ['project'], ['in {here}']]);
-  assert.ok(!schema.screens.some((s) => ['software.roadmap', 'software.gate', 'software.proof', 'software.usage', 'software.releases', 'time.today', 'time.invoices', 'science.undermined'].includes(s.id)), 'the screens their views replace are gone');
   // What a page needs to draw a pack action's form: what it is on and its input.
   const plan = schema.pack_tools.find((t) => t.tool === 'demo_plan_visit')!;
   assert.deepEqual(plan.on, ['work']);
   assert.ok(plan.input, 'the form is drawn from its input');
-  // What can be made public is said by the types themselves, and a flavour inherits it.
-  assert.deepEqual(schema.types.filter((t) => t.public).map((t) => t.id).sort(), ['document', 'feature', 'investigation', 'project', 'proof', 'release', 'shared_document', 'test', 'test_result']);
+  // What can be made public is said by the types themselves.
+  assert.deepEqual(schema.types.filter((t) => t.public && t.pack === 'core').map((t) => t.id).sort(), ['shared_document']);
 
   const dir = packs();
   const bad = (screens: unknown[]) => {

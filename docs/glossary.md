@@ -186,23 +186,15 @@ description). In the code: core's `instruction` type, `src/instructions.ts`,
 stops: how many times it read and surveyed the map, showed the owner
 something, changed the map, edited a file, committed and pushed, as its
 session's hook counts them from the transcript. A rule with `on:
-"reply_ended"` reads those (and one fact of the map, which of the reply's
-commits are unaccounted for) and asks the agent, once a turn, to go on
+"reply_ended"` reads those and asks the agent, once a turn, to go on
 before it stops; it never decides a change. The owner turns one off with
 its switch on the Workspace page's Checks card. In the code:
-`src/reply-rules.ts`, `src/replies.ts`, `src/commits.ts`.
+`src/reply-rules.ts`, `src/replies.ts`.
 
 **run trailer.** The line `Archipelago-Run: <run>` at the end of a commit a
 session makes, naming the run it is registered as, so the commit can be
 traced to its session. Added by the commit-msg hook the setup installs. In
 the code: `scripts/pelago-setup.mjs`.
-
-**accounted for.** A commit is accounted for once the map holds a commit item
-for its full sha, with a settles link to each item it settles, or none. A
-session is asked to account for its own commits before its reply and its run
-end. A commit item with `accounted` false is the owner's attention (reason
-`unaccounted`) until someone sets it true with its links. In the code:
-`commit` and `settles` (`packs/software/pack.json`).
 
 ## Retired words
 

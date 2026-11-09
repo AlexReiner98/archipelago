@@ -6,7 +6,6 @@ import { placeFor } from './places.ts';
 import { askView, canAsk } from './askview.ts';
 import { heldResources } from './blocking.ts';
 import { toConfirm } from './confirm.ts';
-import { sentCommits, unaccountedText } from './unaccounted.ts';
 import { STALE_DAYS } from './attention.ts';
 import { instructionsFor } from './instructions.ts';
 import type { Archipelago, Entity } from './pelago.ts';
@@ -74,8 +73,6 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
       ...judged.map((q) => `- ${q.title}: ${q.answer} (${q.id})`),
       ...(ask.on_agents_judgment > judged.length ? [`- and ${ask.on_agents_judgment - judged.length} more: query "attention" with person "me" and reasons ["to_confirm"].`] : []),
     );
-  // The commits in this checkout that no one has accounted for are put to the session as unconfirmed answers are.
-  if (repo) lines.push(...((u) => (u.length ? ['', ...u] : []))(await unaccountedText(l, sentCommits(input.commits), repo.id)));
   const [heldNow, { rows: holdable }] = await Promise.all([heldResources(l), l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null and (props ?| $2::text[] or $3) -- index entity_type`, holdableBy(l))]);
   for (const res of holdable.filter((one) => (l.registry.capacity(one) ?? Infinity) !== Infinity)) {
     const held = heldNow.find((h) => h.resource === res.id);

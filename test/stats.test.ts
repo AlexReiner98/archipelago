@@ -17,10 +17,10 @@ after(() => folders.forEach((dir) => rmSync(dir, { recursive: true, force: true 
 const analysed = async (db: Q, table: string) => (await db.query<{ n: number }>(`select reltuples::int as n from pg_class where relname = $1`, [table])).rows[0].n;
 const columns = async (db: Q, table: string) => (await db.query<{ n: number }>(`select count(*)::int as n from pg_stats where schemaname = 'public' and tablename = $1`, [table])).rows[0].n;
 
-/** A map of a project with 80 tasks in it. */
+/** A map of a task with 80 tasks in it. */
 async function filled() {
   const l = await fresh();
-  const ops = [{ op: 'create', ref: 'p', type: 'project', title: 'Project' }, ...Array.from({ length: 80 }, (_, i) => [{ op: 'create', ref: `t${i}`, type: 'task', title: `Task ${i}` }, { op: 'link', type: 'part_of', from: `t${i}`, to: 'p' }]).flat()];
+  const ops = [{ op: 'create', ref: 'p', type: 'task', title: 'Hub' }, ...Array.from({ length: 80 }, (_, i) => [{ op: 'create', ref: `t${i}`, type: 'task', title: `Task ${i}` }, { op: 'link', type: 'part_of', from: `t${i}`, to: 'p' }]).flat()];
   await l.change(human, { reason: 'a map to measure', ops: ops as any });
   return l;
 }

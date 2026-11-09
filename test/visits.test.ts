@@ -3,11 +3,15 @@
 
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { opEntries } from '../src/streams.ts';
 import { countVisit, dayOf, flushVisits, heldVisits, isVisit, keepVisits, visitsSince } from '../src/visits.ts';
 import { fresh } from './map.ts';
 import { serve } from './serve.ts';
+
+/** A pack with a document the kernel can publish: core keeps none of its own (test/fixtures/packs/pages). */
+const PAGES = [join(import.meta.dirname, 'fixtures', 'packs')];
 
 const BROWSER = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
 
@@ -31,8 +35,8 @@ function visit(base: string, path: string, headers: Record<string, string>, meth
 }
 
 test('a page read with a tag is counted once, under its tag; its data, figures, a bot and a prefetch are not', async () => {
-  const { call, base } = await serve('off', undefined, { 'visits.test': 'default' });
-  const { home } = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'home', type: 'document', title: 'Welcome', visibility: 'shared', props: { path: 'home' }, body: 'The front page.' }] })).result.created;
+  const { call, base } = await serve('off', undefined, { 'visits.test': 'default' }, PAGES);
+  const { home } = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'home', type: 'page', title: 'Welcome', visibility: 'shared', props: { path: 'home' }, body: 'The front page.' }] })).result.created;
   assert.equal((await call('/api/publish', undefined, { id: home })).status, 200);
   const today = dayOf();
   const count = (tag: string) => heldVisits('default').find((r) => r.tag === tag && r.day === today)?.n ?? 0;

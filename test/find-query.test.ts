@@ -18,7 +18,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'site', type: 'project', title: 'Site works' },
+      { op: 'create', ref: 'site', type: 'aim', title: 'Site works' },
       { op: 'create', ref: 'roof', type: 'task', title: 'Roof the shed' },
       { op: 'create', ref: 'walls', type: 'task', title: 'Walls', body: 'Up before the roof goes on.' },
       { op: 'create', ref: 'gutter', type: 'task', title: 'Gutters' },
@@ -31,7 +31,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       { op: 'link', type: 'depends_on', from: 'gutter', to: 'roof' },
     ],
   })).result.created as Record<string, string>;
-  const page = await open(`${base}/#/v?find=id+${made.other}&over=part_of,depends_on&steps=1`);
+  const page = await open(`${base}/#/v?find=id+${made.other}&over=part_of,depends_on&steps=1&shape=flow`);
   const drawn = `[...document.querySelectorAll('#canvas svg a')].map((a) => a.textContent)`;
   const has = (title: string) => `${drawn}.some((t) => t.includes(${JSON.stringify(title)}))`;
   // Typed as a person does: find opened by a click on its line, then the words.

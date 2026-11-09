@@ -2,11 +2,15 @@
 // caller across its /64, signing in has a budget of its own, a token nobody made opens no workspace, and a published
 // page's live streams are capped by address and by document.
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { counted, limiter } from '../src/limit.ts';
 import { listen as listenTo, LIVE_EACH } from '../src/published-live.ts';
 import { serve } from './serve.ts';
 import { until } from './wait.ts';
+
+/** A pack with a document the kernel can publish: core keeps none of its own (test/fixtures/packs/pages). */
+const PAGES = [join(import.meta.dirname, 'fixtures', 'packs')];
 
 test('an IPv6 address is counted by its /64, written any way', () => {
   assert.equal(counted('2001:db8:1:2::1'), counted('2001:0db8:0001:0002:ffff:eeee:dddd:cccc'));
@@ -45,8 +49,8 @@ test('a token nobody made is refused before its workspace is opened', async () =
 });
 
 test('a published page’s live streams are capped from one address', async () => {
-  const { call, base } = await serve('off');
-  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'document', title: 'Live', visibility: 'shared', body: 'Words.' }] })).result.created.d;
+  const { call, base } = await serve('off', undefined, undefined, PAGES);
+  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'page', title: 'Live', visibility: 'shared', body: 'Words.' }] })).result.created.d;
   await call('/api/publish', undefined, { id: made });
   const streams: AbortController[] = [];
   // Each answer is held, not only its status: fetch closes a stream nobody holds once it is collected, and the

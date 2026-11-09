@@ -4,7 +4,7 @@
 // recorded, a backup taken.
 
 import { z } from 'zod';
-import { askView } from './askview.ts';
+import { askView, canAsk } from './askview.ts';
 import { importAudit } from './audit.ts';
 import { instructionsFor } from './instructions.ts';
 import { takeLook } from './looks.ts';
@@ -250,6 +250,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
       summary: z.string().optional().describe('What was checked and what was found.'),
     },
     run: async (l, actor, input) => {
+      // The re-check is a pack's to say (the recheck view): with no pack here that declares it, there is none.
+      if (!canAsk(l, 'recheck')) throw new Error('No pack here keeps scheduled re-checks: rechecked needs one that declares the recheck view.');
       const projects = ((await askView(l, actor, 'recheck', { repo: input.repo, limit: 0 })) as { projects: { id: string; title: string; waited: boolean }[] }).projects.filter((p) => p.waited);
       const at = new Date().toISOString();
       for (const p of projects) {

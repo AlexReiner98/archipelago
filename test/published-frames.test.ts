@@ -7,7 +7,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
-import { serve } from './serve.ts';
+import { packsWith } from './map.ts';
+import { serve as served } from './serve.ts';
+
+/** A server with the packs and a test pack whose writing is public and read as a document (test/packs/reader). */
+const serve = (auth: 'off') => served(auth, undefined, undefined, packsWith('reader'));
 
 /** A document whose picture is a system drawn as architecture, played in two steps. */
 async function published(call: (path: string, token?: string, body?: unknown) => Promise<any>, extra: unknown[] = []) {
@@ -15,16 +19,16 @@ async function published(call: (path: string, token?: string, body?: unknown) =>
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'd', type: 'document', title: 'The system', visibility: 'shared', body: 'What it is: </script><script>alert(1)</script> $& $\'.\n\n{l}' },
-        { op: 'create', ref: 'p', type: 'project', title: 'A system', visibility: 'shared' },
-        { op: 'create', ref: 'e', type: 'environment', title: 'A server', status: 'up', visibility: 'shared' },
-        { op: 'create', ref: 'a', type: 'component', title: 'Doors', status: 'up', visibility: 'shared' },
-        { op: 'create', ref: 'b', type: 'component', title: 'Store', status: 'up', visibility: 'shared', props: { role: 'data' } },
+        { op: 'create', ref: 'd', type: 'writing', title: 'The system', visibility: 'shared', body: 'What it is: </script><script>alert(1)</script> $& $\'.\n\n{l}' },
+        { op: 'create', ref: 'p', type: 'aim', title: 'A system', visibility: 'shared' },
+        { op: 'create', ref: 'e', type: 'place', title: 'A server', status: 'available', visibility: 'shared' },
+        { op: 'create', ref: 'a', type: 'place', title: 'Doors', status: 'available', visibility: 'shared' },
+        { op: 'create', ref: 'b', type: 'place', title: 'Store', status: 'available', visibility: 'shared' },
         { op: 'link', type: 'part_of', from: 'e', to: 'p' },
         { op: 'link', type: 'part_of', from: 'a', to: 'e' },
         { op: 'link', type: 'part_of', from: 'b', to: 'e' },
-        { op: 'link', type: 'calls', from: 'a', to: 'b' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', visibility: 'shared', props: { filter: { find: ['type project', 'type environment', 'type component'] }, style: { shape: 'architecture' } } },
+        { op: 'link', type: 'uses', from: 'a', to: 'b' },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', visibility: 'shared', props: { filter: { find: ['type aim', 'type place'] }, style: { shape: 'architecture' } } },
         { op: 'link', type: 'about', from: 'l', to: 'p' },
         { op: 'link', type: 'part_of', from: 'l', to: 'd' },
         ...extra,

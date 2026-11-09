@@ -9,7 +9,7 @@ import { contrast, finishTheme, mergeTheme, mix, search } from '../src/colours.t
 const pack = (id: string) => JSON.parse(readFileSync(`packs/${id}/pack.json`, 'utf8'));
 const styleOf = (id: string, style: string) => pack(id).styles.find((s: { id: string }) => s.id === style).props;
 const house = styleOf('core', 'core.house').theme;
-const added = [styleOf('work', 'work.reader_colours').theme, styleOf('software', 'software.public_colours').theme];
+const added = [styleOf('software', 'software.public_colours').theme];
 const themes = pack('themes').styles as { id: string; title: string; over: string; props: { theme: unknown } }[];
 
 /** The colours a page is painted in with this theme chosen: the house's, the packs' own, the theme's, merged as the resolver merges them. */

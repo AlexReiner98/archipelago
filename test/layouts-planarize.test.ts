@@ -23,14 +23,14 @@ const graph = async (items: any[], links: any[]) => (await mod('model.js')).mode
 
 test('wires: one per pair, opposed links as one headless tie', async () => {
   const { joined } = await mod('direct.js');
-  const m = await graph(['a', 'b', 'c'].map((id) => item(id)), [link('about', 'a', 'b'), link('about', 'b', 'a'), link('depends_on', 'c', 'a'), link('calls', 'a', 'c')]);
+  const m = await graph(['a', 'b', 'c'].map((id) => item(id)), [link('about', 'a', 'b'), link('about', 'b', 'a'), link('depends_on', 'c', 'a'), link('uses', 'a', 'c')]);
   const wires = joined(m, house.headless);
   assert.equal(wires.length, 2);
   const ab = wires.find((w: any) => [w.u, w.v].sort().join() === 'a,b');
   assert.equal(ab.directed, false, 'A about B and B about A tie with no way');
   const ac = wires.find((w: any) => [w.u, w.v].sort().join() === 'a,c');
   assert.equal(ac.directed, true, 'two links the same way stay one wire with that way');
-  assert.deepEqual(ac.types.sort(), ['calls', 'depends_on']);
+  assert.deepEqual(ac.types.sort(), ['depends_on', 'uses']);
 });
 
 test('rings: the fewest wires are turned, the same each run', async () => {
@@ -50,7 +50,7 @@ test('trunks: one type and one way only, crossing a shore once', async () => {
   const wire = (id: string, v: string, type = 'about', turned = false) => ({ id, u: 'hub', v, top: 'hub', foot: v, types: [type], directed: true, turned, links: [] });
   const made = (id: string) => id.length;
   const islandOf = (id: string) => (id.startsWith('x') ? 'far' : 'home');
-  const { wires, junctions, trunks } = withTrunks([wire('1', 'a'), wire('2', 'b'), wire('3', 'xa'), wire('4', 'xb'), wire('5', 'c', 'calls'), wire('6', 'd', 'about', true)], made, islandOf);
+  const { wires, junctions, trunks } = withTrunks([wire('1', 'a'), wire('2', 'b'), wire('3', 'xa'), wire('4', 'xb'), wire('5', 'c', 'uses'), wire('6', 'd', 'about', true)], made, islandOf);
   assert.equal(trunks, 1, 'the link of another type and the turned one share no trunk');
   assert.ok(wires.some((w: any) => w.id === '5') && wires.some((w: any) => w.id === '6'));
   const far = junctions.find((j: any) => j.island === 'far');
@@ -63,7 +63,7 @@ test('embedding: islands closed, each wire across one crosses each border once, 
   const { visibility } = await mod('plain.js');
   const items = [...['a1', 'a2', 'a3', 'a4'].map((id) => item(id, 'A')), ...['b1', 'b2', 'b3'].map((id) => item(id, 'B')), item('s')];
   const links = [link('depends_on', 'a2', 'a1'), link('depends_on', 'a3', 'a2'), link('depends_on', 'a4', 'a1'), link('depends_on', 'b2', 'b1'), link('depends_on', 'b3', 'b2'),
-    link('depends_on', 'b1', 'a3'), link('about', 'a4', 'b3'), link('about', 's', 'a2'), link('calls', 'b2', 's'), link('about', 'a1', 'b1')];
+    link('depends_on', 'b1', 'a3'), link('about', 'a4', 'b3'), link('about', 's', 'a2'), link('uses', 'b2', 's'), link('about', 'a1', 'b1')];
   const m = await graph(items, links);
   const e = embedding(m, { sizes: house.sizes, headless: house.headless, islandOf: (id: string) => m.nodes.get(id)?.item?.island ?? null });
   assert.equal(e.counts.up, 0, 'no wire runs against its way');
@@ -102,7 +102,7 @@ test('format: the embedding as step 2 takes it, faces and rotation agreeing, bor
   const { visibility } = await mod('plain.js');
   const items = [...['a1', 'a2', 'a3'].map((id) => item(id, 'A')), ...['b1', 'b2'].map((id) => item(id, 'B')), item('s')];
   const links = [link('depends_on', 'a2', 'a1'), link('depends_on', 'a3', 'a1'), link('depends_on', 'b2', 'b1'), link('depends_on', 'b1', 'a2'),
-    link('about', 'a3', 'b2'), link('about', 's', 'a1'), link('calls', 'b1', 's'), link('depends_on', 'b2', 'a3')];
+    link('about', 'a3', 'b2'), link('about', 's', 'a1'), link('uses', 'b1', 's'), link('depends_on', 'b2', 'a3')];
   const m = await graph(items, links), e = embedding(m, { sizes: house.sizes, headless: house.headless, islandOf: (id: string) => m.nodes.get(id)?.item?.island ?? null });
   const g = asInput(e, m), edge = new Map<string, any>(g.edges.map((x: any) => [x.id, x]));
   const kinds = new Set(g.nodes.map((n: any) => n.kind));
@@ -131,7 +131,7 @@ test('format: a border runs clockwise with its island on the right, with ports o
   const { asInput } = await mod('format.js');
   const cases = [
     { items: ['a', 'b', 'c'].map((id) => item(id, 'A')), links: [link('depends_on', 'b', 'a'), link('depends_on', 'c', 'a')] },
-    { items: [...['a', 'b'].map((id) => item(id, 'A')), item('s')], links: [link('depends_on', 'b', 'a'), link('about', 's', 'b'), link('calls', 'a', 's')] },
+    { items: [...['a', 'b'].map((id) => item(id, 'A')), item('s')], links: [link('depends_on', 'b', 'a'), link('about', 's', 'b'), link('uses', 'a', 's')] },
   ];
   for (const { items, links } of cases) {
     const m = await graph(items, links), e = embedding(m, { sizes: house.sizes, headless: house.headless, islandOf: (id: string) => m.nodes.get(id)?.item?.island ?? null });

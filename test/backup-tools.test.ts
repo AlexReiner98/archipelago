@@ -16,16 +16,19 @@ import { hostFor } from '../src/packtools.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { callTool } from '../src/tools.ts';
+import { packsWith } from './map.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner', admin: true };
 const member: Actor = { kind: 'human', name: 'member' };
 const agent: Actor = { kind: 'agent', name: 'test' };
 
+// The repository's packs and a test pack whose writing can be given as a link (test/packs/reader).
+const PACKS = packsWith('reader');
 const registries: Registry[] = [];
 after(() => registries.forEach((r) => hostFor(r).stop()));
 
 async function map() {
-  const reg = new Registry(join(import.meta.dirname, '..', 'packs'));
+  const reg = new Registry(PACKS);
   registries.push(reg);
   return new Archipelago(await openDb(), reg);
 }
@@ -82,9 +85,9 @@ test("an agent's own view of the map reads whether the owner allows it a backup"
   const made = (await callTool(whole.as('e_agentx'), agent, 'backup_download', {})) as Made;
   assert.ok(await fetched(whole, made), 'a member reads the setting, as an agent token does');
 });
-test('a link given to a document is in the backup, and works again where the backup is restored', async () => {
+test('a link given to a writing is in the backup, and works again where the backup is restored', async () => {
   const l = await map();
-  const made = await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'document', title: 'Shared plan' }] });
+  const made = await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'writing', title: 'Shared plan' }] });
   const doc = Object.values((made as { created: Record<string, string> }).created)[0];
   await createShare(l, owner, doc);
   const file = (await fetched(l, (await callTool(l, owner, 'backup_download', {})) as Made))!;

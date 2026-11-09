@@ -15,8 +15,8 @@ import { serve } from './serve.ts';
 test('the tail says what the changes since a look did to what is shown: what changed and the link made to it', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'P' },
-    { op: 'create', ref: 'q', type: 'project', title: 'Q' },
+    { op: 'create', ref: 'p', type: 'task', title: 'P' },
+    { op: 'create', ref: 'q', type: 'task', title: 'Q' },
   ]);
   const tail = (input: Record<string, unknown>) => callTool(l, human, 'tail', input) as Promise<any>;
   const { pos, seq } = await tail({});
@@ -46,10 +46,10 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
     return res.result.created as Record<string, string>;
   };
   const made = await change('agent:setup', [
-    { op: 'create', ref: 'p', type: 'project', title: 'Read here', body: 'What it is.\n\nA part of it\nFolded until it is asked for.' },
+    { op: 'create', ref: 'p', type: 'task', title: 'Read here', body: 'What it is.\n\nA part of it\nFolded until it is asked for.' },
     { op: 'create', ref: 't', type: 'task', title: 'On the page' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
-    { op: 'create', ref: 'q', type: 'project', title: 'Elsewhere' },
+    { op: 'create', ref: 'q', type: 'task', title: 'Elsewhere' },
     { op: 'create', ref: 'u', type: 'task', title: 'Away' },
     { op: 'link', type: 'part_of', from: 'u', to: 'q' },
   ]);
@@ -90,14 +90,14 @@ test("in a browser, an agent's change reaches a view of the store with no lens r
     return res.result.created as Record<string, string>;
   };
   const made = await change([
-    { op: 'create', ref: 'p', type: 'project', title: 'Canvas' },
+    { op: 'create', ref: 'p', type: 'task', title: 'Canvas' },
     { op: 'create', ref: 'a', type: 'task', title: 'Flat lens' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
   ]);
   const page = await open(`${base}/#/e/${made.p}`);
   try {
     assert.ok(await page.until(`document.querySelector('.part[data-part="item"] h1')?.textContent === 'Canvas'`), 'the page is drawn');
-    // The page's own modules, as it loaded them: a store from live.js, holding the flat lens around the project.
+    // The page's own modules, as it loaded them: a store from live.js, holding the flat lens around the hub.
     await page.evaluate(`(async () => {
       const at = (name) => document.querySelector('link[rel="modulepreload"][href^="/' + name + '.js"]').getAttribute('href');
       const [{ api }, live] = await Promise.all([import(at('base')), import(at('live'))]);

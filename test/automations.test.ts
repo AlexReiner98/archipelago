@@ -69,7 +69,7 @@ test('automations fire on a schedule and on events, are logged, and cannot trigg
   const made = await make(l, [
     { op: 'create', ref: 'hourly', type: 'automation', title: 'Check connections', status: 'enabled', props: { trigger: 'every', every_minutes: 60, action: 'tool', tool: 'check_connections' } },
     { op: 'create', ref: 'morning', type: 'automation', title: 'Morning nudge', status: 'enabled', props: { trigger: 'daily', at: '09:00', action: 'notify', message: 'Review the map' } },
-    { op: 'create', ref: 'review', type: 'automation', title: 'New bug', status: 'enabled', props: { trigger: 'event', on_action: 'entity.create', action: 'notify', message: 'Made by {actor}: {reason}', level: 'warning' } },
+    { op: 'create', ref: 'review', type: 'automation', title: 'New item', status: 'enabled', props: { trigger: 'event', on_action: 'entity.create', action: 'notify', message: 'Made by {actor}: {reason}', level: 'warning' } },
     { op: 'create', ref: 'any', type: 'automation', title: 'Everything', status: 'paused', props: { trigger: 'event', on_action: 'entity.*', action: 'notify' } },
   ]);
   // Nor where agents' other changes are applied as made: an automation acts later with a human's authority, so
@@ -90,7 +90,7 @@ test('automations fire on a schedule and on events, are logged, and cannot trigg
   assert.deepEqual(await fired(at(9, 30)), [], 'daily fires once a day');
   assert.deepEqual(await fired(new Date(2026, 9, 8, 9, 0)), [made.hourly, made.morning].sort());
 
-  await l.change(human, { reason: 'Found a bug', ops: [{ op: 'create', type: 'bug', title: 'Crash' }] });
+  await l.change(human, { reason: 'Found a bug', ops: [{ op: 'create', type: 'task', title: 'Crash' }] });
   assert.deepEqual(await fired(new Date(2026, 9, 8, 9, 5)), [made.review]);
   const unread = (await VIEWS.notifications.run(l, {})) as any[];
   assert.ok(unread.some((n) => n.title === 'Made by human:test: Found a bug' && n.level === 'warning'));
@@ -171,7 +171,7 @@ test('get gives an agent a large field cut to its first lines and its size, and 
 
 test('a query gives an agent each row without what its type and status say, and a shorter note', async () => {
   const l = await fresh();
-  const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'project', title: 'Roof' }, { op: 'create', ref: 't', type: 'task', title: 'Tiles', body: 'Lay them. '.repeat(40) }, { op: 'link', type: 'part_of', from: 't', to: 'p' }]);
+  const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'task', title: 'Roof' }, { op: 'create', ref: 't', type: 'task', title: 'Tiles', body: 'Lay them. '.repeat(40) }, { op: 'link', type: 'part_of', from: 't', to: 'p' }]);
   const rows = async (who: typeof agent, full?: boolean) => ((await callTool(l, who, 'view', { name: 'flat', params: { filter: { find: [`in ${p}`] }, ...(full && { full }) } })) as any).items as any[];
   const [row] = await rows(agent);
   assert.deepEqual([row.title, row.kind, row.open, row.created_at, row.terms, row.status], ['Tiles', undefined, undefined, undefined, undefined, 'todo']);
@@ -182,25 +182,25 @@ test('a refused change is kept and corrected by its one wrong op; history says a
   const l = await fresh();
   const ops = [
     { op: 'create', ref: 'a', type: 'task', title: 'Draw the plan' },
-    { op: 'create', ref: 'b', type: 'task', title: 'The plan is drawn twice', props: { method: 'Open it twice' } },
+    { op: 'create', ref: 'b', type: 'question', title: 'Draw it twice?', props: { outcome: 'Open it twice' } },
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
   ];
   // The refusal names the flavour that has the field, and the name the change is kept under.
   const said = await callTool(l, agent, 'change', { ops, reason: 'A plan to draw' }).then(
-    () => assert.fail('an issue has no repro'),
+    () => assert.fail('a question has no outcome'),
     (e: Error) => e.message,
   );
-  assert.match(said, /op 2 \(create\): task has no field "method".*experiment, a flavour of task, has it/);
+  assert.match(said, /op 2 \(create\): question has no field "outcome".*decision, a flavour of question, has it/);
   const name = /kept for 10 minutes as "(k_\w+)"/.exec(said)![1];
   // A fix that is wrong again is refused again, under the same name.
   await assert.rejects(callTool(l, agent, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], title: 'x'.repeat(61) } }] }), new RegExp(`the title is 61 characters[^]*as "${name}"`));
   await assert.rejects(callTool(l, agent, 'change', { retry: name, fixes: [{ at: 9, op: null }] }), /no op 9/);
   // The name finds it, whatever the session calls itself this time.
-  const sent = (await callTool(l, { ...agent, name: 'test/claude-code:elsewhere' }, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], type: 'experiment' } }] })) as any;
+  const sent = (await callTool(l, { ...agent, name: 'test/claude-code:elsewhere' }, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], type: 'decision' } }] })) as any;
   assert.equal(sent.status, 'proposed');
   const held = (await l.proposals()).at(-1)!;
   assert.equal(held.reason, 'A plan to draw');
-  assert.deepEqual(held.ops.map((o: any) => o.type), ['task', 'experiment', 'depends_on']);
+  assert.deepEqual(held.ops.map((o: any) => o.type), ['task', 'decision', 'depends_on']);
   // Once it has gone through it is no longer kept; nor is it anyone else's to send.
   await assert.rejects(callTool(l, agent, 'change', { retry: name }), /No refused change is kept/);
   await assert.rejects(callTool(l, agent, 'change', { reason: 'nothing' }), /needs ops/);
@@ -226,7 +226,7 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
   const { undo } = await import('../src/undo.ts');
   const l = await fresh();
   const base = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'p', type: 'aim', title: 'Proj' },
     { op: 'create', ref: 'old', type: 'task', title: 'Old task', body: 'x'.repeat(500), props: { priority: 'low' } },
     { op: 'link', type: 'part_of', from: 'old', to: 'p' },
   ]);
@@ -253,7 +253,7 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
   assert.deepEqual(result.skipped, ['"Old task": priority has changed again since, so it was left as it is']);
   const old = (await l.entity(base.old))!;
   assert.deepEqual([old.status, old.body.length, old.props.priority, old.props.due], ['todo', 500, 'urgent', undefined], 'long text comes back whole');
-  assert.equal((await l.entity(base.p))!.archived_at, null, 'the archived project is restored');
+  assert.equal((await l.entity(base.p))!.archived_at, null, 'the archived aim is restored');
   assert.deepEqual((await l.get(base.old)).outgoing.map((r: any) => r.title), ['Proj'], 'the removed link is back');
   assert.deepEqual((await l.search({ type: 'task' })).map((t) => t.title), ['Old task'], 'the created task is archived');
 
@@ -267,11 +267,11 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
 test('the graph view returns a preset of the whole map, or one entity\'s neighbourhood', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'p', type: 'aim', title: 'Proj' },
     { op: 'create', ref: 'a', type: 'task', title: 'A' },
-    { op: 'create', ref: 'b', type: 'experiment', title: 'B' },
+    { op: 'create', ref: 'b', type: 'decision', title: 'B' },
     { op: 'create', ref: 'c', type: 'task', title: 'C', status: 'done' },
-    { op: 'create', ref: 'lonely', type: 'note', title: 'Lonely' },
+    { op: 'create', ref: 'lonely', type: 'finding', title: 'Lonely' },
     { op: 'create', ref: 'far', type: 'task', title: 'Far' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
     { op: 'link', type: 'part_of', from: 'far', to: 'p' },
@@ -285,7 +285,7 @@ test('the graph view returns a preset of the whole map, or one entity\'s neighbo
   assert.deepEqual(blocking.edges.map((e: any) => e.type), ['depends_on']);
   const a = blocking.nodes.find((n: any) => n.title === 'A');
   assert.deepEqual([a.blocked, a.root], [true, 'task']);
-  assert.equal(blocking.nodes.find((n: any) => n.title === 'B').root, 'task', 'a flavour reports its root type');
+  assert.equal(blocking.nodes.find((n: any) => n.title === 'B').root, 'decision', 'each reports its type nearest the starter');
 
   assert.deepEqual(titles(await ask(l, 'graph', { relations: 'all', include_closed: true })), ['A', 'B', 'C', 'Far', 'Proj']);
   assert.deepEqual(titles(await ask(l, 'graph', { focus: made.far, depth: 1 })), ['Far', 'Proj']);

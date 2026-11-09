@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { serve } from './serve.ts';
+
+/** A pack with a document the kernel can publish: core keeps none of its own (test/fixtures/packs/pages). */
+const PAGES = [join(import.meta.dirname, 'fixtures', 'packs')];
 
 /** A GET as a browser at another domain sends it: the same server, a different Host. */
 function visit(base: string, path: string, host: string) {
@@ -15,15 +19,15 @@ function visit(base: string, path: string, host: string) {
 }
 
 test('a domain serves a workspace’s published pages at their address words, the front page at /', async () => {
-  const { call, base } = await serve('off', undefined, { 'site.test': 'default' });
+  const { call, base } = await serve('off', undefined, { 'site.test': 'default' }, PAGES);
   const { home, a, b, d } = (
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'home', type: 'document', title: 'Welcome', visibility: 'shared', props: { path: 'home', menu: 0 }, body: 'The front page. Read {a}, or [an aside](/aside).' },
-        { op: 'create', ref: 'a', type: 'document', title: 'How it works', visibility: 'shared', props: { path: 'how-it-works', menu: 1 }, body: 'How it works, in short. Back to {home}.' },
-        { op: 'create', ref: 'b', type: 'document', title: 'Not in the header', visibility: 'shared', props: { path: 'aside' }, body: 'An aside. Back [home](/), not [a draft](/draft).' },
-        { op: 'create', ref: 'd', type: 'document', title: 'A draft', visibility: 'shared', props: { path: 'draft' }, body: 'Not published.' },
+        { op: 'create', ref: 'home', type: 'page', title: 'Welcome', visibility: 'shared', props: { path: 'home', menu: 0 }, body: 'The front page. Read {a}, or [an aside](/aside).' },
+        { op: 'create', ref: 'a', type: 'page', title: 'How it works', visibility: 'shared', props: { path: 'how-it-works', menu: 1 }, body: 'How it works, in short. Back to {home}.' },
+        { op: 'create', ref: 'b', type: 'page', title: 'Not in the header', visibility: 'shared', props: { path: 'aside' }, body: 'An aside. Back [home](/), not [a draft](/draft).' },
+        { op: 'create', ref: 'd', type: 'page', title: 'A draft', visibility: 'shared', props: { path: 'draft' }, body: 'Not published.' },
       ],
     })
   ).result.created;
@@ -69,19 +73,19 @@ test('a domain serves a workspace’s published pages at their address words, th
 });
 
 test('everything a project holds is published with one click, an agent may only ask for it', async () => {
-  const { call, base } = await serve('off');
+  const { call, base } = await serve('off', undefined, undefined, PAGES);
   const made = (
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'P', type: 'project', title: 'The site', visibility: 'shared' },
-        { op: 'create', ref: 'S', type: 'note', title: 'A part of it', visibility: 'shared' },
-        { op: 'create', ref: 'a', type: 'document', title: 'Alpha', visibility: 'shared', props: { path: 'alpha' }, body: 'Alpha. See {b}.' },
-        { op: 'create', ref: 'b', type: 'document', title: 'Beta', visibility: 'shared', props: { path: 'beta' }, body: 'Beta. Back to {a}.' },
-        { op: 'create', ref: 'd', type: 'document', title: 'Deeper', visibility: 'shared', props: { path: 'deeper' }, body: 'Held a step down.' },
-        { op: 'create', ref: 'c', type: 'document', title: 'Withdrawn', status: 'withdrawn', visibility: 'shared', body: 'Not published.' },
-        { op: 'create', ref: 'f', type: 'document', title: 'Final', status: 'final', visibility: 'shared', props: { path: 'final' }, body: 'Finished, and still published.' },
-        { op: 'create', ref: 'x', type: 'document', title: 'Taken', visibility: 'shared', props: { path: 'alpha' }, body: 'Its path is taken.' },
+        { op: 'create', ref: 'P', type: 'task', title: 'The site', visibility: 'shared' },
+        { op: 'create', ref: 'S', type: 'plate', title: 'A part of it', visibility: 'shared' },
+        { op: 'create', ref: 'a', type: 'page', title: 'Alpha', visibility: 'shared', props: { path: 'alpha' }, body: 'Alpha. See {b}.' },
+        { op: 'create', ref: 'b', type: 'page', title: 'Beta', visibility: 'shared', props: { path: 'beta' }, body: 'Beta. Back to {a}.' },
+        { op: 'create', ref: 'd', type: 'page', title: 'Deeper', visibility: 'shared', props: { path: 'deeper' }, body: 'Held a step down.' },
+        { op: 'create', ref: 'c', type: 'page', title: 'Withdrawn', status: 'withdrawn', visibility: 'shared', body: 'Not published.' },
+        { op: 'create', ref: 'f', type: 'page', title: 'Final', status: 'final', visibility: 'shared', props: { path: 'final' }, body: 'Finished, and still published.' },
+        { op: 'create', ref: 'x', type: 'page', title: 'Taken', visibility: 'shared', props: { path: 'alpha' }, body: 'Its path is taken.' },
         { op: 'link', type: 'part_of', from: 'a', to: 'P' },
         { op: 'link', type: 'part_of', from: 'b', to: 'P' },
         { op: 'link', type: 'part_of', from: 'S', to: 'P' },
@@ -113,14 +117,14 @@ test('everything a project holds is published with one click, an agent may only 
 });
 
 test('a path must be an address word, and one published path belongs to one document', async () => {
-  const { call } = await serve('off');
+  const { call } = await serve('off', undefined, undefined, PAGES);
   const { x, y, z } = (
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'x', type: 'document', title: 'First', visibility: 'shared', props: { path: 'guide' }, body: 'One.' },
-        { op: 'create', ref: 'y', type: 'document', title: 'Second', visibility: 'shared', props: { path: 'guide' }, body: 'Two.' },
-        { op: 'create', ref: 'z', type: 'document', title: 'Third', visibility: 'shared', props: { path: 'Not A Path' }, body: 'Three.' },
+        { op: 'create', ref: 'x', type: 'page', title: 'First', visibility: 'shared', props: { path: 'guide' }, body: 'One.' },
+        { op: 'create', ref: 'y', type: 'page', title: 'Second', visibility: 'shared', props: { path: 'guide' }, body: 'Two.' },
+        { op: 'create', ref: 'z', type: 'page', title: 'Third', visibility: 'shared', props: { path: 'Not A Path' }, body: 'Three.' },
       ],
     })
   ).result.created;
@@ -131,13 +135,13 @@ test('a path must be an address word, and one published path belongs to one docu
 });
 
 test('a site’s pages each end with what its footer page says, and the sitemap leaves the footer out', async () => {
-  const { call, base } = await serve('off', undefined, { 'site.test': 'default' });
+  const { call, base } = await serve('off', undefined, { 'site.test': 'default' }, PAGES);
   const { home, foot } = (
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'home', type: 'document', title: 'Welcome', visibility: 'shared', props: { path: 'home' }, body: 'The front page.' },
-        { op: 'create', ref: 'foot', type: 'document', title: 'Footer', visibility: 'shared', props: { path: 'footer' }, body: 'Made in Canada. Questions: hello@example.com.' },
+        { op: 'create', ref: 'home', type: 'page', title: 'Welcome', visibility: 'shared', props: { path: 'home' }, body: 'The front page.' },
+        { op: 'create', ref: 'foot', type: 'page', title: 'Footer', visibility: 'shared', props: { path: 'footer' }, body: 'Made in Canada. Questions: hello@example.com.' },
       ],
     })
   ).result.created;
@@ -149,17 +153,17 @@ test('a site’s pages each end with what its footer page says, and the sitemap 
 });
 
 test('a link to a site’s page shows the figure its style names, and the page leaves that section out', async () => {
-  const { call, base } = await serve('off', undefined, { 'site.test': 'default' });
+  const { call, base } = await serve('off', undefined, { 'site.test': 'default' }, PAGES);
   const { home, hero, card, a } = (
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'home', type: 'document', title: 'Welcome', visibility: 'shared', props: { path: 'home' }, body: '{hero}\n\nThe front page.\n\n{card}' },
-        { op: 'create', ref: 'hero', type: 'note', title: 'Hero', visibility: 'shared', body: '' },
-        { op: 'create', ref: 'card', type: 'note', title: 'Share', visibility: 'shared', body: '' },
+        { op: 'create', ref: 'home', type: 'page', title: 'Welcome', visibility: 'shared', props: { path: 'home' }, body: '{hero}\n\nThe front page.\n\n{card}' },
+        { op: 'create', ref: 'hero', type: 'plate', title: 'Hero', visibility: 'shared', body: '' },
+        { op: 'create', ref: 'card', type: 'plate', title: 'Share', visibility: 'shared', body: '' },
         { op: 'link', type: 'part_of', from: 'hero', to: 'home' },
         { op: 'link', type: 'part_of', from: 'card', to: 'home' },
-        { op: 'create', ref: 'a', type: 'document', title: 'How it works', visibility: 'shared', props: { path: 'how-it-works' }, body: 'How it works.' },
+        { op: 'create', ref: 'a', type: 'page', title: 'How it works', visibility: 'shared', props: { path: 'how-it-works' }, body: 'How it works.' },
       ],
     })
   ).result.created;
@@ -182,7 +186,7 @@ test('a link to a site’s page shows the figure its style names, and the page l
 });
 
 test('the app and a site serve the style’s emblem as their icon, and every page links it', async () => {
-  const { base } = await serve('off', undefined, { 'site.test': 'default' });
+  const { base } = await serve('off', undefined, { 'site.test': 'default' }, PAGES);
   for (const [path, host] of [['/favicon.ico', 'site.test'], ['/favicon.png', new URL(base).host]]) {
     const icon = await visit(base, path, host);
     assert.equal(icon.status, 200, `${host}${path}`);
@@ -193,7 +197,7 @@ test('the app and a site serve the style’s emblem as their icon, and every pag
 });
 
 test('a style’s icon is served over its emblem', async () => {
-  const { call, base } = await serve('off');
+  const { call, base } = await serve('off', undefined, undefined, PAGES);
   const before = await bytes(base, '/favicon.ico');
   // A one-pixel PNG, as a style kept on the map gives it.
   const icon = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';

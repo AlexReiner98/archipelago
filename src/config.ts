@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from './env.ts';
 import { DEFAULT_AGENT_POLICY, type Policy } from './pelago.ts';
@@ -10,6 +10,9 @@ export interface Config {
   /** A Postgres server holding the databases (PELAGO_DATABASE_URL); unset, each is a folder under dataDir. */
   databaseUrl?: string;
   packsDir: string;
+  /** Every folder workspace packs are read from: packsDir, then those PELAGO_PACKS names (separated as PATH is), so a
+   * private pack is a folder on the machine the server runs on, never a file of this repository. */
+  packDirs: string[];
   /** Pack ids to enable. Omit to enable every pack in packsDir. */
   packs?: string[];
   /** What agents may do without asking. Humans are never restricted. */
@@ -143,5 +146,6 @@ export function loadConfig(): Config {
     databaseUrl,
     backup,
     packsDir: resolve(ROOT, fromFile.packsDir ?? 'packs'),
+    packDirs: [resolve(ROOT, fromFile.packsDir ?? 'packs'), ...(env('PACKS') ?? '').split(delimiter).map((d) => d.trim()).filter(Boolean).map((d) => resolve(d))],
   };
 }

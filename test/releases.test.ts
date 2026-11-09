@@ -1,193 +1,84 @@
+// What the kernel keeps for an item and gives away of it: a picture kept for an item drawn with a figure, what anyone sees
+// of what is public, what a member reads of tokens and settings, and a document given as a link. The types a pack would
+// declare for these are a small pack of the test's own (SHELF), over core's.
+
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
 import { dumpVault } from '../src/vault.ts';
 import { doneEvents } from '../src/activity.ts';
-import { test } from 'node:test';
 import { dump, restore } from '../src/backup.ts';
 import { openDb } from '../src/db.ts';
 import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
+import { Registry, type PackFile } from '../src/packs.ts';
 import { publicPage, publicPicture } from '../src/public.ts';
 import { callTool } from '../src/tools.ts';
-import { askView } from '../src/askview.ts';
-import { human, agent, fresh, make } from './map.ts';
+import { human, agent, freshWith, make, packsWith } from './map.ts';
 
-/** A view asked by its name, as the view tool asks it. */
-const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
+/** What a pack declares for the kernel to keep and show: a picture's type, public work, and writing for a reader. */
+const SHELF = {
+  id: 'shelf', version: '1', title: 'Shelf', requires: ['core'],
+  types: [
+    { id: 'shot', title: 'Shot', description: 'What was seen, with its picture.', extends: 'record', public: true, fields: { value: { type: 'string' } } },
+    { id: 'launch', title: 'Launch', description: 'Work anyone may follow.', extends: 'task', public: true },
+    { id: 'paper', title: 'Paper', description: 'Writing made for a reader.', extends: 'record', deliverable: true, fields: { for: { type: 'string' } } },
+  ],
+  views: [
+    { form: 'screen', id: 'shelf.drawn', title: 'Drawn', on: ['shot'], pieces: [{ piece: 'figure' }] },
+    { form: 'screen', id: 'shelf.reading', title: 'Reading', on: ['paper'], pieces: [{ piece: 'document' }] },
+  ],
+} as PackFile;
+const shelf = () => freshWith(new Registry(packsWith(SHELF)));
 
-test('a commit, an experiment and an issue keep their picture, and their page has the figure for it', async () => {
-  const l = await fresh();
+test('a picture is kept on a type drawn with a figure, one for an item, and travels in a backup', async () => {
+  const l = await shelf();
   const made = await make(l, [
-    { op: 'create', ref: 'c', type: 'commit', title: 'Draw the ridges', props: { sha: 'a'.repeat(40) } },
-    { op: 'create', ref: 'x', type: 'experiment', title: 'Ridges at three scales' },
-    { op: 'create', ref: 'i', type: 'issue', title: 'Two documents disagree' },
-    { op: 'create', ref: 'b', type: 'bug', title: 'The ridge is drawn twice' },
+    { op: 'create', ref: 's', type: 'shot', title: 'Ridges at three scales' },
+    { op: 'create', ref: 't', type: 'task', title: 'Draw the ridges' },
   ]);
-  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]).toString('base64');
-  for (const id of [made.c, made.x, made.i, made.b]) {
-    assert.equal(((await callTool(l, human, 'picture_put', { result: id, data: png, content_type: 'image/png' })) as { size: number }).size, 10);
-    assert.equal(((await callTool(l, human, 'picture', { result: id })) as { data: string }).data, png);
-  }
-  assert.deepEqual(['commit', 'experiment', 'issue', 'bug'].filter((t) => l.registry.drawnWith('figure').includes(t)), ['commit', 'experiment', 'issue', 'bug']);
-});
-
-test('a picture is kept for a result only when sent, travels in a backup, and goes when the test is run again', async () => {
-  const l = await fresh();
-  const made = await make(l, [
-    { op: 'create', ref: 'app', type: 'project', title: 'App' },
-    { op: 'create', ref: 'sun', type: 'proof', title: 'How do we know the sun is correct?' },
-    { op: 'create', ref: 'noaa', type: 'test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa' } },
-    { op: 'link', type: 'part_of', from: 'sun', to: 'app' },
-    { op: 'link', type: 'answers', from: 'noaa', to: 'sun' },
-  ]);
-  type Found = { id: string; picture: string | null; stored: boolean };
-  const found = async () => ((await callTool(l, human, 'view', { name: 'proof', params: { of: made.app } })) as { proofs: { tests: { result: Found | null }[] }[] }).proofs[0].tests[0].result!;
-
-  // A report says where the picture is in the repository; the file stays there.
-  await callTool(l, human, 'test_report', { build: '1.0.0', results: [{ test: 'Sun.MatchesNoaa', passed: true, picture: '.proof/1.0.0/Sun.MatchesNoaa.png' }] });
-  const first = await found();
-  assert.deepEqual([first.picture, first.stored], ['.proof/1.0.0/Sun.MatchesNoaa.png', false]);
-  assert.equal(await callTool(l, human, 'picture', { result: first.id }), null);
-
+  assert.ok(l.registry.drawnWith('figure').includes('shot'));
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  const put = (data: Buffer, content_type = 'image/png', result = first.id) => callTool(l, human, 'picture_put', { result, data: data.toString('base64'), content_type });
-  await put(png);
-  assert.equal((await found()).stored, true);
-  const back = (await callTool(l, human, 'picture', { result: first.id })) as { content_type: string; size: number; data: string };
+  const put = (data: Buffer, content_type = 'image/png', result = made.s) => callTool(l, human, 'picture_put', { result, data: data.toString('base64'), content_type });
+  assert.equal(await callTool(l, human, 'picture', { result: made.s }), null);
+  assert.equal(((await put(png)) as { size: number }).size, png.length);
+  const back = (await callTool(l, human, 'picture', { result: made.s })) as { content_type: string; size: number; data: string };
   assert.deepEqual([back.content_type, back.size, Buffer.from(back.data, 'base64').equals(png)], ['image/png', png.length, true]);
 
-  // Sent again it replaces what was kept: one picture for one result.
+  // Sent again it replaces what was kept: one picture for one item.
   await put(Buffer.concat([png, png]));
-  assert.equal((await l.db.query<{ n: number; size: number }>(`select count(*)::int as n, max(size)::int as size from picture`)).rows[0].size, png.length * 2);
+  assert.deepEqual((await l.db.query<{ n: number; size: number }>(`select count(*)::int as n, max(size)::int as size from picture`)).rows[0], { n: 1, size: png.length * 2 });
   await assert.rejects(put(Buffer.alloc(1_000_001)), /the most kept is/);
-  await assert.rejects(callTool(l, human, 'picture_put', { result: first.id, data: png.toString('base64'), content_type: 'image/svg+xml' }), /drawing alone/);
-  await assert.rejects(put(png, 'image/png', made.noaa), /a pack needs a screen on that type with the figure piece/);
+  await assert.rejects(put(png, 'image/svg+xml'), /drawing alone/);
+  await assert.rejects(put(png, 'image/png', made.t), /a pack needs a screen on that type with the figure piece/);
 
   // A backup carries the picture, byte for byte.
   const copy = new Archipelago(await openDb(), l.registry);
   const counts = await restore(copy.db, { ...JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' }))), vault: await dumpVault(l.db) });
   assert.equal(counts.picture, 1);
-  const restored = (await callTool(copy, human, 'picture', { result: first.id })) as { data: string };
+  const restored = (await callTool(copy, human, 'picture', { result: made.s })) as { data: string };
   assert.ok(Buffer.from(restored.data, 'base64').equals(Buffer.concat([png, png])));
-
-  // Run again, on this build or a later one, the test loses the picture kept for it: it no longer shows what the test found.
-  const again = (await callTool(l, human, 'test_report', { build: '1.0.1', results: [{ test: made.noaa, passed: true }] })) as { pictures_removed: number };
-  assert.equal(again.pictures_removed, 1);
-  assert.equal((await l.db.query<{ n: number }>(`select count(*)::int as n from picture`)).rows[0].n, 0);
-});
-
-test('a release is not clear until what it ships is proven on its own build, and a changelog is only what is built', async () => {
-  const l = await fresh();
-  const made = await make(l, [
-    { op: 'create', ref: 'app', type: 'project', title: 'App' },
-    { op: 'create', ref: 'addin', type: 'feature', title: 'Add-in', status: 'built' },
-    { op: 'create', ref: 'panel', type: 'feature', title: 'Panel', status: 'built' },
-    { op: 'create', ref: 'old', type: 'feature', title: 'Presets', status: 'shipped' },
-    { op: 'create', ref: 'later', type: 'feature', title: 'Sheets', status: 'planned' },
-    { op: 'create', ref: 'proofs', type: 'feature', title: 'Public proof', status: 'built' },
-    { op: 'create', ref: 'sun', type: 'proof', title: 'How do we know the sun is correct?' },
-    { op: 'create', ref: 'noaa', type: 'test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa' } },
-    { op: 'create', ref: 'release', type: 'release', title: 'Version 1.0', props: { version: '1.0.0' } },
-    { op: 'link', type: 'part_of', from: 'addin', to: 'app' },
-    { op: 'link', type: 'part_of', from: 'panel', to: 'addin' },
-    { op: 'link', type: 'part_of', from: 'old', to: 'app' },
-    { op: 'link', type: 'part_of', from: 'later', to: 'app' },
-    { op: 'link', type: 'part_of', from: 'proofs', to: 'app' },
-    { op: 'link', type: 'part_of', from: 'sun', to: 'proofs' },
-    { op: 'link', type: 'answers', from: 'noaa', to: 'sun' },
-    { op: 'link', type: 'ships', from: 'release', to: 'addin' },
-    // The questions are asked of a feature the release does not ship: it is held by it, and so they are the release's too.
-    { op: 'link', type: 'depends_on', from: 'release', to: 'proofs' },
-  ]);
-  type Gate = { clear: boolean; proof: { build: string | null; named: boolean; counts: { questions: number; answered: number }; questions: { id: string; answered: boolean }[] } | null };
-  const gate = async () => (await ask(l, 'gate', { event: made.release })) as Gate;
-
-  // Passing on an earlier build does not answer for the build that is released.
-  await callTool(l, human, 'test_report', { build: '0.9.0', results: [{ test: made.noaa, passed: true }] });
-  const before = await gate();
-  assert.deepEqual([before.proof!.build, before.proof!.named, before.proof!.counts.answered, before.clear], ['1.0.0', true, 0, false]);
-  await callTool(l, human, 'test_report', { build: '1.0.0', results: [{ test: made.noaa, passed: true }] });
-  const after = await gate();
-  assert.deepEqual([after.proof!.counts.answered, after.proof!.questions[0].answered, after.clear], [1, true, true]);
-
-  // A changelog is what is built or shipped, with the release each went out in; what is only planned is not in it.
-  const log = (await callTool(l, human, 'view', { name: 'changelog', params: { of: made.app } })) as { counts: Record<string, number>; features: { id: string; status: string; release: { version: string | null } | null }[] };
-  assert.deepEqual(log.counts, { built: 3, shipped: 1 });
-  assert.deepEqual(log.features.map((f) => f.id).sort(), [made.addin, made.old, made.panel, made.proofs].sort());
-  assert.equal(log.features.at(-1)!.id, made.old, 'what is built and not yet released comes first');
-  assert.equal(log.features.find((f) => f.id === made.panel)!.release!.version, '1.0.0', 'a part goes out with what it is part of');
-  assert.equal(log.features.find((f) => f.id === made.old)!.release, null);
-});
-
-test('costs: dollars where a run says, tokens where it does not, and each regular payment by its share', async () => {
-  const l = await fresh();
-  const longAgo = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
-  const made = await make(l, [
-    { op: 'create', ref: 'repo', type: 'repo', title: 'Repo' },
-    { op: 'create', ref: 'host', type: 'cost', title: 'Hosting', props: { amount: 25, since: longAgo, vendor: 'Render' } },
-    { op: 'create', ref: 'domain', type: 'cost', title: 'Domain', props: { amount: 120, every: 'year', since: longAgo } },
-    { op: 'create', ref: 'unknown', type: 'cost', title: 'Subscription' },
-    { op: 'create', ref: 'euro', type: 'cost', title: 'Licence', props: { amount: 10, currency: 'EUR', since: longAgo } },
-    { op: 'create', ref: 'ended', type: 'cost', title: 'Old host', status: 'ended', props: { amount: 50, since: longAgo, until: longAgo } },
-  ]);
-  await callTool(l, human, 'run_report', { repo: made.repo, title: 'Read a push', tokens: 40_000, cost_usd: 0.31, surface: 'server', link: 'https://example.com/1' });
-  await callTool(l, human, 'run_report', { repo: made.repo, title: 'Read another', tokens: 10_000, cost_usd: 0.09, surface: 'server', link: 'https://example.com/2' });
-  await callTool(l, human, 'run_report', { repo: made.repo, title: 'A session', tokens: 900_000, surface: 'claude-code', link: 'https://example.com/3' });
-
-  type Costs = {
-    total_usd: number;
-    per_month: number;
-    agents: { cost_usd: number; tokens: number; unpriced_tokens: number; by: { surface: string; runs: number; cost_usd: number }[] };
-    recurring: { cost_usd: number; per_month: number; items: { id: string; per_month: number | null; share: number | null }[]; unpriced: { id: string }[]; other_currencies: { id: string }[] };
-  };
-  const c = (await callTool(l, human, 'view', { name: 'costs', params: { days: 30 } })) as Costs;
-  assert.deepEqual([c.agents.cost_usd, c.agents.tokens, c.agents.unpriced_tokens], [0.4, 950_000, 900_000]);
-  assert.deepEqual(c.agents.by.map((s) => [s.surface, s.runs, s.cost_usd]), [['server', 2, 0.4], ['claude-code', 1, 0]]);
-  // A month's payment, and a twelfth of a year's, over thirty days of a month of 30.44.
-  const share = (monthly: number) => Math.round(((monthly * 30) / 30.4375) * 100) / 100;
-  assert.equal(c.recurring.items.find((i) => i.id === made.host)!.share, share(25));
-  assert.deepEqual([c.recurring.items.find((i) => i.id === made.domain)!.per_month, c.recurring.per_month], [10, 35]);
-  assert.equal(c.recurring.cost_usd, Math.round((share(25) + share(10)) * 100) / 100);
-  assert.deepEqual(c.recurring.unpriced.map((i) => i.id), [made.unknown], 'a payment nobody has priced is named, not guessed');
-  assert.deepEqual(c.recurring.other_currencies.map((i) => i.id), [made.euro], 'another currency is listed, not added to the dollars');
-  assert.ok(!c.recurring.items.some((i) => i.id === made.ended), 'what ended before the period is not in it');
-  assert.equal(c.total_usd, Math.round((0.4 + c.recurring.cost_usd) * 100) / 100);
-  assert.equal(c.per_month, Math.round((35 + (0.4 * 30.4375) / 30) * 100) / 100);
 });
 
 test('public: only a human makes it so, only some kinds can be, and anyone then sees little of it', async () => {
-  const l = await fresh();
+  const l = await shelf();
   const made = await make(l, [
-    { op: 'create', ref: 'app', type: 'project', title: 'App', body: 'Internal plan: the secret margin' },
-    { op: 'create', ref: 'between', type: 'feature', title: 'Proof work', body: 'Not for anyone' },
-    { op: 'create', ref: 'sun', type: 'proof', title: 'How do we know the sun is correct?', body: 'An internal note' },
-    { op: 'create', ref: 'areas', type: 'proof', title: 'How do we know the areas are correct?' },
-    { op: 'create', ref: 'noaa', type: 'test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa', tolerance: 'within 0.01 degrees' } },
-    { op: 'create', ref: 'square', type: 'test', title: 'Area of a square', status: 'current', props: { entrypoint: 'Area.Square' } },
-    { op: 'create', ref: 'panel', type: 'feature', title: 'Panel', status: 'built' },
-    { op: 'create', ref: 'hidden', type: 'feature', title: 'Unannounced', status: 'built' },
+    { op: 'create', ref: 'app', type: 'launch', title: 'App', body: 'Internal plan: the secret margin' },
+    { op: 'create', ref: 'between', type: 'task', title: 'Proof work', body: 'Not for anyone' },
+    { op: 'create', ref: 'sun', type: 'shot', title: 'The sun against NOAA', body: 'An internal note', props: { value: '0.004 degrees' } },
+    { op: 'create', ref: 'areas', type: 'shot', title: 'The areas of a square', props: { value: '1' } },
+    { op: 'create', ref: 'panel', type: 'launch', title: 'Panel' },
     { op: 'create', ref: 'choice', type: 'decision', title: 'What does it cost?' },
     { op: 'link', type: 'part_of', from: 'between', to: 'app' },
     { op: 'link', type: 'part_of', from: 'sun', to: 'between' },
     { op: 'link', type: 'part_of', from: 'areas', to: 'between' },
     { op: 'link', type: 'part_of', from: 'panel', to: 'app' },
-    { op: 'link', type: 'part_of', from: 'hidden', to: 'app' },
     { op: 'link', type: 'part_of', from: 'choice', to: 'app' },
-    { op: 'link', type: 'answers', from: 'noaa', to: 'sun' },
-    { op: 'link', type: 'answers', from: 'square', to: 'areas' },
   ]);
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 9, 8, 7]);
-  const report = (await callTool(l, human, 'test_report', { build: '1.0.0', results: [
-    { test: 'Sun.MatchesNoaa', passed: true, value: '0.004 degrees', picture: '.proof/1.0.0/Sun.MatchesNoaa.png' },
-    { test: 'Area.Square', passed: true, picture: '.proof/1.0.0/Area.Square.png' },
-  ] })) as { answer: { send_pictures: unknown[] } };
-  assert.deepEqual(report.answer.send_pictures, [], 'nothing is public yet, so no picture is asked for');
-  type View = { proofs: { id: string; public: boolean; tests: { result: { id: string } }[] }[]; to_send: { result: string; picture: string }[] };
-  const view = async () => (await callTool(l, human, 'view', { name: 'proof', params: { of: made.app } })) as View;
-  const results = Object.fromEntries((await view()).proofs.map((p) => [p.id, p.tests[0].result.id]));
-  for (const id of Object.values(results)) await callTool(l, human, 'picture_put', { result: id, data: png.toString('base64'), content_type: 'image/png' });
+  for (const id of [made.sun, made.areas]) await callTool(l, human, 'picture_put', { result: id, data: png.toString('base64'), content_type: 'image/png' });
 
   // Nothing is public until someone says so.
   assert.equal(await publicPage(l, made.app), null);
-  assert.equal(await publicPicture(l, results[made.sun]), null);
+  assert.equal(await publicPicture(l, made.sun), null);
 
   // An agent cannot say so, even where its other changes are applied as made: it waits for the human.
   const loose = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', link: 'auto' });
@@ -204,43 +95,32 @@ test('public: only a human makes it so, only some kinds can be, and anyone then 
   ]);
   const page = (await publicPage(l, made.app))!;
   assert.equal(page.title, 'App');
-  // A public question brings its tests and results, though the feature it sits in is not public; the other question stays out.
-  assert.deepEqual(page.questions.map((q) => q.id), [made.sun]);
-  assert.deepEqual([page.questions[0].answered, page.questions[0].tests[0].title, page.questions[0].tests[0].result!.value, page.questions[0].tests[0].result!.picture], [true, 'Sun position against NOAA', '0.004 degrees', results[made.sun]]);
-  assert.deepEqual(page.changelog.map((f) => f.title), ['The panel']);
-  const said = JSON.stringify(page);
-  for (const hiddenText of ['secret margin', 'internal note', 'Not for anyone', 'Unannounced', 'areas are correct', 'What does it cost', 'Area of a square']) assert.ok(!said.includes(hiddenText), `"${hiddenText}" is not given away`);
-  assert.ok((await publicPicture(l, results[made.sun]))!.bytes.equals(png));
-  assert.equal(await publicPicture(l, results[made.areas]), null, 'a picture is as public as its result, and no more');
+  assert.ok(!JSON.stringify(page).includes('secret margin'));
+  assert.ok((await publicPicture(l, made.sun))!.bytes.equals(png));
+  assert.equal(await publicPicture(l, made.areas), null, 'a picture is as public as its item, and no more');
 
   // The database itself holds the line, whatever is asked of it.
   const anyoneDb = l.forAnyone().db;
   const seen = (await anyoneDb.query<{ title: string }>(`select title from entity order by title`)).rows.map((r) => r.title);
-  assert.deepEqual(seen, ['1.0.0: Sun position against NOAA', 'App', 'How do we know the sun is correct?', 'Sun position against NOAA', 'The panel']);
+  assert.deepEqual(seen, ['App', 'The panel', 'The sun against NOAA']);
   await assert.rejects(anyoneDb.query(`select body from entity`), /permission denied/);
-  // Of an item's fields, only what the page shows: not where a result's picture lies in its repository.
   await assert.rejects(anyoneDb.query(`select props from entity`), /permission denied/);
   const fields = async (id: string) => (await anyoneDb.query<{ props: Record<string, unknown> | null }>(`select pelago_public_props($1) as props`, [id])).rows[0].props;
-  assert.deepEqual(await fields(results[made.sun]), { build: '1.0.0', passed: true, value: '0.004 degrees' });
-  assert.equal(await fields(results[made.areas]), null, 'and of what is not public, none');
+  assert.deepEqual(await fields(made.sun), { value: '0.004 degrees' });
+  assert.equal(await fields(made.areas), null, 'and of what is not public, none');
   await assert.rejects(anyoneDb.query(`select * from log_op`), /permission denied/);
   await assert.rejects(anyoneDb.query(`select * from setting`), /permission denied/);
   await assert.rejects(anyoneDb.query(`update entity set title = 'x'`), /permission denied/);
   assert.equal((await anyoneDb.query<{ n: number }>(`select count(*)::int as n from picture`)).rows[0].n, 1);
 
-  // Once a question is public, a run says which pictures to send, and the view lists what is still owed.
-  const next = (await callTool(l, human, 'test_report', { build: '1.0.1', results: [{ test: 'Sun.MatchesNoaa', passed: true, picture: '.proof/1.0.1/Sun.MatchesNoaa.png' }] })) as { answer: { send_pictures: { result: string; picture: string }[] }; pictures_removed: number };
-  assert.deepEqual([next.pictures_removed, next.answer.send_pictures.map((p) => p.picture)], [1, ['.proof/1.0.1/Sun.MatchesNoaa.png']]);
-  assert.deepEqual((await view()).to_send.map((p) => p.picture), ['.proof/1.0.1/Sun.MatchesNoaa.png']);
-
-  // Taken back, it is gone from the page at once.
+  // Taken back, it is gone at once.
   await make(l, [{ op: 'update', id: made.sun, visibility: 'private' }]);
-  assert.deepEqual((await publicPage(l, made.app))!.questions, []);
+  assert.equal(await publicPicture(l, made.sun), null);
 });
 
 test('a member sees their own tokens and the few settings every request needs; the rest is an admin’s, by the database', async () => {
   const { createToken, listTokens } = await import('../src/auth.ts');
-  const l = await fresh();
+  const l = await shelf();
   const made = await make(l, [
     { op: 'create', ref: 'ann', type: 'person', title: 'Ann' },
     { op: 'create', ref: 'bo', type: 'person', title: 'Bo' },
@@ -279,7 +159,7 @@ test('a member sees their own tokens and the few settings every request needs; t
 
 test('a document brings items in by id, and a link shows it and them to anyone holding it, and nothing more', async () => {
   const { sharedDocument, sectionIds } = await import('../src/documents.ts');
-  const l = await fresh();
+  const l = await shelf();
   const people = await make(l, [
     { op: 'create', ref: 'ann', type: 'person', title: 'Ann' },
     { op: 'create', ref: 'bo', type: 'person', title: 'Bo' },
@@ -290,12 +170,12 @@ test('a document brings items in by id, and a link shows it and them to anyone h
   const boActor: Actor = { kind: 'human', name: 'bo', person: people.bo };
   const theirs = async (who: Archipelago, actor: Actor, ops: Op[]) => ((await who.change(actor, { ops, reason: 'test' })) as { created: Record<string, string> }).created;
   const hers = await theirs(ann, annActor, [
-    { op: 'create', ref: 'mine', type: 'note', title: 'IRAP', body: 'Call the advisor first.', visibility: 'private' },
-    { op: 'create', ref: 'all', type: 'note', title: 'SR&ED', body: 'Claimed after the work.', visibility: 'shared' },
+    { op: 'create', ref: 'mine', type: 'finding', title: 'IRAP', body: 'Call the advisor first.', visibility: 'private' },
+    { op: 'create', ref: 'all', type: 'finding', title: 'SR&ED', body: 'Claimed after the work.', visibility: 'shared' },
   ]);
-  const his = await theirs(bo, boActor, [{ op: 'create', ref: 'n', type: 'note', title: 'Bo’s secret plan', body: 'Not for Ann’s readers.', visibility: 'private' }]);
+  const his = await theirs(bo, boActor, [{ op: 'create', ref: 'n', type: 'finding', title: 'Bo’s secret plan', body: 'Not for Ann’s readers.', visibility: 'private' }]);
   const body = `# Funding\n\nTwo programs, and a third (${his.n}) the reader does not see.\n\n${hers.mine}\n\nBetween them, ${hers.mine} comes first.\n${hers.all}\n${his.n}\ne_nothing1\n`;
-  const { doc } = await theirs(ann, annActor, [{ op: 'create', ref: 'doc', type: 'document', title: 'Funding for Northwind', body, visibility: 'private', props: { for: 'Sam' } }]);
+  const { doc } = await theirs(ann, annActor, [{ op: 'create', ref: 'doc', type: 'paper', title: 'Funding for Northwind', body, visibility: 'private', props: { for: 'Sam' } }]);
   assert.deepEqual(sectionIds(body), [hers.mine, hers.all, his.n, 'e_nothing1']);
 
   // Its author reads it whole; what she may not see is said as missing, in its place.
@@ -338,15 +218,15 @@ test('a document brings items in by id, and a link shows it and them to anyone h
 });
 
 test('what is made for a reader is marked deliverable by its type, and a document names the sections kept outside it', async () => {
-  const l = await fresh();
+  const l = await shelf();
   const marked = (await callTool(l, human, 'schema', {})) as { types: { id: string; deliverable?: boolean }[] };
   const deliverable = (id: string) => Boolean(marked.types.find((t) => t.id === id)?.deliverable);
-  assert.deepEqual(['document', 'file', 'release', 'spec', 'note', 'task'].map(deliverable), [true, true, true, false, false, false]);
+  assert.deepEqual(['paper', 'shared_document', 'finding', 'task', 'decision'].map(deliverable), [true, true, false, false, false]);
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Research' },
-    { op: 'create', ref: 'a', type: 'note', title: 'Inside' },
-    { op: 'create', ref: 'b', type: 'note', title: 'Beside' },
-    { op: 'create', ref: 'd', type: 'document', title: 'Brief', body: '{a}\n{b}' },
+    { op: 'create', ref: 'p', type: 'task', title: 'Research' },
+    { op: 'create', ref: 'a', type: 'finding', title: 'Inside' },
+    { op: 'create', ref: 'b', type: 'finding', title: 'Beside' },
+    { op: 'create', ref: 'd', type: 'paper', title: 'Brief', body: '{a}\n{b}' },
     { op: 'link', type: 'part_of', from: 'd', to: 'p' },
     { op: 'link', type: 'part_of', from: 'a', to: 'd' },
     { op: 'link', type: 'part_of', from: 'b', to: 'p' },
@@ -356,4 +236,3 @@ test('what is made for a reader is marked deliverable by its type, and a documen
   await make(l, [{ op: 'link', type: 'part_of', from: made.b, to: made.d }]);
   assert.equal(((await callTool(l, human, 'document', { id: made.d })) as { not_inside?: string[] }).not_inside, undefined);
 });
-

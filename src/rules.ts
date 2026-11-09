@@ -74,8 +74,6 @@ export interface RuleDef {
     reply?: Record<string, boolean | number>;
   };
   then?: 'hold' | 'refuse' | 'ask' | { require: string[] };
-  /** For a rule on a reply's end that reads unaccounted: what accounts for a commit, a type and its field holding the full sha. */
-  record?: { type: string; field: string };
   /** Fields whose values together may belong to one item of the type only. */
   unique?: string[];
   /** For unique: the type it holds within, flavours included. */

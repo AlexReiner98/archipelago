@@ -21,8 +21,8 @@ test('imports are read: relative, dynamic and from a page; type-only imports and
     { path: 'ui/index.html', text: '<script type="module" src="/app.js"></script>' },
     { path: 'ui/app.js', text: "import { h } from './base.js';\n" },
     { path: 'ui/base.js', text: '' },
-    { path: 'packs/time/handler.js', text: "import { days } from './days.js';\n" },
-    { path: 'packs/time/days.js', text: '' },
+    { path: 'packs/demo/handler.js', text: "import { days } from './days.js';\n" },
+    { path: 'packs/demo/days.js', text: '' },
     { path: 'test/x.test.ts', text: "import '../src/db.ts';" },
   ]);
   const by = Object.fromEntries(modules.map((m) => [m.path, m]));
@@ -33,8 +33,8 @@ test('imports are read: relative, dynamic and from a page; type-only imports and
   assert.equal(by['src/pelago.ts'].area, 'Write path and model');
   assert.equal(by['src/server.ts'].area, 'Server and surfaces', 'a file no rule names falls in the last area');
   assert.deepEqual(by['ui/index.html'].imports, [{ to: 'ui/app.js', dynamic: false }]);
-  assert.deepEqual(by['packs/time/handler.js'].imports, [{ to: 'packs/time/days.js', dynamic: false }]);
-  assert.equal(by['packs/time/handler.js'].area, 'time pack');
+  assert.deepEqual(by['packs/demo/handler.js'].imports, [{ to: 'packs/demo/days.js', dynamic: false }]);
+  assert.equal(by['packs/demo/handler.js'].area, 'demo pack');
 });
 
 test('layers put what imports above what it imports, and a cycle does not stop them', () => {
@@ -56,8 +56,8 @@ test('the XML escapes what it is given and refuses an edge to nothing', () => {
 test('every type is drawn under what it extends, down to the kinds, and an unknown parent is refused', () => {
   const packs: PackFile[] = [
     { id: 'core', types: [{ id: 'work' }, { id: 'question' }, { id: 'system' }, { id: 'lens', extends: 'system' }], links: [{ id: 'relates_to', root: true }, { id: 'about', root: true }] },
-    { id: 'work', requires: ['core'], types: [{ id: 'task', extends: 'work', capabilities: { bound: {}, where: {} } }], links: [{ id: 'based_on', extends: 'relates_to', from: ['*'], to: ['task'] }] },
-    { id: 'lab', requires: ['core', 'work'], types: [{ id: 'lab.trial', extends: 'task' }, { of: 'task', fields: { cost: {} } }] },
+    { id: 'chores', requires: ['core'], types: [{ id: 'task', extends: 'work', capabilities: { bound: {}, where: {} } }], links: [{ id: 'based_on', extends: 'relates_to', from: ['*'], to: ['task'] }] },
+    { id: 'lab', requires: ['core', 'chores'], types: [{ id: 'lab.trial', extends: 'task' }, { of: 'task', fields: { cost: {} } }] },
   ];
   const [inheritance, relations, packMap] = typeDiagram(packs);
   const xml = pageXml(inheritance);

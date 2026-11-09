@@ -16,7 +16,7 @@ if (!file) throw new Error('Name the answer: node scripts/flow-bench.ts <answer.
 const root = process.env.FLOW_ROOT ?? join(import.meta.dirname, '..');
 const given = JSON.parse(readFileSync(file, 'utf8'));
 const answer = given.result ?? given;
-const drawing = layoutFor({ dir: join(root, 'packs'), packs: [JSON.parse(readFileSync(join(root, 'packs', 'core', 'pack.json'), 'utf8'))] }, { shape: 'flow' }, []);
+const drawing = layoutFor({ folderOf: (p: string) => join(root, 'packs', p), packs: [JSON.parse(readFileSync(join(root, 'packs', 'core', 'pack.json'), 'utf8'))] }, { shape: 'flow' }, []);
 const plain = house('flow'), style = { ...plain, ...(process.env.FLOW_WORK && { sizes: { ...plain.sizes, flow_picture_work: Number(process.env.FLOW_WORK) } }), noLit: true, drawing };
 
 const bench = `async (answer, style) => {

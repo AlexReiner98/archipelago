@@ -12,7 +12,7 @@ import { layoutFor } from '../src/layouts.ts';
 
 const base = process.argv[2] ?? 'http://127.0.0.1:3100';
 const root = join(import.meta.dirname, '..');
-const drawing = layoutFor({ dir: join(root, 'packs'), packs: [JSON.parse(readFileSync(join(root, 'packs', 'core', 'pack.json'), 'utf8'))] }, { shape: 'architecture' }, []);
+const drawing = layoutFor({ folderOf: (p: string) => join(root, 'packs', p), packs: [JSON.parse(readFileSync(join(root, 'packs', 'core', 'pack.json'), 'utf8'))] }, { shape: 'architecture' }, []);
 
 const pictures = { hero: architectureCases()[0].answer, system: architectureCases()[3].answer, big: bigSystem() };
 const style = { ...house('architecture'), noLit: true, drawing };

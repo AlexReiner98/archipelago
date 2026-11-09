@@ -3,6 +3,8 @@
 // same. Ids are named by the ref that made them and times are dropped; a list whose order differs from run to run
 // (one ordered by random ids) is compared as a set, and that is recorded too. PIN_RECORD=1 records it again.
 // The `lens` answers, the page's picture the old lens drew, went with it (task e_vtvhebut): the page draws flat lenses.
+// Recorded again on 9 Nov 2026 with the fixture on core's types (task e_5jt399qt): the packs that left the repository
+// took handoff and gate, and a project and a feature are the test's own types, at the altitudes such a pack declares.
 
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -10,40 +12,56 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { askView } from '../src/askview.ts';
+import { Registry, type PackFile } from '../src/packs.ts';
 import { sessionStart } from '../src/sessions.ts';
-import { agent, fresh, human, make } from './map.ts';
+import { agent, freshWith, human, make, packsWith } from './map.ts';
 
 const PINNED = join(import.meta.dirname, 'fixtures', 'standing-views.json');
 
+/** What work is planned by: how many tokens it is to take and has taken. */
+const tokens = { tokens_estimated: { type: 'number', description: 'Tokens it is to take.' }, tokens_used: { type: 'number', description: 'Tokens it took.' } };
+
+/** A project, a stream in it and an issue, at the altitudes a pack that keeps them declares, with the fields the views read, and
+ * the tree over them a pack declares. */
+const levels: PackFile = {
+  id: 'x', version: '1', title: 'X', requires: ['core'],
+  types: [
+    { id: 'x.project', title: 'Project', description: 'A project.', extends: 'work', altitude: 'project', fields: { hub_at: { type: 'number', description: 'How many open things an item in it holds before it is a hub.' } } },
+    { id: 'x.feature', title: 'Feature', description: 'A stream of work in a project.', extends: 'work', altitude: 'stream', fields: { order: { type: 'number', description: 'Its place among its siblings.' }, ...tokens } },
+    { id: 'x.issue', title: 'Issue', description: 'Something wrong to look into.', extends: 'work', fields: tokens },
+  ],
+  views: [{ form: 'tree', id: 'x.roadmap', title: 'Roadmap', description: 'A project, its features in order and the work under each.', roots: ['x.project'], branches: ['x.feature'], work: ['task', 'x.issue'], order: 'order', active: ['doing'] }],
+} as PackFile;
+
 async function fixture() {
-  const l = await fresh();
+  const l = await freshWith(new Registry(packsWith(levels)));
   const made = await make(l, [
     { op: 'create', ref: 'me', type: 'person', title: 'Owner' },
     { op: 'create', ref: 'bo', type: 'person', title: 'Bo' },
-    { op: 'create', ref: 'repo', type: 'repo', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } },
-    { op: 'create', ref: 'app', type: 'project', title: 'App', props: { hub_at: 2 } },
-    { op: 'create', ref: 'business', type: 'project', title: 'Business' },
-    { op: 'create', ref: 'addin', type: 'feature', title: 'Add-in', props: { order: 2 } },
-    { op: 'create', ref: 'installer', type: 'feature', title: 'Installer', status: 'building', props: { order: 1 } },
-    { op: 'create', ref: 'docs', type: 'feature', title: 'Docs' },
-    { op: 'create', ref: 'old', type: 'feature', title: 'Old feature', status: 'shipped' },
+    { op: 'create', ref: 'home', type: 'place', title: 'Apex repo' },
+    { op: 'create', ref: 'app', type: 'x.project', title: 'App', props: { hub_at: 2 } },
+    { op: 'create', ref: 'business', type: 'x.project', title: 'Business' },
+    { op: 'create', ref: 'addin', type: 'x.feature', title: 'Add-in', props: { order: 2 } },
+    { op: 'create', ref: 'installer', type: 'x.feature', title: 'Installer', status: 'doing', props: { order: 1 } },
+    { op: 'create', ref: 'docs', type: 'x.feature', title: 'Docs' },
+    { op: 'create', ref: 'old', type: 'x.feature', title: 'Old feature', status: 'done' },
     { op: 'create', ref: 'sign', type: 'task', title: 'Sign the package', props: { tokens_estimated: 4000 } },
     { op: 'create', ref: 'cert', type: 'decision', title: 'Which certificate?', owner: 'me' },
     { op: 'create', ref: 'clean', type: 'task', title: 'Uninstall leaves it clean', status: 'done', props: { tokens_estimated: 1000 } },
     { op: 'create', ref: 'hover', type: 'task', title: 'Hover cards', status: 'doing', owner: 'bo' },
     { op: 'create', ref: 'extras', type: 'task', title: 'Capture extras' },
     { op: 'create', ref: 'guide', type: 'task', title: 'Write the guide', props: { tokens_estimated: 2000, tokens_used: 500 } },
-    { op: 'create', ref: 'bug', type: 'issue', title: 'Crash on thin walls' },
+    { op: 'create', ref: 'crash', type: 'x.issue', title: 'Crash on thin walls' },
     { op: 'create', ref: 'loose', type: 'task', title: 'Loose task in app' },
     { op: 'create', ref: 'pricing', type: 'decision', title: 'What does it cost?', owner: 'me' },
-    { op: 'create', ref: 'release', type: 'release', title: 'Version 1.0' },
-    { op: 'create', ref: 'plans', type: 'feature', title: 'Price plans' },
+    { op: 'create', ref: 'launch', type: 'event', title: 'Version 1.0' },
+    { op: 'create', ref: 'plans', type: 'x.feature', title: 'Price plans' },
     { op: 'create', ref: 'tiers', type: 'task', title: 'Write the tiers' },
     { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Live lane' },
     { op: 'create', ref: 'rule', type: 'decision', title: 'One live lane.', status: 'decided', props: { outcome: 'Only one session drives the CAD app.' } },
     { op: 'create', ref: 'q', type: 'decision', title: 'Is the cert enough?' },
     { op: 'create', ref: 'view', type: 'lens', title: 'The app, flat', props: { walk: { over: ['part_of'], steps: 1 } } },
-    { op: 'link', type: 'lives_in', from: 'app', to: 'repo' },
+    { op: 'link', type: 'lives_in', from: 'app', to: 'home' },
     { op: 'link', type: 'part_of', from: 'addin', to: 'app' },
     { op: 'link', type: 'part_of', from: 'installer', to: 'addin' },
     { op: 'link', type: 'part_of', from: 'docs', to: 'addin' },
@@ -54,7 +72,7 @@ async function fixture() {
     { op: 'link', type: 'part_of', from: 'hover', to: 'addin' },
     { op: 'link', type: 'part_of', from: 'extras', to: 'addin' },
     { op: 'link', type: 'part_of', from: 'guide', to: 'docs' },
-    { op: 'link', type: 'part_of', from: 'bug', to: 'docs' },
+    { op: 'link', type: 'part_of', from: 'crash', to: 'docs' },
     { op: 'link', type: 'part_of', from: 'loose', to: 'app' },
     { op: 'link', type: 'part_of', from: 'pricing', to: 'business' },
     { op: 'link', type: 'part_of', from: 'q', to: 'installer' },
@@ -69,10 +87,10 @@ async function fixture() {
     { op: 'link', type: 'needs', from: 'sign', to: 'lane' },
     { op: 'link', type: 'about', from: 'lane', to: 'rule' },
     { op: 'link', type: 'link', from: 'sign', to: 'q' },
-    { op: 'link', type: 'ships', from: 'release', to: 'addin' },
-    { op: 'link', type: 'depends_on', from: 'release', to: 'installer' },
-    { op: 'link', type: 'depends_on', from: 'release', to: 'pricing' },
-    { op: 'link', type: 'defers', from: 'release', to: 'hover' },
+    { op: 'link', type: 'produced', from: 'launch', to: 'addin' },
+    { op: 'link', type: 'depends_on', from: 'launch', to: 'installer' },
+    { op: 'link', type: 'depends_on', from: 'launch', to: 'pricing' },
+    { op: 'link', type: 'link', from: 'launch', to: 'hover' },
     { op: 'link', type: 'about', from: 'view', to: 'app' },
   ]);
   // Each made a minute apart, in the order of their titles: what is ordered by when it changed has one order.
@@ -98,20 +116,17 @@ async function answers() {
     'graph newest blocking': await ask('graph', {}),
     'graph newest structure closed': await ask('graph', { relations: 'structure', include_closed: true }),
     'graph newest all system': await ask('graph', { relations: 'all', include_system: true }),
-    'tree roots': await ask('tree', {}),
-    'tree app': await ask('tree', { root: made.app }),
-    'tree business': await ask('tree', { root: made.business }),
-    'tree addin': await ask('tree', { root: made.addin }),
+    'tree roots': await ask('tree', { tree: 'x.roadmap' }),
+    'tree app': await ask('tree', { tree: 'x.roadmap', root: made.app }),
+    'tree business': await ask('tree', { tree: 'x.roadmap', root: made.business }),
+    'tree addin': await ask('tree', { tree: 'x.roadmap', root: made.addin }),
     'hubs app': await ask('hubs', { within: made.app }),
-    'hubs repo': await ask('hubs', { within: made.repo }),
+    'hubs home': await ask('hubs', { within: made.home }),
     'attention me': await ask('attention', { person: 'me' }),
     'attention app': await ask('attention', { within: made.app }),
     'brief sign': await ask('brief', { task: made.sign }),
     'brief hover': await ask('brief', { task: made.hover }),
     'brief installer': await ask('brief', { task: made.installer }),
-    'handoff repo': await ask('handoff', { repo: made.repo }),
-    'gate release': await ask('gate', { event: made.release }),
-    'gate events': await ask('gate', {}),
   };
   // Names for ids: the refs that made them, the workspace owner's person as "owner".
   const names = new Map<string, string>(Object.entries(made).map(([ref, id]) => [id, ref]));

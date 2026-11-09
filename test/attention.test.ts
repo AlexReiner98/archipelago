@@ -3,24 +3,27 @@
 // is the core pack's screen of its pieces. It can be read latest first.
 
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { test } from 'node:test';
 import { REPLACED } from '../src/attention.ts';
 import { type Actor, type Op } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
+import { Registry, type PackFile } from '../src/packs.ts';
 import { sessionStart } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
-import { freshWith, human } from './map.ts';
+import { freshWith, human, packsWith } from './map.ts';
 
 const agent: Actor = { kind: 'agent', name: 'test' };
+
+/** A pack written for the test with a question settled by evidence, not by anyone's word. */
+const CLAIMS = {
+  id: 'claims', version: '1', title: 'Claims', description: 'Beliefs to be tested.', requires: ['core'],
+  types: [{ id: 'claim', title: 'Claim', description: 'A belief about the world that could be wrong.', extends: 'question', statuses: { open: ['untested', 'testing'], closed: ['supported', 'refuted'] }, capabilities: { settles: { by: 'evidence', whose: 'owner' } } }],
+} as unknown as PackFile;
 
 /** The map the demo is seeded with too: two projects, and something of every reason in the first. */
 export function scenario(soon: string): Op[] {
   return [
     { op: 'create', ref: 'sam', type: 'person', title: 'Sam' },
-    { op: 'create', ref: 'site', type: 'project', title: 'Website' },
+    { op: 'create', ref: 'site', type: 'aim', title: 'Website' },
     { op: 'create', ref: 'copy', type: 'task', title: 'Write the copy', props: { due: soon } },
     { op: 'create', ref: 'fonts', type: 'task', title: 'Pick the fonts', owner: 'sam' },
     { op: 'link', type: 'waits_on', from: 'fonts', to: 'ME', props: { for: 'Your taste' } },
@@ -28,12 +31,12 @@ export function scenario(soon: string): Op[] {
     { op: 'create', ref: 'contract', type: 'task', title: 'Sign the contract' },
     { op: 'link', type: 'depends_on', from: 'launch', to: 'contract' },
     { op: 'create', ref: 'host', type: 'decision', title: 'Which host?' },
-    { op: 'create', ref: 'blog', type: 'hypothesis', title: 'People read the blog' },
+    { op: 'create', ref: 'blog', type: 'claim', title: 'People read the blog' },
     { op: 'create', ref: 'chore', type: 'task', title: 'Tidy the old pages' },
     { op: 'create', ref: 'news', type: 'task', title: 'Draft the newsletter', props: { tokens_estimated: 20000 } },
     { op: 'create', ref: 'cms', type: 'decision', title: 'Which CMS?' },
     ...['copy', 'fonts', 'launch', 'contract', 'host', 'blog', 'chore', 'news', 'cms'].map((ref) => ({ op: 'link' as const, type: 'part_of', from: ref, to: 'site' })),
-    { op: 'create', ref: 'garden', type: 'project', title: 'Garden' },
+    { op: 'create', ref: 'garden', type: 'aim', title: 'Garden' },
     { op: 'create', ref: 'seeds', type: 'task', title: 'Order the seeds', props: { due: soon } },
     { op: 'link', type: 'part_of', from: 'seeds', to: 'garden' },
   ];
@@ -43,9 +46,7 @@ type Item = { id: string; title: string; reasons: { why: string; [k: string]: un
 type Answer = { person: string | null; counts: Record<string, number>; items: Item[]; to_confirm?: { upto: number; on_agents_judgment: number } };
 
 test('attention finds every reason, for the right person, within a scope, and the old views say where to look', async () => {
-  const packs = mkdtempSync(join(tmpdir(), 'pelago-attention-'));
-  cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
-  const l = await freshWith(new Registry(packs));
+  const l = await freshWith(new Registry(packsWith(CLAIMS)));
   const me = ((await callTool(l, human, 'init', { name: 'Alex' })) as { me: string }).me;
   const soon = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
   const ops = scenario(soon).map((o) => (o.op === 'link' && o.to === 'ME' ? { ...o, to: me } : o));
@@ -105,9 +106,7 @@ test('attention finds every reason, for the right person, within a scope, and th
 });
 
 test('attention can be read latest first, each item saying when it last changed', async () => {
-  const packs = mkdtempSync(join(tmpdir(), 'pelago-attention-'));
-  cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
-  const l = await freshWith(new Registry(packs));
+  const l = await freshWith(new Registry(packsWith(CLAIMS)));
   const me = ((await callTool(l, human, 'init', { name: 'Alex' })) as { me: string }).me;
   const soon = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
   const made = ((await l.change(human, { reason: 'test', ops: [

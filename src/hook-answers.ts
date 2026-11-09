@@ -3,7 +3,6 @@
 // answered as well by a server it has not spoken to before.
 
 import { SETUP_VERSION, setupCommand } from './connect.ts';
-import { addCommits } from './commits.ts';
 import type { Q } from './db.ts';
 import type { Archipelago, May } from './pelago.ts';
 import { askOnReply } from './replies.ts';
@@ -34,12 +33,6 @@ export interface HookBody {
   source?: unknown;
   /** At a prompt: what was typed, as Claude Code passes it (src/frontier-prompt.ts narrows the session's start by the first). */
   prompt?: unknown;
-  /**
-   * At the start: the checkout's newest commits (id and message), which the session is asked to account for. After
-   * it: the commits the session has made so far, by full sha, and those its reply made or pushed (src/commits.ts).
-   */
-  commits?: unknown;
-  turn_commits?: unknown;
   /** At a turn's end: what the reply did since the owner's last message (src/reply-rules.ts), and that message's id. */
   reply?: unknown;
   turn?: unknown;
@@ -111,9 +104,8 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   // The hook counts what the session has used so far; it is recorded before anything else, so an ending session's last tokens reach its work.
   if (event !== 'session-start') await recordUsage(pelago, body.session_id, body.tokens).catch((err) => console.error(`hook usage: ${(err as Error).message}`));
   // And what it touched, so that report, action session_end, asks about those when it ends.
-  const run = event !== 'session-start' && body.session_id && (Array.isArray(body.touched) || Array.isArray(body.commits) || typeof body.title === 'string') ? await resolveRun(pelago, body.session_id, true) : undefined;
+  const run = event !== 'session-start' && body.session_id && (Array.isArray(body.touched) || typeof body.title === 'string') ? await resolveRun(pelago, body.session_id, true) : undefined;
   if (run) await addTouched(whole, run.id, body.touched).catch((err) => console.error(`hook touched: ${(err as Error).message}`));
-  if (run) await addCommits(whole, run.id, body.commits).catch((err) => console.error(`hook commits: ${(err as Error).message}`));
   if (run) await sessionLabelled(pelago, run, body.title).catch((err) => console.error(`hook title: ${(err as Error).message}`));
   // Where its checkout stands, kept on the run while it is open: at the end, before the run is closed.
   if (event === 'stop' || event === 'session-end') await keepGit(pelago, body.session_id, body.git).catch((err) => console.error(`hook git: ${(err as Error).message}`));
