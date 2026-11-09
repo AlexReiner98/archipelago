@@ -13,8 +13,8 @@ test('every projection made again from the log is the live one', async () => {
   const l = await fresh();
   const me = (await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }])).me;
   const made = await make(l, [
-    { op: 'create', ref: 'repo', type: 'repo', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } },
-    { op: 'create', ref: 'p', type: 'project', title: 'Projections' },
+    { op: 'create', ref: 'repo', type: 'place', title: 'Apex repo', props: { exclusive: true } },
+    { op: 'create', ref: 'p', type: 'task', title: 'Projections' },
     { op: 'create', ref: 't', type: 'task', title: 'Project the facts', owner: me },
     { op: 'create', ref: 'u', type: 'task', title: 'Read events from the log' },
     { op: 'create', ref: 'q', type: 'decision', title: 'Keep the event table?' },
@@ -41,7 +41,7 @@ test('every projection made again from the log is the live one', async () => {
   const no = (await l.change(agent, { reason: 'Rename', ops: [{ op: 'update', id: made.p, title: 'Elsewhere' }] })) as { proposal: string };
   await l.decide(human, { proposal: no.proposal, approve: false, note: 'Keep it' });
   const moot = (await l.change(agent, { reason: 'Done', ops: [{ op: 'update', id: made.u, status: 'done' }] })) as { proposal: string };
-  const open = (await l.change(agent, { reason: 'Later', ops: [{ op: 'update', id: made.p, props: { hub_at: 4 } }] })) as { proposal: string };
+  const open = (await l.change(agent, { reason: 'Later', ops: [{ op: 'update', id: made.p, props: { priority: 'high' } }] })) as { proposal: string };
   await make(l, [{ op: 'update', id: made.u, status: 'done' }]);
   const edit = (await l.change(human, { reason: 'Reshape', ops: [{ op: 'update', id: twice.s, title: 'Cited once' }, { op: 'archive', id: twice.s }] })) as { changeset: string };
   await undo(l, human, { changeset: edit.changeset });
@@ -66,9 +66,9 @@ test('every projection made again from the log is the live one', async () => {
 test('what is inside what, all the way down, follows every link made, ended and moved, and is read by index', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'top', type: 'project', title: 'Top' },
-    { op: 'create', ref: 'mid', type: 'project', title: 'Middle' },
-    { op: 'create', ref: 'other', type: 'project', title: 'Other' },
+    { op: 'create', ref: 'top', type: 'task', title: 'Top' },
+    { op: 'create', ref: 'mid', type: 'task', title: 'Middle' },
+    { op: 'create', ref: 'other', type: 'task', title: 'Other' },
     { op: 'create', ref: 'a', type: 'task', title: 'A', body: 'See {mid} first.' },
     { op: 'create', ref: 'b', type: 'task', title: 'B' },
     { op: 'link', type: 'part_of', from: 'mid', to: 'top' },
@@ -95,7 +95,7 @@ test('what a change set did is read from the log, not kept a second time as even
   const l = await fresh();
   const start = await latestSeq(l);
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'History' },
+    { op: 'create', ref: 'p', type: 'task', title: 'History' },
     { op: 'create', ref: 't', type: 'task', title: 'Read it back' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
