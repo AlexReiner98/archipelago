@@ -130,6 +130,8 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
           // Two people made one: what was private to the dropped one is the kept one's, or nobody could read it again.
           const mine = await ownerRows<{ id: string }>(tx, `select id from entity where private_to = $1 -- index entity_private_to`, [op.drop]);
           await said([...moves, ...owned.map((o): Fact => ['+', o.id, 'owner', op.keep]), ...mine.map((o): Fact => ['+', o.id, 'private_to', op.keep])]);
+          // Projected as the tables' owner, as a forget's rows are: the person merging cannot see those rows to move them.
+          if (mine.length) await asOwner(tx, [`update entity set private_to = $1, updated_at = $3 where id = any($2::text[])`], [op.keep, mine.map((o) => o.id), when]);
           const now = (await map.entity(op.keep, tx))!;
           const body = drop.body && keep.body.includes(drop.body) ? keep.body : [keep.body, drop.body].filter(Boolean).join('\n\n'); // a merge finished again adds nothing twice
           await said(changedFacts(now, { ...now, props: { ...drop.props, ...keep.props }, body }));
