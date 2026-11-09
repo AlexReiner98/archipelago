@@ -126,7 +126,7 @@ test('in a browser, a change that only makes an item is drawn when it is all tha
   const { base, call } = await serve('off');
   await call('/api/workspace_set', undefined, { agent_changes: 'hold' });
   await call('/agent/change', undefined, { actor: 'robot', reason: 'held alone', ops: [{ op: 'create', type: 'task', title: 'Nothing else held' }] });
-  const page = await open(`${base}/#/v?find=held&shape=list`);
+  const page = await open(`${base}/#/v?find=held`);
   try {
     const row = `[...document.querySelectorAll('#canvas a')].find((a) => a.textContent.includes('Nothing else held'))`;
     assert.ok(await page.until(`Boolean(${row})`), `drawn, though the query finds nothing yet: ${await page.evaluate("document.querySelector('#canvas')?.innerText")}`);

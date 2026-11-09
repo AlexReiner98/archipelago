@@ -3,44 +3,68 @@
 // how drawings draw is test/layouts.test.ts and the files beside it.
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { readSteps, stepsShown } from '../src/query-steps.ts';
 import { keptPicture } from '../src/query-saved.ts';
-import { system } from './layout-golden.ts';
 import { fresh, make } from './map.ts';
 import { serve } from './serve.ts';
 
+/** A small system on the map, its picture kept as a view drawn as a map, and a style about it saying so. */
+async function system(call: (path: string, token?: string, body?: unknown) => Promise<any>) {
+  const made = (await call('/api/change', undefined, { reason: 'test', ops: [
+    // Core's types alone: a new workspace on this server is an island map, where only the shared set is taken.
+    { op: 'create', ref: 'p', type: 'work', title: 'A system' },
+    { op: 'create', ref: 'a', type: 'task', title: 'Doors' },
+    { op: 'create', ref: 'b', type: 'task', title: 'Store' },
+    { op: 'link', type: 'part_of', from: 'a', to: 'p' },
+    { op: 'link', type: 'part_of', from: 'b', to: 'p' },
+    { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
+  ] })).result.created as Record<string, string>;
+  const kept = await call('/api/change', undefined, { reason: 'test', ops: [
+    { op: 'create', ref: 's', type: 'style', title: 'As a map', status: 'current', props: { shape: 'map' } },
+    { op: 'link', type: 'about', from: 's', to: made.p },
+  ] });
+  return { ...made, ...kept.result.created } as Record<string, string>;
+}
+
+const shipped = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'core', 'pack.json'), 'utf8')).layouts.find((d: { id: string }) => d.id === 'core.map');
+
 test('a picture is sent the drawing its shape is drawn by, once, and the owner’s version stands in module by module', async () => {
   const { call } = await serve('off');
-  const { p, s } = await system(call);
+  const { s } = await system(call);
   const first = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [] } })).result.style.drawing;
-  assert.equal(first.id, 'core.architecture');
-  assert.deepEqual(Object.keys(first.modules).sort(), ['boards.js', 'boats.js', 'deep.js', 'index.js', 'islands.js', 'layout.js', 'look.js', 'marks.js', 'moves.js', 'play.js', 'route.js', 'says.js', 'sides.js', 'story-look.js', 'story.js', 'tree.js']);
+  assert.equal(first.id, 'core.map');
+  assert.deepEqual(Object.keys(first.modules).sort(), Object.keys(shipped.modules).sort());
   assert.match(first.hash, /^[0-9a-f]{64}$/);
   // A page that has it is sent only its name.
   const again = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [first.hash] } })).result.style.drawing;
-  assert.deepEqual(again, { id: 'core.architecture', title: 'Architecture', shape: 'architecture', hash: first.hash });
-  // With nothing kept for it, a picture is drawn as a flow, by the core pack's flow drawing.
+  assert.deepEqual(again, { id: 'core.map', title: 'Map', shape: 'map', hash: first.hash });
+  // With nothing kept for it, and with a layout retired on 9 Nov 2026, a picture is drawn as the map.
   const holding = (await call('/api/view', undefined, { name: 'style', params: { have: [] } })).result.style;
-  assert.equal(holding.drawing.id, 'core.flow');
+  assert.equal(holding.drawing.id, 'core.map');
+  const retired = (await call('/api/view', undefined, { name: 'style', params: { shape: 'architecture', have: [first.hash] } })).result.style;
+  assert.deepEqual([retired.shape, retired.drawing.id], ['map', 'core.map']);
 
   // The owner's version changes one module; the rest are the pack's.
-  const look = 'export const css = `.ar-part { cursor: help; }`;\n';
-  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Architecture, mine', props: { preset: 'core.architecture', modules: { 'look.js': look } } }] });
+  const look = 'export const css = `.lf-step { cursor: help; }`;\n';
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Map, mine', props: { preset: 'core.map', modules: { 'look.js': look } } }] });
   const mine = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [first.hash] } })).result.style.drawing;
   assert.notEqual(mine.hash, first.hash);
   assert.equal(mine.modules['look.js'], look);
   assert.equal(mine.modules['index.js'], first.modules['index.js']);
 
   // An agent's version waits for the human: it is code that runs in whoever looks.
-  const asked = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Architecture, the agent’s', props: { modules: { 'look.js': look } } }] });
+  const asked = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Map, the agent’s', props: { modules: { 'look.js': look } } }] });
   assert.equal(asked.result.status, 'proposed');
   // Unless the owner lets agents change drawings here: it runs in the sandbox either way.
   assert.equal((await call('/api/workspace_set', undefined, { agent_code: true, agent_changes: 'apply' })).result.agent_code, true);
-  const made = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Architecture, the agent’s again', props: { modules: { 'look.js': look } } }] });
+  const made = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Map, the agent’s again', props: { modules: { 'look.js': look } } }] });
   assert.equal(made.result.status, 'applied');
   // What else is held is held still: a change to what anyone sees is the human's.
-  const shown = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'update', id: p, visibility: 'public' }] });
+  const doc = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'shared_document', title: 'About it' }] })).result.created.d;
+  const shown = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'update', id: doc, visibility: 'public' }] });
   assert.equal(shown.result.status, 'proposed');
 });
 

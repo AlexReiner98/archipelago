@@ -25,7 +25,7 @@ test('a view kept before the flat lens is translated once into the flat lens its
     { op: 'create', ref: 'cut', type: 'lens', title: 'Shortcut to Q' },
     { op: 'create', ref: 'whole', type: 'lens', title: 'Features' },
     { op: 'create', ref: 'none', type: 'lens', title: 'The whole map' },
-    { op: 'create', ref: 'st', type: 'style', title: 'As architecture', props: { shape: 'architecture' } },
+    { op: 'create', ref: 'st', type: 'style', title: 'As a map', props: { shape: 'map' } },
     { op: 'link', type: 'about', from: 'about', to: 'p' },
     { op: 'link', type: 'about', from: 'cut', to: 'p' },
     { op: 'link', type: 'about', from: 'st', to: 'about' },

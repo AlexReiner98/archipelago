@@ -43,27 +43,27 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
     { id: 'software.public_colours', title: "A product's public page colours", preset: 'software.public_colours' },
   ];
   const whole = await run();
-  assert.deepEqual([whole.style.shape, whole.style.lit, whole.style.open, whole.used], ['flow', 'all', 1, [house, ...added, canvas]]);
+  assert.deepEqual([whole.style.shape, whole.style.lit, whole.style.open, whole.used], ['map', 'all', 1, [house, ...added, canvas]]);
   // Kept on the map: the workspace's style (about nothing), then those about what the picture is of, then one named.
   const drawn = await make(l, [
-    { op: 'create', ref: 'ws', type: 'style', title: 'House style', props: { shape: 'list', open: 1, colors: { sea: '#f0f4f5' } } },
+    { op: 'create', ref: 'ws', type: 'style', title: 'House style', props: { shape: 'map', open: 1, colors: { sea: '#f0f4f5' } } },
     { op: 'create', ref: 'ps', type: 'style', title: 'P opened', props: { open: 2 } },
-    { op: 'create', ref: 'spare', type: 'style', title: 'Spare', status: 'retired', props: { shape: 'flow' } },
+    { op: 'create', ref: 'spare', type: 'style', title: 'Spare', status: 'retired', props: { shape: 'map' } },
     { op: 'link', type: 'about', from: 'ps', to: made.p },
   ]);
   const opened = await run();
-  // The canvas pack's preset lies over the workspace's own style (over: workspace): its flow is the default for now.
-  assert.deepEqual([opened.style.shape, opened.style.open, opened.style.colors], ['flow', 1, { sea: '#f0f4f5' }], 'the workspace’s own, under the canvas');
+  // The canvas pack's preset lies over the workspace's own style (over: workspace): its map is the default.
+  assert.deepEqual([opened.style.shape, opened.style.open, opened.style.colors], ['map', 1, { sea: '#f0f4f5' }], 'the workspace’s own, under the canvas');
   // A named set (sizes, colours) is merged name by name: a style that sets one size keeps the house style's others.
   assert.equal(typeof opened.style.sizes.flow_layer_gap, 'number');
   assert.deepEqual(opened.used, [house, ...added, { id: drawn.ws, title: 'House style' }, canvas]);
   const ofP = await run({ of: made.p });
-  assert.deepEqual([ofP.style.open, ofP.style.shape], [2, 'flow'], 'a field the nearer one names replaces it; one it does not falls through');
+  assert.deepEqual([ofP.style.open, ofP.style.shape], [2, 'map'], 'a field the nearer one names replaces it; one it does not falls through');
   assert.deepEqual(ofP.used.map((k: any) => k.title), ['House style', ...added.map((a) => a.title), 'House style', 'Canvas', 'P opened']);
   // The owner's version of a preset: its fields over the preset's, in its place; retired, the preset is not used.
   const mine = await make(l, [{ op: 'create', ref: 'v', type: 'style', title: 'Mine', props: { preset: 'core.house', lit: 'blocked' } }]);
   const versioned = await run();
-  assert.deepEqual([versioned.style.lit, versioned.style.shape, versioned.used[0]], ['blocked', 'flow', { id: mine.v, title: 'Mine', preset: 'core.house' }]);
+  assert.deepEqual([versioned.style.lit, versioned.style.shape, versioned.used[0]], ['blocked', 'map', { id: mine.v, title: 'Mine', preset: 'core.house' }]);
   await make(l, [{ op: 'update', id: mine.v, status: 'retired' }]);
   assert.deepEqual((await run()).used.map((k: any) => k.title), [...added.map((a) => a.title), 'House style', 'Canvas'], 'retired, the preset is not used');
   await make(l, [{ op: 'update', id: mine.v, status: 'current' }, { op: 'update', id: mine.v, props: { lit: null } }]);
@@ -73,19 +73,19 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
   assert.deepEqual([kinded.style.sizes.list_row, typeof kinded.style.sizes.flow_layer_gap], [40, 'number'], 'one size changed, the house style keeps the rest');
   assert.deepEqual([kinded.style.open, kinded.style.radius], [2, 4], "the item's own over its kind's, the kind's over the workspace's");
   await make(l, [{ op: 'archive', id: onKind.k }]);
-  assert.equal((await run({ style: drawn.spare })).style.shape, 'flow', 'a style named outright is used, retired or not');
+  assert.equal((await run({ style: drawn.spare })).style.shape, 'map', 'a style named outright is used, retired or not');
   await assert.rejects(run({ style: 'e_nothing0' }), /No style/);
 
   // A view kept about an item: what it holds of how it is drawn lies over the rest, and a style about it says nothing.
   const kept = await make(l, [
-    { op: 'create', ref: 'road', type: 'lens', title: 'Roadmap', props: { place: 1, filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'grid', open: 4 } } },
+    { op: 'create', ref: 'road', type: 'lens', title: 'Roadmap', props: { place: 1, filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'map', open: 4 } } },
     { op: 'link', type: 'about', from: 'road', to: made.p },
     { op: 'create', ref: 'rs', type: 'style', title: 'Road opened', props: { open: 9 } },
     { op: 'link', type: 'about', from: 'rs', to: 'road' },
   ]);
   const { keptPicture } = await import('../src/query-saved.ts');
   const road = await keptPicture(l, kept.road);
-  assert.deepEqual([road.items.map((i) => i.title).sort(), road.style.shape, road.style.open], [['C', 'Early', 'Late', 'P'], 'grid', 4]);
+  assert.deepEqual([road.items.map((i) => i.title).sort(), road.style.shape, road.style.open], [['C', 'Early', 'Late', 'P'], 'map', 4]);
 
   // A hub is an item that holds enough to need views of its own: how much is enough is its project's to say.
   assert.deepEqual(((await ask(l, 'hubs', { within: made.p })) as any).hubs, [], 'five things are not twelve');

@@ -15,7 +15,7 @@ const browser = chrome();
 test('an agent makes and changes a saved canvas through change, and report show opens it', async () => {
   const l = await fresh();
   const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'project', title: 'P' }]);
-  const asked = { reason: 'test: a canvas of P', ops: [{ op: 'create' as const, ref: 'c', type: 'lens', title: 'P and its parts', body: 'P and what it holds.', props: { filter: { find: [`id ${p}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'flow' } } }] };
+  const asked = { reason: 'test: a canvas of P', ops: [{ op: 'create' as const, ref: 'c', type: 'lens', title: 'P and its parts', body: 'P and what it holds.', props: { filter: { find: [`id ${p}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'map' } } }] };
   const made = (await callTool(l, agent, 'change', asked)) as { status: string; created?: Record<string, string>; proposal?: string };
   // Held for a person, as every agent's change is until the owner lets them apply: approved, it is made.
   const id = made.created?.c ?? ((await l.change(human, asked)) as { created: Record<string, string> }).created.c;
@@ -30,19 +30,12 @@ test('an agent makes and changes a saved canvas through change, and report show 
   assert.ok(!drawn.items.some((i) => i.id === id), 'not drawn on a canvas of the work');
 });
 
-test('a drawing the page lays out says so before it is drawn, so the page gives it its box first', async () => {
-  const l = await fresh();
-  const read = async (shape: string) => ((await callTool(l, human, 'view', { name: 'style', params: { shape, have: [] } })) as { style: { drawing: { flat?: boolean } } }).style.drawing;
-  assert.equal((await read('time')).flat, true);
-  assert.equal((await read('flow')).flat, undefined, 'one the frame pans and zooms does not');
-});
-
 test("a pack ships canvases as presets: the schema offers each, its lens answers, and the owner keeps their version under its id", async () => {
   const l = await fresh();
   const { canvases, shapes } = (await callTool(l, human, 'schema', {})) as { canvases: { id: string; pack: string; title: string; props: { filter: Record<string, unknown>; walk: unknown } }[]; shapes: { shape: string }[] };
   const waiting = canvases.find((c) => c.id === 'core.waiting');
   assert.ok(waiting && waiting.pack === 'core' && waiting.title, 'core ships what waits on you');
-  assert.ok(shapes.some((s) => s.shape === 'flow'), 'the shapes the drawings draw, for the style switch');
+  assert.deepEqual(shapes.filter((s) => s.shape === 'map').length, 1, 'the shapes the drawings draw, for the style switch');
   // What waits on the person looking: the lens answers as a saved one does.
   const { me } = await l.init(human, { name: 'Me' });
   const { t } = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'T' }]);
