@@ -190,7 +190,7 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
   for (const b of boxes) arcs.push([b.low, b.high, b.named[axis]]);
   // A wire's end stands on its box, inside its corners; or, where the line holds it (`ends`, a port's middle from the
   // box's: at sea, where its island put the port), at that point, the box keeping its size. Kept whatever the order.
-  const fixed = [];
+  const fixed = [], landing = new Map(), sharing = (b) => lines.filter((l) => l.a === b.id || l.b === b.id).length > 1;
   for (const s of stretches) for (const id of s.own) {
     const b = lines.box.get(id), end = s.i === 1 && id === s.line.a ? 0 : 1, held = s.line.ends?.[end];
     if (held) {
@@ -199,9 +199,17 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
       fixed.push(...[[b.low, s.n, d], [s.n, b.low, -d], [b.high, b.low, -b.named[axis]]].map((a) => Object.assign(a, { hold })));
       continue;
     }
-    // A port is where a wire passes through a box's side: its wires meet in its middle.
-    const inset = b.port ? b.size[axis] / 2 : Math.min(corner, b.size[axis] / 3);
+    // A port is where a wire passes through a box's side: its wires meet in its middle, or, on an island's side where
+    // several come in, stand along it side by side.
+    const shared = b.edge && sharing(b), inset = b.port ? (shared ? Math.min(wire / 2, b.size[axis] / 2) : b.size[axis] / 2) : Math.min(corner, b.size[axis] / 3);
     arcs.push(Object.assign([b.low, s.n, inset], { end: true }), Object.assign([s.n, b.high, inset], { end: true }));
+    if (shared) (landing.get(b) ?? landing.set(b, []).get(b)).push(s);
+  }
+  // The wires that come in at one port on an island's side stand a wire apart on it, so its bar is no wider than they
+  // are. Let go, port by port, where the rest cannot hold.
+  for (const on of landing.values()) {
+    const hold = fixed.length, sorted = [...new Set(on)].sort((p, q) => p.at - q.at || byTie(p, q));
+    for (let k = 1; k < sorted.length; k++) fixed.push(...[[sorted[k - 1].n, sorted[k].n, wire], [sorted[k].n, sorted[k - 1].n, -wire]].map((a) => Object.assign(a, { hold })));
   }
   // Each thing keeps its distance from what it can see on the low side: what stands behind that is kept off by the chain.
   const facing = (p, q) => {
@@ -237,11 +245,12 @@ function pass(axis, { lines, boxes, wire, room, run, corner, apart, join = apart
     seen.splice(from, to - from, ...left, { lo: it.lo, hi: it.hi, it }, ...right);
   }
   // A box on an edge (`edge`: [axis, way], a port on an island's frame) stands beyond every other box by `edging` and
-  // every wire by `room`, on its way; and all on one edge stand on one line, the outermost.
+  // every wire by `room`, on its way; and all on one edge stand on one line, the outermost. One that several wires come
+  // to stands a run and a room further, where they turn in under it.
   const edged = boxes.filter((b) => b.edge?.[0] === axis);
   for (const e of edged) {
-    const out = e.edge[1] < 0;
-    for (const b of boxes) if (!b.edge) fixed.push(out ? [e.high, b.low, edging] : [b.high, e.low, edging]);
+    const out = e.edge[1] < 0, off = edging + (sharing(e) ? run + room : 0);
+    for (const b of boxes) if (!b.edge) fixed.push(out ? [e.high, b.low, off] : [b.high, e.low, off]);
     for (const s of stretches) if (!s.own.includes(e.id)) fixed.push(out ? [e.high, s.n, room] : [s.n, e.low, room]);
   }
   // A box that goes `first` (an island's header) stands left of every other box and wire but those on an edge, and
