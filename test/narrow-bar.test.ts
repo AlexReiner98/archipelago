@@ -16,8 +16,8 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'site', type: 'project', title: 'Site works' },
-      { op: 'create', ref: 'roof', type: 'feature', title: 'Roof' },
+      { op: 'create', ref: 'site', type: 'aim', title: 'Site works' },
+      { op: 'create', ref: 'roof', type: 'work', title: 'Roof' },
       { op: 'create', ref: 'which', type: 'question', title: 'Which tiles?' },
       { op: 'create', ref: 'gutter', type: 'task', title: 'Gutters' },
       { op: 'create', ref: 'away', type: 'question', title: 'Elsewhere?' },

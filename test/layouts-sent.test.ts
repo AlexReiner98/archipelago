@@ -6,13 +6,23 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readSteps, stepsShown } from '../src/query-steps.ts';
 import { keptPicture } from '../src/query-saved.ts';
-import { system } from './layout-golden.ts';
 import { fresh, make } from './map.ts';
 import { serve } from './serve.ts';
 
 test('a picture is sent the drawing its shape is drawn by, once, and the owner’s version stands in module by module', async () => {
   const { call } = await serve('off');
-  const { p, s } = await system(call);
+  // A system on core's types, drawn as architecture by a style about it.
+  const { s, doc } = (await call('/api/change', undefined, {
+    reason: 'test',
+    ops: [
+      { op: 'create', ref: 'p', type: 'task', title: 'A system' },
+      { op: 'create', ref: 'a', type: 'place', title: 'Doors', status: 'available' },
+      { op: 'link', type: 'part_of', from: 'a', to: 'p' },
+      { op: 'create', ref: 's', type: 'style', title: 'As architecture', status: 'current', props: { shape: 'architecture' } },
+      { op: 'link', type: 'about', from: 's', to: 'p' },
+      { op: 'create', ref: 'doc', type: 'shared_document', title: 'A shared page' },
+    ],
+  })).result.created as Record<string, string>;
   const first = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [] } })).result.style.drawing;
   assert.equal(first.id, 'core.architecture');
   assert.deepEqual(Object.keys(first.modules).sort(), ['boards.js', 'boats.js', 'deep.js', 'index.js', 'islands.js', 'layout.js', 'look.js', 'marks.js', 'moves.js', 'play.js', 'route.js', 'says.js', 'sides.js', 'story-look.js', 'story.js', 'tree.js']);
@@ -40,19 +50,19 @@ test('a picture is sent the drawing its shape is drawn by, once, and the owner�
   const made = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'layout', title: 'Architecture, the agent’s again', props: { modules: { 'look.js': look } } }] });
   assert.equal(made.result.status, 'applied');
   // What else is held is held still: a change to what anyone sees is the human's.
-  const shown = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'update', id: p, visibility: 'public' }] });
+  const shown = await call('/agent/change', undefined, { reason: 'test', ops: [{ op: 'update', id: doc, visibility: 'public' }] });
   assert.equal(shown.result.status, 'proposed');
 });
 
 test('a picture with steps is sent them, and the finished parts they name, whatever it leaves out', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'A system' },
-    { op: 'create', ref: 'a', type: 'component', title: 'Doors', status: 'up' },
-    { op: 'create', ref: 'o', type: 'component', title: 'Old backups', status: 'retired' },
+    { op: 'create', ref: 'p', type: 'task', title: 'A system' },
+    { op: 'create', ref: 'a', type: 'place', title: 'Doors', status: 'available' },
+    { op: 'create', ref: 'o', type: 'place', title: 'Old backups', status: 'retired' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
     { op: 'link', type: 'part_of', from: 'o', to: 'p' },
-    { op: 'link', type: 'calls', from: 'a', to: 'o' },
+    { op: 'link', type: 'uses', from: 'a', to: 'o' },
   ]);
   const steps = [{ chapter: { name: 'Then', when: '7 Oct', count: 1 }, add: [made.a, made.o], titles: { [made.a]: 'Old doors' }, lines: [{ by: 'Alex', text: 'Back it up.' }] }, { remove: [made.o], lines: [{ by: 'Agent', text: 'It is gone.' }] }];
   Object.assign(made, await make(l, [{ op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', props: { filter: { find: [`part_of ${made.p}`], not: ['done', 'kind system'] }, steps } }]));
