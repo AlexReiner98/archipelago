@@ -624,9 +624,11 @@ picture, a firing, a session gone quiet) is read from that stream; the rest
 is the `activity` stream (`src/activity.ts`). Every `log_op` entry is
 numbered from the sequence `log_fact` is (step 33), so the activity log
 reads all of them in one order. The table's rows were carried into the
-`activity` stream when each workspace opened, with their numbers and times;
-the table stays, read only to carry rows, until the app before no longer
-reads it, and a later step drops it.
+`activity` stream when each workspace opened, with their numbers and times,
+and step 34 carries any left (`carryEventTable`, run before its SQL) and
+drops the table; its sequence stays, under its name, numbering both. A
+backup from before holds the table's rows: a restore carries those not yet
+in its `activity` stream the same way (`carryRows`), never into a table.
 
 ---
 

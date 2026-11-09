@@ -9,10 +9,10 @@
  * projections, written from its facts by src/replay.ts in the append's transaction (and, until the operational
  * streams hold them, by the operational writes). log_op holds the compacted streams (src/streams.ts): what is below
  * appended there at once, sealed by day in the fact stream and kept by the retention rules of the packs; what was done
- * that is neither a fact nor state is its activity stream (src/activity.ts). event is written no more: its rows were
- * carried into that stream, and it stays, read only to carry them, while the app before still reads it.
+ * that is neither a fact nor state is its activity stream (src/activity.ts), where the rows of the event table it
+ * replaced were carried before schema step 34 dropped it.
  */
-export const MAP_TABLES = ['entity', 'relation', 'event', 'log_entry', 'log_fact', 'log_op'];
+export const MAP_TABLES = ['entity', 'relation', 'log_entry', 'log_fact', 'log_op'];
 
 /** The fields operational may write on an item. Anything else on an item is a fact, and changes through change. */
 export const KEPT_FIELDS = ['last_seen', 'active', 'busy', 'git', 'tokens_used', 'story', 'stale_flagged', 'last_run', 'last_fired', 'last_result', 'rechecked_at'];

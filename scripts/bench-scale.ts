@@ -183,8 +183,8 @@ const folderSize = (path: string): number => (statSync(path).isDirectory() ? rea
 {
   const { openDb } = await import('../src/db.ts');
   const db = await openDb(where);
-  const sizes = (await db.query<Record<string, number>>(`select pg_database_size(current_database())::bigint as database, ${['entity', 'relation', 'event', 'proposal'].map((t) => `pg_total_relation_size('${t}')::bigint as ${t}`).join(', ')}`)).rows[0];
-  const counts = (await db.query<Record<string, number>>(`select (select count(*) from entity)::int as items, (select count(*) from relation)::int as links, (select count(*) from event)::int as events`)).rows[0];
+  const sizes = (await db.query<Record<string, number>>(`select pg_database_size(current_database())::bigint as database, ${['entity', 'relation', 'log_op', 'proposal'].map((t) => `pg_total_relation_size('${t}')::bigint as ${t}`).join(', ')}`)).rows[0];
+  const counts = (await db.query<Record<string, number>>(`select (select count(*) from entity)::int as items, (select count(*) from relation)::int as links, (select count(*) from log_op where stream = 'activity')::int as events`)).rows[0];
   await db.close();
   results.counts = counts;
   results.size_mb = Object.fromEntries(Object.entries({ ...sizes, ...(DB === 'pglite' && { folder: folderSize(where) }) }).map(([k, v]) => [k, Math.round(Number(v) / 1e6)]));

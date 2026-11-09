@@ -117,7 +117,8 @@ test('items and relations are written in one place', () => {
 });
 
 test('every store is named, with its rule', () => {
-  const tables = [...new Set(codeFiles.filter((f) => f.startsWith('src/')).flatMap((f) => [...read(f).matchAll(/create table if not exists (\w+)/gi)].map((m) => m[1])))];
+  const made = (re: RegExp) => new Set(codeFiles.filter((f) => f.startsWith('src/')).flatMap((f) => [...read(f).matchAll(re)].map((m) => m[1])));
+  const tables = [...made(/create table if not exists (\w+)/gi)].filter((t) => !made(/drop table if exists (\w+)/gi).has(t)); // one a later step drops is no store
   const named = [...MAP_TABLES, ...Object.keys(STORES)];
   assert.deepEqual(tables.filter((t) => !named.includes(t)), [], 'Name the store in src/operational.ts, with the one rule it keeps.');
   assert.deepEqual(named.filter((t) => !tables.includes(t)), [], 'A store src/operational.ts names that no longer exists: take it out.');

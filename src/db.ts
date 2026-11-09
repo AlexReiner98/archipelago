@@ -2,7 +2,7 @@
 
 import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -164,10 +164,4 @@ export function anyone(db: Db): Db {
   };
 }
 
-const ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
-
-export function newId(prefix: string): string {
-  let out = '';
-  for (const byte of randomBytes(8)) out += ALPHABET[byte % ALPHABET.length];
-  return `${prefix}_${out}`;
-}
+export { newId } from './ids.ts';

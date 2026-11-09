@@ -166,8 +166,8 @@ test('a forgotten item is gone from every read', async () => {
   const task = (await l.get(made.t)) as { entity: { owner: string | null }; outgoing: { type: string }[] };
   assert.equal(task.entity.owner, null, 'what it owned is owned by no one');
   assert.deepEqual(task.outgoing.map((r) => r.type), ['part_of'], 'its links are gone with it');
-  const tables = JSON.stringify((await l.db.query(`select (select jsonb_agg(e) from event e) as events, (select jsonb_agg(p) from proposal p) as proposals, (select count(*) from picture) as pictures`)).rows);
-  assert.ok(!tables.includes('Quill') && !tables.includes('Salary'), 'not in the events, proposals or pictures');
+  const tables = JSON.stringify((await l.db.query(`select (select jsonb_agg(p) from proposal p) as proposals, (select count(*) from picture) as pictures`)).rows);
+  assert.ok(!tables.includes('Quill') && !tables.includes('Salary'), 'not in the proposals or pictures');
   assert.ok(tables.includes('"pictures":0'));
 
   // The fact stream replays into the rows the map has: the forgotten item and its links nowhere.
@@ -192,7 +192,7 @@ test('a backup taken before a forget cannot bring the item back', async () => {
   assert.equal(await now.entity(made.sam), undefined);
   assert.equal((await now.entity(made.t))!.title, 'Offer letter', 'the rest comes back whole');
   assert.equal((await now.entity(made.t))!.owner, null);
-  assert.ok(!JSON.stringify((await now.db.query(`select * from entity, relation, event`)).rows).includes('Quill'));
+  assert.ok(!JSON.stringify((await now.db.query(`select * from entity, relation`)).rows).includes('Quill'));
   assert.deepEqual((await verify(now.db)).problems, [], 'its log comes with it, and verifies');
 
   // Without a vault it cannot be read at all; with the vault of before it can: the vault's backups bound the window.

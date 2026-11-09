@@ -65,6 +65,22 @@ grant execute on function pelago_log_forget(text[], jsonb), pelago_forget_stores
 `;
 
 /**
+ * Step 34: what a forget clears beside the log, with no event table. What was done to an item is in the activity
+ * stream since, sealed with the item's key, so the forget's destroying that key takes it.
+ */
+export const FORGET_STORES = `
+create or replace function pelago_forget_stores(item text, reasons text[], held text[]) returns void language plpgsql security definer set search_path = public as $fn$
+begin
+  delete from picture where entity_id = item;
+  delete from share where entity_id = item;
+  delete from published where entity_id = item;
+  update proposal set ops = '[]', warnings = '[]', source = null, note = 'Forgotten with what it touched',
+    status = case when status = 'pending' then 'superseded' else status end where id = any(held);
+  update proposal set reason = '' where id = any(reasons);
+end $fn$;
+`;
+
+/**
  * Run statements as the tables' owner, in a transaction that may have dropped to a viewer's role: a forget reaches rows
  * its maker cannot see (an item private to someone else that the forgotten person owns). Back to that role after.
  */
