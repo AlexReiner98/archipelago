@@ -284,12 +284,14 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
 
   const tieLayer = g.ties.map((t, n) => {
     const cls = `${kind(t.type)}${onYou(t)}${pend(t.pending)}`;
-    const path = m('path', { key: `n:${n}`, d: line(t), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${headless.has(t.type) ? '' : ' headed'}${cls}`, ...drawIn, ...hidden });
+    const path = m('path', { key: `n:${n}`, d: line(t), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${headless.has(t.type) ? '' : ' headed'}${t.dashed ? ' dashed' : ''}${cls}`, ...drawIn, ...hidden });
     // A read that ends on a finding's name has no head of its own: the wire from the name to the finding carries it.
     return headless.has(t.type) || t.toPort ? path : [path, m('path', { key: `nh:${n}`, d: tieHead(t), class: `lf-head${cls}`, ...hidden })];
   });
   const wireLayer = g.chains.map((c, n) => {
-    return [m('path', { key: `w:${n}`, d: line(c), class: `lf-wire${kind(ORDER_TYPE)}${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden }), m('path', { key: `h:${n}`, d: head(c.points), class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}`, ...hidden })];
+    // A wire that ends on a trunk (a bundle's, ./bundle.js) has no head of its own: the trunk's wire carries it.
+    const wire = m('path', { key: `w:${n}`, d: line(c), class: `lf-wire${kind(ORDER_TYPE)}${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden });
+    return c.toPort ? [wire] : [wire, m('path', { key: `h:${n}`, d: head(c.points), class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}`, ...hidden })];
   });
   // The badges of held links, with the wire or tie each sits on, so a step moved takes them with its wires. A link of a
   // new item held in the same change is decided with it: the item's badge is the one.

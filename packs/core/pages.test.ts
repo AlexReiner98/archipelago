@@ -11,7 +11,7 @@ import test from 'node:test';
 
 // The drawing's modules laid out by the names it imports them by, as the sandbox serves them (pack.json, drawings).
 const core = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
-const laid = mkdtempSync(join(tmpdir(), 'pages-'));
+const laid = mkdtempSync(join(tmpdir(), 'pelago-pages-'));
 for (const [name, file] of Object.entries(core.layouts.find((d: any) => d.id === 'core.pages').modules as Record<string, string>)) copyFileSync(join(import.meta.dirname, file), join(laid, name));
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 
