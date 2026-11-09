@@ -135,8 +135,26 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
 
   // 6. Share: a view of the plan, as a link anyone opens with no login, drawn live in the sandbox, with a way to start
   // a map of their own.
-  const lens = ((await person('change', { reason: 'A view to share', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'The login plan', visibility: 'shared', props: { filter: { find: [`in ${ids.hub}`], not: [] }, walk: { over: [], steps: 0 } } }] })) as { created: Record<string, string> }).created.v;
-  const link = (await person('share_create', { id: lens })) as { path: string };
+  // Made where a person is: the view up on the canvas, its band's menu, Make a link to see it (saved first, named in
+  // the page), the link shown once.
+  const sharer = await open(`${base}/#/v?find=in+${ids.hub}`);
+  let link: { path: string };
+  try {
+    assert.ok(await sharer.until(`Boolean(document.querySelector('.q-band-menu'))`, 20000), 'the band has its menu');
+    await sharer.evaluate(`document.querySelector('.q-band-menu').click()`);
+    assert.ok(await sharer.until(`[...document.querySelectorAll('.tab-menu button')].some((b) => b.textContent === 'Make a link to see it')`), 'the menu offers a link');
+    await sharer.evaluate(`[...document.querySelectorAll('.tab-menu button')].find((b) => b.textContent === 'Make a link to see it').click()`);
+    // Named first, since a link shows a view kept on the map; then asked; then the link, once.
+    assert.ok(await sharer.until(`Boolean(document.querySelector('dialog.ask textarea'))`), 'asked for a name');
+    await sharer.evaluate(`(() => { const d = document.querySelector('dialog.ask'); d.querySelector('textarea').value = 'The login plan'; d.querySelector('button[value="ok"]').click(); })()`);
+    assert.ok(await sharer.until(`document.querySelector('dialog.ask h2')?.textContent.startsWith('Make a link to')`, 10000), 'asked to make the link');
+    await sharer.evaluate(`document.querySelector('dialog.ask button[value="ok"]').click()`);
+    assert.ok(await sharer.until(`(document.querySelector('dialog.ask .ask-message')?.textContent ?? '').includes('/s/')`, 10000), `the link is shown: ${sharer.logs().join(' ').slice(0, 400)}`);
+    const message = await sharer.evaluate<string>(`document.querySelector('dialog.ask .ask-message').textContent`);
+    link = { path: new URL(message.trim().split(/\s+/)[0]).pathname };
+  } finally {
+    await sharer.close();
+  }
   assert.match(link.path, /^\/s\//);
   const reader = await open(`${base}${link.path}`);
   try {

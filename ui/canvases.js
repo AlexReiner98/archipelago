@@ -154,6 +154,28 @@ async function save(lens, style, current, open, fresh = false) {
   const id = same?.id ?? made.created?.canvas;
   savedCanvases(true);
   if (id) open(`#/v?${addressOf(lens, { ...style, canvas: id })}`);
+  return id ? { id, title } : null;
+}
+
+/**
+ * A link anyone opens with no login, to the view that is up, drawn live (share_create, src/share-view.ts): saved first
+ * when it is not, since a link shows a view kept on the map. The link is shown once and put on the clipboard.
+ */
+async function shareView(lens, style, current, open) {
+  const kept = current && !current.preset ? { id: current.id, title: current.title } : await save(lens, style, current, open, true);
+  if (!kept) return;
+  const yes = await ask({ title: `Make a link to "${kept.title}"?`, message: 'Anyone with the link can see this view, with no login, as it stands each time it is opened, until the link is revoked.', action: 'Make link' });
+  if (!yes) return;
+  try {
+    const made = await api('share_create', { id: kept.id });
+    const url = `${location.origin}${made.path}`;
+    const copied = await navigator.clipboard?.writeText(url).then(() => true, () => false);
+    tell(copied ? 'Link copied' : 'Link made', `${url}
+
+Shown once: it is not stored and cannot be shown again. Revoke it from the view's page.`);
+  } catch (err) {
+    tell('No link was made', err.message);
+  }
 }
 
 /** Delete a saved canvas, after asking: it is retired (a lens's closed status), so it leaves the bar and Home and can
@@ -211,7 +233,7 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const travel = own.filter((b) => b.classList.contains('q-travel'));
     // Each picker marked before it, its tooltip saying what it is.
     const named = (mark, title) => h('span', { class: 'q-label q-pick-label', title, 'aria-hidden': 'true' }, mark);
-    part.replaceChildren(...travel, named(canvasMark(), 'View: the saved view up'), pick, h('button', { type: 'button', class: 'q-save q-word', title: current ? (changed ? `Save the changes to “${current.title}”` : working(current) ? `Keep “${current.title}”: an agent’s view, retired with what it is about until you keep it` : `“${current.title}” is kept`) : 'Save this view', 'aria-label': 'Save this view', ...(current && !changed && !current.preset && !working(current) && { disabled: true }), onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, changed ? 'Save •' : working(current) ? 'Keep' : 'Save')), ...(current && !current.preset ? [h('button', { type: 'button', class: 'q-save q-delete', title: `Delete “${current.title}”`, 'aria-label': 'Delete this saved view', onclick: () => drop(lens, style, current, open) }, binMark())] : []), ...own.filter((b) => !travel.includes(b)), canvasMenu([{ element: h('label', { class: 'q-look-row', title: 'Layout: how this view is arranged' }, h('span', { class: 'muted' }, 'Layout'), lookSwitch(lens, style, open)) }, current && { text: 'Save as new view', title: 'Keep what is up as a view of its own', act: () => save(lens, style, current, open, true) }, styleDelete(lens, style, open)]));
+    part.replaceChildren(...travel, named(canvasMark(), 'View: the saved view up'), pick, h('button', { type: 'button', class: 'q-save q-word', title: current ? (changed ? `Save the changes to “${current.title}”` : working(current) ? `Keep “${current.title}”: an agent’s view, retired with what it is about until you keep it` : `“${current.title}” is kept`) : 'Save this view', 'aria-label': 'Save this view', ...(current && !changed && !current.preset && !working(current) && { disabled: true }), onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, changed ? 'Save •' : working(current) ? 'Keep' : 'Save')), ...(current && !current.preset ? [h('button', { type: 'button', class: 'q-save q-delete', title: `Delete “${current.title}”`, 'aria-label': 'Delete this saved view', onclick: () => drop(lens, style, current, open) }, binMark())] : []), ...own.filter((b) => !travel.includes(b)), canvasMenu([{ element: h('label', { class: 'q-look-row', title: 'Layout: how this view is arranged' }, h('span', { class: 'muted' }, 'Layout'), lookSwitch(lens, style, open)) }, current && { text: 'Save as new view', title: 'Keep what is up as a view of its own', act: () => save(lens, style, current, open, true) }, { text: 'Make a link to see it', title: 'A link anyone can open with no login: this view, drawn live (saved first if it is not)', act: () => shareView(lens, style, current, open) }, styleDelete(lens, style, open)]));
     fitBar();
   });
   return part;
