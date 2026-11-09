@@ -149,7 +149,11 @@ export async function rotateGrant(db: Q, workspace: string, refresh: string, cli
  */
 export async function verifyToken(db: Db, token: string, from?: string, ws = 'default'): Promise<Identity | undefined> {
   const { rows } = await db.query<{ id: string; hash: string; kind: 'human' | 'agent'; name: string; entity_id: string | null; admin: boolean; within: string[] | null; may: May; seen: string[] | null; last_used: Date | null; hosted: boolean }>(
-    `select id, hash, kind, name, entity_id, admin, within, coalesce(may, 'change') as may, seen, last_used, granted is not null as hosted from token where hash = $1 and revoked_at is null and (expires_at is null or expires_at > now())`,
+    // A person merged into another acts as that other: their sign-ins and tokens follow the merge.
+    `select id, hash, kind, name, coalesce((select f.value #>> '{}' from log_fact f join entity e on e.id = f.id and e.archived_at is not null
+       where f.stream = 'facts' and f.id = t.entity_id and f.field = 'merged_into' order by f.pos desc limit 1 -- index log_fact_history
+     ), entity_id) as entity_id, admin, within, coalesce(may, 'change') as may, seen, last_used, granted is not null as hosted
+     from token t where hash = $1 and revoked_at is null and (expires_at is null or expires_at > now())`,
     [hash(token)],
   );
   const row = rows[0];

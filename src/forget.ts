@@ -78,6 +78,17 @@ export async function asOwner(tx: Q, statements: string[], params: unknown[]): P
   }
 }
 
+/** Rows read as the tables' owner, as asOwner writes: what is private to someone the reader is not. */
+export async function ownerRows<T>(tx: Q, sql: string, params: unknown[]): Promise<T[]> {
+  const { rows } = await tx.query<{ now: string; was: string }>(`select current_user as now, session_user as was`);
+  if (rows[0].now !== rows[0].was) await tx.query(`reset role`);
+  try {
+    return (await tx.query<T>(sql, params)).rows as T[];
+  } finally {
+    if (rows[0].now !== rows[0].was) await tx.query(`select set_config('role', $1, true)`, [rows[0].now]);
+  }
+}
+
 /** Every link that ever had the item at either end, as the log says. */
 async function linksOf(tx: Q, item: string): Promise<string[]> {
   const { rows } = await tx.query<{ id: string }>(`select distinct id from log_fact where field = 'link' and op = '+' and (value->>1 = $1 or value->>2 = $1)`, [item]);

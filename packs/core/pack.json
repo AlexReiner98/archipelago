@@ -914,6 +914,12 @@
       "say": "Folding one style or layout into another can bring its code along: the human's to allow."
     },
     {
+      "id": "people_merge",
+      "when": { "actor": "agent", "op": "merge", "type": ["person", "agent"] },
+      "then": "hold",
+      "say": "Making \"{title}\" one with another moves what is private to them, and their sign-ins and tokens: the owner's to allow."
+    },
+    {
       "id": "public",
       "when": { "actor": "agent", "op": ["create", "update"], "visibility": "public" },
       "then": "hold",
