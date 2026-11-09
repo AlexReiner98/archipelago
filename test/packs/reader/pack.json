@@ -1,0 +1,100 @@
+{
+  "id": "reader",
+  "version": "0.1.0",
+  "title": "Reader",
+  "description": "A pack for testing what the kernel does with writing for a reader: a public type, drawn as a document, that can be shared, published and read, and a clipping, a record whose page shows a figure.",
+  "requires": [
+    "core"
+  ],
+  "types": [
+    {
+      "id": "writing",
+      "title": "Writing",
+      "description": "Writing for a reader, made of the map: its note is the text, and a line holding only an item's id brings that item in as a section.",
+      "extends": "record",
+      "public": true,
+      "deliverable": true,
+      "statuses": {
+        "open": [
+          "draft",
+          "ready"
+        ],
+        "closed": [
+          "final",
+          "superseded",
+          "withdrawn"
+        ],
+        "phases": {
+          "final": "finished",
+          "superseded": "ended",
+          "withdrawn": "ended"
+        }
+      },
+      "fields": {
+        "for": {
+          "type": "string",
+          "description": "Who it is written for."
+        },
+        "path": {
+          "type": "string",
+          "description": "Its address word once published.",
+          "shown": true
+        },
+        "menu": {
+          "type": "number",
+          "description": "Its place in the site's header, lowest first.",
+          "shown": true
+        }
+      }
+    },
+    {
+      "id": "clipping",
+      "title": "Clipping",
+      "description": "A record whose page shows a figure.",
+      "extends": "record"
+    }
+  ],
+  "views": [
+    {
+      "form": "screen",
+      "id": "reader.reading",
+      "title": "Reading",
+      "on": [
+        "writing"
+      ],
+      "pieces": [
+        {
+          "piece": "document"
+        }
+      ]
+    },
+    {
+      "form": "screen",
+      "id": "reader.figure",
+      "title": "Figure",
+      "on": [
+        "clipping"
+      ],
+      "pieces": [
+        {
+          "piece": "figure"
+        }
+      ]
+    }
+  ],
+  "styles": [
+    {
+      "id": "reader.reading",
+      "title": "Reading writing",
+      "on": [
+        "writing"
+      ],
+      "props": {
+        "page": {
+          "picture": false,
+          "notes": "whole"
+        }
+      }
+    }
+  ]
+}

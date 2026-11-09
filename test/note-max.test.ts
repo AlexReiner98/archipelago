@@ -20,7 +20,7 @@ test('a note held to a length is not grown past it by an agent, only rewritten',
     types: [{ id: 'brief_note', extends: 'record', title: 'Brief', description: 'A note every session reads whole.', note_max: { chars: 3000, say: SAY } }],
   }));
   const l = await freshWith(new Registry(dir));
-  const { note } = await make(l, [{ op: 'create', ref: 'note', type: 'brief_note', title: 'Apex brief', body: 'Next\nRun the probe.' }]);
+  const { brief: note } = await make(l, [{ op: 'create', ref: 'brief', type: 'brief_note', title: 'Apex brief', body: 'Next\nRun the probe.' }]);
   const part = 'Next, and why\n' + 'Run the probe on a real model. '.repeat(40);
   for (let i = 0; i < 4; i++) await l.change(human, { reason: 'test', ops: [{ op: 'update', id: note, append: part }] });
   await assert.rejects(callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: note, append: part }] }), /the brief note would be \d+ characters: 3000 at most[^]*Rewrite it whole/);

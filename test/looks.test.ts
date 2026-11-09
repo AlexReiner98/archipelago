@@ -11,6 +11,7 @@ import { askedFace, fellBack, stopLayout } from '../src/look-draw.ts';
 import { passFor } from '../src/looks.ts';
 import { contentOf } from '../src/mcp.ts';
 import { chrome, open } from './browser.ts';
+import { packsWith } from './map.ts';
 import { serve } from './serve.ts';
 
 after(stopLayout);
@@ -142,8 +143,9 @@ test('in a browser, a look is the view as drawn: a flow, a style’s own code, a
   }
 });
 
-test('in a browser, a look of another workspace’s view draws it, and a document as it would publish, saying a face that fell back', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
-  const { workspaces, call } = await serve('tokens');
+test('in a browser, a look of another workspace’s view draws it, and a writing as it would publish, saying a face that fell back', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  // A test pack's writing is what can be published (test/packs/reader).
+  const { workspaces, call } = await serve('tokens', undefined, undefined, packsWith('reader'));
   const db = (await workspaces.create('acme', 'Acme')).pelago.db;
   const owner = (await createToken(db, 'acme', { kind: 'human', name: 'owner', admin: true })).token;
   const agent = (await createToken(db, 'acme', { kind: 'agent', name: 'robot' })).token;
@@ -151,7 +153,7 @@ test('in a browser, a look of another workspace’s view draws it, and a documen
     reason: 'test',
     ops: [
       { op: 'create', ref: 'a', type: 'work', title: 'Only in Acme' },
-      { op: 'create', ref: 'd', type: 'document', title: 'Acme’s page', visibility: 'shared', body: 'What a reader reads.' },
+      { op: 'create', ref: 'd', type: 'writing', title: 'Acme’s page', visibility: 'shared', body: 'What a reader reads.' },
       // The whole workspace asks for a face no machine has.
       { op: 'create', ref: 's', type: 'style', title: 'Nowhere', status: 'current', props: { faces: { text: "'Nowhere Zq', serif" } } },
     ],

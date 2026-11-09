@@ -28,7 +28,7 @@ const byId = (a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id);
 test('a page opened later works out what changed since its reader looked, and plays it to where the map stands', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Canvas' },
+    { op: 'create', ref: 'p', type: 'aim', title: 'Canvas' },
     { op: 'create', ref: 'a', type: 'task', title: 'Flat lens' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
   ]);
@@ -40,7 +40,7 @@ test('a page opened later works out what changed since its reader looked, and pl
   // Where the reader last looked; then the page is closed.
   const looked = (await tail({})).pos;
 
-  // While it is closed, an agent renames the task and adds one under the project; the owner then starts it.
+  // While it is closed, an agent renames the task and adds one under the aim; the owner then starts it.
   const loose = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', link: 'auto' });
   await loose.change(agent, {
     reason: 'Rework the canvas',

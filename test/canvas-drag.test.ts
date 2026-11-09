@@ -14,7 +14,7 @@ test('in a browser, a step cannot be dragged: a press and move on it pans the ca
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'p', type: 'project', title: 'Moved here' },
+      { op: 'create', ref: 'p', type: 'aim', title: 'Moved here' },
       { op: 'create', ref: 'a', type: 'task', title: 'First step' },
       { op: 'create', ref: 'b', type: 'task', title: 'Second step' },
       { op: 'link', type: 'part_of', from: 'a', to: 'p' },
@@ -23,7 +23,7 @@ test('in a browser, a step cannot be dragged: a press and move on it pans the ca
     ],
   })).result.created as Record<string, string>;
   const events = async () => (await call('/api/events', undefined, { limit: 100 })).result.length as number;
-  const page = await open(`${base}/#/v?from=${made.p}`);
+  const page = await open(`${base}/#/v?from=${made.p}&shape=flow`);
   const step = `document.querySelector('#canvas svg a[href="#/e/${made.a}"]')`;
   const wires = `[...document.querySelectorAll('#canvas svg path.lf-wire, #canvas svg path.lf-tie')].map((p) => p.getAttribute('d'))`;
   // Where the step's middle is in the picture's own units, and on the screen.

@@ -71,7 +71,7 @@ test('a client told only the address signs in through the browser and calls the 
   await connected.connect(client.transport());
   const names = (await connected.listTools()).tools.map((t) => t.name);
   assert.ok(names.includes('query') && names.includes('change'), 'it has the agents’ tools');
-  const made = await connected.callTool({ name: 'change', arguments: { reason: 'first', ops: [{ op: 'create', type: 'note', title: 'From a browser sign-in' }] } });
+  const made = await connected.callTool({ name: 'change', arguments: { reason: 'first', ops: [{ op: 'create', type: 'record', title: 'From a browser sign-in' }] } });
   assert.match(JSON.stringify(made.content), /applied|proposed/);
   await connected.close();
 
