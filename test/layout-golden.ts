@@ -1,4 +1,5 @@
-// What the tests of the drawings a pack ships share (test/layouts*.test.ts): a small system kept on the map, and a
+// What the tests of the drawings a pack ships share (test/layouts*.test.ts): a small system kept on the map (its types
+// from test/fixtures/systems, as the code pack, now hosted, declares them; the server given that folder), and a
 // drawing's pictures captured in a real browser and compared with what the kernel drew before it.
 
 import assert from 'node:assert/strict';
@@ -11,7 +12,7 @@ export async function system(call: (path: string, token?: string, body?: unknown
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'p', type: 'project', title: 'A system' },
+      { op: 'create', ref: 'p', type: 'work', title: 'A system' },
       { op: 'create', ref: 'e', type: 'environment', title: 'A server', status: 'up' },
       { op: 'create', ref: 'a', type: 'component', title: 'Doors', status: 'up' },
       { op: 'create', ref: 'b', type: 'component', title: 'Store', status: 'up', props: { role: 'data' } },

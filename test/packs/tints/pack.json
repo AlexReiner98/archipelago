@@ -1,0 +1,211 @@
+{
+ "id": "tints",
+ "version": "0.1.0",
+ "title": "Tints",
+ "description": "Two themes for the tests of how a theme is chosen, tried and published (test/theme-model.test.ts), as the themes pack, now hosted, ships them.",
+ "requires": [
+  "core"
+ ],
+ "styles": [
+  {
+   "id": "tints.open_water",
+   "title": "Open water",
+   "over": "chosen",
+   "props": {
+    "theme": {
+     "light": {
+      "paper": "#f5f6f0",
+      "ink": "#1f1e1b",
+      "sea": "#216bc0"
+     },
+     "dark": {
+      "paper": "#13161a",
+      "ink": "#ecebe6",
+      "sea": "#70a4e6"
+     },
+     "derive": {
+      "bg": "paper",
+      "text": "ink",
+      "panel": {
+       "light": "#ffffff",
+       "dark": {
+        "mix": [
+         "ink",
+         "paper"
+        ],
+        "share": 0.042
+       }
+      },
+      "line": {
+       "mix": [
+        "ink",
+        "paper"
+       ],
+       "share": {
+        "light": 0.088,
+        "dark": 0.14
+       }
+      },
+      "muted": {
+       "search": {
+        "mix": [
+         "ink",
+         "paper"
+        ],
+        "share": 0.64
+       },
+       "on": [
+        "bg",
+        "panel"
+       ],
+       "ratio": 4.8
+      },
+      "accent": {
+       "search": "sea",
+       "on": {
+        "light": [
+         "bg",
+         "panel"
+        ],
+        "dark": "bg"
+       },
+       "ratio": {
+        "light": 4.8,
+        "dark": 7
+       }
+      },
+      "accent_soft": {
+       "search": {
+        "mix": [
+         "accent",
+         "bg"
+        ],
+        "share": 0.3
+       },
+       "on": "ink",
+       "ratio": {
+        "light": 14,
+        "dark": 11.5
+       }
+      },
+      "edge": {
+       "mix": [
+        "ink",
+        "paper"
+       ],
+       "share": 0.28
+      },
+      "edge_strong": {
+       "mix": [
+        "ink",
+        "paper"
+       ],
+       "share": 0.72
+      },
+      "relief_water": "sea"
+     }
+    }
+   }
+  },
+  {
+   "id": "tints.bay",
+   "title": "Bay",
+   "over": "chosen",
+   "props": {
+    "theme": {
+     "light": {
+      "paper": "#f8f4ef",
+      "ink": "#1f1e1b",
+      "sea": "#077783"
+     },
+     "dark": {
+      "paper": "#121718",
+      "ink": "#ecebe6",
+      "sea": "#28b1c3"
+     },
+     "derive": {
+      "bg": "paper",
+      "text": "ink",
+      "panel": {
+       "light": "#ffffff",
+       "dark": {
+        "mix": [
+         "ink",
+         "paper"
+        ],
+        "share": 0.042
+       }
+      },
+      "line": {
+       "mix": [
+        "ink",
+        "paper"
+       ],
+       "share": {
+        "light": 0.088,
+        "dark": 0.14
+       }
+      },
+      "muted": {
+       "search": {
+        "mix": [
+         "ink",
+         "paper"
+        ],
+        "share": 0.64
+       },
+       "on": [
+        "bg",
+        "panel"
+       ],
+       "ratio": 4.8
+      },
+      "accent": {
+       "search": "sea",
+       "on": {
+        "light": [
+         "bg",
+         "panel"
+        ],
+        "dark": "bg"
+       },
+       "ratio": {
+        "light": 4.8,
+        "dark": 7
+       }
+      },
+      "accent_soft": {
+       "search": {
+        "mix": [
+         "accent",
+         "bg"
+        ],
+        "share": 0.3
+       },
+       "on": "ink",
+       "ratio": {
+        "light": 14,
+        "dark": 11.5
+       }
+      },
+      "edge": {
+       "mix": [
+        "ink",
+        "paper"
+       ],
+       "share": 0.28
+      },
+      "edge_strong": {
+       "mix": [
+        "ink",
+        "paper"
+       ],
+       "share": 0.72
+      },
+      "relief_water": "sea"
+     }
+    }
+   }
+  }
+ ]
+}

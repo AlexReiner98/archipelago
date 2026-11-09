@@ -8,7 +8,9 @@ import { callTool } from '../src/tools.ts';
 import { agent, freshWith, human, PACKS } from './map.ts';
 
 export type { Actor, Archipelago, Op };
-export { agent, human };
+export { agent, human, PACKS };
+/** How a style's colours are worked out, for a pack that adds colours or themes (src/colours.ts). */
+export { contrast, finishTheme, mergeTheme, mix, search } from '../src/colours.ts';
 
 /** A fresh map in memory with the kernel's packs and those in the folders given (a pack's own folder's parent). */
 export const mapWith = (...folders: string[]) => freshWith(new Registry([PACKS, ...folders.filter((f) => f !== PACKS)]));
