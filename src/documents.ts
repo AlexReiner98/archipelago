@@ -93,7 +93,7 @@ export const sharePath = (workspace: string, secret: string) => `/s/${workspace}
 /** A link to a document for someone with no login. The secret is in the path it returns, shown once. */
 export async function createShare(l: Archipelago, actor: Actor, id: string) {
   const doc = await l.entity(id);
-  if (!doc || doc.type === SHARED || !l.registry.drawnWith('document').includes(doc.type)) throw new Error(`"${id}" is not a document of this workspace: only one can be given as a link.`);
+  if (!doc || doc.type === SHARED || !(await import('./share-view.ts')).readWhole(l).includes(doc.type)) throw new Error(`"${id}" is not a document of this workspace: only one can be given as a link.`);
   if (doc.archived_at) throw new Error(`"${doc.title}" is archived.`);
   const secret = randomHex(24);
   const share = newId('s');

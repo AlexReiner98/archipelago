@@ -9,7 +9,7 @@
 
 import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
-import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, HOLDS_OFF_READ, MEMBER, ORDERED, SCHEMA, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
+import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, HOLDS_OFF_READ, ITEM_HIDDEN, MEMBER, ORDERED, SCHEMA, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
 import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';
 import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH, SHARE_PUBLISHABLE } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
@@ -80,6 +80,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 32, name: 'what lives on an island', sql: ISLAND_INDEX },
   { version: 33, name: 'what was done outside change sets, in the activity stream', sql: ACTIVITY_STREAM },
   { version: 34, name: 'the event table, carried into the activity stream and gone', sql: EVENT_GONE + FORGET_STORES, before: carryEventTable },
+  { version: 35, name: 'a get says hidden, not missing', sql: ITEM_HIDDEN },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

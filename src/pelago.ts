@@ -323,9 +323,16 @@ export class Archipelago {
     return search(this.db, (type) => this.registry.family(type), input);
   }
 
+  /** Whether an item is there though the reader may not see it (pelago_item_hidden, src/schema.ts). */
+  async hidden(id: string): Promise<boolean> {
+    if (!/^e_[a-z0-9]{8}$/.test(id)) return false;
+    return Boolean((await this.db.query<{ h: boolean }>(`select pelago_item_hidden($1) as h`, [id])).rows[0]?.h);
+  }
+
   async get(id: string) {
     const entity = await this.entity(id);
-    if (!entity) throw new Error(`No item "${id}"`);
+    // One the reader may not see is said to be hidden, not missing: an agent can tell a private item from a wrong id.
+    if (!entity) throw new Error((await this.hidden(id)) ? `Item "${id}" is private to someone else: you cannot read it` : `No item "${id}"`);
     const rel = `r.id as relation, r.type, r.props, r.confidence, e.id, e.type as entity_type, e.title, e.status`;
     const [out, inc, events, source] = await Promise.all([
       this.db.query(`select ${rel} from relation r join entity e on e.id = r.to_id where r.from_id = $1 and r.valid_to is null`, [id]),

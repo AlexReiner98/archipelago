@@ -464,5 +464,17 @@ create policy member_setting_read on setting for select to pelago_member
   using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish'));
 `;
 
+/**
+ * Step 35 (src/migrate.ts): whether an item the reader may not see is there at all, and nothing more about it: so a get
+ * of a private item says it is hidden, not that the id is wrong. Its title, type and who it is private to stay unread.
+ */
+export const ITEM_HIDDEN = `
+create or replace function pelago_item_hidden(item text) returns boolean
+language sql stable security definer set search_path = public as $fn$
+  select exists (select 1 from entity where id = item and archived_at is null)
+$fn$;
+grant execute on function pelago_item_hidden(text) to pelago_member;
+`;
+
 /** Step 16 (src/migrate.ts): a held change keeps the rule that held it (src/rules.ts, decide). */
 export const HELD_BY = `alter table proposal add column if not exists held_by jsonb;`;

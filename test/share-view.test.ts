@@ -51,3 +51,27 @@ test('a view or an item is given as a link through a document that brings it in 
   // A page read with no login carries the style's words for starting a map of one's own.
   assert.equal((await pageLook(l, { id: 'e_aaaaaaaa', type: 'document' })).start, 'Start a map of your own');
 });
+
+test('a map with only core on gives a view as a link too, through a record that brings it in', async () => {
+  const { cpSync, mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { Registry } = await import('../src/packs.ts');
+  const { freshWith } = await import('./map.ts');
+  const packs = mkdtempSync(join(tmpdir(), 'pelago-core-share-'));
+  cpSync(join(import.meta.dirname, '..', 'packs', 'core'), join(packs, 'core'), { recursive: true });
+  const l = await freshWith(new Registry(packs));
+  assert.deepEqual(l.registry.packs.map((p) => p.id), ['core'], 'core alone');
+  const human: Actor = { kind: 'human', name: 'owner' };
+  const made = ((await l.change(human, {
+    reason: 'test',
+    ops: [
+      { op: 'create', ref: 'plan', type: 'task', title: 'Ship the login', visibility: 'shared' },
+      { op: 'create', ref: 'lens', type: 'lens', title: 'Open work', visibility: 'shared', props: { filter: { find: ['type task'], not: [] }, walk: { over: [], steps: 0 } } },
+    ],
+  })) as { created: Record<string, string> }).created;
+  const link = (await callTool(l, human, 'share_create', { id: made.lens })) as { path: string };
+  const shown = (await sharedView(l, secretOf(link.path)))!;
+  assert.deepEqual(shown.parts.map((p) => ('section' in p ? p.section.id : 'text')), [made.lens]);
+  assert.deepEqual((shown as { lenses?: Record<string, { items: { title: string }[] }> }).lenses?.[made.lens]?.items.map((i) => i.title), ['Ship the login']);
+});

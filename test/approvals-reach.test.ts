@@ -51,3 +51,14 @@ test('an approval and a rejection reach watch and the prompt hook', async () => 
   assert.deepEqual(watched.counts ?? Object.fromEntries((watched.changes as { action: string }[]).map((c) => [c.action, 1])), { 'entity.update': 1, 'proposal.reject': 1 });
   assert.deepEqual(await humanChanges(l, watched.latest), []);
 });
+
+test('a get of an item the reader may not see says it is hidden, not missing', async () => {
+  const l = await fresh();
+  const { me } = await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }]);
+  const owner = l.as(me), other = l.as('');
+  const made = ((await owner.change(human, { reason: 'Private', ops: [{ op: 'create', ref: 'p', type: 'task', title: 'Mine alone', visibility: 'private' }] })) as { created: Record<string, string> }).created.p;
+  await assert.rejects(other.get(made), /private to someone else/, 'hidden, said so, and nothing more of it');
+  await assert.rejects(other.get(made), (err: Error) => !err.message.includes('Mine alone'));
+  await assert.rejects(other.get('e_zzzzzzzz'), /No item "e_zzzzzzzz"/, 'a wrong id is still missing');
+  assert.ok(await owner.get(made));
+});

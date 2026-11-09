@@ -8,8 +8,16 @@ import type { Actor, Archipelago } from './pelago.ts';
 import { picturesOf } from './published-pictures.ts';
 import { bringersIn } from './query-saved.ts';
 
-/** The types a screen reads whole, as a document is, that a link may open (not one another workspace shares). */
-const readWhole = (l: Archipelago) => bringersIn(l).filter((t) => t !== SHARED);
+/**
+ * The types a screen reads whole, as a document is, that a link may open (not one another workspace shares). On a map
+ * with none of those (core alone), the starter a shared document comes from: a note whose lines bring items in reads
+ * whole all the same (query document), so a view or an item can be given as a link on any map.
+ */
+export const readWhole = (l: Archipelago) => {
+  const types = bringersIn(l).filter((t) => t !== SHARED);
+  const plain = l.registry.type(SHARED)?.starter;
+  return types.length || !plain ? types : [plain];
+};
 
 /** The type a wrapping document is made of: one read whole that is no flavour of another (a plain document, not an invoice). */
 const documentType = (l: Archipelago) => {
@@ -28,7 +36,7 @@ export async function shareable(l: Archipelago, actor: Actor, id: string): Promi
   const docs = readWhole(l);
   if (docs.includes(item.type)) return item.id;
   const type = documentType(l);
-  if (!type) throw new Error('This map has no type of document to give it a link with: turn on a pack that has one (work).');
+  if (!type) throw new Error('This map has no type to give it a link with.');
   // One made for an earlier link is used again: its note still brings in this item, and nothing else.
   const { rows } = await l.db.query<{ id: string }>(
     `select e.id from relation r join entity e on e.id = r.from_id
