@@ -237,7 +237,7 @@ const row = (c, now) =>
     h('span', { class: 'muted small gist', title: lensWords(viewParts(c).lens) }, lensWords(viewParts(c).lens)),
     working(c) && h('span', { class: 'muted small', title: 'Working: an agent’s view, retired with what it is about unless you keep it' }, 'working'),
     c.cannot && h('span', { class: 'muted small', title: `It cannot draw here: ${c.cannot}` }, 'cannot draw'),
-    c.id === now && h('span', { class: 'pill ok', title: 'The view up now' }, 'up'),
+    c.id === now && h('span', { class: 'mark ok', title: 'The view up now' }, 'up'),
   );
 
 /** Home's list: the saved canvases of the workspace, then, folded, those kept as views of an item. */

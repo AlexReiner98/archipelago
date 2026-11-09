@@ -22,7 +22,7 @@
 
 #sheet .page-rows dd .field-parts { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #sheet .page-rows dd .field-part + .field-part::before { content: " · "; color: var(--muted); }
-#sheet .page-rows dd .field-pill { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+#sheet .page-rows dd .field-word { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
 #sheet .page-rows dd .num { font-variant-numeric: tabular-nums; }
 #sheet .page-rows dd table.field-table { white-space: nowrap; margin: var(--space-3) 0; }
 #sheet .page-rows dd table.field-table td, #sheet .page-rows dd table.field-table th { max-width: var(--chip-most); overflow: hidden; text-overflow: ellipsis; }

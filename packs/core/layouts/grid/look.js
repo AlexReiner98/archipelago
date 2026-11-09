@@ -21,7 +21,7 @@ a.lg-row:hover { text-decoration: underline; }
 .lg-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lg-detail { color: var(--ln-muted); font-size: var(--ln-grid-detail-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lg-marks { display: flex; gap: var(--ln-grid-mark-gap); flex-wrap: wrap; margin-top: var(--ln-grid-card-gap); }
-.lg-due { padding: 0 var(--ln-pill-pad-x); border-radius: 999px; background: var(--ln-blocked); color: var(--on-mark); font-size: var(--ln-grid-mark-text); font-weight: 600; white-space: nowrap; }
+.lg-due { color: var(--ln-blocked); font-size: var(--ln-grid-mark-text); font-weight: 600; white-space: nowrap; }
 .lg-key-chip rect { fill: color-mix(in srgb, var(--lg-hue) var(--ln-grid-swatch-mix), var(--ln-land)); stroke: var(--lg-hue); stroke-width: var(--ln-rule); }
 .lg-card.dim { opacity: var(--ln-dim); }
 .lg-h-none { --lg-hue: var(--ln-line); }

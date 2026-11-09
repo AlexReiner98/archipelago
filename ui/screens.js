@@ -17,7 +17,7 @@ import { time } from './time.js';
 import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
 import { turnsPiece } from './turns.js';
-import { chip, isA, label, link, pill, unfolded } from './words.js';
+import { isA, label, link, statusMark, typeMark, unfolded } from './words.js';
 
 /** The screens shown on an item of this type, in the order the packs load. */
 export const screensFor = (typeId) => (state.schema?.screens ?? []).filter((s) => s.on?.some((t) => isA(typeId, t)));
@@ -97,7 +97,7 @@ export function actionForm(tool, id, done) {
 
 /** One row a pack's view answered: an item by its name, or a line of text. */
 const viewRow = (row) =>
-  h('li', { class: 'row-top' }, row && typeof row === 'object' && row.id ? [row.type && chip(row.type), h('span', { class: 'grow', title: row.title ?? '' }, link(row)), row.status && row.type && pill(row.type, row.status)] : h('span', { class: 'grow', title: String(row) }, String(row)));
+  h('li', { class: 'row-top' }, row && typeof row === 'object' && row.id ? [row.type && typeMark(row.type), h('span', { class: 'grow', title: row.title ?? '' }, link(row)), row.status && row.type && statusMark(row.type, row.status)] : h('span', { class: 'grow', title: String(row) }, String(row)));
 
 /** Rows from a pack's view of this item. */
 async function rows(host, id, p) {
@@ -213,7 +213,7 @@ const unknownPiece = (p) => {
           'div',
           { class: 'toolbar fold-bar' },
           h('span', { class: 'grow gist muted', title: stale ? `The server runs ${now.slice(0, 7)}; this page was loaded with ${then?.slice(0, 7) ?? 'older code'}` : `No piece named "${p.piece}" here` }, `${p.title ?? p.screen?.title ?? p.piece}: not drawn`),
-          stale ? h('button', { class: 'primary', title: 'This page is older than the server', onclick: () => location.reload() }, 'Reload') : h('span', { class: 'pill warn' }, p.piece),
+          stale ? h('button', { class: 'primary', title: 'This page is older than the server', onclick: () => location.reload() }, 'Reload') : h('span', { class: 'mark warn' }, p.piece),
         ),
       ),
     );

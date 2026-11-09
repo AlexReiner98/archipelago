@@ -7,7 +7,7 @@ import { api, h, part } from './base.js';
 import { proposalCard } from './held-card.js';
 import { decide } from './held.js';
 import { renderBody } from './body.js';
-import { ago, chip, gist, who } from './words.js';
+import { ago, typeMark, gist, who } from './words.js';
 
 const ITEM = /^e_[a-z0-9]{8}$/;
 /** The ids an op names, as written. */
@@ -77,7 +77,7 @@ export async function heldPage(proposal) {
       h(
         'section',
         { class: 'page-section ghost-item' },
-        h('div', { class: 'page-head' }, h('h1', { class: 'grow', title: o.title }, o.title), chip(o.type)),
+        h('div', { class: 'page-head' }, h('h1', { class: 'grow', title: o.title }, o.title), typeMark(o.type)),
         o.body && h('div', {}, renderBody(o.body)),
       ),
     ),

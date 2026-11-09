@@ -26,8 +26,8 @@ export function membersCard({ me, members, others, tokenRow, then, fail, say }) 
       'li',
       { class: 'one' },
       h('span', { class: 'grow', title: m.email }, h('strong', {}, m.name ?? m.email), ' ', h('span', { class: 'muted small' }, m.last_used ? ['signed in ', ago(m.last_used)] : 'not signed in yet')),
-      m.admin && h('span', { class: 'pill' }, 'admin'),
-      you && h('span', { class: 'pill ok' }, 'you'),
+      m.admin && h('span', { class: 'mark' }, 'admin'),
+      you && h('span', { class: 'mark ok' }, 'you'),
       you
         ? h('span', { class: 'menu-room' })
         : menu('⋯', [

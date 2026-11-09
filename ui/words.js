@@ -163,7 +163,7 @@ export function changeRow(g, { undone, onUndo, attention, onRead, here, fresh })
   const moved = touched.filter((e) => e.action === 'entity.update' && e.detail?.changes?.status);
   const effect =
     moved.length === 1
-      ? h('span', { class: 'effect' }, h('span', { class: 'pill closed' }, moved[0].detail.changes.status.from), ' \u2192 ', h('span', { class: 'pill' }, moved[0].detail.changes.status.to))
+      ? h('span', { class: 'effect' }, h('span', { class: 'mark closed' }, moved[0].detail.changes.status.from), ' \u2192 ', h('span', { class: 'mark' }, moved[0].detail.changes.status.to))
       : touched.length > 0 && h('span', { class: 'effect muted' }, `${new Set(touched.map((e) => e.target_id)).size} item${new Set(touched.map((e) => e.target_id)).size === 1 ? '' : 's'}`);
   const subject = moved.length === 1 ? moved[0] : touched.length && touched.every((e) => e.target_id === touched[0].target_id) ? touched[0] : undefined;
   // A change is a line, not a page of its own: what it changed has a page, and
@@ -189,8 +189,12 @@ export function changeRow(g, { undone, onUndo, attention, onRead, here, fresh })
   return row;
 }
 
-export const chip = (typeId) => h('span', { class: 'chip', title: typeId }, typeTitle(typeId));
-export const pill = (typeId, status) => h('span', { class: `pill${isClosed(typeId, status) ? ' closed' : ''}` }, status);
+/** A type's name as a word on the surface, never boxed (rule e_vgs9vt5j). */
+export const typeMark = (typeId) => h('span', { class: 'mark mark-type', title: typeId }, typeTitle(typeId));
+/** A status as a word in its tone: open in the accent, closed quiet. */
+export const statusMark = (typeId, status) => h('span', { class: `mark ${isClosed(typeId, status) ? 'closed' : 'open'}` }, status);
+// The old names, for ui/item-links.js only, which another branch removes: drop these with it.
+export { typeMark as chip, statusMark as pill };
 /** Titles of the items the pages have shown, so a line that only holds an id can still say a name. */
 export const titles = new Map();
 /** An item's name where the page knows it, else a word for it: never its id. */

@@ -47,7 +47,7 @@ export function drawList(host, answer, style, keep, kept) {
       c === 'type'
         ? cell('type', typeTitle(n.type))
         : c === 'status'
-          ? cell('status', h('span', { class: `pill${isClosed(n.type, n.status) ? ' closed' : ''}` }, n.status))
+          ? cell('status', h('span', { class: `mark ${isClosed(n.type, n.status) ? 'closed' : 'open'}` }, n.status))
           : c === 'waits'
             ? cell(
                 'waits',
