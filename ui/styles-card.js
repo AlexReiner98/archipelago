@@ -32,7 +32,7 @@ export function styleRows(styles, then) {
       s.retired
         ? h('button', { onclick: () => useAgain(s) }, 'Use again')
         : s.item
-          ? h('span', { class: 'pill', title: 'You changed this preset: open it to change it again' }, 'yours')
+          ? h('span', { class: 'mark', title: 'You changed this preset: open it to change it again' }, 'yours')
           : h('button', { title: 'Keep your own version of it on the map, to change', onclick: () => change(s) }, 'Change'),
     ),
   );

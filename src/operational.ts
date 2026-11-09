@@ -7,27 +7,12 @@
  * The map itself: items, links and the log. Written only in src/pelago.ts. log_entry and log_fact are the log the
  * owner decided is the source of truth (docs/log.md), appended to and never changed; entity and relation are its
  * projections, written from its facts by src/replay.ts in the append's transaction (and, until the operational
- * streams hold them, by the operational writes). event holds only what is not a fact: what a change set did is read
- * from the log. log_op holds the compacted streams (src/streams.ts): what is below appended there at once, sealed by
- * day in the fact stream and kept by the retention rules of the packs.
+ * streams hold them, by the operational writes). log_op holds the compacted streams (src/streams.ts): what is below
+ * appended there at once, sealed by day in the fact stream and kept by the retention rules of the packs; what was done
+ * that is neither a fact nor state is its activity stream (src/activity.ts). event is written no more: its rows were
+ * carried into that stream, and it stays, read only to carry them, while the app before still reads it.
  */
 export const MAP_TABLES = ['entity', 'relation', 'event', 'log_entry', 'log_fact', 'log_op'];
-
-/**
- * State kept on the map's own items that skips approval. It takes effect at once and is never held, through the
- * operational writes in src/pelago.ts (operational, claim, release, and apply for what is made at once).
- */
-export const ON_THE_MAP: Record<string, string> = {
-  sessions: "A run's tokens_used (shared onto the work it is on), story and stale flag: kept at once by operational and appended to the sessions stream; its start, end and task are facts; its heartbeat (last_seen, active, busy) and where its checkout stands (git, src/git-state.ts) are in no stream.",
-  session_events: "What a session did, as raw events in one vocabulary (docs/sessions.md): sent by its adapter to /hooks/events, appended at once to the sessions stream as event facts on its run, sealed with the run's key, a resent one dropped (src/session-events.ts); kept two weeks.",
-  claims: 'A holds link from holder to resource: made by claim and ended by release, at once, appended to the claims stream.',
-  notifications: 'A notification item, made by apply at once and never held; who may read it is set by operational and appended to the notifications stream.',
-  automations: "An automation's last_run, last_fired and last_result, and the event cursor: kept at once, appended to the automations stream.",
-  rechecks: "A project's rechecked_at: kept by operational, appended to the automations stream.",
-  places: "Retired (the owner, 3 Nov 2026: a view is drawn from its query alone): nothing appends to the places stream now. The name stays so entries and backups from before still read and restore, and core's retention rule places drops what is left a day after it was put.",
-  visits: "How many readers opened a public site's pages, per source tag per day: counted in memory and appended to the visits stream each minute as ['+', 'tag:<tag>', day, n], added to the day (src/visits.ts). No address, no browser string, no hash of either; core's retention rule visits keeps every entry.",
-  kinds: "An item's kind column, read from its type: filled by fillKinds when a workspace opens, and by the database for a row written without it; never a fact anyone states.",
-};
 
 /** The fields operational may write on an item. Anything else on an item is a fact, and changes through change. */
 export const KEPT_FIELDS = ['last_seen', 'active', 'busy', 'git', 'tokens_used', 'story', 'stale_flagged', 'last_run', 'last_fired', 'last_result', 'rechecked_at'];
@@ -57,7 +42,7 @@ export const STORES: Record<string, string> = {
   schema_version: 'Which schema steps have run: written by migrate only.',
   vault_key: "Each item's, link's and change set's key, wrapped with the server's sealing key: made in the append that first seals with it, deleted only by a forget, backed up apart and kept 30 days.",
   log_snapshot: 'The projections as they stood at a position of the log, sealed per item and anchored to the chain (src/snapshot.ts): taken by the server, never by a change, and deleted and taken again at will.',
-  vault_secret: 'Secrets kept by name, wrapped like a key: set and removed by the owner or the server, never in the log or its backups.',
+  vault_secret: 'Retired (bug e_27zw6jt3): a store of secrets by name that nothing wrote. Step 20 still makes it; nothing reads or writes it, a backup leaves it out, and a later step drops it once no app before reads it.',
 };
 
 /**

@@ -24,9 +24,9 @@ a.ll-title:hover { text-decoration: underline; }
 .ll-fold { flex: none; border: 0; background: none; padding: 0; width: var(--ln-list-fold); height: var(--ln-list-fold); color: var(--ln-muted); font-size: var(--ln-small-text); line-height: 1; cursor: pointer; }
 .ll-lane .ll-title { font-weight: 400; color: var(--ln-muted); padding-left: var(--ln-list-lane-indent); }
 .ll-counts { display: flex; gap: var(--ln-list-count-gap); flex: none; margin-left: auto; padding-left: var(--ln-list-name-gap); }
-.ll-n { min-width: var(--ln-list-count); padding: var(--ln-pill-pad-y) var(--ln-pill-pad-x); border-radius: 999px; font-size: var(--ln-tiny-text); text-align: center; color: var(--ln-muted); background: var(--ln-sea); }
-.ll-n.blocked { background: var(--ln-blocked); color: var(--on-mark); }
-.ll-n.you { background: var(--ln-you); color: var(--on-mark); }
+.ll-n { min-width: var(--ln-list-count); font-size: var(--ln-tiny-text); text-align: center; color: var(--ln-muted); font-variant-numeric: tabular-nums; }
+.ll-n.blocked { color: var(--ln-blocked); font-weight: 600; }
+.ll-n.you { color: var(--ln-you); font-weight: 600; }
 /* The columns: each as wide as its widest, never more than a few words. */
 .ll-col { display: flex; align-items: center; justify-content: flex-end; min-width: 0; max-width: var(--ln-list-column-most); overflow: hidden; font-size: var(--ln-small-text); color: var(--ln-muted); }
 .ll-status { width: var(--ln-list-status); }
@@ -38,10 +38,10 @@ a.ll-title:hover { text-decoration: underline; }
 .ll-head .ll-field { color: var(--ln-muted); }
 .ll-field > span { overflow: hidden; text-overflow: ellipsis; }
 .ll-narrow .ll-field { width: var(--ln-list-field-narrow); }
-.ll-who, .ll-blocked { overflow: hidden; text-overflow: ellipsis; padding: var(--ln-pill-pad-y) var(--ln-pill-pad-x); border-radius: 999px; font-size: var(--ln-tiny-text); }
-.ll-who { background: var(--ln-inner); color: var(--ln-text); }
-.ll-who.you { background: var(--ln-you); color: var(--on-mark); }
-.ll-blocked { background: var(--ln-blocked); color: var(--on-mark); }
+.ll-who, .ll-blocked { overflow: hidden; text-overflow: ellipsis; font-size: var(--ln-tiny-text); }
+.ll-who { color: var(--ln-text); }
+.ll-who.you { color: var(--ln-you); font-weight: 600; }
+.ll-blocked { color: var(--ln-blocked); font-weight: 600; }
 .ll-at { width: var(--ln-dot); height: var(--ln-dot); border-radius: 50%; background: var(--ln-session); }
 .ll-narrow .ll-type, .ll-narrow .ll-waits { display: none; }
 .ll-narrow .ll-row { column-gap: var(--ln-list-name-gap); }

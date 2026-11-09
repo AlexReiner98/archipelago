@@ -5,7 +5,10 @@
 // beside it and gives each step the dot of where it stood then. The conversation beside it and the chapters above it are play.js's, shared with the
 // architecture's stories. The last step is the map as it is: what the steps leave in, with its own state now.
 
+import { accent } from './play.js';
 import { css as storyLook } from './story-look.js';
+
+export { everyNamed } from './play.js';
 
 /**
  * What each step shows: the ids it has in (as the steps add and take away), its chapter, the wires it lights, the
@@ -30,9 +33,6 @@ export function statesOf(steps) {
     return { step: s, chapter, ids: new Set(present), lit: (s.lit ?? []).map(pair), flags: final ? new Map() : new Map(flags), phases: final ? new Map() : new Map(phases), made, linked: new Set(linked) };
   });
 }
-
-/** Every item any step brings in: what the story lays out. */
-export const everyNamed = (steps) => new Set(steps.flatMap((s) => s.add ?? []));
 
 /** How a story's marks look besides the flow's own: what comes in, and what a step lights. */
 export const css = `${storyLook}
@@ -83,8 +83,7 @@ export function reveal({ frames, marks, t, send, later }) {
       for (const [id, key] of marks.dots ?? []) if (!was || f.phases.get(id) !== was.phases.get(id)) list.push({ key, mark: marks.dot(id, f.phases.get(id)) });
       // The word flagged on each step then, or none.
       for (const [id, key] of marks.flags ?? []) if ((f.flags.get(id) ?? '') !== (was?.flags.get(id) ?? '') || !was) list.push({ key, text: f.flags.get(id) ?? '' });
-      // What a step brings is in the accent a while.
-      if (fresh.length) (list.push(...fresh.map((key) => ({ key, toggle: { 'sp-new': true } }))), later(t('new_for'), () => send(fresh.map((key) => ({ key, toggle: { 'sp-new': false } })))));
+      accent(fresh, list, { t, send, later });
       send(list);
       was = f;
     },

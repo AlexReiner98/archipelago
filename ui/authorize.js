@@ -2,10 +2,10 @@
 // would act in and where it returns to, and says Allow or Deny. Anyone can name a client anything, so every connection
 // is asked for here and the place it returns to is always shown.
 
-import { authHeaders, gate, gateRow, h, keepWaiting, signIn, store, waitingOnSignIn } from './base.js';
+import { authHeaders, gate, gateRow, h, keepWaiting, postJson, signIn, store, waitingOnSignIn, whoami } from './base.js';
 
 const post = async (path, body, headers = {}) => {
-  const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+  const res = await postJson(path, body, headers);
   return { res, body: await res.json().catch(() => ({})) };
 };
 
@@ -23,8 +23,7 @@ export async function authorizePage(given) {
     return page('This client cannot connect', h('div', { class: 'muted' }, asked.body.error ?? 'Start again from the client.'));
   }
   const { client, returns_to, workspace } = asked.body;
-  const whoami = store.token ? await fetch('/whoami', { headers: authHeaders() }) : null;
-  const me = whoami?.ok ? await whoami.json() : null;
+  const me = store.token ? await whoami() : null;
   if (me?.actor.kind !== 'human') return signIn('', `Sign in to connect ${client}`);
   // This address is one workspace's own: a person signed in to another is asked to sign in to it.
   if (workspace && me.workspace.id !== workspace) return signIn('', `Sign in to ${workspace} to connect ${client}`);

@@ -16,8 +16,12 @@ backups/
 .claude/settings.json
 .claude/settings.local.json
 .claude/pelago-hook.mjs
+.claude/pelago-events.mjs
 .claude/pelago.md
 .claude/skills/pelago-bump/references/home.md
 .claude/pelago-setup.json
 *.pelago-backup
 CLAUDE.local.md
+
+# Content kept on one machine, never in the repository.
+brand/content/

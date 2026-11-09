@@ -44,6 +44,19 @@ const sheets = new Map();
 /** The scenes drawn lately, by the drawing and all it was given: drawn again from the same, a picture is mounted at once. */
 const scenes = new Map();
 let sandbox;
+/** What the frame says, heard by one listener for the page, about the frame started last. */
+let hearing = false;
+function hear(ev) {
+  const box = sandbox;
+  if (!box || ev.source !== box.frame.contentWindow) return;
+  const said = ev.data ?? {};
+  if (said.type === 'ready') box.started();
+  const load = box.loads.get(said.hash);
+  if (!load) return;
+  if (said.type === 'loaded') load.resolve();
+  // A drawing that failed to start, or was stopped, starts again for the next picture that asks.
+  if (said.type === 'failed' || said.type === 'stopped') (box.loads.delete(said.hash), load.reject(new Error(String(said.message ?? 'The drawing stopped.').slice(0, 300))), load.stopped?.());
+}
 
 /** The frame every drawing runs in, started once: before a picture asks, wherever one may be drawn. */
 export function warmLayouts() {
@@ -52,19 +65,9 @@ export function warmLayouts() {
   // Not hidden: a frame that is not drawn has its worker slowed many times over. It is drawn with no size instead (flow.css).
   const frame = h('iframe', { class: 'drawing-sandbox', sandbox: frameSandbox(), src: '/draw.html', title: 'Where drawings run', tabindex: '-1', 'aria-hidden': 'true' });
   const loads = new Map();
-  sandbox = { frame, loads, ready: null };
-  sandbox.ready = new Promise((resolve) => {
-    addEventListener('message', (ev) => {
-      if (ev.source !== frame.contentWindow) return;
-      const said = ev.data ?? {};
-      if (said.type === 'ready') resolve();
-      const load = loads.get(said.hash);
-      if (!load) return;
-      if (said.type === 'loaded') load.resolve();
-      // A drawing that failed to start, or was stopped, starts again for the next picture that asks.
-      if (said.type === 'failed' || said.type === 'stopped') (loads.delete(said.hash), load.reject(new Error(String(said.message ?? 'The drawing stopped.').slice(0, 300))), load.stopped?.());
-    });
-  });
+  sandbox = { frame, loads, ready: null, started: null };
+  sandbox.ready = new Promise((resolve) => (sandbox.started = resolve));
+  if (!hearing) ((hearing = true), addEventListener('message', hear));
   // Beside the body, not in it, so a page that draws its body anew does not take it away.
   document.documentElement.append(frame);
   // What this browser drew last is loaded now, before an answer asks for it.
@@ -143,6 +146,8 @@ export function drawWith(host, answer, style, keep) {
     if (!scene.shaped || !(input.width > 0) || reshape) return;
     let wait;
     reshape = new ResizeObserver(() => {
+      // A picture taken off the page ends there, and lets go of what it holds.
+      if (!host.isConnected) return end();
       clearTimeout(wait);
       wait = setTimeout(() => {
         // Measured as it was laid out (`across`, below): a panned picture's width is the pane's with the sheet shut, so the sheet open is no new shape.
@@ -153,7 +158,7 @@ export function drawWith(host, answer, style, keep) {
     });
     reshape.observe(host);
   };
-  const end = () => ((ended = true), reshape?.disconnect(), surface?.end(), port.postMessage({ type: 'end' }), port.close());
+  const end = () => ((ended = true), reshape?.disconnect(), host.moves?.stop(), surface?.end(), port.postMessage({ type: 'end' }), port.close());
   host.endDrawing = end;
   const send = (event) => !ended && port.postMessage({ type: 'event', event });
   // Every event is told as it is. A click on a mark keyed for a held change (`held:<proposal>…`, ui/ghosts.js) also asks the page to put that change to
@@ -322,6 +327,9 @@ ${JSON.stringify(input)}`;
       return;
     }
     const { width, height } = scene.size ?? {};
+    // The stage drawn before goes, and its observers with it.
+    host.moves?.stop();
+    host.moves = undefined;
     // Read on a published page, a picture holds still: all of it in sight at the width it is given, its key open
     // above it, where it covers no part and no wire.
     if (style.still) {

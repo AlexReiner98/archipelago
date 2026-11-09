@@ -7,17 +7,16 @@ import { cpSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
+import { Archipelago, type Op } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { callTool } from '../src/tools.ts';
+import { freshWith, human } from './map.ts';
 
-const human: Actor = { kind: 'human', name: 'test' };
 
 async function fresh() {
   const packs = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
-  return new Archipelago(await openDb(), new Registry(packs));
+  return freshWith(new Registry(packs));
 }
 
 async function make(l: Archipelago, ops: Op[]) {

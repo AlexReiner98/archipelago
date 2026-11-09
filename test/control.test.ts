@@ -28,7 +28,7 @@ function setUp() {
 
 test('what the files beside the data held is taken into the database, and kept there without them', async () => {
   const { root, config } = setUp();
-  const operator = 'latop_' + 'o'.repeat(40);
+  const operator = 'pelop_' + 'o'.repeat(40);
   mkdirSync(config.rootDir, { recursive: true });
   writeFileSync(join(config.rootDir, 'index.json'), JSON.stringify({ operator: hashSecret(operator), workspaces: [{ id: 'acme', name: 'Acme', created: '2026-10-01T00:00:00.000Z' }] }));
   mkdirSync(join(config.packsDir, 'local'));

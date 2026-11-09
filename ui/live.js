@@ -120,11 +120,6 @@ export async function replicate(read) {
 const heldNow = () => api('proposals').catch(() => []);
 /** Where the queue of held changes stood when the stores last read it. */
 const heard = { queue: undefined };
-/** Read the log and what is held again now, not at the next beat: after the person decided or made something here. */
-export async function heldAgain() {
-  await checkTail();
-  store.holdChanges(await heldNow());
-}
 /** The queue moved (a change held, applied or declined): the store reads what is held again. */
 async function queueMoved(queue) {
   if (queue === heard.queue || !store.views.size) return;

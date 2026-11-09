@@ -87,11 +87,15 @@ export async function hubs(l: Archipelago, within?: string) {
     .sort((a, b) => b.inside - a.inside || a.title.localeCompare(b.title));
 }
 
-/** The hub_at of the nearest item an item is part of (itself included) that says one, step by step up; else HUB_AT. */
+/**
+ * The hub_at of the nearest item an item is part of (itself included) that says one; else HUB_AT. What it is part of
+ * is read from the part_of closure (src/closure.ts), and the nearest is the deepest: the one with the most above it.
+ */
 async function hubAtAbove(l: Archipelago, id: string): Promise<number> {
   const { rows } = await l.db.query<{ hub_at: unknown }>(
-    `with recursive up(id, n) as (select $1::text, 0 union select r.to_id, up.n + 1 from relation r join up on r.from_id = up.id where r.type = 'part_of' and r.valid_to is null and up.n < 64)
-     select e.props -> 'hub_at' as hub_at from up join entity e on e.id = up.id where jsonb_typeof(e.props -> 'hub_at') = 'number' order by up.n limit 1`,
+    `with up(id) as (select $1::text union select ancestor from part_closure where descendant = $1)
+     select e.props -> 'hub_at' as hub_at from up join entity e on e.id = up.id where jsonb_typeof(e.props -> 'hub_at') = 'number'
+     order by (select count(*) from part_closure a where a.descendant = up.id) desc, up.id limit 1`,
     [id],
   );
   return rows.length ? Number(rows[0].hub_at) : HUB_AT;

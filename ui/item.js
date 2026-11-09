@@ -12,7 +12,7 @@ import { readingOf } from './item-read.js';
 import { readAgain } from './reader-frame.js';
 import { choicesOf } from './fields.js';
 import { choicesSection, fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
-import { relationEditor } from './item-links.js';
+import { linkAdder } from './item-links.js';
 import { added } from './query-bar.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
 import { actionForm, actionsFor, buttonsOn, countOn, drawnBy, keepsFigure, readWhole, sectionsOn, toolOf } from './screens.js';
@@ -67,7 +67,7 @@ export async function entity(id, here) {
   const publishable = !e.archived_at && type?.public;
   // Work an agent can take on: what can be estimated.
   const workish = !e.archived_at && Boolean(type?.capabilities?.plannable) && Boolean(type?.fields.tokens_estimated);
-  const ties = relationEditor(e, data, change, again);
+  const ties = linkAdder(e, change, again);
   const endSession = async () => {
     if (!(await ask({ title: `End "${e.title}"?`, message: 'Anything it holds is released.', action: 'End session', danger: true }))) return;
     try {
@@ -179,7 +179,7 @@ export async function entity(id, here) {
         !e.archived_at && along.length > 0 && h('button', { class: 'quiet-button walk-from', title: `Draw it and what it links to, along ${walkSaid}, in place of the canvas's lens`, onclick: () => walkFrom(false) }, 'Walk from it'),
       menu('⋯', [
         ...buttons.slice(1).map((b) => [b.label, () => press(b)]),
-        !e.archived_at && ties.any && ['Edit links', ties.open],
+        !e.archived_at && ties.any && ['Link to…', ties.open],
         !e.archived_at && along.length > 0 && ['Walk from it, added to the lens', () => walkFrom(true)],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
         // What packs offer to do with this kind of item.

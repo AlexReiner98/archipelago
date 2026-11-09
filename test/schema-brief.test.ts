@@ -7,8 +7,8 @@ import { hostFor } from '../src/packtools.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { callTool } from '../src/tools.ts';
+import { human } from './map.ts';
 
-const human: Actor = { kind: 'human', name: 'test' };
 const agent: Actor = { kind: 'agent', name: 'test' };
 
 const registries: Registry[] = [];

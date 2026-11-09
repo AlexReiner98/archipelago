@@ -1,5 +1,6 @@
 // The whole map as a file: the owner downloads it by a link good once; an agent only once the owner allows it.
 import assert from 'node:assert/strict';
+import { doneEvents } from '../src/activity.ts';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -58,7 +59,7 @@ test('an agent downloads a backup only once the owner allows it', async () => {
   assert.equal(((await callTool(l, owner, 'workspace_info', {})) as { agent_backups: boolean }).agent_backups, true);
   const made = (await callTool(l, agent, 'backup_download', {})) as Made;
   assert.ok(await fetched(l, made));
-  const logged = (await l.db.query<{ actor: string }>(`select actor from event where action = 'workspace.backup_download'`)).rows;
+  const logged = await doneEvents(l.db, { action: 'workspace.backup_download' }, 50);
   assert.equal(logged.length, 1, 'the owner can see that an agent took one');
 });
 

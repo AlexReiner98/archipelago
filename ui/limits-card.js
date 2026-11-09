@@ -24,7 +24,7 @@ export function limitsCard(limit, use, ended) {
       h(
         'li',
         { class: 'one' },
-        ended && h('span', { class: 'pill bad', title: `Ended ${ended.since.slice(0, 10)}` }, 'ended'),
+        ended && h('span', { class: 'mark bad', title: `Ended ${ended.since.slice(0, 10)}` }, 'ended'),
         ended
           ? h('span', { class: 'grow gist', title: `Read-only until it is deleted from the server on ${ended.delete_at.slice(0, 10)}.${ended.note ? ` ${ended.note}` : ''}` }, `read-only · deleted ${ended.delete_at.slice(0, 10)}`)
           : h('span', { class: `grow gist${near.length ? '' : ' muted'}`, title: near.length ? `${near.map((u) => u.name).join(', ')}${limit.note ? `: ${limit.note}` : ''}` : 'Within every limit' }, near.length ? `near the limit: ${near.map((u) => u.name).join(', ')}` : 'within its limits'),

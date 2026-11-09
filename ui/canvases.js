@@ -90,14 +90,6 @@ export const viewsOn = (typeId, id) =>
       return { id: p.id, title: p.title, at: `#/v?${addressOf(lens, style)}` };
     });
 
-/** Open a saved canvas named with no lens beside it: its lens and style put in the address, in place of the one asked. */
-export async function openCanvas(id) {
-  const got = await api('get', { id }).catch(() => null);
-  if (!got || !isA(got.entity.type, TYPE)) return void location.replace('#/');
-  const { lens, style } = viewParts(got.entity);
-  location.replace(`#/v?${addressOf(lens, style)}`);
-}
-
 /**
  * A saved canvas drawn where something brings it in (a document's section, a screen's piece): its lens and style read
  * from the map, drawn with the style of what it is about.
@@ -245,7 +237,7 @@ const row = (c, now) =>
     h('span', { class: 'muted small gist', title: lensWords(viewParts(c).lens) }, lensWords(viewParts(c).lens)),
     working(c) && h('span', { class: 'muted small', title: 'Working: an agent’s view, retired with what it is about unless you keep it' }, 'working'),
     c.cannot && h('span', { class: 'muted small', title: `It cannot draw here: ${c.cannot}` }, 'cannot draw'),
-    c.id === now && h('span', { class: 'pill ok', title: 'The view up now' }, 'up'),
+    c.id === now && h('span', { class: 'mark ok', title: 'The view up now' }, 'up'),
   );
 
 /** Home's list: the saved canvases of the workspace, then, folded, those kept as views of an item. */

@@ -3,6 +3,8 @@
 // names them. A card's colour and the grid's columns are classes the drawing writes rules for (hues, columns): a
 // drawing sets no style on a mark.
 
+import { hues } from './marks.js';
+
 export const css = `
 .lg-card.here { outline: var(--ln-here-ring) solid var(--accent); outline-offset: var(--ln-here-ring); }
 .lg-stage { position: relative; background: var(--ln-sea); padding: var(--ln-grid-pad); overflow-x: auto; }
@@ -19,15 +21,14 @@ a.lg-row:hover { text-decoration: underline; }
 .lg-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lg-detail { color: var(--ln-muted); font-size: var(--ln-grid-detail-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lg-marks { display: flex; gap: var(--ln-grid-mark-gap); flex-wrap: wrap; margin-top: var(--ln-grid-card-gap); }
-.lg-due { padding: 0 var(--ln-pill-pad-x); border-radius: 999px; background: var(--ln-blocked); color: var(--on-mark); font-size: var(--ln-grid-mark-text); font-weight: 600; white-space: nowrap; }
+.lg-due { color: var(--ln-blocked); font-size: var(--ln-grid-mark-text); font-weight: 600; white-space: nowrap; }
 .lg-key-chip rect { fill: color-mix(in srgb, var(--lg-hue) var(--ln-grid-swatch-mix), var(--ln-land)); stroke: var(--lg-hue); stroke-width: var(--ln-rule); }
 .lg-card.dim { opacity: var(--ln-dim); }
 .lg-h-none { --lg-hue: var(--ln-line); }
 `;
 
 /** The class a colour is drawn by, and its rule: named by the colour itself, so two pictures on a page never differ on one. */
-export const hueClass = (hex) => `lg-h-${hex.slice(1).toLowerCase()}`;
-export const hueRule = (hex) => `.${hueClass(hex)} { --lg-hue: ${hex}; }`;
+export const { hueClass, hueRule } = hues('lg-h', '--lg-hue');
 
 /** The class a grid's columns are laid out by, and its rule: named by what it lays out, as hueClass is. */
 const n = (v) => String(v).replace('.', '_');

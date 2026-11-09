@@ -36,12 +36,12 @@ test('with nobody at a terminal, the first start writes the operator secret to a
     const file = await firstStart(workspaces, main, root, false);
     assert.equal(file, join(root, FIRST_START_FILE));
     const held = readFileSync(file!, 'utf8');
-    assert.match(held, /latop_[0-9a-f]+/, 'the operator secret is in the file');
+    assert.match(held, /pelop_[0-9a-f]+/, 'the operator secret is in the file');
     assert.doesNotMatch(held, /pel_default_/, 'and no token to paste');
     assert.deepEqual(await adminEmails(main.pelago), ['owner@example.test'], 'the owner is the first admin');
     assert.deepEqual(sent.map((m) => m.to), ['owner@example.test']);
     assert.match(sent[0].text, /#\/join\/inv_default_/, 'mailed a link to sign in');
-    assert.doesNotMatch(logged.join('\n'), /latop_|pel_default_|inv_default_/, 'the log holds no secret');
+    assert.doesNotMatch(logged.join('\n'), /pelop_|pel_default_|inv_default_/, 'the log holds no secret');
     assert.equal(await firstStart(workspaces, main, root, false), undefined, 'given once: a second start has nothing to give');
     assert.equal(sent.length, 1, 'nor mails again');
   }));

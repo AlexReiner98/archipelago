@@ -64,7 +64,10 @@ export function drawDiagram(host, data, { download } = {}) {
   host.classList.add('lens-view');
   dress(host, state.style);
   host.replaceChildren(stage);
+  // The stage drawn before goes, and its observers with it.
+  host.stopMoves?.();
   const moves = panZoom(stage, picture, { width: data.width, height: data.height, style: state.style });
+  host.stopMoves = moves.stop;
   const zoom = h(
     'span',
     { class: 'switch' },
@@ -72,5 +75,5 @@ export function drawDiagram(host, data, { download } = {}) {
     h('button', { title: 'All of it in sight', onclick: () => moves.fit() }, 'Fit'),
     h('button', { title: 'Zoom in', onclick: () => moves.zoomBy(numberOf(state.style, 'zoom_step')) }, '+'),
   );
-  host.prepend(h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow muted small' }, `${boxes.length} boxes, ${data.wires.length} wires`), download && h('a', { class: 'chip', href: download, target: '_blank', rel: 'noopener', title: 'The draw.io file it was drawn from, at its commit' }, '.drawio'), zoom));
+  host.prepend(h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow muted small' }, `${boxes.length} boxes, ${data.wires.length} wires`), download && h('a', { class: 'mark', href: download, target: '_blank', rel: 'noopener', title: 'The draw.io file it was drawn from, at its commit' }, '.drawio'), zoom));
 }

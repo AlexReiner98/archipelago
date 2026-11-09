@@ -12,6 +12,31 @@
 
 import { m } from './marks.js';
 
+/** Every item any step brings in: what a story lays out. */
+export const everyNamed = (steps) => new Set(steps.flatMap((s) => s.add ?? []));
+
+/** What each step shows, for a stage that shows only what is in: the ids it has in, as the steps add and take away, and its chapter. */
+export function present(steps) {
+  const ids = new Set();
+  let chapter = -1;
+  return steps.map((s) => {
+    for (const id of s.add ?? []) ids.add(id);
+    for (const id of s.remove ?? []) ids.delete(id);
+    if (s.chapter) chapter++;
+    return { step: s, chapter, ids: new Set(ids) };
+  });
+}
+
+/** Whether a step's frame has any of these items in (none where there is no frame yet). */
+export const inFrame = (ids, frame) => Boolean(frame) && ids.some((id) => frame.ids.has(id));
+
+/** What a step brings is in the accent a while: the marks keyed `fresh` lit with `list`, and unlit after the style's new_for. */
+export function accent(fresh, list, { t, send, later }) {
+  if (!fresh.length) return;
+  list.push(...fresh.map((key) => ({ key, toggle: { 'sp-new': true } })));
+  later(t('new_for'), () => send(fresh.map((key) => ({ key, toggle: { 'sp-new': false } }))));
+}
+
 export function play({ answer, style, reduced, tools, shape }) {
   const { frames, keyLooks = [], dotsOf = () => null } = shape;
   const t = (name) => {

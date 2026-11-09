@@ -170,8 +170,6 @@ export function toAddress(at, here) {
   if (at !== undefined) goPane(active, paneAt(at), true, false);
   entry?.canvas.mark(here);
 }
-/** Whether a pane of the tab in sight draws this item now. */
-export const drawsIt = (id) => drawn.get(active)?.canvas.has(id);
 
 // ---- The pane the bar acts on: the one last touched. A press in a pane, or the focus going into a style's frame
 // there (a frame keeps its presses to itself), makes it the one.

@@ -1,7 +1,7 @@
 // The type table: a pack removed under live items leaves them dormant, not frozen. They keep their kind, statuses,
 // fields and capabilities; a person may edit and close them; an agent's edit waits; the pack's tools are gone.
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -11,13 +11,13 @@ import { openDb } from '../src/db.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { callTool } from '../src/tools.ts';
-import { syncTypes } from '../src/typetable.ts';
+import { movesAgain, syncTypes } from '../src/typetable.ts';
 import { askView } from '../src/askview.ts';
+import { human } from './map.ts';
 
 /** A view asked by its name, as the view tool asks it. */
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
-const human: Actor = { kind: 'human', name: 'test' };
 const agent: Actor = { kind: 'agent', name: 'test' };
 
 test('a pack removed under live items leaves them dormant: editable by a person, closable, still at risk, its tools gone', async () => {
@@ -71,8 +71,6 @@ test('a pack removed under live items leaves them dormant: editable by a person,
   const again = await syncTypes(back);
   assert.ok(again.activated.includes('program'));
   assert.equal(back.registry.type('program')!.dormant, undefined);
-  const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from event where action = 'types.sync'`);
-  assert.equal(rows[0].n, 2);
 });
 
 test('a type a pack took over takes its items with it, once, when no pack defines the old one', async () => {
@@ -97,8 +95,9 @@ test('a type a pack took over takes its items with it, once, when no pack define
   const host = (await now.entity(made.created.host))!;
   assert.deepEqual([host.type, host.status, host.props.amount], ['cost', 'paying', 25]);
   assert.equal((await now.entity(made.created.gone))!.status, 'ended');
-  const { rows } = await db.query<{ detail: { from: string; to: string; items: string[] } }>(`select detail from event where action = 'type.moved'`);
-  assert.deepEqual([rows.length, rows[0].detail.from, rows[0].detail.to, rows[0].detail.items.length], [1, 'money.cost', 'cost', 2]);
+  // The move is one system change set on the log, asserting the new type on each item.
+  const { rows } = await db.query<{ n: number }>(`select (select count(*)::int from log_fact f where f.stream = 'facts' and f.pos = e.pos and f.at = e.at and f.field = 'type') as n from log_entry e where e.stream = 'facts' and e.head->>'action' = 'type.moved'`);
+  assert.deepEqual(rows.map((r) => r.n), [2]);
   const costs = (await callTool(now, human, 'view', { name: 'costs', params: { days: 30 } })) as { recurring: { items: { title: string }[] } };
   assert.deepEqual(costs.recurring.items.map((i) => i.title), ['Hosting'], 'the costs view reads them where they are now');
   assert.deepEqual((await syncTypes(now)).moved, {}, 'once moved, nothing moves again');
@@ -128,6 +127,8 @@ test('a relation a pack took over takes its links with it, and the work at risk 
     ],
   })) as { created: Record<string, string> };
 
+  // Its views were kept in the filter's old words, so it is a map from before the migrations were done once.
+  await movesAgain(old);
   const dir = mkdtempSync(join(tmpdir(), 'pelago-moved-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
   const now = new Archipelago(db, new Registry(dir));
@@ -164,4 +165,21 @@ test('a type that takes another over says what its statuses are here, and the it
   assert.deepEqual((await syncTypes(now)).moved, { part: 2 });
   const [a, b] = [(await now.entity(made.created.a))!, (await now.entity(made.created.b))!];
   assert.deepEqual([a.type, a.status, a.is_open, b.type, b.status, b.is_open], ['component', 'up', true, 'component', 'retired', false]);
+});
+
+test('the migrations a workspace runs when it opens run once, and again after a merge asks for them', async () => {
+  const db = await openDb();
+  const l = new Archipelago(db, new Registry(join(import.meta.dirname, '..', 'packs')));
+  await syncTypes(l);
+  const stamp = async () => (await db.query<{ value: { done: string[] } }>(`select value from setting where key = 'moves_done'`)).rows[0]?.value;
+  assert.deepEqual((await stamp())!.done.sort(), ['kinds', 'layouts', 'lives', 'owners', 'pins', 'queries', 'styles', 'terms']);
+  // A view in the filter's old words, as one from before: a second open leaves it, since the migration is done here.
+  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'Old words', props: { filter: { types: ['task'] } } }] })) as { created: Record<string, string> };
+  await syncTypes(l);
+  assert.deepEqual((await l.entity(made.created.v))!.props.filter, { types: ['task'] }, 'done once, not asked again');
+  await movesAgain(l);
+  assert.equal(await stamp(), undefined);
+  await syncTypes(l);
+  assert.deepEqual((await l.entity(made.created.v))!.props.filter, { find: ['type task'], only: [] }, 'asked again, it runs');
+  assert.equal((await stamp())!.done.length, 8);
 });

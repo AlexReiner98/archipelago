@@ -16,7 +16,7 @@ const MARKER = /^<!-- working_rules\b.*-->$/m;
 export const checkoutPacks = (root = ROOT): PackFile[] =>
   readdirSync(join(root, 'packs'))
     .filter((p) => existsSync(join(root, 'packs', p, 'pack.json')))
-    .map((p) => readManifest(readFileSync(join(root, 'packs', p, 'pack.json'), 'utf8'), `packs/${p}/pack.json`).manifest as PackFile);
+    .map((p) => readManifest(readFileSync(join(root, 'packs', p, 'pack.json'), 'utf8'), `packs/${p}/pack.json`) as PackFile);
 
 /** The working rules file, with the packs' working_rules instructions said in it. */
 export function workingRules(packs: PackFile[] = checkoutPacks(), root = ROOT): string {

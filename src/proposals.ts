@@ -3,6 +3,7 @@
 // was when nothing it sets has moved since, planned again when something has, and refused as overtaken when a field it
 // sets outright has since been set to something else. Rejecting it, or finding it moot, appends an entry with no facts.
 
+import { needHuman } from './actor-checks.ts';
 import type { Actor, Archipelago, Op, Proposal } from './pelago.ts';
 import { append, entry, factAt, type Decision } from './log.ts';
 import { ITEM_COLUMNS } from './facts.ts';
@@ -56,7 +57,7 @@ export async function rejection(tx: Q, ws: string, proposal: string, d: { outcom
 
 /** Approve or reject a held change. `ops`, when given, is the reviewer's corrected version, planned on the map as it is. */
 export async function decideProposal(l: Archipelago, actor: Actor, input: { proposal: string; approve: boolean; except?: string[]; note?: string; ops?: Op[] }) {
-  if (actor.kind !== 'human') throw new Error('Only a human can approve or reject proposals.');
+  needHuman(actor, 'Only a human can approve or reject proposals.');
   const { rows } = await l.db.query<Proposal>(`select * from proposal where id = $1`, [input.proposal]);
   const proposal = rows[0];
   if (!proposal) throw new Error(`No proposal "${input.proposal}"`);
@@ -88,13 +89,6 @@ export async function decideProposal(l: Archipelago, actor: Actor, input: { prop
   // The queue's row is the projection of what was appended: approved by the change set, declined by its own entry.
   const status = input.approve ? 'approved' : 'rejected';
   if (!input.approve) await l.db.transaction((tx) => rejection(tx, l.workspace, proposal.id, { outcome: 'rejected', actor: me, by: me, reason: input.note ?? '' }));
-  await l.log(l.db, {
-    actor: me,
-    action: `proposal.${input.approve ? 'approve' : 'reject'}`,
-    changeset: result?.changeset,
-    reason: input.note ?? '',
-    detail: { proposal: proposal.id, proposed_by: proposal.actor, except: input.except ?? [], revised: Boolean(input.ops) },
-  });
   return { ...result, proposal: proposal.id, status };
 }
 
@@ -113,7 +107,7 @@ export async function supersede(l: Archipelago, changeset: string): Promise<void
       if (!moot) break;
     }
     if (!moot) continue;
-    const done = await l.db.transaction((tx) => rejection(tx, l.workspace, p.id, { outcome: 'superseded', actor: 'system', by: changeset, reason: p.reason }));
-    if (done) await l.log(l.db, { actor: 'agent:pelago', action: 'proposal.supersede', reason: p.reason, detail: { proposal: p.id, proposed_by: p.actor, by: changeset } });
+    // Its own entry in the log says it was superseded, and by what.
+    await l.db.transaction((tx) => rejection(tx, l.workspace, p.id, { outcome: 'superseded', actor: 'system', by: changeset, reason: p.reason }));
   }
 }

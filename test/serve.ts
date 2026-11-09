@@ -15,9 +15,8 @@ setMailer(async (mail) => void mailbox.push(mail));
 /** The code in the newest link sent to an address. */
 export const codeSentTo = (email: string) => /#\/join\/(inv_[a-z0-9-]+_[0-9a-f]{40})/.exec(mailbox.findLast((m) => m.to === email)?.text ?? '')?.[1];
 
-// What this machine keeps for its own sessions stays out of the tests: a setup run here would take it for a
-// machine connected before, and keep it again under the new names.
-for (const name of ['PELAGO_URL', 'PELAGO_AGENT_TOKEN', 'LATTICE_URL', 'LATTICE_AGENT_TOKEN']) delete process.env[name];
+// What this machine keeps for its own sessions stays out of the tests: a setup run here would keep it again.
+for (const name of ['PELAGO_URL', 'PELAGO_AGENT_TOKEN']) delete process.env[name];
 
 export const closers: (() => Promise<void>)[] = [];
 after(async () => {
