@@ -4,7 +4,7 @@
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
 import { authorizePage } from './authorize.js';
-import { SignInNeeded, h, hooks, join, main, part, showIdentity, signIn, state, store } from './base.js';
+import { SignInNeeded, h, hooks, join, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { mayLeave, newItem, unsaved } from './draft.js';
 import { drawFind } from './find.js';
@@ -42,9 +42,9 @@ async function route(pulse = false) {
   // Addresses from before the canvas still lead somewhere.
   if (name === 'join' && arg) return join(arg);
   // A client asking to connect: before anything is read of a map, as whoever may not be signed in yet.
-  if (name === 'authorize') return void ((document.body.dataset.sheet = 'open'), authorizePage(query));
-  // Buying a workspace, and the page a buyer comes back to: in the sheet, before anything is read of a map.
-  if (name === 'signup' || name === 'welcome') return void ((document.body.dataset.sheet = 'open'), name === 'signup' ? signupPage() : welcome());
+  if (name === 'authorize') return void authorizePage(query);
+  // Buying a workspace, and the page a buyer comes back to: a page of their own, before anything is read of a map.
+  if (name === 'signup' || name === 'welcome') return void (name === 'signup' ? signupPage() : welcome());
   if (['home', 'activity', 'review', 'projects', 'today', 'map', 'automations'].includes(name)) return void (location.hash = '#/');
   if (name === 'graph') return void (location.hash = arg ? `#/v?from=${arg}` : `#/v?${query}`);
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/');
@@ -55,6 +55,8 @@ async function route(pulse = false) {
     if (err instanceof SignInNeeded) return signIn(store.token ? 'Your token is no longer accepted.' : '');
     return main.replaceChildren(h('div', { class: 'error' }, err.message));
   }
+  // In a workspace: the page is the app again, whatever signed-out page was up.
+  ungate();
   if (name === 'time') return void (location.hash = screenOfPage('time') ? `#/s/${screenOfPage('time').id}` : '#/workspace');
   drawFind();
   drawNav();
