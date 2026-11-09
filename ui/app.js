@@ -122,7 +122,8 @@ async function startOwn() {
   if (document.querySelector('#nav .start-own')) return;
   const words = (await api('view', { name: 'style' }).catch(() => null))?.style?.start;
   if (typeof words !== 'string' || !words) return;
-  const a = h('a', { class: 'start-own', href: '/' }, words);
-  document.querySelector('#nav .brand')?.after(a);
+  // The one thing the page asks of a stranger, loud; and for one who has a map already, a way back in to it.
+  const a = h('a', { class: 'start-own', href: '/', title: 'Make a map of your own, for your own work and agents' }, words);
+  document.querySelector('#nav .brand')?.after(h('a', { class: 'sign-in', href: '/', title: 'Open the map you have' }, 'Sign in'), a);
   fetch('/connect/start').then((r) => (r.ok ? r.json() : null)).then((r) => r?.url && a.setAttribute('href', r.url), () => null);
 }

@@ -451,6 +451,7 @@ body:not([data-panes="1"]) #query .q-view { margin: 0 calc(var(--space-5) + (var
 :root[data-reader] #tabs, :root[data-reader] #more, :root[data-reader] #listening, :root[data-reader] #query .q-travel, :root[data-reader] #query .q-split, :root[data-reader] #query .q-band-menu, :root[data-reader] #query .q-view-pick > :last-child { display: none; }
 :root[data-reader] #query .q-view-pick, :root[data-reader] #find { pointer-events: none; }
 /* A link's reader is shown, in the bar, a way to start a map of their own (ui/app.js, startOwn). */
-#nav .start-own { margin-left: auto; color: var(--muted); font-size: var(--text-3); }
+#nav .sign-in { margin-left: auto; color: var(--text); font-size: var(--text-4); }
+#nav .start-own { margin-left: var(--space-7); padding: var(--space-3) var(--space-7); background: var(--accent); color: var(--panel); border-radius: var(--radius-2); font-size: var(--text-4); font-weight: 600; white-space: nowrap; }
 /* A link's reader sees an item, not how the map keeps it: no menu of actions, no source, history or empty fields. */
 :root[data-reader] #sheet details.menu, :root[data-reader] #sheet [data-section="source"], :root[data-reader] #sheet [data-section="history"], :root[data-reader] #sheet .fields-empty, :root[data-reader] #sheet [data-section="fields"]:not(:has(> .page-rows)) { display: none; }
