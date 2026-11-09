@@ -9,6 +9,7 @@
 import { randomInt } from 'node:crypto';
 import { sha256Hex, workspaceSecret } from './hashes.ts';
 import { z } from 'zod';
+import { needAdmin } from './actor-checks.ts';
 import { createToken } from './auth.ts';
 import { controlValue, setControlValue, takeControlValue } from './control.ts';
 import { stillWritable } from './ended.ts';
@@ -250,9 +251,6 @@ export async function requestSignIn(workspaces: { id: string; name: string; db: 
   });
 }
 
-const needAdmin = (actor: Actor, what: string) => {
-  if (!actor.admin) throw new Error(`Only a workspace admin can ${what}.`);
-};
 
 export const MEMBER_TOOLS: Record<string, Tool> = {
   member_add: {

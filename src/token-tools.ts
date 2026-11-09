@@ -3,14 +3,12 @@
 // propose (every change waits for a person) or change (as any agent, under the workspace's setting).
 
 import { z } from 'zod';
+import { needAdmin } from './actor-checks.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { humanTokenAllowed } from './members.ts';
 import type { Actor } from './pelago.ts';
 import type { Tool } from './tools.ts';
 
-const needAdmin = (actor: Actor, what: string) => {
-  if (!actor.admin) throw new Error(`Only a workspace admin can ${what}.`);
-};
 
 export const TOKEN_TOOLS: Record<string, Tool> = {
   token_create: {

@@ -9,6 +9,7 @@ import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from 
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { createToken, revokeToken } from './auth.ts';
+import { needHuman } from './actor-checks.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
 import { cloudLaunch, cloudOn } from './cloud-launch.ts';
@@ -39,7 +40,7 @@ export function configureLauncher(next: LauncherConfig): void {
 }
 
 export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, by?: StartedBy) {
-  if (actor.kind !== 'human') throw new Error('Only a human can launch a session.');
+  needHuman(actor, 'Only a human can launch a session.');
   // A hosted server starts it in the cloud instead, on the workspace's own model account.
   if (cloudOn()) return cloudLaunch(l, actor, input, by);
   if (!config) throw new Error('Launching is off on this server. It starts Claude Code in a repository on the machine the server runs on, so it works only on a server that listens on that machine alone, or in the cloud where its operator turns that on.');

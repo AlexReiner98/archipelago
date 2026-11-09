@@ -11,6 +11,7 @@ import type { ActionDef, HostDef } from './declared.ts';
 import { notify } from './notify.ts';
 import type { Done, PackHost } from './packhost.ts';
 import type { PackFile } from './packs.ts';
+import { needHuman } from './actor-checks.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { seal, unseal } from './secrets.ts';
 
@@ -144,7 +145,7 @@ async function makeAct(host: PackHost, l: Archipelago, actor: Actor, pack: PackF
 
 /** A person allows a held act, which is then made, or declines it. */
 export async function decideAct(host: PackHost, l: Archipelago, actor: Actor, input: { act: string; allow: boolean }) {
-  if (actor.kind !== 'human') throw new Error('Only a person allows an act that is held.');
+  needHuman(actor, 'Only a person allows an act that is held.');
   const { rows } = await l.db.query<{ pack: string; request: OutsideRequest; actor: Actor; status: string }>(`select pack, request, actor, status from act where id = $1`, [input.act]);
   const row = rows[0];
   if (!row) throw new Error(`No act "${input.act}"`);

@@ -2,6 +2,7 @@
 // (src/launcher.ts) or in the cloud (src/cloud-launch.ts).
 
 import { askView } from './askview.ts';
+import { needHuman } from './actor-checks.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 
 /**
@@ -39,7 +40,7 @@ export interface Brief {
 
 /** The task's brief, and who the session is started for when it is not the owner (another member, or what `by` names). */
 export async function briefFor(l: Archipelago, actor: Actor, input: LaunchInput, by?: StartedBy): Promise<{ brief: Brief; started?: StartedBy }> {
-  if (actor.kind !== 'human') throw new Error('Only a human can launch a session.');
+  needHuman(actor, 'Only a human can launch a session.');
   // Started by anyone but the owner (another member, or an automation), the session only proposes.
   const owner = await l.setting<string>('me');
   const started = by ?? (owner && actor.person && actor.person !== owner ? { kind: 'person' as const, id: actor.person, name: actor.name } : undefined);

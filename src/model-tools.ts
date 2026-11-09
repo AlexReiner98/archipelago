@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { REPO_TOKEN } from './cloud-launch.ts';
 import { connectModel, forgetModel, modelStatus, named, priceModel, priceOf, PROVIDERS } from './model-account.ts';
 import { wholeMap } from './outbox.ts';
+import { needAdmin } from './actor-checks.ts';
 import { actorId } from './pelago.ts';
 import type { Tool } from './tools.ts';
 
@@ -27,7 +28,7 @@ export const MODEL_TOOLS: Record<string, Tool> = {
       const whole = await wholeMap(l);
       const price = priceOf(input);
       if (!input.provider && !input.remove && !price) return modelStatus(whole, Boolean(actor.admin));
-      if (!actor.admin) throw new Error('Only a workspace admin can connect, price or remove its model account.');
+      needAdmin(actor, 'connect, price or remove its model account');
       if (!input.provider && !input.remove) {
         await priceModel(whole, price);
         await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `Model price set: US$${price!.input} in, US$${price!.output} out, a million tokens` });
@@ -54,7 +55,7 @@ export const MODEL_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => {
       const whole = await wholeMap(l);
       if (!input.token && !input.remove) return { kept: Boolean(await whole.secret(REPO_TOKEN)) };
-      if (!actor.admin) throw new Error('Only a workspace admin can give or forget its GitHub token.');
+      needAdmin(actor, 'give or forget its GitHub token');
       const token = input.remove ? undefined : input.token!.trim();
       if (token && !/^(github_pat_|ghp_|ghs_)\w{20,}$/.test(token)) throw new Error('That is not a GitHub token: one starts github_pat_ (fine-grained) or ghp_.');
       await whole.setSecret(REPO_TOKEN, token);
