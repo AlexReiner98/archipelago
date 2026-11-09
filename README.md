@@ -71,22 +71,40 @@ on port 3200, its data kept apart.
 
 ## Connect Claude Code
 
-In the folder of a project you work on, with the server running:
+Install the plugin from Claude Code:
 
-```bash
-node -e "fetch('http://127.0.0.1:3100/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"
+```
+/plugin marketplace add AlexReiner98/archipelago
+/plugin install archipelago@archipelago
 ```
 
-It lists the files it will write (`.mcp.json`, a few hooks, working rules in
-`CLAUDE.md`) and asks first. Add ` -- --dry-run` to only see the list, or
-` -- --remove` to take it out. Then reopen Claude Code in that folder and say:
+Start a new session. The first one opens your browser to sign in to your
+workspace on archipelago.tools (the [Quickstart](https://archipelago.tools/quickstart?ref=github)
+makes one), and type `/mcp`, then choose pelago, so the agent can use the
+map's tools. From then on each session, in any project, starts on your map,
+handed the open work the sessions before it left there and why each piece
+needs attention. To use a server of your own, set `PELAGO_URL` to it
+(`http://127.0.0.1:3100`) before you start Claude Code.
+
+Then say:
 
 > Put this project in Archipelago, with the three things I am working on as
 > tasks, and tell me what you would do first.
 
 Your tasks appear on the map right away. To take anything back, open
 **Changes** and choose **Undo**. Any other MCP client works the map at
-`http://127.0.0.1:3100/mcp`.
+`/mcp` on the same server.
+
+To keep the hooks and working rules in the project's own files instead, run
+this in its folder with your server running:
+
+```bash
+node -e "fetch('http://127.0.0.1:3100/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"
+```
+
+It lists what it will write (`.mcp.json`, a few hooks, working rules in
+`CLAUDE.md`) and asks first. Add ` -- --dry-run` to only see the list, or
+` -- --remove` to take it out.
 
 ## Read on
 
