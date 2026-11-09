@@ -41,7 +41,9 @@ prevented it cheaply, it counts.
 1. **Find the home.** Bumps live as issues under the Archipelago project's feature
    for friction. `query` with name `search`, params type `feature` and q
    `friction`; `references/home.md` says the same for this workspace. If there
-   is none, create the issue as part of the Archipelago project instead.
+   is none, create the issue as part of the Archipelago project instead. A map
+   with no `issue` type (`query` `schema` says which it has) takes each bump as
+   a `finding` linked `about` the item it concerns, in the same shape below.
 
 2. **Look for it first.** `query` `search` with type `issue`, `open: true`, and
    one distinctive word of what happened in q (a search of several words can

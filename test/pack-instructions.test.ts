@@ -47,7 +47,7 @@ test('a core-only map is told nothing it lacks: rules, MCP words, tools and the 
   const held = /holding its query\s+\(([^)]*)\)\s+and how it is drawn\s+\(([^)]*)\)/.exec(rules)!;
   for (const field of `${held[1]},${held[2]}`.match(/[a-z_]+/g)!) assert.ok(lens[field], `a lens has ${field}`);
   assert.deepEqual(lacking(connectText(core), lacks), [], 'the MCP server text');
-  assert.match(connectText(core), /name brief with task/);
+  assert.match(connectText(core), /name frontier for where this session stands, brief with task/);
   assert.doesNotMatch(connectText(core), /handoff/);
   for (const [name, tool] of surfaceFor(core)) assert.deepEqual(lacking(tool.description, lacks), [], `the ${name} tool`);
 

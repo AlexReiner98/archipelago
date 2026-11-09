@@ -14,12 +14,12 @@ actions; `query` with name `actions` gives their inputs whole.
 ## At the start
 
 1. Handed a task, `query` with name `brief` and params `task`: it holds what that
-   task needs. Otherwise `query` with name `handoff` and params `repo` (the id
-   the session hook gave). One answer holds the last push, what has happened lately, what sessions left
-   unpushed (`left`), what nobody has seen working (`unseen`), the traps in
-   the repository's files (`traps`), and the open work. If it has `for_owner` with questions settled on an
-   agent's own judgment, show the owner those in your first reply and ask
-   them to confirm or correct; record their answer with `settle`, action `confirmed`.
+   task needs. Otherwise the session start says where things stand and which
+   view reads it again; `query` with no name lists the views this map has, and
+   `search` with `open: true` finds the open work. If the session start puts
+   questions settled on an agent's own judgment to the owner, show them in your
+   first reply and ask the owner to confirm or correct; record their answer
+   with `settle`, action `confirmed`.
    If the session opened with no word from Archipelago, the
    hooks did not run here (the setup was run in another folder): call
    `capture` with action `session_start`, params `cwd` and the repository's `remote` yourself, and
@@ -36,21 +36,18 @@ actions; `query` with name `actions` gives their inputs whole.
   about, and the ties between them you want seen. The owner reads the beats
   on your session's page beside a drawing of those items. Tell what matters,
   not every step; take a beat back with `replaces` when you change your mind.
-- **Keep the map true.** When what you do or find settles something still open (a task done, an experiment run, a decision made in practice, a hypothesis borne out or not), change its status in the same breath, with the outcome and the evidence, rather than leaving it open with a note. Settle only what the work or the owner has in fact settled: closing a decision or hypothesis waits for the owner unless this workspace applies agents’ changes as made, so propose it with what was chosen (props.outcome) and why (props.rationale). A choice that is still the owner’s stays open.
+- **Keep the map true.** When what you do or find settles something still open (a task done, a decision made in practice, a question answered), change its status in the same breath, with the outcome and the evidence, rather than leaving it open with a note. Settle only what the work or the owner has in fact settled: closing a decision waits for the owner unless this workspace applies agents’ changes as made, so propose it with what was chosen (props.outcome) and why (props.rationale). A choice that is still the owner’s stays open.
 - **Say on whose authority.** Every change takes authority: of "human" with what the owner said and where, when they told you to or decided it; of "agent" for your own reading of the work. Never claim the owner’s word for your own judgment.
 - **A name is a few words.** A title names the thing in 60 characters at most; the rest goes in the first line of its note. Lead a note with the point in two or three sentences, and give each further part a short title on a line of its own, so it folds. Write it in the map's one dialect, which every page reads alike: ## titles, - points, - [ ] and - [x] checklists, > [!NOTE] or > [!WARNING] callouts, | tables |, `code`, **strong**, and an item named by its id (e_...) or as [its name](e_...).
 - **Search before you create.** Query with name search first, so nothing is made twice.
-- **A result is items and a view.** Anything with parts goes on the map as items first, never as one long note: a plan, research, an evaluation, a comparison. A plan: each step a task, part_of its hub, its order as depends_on, who must act as waits_on. Research: each finding and each option an item that bears_on the question it answers (or is about it), what it rests on as based_on, its facts as fields or a short note. Then a view about the hub (a lens linked about it: shape flow for steps, a drawing of how the parts connect for an explanation), and show it. The hub's note holds only the point: why, what done is, what was found or chosen. This holds whatever a brief says about notes.
+- **A result is items and a view.** Anything with parts goes on the map as items first, never as one long note: a plan, research, an evaluation, a comparison. A plan: each step a task, part_of its hub, its order as depends_on, who must act as waits_on. Research: each finding and each option an item that bears_on the question it answers (anything else it informs, it is about), what it rests on as depends_on, its facts as fields or a short note. Then a view about the hub (a lens linked about it: shape flow for steps, a drawing of how the parts connect for an explanation), and show it. The hub's note holds only the point: why, what done is, what was found or chosen. This holds whatever a brief says about notes.
 - **Say who is waited on with a link.** A person who has to answer or act is waits_on (what for in props.for), removed once they have; other work is depends_on; a resource is needs, and an exclusive one is taken with assign, action claim, and given back with revise, action release.
 - **Give a hub its views.** An item that holds a lot is the hub of its
   problem, and the owner reads it through its views: each a `lens` item
-  linked `about` it, named for the question it answers (`place` for its
-  order; `kinds`, `far`, `over` for what is in it; `controls` for what the
-  owner may change on the page). A lens whose `from` is another item is a
-  shortcut to there. Give a project its views when you make it, if the owner
-  says what they want to see; the session start and `query` `hubs` name the
-  hubs that have none. While a project is still being shaped, set its
-  `hub_at` to 1: nearly everything in it is then a hub.
+  linked `about` it, named for the question it answers, holding its query
+  (`filter`, `walk`, `limit`) and how it is drawn (`style`). Give a hub
+  its views when you make it, if the owner says what they want to see; the
+  session start and `query` `hubs` name the hubs that have none.
 - **If a pelago tool answers with a web page or "502",** the server is
   restarting. Do not send the call again through MCP: each such answer is a
   whole page in your context. Wait until `GET /health` on the server answers,
@@ -62,11 +59,9 @@ actions; `query` with name `actions` gives their inputs whole.
 ## Before you finish
 
 1. What you built and nobody has seen working: say so on the item
-   (`seen_working` false, and in `to_see` what would show it). What bit you
-   and nothing can fix: an `instruction` linked `about` the repository, its
-   title the trap, its note the way round it, `for` the files it bites in
-   (`file:<glob>`); what can be fixed is an issue. Nothing else is written
-   down for the next session: what is left unpushed is read off the checkout.
+   (`seen_working` false, and in `to_see` what would show it). Nothing else is
+   written down for the next session: what is left unpushed is read off the
+   checkout.
 2. `report` with action `session_end` and a summary. It lists what is still open here that nobody
    changed: change each, name it in `still_true` if you checked it, or in
    `cannot_tell` if you had nothing to do with it (`cannot_tell_rest: true`
