@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { counted, limiter } from '../src/limit.ts';
 import { listen as listenTo, LIVE_EACH } from '../src/published-live.ts';
 import { serve } from './serve.ts';
+import { until } from './wait.ts';
 
 test('an IPv6 address is counted by its /64, written any way', () => {
   assert.equal(counted('2001:db8:1:2::1'), counted('2001:0db8:0001:0002:ffff:eeee:dddd:cccc'));
@@ -63,11 +64,11 @@ test('a published page’s live streams are capped from one address', async () =
   assert.deepEqual(statuses, [...Array(LIVE_EACH).fill(200), 429], 'one /64 holds at most so many streams');
   assert.equal(await listen('198.51.100.5'), 200, 'another address still listens');
   for (const ac of streams) ac.abort();
-  await new Promise((r) => setTimeout(r, 200));
+  // The server hears each close as it comes: the /64 listens again once it has.
+  assert.ok(await until(async () => (await listen('2001:db8:9:9::1')) === 200, 10_000), 'a stream closed is given back');
   // A page that left before its stream began is not counted: else opening and resetting at once would use the address up.
   for (let i = 0; i < LIVE_EACH + 2; i++) listenTo({ destroyed: true } as never, 'default', made, {}, '203.0.113.50');
   assert.equal(await listen('203.0.113.50'), 200);
-  assert.equal(await listen('2001:db8:9:9::1'), 200, 'a stream closed is given back');
   for (const ac of streams) ac.abort();
 });
 

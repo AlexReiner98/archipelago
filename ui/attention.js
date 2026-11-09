@@ -2,7 +2,7 @@
 // at the top, muted. The same rows on Home, for you, and on an item's page, for what is that item's.
 
 import { api, h } from './base.js';
-import { ago, chip, link, when } from './words.js';
+import { ago, typeMark, link, when } from './words.js';
 
 /** The order Needs you is read in, kept for this browser: the strongest reason first, or the latest change first. */
 const ORDER_KEY = 'pelago-needs-order';
@@ -32,13 +32,13 @@ export function attentionRow(item, latest = false) {
   return h(
     'li',
     // One line at any width: the title gives way first, then what it sits in; the marks keep their size.
-    { class: 'row-top', style: 'flex-wrap: nowrap' },
-    item.type && chip(item.type),
-    h('span', { class: 'grow gist', title: item.title, style: 'min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' }, link(item)),
-    item.top && h('a', { class: 'gist muted small', href: `#/e/${item.top.id}`, title: item.top.title, style: 'min-width: 0; max-width: 25%; flex-shrink: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' }, item.top.title),
+    { class: 'row-top' },
+    item.type && typeMark(item.type),
+    h('span', { class: 'grow gist', title: item.title }, link(item)),
+    item.top && h('a', { class: 'gist muted small cut', href: `#/e/${item.top.id}`, title: item.top.title, style: 'max-width: 25%; flex-shrink: 2' }, item.top.title),
     item.reasons.map((r) => {
       const [said, tone, tip] = mark(r);
-      return h('span', { class: `pill ${tone}`.trim(), title: tip, style: 'flex: none' }, said);
+      return h('span', { class: `mark ${tone}`.trim(), title: tip, style: 'flex: none' }, said);
     }),
     latest && item.changed && h('span', { class: 'muted small nowrap' }, ago(item.changed)),
   );
@@ -71,16 +71,15 @@ function askOf(item) {
 /** A row of what is yours to do, read as the thing to do: its verb, what is asked (or the item, when nothing more is said), then the item and where it sits, muted. Under its kind's line the verb is that line's. */
 export function moveRow(item, latest = false, under = false) {
   const { why, verb, said } = askOf(item);
-  const cut = 'min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis';
   // Beside it, muted: the item, when the ask is not its title; else what it waits on you for.
   const aside = said ? item.title : sentence(item.reasons.find((r) => r.why === 'waits_on')?.for);
   return h(
     'li',
-    { class: 'row-top', style: 'flex-wrap: nowrap' },
-    !under && h('span', { class: `pill ${why === 'due' || why === 'to_confirm' ? 'warn' : ''}`.trim(), style: 'flex: none', title: item.reasons.map((r) => mark(r)[2]).filter(Boolean).join('\n') }, verb),
-    h('a', { class: 'grow', href: `#/e/${item.id}`, title: said ? `${sentence(said)}\n${item.title}` : item.title, style: cut }, sentence(said) || item.title),
-    aside && h('span', { class: 'muted small', title: aside, style: `${cut}; max-width: 35%; flex-shrink: 2` }, aside),
-    item.top && h('a', { class: 'muted small', href: `#/e/${item.top.id}`, title: item.top.title, style: `${cut}; max-width: 20%; flex-shrink: 3` }, item.top.title),
+    { class: 'row-top' },
+    !under && h('span', { class: `mark ${why === 'due' || why === 'to_confirm' ? 'warn' : ''}`.trim(), style: 'flex: none', title: item.reasons.map((r) => mark(r)[2]).filter(Boolean).join('\n') }, verb),
+    h('a', { class: 'grow', href: `#/e/${item.id}`, title: said ? `${sentence(said)}\n${item.title}` : item.title }, sentence(said) || item.title),
+    aside && h('span', { class: 'muted small cut', title: aside, style: 'max-width: 35%; flex-shrink: 2' }, aside),
+    item.top && h('a', { class: 'muted small cut', href: `#/e/${item.top.id}`, title: item.top.title, style: 'max-width: 20%; flex-shrink: 3' }, item.top.title),
     latest && item.changed && h('span', { class: 'muted small nowrap' }, ago(item.changed)),
   );
 }
@@ -95,7 +94,7 @@ function overflow(rest) {
   const groups = [...by.values()].sort((a, b) => b.n - a.n);
   return h(
     'div',
-    { class: 'row-top muted small overflow', style: 'white-space: nowrap; overflow: hidden; text-overflow: ellipsis' },
+    { class: 'row-top muted small overflow cut' },
     `and ${rest.length} more:`,
     groups.map((g) => (g.top ? h('a', { href: `#/e/${g.top.id}`, title: `${g.n} in ${g.top.title}` }, `${g.top.title} ${g.n}`) : h('span', { title: 'In no project' }, `elsewhere ${g.n}`))),
   );

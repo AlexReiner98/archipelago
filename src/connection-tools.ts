@@ -3,6 +3,7 @@
 // for the whole server (setup) is the default workspace admin's, once.
 
 import { z } from 'zod';
+import { needAdmin } from './actor-checks.ts';
 import { actorId, type Actor } from './pelago.ts';
 import { begin, dropConnections } from './server-connect.ts';
 import type { ServerPacks } from './server-host.ts';
@@ -14,9 +15,6 @@ export function configureConnections(packs: ServerPacks | undefined): void {
   serverPacks = packs;
 }
 
-const needAdmin = (actor: Actor) => {
-  if (!actor.admin) throw new Error('Only a workspace admin can connect what this server offers.');
-};
 
 export const CONNECTION_TOOLS: Record<string, Tool> = {
   connections: {
@@ -44,7 +42,7 @@ export const CONNECTION_TOOLS: Record<string, Tool> = {
           }),
         );
       if (!input.start && !input.setup && !input.end) return { packs: await list() };
-      needAdmin(actor);
+      needAdmin(actor, 'connect what this server offers');
       const pack = offered.find((p) => p.file.id === input.pack)?.file;
       if (!pack || !packs || !control) throw new Error(`Nothing here connects by the name "${input.pack ?? ''}".`);
       if (input.end) {

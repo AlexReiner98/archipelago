@@ -211,9 +211,9 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `packs/core/layouts/flow/` | the flow drawing: `graph.js` flattens, `layout.js` orders, `free.js` keeps places, `index.js` answers marks |
 
 ## How a canvas is read
-1. The address holds the query (`#/v?…` or `#/e/<id>?…`); `app.js` reads it
-   with `readAddress` and `canvas.js` `showCanvas` puts it up (Home's query
-   when there is none).
+1. The address holds the query (`#/v?…` or `#/e/<id>?…`); `panes.js` reads
+   each pane's with `readAddress` (`query.js`) and draws it in a canvas made
+   by `canvas.js` `canvasIn` (Home's query when there is none).
 2. `flatView` asks `view` `flat` with the query and `view` `style` beside it,
    and nothing else: no place is read beside it.
 3. The answer goes into a store (`live.js` `replicate`), with the position

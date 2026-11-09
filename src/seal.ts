@@ -56,7 +56,21 @@ export function seal(key: Key, field: string, value: unknown): Sealed {
   return { $k: key.version, $n: iv.toString('base64url'), $c: body.toString('base64url') };
 }
 
-/** The value, or undefined when no key given opens it. */
+/** A sealed value that its key is there for and does not open: changed since it was sealed, or moved to another item or field. */
+export class SealBroken extends Error {
+  readonly id: string;
+  readonly field: string;
+  constructor(id: string, field: string) {
+    super(`A sealed value of ${id} (${field}) does not open with its key: it was changed after it was sealed, or moved.`);
+    this.id = id;
+    this.field = field;
+  }
+}
+
+/**
+ * The value, or undefined when no key given is its own (forgotten, or never given): what reads as the digest. A
+ * value whose key is there and does not open with it is not forgotten but broken, and throws SealBroken.
+ */
 export function open(keys: Key[] | undefined, field: string, v: Sealed): unknown {
   const key = keys?.find((k) => k.version === v.$k);
   if (!key) return undefined;
@@ -67,6 +81,20 @@ export function open(keys: Key[] | undefined, field: string, v: Sealed): unknown
     decipher.setAuthTag(bytes.subarray(bytes.length - 16));
     return JSON.parse(unsqueeze(Buffer.concat([decipher.update(bytes.subarray(0, bytes.length - 16)), decipher.final()])).toString('utf8'));
   } catch {
+    throw new SealBroken(key.id, field);
+  }
+}
+
+/**
+ * As open, for a read of the log: a broken value is said loudly in the server's log and read as its digest, so one
+ * changed value is seen and does not take the whole read down with it.
+ */
+export function openNoting(keys: Key[] | undefined, field: string, v: Sealed): unknown {
+  try {
+    return open(keys, field, v);
+  } catch (err) {
+    if (!(err instanceof SealBroken)) throw err;
+    console.error(`TAMPERED: ${err.message}`);
     return undefined;
   }
 }
@@ -109,7 +137,7 @@ export async function openEntries(q: Q, entries: Entry[]): Promise<Entry[]> {
   // one of them, and an entry that only clears a field (an undo of a note) names its item by that alone.
   const named = entries.flatMap((e) => e.facts.map((f) => f[1]).filter((id) => id.startsWith('e_') || id.startsWith('r_')));
   const [ring, visible] = await Promise.all([keysOf(q, [...ids]), seen(q, [...new Set([...ids, ...named]), ...entries.filter((e) => e.stream === 'pending').map((e) => e.id)])]);
-  const read = (id: string, field: string, v: unknown, may: boolean) => (isSealed(v) ? opened(may ? open(ring.get(id), field, v) : undefined, v) : v);
+  const read = (id: string, field: string, v: unknown, may: boolean) => (isSealed(v) ? opened(may ? openNoting(ring.get(id), field, v) : undefined, v) : v);
   return entries.map((e) => {
     // A held change's reader also reads what it would make, which no one can see yet.
     const making = new Set(e.stream === 'pending' && visible.has(e.id) ? Object.values((e.ids as Record<string, string> | undefined) ?? {}) : []);
@@ -131,7 +159,7 @@ export async function openEntries(q: Q, entries: Entry[]): Promise<Entry[]> {
 export async function openValue(q: Q, id: string, field: string, value: unknown): Promise<unknown> {
   if (!isSealed(value)) return value;
   const [ring, visible] = await Promise.all([keysOf(q, [id]), seen(q, [id])]);
-  return opened(visible.has(id) ? open(ring.get(id), field, value) : undefined, value);
+  return opened(visible.has(id) ? openNoting(ring.get(id), field, value) : undefined, value);
 }
 
 /**
@@ -142,7 +170,7 @@ export async function openSaid<T extends { id: string; field: string; value: unk
   const ids = [...new Set(said.filter((r) => isSealed(r.value)).map((r) => r.id))];
   if (!ids.length) return said;
   const ring = await keysOf(q, ids);
-  return said.map((r) => (isSealed(r.value) ? { ...r, value: opened(open(ring.get(r.id), r.field, r.value), r.value) } : r));
+  return said.map((r) => (isSealed(r.value) ? { ...r, value: opened(openNoting(ring.get(r.id), r.field, r.value), r.value) } : r));
 }
 
 /**
@@ -157,7 +185,7 @@ export async function openAll(q: Q, entries: Entry[], vault?: VaultDump): Promis
   }
   if (!ids.size) return entries;
   const ring = new Map([...(vault ? keysIn(vault, ids) : []), ...(await keysOf(q, [...ids]))]);
-  const read = (id: string, field: string, v: unknown) => (isSealed(v) ? opened(open(ring.get(id), field, v), v) : v);
+  const read = (id: string, field: string, v: unknown) => (isSealed(v) ? opened(openNoting(ring.get(id), field, v), v) : v);
   return entries.map((e) => {
     const out: Entry = { ...e, facts: e.facts.map((f): Fact => (f[0] === '+' && isSealed(f[3]) ? ([...f.slice(0, 3), read(f[1], f[2], f[3]), ...f.slice(4)] as Fact) : f)) };
     for (const [field, key] of HEAD[e.stream] ?? []) if (field in e) out[field] = read(key(e.id), field, e[field]);

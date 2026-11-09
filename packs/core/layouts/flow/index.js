@@ -24,7 +24,7 @@ import { effortOf } from './effort.js';
 import { css } from './look.js';
 import { css as islandCss, islandMarks, nameOf, saidOf } from './islands.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
-import { addClass, m, titled } from './marks.js';
+import { addClass, HEX, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
 import { drawn } from './polyline.js';
 import { shapedBy } from './steps.js';
@@ -34,9 +34,6 @@ import { statesOf as standing } from './state.js';
 import { css as sessionCss, hueRules, litStates, sessionItems, sessionMarks, sessionOf, stateMark, STATES, STATE_WORDS } from './session.js';
 import { cut } from './lines.js';
 
-/** Whether an item stays lit: what was asked for by name (style.only), else what the style's lit says. */
-/** A colour a style may name. */
-const HEX = /^#[0-9a-f]{3,8}$/i;
 /** The link type the order's wires are, for their colour. */
 const ORDER_TYPE = 'depends_on';
 /** What the key calls the outline of each of core's starter types, and the order its rows go in. */

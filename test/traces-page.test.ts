@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { chrome, open } from './browser.ts';
+import { chrome, open, wait } from './browser.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
@@ -25,33 +25,34 @@ test("in a browser, an agent's change is traced in its session's hue and clears 
   ]);
   const { result: session } = await agent('capture', { action: 'session_start', params: { title: 'Tracer' } });
   const page = await open(`${base}/#/e/${made.p}`);
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const until = async (expression: string, ms = 15000) => {
-    for (const end = Date.now() + ms; Date.now() < end; await wait(100)) if (await page.evaluate(expression)) return true;
-    return false;
-  };
   const row = `document.querySelector('#canvas a[href="#/e/${made.a}"]')`;
   try {
-    assert.ok(await until(`Boolean(${row})`), 'the task is on the canvas');
-    assert.ok(await until(`[...document.querySelectorAll('#canvas .lens-wrap')].some((w) => w.store)`), 'held in a store');
+    assert.ok(await page.until(`Boolean(${row})`), 'the task is on the canvas');
+    assert.ok(await page.until(`[...document.querySelectorAll('#canvas .lens-wrap')].some((w) => w.store)`), 'held in a store');
     // Out of sight: the pane is hidden while the change lands.
     await page.evaluate(`${row}.closest('.pane').hidden = true`);
     await change([{ op: 'update', id: made.a, status: 'doing' }], { run: session.run, reason: 'Started on the tail. The rest is detail.', authority: { of: 'agent' } });
-    assert.ok(await until(`${row}?.classList.contains('traced')`), 'the row is traced');
-    const traced = await page.evaluate<{ line: string; hue: string }>(`({ line: ${row}.dataset.trace, hue: ${row}.style.getPropertyValue('--trace-hue') })`);
-    assert.equal(traced.line, `Session ${session.name}, doing: Started on the tail`, 'who, what and why, in a line');
+    // Waited for whole: a drawing may put a new row in its place between a wait and a read, traced a moment later.
+    const line = `Session ${session.name}, doing: Started on the tail`;
+    const ready = await page.until(`${row}?.classList.contains('traced') && ${row}.dataset.trace === ${JSON.stringify(line)} && /^#/.test(${row}.style.getPropertyValue('--trace-hue'))`);
+    const traced = await page.evaluate<{ line: string; hue: string }>(`({ line: ${row}?.dataset.trace, hue: ${row}?.style.getPropertyValue('--trace-hue') })`);
+    assert.ok(ready, `the row is traced with who, what and why, in a line: ${JSON.stringify(traced)}`);
+    assert.equal(traced.line, line, 'who, what and why, in a line');
     assert.match(traced.hue, /^#[0-9a-f]{6}$/i, "in the session's hue");
+    // About time passing: a mark is seen after its moment in sight (the style's trace_seen_after), and a hidden pane's
+    // moment never comes. It is given well past that moment.
     await wait(2500);
     assert.ok(await page.evaluate(`${row}.classList.contains('traced')`), 'a hidden pane never counts as seen');
     await page.evaluate(`${row}.closest('.pane').hidden = false`);
     // Over the row, the page's one tip says the trace.
     await page.evaluate(`${row}.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }))`);
     assert.equal(await page.evaluate(`document.querySelector('.tip')?.textContent`), traced.line, 'the tip says who and why');
-    assert.ok(await until(`!${row}.classList.contains('traced')`, 6000), 'in sight a moment, it clears');
+    assert.ok(await page.until(`!${row}.classList.contains('traced')`, 6000), 'in sight a moment, it clears');
     const kept = await page.evaluate<string>(`localStorage.getItem('pelago-traces-default')`);
     assert.ok(Object.keys(JSON.parse(kept).seen).some((k) => k.startsWith(made.a)), 'kept as seen in this browser');
     await page.evaluate(`location.reload()`);
-    assert.ok(await until(`Boolean(${row})`), 'drawn again');
+    assert.ok(await page.until(`Boolean(${row})`), 'drawn again');
+    // About time passing as above: a reload is given past the moment in which it would (wrongly) trace it again.
     await wait(1000);
     assert.ok(!(await page.evaluate(`${row}.classList.contains('traced')`)), 'a reload does not bring it back');
   } finally {

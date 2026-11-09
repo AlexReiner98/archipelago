@@ -15,7 +15,7 @@ import { openDb } from '../src/db.ts';
 import { mentions } from '../src/forget.ts';
 import { entries, stored, verify, type Entry } from '../src/log.ts';
 import { Archipelago } from '../src/pelago.ts';
-import { isSealed, open, seal } from '../src/seal.ts';
+import { isSealed, open, openSaid, SealBroken, seal } from '../src/seal.ts';
 import { undo } from '../src/undo.ts';
 import { dumpVault, keysOf } from '../src/vault.ts';
 
@@ -62,8 +62,10 @@ test('every value that is words is sealed in the log with its own key, and opene
   assert.equal((plain2.authority as { basis: string }).basis, 'Quill on the phone');
   const ring = await keysOf(l.db, [made.t]);
   assert.equal(open(ring.get(made.t), 'title', fact(first, made.t, 'title') as never), 'Offer letter');
-  assert.equal(open(ring.get(made.t), 'body', fact(first, made.t, 'title') as never), undefined, 'not as another field');
-  assert.equal(open(ring.get(made.sam), 'title', fact(first, made.t, 'title') as never), undefined, 'not with another key');
+  assert.throws(() => open(ring.get(made.t), 'body', fact(first, made.t, 'title') as never), SealBroken, 'not as another field');
+  const samKeys = (await keysOf(l.db, [made.sam])).get(made.sam);
+  assert.throws(() => open(samKeys, 'title', fact(first, made.t, 'title') as never), SealBroken, 'not with another key');
+  assert.equal(open(undefined, 'title', fact(first, made.t, 'title') as never), undefined, 'with no key, forgotten');
 
   // The chain verifies with no key at all: it hashes each sealed value by its digest.
   assert.deepEqual((await verify(l.db)).problems, []);
@@ -76,6 +78,35 @@ test('every value that is words is sealed in the log with its own key, and opene
   assert.deepEqual(hidden.facts.find((f) => f[2] === 'title')![3], { $h: (hidden.facts.find((f) => f[2] === 'title')![3] as { $h: string }).$h });
   assert.ok(!JSON.stringify(theirs).includes('Kept to myself'));
   assert.ok(JSON.stringify(await entries(l.as('e_owner').db, 'facts', 1)).includes('Kept to myself'));
+});
+
+test('a sealed value changed in the log is said to be broken, not taken for forgotten', async () => {
+  const l = await fresh();
+  const made = await setup(l);
+  const [stored1] = await raw(l, made.t).then((rows) => rows.filter((r) => r.field === 'title'));
+  const sealed = stored1.value as { $k: number; $n: string; $c: string };
+  const bytes = Buffer.from(sealed.$c, 'base64url');
+  bytes[0] ^= 1;
+  const changed = { ...sealed, $c: bytes.toString('base64url') };
+  const ring = await keysOf(l.db, [made.t]);
+  assert.throws(() => open(ring.get(made.t), 'title', changed), SealBroken);
+
+  // A read of the log still answers, with the digest where the words were, and the server's log says why.
+  const said: unknown[] = [];
+  const was = console.error;
+  console.error = (...args: unknown[]) => said.push(args.join(' '));
+  try {
+    const [opened] = await openSaid(l.db, [{ id: made.t, field: 'title', value: changed }]);
+    assert.ok('$h' in (opened.value as object), 'read as its digest');
+    assert.equal(said.length, 1);
+    assert.match(String(said[0]), new RegExp(`TAMPERED.*${made.t}`));
+    // With no key at all, it is forgotten: the digest, and nothing said.
+    const [gone] = await openSaid(l.db, [{ id: 'e_nokey000', field: 'title', value: changed }]);
+    assert.ok('$h' in (gone.value as object));
+    assert.equal(said.length, 1, 'a forgotten value is not news');
+  } finally {
+    console.error = was;
+  }
 });
 
 test('a forget destroys the keys, leaves digests where the words were, and the chain still verifies', async () => {
@@ -183,7 +214,7 @@ test('a long value is compressed before it is sealed, and one sealed whole befor
   const sealed = seal(key, 'body', note);
   assert.ok(Buffer.from(sealed.$c, 'base64url').length < note.length / 4, 'the note is sealed compressed');
   assert.equal(open([key], 'body', sealed), note);
-  assert.equal(open([key], 'body', seal(key, 'title', 'Short')), undefined, 'still bound to its field');
+  assert.throws(() => open([key], 'body', seal(key, 'title', 'Short')), SealBroken, 'still bound to its field');
   assert.equal(open([key], 'title', seal(key, 'title', 'Short')), 'Short', 'a short value is sealed as it is');
   // As a value was sealed before compression: its JSON, as it is.
   const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key.key, iv);

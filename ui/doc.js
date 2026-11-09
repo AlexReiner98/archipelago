@@ -2,6 +2,7 @@
 // Nothing drawn that the server did not say, and every text set as text, never as markup. Made to be read whole and
 // printed: the one place in Archipelago where a page is meant to be read through.
 
+import { SignInNeeded, authHeaders, call, h } from './base.js';
 import { drawFrozen } from './doc-lens.js';
 import { carried } from './doc-ref.js';
 import { warmLayouts } from './layout.js';
@@ -10,6 +11,7 @@ import { checkedCss } from './marks.js';
 import { readSpans, readText } from './text.js';
 import { applyTheme } from './theme.js';
 import { startTips } from './tip.js';
+import { day } from './words.js';
 
 startTips();
 
@@ -21,36 +23,13 @@ const here = location.pathname.replace(/\/+$/, '');
 const own = /^\/read\/(e_[a-z0-9]{8})$/.exec(here)?.[1];
 const preview = /^\/preview\/e_[a-z0-9]{8}$/.test(here);
 const published = here.startsWith('/p/');
-const token = () => {
-  try {
-    return localStorage.getItem('pelago-token') ?? '';
-  } catch {
-    return '';
-  }
-};
-const post = async (at, input) => {
-  const res = await fetch(at, { method: 'POST', headers: { 'content-type': 'application/json', ...(token() && { authorization: `Bearer ${token()}` }) }, body: JSON.stringify(input) });
-  const body = await res.json();
-  if (!res.ok) throw new Error(res.status === 401 ? 'Sign in to Archipelago in this browser first, then open this again.' : body.error);
-  return body.result;
-};
+const post = (at, input) =>
+  call(at, input, authHeaders()).catch((err) => {
+    throw err instanceof SignInNeeded ? new Error('Sign in to Archipelago in this browser first, then open this again.') : err;
+  });
 const api = (tool, input) => post(`/api/${tool}`, input);
 /** A section's figure: from the link's own address, or fetched with the reader's sign-in. */
 const figureSrc = (id) => (own || preview ? '' : `${here}/picture/${id}`);
-
-function h(tag, attrs, ...kids) {
-  const el = document.createElement(tag);
-  for (const [key, value] of Object.entries(attrs ?? {})) {
-    if (value === false || value == null) continue;
-    if (key.startsWith('on')) el[key] = value;
-    else if (key === 'class') el.className = value;
-    else el.setAttribute(key, value === true ? '' : value);
-  }
-  for (const kid of kids.flat(Infinity)) if (kid !== false && kid != null && kid !== '') el.append(kid.nodeType ? kid : String(kid));
-  return el;
-}
-
-const day = (ts) => new Date(ts).toLocaleDateString(undefined, { dateStyle: 'long' });
 
 /** A control that copies code, in line with it, saying so until the pointer or the focus leaves. Where the browser refuses, the code is selected instead, to copy by hand. */
 const copyButton = (text, code) => {
@@ -248,7 +227,7 @@ function draw(d) {
   // The page's parts, lists and all, laid out in one flat row as the page takes them.
   const kids = [
     d.site && siteHead(d.site),
-    d.head === 'invoice' ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at)}` : `Updated ${day(d.updated_at)}`)),
+    d.head === 'invoice' ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at, 'long')}` : `Updated ${day(d.updated_at, 'long')}`)),
     parts(),
     // A site's pages each end with what its footer page says (src/site.ts).
     d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, titles, 3)),

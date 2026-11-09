@@ -1,21 +1,9 @@
 // Altitude: how high an item sits, read from its type, so a page can list one level and count the rest
 // (docs/ui-strategy.md). A kind gives it; a type may set its own; a flavour inherits it.
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { test } from 'node:test';
 import { Registry, type PackFile } from '../src/packs.ts';
-
-function packsWith(extra?: PackFile): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pelago-altitude-'));
-  cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
-  if (extra) {
-    mkdirSync(join(dir, extra.id));
-    writeFileSync(join(dir, extra.id, 'pack.json'), JSON.stringify(extra));
-  }
-  return dir;
-}
+import { packsWith } from './map.ts';
 
 test('a project, its streams and their steps each sit at their own level', () => {
   const reg = new Registry(packsWith());

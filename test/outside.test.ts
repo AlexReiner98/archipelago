@@ -2,6 +2,7 @@
 // sees, an act held for a person and made once allowed, a webhook checked by its signature, a schedule, and an undo
 // that says which acts it could not reach.
 import assert from 'node:assert/strict';
+import { doneEvents } from '../src/activity.ts';
 import { createHmac } from 'node:crypto';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage } from 'node:http';
@@ -13,12 +14,12 @@ import { openDb } from '../src/db.ts';
 import { runSchedule, serveHook } from '../src/hooks.ts';
 import { decideAct, setPackSecret, type Outcome } from '../src/outside.ts';
 import { hostFor } from '../src/packtools.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
+import { Archipelago } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { readEvents } from '../src/eventlog.ts';
 import { undo } from '../src/undo.ts';
+import { human } from './map.ts';
 
-const human: Actor = { kind: 'human', name: 'test' };
 const closers: (() => unknown)[] = [];
 after(() => closers.forEach((c) => c()));
 
@@ -98,7 +99,7 @@ test('a webhook is taken only with its signature, and a schedule runs as the pac
   assert.ok((await titles(l)).includes('Delivered: flour'));
   const rows = await readEvents(l.db, { action: 'entity.create', limit: 1 });
   assert.match(rows[0].actor, /pack:demo/);
-  const { rows: arrived } = await l.db.query<{ actor: string; reason: string; detail: { pack?: string } }>(`select actor, reason, detail from event where action = 'demo.arrived'`);
+  const arrived = (await doneEvents(l.db, { action: 'demo.arrived' }, 50)) as { actor: string; reason: string; detail: { pack?: string } }[];
   assert.deepEqual(arrived.map((e) => [e.actor, e.reason, e.detail.pack]), [['agent:pack:demo', 'flour arrived', 'demo']], 'an event of a kind it declares, recorded as the pack');
   const stray = await fetch(`${url}/demo.delivered`, { method: 'POST', body, headers: { 'x-signature-256': sign('h00k'), 'x-demo-kind': 'stray' } });
   assert.equal(stray.status, 500);

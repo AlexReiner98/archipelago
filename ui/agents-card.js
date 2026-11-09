@@ -50,7 +50,7 @@ export function tokensCard({ tokens, row, then, fail, say, workspace, connect })
         { class: 'toolbar', style: 'padding: var(--space-6) 0; flex-wrap: nowrap' },
         name,
         life,
-        h('button', { class: 'gist', style: 'white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis', title: `Claude Code setup: a command that sets up Claude Code in a project, with sessions on the map of ${workspace.name} (${workspace.id})`, onclick: () => make('claude-code', (made) => connectBox(made, workspace)) }, `Set up in ${workspace.name}`),
+        h('button', { class: 'gist cut', style: 'flex: 0 1 auto', title: `Claude Code setup: a command that sets up Claude Code in a project, with sessions on the map of ${workspace.name} (${workspace.id})`, onclick: () => make('claude-code', (made) => connectBox(made, workspace)) }, `Set up in ${workspace.name}`),
         menu('⋯', [[`Token only, for ${workspace.name}`, () => make('agent', (made) => secretBox(`Token for ${made.name}, in ${workspace.name}`, made.token, workspace))]]),
       ),
     ),
@@ -88,5 +88,5 @@ export function checkRow(r) {
   // A check that counts: how many the reply must do before it asks, the owner's to set.
   const at = r.counts && h('input', { type: 'number', min: '1', step: '1', value: String(r.at), style: 'width: var(--hours-field)', title: `Asks once a reply has done this many (${r.counts})` });
   if (at) at.onchange = () => api('workspace_set', { asks_at: { [r.lifted]: Number(at.value) } }).then(() => (r.at = Number(at.value))).catch((err) => ((at.value = String(r.at)), (at.title = err.message)));
-  return line(name, ...(at ? [at] : []), h('span', { class: 'pill', title: `Asked ${r.asked} time${r.asked === 1 ? '' : 's'} in the last week` }, String(r.asked)), on);
+  return line(name, ...(at ? [at] : []), h('span', { class: 'mark', title: `Asked ${r.asked} time${r.asked === 1 ? '' : 's'} in the last week` }, String(r.asked)), on);
 }

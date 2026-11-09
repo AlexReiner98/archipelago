@@ -140,14 +140,14 @@ async function byOf(db: Q, heads: Entry[]): Promise<(By | undefined)[]> {
 }
 
 /**
- * What else moved on what is held, outside the fact stream: the events still kept as rows (a session's heartbeat, a
- * pack turned on), after an event number, read through the viewer's own rows. The page draws again for them; there
+ * What else moved on what is held, outside the fact stream: the entries of the compacted streams about it (a
+ * session's story, a push heard), after a number of the activity log, read through the viewer's own rows. The page draws again for them; there
  * are no facts in them to project.
  */
 export async function eventsAfter(db: Q, input: { seq?: number; ids: string[] }): Promise<{ seq: number; ids: string[] }> {
-  const { rows: top } = await db.query<{ seq: number }>(`select coalesce((select seq from event order by seq desc limit 1), 0)::int as seq`);
+  const { rows: top } = await db.query<{ seq: number }>(`select coalesce((select seq from log_op where seq is not null order by seq desc limit 1), 0)::int as seq -- index log_op_seq`);
   if (input.seq === undefined || !input.ids.length) return { seq: top[0].seq, ids: [] };
-  const { rows } = await db.query<{ id: string }>(`select distinct target_id as id from event where seq > $1 and target_id = any($2::text[])`, [input.seq, input.ids]);
+  const { rows } = await db.query<{ id: string }>(`select distinct facts->0->>1 as id from log_op where seq > $1 and facts->0->>1 = any($2::text[]) -- index log_op_about`, [input.seq, input.ids]);
   return { seq: top[0].seq, ids: rows.map((r) => r.id) };
 }
 

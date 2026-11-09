@@ -22,7 +22,7 @@ export function diagrams(files: SourceFile[], packs: PackFile[], link?: (path: s
 /** What is read to draw them: this checkout's sources and pack files. */
 export function readCheckout(root = ROOT): { files: SourceFile[]; packs: PackFile[] } {
   const files = ['src', 'ui', 'packs'].flatMap((d) => walk(join(root, d))).map((f) => ({ path: relative(root, f).split('\\').join('/'), text: readFileSync(f, 'utf8') }));
-  const packs = readdirSync(join(root, 'packs')).filter((p) => existsSync(join(root, 'packs', p, 'pack.json'))).map((p) => readManifest(readFileSync(join(root, 'packs', p, 'pack.json'), 'utf8'), `packs/${p}/pack.json`).manifest as PackFile);
+  const packs = readdirSync(join(root, 'packs')).filter((p) => existsSync(join(root, 'packs', p, 'pack.json'))).map((p) => readManifest(readFileSync(join(root, 'packs', p, 'pack.json'), 'utf8'), `packs/${p}/pack.json`) as PackFile);
   return { files, packs };
 }
 

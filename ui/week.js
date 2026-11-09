@@ -1,6 +1,6 @@
 import { api, h, state } from './base.js';
 import { keepInSight } from './menu-place.js';
-import { chip } from './words.js';
+import { typeMark } from './words.js';
 
 // ---- Time ------------------------------------------------------------------
 
@@ -55,7 +55,7 @@ export function workPicker(initial, onPick) {
               onPick?.(picked);
             },
           },
-          chip(x.type),
+          typeMark(x.type),
           h('span', { class: 'gist' }, x.title),
         ),
       ),

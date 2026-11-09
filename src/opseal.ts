@@ -5,7 +5,7 @@
 // verifies with no key and still does once a forget has put the digest in the value's place.
 
 import type { Q } from './db.ts';
-import { digestOf, isSealed, open, seal, sealable } from './seal.ts';
+import { digestOf, isSealed, openNoting, seal, sealable } from './seal.ts';
 import { keysFor, keysOf } from './vault.ts';
 import type { Light, OpFact } from './streams.ts';
 
@@ -41,7 +41,7 @@ export async function openOps(q: Q, entries: Light[]): Promise<Light[]> {
   }
   if (!ids.size) return entries;
   const ring = await keysOf(q, [...ids]);
-  const read = (id: string, name: string, v: unknown) => (isSealed(v) ? (open(ring.get(id), field(name), v) ?? digestOf(v)) : v);
+  const read = (id: string, name: string, v: unknown) => (isSealed(v) ? (openNoting(ring.get(id), field(name), v) ?? digestOf(v)) : v);
   return entries.map((e) => ({
     ...e,
     facts: e.facts.map((f): OpFact => (f[0] === '+' ? ['+', f[1], f[2], read(f[1], f[2], f[3])] : f)),

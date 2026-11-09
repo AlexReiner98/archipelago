@@ -10,10 +10,10 @@ h2 { font-size: var(--text-6); margin: 0; }
 .small { font-size: var(--text-3); }
 .head { display: flex; gap: var(--space-6); align-items: center; flex-wrap: wrap; margin-bottom: var(--space-10); }
 .grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pill { font-size: var(--text-2); padding: var(--space-1) var(--space-5); border-radius: var(--radius-4); white-space: nowrap; background: var(--public-soft); color: var(--public-muted); flex: none; }
-.pill.ok { background: var(--public-ok-soft); color: var(--public-ok); }
-.pill.warn { background: var(--public-warn-soft); color: var(--public-warn); }
-.pill.bad { background: var(--public-bad-soft); color: var(--public-bad); }
+.mark { font-size: var(--text-2); white-space: nowrap; color: var(--public-muted); flex: none; }
+.mark.ok { color: var(--public-ok); }
+.mark.warn { color: var(--public-warn); }
+.mark.bad { color: var(--public-bad); font-weight: 600; }
 select { font: inherit; padding: var(--space-3) var(--space-4); border: var(--border-1) solid var(--public-line); border-radius: var(--radius-2); background: var(--public-panel); color: var(--public-text); }
 .card { background: var(--public-panel); border: var(--border-1) solid var(--public-line); border-radius: var(--radius-4); overflow: hidden; margin-bottom: var(--space-8); }
 .card > header { display: flex; gap: var(--space-6); align-items: center; padding: var(--space-7) var(--space-8); border-bottom: var(--border-1) solid var(--public-line); }

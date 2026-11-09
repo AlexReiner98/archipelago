@@ -8,8 +8,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
+import { until as holds } from './wait.ts';
 import { serve } from './serve.ts';
-import { agent, press, wait } from './tab-page.ts';
+import { agent, heard, press, ready } from './tab-page.ts';
 
 const browser = chrome();
 
@@ -19,16 +20,14 @@ test('in a browser, a show lands in its chat’s tab without a line at the foot,
   const { run } = (await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: 'no-line', title: 'No line' } })).result;
   const page = await open(`${base}/`);
   const until = async (what: string, ok: () => Promise<boolean>) => {
-    for (let n = 0; n < 60; n++) if (await ok()) return;
-    else await wait(250);
-    assert.fail(`${what}: ${page.logs().join('\n')}`);
+    if (!(await holds(ok, 20_000, 250))) assert.fail(`${what}: ${page.logs().join('\n')}`);
   };
   const show = (params: Record<string, unknown>) => call('/agent/report', undefined, { actor: agent, action: 'show', params: { ...params, run } });
   const tabs = () => page.evaluate<number>(`document.querySelectorAll('#tabs .tab').length`);
   const panes = () => page.evaluate<number>(`document.querySelectorAll('#canvas > .pane').length`);
   try {
     // The page follows steps from its first look at the map on.
-    await wait(3000);
+    await ready(page);
     // A show lands in its chat's tab, opened for it out of sight; the note is on the pane, in its mark's tooltip.
     await show({ entity: made.a, note: 'What the note says' });
     await until('the chat has a tab', async () => (await tabs()) === 2);
@@ -44,14 +43,14 @@ test('in a browser, a show lands in its chat’s tab without a line at the foot,
     // A question open over the page holds a show: it lands once the question is answered.
     await page.evaluate(`(() => { const d = document.createElement('dialog'); d.id = 'held'; document.body.append(d); d.showModal(); })()`);
     await show({ entity: made.a, pane: 'after' });
-    await wait(3000);
+    await heard(page);
     assert.equal(await page.evaluate(`Boolean([...document.querySelectorAll('.pane-follows')].some((m) => m.textContent === 'after'))`), false, 'nothing lands while it is open');
     await page.evaluate(`document.getElementById('held').close()`);
     await until('it lands', () => page.evaluate<boolean>(`[...document.querySelectorAll('.pane-follows')].some((m) => m.textContent === 'after')`));
     const theirs = await panes();
     // Merge into, in ⋯: the chat's panes join the owner's tab, which comes into sight, and the chat's tab is gone.
     await page.evaluate(`document.querySelector('#tabs .tab:nth-child(2) [aria-label="This tab: whom it follows, pop it out"]').click()`);
-    await wait(500);
+    assert.ok(await page.until(`[...document.querySelectorAll('.tab-menu [role="menuitem"]')].some((b) => b.textContent === 'Home')`), 'the menu offers Home');
     await page.evaluate(`[...document.querySelectorAll('.tab-menu [role="menuitem"]')].find((b) => b.textContent === 'Home').click()`);
     await until('merged', async () => (await tabs()) === 1 && (await panes()) === theirs + 1);
     // Its next show finds its panes there: no tab is opened for it.

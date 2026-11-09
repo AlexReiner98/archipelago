@@ -3,7 +3,7 @@
 // Whoever may see a document may read it whole here; the owner can give someone with no login a link to it, and the
 // link shows that document and the items it brings in, nothing else (pelago_shared_document in src/db.ts).
 
-import { createHash, randomBytes } from 'node:crypto';
+import { randomHex, sha256Hex } from './hashes.ts';
 import { newId, type Q } from './db.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 
@@ -85,7 +85,7 @@ export async function readDocument(l: Archipelago, id: string) {
   return { id: doc.id, type: doc.type, title: doc.title, status: doc.status, for: doc.props.for ?? null, fields: shownOf(l, doc.type, doc.props), updated_at: doc.updated_at, parts: assemble(doc.body, items), ...(notInside.length && { not_inside: notInside }) };
 }
 
-const hash = (secret: string) => createHash('sha256').update(secret).digest('hex');
+const hash = sha256Hex;
 
 /** Where a link is read: a path on this server. */
 export const sharePath = (workspace: string, secret: string) => `/s/${workspace}/${secret}`;
@@ -95,7 +95,7 @@ export async function createShare(l: Archipelago, actor: Actor, id: string) {
   const doc = await l.entity(id);
   if (!doc || doc.type === SHARED || !l.registry.drawnWith('document').includes(doc.type)) throw new Error(`"${id}" is not a document of this workspace: only one can be given as a link.`);
   if (doc.archived_at) throw new Error(`"${doc.title}" is archived.`);
-  const secret = randomBytes(24).toString('hex');
+  const secret = randomHex(24);
   const share = newId('s');
   const by = actor.person ?? `${actor.kind}:${actor.name}`;
   await l.db.transaction(async (tx: Q) => {

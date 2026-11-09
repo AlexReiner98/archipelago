@@ -16,6 +16,7 @@ import { op } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 import { eventsAfter, factsAfter, factsUpTo, HELD_MOST, headPos, ISLANDS_MOST } from './tail.ts';
 import { typeItemsIn, typesTaken } from './type-items.ts';
+import { movesAgain, syncTypes } from './typetable.ts';
 
 /** Moves when any file of the web UI is saved (the projector it runs too), so an open page knows to load itself again. */
 const UI_DIR = join(import.meta.dirname, '..', 'ui');
@@ -90,6 +91,8 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       const my = their ? await whole.entity(mine!) : undefined;
       const owners = their && my && !my.archived_at ? { here: { id: my.id, title: my.title }, file: { id: theirs!, title: their.title as string }, made_one: false } : undefined;
       const report = await merge(whole.db, file, { workspace: l.workspace, sessionTypes: whole.registry.family('run'), apply: input.apply });
+      // What the file brought may be in the shapes from before the migrations a workspace runs once: they run again.
+      if (input.apply) (await movesAgain(whole), await syncTypes(whole));
       if (input.apply && named.length) await typesTaken(whole);
       if (input.apply && input.same_owner && owners) {
         await whole.apply(actorId(actor), { ops: [{ op: 'merge', keep: owners.file.id, drop: owners.here.id }], reason: 'The owner here and the owner in the imported backup are one person' });
@@ -139,7 +142,6 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
     humanOnly: true,
     input: { upto: z.number().int().nonnegative().describe('The seq of the newest event looked at.') },
     run: async (l, actor, input) => {
-      await l.log(l.db, { actor: actorId(actor), action: 'changes.seen', reason: 'Looked at what agents changed', detail: { upto: input.upto } });
       await l.record('settings', actorId(actor), [['+', actorId(actor), 'changes.seen', input.upto]]);
       return { seen_upto: input.upto };
     },

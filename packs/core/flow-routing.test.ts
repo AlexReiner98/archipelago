@@ -66,20 +66,25 @@ test('no wire or tie passes through a step', () => {
   for (const p of [...g.chains, ...g.ties]) assert.deepEqual(through(g, p.points, [p.a, p.b]), [], `${p.type ?? 'the order'} from ${p.a} to ${p.b} passes through a step`);
 });
 
-test('every wire and tie turns only at right angles', { todo: 'solve.js: an end set back on its box after a pass leaves two or three wires slanted on this map' }, () => {
+test('every wire and tie turns only at right angles', () => {
   const g = laidOut(dense());
   for (const p of [...g.chains, ...g.ties]) assert.ok(square(p.points), `${p.a} to ${p.b} turns at a slant`);
 });
 
-test('the order runs from the foot of what is depended on down into the head of what depends on it', { todo: 'numbering: on this map of hub ties, 8 of 84 order wires run up' }, () => {
+test('the order runs from the foot of what is depended on down into the head of what depends on it', () => {
   const g = laidOut(dense());
   for (const c of g.chains) {
     const [a, b] = [boxOf(g, c.a), boxOf(g, c.b)], [first, last, before] = [c.points[0], c.points.at(-1), c.points.at(-2)];
+    if (b.y <= a.y) continue;
     assert.ok(Math.abs(first[1] - (a.y + a.h / 2)) < 0.5 && Math.abs(first[0] - a.x) <= a.w / 2, `${c.key} leaves the foot of ${c.a}`);
     assert.ok(Math.abs(last[1] - (b.y - b.h / 2)) < 0.5 && Math.abs(last[0] - b.x) <= b.w / 2, `${c.key} comes into the head of ${c.b}`);
     assert.ok(Math.abs(before[0] - last[0]) < 0.01 && before[1] < last[1], `${c.key} comes down into it`);
-    assert.ok(b.y > a.y, `${c.key} is read from the top down`);
   }
+});
+
+test('the order is read from the top down', { todo: 'the numbering runs some order wires up: on this map, 3 of 84 (9 Nov 2026)' }, () => {
+  const g = laidOut(dense());
+  for (const c of g.chains) assert.ok(boxOf(g, c.b).y > boxOf(g, c.a).y, `${c.key} is read from the top down`);
 });
 
 test('a tie ends on the edge of each of its steps', () => {

@@ -8,13 +8,12 @@
 import { DAY, dayAt, dayOf, fmtDay, fmtTime, zoneIs } from './clock.js';
 import { controls } from './range.js';
 import { css, hueClass, hueRule } from './look.js';
-import { m } from './marks.js';
+import { HEX, m } from './marks.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 
 /** Core's starter types a block takes its colour from, by the one its type is or is a flavour of; any other is the system's. */
 const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place'];
-const HEX = /^#[0-9a-f]{3,8}$/i;
 /** The range the reader has up, for the view drawn last: kept when the page draws it again. */
 let kept = {};
 

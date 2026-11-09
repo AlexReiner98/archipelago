@@ -100,9 +100,6 @@ export async function undo(l: Archipelago, actor: Actor, input: { changeset: str
   const { rows: acts } = await l.db.query<{ act: string; pack: string }>(`select act, pack from act where changeset = $1 and status = 'done'`, [input.changeset]);
   for (const a of acts) skipped.push(`the ${a.pack} pack's act "${a.act}" was made outside the map and cannot be undone`);
   const result = await l.change(actor, { ops, reason: `Undo: ${done.reason || input.changeset}`, undoes: input.changeset });
-  // An agent's undo is only a proposal; it is the undo once it has really happened.
-  if (result.status === 'applied') {
-    await l.log(l.db, { actor: `${actor.kind}:${actor.name}`, action: 'changeset.undo', changeset: result.changeset, reason: `Undo: ${done.reason}`, detail: { undoes: input.changeset, skipped } });
-  }
+  // An agent's undo is only a proposal; it is the undo once it has really happened, and its change set says so (undoes).
   return { ...result, undoes: input.changeset, reversed: ops.length, skipped };
 }

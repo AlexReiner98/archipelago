@@ -9,6 +9,22 @@ import { types } from './words.js';
 
 const ITEM = /^#\/e\/(e_[a-z0-9]{8})$/;
 
+/** The items of each picture drawn outside the app, by its host: one listener for all of them puts the address back. */
+const outside = new Map();
+let listening = false;
+function keepAddress(host, byId) {
+  outside.set(host, byId);
+  if (listening) return;
+  listening = true;
+  addEventListener('hashchange', () => {
+    const id = ITEM.exec(location.hash)?.[1];
+    for (const [at, ids] of outside) {
+      if (!at.isConnected) outside.delete(at);
+      else if (ids.has(id)) return void history.replaceState(null, '', location.pathname);
+    }
+  });
+}
+
 /** Draw one frozen answer into host. `typeTitles` names each type the picture holds. `inApp`: drawn in the app's sheet, whose addresses are its own. */
 export function drawFrozen(host, answer, typeTitles = {}, { inApp = false } = {}) {
   for (const [id, title] of Object.entries(typeTitles)) if (!types.has(id)) types.set(id, { id, title });
@@ -24,8 +40,5 @@ export function drawFrozen(host, answer, typeTitles = {}, { inApp = false } = {}
   // A part is a way to its page in the app; here it leads nowhere.
   body.addEventListener('click', (ev) => ev.target.closest?.('a') && ev.preventDefault());
   // A shape that opens an item by the address (a bar in time) has the address put back.
-  if (!inApp)
-    addEventListener('hashchange', () => {
-      if (byId.has(ITEM.exec(location.hash)?.[1])) history.replaceState(null, '', location.pathname);
-    });
+  if (!inApp) keepAddress(host, byId);
 }

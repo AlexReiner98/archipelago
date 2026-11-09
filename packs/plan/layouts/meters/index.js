@@ -7,9 +7,8 @@
 // It is laid out by the page, not drawn to a size. Its look is ./look.js.
 
 import { css, hueClass, hueRule } from './look.js';
-import { m } from './marks.js';
+import { HEX, m } from './marks.js';
 
-const HEX = /^#[0-9a-f]{3,8}$/i;
 /** A bar as wide as its box, in a thousandth of it: rects need no style to be sized. */
 const WIDE = 1000;
 const at = (share) => Math.max(0, Math.min(WIDE, Math.round(share * WIDE)));

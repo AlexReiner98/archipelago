@@ -37,7 +37,7 @@ export function checkAutomation(props: Record<string, unknown>): string[] {
       if (typeof props.at !== 'string' || !TIME.test(props.at)) problems.push('trigger "weekly" needs at as "HH:MM" (24-hour, local time)');
       break;
     case 'event':
-      if (typeof props.on_action !== 'string' || !props.on_action) problems.push('trigger "event" needs on_action, e.g. "proposal.create" or "resource.*"');
+      if (typeof props.on_action !== 'string' || !props.on_action) problems.push('trigger "event" needs on_action, e.g. "entity.create" or "resource.*"');
       break;
     default:
       problems.push('an automation needs trigger: every, daily, weekly or event');

@@ -200,7 +200,7 @@ async function heard(l: Archipelago, run: Entity, why: string): Promise<void> {
   await l.operational(run.id, { unset: ['stale_flagged'] });
   const { rows } = await l.db.query<{ id: string }>(
     `select n.id from entity n join relation r on r.from_id = n.id and r.type = 'about' and r.valid_to is null
-     where r.to_id = $1 and n.type = 'notification' and n.is_open and n.archived_at is null and n.props->>'from' in ('agent:pelago', 'agent:lattice')`,
+     where r.to_id = $1 and n.type = 'notification' and n.is_open and n.archived_at is null and n.props->>'from' = 'agent:pelago'`,
     [run.id],
   );
   if (rows.length) await l.apply('agent:pelago', { ops: rows.map((n): Op => ({ op: 'update', id: n.id, status: 'read' })), reason: why });
@@ -448,6 +448,6 @@ export async function sessionEnd(
   await heard(l, run, `Session "${run.title}" ended`);
   // The owner's page closes its tab (ui/tab-life.js); a page that missed this finds it ended when it next reads the sessions.
   // One that stays, waiting, lets its tab go until it next shows something.
-  await took((await wholeMap(l)).db, l, { kind: 'other', actor: actorId(actor), did: stays ? 'waiting' : (input.reason ?? 'ended'), ...(stays ? { rests: true } : { ends: true }), run: run.id }, true).catch(() => {});
+  await took((await wholeMap(l)).db, l, { kind: 'other', actor: actorId(actor), did: stays ? 'waiting' : (input.reason ?? 'ended'), ...(stays ? { rests: true } : { ends: true }), run: run.id }, true).catch((err) => console.error(`session_end ${run.id}: the owner's page could not be told: ${(err as Error).message}`));
   return { run: run.id, status: stays ? 'waiting' : outcome, released: held.length, unaccounted_commits: commits.length ? commits : undefined, note: stays ? 'Kept. The session stays open, under its name, until its chat ends.' : undefined };
 }

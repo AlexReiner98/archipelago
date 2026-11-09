@@ -31,7 +31,7 @@ const { scene, ms, told, lines } = await setOut(drawing, async (url) => {
   stages((n: string, snapshot: any) => told.push({ name: n, snapshot }));
   const { picture } = await import(url('index.js'));
   const t0 = performance.now();
-  const drawn = await picture(input, { measure, patch() {}, open() {}, frame: () => new Promise(() => {}), surface: () => null, cola: async () => (await import('../ui/cola.module.min.js')).default });
+  const drawn = await picture(input, { measure, patch() {}, open() {}, frame: () => new Promise(() => {}), surface: () => null, cola: async () => ((await import('../ui/cola.module.min.js' as string)) as any).default });
   const ms = performance.now() - t0, last = told.filter((t) => t.name === 'finish').at(-1)?.snapshot;
   return { scene: drawn?.scene, ms, told, lines: last ? [...last.chains, ...last.ties] : [] };
 });

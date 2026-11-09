@@ -2,7 +2,7 @@
 // connect GitHub, connect an agent, invite the team. It goes once every
 // step is done, or once the admin hides it in this browser. Only an admin sees it, on a server where people sign in.
 
-import { api, authHeaders, h } from './base.js';
+import { api, h, whoami } from './base.js';
 
 const HIDDEN = 'pelago-start-hidden';
 const hidden = (ws) => {
@@ -15,7 +15,7 @@ const hidden = (ws) => {
 
 /** The piece: drawn into host. */
 export async function startPiece(host, title) {
-  const me = await fetch('/whoami', { headers: authHeaders() }).then((r) => r.json()).catch(() => null);
+  const me = await whoami().catch(() => null);
   if (me?.auth !== 'tokens' || !me.actor?.admin || hidden(me.workspace.id)) return host.remove();
   const [offered, tokens, members, info] = await Promise.all([api('connections').catch(() => ({ packs: [] })), api('token_list').catch(() => []), api('member_list').catch(() => []), api('workspace_info').catch(() => ({}))]);
   const room = info.member_limit?.members;
@@ -37,7 +37,7 @@ export async function startPiece(host, title) {
     h(
       'li',
       { class: 'row-top' },
-      h('span', { class: `pill${s.done ? ' ok' : ''}` }, s.done ? 'done' : 'to do'),
+      h('span', { class: `mark${s.done ? ' ok' : ''}` }, s.done ? 'done' : 'to do'),
       h('a', { class: `grow gist${s.done ? ' muted' : ''}`, href: s.href, title: s.tip }, s.title),
     );
   host.replaceChildren(

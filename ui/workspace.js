@@ -4,7 +4,7 @@
 // to it from outside. Which is open is kept in the address (#/workspace?at=map); a step of Start here (ui/start.js)
 // names a card, and lands on its section with that card in view.
 
-import { api, ask, authHeaders, h, part, state } from './base.js';
+import { api, ask, h, part, state, whoami } from './base.js';
 import { screenRows } from './nav.js';
 import { themesCard } from './themes-card.js';
 import { packsCard } from './packs.js';
@@ -44,8 +44,8 @@ const at = (step, el) => (el && (el.dataset.at = step), el);
 export async function workspace() {
   const main = part('workspace');
   const step = asked();
-  const me = await (await fetch('/whoami', { headers: authHeaders() })).json();
-  const tokensOn = me.auth === 'tokens';
+  const me = await whoami();
+  const tokensOn = me?.auth === 'tokens';
   const admin = !tokensOn || me.actor.admin;
   const [info, tokens, people, members] = await Promise.all([
     api('workspace_info'),

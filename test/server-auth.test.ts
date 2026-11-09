@@ -65,7 +65,7 @@ test('a token fixes identity and authority, whichever surface is used', async ()
   // The log names the token's identity; an agent may add a session label, not replace it.
   await call('/agent/notify', agent, { actor: 'session-7', title: 'Hello' });
   const events = (await call('/api/events', owner, { limit: 20 })).result as any[];
-  assert.ok(events.some((e) => e.actor === 'agent:claude-code' && e.action === 'proposal.create'));
+  assert.ok(events.some((e) => e.actor === 'agent:claude-code' && e.detail?.approved_by), 'what it proposed, applied, is its own');
   assert.ok(events.some((e) => e.actor === 'agent:claude-code/session-7'));
 
   // MCP with the agent token.

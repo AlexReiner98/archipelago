@@ -4,7 +4,7 @@
 // stored, so it is asked for again after a reload; the operator routes are the server's (/operator/workspaces).
 
 import { ask, h } from './base.js';
-import { menu } from './words.js';
+import { day, menu } from './words.js';
 import { card, fileInput, line, secretBox } from './workspace-cards.js';
 
 let secret = '';
@@ -68,7 +68,7 @@ export function workspacesCard(current) {
     };
     const reissue = async (w) =>
       (await ask({ title: `A new owner token for ${w.name}?`, message: 'It has full control of that workspace. Tokens already made keep working until its owner revokes them.', action: 'Make it' })) && call('POST', {}, `/${encodeURIComponent(w.id)}/owner-token`).then(draw, fail);
-    const restored = made?.restored && `${made.restored.entities} items and ${made.restored.events} events from ${made.restored.from.name}, taken ${new Date(made.restored.taken).toLocaleDateString()}`;
+    const restored = made?.restored && `${made.restored.entities} items and ${made.restored.events} events from ${made.restored.from.name}, taken ${day(made.restored.taken)}`;
     body.replaceChildren(
       made ? secretBox(`Owner token for ${made.workspace.name} (${made.workspace.id})`, made.owner_token, made.workspace) : '',
       restored ? h('div', { class: 'muted small gist', title: `${restored}. Tokens from where it came from do not work here.` }, restored) : '',

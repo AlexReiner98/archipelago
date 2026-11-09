@@ -48,9 +48,9 @@ export async function heldPiece(host, title) {
   host.replaceChildren(
     h(
       'div',
-      { class: 'row-top needs', style: 'flex-wrap: nowrap; margin-bottom: var(--space-8)' },
+      { class: 'row-top needs', style: 'margin-bottom: var(--space-8)' },
       h('span', { class: 'n', style: 'flex: none' }, n),
-      h('a', { class: 'grow', href: canvas ? canvasAt(canvas) : '#/', title: 'Draw what these changes would touch', style: 'min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' }, `${title}: ${n} wait${n === 1 ? 's' : ''} for your word`),
+      h('a', { class: 'grow', href: canvas ? canvasAt(canvas) : '#/', title: 'Draw what these changes would touch' }, `${title}: ${n} wait${n === 1 ? 's' : ''} for your word`),
     ),
   );
 }

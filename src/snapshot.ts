@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import type { Q } from './db.ts';
+import { sha256Hex as sha256 } from './hashes.ts';
 import { jcs } from './jcs.ts';
 import { openTables, sealTables } from './backup-seal.ts';
 import type { VaultDump } from './vault.ts';
@@ -61,7 +62,6 @@ export interface Snapshot {
   hash: string;
 }
 
-const sha256 = (data: string | Buffer) => createHash('sha256').update(data).digest('hex');
 /** A snapshot's hash: its header canonical, then its rows by the digest of the bytes kept (sealed, so a forget changes none of them). */
 export const hashOf = (head: Omit<Snapshot, 'hash' | 'id'>, rows: Buffer) => sha256(`pelago-snapshot\n${jcs(head)}\n${sha256(rows)}`);
 

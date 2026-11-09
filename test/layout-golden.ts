@@ -2,8 +2,8 @@
 // drawing's pictures captured in a real browser and compared with what the kernel drew before it.
 
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import type { Page } from './browser.ts';
 
 /** A small system on the map, its picture kept as a view drawn as architecture. */
@@ -33,8 +33,29 @@ export async function system(call: (path: string, token?: string, body?: unknown
   return { ...made, ...kept.result.created } as Record<string, string>;
 }
 
-/** What the kernel drew for a shape, on a machine like this one (test/fixtures/layouts). */
-export const golden = (shape: string) => join(import.meta.dirname, 'fixtures', 'layouts', `${shape}.golden.${process.platform}.json`);
+/**
+ * A file of test/fixtures/layouts kept for this platform: text is measured by the fonts of the machine, so Windows and
+ * Linux each keep their own (`name.<platform>.json`). The Linux ones are what CI's runner drew.
+ */
+export const fixture = (name: string) => join(import.meta.dirname, 'fixtures', 'layouts', `${name}.${process.platform}.json`);
+
+/** What the kernel drew for a shape, on a machine like this one. */
+export const golden = (shape: string) => fixture(`${shape}.golden`);
+
+/**
+ * What a golden holds, or null where this platform keeps none. Under CI a missing golden fails, so nothing passes there
+ * without comparing: what was drawn is written to runs/goldens/ (uploaded with the run, see tests.yml), to be committed
+ * as the golden once looked at. Elsewhere a missing one is skipped, and written with GOLDEN_WRITE=1.
+ */
+export function kept(file: string, now: unknown): any {
+  if (process.env.GOLDEN_WRITE) return writeFileSync(file, `${JSON.stringify(now)}\n`), null;
+  if (existsSync(file)) return JSON.parse(readFileSync(file, 'utf8'));
+  if (!process.env.CI) return null;
+  const out = join(import.meta.dirname, '..', 'runs', 'goldens');
+  mkdirSync(out, { recursive: true });
+  writeFileSync(join(out, basename(file)), `${JSON.stringify(now)}\n`);
+  assert.fail(`No golden ${basename(file)} for ${process.platform}: what was drawn is in runs/goldens/ (the run's goldens artifact). Commit it to test/fixtures/layouts/ once it looks right.`);
+}
 
 /**
  * Each case drawn by `drawing` in the page, every one checked to hold `mark`, and compared with what `file` keeps: the
@@ -46,9 +67,8 @@ export async function drawsAsBefore<C extends { name: string; style: object }>(p
   const drawn = cases.map((c) => ({ ...c, style: { ...c.style, drawing } }));
   const now: any = await page.evaluate(`(async () => { const { drawWith } = await import('/layout.js'); return captureDrawings(drawWith, ${JSON.stringify(drawn)}); })()`);
   for (const c of drawn) assert.ok(now[c.name].html.includes(mark), `${c.name} is drawn: ${now[c.name].html.slice(0, 200)}`);
-  if (process.env.GOLDEN_WRITE) writeFileSync(file, `${JSON.stringify(now)}\n`);
-  else if (existsSync(file)) {
-    const was = JSON.parse(readFileSync(file, 'utf8'));
+  const was = kept(file, now);
+  if (was) {
     for (const name of Object.keys(was)) {
       const [a, b] = [was[name], now[name]];
       assert.equal(b.html, a.html, `${name}: the marks`);

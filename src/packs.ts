@@ -131,7 +131,6 @@ export class Registry {
   added = new Map<string, Map<string, string>>();
   /** A name a type or link type had before (its moved_from), by the one it is now: what an old name still reads as. */ renamed = new Map<string, string>();
   /** Warnings said once: a pack file using the keys of the shape before the manifest. */
-  private warned = new Set<string>();
   /** Packs the owner turned off in this workspace. */
   private turnedOff: string[] = []; /** Whether this workspace holds its packs to the island rules (src/islands.ts). */ private islands = false; /** Whether this workspace has islands on: its items live on islands (src/island-items.ts). */ get onIslands() { return this.islands; }
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
@@ -151,19 +150,16 @@ export class Registry {
       .filter((name) => name !== LOCAL_PACK)
       .map((name) => [name, join(this.dir, name, 'pack.json')]);
     const hashes = new Map<string, string>();
-    const warnings: string[] = [];
     for (const [name, file] of folders) {
       if (!existsSync(file)) continue;
       const text = readFileSync(file, 'utf8');
-      const { manifest: pack, warnings: said } = readManifest(text, `packs/${name}/pack.json`);
+      const pack = readManifest(text, `packs/${name}/pack.json`);
       // A server pack kept beside the workspace packs is the server's (src/server-packs.ts), never a workspace's.
       if (isServerPack(pack)) continue;
       if (pack.id !== name) throw new Error(`Pack folder "${name}" contains pack id "${pack.id}"`);
       found.set(pack.id, pack);
       hashes.set(pack.id, createHash('sha256').update(text).digest('hex'));
-      warnings.push(...said);
     }
-    for (const w of warnings) if (!this.warned.has(w)) (this.warned.add(w), console.warn(w));
     if (!found.has('core')) throw new Error(`No core pack in ${this.dir}`);
     const own = ownPack(this.localPack(), this.items, LOCAL_PACK); if (own) found.set(LOCAL_PACK, own);
 

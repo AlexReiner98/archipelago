@@ -106,9 +106,9 @@ function importer(done) {
         return done?.();
       }
       if (nothing)
-        return say('muted small', `Nothing to import: this map already has everything in the backup of "${p.from.name}" taken ${new Date(p.taken).toLocaleString()}.`);
+        return say('muted small', `Nothing to import: this map already has everything in the backup of "${p.from.name}" taken ${when(p.taken)}.`);
       const message = [
-        `From the backup of "${p.from.name}" taken ${new Date(p.taken).toLocaleString()}.`,
+        `From the backup of "${p.from.name}" taken ${when(p.taken)}.`,
         `Added: ${e.added}${list(p.examples.added, e.added)}`,
         `Replaced by the file's later edit: ${e.updated}${list(p.examples.updated, e.updated)}`,
         `Kept, because edited later here: ${e.kept_newer_here}${list(p.examples.kept_newer_here, e.kept_newer_here)}`,
@@ -238,11 +238,11 @@ export function serverPacksCard() {
       plate({
         name: p.title,
         title: `${p.title} ${p.version}, at /x/${p.id}`,
-        marks: [h('span', { class: 'muted small' }, p.version), h('span', { class: 'pill', title: `What it may ask the server for:\n${p.acts.join('\n') || 'nothing'}` }, `${p.acts.length} act${p.acts.length === 1 ? '' : 's'}`)],
+        marks: [h('span', { class: 'muted small' }, p.version), h('span', { class: 'mark', title: `What it may ask the server for:\n${p.acts.join('\n') || 'nothing'}` }, `${p.acts.length} act${p.acts.length === 1 ? '' : 's'}`)],
         says: `At /x/${p.id}`,
         foot: offers(p).length > 0 && { text: offers(p).join(' · '), title: offers(p).join('\n') },
       });
-    const left = (r) => plate({ name: r.folder.split(/[\\/]/).pop(), title: r.folder, off: true, marks: h('span', { class: 'pill bad', title: r.why.join('\n') }, 'left out'), says: r.why.join(' · ') });
+    const left = (r) => plate({ name: r.folder.split(/[\\/]/).pop(), title: r.folder, off: true, marks: h('span', { class: 'mark bad', title: r.why.join('\n') }, 'left out'), says: r.why.join(' · ') });
     box.append(plates(packs.map(served), refused.map(left)));
     box.hidden = false;
   }, () => null);

@@ -49,36 +49,31 @@ test('in a browser, a document’s kept view is drawn as a canvas, the packs’ 
     ],
   });
   const page = await open(`${base}/#/e/${kept.d}`);
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const until = async (expression: string, ms = 20000) => {
-    for (const end = Date.now() + ms; Date.now() < end; await wait(150)) if (await page.evaluate(expression)) return true;
-    return false;
-  };
   const linked = (scope: string, id: string) => `Boolean(document.querySelector('${scope} a[href="#/e/${id}"]'))`;
   try {
     // The document: its page in the sheet reads it as it will publish, its words and its view drawn in its place
     // (the owner, 27 Oct 2026: a document is reviewed in its sheet as it will publish).
-    assert.ok(await until(`(document.querySelector('#sheet')?.textContent ?? '').includes('Closing words')`), `the document's words: ${page.logs().join('\n')}`);
-    assert.ok(await until(`Boolean(document.querySelector('#sheet .reading .doc-lens .lens-view')?.childElementCount)`), `its view drawn in the sheet: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(`(document.querySelector('#sheet')?.textContent ?? '').includes('Closing words')`), `the document's words: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(`Boolean(document.querySelector('#sheet .reading .doc-lens .lens-view')?.childElementCount)`), `its view drawn in the sheet: ${page.logs().join('\n')}`);
     // Its kept view, opened as a canvas: drawn flat (depth is never drawn on the canvas), the server and both parts.
     await page.go(`${base}/#/v?canvas=${kept.l}`);
-    assert.ok(await until(`${linked('#canvas', made.a)} && ${linked('#canvas', made.b)} && ${linked('#canvas', made.e)}`), `the view is drawn as a canvas: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(`${linked('#canvas', made.a)} && ${linked('#canvas', made.b)} && ${linked('#canvas', made.e)}`), `the view is drawn as a canvas: ${page.logs().join('\n')}`);
 
     // Home: the owner's Releases, the open ones.
     await page.go(`${base}/#/v?find=id+${made.p}`);
     await page.go(`${base}/#/you`);
-    assert.ok(await until(linked('.lens-card', made.r)), `Releases drawn on Home: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(linked('.lens-card', made.r)), `Releases drawn on Home: ${page.logs().join('\n')}`);
     assert.ok(!(await page.evaluate<boolean>(linked('.lens-card', made.old))), 'not what has happened');
 
     // A company: its page is bare, with no pack's screen drawn on it.
     await page.go(`${base}/#/e/${made.co}`);
-    assert.ok(await until(`(document.querySelector('#sheet')?.textContent ?? '').includes('Client Co')`), `the company's page: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(`(document.querySelector('#sheet')?.textContent ?? '').includes('Client Co')`), `the company's page: ${page.logs().join('\n')}`);
     assert.ok(!(await page.evaluate<boolean>(`Boolean(document.querySelector('#sheet .lens-card'))`)), 'no pack screen on a bare page');
     // What the time pack shows of a company is a view of it, offered in its head: drawn on the canvas, its invoice in it.
     const invoices = `[...document.querySelectorAll('#sheet .sheet-marks button')].find((b) => b.textContent === 'Invoices')`;
-    assert.ok(await until(`Boolean(${invoices})`), 'its view offered on its page');
+    assert.ok(await page.until(`Boolean(${invoices})`), 'its view offered on its page');
     await page.evaluate(`${invoices}.click()`);
-    assert.ok(await until(linked('#canvas', made.inv)), `its invoices drawn on the canvas: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(linked('#canvas', made.inv)), `its invoices drawn on the canvas: ${page.logs().join('\n')}`);
     assert.ok(!(await page.evaluate<boolean>(linked('#canvas', made.job))), 'and not its other work');
   } finally {
     await page.close();

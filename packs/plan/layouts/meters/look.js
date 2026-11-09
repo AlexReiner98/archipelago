@@ -2,6 +2,8 @@
 // the style's (sizes, read as --ln-meter-*: the usage pack's preset names them); the colours are the page's. A
 // share's colour is a class the drawing writes a rule for (hueRule): a drawing sets no style on a mark.
 
+import { hues } from './marks.js';
+
 export const css = `
 .mt-stage { display: flex; flex-direction: column; gap: var(--ln-meter-gap); padding: var(--ln-meter-pad); max-width: var(--ln-meter-most); margin: 0 auto; box-sizing: border-box; color: var(--ln-text); font-size: var(--ln-text-size); }
 .mt-head { display: flex; gap: var(--ln-meter-row-gap); color: var(--ln-muted); font-size: var(--ln-meter-head-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -33,5 +35,4 @@ a.mt-row:hover .mt-row-name { text-decoration: underline; }
 `;
 
 /** The class a colour is drawn by, and its rule: named by the colour itself. */
-export const hueClass = (hex) => `mt-h-${hex.slice(1).toLowerCase()}`;
-export const hueRule = (hex) => `.${hueClass(hex)} { --mt-hue: ${hex}; }`;
+export const { hueClass, hueRule } = hues('mt-h', '--mt-hue');

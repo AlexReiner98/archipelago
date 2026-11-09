@@ -6,7 +6,8 @@
 // made as "Make a token for this" makes it (an agent's, acting for them, within those items, that may only report) the
 // first time the system polls, and handed to it then and never again. The secret is never kept and never shown.
 
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
+import { randomHex, sameBytes, sha256Hex } from './hashes.ts';
 import { z } from 'zod';
 import { createToken } from './auth.ts';
 import type { Q } from './db.ts';
@@ -40,7 +41,7 @@ export interface Ask {
 }
 
 const KEY = 'connect:';
-const hash = (secret: string) => createHash('sha256').update(secret).digest('hex');
+const hash = sha256Hex;
 const left = (a: Ask) => Math.max(1000, Date.parse(a.expires_at) - Date.now());
 const newCode = () => Array.from(randomBytes(8), (b, i) => (i === 4 ? '-' : '') + LETTERS[b % LETTERS.length]).join('');
 
@@ -79,8 +80,8 @@ export async function askForToken(db: Q, input: unknown) {
   if (waiting.length >= ASK_MOST) throw new Error(`${ASK_MOST} requests are already waiting here. Ask again once they are answered or have run out.`);
   let code = newCode();
   while (waiting.some((a) => a.code === code)) code = newCode();
-  const id = `a_${randomBytes(6).toString('hex')}`;
-  const secret = randomBytes(24).toString('hex');
+  const id = `a_${randomHex(6)}`;
+  const secret = randomHex(24);
   const now = Date.now();
   const ask: Ask = { id, code, name: parsed.data.name, addresses: [...new Set(addresses)], may: 'report', poll_hash: hash(secret), asked_at: new Date(now).toISOString(), expires_at: new Date(now + ASK_MINUTES * 60_000).toISOString(), state: 'pending' };
   await keep(db, KEY + id, ask, ASK_MINUTES * 60_000);
@@ -94,7 +95,7 @@ export async function askForToken(db: Q, input: unknown) {
 export async function pollForToken(db: Q, workspace: string, id: string, secret: string): Promise<{ state: 'pending' | 'refused' | 'gone' } | { state: 'approved'; token: string; name: string; may: 'report' }> {
   const { rows } = await db.query<{ value: Ask }>(`select value from transient where key = $1 and until >= now()`, [KEY + id]);
   const ask = rows[0]?.value;
-  const held = ask && timingSafeEqual(Buffer.from(ask.poll_hash), Buffer.from(hash(secret)));
+  const held = ask && sameBytes(ask.poll_hash, hash(secret));
   if (!ask || !held || ask.state === 'handed') return { state: 'gone' };
   if (ask.state !== 'approved') return { state: ask.state };
   // Taken as it is read: of two polls at once, one is given the token and the other is told it is gone.

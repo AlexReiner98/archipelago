@@ -7,7 +7,7 @@ import { api, h, part } from './base.js';
 import { proposalCard } from './held-card.js';
 import { decide } from './held.js';
 import { renderBody } from './body.js';
-import { ago, chip, gist, who } from './words.js';
+import { ago, typeMark, gist, who } from './words.js';
 
 const ITEM = /^e_[a-z0-9]{8}$/;
 /** The ids an op names, as written. */
@@ -53,9 +53,9 @@ export async function heldBand(p, again) {
     { class: 'held-band needs', 'data-held': p.id },
     h(
       'div',
-      { class: 'row-top', style: 'flex-wrap: nowrap' },
+      { class: 'row-top' },
       h('span', { class: 'muted small', style: 'flex: none' }, 'Held for you'),
-      h('span', { class: 'grow', title: p.reason, style: 'min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' }, gist(p.reason)),
+      h('span', { class: 'grow', title: p.reason }, gist(p.reason)),
       h('span', { class: 'muted small', style: 'flex: none' }, who(p.actor, p.run_name)),
       h('span', { class: 'muted small nowrap', style: 'flex: none' }, ago(p.ts)),
       p.ops.length > 1 && h('button', { class: 'quiet-button', style: 'flex: none', title: 'See each part of it, and leave out or correct any before applying', onclick: look }, `Look (${p.ops.length})`),
@@ -77,7 +77,7 @@ export async function heldPage(proposal) {
       h(
         'section',
         { class: 'page-section ghost-item' },
-        h('div', { class: 'page-head' }, h('h1', { class: 'grow', title: o.title }, o.title), chip(o.type)),
+        h('div', { class: 'page-head' }, h('h1', { class: 'grow', title: o.title }, o.title), typeMark(o.type)),
         o.body && h('div', {}, renderBody(o.body)),
       ),
     ),

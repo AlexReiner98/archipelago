@@ -6,8 +6,10 @@
 // on you where the style lights that state (`lit`, ./session.js), held up where it is blocked. Layer: marks. Pure: an
 // answer in, each item's state out.
 
-/** Whether a link is of a type, or a flavour of it. */
-const isA = (l, type) => (l.type ?? l.kind) === type || (Array.isArray(l.is) && l.is.includes(type));
+import { isOf } from './graph.js';
+
+/** Whether a link is of a type, or a flavour of it: an older answer names its type as its kind. */
+const isA = (l, type) => isOf({ type: l.type ?? l.kind, is: l.is }, type);
 
 /** Each item's state: { phase, you, blocked, working, session? }. An older answer's own state is kept where it says more. */
 export function statesOf({ items, links = [], viewer, lit = new Set() }) {

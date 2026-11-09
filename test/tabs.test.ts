@@ -8,8 +8,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
+import { until as holds } from './wait.ts';
 import { serve } from './serve.ts';
-import { agent, press, wait } from './tab-page.ts';
+import { agent, heard, press, ready, wait } from './tab-page.ts';
 
 const browser = chrome();
 
@@ -26,16 +27,14 @@ test('in a browser, every chat that shows something has a tab named by its title
   const strip = () => page.evaluate<string>(`JSON.stringify([...document.querySelectorAll('#tabs .tab')].map((t) => [t.querySelector('.tab-name').textContent, t.getAttribute('aria-selected') === 'true', Boolean(t.dataset.unseen), t.classList.contains('tab-out')]))`).then(JSON.parse) as Promise<[string, boolean, boolean, boolean][]>;
   const names = async () => (await strip()).map((t) => t[0]);
   const until = async (what: string, ok: () => Promise<boolean>) => {
-    for (let n = 0; n < 60; n++) if (await ok()) return;
-    else await wait(250);
-    assert.fail(`${what}: ${JSON.stringify(await strip())} ${page.logs().join('\n')}`);
+    if (!(await holds(ok, 20_000, 250))) assert.fail(`${what}: ${JSON.stringify(await strip())} ${page.logs().join('\n')}`);
   };
   const show = (n: number, item: string) => call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made[item], run: sessions[n].run, focus: false } });
   /** The tab named `name`, as a selector. */
   const tabNamed = async (name: string) => `#tabs .tab:nth-child(${(await names()).indexOf(name) + 1})`;
   try {
     // The page follows steps from its first look at the map on. A chat open that has shown nothing has no tab.
-    await wait(3000);
+    await ready(page);
     assert.equal((await strip()).length, 1);
     const reader = await page.evaluate<string>('location.hash');
     // Each chat's first show opens its tab: the owner's tab first, then one for each, by its title, out of sight and marked.
@@ -47,7 +46,7 @@ test('in a browser, every chat that shows something has a tab named by its title
     assert.deepEqual(now.map((t) => [t[1], t[2]]), [[true, false], [false, true], [false, true], [false, true]], 'the tab in sight stays; the others are marked');
     // A show goes to its chat's tab, in the background: no tab is added and the reader stays.
     await show(1, 'i1');
-    await wait(2000);
+    await heard(page);
     assert.equal((await strip()).length, 4);
     assert.equal(await page.evaluate(`location.hash`), reader);
     // A press brings it into sight, where its chat last showed.
@@ -62,7 +61,7 @@ test('in a browser, every chat that shows something has a tab named by its title
     // The tab in sight pops out into a window of its own, and docks back whole.
     await page.send('Target.setDiscoverTargets', { discover: true });
     await press(page, `${await tabNamed('Chat 1')} [aria-label="This tab: whom it follows, pop it out"]`);
-    await wait(1000);
+    assert.ok(await page.until(`[...document.querySelectorAll('.tab-menu [role="menuitem"]')].some((b) => b.textContent === 'Pop out')`), 'the menu offers Pop out');
     await page.evaluate(`[...document.querySelectorAll('.tab-menu [role="menuitem"]')].find((b) => b.textContent === 'Pop out').click()`);
     await until('the tab is out', async () => (await strip()).some((t) => t[3]));
     const targets = (await page.send('Target.getTargets')).result.targetInfos as { targetId: string; type: string; url: string }[];

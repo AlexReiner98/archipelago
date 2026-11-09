@@ -11,7 +11,11 @@ import { openSaid } from './seal.ts';
  * a notification for each.
  */
 export async function toConfirm(l: Archipelago, input: { limit?: number } = {}) {
-  const { rows: marks } = await l.db.query<{ upto: number | null }>(`select max((detail->>'upto')::int) as upto from event where action in ('changes.seen', 'questions.confirmed') -- index event_marks`);
+  // Each mark is in the settings stream; one made before that stream was numbered is an activity entry carried in.
+  const { rows: marks } = await l.db.query<{ upto: number | null }>(
+    `select max(case when o.stream = 'settings' then (o.facts->0->>3)::int else (o.facts->0->3->'detail'->>'upto')::int end) as upto from log_op o
+     where o.seq is not null and o.facts->0->>2 in ('changes.seen', 'questions.confirmed') and o.stream in ('settings', 'activity') -- index log_op_action`,
+  );
   const since = marks[0]?.upto ?? 0;
   const { rows } = await l.db.query<{ id: string; type: string; title: string; status: string; outcome: string | null; seq: number; ts: Date; actor: string; changeset: string; authority: { of?: string; basis?: unknown } | null }>(
     // Read from the log: each status an agent set, on its own say or a human's word it reported, that the item still has.

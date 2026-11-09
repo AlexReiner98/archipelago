@@ -60,8 +60,6 @@ export const drawIn = (style) => {
 };
 /** Open an item's page over the canvas in focus, the lens as it is. */
 export const openOver = (id) => current?.pane.opened(id, queryNow() ?? home());
-/** Draw Home in the canvas in focus. */
-export const goHome = () => current?.pane.go(null);
 /** Whether the canvas in focus draws this item now. */
 export const canvasHas = (id) => Boolean(current?.has(id));
 /** Light this item in the canvas in focus (its page is open), or none. */

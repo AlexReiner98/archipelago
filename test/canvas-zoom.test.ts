@@ -24,11 +24,6 @@ test('in a browser, what comes into sight is drawn, though the picture changed w
     ],
   })).result.created as Record<string, string>;
   const page = await open(`${base}/#/v?from=${made.p}`);
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const until = async (expression: string) => {
-    for (const end = Date.now() + 20000; Date.now() < end; await wait(200)) if (await page.evaluate(expression)) return true;
-    return false;
-  };
   const step = (id: string) => `document.querySelector('#canvas svg a[href="#/e/${id}"]')`;
   const moves = `document.querySelector('#canvas .lens-view').moves`;
   const frames = `new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`;
@@ -37,8 +32,8 @@ test('in a browser, what comes into sight is drawn, though the picture changed w
   const middle = (id: string) => `(() => { const b = ${step(id)}.getBBox(); return [b.x + b.width / 2, b.y + b.height / 2]; })()`;
   const drawn = (id: string) => `${step(id)}.getAttribute('display') !== 'none'`;
   try {
-    assert.ok(await until(`Boolean(${step(last)}) && Boolean(${moves})`), `the order is drawn: ${page.logs().join('\n')}`);
-    await wait(500);
+    assert.ok(await page.until(`Boolean(${step(last)}) && Boolean(${moves})`), `the order is drawn: ${page.logs().join('\n')}`);
+    assert.ok(await page.still(`${step(last)}.getBoundingClientRect()`), 'the picture stands still');
     await page.evaluate(`(async () => { ${moves}.fit(); await ${frames}; })()`);
     const [top, bottom] = [await page.evaluate<[number, number]>(middle(first)), await page.evaluate<[number, number]>(middle(last))];
     assert.ok(bottom[1] - top[1] > 400, `the last step is far below the first: ${top} and ${bottom}`);

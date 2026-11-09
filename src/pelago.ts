@@ -4,13 +4,13 @@
 import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, type Policy } from './rules.ts'; import { renamedQuery } from './query-names.ts';
 import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.ts'; import { authorityOf } from './authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
-import { once } from './merge.ts'; import { readEvents, type EventQuery } from './eventlog.ts';
+import { once } from './merge.ts'; import { readEvents, type EventQuery } from './eventlog.ts'; import { doneFact, type Done } from './activity.ts';
 import type { Registry } from './packs.ts'; import { currentNames } from './type-items.ts'; import { noTwins } from './view-twins.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
 import { KEPT_FIELDS } from './operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from './streams.ts';
 import { search, type SearchInput } from './search.ts'; import { layoutOf } from './layout-changes.ts';
 import { append, headOf, type Fact } from './log.ts'; import { projectDecision, projectFacts, stamp } from './replay.ts'; import { linkFacts } from './facts.ts';
-import { decideProposal } from './proposals.ts'; import { guardedFetch } from './outbound.ts';
+import { decideProposal } from './proposals.ts'; import { guardedFetch } from './outbound.ts'; import { needHuman } from './actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
 import { planChange } from './change-plan.ts'; import { applyChange, letThrough } from './change-apply.ts';
 
@@ -114,7 +114,6 @@ export class Archipelago {
       await this.db.transaction(async (tx) =>
         projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, ...(input.run && { run: input.run }), base, ops: input.ops, warnings, ids, private_to: this.viewer || null }, facts)),
       );
-      await this.log(this.db, { actor: actorId(actor), action: 'proposal.create', reason: input.reason, detail: { proposal: id, ops: input.ops.length, held_by: verdict.by?.rule } });
       return {
         status: 'proposed' as const,
         proposal: id,
@@ -162,27 +161,20 @@ export class Archipelago {
       const { rows: held } = await tx.query<{ id: string; type: string; props: Props }>(`select id, type, props from entity where type = any($1::text[]) -- index entity_type`, [[...this.registry.family('screen'), ...this.registry.family('lens')]]);
       const on = (p: Props) => (what === 'entity' && Array.isArray(p.on) && p.on.includes(from) ? { on: p.on.map((t) => (t === from ? to : t)) } : {});
       const named = held.map((r) => ({ id: r.id, props: this.registry.isA(r.type, 'lens') ? renamedQuery(r.props, from, to, what) : on(r.props) })).filter((r) => Object.keys(r.props).length);
-      const settings = named.length ? { settings: named.map((r) => r.id) } : {};
       const reason = `Every ${from} is a ${to} now: its pack took the ${what === 'entity' ? 'type' : 'relation'} over.`;
       const facts = rows.flatMap((r): Fact[] => (what === 'entity' ? [['+', r.id, 'type', to], ...(r.status && statuses[r.status] ? [['+', r.id, 'status', statuses[r.status]] as Fact] : [])] : [['+', r.id, 'link', [to, r.from_id, r.to_id]]]));
       for (const r of named) for (const [k, v] of Object.entries(r.props)) facts.push(['+', r.id, k, v]);
       if (facts.length) await this.moved(tx, 'type.moved', reason, facts);
-      if (rows.length || named.length) await this.log(tx, { actor: 'system', action: 'type.moved', reason, detail: { from, to, items: rows.map((r) => r.id), ...settings } });
       return rows.length;
     });
   }
 
-  async log(
-    q: Q,
-    e: { actor: string; action: string; target?: string; changeset?: string; reason?: string; detail?: Props; origin?: string; ts?: string },
-  ): Promise<void> {
-    await q.query(
-      `insert into event (actor, action, target_id, changeset, reason, detail, origin, ts, private_to)
-       values ($1, $2, $3, $4, $5, $6::jsonb, $7, coalesce($8::timestamptz, now()), $9)`,
-      // An event about an entity is as visible as that entity. One with no
-      // target (a proposal, an undo) is private to whoever caused it.
-      [e.actor, e.action, e.target ?? null, e.changeset ?? null, e.reason ?? '', JSON.stringify(e.detail ?? {}), e.origin ?? 'pelago', e.ts ?? null, e.target ? null : this.viewer || null],
-    );
+  /**
+   * Something done that is no change to the map and is kept in no other stream (a push heard, a pack turned on), in
+   * the activity stream (src/activity.ts), in the transaction given. An entry about an item is as visible as the item.
+   */
+  async log(q: Q, e: Done): Promise<void> {
+    await this.record('activity', e.actor, [doneFact(e)], e.reason || undefined, q === this.db ? undefined : q);
   }
 
   // ---- operational state (src/operational.ts) ------------------------------
@@ -191,7 +183,7 @@ export class Archipelago {
   /**
    * The one write to an item that skips change: bookkeeping no one states as a fact (a session's heartbeat, an
    * automation's last firing), and who may read a notification. Only the fields src/operational.ts names; out of the
-   * item's history, so it does not look newly confirmed. The event, when given, is logged with it.
+   * item's history, so it does not look newly confirmed. The event's actor and reason, when given, go with its stream's entry.
    */
   async operational(id: string, set: { props?: Props; unset?: string[]; add?: Record<string, number>; reach?: { private_to: string | null; visibility?: 'shared' } }, event?: { actor: string; action: string; reason?: string; detail?: Props }) {
     const named = [...Object.keys(set.props ?? {}), ...(set.unset ?? []), ...Object.keys(set.add ?? {})].filter((k) => !KEPT_FIELDS.includes(k));
@@ -202,7 +194,6 @@ export class Archipelago {
       [id, JSON.stringify(set.props ?? {}), set.unset ?? [], JSON.stringify(set.add ?? {}), set.reach?.visibility ?? null, Boolean(set.reach), set.reach?.private_to ?? null],
     );
     for (const [stream, facts] of rows[0] ? operationalFacts(id, set, rows[0]) : []) await this.record(stream, event?.actor ?? 'system', facts, event?.reason);
-    if (event) await this.log(this.db, { ...event, target: id });
   }
 
   /** Append to a compacted stream at once (src/streams.ts), kept by the retention rules the packs declare. */
@@ -233,7 +224,6 @@ export class Archipelago {
       const id = newId('r');
       await tx.query(`insert into relation (id, type, from_id, to_id, props) values ($1, 'holds', $2, $3, $4::jsonb)`, [id, holder.id, resource.id, JSON.stringify(input.for ? { for: input.for } : {})]);
       await this.record('claims', actorId(actor), linkFacts({ id, type: 'holds', from_id: holder.id, to_id: resource.id, props: input.for ? { for: input.for } : {}, confidence: 1 }) as OpFact[], input.reason, tx);
-      await this.log(tx, { actor: actorId(actor), action: 'resource.claim', target: resource.id, reason: input.reason, detail: { resource: resource.title, holder: holder.id, holder_title: holder.title, for: input.for } });
       return { status: 'claimed' as const, relation: id };
     });
   }
@@ -244,7 +234,6 @@ export class Archipelago {
       [input.resource, input.holder ?? null],
     );
     await this.record('claims', actorId(actor), rows.map((r): OpFact => ['-', r.id, 'link']), input.reason);
-    for (const row of rows) await this.log(this.db, { actor: actorId(actor), action: 'resource.release', target: input.resource, reason: input.reason, detail: { holder: row.from_id } });
     return { released: rows.length };
   }
 
@@ -312,7 +301,7 @@ export class Archipelago {
 
   /** Create (or find) the person this workspace belongs to and make them the default for views. */
   async init(actor: Actor, input: { name: string; email?: string }) {
-    if (actor.kind !== 'human') throw new Error('Only a human can set the workspace owner.');
+    needHuman(actor, 'Only a human can set the workspace owner.');
     const found = await this.db.query<{ id: string }>(`select id from entity where type = 'person' and lower(title) = lower($1) and archived_at is null -- index entity_type_title`, [input.name]);
     let id = found.rows[0]?.id;
     if (!id) id = (await this.apply(actorId(actor), { ops: [{ op: 'create', ref: 'me', type: 'person', title: input.name, props: input.email ? { email: input.email } : {} }], reason: 'Workspace owner' })).created.me;

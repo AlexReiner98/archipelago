@@ -6,7 +6,7 @@
 // screen it was asked for, and read again with query picture; the same view at the same size, the map, the UI's files
 // and this process unchanged since, is that kept picture again rather than a second drawing, and says when it was drawn.
 
-import { createHash, randomBytes } from 'node:crypto';
+import { randomHex, sha256Hex, workspaceSecret } from './hashes.ts';
 import type { Q } from './db.ts';
 import { drawLook, type Marks } from './look-draw.ts';
 import { whose, type Whose } from './presence.ts';
@@ -40,7 +40,7 @@ export interface Pass {
   actor: string;
 }
 
-const hashOf = (pass: string) => createHash('sha256').update(pass).digest('hex');
+const hashOf = sha256Hex;
 
 /** The workspace a look pass is for, when the token is one. Says nothing about whether it is good. */
 export const passWorkspace = (token: string | undefined) => (token ? PASS.exec(token)?.[1] : undefined);
@@ -50,7 +50,7 @@ export const readPass = (db: Q, token: string) => kept<Pass>(db, `lookpass:${has
 
 /** A look pass for this screen's person, made for `actor`: what the server's Chrome reads with, for one drawing. */
 export async function passFor(db: Q, w: Whose, actor: string): Promise<string> {
-  const pass = `look_${w.workspace}_${randomBytes(20).toString('hex')}`;
+  const pass = workspaceSecret('look', w.workspace);
   await keep(db, `lookpass:${hashOf(pass)}`, { viewer: w.viewer ?? null, actor } satisfies Pass, LOOK_PASS_MS);
   return pass;
 }
@@ -119,7 +119,7 @@ export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: s
   // Marks are a canvas's: an item's page is a page, and is a picture.
   const marks = Boolean(size.marks) && hash.startsWith('v');
   const pos = await headPos(mapDb);
-  const same = `lookof:${whose(w)}:${createHash('sha256').update(JSON.stringify([hash, width, height, scheme, pos, marks, await uiVersion(), BEGAN])).digest('hex').slice(0, 32)}`;
+  const same = `lookof:${whose(w)}:${sha256Hex(JSON.stringify([hash, width, height, scheme, pos, marks, await uiVersion(), BEGAN])).slice(0, 32)}`;
   if (!size.fresh) {
     const was = await kept<{ look: string }>(db, same);
     const had = was && (await keptWith<Kept>(db, `look:${whose(w)}:${was.look}`));
@@ -129,7 +129,7 @@ export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: s
   const pass = await passFor(db, w, actor);
   const address = hash.startsWith('preview/') ? `${origin}/${hash}?look` : `${origin}/?look#/${hash}`;
   const got = await drawLook(address, pass, width, height, scheme, marks);
-  const look = `l_${randomBytes(6).toString('hex')}`;
+  const look = `l_${randomHex(6)}`;
   const k: Kept = { scheme, content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms, at: new Date().toISOString(), workspace: w.workspace, ...(got.marks && { marks: got.marks }), ...(got.fell_back && { fell_back: got.fell_back }) };
   await keep(db, `look:${whose(w)}:${look}`, k, LOOK_MS, got.data);
   await keep(db, same, { look }, LOOK_MS);
