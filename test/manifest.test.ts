@@ -3,7 +3,7 @@
 // kept to) and in time (a pack's presence a fact on the log, its registrations derived from the set of packs).
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { openDb } from '../src/db.ts';
@@ -22,6 +22,13 @@ import { human, packsWith } from './map.ts';
 const ROOT = join(import.meta.dirname, '..');
 const registries: Registry[] = [];
 after(() => registries.forEach((r) => hostFor(r).stop()));
+
+/** A pack that keeps hours and adds an hourly rate to a company, and one that requires it. */
+const CLOCK: PackFile = {
+  id: 'clock', version: '0.1.0', title: 'Clock', requires: ['core'],
+  types: [{ id: 'clock.entry', title: 'Entry', description: 'Hours kept.', extends: 'record', fields: { hours: { type: 'number' } } }, { of: 'company', fields: { hourly: { type: 'number' } } }],
+};
+const LEANS: PackFile = { id: 'leans', version: '0.1.0', title: 'Leans', requires: ['core', 'clock'] };
 
 /** A copy of the packs, with more put beside them: a fixture's folder, or a pack file of its own. */
 async function mapOf(dir: string) {
@@ -42,12 +49,13 @@ test('a manifest has its own keys and nothing else; the old keys are refused, ea
 });
 
 test('every pack here is in the manifest shape, and reads as it did', () => {
+  const added = new Registry(packsWith(CLOCK));
+  registries.push(added);
+  assert.ok(added.type('company')!.fields.hourly, 'a pack adds its fields to company as a types entry with of');
   const reg = new Registry(join(ROOT, 'packs'));
   registries.push(reg);
   for (const p of reg.found) for (const key of Object.keys(p)) assert.ok((MANIFEST_KEYS as readonly string[]).includes(key), `${p.id}: ${key}`);
   assert.deepEqual(reg.verbs.map((v) => v.id), ['capture', 'assign', 'report', 'ask', 'settle', 'revise'], "core's verbs are actions marked kernel");
-  assert.ok(reg.trees.has('software.roadmap'), 'a tree is a view of form tree');
-  assert.ok(reg.type('company')!.fields.rate, 'time adds its fields to company as a types entry with of');
   const file = readFileSync(join(ROOT, 'packs', 'core', 'pack.json'), 'utf8');
   assert.equal(reg.hashes.get('core'), createHash('sha256').update(file).digest('hex'), 'the manifest is named by the hash of its file');
 });
@@ -63,17 +71,17 @@ test('a server pack is a pack that asks for server reach: never a workspace pack
 
 test('a pack waits while what it requires is missing, and what names a pack it uses registers only while that one is active', async () => {
   const tally: PackFile = {
-    id: 'tally', version: '1', title: 'Tally', requires: ['core'], uses: ['time'],
-    types: [{ id: 'tally.thing', title: 'Thing', description: 'A thing it counts.', extends: 'record' }, { of: 'time_entry', fields: { tally: { type: 'number' } } }],
-    links: [{ id: 'tally.counts', extends: 'about', title: 'counts', inverse: 'is counted by', from: ['tally.thing'], to: ['time_entry'], description: 'What it counts.' }],
-    views: [{ form: 'screen', id: 'tally.on_entry', title: 'Tally', on: ['time_entry'], pieces: [{ piece: 'note', text: 'Counted.' }] }],
+    id: 'tally', version: '1', title: 'Tally', requires: ['core'], uses: ['clock'],
+    types: [{ id: 'tally.thing', title: 'Thing', description: 'A thing it counts.', extends: 'record' }, { of: 'clock.entry', fields: { tally: { type: 'number' } } }],
+    links: [{ id: 'tally.counts', extends: 'about', title: 'counts', inverse: 'is counted by', from: ['tally.thing'], to: ['clock.entry'], description: 'What it counts.' }],
+    views: [{ form: 'screen', id: 'tally.on_entry', title: 'Tally', on: ['clock.entry'], pieces: [{ piece: 'note', text: 'Counted.' }] }],
   };
-  const dir = packsWith(tally, { id: 'needy', version: '1', title: 'Needy', requires: ['core', 'nowhere'] });
+  const dir = packsWith(CLOCK, tally, { id: 'needy', version: '1', title: 'Needy', requires: ['core', 'nowhere'] });
   const reg = new Registry(dir);
   registries.push(reg);
   assert.deepEqual(reg.states.get('needy'), { state: 'waiting', why: 'needs nowhere, which is not on this server' });
-  assert.ok(reg.relations.has('tally.counts') && reg.type('time_entry')!.fields.tally, 'with time active, what names it is registered');
-  reg.turnOff(['time']);
+  assert.ok(reg.relations.has('tally.counts') && reg.type('clock.entry')!.fields.tally, 'with clock active, what names it is registered');
+  reg.turnOff(['clock']);
   assert.equal(reg.states.get('tally')!.state, 'active', 'a pack it only uses is not one it waits for');
   assert.ok(reg.type('tally.thing'), 'its own type stays');
   assert.ok(!reg.relations.has('tally.counts'), 'a link type to a used pack’s type leaves with it');
@@ -83,112 +91,104 @@ test('a pack waits while what it requires is missing, and what names a pack it u
 });
 
 test("a change a pack's action makes may touch only what the pack declares or requires", async () => {
-  const l = await mapOf(packsWith('reacher'));
+  const l = await mapOf(packsWith('reacher', CLOCK));
   const kept = (await callTool(l, human, 'reacher_keep', { title: 'Mine' })) as { status: string; changeset: string };
   assert.equal(kept.status, 'applied', 'its own type is inside its reach');
   const head = (await entries(l.db)).find((e) => e.id === kept.changeset)!;
   assert.deepEqual(head.pack, { id: 'reacher', manifest: l.registry.hashes.get('reacher'), action: 'reacher.keep' }, 'the entry names the pack, its manifest and the action');
-  const task = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'project', title: 'Survey' }] })) as { created: Record<string, string> };
-  await assert.rejects(callTool(l, human, 'reacher_rename', { id: task.created.t, title: 'Renamed' }), /The reacher pack touched "Survey", a project it neither declares nor requires/);
+  const task = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'clock.entry', title: 'Survey' }] })) as { created: Record<string, string> };
+  await assert.rejects(callTool(l, human, 'reacher_rename', { id: task.created.t, title: 'Renamed' }), /The reacher pack touched "Survey", a clock.entry it neither declares nor requires/);
   assert.equal((await l.entity(task.created.t))!.title, 'Survey', 'refused whole');
 
-  // A field another pack adds is that pack's: work requires core only, so time's rate on a company is outside it.
-  const company = { op: 'create' as const, type: 'company', title: 'Acme', props: { rate: 120 } };
-  assert.equal((await decide(l.db, l.registry, { human: true, pack: 'time' }, [company])).outcome, 'apply');
-  assert.match((await decide(l.db, l.registry, { human: true, pack: 'work' }, [company])).refused.join(), /a company \(its field rate\)/);
+  // A field another pack adds is that pack's: reacher requires core only, so clock's hourly on a company is outside it.
+  const company = { op: 'create' as const, type: 'company', title: 'Acme', props: { hourly: 120 } };
+  assert.equal((await decide(l.db, l.registry, { human: true, pack: 'clock' }, [company])).outcome, 'apply');
+  assert.match((await decide(l.db, l.registry, { human: true, pack: 'reacher' }, [company])).refused.join(), /a company \(its field hourly\)/);
   assert.equal((await decide(l.db, l.registry, { human: true }, [company])).outcome, 'apply', 'a change no pack makes is not under it');
 });
 
 test("adding and taking out a pack is a fact on the log; its registrations follow, and its items stay", async () => {
-  const l = await mapOf(packsWith());
+  const l = await mapOf(packsWith(CLOCK, LEANS, 'reacher'));
   const first = await syncPacks(l);
   assert.deepEqual(first.map((f) => f[1]).sort(), l.registry.found.map((p) => `pack:${p.id}`).sort(), 'every pack the server starts a workspace with is asserted when it opens');
-  const time = first.find((f) => f[1] === 'pack:time')![3] as { version: string; manifest: string; text: string };
-  assert.deepEqual([time.version, time.manifest, createHash('sha256').update(time.text).digest('hex')], ['0.1.0', l.registry.hashes.get('time'), l.registry.hashes.get('time')], 'the log keeps the manifest itself, the first time it meets it');
+  const reacher = first.find((f) => f[1] === 'pack:reacher')![3] as { version: string; manifest: string; text: string };
+  assert.deepEqual([reacher.version, reacher.manifest, createHash('sha256').update(reacher.text).digest('hex')], ['0.1.0', l.registry.hashes.get('reacher'), l.registry.hashes.get('reacher')], 'the log keeps the manifest itself, the first time it meets it');
   assert.deepEqual(await syncPacks(l), [], 'and only once');
-  const entry = await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'e', type: 'time_entry', title: 'Drafting', props: { date: '2026-10-16', hours: 3 } }] }) as { created: Record<string, string> };
+  const note = await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'e', type: 'reacher.note', title: 'Drafting' }] }) as { created: Record<string, string> };
 
-  await setPack(l, human, { pack: 'time', on: false });
+  await setPack(l, human, { pack: 'reacher', on: false });
   const last = (await entries(l.db)).at(-1)!;
-  assert.deepEqual([last.facts, last.actor.id, last.action], [[['-', 'pack:time', 'pack']], 'human:test', 'pack.off']);
-  assert.deepEqual(await packsOff(l), ['time'], 'which packs are off is read from the log');
-  assert.ok(l.registry.type('time_entry')!.dormant && !l.registry.tools.has('time_log'), 'what it registered unwinds');
-  assert.equal((await l.entity(entry.created.e))!.title, 'Drafting', 'its items stay');
+  assert.deepEqual([last.facts, last.actor.id, last.action], [[['-', 'pack:reacher', 'pack']], 'human:test', 'pack.off']);
+  assert.deepEqual(await packsOff(l), ['reacher'], 'which packs are off is read from the log');
+  assert.ok(l.registry.type('reacher.note')!.dormant && !l.registry.tools.has('reacher_keep'), 'what it registered unwinds');
+  assert.equal((await l.entity(note.created.e))!.title, 'Drafting', 'its items stay');
   assert.deepEqual(await syncPacks(l), [], 'a pack taken out stays out');
 
-  await assert.rejects(setPack(l, human, { pack: 'work', on: false }), /require the work pack: take them out first/);
+  await assert.rejects(setPack(l, human, { pack: 'clock', on: false }), /leans requires the clock pack: take it out first/);
   await assert.rejects(setPack(l, human, { pack: 'core', on: false }), /the kernel's own/);
-  await setPack(l, human, { pack: 'time', on: true });
-  assert.ok(!l.registry.type('time_entry')!.dormant && l.registry.tools.has('time_log'), 'and adding it back brings it all back');
-  assert.deepEqual((await entries(l.db)).at(-1)!.facts, [['+', 'pack:time', 'pack', { version: '0.1.0', manifest: l.registry.hashes.get('time') }]], 'a manifest the log keeps already is named, not kept again');
+  await setPack(l, human, { pack: 'reacher', on: true });
+  assert.ok(!l.registry.type('reacher.note')!.dormant && l.registry.tools.has('reacher_keep'), 'and adding it back brings it all back');
+  assert.deepEqual((await entries(l.db)).at(-1)!.facts, [['+', 'pack:reacher', 'pack', { version: '0.1.0', manifest: l.registry.hashes.get('reacher') }]], 'a manifest the log keeps already is named, not kept again');
 
-  l.registry.hashes.set('time', 'f'.repeat(64));
-  assert.deepEqual(await syncPacks(l), [['+', 'pack:time', 'pack', { version: '0.1.0', manifest: 'f'.repeat(64) }]], 'a manifest that changed on the server is asserted again');
+  l.registry.hashes.set('reacher', 'f'.repeat(64));
+  assert.deepEqual(await syncPacks(l), [['+', 'pack:reacher', 'pack', { version: '0.1.0', manifest: 'f'.repeat(64) }]], 'a manifest that changed on the server is asserted again');
 });
 
-test('a pack renamed takes the place of the one the owner added: inquiry is science now', async () => {
-  // A map that had the inquiry pack: the science pack as it was, under its old name.
-  const before = packsWith();
-  const science = JSON.parse(readFileSync(join(before, 'science', 'pack.json'), 'utf8'));
-  rmSync(join(before, 'science'), { recursive: true });
-  mkdirSync(join(before, 'inquiry'));
-  writeFileSync(join(before, 'inquiry', 'pack.json'), JSON.stringify({ ...science, id: 'inquiry', types: science.types.filter((t: { id: string }) => t.id !== 'investigation'), views: [], styles: [] }));
-  const old = await mapOf(before);
+test('a pack renamed takes the place of the one the owner added: inquiry is grove now', async () => {
+  // A map that had the inquiry pack: the grove pack as it was, under its old name and without its newest type.
+  const guess = { id: 'guess', title: 'Guess', description: 'A guess to try.', extends: 'record' } as const;
+  const old = await mapOf(packsWith({ id: 'inquiry', version: '0.1.0', title: 'Inquiry', requires: ['core'], types: [guess] }));
   await syncPacks(old);
   await syncTypes(old);
-  const h = (await old.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'h', type: 'hypothesis', title: 'Replay is fast' }] })) as { created: Record<string, string> };
+  const h = (await old.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'h', type: 'guess', title: 'Replay is fast' }] })) as { created: Record<string, string> };
 
-  const reg = new Registry(packsWith());
+  const reg = new Registry(packsWith({ id: 'grove', version: '0.2.0', title: 'Grove', requires: ['core'], types: [guess, { id: 'hunch', title: 'Hunch', description: 'A guess not yet put.', extends: 'record' }] }));
   registries.push(reg);
   const now = new Archipelago(old.db, reg);
   const facts = await syncPacks(now);
-  assert.deepEqual(facts.filter((f) => /inquiry|science/.test(f[1])).map((f) => [f[0], f[1]]), [['+', 'pack:science'], ['-', 'pack:inquiry']]);
-  assert.ok(!(await packsOff(now)).includes('science'), 'on, as inquiry was');
+  assert.deepEqual(facts.filter((f) => /inquiry|grove/.test(f[1])).map((f) => [f[0], f[1]]), [['+', 'pack:grove'], ['-', 'pack:inquiry']]);
+  assert.ok(!(await packsOff(now)).includes('grove'), 'on, as inquiry was');
   now.registry.turnOff(await packsOff(now));
   await syncTypes(now);
-  assert.ok(!now.registry.type('hypothesis')!.dormant && now.registry.type('investigation'), 'its types live, and the new ones with them');
-  assert.equal((await now.entity(h.created.h))!.type, 'hypothesis');
+  assert.ok(!now.registry.type('guess')!.dormant && now.registry.type('hunch'), 'its types live, and the new ones with them');
+  assert.equal((await now.entity(h.created.h))!.type, 'guess');
   assert.deepEqual(await syncPacks(now), [], 'once');
 });
 
-test('a pack that took over words a pack the owner added held is added with them: software’s feature is code’s now', async () => {
-  // A map that had the software pack while it still declared feature and test, before code and proof held them.
-  const before = packsWith();
-  const code = JSON.parse(readFileSync(join(before, 'code', 'pack.json'), 'utf8'));
-  const proof = JSON.parse(readFileSync(join(before, 'proof', 'pack.json'), 'utf8'));
-  const software = JSON.parse(readFileSync(join(before, 'software', 'pack.json'), 'utf8'));
-  for (const id of ['code', 'proof']) rmSync(join(before, id), { recursive: true });
-  const kept = (pack: { types: { id: string }[] }, id: string) => ({ ...pack.types.find((t) => t.id === id)!, moved_from: undefined, moved_statuses: undefined, belongs_with: undefined });
-  writeFileSync(join(before, 'software', 'pack.json'), JSON.stringify({ id: 'software', version: '0.0.1', title: software.title, description: software.description, requires: ['core', 'work'], types: [kept(code, 'feature'), kept(proof, 'test')] }));
-  const old = await mapOf(before);
+test('a pack that took over words a pack the owner added held is added with them: hub’s sprout is stem’s now', async () => {
+  // A map that had the hub pack while it still declared sprout and probe, before stem and leaf held them.
+  const sprout = { id: 'sprout', title: 'Sprout', description: 'A piece of work.', extends: 'work' } as const;
+  const probe = { id: 'probe', title: 'Probe', description: 'A check kept.', extends: 'record' } as const;
+  const hub = (types: PackFile['types']): PackFile => ({ id: 'hub', version: '0.0.1', title: 'Hub', requires: ['core'], types });
+  const old = await mapOf(packsWith(hub([sprout, probe])));
   await syncPacks(old);
   await syncTypes(old);
-  assert.ok(!(await packsOff(old)).includes('software'), 'the owner has software');
-  const f = (await old.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'f', type: 'feature', title: 'Sun study', status: 'building' }] })) as { created: Record<string, string> };
+  assert.ok(!(await packsOff(old)).includes('hub'), 'the owner has hub');
+  const f = (await old.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'f', type: 'sprout', title: 'Sun study', status: 'doing' }] })) as { created: Record<string, string> };
 
-  const reg = new Registry(packsWith());
+  const reg = new Registry(packsWith(hub([]), { id: 'stem', version: '0.1.0', title: 'Stem', requires: ['core'], types: [sprout] }, { id: 'leaf', version: '0.1.0', title: 'Leaf', requires: ['core'], types: [probe] }, { id: 'other', version: '0.1.0', title: 'Other', requires: ['core'] }));
   registries.push(reg);
   const now = new Archipelago(old.db, reg);
-  const added = (await syncPacks(now)).filter((x) => x[0] === '+' && /pack:(code|proof|outreach|design)$/.test(x[1])).map((x) => x[1]).sort();
-  assert.deepEqual(added, ['pack:code', 'pack:proof'], 'the packs that hold its words now, and no other new one');
+  const added = (await syncPacks(now)).filter((x) => x[0] === '+' && /pack:(stem|leaf|other)$/.test(x[1])).map((x) => x[1]).sort();
+  assert.deepEqual(added, ['pack:leaf', 'pack:stem'], 'the packs that hold its words now, and no other new one');
   now.registry.turnOff(await packsOff(now));
   await syncTypes(now);
-  assert.equal(now.registry.type('feature')?.pack, 'code');
-  assert.equal(now.registry.states.get('software')?.state, 'active', 'software runs over them, as before');
-  assert.deepEqual([(await now.entity(f.created.f))!.type, (await now.entity(f.created.f))!.status], ['feature', 'building']);
-  assert.deepEqual((await syncPacks(now)).filter((x) => /pack:(code|proof)$/.test(x[1])), [], 'once');
+  assert.equal(now.registry.type('sprout')?.pack, 'stem');
+  assert.equal(now.registry.states.get('hub')?.state, 'active', 'hub runs over them, as before');
+  assert.deepEqual([(await now.entity(f.created.f))!.type, (await now.entity(f.created.f))!.status], ['sprout', 'doing']);
+  assert.deepEqual((await syncPacks(now)).filter((x) => /pack:(stem|leaf)$/.test(x[1])), [], 'once');
 });
 
 test('a new workspace starts with the kernel alone, and a pack the log never added waits for the owner', async () => {
   const was = process.env.PELAGO_START_PACKS;
   delete process.env.PELAGO_START_PACKS;
   try {
-    const l = await mapOf(packsWith());
+    const l = await mapOf(packsWith(CLOCK, 'reacher'));
     assert.deepEqual((await syncPacks(l)).map((f) => f[1]), ['pack:core'], 'only the kernel is asserted');
     assert.deepEqual((await packsOff(l)).sort(), l.registry.found.map((p) => p.id).filter((p) => p !== 'core').sort(), 'every other pack is off');
     assert.deepEqual(await syncPacks(l), [], 'and opening it again adds none');
-    await setPack(l, human, { pack: 'work', on: true });
-    assert.ok(!(await packsOff(l)).includes('work') && (await packsOff(l)).includes('time'), 'the owner adds one');
+    await setPack(l, human, { pack: 'clock', on: true });
+    assert.ok(!(await packsOff(l)).includes('clock') && (await packsOff(l)).includes('reacher'), 'the owner adds one');
 
     // A workspace made before packs were facts holds items: it is said to have every pack it had.
     const old = await mapOf(packsWith());
