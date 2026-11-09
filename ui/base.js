@@ -356,7 +356,7 @@ export async function showIdentity() {
     slot.replaceChildren(
       h('div', { class: 'ws-head', id: 'ws-head' }, 'Signed in to'),
       h('div', { class: 'ws-rows', role: 'group', 'aria-labelledby': 'ws-head' }, Object.entries({ [me.workspace.id]: me.workspace, ...known.all() }).map(row)),
-      h('a', { href: '#', class: 'ws-row ws-add', title: 'Sign in by email to a workspace you belong to; this one stays a click away', onclick: go(() => signIn('', 'Sign in to another workspace', { back: true, email: who })) }, '+ Sign in to another workspace'),
+      h('a', { href: '#', class: 'ws-row ws-add', title: 'Sign in by email to a workspace you belong to; this one stays a click away', onclick: go(() => signIn('', 'Sign in to another workspace', { back: true, email: who })) }, h('span', { class: 'gist' }, '+ Sign in to another workspace')),
       h('div', { class: 'ws-foot' }, h('span', { class: 'muted small gist', title: `Signed in as ${me.actor.name}` }, me.actor.name), h('a', { href: '#', class: 'small gist', title: `Sign out of ${me.workspace.name} on this browser; the others stay signed in`, onclick: go(signedOut) }, `Sign out of ${me.workspace.name}`)),
     );
   } catch {

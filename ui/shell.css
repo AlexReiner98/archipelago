@@ -200,7 +200,7 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #listening[hidden] { display: none; }
 /* The bar's own controls are marks on it, as a tab's are: no box of their own (rule e_vgs9vt5j). */
 #more > summary { display: inline-grid; place-items: center; width: var(--box-8); height: var(--box-8); padding: 0; border: 0; border-radius: var(--radius-2); background: none; color: var(--muted); }
-#more > .menu-items { min-width: var(--menu-least); }
+#more > .menu-items { min-width: var(--menu-least); width: max-content; max-width: var(--menu-item-most); }
 #menu-pages { display: grid; }
 #menu-pages > a { padding: var(--space-5) var(--space-6); border-radius: var(--radius-2); color: var(--text); text-decoration: none; }
 #menu-pages > a:hover { background: var(--accent-soft); }
