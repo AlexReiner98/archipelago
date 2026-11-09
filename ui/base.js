@@ -18,13 +18,13 @@ export const loadMay = async () => (state.may ??= link ? ['read'] : (await whoam
  * its secret is traded for, held in memory only and traded again when it runs out. Null on any other address.
  */
 const linked = /^\/s\/([^/]+)\/([^/]+?)\/?$/.exec(location.pathname);
-export const link = linked ? { ws: linked[1], secret: linked[2], token: '', of: '' } : null;
+export const link = linked ? { ws: linked[1], secret: linked[2], token: '', of: '', reads: null, views: null } : null;
 if (link) document.documentElement.dataset.reader = 'link';
 export async function openLink() {
   const res = await postJson(`/s/${link.ws}/${link.secret}/token`, {});
   const body = await res.json();
   if (!res.ok) throw new Error(body.error);
-  return Object.assign(link, { token: body.token, of: body.of });
+  return Object.assign(link, { token: body.token, of: body.of, reads: body.reads ?? null, views: body.views ?? null });
 }
 export const hooks = {};
 export const route = (pulse) => hooks.route(pulse);
@@ -222,8 +222,12 @@ export async function call(path, input, headers) {
   if (!res.ok) throw new Error(body.error);
   return body.result;
 }
+/** What a link's reader may not ask, as its token said: refused here, quietly, rather than sent to be refused. */
+const notForLink = (tool, input) => Boolean(link?.reads) && (!link.reads.includes(tool) || (tool === 'view' && Boolean(link.views) && !link.views.includes(input?.name)));
 export const api = (tool, input = {}) =>
-  call(`/api/${tool}`, input, authHeaders()).catch(async (err) => {
+  notForLink(tool, input)
+    ? Promise.reject(new Error(`A link only reads what it shows: not ${tool === 'view' ? `the view ${input?.name}` : tool}.`))
+    : call(`/api/${tool}`, input, authHeaders()).catch(async (err) => {
     // A link's reader token has run out: trade the secret again, once.
     if (!link || !(err instanceof SignInNeeded)) throw err;
     await openLink();

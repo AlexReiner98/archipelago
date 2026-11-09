@@ -4,7 +4,7 @@
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
 import { authorizePage } from './authorize.js';
-import { SignInNeeded, h, hooks, join, link, loadMay, main, openLink, part, showIdentity, signIn, state, store, ungate } from './base.js';
+import { SignInNeeded, api, h, hooks, join, link, loadMay, main, openLink, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { mayLeave, newItem, unsaved } from './draft.js';
 import { drawFind } from './find.js';
@@ -47,7 +47,7 @@ async function route(pulse = false) {
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/');
   try {
     // A frozen link: its reader token first, and the view it shows when the address names nothing else.
-    if (link && !link.token) await openLink();
+    if (link && !link.token) await openLink(), startOwn();
     if (link && (name === '' || name === 'home')) return void location.replace(`#/v?canvas=${link.of}`);
     if (!state.schema) await loadSchema();
     // What this session may do, before anything is drawn: each control is drawn only where it may (ui/base.js may).
@@ -113,3 +113,16 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 route();
+
+/**
+ * A link's reader is shown a way to start a map of their own, in the bar beside the emblem: the words the style gives
+ * (start, core's house style), to where this server says a person with no account begins. Once, and only on a link.
+ */
+async function startOwn() {
+  if (document.querySelector('#nav .start-own')) return;
+  const words = (await api('view', { name: 'style' }).catch(() => null))?.style?.start;
+  if (typeof words !== 'string' || !words) return;
+  const a = h('a', { class: 'start-own', href: '/' }, words);
+  document.querySelector('#nav .brand')?.after(a);
+  fetch('/connect/start').then((r) => (r.ok ? r.json() : null)).then((r) => r?.url && a.setAttribute('href', r.url), () => null);
+}

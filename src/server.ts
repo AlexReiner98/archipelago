@@ -52,7 +52,7 @@ import { sharedPicture } from './documents.ts'; import { sharedAnswer } from './
 import { configureSecrets } from './secrets.ts'; import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
-import { UI_FILES, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY, SHARED_POLICY } from './page-policies.ts';
+import { UI_FILES, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, unlisted, PAGE_POLICY, PREVIEW_POLICY, SHARED_POLICY } from './page-policies.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
@@ -239,7 +239,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         const guard = UNLISTED, app = !data && (await workspaces.has(wsId)) && (await frozen((await workspaces.get(wsId)).pelago, secret)); // a frozen link opens the app, read only
         if (!data) {
           res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': app ? PAGE_POLICY : SHARED_POLICY });
-          return res.end(app && options.unsandboxed ? markPage(await uiPage('index.html'), { open: false, unsandboxed: true }) : await uiPage(app ? 'index.html' : 'doc.html'));
+          return res.end(unlisted(app && options.unsandboxed ? markPage(await uiPage('index.html'), { open: false, unsandboxed: true }) : await uiPage(app ? 'index.html' : 'doc.html')));
         }
         if (data === 'picture') {
           const picture = figure && (await workspaces.has(wsId)) ? await sharedPicture((await workspaces.get(wsId)).pelago, secret, figure) : null;

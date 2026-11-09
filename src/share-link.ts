@@ -106,13 +106,14 @@ export async function freeze(l: Archipelago, id: string): Promise<Snapshot> {
  * A reader token for a link's secret, or nothing when no standing link has it (or it was made before links were
  * frozen). Read with the whole database: a token is made here, never by the reader.
  */
-export async function trade(l: Archipelago, secret: string): Promise<{ token: string; expires_in: number; of: string } | null> {
+export async function trade(l: Archipelago, secret: string): Promise<{ token: string; expires_in: number; of: string; reads: string[]; views: string[] } | null> {
   if (!/^[a-f0-9]{48}$/.test(secret)) return null;
   const { rows } = await l.db.query<{ id: string; of: string }>(`select id, snapshot ->> 'of' as of from share where hash = $1 and revoked_at is null and snapshot is not null`, [hash(secret)]);
   if (!rows[0]) return null;
   const token = workspaceSecret('link', l.workspace);
   await keep(l.db, `linkreader:${hash(token)}`, { share: rows[0].id }, READER_MINUTES * 60_000);
-  return { token, expires_in: READER_MINUTES * 60, of: rows[0].of };
+  // With what it may read, so the page asks for nothing else (ui/base.js): what it asks past that is refused all the same.
+  return { token, expires_in: READER_MINUTES * 60, of: rows[0].of, reads: [...LINK_READS], views: [...LINK_VIEWS] };
 }
 
 /** Whether a link's secret opens a frozen link, which the app reads (a link made before links froze opens its own page). */

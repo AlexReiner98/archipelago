@@ -142,13 +142,13 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
   try {
     assert.ok(await sharer.until(`Boolean(document.querySelector('.q-band-menu'))`, 20000), 'the band has its menu');
     await sharer.evaluate(`document.querySelector('.q-band-menu').click()`);
-    assert.ok(await sharer.until(`[...document.querySelectorAll('.tab-menu button')].some((b) => b.textContent === 'Make a link to see it')`), 'the menu offers a link');
-    await sharer.evaluate(`[...document.querySelectorAll('.tab-menu button')].find((b) => b.textContent === 'Make a link to see it').click()`);
-    // Named first, since a link shows a view kept on the map; then asked; then the link, once.
+    assert.ok(await sharer.until(`[...document.querySelectorAll('.tab-menu button')].some((b) => b.textContent === 'Share it')`), 'the menu offers to share it');
+    await sharer.evaluate(`[...document.querySelectorAll('.tab-menu button')].find((b) => b.textContent === 'Share it').click()`);
+    // Named first, since a link shows a view kept on the map; then a link, not a guest; then the link, once.
     assert.ok(await sharer.until(`Boolean(document.querySelector('dialog.ask textarea'))`), 'asked for a name');
     await sharer.evaluate(`(() => { const d = document.querySelector('dialog.ask'); d.querySelector('textarea').value = 'The login plan'; d.querySelector('button[value="ok"]').click(); })()`);
-    assert.ok(await sharer.until(`document.querySelector('dialog.ask h2')?.textContent.startsWith('Make a link to')`, 10000), 'asked to make the link');
-    await sharer.evaluate(`document.querySelector('dialog.ask button[value="ok"]').click()`);
+    assert.ok(await sharer.until(`/^(Share|Make a link to)/.test(document.querySelector('dialog.ask h2')?.textContent ?? '')`, 10000), 'asked how to share it');
+    await sharer.evaluate(`(document.querySelector('dialog.ask button[value="choice:0"]') ?? document.querySelector('dialog.ask button[value="ok"]')).click()`);
     // A new map makes things shared, so nothing the agent made is left out and nothing is asked about it (what a link
     // leaves out as private, and the asking, is test/share-view.test.ts's).
     assert.ok(await sharer.until(`(document.querySelector('dialog.ask .ask-message')?.textContent ?? '').includes('/s/')`, 10000), `the link is shown: ${sharer.logs().join(' ').slice(0, 400)}`);
@@ -160,26 +160,25 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
   assert.match(link.path, /^\/s\//);
   const reader = await open(`${base}${link.path}`);
   try {
-    const shown = (text: string) => `[document, ...[...document.querySelectorAll('iframe')].flatMap((f) => { try { return f.contentDocument ? [f.contentDocument] : []; } catch { return []; } })].some((d) => d.body?.innerText.includes(${JSON.stringify(text)}) || [...d.querySelectorAll('svg text')].some((t) => t.textContent.includes(${JSON.stringify(text)})))`;
-    assert.ok(await reader.until(shown('The login plan'), 20000), `the link opens with no login: ${reader.logs().join('\n').slice(0, 600)}`);
-    assert.ok(await reader.until(shown('Login form'), 20000), `the view is drawn: ${reader.logs().join('\n').slice(0, 600)} | ${await reader.evaluate<string>(`JSON.stringify({ text: document.body.innerText.slice(0, 400), frames: [...document.querySelectorAll('iframe')].map((f) => [f.src, f.getAttribute('sandbox'), f.offsetWidth, f.offsetHeight]), svgs: document.querySelectorAll('svg').length, html: document.body.innerHTML.slice(0, 1200) })`)}`);
-    assert.ok(await reader.until(`[...document.querySelectorAll('a')].some((a) => a.textContent.includes('Start a map of your own'))`), 'with a way to start your own');
-    // Drawn at its own size, as in the app, never stretched to the column: a view of a few steps reads as one.
-    const size = JSON.parse(await reader.evaluate<string>(`JSON.stringify((() => { const s = document.querySelector('.doc-lens .lf-stage svg'); return [s.getBoundingClientRect().width, Number(s.getAttribute('viewBox').split(' ')[2])]; })())`));
-    assert.ok(size[0] <= size[1] + 1, `the view is drawn at its own size, not stretched: ${size.join(' drawn, own ')}`);
-    // An item in the view opens its page, read only, in a sheet over the shared page, and closes again.
-    const part = `[...document.querySelectorAll('.doc-lens a[href="#/e/${ids.form}"]')][0]`;
-    assert.ok(await reader.until(`Boolean(${part})`, 10000), 'the view’s part is a way to its page');
-    await reader.evaluate(`${part}.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))`);
-    assert.ok(await reader.until(`document.querySelector('.doc-sheet h2')?.textContent === 'Login form'`, 10000), `the item opens in a sheet: ${reader.logs().join(' ').slice(0, 400)}`);
-    assert.ok(await reader.evaluate<boolean>(`!document.querySelector('.doc-sheet input, .doc-sheet textarea, .doc-sheet [contenteditable]')`), 'read only');
+    // The real app, opened read only on the view: its canvas draws the plan.
+    const mark = (id: string) => `document.querySelector('#canvas svg a[href="#/e/${id}"]')`;
+    assert.ok(await reader.until(`Boolean(${mark(ids.form)})`, 20000), `the link opens the app on the view: ${reader.logs().join(' ').slice(0, 600)}`);
+    assert.ok(await reader.until(`document.querySelector('#nav .start-own')?.textContent.includes('Start a map of your own')`), 'with a way to start your own');
+    assert.ok(await reader.evaluate<boolean>(`![...document.querySelectorAll('#query button, #nav #more')].some((b) => b.offsetParent && /Save|☰/.test(b.textContent))`), 'nothing to save or set: it is read only');
+    // An item opens in the app's own sheet, without how the map keeps it, and closes again.
+    await reader.evaluate(`${mark(ids.form)}.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))`);
+    assert.ok(await reader.until(`document.body.dataset.sheet === 'open' && document.getElementById('sheet').innerText.includes('Login form')`, 10000), `the item opens in the sheet: ${reader.logs().join(' ').slice(0, 400)}`);
+    const kept = `(() => { const s = document.getElementById('sheet'); const seen = (q) => [...s.querySelectorAll(q)].some((e) => e.offsetParent); return !seen('details.menu') && !seen('[data-section="history"]') && !seen('[contenteditable="true"], select, textarea, input') && !/Visibility|Confidence/.test(s.innerText); })()`;
+    assert.ok(await reader.evaluate<boolean>(kept), 'read only, and nothing of how the map keeps it');
     assert.ok((await reader.evaluate<string>(`location.pathname`)).startsWith('/s/'), 'the reader stays on the link');
     await reader.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-    assert.ok(await reader.until(`!document.querySelector('.doc-sheet')`), 'and closes');
-    // What the link does not show cannot be opened through it.
-    const refused = await fetch(`${base}${link.path}/data?item=e_zzzzzzzz`);
-    assert.equal(refused.status, 404, 'an item the link does not show is not read through it');
-    assert.ok(!reader.logs().some((line) => /Uncaught|TypeError|ReferenceError/.test(line)), `no errors: ${reader.logs().join('\n').slice(0, 600)}`);
+    assert.ok(await reader.until(`document.body.dataset.sheet !== 'open'`), 'and closes');
+    // What the link does not show cannot be read with its token, and nothing is written through it.
+    const { token } = (await (await fetch(`${base}${link.path}/token`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json()) as { token: string };
+    const asked = (tool: string, body: object) => fetch(`${base}/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+    assert.equal((await asked('get', { id: 'e_zzzzzzzz' })).status, 404, 'an item the link does not show is not read through it');
+    assert.equal((await asked('change', { reason: 'x', ops: [{ op: 'update', id: ids.form, title: 'Taken' }] })).status, 403, 'and nothing is written through it');
+    assert.ok(!reader.logs().some((line) => /Uncaught|TypeError|ReferenceError| 403 /.test(line)), `no errors, nothing refused: ${reader.logs().join('\n').slice(0, 600)}`);
   } finally {
     await reader.close();
   }
