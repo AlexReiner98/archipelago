@@ -30,8 +30,9 @@ const get = (port: number, path: string) =>
 
 test('a request in hand is answered before the server is drained', async () => {
   const { server, port } = await serve(150);
+  const arrived = new Promise((r) => server.once('request', r));
   const answer = get(port, '/slow');
-  await new Promise((r) => setTimeout(r, 30));
+  await arrived;
   let finished = false;
   const done = drained(server, 5_000).then(() => (finished = true));
   assert.equal(await answer, 'slow');
@@ -42,8 +43,9 @@ test('a request in hand is answered before the server is drained', async () => {
 
 test('a request held open past the bound is cut, and the drain does not wait on it', async () => {
   const { server, port } = await serve(0);
+  const arrived = new Promise((r) => server.once('request', r));
   const held = get(port, '/held').catch((err: Error) => err);
-  await new Promise((r) => setTimeout(r, 30));
+  await arrived;
   const began = Date.now();
   await drained(server, 100);
   assert.ok(Date.now() - began < 2_000, 'it waited only the bound');

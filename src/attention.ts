@@ -60,13 +60,6 @@ export interface Read {
   graph?: BlockGraph;
 }
 
-/** What needs a person now, by the reasons only they act on: it waits on them, it is theirs to confirm, it is due, what it reads has moved, or it is theirs to settle. Of what a lens read, when it is given. */
-export async function needsOf(l: Archipelago, person: string | null, read?: Read): Promise<Set<string>> {
-  if (!person) return new Set();
-  const { items } = await attention(l, { person, reasons: ['waits_on', 'to_confirm', 'due', 'moved', 'unsettled'], limit: 100_000 }, read);
-  return new Set(items.map((i) => i.id));
-}
-
 /** What deserves attention, and why: the state of what a lens read, or of the whole map. */
 export async function attention(l: Archipelago, input: Input, read?: Read) {
   // The reasons packs declare, each weighed when it is asked for or the kernel's reason it joins is.

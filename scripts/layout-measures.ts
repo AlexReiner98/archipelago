@@ -74,7 +74,7 @@ for (const id of layouts) {
       try {
         const base = await draw(input), pic = readScene(base.scene, px), times = [base.ms];
         const shown = new Set(pic.boxes.map((b) => b.id)), anchors = input.answer.items.filter((i: any) => shown.has(i.id));
-        const moves = [];
+        const moves: any[] = [];
         for (let k = 1; k <= ADDS && anchors.length; k++) {
           const again = await draw({ ...input, answer: plusOne(input.answer, anchors[Math.floor((anchors.length * k) / (ADDS + 1))], k) });
           times.push(again.ms);

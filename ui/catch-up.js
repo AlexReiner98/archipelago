@@ -139,6 +139,3 @@ function end() {
 }
 
 const nothing = () => ({ items: { added: [], changed: [], removed: [] }, links: { added: [], changed: [], removed: [] } });
-
-/** The catch-up offered, for a test: how many steps, and whether it plays. */
-export const caughtUp = () => (offered ? { steps: offered.steps.length, playing: Boolean(offered.view.store.playing), to: offered.to } : null);

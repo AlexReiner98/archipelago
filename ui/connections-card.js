@@ -26,7 +26,7 @@ export function connectionsCard(...more) {
         h(
           'li',
           { class: 'one' },
-          h('span', { class: `pill${p.connected ? ' ok' : ''}` }, p.connected ? 'connected' : p.ready ? 'not connected' : 'not set up'),
+          h('span', { class: `mark${p.connected ? ' ok' : ''}` }, p.connected ? 'connected' : p.ready ? 'not connected' : 'not set up'),
           h('span', { class: 'grow', title: p.name ?? p.title }, h('strong', {}, p.title), p.connected?.account ? h('span', { class: 'muted small' }, ` ${p.connected.account}`) : ''),
           p.connected
             ? [h('button', { title: `Choose again what ${p.title} is given`, onclick: go(p.pack, 'start') }, 'Choose'), menu('More', [['Disconnect', end(p), 'danger']])]

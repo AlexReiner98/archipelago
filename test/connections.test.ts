@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { heldResources } from '../src/blocking.ts';
 import { agent, fresh, make } from './map.ts';
 import { append, verify } from '../src/log.ts';
+import { wait } from './wait.ts';
 
 test('an exclusive resource taken by many at once has one holder', async () => {
   const l = await fresh();
@@ -23,19 +24,23 @@ test('an event is not seen before one numbered ahead of it that is still being w
   const l = await fresh();
   let open!: () => void;
   const gate = new Promise<void>((r) => (open = r));
+  let begun!: () => void;
+  const holding = new Promise<void>((r) => (begun = r));
   const first = l.db.transaction(async (tx) => {
     await l.log(tx, { actor: 'human:test', action: 'test.first', reason: 'test' });
+    begun();
     await gate;
   });
-  await new Promise((r) => setTimeout(r, 100));
+  await holding;
   let second = false;
   const after = l.log(l.db, { actor: 'human:test', action: 'test.second', reason: 'test' }).then(() => (second = true));
-  await new Promise((r) => setTimeout(r, 300));
+  // What is asked is that nothing happens while the first is open: the later write is given time to (wrongly) finish.
+  await wait(300);
   const waited = !second;
   open();
   await Promise.all([first, after]);
   assert.ok(waited, 'the later event waits for the earlier one to be written');
-  const { rows } = await l.db.query<{ action: string }>(`select action from event where action like 'test.%' order by seq`);
+  const { rows } = await l.db.query<{ action: string }>(`select facts->0->>2 as action from log_op where stream = 'activity' and facts->0->>2 like 'test.%' order by seq`);
   assert.deepEqual(rows.map((r) => r.action), ['test.first', 'test.second']);
 });
 
@@ -74,14 +79,18 @@ test('an append waits for the stream’s lock while another holds it, and follow
   const l = await fresh();
   let open!: () => void;
   const gate = new Promise<void>((r) => (open = r));
+  let begun!: () => void;
+  const holding = new Promise<void>((r) => (begun = r));
   const first = l.db.transaction(async (tx) => {
     await append(tx, 'default', 'facts', { id: 'c_first', actor: { id: 'human:test' }, reason: 'first' }, []);
+    begun();
     await gate;
   });
-  await new Promise((r) => setTimeout(r, 100));
+  await holding;
   let second = false;
   const after = l.db.transaction((tx) => append(tx, 'default', 'facts', { id: 'c_second', actor: { id: 'human:test' }, reason: 'second' }, [])).then(() => (second = true));
-  await new Promise((r) => setTimeout(r, 300));
+  // What is asked is that nothing happens while the first is open: the later write is given time to (wrongly) finish.
+  await wait(300);
   const waited = !second;
   open();
   await Promise.all([first, after]);

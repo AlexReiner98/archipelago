@@ -107,9 +107,9 @@ const copyButton = (text, label = 'Copy') => h('button', { class: 'primary', onc
 const openButton = ({ open, label, same }) => h('a', { class: 'button', href: open, ...(!same && { target: '_blank', rel: 'noopener' }) }, label);
 
 function stepRow(n, [words, action, tip]) {
-  const text = h('span', { class: 'grow gist', style: 'min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis', title: tip ?? words }, h('span', { class: 'muted' }, `${n}  `), words);
+  const text = h('span', { class: 'grow gist cut', title: tip ?? words }, h('span', { class: 'muted' }, `${n}  `), words);
   const row = line(text, action?.copy && copyButton(action.copy, action.label), action?.open && openButton(action));
-  return action?.copy && (action.show || action.copy === address()) ? [row, line(h('code', { class: 'muted small gist', style: 'min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis', title: action.copy }, action.copy))] : [row];
+  return action?.copy && (action.show || action.copy === address()) ? [row, line(h('code', { class: 'muted small gist cut', title: action.copy }, action.copy))] : [row];
 }
 
 /** Ask every few seconds whether a new connection has landed, for as long as this card is on the page. */

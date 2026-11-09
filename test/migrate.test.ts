@@ -88,7 +88,7 @@ test('a step that fails leaves nothing of itself and no record, and says which i
 
 test('step 27 drops the activity written before the log began, and keeps the rest', async () => {
   const { fresh, make } = await import('./map.ts');
-  const { PRE_LOG_ACTIVITY } = await import('../src/eventlog.ts');
+  const { PRE_LOG_ACTIVITY } = await import('../src/activity-steps.ts');
   const l = await fresh();
   await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'After the log began' }]);
   const add = (seq: number | null, action: string) =>

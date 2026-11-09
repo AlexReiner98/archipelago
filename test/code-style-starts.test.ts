@@ -4,11 +4,10 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { chrome, open } from './browser.ts';
+import { chrome, open, wait } from './browser.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // It says so from its first frame, as a drawing that animates paints: a frame never given one paints nothing.
 const CODE = `export default function draw({ canvas, field, size, theme }) {
@@ -35,7 +34,7 @@ test('in a browser, a code style opened from Home starts, with room to draw and 
   try {
     await page.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
     for (let n = 0; n < 50 && !(await page.evaluate(`Boolean(document.querySelector('.home, #canvas'))`)); n++) await wait(200);
-    await wait(1000);
+    assert.ok(await page.still(), 'Home stands still');
     await page.evaluate(`location.hash = '#/v?canvas=${made.c}'`);
     let said = '';
     for (let n = 0; n < 100 && !said; n++, await wait(200)) {

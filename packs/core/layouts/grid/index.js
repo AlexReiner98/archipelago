@@ -6,36 +6,13 @@
 // ./look.js. A lens with steps tells the grid as it fills (./story.js), the conversation beside it.
 
 import { columnsClass, columnsRule, css, hueClass, hueRule } from './look.js';
-import { m } from './marks.js';
+import { HEX, m } from './marks.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
+import { litCount, queryTree } from './tree.js';
 
 /** A stored value as a person reads it: "set_up" is "Set up". */
 const inWords = (value) => (value == null ? 'Unfiled' : String(value).charAt(0).toUpperCase() + String(value).slice(1).replaceAll('_', ' '));
-const HEX = /^#[0-9a-f]{3,8}$/i;
-
-/** A lens answer as a tree, each thing with what it says of itself and of all that is inside it. */
-function queryTree(answer) {
-  const byId = new Map(answer.items.map((item) => [item.id, { ...item, kids: [] }]));
-  const root = { kids: [], title: 'Everything' };
-  for (const n of byId.values()) (byId.get(n.inside) ?? root).kids.push(n);
-  for (const n of byId.values()) {
-    n.you = (n.state.needs_you ? 1 : 0) + (n.within.needs_you ?? 0);
-    n.blk = (n.state.blocked ? 1 : 0) + n.within.blocked;
-  }
-  const sort = (n) => (n.kids.sort((a, b) => a.place - b.place), n.kids.forEach(sort));
-  sort(root);
-  return { byId, root };
-}
-/** How much of a thing stays lit: what was asked for by name (style.only), else what the style's lit says. */
-function litCount(n, style) {
-  if (Array.isArray(style.only)) {
-    const only = new Set(style.only);
-    const any = (x) => only.has(x.id) || x.kids.some(any);
-    return any(n) ? 1 : 0;
-  }
-  return style.lit === 'you' ? n.you : style.lit === 'blocked' ? n.blk : 1;
-}
 
 /**
  * The grid. `input` is what the page gives every drawing: the answer, the style, the enum values each type it holds

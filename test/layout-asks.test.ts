@@ -4,11 +4,10 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { chrome, open } from './browser.ts';
+import { chrome, open, wait } from './browser.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const CODE = `export default function draw({ field, change, on }) {
   const at = { x: 20, y: 20, width: 240, height: 30, placeholder: 'Name' };

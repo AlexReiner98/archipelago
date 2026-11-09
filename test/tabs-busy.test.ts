@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
-import { agent, press, wait } from './tab-page.ts';
+import { agent, heard, press, ready, wait } from './tab-page.ts';
 
 const browser = chrome();
 
@@ -22,7 +22,7 @@ test('in a browser, a chat’s show waits while the reader is at work in its tab
   const hash = () => page.evaluate<string>(`location.hash`);
   const show = (item: string) => call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made[item], run } });
   try {
-    await wait(3000);
+    await ready(page);
     await show('i1');
     for (let n = 0; n < 60 && (await tabs()) < 2; n++) await wait(250);
     assert.equal(await tabs(), 2, 'its tab');
@@ -33,7 +33,7 @@ test('in a browser, a chat’s show waits while the reader is at work in its tab
     // While the reader is at work in it, its chat's next show waits: a chat has one tab.
     await press(page, '#canvas .pane-canvas');
     await show('i0');
-    await wait(4000);
+    await heard(page);
     assert.equal(await tabs(), 2, 'no second tab for the chat');
     for (const end = Date.now() + 30000; Date.now() < end && !(await hash()).startsWith(`#/e/${made.i0}?`); ) await wait(250);
     assert.ok((await hash()).startsWith(`#/e/${made.i0}?`), 'the show lands when the reader is quiet');

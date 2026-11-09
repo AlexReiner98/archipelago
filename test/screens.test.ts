@@ -9,8 +9,8 @@ import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { overlay, type Screen } from '../src/screens.ts';
 import { callTool } from '../src/tools.ts';
+import { human } from './map.ts';
 
-const human: Actor = { kind: 'human', name: 'test' };
 const agent: Actor = { kind: 'agent', name: 'test' };
 
 const registries: Registry[] = [];

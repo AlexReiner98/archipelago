@@ -84,7 +84,7 @@ export function packsCard({ info, then, goTo }) {
       name: p.title,
       title: `${p.title} ${p.version}${p.why ? `: ${p.why}` : ''}${p.description ? `\n${p.description}` : ''}${p.requires?.length ? `\nNeeds: ${p.requires.join(', ')}` : ''}`,
       off: !on,
-      marks: p.state === 'waiting' && h('span', { class: 'pill warn', title: p.why ?? '' }, 'waiting'),
+      marks: p.state === 'waiting' && h('span', { class: 'mark warn', title: p.why ?? '' }, 'waiting'),
       // The switch is on the plate's face; the kernel's pack has none, since it is never off.
       action: KERNEL.includes(p.id) ? h('span', { class: 'muted small', title: 'The kernel’s own: never off' }, 'always on') : box,
       rows: [h('li', { class: 'touches' }, touched.map(cell)), open ? group(p, open) : []],

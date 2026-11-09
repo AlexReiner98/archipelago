@@ -1,6 +1,7 @@
 // An agent publishes a document only where the workspace's owner allows it, each publish logged with its authority;
 // the allowance is a human admin's to give, and taking a document down stays a human's.
 import assert from 'node:assert/strict';
+import { doneEvents } from '../src/activity.ts';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { openDb } from '../src/db.ts';
@@ -41,7 +42,7 @@ test('with the owner’s allowance an agent publishes, and the log keeps on whos
   const basis = 'Owner in chat, 21 Oct: publish the landing page';
   assert.equal(((await callTool(l, agent, 'publish', { id: doc, authority: { of: 'human', basis } })) as { published: string }).published, doc);
   assert.equal((await l.entity(doc))!.visibility, 'public');
-  const { rows } = await l.db.query<{ actor: string; detail: { authority: Record<string, string> } }>(`select actor, detail from event where action = 'document.publish'`);
+  const rows = (await doneEvents(l.db, { action: 'document.publish' }, 50)) as unknown as { actor: string; detail: { authority: Record<string, string> } }[];
   assert.equal(rows.length, 1);
   assert.match(rows[0].actor, /^agent:/);
   assert.deepEqual(rows[0].detail.authority, { of: 'human', basis, stated_by: rows[0].actor });

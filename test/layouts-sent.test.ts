@@ -15,7 +15,7 @@ test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€
   const { p, s } = await system(call);
   const first = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [] } })).result.style.drawing;
   assert.equal(first.id, 'core.architecture');
-  assert.deepEqual(Object.keys(first.modules).sort(), ['boards.js', 'boats.js', 'deep.js', 'index.js', 'islands.js', 'layout.js', 'look.js', 'marks.js', 'moves.js', 'play.js', 'route.js', 'says.js', 'sides.js', 'story-look.js', 'story.js']);
+  assert.deepEqual(Object.keys(first.modules).sort(), ['boards.js', 'boats.js', 'deep.js', 'index.js', 'islands.js', 'layout.js', 'look.js', 'marks.js', 'moves.js', 'play.js', 'route.js', 'says.js', 'sides.js', 'story-look.js', 'story.js', 'tree.js']);
   assert.match(first.hash, /^[0-9a-f]{64}$/);
   // A page that has it is sent only its name.
   const again = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [first.hash] } })).result.style.drawing;

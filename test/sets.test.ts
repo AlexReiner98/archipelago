@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { affected, allTests, ENGINES, fastTests, FIRST_STEPS, PER_FILE, predict, reads, readWeights, ROOT, shard, SLOW, weigher } from './sets.ts';
+import { affected, allTests, ENGINES, fastTests, FIRST_STEPS, LONG, PER_FILE, predict, reads, readWeights, ROOT, shard, SLOW, UNPRIVILEGED, weigher } from './sets.ts';
 
 test('the fast set is every test file but the slow ones, the structure test always among them', () => {
   const all = allTests();
@@ -12,6 +12,15 @@ test('the fast set is every test file but the slow ones, the structure test alwa
   assert.deepEqual(Object.keys(SLOW).filter((f) => !existsSync(join(ROOT, f))), [], 'every slow file is there');
   assert.deepEqual([...fastTests(), ...Object.keys(SLOW)].sort(), all);
   for (const f of ['test/structure.test.ts', 'test/sets.test.ts']) assert.ok(fastTests().includes(f), f);
+});
+
+test('the fast set holds no file past LONG seconds, and SLOW names none for its length that has come under it', () => {
+  const files = readWeights().files;
+  const seconds = (f: string) => Math.max(...ENGINES.map((e) => files[f]?.[e] ?? 0));
+  const over = fastTests().filter((f) => f !== 'test/structure.test.ts' && seconds(f) > LONG);
+  assert.deepEqual(over, [], `over ${LONG} s in CI: put each in SLOW as 'long' (test/sets.ts)`);
+  const under = Object.keys(SLOW).filter((f) => SLOW[f] === 'long' && f in files && seconds(f) <= LONG);
+  assert.deepEqual(under, [], `no longer over ${LONG} s: take each out of SLOW`);
 });
 
 test('a change runs the tests that import it or name it, the structure test, and more where it cannot tell', () => {
@@ -33,17 +42,20 @@ test('a change runs the tests that import it or name it, the structure test, and
   assert.ok(fastTests().every((f) => manifest.includes(f)), 'a pack’s manifest is read by every map: the fast set');
 });
 
-const workflow = readFileSync(join(ROOT, '.github/workflows/tests.yml'), 'utf8');
-const matrices = [...workflow.matchAll(/^\s+shard: \[(.+)\]$/gm)].map((m) => m[1].split(',').map((s) => s.trim()));
+const workflow = readFileSync(join(ROOT, '.github/workflows/tests.yml'), 'utf8').replaceAll('\r\n', '\n'); // a Windows checkout has CRLF
+const matrices = [...workflow.matchAll(/^\s+shard: \[(.+)\](?: #.*)?$/gm)].map((m) => m[1].split(',').map((s) => s.trim()));
 
 test('CI runs every file in exactly one shard, on each engine, and shard 1 alone runs the steps counted on it', () => {
   assert.equal(matrices.length, 2, 'one matrix for pglite, one for postgres');
+  assert.deepEqual(matrices[1], matrices[0], 'both engines run the same shards: a shard added to one is added to the other');
   for (const shards of matrices) {
     const n = shards.length;
     assert.deepEqual(shards, Array.from({ length: n }, (_, i) => `${i + 1}/${n}`), 'the shards are 1/N to N/N');
     assert.deepEqual(shards.flatMap((s) => shard(s)).sort(), allTests(), `${n} shards: every file once`);
   }
   const guarded = [...workflow.matchAll(/^\s+- name: (.+)\n\s+if: (.+?)(?: #.*)?$/gm)].map((m) => [m[1], m[2]]);
+  assert.ok(workflow.includes('node scripts/test.ts unprivileged'), 'the step as a role that is not a superuser runs its files through scripts/test.ts, as the shards do');
+  assert.deepEqual(UNPRIVILEGED.filter((f) => !allTests().includes(f)), [], 'every file it runs is a test of the full run');
   assert.deepEqual(guarded.filter(([, cond]) => cond.includes('matrix.shard')).map(([name, cond]) => [name, cond]), FIRST_STEPS.map((name) => [name, "startsWith(matrix.shard, '1/')"]), 'a step that runs on one shard only is one FIRST_STEPS counts on shard 1');
 });
 
@@ -59,6 +71,7 @@ test('the heaviest shard keeps under its budget, so CI waits on no one shard', (
   const weights = readWeights();
   const weight = weigher(weights);
   const n = matrices[0].length;
+  assert.equal(matrices[1].length, n, 'the budget holds for both engines’ shards');
   for (const engine of ENGINES)
     for (let k = 1; k <= n; k++) {
       const files = shard(`${k}/${n}`, weights);

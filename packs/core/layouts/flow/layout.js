@@ -135,6 +135,13 @@ function drawnOut({ items: asked, links: linked = [], undrawn = [], headless = [
     if (inward) for (const l of lines) if (inward.placed.has(l.a) || inward.placed.has(l.b)) l.turns = true;
     // A wire whose ends are held (at sea, at its ports) is shaped from those points, out of each the way its port faces.
     for (const l of lines) if (l.r.ends) Object.assign(l, { at: l.r.ends.map((e, k) => [x.get(k ? l.b : l.a) + e[0], y.get(k ? l.b : l.a) + e[1]]), leave: l.r.sides.map((s) => SIDES[s]) });
+    // A wire of the order leaves the foot of what is depended on and comes down into the head of what depends on it,
+    // where the sketch has it below: never by a side.
+    const order = new Set(chains.map((c) => `${c.a} ${c.b}`));
+    for (const l of lines) if (!l.leave && y.get(l.b) !== y.get(l.a)) {
+      const [top, foot] = y.get(l.a) < y.get(l.b) ? [l.a, l.b] : [l.b, l.a];
+      if (order.has(`${top} ${foot}`)) l.leave = top === l.a ? [[1, 1], [1, -1]] : [[1, -1], [1, 1]];
+    }
     charge(effort, shapeWires({ nodes, x, y, lines, z, inward, most: effort?.left ?? Infinity }));
     for (const l of lines) l.r.points = l.points;
   }

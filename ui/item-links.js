@@ -1,48 +1,22 @@
-// An item's relations, to remove and to add: done rarely, so the list and the form open together, from its menu.
+// Linking an item to another: done rarely, so the form opens from its menu.
 
-import { api, ask, h, state } from './base.js';
-import { chip, fits, kept, link, pill, relations, typeTitle } from './words.js';
+import { api, h, state } from './base.js';
+import { fits, kept, statusMark, typeMark, typeTitle } from './words.js';
 
 /**
- * The editor of an item's relations, hidden until `open` is called. `change` sends ops and draws the page again;
- * `redraw` draws it again as it was.
+ * The form that links an item to another, hidden until `open` is called. `change` sends ops and draws the page again;
+ * `redraw` draws it again as it was. Its links are not listed here: the canvas draws them, and a link is not removed by
+ * hand (the owner, 9 Nov 2026).
  */
-export function relationEditor(e, data, change, redraw) {
+export function linkAdder(e, change, redraw) {
   const id = e.id;
-  const rows = (list, direction) =>
-    list.map((r) => {
-      const phrase = relations.get(r.type)?.[direction === 'out' ? 'title' : 'inverse'] ?? r.type;
-      return h(
-        'tr',
-        {},
-        h('td', { class: 'nowrap muted water' }, phrase),
-        h('td', {}, chip(r.entity_type), ' ', link(r)),
-        h('td', {}, pill(r.entity_type, r.status)),
-        h(
-          'td',
-          { class: 'act' },
-          !e.archived_at &&
-            !kept(r.type) &&
-            h(
-              'button',
-              {
-                class: 'danger',
-                onclick: async () =>
-                  (await ask({ title: 'Remove this link?', message: `${e.title} ${phrase} ${r.title}`, action: 'Remove', danger: true })) && change([{ op: 'unlink', relation: r.relation }], 'Link removed in the UI'),
-              },
-              'Remove',
-            ),
-        ),
-      );
-    });
-
   // Every way this item can be linked, read from its side: "depends on" and "blocks" are one relation in its two directions.
   const phrases = state.schema.relations
     .filter((r) => !kept(r.id))
     .flatMap((r) => [fits(r.from, e.type) && { rel: r.id, out: true, label: r.title, others: r.to }, fits(r.to, e.type) && r.inverse !== r.title && { rel: r.id, out: false, label: r.inverse, others: r.from }])
     .filter(Boolean);
   const adder = h('div', { class: 'add-relation', hidden: true });
-  const editor = h('section', { class: 'card', hidden: true, style: 'margin-bottom: var(--space-8)' }, h('table', { class: 'list' }, h('tbody', {}, rows(data.outgoing, 'out'), rows(data.incoming, 'in'))), adder);
+  const editor = h('section', { class: 'card', hidden: true, style: 'margin-bottom: var(--space-8)' }, adder);
   const open = () => {
     state.dirty = true; // a live update must not close this
     editor.hidden = false;
@@ -70,9 +44,9 @@ export function relationEditor(e, data, change, redraw) {
                   h(
                     'li',
                     { class: 'row-top' },
-                    chip(x.type),
+                    typeMark(x.type),
                     h('span', { class: 'grow' }, x.title),
-                    pill(x.type, x.status),
+                    statusMark(x.type, x.status),
                     h('button', { onclick: () => change([{ op: 'link', type: p.rel, from: p.out ? id : x.id, to: p.out ? x.id : id }], 'Link added in the UI') }, 'Link'),
                   ),
                 ),

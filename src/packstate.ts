@@ -19,6 +19,7 @@ import { ISLANDS } from './islands.ts';
 import { KERNEL_PACKS } from './packorder.ts';
 import { LOCAL_PACK, type PackFile } from './packs.ts';
 import { hostFor } from './packtools.ts';
+import { needHuman } from './actor-checks.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import type { Tool } from './tools.ts';
 import { syncTypes } from './typetable.ts';
@@ -63,13 +64,12 @@ export async function islandsOn(l: Archipelago): Promise<boolean> {
  * yet beyond who is in it and the kernel's own: on a map with work, the packs it refuses would leave that work dormant.
  */
 export async function setIslands(l: Archipelago, actor: Actor, on: boolean) {
-  if (actor.kind !== 'human') throw new Error('Holding the packs to the island rules is the owner’s.');
+  needHuman(actor, 'Holding the packs to the island rules is the owner’s.');
   if (on && !(await islandsOn(l))) {
     const { rows } = await l.db.query(`select 1 from entity where type <> all($1::text[]) and ${notKernel(l.registry)} limit 1`, [l.registry.family('actor')]);
     if (rows.length) throw new Error('The island rules are set on a new workspace, before anything is put on it: this one already has items.');
   }
   await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [ISLANDS, JSON.stringify(on)]);
-  await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `${ISLANDS} set to ${on}` });
   await l.record('settings', actorId(actor), [['+', 'setting', ISLANDS, on]]);
   l.registry.turnOff(await packsOff(l), on);
   if (on) hostFor(l.registry).stop();
@@ -229,7 +229,7 @@ export function packStates(l: Archipelago) {
 
 /** Turn a pack off or on in this workspace. */
 export async function setPack(l: Archipelago, actor: Actor, input: { pack: string; on: boolean }) {
-  if (actor.kind !== 'human') throw new Error('Turning a pack on or off is the owner’s.');
+  needHuman(actor, 'Turning a pack on or off is the owner’s.');
   if (!l.registry.states.has(input.pack)) throw new Error(`No pack "${input.pack}" on this server. Packs: ${[...l.registry.states.keys()].join(', ')}`);
   if (!input.on && KERNEL_PACKS.includes(input.pack)) throw new Error(`The ${input.pack} pack is the kernel's own: it is never taken out.`);
   const needing = input.on ? [] : l.registry.packs.filter((p) => (p.requires ?? []).includes(input.pack)).map((p) => p.id);

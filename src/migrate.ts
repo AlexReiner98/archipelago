@@ -17,7 +17,7 @@ import { ITEM_KIND } from './head.ts';
 import { ISLAND_INDEX } from './island-items.ts';
 import { SEARCH_ANY, SEARCH_INDEX } from './search.ts';
 import { LOG } from './log.ts';
-import { ACTIVITY, PRE_LOG_ACTIVITY } from './eventlog.ts';
+import { ACTIVITY, ACTIVITY_STREAM, PRE_LOG_ACTIVITY } from './activity-steps.ts';
 import { VAULT } from './vault.ts';
 import { FORGET } from './forget.ts';
 import { OPLOG, OPLOG_GUARDED, OPLOG_SERVER } from './oplog.ts';
@@ -72,6 +72,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 30, name: 'search finds an item with any of the words', sql: SEARCH_ANY },
   { version: 31, name: 'an agent reads whether holds are off', sql: HOLDS_OFF_READ },
   { version: 32, name: 'what lives on an island', sql: ISLAND_INDEX },
+  { version: 33, name: 'what was done outside change sets, in the activity stream', sql: ACTIVITY_STREAM },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

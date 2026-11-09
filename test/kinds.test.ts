@@ -1,15 +1,13 @@
 // The kinds every type extends (the seven of the work, and system for the app's own), the root relations every
 // relation extends, naming kinds at their ends. What the kernel computes from a root holds for a pack's relation extending it.
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { test } from 'node:test';
 import { callTool } from '../src/tools.ts';
 import { openDb } from '../src/db.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
+import { Archipelago } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
 import { askView } from '../src/askview.ts';
+import { freshWith, human, packsWith } from './map.ts';
 
 /** A view asked by its name, as the view tool asks it. */
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
@@ -19,19 +17,8 @@ const ROOTS = ['part_of', 'depends_on', 'waits_on', 'needs', 'holds', 'involves'
 /** The kernel's own that stand on a starter of the work: a connection to the outside and a document another workspace shares, which live on no island. */
 const KERNEL_OF_WORK = ['connection', 'shared_document'];
 const SYSTEM = ['lens', 'style', 'layout', 'instruction', 'screen', 'type', 'link_type', 'source', 'run', 'notification', 'automation', 'island'];
-const human: Actor = { kind: 'human', name: 'test' };
 
 /** A copy of the shipped packs, with one more pack beside them when given. */
-function packsWith(extra?: PackFile): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pelago-kinds-'));
-  cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
-  if (extra) {
-    mkdirSync(join(dir, extra.id));
-    writeFileSync(join(dir, extra.id, 'pack.json'), JSON.stringify(extra));
-  }
-  return dir;
-}
-
 test('every shipped type comes from one of core’s starter types, the system tier included', () => {
   const reg = new Registry(packsWith());
   assert.deepEqual(reg.starters().map((t) => t.id), KINDS);
@@ -140,7 +127,7 @@ test("the roots name kinds at their ends, so a pack's own actor can be waited on
 });
 
 test('views of the work leave the system kind out by default', async () => {
-  const l = new Archipelago(await openDb(), new Registry(packsWith()));
+  const l = await freshWith(new Registry(packsWith()));
   const made = await l.change(human, {
     reason: 'test',
     ops: [

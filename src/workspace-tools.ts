@@ -92,7 +92,7 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       if (islands !== undefined) await setIslands(l, actor, islands);
       if (name) {
         await renameWorkspace(l.workspace, name);
-        await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `The workspace is called "${name}" now` });
+        await l.record('settings', actorId(actor), [['+', 'setting', 'name', name]]);
       }
       const known = replyLifts(l);
       for (const name of Object.keys(lifted ?? {})) if (!known.includes(name)) throw new Error(`No rule here is turned off by "${name}": ${known.length ? `these are, ${known.join(', ')}` : 'no pack here declares a rule on a reply ending'}.`);
@@ -104,7 +104,6 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       });
       for (const [key, value] of [...Object.entries(rest), ...Object.entries(lifted ?? {}), ...ats]) {
         await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [key, JSON.stringify(value)]);
-        await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `${key} set to ${JSON.stringify(value)}` });
         await l.record('settings', actorId(actor), [['+', 'setting', key, value]]);
       }
       return settings(l);

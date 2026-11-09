@@ -1,20 +1,37 @@
 // A headless Chrome for the tests that need a real browser, driven over the DevTools protocol with nothing but
 // Node's own WebSocket. Where no Chrome is found (CHROME, or where it is usually installed), `chrome()` says so and
-// those tests are skipped.
+// those tests are skipped: on a machine, not in CI, where a missing Chrome would let them all pass unrun.
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromeBinary } from '../src/chrome.ts';
+import { until, wait } from './wait.ts';
 
-/** Where Chrome is, or null: where the server looks for the one it draws looks in (src/chrome.ts). */
-export const chrome = chromeBinary;
+export { until, wait };
+
+/** Where Chrome is, or null: where the server looks for the one it draws looks in (src/chrome.ts). In CI there is no
+ * null: a file of browser tests that finds no Chrome there fails, rather than skipping every test in it. */
+export function chrome(): string | null {
+  const found = chromeBinary();
+  if (!found && process.env.CI) throw new Error('CI has no Chrome, so every browser test would pass as skipped: install it, or set CHROME to where it is');
+  return found;
+}
+
+/** An expression importing the page's own copy of one of its modules (`live.js`), at the version it loads them at
+ * (src/ui-files.ts): a bare address would load a second copy, with state and timers of its own. */
+export const pageModule = (name: string) => `import('/${name}' + new URL(document.querySelector('link[href^="/base.js"]').href).search)`;
 
 export interface Page {
   /** Open another address in the same page (the same browser, its storage kept). */
   go: (url: string) => Promise<void>;
   evaluate: <T = unknown>(expression: string) => Promise<T>;
+  /** Whether `expression` comes to be truthy in the page within ms, asked every `every` ms. */
+  until: (expression: string, ms?: number, every?: number) => Promise<boolean>;
+  /** Whether the page comes to stand still within ms: no animation running, and `watch` (an expression, a picture's
+   * place say) reading the same over a few frames. What a test waits for before it measures or after it moves. */
+  still: (watch?: string, ms?: number) => Promise<boolean>;
   /** A DevTools command, for what the rest does not cover (emulating less motion, say). */
   send: (method: string, params?: Record<string, unknown>, sessionId?: string) => Promise<any>;
   /** The page as it looks, as a PNG. */
@@ -82,14 +99,26 @@ export async function open(url: string): Promise<Page> {
     for (let n = 0; n < 200 && !events.some((e) => e.method === 'Page.loadEventFired'); n++) await new Promise((r) => setTimeout(r, 25));
   };
   await go(url);
+  const evaluate = async <T = unknown>(expression: string): Promise<T> => {
+    const m = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+    if (m.result?.exceptionDetails) throw new Error(m.result.exceptionDetails.exception?.description ?? JSON.stringify(m.result.exceptionDetails));
+    return m.result?.result?.value;
+  };
   return {
     go,
     send,
-    evaluate: async (expression) => {
-      const m = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
-      if (m.result?.exceptionDetails) throw new Error(m.result.exceptionDetails.exception?.description ?? JSON.stringify(m.result.exceptionDetails));
-      return m.result?.result?.value;
-    },
+    evaluate,
+    until: (expression, ms = 20_000, every = 50) => until(() => evaluate(expression), ms, every),
+    still: (watch = 'null', ms = 10_000) =>
+      until(() => evaluate(`(async () => {
+        const moving = () => document.getAnimations().some((a) => a.playState === 'running');
+        const at = JSON.stringify(${watch});
+        for (let n = 0; n < 5; n++) {
+          await new Promise((r) => requestAnimationFrame(r));
+          if (moving() || JSON.stringify(${watch}) !== at) return false;
+        }
+        return true;
+      })()`), ms, 0),
     screenshot: async () => Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).result.data, 'base64'),
     logs: () => events.filter((e) => e.method === 'Runtime.consoleAPICalled' || e.method === 'Runtime.exceptionThrown').map((e) => JSON.stringify(e.params).slice(0, 500)),
     // Chrome holds its profile until it has exited (on Windows, a while after the kill): wait for that, then remove it.

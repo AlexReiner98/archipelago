@@ -3,7 +3,7 @@
 // so a mistyped address is seen and refused. The token goes to the system's poll, never to this page. An answered
 // request stays as one line until it runs out, linking to the items its token is within, whose page lists the token.
 
-import { api, ask, authHeaders, h } from './base.js';
+import { api, ask, h, whoami } from './base.js';
 import { link, when } from './words.js';
 import { seekTokens } from './token-piece.js';
 
@@ -15,7 +15,7 @@ export async function tokenAskPiece(host, e) {
   if (!host.isConnected) return;
   // What could not be read is said in the card, and looked for again: a card that draws nothing is never a failure.
   let failed;
-  const me = await fetch('/whoami', { headers: authHeaders() }).then((r) => r.json()).catch((err) => ((failed = `Could not ask who you are: ${err.message}`), null));
+  const me = await whoami().catch((err) => ((failed = `Could not ask who you are: ${err.message}`), null));
   if ((!failed && me?.auth !== 'tokens') || e?.archived_at) return host.remove();
   const asks = failed ? [] : await api('token_requests', { ...(e && { within: e.id }), answered: true }).catch((err) => ((failed = `Could not read the requests: ${err.message}`), []));
   const waiting = asks.filter((a) => a.state === 'pending');
@@ -37,8 +37,8 @@ export async function tokenAskPiece(host, e) {
     h(
       'li',
       { class: 'row-top tie-row' },
-      h('strong', { class: 'gist muted', title: a.name, style: 'flex: 0 1 auto; min-width: var(--code-least); max-width: var(--code-most); overflow: hidden; text-overflow: ellipsis; white-space: nowrap' }, a.name),
-      h('span', { class: `pill ${a.state === 'refused' ? 'bad' : 'ok'}`, title: `${a.answered_by ? `By ${a.answered_by}, ` : ''}${a.state === 'handed' ? 'and the system has collected its token' : a.state === 'approved' ? 'not yet collected by the system' : 'the system is told no'}` }, a.state === 'refused' ? 'refused' : a.state === 'handed' ? 'collected' : 'approved'),
+      h('strong', { class: 'gist muted cut', title: a.name, style: 'flex: 0 1 auto; min-width: var(--code-least); max-width: var(--code-most)' }, a.name),
+      h('span', { class: `mark ${a.state === 'refused' ? 'bad' : 'ok'}`, title: `${a.answered_by ? `By ${a.answered_by}, ` : ''}${a.state === 'handed' ? 'and the system has collected its token' : a.state === 'approved' ? 'not yet collected by the system' : 'the system is told no'}` }, a.state === 'refused' ? 'refused' : a.state === 'handed' ? 'collected' : 'approved'),
       h('span', { class: 'grow gist', title: names(a) }, a.state === 'refused' ? h('span', { class: 'muted' }, names(a)) : items(a, a.state === 'handed' ? 'Its token is under Tokens for this' : 'Its token is made when the system collects it')),
       h('span', { class: 'muted small', title: `Gone from here ${when(a.expires_at)}` }, a.code),
     );
@@ -46,8 +46,8 @@ export async function tokenAskPiece(host, e) {
     h(
       'li',
       { class: 'row-top tie-row' },
-      h('strong', { class: 'gist', title: a.name, style: 'flex: 0 1 auto; min-width: var(--code-least); max-width: var(--code-most); overflow: hidden; text-overflow: ellipsis; white-space: nowrap' }, a.name),
-      h('span', { class: 'pill warn', title: `The code the system showed: approve only if it is the same.\nAsked ${when(a.asked_at)}, runs out ${when(a.expires_at)}` }, a.code),
+      h('strong', { class: 'gist cut', title: a.name, style: 'flex: 0 1 auto; min-width: var(--code-least); max-width: var(--code-most)' }, a.name),
+      h('span', { class: 'mark warn', title: `The code the system showed: approve only if it is the same.\nAsked ${when(a.asked_at)}, runs out ${when(a.expires_at)}` }, a.code),
       h('span', { class: 'grow gist', title: names(a) }, a.items.map((i, n) => [n > 0 && ', ', i ? link(i) : h('span', { class: 'muted', title: 'No item you can see is watched here' }, a.addresses[n])])),
       h('button', { class: 'primary', disabled: !known(a), title: known(a) ? `A token that may only report, within ${names(a)}` : 'No item you can see is watched at one of its addresses', onclick: () => answer(a, true) }, 'Approve'),
       h('button', { onclick: () => answer(a, false) }, 'Refuse'),

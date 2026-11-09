@@ -6,8 +6,9 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
+import { until as holds } from './wait.ts';
 import { serve } from './serve.ts';
-import { agent, press, wait } from './tab-page.ts';
+import { agent, press, ready } from './tab-page.ts';
 
 const browser = chrome();
 
@@ -20,13 +21,11 @@ test('in a browser, a show frames a web address in its pane, and says whether th
   const { run } = (await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: 'web-show', title: 'Web show' } })).result;
   const page = await open(`${base}/`);
   const until = async (what: string, ok: () => Promise<boolean>) => {
-    for (let n = 0; n < 60; n++) if (await ok()) return;
-    else await wait(250);
-    assert.fail(`${what}: ${page.logs().join('\n')}`);
+    if (!(await holds(ok, 20_000, 250))) assert.fail(`${what}: ${page.logs().join('\n')}`);
   };
   const show = async (params: Record<string, unknown>) => (await call('/agent/report', undefined, { actor: agent, action: 'show', params: { ...params, run } })).result;
   try {
-    await wait(3000);
+    await ready(page);
     // Left out of sight when asked: its first show opens a tab of its own, marked, and the owner stays where they are.
     const first = await show({ url, note: 'The build', focus: false });
     assert.equal(first.sight.looking, false, 'focus: false opens a tab of its own, out of sight');
@@ -39,9 +38,7 @@ test('in a browser, a show frames a web address in its pane, and says whether th
     assert.equal(await page.evaluate(`document.querySelector('#canvas > .pane .pane-canvas').hidden`), true, 'in place of the canvas');
     // Its tab in sight now: a show says the owner is looking at it, once the page has said so with its beat.
     const sees = async (looking: boolean) => {
-      for (let n = 0; n < 30; n++) if ((await show({ url, focus: false })).sight.looking === looking) return;
-      else await wait(500);
-      assert.fail(`sight never ${looking}: ${page.logs().join(' ')}`);
+      if (!(await holds(async () => (await show({ url, focus: false })).sight.looking === looking, 15_000, 500))) assert.fail(`sight never ${looking}: ${page.logs().join(' ')}`);
     };
     await sees(true);
     // Back on the owner's tab, a show with focus: false lands out of sight, and says so.

@@ -3,9 +3,9 @@ import { createHmac } from 'node:crypto';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { createToken } from '../src/auth.ts';
-import { freeId } from '../src/server-acts.ts';
+import { freeId } from '../src/workspace-id.ts';
 import { checkServerPack, loadServerPacks } from '../src/server-packs.ts';
-import { signedBy } from '../src/server-routes.ts';
+import { signedWith as signedBy } from '../src/hashes.ts';
 import { serve } from './serve.ts';
 
 const FIXTURES = join(import.meta.dirname, 'server-packs');
@@ -144,13 +144,19 @@ test('a webhook signature is the HMAC of the raw body, prefixed or bare', () => 
   assert.equal(signedBy('s', raw, hex), false);
   assert.equal(signedBy('t', raw, hex, 'hex'), false);
   assert.equal(signedBy('s', raw, undefined, 'hex'), false);
+  assert.equal(signedBy('', raw, hex, 'hex'), false, 'no secret, nothing signed');
+  assert.equal(signedBy('s', raw, `  ${hex} `, 'hex'), true, 'space around it is not part of it');
+  // A signature as long as the right one in characters but not in bytes is refused, not thrown on.
+  assert.equal(signedBy('s', raw, 'é'.repeat(64), 'hex'), false);
+  assert.equal(signedBy('s', raw, 'é'.repeat(71)), false);
 });
 
-test('a workspace id is made from its name', async () => {
-  const taken = new Set(['acme']);
+test('a workspace id is made from its name, by a pack and by the sign-up page alike', async () => {
+  const taken = new Set(['acme', 'default']);
   const at = { has: async (id: string) => taken.has(id) };
   assert.equal(await freeId(at, 'Acme'), 'acme-2');
   assert.equal(await freeId(at, 'Café Ünïon & Co.'), 'cafe-union-co');
   assert.equal(await freeId(at, 'Default'), 'default-2');
   assert.equal(await freeId(at, '!!!'), 'workspace');
+  for (const name of ['X', 'Www', 'Archipelago']) assert.equal(await freeId(at, name), `${name.toLowerCase()}-2`, 'never a reserved id');
 });

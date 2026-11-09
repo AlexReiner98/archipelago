@@ -51,7 +51,8 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     textPx = text ? parseFloat(getComputedStyle(text).fontSize) || 0 : 0;
   };
   // A drawing that moves, adds or takes away a mark has it read again before the plane next moves.
-  new MutationObserver(() => (marks = null)).observe(svg, { subtree: true, childList: true, attributes: true, attributeFilter: ['d', 'transform', 'x', 'y', 'cx', 'cy', 'width', 'height', 'points'] });
+  const reshaped = new MutationObserver(() => (marks = null));
+  reshaped.observe(svg, { subtree: true, childList: true, attributes: true, attributeFilter: ['d', 'transform', 'x', 'y', 'cx', 'cy', 'width', 'height', 'points'] });
 
   /** What is in view, in the picture's units, a margin round it drawn too so a short move shows nothing missing. */
   const inView = () => {
@@ -193,7 +194,10 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   // beside it changes. One first given a size opens.
   let opened = Boolean(frame.clientWidth), was = size(), beside = sheetAside();
   if (opened) open();
-  new ResizeObserver(() => {
+  /** Taken off the page, the frame's observers end with it. */
+  const stop = () => (resized.disconnect(), reshaped.disconnect());
+  const resized = new ResizeObserver(() => {
+    if (!frame.isConnected) return stop();
     if (!frame.clientWidth) return;
     const now = size();
     if (!opened) return void ((opened = true), (was = now), open());
@@ -203,9 +207,10 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     was = now;
     beside = sheetAside();
     apply();
-  }).observe(frame);
+  });
+  resized.observe(frame);
   /** Where it stands now, and put back where it stood (a picture drawn again, kept where the reader left it). */
   const state = () => ({ ...view });
   const restore = (was) => (Object.assign(view, was), now());
-  return { zoomBy, fit, open, show, state, restore, inView };
+  return { zoomBy, fit, open, show, state, restore, inView, stop };
 }

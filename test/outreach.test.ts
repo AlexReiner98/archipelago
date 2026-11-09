@@ -13,7 +13,7 @@ import { readManifest } from '../src/manifest.ts';
 import { Registry } from '../src/packs.ts';
 
 const PACKS = join(import.meta.dirname, '..', 'packs');
-const read = (id: string) => readManifest(readFileSync(join(PACKS, id, 'pack.json'), 'utf8'), id).manifest;
+const read = (id: string) => readManifest(readFileSync(join(PACKS, id, 'pack.json'), 'utf8'), id);
 
 /** The registry over the packs as they are, with the island rules on. */
 function onIslands() {

@@ -101,21 +101,23 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
   }
   if (q.trail !== undefined) return (await l.trail(q.trail)).map(({ id, type, title }) => typed({ id, type, title }));
   if (q.scope !== undefined) {
-    const under = q.parts ? `with recursive scope(id) as (select $1::text union select r.from_id from relation r join scope s on r.to_id = s.id where r.type = 'part_of' and r.valid_to is null and $2::text[] is not null)` : SCOPE;
+    // Its parts at any depth, along the part_of family as the registry has it. Walked, not read from the closure: a
+    // pack's read may run for a public page, whose reader is not given the closure (src/closure.ts).
+    const under = q.parts ? `with recursive scope(id) as (select $1::text union select r.from_id from relation r join scope s on r.to_id = s.id where r.type = any($6::text[]) and r.valid_to is null and $2::text[] is not null)` : SCOPE;
     const { rows } = await l.db.query<Entity>(
       `${under} select ${cols('e')} from entity e join scope s on s.id = e.id
        where e.archived_at is null and ($3::text[] is null or e.type = any($3::text[])) and ($4::boolean is null or e.is_open = $4) and ($5::timestamptz is null or e.updated_at > $5::timestamptz)
        order by e.updated_at desc`,
-      [q.scope, livesIn(l), family(q.types), q.open ?? null, q.since ?? null],
+      [q.scope, livesIn(l), family(q.types), q.open ?? null, q.since ?? null, ...(q.parts ? [l.registry.relationFamily('part_of')] : [])],
     );
     return rows.map(typed);
   }
   if (q.parts_of !== undefined) {
     if (!Array.isArray(q.parts_of) || q.parts_of.some((id) => typeof id !== 'string')) throw new Error('parts_of is a list of item ids');
     const { rows } = await l.db.query<Entity>(
-      `with recursive scope(id) as (select unnest($1::text[]) union select r.from_id from relation r join scope s on r.to_id = s.id where r.type = 'part_of' and r.valid_to is null)
+      `with recursive scope(id) as (select unnest($1::text[]) union select r.from_id from relation r join scope s on r.to_id = s.id where r.type = any($2::text[]) and r.valid_to is null)
        select ${cols('e')} from entity e join scope s on s.id = e.id where e.archived_at is null order by e.updated_at desc`,
-      [q.parts_of],
+      [q.parts_of, l.registry.relationFamily('part_of')],
     );
     return rows.map(typed);
   }

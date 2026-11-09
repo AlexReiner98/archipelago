@@ -58,9 +58,7 @@ const count = (files: string[], pattern: RegExp) =>
   Object.fromEntries(files.map((f) => [f, read(f).match(pattern)?.length ?? 0]).filter(([, n]) => (n as number) > 0));
 
 // 1. No file over 500 lines.
-const LONG_FILES: Record<string, number> = {
-  'ui/style.css': 583,
-};
+const LONG_FILES: Record<string, number> = {};
 
 test(`no file is over ${MAX_LINES} lines`, () => {
   const counted = Object.fromEntries(codeFiles.map((f) => [f, lines(read(f))]));
@@ -235,9 +233,8 @@ test('every UI module parses', () => {
 // numeric constants. Counted here as hex colours, CSS lengths and UPPER_CASE number constants, as of 20 Oct 2026.
 const LOOKS_IN_KERNEL: Record<string, number> = {
   'ui/draw.html': 6,
-  'ui/list.css': 2,
   'ui/public.css': 1,
-  'ui/style.css': 14,
+  'ui/style.css': 8,
   'ui/token-ask.js': 1,
   'ui/week.js': 1,
 };
@@ -246,6 +243,16 @@ const LOOKS = /#[0-9a-fA-F]{3,8}\b|\b\d+(?:\.\d+)?(?:px|rem|em|ch|vh|vw)\b|^(?:e
 test('how things look lives in style presets, not in the kernel', () => {
   const files = walk('ui').filter((f) => /\.(js|css|html)$/.test(f) && !VENDORED.includes(f));
   assert.deepEqual(ratchet(count(files, LOOKS), LOOKS_IN_KERNEL), [], "Make it a style field, give it its value in a pack's style preset (packs/*/pack.json, styles), and read it from the style.");
+});
+
+// 10b. No pills (the owner, 27 Oct 2026, rule e_vgs9vt5j): a state, a kind or a count is a word on the surface, its
+// tone a colour (`.mark`), never a capsule. Counted as pill or chip classes and capsule radii; a key's `-chip` is a
+// colour swatch, not a word, and the one left is the toggle switch's own track (ui/shell.css). Frozen 9 Nov 2026.
+const CAPSULES: Record<string, number> = { 'ui/shell.css': 1 };
+const CAPSULE = /(?:class(?:Name)?:\s*[`'"][^`'"]*?|\.)(?<![\w-])(?:pill|chip|[\w-]+-pill)(?![\w-])|999px|radius-pill/g;
+test('no term or control is wrapped in a capsule', () => {
+  const files = [...walk('ui'), ...walk('packs')].filter((f) => /\.(js|css|html)$/.test(f) && !VENDORED.includes(f));
+  assert.deepEqual(ratchet(count(files, CAPSULE), CAPSULES), [], 'Draw it as a word with class mark and a tone (open, closed, ok, warn, bad): no background, padding or round ends.');
 });
 
 // 11. Every picture is drawn by a drawing: code a pack ships, which the owner changes on the map and which runs in
@@ -326,8 +333,8 @@ test('every kernel view is a lens preset or named as operational', async () => {
 });
 
 // 14. A small pack manifest (Rule 8 of the target model): a pack file says what it declares in the manifest's keys
-// (src/manifest.ts), and nothing else. A key of the shape before is one LEGACY maps, read for one release with a
-// warning; here no pack file uses one. A key that is neither is refused.
+// (src/manifest.ts), and nothing else. A key of the shape before is one LEGACY maps, refused with where it went;
+// here no pack file uses one. A key that is neither is refused.
 test('every pack file is in the manifest shape, and every old key is mapped', async () => {
   const { LEGACY, MANIFEST_KEYS, REACH_KEYS, SERVER_KEYS } = await import('../src/manifest.ts');
   const unmapped: string[] = [];
@@ -346,7 +353,7 @@ test('every pack file is in the manifest shape, and every old key is mapped', as
 // (the part_of closure), a person, a time or place in the log, or a limit; or names the index it goes by
 // (`-- index <name>`), one the schema makes (src/read-indexes.ts has those made for it). What already broke it on 24 Oct is listed, and may only shrink.
 const WHOLE_READS: Record<string, number> = {
-  'src/backup.ts': 2,
+  'src/backup.ts': 1,
   'src/forget.ts': 2,
   'src/log.ts': 2,
   'src/mentions.ts': 1,
@@ -427,9 +434,9 @@ test("a drawing's list holds every module it reaches", () => {
 const LENGTHS_IN_DRAWINGS: Record<string, number> = {
   'architecture/boats.js': 3, 'architecture/deep.js': 32, 'architecture/index.js': 28, 'architecture/islands.js': 18, 'architecture/layout.js': 9, 'architecture/moves.js': 6,
   'architecture/route.js': 8, 'architecture/says.js': 3, 'architecture/sides.js': 1, 'architecture/story.js': 3, 'flow/combs.js': 1, 'flow/direction.js': 1, 'flow/faults.js': 4,
-  'flow/index.js': 15, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/search.js': 1,
-  'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 4, 'flow/wrap.js': 2, 'grid/index.js': 8, 'grid/look.js': 1,
-  'pages/index.js': 5, 'time/index.js': 30, 'packs/plan/layouts/meters/index.js': 10,
+  'flow/index.js': 13, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/search.js': 1,
+  'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 4, 'flow/wrap.js': 2, 'grid/index.js': 6,
+  'pages/index.js': 5, 'time/index.js': 28, 'packs/plan/layouts/meters/index.js': 8,
 };
 const BARE = /(?<![\w.$#])\d+(?:\.\d+)?(?![\w.])/g;
 

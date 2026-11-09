@@ -38,6 +38,8 @@ export function statesOf(answer) {
   const present = new Set(), titles = new Map(), fields = new Map(), flags = new Map();
   let chapter = -1, look = null;
   const states = [];
+  // The phase a step's status came with (none from an older step, which is read by its word); else the item's own.
+  const phaseThen = (i) => (fields.get(i.id)?.status != null ? fields.get(i.id).phase : i.open ? i.phase : undefined);
   steps.forEach((s, k) => {
     for (const id of s.add ?? []) present.add(id);
     for (const id of s.remove ?? []) present.delete(id);
@@ -56,7 +58,7 @@ export function statesOf(answer) {
     const kept = (id, depth = 0) => id === root || (moving.has(id) ? shows(id) : depth < 16 && (holds.get(id) ?? []).some((c) => kept(c, depth + 1)));
     const items = answer.items
       .filter((i) => kept(i.id))
-      .map((i) => (final ? (done(i.id) ? { ...i, open: true } : i) : { ...i, open: true, status: String(fields.get(i.id)?.status ?? (i.open ? i.status : 'up')), title: titles.get(i.id) ?? i.title, fields: { ...i.fields, ...fields.get(i.id) } }));
+      .map((i) => (final ? (done(i.id) ? { ...i, open: true } : i) : { ...i, open: true, status: String(fields.get(i.id)?.status ?? (i.open ? i.status : 'up')), phase: phaseThen(i), title: titles.get(i.id) ?? i.title, fields: { ...i.fields, ...fields.get(i.id) } }));
     const ids = new Set(items.map((i) => i.id));
     states.push({ items, links: answer.links.filter((l) => ids.has(l.from) && ids.has(l.to)), flags: final ? new Map() : new Map(flags), chapter, look, step: s, ids });
   });

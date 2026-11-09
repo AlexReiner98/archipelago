@@ -13,7 +13,8 @@
 .doc-lens .switch { display: inline-flex; }
 .doc-lens button { font: inherit; font-size: var(--text-3); padding: var(--space-3) var(--space-6); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--edge); border-radius: var(--radius-2); cursor: pointer; }
 .doc-lens button.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
-.doc-lens .pill { font-size: var(--text-1); padding: var(--space-1) var(--space-5); border-radius: var(--radius-4); white-space: nowrap; background: var(--accent-soft); color: var(--accent); }
+.doc-lens .mark { font-size: var(--text-1); white-space: nowrap; color: var(--muted); }
+.doc-lens .mark.ok { color: var(--ok); } .doc-lens .mark.warn { color: var(--warn); } .doc-lens .mark.bad { color: var(--bad); font-weight: 600; } .doc-lens .mark.closed { color: var(--closed); }
 /* A picture in time colours each thing by its kind, as the app's pages do (ui/style.css). */
 .doc-lens .group-actor .dot { fill: var(--g-actor); } .doc-lens .group-aim .dot { fill: var(--g-aim); } .doc-lens .group-work .dot { fill: var(--g-work); }
 .doc-lens .group-record .dot { fill: var(--g-record); } .doc-lens .group-question .dot { fill: var(--g-question); } .doc-lens .group-occurrence .dot { fill: var(--g-occurrence); }

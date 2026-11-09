@@ -30,6 +30,7 @@ import { mentionedAll } from './mentions.ts';
 import { databaseFor } from './pg.ts';
 import { analyzeAll, analyzeDue } from './stats.ts';
 import { FACT_ACTIONS, factEvents } from './eventlog.ts';
+import { bringIn, doneEvents } from './activity.ts';
 import { openTables, sealTables, sealedDump } from './backup-seal.ts';
 import { projectBackup } from './backup-log.ts';
 import { liveSnapshot } from './snapshot.ts';
@@ -67,7 +68,8 @@ export async function dump(db: Db, workspace: { id: string; name: string }, loca
     snapshot = await liveSnapshot(tx, workspace.id);
     // A merge does not take another map's log, so what its change sets did goes in as well, as the events it reads
     // as (a restore leaves those out).
-    const done = await factEvents(tx, {}, Number.MAX_SAFE_INTEGER);
+    // What was done outside change sets is in log_op, read the same way: a restore leaves those out too.
+    const done = [...(await factEvents(tx, {}, Number.MAX_SAFE_INTEGER)), ...(await doneEvents(tx, {}, Number.MAX_SAFE_INTEGER))];
     tables.event.push(...done.map(({ target_title: _t, target_type: _y, ...ev }) => ({ ...ev, workspace: workspace.id, private_to: null })));
     await sealTables(tx, workspace.id, tables);
   });
@@ -118,7 +120,9 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
     const backup = await opened(tx, given, true);
     // What a change set in the file's log did is read from that log again: its events are not rows.
     const logged = new Set((backup.tables.log_entry ?? []).map((e) => e.id as string));
-    backup.tables.event = (backup.tables.event ?? []).filter((ev) => !(logged.has(ev.changeset as string) && FACT_ACTIONS.includes(ev.action as string)));
+    // And what log_op holds is read from there: an event row numbered as one of its entries is that entry, for a merge.
+    const numbered = new Set((backup.tables.log_op ?? []).map((o) => Number(o.seq)).filter((n) => n > 0));
+    backup.tables.event = (backup.tables.event ?? []).filter((ev) => !(logged.has(ev.changeset as string) && FACT_ACTIONS.includes(ev.action as string)) && !numbered.has(Number(ev.seq)));
     // The log goes into the years it was written in, in order: each entry follows the one before (src/partitions.ts),
     // the compacted streams' too, whose rows a forget has rewritten out of their order on disk.
     const logAt = new Map((backup.tables.log_entry ?? []).map((e) => [`${e.stream} ${e.pos}`, e.at]));
@@ -132,7 +136,7 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
       if (rows.length) await tx.query(`insert into ${table} select * from jsonb_populate_recordset(null::${table}, $1::jsonb)`, [JSON.stringify(rows)]);
       counts[table] = rows.length;
     }
-    await tx.query(`select setval(pg_get_serial_sequence('event', 'seq'), greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact), 1))`);
+    await tx.query(`select setval(pg_get_serial_sequence('event', 'seq'), greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact), (select coalesce(max(seq), 0) from log_op where seq is not null), 1)) -- index log_fact_seq, log_op_seq`);
     // What is inside what is a projection of the links just written: made again whole.
     await regatherAll(tx, ['part_of']);
     await mentionedAll(tx);
@@ -209,23 +213,12 @@ export async function merge(db: Db, given: Dump, options: { workspace: string; s
          returning (xmax = 0) as added`,
         [JSON.stringify(here(backup.tables.proposal))],
       );
-      // An event is the same one if everything about it but its number is the same.
-      const { rows: events } = await tx.query<{ seq: number }>(
-        `insert into event (workspace, ts, origin, actor, action, target_id, changeset, reason, detail, private_to)
-         select i.workspace, i.ts, i.origin, i.actor, i.action, i.target_id, i.changeset, i.reason, i.detail, i.private_to
-         from jsonb_populate_recordset(null::event, $1::jsonb) i
-         where (i.target_id is null or exists (select 1 from entity where id = i.target_id))
-           and not exists (select 1 from event e where e.ts = i.ts and e.actor = i.actor and e.action = i.action and e.origin = i.origin and e.reason = i.reason and e.detail = i.detail
-                           and e.target_id is not distinct from i.target_id and e.changeset is not distinct from i.changeset)
-         order by i.seq
-         returning seq::int as seq`,
-        [JSON.stringify(here(backup.tables.event))],
-      );
+      // Its events go in the activity stream, after this map's own (src/activity.ts): each once.
+      const seqs = await bringIn(tx, options.workspace, [], backup.tables.event ?? []);
       const { rows: owner } = await tx.query(
         `insert into setting (key, value) select 'me', $1::jsonb where exists (select 1 from entity where to_jsonb(id) = $1::jsonb) on conflict (key) do nothing returning key`,
         [JSON.stringify(backup.tables.setting?.find((s) => s.key === 'me')?.value ?? null)],
       );
-      const seqs = events.map((e) => e.seq);
       report = {
         applied: Boolean(options.apply),
         from: backup.workspace,
@@ -355,10 +348,7 @@ export function parseBackup(bytes: Uint8Array): Dump {
     throw new Error('That is not an Archipelago backup file (a .json.gz written by the server).');
   }
   try {
-    const dump = JSON.parse(text) as Dump;
-    // A backup written while this was called Lattice says so on each event of its own.
-    for (const event of dump.tables?.event ?? []) if (event.origin === 'lattice') event.origin = 'pelago';
-    return dump;
+    return JSON.parse(text) as Dump;
   } catch {
     throw new Error('That is not an Archipelago backup file (a .json.gz written by the server).');
   }

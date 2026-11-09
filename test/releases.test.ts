@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { dumpVault } from '../src/vault.ts';
+import { doneEvents } from '../src/activity.ts';
 import { test } from 'node:test';
 import { dump, restore } from '../src/backup.ts';
 import { openDb } from '../src/db.ts';
@@ -333,7 +334,7 @@ test('a document brings items in by id, and a link shows it and them to anyone h
   await theirs(ann, annActor, [{ op: 'archive', id: doc }]);
   assert.equal(await sharedDocument(l, again.path.split('/').at(-1)!), null);
   // What was done is in the history.
-  const actions = (await l.db.query<{ action: string }>(`select action from event where target_id = $1 and action like 'share.%' order by seq`, [doc])).rows.map((r) => r.action);
+  const actions = (await doneEvents(l.db, { target: doc, oldest: true }, 50)).map((r) => r.action).filter((a) => a.startsWith('share.'));
   assert.deepEqual(actions, ['share.create', 'share.revoke', 'share.create']);
 });
 

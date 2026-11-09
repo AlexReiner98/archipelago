@@ -60,10 +60,10 @@ export const ARROW = { either: '↔', out: '→', in: '←' };
 export const NEXT_WAY = { either: 'out', out: 'in', in: 'either' };
 
 export const when = (ts) => new Date(ts).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-export const daysAgo = (ts) => {
-  const days = Math.floor((Date.now() - new Date(ts).getTime()) / 86_400_000);
-  return days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
-};
+/** A day as a person reads it: a time, or a day as kept (2026-11-08, read where it is, not in UTC). */
+export const day = (ts, dateStyle = 'medium') => new Date(/^\d{4}-\d{2}-\d{2}$/.test(ts) ? `${ts}T12:00` : ts).toLocaleDateString(undefined, { dateStyle });
+/** The hour and minute of a time. */
+export const clock = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 // ---- Saying things briefly -------------------------------------------------
 // The screens show what agents write, and agents write paragraphs. These keep
 // a row to one line: a short name, a few words, a mark. The whole of it is
@@ -108,7 +108,7 @@ export function who(actor, session) {
     : kind === 'github' ? 'GitHub'
     : name.startsWith('automation:') ? 'Automation'
     : name.startsWith('launched:') ? 'Launched session'
-    : (name === 'pelago' || name === 'lattice') && !raw.includes('/') && !raw.includes('claude') ? 'Archipelago'
+    : name === 'pelago' && !raw.includes('/') && !raw.includes('claude') ? 'Archipelago'
     : name.split(':').at(-1) || raw;
   return h('span', { class: `who who-${kind === 'human' ? 'human' : kind === 'github' ? 'github' : 'agent'}`, title: raw }, label);
 }
@@ -144,7 +144,7 @@ export function eventLine(ev) {
     'div',
     { class: 'change line' },
     who(ev.actor, ev.detail?.run_name),
-    h('span', { class: 'gist', title: ev.reason ?? '' }, h('span', { class: 'muted' }, `${verb(ev)} `), ev.target_id ? h('a', { href: `#/e/${ev.target_id}` }, ev.target_title ?? ev.target_id) : gist(ev.reason) || about),
+    h('span', { class: 'gist', title: ev.reason ?? '' }, h('span', { class: 'muted' }, `${verb(ev)} `), ev.target_id ? h('a', { href: `#/e/${ev.target_id}`, title: ev.target_id }, ev.target_title ?? nameOr(ev.target_id)) : gist(ev.reason) || about),
     ago(ev.ts),
   );
 }
@@ -163,7 +163,7 @@ export function changeRow(g, { undone, onUndo, attention, onRead, here, fresh })
   const moved = touched.filter((e) => e.action === 'entity.update' && e.detail?.changes?.status);
   const effect =
     moved.length === 1
-      ? h('span', { class: 'effect' }, h('span', { class: 'pill closed' }, moved[0].detail.changes.status.from), ' \u2192 ', h('span', { class: 'pill' }, moved[0].detail.changes.status.to))
+      ? h('span', { class: 'effect' }, h('span', { class: 'mark closed' }, moved[0].detail.changes.status.from), ' \u2192 ', h('span', { class: 'mark' }, moved[0].detail.changes.status.to))
       : touched.length > 0 && h('span', { class: 'effect muted' }, `${new Set(touched.map((e) => e.target_id)).size} item${new Set(touched.map((e) => e.target_id)).size === 1 ? '' : 's'}`);
   const subject = moved.length === 1 ? moved[0] : touched.length && touched.every((e) => e.target_id === touched[0].target_id) ? touched[0] : undefined;
   // A change is a line, not a page of its own: what it changed has a page, and
@@ -172,7 +172,7 @@ export function changeRow(g, { undone, onUndo, attention, onRead, here, fresh })
   // reading what was said.
   const ids = [...new Set(touched.map((e) => e.target_id).filter(Boolean))];
   const read = () => attention?.length && onRead?.(attention, row);
-  const nameOf = (id) => touched.find((e) => e.target_id === id)?.target_title ?? named(id);
+  const nameOf = (id) => touched.find((e) => e.target_id === id)?.target_title ?? nameOr(id);
   // On the page of the thing it changed, the line does not name that thing again.
   const only = subject?.target_id ?? (ids.length === 1 ? ids[0] : undefined);
   const one = only === here ? undefined : only;
@@ -189,11 +189,15 @@ export function changeRow(g, { undone, onUndo, attention, onRead, here, fresh })
   return row;
 }
 
-export const chip = (typeId) => h('span', { class: 'chip', title: typeId }, typeTitle(typeId));
-export const pill = (typeId, status) => h('span', { class: `pill${isClosed(typeId, status) ? ' closed' : ''}` }, status);
+/** A type's name as a word on the surface, never boxed (rule e_vgs9vt5j). */
+export const typeMark = (typeId) => h('span', { class: 'mark mark-type', title: typeId }, typeTitle(typeId));
+/** A status as a word in its tone: open in the accent, closed quiet. */
+export const statusMark = (typeId, status) => h('span', { class: `mark ${isClosed(typeId, status) ? 'closed' : 'open'}` }, status);
+// The old names, for ui/item-links.js only, which another branch removes: drop these with it.
 /** Titles of the items the pages have shown, so a line that only holds an id can still say a name. */
 export const titles = new Map();
-export const named = (id) => titles.get(id) ?? id;
+/** An item's name where the page knows it, else a word for it: never its id. */
+export const nameOr = (id, word = 'an item') => titles.get(id) ?? word;
 /** Text an agent wrote, with each item id in it as a link by the item's name: an id is something to follow, never something to read. */
 export const idsAsLinks = (text) => {
   const out = [];
@@ -208,16 +212,6 @@ export const idsAsLinks = (text) => {
 /** The item ids a text names, each once: what idsAsLinks will need a name for. */
 export const idsIn = (text) => [...new Set(text.match(/\be_[a-z0-9]{8}\b/g) ?? [])];
 export const link = (e) => (e ? (titles.set(e.id, e.title), h('a', { href: `#/e/${e.id}` }, e.title)) : h('span', { class: 'muted' }, '(missing)'));
-
-/** The usual one-line rendering of an entity. */
-export function entityRow(e, sub) {
-  return h(
-    'li',
-    {},
-    h('div', { class: 'row-top' }, chip(e.type), h('span', { class: 'grow' }, link(e)), e.due && h('span', { class: 'pill warn' }, `due ${e.due}`), pill(e.type, e.status)),
-    sub && h('div', { class: 'row-sub' }, sub),
-  );
-}
 
 export function card(title, { wide } = {}) {
   const count = h('span', { class: 'n' });
@@ -238,8 +232,6 @@ export function card(title, { wide } = {}) {
   };
 }
 
-export const WHY = { depends_on: 'depends on', waits_on: 'waits on', resource_unavailable: 'needs (unavailable)', resource_held: 'needs (held by another)' };
-
 /** A small menu for what is done rarely: the page keeps one or two actions in sight. */
 export function menu(label, items) {
   const box = h('details', { class: 'menu' }, h('summary', {}, label), h('div', { class: 'menu-items' }, items.filter(Boolean).map(([text, onclick, cls]) => h('button', { class: cls ?? '', onclick: (ev) => ((box.open = false), onclick(ev)) }, text))));
@@ -254,14 +246,6 @@ document.addEventListener('click', (ev) => {
   for (const open of document.querySelectorAll('details.menu[open]')) if (!open.contains(ev.target) || (option && open.contains(option))) open.open = false;
 });
 
-/** When an open item was last changed or confirmed, as a mark that turns as it ages. */
-export function ageChip(e) {
-  const days = Math.floor((Date.now() - new Date(e.updated_at).getTime()) / 86_400_000);
-  return h('span', { class: `mark ${days >= 14 ? 'mark-old' : 'mark-human'}`, title: `Last changed or confirmed ${when(e.updated_at)}` }, days === 0 ? 'true today' : days === 1 ? 'true yesterday' : `${days} days unconfirmed`);
-}
-
-/** Where a run was, as a person says it. */
-export const RAN = { 'github-actions': 'Sync agent', server: 'Server agent', 'claude-code': 'Session' };
 /** Which of each item's sections are unfolded, kept while the page is open. */
 export const unfolded = new Map();
 /** A sentence of explanation, kept behind a small mark: there to be asked for, not to be read past. */
@@ -287,14 +271,14 @@ export function describeEvent(ev) {
         .map(([k, c]) => (k === 'body' ? 'notes rewritten' : `${k.replace(/^props./, '')}: ${short(c.from)} → ${short(c.to)}`))
         .join('; ') || 'checked: still true as written'
     );
-  if (ev.action === 'changeset.undo') return `undid ${d.undoes}${d.skipped?.length ? `, ${d.skipped.length} left alone` : ''}`;
-  if (ev.action === 'relation.link' || ev.action === 'relation.unlink') return `${relations.get(d.type)?.title ?? d.type} ${named(d.to)}`;
+  if (ev.action === 'changeset.undo') return `undid a change${d.skipped?.length ? `, ${d.skipped.length} left alone` : ''}`;
+  if (ev.action === 'relation.link' || ev.action === 'relation.unlink') return `${relations.get(d.type)?.title ?? d.type} ${nameOr(d.to)}`;
   if (ev.action === 'entity.create') return `${typeTitle(d.type)}, ${d.status ?? ''}`;
-  if (ev.action === 'proposal.supersede') return `${d.proposal} asked only for what ${d.by} had already made so`;
-  if (ev.action === 'proposal.withdraw') return `${d.proposal}${d.by ? `, covered by ${d.by}` : ''}`;
-  if (ev.action.startsWith('proposal.')) return `${d.proposal}${d.revised ? ', with corrections' : ''}`;
+  if (ev.action === 'proposal.supersede') return 'it asked only for what a newer change had already made so';
+  if (ev.action === 'proposal.withdraw') return d.by ? 'covered by a newer change' : 'a held change';
+  if (ev.action.startsWith('proposal.')) return `a held change${d.revised ? ', with corrections' : ''}`;
   if (ev.action === 'connection.check') return `${d.from} → ${d.to}`;
-  if (ev.action.startsWith('resource.')) return d.holder_title ?? d.holder ?? '';
+  if (ev.action.startsWith('resource.')) return d.holder_title ?? (d.holder ? nameOr(d.holder, 'someone') : '');
   return '';
 }
 

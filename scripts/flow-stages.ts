@@ -10,10 +10,15 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromeBinary } from '../src/chrome.ts';
+// @ts-expect-error: the flow drawing is plain JavaScript, with no types of its own.
 import { layout, stages } from '../packs/core/layouts/flow/layout.js';
+// @ts-expect-error: as above.
 import { count } from '../packs/core/layouts/flow/count.js';
+// @ts-expect-error: as above.
 import { faults, spacing } from '../packs/core/layouts/flow/faults.js';
+// @ts-expect-error: as above.
 import { shownOnly } from '../packs/core/layouts/flow/graph.js';
+// @ts-expect-error: as above.
 import { placesAsColours } from '../packs/core/layouts/flow/places.js';
 
 const args = process.argv.slice(2), fresh = args.includes('--fresh');

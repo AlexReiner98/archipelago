@@ -6,12 +6,10 @@ import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { openDb } from '../src/db.ts';
 import { Archipelago, type Op } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
 import { callTool } from '../src/tools.ts';
-import { syncTypes } from '../src/typetable.ts';
-import { human, PACKS } from './map.ts';
+import { freshWith, human, PACKS } from './map.ts';
 
 const CHORES = {
   id: 'chores',
@@ -36,8 +34,7 @@ async function map() {
   cpSync(PACKS, dir, { recursive: true });
   mkdirSync(join(dir, CHORES.id));
   writeFileSync(join(dir, CHORES.id, 'pack.json'), JSON.stringify(CHORES));
-  const l = new Archipelago(await openDb(), new Registry(dir));
-  await syncTypes(l);
+  const l = await freshWith(new Registry(dir));
   await callTool(l, human, 'init', { name: 'Alex' });
   return l;
 }

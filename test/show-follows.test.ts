@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
-import { agent, called, wait } from './tab-page.ts';
+import { agent, called, ready, wait } from './tab-page.ts';
 
 const browser = chrome();
 
@@ -18,7 +18,7 @@ test('in a browser, the Follows menu lists the chats open now, by title', { skip
   const opened = async (ok: (names: string[]) => boolean) => {
     for (let n = 0; n < 40; n++) {
       await page.evaluate(`document.querySelector('[aria-label="This tab: whom it follows, pop it out"]').click()`);
-      await wait(300);
+      await page.until(`Boolean(document.querySelector('.tab-menu:popover-open [role="menuitem"]'))`, 2000);
       const names = await menu();
       await page.evaluate(`document.querySelector('.tab-menu').hidePopover()`);
       if (ok(names)) return names;
@@ -27,7 +27,7 @@ test('in a browser, the Follows menu lists the chats open now, by title', { skip
     assert.fail(`the menu: ${JSON.stringify(await menu())} ${page.logs().join('\n')}`);
   };
   try {
-    await wait(2500);
+    await ready(page);
     await opened((names) => names.includes('Will end') && names.includes('Stays quiet'));
     await call('/agent/report', undefined, { actor: agent, action: 'session_end', params: { run: ending.run, reason: 'closed', cannot_tell_rest: true } });
     const names = await opened((list) => !list.includes('Will end'));

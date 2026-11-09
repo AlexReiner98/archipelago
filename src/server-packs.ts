@@ -146,8 +146,7 @@ export const serverPackDirs = (given = env('SERVER_PACKS')): string[] => [OWN_PA
 /** Whether a pack file asks for server reach: only those are read from a folder that holds workspace packs too. */
 function markedServer(at: string): boolean {
   try {
-    const raw = JSON.parse(readFileSync(at, 'utf8')) as { tier?: string; reach?: { server?: unknown } };
-    return raw.tier === 'server' || raw.reach?.server !== undefined;
+    return (JSON.parse(readFileSync(at, 'utf8')) as { reach?: { server?: unknown } }).reach?.server !== undefined;
   } catch {
     return true;
   }
@@ -168,9 +167,7 @@ export function loadServerPacks(dirs = serverPackDirs()): { packs: ServerPack[];
       if (!existsSync(at) || (dir === OWN_PACKS && !markedServer(at))) continue;
       let file: Partial<Manifest>;
       try {
-        const read = readManifest(readFileSync(at, 'utf8'), at);
-        file = read.manifest;
-        for (const w of read.warnings) console.warn(w);
+        file = readManifest(readFileSync(at, 'utf8'), at);
       } catch (err) {
         refused.push({ folder, why: [err instanceof SyntaxError ? `its pack.json is not JSON: ${err.message}` : (err as Error).message] });
         continue;

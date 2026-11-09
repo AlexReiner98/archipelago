@@ -94,7 +94,7 @@ export function choicesSection(e, pick, edit) {
           open
             ? h('button', { type: 'button', class: 'choice-pick', title: `Settle it: ${x}`, onclick: () => pick(x) }, h('span', { class: 'gist' }, x))
             : h('span', { class: 'gist', title: x }, x),
-          chosen(x) && h('span', { class: 'pill ok' }, 'chosen'),
+          chosen(x) && h('span', { class: 'mark ok' }, 'chosen'),
         ),
       ),
     ),

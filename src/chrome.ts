@@ -19,9 +19,6 @@ const PLACES = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Pro
 /** Where Chrome is installed here, or null. */
 export const chromeBinary = (): string | null => [process.env.CHROME, ...PLACES].find((p): p is string => Boolean(p && existsSync(p))) ?? null;
 
-/** Whether this server has a Chrome to draw in: another container's, or one installed here. */
-export const canDraw = () => Boolean(process.env.PELAGO_CHROME || chromeBinary());
-
 export interface Tab {
   /** A DevTools command for this tab. */
   send: (method: string, params?: Record<string, unknown>) => Promise<any>;
