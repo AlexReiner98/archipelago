@@ -7,6 +7,8 @@ import { scanAround, type Row } from './region.ts';
 import { whereOf } from './places.ts';
 import { FILE, globNames, instructionsFor } from './instructions.ts';
 import { ACTIVE_HOLDS, type Entity, type Archipelago } from './pelago.ts';
+import { findingLine, islandFindings } from './findings.ts';
+import { ISLAND } from './island-items.ts';
 
 interface Brief {
   id: string;
@@ -112,11 +114,19 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
   // What bites in the files of its repository: the instructions said for files there, each with the files it names.
   // Each is named; the way round is said for the files the task names (all of them, when it names none), since the
   // rest is said whole when a session opens one of its files. Most of a brief was traps of files the work never opened.
-  const traps = await instructionsFor(l, FILE, { ...(repo && { about: repo.id }) });
+  // An island is read for what it publishes: its findings, one line each, in place of the traps and the reporting a
+  // task's brief gives a session about to work on it (task e_p27ddjqt).
+  const island = l.registry.isA(task.type, ISLAND);
+  const found = island ? await islandFindings(l, task.id) : undefined;
+  if (found) {
+    lines.push('', `## Findings (${found.rows.length + found.more})`, ...(found.rows.length ? found.rows.map(findingLine) : ['None published.']));
+    if (found.more) lines.push(`- and ${found.more} more`);
+  }
+  const traps = island ? [] : await instructionsFor(l, FILE, { ...(repo && { about: repo.id }) });
   const named = task.body?.match(/[\w.*-]+(?:\/[\w.*-]+)+|[\w*-]+\.(?:[cm]?[jt]s|json|css|html|md|sql|ya?ml|py|cs)\b/gi) ?? [];
   const bites = (t: (typeof traps)[number]) => !named.length || t.files!.some((g) => named.some((p) => globNames(g, p) || globNames(p, g)));
   if (traps.length) lines.push('', '## Where it bites', ...traps.map((t) => `- ${t.files!.join(', ')}: ${t.title}.${bites(t) ? ` ${t.text}` : ''}`));
-  lines.push('', '## Reporting', `Register with pelago (capture, action session_start, task ${task.id}, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done.`);
+  if (!island) lines.push('', '## Reporting', `Register with pelago (capture, action session_start, task ${task.id}, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done.`);
 
   const slim = (e: Row) => ({ id: e.id, type: e.type, title: e.title, status: e.status });
   return {
@@ -127,6 +137,7 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
     root_blockers: roots.map((id) => names.get(id)),
     needs: needs.map((n) => ({ ...slim(n), exclusive: (l.registry.capacity(n) ?? Infinity) !== Infinity, held_by: held.find((h) => h.to_id === n.id)?.title })),
     ties: ties.map(({ rel, e }) => ({ relation: rel, ...slim(e) })),
+    ...(found && { findings: found.rows, ...(found.more > 0 && { findings_more: found.more }) }),
     ...(traps.length > 0 && { traps: traps.map(({ id, title, files }) => ({ id, title, files })) }),
     text: lines.join('\n'),
   };

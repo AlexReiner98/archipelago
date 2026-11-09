@@ -1272,6 +1272,13 @@
     },
     {
       "form": "screen",
+      "id": "core.island_findings",
+      "title": "Findings",
+      "on": ["island"],
+      "pieces": [{ "piece": "findings" }]
+    },
+    {
+      "form": "screen",
       "id": "core.shared_reading",
       "title": "Reading",
       "on": [
