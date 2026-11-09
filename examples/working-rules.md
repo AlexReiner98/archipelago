@@ -14,9 +14,10 @@ actions; `query` with name `actions` gives their inputs whole.
 ## At the start
 
 1. Handed a task, `query` with name `brief` and params `task`: it holds what that
-   task needs. Otherwise the session start says where things stand and which
-   view reads it again; `query` with no name lists the views this map has, and
-   `search` with `open: true` finds the open work. If the session start puts
+   task needs. Otherwise the session start says where things stand: `query`
+   with name `frontier` reads it again (the open items the sessions before you
+   here worked on, each with why it needs attention now); `query` with no name
+   lists the views this map has, and `search` with `open: true` finds the open work. If the session start puts
    questions settled on an agent's own judgment to the owner, show them in your
    first reply and ask the owner to confirm or correct; record their answer
    with `settle`, action `confirmed`.

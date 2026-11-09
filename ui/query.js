@@ -12,7 +12,10 @@ import { ago, idsAsLinks, isA, titles } from './words.js';
 async function firstStep(body) {
   const info = await api('workspace_info').catch(() => null);
   // Asked after the fact: only while nothing has been drawn here since.
-  if (info && !info.started && (!body.firstChild || body.firstChild.matches?.('.empty'))) body.replaceChildren(h('div', { class: 'empty' }, 'Your map is empty. ', h('a', { href: '#/workspace?at=agent' }, 'Connect an agent')));
+  if (!info || (body.firstChild && !body.firstChild.matches?.('.empty'))) return;
+  // Until an agent has worked here, an empty page says how to bring one, whatever a person has made by hand.
+  if (!info.started) body.replaceChildren(h('div', { class: 'empty' }, 'Your map is empty. ', h('a', { href: '#/workspace?at=agent' }, 'Connect an agent')));
+  else if (!info.agents) body.replaceChildren(h('div', { class: 'empty' }, 'No agent has worked here yet. ', h('a', { href: '#/workspace?at=agent' }, 'Connect an agent')));
 }
 
 // ---- A session's story -----------------------------------------------------

@@ -66,7 +66,9 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       const limits = await limitOf(l.workspace);
       // Whether anything has been put here yet beyond who is in it and how the app is set up.
       const started = (await l.db.query(`select 1 from entity where type <> all($1::text[]) and ${notKernel(l.registry)} and archived_at is null limit 1`, [l.registry.family('actor')])).rows.length > 0;
-      return { ...(await settings(l)), started, owner: rows[0] ?? null, member_limit: limits ?? null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
+      // Whether any agent session has ever been here: until one has, an empty page points at connecting one.
+      const agents = (await l.db.query(`select 1 from entity where type = 'run' limit 1 -- index entity_type`)).rows.length > 0;
+      return { ...(await settings(l)), started, agents, owner: rows[0] ?? null, member_limit: limits ?? null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
     },
   },
   workspace_set: {

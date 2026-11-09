@@ -17,6 +17,8 @@ export function drawNav(open) {
   if (!host) return;
   const at = location.hash.split('?')[0];
   host.replaceChildren(
+    // For you: what waits on the person, the canvases kept and where to start (the core pack's home screen).
+    h('a', { href: '#/you', class: at === '#/you' ? 'active' : '' }, 'For you'),
     ...inNav().map((s) => h('a', { href: `#/s/${s.id}`, class: open === s.id || at === `#/s/${s.id}` ? 'active' : '' }, s.title)),
     h('a', { href: '#/workspace', class: at === '#/workspace' ? 'active' : '' }, 'Settings'),
   );

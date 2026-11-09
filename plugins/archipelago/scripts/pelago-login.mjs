@@ -6,12 +6,12 @@
 //
 //   node pelago-login.mjs <origin> <folder> <port> <verifier> <state> <client id> [<address to open>]   (started by the hook, detached)
 
-import { execFile, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** How long a sign-in waits for the browser, and how long before it runs out a token is refreshed. */
@@ -211,6 +211,18 @@ export function plugin(session, hookUrl, folder = folderOf()) {
       } catch {
         return '';
       }
+    },
+    /**
+     * A plugin installs no commit-msg hook, so where the checkout has none naming the run (the setup's), the session is
+     * asked to name it in its commits itself. Nothing outside a git checkout, where keepRun kept no run.
+     */
+    trailer: (run, cwd) => {
+      if (!run) return undefined;
+      try {
+        const git = execFileSync('git', ['-C', cwd || '.', 'rev-parse', '--git-common-dir'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 }).trim();
+        if (readFileSync(resolve(cwd || '.', git, 'hooks', 'commit-msg'), 'utf8').includes('Archipelago-Run')) return undefined;
+      } catch { /* no hook there: ask */ }
+      return `End each commit message you make in this session with the trailer "Archipelago-Run: ${run}", so the map reads the commit against this session's work.`;
     },
     /** The server's answer to a start, less its word on a project's setup files: a plugin is renewed by Claude Code. */
     fromServer: (text) => {

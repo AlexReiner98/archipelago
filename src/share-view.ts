@@ -63,5 +63,5 @@ export async function sharedView(l: Archipelago, secret: string) {
   if (!doc) return null;
   const sections = doc.parts.flatMap((p) => ('section' in p ? [p.section] : []));
   const { lenses, types } = await picturesOf(l, sections, true);
-  return Object.keys(lenses).length ? { ...doc, lenses, types } : doc;
+  return Object.keys(lenses).length ? { ...doc, lenses: (await import('./published.ts')).drawingsGiven(l, lenses), types } : doc;
 }

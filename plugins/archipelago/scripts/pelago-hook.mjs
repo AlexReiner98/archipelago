@@ -379,11 +379,15 @@ function keepRun(res, sent) {
       mkdirSync(resolve(file, '..'), { recursive: true });
       writeFileSync(file, run);
       if (/^\d+$/.test(process.env.CLAUDE_PID ?? '')) writeFileSync(`${file}.pid`, process.env.CLAUDE_PID);
+      return run;
     }
   } catch (err) {
     console.error(`Archipelago ${name} hook: the run could not be kept for commits (${err.message})`);
   }
+  // Outside a git checkout there are no commits to name it in.
+  return undefined;
 }
+
 /** What goes wrong is said to the person in the session, once a session for each thing, not at every turn. */
 function sayOnce(kind, words) {
   console.error(words);
@@ -406,7 +410,7 @@ try {
   const late = name === 'prompt' && token ? plugin?.lateStart() : null;
   if (late) {
     const res = await post('session-start', late);
-    if (res.ok) keepRun(res, late), context.push(plugin.fromServer(await res.text())?.hookSpecificOutput?.additionalContext, plugin.rules());
+    if (res.ok) context.push(plugin.fromServer(await res.text())?.hookSpecificOutput?.additionalContext, plugin.rules(), plugin.trailer(keepRun(res, late), said.cwd));
   }
   const res = await post(name, body);
   const answer = (answered = await res.text());
@@ -429,7 +433,10 @@ try {
     out = rest;
   } else if (res.ok) {
     out = answer;
-    if (name === 'session-start') keepRun(res, body), plugin && ((out = plugin.fromServer(answer)), context.push(plugin.rules()));
+    if (name === 'session-start') {
+      const run = keepRun(res, body);
+      if (plugin) (out = plugin.fromServer(answer)), context.push(plugin.rules(), plugin.trailer(run, said.cwd));
+    }
   } else notice = sayOnce(`status-${res.status}`, `Archipelago ${name} hook: ${base} answered ${res.status}${res.status === 401 || res.status === 403 ? `: this machine ${token ? 'has a token the server refused' : 'has no token for it'}, so this session is not on the map` : ''}.`);
 } catch (err) {
   notice = sayOnce('away', `Archipelago ${name} hook: ${base} did not answer (${err.message}), so this session’s work is not reaching the map.`);
