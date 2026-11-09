@@ -6,8 +6,6 @@ import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, wri
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-// @ts-ignore: WebCola, vendored (ui/cola.LICENSE)
-import cola from '../ui/cola.module.min.js';
 
 const ROOT = join(import.meta.dirname, '..');
 
@@ -76,9 +74,32 @@ const boxesOf = (g: any): Box[] => g.all.filter((n: any) => !n.dummy).map((n: an
 const linesOf = (wires: any[]): Line[] => wires.filter((w) => w.points?.length > 1).map((w) => ({ ends: [w.a, w.b], points: w.points }));
 
 /** What every wired drawing draws of a sketch, with its layout, and the spacing it keeps its wires at. A new wired
- *  drawing is added here. The map is not yet (its layout answers in step 2's format): the drawings that were went with
- *  the layouts retired on 9 Nov 2026 (git tag archive/layouts-2026-11-09). */
-export const WIRED: Record<string, { gap: (sizes: Record<string, number>) => number; draw: (layout: any, s: Sketch) => { boxes: Box[]; lines: Line[] } }> = {};
+ *  drawing is added here; those retired on 9 Nov 2026 are at git tag archive/layouts-2026-11-09. */
+export const WIRED: Record<string, { gap: (sizes: Record<string, number>) => number; draw: (layout: any, s: Sketch) => { boxes: Box[]; lines: Line[] } }> = {
+  'core.map': {
+    gap: (sizes) => sizes.flow_wire_gap,
+    draw(layout, { items, links }) {
+      const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn });
+      return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
+    },
+  },
+};
+
+/** How each sketch fails a drawing, counted: `spacing` (test/spacing.ts) run on its lines at `gap`. */
+export function faultsOf(wired: (typeof WIRED)[string], layout: any, spacing: (lines: Line[], gap: number) => any) {
+  const gap = wired.gap(house().sizes), found: Record<string, number> = {};
+  for (const [name, s] of Object.entries(SKETCHES)) {
+    const { boxes, lines } = wired.draw(layout, s), { down, across } = spacing(lines, gap);
+    const stand = boxes.flatMap((p, i) => boxes.slice(i + 1).filter((q) => Math.min(p.r, q.r) - Math.max(p.l, q.l) > 0.5 && Math.min(p.u, q.u) - Math.max(p.t, q.t) > 0.5)).length;
+    const through = lines.filter((w) => boxes.some((b) => !w.ends.includes(b.id) && w.points.some((p, i) => {
+      const q = w.points[i - 1];
+      return i > 0 && Math.max(p[0], q[0]) > b.l + 1 && Math.min(p[0], q[0]) < b.r - 1 && Math.max(p[1], q[1]) > b.t + 1 && Math.min(p[1], q[1]) < b.u - 1;
+    }))).length;
+    const counts = { overlaps: down.overlaps + across.overlaps, shared: down.shared + across.shared, under: down.under + across.under, 'boxes on boxes': stand, 'wires through boxes': through };
+    for (const [what, n] of Object.entries(counts)) if (n) found[`${name}: ${what}`] = n;
+  }
+  return found;
+}
 
 /** The layers of a wired drawing, in the order each may read those before it (docs/layouts.md). */
 export const LAYERS = ['graph', 'topology', 'shape', 'metrics', 'marks'];

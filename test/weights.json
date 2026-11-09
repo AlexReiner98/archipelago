@@ -221,7 +221,11 @@
   "test/weekly-trigger.test.ts": { "pglite": 4.5, "postgres": 2.4 },
   "test/withdraw.test.ts": { "pglite": 2.4, "postgres": 0.8 },
   "test/workspace-share.test.ts": { "pglite": 7.3, "postgres": 3.4 },
-  "test/workspace-tokens.test.ts": { "pglite": 8.9, "postgres": 6 }
+  "test/workspace-tokens.test.ts": { "pglite": 8.9, "postgres": 6 },
+  "packs/core/map-routing.test.ts": { "pglite": 22, "postgres": 22 },
+  "packs/core/map-sea.test.ts": { "pglite": 1, "postgres": 1 },
+  "packs/core/map-islands-view.test.ts": { "pglite": 4, "postgres": 4 },
+  "packs/core/map-time.test.ts": { "pglite": 22, "postgres": 22 }
  },
- "steps": {"pglite":2,"postgres":17}
+ "steps": { "pglite": 2, "postgres": 17 }
 }

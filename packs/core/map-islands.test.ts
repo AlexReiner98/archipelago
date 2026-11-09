@@ -141,3 +141,12 @@ test('a picture of no island draws no border', () => {
   assert.ok(!scene.css.includes('lf-shore'), 'nor its rules');
   assert.ok(scene.key.length > 0, 'and keeps its key');
 });
+
+test('a finding read across crosses the sea, with a gate on each shore naming it', { todo: "Map (9 Nov 2026): 3 gates where the flow drew 2" }, () => {
+  const svg = draw({ ...answer, items: answer.items.map((i) => (i.id === 'e_costzzzz' ? { ...i, fields: { value: 42 } } : i)) }).svg;
+  const gates = marks(svg, (m) => String(m[1]?.key ?? '').startsWith('gate:'));
+  assert.equal(gates.length, 2, 'one where it leaves Lab, one where it enters Grants');
+  for (const g of gates) assert.ok(JSON.stringify(g).includes('Cost per sample: 42'), 'each names what crosses, and its value');
+  const wire = marks(svg, (m) => m[0] === 'path' && String(m[1]?.class ?? '').includes('lf-tie') && /^n:/.test(m[1].key ?? '')).find((m) => m[1].class.includes('headed') && gates.length);
+  assert.ok(wire, 'the crossing is a tie');
+});

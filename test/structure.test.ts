@@ -14,13 +14,14 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../src/operational.ts';
-import { drawings, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
+import { spacing } from './spacing.ts';
+import { drawings, faultsOf, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const MAX_LINES = 500;
 const CODE = /\.(ts|js|mjs|css|html)$/;
 /** Vendored as a file at the owner's asking (CLAUDE.md), not written here. */
-const VENDORED = ['ui/three.module.min.js', 'ui/cola.module.min.js'];
+const VENDORED = ['ui/three.module.min.js'];
 
 const walk = (dir: string): string[] =>
   !existsSync(join(ROOT, dir))
@@ -479,3 +480,18 @@ test("only Metrics sets a place or a wire's points", () => {
   assert.deepEqual(ratchet(counted, WRITERS), [], 'Coordinates are output: Metrics sets them, from what this layer says.');
 });
 
+
+// 21. Sealed: each wired drawing runs on small sketches (test/wired.ts), and no two wires of it lie on one line, none stands
+// under the spacing, no box stands on a box, none runs through a box. The spacing is the flow's (test/spacing.ts).
+// Counted for the map as it stood when it became the one layout, 9 Nov 2026; each count may only go down.
+// The map's trunks (one wire for the links of one type and one way off a box) are what share: wires of one box.
+const NOT_SEALED: Record<string, number> = { 'core.map knot: shared': 1, 'core.map fan: shared': 24, 'core.map crossed: shared': 3, 'core.map comb: shared': 31 };
+
+test('a wired drawing keeps its wires apart', async () => {
+  const counted: Record<string, number> = {};
+  for (const d of wired) {
+    const found = await setOut(d, async (url) => faultsOf(WIRED[d.id], (await import(url('layout.js'))).layout, spacing));
+    for (const [what, n] of Object.entries(found)) counted[`${d.id} ${what}`] = n;
+  }
+  assert.deepEqual(ratchet(counted, NOT_SEALED), [], `Wires take room in the solve: each stretch keeps its distance from every other (docs/layouts.md). Now: ${JSON.stringify(counted)}`);
+});

@@ -50,3 +50,13 @@ test('a wait on the person looking has its own row in their colour, and is drawn
   assert.match(JSON.stringify(rows[0].glyph), /lf-tie headed[^"]* you/, 'in the colour of what waits on you, as it is drawn');
   assert.match(JSON.stringify(scene.svg), /lf-tie headed[^"]* you/, 'the wire is drawn in that colour');
 });
+
+test('a style that draws no tagged tie: what is tagged and nothing else is a step on its own', { todo: "Map (9 Nov 2026): 3 ties where the flow drew 2" }, () => {
+  const quiet = { ...house, undrawn: ['tagged'] };
+  assert.ok(steps(quiet).includes('e_loosezzz') && steps(quiet).includes('e_tagzzzzz'), 'the tagged item and its tag are steps');
+  assert.equal(ties(quiet), 2, 'what is part of the process is tied to it; the tag ties nothing');
+});
+
+test('a style that draws every link ties the tagged item to its tag', { todo: "Map (9 Nov 2026): 4 ties where the flow drew 3" }, () => {
+  assert.equal(ties({ ...house, undrawn: [] }), 3);
+});

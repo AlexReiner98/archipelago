@@ -12,6 +12,7 @@ import { model } from './model.js';
 import { relax } from './relax.js';
 import { shape } from './shape.js';
 import { stage } from './stage.js';
+import { spend } from './effort.js';
 
 export { stages } from './stage.js';
 
@@ -65,9 +66,9 @@ export function laidOut(args, { islandOf = () => null, heads = new Map() } = {})
     return { m, nodes: m.nodes, x, y, chains: [], ties: [], islands: [], ports: [] };
   }
   const e = embedding(m, { sizes, headless, islandOf: (id) => islandOf(id) ?? null });
-  const input = asInput(e, m), sketch = shape(input);
+  const input = asInput(e, m), afford = (work) => spend(args.effort, work), sketch = shape(input, { afford });
   stage('shaped', { bends: sketch.bends, nodes: sketch.nodes.length, wires: sketch.wires.length });
-  const r = relax(sketch, { size: (n) => (m.nodes.has(n.id) ? [m.nodes.get(n.id).w, m.nodes.get(n.id).h] : [0, 0]), sizes, heads });
+  const r = relax(sketch, { size: (n) => (m.nodes.has(n.id) ? [m.nodes.get(n.id).w, m.nodes.get(n.id).h] : [0, 0]), sizes, heads, afford });
   const M = sizes.flow_margin, to = ([px, py]) => [px + M, py + M];
   const at = new Map(r.nodes.map((n) => [n.id, { ...n, x: n.x + M, y: n.y + M }]));
   // A box is drawn as the shape made it: where many wires land on it, it stands as long as they need.

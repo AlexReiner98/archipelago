@@ -166,3 +166,33 @@ test('in a browser, the workspace style’s page_css is how a published page loo
     await page.close();
   }
 });
+
+test('in a browser, a step hovered while its story plays says what it is in a tip its drawing makes, beside it', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { call, base } = await serve('off');
+  const { d, a } = await published(call);
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: a, body: 'Where everything comes in: the MCP server, the CLI and the web.' }] });
+  await call('/api/publish', undefined, { id: d });
+  const page = await open(`${base}/p/default/${d}`);
+  try {
+    const got = await page.evaluate(`(async () => {
+      const until = async (test) => { for (let n = 0; n < 400 && !test(); n++) await new Promise((r) => setTimeout(r, 25)); return test(); };
+      let part;
+      await until(() => (part = document.querySelector('[data-lens] svg a.lf-step[href="#/e/${a}"]')));
+      const tip = () => document.querySelector('[data-lens] .drawing-tip');
+      // As a pointer does: its title is taken off by the page's tip (ui/tip.js), so the browser shows none beside this one.
+      part.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+      part.dispatchEvent(new MouseEvent('mouseenter'));
+      await until(() => tip() && !tip().hidden);
+      const shown = { text: tip()?.textContent, title: part.querySelector('title') === null, said: document.querySelector('.lens-said') === null };
+      part.dispatchEvent(new MouseEvent('mouseleave'));
+      part.parentElement.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+      await until(() => tip().hidden);
+      // The step as it stands now: a story may draw it again as it lights and goes dark.
+      const now = document.querySelector('[data-lens] svg a.lf-step[href="#/e/${a}"]');
+      return { ...shown, after: tip().hidden, back: now.querySelector('title') !== null };
+    })()`);
+    assert.deepEqual(got, { text: 'DoorsWhere everything comes in: the MCP server, the CLI and the web.', title: true, said: true, after: true, back: true });
+  } finally {
+    await page.close();
+  }
+});

@@ -43,8 +43,6 @@ export const UI_FILES: Record<string, string> = {
   '/source-tag.js': 'source-tag.js',
   // three.js as its authors build it (MIT), offered to a layout's code; loaded only when one asks for it.
   '/three.js': 'three.module.min.js',
-  // WebCola as its authors build it (MIT, ui/cola.LICENSE), wrapped as a module, offered to a layout's code (core's cola).
-  '/cola.js': 'cola.module.min.js',
 };
 
 const UI_DIR = join(import.meta.dirname, '..', 'ui');
@@ -78,7 +76,7 @@ async function current() {
   const text = new Map<string, string>();
   for (const [f, body] of raw) {
     if (f.endsWith('.html')) text.set(f, body.replace(/\b(href|src)="(\/[\w.-]+)"/g, (all, attr, path) => (named(path) ? `${attr}="${at(path)}"` : all)));
-    else if (f.endsWith('.js') && f !== 'three.module.min.js' && f !== 'cola.module.min.js')
+    else if (f.endsWith('.js') && f !== 'three.module.min.js')
       // An import of another of the UI's modules, or a quoted address of one of its files ('/draw.html').
       text.set(f, body.replace(/(\bfrom\s*|\bimport\s*\(\s*)?(['"])(\.?\/)([\w.-]+)\2/g, (all, imp, q, dot, name) => ((dot === '/' || imp) && named(`/${name}`) ? `${imp ?? ''}${q}${dot}${name}?v=${version}${q}` : all)));
     else text.set(f, body);

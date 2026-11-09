@@ -64,6 +64,9 @@ export function minCostFlow(n, supply, arcs) {
     while (q.size) {
       const [d, u] = q.pop();
       if (d > dist[u]) continue;
+      // Once the sink is reached its distance is known, and every node not yet out of the heap is at least as far: the
+      // potentials below rise by no more than the sink's distance, so the rest of the search would change nothing.
+      if (u === T) break;
       for (const k of head[u]) {
         if (cap[k] <= 0) continue;
         const v = to[k], nd = d + cost[k] + pot[u] - pot[v];

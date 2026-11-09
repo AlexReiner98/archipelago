@@ -425,9 +425,10 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
         const on = String(key).startsWith('p:') ? `s:${String(key).slice(2)}` : null;
         return on && tipped.has(on) ? [{ tip: { key: on, mark: tipFor(on) } }] : [{ tip: null }];
       }
-      if (name === 'leave') return [...light(null), ...(story ? [] : [{ tip: null }])];
+      if (name === 'leave') return [...light(null), { tip: null }];
       if (!keyed.has(key)) return [];
-      return [...light(keyed.get(key)), ...(!story && tipped.has(key) ? [{ tip: { key, mark: tipFor(key) } }] : [])];
+      // A step says what it is in a tip, while a story plays too.
+      return [...light(keyed.get(key)), ...(tipped.has(key) ? [{ tip: { key, mark: tipFor(key) } }] : [])];
     },
     restyle(now) {
       const off = new Set(dimmed(now));
