@@ -70,7 +70,6 @@ export async function setIslands(l: Archipelago, actor: Actor, on: boolean) {
     if (rows.length) throw new Error('The island rules are set on a new workspace, before anything is put on it: this one already has items.');
   }
   await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [ISLANDS, JSON.stringify(on)]);
-  await l.log(l.db, { actor: actorId(actor), action: 'workspace.set', reason: `${ISLANDS} set to ${on}` });
   await l.record('settings', actorId(actor), [['+', 'setting', ISLANDS, on]]);
   l.registry.turnOff(await packsOff(l), on);
   if (on) hostFor(l.registry).stop();

@@ -253,8 +253,8 @@ test('a held change that asks only for what is already so leaves the queue as su
   assert.deepEqual(await pending(), [both, more, other], 'the answer already given is gone; what asks for more, or for something else, stays');
   const [gone] = await l.proposals({ status: 'superseded' });
   assert.deepEqual([gone.id, gone.note, gone.decided_by], [answer, `Already so since ${(settled as { changeset: string }).changeset}`, 'agent:pelago']);
-  const said = (await l.events({ limit: 20 })).find((e: any) => e.action === 'proposal.supersede') as any;
-  assert.deepEqual([said.detail.proposal, said.detail.by], [answer, (settled as { changeset: string }).changeset], 'and the log says what overtook it');
+  const { rows: said } = await l.db.query<{ rule: { outcome: string; proposal: string; by: string } }>(`select head->'rule' as rule from log_entry where stream = 'facts' and head->'rule'->>'proposal' = $1 and head->'rule'->>'outcome' = 'superseded'`, [answer]);
+  assert.deepEqual(said.map((s) => s.rule.by), [(settled as { changeset: string }).changeset], 'and the log says what overtook it');
 
   await l.change(human, { reason: 'mine', ops: [{ op: 'update', id: made.u, status: 'done' }] });
   assert.deepEqual(await pending(), [more, other], 'once every part of it is so');

@@ -101,8 +101,6 @@ export async function syncTypes(given: Archipelago): Promise<{ activated: string
       );
     }
     if (dormant.length) await tx.query(`update type_def set state = 'dormant', changed = now() where id = any($1::text[])`, [dormant]);
-    if (dormant.length || activated.length || Object.keys(changed).length)
-      await l.log(tx, { actor: 'system', action: 'types.sync', reason: 'The packs loaded differ from the types the workspace kept.', detail: { dormant, activated, changed } });
   });
   const stamp: Moves = (await l.setting<Moves>(MOVES)) ?? { done: [] };
   const was = JSON.stringify(stamp);

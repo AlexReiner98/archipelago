@@ -1,12 +1,17 @@
 // The activity log as it is read: newest first, each event with the title and type of what it is about, filtered by
 // when, by whom, about what and from where. What a change set did is read from the log (docs/log.md, section 7): one
 // event for each item or link it touched, its action and its before-values found by the history index, its title as
-// it was then. What is not a fact (a session's heartbeat, a pack turned on, a proposal decided) is still an event row
-// until its own stream holds it. Both are numbered from one sequence, so a cursor (`after`, `before`) runs over both.
+// it was then. What is not a fact (a push heard, a pack turned on, a setting changed) is an entry of log_op, read by
+// src/activity.ts. Both are numbered from one sequence, so a cursor (`after`, `before`) runs over both.
 
 import type { Q } from './db.ts';
 import { isLink, MOVED } from './replay.ts';
 import { openSaid } from './seal.ts';
+import { doneEvents } from './activity.ts';
+import { FACT_ACTIONS } from './activity-steps.ts';
+
+export { lastSeq, notImported } from './activity.ts';
+export { FACT_ACTIONS } from './activity-steps.ts';
 
 export type EventQuery = {
   since?: string; before?: number; after?: number; target?: string; actor?: string; origin?: string; action?: string; limit?: number;
@@ -37,8 +42,6 @@ const HEAD = ['title', 'body', 'status', 'owner', 'visibility', 'confidence'];
 /** What moves with another field, or is not a change anyone made: left out of what changed. */
 const QUIET = ['private_to', 'type', 'source', 'checked'];
 
-/** The actions a change set's events can have. */
-export const FACT_ACTIONS = ['entity.create', 'entity.update', 'entity.archive', 'entity.restore', 'entity.merge', 'relation.link', 'relation.unlink', 'type.define'];
 
 type FactRow = { pos: number; id: string; n: number; op: '+' | '-'; field: string; value: any; seq: number; was: ['+' | '-', unknown] | null };
 type Group = { seq: number; pos: number; id: string };
@@ -213,70 +216,10 @@ export async function factEvents(db: Q, input: EventQuery, limit: number): Promi
   return rows.filter((r) => (!r.target_id || known.has(r.target_id)) && (!toOf(r) || known.has(toOf(r)!))).map((r) => ({ ...r, ...session(r), target_title: r.target_id ? known.get(r.target_id)!.title : null, target_type: r.target_id ? known.get(r.target_id)!.type : null }));
 }
 
-/** True of an event that was written here, false of one that arrived in a merged backup: those are history, not news. */
-export const notImported = (ev: string) =>
-  `not exists (select 1 from event imp where imp.action = 'workspace.import' and ${ev}.seq between (imp.detail->>'first_seq')::bigint and (imp.detail->>'last_seq')::bigint) -- index event_imports
-`;
-
-/** Events that are not facts, from the event table, under the same filters. */
-async function rowEvents(db: Q, input: EventQuery, limit: number): Promise<LoggedEvent[]> {
-  const where: string[] = [];
-  const params: unknown[] = [];
-  const add = (sql: string, value: unknown) => where.push(sql.replace('?', `$${params.push(value)}`));
-  if (input.since) add(`ev.ts >= ?::timestamptz`, input.since);
-  if (input.before) add(`ev.seq < ?`, input.before);
-  if (input.after !== undefined) add(`ev.seq > ?`, input.after);
-  if (input.target) add(`ev.target_id = ?`, input.target);
-  if (input.actor) add(`ev.actor = ?`, input.actor);
-  if (input.origin) add(`ev.origin = ?`, input.origin);
-  if (input.action) add(`ev.action = ?`, input.action);
-  if (input.actorLike) add(`ev.actor like ?`, input.actorLike);
-  if (input.news) where.push(notImported('ev'));
-  const { rows } = await db.query<LoggedEvent>(
-    `select ev.seq::int8 as seq, ev.ts, ev.origin, ev.actor, ev.action, ev.target_id, e.title as target_title, e.type as target_type, ev.changeset, ev.reason, ev.detail
-     from event ev left join entity e on e.id = ev.target_id
-     ${where.length ? 'where ' + where.join(' and ') : ''} order by ev.seq ${input.oldest ? 'asc' : 'desc'} limit $${params.push(limit)}`,
-    params,
-  );
-  return rows.map((r) => ({ ...r, seq: Number(r.seq) }));
-}
-
-/** The activity log: what change sets did and the events that are not facts, in one order. */
+/** The activity log: what change sets did and what was done outside them (src/activity.ts), in one order. */
 export async function readEvents(db: Q, input: EventQuery): Promise<LoggedEvent[]> {
   const limit = Math.min(input.limit ?? 50, READ_MOST);
-  const [facts, rows] = await Promise.all([factEvents(db, input, limit), rowEvents(db, input, limit)]);
+  const [facts, rows] = await Promise.all([factEvents(db, input, limit), doneEvents(db, input, limit)]);
   const order = input.oldest ? 1 : -1;
   return [...facts, ...rows].sort((a, b) => order * (a.seq - b.seq)).slice(0, limit);
 }
-
-/** The newest number either kind of event has: a cursor's start. */
-export async function lastSeq(db: Q): Promise<number> {
-  const { rows } = await db.query<{ seq: string }>(`select greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact)) as seq -- index log_fact_seq`);
-  return Number(rows[0].seq);
-}
-
-/**
- * Step 19. Each fact numbered from the event table's sequence, so the activity log is in one order across both;
- * found by that number, by what a link starts from and what an item was merged into, and its entries by their time. The number is not hashed: it is
- * where the row sits in this database, not part of what was said.
- */
-export const ACTIVITY = `
-alter table log_fact add column if not exists seq bigint default nextval('event_seq_seq');
-create index if not exists log_fact_seq on log_fact(seq);
-create index if not exists log_fact_link_from on log_fact((value->>1)) where field = 'link';
-create index if not exists log_fact_merged_into on log_fact(value) where field = 'merged_into';
-create index if not exists log_entry_at on log_entry(at);
-`;
-
-/**
- * Step 27. The activity from before the log began, gone: what change sets did is read from the log, and the event
- * rows a map wrote of them before it had one were history of a legacy state that no read needs (the owner, 29 Oct
- * 2026, question e_cgctyctz). They were two thirds of each backup. Only rows numbered before the log's first fact go;
- * a merged backup's change sets, brought in since as events, stay.
- */
-export const PRE_LOG_ACTIVITY = `
-delete from event ev
- where ev.action in (${FACT_ACTIONS.map((a) => `'${a}'`).join(', ')})
-   and ev.seq < (select coalesce(min(f.seq), 0) from log_fact f) -- index log_fact_seq
-;
-`;

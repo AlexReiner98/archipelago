@@ -300,7 +300,7 @@ rules that govern them, as text to start a session with.
   reporting raises one, saying what it still holds.
 - **Automations:** a trigger and an action, stored as an item.
   - Triggers: `every` N minutes, `daily` at a local time, or an `event` in the
-    activity log (`proposal.create`, or a prefix such as `resource.*`).
+    activity log (`entity.create`, `repo.push`, or a prefix such as `resource.*`).
   - Actions: `notify`, call `check_connections` or `import_audit`, or `launch`
     a headless session on a task.
   - An automation an agent proposes does nothing until you approve it. Every

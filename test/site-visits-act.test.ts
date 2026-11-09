@@ -2,6 +2,7 @@
 // the visits stream, and nothing else; the read is logged on the site's map.
 
 import assert from 'node:assert/strict';
+import { doneEvents } from '../src/activity.ts';
 import { test } from 'node:test';
 import { runAct } from '../src/server-acts.ts';
 import type { ServerPackFile } from '../src/server-packs.ts';
@@ -34,7 +35,7 @@ test('a pack that declares site.visits reads a site’s counts after a position;
     assert.deepEqual((await act({ site: 'visits.example', after: next.pos })).counts, []);
 
     const { pelago } = await workspaces.get('default');
-    const { rows } = await pelago.db.query<{ actor: string; detail: { rows: number } }>(`select actor, detail from event where action = 'server.site.visits' order by seq desc limit 1`);
+    const rows = (await doneEvents(pelago.db, { action: 'server.site.visits' }, 1)) as unknown as { actor: string; detail: { rows: number } }[];
     assert.equal(rows[0].actor, 'pack:reader');
     assert.equal(rows[0].detail.rows, 0);
   } finally {

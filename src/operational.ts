@@ -7,9 +7,10 @@
  * The map itself: items, links and the log. Written only in src/pelago.ts. log_entry and log_fact are the log the
  * owner decided is the source of truth (docs/log.md), appended to and never changed; entity and relation are its
  * projections, written from its facts by src/replay.ts in the append's transaction (and, until the operational
- * streams hold them, by the operational writes). event holds only what is not a fact: what a change set did is read
- * from the log. log_op holds the compacted streams (src/streams.ts): what is below appended there at once, sealed by
- * day in the fact stream and kept by the retention rules of the packs.
+ * streams hold them, by the operational writes). log_op holds the compacted streams (src/streams.ts): what is below
+ * appended there at once, sealed by day in the fact stream and kept by the retention rules of the packs; what was done
+ * that is neither a fact nor state is its activity stream (src/activity.ts). event is written no more: its rows were
+ * carried into that stream, and it stays, read only to carry them, while the app before still reads it.
  */
 export const MAP_TABLES = ['entity', 'relation', 'event', 'log_entry', 'log_fact', 'log_op'];
 

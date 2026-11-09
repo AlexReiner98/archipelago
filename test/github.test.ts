@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHmac, createVerify, generateKeyPairSync } from 'node:crypto';
+import { doneEvents } from '../src/activity.ts';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
@@ -257,7 +258,7 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   assert.deepEqual([checks[0].method, checks[0].url, checks[0].body.name, checks[0].body.head_sha, checks[0].body.conclusion], ['POST', '/repos/Acme/Tools/check-runs', 'Every commit accounted for', 'a'.repeat(40), 'failure']);
   // Asked again each minute, it stays as it is, and asking writes nothing to the workspace's log.
   const recheck = () => serverPacksOf(workspaces).call('github_app', 'schedule', 'recheck', {});
-  const logged = async () => (await db.query<{ n: number }>(`select count(*)::int as n from event where action = 'server.workspace.deliver'`)).rows[0].n;
+  const logged = async () => (await doneEvents(db, { action: 'server.workspace.deliver' }, 500)).length;
   const was = await logged();
   assert.deepEqual(await recheck(), { asked: 1, green: [] });
   assert.equal(await logged(), was);

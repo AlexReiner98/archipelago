@@ -71,8 +71,6 @@ test('a pack removed under live items leaves them dormant: editable by a person,
   const again = await syncTypes(back);
   assert.ok(again.activated.includes('program'));
   assert.equal(back.registry.type('program')!.dormant, undefined);
-  const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from event where action = 'types.sync'`);
-  assert.equal(rows[0].n, 2);
 });
 
 test('a type a pack took over takes its items with it, once, when no pack defines the old one', async () => {
@@ -97,8 +95,9 @@ test('a type a pack took over takes its items with it, once, when no pack define
   const host = (await now.entity(made.created.host))!;
   assert.deepEqual([host.type, host.status, host.props.amount], ['cost', 'paying', 25]);
   assert.equal((await now.entity(made.created.gone))!.status, 'ended');
-  const { rows } = await db.query<{ detail: { from: string; to: string; items: string[] } }>(`select detail from event where action = 'type.moved'`);
-  assert.deepEqual([rows.length, rows[0].detail.from, rows[0].detail.to, rows[0].detail.items.length], [1, 'money.cost', 'cost', 2]);
+  // The move is one system change set on the log, asserting the new type on each item.
+  const { rows } = await db.query<{ n: number }>(`select (select count(*)::int from log_fact f where f.stream = 'facts' and f.pos = e.pos and f.at = e.at and f.field = 'type') as n from log_entry e where e.stream = 'facts' and e.head->>'action' = 'type.moved'`);
+  assert.deepEqual(rows.map((r) => r.n), [2]);
   const costs = (await callTool(now, human, 'view', { name: 'costs', params: { days: 30 } })) as { recurring: { items: { title: string }[] } };
   assert.deepEqual(costs.recurring.items.map((i) => i.title), ['Hosting'], 'the costs view reads them where they are now');
   assert.deepEqual((await syncTypes(now)).moved, {}, 'once moved, nothing moves again');

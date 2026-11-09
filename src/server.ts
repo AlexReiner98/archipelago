@@ -373,7 +373,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
             if (admin) await admitMember(ws.pelago, admin, true);
             const owner = await ownerToken(ws, 'owner');
             if (!from) return send(res, 200, { result: owner });
-            const { rows } = await ws.pelago.db.query<{ entities: number; events: number }>(`select (select count(*)::int from entity) as entities, (select count(*)::int from event) as events`);
+            const { rows } = await ws.pelago.db.query<{ entities: number; events: number }>(`select (select count(*)::int from entity) as entities, (select count(*)::int from log_op where stream = 'activity') as events`);
             return send(res, 200, { result: { ...owner, restored: { from: from.workspace, taken: from.taken, ...rows[0] } } });
           } catch (err) {
             return send(res, 400, { error: (err as Error).message });

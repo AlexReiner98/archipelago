@@ -69,7 +69,7 @@ test('automations fire on a schedule and on events, are logged, and cannot trigg
   const made = await make(l, [
     { op: 'create', ref: 'hourly', type: 'automation', title: 'Check connections', status: 'enabled', props: { trigger: 'every', every_minutes: 60, action: 'tool', tool: 'check_connections' } },
     { op: 'create', ref: 'morning', type: 'automation', title: 'Morning nudge', status: 'enabled', props: { trigger: 'daily', at: '09:00', action: 'notify', message: 'Review the map' } },
-    { op: 'create', ref: 'review', type: 'automation', title: 'New proposal', status: 'enabled', props: { trigger: 'event', on_action: 'proposal.create', action: 'notify', message: 'Proposal from {actor}: {reason}', level: 'warning' } },
+    { op: 'create', ref: 'review', type: 'automation', title: 'New bug', status: 'enabled', props: { trigger: 'event', on_action: 'entity.create', action: 'notify', message: 'Made by {actor}: {reason}', level: 'warning' } },
     { op: 'create', ref: 'any', type: 'automation', title: 'Everything', status: 'paused', props: { trigger: 'event', on_action: 'entity.*', action: 'notify' } },
   ]);
   // Nor where agents' other changes are applied as made: an automation acts later with a human's authority, so
@@ -90,10 +90,10 @@ test('automations fire on a schedule and on events, are logged, and cannot trigg
   assert.deepEqual(await fired(at(9, 30)), [], 'daily fires once a day');
   assert.deepEqual(await fired(new Date(2026, 9, 8, 9, 0)), [made.hourly, made.morning].sort());
 
-  await l.change(agent, { reason: 'Found a bug', ops: [{ op: 'create', type: 'bug', title: 'Crash' }] });
+  await l.change(human, { reason: 'Found a bug', ops: [{ op: 'create', type: 'bug', title: 'Crash' }] });
   assert.deepEqual(await fired(new Date(2026, 9, 8, 9, 5)), [made.review]);
   const unread = (await VIEWS.notifications.run(l, {})) as any[];
-  assert.ok(unread.some((n) => n.title === 'Proposal from agent:test: Found a bug' && n.level === 'warning'));
+  assert.ok(unread.some((n) => n.title === 'Made by human:test: Found a bug' && n.level === 'warning'));
 
   // Unpause the catch-all: the notifications automations create must not set it off.
   await make(l, [{ op: 'update', id: made.any, status: 'enabled' }]);
