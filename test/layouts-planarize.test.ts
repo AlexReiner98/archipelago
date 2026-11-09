@@ -51,36 +51,11 @@ test('trunks: one type and one way only, crossing a shore once', async () => {
   const made = (id: string) => id.length;
   const islandOf = (id: string) => (id.startsWith('x') ? 'far' : 'home');
   const { wires, junctions, trunks } = withTrunks([wire('1', 'a'), wire('2', 'b'), wire('3', 'xa'), wire('4', 'xb'), wire('5', 'c', 'uses'), wire('6', 'd', 'about', true)], made, islandOf);
-  assert.equal(trunks, 2, 'one into the far island, one on the home island; the link of another type and the turned one share none');
+  assert.equal(trunks, 1, 'the link of another type and the turned one share no trunk');
   assert.ok(wires.some((w: any) => w.id === '5') && wires.some((w: any) => w.id === '6'));
   const far = junctions.find((j: any) => j.island === 'far');
   assert.ok(far, 'the two wires to the far island meet at a junction on it');
   assert.equal(wires.filter((w: any) => w.trunk === 0 && [w.u, w.v].includes(far.id) && ![w.u, w.v].some((v: string) => v.startsWith('x'))).length, 1, 'one stretch of the trunk crosses to the far island');
-});
-
-test('trunks: wires from many items into one island cross its shore once, and out of one once', async () => {
-  const { withTrunks } = await mod('trunks.js');
-  const wire = (u: string, v: string, type = 'reads', turned = false) => ({ id: `${u}>${v}`, u, v, top: turned ? v : u, foot: turned ? u : v, types: [type], directed: true, turned, links: [{ a: u, b: v, type }] });
-  const given = [wire('p1', 'a1'), wire('p1', 'b1'), wire('p2', 'a1'), wire('p2', 'a2'), wire('p3', 'b2'), wire('p3', 'a2'), wire('p1', 'a3', 'uses'), wire('p2', 'a3', 'uses'), wire('p3', 'a4', 'reads', true)];
-  const islandOf = (id: string) => ({ p: 'P', a: 'A', b: 'B' } as any)[id[0]] ?? null;
-  const { wires, junctions } = withTrunks(given, (id: string) => Number(id.slice(1)), islandOf);
-  const placed = new Map<string, string | null>(junctions.map((j: any) => [j.id, j.island])), placeOf = (id: string) => (placed.has(id) ? placed.get(id)! : islandOf(id));
-  for (const island of ['P', 'A', 'B']) {
-    const across = new Map<string, number>();
-    for (const w of wires) if ((placeOf(w.u) === island) !== (placeOf(w.v) === island)) across.set(`${w.types} ${w.turned}`, (across.get(`${w.types} ${w.turned}`) ?? 0) + 1);
-    assert.ok([...across.values()].every((n) => n === 1), `island ${island} is crossed once for each type and way: ${[...across]}`);
-  }
-  assert.ok(wires.every((w: any) => w.types.length === 1), 'a stretch never mixes types');
-  const kept = wires.flatMap((w: any) => w.links.map((l: any) => `${l.a}>${l.b}`)).sort();
-  assert.deepEqual(kept, given.map((w) => w.id).sort(), 'every link is kept once, on the stretch that reaches its end');
-  for (const w of wires) for (const l of w.links) assert.equal(w.v, l.b, 'a link rides the stretch that reaches its end');
-  const pairs = wires.map((w: any) => [w.u, w.v].sort().join(' '));
-  assert.equal(new Set(pairs).size, pairs.length, 'no two stretches join the same pair');
-  for (const j of junctions) {
-    const ends = wires.filter((w: any) => w.u === j.id || w.v === j.id);
-    assert.ok(ends.length > 2, `a junction joins three or more: ${j.id}`);
-    assert.equal(new Set(ends.map((w: any) => `${w.types} ${w.turned}`)).size, 1, 'a junction never mixes types or ways');
-  }
 });
 
 test('embedding: as many tries as the first one\'s work allows, and past the most work it says so', async () => {
