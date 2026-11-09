@@ -951,5 +951,10 @@ on your own laptop.
 npm test            # the fast set: all but the slow files test/sets.ts names
 npm run test:full   # every file, as CI runs them (CI is the gate: not needed before a push)
 npm run test:changed  # what this branch's changes can reach
+npm test -- test/a.test.ts  # just those files: what to run while working
 npm run typecheck
 ```
+
+One run uses the machine at a time: a second, from any worktree, waits for it
+(`test/lock.ts`). A run of a set skips the files that passed on the same code
+before (`test/passes.ts`); `--no-cache` runs them all.
