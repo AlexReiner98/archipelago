@@ -10,7 +10,7 @@ test('a session keeps its branch, and taking a task tells it how a commit closes
   const l = await fresh();
   const made = await laneSetup(l);
   const started = await sessionStart(l, agent, { task: made.offline, branch: 'claude/tests', session_id: 'b1' });
-  assert.match(started.commit!, new RegExp(`end its message with the line "Closes: ${made.offline}"`));
+  assert.match(started.commit!, new RegExp(`a commit item with its full sha, linked settles to ${made.offline}`));
   const branchOf = async () => (await l.entity(started.run))!.props.branch;
   assert.equal(await branchOf(), 'claude/tests');
 
@@ -23,12 +23,12 @@ test('a session keeps its branch, and taking a task tells it how a commit closes
   assert.equal(await count(), events, 'the same branch again is a heartbeat');
 
   // A task picked up later is answered the same way, and a session with no task is told nothing of it.
-  assert.match((await sessionUpdate(l, agent, { run: started.run, task: made.gated })).commit!, new RegExp(`Closes: ${made.gated}`));
+  assert.match((await sessionUpdate(l, agent, { run: started.run, task: made.gated })).commit!, new RegExp(`linked settles to ${made.gated}`));
   assert.equal((await sessionStart(l, agent, { title: 'Looking around' })).commit, undefined);
 
   // A brief for a launched session says it too.
   const brief = (await callTool(l, agent, 'view', { name: 'brief', params: { task: made.offline } })) as { text: string };
-  assert.match(brief.text, new RegExp(`with your git branch[\\s\\S]*Closes: ${made.offline}`));
+  assert.match(brief.text, new RegExp(`with your git branch[\\s\\S]*linked settles to ${made.offline}`));
 });
 
 test('a pack finds the sessions on a branch and what they work on, through its reads', async () => {

@@ -97,9 +97,9 @@ prevented it cheaply, it counts.
 
 ## When one is fixed
 
-When a change removes a bump, resolve its issue in the same breath, with the
-commit. A last line `Closes: e_...` in the commit message closes it when the
-push that carries the commit reaches the map, on any branch.
+When a change removes a bump, resolve its issue in the same breath, in the
+change that records the commit (a commit item with its sha, linked settles to
+the issue).
 
 ## Keeping this smooth
 

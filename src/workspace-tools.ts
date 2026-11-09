@@ -6,7 +6,7 @@ import { endedOf } from './ended.ts';
 import { limitOf, renameWorkspace } from './members.ts';
 import { looksThisHour } from './looks.ts';
 import { sessionsAwake } from './sessions.ts';
-import { daysLeft, requestsThisMinute, storageOf, useOf, type Limits } from './plan.ts';
+import { requestsThisMinute, storageOf, useOf, type Limits } from './plan.ts';
 import { acceptedSenders, wholeMap } from './outbox.ts';
 import { actorId, type Archipelago } from './pelago.ts';
 import { askedLately } from './replies.ts';
@@ -49,7 +49,7 @@ async function replyRules(l: Archipelago, lifted: Record<string, boolean>, set: 
   });
 }
 
-/** How much of what its plan limits the workspace uses now (src/plan.ts), each said as the Plan card shows it. */
+/** How much of what its limits cap the workspace uses now (src/plan.ts), each said as the Limits card shows it. */
 async function planUse(l: Archipelago, limits: Limits) {
   const { db } = await wholeMap(l);
   const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from member where removed_at is null`);
@@ -58,7 +58,7 @@ async function planUse(l: Archipelago, limits: Limits) {
 
 export const WORKSPACE_TOOLS: Record<string, Tool> = {
   workspace_info: {
-    description: 'This workspace’s settings: its id, its owner (null until one is set with init), the default visibility of new things, whether agents’ changes are applied as they are made or held for a human, whether agents may download backups or publish documents, whether a layout’s code runs without the sandbox (drawings_open), whether holds are off (holds_off), whether its packs are held to the island rules (islands), which workspaces it accepts notifications from, and on a workspace sold on a plan, its limits (member_limit) and how much of each it uses (use).',
+    description: 'This workspace’s settings: its id, its owner (null until one is set with init), the default visibility of new things, whether agents’ changes are applied as they are made or held for a human, whether agents may download backups or publish documents, whether a layout’s code runs without the sandbox (drawings_open), whether holds are off (holds_off), whether its packs are held to the island rules (islands), which workspaces it accepts notifications from, and on a workspace the server caps, its limits (member_limit) and how much of each it uses (use).',
     humanOnly: true,
     input: {},
     run: async (l) => {
@@ -66,7 +66,7 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       const limits = await limitOf(l.workspace);
       // Whether anything has been put here yet beyond who is in it and how the app is set up.
       const started = (await l.db.query(`select 1 from entity where type <> all($1::text[]) and ${notKernel(l.registry)} and archived_at is null limit 1`, [l.registry.family('actor')])).rows.length > 0;
-      return { ...(await settings(l)), started, owner: rows[0] ?? null, member_limit: limits ? { ...limits, ...(limits.until && { days_left: daysLeft(limits.until) }) } : null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
+      return { ...(await settings(l)), started, owner: rows[0] ?? null, member_limit: limits ?? null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
     },
   },
   workspace_set: {

@@ -37,10 +37,10 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
   // The marks of a session's state, the colours the work and software packs add to every page's, worked out from the house style's, and the plan pack's lengths.
   const added = [
     { id: 'core.sessions_look', title: "A session's state", preset: 'core.sessions_look' },
-    { id: 'work.reader_colours', title: "A document's colours", preset: 'work.reader_colours' },
-    { id: 'software.public_colours', title: "A product's public page colours", preset: 'software.public_colours' },
     { id: 'plan.meters_look', title: "The usage meters' lengths", preset: 'plan.meters_look' },
+    { id: 'work.reader_colours', title: "A document's colours", preset: 'work.reader_colours' },
     { id: 'social.table_look', title: "The channels table's lengths", preset: 'social.table_look' },
+    { id: 'software.public_colours', title: "A product's public page colours", preset: 'software.public_colours' },
   ];
   const whole = await run();
   assert.deepEqual([whole.style.shape, whole.style.lit, whole.style.open, whole.used], ['flow', 'all', 1, [house, ...added, canvas]]);

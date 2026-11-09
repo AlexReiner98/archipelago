@@ -6,7 +6,6 @@
 
 import { AUTOMATION_TOOLS, checkAutomation, weekdays } from './automation-rules.ts';
 import { lastSeq, readEvents } from './eventlog.ts';
-import { checkCloud, cloudOn } from './cloud-launch.ts';
 import { launch } from './launcher.ts';
 import type { Entity, Archipelago } from './pelago.ts';
 import { notify } from './notify.ts';
@@ -68,8 +67,6 @@ export class Automations {
     this.busy = true;
     try {
       await this.flagStaleSessions();
-      // Runs launched in the cloud are ended here when their sessions stop: nothing on this server waits on them.
-      if (cloudOn()) await checkCloud(this.l);
       const { rows: autos } = await this.l.db.query<Entity>(
         `select * from entity where type = any($1::text[]) and status = 'enabled' and archived_at is null order by created_at`,
         [this.l.registry.family('automation')],
@@ -149,7 +146,7 @@ export class Automations {
       } else {
         // A human approved this automation, launch settings included, so it may launch.
         // The session it starts only proposes, and its run names the automation.
-        const started = await launch(this.l, { kind: 'human', name }, { task: input.task as string, mode: input.mode as 'plan', instructions: input.instructions as string | undefined, budget_usd: input.budget_usd as number | undefined }, { kind: 'automation', id: auto.id, name: auto.title });
+        const started = await launch(this.l, { kind: 'human', name }, { task: input.task as string, mode: input.mode as 'plan', instructions: input.instructions as string | undefined }, { kind: 'automation', id: auto.id, name: auto.title });
         await this.l.operational(auto.id, { props: { last_run: started.run } });
         result = `launched run ${started.run} (${started.mode})`;
       }

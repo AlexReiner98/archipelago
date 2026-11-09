@@ -43,7 +43,7 @@ async function mapOf(dir: string) {
 }
 
 test('a manifest has its own keys and nothing else; the old keys are read for one release, then refused', () => {
-  const now = readManifest(JSON.stringify({ id: 'x', version: '1', title: 'X', links: [], handlers: [{ event: 'repo.push' }], reach: { runs: ['get'] } }), 'x');
+  const now = readManifest(JSON.stringify({ id: 'x', version: '1', title: 'X', links: [], handlers: [{ event: 'repo.push' }], reach: { via: [{ pack: 'p', host: 'api' }] } }), 'x');
   assert.deepEqual(now.warnings, []);
   assert.throws(() => readManifest(JSON.stringify({ id: 'x', version: '1', title: 'X', colour: 'red' }), 'x'), /"colour" is not a key of a manifest/);
   assert.throws(() => readManifest(JSON.stringify({ id: 'x', version: '1', title: 'X', reach: { disk: true } }), 'x'), /"reach.disk" is not a key/);
@@ -53,7 +53,7 @@ test('a manifest has its own keys and nothing else; the old keys are read for on
     id: 'x', version: '1', title: 'X', contract: 1, tier: 'server',
     relations: [{ id: 'x.r' }], extend: { person: { fields: { rate: { type: 'number' } } } }, trees: [{ id: 'x.t' }], screens: [{ id: 'x.s' }], verbs: [{ id: 'capture' }],
     schedules: [{ id: 'tick', every_minutes: 5 }], hears: [{ event: 'repo.push' }], webhooks: [{ id: 'x.hook', secret: 's' }], events: ['x.heard'],
-    hosts: [{ id: 'api', base: 'https://a.test' }], secrets: [{ name: 's' }], via: [{ pack: 'p', host: 'api' }], runs: ['get'],
+    hosts: [{ id: 'api', base: 'https://a.test' }], secrets: [{ name: 's' }], via: [{ pack: 'p', host: 'api' }],
     acts: ['mail.send'], entries: [{ id: 'e' }], pages: [{ id: 'p', file: 'p.html' }], connect: { status: 's', start: 't' }, aliases: { '/a': 'e' }, agreements: 'e',
   };
   assert.deepEqual(Object.keys(old).filter((k) => !['id', 'version', 'title'].includes(k)).sort(), Object.keys(LEGACY).sort(), 'every old key is tried here');
@@ -62,7 +62,7 @@ test('a manifest has its own keys and nothing else; the old keys are read for on
   const p = parts(manifest);
   assert.deepEqual([p.relations.map((r) => r.id), Object.keys(p.adds), p.trees.map((t) => t.id), p.screens.map((s) => s.id), p.verbs.map((v) => v.id)], [['x.r'], ['person'], ['x.t'], ['x.s'], ['capture']]);
   assert.deepEqual([p.schedules, p.hears.map((h) => h.event), p.events], [[{ id: 'tick', every_minutes: 5, at_start: undefined, limit_ms: undefined }], ['repo.push'], ['x.heard']]);
-  assert.deepEqual([p.hosts.length, p.secrets.length, p.webhooks.length, p.via.length, p.runs], [1, 1, 1, 1, ['get']]);
+  assert.deepEqual([p.hosts.length, p.secrets.length, p.webhooks.length, p.via.length], [1, 1, 1, 1]);
   assert.deepEqual(Object.keys(p.server!).sort(), ['acts', 'agreements', 'aliases', 'connect', 'entries', 'pages']);
   assert.ok(!('contract' in manifest), 'contract goes: nothing read it');
   assert.throws(() => readManifest(JSON.stringify(old), 'x', '0.2.0'), /keys of the shape before the manifest, refused since 0\.1\.0/);
@@ -80,12 +80,12 @@ test('every pack here is in the manifest shape, and reads as it did', () => {
 });
 
 test('a server pack is a pack that asks for server reach: never a workspace pack, and read as the server’s', () => {
-  const reg = new Registry(join(ROOT, 'packs'));
+  const dir = packsWith({ id: 'hub', version: '1', title: 'Hub', reach: { server: {} } } as unknown as PackFile);
+  const reg = new Registry(dir);
   registries.push(reg);
-  assert.ok(!reg.found.some((p) => p.id === 'github_app'), "a workspace's registry leaves it out");
-  const { packs } = loadServerPacks([OWN_PACKS]);
-  assert.deepEqual(packs.map((p) => [p.file.id, Boolean(p.file.reach.server)]), [['github_app', true]]);
-  assert.deepEqual(parts(packs[0].file).schedules.map((s) => s.id), ['refresh', 'recheck'], 'its schedules are handlers like any pack’s');
+  assert.ok(!reg.found.some((p) => p.id === 'hub'), "a workspace's registry leaves it out");
+  assert.deepEqual(loadServerPacks([dir]).packs.map((p) => [p.file.id, Boolean(p.file.reach.server)]), [['hub', true]]);
+  assert.deepEqual(loadServerPacks([OWN_PACKS]).packs, [], 'the kernel ships none of its own');
 });
 
 test('a pack waits while what it requires is missing, and what names a pack it uses registers only while that one is active', async () => {
@@ -187,7 +187,6 @@ test('a pack that took over words a pack the owner added held is added with them
   for (const id of ['code', 'proof']) rmSync(join(before, id), { recursive: true });
   const kept = (pack: { types: { id: string }[] }, id: string) => ({ ...pack.types.find((t) => t.id === id)!, moved_from: undefined, moved_statuses: undefined, belongs_with: undefined });
   writeFileSync(join(before, 'software', 'pack.json'), JSON.stringify({ id: 'software', version: '0.0.1', title: software.title, description: software.description, requires: ['core', 'work'], types: [kept(code, 'feature'), kept(proof, 'test')] }));
-  for (const id of ['github', 'reader']) rmSync(join(before, id), { recursive: true });
   const old = await mapOf(before);
   await syncPacks(old);
   await syncTypes(old);

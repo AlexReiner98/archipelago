@@ -8,7 +8,6 @@ import { SignInNeeded, h, hooks, join, main, part, showIdentity, signIn, state, 
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { mayLeave, newItem, unsaved } from './draft.js';
 import { drawFind } from './find.js';
-import { signupPage, welcome } from './signup.js';
 import { home } from './home.js';
 import { entity } from './item.js';
 import { heldPage } from './item-held.js';
@@ -43,8 +42,6 @@ async function route(pulse = false) {
   if (name === 'join' && arg) return join(arg);
   // A client asking to connect: before anything is read of a map, as whoever may not be signed in yet.
   if (name === 'authorize') return void authorizePage(query);
-  // Buying a workspace, and the page a buyer comes back to: a page of their own, before anything is read of a map.
-  if (name === 'signup' || name === 'welcome') return void (name === 'signup' ? signupPage() : welcome());
   if (['home', 'activity', 'review', 'projects', 'today', 'map', 'automations'].includes(name)) return void (location.hash = '#/');
   if (name === 'graph') return void (location.hash = arg ? `#/v?from=${arg}` : `#/v?${query}`);
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/');

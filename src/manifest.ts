@@ -1,7 +1,7 @@
 // The pack manifest (Rule 8 of the target model): what a pack declares, in one small shape. A pack declares its
 // types, links, rules, views, actions, handlers (code run on an event, a schedule or a webhook), drawings and styles,
-// the reach it asks for (hosts, secrets, webhooks, what it reads through, the map's tools its model runs may offer,
-// and server reach), and what it requires and what it uses if present. A server pack is a pack that asks for server
+// the reach it asks for (hosts, secrets, webhooks, what it reads through and server
+// reach), and what it requires and what it uses if present. A server pack is a pack that asks for server
 // reach: no other kind of pack.
 //
 // The keys pack files used before this shape are read for one release with a warning, each as LEGACY says, then
@@ -40,8 +40,6 @@ export interface ReachDef {
   webhooks?: (WebhookDef & { format?: 'prefixed' | 'hex'; limit_ms?: number })[];
   /** Server packs' hosts it reads through, as its workspace's connection to that pack. */
   via?: ViaDef[];
-  /** The map's tools a model run it asks for may offer the model. */
-  runs?: string[];
   /** Server reach: a pack that asks for it is the server's, never a workspace's. */
   server?: ServerReach;
 }
@@ -70,7 +68,7 @@ export interface Manifest {
 
 /** The keys of a manifest, and of its reach. */
 export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'styles', 'reach', 'shared'] as const;
-export const REACH_KEYS = ['hosts', 'secrets', 'webhooks', 'via', 'runs', 'server'] as const;
+export const REACH_KEYS = ['hosts', 'secrets', 'webhooks', 'via', 'server'] as const;
 export const SERVER_KEYS = ['acts', 'entries', 'pages', 'connect', 'aliases', 'agreements'] as const;
 
 /** Every key pack files used before the manifest, and where it went (docs/packs.md has the table). */
@@ -87,7 +85,6 @@ export const LEGACY: Record<string, string> = {
   secrets: 'reach.secrets',
   webhooks: 'reach.webhooks',
   via: 'reach.via',
-  runs: 'reach.runs',
   tier: 'reach.server (a server pack is a pack that asks for server reach)',
   acts: 'reach.server.acts',
   entries: 'reach.server.entries',
@@ -128,7 +125,7 @@ function fromLegacy(raw: Raw): Raw {
     const hook = arr<{ id: string }>(raw.webhooks)[0];
     push('handlers', hook ? { webhook: hook.id, records: raw.events } : { webhook: '', records: raw.events });
   }
-  for (const key of ['hosts', 'secrets', 'webhooks', 'via', 'runs']) if (raw[key] !== undefined) reach[key] = raw[key];
+  for (const key of ['hosts', 'secrets', 'webhooks', 'via']) if (raw[key] !== undefined) reach[key] = raw[key];
   for (const key of SERVER_KEYS) if (raw[key] !== undefined) server[key] = raw[key];
   if (raw.tier === 'server' || Object.keys(server).length) reach.server = server;
   if (Object.keys(reach).length) out.reach = reach;
@@ -193,7 +190,6 @@ export interface Parts {
   secrets: { name: string; env?: string }[];
   webhooks: NonNullable<ReachDef['webhooks']>;
   via: ViaDef[];
-  runs: string[] | undefined;
   server: ServerReach | undefined;
 }
 
@@ -227,7 +223,6 @@ export function parts(m: Manifest): Parts {
     secrets: m.reach?.secrets ?? [],
     webhooks: m.reach?.webhooks ?? [],
     via: m.reach?.via ?? [],
-    runs: m.reach?.runs,
     server: m.reach?.server,
   };
   cache.set(m, out);

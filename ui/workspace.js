@@ -9,12 +9,12 @@ import { screenRows } from './nav.js';
 import { themesCard } from './themes-card.js';
 import { packsCard } from './packs.js';
 import { membersCard } from './members-card.js';
-import { planCard } from './plan-card.js';
+import { limitsCard } from './limits-card.js';
 import { connectionsCard } from './connections-card.js';
 import { agentsMayCard, tokenRow, tokensCard } from './agents-card.js';
 import { connectCard, connecting, isConnecting } from './connect-agent.js';
 import { workspacesCard } from './workspaces-card.js';
-import { backupCard, card, githubRow, islandsRow, notificationsRow, ownerRow, serverPacksCard, visibilityRow } from './workspace-cards.js';
+import { backupCard, card, islandsRow, notificationsRow, ownerRow, serverPacksCard, visibilityRow } from './workspace-cards.js';
 
 const SECTIONS = [
   ['people', 'People', 'Who is in this workspace'],
@@ -24,7 +24,7 @@ const SECTIONS = [
   ['connections', 'Connections', 'What is tied to it from outside'],
 ];
 /** The section each card a step of Start here names is in. */
-const CARD_IN = { team: 'people', agent: 'agents', model: 'agents', backup: 'map', connections: 'connections', github: 'connections' };
+const CARD_IN = { team: 'people', agent: 'agents', backup: 'map', connections: 'connections', github: 'connections' };
 /** Sections by the names they had before (27 Oct 2026), for an address kept from then. */
 const WAS = { look: 'map', outside: 'connections' };
 
@@ -85,7 +85,7 @@ export async function workspace() {
       // With sign-in, the owner is whoever the workspace was made for, by their address (marked under Members); with
       // none, the person at this machine says who they are here.
       !tokensOn && card('Owner', null, h('ul', { class: 'rows' }, ownerRow(info.owner, workspace))),
-      tokensOn && me.actor.admin && planCard(info.member_limit, info.use, info.ended),
+      tokensOn && me.actor.admin && limitsCard(info.member_limit, info.use, info.ended),
       // A workspace for one person (its limit is one, and it has no more) has no members to manage.
       tokensOn && me.actor.admin && !(info.member_limit?.members === 1 && members.length <= 1) && at('team', membersCard({ me, owner: info.owner?.id, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow: row, then: workspace, fail, say })),
     ],
@@ -97,7 +97,7 @@ export async function workspace() {
     ],
     map: () => [themesCard(workspace), at('backup', backupCard(workspace, visibilityRow(info, workspace, fail), islandsRow(info, workspace, fail)))],
     packs: () => [packsCard({ info, then: workspace, goTo: go }), own.length > 0 && card('Your screens', 'Screens you made, which no pack offers', h('ul', { class: 'rows' }, screenRows(own, workspace))), me.workspace.id === 'default' && serverPacksCard(), me.workspace.id === 'default' && tokensOn && me.actor.admin && workspacesCard(me.workspace.id)],
-    connections: () => [at('connections', connectionsCard(...githubRow(), notificationsRow(info, workspace, fail)))],
+    connections: () => [at('connections', connectionsCard(notificationsRow(info, workspace, fail)))],
   };
   // What a person who is not an admin may change is only their own agent tokens.
   const shown = SECTIONS.filter(([key]) => admin || (key === 'agents' && tokensOn) || (key === 'people' && !tokensOn && !info.owner));

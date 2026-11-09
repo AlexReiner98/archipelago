@@ -358,7 +358,7 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .page-json { margin: var(--space-3) 0 0; font-size: var(--text-3); white-space: pre-wrap; overflow-wrap: anywhere; }
 #sheet .page-lines .change.line { padding-left: 0; padding-right: 0; }
 
-/* A page for whoever is not in a workspace yet (gate, ui/base.js): sign in, agree, sign up, Allow a client. One column
+/* A page for whoever is not in a workspace yet (gate, ui/base.js): sign in, agree, Allow a client. One column
    in the middle of the page, and nothing of the app behind it: no canvas, bar, tabs, find or close. */
 body[data-gate] #canvas, body[data-gate] #nav, body[data-gate] #query, body[data-gate] #find, body[data-gate] #sheet-close, body[data-gate]::before { display: none; }
 body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; transform: none; visibility: visible; transition: none; }

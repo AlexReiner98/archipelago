@@ -22,7 +22,7 @@ export const ON_THE_MAP: Record<string, string> = {
   session_events: "What a session did, as raw events in one vocabulary (docs/sessions.md): sent by its adapter to /hooks/events, appended at once to the sessions stream as event facts on its run, sealed with the run's key, a resent one dropped (src/session-events.ts); kept two weeks.",
   claims: 'A holds link from holder to resource: made by claim and ended by release, at once, appended to the claims stream.',
   notifications: 'A notification item, made by apply at once and never held; who may read it is set by operational and appended to the notifications stream.',
-  automations: "An automation's last_run, last_fired and last_result, the event cursor and run_once marks: kept at once, appended to the automations stream.",
+  automations: "An automation's last_run, last_fired and last_result, and the event cursor: kept at once, appended to the automations stream.",
   rechecks: "A project's rechecked_at: kept by operational, appended to the automations stream.",
   places: "Retired (the owner, 3 Nov 2026: a view is drawn from its query alone): nothing appends to the places stream now. The name stays so entries and backups from before still read and restore, and core's retention rule places drops what is left a day after it was put.",
   visits: "How many readers opened a public site's pages, per source tag per day: counted in memory and appended to the visits stream each minute as ['+', 'tag:<tag>', day, n], added to the day (src/visits.ts). No address, no browser string, no hash of either; core's retention rule visits keeps every entry.",

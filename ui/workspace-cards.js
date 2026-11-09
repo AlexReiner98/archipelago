@@ -2,7 +2,7 @@
 // and importing, GitHub's webhook, the server's packs and the workspace's own settings. Each setting is one row.
 
 import { api, ask, drawingsChanged, h, state } from './base.js';
-import { hint, link, menu, when } from './words.js';
+import { hint, link, menu } from './words.js';
 import { plate, plates } from './plates.js';
 
 // ---- Workspace -----------------------------------------------------------
@@ -138,51 +138,6 @@ export const card = (title, tip, ...body) => h('section', { class: 'card wide' }
 export const line = (...kids) => h('li', { class: 'one' }, ...kids);
 /** A hidden chooser of a backup file, opened by a menu's entry. */
 export const fileInput = (accept) => h('input', { type: 'file', accept, hidden: true });
-
-// GitHub tells this workspace when a repository is pushed to: through the GitHub App (its row above, on the same
-// card), or a webhook added by hand, whose secret is made here and shown once, with where to put it. One row: whether
-// pushes are read, the repositories and the latest push, each repository's in the tooltip; the webhook in its menu.
-export function githubRow() {
-  const row = line(h('span', { class: 'grow muted small' }, 'GitHub pushes…'));
-  const shown = h('li', { hidden: true });
-  const fail = (err) => row.replaceChildren(h('span', { class: 'grow error', title: err.message }, err.message));
-  const draw = async (made) => {
-    const s = made ?? (await api('github'));
-    // What reads the pushes the GitHub App hands over: an agent on this server, on the workspace's model account.
-    const on = (await api('model_account').catch(() => ({}))).runs_on;
-    const url = location.origin + s.webhook_path;
-    const fresh = async () => {
-      if (s.connected && !(await ask({ title: 'Make a new secret?', message: 'The one GitHub has now stops working until you replace it in each repository’s webhook.', action: 'New secret', danger: true }))) return;
-      draw(await api('github', { new_secret: true })).catch(fail);
-    };
-    const heard = s.repos.filter((r) => r.last_push).sort((a, b) => (a.last_push.at < b.last_push.at ? 1 : -1));
-    const repos = s.repos.map((r) => `${r.title}: ${!r.github ? 'no GitHub address' : r.last_push ? `pushed ${when(r.last_push.at)}` : 'no push heard yet'}`).join('\n');
-    row.replaceChildren(
-      h('span', { class: `pill ${on ? 'ok' : 'warn'}`, title: on ? 'An agent on this server reads each push against the open work' : 'Pushes are recorded, but nothing reads them until a model account is connected, under Agents' }, on ? 'read' : 'not read'),
-      h('span', { class: 'grow', title: repos || 'No repository on the map yet' }, h('strong', {}, 'Pushes'), ' ', h('span', { class: 'muted small' }, `${s.repos.length} repositor${s.repos.length === 1 ? 'y' : 'ies'}`, heard[0] && ` · ${heard[0].title} pushed ${when(heard[0].last_push.at)}`)),
-      menu('⋯', [[s.connected ? 'New webhook secret' : 'Use a webhook', fresh], s.connected && ['Copy the webhook address', () => navigator.clipboard.writeText(url)]]),
-    );
-    shown.hidden = !made?.secret;
-    shown.replaceChildren(
-      made?.secret
-        ? h(
-            'div',
-            {},
-            h(
-              'div',
-              { class: 'secret' },
-              h('div', {}, h('strong', {}, 'Webhook secret')),
-              h('code', {}, made.secret),
-              h('div', { class: 'toolbar' }, h('button', { onclick: (e) => navigator.clipboard.writeText(made.secret).then(() => (e.target.textContent = 'Copied')) }, 'Copy'), h('span', { class: 'muted small' }, 'Shown once. If it is lost, make a new one.')),
-            ),
-            h('div', { class: 'muted small', style: 'margin-top: var(--space-5)' }, 'In each repository on GitHub: Settings, Webhooks, Add webhook. Payload URL: ', h('code', {}, url), '. Content type: application/json. Secret: the one above. Events: just the push event.'),
-          )
-        : '',
-    );
-  };
-  draw().catch(fail);
-  return [row, shown];
-}
 
 // Whose workspace this is. "Needs you now" and the other standing questions
 // are asked about the owner, so a new workspace is not much use until one is set.
