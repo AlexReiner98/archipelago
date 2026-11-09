@@ -11,7 +11,7 @@ import { test } from 'node:test';
 
 const LAYOUTS = join(import.meta.dirname, '..', 'packs', 'core', 'layouts');
 /** The flow's, the kit's and these modules side by side, under the names they import each other by. */
-const dir = mkdtempSync(join(tmpdir(), 'planarize-test-'));
+const dir = mkdtempSync(join(tmpdir(), 'pelago-planarize-test-'));
 for (const folder of ['flow', 'kit', 'planarize']) for (const f of readdirSync(join(LAYOUTS, folder))) if (f.endsWith('.js')) cpSync(join(LAYOUTS, folder, f), join(dir, f));
 const mod = (name: string) => import(pathToFileURL(join(dir, name)).href);
 

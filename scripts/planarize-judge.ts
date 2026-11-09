@@ -25,7 +25,7 @@ const house = JSON.parse(readFileSync(join(ROOT, 'packs', 'core', 'pack.json'), 
 mkdirSync(out, { recursive: true });
 
 /** The flow's, the kit's and the planarize modules side by side, under the names they import each other by. */
-const dir = mkdtempSync(join(tmpdir(), 'planarize-'));
+const dir = mkdtempSync(join(tmpdir(), 'pelago-planarize-'));
 for (const folder of ['flow', 'kit', 'planarize']) for (const f of readdirSync(join(LAYOUTS, folder))) if (f.endsWith('.js')) cpSync(join(LAYOUTS, folder, f), join(dir, f));
 const mod = (name: string) => import(pathToFileURL(join(dir, name)).href);
 const { model } = await mod('model.js'), { embedding } = await mod('embedding.js'), { visibility } = await mod('plain.js'), { count } = await mod('count.js'), { asInput } = await mod('format.js');
