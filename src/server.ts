@@ -33,7 +33,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './auth.ts'; import { firstStart } from './first-start.ts';
 import { notify } from './notify.ts'; import { alertOnCrash } from './alert.ts';
-import { backupAll, parseBackup, parseVault } from './backup.ts'; import { configureMembers, memberLimit } from './members.ts'; import { configureEnded, readEnded } from './ended.ts'; import { askedAs, configurePlan, requestWait, slowTokensAt, storageBytes, tooManyRequests } from './plan.ts';
+import { backupAll, parseBackup, parseVault } from './backup.ts'; import { adminEmails, admitMember, configureMembers, memberLimit, ownerEmail } from './members.ts'; import { configureEnded, readEnded } from './ended.ts'; import { askedAs, configurePlan, requestWait, slowTokensAt, storageBytes, tooManyRequests } from './plan.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { env } from './env.ts';
 import { serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
@@ -364,14 +364,18 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (url.pathname === '/operator/workspaces' && tokens) {
         if (!local(req, req.method === 'POST')) return send(res, 403, { error: 'Local requests only.' });
         if (!(await workspaces.isOperator(bearer(req.headers.authorization)))) return send(res, 401, { error: 'The operator secret is required.' });
-        if (req.method === 'GET') return send(res, 200, { result: await workspaces.list() });
+        // Each with its admins' addresses: one with none is a workspace nobody can sign in to by email.
+        if (req.method === 'GET') return send(res, 200, { result: await Promise.all((await workspaces.list()).map(async (w) => ({ ...w, admins: await adminEmails((await workspaces.get(w.id)).pelago) }))) });
         if (req.method === 'POST') {
           // `backup` is a backup file's bytes in base64: the workspace starts as that map.
-          const { id, name, backup, vault } = ((await readJson(req)) ?? {}) as { id?: string; name?: string; backup?: string; vault?: string };
+          const { id, name, backup, vault, email } = ((await readJson(req)) ?? {}) as { id?: string; name?: string; backup?: string; vault?: string; email?: string };
           try {
+            // A new workspace is made with its owner's address; one from a backup brings its members with it.
+            const admin = backup === undefined ? ownerEmail(email) : undefined;
             // `vault`: the backup of the key vault taken with it, which a sealed backup is read with.
             const from = backup === undefined ? undefined : { ...parseBackup(Buffer.from(String(backup), 'base64')), ...(vault && { vault: parseVault(Buffer.from(vault, 'base64')) }) };
             const ws = await workspaces.create(id ?? '', name ?? '', from);
+            if (admin) await admitMember(ws.pelago, admin, true);
             const owner = await ownerToken(ws, 'owner');
             if (!from) return send(res, 200, { result: owner });
             const { rows } = await ws.pelago.db.query<{ entities: number; events: number }>(`select (select count(*)::int from entity) as entities, (select count(*)::int from event) as events`);

@@ -10,8 +10,8 @@ test('a document shared with another workspace is read there once accepted, and 
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
-  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
-  const elsewhere = (await call('/operator/workspaces', operator, { id: 'other', name: 'Other' })).result.owner_token as string;
+  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
+  const elsewhere = (await call('/operator/workspaces', operator, { id: 'other', name: 'Other', email: 'owner@acme.test' })).result.owner_token as string;
   const api = async (token: string, tool: string, input: unknown = {}) => {
     const answer = await call(`/api/${tool}`, token, input);
     if (answer.error) throw new Error(answer.error);
@@ -98,7 +98,7 @@ test('the receiver ends a share on its side, and the sender can share again', as
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
-  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
   const api = async (token: string, tool: string, input: unknown = {}) => {
     const answer = await call(`/api/${tool}`, token, input);
     if (answer.error) throw new Error(answer.error);
@@ -118,7 +118,7 @@ test('a shared document is published where it is read only if its sender says so
   const { workspaces, call, base } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
-  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
   const api = async (token: string, tool: string, input: unknown = {}) => {
     const answer = await call(`/api/${tool}`, token, input);
     if (answer.error) throw new Error(answer.error);

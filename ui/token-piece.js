@@ -7,10 +7,10 @@ import { api, ask, authHeaders, h, state } from './base.js';
 import { ago, unfolded, when } from './words.js';
 import { connectBox, secretBox } from './workspace-cards.js';
 
-/** What an agent's token may write, as pills: within what, by name, and whether it only reports or proposes. */
+/** What an agent's token may write, as marks: within what, by name, and whether it only reports or proposes. */
 export const scopePills = (t) => [
-  t.within?.length && [' ', h('span', { class: 'pill', title: `It writes only within: ${(t.within_titles ?? t.within).join(', ')}` }, `${t.within.length === 1 ? (t.within_titles?.[0] ?? t.within[0]) : `${t.within.length} items`} only`)],
-  t.may && t.may !== 'change' && [' ', h('span', { class: 'pill', title: t.may === 'report' ? 'It can only send what a system measured' : 'Every change it sends waits for you' }, t.may === 'report' ? 'reports' : 'proposes')],
+  t.within?.length && [' ', h('span', { class: 'muted small', title: `It writes only within: ${(t.within_titles ?? t.within).join(', ')}` }, `${t.within.length === 1 ? (t.within_titles?.[0] ?? t.within[0]) : `${t.within.length} items`} only`)],
+  t.may && t.may !== 'change' && [' ', h('span', { class: 'muted small', title: t.may === 'report' ? 'It can only send what a system measured' : 'Every change it sends waits for you' }, t.may === 'report' ? 'reports' : 'proposes')],
 ];
 
 /** The item whose tokens a link led to: its page opens with them unfolded and in sight. */
