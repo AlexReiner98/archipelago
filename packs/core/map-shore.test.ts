@@ -12,7 +12,7 @@ import { pathToFileURL } from 'node:url';
 const pack = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
 const house = { ...pack.styles.find((s: any) => s.id === 'core.house').props, shape: 'flow' };
 const laid = mkdtempSync(join(tmpdir(), 'pelago-flow-shore-'));
-for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.flow').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
+for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 const { findingSaid } = await import(pathToFileURL(join(laid, 'islands.js')).href);
 const measure = (t: string, px: number) => t.length * px * 0.55;

@@ -53,7 +53,6 @@
   "test/declared.test.ts": { "pglite": 3.6, "postgres": 1.5 },
   "test/diagrams.test.ts": { "pglite": 0.5, "postgres": 0.5 },
   "test/doc-ref.test.ts": { "pglite": 0.1, "postgres": 0.1 },
-  "test/docs-beside.test.ts": { "pglite": 16.4, "postgres": 10.7 },
   "test/drain.test.ts": { "pglite": 0.3, "postgres": 0.3 },
   "test/find-query.test.ts": { "pglite": 12.6, "postgres": 7.7 },
   "test/finding-moved.test.ts": { "pglite": 4.9, "postgres": 2.3 },

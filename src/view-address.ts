@@ -17,7 +17,7 @@ export const VIEW_INPUT = {
   style: z
     .object({
       lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.'),
-      layout: z.string().optional().describe('The layout: map, the one built in (the whole graph made plane at once, islands and ports with it, at right angles with the fewest bends, its distances relaxed). A name no pack draws is drawn as map.'),
+      layout: z.enum(['map', 'list', 'flow', 'strips', 'rows', 'cola', 'planar', 'grid', 'time', 'architecture', 'pages']).optional().describe('The layout: map, the one built in (the whole graph made plane at once, islands and ports with it, at right angles with the fewest bends, its distances relaxed). The others were retired on 9 Nov 2026 and draw as map.'),
       shape: z.string().optional().describe('The old name of layout, still taken.'),
       id: z.string().optional().describe('A style kept on the map (an item of type style), drawn with for this one look.'),
     })

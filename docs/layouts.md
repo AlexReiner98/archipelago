@@ -18,7 +18,7 @@ On 9 Nov 2026 the owner kept Map alone, to bring the others back one by one as t
 | Grid | `grid` | `packs/core/layouts/grid/` |
 | Time | `time` | `packs/core/layouts/time/` |
 | Architecture | `architecture` | `packs/core/layouts/architecture/` (Map keeps its `marks.js`, `play.js`, `story-look.js`) |
-| Pages | `pages` | `packs/core/layouts/pages/` |
+| Pages | `pages` | `packs/core/layouts/pages/`: a document written beside its live draft went with it (`test/docs-beside.test.ts`) |
 
 To read one: `git show archive/layouts-2026-11-09:packs/core/layouts/<folder>/<file>`. To bring one back: `git checkout archive/layouts-2026-11-09 -- packs/core/layouts/<folder>`, its entry in `layouts` and its shape in the style's `shape` enum in `packs/core/pack.json`, and its tests (`git show --stat archive/layouts-2026-11-09` lists them; `git diff archive/layouts-2026-11-09 -- test packs/core` shows what went). Much of what follows (Wired drawings, Levels and ports) was written of the flow and holds of Map where it reuses the flow's modules.
 

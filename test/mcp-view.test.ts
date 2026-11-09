@@ -33,11 +33,11 @@ test('only draw names the view, so an ordinary call opens no page, and the serve
 
 test('draw answers in words, takes a view as a look does, and refuses what could not be drawn', async () => {
   const { client } = await connected();
-  const view = await client.callTool({ name: 'draw', arguments: { query: { filter: { find: ['type task'] } }, style: { layout: 'flow' } } });
+  const view = await client.callTool({ name: 'draw', arguments: { query: { filter: { find: ['type task'] } }, style: { layout: 'map' } } });
   assert.ok(!view.isError, JSON.stringify(view.content));
   assert.deepEqual((view.content as { type: string }[]).map((c) => c.type), ['text'], 'no picture and no marks for the model');
   const { text } = (view.content as { text: string }[])[0];
-  assert.match(JSON.parse(text).view, /shape=flow/);
+  assert.match(JSON.parse(text).view, /shape=map/);
 
   const refused = async (args: Record<string, unknown>) => (await client.callTool({ name: 'draw', arguments: args })).isError;
   assert.ok(await refused({}), 'nothing named');
