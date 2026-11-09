@@ -76,7 +76,7 @@ test('a chain is a straight line down, with nothing crossing', () => {
   assert.ok(held.chains.every((c: any) => c.points.length === 2 && c.points[0][0] === c.points[1][0]), 'each wire one straight drop');
 });
 
-test('a wire between two boxes is long enough to show its head', { todo: 'solve.js: boxes joined by one straight wire stand gap / 2 apart, 8 px, under the 9 px head' }, () => {
+test('a wire between two boxes is long enough to show its head', () => {
   const g = alone([item('a'), item('b'), item('c')], [dep('b', 'a'), dep('c', 'b')]);
   for (const c of g.chains) assert.ok(Math.abs(c.points.at(-1)[1] - c.points.at(-2)[1]) >= house.sizes.flow_head_length, `${c.key} is ${Math.abs(c.points.at(-1)[1] - c.points.at(-2)[1])} long`);
 });

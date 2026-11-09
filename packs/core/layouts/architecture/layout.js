@@ -8,7 +8,13 @@
 
 import { route } from './route.js';
 
-/** How a part is, read from its status word alone: no type is named. */
+/**
+ * How a part is: its status word where the list below knows it (a phase cannot tell up from on standby, or down from
+ * degraded), else its phase, as the answer gives it from its type (src/phases.ts), so a pack's new status is placed
+ * as the flow places it. No type is named.
+ */
+const BY_PHASE = { not_started: 'planned', under_way: 'building', standing: 'ok', trouble: 'down', finished: 'ok', ended: 'gone' };
+/** What each health's status words are. */
 const HEALTH = {
   ok: ['up', 'available', 'in_use', 'active', 'running', 'live', 'shipped', 'built', 'current', 'happened', 'done', 'works'],
   warn: ['degraded', 'mitigated', 'waiting', 'investigating', 'unavailable_partly', 'partly'],
@@ -17,13 +23,14 @@ const HEALTH = {
   planned: ['planned', 'todo', 'draft', 'upcoming', 'raw', 'untested', 'sketched'],
   standby: ['standby', 'idle', 'paused'],
 };
+const worded = (status) => Object.keys(HEALTH).find((h) => HEALTH[h].includes(status)) ?? 'unknown';
 export function health(item) {
   if (!item.open) return 'gone';
-  for (const [h, words] of Object.entries(HEALTH)) if (words.includes(item.status)) return h;
-  return 'unknown';
+  const word = worded(item.status);
+  return word === 'unknown' ? (BY_PHASE[item.phase] ?? word) : word;
 }
 /** Whether an item is closed because its work was done (not dropped, not retired). */
-export const finished = (item) => !item.open && HEALTH.ok.includes(item.status);
+export const finished = (item) => !item.open && (HEALTH.ok.includes(item.status) || item.phase === 'finished');
 /** A wire's state: what the link says of itself (props.state), else what its two ends make it. */
 export function wireState(link, a, b) {
   if (['wired', 'planned', 'broken'].includes(link.state)) return link.state;
