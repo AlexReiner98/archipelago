@@ -16,8 +16,9 @@ change and why. It saves you writing something that does not fit.
 
 A change is ready to be looked at when:
 
-- `npm test` and `npm run typecheck` pass. Both run on every pull request, on
-  Linux and Windows, and the tests once more on a Postgres server. To run them
+- `npm test` and `npm run typecheck` pass. CI runs both on every pull request,
+  on Linux, every test file on PGlite and again on a Postgres server; Windows
+  runs nightly. To run them
   on one here, any Postgres 18 will do; with Docker:
 
   ```bash
@@ -26,8 +27,9 @@ A change is ready to be looked at when:
   ```
 
   Each test gets a database of its own there, dropped when it ends. Through
-  Docker on Windows every query is a slow round trip, and the longest test
-  (the approvals table) can outrun its ten minutes.
+  Docker on Windows every query is a slow round trip, and the longest tests
+  (the approvals tables, `test/approvals-*.test.ts`) can outrun their ten
+  minutes.
 - What it changes in behaviour has a test that would fail without it.
 - What it changes in the web UI you have looked at in a browser, at 1280 and
   at 560 pixels wide.
@@ -61,7 +63,8 @@ These are refused in review, so they are said here first.
   manage tokens.
 
 `CLAUDE.md` holds the fuller working rules, written for agent sessions and
-true for people too.
+true for people too. The scripts beside the code (the test runner, demos,
+benchmarks, pictures) are listed in [docs/scripts.md](docs/scripts.md).
 
 ## Licence
 

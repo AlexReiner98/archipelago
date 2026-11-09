@@ -1113,8 +1113,8 @@ section 4, Where this stands. Nothing else writes the map today
 | write today | becomes |
 | --- | --- |
 | `change` holds: `insert into proposal`, `log proposal.create` | a proposal record in `pending` (section 3) |
-| `decideNow` approves: `apply`, `update proposal set ops` (revised), `update proposal set status`, `log proposal.approve` | one fact entry: the change set, with `rule.outcome: approved`, `revised`, `except`; the revised ops are the facts appended, the original stays in the record |
-| `decideNow` rejects: `update proposal set status`, `log proposal.reject` | a fact entry with no facts, `rule.outcome: rejected` |
+| `decideProposal` approves: `apply`, `update proposal set ops` (revised), `update proposal set status`, `log proposal.approve` | one fact entry: the change set, with `rule.outcome: approved`, `revised`, `except`; the revised ops are the facts appended, the original stays in the record |
+| `decideProposal` rejects: `update proposal set status`, `log proposal.reject` | a fact entry with no facts, `rule.outcome: rejected` |
 | `apply` create: `insert into entity`, `log entity.create` | create facts in the change set |
 | `apply` update: `update entity`, `log entity.update` | assertions and retractions; `detail.changes` is gone (the history index has before-values) |
 | `apply` link: `insert into relation`, `log relation.link` | `link` fact on a new `r_` id |

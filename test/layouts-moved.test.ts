@@ -5,15 +5,16 @@
 // and the kernel's style attributes are left out of the comparison, and what they drew is compared as looks.
 
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { gridCases, timeCases, type DrawingCase } from './layout-cases.ts';
+import { fixture as keptFor, kept as golden } from './layout-golden.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
-const fixture = (name: string) => join(import.meta.dirname, 'fixtures', 'layouts', `${name}.kernel.${process.platform}.json`);
+const fixture = (name: string) => keptFor(`${name}.kernel`);
 
 /** The drawing a picture kept in this shape is sent, and what it draws of each case, captured in the page. */
 async function drawn(shape: string, cases: DrawingCase[]) {
@@ -36,10 +37,8 @@ async function drawn(shape: string, cases: DrawingCase[]) {
 /** Each case drawn now against what the kernel drew, or what was last kept as the drawing's own. `own` matches the drawing's own classes, `extra` its own marks. */
 function same(now: Record<string, any>, kernel: string, own: RegExp, extra: string[] = [], html = (text: string) => text) {
   // A change meant to draw otherwise (the house style's text, 27 Oct 2026) keeps what it now draws, with GOLDEN_WRITE=1.
-  if (process.env.GOLDEN_WRITE) return void writeFileSync(kernel, `${JSON.stringify(now)}
-`);
-  if (!existsSync(kernel)) return;
-  const was = JSON.parse(readFileSync(kernel, 'utf8'));
+  const was = golden(kernel, now);
+  if (!was) return;
   // The key is the page's now, drawn from the scene's key (docs/layouts.md), not the drawing's own marks: what is
   // compared is the picture, so each record is cut where its key starts (the last thing in a picture the page lays out).
   const keyless = (r: any) => {

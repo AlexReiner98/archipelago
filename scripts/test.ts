@@ -4,12 +4,13 @@
 //   npm run test:changed [base]    the files what changed since base (where this branch left main) can reach
 //   npm test -- test/a.test.ts …   just those files; an argument starting -- goes to node (--test-name-pattern=…)
 //   node scripts/test.ts shard 3/8   one shard of the full run, as CI runs them side by side
+//   node scripts/test.ts unprivileged   the files CI runs again as a Postgres role that is not a superuser
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { blankImageFile } from '../src/db.ts';
-import { affected, allTests, fastTests, heaviestFirst, ROOT, shard } from '../test/sets.ts';
+import { affected, allTests, fastTests, heaviestFirst, ROOT, shard, UNPRIVILEGED } from '../test/sets.ts';
 import { sweepTemp } from '../test/sweep.ts';
 
 const flags = process.argv.slice(2).filter((a) => a.startsWith('--'));
@@ -24,6 +25,7 @@ function changedSince(base?: string) {
 let files: string[];
 if (args[0] === 'full') files = allTests();
 else if (args[0] === 'shard') files = shard(args[1]);
+else if (args[0] === 'unprivileged') files = UNPRIVILEGED;
 else if (args[0] === 'changed') {
   const changed = changedSince(args[1]);
   const picked = affected(changed);

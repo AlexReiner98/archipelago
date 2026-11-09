@@ -8,6 +8,7 @@ export const ROOT = join(import.meta.dirname, '..');
 /**
  * Left out of the fast set, each for what makes it slow. What they protect is still checked by the full run, by CI on
  * every pull request, and by test:changed when a change reaches them. The structure test is never here.
+ * test/sets.test.ts holds the fast set to LONG by the weights: a file past it comes here, as 'long'.
  */
 export const SLOW: Record<string, string> = {
   // A headless Chrome each, and the page loaded and driven in it: seconds per test, most of a core under load.
@@ -52,7 +53,7 @@ export const SLOW: Record<string, string> = {
   'test/transition-browser.test.ts': 'browser',
   'test/walk-from.test.ts': 'browser',
   // A whole map moved, backed up, restored, migrated or pulled: databases opened, filled and replayed from the log,
-  // 6 to 16 seconds of one process each. test:changed runs them for a change to what they import.
+  // 8 to 29 seconds of one process each in CI. test:changed runs them for a change to what they import.
   'test/backup.test.ts': 'whole map',
   'test/backup-tools.test.ts': 'whole map',
   'test/control.test.ts': 'whole map',
@@ -68,9 +69,20 @@ export const SLOW: Record<string, string> = {
   'test/approvals-dev-2.test.ts': 'table',
   'test/approvals-mixed-1.test.ts': 'table',
   'test/approvals-mixed-2.test.ts': 'table',
-  // A flow of a few hundred items drawn whole through its budget, three times over and timed: about ten seconds.
+  // A flow of a few hundred items drawn whole through its budget, three times over and timed: about 25 seconds.
   'packs/core/flow-time.test.ts': 'timed',
+  // Many tests in one file, past LONG seconds of one process in CI (test/weights.json, 8 Nov 2026).
+  'test/sessions.test.ts': 'long',
+  'test/query-flat.test.ts': 'long',
+  'test/new-workspace.test.ts': 'long',
+  'packs/core/flow.test.ts': 'long',
+  'test/seeing.test.ts': 'long',
+  'test/handoff.test.ts': 'long',
+  'test/setup.test.ts': 'long',
 };
+
+/** The most seconds a file of the fast set may take in CI, on either engine (test/weights.json). */
+export const LONG = 15;
 
 const walk = (dir: string): string[] =>
   !existsSync(join(ROOT, dir)) ? [] : readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? (e.name === 'node_modules' ? [] : walk(`${dir}/${e.name}`)) : [`${dir}/${e.name}`]));
@@ -95,6 +107,12 @@ export const PER_FILE = 0.6;
  * the test's process (fitted to main's run 41751821168, 4 Nov 2026: the shards with most browser seconds ran longest).
  */
 export const BROWSER = 1.7;
+/**
+ * The files CI runs again on Postgres as a role that is not a superuser (node scripts/test.ts unprivileged, the step
+ * FIRST_STEPS names second): the log's triggers, its lock, the move and the keys, which a superuser would pass however
+ * they were granted.
+ */
+export const UNPRIVILEGED = ['test/log.test.ts', 'test/connections.test.ts', 'test/move.test.ts', 'test/streams.test.ts', 'test/keys.test.ts'];
 /** The steps of the workflow that run on shard 1 alone, beside its tests; their time counts toward it. */
 export const FIRST_STEPS = ['Type check', 'The log as a role that is not a superuser'];
 

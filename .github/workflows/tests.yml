@@ -63,6 +63,15 @@ jobs:
           name: times-pglite-${{ strategy.job-index }}
           path: runs/times.json
 
+      # A layout golden this platform keeps none of fails the run, and what was drawn is here to be committed
+      # (test/layout-golden.ts).
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: goldens-pglite-${{ strategy.job-index }}
+          path: runs/goldens/
+          if-no-files-found: ignore
+
   postgres-shard:
     # The engine that runs live. Each test gets a database copied from a
     # template the run builds once (scratchPg in src/pg.ts).
@@ -72,7 +81,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1/8, 2/8, 3/8, 4/8, 5/8, 6/8, 7/8, 8/8]
+        shard: [1/8, 2/8, 3/8, 4/8, 5/8, 6/8, 7/8, 8/8] # the same as pglite's: test/sets.test.ts checks
     services:
       postgres:
         image: postgres:18
@@ -119,12 +128,21 @@ jobs:
         if: startsWith(matrix.shard, '1/') # FIRST_STEPS in test/sets.ts: its time counts toward shard 1
         run: |
           psql "$PELAGO_TEST_DATABASE_URL" -c "create role pelago_app login password 'app' createdb createrole" -c "create database pelago_app owner pelago_app" -c "grant pelago_member, pelago_public, pelago_compactor to pelago_app with admin option"
-          PELAGO_TEST_DATABASE_URL=postgres://pelago_app:app@127.0.0.1:5432/pelago_app node --test --test-force-exit --test-global-setup=./test/global.ts --import ./test/each.ts test/log.test.ts test/connections.test.ts test/move.test.ts test/streams.test.ts test/keys.test.ts
+          PELAGO_TEST_DATABASE_URL=postgres://pelago_app:app@127.0.0.1:5432/pelago_app node scripts/test.ts unprivileged # UNPRIVILEGED in test/sets.ts
 
       - uses: actions/upload-artifact@v4
         with:
           name: times-postgres-${{ strategy.job-index }}
           path: runs/times.json
+
+      # A layout golden this platform keeps none of fails the run, and what was drawn is here to be committed
+      # (test/layout-golden.ts).
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: goldens-postgres-${{ strategy.job-index }}
+          path: runs/goldens/
+          if-no-files-found: ignore
 
   pglite:
     needs: pglite-shard
