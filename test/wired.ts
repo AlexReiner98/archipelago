@@ -82,6 +82,13 @@ export const WIRED: Record<string, { gap: (sizes: Record<string, number>) => num
       return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
     },
   },
+  'core.strips': {
+    gap: (sizes) => sizes.flow_wire_gap,
+    draw(layout, { items, links }) {
+      const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn });
+      return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
+    },
+  },
   'core.architecture': {
     gap: (sizes) => sizes.arch_track,
     draw(layout, { items, links }) {
