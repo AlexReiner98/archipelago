@@ -65,7 +65,7 @@ export function looksBy(workspace: string): Map<string, number> {
   for (const x of lastHour(workspace)) by.set(x.by, (by.get(x.by) ?? 0) + 1);
   return by;
 }
-/** Another look for this workspace, asked by `by`, unless it has had its plan's (else PER_HOUR) in the last hour. */
+/** Another look for this workspace, asked by `by`, unless it has had its limit (else PER_HOUR) in the last hour. */
 export async function countLook(workspace: string, by = '') {
   const { most, limits } = await looksAllowed(workspace, PER_HOUR);
   const now = Date.now(), had = lastHour(workspace, now);

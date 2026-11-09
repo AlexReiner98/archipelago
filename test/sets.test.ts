@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { affected, allTests, ENGINES, fastTests, FIRST_STEPS, LONG, PER_FILE, predict, readWeights, ROOT, shard, SLOW, UNPRIVILEGED, weigher } from './sets.ts';
+import { affected, allTests, ENGINES, fastTests, FIRST_STEPS, LONG, PER_FILE, predict, reads, readWeights, ROOT, shard, SLOW, UNPRIVILEGED, weigher } from './sets.ts';
 
 test('the fast set is every test file but the slow ones, the structure test always among them', () => {
   const all = allTests();
@@ -30,7 +30,13 @@ test('a change runs the tests that import it or name it, the structure test, and
   assert.deepEqual(affected(['test/kinds.test.ts']).files, ['test/kinds.test.ts', 'test/sets.test.ts', 'test/structure.test.ts'], 'a test alone, with the structure test (and this one, which names it)');
 
   const page = affected(['ui/canvas.js']).files;
-  assert.ok(fastTests().every((f) => page.includes(f)) && page.includes('test/layouts.test.ts'), 'a page: the fast set and the browser tests');
+  assert.ok(page.includes('test/layouts.test.ts') && page.includes('test/page-css.test.ts'), 'a page: the browser tests, and the tests that read the pages as text');
+  assert.ok(!page.includes('test/rules.test.ts'), 'but not a test that never reads a page');
+
+  const flow = affected(['packs/core/layouts/flow/ports.js']).files;
+  for (const f of ['packs/core/flow-layout.test.ts', 'test/layouts-flow.test.ts']) assert.ok(flow.includes(f), `a layout's code: ${f}, which imports it or draws that layout`);
+  assert.ok(!flow.includes('test/rules.test.ts') && !flow.includes('test/canvas-pan.test.ts'), 'but not the kernel’s tests, nor a browser test that names no such layout');
+  assert.ok(reads('test/canvas-pan.test.ts', 'packs/core/layouts/flow/ports.js', true), 'a reused pass counts every pack’s code a browser test could draw');
 
   const manifest = affected(['packs/core/pack.json']).files;
   assert.ok(fastTests().every((f) => manifest.includes(f)), 'a pack’s manifest is read by every map: the fast set');

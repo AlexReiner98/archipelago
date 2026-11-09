@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { notify } from './notify.ts';
 import { handleRequests, type OutsideRequest } from './outside.ts';
-import { answerBeyond, holdWorkspace, NOT_BEYOND, startRuns, type RunAsk } from './pack-reach.ts';
+import { answerBeyond, holdWorkspace, NOT_BEYOND } from './pack-reach.ts';
 import type { PackFile } from './packs.ts';
 import { answerRead, type Read } from './packreads.ts';
 import { actorId, type Actor, type Archipelago, type Op, type SourceSpec } from './pelago.ts';
@@ -38,16 +38,12 @@ export interface Done {
   log?: { action: string; target?: string; reason?: string; detail?: Record<string, unknown> }[];
   /** What the owner is told. */
   notify?: { title: string; body?: string; level?: 'info' | 'warning' | 'urgent'; about?: string }[];
-  /** Model runs it asks the kernel for (src/pack-reach.ts): each starts after the call and runs on by itself. */
-  runs?: RunAsk[];
-  /** From the entry told how a run ended: the map's tools to call as that run's agent, of those its pack declares in runs. */
-  calls?: { tool: string; input?: unknown }[];
 }
 
 /** What is asked of an action's ops before they are applied: a token limited to some work is held to it. */
 export type Check = (done: Done) => Promise<void>;
 
-export type Call = 'action' | 'view' | 'answer' | 'webhook' | 'schedule' | 'event' | 'tool';
+export type Call = 'action' | 'view' | 'answer' | 'webhook' | 'schedule' | 'event';
 
 /** One pack's process, started when first called. */
 /** A running process, with the calls waiting on it: they end with it. */
@@ -236,8 +232,7 @@ export class PackHost {
     const dropped = changed?.status === 'applied' && done.drop_pictures?.length ? await dropPictures(l, actor, done.drop_pictures, done.reason?.trim() || name) : undefined;
     const others = await further(l, actor, file, name, done);
     for (const e of done.log ?? []) this.tell(l, file.id, e);
-    const runs = done.runs?.length ? await startRuns(l, actor, file, call, done.runs) : undefined;
-    return { answer, ...changed, ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }), ...(runs && { runs }) };
+    return { answer, ...changed, ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }) };
   }
 
   /**

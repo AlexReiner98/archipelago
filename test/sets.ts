@@ -189,25 +189,58 @@ export function reaches(file: string, seen = new Set<string>()): Set<string> {
 }
 
 /**
- * The test files a change to these files can reach: each test that imports one (at any depth) or names it by its
- * path, and the structure test always. Nearly every test imports the kernel's core (src/pelago.ts), so a change
- * there reaches nearly all of them; this mode saves most for a change to a pack's code, a page, a script, the docs or
- * a test. A file under src/ or ui/ that is not a module some test imports (the schema, a stylesheet), and any file of
- * a pack but its tests (a manifest, a handler the server loads by its path), could be read by any test, so it runs
- * the fast set with them; a page the server serves (ui/) runs the browser tests too.
+ * What every test may read without importing or naming it: the packs' manifests (each test's map starts with every
+ * pack), what src/ keeps that is not a module (the schema), and the dependencies. A change to one reaches every test.
+ */
+export const shared = (file: string) => /^packs\/[^/]+\/pack\.json$/.test(file) || (file.startsWith('src/') && !/\.(ts|js|mjs)$/.test(file)) || /^package(-lock)?\.json$/.test(file);
+
+const texts = new Map<string, string>();
+const textOf = (test: string) => {
+  if (!texts.has(test)) texts.set(test, readFileSync(join(ROOT, test), 'utf8'));
+  return texts.get(test)!;
+};
+/** A test that names a folder of these reads the files in it by listing them (the pages' words, the docs' terms). */
+const LISTED = ['ui', 'docs'];
+const lists = (test: string, folder: string) => new RegExp(`['"\`/]${folder}/|['"]${folder}['"]`).test(textOf(test));
+
+/**
+ * Whether a test may read a file: it imports it (at any depth), names it by its path, or reads it another way. A
+ * browser test reads every page (ui/); a test that names ui/ or docs/ lists their files; a test that names a file's
+ * folder within its pack (`layouts/flow/`) reads that folder's code by path, and a browser test one that names its
+ * layout (`flow`). That last is a guess, good enough to choose what to run (CI runs the rest); `wide` asks for what
+ * a browser test could draw, every pack's code, for when a pass is reused (test/passes.ts) and a guess will not do.
+ */
+export function reads(test: string, file: string, wide = false): boolean {
+  if (reaches(test).has(file) || textOf(test).includes(file)) return true;
+  const browser = SLOW[test] === 'browser';
+  const top = file.split('/')[0];
+  if (LISTED.includes(top)) return (top === 'ui' && browser) || lists(test, top);
+  const inPack = /^packs\/[^/]+\/(.+)$/.exec(file)?.[1];
+  if (!inPack || /\.test\.ts$/.test(file)) return false;
+  if (browser && wide) return true;
+  const folder = dirname(inPack);
+  if (folder !== '.' && textOf(test).includes(`${folder}/`)) return true;
+  const layout = /^layouts\/([\w-]+)\//.exec(inPack)?.[1];
+  return textOf(test).includes(inPack) || (browser && !!layout && new RegExp(`\\b${layout}\\b`).test(textOf(test)));
+}
+
+/**
+ * The test files a change to these files can reach: each test that reads one (reads), and the structure test always.
+ * Nearly every test imports the kernel's core (src/pelago.ts), so a change there reaches nearly all of them; this
+ * mode saves most for a change to a pack's code, a page, a script, the docs or a test. What every test reads (shared),
+ * and a file under src/, ui/ or packs/ no test is seen to read (a handler the server loads by its path), could be read
+ * by any test, so it runs the fast set with them. CI runs every file before main deploys, so what this misses is
+ * caught there.
  */
 export function affected(changed: string[]): { files: string[]; why: string } {
   const tests = allTests();
-  const imports = new Map(tests.map((t) => [t, reaches(t)]));
-  const text = new Map(tests.map((t) => [t, readFileSync(join(ROOT, t), 'utf8')]));
   const picked = new Set<string>(['test/structure.test.ts']);
   const unreached: string[] = [];
   for (const file of changed) {
-    const by = tests.filter((t) => imports.get(t)!.has(file) || text.get(t)!.includes(file));
+    const by = tests.filter((t) => reads(t, file));
     by.forEach((t) => picked.add(t));
-    const packCode = /^packs\//.test(file) && !/\.test\.ts$/.test(file);
-    if (packCode || (/^(src|ui)\//.test(file) && !(/\.(ts|js|mjs)$/.test(file) && tests.some((t) => imports.get(t)!.has(file))))) unreached.push(file);
-    if (file.startsWith('ui/')) Object.keys(SLOW).filter((f) => SLOW[f] === 'browser').forEach((f) => picked.add(f));
+    // A file that is gone is read by no one now: what read it changed with it.
+    if (shared(file) || (/^(src|ui|packs)\//.test(file) && !by.length && existsSync(join(ROOT, file)))) unreached.push(file);
   }
   if (unreached.length) fastTests().forEach((f) => picked.add(f));
   const files = tests.filter((t) => picked.has(t));

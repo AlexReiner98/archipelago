@@ -52,7 +52,6 @@ export function checkAutomation(props: Record<string, unknown>): string[] {
     case 'launch':
       if (typeof input.task !== 'string') problems.push('action "launch" needs input.task: the id of the entity to work on');
       if (input.mode !== undefined && input.mode !== 'plan' && input.mode !== 'acceptEdits') problems.push('input.mode must be plan or acceptEdits');
-      if (input.budget_usd !== undefined && !(typeof input.budget_usd === 'number' && input.budget_usd > 0 && input.budget_usd <= 500)) problems.push('input.budget_usd is a cloud session’s cap in US$, more than 0 and at most 500');
       break;
     default:
       problems.push('an automation needs action: notify, tool or launch');

@@ -37,12 +37,12 @@ import { backupAll, parseBackup, parseVault } from './backup.ts'; import { admin
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
 import { env } from './env.ts';
 import { serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
-import { configureLauncher, stopAllLaunched } from './launcher.ts'; import { configureCloud } from './cloud-launch.ts';
+import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
 import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from './control-index.ts';
-import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { setReach } from './pack-reach.ts'; import './agent-run.ts';
+import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { setReach } from './pack-reach.ts';
 import { pgLeader, soleLeader, type Leader } from './leader.ts'; import { drained } from './drain.ts';
 import { serverDuties } from './duties.ts'; import { keepVisits, onSitePage } from './visits.ts';
 import { clientAddress, trustedProxies } from './address.ts';
@@ -216,7 +216,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // What a project needs to work with this server, and a running system's request for its token: no token needed.
       // A server pack answers at the addresses it had before it was a pack, too (a GitHub App set up then still sends there).
       const packPath = serverPacks.aliased(url.pathname) ?? url.pathname;
-      if (/^\/(connect|x|oauth|\.well-known)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : /^\/connect\/(sign-in|code|join|signup)$/.test(packPath) ? signIn : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX), person: () => resolve(req, res, 'human') });
+      if (/^\/(connect|x|oauth|\.well-known)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : /^\/connect\/(sign-in|code|join)$/.test(packPath) ? signIn : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX), person: () => resolve(req, res, 'human') });
 
       // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture|drawing|live)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
@@ -408,7 +408,7 @@ if (import.meta.main) {
   // Before anything reads a secret: where the key they are sealed with is kept.
   configureSecrets(rootDir, !config.databaseUrl);
   const workspaces = new Workspaces({ dataDir: config.dataDir, databaseUrl: config.databaseUrl, rootDir, packsDir: config.packsDir, packs: config.packs, policy: config.policy, backupsDir: config.backup ? config.backup.dir : undefined });
-  if (config.launch === 'cloud') configureCloud({ mcpUrl: config.cloudMcpUrl!, auth: config.auth === 'tokens' }); else if (config.launch) configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
+  if (config.launch) configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
 
   // One server per data folder, whatever port each is on: two of them writing
   // the same database files destroy it. The lock names the process that has it.

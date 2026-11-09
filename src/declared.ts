@@ -380,9 +380,8 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
   // What it records in the log, beside its changes: the kernel's own kinds of event are the kernel's.
   for (const action of parts(pack).events) if (!/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*$/.test(action) || /^(entity|relation|proposal|changeset|picture|session|pack)\./.test(action)) problems.push(`event "${action}" is not one a pack may record`);
   for (const s of parts(pack).schedules) if (!handler || !((s.every_minutes ?? 0) >= 1 || (s.at_start && s.every_minutes === undefined)) || !((s.limit_ms ?? 1) > 0 && (s.limit_ms ?? 1) <= 30_000)) problems.push(`schedule "${s.id}" needs the handler, every_minutes of 1 or more or at_start, and limit_ms of 30000 at most`);
-  // What it is told of, what it reads through, and the map's tools a run it asks for may offer its model.
+  // What it is told of, and what it reads through.
   for (const h of parts(pack).hears) if (!handler || !/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*$/.test(h.event) || !((h.limit_ms ?? 1) > 0 && (h.limit_ms ?? 1) <= 30_000)) problems.push(`hears "${h.event}" needs the handler, an event's name and limit_ms of 30000 at most`);
   for (const v of parts(pack).via) if (!/^[a-z][a-z0-9_]*$/.test(v.pack ?? '') || !/^[a-z][a-z0-9_]*$/.test(v.host ?? '')) problems.push('via names a server pack and one of its hosts');
-  for (const name of parts(pack).runs ?? []) if (!handler || !/^[a-z][a-z0-9_]*$/.test(name)) problems.push(`runs: "${name}" is not the name of a tool, or the pack has no handler`);
   return problems;
 }

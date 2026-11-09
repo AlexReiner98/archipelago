@@ -15,7 +15,6 @@ import { FORMER_NAMES, REPORT_TOOLS } from './report.ts';
 import { TOKEN_TOOLS } from './token-tools.ts';
 import { ASK_TOOLS } from './token-ask.ts';
 import { CONNECTION_TOOLS } from './connection-tools.ts';
-import { MODEL_TOOLS } from './model-tools.ts';
 import { wholeMap } from './outbox.ts';
 import type { Registry } from './packs.ts';
 import { packActionByShort, packTool, packTools } from './packtools.ts';
@@ -70,7 +69,7 @@ async function step(l: Archipelago, actor: Actor, name: string, input: Record<st
 
 export const TOOLS: Record<string, Tool> = {
   ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...HUMAN_TOOLS,
-  ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS, ...MODEL_TOOLS,
+  ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
   ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS, ...WORKSPACE_TOOLS, ...CONNECTION_TOOLS,
 };
 

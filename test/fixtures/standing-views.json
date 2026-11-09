@@ -780,7 +780,7 @@
     "title": "Hover cards",
     "type": "task"
    },
-   "text": "# Hover cards\nTask, doing. Archipelago id: <hover>\n\nPart of: Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Bo (person, active)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <hover>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <hover>, end its message with the line \"Closes: <hover>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
+   "text": "# Hover cards\nTask, doing. Archipelago id: <hover>\n\nPart of: Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Bo (person, active)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <hover>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <hover>, record it in the same change that closes <hover>: a commit item with its full sha, linked settles to <hover>.",
    "ties": []
   },
   "brief installer": {
@@ -814,7 +814,7 @@
     "title": "Installer",
     "type": "feature"
    },
-   "text": "# Installer\nFeature, building. Archipelago id: <installer>\n\nPart of: Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <installer>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <installer>, end its message with the line \"Closes: <installer>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
+   "text": "# Installer\nFeature, building. Archipelago id: <installer>\n\nPart of: Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <installer>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <installer>, record it in the same change that closes <installer>: a commit item with its full sha, linked settles to <installer>.",
    "ties": []
   },
   "brief sign": {
@@ -883,7 +883,7 @@
     "title": "Sign the package",
     "type": "task"
    },
-   "text": "# Sign the package\nTask, todo. Archipelago id: <sign>\n\nPart of: Installer > Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Which certificate? (decision, open)\n\n## Needs\n- Live lane: available (exclusive: claim it before use, release it after)\n\n## Is about\n- One live lane. (decided) Only one session drives the CAD app.\n\n## Is linked to\n- Is the cert enough? (open)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <sign>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <sign>, end its message with the line \"Closes: <sign>\". The push that carries it closes the item, on any branch: the sure way, since the push reader closes only what it can see a commit do.",
+   "text": "# Sign the package\nTask, todo. Archipelago id: <sign>\n\nPart of: Installer > Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Which certificate? (decision, open)\n\n## Needs\n- Live lane: available (exclusive: claim it before use, release it after)\n\n## Is about\n- One live lane. (decided) Only one session drives the CAD app.\n\n## Is linked to\n- Is the cert enough? (open)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <sign>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done. When a commit finishes <sign>, record it in the same change that closes <sign>: a commit item with its full sha, linked settles to <sign>.",
    "ties": [
     {
      "id": "<rule>",

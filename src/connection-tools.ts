@@ -19,7 +19,7 @@ export function configureConnections(packs: ServerPacks | undefined): void {
 export const CONNECTION_TOOLS: Record<string, Tool> = {
   connections: {
     description:
-      'What this server offers to connect a workspace to (each a server pack: GitHub, say), whether each is ready, and whether this workspace has connected it (and to which account outside). ' +
+      'What this server offers to connect a workspace to (each a server pack), whether each is ready, and whether this workspace has connected it (and to which account outside). ' +
       'start: where to go to connect one (choose there what it is given); setup: where to go to ready one for the whole server, once (an admin of the default workspace only); end: stop it here. Admins only for these.',
     humanOnly: true,
     input: {

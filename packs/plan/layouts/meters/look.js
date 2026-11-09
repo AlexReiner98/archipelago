@@ -1,5 +1,5 @@
 // How the meters drawing looks (index.js): a band for each limit, its bar, and the lists under it. Every length is
-// the style's (sizes, read as --ln-meter-*: the plan pack's preset names them); the colours are the page's. A
+// the style's (sizes, read as --ln-meter-*: the usage pack's preset names them); the colours are the page's. A
 // share's colour is a class the drawing writes a rule for (hueRule): a drawing sets no style on a mark.
 
 import { hues } from './marks.js';

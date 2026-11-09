@@ -19,7 +19,7 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `actions` | What people and agents can do through it, each under a verb. Core's six verbs are its actions marked `kernel`. |
 | `handlers` | Code run by itself: `{ event }`, `{ schedule, every_minutes, at_start }` or `{ webhook, records }`. |
 | `layouts`, `styles` | The code views are drawn by, and the presets of the map's own configuration: how things look, and (an entry with `type: "instruction"`, its words in `body`) what agents are told (`src/instructions.ts`), and (an entry with `type: "lens"`, its props a flat query and a style: `filter`, `walk`, `limit`, `style`) a view the pack ships, listed in the bar's picker and on Home until the owner saves their own version of it (`props.preset`); one `on` types, its query naming the item as `{here}`, is a view of each such item (a project's roadmap, an event's gate), offered on that item's page and drawn on the canvas (decision e_2mndpgdj: what a pack shows of an item is a view, not a screen). A style preset on nothing is used on every page; with `over: "workspace"` it lies over the workspace's own style; with `over: "chosen"` (a theme) only once the owner keeps a version of it. |
-| `reach` | What it may reach beyond the map: `hosts`, `secrets`, `webhooks`, `via`, `runs`, and `server`. |
+| `reach` | What it may reach beyond the map: `hosts`, `secrets`, `webhooks`, `via`, and `server`. |
 | `shared` | Core's alone: the shared set, the type ids every pack on an island map may build on (below). |
 
 A **server pack** is a pack whose reach includes `server` (`acts`, `entries`,
@@ -38,7 +38,7 @@ warning, until the release after 0.1.0, and then refused.
 | `trees`, `screens` | `views`, with `form` |
 | `verbs` | `actions`, with `kernel: true` |
 | `schedules`, `hears`, `events` | `handlers` |
-| `hosts`, `secrets`, `webhooks`, `via`, `runs` | `reach.*` |
+| `hosts`, `secrets`, `webhooks`, `via` | `reach.*` |
 | `acts`, `entries`, `pages`, `connect`, `aliases`, `agreements` | `reach.server.*` |
 | `tier` | goes: `reach.server` makes a server pack |
 | `contract` | goes: nothing read it |

@@ -150,7 +150,7 @@ reply ending, commits accounted for) is `docs/agents.md`.
 - **The UI has no build step and no framework.** Plain files in `ui/`.
 - **Dependencies stay at four** (`@electric-sql/pglite`,
   `@modelcontextprotocol/sdk`, `zod`, and since 18 Oct 2026 `pg`, for a
-  Postgres server; model calls are plain fetch, in `src/model.ts`) unless the owner agrees to another. Two libraries are kept as files, not
+  Postgres server) unless the owner agrees to another. Two libraries are kept as files, not
   dependencies. One is `ui/three.module.min.js` (three.js 0.160, MIT, since 13 Oct
   2026 at the owner's asking), offered to a layout's drawing code and to
   a drawing that paints on a surface (`ui/surface.js`, since 23 Oct 2026, for
@@ -328,17 +328,27 @@ npm test -- test/a.test.ts test/structure.test.ts
 npm run typecheck
 ```
 
-When it is ready to commit, run what your branch can reach:
+That is also all you run before a commit or a push: the test files for what
+you changed, the structure test and typecheck (the owner, 9 Nov 2026: local
+runs stay small, CI runs the rest). Do not run `npm test`, `test:changed` or
+`test:full` with no files to "make sure": several sessions share one machine,
+and a broad run slows every one of them for minutes. CI runs every file
+before anything reaches main, and a failure there names its file: fix it then.
 
-```bash
-npm run test:changed
-```
+One test run uses the machine at a time: `scripts/test.ts` waits for any run
+in another worktree to end first, and says whose. Never start tests with a
+bare `node --test`; it skips that wait and the force exit, and a hung file
+then runs for hours.
 
 `npm test` with no files is the fast set: every test file but the browser
 tests, the approvals table and the tests that move, back up, restore, migrate
 or pull a whole map (`SLOW` in `test/sets.ts`, each with why). The structure
-test is always in it. `npm run test:changed` runs only the files your
-branch's changes can reach (with the slow ones they reach).
+test is always in it. `npm run test:changed` runs only the files that may
+read what your branch changed (`reads` in `test/sets.ts`): a pack's code or a
+page picks a few dozen, but a change under `src/` still reaches nearly every
+file, since nearly every test imports the core. A run of a set skips the
+files that passed on the same code before, in any worktree
+(`test/passes.ts`); `--no-cache` runs them all.
 
 CI is the gate (the owner, 4 Nov 2026): it runs every file on every pull
 request and push to main, on both engines, and main deploys only when all of

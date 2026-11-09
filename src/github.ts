@@ -1,14 +1,7 @@
-// What the kernel still keeps of GitHub, none of it the App's (a server pack now, packs/github_app): finding a
-// repository by its address, when each was last pushed to, and the Workspace card's webhook added by hand. A push
-// itself is taken in by the pack that records pushes (packs/github); reading the commits is the work of a pack that hears it.
+// Finding a repository on the map by its GitHub address, however the address is written. Nothing here hears GitHub
+// any more: the GitHub pack and the GitHub App went on 9 Nov 2026.
 
-import { hookFor } from './hooks.ts';
-import { hasPackSecret, setPackSecret } from './outside.ts';
 import type { Entity, Archipelago } from './pelago.ts';
-import { doneEvents } from './activity.ts';
-
-/** How many pushes are read back to find each repository's last: a repository quiet for longer shows none. */
-const PUSHES_READ = 500;
 
 /**
  * "owner/name" from any way of writing a GitHub repository's address, or from
@@ -31,37 +24,4 @@ export async function repoByName(l: Archipelago, name: string | undefined): Prom
   if (!name || !types.length) return undefined;
   const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null`, [types]);
   return rows.find((r) => repoName(addressOf(l, r)) === name.toLowerCase());
-}
-
-/** When each repository was last pushed to, as GitHub told us. */
-export async function lastPushes(l: Archipelago): Promise<Map<string, { at: string; branch: string; head?: string; subject: string }>> {
-  // The pushes heard, newest first: what each says is sealed with its repository's key, so it is read opened.
-  const heard = await doneEvents(l.db, { action: 'repo.push' }, PUSHES_READ);
-  const out = new Map<string, { at: string; branch: string; head?: string; subject: string }>();
-  for (const r of heard) {
-    const d = r.detail as { branch?: string; after?: string; deleted?: unknown };
-    // A tag, or a branch that was deleted, is heard but is not a push of work to a branch.
-    if (!r.target_id || out.has(r.target_id) || !d.branch || d.deleted != null) continue;
-    out.set(r.target_id, { at: new Date(r.ts).toISOString(), branch: d.branch, head: d.after?.slice(0, 7), subject: r.reason });
-  }
-  return out;
-}
-
-export async function githubStatus(l: Archipelago) {
-  const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null order by title`, [addressed(l)]);
-  const pushes = await lastPushes(l);
-  // The webhook added by hand is the pack's: where it is served, and whether the owner has made its secret.
-  const hook = hookFor(l, 'repo.push');
-  return {
-    connected: Boolean(hook && (await hasPackSecret(l, hook.pack, hook.secret))),
-    webhook_path: hook ? `/hook/${l.workspace}/${hook.pack}/${hook.hook}` : null,
-    repos: rows.map((r) => ({ id: r.id, title: r.title, github: repoName(addressOf(l, r)) ?? null, last_push: pushes.get(r.id) ?? null })),
-  };
-}
-
-/** Make (or replace) the secret GitHub signs its deliveries with, kept for the pack that takes them in. Returned once. */
-export async function newGithubSecret(l: Archipelago): Promise<string> {
-  const hook = hookFor(l, 'repo.push');
-  if (!hook) throw new Error('No pack here takes pushes in: turn the GitHub pack on first.');
-  return (await setPackSecret(l, { pack: hook.pack, name: hook.secret, make: true })).secret!;
 }

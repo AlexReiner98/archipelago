@@ -1,11 +1,10 @@
 // The human's own tools, for the CLI and the web UI: never offered to agents. What the page follows of the log,
-// merging a backup in, starting a session, GitHub's secret, the mark that a person looked, deciding a held change.
+// merging a backup in, starting a session, the mark that a person looked, deciding a held change.
 
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { merge, parseBackup, parseVault, readable } from './backup.ts';
-import { githubStatus, newGithubSecret } from './github.ts';
 import { launch } from './launcher.ts';
 import { notifyWorkspace, wholeMap } from './outbox.ts';
 import type { TypeDef } from './packs.ts';
@@ -118,13 +117,12 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
   },
   launch: {
     description:
-      'Start a headless Claude Code session on a task, in the task\u2019s repository, with its brief as the prompt: on this machine, or, on a hosted server, in the cloud on the workspace’s own Anthropic account. The session is registered first, so it holds any exclusive resource the task needs, or the launch is refused.',
+      'Start a headless Claude Code session on a task, in the task\u2019s repository, with its brief as the prompt, on this machine. The session is registered first, so it holds any exclusive resource the task needs, or the launch is refused.',
     humanOnly: true,
     input: {
       task: z.string(),
       mode: z.enum(['plan', 'acceptEdits']).optional().describe('plan (default): read and investigate only. acceptEdits: may edit files in the repository.'),
       instructions: z.string().optional().describe('Anything to add to the brief.'),
-      budget_usd: z.number().positive().max(500).optional().describe('In the cloud: the most the session may spend, in US$ (5 unless given).'),
     },
     run: async (l, actor, input) => launch(l, actor, input),
   },
@@ -138,20 +136,6 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       level: z.enum(['info', 'warning', 'urgent']).optional(),
     },
     run: async (l, actor, input) => notifyWorkspace(l, actor, input),
-  },
-  github: {
-    description:
-      'This workspace and GitHub: whether pushes are being received, the address GitHub is to send them to, and for each repository in the map its GitHub name and when it was last pushed to. ' +
-      'With new_secret, makes (or replaces) the secret GitHub signs with and shows it once; put it and the address into the repository\u2019s webhook settings, content type application/json, push events only. Admins only for that.',
-    humanOnly: true,
-    input: { new_secret: z.boolean().optional() },
-    run: async (l, actor, input) => {
-      if (!input.new_secret) return githubStatus(l);
-      needAdmin(actor, 'connect GitHub');
-      const whole = await wholeMap(l);
-      const secret = await newGithubSecret(whole);
-      return { ...(await githubStatus(whole)), secret, note: 'Keep this secret now: it is shown once. A secret made earlier no longer works.' };
-    },
   },
   seen: {
     description: 'Record that you have looked at what agents changed, up to an event. It permits nothing: it is the mark that a human saw.',

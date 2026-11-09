@@ -1,5 +1,4 @@
-// What a launched session is told and who it is started for: the same whether it runs on this machine
-// (src/launcher.ts) or in the cloud (src/cloud-launch.ts).
+// What a launched session is told and who it is started for: on this machine (src/launcher.ts).
 
 import { askView } from './askview.ts';
 import { needHuman } from './actor-checks.ts';
@@ -22,8 +21,6 @@ export interface LaunchInput {
   task: string;
   mode?: LaunchMode;
   instructions?: string;
-  /** A cloud session's spending cap, in US$: the workspace's account pays it. */
-  budget_usd?: number;
 }
 
 const MODE_NOTE: Record<LaunchMode, string> = {

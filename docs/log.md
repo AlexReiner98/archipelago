@@ -538,7 +538,7 @@ kept forever as facts instead: a run's start, end and the task it is on
 | `sessions` | a run's story, tokens_used, cost, stale_flagged (its start, end and task are facts) | `latest`, `history: P14D`, `closed: P180D` |
 | `claims` | `holds` links: claim and release | `latest`, `history: P30D`, `closed: P90D` |
 | `notifications` | notification items and who may read them; outbox deliveries | `latest`, `closed: P30D` after read, `open: P90D` unread |
-| `automations` | an automation's last_run, last_fired, last_result; the event cursor; `run_once` marks; `rechecked_at` | `latest`, `history: P7D` |
+| `automations` | an automation's last_run, last_fired, last_result; the event cursor; `rechecked_at` | `latest`, `history: P7D` |
 | `settings` | the workspace's settings, `me`, each person's `changes.seen` and `questions.confirmed` (not packs: adding and removing one is a fact, section 8; not secrets: they are in the vault) | `latest`, `history: P365D` |
 | `access` | a token's last use (at most hourly), backup downloads (the grants themselves are facts) | `latest`, `history: P365D` |
 | `pack:<id>` | a pack's own keys and values (today's `pack_store`), read only while the pack is active | `latest`; the pack may declare more |
@@ -609,7 +609,7 @@ fact stream is. Each write the table of section 10 sends to a compacted
 stream appends there as it is made, beside today's tables, which are still
 written and read until the projections read the streams: `operational`, `claim`, `release` and
 `checkConnections` in `src/pelago.ts`, settings and secrets by name, the
-event and audit cursors, `run_once` marks, a token's use (hourly), backup
+event and audit cursors, a token's use (hourly), backup
 downloads, audit imports and a picture's hash. Not yet: the notification item
 itself (still facts through `apply`), a run's heartbeat (still on the run's
 row, in no stream), `pack_store` (the server's own log, `e_8g9feum7`), and
@@ -710,8 +710,7 @@ forgotten with an item without the person choosing it.
   created_at)`, one row per item, per link with fields, and per change set
   with free text. Keys are created with what they seal, in the append
   transaction.
-- **Secrets** live here too (`e_7cv7xefh`): a workspace's model account, a
-  pack's webhook and host secrets, as `vault_secret (ws, name, version,
+- **Secrets** live here too (`e_7cv7xefh`): a pack's webhook and host secrets, as `vault_secret (ws, name, version,
   wrapped)`. A secret must be truly deletable and never sit in the log's
   backups, as a key must not. Setting or removing one is recorded in the
   `settings` stream by name only, never its value.
@@ -1190,9 +1189,9 @@ section 4, Where this stands. Nothing else writes the map today
 | `share.create`, `share.revoke`, `share.workspace` | facts, kept forever (`e_x9wxnqz4`) |
 | token made, moved, revoked (`src/auth.ts`, `src/members.ts`, `src/tools.ts`) | facts, kept forever; last use in `access` |
 | `PACKS_OFF` (`src/packstate.ts`) | `pack` facts: a pack added or removed (section 8) |
-| `workspace.set` (`src/model-tools.ts`, `src/workspace-tools.ts`), `me` (`src/tools.ts`) | `settings` stream |
+| `workspace.set` (`src/workspace-tools.ts`), `me` (`src/tools.ts`) | `settings` stream |
 | `changes.seen`, `questions.confirmed` | `settings` stream, per person |
-| `run_once` marks (`src/agent-run.ts`) and the automation cursor (`src/automations.ts`, now a fact position) | `automations` stream |
+| the automation cursor (`src/automations.ts`, now a fact position) | `automations` stream |
 | pack secrets (`src/outside.ts`) | the key vault (`e_7cv7xefh`) |
 | `act.done`, `act.refused` | fact entries, as above |
 | `picture.stored`, `picture.removed` | a blob and its hash in `observations` |
