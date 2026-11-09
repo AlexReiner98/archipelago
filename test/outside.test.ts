@@ -13,12 +13,12 @@ import { openDb } from '../src/db.ts';
 import { runSchedule, serveHook } from '../src/hooks.ts';
 import { decideAct, setPackSecret, type Outcome } from '../src/outside.ts';
 import { hostFor } from '../src/packtools.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
+import { Archipelago } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { readEvents } from '../src/eventlog.ts';
 import { undo } from '../src/undo.ts';
+import { human } from './map.ts';
 
-const human: Actor = { kind: 'human', name: 'test' };
 const closers: (() => unknown)[] = [];
 after(() => closers.forEach((c) => c()));
 

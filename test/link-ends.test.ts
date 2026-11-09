@@ -2,29 +2,21 @@
 // (has:owned) rather than a kind, as core's owned_by does: whatever declares owned may be owned by a person or an
 // agent. Every link the packs allowed before is allowed still, and nothing more.
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { Archipelago } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
-import { syncTypes } from '../src/typetable.ts';
-import { human, make, PACKS } from './map.ts';
+import { freshWith, human, make, packsWith } from './map.ts';
 
 /** A copy of the shipped packs, core changed by `core` and one more pack beside them when given. */
-function packsWith(extra?: PackFile, core?: (p: PackFile) => void): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pelago-ends-'));
-  cpSync(PACKS, dir, { recursive: true });
+/** The packs with extra beside them, and core as `core` changes it. */
+function packsOf(extra?: PackFile, core?: (p: PackFile) => void): string {
+  const dir = packsWith(extra);
   if (core) {
     const file = join(dir, 'core', 'pack.json');
     const p = JSON.parse(readFileSync(file, 'utf8')) as PackFile;
     core(p);
     writeFileSync(file, JSON.stringify(p));
-  }
-  if (extra) {
-    mkdirSync(join(dir, extra.id));
-    writeFileSync(join(dir, extra.id, 'pack.json'), JSON.stringify(extra));
   }
   return dir;
 }
@@ -46,8 +38,8 @@ const ends = (reg: Registry) =>
   Object.fromEntries([...reg.relations.values()].map((r) => [r.id, [r.from, r.to].map((side) => (side.includes('*') ? 'all' : [...new Set(side.flatMap((e) => reg.family(e)))].sort()))]));
 
 test('owned_by allows exactly what it allowed when it named the five kinds', () => {
-  const now = new Registry(packsWith());
-  const was = new Registry(packsWith(undefined, (p) => { p.links!.find((r) => r.id === 'owned_by')!.from = ['aim', 'work', 'question', 'record', 'occurrence']; }));
+  const now = new Registry(packsOf());
+  const was = new Registry(packsOf(undefined, (p) => { p.links!.find((r) => r.id === 'owned_by')!.from = ['aim', 'work', 'question', 'record', 'occurrence']; }));
   assert.deepEqual(now.relations.get('owned_by')!.from, ['has:owned']);
   assert.deepEqual(ends(now), ends(was), 'every end of every link type takes the same types');
   for (const t of now.types.values()) {
@@ -59,8 +51,7 @@ test('owned_by allows exactly what it allowed when it named the five kinds', () 
 });
 
 test('a link type that extends nothing is its own root, joining its own types', async () => {
-  const l = new Archipelago(await openDb(), new Registry(packsWith(LEDGER)));
-  await syncTypes(l);
+  const l = await freshWith(new Registry(packsOf(LEDGER)));
   const posts = l.registry.relations.get('posts_to')!;
   assert.equal(posts.root, 'posts_to');
   assert.deepEqual(l.registry.relationFamily('posts_to'), ['posts_to']);
@@ -77,7 +68,7 @@ test('a link type that extends nothing is its own root, joining its own types', 
 });
 
 test('a capability end is checked: known, and kept inside what a flavour extends', () => {
-  const with_ = (links: PackFile['links']) => new Registry(packsWith({ ...LEDGER, links: [...LEDGER.links!, ...links!] } as PackFile));
+  const with_ = (links: PackFile['links']) => new Registry(packsOf({ ...LEDGER, links: [...LEDGER.links!, ...links!] } as PackFile));
   const rel = { title: 'r', inverse: 'r', description: '', to: ['*'] };
   assert.throws(() => with_([{ id: 'x', ...rel, from: ['has:nothing'] }]), /refers to unknown capability "nothing"/);
   assert.equal(with_([{ id: 'x', ...rel, from: ['has:owned'] }]).relations.get('x')!.root, 'x');
@@ -90,7 +81,7 @@ test('a capability end is checked: known, and kept inside what a flavour extends
 });
 
 test('a kept type from before owned was a capability is owned by its owner column', () => {
-  const reg = new Registry(packsWith());
+  const reg = new Registry(packsOf());
   const task = reg.type('task')!;
   const { owned: _, ...older } = task.capabilities;
   reg.keep({ types: [{ ...task, id: 'gone.chore', pack: 'gone', capabilities: older }], relations: [] });

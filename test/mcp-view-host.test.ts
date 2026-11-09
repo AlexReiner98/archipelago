@@ -9,7 +9,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createToken } from '../src/auth.ts';
 import { stopLayout } from '../src/look-draw.ts';
-import { chrome, open } from './browser.ts';
+import { chrome, open, wait } from './browser.ts';
+import { until as holds } from './wait.ts';
 import { serve } from './serve.ts';
 
 after(stopLayout);
@@ -67,10 +68,7 @@ test('in a browser, the page draws a flow from the look it asks the host for, fo
     const session = (await page.send('Target.attachToTarget', { targetId: targets.findLast((t) => t.type === 'iframe')!.targetId, flatten: true })).result.sessionId;
     return (await page.send('Runtime.evaluate', { expression, returnByValue: true }, session)).result?.result?.value;
   };
-  const until = async (expression: string, ms = 20000) => {
-    for (const end = Date.now() + ms; Date.now() < end; await new Promise((r) => setTimeout(r, 100))) if (await frameSees(expression).catch(() => false)) return true;
-    return false;
-  };
+  const until = (expression: string, ms = 20000) => holds(() => frameSees(expression).catch(() => false), ms, 100);
   try {
     await page.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
     // What is no call of draw, as a client holding the old list would send it, and a draw that was refused: the page
@@ -79,7 +77,8 @@ test('in a browser, the page draws a flow from the look it asks the host for, fo
       await page.go(`${base}/health`);
       await page.evaluate(HOST(html, `${base}/mcp`, token, input, { theme: 'light' }, refused));
       assert.ok(await page.evaluate<boolean>(`new Promise((r) => { const t = setInterval(() => window.said.initialized && (clearInterval(t), r(true)), 50); })`));
-      await new Promise((r) => setTimeout(r, 400));
+      // Asked is that nothing comes: the page is given a moment in which it would (wrongly) ask or grow.
+      await wait(400);
       const shut = await page.evaluate<{ sizes: { height: number }[]; calls: unknown[] }>('window.said');
       assert.deepEqual(shut.calls, [], JSON.stringify(input));
       assert.ok(shut.sizes.every((s) => s.height === 0), JSON.stringify(shut.sizes));

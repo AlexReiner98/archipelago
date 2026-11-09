@@ -4,11 +4,10 @@ import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { openDb } from '../src/db.ts';
 import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
+import { freshWith, human } from './map.ts';
 
-const human: Actor = { kind: 'human', name: 'test' };
 const agent: Actor = { kind: 'agent', name: 'test' };
 
 /** A shop's orders: big ones wait for a person, a paid one needs its date, numbers are not reused. */
@@ -34,7 +33,7 @@ async function map(packs: PackFile[] = [SHOP]) {
     mkdirSync(join(dir, pack.id));
     writeFileSync(join(dir, pack.id, 'pack.json'), JSON.stringify(pack));
   }
-  return new Archipelago(await openDb(), new Registry(dir), { create: 'auto', update: 'auto', link: 'auto' });
+  return freshWith(new Registry(dir), { create: 'auto', update: 'auto', link: 'auto' });
 }
 
 const change = (l: Archipelago, actor: Actor, ops: Op[]) => l.change(actor, { reason: 'test', ops });

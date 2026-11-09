@@ -21,11 +21,6 @@ test("in a browser, an agent's change reaches an open canvas without a lens read
     ],
   })).result.created as Record<string, string>;
   const page = await open(`${base}/#/v?find=id+${made.a}&over=depends_on&steps=1`);
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const until = async (expression: string) => {
-    for (const end = Date.now() + 20000; Date.now() < end; await wait(200)) if (await page.evaluate(expression)) return true;
-    return false;
-  };
   // An agent's change, approved as the owner would (it waits under the core rule agent_changes).
   const agentChange = async (ops: unknown[]) => {
     const asked = (await call('/agent/change', undefined, { actor: 'robot', reason: 'test', ops })).result;
@@ -34,20 +29,20 @@ test("in a browser, an agent's change reaches an open canvas without a lens read
   };
   const drawn = (title: string) => `[...document.querySelectorAll('#canvas svg a')].some((a) => a.textContent.includes(${JSON.stringify(title)}))`;
   try {
-    assert.ok(await until(drawn('Second step')), `the canvas is drawn: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(drawn('Second step')), `the canvas is drawn: ${page.logs().join('\n')}`);
     // Count the lens reads the page makes from here on.
     await page.evaluate(`(() => { window.flatReads = 0; const was = window.fetch; window.fetch = (url, init) => { if (String(init?.body ?? '').includes('"name":"flat"')) window.flatReads++; return was(url, init); }; })()`);
     await agentChange([{ op: 'update', id: made.b, title: 'Renamed step' }]);
     const probe = `(() => { const v = document.querySelector('#canvas .pane-canvas > .lens-wrap'); const s = v?.store; return JSON.stringify({ has: Boolean(v), store: Boolean(s), pos: s?.pos, titles: s ? [...s.items.values()].map((r) => r.title) : null, drawn: [...document.querySelectorAll('#canvas svg a')].map((a) => a.textContent) }); })()`;
-    assert.ok(await until(drawn('Renamed step')), `the new title is drawn: ${await page.evaluate(probe)} ${page.logs().join('\n')}`);
+    assert.ok(await page.until(drawn('Renamed step')), `the new title is drawn: ${await page.evaluate(probe)} ${page.logs().join('\n')}`);
     assert.equal(await page.evaluate('window.flatReads'), 0, 'drawn from the facts, with no lens read');
     // An item made and linked to what is drawn may change what the walk finds: the lens is read again, the server judging.
     await agentChange([{ op: 'create', ref: 'c', type: 'task', title: 'Third step' }, { op: 'link', type: 'depends_on', from: 'c', to: made.a }]);
-    assert.ok(await until(drawn('Third step')), `a new item linked in is drawn: ${await page.evaluate(probe)} ${page.logs().join('\n')}`);
+    assert.ok(await page.until(drawn('Third step')), `a new item linked in is drawn: ${await page.evaluate(probe)} ${page.logs().join('\n')}`);
     assert.ok((await page.evaluate<number>('window.flatReads')) >= 1, 'what a query finds is asked of the server');
     // A link to an item that was there all along, not held: the lens is read again, and the walk reaches it.
     await agentChange([{ op: 'link', type: 'depends_on', from: made.d, to: made.a }]);
-    assert.ok(await until(drawn('Elsewhere')), `what a new link reaches is drawn: ${await page.evaluate(probe)} ${page.logs().join('\n')}`);
+    assert.ok(await page.until(drawn('Elsewhere')), `what a new link reaches is drawn: ${await page.evaluate(probe)} ${page.logs().join('\n')}`);
     assert.ok((await page.evaluate<number>('window.flatReads')) >= 1, 'read again for what it did not hold');
   } finally {
     await page.close();

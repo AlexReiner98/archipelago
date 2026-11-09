@@ -2,8 +2,7 @@
 // is taken only if its file holds vocabulary, views and instructions and it builds on the shared set alone. Off is the
 // default, and with it off every pack is taken as before.
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { openDb } from '../src/db.ts';
@@ -13,7 +12,7 @@ import { Registry } from '../src/packs.ts';
 import { islandsOn, setIslands } from '../src/packstate.ts';
 import { Archipelago } from '../src/pelago.ts';
 import { syncTypes } from '../src/typetable.ts';
-import { human } from './map.ts';
+import { human, packsWith } from './map.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const HANDLER = { schedule: 'tick', every_minutes: 60 };
@@ -33,17 +32,6 @@ const island = (id: string, more: Partial<Manifest> = {}): Manifest => ({
 });
 
 /** The packs, with more beside them. */
-function packsWith(...more: Manifest[]): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pelago-islands-'));
-  cpSync(join(ROOT, 'packs'), dir, { recursive: true });
-  for (const m of more) {
-    mkdirSync(join(dir, m.id));
-    writeFileSync(join(dir, m.id, 'pack.json'), JSON.stringify(m));
-    if (m.handlers) writeFileSync(join(dir, m.id, 'handler.js'), 'export default {};\n');
-  }
-  return dir;
-}
-
 const core = () => readManifest(readFileSync(join(ROOT, 'packs', 'core', 'pack.json'), 'utf8'), 'core').manifest;
 
 test('the shared set is core’s list: the eight starter types, task, decision and finding', () => {

@@ -1,9 +1,11 @@
 // What the map's tests share: a fresh map in memory, the two actors, and quick ways to change and ask it.
 import assert from 'node:assert/strict';
+import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/db.ts';
 import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
+import { Registry, type PackFile } from '../src/packs.ts';
 import { callTool } from '../src/tools.ts';
 import { syncTypes } from '../src/typetable.ts';
 import { entries, type Entry } from '../src/log.ts';
@@ -18,9 +20,29 @@ export const agent: Actor = { kind: 'agent', name: 'test' };
 export const PACKS = join(import.meta.dirname, '..', 'packs');
 
 /** A fresh in-memory map with the repository's packs. */
-export async function fresh() {
-  const l = new Archipelago(await openDb(), new Registry(PACKS));
+export const fresh = () => freshWith(new Registry(PACKS));
+
+/** A fresh in-memory map with these packs, and the policy given. */
+export async function freshWith(registry: Registry, policy?: ConstructorParameters<typeof Archipelago>[2]) {
+  const l = new Archipelago(await openDb(), registry, policy);
   return (await syncTypes(l), l); // as a workspace is opened: the type table holds what the public rule reads
+}
+
+/** A copy of the repository's packs, in a folder of its own, with more beside them: a pack file (with an empty
+ * handler.js when it names handlers), or the name of a test pack under test/packs. */
+export function packsWith(...more: (PackFile | string | undefined)[]): string {
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
+  cpSync(PACKS, dir, { recursive: true });
+  for (const m of more) {
+    if (!m) continue;
+    if (typeof m === 'string') cpSync(join(PACKS, '..', 'test', 'packs', m), join(dir, m), { recursive: true });
+    else {
+      mkdirSync(join(dir, m.id));
+      writeFileSync(join(dir, m.id, 'pack.json'), JSON.stringify(m));
+      if (m.handlers) writeFileSync(join(dir, m.id, 'handler.js'), 'export default {};\n');
+    }
+  }
+  return dir;
 }
 
 export const attend = async (l: Archipelago, params: Record<string, unknown>) => (await callTool(l, human, 'view', { name: 'attention', params })) as any;

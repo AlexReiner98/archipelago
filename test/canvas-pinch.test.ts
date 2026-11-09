@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { chrome, open } from './browser.ts';
+import { chrome, open, wait } from './browser.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
@@ -22,11 +22,6 @@ test('in a browser with a touch screen, two fingers zoom the canvas', { skip: !b
     ],
   })).result.created as Record<string, string>;
   const page = await open('about:blank');
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const until = async (expression: string) => {
-    for (const end = Date.now() + 20000; Date.now() < end; await wait(200)) if (await page.evaluate(expression)) return true;
-    return false;
-  };
   const moves = `document.querySelector('#canvas .lens-view').moves`;
   const frames = `new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`;
   const touch = (type: string, points: [number, number][]) => page.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y], id) => ({ x, y, id })) });
@@ -35,8 +30,8 @@ test('in a browser with a touch screen, two fingers zoom the canvas', { skip: !b
     await page.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
     await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'pointer', value: 'coarse' }, { name: 'hover', value: 'none' }] });
     await page.go(`${base}/#/v?from=${made.p}`);
-    assert.ok(await until(`Boolean(document.querySelector('#canvas svg a[href="#/e/${made.s5}"]')) && Boolean(${moves})`), `the order is drawn: ${page.logs().join('\n')}`);
-    await wait(500);
+    assert.ok(await page.until(`Boolean(document.querySelector('#canvas svg a[href="#/e/${made.s5}"]')) && Boolean(${moves})`), `the order is drawn: ${page.logs().join('\n')}`);
+    assert.ok(await page.still(`document.querySelector('#canvas svg a[href="#/e/${made.s5}"]').getBoundingClientRect()`), 'the picture stands still');
 
     assert.equal(await page.evaluate(`[...document.querySelectorAll('#canvas button[title="Zoom in"]')].some((b) => b.getClientRects().length)`), false, 'the canvas keeps its zoom buttons hidden');
 
@@ -50,6 +45,7 @@ test('in a browser with a touch screen, two fingers zoom the canvas', { skip: !b
 
     // One finger on a step moves the picture, not the step.
     await touch('touchStart', [[x, y]]);
+    // The pointer moves as a hand does, a step every few milliseconds: the gesture is the time it takes.
     for (const by of [10, 20, 30]) (await touch('touchMove', [[x, y + by]]), await wait(30));
     await touch('touchEnd', []);
     await page.evaluate(frames);

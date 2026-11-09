@@ -2,21 +2,11 @@
 // times; status, owner, confidence and source are fields the kinds declare; every field is checked on write, and a
 // large value is a system item's alone.
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { test } from 'node:test';
 import { LARGE } from '../src/head.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
-import { fresh, human, make } from './map.ts';
+import { fresh, human, make, packsWith } from './map.ts';
 
-function packsWith(extra: PackFile): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pelago-head-'));
-  cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
-  mkdirSync(join(dir, extra.id));
-  writeFileSync(join(dir, extra.id, 'pack.json'), JSON.stringify(extra));
-  return dir;
-}
 const pack = (types: PackFile['types']): PackFile => ({ id: 'x', version: '1', title: 'X', requires: ['core'], types });
 
 test('the starter types declare status, owner, confidence and source; a flavour inherits them', async () => {

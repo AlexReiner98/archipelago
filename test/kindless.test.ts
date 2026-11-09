@@ -2,15 +2,9 @@
 // declares: status, confidence and source for its statuses, and an owner only when it is owned. The kinds declare
 // owned and actionable, so every type that had an owner or counted as work or a question through its kind still does.
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { Archipelago } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
-import { syncTypes } from '../src/typetable.ts';
-import { fresh, human, make, PACKS, replayed } from './map.ts';
+import { fresh, freshWith, human, make, packsWith, replayed } from './map.ts';
 
 const LEDGER: PackFile = {
   id: 'ledger',
@@ -24,17 +18,8 @@ const LEDGER: PackFile = {
   ],
 } as PackFile;
 
-function packsWith(extra: PackFile): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pelago-kindless-'));
-  cpSync(PACKS, dir, { recursive: true });
-  mkdirSync(join(dir, extra.id));
-  writeFileSync(join(dir, extra.id, 'pack.json'), JSON.stringify(extra));
-  return dir;
-}
-
 async function ledger() {
-  const l = new Archipelago(await openDb(), new Registry(packsWith(LEDGER)));
-  return (await syncTypes(l), l);
+  return freshWith(new Registry(packsWith(LEDGER)));
 }
 
 test('a type of no kind keeps status, confidence and source in its row, and an owner only when owned', async () => {
