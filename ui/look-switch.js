@@ -3,7 +3,7 @@
 // saved view brings its own when it is opened, and Save keeps it. A style drawn here, by Use here on its page, is one
 // more choice while it is.
 
-import { api, ask, h, state, tell } from './base.js';
+import { api, ask, h, may, state, tell } from './base.js';
 import { addressOf } from './query.js';
 import { titles } from './words.js';
 
@@ -26,7 +26,7 @@ const titled = async (id) => {
 /** Delete, in the band's menu while the pane is drawn with a layout or style kept on the map: it is archived (it leaves
  *  every choice and stays in the history), after saying which views use it, and the pane is drawn in the default. */
 export function styleDelete(lens, style, open) {
-  if (!style.style) return null;
+  if (!style.style || !may('write')) return null;
   const act = async () => {
     const kept = (await namedStyles()).find((s) => s.id === style.style);
     const title = kept?.title ?? (await titled(style.style)) ?? 'this style';

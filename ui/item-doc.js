@@ -1,7 +1,7 @@
 // An item read whole, as its reader meets it (drawn by the reading page, ui/doc.js), and the links that let someone
 // read it with no login, and its shares with other workspaces.
 
-import { api, ask, call as callAt, h, known, tell } from './base.js';
+import { api, ask, call as callAt, h, known, may, tell } from './base.js';
 import { secretBox } from './workspace-cards.js';
 
 /** The item as a reader meets it, and the links to it that still work. */
@@ -47,8 +47,8 @@ export function shareLinkOf(e, page, isDoc = true) {
   };
 }
 
-/** What the item's menu offers for reading it: print it, make a link to it, share it with a workspace (to publish, or not), stop sharing. */
-export function documentMenu(e, links, page, redraw, doc) {
+/** What the item's menu offers for reading it: print it, and where this session may write, make a link to it, share it with a workspace (to publish, or not), stop sharing. */
+export function documentMenu(e, links, page, redraw, doc, writes = may('write')) {
   const shareLink = shareLinkOf(e, page);
   // To publish too: that workspace may publish it as this map gives it, until the share stops, which takes it down there.
   const shareWorkspace = async (publish) => {
@@ -71,7 +71,7 @@ export function documentMenu(e, links, page, redraw, doc) {
   };
   const plain = links.filter((s) => !s.to_workspace);
   // Read here through another workspace's share: that workspace says who else may read it.
-  if (doc?.from) return [['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')]];
+  if (doc?.from || !writes) return [['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')]];
   return [
     ['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')],
     !e.archived_at && ['Make a link to read it', shareLink],

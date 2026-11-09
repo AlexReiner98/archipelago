@@ -3,7 +3,7 @@
 // parts can be left out or corrected. A change that only makes a new item has no item yet: its own sheet shows the item
 // proposed, read-only, under the same band (`heldPage`).
 
-import { api, h, part } from './base.js';
+import { api, h, may, part } from './base.js';
 import { proposalCard } from './held-card.js';
 import { decide } from './held.js';
 import { renderBody } from './body.js';
@@ -35,7 +35,8 @@ async function namesOf(p) {
 export async function heldBand(p, again) {
   const names = await namesOf(p);
   const whole = h('div', { hidden: true });
-  const buttons = [
+  // Deciding is writing: a session that may only read sees the change, not the way to decide it.
+  const buttons = !may('write') ? [] : [
     h('button', { class: 'primary', style: 'flex: none', title: p.held_by?.say ?? 'Apply the change as it was asked', onclick: () => go(true) }, 'Apply'),
     h('button', { class: 'danger', style: 'flex: none', title: 'Decline it, with a word for whoever asked', onclick: () => go(false) }, 'Decline'),
   ];

@@ -184,6 +184,9 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
 
   // What can be dimmed, by the item it is of; each step's key, for hovering; the badge of each step a held change is on.
   const dims = new Map(), keyed = new Map(), tipped = new Set(), stepBadges = new Map();
+  // The gestures of the drawing tools (ui/draw-marks.js), where the session may write: a step dragged onto another
+  // links them, a double click on an island's land adds an item there. Not while a story plays.
+  const gestures = !story && tools.gestures ? tools.gestures({ item: (key) => (/^e_/.test(keyed.get(key) ?? '') ? keyed.get(key) : null), island: (key) => (/^i:e_/.test(key) ? key.slice(2) : null) }) : { on: () => [], hear: () => false };
   // Ties under everything, then wires, each broken where it passes under, then the steps over all, then what each choice is.
   const drawIn = story ? { pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 } : {};
   const pend = (p) => (p ? ` held${p.mine ? ' mine' : ''}` : '');
@@ -334,7 +337,7 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
   };
   // On an archipelago each island a region round what lives on it, under everything, and a gate where a link crosses its
   // shore; a finding read across outlined in its island's colour (./islands.js).
-  const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)) });
+  const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)), on: gestures.on });
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
@@ -363,7 +366,7 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
     if (held(i.pending)) stepBadges.set(n.id, badge(i.pending, [X + n.w / 2, Y - n.h / 2]));
     tipped.add(key);
     if (ghost) return m('g', { key: `held:${i.pending.proposal}:${n.id}`, on: ['click'] }, titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nHeld for you`));
-    const el = titled(m('a', { key, on: ['enter', 'leave'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), i.said ?? i.title);
+    const el = titled(m('a', { key, on: ['enter', 'leave', ...gestures.on(key)], href: `#/e/${i.id}`, class: cls, ...hidden }, body), i.said ?? i.title);
     dims.set(n.id, el);
     return el;
   });
@@ -430,6 +433,7 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
     end: player?.end,
     on(event) {
       const { name, key } = event;
+      if (gestures.hear(event)) return [];
       if (player?.hears(key)) return player.on(event);
       // A shared mark's tip, over the step's while the pointer is on the mark; off it, back to the step it is on, if any.
       if (!story && markTip(String(key))) {

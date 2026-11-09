@@ -3,7 +3,7 @@
 // screens as presets; the owner adds one, takes it out and puts it back on its pack's card on the Workspace page, where each
 // screen is (a page in the nav, or a part of every item of a kind) is a row with its switch.
 
-import { api, ask, h, part, state, tell } from './base.js';
+import { api, ask, h, may, part, state, tell } from './base.js';
 import { drawScreen } from './screens.js';
 import { loadSchema, menu, typeTitle } from './words.js';
 
@@ -20,7 +20,8 @@ export function drawNav(open) {
     // For you: what waits on the person, the canvases kept and where to start (the core pack's home screen).
     h('a', { href: '#/you', class: at === '#/you' ? 'active' : '' }, 'For you'),
     ...inNav().map((s) => h('a', { href: `#/s/${s.id}`, class: open === s.id || at === `#/s/${s.id}` ? 'active' : '' }, s.title)),
-    h('a', { href: '#/workspace', class: at === '#/workspace' ? 'active' : '' }, 'Settings'),
+    // Settings are the workspace's to change: a session that may only read has none.
+    may('write') && h('a', { href: '#/workspace', class: at === '#/workspace' ? 'active' : '' }, 'Settings'),
   );
 }
 
@@ -70,7 +71,9 @@ export function screenRows(screens, then) {
   // What could be a page in the nav: what is there, what a pack offers, and the owner's own.
   const navable = (s) => typeof s.nav === 'number' || Boolean(s.offered) || Boolean(s.item && !s.pack && !s.on.length);
   // Taking a screen off Home or out of the nav, in its menu: room kept where there is nothing to take away.
+  const writes = may('write');
   const rare = (s) => {
+    if (!writes) return h('span', { class: 'menu-room' });
     const items = [s.at === 'home' && ['Take off Home', () => home(s, false)], typeof s.nav === 'number' && ['Take out of the nav', () => remove(s)]].filter(Boolean);
     return items.length ? menu('⋯', items) : h('span', { class: 'menu-room' });
   };
@@ -80,8 +83,8 @@ export function screenRows(screens, then) {
       { class: 'one' },
       h('span', { class: 'grow', title: `${s.title}${s.pack ? `, from the ${s.pack} pack` : ''}: ${where(s)}` }, s.item ? h('a', { href: `#/e/${s.item}` }, h('strong', {}, s.title)) : h('strong', {}, s.title), ' ', h('span', { class: 'muted small' }, where(s))),
       // Putting a screen somewhere is in sight; taking it away is rarer, and in its menu.
-      s.homeable && s.at !== 'home' && h('button', { title: 'Draw it on Home again, where its pack put it', onclick: () => home(s, true) }, 'Put on Home'),
-      navable(s) && typeof s.nav !== 'number' && h('button', { title: 'Give it a place in the nav, after the others', onclick: () => add(s) }, 'Add to nav'),
+      writes && s.homeable && s.at !== 'home' && h('button', { title: 'Draw it on Home again, where its pack put it', onclick: () => home(s, true) }, 'Put on Home'),
+      writes && navable(s) && typeof s.nav !== 'number' && h('button', { title: 'Give it a place in the nav, after the others', onclick: () => add(s) }, 'Add to nav'),
       rare(s),
     );
   // A screen on the pages of a kind has no switch here: it is a row of its own, saying which pages it is on.

@@ -1,7 +1,7 @@
 // The Workspace screen's Agents section: the tokens agents act with, what the owner lets them do, and the checks that
 // ask an agent at its reply's end. Each token, permission and check is one row; what is done rarely is in a menu.
 
-import { api, ask, h } from './base.js';
+import { api, ask, h, may } from './base.js';
 import { ago, menu, when } from './words.js';
 import { scopePills } from './token-piece.js';
 import { allowance, card, connectBox, line, secretBox } from './workspace-cards.js';
@@ -24,7 +24,7 @@ export function tokenRow(t, { me, personName, then, fail }) {
     t.everywhere && h('span', { class: 'muted small', title: `Acts as you in every workspace you are a member of, as ${t.emails.join(', ')}; at home in ${t.home}. Revoking it ends it in all of them.` }, 'all workspaces'),
     mine && h('span', { class: 'muted small', title: 'The token this browser is signed in with' }, 'this browser'),
     scopePills(t),
-    mine ? h('span', { class: 'menu-room' }) : menu('⋯', [['Revoke', revoke, 'danger']]),
+    mine || !may('write') ? h('span', { class: 'menu-room' }) : menu('⋯', [['Revoke', revoke, 'danger']]),
   );
 }
 
@@ -43,7 +43,8 @@ export function tokensCard({ tokens, row, then, fail, say, workspace, connect })
     'Agents',
     'Each acts for you: it sees what you see and proposes to you.',
     h('ul', { class: 'rows' }, tokens.length ? tokens.map(row) : line(h('span', { class: 'muted grow' }, 'None connected yet'))),
-    h(
+    // Making a token is a write: drawn only where this session may.
+    may('write') && h(
       'details',
       { class: 'fold-bar' },
       h('summary', { class: 'muted small', title: 'For Claude Code’s sessions and hooks, or a client that cannot sign in through the browser' }, 'With a token'),
@@ -61,12 +62,14 @@ export function tokensCard({ tokens, row, then, fail, say, workspace, connect })
       ),
     ),
   );
-  if (connect) box.querySelector('header').append(h('span', { class: 'grow' }), h('button', { class: 'primary', title: 'Pick the app your agent runs in and follow its steps', onclick: connect }, 'Connect an agent'));
+  if (connect && may('write')) box.querySelector('header').append(h('span', { class: 'grow' }), h('button', { class: 'primary', title: 'Pick the app your agent runs in and follow its steps', onclick: connect }, 'Connect an agent'));
   return box;
 }
 
 /** What the owner lets agents do: whether their changes wait, and the three things each asked for in turn. */
 export function agentsMayCard(info, then, fail) {
+  // What agents may do is the workspace's setting: an admin's to change.
+  if (!may('admin')) return null;
   return card(
     'What agents may do',
     'Every change is in the log with who made it and why.',
@@ -88,11 +91,11 @@ export function agentsMayCard(info, then, fail) {
 
 /** A rule that asks an agent at its reply's end (on its pack's card): how often it asked this week, and its switch. */
 export function checkRow(r) {
-  const on = h('input', { type: 'checkbox', checked: !r.off, title: 'On: it asks an agent whose reply did what it names' });
+  const on = h('input', { type: 'checkbox', checked: !r.off, disabled: !may('admin'), title: 'On: it asks an agent whose reply did what it names' });
   const name = h('span', { class: 'grow', title: `A check: once a turn, it asks an agent whose reply did what it names.\n${r.say}` }, h('strong', {}, r.rule.split('.').pop().replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase())), ' ', h('span', { class: 'muted small' }, 'a check on replies'));
   on.onchange = () => api('workspace_set', { lifted: { [r.lifted]: !on.checked } }).catch((err) => ((on.checked = !on.checked), (name.title = err.message)));
   // A check that counts: how many the reply must do before it asks, the owner's to set.
-  const at = r.counts && h('input', { type: 'number', min: '1', step: '1', value: String(r.at), style: 'width: var(--hours-field)', title: `Asks once a reply has done this many (${r.counts})` });
+  const at = r.counts && h('input', { type: 'number', min: '1', step: '1', value: String(r.at), disabled: !may('admin'), style: 'width: var(--hours-field)', title: `Asks once a reply has done this many (${r.counts})` });
   if (at) at.onchange = () => api('workspace_set', { asks_at: { [r.lifted]: Number(at.value) } }).then(() => (r.at = Number(at.value))).catch((err) => ((at.value = String(r.at)), (at.title = err.message)));
   return line(name, ...(at ? [at] : []), h('span', { class: 'mark', title: `Asked ${r.asked} time${r.asked === 1 ? '' : 's'} in the last week` }, String(r.asked)), on);
 }
