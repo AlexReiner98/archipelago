@@ -77,7 +77,7 @@ async function capture(lens: string, name = lens, width = 1600, height = 1000, b
 
 /** The flow drawing's modules under the names it imports them by (the pack's `modules`), in a folder of their own. */
 export function laidOutModules(core = join(flow, '..', '..')) {
-  const dir = mkdtempSync(join(tmpdir(), 'flow-replay-'));
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-flow-replay-'));
   const listed = JSON.parse(readFileSync(join(core, 'pack.json'), 'utf8')).layouts.find((d: any) => d.id === 'core.flow').modules;
   for (const [n, f] of Object.entries(listed)) copyFileSync(join(core, f as string), join(dir, n));
   return dir;
