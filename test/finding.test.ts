@@ -61,7 +61,7 @@ test('a reader reads a finding; reads points at a finding only, and crosses', as
 });
 
 test('a finding is in the shared set: a pack on an island map may build on it', () => {
-  const core = readManifest(readFileSync(join(PACKS, 'core', 'pack.json'), 'utf8'), 'core').manifest;
+  const core = readManifest(readFileSync(join(PACKS, 'core', 'pack.json'), 'utf8'), 'core');
   const shared = sharedOf([core]);
   assert.ok(shared.types.has('finding'));
   assert.ok(shared.links.has('reads'));

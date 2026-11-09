@@ -4,11 +4,8 @@
 // and server reach), and what it requires and what it uses if present. A server pack is a pack that asks for server
 // reach: no other kind of pack.
 //
-// The keys pack files used before this shape are read for one release with a warning, each as LEGACY says, then
-// refused. `parts` is how the kernel reads a pack: each thing it declares as one list, whichever shape it came in.
+// The keys pack files used before this shape are refused, each named with where it went (LEGACY). `parts` is how the kernel reads a pack: each thing it declares as one list, whichever shape it came in.
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { ActionDef, LayoutDef, HearDef, HostDef, ReasonDef, ScheduleDef, ScreenDef, StyleDef, TreeDef, VerbDef, ViaDef, ViewDef, WebhookDef } from './declared.ts';
 import { KERNEL_PACKS } from './packorder.ts';
 import type { FieldDef, RelationDef, TypeDef } from './packs.ts';
@@ -98,43 +95,8 @@ export const LEGACY: Record<string, string> = {
   contract: 'nothing: no part of the kernel reads it',
 };
 
-/** The release whose packs may still use the old keys; the next one refuses them. */
-export const LEGACY_UNTIL = '0.1.0';
-const RELEASE = (JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8')) as { version: string }).version;
-const after = (a: string, b: string) => {
-  const [x, y] = [a, b].map((v) => v.split('.').map(Number));
-  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0);
-  return false;
-};
-
 type Raw = Record<string, unknown>;
 const arr = <T>(x: unknown) => (Array.isArray(x) ? (x as T[]) : []);
-
-/** A pack file in the shape before the manifest, put in the manifest's shape. */
-function fromLegacy(raw: Raw): Raw {
-  const out: Raw = {};
-  const reach: Raw = { ...(raw.reach as Raw | undefined) };
-  const server: Raw = { ...(reach.server as Raw | undefined) };
-  const push = (key: string, ...items: unknown[]) => (out[key] = [...arr(out[key]), ...items]);
-  for (const [key, value] of Object.entries(raw)) {
-    if (!(key in LEGACY)) out[key] = value;
-  }
-  if (raw.relations) push('links', ...arr(raw.relations));
-  for (const [of, add] of Object.entries((raw.extend as Record<string, { fields: Raw }> | undefined) ?? {})) push('types', { of, fields: add.fields });
-  push('views', ...arr<Raw>(raw.trees).map((t) => ({ form: 'tree', ...t })), ...arr<Raw>(raw.screens).map((s) => ({ form: 'screen', ...s })));
-  if (raw.verbs) out.actions = [...arr<Raw>(raw.verbs).map((v) => ({ ...v, kernel: true })), ...arr(out.actions)];
-  push('handlers', ...arr<Raw>(raw.schedules).map(({ id, ...rest }) => ({ schedule: id, ...rest })), ...arr<Raw>(raw.hears).map((h) => ({ ...h })));
-  if (raw.events) {
-    const hook = arr<{ id: string }>(raw.webhooks)[0];
-    push('handlers', hook ? { webhook: hook.id, records: raw.events } : { webhook: '', records: raw.events });
-  }
-  for (const key of ['hosts', 'secrets', 'webhooks', 'via', 'runs']) if (raw[key] !== undefined) reach[key] = raw[key];
-  for (const key of SERVER_KEYS) if (raw[key] !== undefined) server[key] = raw[key];
-  if (raw.tier === 'server' || Object.keys(server).length) reach.server = server;
-  if (Object.keys(reach).length) out.reach = reach;
-  for (const key of ['views', 'handlers']) if (!arr(out[key]).length) delete out[key];
-  return out;
-}
 
 /** Problems with a manifest's own keys, as sentences. */
 function keyProblems(m: Raw): string[] {
@@ -159,20 +121,15 @@ function keyProblems(m: Raw): string[] {
   return problems;
 }
 
-/**
- * Read a pack file: the manifest, and what to warn of. A key of the shape before is read as LEGACY says, with a
- * warning, until the release after LEGACY_UNTIL; then it is refused, as any key that is not the manifest's is.
- */
-export function readManifest(text: string, where: string, release = RELEASE): { manifest: Manifest; warnings: string[] } {
+/** Read a pack file. A key of the shape before is refused with where it went (LEGACY), as any key that is not the manifest's is. */
+export function readManifest(text: string, where: string): Manifest {
   const raw = JSON.parse(text) as Raw;
   const old = Object.keys(raw).filter((k) => k in LEGACY);
   const id = String(raw.id ?? where);
-  if (old.length && after(release, LEGACY_UNTIL)) throw new Error(`Pack "${id}" (${where}) uses keys of the shape before the manifest, refused since ${LEGACY_UNTIL}: ${old.map((k) => `${k} is ${LEGACY[k]}`).join('; ')}`);
-  const manifest = old.length ? fromLegacy(raw) : raw;
-  const problems = keyProblems(manifest);
+  if (old.length) throw new Error(`Pack "${id}" (${where}) uses keys of the shape before the manifest, refused since 0.1.0: ${old.map((k) => `${k} is ${LEGACY[k]}`).join('; ')}`);
+  const problems = keyProblems(raw);
   if (problems.length) throw new Error(`Pack "${id}" (${where}): ${problems.join('; ')}`);
-  const warnings = old.map((k) => `Pack "${id}" (${where}): "${k}" is read as ${LEGACY[k]} until the release after ${LEGACY_UNTIL}; move it.`);
-  return { manifest: manifest as unknown as Manifest, warnings };
+  return raw as unknown as Manifest;
 }
 
 /** Each thing a pack declares, as one list the kernel reads: what `parts` answers. */

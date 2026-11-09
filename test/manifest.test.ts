@@ -31,30 +31,14 @@ async function mapOf(dir: string) {
   return (await syncTypes(l), l);
 }
 
-test('a manifest has its own keys and nothing else; the old keys are read for one release, then refused', () => {
+test('a manifest has its own keys and nothing else; the old keys are refused, each with where it went', () => {
   const now = readManifest(JSON.stringify({ id: 'x', version: '1', title: 'X', links: [], handlers: [{ event: 'repo.push' }], reach: { runs: ['get'] } }), 'x');
-  assert.deepEqual(now.warnings, []);
+  assert.deepEqual(now.links, []);
   assert.throws(() => readManifest(JSON.stringify({ id: 'x', version: '1', title: 'X', colour: 'red' }), 'x'), /"colour" is not a key of a manifest/);
   assert.throws(() => readManifest(JSON.stringify({ id: 'x', version: '1', title: 'X', reach: { disk: true } }), 'x'), /"reach.disk" is not a key/);
   assert.throws(() => readManifest(JSON.stringify({ id: 'x', version: '1', title: 'X', handlers: [{ event: 'a.b', schedule: 'c' }] }), 'x'), /a handler runs on one of/);
-
-  const old = {
-    id: 'x', version: '1', title: 'X', contract: 1, tier: 'server',
-    relations: [{ id: 'x.r' }], extend: { person: { fields: { rate: { type: 'number' } } } }, trees: [{ id: 'x.t' }], screens: [{ id: 'x.s' }], verbs: [{ id: 'capture' }],
-    schedules: [{ id: 'tick', every_minutes: 5 }], hears: [{ event: 'repo.push' }], webhooks: [{ id: 'x.hook', secret: 's' }], events: ['x.heard'],
-    hosts: [{ id: 'api', base: 'https://a.test' }], secrets: [{ name: 's' }], via: [{ pack: 'p', host: 'api' }], runs: ['get'],
-    acts: ['mail.send'], entries: [{ id: 'e' }], pages: [{ id: 'p', file: 'p.html' }], connect: { status: 's', start: 't' }, aliases: { '/a': 'e' }, agreements: 'e',
-  };
-  assert.deepEqual(Object.keys(old).filter((k) => !['id', 'version', 'title'].includes(k)).sort(), Object.keys(LEGACY).sort(), 'every old key is tried here');
-  const { manifest, warnings } = readManifest(JSON.stringify(old), 'x', '0.1.0');
-  assert.equal(warnings.length, Object.keys(LEGACY).length, 'each old key is warned of');
-  const p = parts(manifest);
-  assert.deepEqual([p.relations.map((r) => r.id), Object.keys(p.adds), p.trees.map((t) => t.id), p.screens.map((s) => s.id), p.verbs.map((v) => v.id)], [['x.r'], ['person'], ['x.t'], ['x.s'], ['capture']]);
-  assert.deepEqual([p.schedules, p.hears.map((h) => h.event), p.events], [[{ id: 'tick', every_minutes: 5, at_start: undefined, limit_ms: undefined }], ['repo.push'], ['x.heard']]);
-  assert.deepEqual([p.hosts.length, p.secrets.length, p.webhooks.length, p.via.length, p.runs], [1, 1, 1, 1, ['get']]);
-  assert.deepEqual(Object.keys(p.server!).sort(), ['acts', 'agreements', 'aliases', 'connect', 'entries', 'pages']);
-  assert.ok(!('contract' in manifest), 'contract goes: nothing read it');
-  assert.throws(() => readManifest(JSON.stringify(old), 'x', '0.2.0'), /keys of the shape before the manifest, refused since 0\.1\.0/);
+  for (const key of Object.keys(LEGACY))
+    assert.throws(() => readManifest(JSON.stringify({ id: 'x', version: '1', title: 'X', [key]: [] }), 'x'), new RegExp(`keys of the shape before the manifest, refused since 0\.1\.0: ${key} is `));
 });
 
 test('every pack here is in the manifest shape, and reads as it did', () => {

@@ -1,8 +1,8 @@
 // The key vault (docs/log.md, section 5): one AES-256-GCM key for each item, each link with fields and each change set
 // with free text, kept outside the log in the workspace's own database, so a forget is one transaction (the owner,
 // e_98cdhgn6). Each key is stored wrapped with the server's sealing key (src/secrets.ts), which is never in a database
-// or a backup. A key is deleted only by a forget, and deleted for real: what it sealed is never read again. Secrets live
-// here too (e_7cv7xefh), by name. The vault is backed up apart from the log, and those backups are kept 30 days.
+// or a backup. A key is deleted only by a forget, and deleted for real: what it sealed is never read again. The vault
+// is backed up apart from the log, and those backups are kept 30 days. Secrets are sealed settings (src/secrets.ts).
 
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import type { Q } from './db.ts';
@@ -12,7 +12,8 @@ import { sealingKey } from './secrets.ts';
 export const VAULT_BACKUP_DAYS = 30;
 
 /**
- * Step 20, with the forget's own (src/forget.ts). A member may read and add keys, never change one; deleting goes
+ * Step 20, with the forget's own (src/forget.ts). It also makes vault_secret, a store of secrets by name that nothing
+ * has written (bug e_27zw6jt3): nothing reads it now, and a later step drops it once no app before reads it. A member may read and add keys, never change one; deleting goes
  * through the one function a forget calls.
  */
 export const VAULT = `
@@ -142,38 +143,19 @@ export async function destroy(q: Q, ids: string[]): Promise<number> {
   return rows[0].n;
 }
 
-/** A secret kept by name (a model account, a pack's webhook or host secret), wrapped like a key. */
-export async function putSecret(q: Q, ws: string, name: string, value: string): Promise<void> {
-  const { rows } = await q.query<{ v: number | null }>(`select max(version) as v from vault_secret where name = $1`, [name]);
-  const version = (rows[0].v ?? 0) + 1;
-  await q.query(`insert into vault_secret (ws, name, version, wrapped) values ($1, $2, $3, $4)`, [ws, name, version, wrap(ws, `secret:${name}`, version, Buffer.from(value, 'utf8'))]);
-}
-
-/** The newest version of a secret, or undefined when there is none or it cannot be opened here. */
-export async function getSecret(q: Q, name: string): Promise<string | undefined> {
-  const { rows } = await q.query<{ ws: string; version: number; wrapped: Uint8Array }>(`select ws, version, wrapped from vault_secret where name = $1 order by version desc limit 1`, [name]);
-  const r = rows[0];
-  return r && unwrap(r.ws, `secret:${name}`, r.version, Buffer.from(r.wrapped))?.toString('utf8');
-}
-
-/** Remove a secret, every version of it. */
-export async function removeSecret(q: Q, name: string): Promise<void> {
-  await q.query(`delete from vault_secret where name = $1`, [name]);
-}
-
 /** The vault as a backup holds it: keys still wrapped, so the file gives up nothing without the sealing key. */
 export interface VaultDump {
   format: 1;
   vault: true;
   taken: string;
   keys: { ws: string; id: string; version: number; wrapped: string; created_at: string }[];
-  secrets: { ws: string; name: string; version: number; wrapped: string; created_at: string }[];
+  /** Always empty: the secrets store is retired. Kept so the app before, which counts it, still restores a backup made here. */
+  secrets: unknown[];
 }
 
 export async function dumpVault(q: Q): Promise<VaultDump> {
-  const read = (table: string, name: string) =>
-    q.query<any>(`select ws, ${name}, version, encode(wrapped, 'base64') as wrapped, created_at from ${table} order by ${name}, version`).then((r) => r.rows);
-  return { format: 1, vault: true, taken: new Date().toISOString(), keys: await read('vault_key', 'id'), secrets: await read('vault_secret', 'name') };
+  const { rows } = await q.query<VaultDump['keys'][number]>(`select ws, id, version, encode(wrapped, 'base64') as wrapped, created_at from vault_key order by id, version`);
+  return { format: 1, vault: true, taken: new Date().toISOString(), keys: rows, secrets: [] };
 }
 
 /**
@@ -182,26 +164,22 @@ export async function dumpVault(q: Q): Promise<VaultDump> {
  * it in wraps them under its own. A key that does not open is left out.
  */
 export function rewrap(dump: VaultDump, from?: Buffer, to?: Buffer): VaultDump {
-  const again = <T extends { ws: string; version: number; wrapped: string }>(rows: T[], id: (r: T) => string) =>
-    rows.flatMap((r) => {
-      const key = unwrap(r.ws, id(r), r.version, Buffer.from(r.wrapped, 'base64'), from);
-      return key ? [{ ...r, wrapped: wrap(r.ws, id(r), r.version, key, to).toString('base64') }] : [];
-    });
-  return { ...dump, keys: again(dump.keys, (r) => r.id), secrets: again(dump.secrets, (r) => `secret:${r.name}`) };
+  const keys = dump.keys.flatMap((r) => {
+    const key = unwrap(r.ws, r.id, r.version, Buffer.from(r.wrapped, 'base64'), from);
+    return key ? [{ ...r, wrapped: wrap(r.ws, r.id, r.version, key, to).toString('base64') }] : [];
+  });
+  // Secrets an older backup carries are left behind: nothing here reads them.
+  return { ...dump, keys, secrets: [] };
 }
 
-/** Put a vault backup back, beside the keys already there. */
+/** Put a vault backup back, beside the keys already there. Secrets an older backup carries are not put back: nothing reads them. */
 export async function restoreVault(q: Q, dump: VaultDump): Promise<number> {
   if (dump?.vault !== true || dump.format !== 1) throw new Error('That is not a backup of the key vault.');
-  const put = (table: string, name: string, rows: unknown[]) =>
-    rows.length
-      ? q.query(
-          `insert into ${table} (ws, ${name}, version, wrapped, created_at) select x.ws, x.${name}, x.version, decode(x.wrapped, 'base64'), x.created_at
-           from jsonb_to_recordset($1::jsonb) as x(ws text, ${name} text, version int, wrapped text, created_at timestamptz) on conflict do nothing`,
-          [JSON.stringify(rows)],
-        )
-      : undefined;
-  await put('vault_key', 'id', dump.keys);
-  await put('vault_secret', 'name', dump.secrets);
-  return dump.keys.length + dump.secrets.length;
+  if (dump.keys.length)
+    await q.query(
+      `insert into vault_key (ws, id, version, wrapped, created_at) select x.ws, x.id, x.version, decode(x.wrapped, 'base64'), x.created_at
+       from jsonb_to_recordset($1::jsonb) as x(ws text, id text, version int, wrapped text, created_at timestamptz) on conflict do nothing`,
+      [JSON.stringify(dump.keys)],
+    );
+  return dump.keys.length;
 }

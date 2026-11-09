@@ -51,6 +51,22 @@ export function differences(was: Record<string, unknown>, now: Record<string, un
   return out;
 }
 
+/**
+ * The migrations a workspace runs when it opens, each once (bug e_kdt2upeg): the names of those done, kept as a setting
+ * of the workspace, and the takeovers last moved. A restored backup brings its own (none, if it is older than this);
+ * a merge takes it off (movesAgain), since what it brings may be from before them.
+ */
+const MOVES = 'moves_done';
+interface Moves {
+  done: string[];
+  taken?: string;
+}
+
+/** Have the migrations asked again on the next sync: what a merge brought in may be in the shapes from before them. */
+export async function movesAgain(l: Archipelago): Promise<void> {
+  await wholeMap(l).db.query(`delete from setting where key = $1`, [MOVES]);
+}
+
 /** The map whole: the type table is the system's own, kept as the server keeps it whoever's act changed the types. */
 const wholeMap = (l: Archipelago) => (l.db.whole ? new Archipelago(l.db.whole, l.registry, l.policy, l.workspace) : l);
 
@@ -88,18 +104,38 @@ export async function syncTypes(given: Archipelago): Promise<{ activated: string
     if (dormant.length || activated.length || Object.keys(changed).length)
       await l.log(tx, { actor: 'system', action: 'types.sync', reason: 'The packs loaded differ from the types the workspace kept.', detail: { dormant, activated, changed } });
   });
-  await termQueries(l); // views kept in the filter's old words, said in its terms (a migration, run once)
-  // A type a pack took over brings its items with it, once no pack defines the old one (a migration, run once).
+  const stamp: Moves = (await l.setting<Moves>(MOVES)) ?? { done: [] };
+  const was = JSON.stringify(stamp);
+  const once = async (name: string, ready: boolean, run: () => Promise<unknown>) => {
+    if (!ready || stamp.done.includes(name)) return;
+    await run();
+    stamp.done.push(name);
+  };
+  const has = (...types: string[]) => types.every((t) => reg.types.has(t));
+  await once('terms', has('lens'), () => termQueries(l)); // views kept in the filter's old words, said in its terms
+  // A type a pack took over brings its items with it, once no pack defines the old one: asked again only when which
+  // types are taken over and gone changes, or when the type table did.
+  const typesChanged = !rows.length || dormant.length > 0 || activated.length > 0 || Object.keys(changed).length > 0;
+  const takeovers = [
+    ...[...reg.types.values()].flatMap((t) => (t.dormant ? [] : (t.movedFrom ?? []).filter((old) => !now.has(old)).map((old) => ({ old, to: t.id, what: 'entity' as const, statuses: t.movedStatuses?.[old] })))),
+    ...[...reg.relations.values()].flatMap((r) => (r.dormant ? [] : (r.moved_from ?? []).filter((old) => !now.has(old)).map((old) => ({ old, to: r.id, what: 'relation' as const, statuses: undefined })))),
+  ];
+  const taken = takeovers.map((t) => `${t.old}>${t.to}`).sort().join(' ');
   const moved: Record<string, number> = {};
-  for (const t of reg.types.values()) for (const old of t.dormant ? [] : (t.movedFrom ?? [])) if (!now.has(old) && (moved[old] = await l.retype(old, t.id, 'entity', t.movedStatuses?.[old])) === 0) delete moved[old];
-  for (const r of reg.relations.values()) for (const old of r.dormant ? [] : (r.moved_from ?? [])) if (!now.has(old) && (moved[old] = await l.retype(old, r.id, 'relation')) === 0) delete moved[old];
-  await l.fillKinds(); // each item's kind in its row, now the type table is whole
-  await moveQueries(l); // views kept before the flat lens, translated into flat lenses (a migration, run once)
-  await moveStyles(l); // styles made for one view, moved into it (a migration, run once)
-  await moveLayouts(l); // styles with code, layouts now (a migration, run once; after moveStyles, which reads code on a style)
-  await moveLives(l); // views and layouts still current, sorted into working, kept and retired (a migration, run once; after moveLayouts)
-  await movePins(l); // the ids a view held by hand, id terms of its filter; pinned taken off (a migration, run once; after moveLives, which reads pinned)
-  await linkOwners(l, () => newId('r')); // each owner said as a link (a migration, run once)
+  if (typesChanged || stamp.taken !== taken) {
+    for (const t of takeovers) if ((moved[t.old] = await l.retype(t.old, t.to, t.what, t.statuses)) === 0) delete moved[t.old];
+    stamp.taken = taken;
+  }
+  // Each item's kind in its row, now the type table is whole: again whenever the types changed or items moved.
+  if (typesChanged || Object.keys(moved).length) stamp.done = stamp.done.filter((d) => d !== 'kinds');
+  await once('kinds', true, () => l.fillKinds());
+  await once('queries', has('lens'), () => moveQueries(l)); // views kept before the flat lens, translated into flat lenses
+  await once('styles', has('style', 'lens'), () => moveStyles(l)); // styles made for one view, moved into it
+  await once('layouts', has('style', 'layout'), () => moveLayouts(l)); // styles with code, layouts now (after styles, which reads code on a style)
+  await once('lives', has('lens', 'layout'), () => moveLives(l)); // views and layouts sorted into working, kept and retired (after layouts)
+  await once('pins', has('lens'), () => movePins(l)); // the ids a view held by hand, id terms of its filter (after lives, which reads pinned)
+  await once('owners', true, () => linkOwners(l, () => newId('r'))); // each owner said as a link
+  if (JSON.stringify(stamp) !== was) await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [MOVES, JSON.stringify(stamp)]);
   const asleep = rows.filter((r) => !now.has(r.id));
   reg.keep({
     types: asleep.filter((r) => r.what === 'type').map((r) => r.def as ResolvedType),

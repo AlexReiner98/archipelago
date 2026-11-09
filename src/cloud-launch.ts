@@ -16,6 +16,7 @@ import { ANTHROPIC, anthropicHeaders } from './model.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
+import { logged } from './logged.ts';
 
 interface CloudConfig {
   /** This map's MCP endpoint as the internet reaches it: the session calls it from Anthropic's side. */
@@ -163,8 +164,8 @@ export async function cloudLaunch(l: Archipelago, actor: Actor, input: LaunchInp
     await sessionUpdate(l, agent, { run, note: `Started in the cloud: session ${session.id}, capped at US$${budget}` });
     return { run, session_id: session.id, mode, where: 'cloud' as const, ...(repo && { repo }), budget_usd: budget, claimed: ('claimed' in begun ? begun.claimed : undefined) ?? [] };
   } catch (err) {
-    if (token) await revokeToken(l.db, token.id).catch(() => {});
-    if (vault) await call(account.key, 'DELETE', `/v1/vaults/${vault}`).catch(() => {});
+    if (token) await revokeToken(l.db, token.id).catch(logged(`cloud launch ${run}: its token could not be revoked`));
+    if (vault) await call(account.key, 'DELETE', `/v1/vaults/${vault}`).catch(logged(`cloud launch ${run}: its vault ${vault} could not be deleted`));
     await sessionEnd(l, agent, { run, outcome: 'failed', summary: `Could not start in the cloud: ${(err as Error).message}` });
     throw err;
   }
@@ -177,7 +178,7 @@ interface Session {
 
 /** What the session last said, for its run's summary. */
 async function lastSaid(key: string, session: string): Promise<string> {
-  const page = await call<{ data?: { type: string; content?: { type: string; text?: string }[] }[] }>(key, 'GET', `/v1/sessions/${session}/events?order=desc&limit=50`).catch(() => ({ data: [] }));
+  const page = await call<{ data?: { type: string; content?: { type: string; text?: string }[] }[] }>(key, 'GET', `/v1/sessions/${session}/events?order=desc&limit=50`).catch(logged(`cloud session ${session}: what it last said could not be read`, { data: [] }));
   const said = page.data?.find((ev) => ev.type === 'agent.message');
   return (said?.content ?? []).filter((c) => c.type === 'text' && c.text).map((c) => c.text).join('\n').trim();
 }
@@ -199,16 +200,16 @@ export async function checkCloud(given: Archipelago): Promise<string[]> {
   for (const o of open) {
     // Ended on the map (by its owner, or for going quiet): the session is stopped too.
     if (!(await l.entity(o.run))?.is_open) {
-      await call(account.key, 'POST', `/v1/sessions/${o.session}/events`, { events: [{ type: 'user.interrupt' }] }).catch(() => {});
+      await call(account.key, 'POST', `/v1/sessions/${o.session}/events`, { events: [{ type: 'user.interrupt' }] }).catch(logged(`cloud session ${o.session}: it could not be stopped`));
     } else {
-      const s = await call<Session>(account.key, 'GET', `/v1/sessions/${o.session}`).catch(() => undefined);
+      const s = await call<Session>(account.key, 'GET', `/v1/sessions/${o.session}`).catch(logged(`cloud session ${o.session}: it could not be read`));
       if (!s || (s.status !== 'idle' && s.status !== 'terminated')) continue;
       const why = STOPPED[s.stop_reason?.type ?? ''];
       const text = (await lastSaid(account.key, o.session)) || 'The session ended without a word.';
-      await sessionEnd(l, agent, { run: o.run, outcome: why ? 'failed' : 'finished', summary: `${why ? `${why}\n\n` : ''}${text.slice(0, 6000)}\n\n(cloud session ${o.session})` }).catch(() => {});
+      await sessionEnd(l, agent, { run: o.run, outcome: why ? 'failed' : 'finished', summary: `${why ? `${why}\n\n` : ''}${text.slice(0, 6000)}\n\n(cloud session ${o.session})` }).catch(logged(`cloud session ${o.session}: its run ${o.run} could not be ended`));
     }
-    if (o.token) await revokeToken(l.db, o.token).catch(() => {});
-    if (o.vault) await call(account.key, 'DELETE', `/v1/vaults/${o.vault}`).catch(() => {});
+    if (o.token) await revokeToken(l.db, o.token).catch(logged(`cloud session ${o.session}: its token could not be revoked`));
+    if (o.vault) await call(account.key, 'DELETE', `/v1/vaults/${o.vault}`).catch(logged(`cloud session ${o.session}: its vault ${o.vault} could not be deleted`));
     ended.push(o.run);
   }
   if (ended.length) await keep(l, OPEN, ((await l.setting<OpenRun[]>(OPEN)) ?? []).filter((o) => !ended.includes(o.run)));
