@@ -1,6 +1,7 @@
 // The public page of one product: how we know it is correct, and what has been built. No login, no framework,
 // and nothing drawn that the server did not say: every text is set as text, never as markup.
 
+import { h } from './base.js';
 import { applyTheme } from './theme.js';
 import { startTips } from './tip.js';
 
@@ -8,18 +9,6 @@ startTips();
 
 const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');
-
-function h(tag, attrs, ...kids) {
-  const el = document.createElement(tag);
-  for (const [key, value] of Object.entries(attrs ?? {})) {
-    if (value === false || value == null) continue;
-    if (key.startsWith('on')) el[key] = value;
-    else if (key === 'class') el.className = value;
-    else el.setAttribute(key, value === true ? '' : value);
-  }
-  for (const kid of kids.flat(Infinity)) if (kid !== false && kid != null && kid !== '') el.append(kid.nodeType ? kid : String(kid));
-  return el;
-}
 
 const day = (ts) => new Date(ts).toLocaleDateString(undefined, { dateStyle: 'medium' });
 const bar = (done, total, what) => h('span', { class: 'bar', title: `${done} of ${total} ${what}` }, h('span', { style: `width: ${total ? Math.round((done / total) * 100) : 0}%` }));

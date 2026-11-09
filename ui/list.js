@@ -128,6 +128,9 @@ export function drawList(host, answer, style, keep, kept) {
   host.replaceChildren(...[lit && h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), lit), body].filter(Boolean));
   host.redraw = draw;
   // Narrow, the type and waits columns step aside, at the width the style says.
-  new ResizeObserver(([seen]) => body.classList.toggle('ll-narrow', seen.contentRect.width < sizeOf(style, 'list_narrow_at'))).observe(body);
+  // The list drawn before is let go of first.
+  host.listSeen?.disconnect();
+  host.listSeen = new ResizeObserver(([seen], seer) => (body.isConnected ? body.classList.toggle('ll-narrow', seen.contentRect.width < sizeOf(style, 'list_narrow_at')) : seer.disconnect()));
+  host.listSeen.observe(body);
   draw();
 }

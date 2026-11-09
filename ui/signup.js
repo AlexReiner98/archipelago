@@ -1,7 +1,7 @@
 // Buying a workspace: a name and an address, then the seller's checkout; and the page the checkout sends the buyer
 // back to, which signs this browser in to the new workspace as soon as it is made (src/signup.ts). No login needed.
 
-import { enter, gate, gateRow, h } from './base.js';
+import { enter, gate, gateRow, h, postJson } from './base.js';
 
 /** Where this browser keeps the request it began, until the workspace is made. */
 const KEPT = 'pelago-signup';
@@ -30,7 +30,7 @@ export async function signupPage() {
   const go = h('button', { class: 'primary', title: 'Pay on Lemon Squeezy, then come back here signed in' }, 'Continue to payment');
   go.onclick = async () => {
     go.disabled = true;
-    const res = await fetch('/connect/signup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: name.value.trim(), email: email.value.trim() }) });
+    const res = await postJson('/connect/signup', { name: name.value.trim(), email: email.value.trim() });
     const body = await res.json().catch(() => ({}));
     go.disabled = false;
     if (!res.ok) return (error.textContent = body.error ?? 'That did not work.');

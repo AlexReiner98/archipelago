@@ -53,9 +53,9 @@ export async function heldBand(p, again) {
     { class: 'held-band needs', 'data-held': p.id },
     h(
       'div',
-      { class: 'row-top', style: 'flex-wrap: nowrap' },
+      { class: 'row-top' },
       h('span', { class: 'muted small', style: 'flex: none' }, 'Held for you'),
-      h('span', { class: 'grow', title: p.reason, style: 'min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' }, gist(p.reason)),
+      h('span', { class: 'grow', title: p.reason }, gist(p.reason)),
       h('span', { class: 'muted small', style: 'flex: none' }, who(p.actor, p.run_name)),
       h('span', { class: 'muted small nowrap', style: 'flex: none' }, ago(p.ts)),
       p.ops.length > 1 && h('button', { class: 'quiet-button', style: 'flex: none', title: 'See each part of it, and leave out or correct any before applying', onclick: look }, `Look (${p.ops.length})`),

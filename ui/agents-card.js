@@ -50,7 +50,7 @@ export function tokensCard({ tokens, row, then, fail, say, workspace, connect })
         { class: 'toolbar', style: 'padding: var(--space-6) 0; flex-wrap: nowrap' },
         name,
         life,
-        h('button', { class: 'gist', style: 'white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis', title: `Claude Code setup: a command that sets up Claude Code in a project, with sessions on the map of ${workspace.name} (${workspace.id})`, onclick: () => make('claude-code', (made) => connectBox(made, workspace)) }, `Set up in ${workspace.name}`),
+        h('button', { class: 'gist cut', style: 'flex: 0 1 auto', title: `Claude Code setup: a command that sets up Claude Code in a project, with sessions on the map of ${workspace.name} (${workspace.id})`, onclick: () => make('claude-code', (made) => connectBox(made, workspace)) }, `Set up in ${workspace.name}`),
         menu('⋯', [[`Token only, for ${workspace.name}`, () => make('agent', (made) => secretBox(`Token for ${made.name}, in ${workspace.name}`, made.token, workspace))]]),
       ),
     ),

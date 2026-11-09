@@ -32,8 +32,6 @@ body[data-panes="1"] #canvas .pane-canvas .lens-view.laid-out, #canvas > .pane.p
 /* A picture read beside the sheet: what is published gives way to the draft. */
 .lens-view.sheet-over .rd.published { display: none; }
 body[data-panes="1"] #canvas .lf-legend { bottom: auto; pointer-events: auto; }
-#canvas .pane-canvas > .lens-wrap > .lens-bar { position: absolute; z-index: 2; top: calc(var(--box-9) + var(--space-5)); left: var(--space-9); right: var(--space-9); width: auto; pointer-events: none; }
-#canvas .pane-canvas > .lens-wrap > .lens-bar > * { pointer-events: auto; }
 #canvas .lens-view > .lens-error { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
 
 /* The bar: where the canvas stands, what waits for you, and the menu. */
@@ -256,7 +254,7 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .note > .fields { padding: 0; margin: 0 0 var(--space-8); }
 #sheet .draft-read { cursor: text; }
 #sheet .draft-read .body-text, #sheet .note.doc .body-text { padding-left: 0; padding-right: 0; }
-#sheet .note.doc h3.doc-head, #sheet .page-section > img.figure { margin-left: 0; margin-right: 0; }
+#sheet .page-section > img.figure { margin-left: 0; margin-right: 0; }
 /* An image never runs wider than the sheet: a wide one scales down with its proportions, a small one keeps its size. */
 #sheet img { max-width: 100%; height: auto; }
 #sheet .draft-body { display: block; width: 100%; min-height: var(--box-10); padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-size: var(--text-6); line-height: 1.6; resize: none; outline: none; overflow: hidden; }
@@ -283,7 +281,6 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .part > :first-child .card:first-child > header, #sheet .part > .card:first-child > header { padding-right: calc(var(--box-8) + var(--space-5)); }
 /* A row that never wraps: its name cut with an ellipsis, its marks and one action at the end, rare ones in a menu. */
 .rows > li.one { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--space-5); white-space: nowrap; min-width: 0; }
-.rows > li.one > .grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rows > li.one > * { flex: none; }
 .rows > li.one > .grow, .rows > li.one > input[type='text'] { flex: 1 1 0; }
 .rows > li.one .menu-room { width: var(--box-7); }
@@ -299,7 +296,7 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 .plate.off { background: none; border-style: dashed; }
 .plate.off .plate-name { color: var(--muted); }
 .plate-head { display: flex; align-items: center; gap: var(--space-5); min-width: 0; white-space: nowrap; }
-.plate-head > .grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.plate-head > .grow { flex: 1 1 0; }
 .plate-name { font-size: var(--text-5); font-weight: 600; }
 .plate-says, .plate-foot { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--text-2); }
 .plate-foot { margin-top: auto; padding-top: var(--space-4); border-top: var(--border-1) solid var(--line); }

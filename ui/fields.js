@@ -3,7 +3,7 @@
 // field means beyond its kind is said by the capabilities its type declares, and how it looks by the style.
 
 import { h } from './base.js';
-import { ago, gist, idsAsLinks, label } from './words.js';
+import { ago, day as dayText, gist, idsAsLinks, label } from './words.js';
 
 /** A field that holds an item's id, a day, an address on the web. */
 const ID = /^e_[a-z0-9]{8}$/;
@@ -15,10 +15,7 @@ const plain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const scalar = (v) => v === null || typeof v !== 'object';
 
 /** A day as a person reads it; as it is kept is the tooltip. */
-const day = (v) => {
-  const [, y, m, d] = DAY.exec(v);
-  return h('span', { class: 'gist', title: v }, new Date(Number(y), Number(m) - 1, Number(d)).toLocaleDateString(undefined, { dateStyle: 'medium' }));
-};
+const day = (v) => h('span', { class: 'gist', title: v }, dayText(v.slice(0, 10)));
 /** An address on the web, by where it goes, opened apart. */
 const address = (v) => h('a', { href: v, target: '_blank', rel: 'noopener noreferrer', class: 'gist', title: v }, v.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, ''));
 

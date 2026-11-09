@@ -64,7 +64,10 @@ export function drawDiagram(host, data, { download } = {}) {
   host.classList.add('lens-view');
   dress(host, state.style);
   host.replaceChildren(stage);
+  // The stage drawn before goes, and its observers with it.
+  host.stopMoves?.();
   const moves = panZoom(stage, picture, { width: data.width, height: data.height, style: state.style });
+  host.stopMoves = moves.stop;
   const zoom = h(
     'span',
     { class: 'switch' },

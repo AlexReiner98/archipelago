@@ -7,7 +7,7 @@
 // once it comes into sight. The frame is as tall as what it holds, so the canvas scrolls, not the frame. A document
 // changed is read again in a frame that takes the old one's place once it has drawn, so nothing around it moves.
 
-import { api, authHeaders, h, state } from './base.js';
+import { api, h, state, whoami } from './base.js';
 import { numberOf } from './query-base.js';
 
 const ID = /^e_[a-z0-9]{8}$/;
@@ -15,7 +15,7 @@ export const AS = ['draft', 'published', 'own'];
 
 /** The workspace this page reads, for a published page's address: asked once. */
 let workspace;
-const workspaceId = () => (workspace ??= fetch('/whoami', { headers: authHeaders() }).then((res) => res.json()).then((me) => me.workspace.id));
+const workspaceId = () => (workspace ??= whoami().then((me) => me.workspace.id));
 
 /** Whether each item is published and its draft differs, asked once for each item as it stood when it last changed (`at`). */
 const states = new Map();
