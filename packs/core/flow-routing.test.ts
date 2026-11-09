@@ -66,12 +66,12 @@ test('no wire or tie passes through a step', () => {
   for (const p of [...g.chains, ...g.ties]) assert.deepEqual(through(g, p.points, [p.a, p.b]), [], `${p.type ?? 'the order'} from ${p.a} to ${p.b} passes through a step`);
 });
 
-test('every wire and tie turns only at right angles', { todo: 'solve.js: an end set back on its box after a pass leaves two or three wires slanted on this map' }, () => {
+test('every wire and tie turns only at right angles', () => {
   const g = laidOut(dense());
   for (const p of [...g.chains, ...g.ties]) assert.ok(square(p.points), `${p.a} to ${p.b} turns at a slant`);
 });
 
-test('the order runs from the foot of what is depended on down into the head of what depends on it', { todo: 'numbering: on this map of hub ties, 8 of 84 order wires run up' }, () => {
+test('the order runs from the foot of what is depended on down into the head of what depends on it', { todo: 'shape.js may bring an order wire in by a side, and the numbering runs some up: on this map, 20 of 84 (8 Nov 2026)' }, () => {
   const g = laidOut(dense());
   for (const c of g.chains) {
     const [a, b] = [boxOf(g, c.a), boxOf(g, c.b)], [first, last, before] = [c.points[0], c.points.at(-1), c.points.at(-2)];
