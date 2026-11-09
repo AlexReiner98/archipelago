@@ -54,7 +54,7 @@ test('an island pack: vocabulary, views and instructions on the shared set', () 
   assert.match(said(island('w', { requires: ['core', 'fine'] })), /requires fine: a pack builds on the shared set alone/);
   assert.match(said(island('o', { types: [ADDS] })), /adds fields to person/);
   assert.match(said(island('n', { types: [{ id: 'n_memo', title: 'Memo', extends: 'fine_thing' } as never] })), /names fine_thing, not its own nor in the shared set/);
-  assert.match(said(island('l', { links: [{ id: 'l_r', extends: 'answers', title: 'r', inverse: 'r', from: ['*'], to: ['*'], description: '' }] })), /extend another pack's \(l_r extends answers\)/);
+  assert.match(said(island('l', { links: [{ id: 'l_r', extends: 'fine_answers', title: 'r', inverse: 'r', from: ['*'], to: ['*'], description: '' }] })), /extend another pack's \(l_r extends fine_answers\)/);
   assert.deepEqual(islandProblems(core(), shared), [], 'the kernel’s own pack is not judged');
 });
 

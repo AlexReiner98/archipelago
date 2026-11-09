@@ -26,7 +26,8 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
       { op: 'link', type: 'part_of', from: 'gutter', to: 'roof' },
     ],
   })).result.created as Record<string, string>;
-  const page = await open(`${base}/#/v?find=type+question&only=in+${made.site}`);
+  // Drawn as a flow, whatever the house style says: what is drawn is read off its marks.
+  const page = await open(`${base}/#/v?find=type+question&only=in+${made.site}&shape=flow`);
   const drawn = `[...document.querySelectorAll('#canvas svg a')].map((a) => a.textContent)`;
   const has = (title: string) => `${drawn}.some((t) => t.includes(${JSON.stringify(title)}))`;
   // The Only row's terms in sight, then those beyond what fits, which its "+N more" names.

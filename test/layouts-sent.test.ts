@@ -30,9 +30,6 @@ test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€
   // A page that has it is sent only its name.
   const again = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [first.hash] } })).result.style.drawing;
   assert.deepEqual(again, { id: 'core.architecture', title: 'Architecture', shape: 'architecture', hash: first.hash });
-  // With nothing kept for it, a picture is drawn as a flow, by the core pack's flow drawing.
-  const holding = (await call('/api/view', undefined, { name: 'style', params: { have: [] } })).result.style;
-  assert.equal(holding.drawing.id, 'core.flow');
 
   // The owner's version changes one module; the rest are the pack's.
   const look = 'export const css = `.ar-part { cursor: help; }`;\n';

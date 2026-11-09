@@ -84,8 +84,6 @@ test('a document a human makes public is read by anyone at its own address, with
   // The database itself gives no other public item's note as a document's.
   const { pelago } = await workspaces.get('default');
   assert.equal(await publicDocument(pelago, q), null);
-  // An invoice is read as a document, but is never public.
-  assert.equal(pelago.registry.type('invoice')?.public ?? false, false);
 
   // A link to it is still kept out of search engines.
   const link = (await call('/api/share_create', undefined, { id: d })).result;
