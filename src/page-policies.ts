@@ -4,6 +4,8 @@
 export const PAGE_POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' https: http://localhost:* http://127.0.0.1:*; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 /** A document's preview, which this server's own page may frame, to read drafts on the canvas (ui/reader-frame.js). */
 export const PREVIEW_POLICY = PAGE_POLICY.replace(" https: http://localhost:* http://127.0.0.1:*", '').replace("frame-ancestors 'none'", "frame-ancestors 'self'");
+/** A page a link opens (/s/...): its own files, this server, and the sandbox the views it brings in are drawn in; never framed. */
+export const SHARED_POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 // The frame a layout's code runs in. `sandbox` gives it an origin of its own, so it has no way to the page's token or storage, cannot open
 // windows or move the page, and `connect-src 'none'` with no outside source for anything leaves it nowhere to send what it is shown.
 // It does not say who may frame it: sandboxed, it has no origin for 'self' to match, and framed by a stranger it is an empty page that can reach nothing.

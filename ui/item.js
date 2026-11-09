@@ -6,7 +6,7 @@ import { api, ask, h, part, state, tell } from './base.js';
 import { drawIn, goQuery, openHere, queryNow } from './canvas.js';
 import { viewsOn } from './canvases.js';
 import { draftOf } from './draft.js';
-import { documentMenu, figureOf, homeOf, readDocument } from './item-doc.js';
+import { documentMenu, figureOf, homeOf, readDocument, shareLinkOf } from './item-doc.js';
 import { heldBand, heldOn } from './item-held.js';
 import { readingOf } from './item-read.js';
 import { readAgain } from './reader-frame.js';
@@ -215,6 +215,7 @@ export async function entity(id, here) {
         publishable && !shown && e.visibility === 'public' && ['Stop being public', () => change([{ op: 'update', id, visibility: 'private' }], 'No longer public, set in the UI')],
         e.visibility === 'public' && type?.public && (Boolean(type?.capabilities?.plannable) || shown?.published) && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
         ...(doc ? documentMenu(e, links, page, again, doc) : []),
+        !doc && !e.archived_at && ['Make a link to see it', shareLinkOf(e, page, false)],
         ['Copy id', () => navigator.clipboard.writeText(e.id)],
         !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],
       ]),
