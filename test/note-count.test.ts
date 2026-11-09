@@ -1,13 +1,16 @@
 // How long a note is while it is written (ui/note-count.js): a post's ## Text counted as the places it goes count it,
-// against the limit its channel picks from the social pack's count piece.
+// against the limit its channel picks from a pack's count piece (here one written out, as a pack would declare it).
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 // @ts-expect-error a page's module, plain JavaScript with no types
 import { counted, sectionOf, weigh } from '../ui/note-count.js';
 
-const social = JSON.parse(readFileSync(new URL('../packs/social/pack.json', import.meta.url), 'utf8'));
-const piece = social.views.find((v: { id: string }) => v.id === 'social.length').pieces[0];
+const piece = {
+  piece: 'count',
+  section: 'Text',
+  by: 'channel',
+  limits: { linkedin: { max: 3000, low: 1200, high: 1900 }, x: { max: 280, split: 'paragraph', emoji: 2, link: 23 }, bluesky: { max: 300 } },
+};
 
 test('an emoji is one character, never the two halves it is stored as', () => {
   assert.equal(weigh('ok 👍🏽'), 4);
