@@ -52,7 +52,7 @@ async function route(pulse = false) {
     if (!state.schema) await loadSchema();
   } catch (err) {
     document.body.dataset.sheet = 'open';
-    if (err instanceof SignInNeeded) return signIn(store.token ? 'Your token is no longer accepted.' : '');
+    if (err instanceof SignInNeeded) return signIn(store.token ? 'Your sign-in has run out. Sign in again.' : '');
     return main.replaceChildren(h('div', { class: 'error' }, err.message));
   }
   // In a workspace: the page is the app again, whatever signed-out page was up.
@@ -89,7 +89,7 @@ async function route(pulse = false) {
   try {
     await draw();
   } catch (err) {
-    if (err instanceof SignInNeeded) return signIn(store.token ? 'Your token is no longer accepted.' : '');
+    if (err instanceof SignInNeeded) return signIn(store.token ? 'Your sign-in has run out. Sign in again.' : '');
     part(page).replaceChildren(h('div', { class: 'error' }, err.message));
   }
   if (!pulse) sheet.scrollTop = 0;

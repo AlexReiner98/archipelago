@@ -64,3 +64,14 @@ test('one held merge approved twice at once is applied once', async () => {
   assert.equal((await l.entity(keep))!.body, 'The original.\n\nThe copy.');
   assert.equal(((await l.events({ target: keep })) as any[]).filter((e) => e.action === 'entity.merge').length, 1);
 });
+
+test('the owner merged into another person is that person: what waits on the owner still finds them', async () => {
+  const l = await fresh();
+  const { me } = await l.init(human, { name: 'Alex' });
+  const { other } = await make(l, [{ op: 'create', ref: 'other', type: 'person', title: 'Alex R', props: { email: 'alex@example.test' } }]);
+  await make(l, [{ op: 'merge', keep: other, drop: me }]);
+  assert.equal(await l.setting<string>('me'), other, 'the owner follows the merge');
+  const { third } = await make(l, [{ op: 'create', ref: 'third', type: 'person', title: 'Alexander' }]);
+  await make(l, [{ op: 'merge', keep: third, drop: other }]);
+  assert.equal(await l.setting<string>('me'), third, 'and a merge of that one too');
+});

@@ -214,7 +214,7 @@ async function redeemWith(db: Q, workspace: string, key: string): Promise<string
  * to an address in none, where to begin one (start) if this server offers that. Nothing is said back either way, so
  * the page cannot be used to learn who is a member where.
  */
-export async function requestSignIn(workspaces: { id: string; name: string; db: () => Promise<Q> }[], email: string, origin: string, start?: string): Promise<void> {
+export async function requestSignIn(workspaces: { id: string; name: string; db: () => Promise<Q> }[], email: string, origin: string = site.origin, start?: string): Promise<void> {
   const links: string[] = [];
   for (const ws of workspaces) {
     const db = await ws.db();

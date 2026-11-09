@@ -18,7 +18,7 @@ export function drawNav(open) {
   const at = location.hash.split('?')[0];
   host.replaceChildren(
     ...inNav().map((s) => h('a', { href: `#/s/${s.id}`, class: open === s.id || at === `#/s/${s.id}` ? 'active' : '' }, s.title)),
-    h('a', { href: '#/workspace', class: at === '#/workspace' ? 'active' : '' }, 'Workspace'),
+    h('a', { href: '#/workspace', class: at === '#/workspace' ? 'active' : '' }, 'Settings'),
   );
 }
 
@@ -29,7 +29,7 @@ export const screenOfPage = (page) => (state.schema?.screens ?? []).find((s) => 
 export async function screenPage(id) {
   const main = part('screen');
   const screen = (state.schema?.screens ?? []).find((s) => s.id === id);
-  if (!screen) return main.replaceChildren(h('div', { class: 'empty' }, 'There is no such screen here. ', h('a', { href: '#/workspace' }, 'Screens are on the Workspace page.')));
+  if (!screen) return main.replaceChildren(h('div', { class: 'empty' }, 'There is no such screen here. ', h('a', { href: '#/workspace' }, 'Screens are in Settings.')));
   const drawn = drawScreen(screen, () => screenPage(id));
   // A screen that holds one of the kernel's own pages has that page's head; any other is named by its title.
   const own = screen.pieces.some((p) => p.piece === 'page');
