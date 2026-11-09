@@ -4,15 +4,12 @@ import { CARRIED, doneEvents, lastSeq } from '../src/activity.ts';
 import { dump, restore } from '../src/backup.ts';
 import { openDb, type Database } from '../src/db.ts';
 import { readEvents } from '../src/eventlog.ts';
+import { OLD_EVENT } from './old-event.ts';
 import { LATEST, migrate, versionOf } from '../src/migrate.ts';
 import { dumpVault } from '../src/vault.ts';
 import { Archipelago } from '../src/pelago.ts';
 import { fresh, make } from './map.ts';
 
-/** The event table as it stood until step 34, numbered from the sequence the log's facts are. */
-const OLD_EVENT = `create table event (seq bigint primary key default nextval('event_seq_seq'), workspace text not null default 'default',
-  ts timestamptz not null default now(), origin text not null default 'pelago', actor text not null, action text not null, target_id text,
-  changeset text, reason text not null default '', detail jsonb not null default '{}', private_to text);`;
 
 const tableThere = async (db: Database) => (await db.query<{ t: string | null }>(`select to_regclass('event')::text as t`)).rows[0].t !== null;
 
