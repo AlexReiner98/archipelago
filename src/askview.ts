@@ -37,6 +37,12 @@ export function viewNames(reg: Registry): string[] {
   return [...names];
 }
 
+/** The views the other packs on here add, by name, or nothing when only core is on. */
+function packsSaid(reg?: Registry): string {
+  const added = (reg?.packs ?? []).filter((p) => p.id !== 'core').flatMap((p) => parts(p).views.map((v) => short(v.id)));
+  return added.length ? ` The other packs on here add their own (${[...new Set(added)].join(', ')}): call with no name for what each answers.` : '';
+}
+
 /** What the view tool says it answers: the views the core pack declares (none without a registry), the flat lens first, then the kernel's own views, then the packs'. */
 export function viewsSaid(reg?: Registry): string {
   const core = reg ? parts(reg.packs.find((p) => p.id === 'core')!).views : [];
@@ -45,7 +51,7 @@ export function viewsSaid(reg?: Registry): string {
   return (
     'Answer one of the standing questions. Call with no name to list them. Answers drop empty fields and cut long lists (params.full: true for all).' +
     views.map(([name, said]) => `${name}: ${said}`).join(' ') +
-    ' The packs here add their own (the repository views handoff, repo_work, recheck and agent_usage, and a release’s gate, are the software pack’s): call with no name for all of them.'
+    packsSaid(reg)
   );
 }
 
