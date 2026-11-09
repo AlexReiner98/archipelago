@@ -6,7 +6,8 @@
 // it; removing a member ends their sign-ins at once. The table is read only through the whole database: no member's
 // role is granted it.
 
-import { createHash, randomBytes, randomInt } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { sha256Hex, workspaceSecret } from './hashes.ts';
 import { z } from 'zod';
 import { createToken } from './auth.ts';
 import { controlValue, setControlValue, takeControlValue } from './control.ts';
@@ -136,11 +137,11 @@ export async function memberToken(db: Q, workspace: string, email: string): Prom
 }
 
 const KEY = 'signin:';
-const hash = (code: string) => createHash('sha256').update(code).digest('hex');
+const hash = sha256Hex;
 
 /** A one-time link that signs this member in. The code names its workspace, so the server knows where to trade it. */
 export async function linkFor(db: Q, workspace: string, email: string, ms: number, origin = site.origin): Promise<string> {
-  const code = `inv_${workspace}_${randomBytes(20).toString('hex')}`;
+  const code = workspaceSecret('inv', workspace);
   await keep(db, KEY + hash(code), { email }, ms);
   return `${origin}/#/join/${code}`;
 }

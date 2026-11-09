@@ -1,7 +1,7 @@
 // The canonical form of a log entry and its hash (docs/log.md, section 1): RFC 8785 (JCS) over the entry without its
 // hash, each sealed value standing as the digest of its bytes, after a prefix no other JSON document starts with.
 
-import { createHash } from 'node:crypto';
+import { sha256Hex as sha256 } from './hashes.ts';
 
 /** RFC 8785: keys sorted by UTF-16 code units, no whitespace, numbers and strings as ECMAScript writes them. */
 export function jcs(value: unknown): string {
@@ -20,7 +20,6 @@ export function jcs(value: unknown): string {
   throw new Error(`A log entry cannot hold a ${typeof value}`);
 }
 
-const sha256 = (data: string | Buffer) => createHash('sha256').update(data).digest('hex');
 
 /** A value sealed with its item's key (section 5): { $k, $n, $c }. Nothing is sealed yet; the per-item keys task seals. */
 const isSealed = (v: unknown): v is { $k: number; $n: string; $c: string } =>

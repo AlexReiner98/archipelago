@@ -3,7 +3,7 @@
 // the pack's handler sees it; a schedule is a handler entry the kernel runs every so often. Both run as the pack, an
 // agent, so what they write follows the workspace's policy, and both may read from hosts but never act.
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { signedWith } from './hashes.ts';
 import { parts } from './manifest.ts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Registry } from './packs.ts';
@@ -14,13 +14,6 @@ import { unseal } from './secrets.ts';
 const asPack = (pack: string): Actor => ({ kind: 'agent', name: `pack:${pack}` });
 /** The most a webhook may carry. */
 const HOOK_MAX = 1_000_000;
-
-/** Whether a signature (sha256=<hex>) is the body's HMAC with the secret. */
-export function signedWith(secret: string, body: string, signature: string | undefined): boolean {
-  const want = Buffer.from(`sha256=${createHmac('sha256', secret).update(body).digest('hex')}`);
-  const got = Buffer.from(signature ?? '');
-  return got.length === want.length && timingSafeEqual(got, want);
-}
 
 /** Answer a POST to /hook/... for the workspace's map (unscoped: a webhook is no one's session). */
 export async function serveHook(req: IncomingMessage, res: ServerResponse, l: Archipelago, pack: string, id: string): Promise<void> {

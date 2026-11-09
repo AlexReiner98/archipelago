@@ -4,8 +4,8 @@
 // it may report, propose or change. Tokens live in their workspace's own
 // database, stored only as a hash.
 
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { newId, type Db, type Q } from './db.ts';
+import { sameBytes, sha256Hex, workspaceSecret } from './hashes.ts';
 import { indexToken, unindexed } from './control-index.ts';
 import { record } from './streams.ts';
 import type { Actor, May } from './pelago.ts';
@@ -58,7 +58,7 @@ const REPLAY_MS = 60_000;
 const WORKSPACE_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 export const validWorkspaceId = (id: string) => WORKSPACE_ID.test(id);
 
-const hash = (token: string) => createHash('sha256').update(token).digest('hex');
+const hash = sha256Hex;
 
 /** Which workspace a token claims to be for. Says nothing about whether it is valid. One made while this was called Lattice begins lat_. */
 export function workspaceOf(token: string): string | undefined {
@@ -74,7 +74,7 @@ export function bearer(header: string | undefined): string | undefined {
 export async function createToken(db: Q, workspace: string, input: { kind: 'human' | 'agent'; name: string; entity?: string; expires_days?: number; expires_minutes?: number; admin?: boolean; within?: string[]; may?: May; granted?: Grant }) {
   if (!validWorkspaceId(workspace)) throw new Error(`Invalid workspace id "${workspace}"`);
   if (!input.name.trim()) throw new Error('A token needs a name: who or what will use it.');
-  const token = `pel_${workspace}_${randomBytes(20).toString('hex')}`;
+  const token = workspaceSecret('pel', workspace);
   const id = newId('k');
   const agent = input.kind === 'agent';
   const within = agent && input.within?.length ? JSON.stringify(input.within) : null;
@@ -99,7 +99,7 @@ interface Grant {
   until: string;
 }
 
-const newRefresh = (workspace: string) => `per_${workspace}_${randomBytes(20).toString('hex')}`;
+const newRefresh = (workspace: string) => workspaceSecret('per', workspace);
 const grantUntil = () => new Date(Date.now() + GRANT_DAYS * 86_400_000).toISOString();
 
 /** Which workspace a code or a refresh token is for (src/oauth.ts). Says nothing about whether it is good. */
@@ -127,7 +127,7 @@ export async function rotateGrant(db: Q, workspace: string, refresh: string, cli
     return undefined;
   }
   if (Date.parse(row.granted.until) < Date.now()) return undefined;
-  const access = `pel_${workspace}_${randomBytes(20).toString('hex')}`;
+  const access = workspaceSecret('pel', workspace);
   const next = newRefresh(workspace);
   const granted: Grant = { client: row.granted.client, refresh: hash(next), previous: given, rotated: new Date().toISOString(), until: grantUntil() };
   // Of two at once, one finds the refresh token it read still there.
@@ -153,7 +153,7 @@ export async function verifyToken(db: Db, token: string, from?: string, ws = 'de
     [hash(token)],
   );
   const row = rows[0];
-  if (!row || !timingSafeEqual(Buffer.from(row.hash), Buffer.from(hash(token)))) return undefined;
+  if (!row || !sameBytes(row.hash, hash(token))) return undefined;
   const place = network(from);
   const seen = row.seen ?? [];
   const fresh = place !== undefined && !seen.includes(place);
@@ -196,9 +196,4 @@ export async function hasHumanToken(db: Q): Promise<boolean> {
 export const hashSecret = hash;
 /** Written by `pelago operator-reset`, in the folder that holds the workspaces. */
 export const OPERATOR_RESET_FILE = 'operator-reset';
-export const newSecret = (prefix: string) => `${prefix}_${randomBytes(24).toString('hex')}`;
-export function sameSecret(given: string, expectedHash: string): boolean {
-  const a = Buffer.from(hash(given));
-  const b = Buffer.from(expectedHash);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
+export { newSecret, sameSecret } from './hashes.ts';

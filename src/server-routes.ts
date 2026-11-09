@@ -5,11 +5,11 @@
 // GET is where a person comes back to from another site: it answers where to send them on. Every request is counted
 // by address, as the other open routes are.
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { alertOwner } from './alert.ts';
+import { signedWith } from './hashes.ts';
 import { serverPacksOf } from './server-host.ts';
 import { hostBase, serverSecret } from './server-requests.ts';
 import type { ActPlaces } from './server-acts.ts';
@@ -32,14 +32,6 @@ export interface ServerRoutes {
 async function tellOwner(workspaces: ActPlaces, pack: string, hook: string, what: 'refused' | 'failed', detail: string): Promise<void> {
   const title = what === 'refused' ? `The ${pack} pack's webhook "${hook}" refused a delivery` : `The ${pack} pack's webhook "${hook}" failed`;
   await alertOwner((await workspaces.get('default')).pelago, { key: `hook/${pack}/${hook}/${what}`, title, body: detail, level: what === 'failed' ? 'urgent' : 'warning', from: `pack:${pack}` });
-}
-
-/** Whether a body was signed with the secret: sha256=<hex> (prefixed, as GitHub sends) or the bare hex. */
-export function signedBy(secret: string, raw: Buffer, signature: string | undefined, format: 'prefixed' | 'hex' = 'prefixed'): boolean {
-  const hex = createHmac('sha256', secret).update(raw).digest('hex');
-  const want = Buffer.from(format === 'hex' ? hex : `sha256=${hex}`);
-  const got = Buffer.from((signature ?? '').trim());
-  return got.length === want.length && timingSafeEqual(got, want);
 }
 
 export async function serveServerPack(req: IncomingMessage, res: ServerResponse, path: string, at: ServerRoutes): Promise<unknown> {
@@ -74,7 +66,7 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
     const raw = await at.raw();
     const secret = await serverSecret(await packs.control(), file, hook.secret);
     const signature = req.headers[(hook.header ?? 'x-signature-256').toLowerCase()];
-    if (!secret || !signedBy(secret, raw, typeof signature === 'string' ? signature : undefined, hook.format)) {
+    if (!secret || !signedWith(secret, raw, typeof signature === 'string' ? signature : undefined, hook.format)) {
       // Most such are strangers; one from the sender itself means its secret and ours differ, and sales stop.
       console.error(`server pack ${file.id} webhook ${hook.id}: ${secret ? 'a delivery with a signature that does not match' : 'a delivery, and no secret is set'}`);
       await tellOwner(at.workspaces, file.id, hook.id, 'refused', secret ? 'Its signature did not match the secret this server holds. If the sender is the real one, the two secrets differ.' : `No secret is set for it on this server, so every delivery is refused.`);
