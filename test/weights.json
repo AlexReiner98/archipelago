@@ -191,7 +191,7 @@
   "test/site-visits-act.test.ts": { "pglite": 2.4, "postgres": 0.8 },
   "test/site.test.ts": { "pglite": 8.8, "postgres": 4.5 },
   "test/snapshots.test.ts": { "pglite": 17.7, "postgres": 8.1 },
-  "test/socialpack.test.ts": { "pglite": 3.3, "postgres": 1.2 },
+  "packs/social/social-map.test.ts": { "pglite": 3.3, "postgres": 1.2 },
   "test/stable-page.test.ts": { "pglite": 23.3, "postgres": 18.9 },
   "test/standing-views.test.ts": { "pglite": 2.6, "postgres": 1.3 },
   "test/stats.test.ts": { "pglite": 8, "postgres": 10.1 },

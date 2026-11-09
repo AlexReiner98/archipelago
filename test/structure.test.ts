@@ -139,13 +139,14 @@ test('every approval is decided by a rule', () => {
   assert.deepEqual(policy, {}, "The server's policy is read only by the rules: what it lifts, and what it forbids (serverRules).");
 });
 
-// 4. A pack's code imports only its own files and Node's built-ins: never the kernel's source.
+// 4. A pack's code imports only its own files and Node's built-ins: never the kernel's source. Its tests may also use
+// the kernel's test harness, by its one name (#pelago/test), to try the pack's rules on a real map (the owner, 9 Nov 2026).
 test("a pack's code imports nothing of the kernel", () => {
   const reaching: string[] = [];
   for (const file of walk('packs').filter((f) => /\.(ts|js|mjs)$/.test(f))) {
     for (const [, spec] of read(file).matchAll(/(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/g)) {
       const own = spec.startsWith('./') || (spec.startsWith('../') && !relative(join(ROOT, 'packs', file.split('/')[1]), join(ROOT, file, '..', spec)).startsWith('..'));
-      if (!own && !spec.startsWith('node:')) reaching.push(`${file} imports ${spec}`);
+      if (!own && !(spec === '#pelago/test' && /\.test\.ts$/.test(file)) && !spec.startsWith('node:')) reaching.push(`${file} imports ${spec}`);
     }
   }
   assert.deepEqual(reaching, [], 'A pack is handed what it reads and answers with ops and requests.');

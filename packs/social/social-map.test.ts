@@ -3,38 +3,22 @@
 // channel.
 
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname } from 'node:path';
 import { test } from 'node:test';
-import { Archipelago, type Op } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
-import { callTool } from '../src/tools.ts';
-import { freshWith, human } from './map.ts';
+import { call, human, make, mapWith, type Archipelago } from '#pelago/test';
 
+const fresh = () => mapWith(dirname(import.meta.dirname));
 
-async function fresh() {
-  const packs = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
-  cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
-  return freshWith(new Registry(packs));
-}
-
-async function make(l: Archipelago, ops: Op[]) {
-  const result = await l.change(human, { ops, reason: 'test' });
-  assert.equal(result.status, 'applied');
-  return (result as { created: Record<string, string> }).created;
-}
-
-const props = async (l: Archipelago, id: string) => ((await callTool(l, human, 'get', { id })) as { entity: { props: Record<string, unknown> } }).entity.props;
+const props = async (l: Archipelago, id: string) => ((await call(l, human, 'get', { id })) as { entity: { props: Record<string, unknown> } }).entity.props;
 
 test('a reply that names the problem becomes a conversation from the post, and the post counts what came from it', async () => {
   const l = await fresh();
   const made = await make(l, [{ op: 'create', ref: 'p', type: 'post', title: 'Launch: LinkedIn', status: 'posted', props: { channel: 'linkedin', tag: 'linkedin-26w45-1', impressions: 1200, reactions: 30, reposts: 2 } }]);
-  const say = (input: Record<string, unknown>) => callTool(l, human, 'social_conversation', { from: made.p, ...input }) as Promise<{ answer: { conversations: number }; created: { c: string } }>;
+  const say = (input: Record<string, unknown>) => call(l, human, 'social_conversation', { from: made.p, ...input }) as Promise<{ answer: { conversations: number }; created: { c: string } }>;
 
   const first = await say({ person: 'Sam Lee', problem: 'Our agents lose track of what was decided last week', date: '2026-11-04' });
   assert.equal(first.answer.conversations, 1);
-  const c = (await callTool(l, human, 'get', { id: first.created.c })) as { entity: { type: string; title: string; props: Record<string, unknown> }; outgoing: { type: string; id: string }[] };
+  const c = (await call(l, human, 'get', { id: first.created.c })) as { entity: { type: string; title: string; props: Record<string, unknown> }; outgoing: { type: string; id: string }[] };
   assert.equal(c.entity.type, 'conversation');
   assert.ok(c.entity.title.length <= 60, c.entity.title);
   assert.deepEqual(c.entity.props, { person: 'Sam Lee', problem: 'Our agents lose track of what was decided last week', began: '2026-11-04', channel: 'linkedin' });
@@ -51,7 +35,7 @@ test('a reply that names the problem becomes a conversation from the post, and t
   assert.deepEqual([(await props(l, made.p)).impressions, (await props(l, made.p)).reactions, (await props(l, made.p)).reposts], [1200, 30, 2]);
 
   await assert.rejects(say({ person: '', problem: 'x' }));
-  await assert.rejects(callTool(l, human, 'social_conversation', { from: 'e_nothing0', person: 'A', problem: 'B' }), /No post or source/);
+  await assert.rejects(call(l, human, 'social_conversation', { from: 'e_nothing0', person: 'A', problem: 'B' }), /No post or source/);
 });
 
 test('hours logged against two posts of one channel are read by post, and sum under the channel', async () => {
@@ -61,10 +45,10 @@ test('hours logged against two posts of one channel are read by post, and sum un
     { op: 'create', ref: 'b', type: 'post', title: 'LinkedIn 2', props: { channel: 'linkedin' } },
     { op: 'create', ref: 'x', type: 'post', title: 'X 1', props: { channel: 'x' } },
   ]);
-  for (const [work, hours] of [[made.a, 1.5], [made.b, 2], [made.x, 0.5]] as const) await callTool(l, human, 'time_log', { work, hours, what: 'Writing and replies', date: '2026-11-04' });
+  for (const [work, hours] of [[made.a, 1.5], [made.b, 2], [made.x, 0.5]] as const) await call(l, human, 'time_log', { work, hours, what: 'Writing and replies', date: '2026-11-04' });
 
   // What a view reads: the posts, and one step along part_of to the time entries in them.
-  const flat = (await callTool(l, human, 'view', { name: 'flat', params: { filter: { find: ['type post'] }, walk: { over: ['part_of'], steps: 1 }, full: true } })) as { items: { id: string; type: string; fields: Record<string, unknown> }[]; links: { type: string; from: string; to: string }[] };
+  const flat = (await call(l, human, 'view', { name: 'flat', params: { filter: { find: ['type post'] }, walk: { over: ['part_of'], steps: 1 }, full: true } })) as { items: { id: string; type: string; fields: Record<string, unknown> }[]; links: { type: string; from: string; to: string }[] };
   const byId = new Map(flat.items.map((e) => [e.id, e]));
   const sums: Record<string, number> = {};
   for (const r of flat.links.filter((r) => r.type === 'part_of' && byId.get(r.from)?.type === 'time_entry')) {
