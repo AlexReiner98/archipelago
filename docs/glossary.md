@@ -136,7 +136,9 @@ of core's `finding` type, read in one line: its title the claim as a
 sentence, its `value` the fact (of the simple type `value_type` says: text,
 number, boolean, date; checked on write) with its `unit`, its confidence, and
 `as_of` the date it was true. Its note says how it was found, in three lines
-at most. An option, a bug or working research is not a finding. A reader ties itself to one with a
+at most. Marked `published`, it is what its island stands by, and only then
+may another island read it; the rest are its working findings. An option, a
+bug or working research is not a finding. A reader ties itself to one with a
 `reads` link, the one link that crosses between islands (`crosses`).
 
 **place.** Where a drawing's layout puts an item: never set by hand (the

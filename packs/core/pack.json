@@ -172,13 +172,14 @@
     {
       "id": "finding",
       "extends": "record",
-      "capabilities": { "promised": { "fields": ["value", "as_of"] } },
+      "capabilities": { "promised": { "fields": ["value", "as_of"], "published": "published" } },
       "title": "Finding",
-      "description": "What an island stands by, published for others to read in one line: the claim, its value, how sure, as of when. The title is the claim as a short sentence (\"Peak load is 42 kW\", not \"Peak load\"); the value is the fact, with its unit; confidence says how sure; as_of when it was true. The note says how it was found, three lines at most. An option is an alternative, a bug is a bug, working research stays research: none is a finding. Its readers read it (reads); a new value keeps the old one in the log.",
+      "description": "What an island has found, read in one line: the claim, its value, how sure, as of when. Marked published, it is what the island stands by, and only then may another island read it; the rest are its working findings. The title is the claim as a short sentence (\"Peak load is 42 kW\", not \"Peak load\"); the value is the fact, with its unit; confidence says how sure; as_of when it was true. The note says how it was found, three lines at most. An option is an alternative, a bug is a bug, working research stays research: none is a finding. Its readers read it (reads); a new value keeps the old one in the log.",
       "statuses": { "open": ["current"], "closed": ["superseded", "withdrawn"] },
       "fields": {
         "value": { "type": "json", "typed_by": "value_type", "shown": true, "description": "The fact itself, never left out: 557, true, 2026-11-05, or a few words of text. A number takes its unit in unit; text says its own." },
         "value_type": { "type": "enum", "values": ["text", "number", "boolean", "date"], "shown": true, "description": "What sort of value it is: text, number, boolean or date. A measure is a number." },
+        "published": { "type": "boolean", "shown": true, "description": "true: the island stands by it, and other islands may read it. Left out or false, it is a working finding, read on its own island only." },
         "unit": { "type": "string", "shown": true, "description": "What a number counts, read after it: s, kW, EUR, requests a minute." },
         "as_of": { "type": "date", "shown": true, "description": "When the value was true: the day it was found or measured." }
       }
@@ -1445,7 +1446,7 @@
     { "id": "core.waiting", "type": "lens", "title": "Waiting on you", "props": { "filter": { "find": ["waits_on me"] }, "walk": { "over": [], "steps": 0 } } },
     { "id": "core.moved", "type": "lens", "title": "Findings moved", "props": { "filter": { "find": ["moved"] }, "walk": { "over": ["reads>"], "steps": 1 }, "style": { "shape": "flow" } } },
     { "id": "core.plan_flow", "type": "instruction", "title": "A result is items and a view", "body": "Anything with parts goes on the map as items first, never as one long note: a plan, research, an evaluation, a comparison. A plan: each step a task, part_of its hub, its order as depends_on, who must act as waits_on. Research: each finding and each option an item that bears_on the question it answers (or is about it), what it rests on as based_on, its facts as fields or a short note. Then a view about the hub (a lens linked about it: shape flow for steps, a drawing of how the parts connect for an explanation), and show it. The hub's note holds only the point: why, what done is, what was found or chosen. This holds whatever a brief says about notes.", "props": { "for": ["working_rules"], "order": 75 } },
-    { "id": "core.finding_line", "type": "instruction", "title": "A finding is what an island stands by, in one line", "body": "Its title is the claim as a sentence, value the fact (a number takes its unit), with its confidence and as_of; its note says how it was found, three lines at most. An option is an alternative, a bug is a bug, and working research stays research.", "props": { "for": ["working_rules"], "order": 75 } },
+    { "id": "core.finding_line", "type": "instruction", "title": "A finding is what an island stands by, in one line", "body": "Its title is the claim as a sentence, value the fact (a number takes its unit), with its confidence and as_of; its note says how it was found, three lines at most. Mark it published (props.published: true) only when the island stands by it, a few per island: only those are read from other islands. An option is an alternative, a bug is a bug, and working research stays research.", "props": { "for": ["working_rules"], "order": 75 } },
     { "id": "core.waits_on", "type": "instruction", "title": "Say who is waited on with a link", "body": "A person who has to answer or act is waits_on (what for in props.for), removed once they have; other work is depends_on; a resource is needs, and an exclusive one is taken with assign, action claim, and given back with revise, action release.", "props": { "for": ["working_rules"], "order": 80 } }
   ]
 }

@@ -81,6 +81,8 @@ export interface Watch {
  */
 export interface Promised {
   fields: string[];
+  /** A boolean field the item stands by itself with: only one it marks true is read from another island. Left out, every one is. */
+  published?: string;
 }
 
 export interface Capabilities {
@@ -170,6 +172,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
   if (promised) {
     if (!Array.isArray(promised.fields) || !promised.fields.length) problems.push('promised names the fields its readers rely on');
     else for (const f of promised.fields) if (!fields[f]) problems.push(`promised reads "${f}", which it has no field of`);
+    if (promised.published !== undefined && fields[promised.published]?.type !== 'boolean') problems.push(`promised marks what is published by "${promised.published}", which is no boolean field of it`);
   }
   return problems;
 }

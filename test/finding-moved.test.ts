@@ -18,7 +18,7 @@ async function twoIslands() {
     { op: 'create', ref: 'ann', type: 'person', title: 'Ann' },
   ]);
   const { f, budget } = await make(l, [
-    { op: 'create', ref: 'f', type: 'finding', title: 'Hosting a month', props: { value: 400, value_type: 'number', as_of: '2026-11-04', island: a } },
+    { op: 'create', ref: 'f', type: 'finding', title: 'Hosting a month', props: { value: 400, value_type: 'number', as_of: '2026-11-04', published: true, island: a } },
     { op: 'create', ref: 'budget', type: 'task', title: 'Set the budget', owner: ann, props: { island: b } },
     { op: 'link', type: 'reads', from: 'budget', to: 'f' },
   ]);
