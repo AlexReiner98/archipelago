@@ -54,13 +54,20 @@ test('the view that stopped draws', () => {
   assert.ok(took < MOST, `drawn in ${Math.round(took)} ms of work`);
 });
 
-test('four of it side by side, some two hundred and seventy items and six hundred links, take no more than twice as long', () => {
-  // The budget bounds the polish, so the time stops growing with the size: before it, twice the view took seven times as long.
+/**
+ * How much longer four of the view may take than one. The work is counted, so both draw the same each time, but their CPU
+ * time is not: alone it ran 1.7 to 2.2 times as long (9 Nov 2026, six runs), 2.1 to 2.2 in CI's shards. Before the
+ * budget, twice the view took seven times as long: that is what this keeps out.
+ */
+const FOUR_TIMES = 2.5;
+
+test('four of it side by side, some two hundred and seventy items and six hundred links, take no more than two and a half times as long', () => {
+  // The budget bounds the polish, so the time stops growing with the size.
   const big = times(built, 4);
   assert.ok(big.items.length > 250 && big.links.length > 580, `${big.items.length} items, ${big.links.length} links`);
   const { out, took } = drawn(big);
   assert.ok(out.scene && !out.scene.message, 'it draws');
-  assert.ok(took < 2 * one, `drawn in ${Math.round(took)} ms of work, against ${Math.round(one)} for one`);
+  assert.ok(took < FOUR_TIMES * one, `drawn in ${Math.round(took)} ms of work, against ${Math.round(one)} for one`);
   assert.ok(took < MOST, `drawn in ${Math.round(took)} ms of work`);
 });
 
