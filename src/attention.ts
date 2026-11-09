@@ -37,6 +37,8 @@ export interface Input {
   person?: string;
   /** Only what is this item's or place's: itself, what lives in it, and all part of that or about it. */
   within?: string;
+  /** Only these items: a set another read found (the frontier's), weighed as within weighs a scope. */
+  among?: string[];
   /** Only these reasons, the kernel's or a pack's. All of them when left out. */
   reasons?: string[];
   /** What is due within this many days counts as due: 7 unless given. */
@@ -72,7 +74,7 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   const owner = (await l.setting<string>('me')) || null;
   const me = input.person === undefined ? null : input.person === 'me' ? l.viewer || owner : input.person;
   if (input.person !== undefined && !me) throw new Error('No person: give an id, or set the workspace owner (pelago init "Your Name").');
-  const scope = input.within ? await scopeOf(l, input.within, true) : null;
+  const scope = input.within ? await scopeOf(l, input.within, true) : input.among ? new Set(input.among) : null;
   const staleDays = input.stale_days ?? STALE_DAYS;
 
   const rows: Row[] = read
@@ -168,7 +170,7 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   // What agents settled and the owner has not confirmed: the owner's to look at, closed though it is.
   const confirm = wanted.has('to_confirm') && (me === null || me === owner) ? await toConfirm(l, { limit: 40 }) : undefined;
   // What was settled is closed: whether it is within is asked of the whole scope, for those few.
-  const settledWithin = confirm && input.within ? await scopeOf(l, input.within, false, confirm.questions.map((q) => q.id)) : null;
+  const settledWithin = confirm && input.within ? await scopeOf(l, input.within, false, confirm.questions.map((q) => q.id)) : confirm && input.among ? new Set(input.among) : null;
   for (const q of confirm?.questions ?? []) {
     const row = { id: q.id, type: '', title: q.title, status: '', owner: null, is_open: false, due: null, updated_at: q.settled } as Row;
     const { rows: [e] } = await l.db.query<Row>(`select id, type, title, status, owner, is_open, props->>'due' as due, updated_at from entity where id = $1`, [q.id]);

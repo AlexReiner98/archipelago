@@ -1230,6 +1230,13 @@
       "description": "Everything a session needs to start on one task: context, repository, blockers, resources it needs, and the rules that apply. Params: task (required)."
     },
     {
+      "id": "core.frontier",
+      "shape": "data",
+      "lens": {},
+      "answer": "frontier",
+      "description": "Where a session stands on the map, and what there needs it: the open items the earlier sessions in this place worked on, one step along part_of either way, each with why it needs attention now, the strongest first. Reasons: corrected (a person changed or added it since an agent last touched it), waits_on, to_confirm, unsettled, left (begun, no session on it now), under_way, holding_up, blocked, moved, due, unseen (nobody has seen it working), open. Not a summary of the sessions: what their work reaches. What a session is handed as it starts. Params: run (the session asking: its folder is read from it), cwd, remote, limit (12)."
+    },
+    {
       "form": "screen",
       "id": "home",
       "title": "For you",

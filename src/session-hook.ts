@@ -30,6 +30,10 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   const lines = [`This session is registered in Archipelago, the owner's map of work and dependencies, as run ${started.run}, called "${(await l.entity(started.run))?.title}" after this chat, on the workspace "${started.workspace.name}" (${started.workspace.id}).`];
   const repo = 'repo' in started ? started.repo : undefined;
   if (repo) lines.push(`Repository: ${repo.title} (${repo.id}).`);
+  // Where this session stands, on any map: the open items the sessions before it here worked on, each with why it
+  // needs attention now (src/frontier.ts). Read off the map, never a note one session left for the next.
+  const { frontier, frontierText } = await import('./frontier.ts');
+  lines.push('', ...frontierText(await frontier(l, { run: started.run, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined })));
   // Where the work there stands is the place's pack's to say: a repository's, the software pack's views.
   if (repo && canAsk(l, 'repo_work') && canAsk(l, 'handoff')) {
     const work = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'repo_work', { repo: repo.id })) as { ready: { id: string; title: string; type: string; last_confirmed: string | Date }[]; blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[] };

@@ -136,7 +136,9 @@ export const ACT_TOOLS: Record<string, Tool> = {
       // registered and that joins that run hears it as a new one does (issue e_sm2sa75h). A resume was told at first.
       if (started.resumed) return started;
       const told = await instructionsFor(l, 'session_start', { about: started.repo?.id, fill: { run: started.run } });
-      return told.length ? { ...started, instructions: told.map((one) => one.text) } : started;
+      // And where it stands: what the sessions before it here worked on that needs attention now (src/frontier.ts).
+      const here = await (await import('./frontier.ts')).frontier(l, { run: started.run, cwd: input.cwd, remote: input.remote });
+      return { ...started, frontier: here, ...(told.length && { instructions: told.map((one) => one.text) }) };
     },
   },
   session_update: {

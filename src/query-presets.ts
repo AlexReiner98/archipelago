@@ -5,6 +5,7 @@
 import { attention, type Input } from './attention.ts';
 import { brief, briefRead } from './brief.ts';
 import type { LENS_ANSWERS, ViewDef } from './declared.ts';
+import type { FrontierInput } from './frontier.ts';
 import { HUB_AT, hubs } from './query-kept.ts';
 import { flatRead } from './query-flat.ts';
 import type { Archipelago } from './pelago.ts';
@@ -29,6 +30,9 @@ const briefOf: Reading = async (l, def, params) => {
   return brief(l, { task: String(params.task) }, read);
 };
 
+/** Where a session stands, and what there needs it (src/frontier.ts). */
+const frontierOf: Reading = async (l, _def, params) => (await import('./frontier.ts')).frontier(l, params as FrontierInput);
+
 const READINGS: Record<(typeof LENS_ANSWERS)[number], Reading> = {
   flat: (l, _def, params) => flatRead(l, params),
   graph,
@@ -36,6 +40,7 @@ const READINGS: Record<(typeof LENS_ANSWERS)[number], Reading> = {
   hubs: hubsOf,
   attention: attend,
   brief: briefOf,
+  frontier: frontierOf,
 };
 
 /** Answer a standing view a pack declares as data: read as its answer says. */
