@@ -1,6 +1,7 @@
-// Connecting an agent, step by step: the person says which client they use and is shown that client's own steps, a row
-// each, with the address to copy and the place to go. No client takes a link that fills the address in except where
-// a step says so. The page then watches for the connection and says when it lands, with a first thing to ask.
+// Connecting an agent, step by step, once the person asks to (Connect an agent, on the Agents card): they say which
+// client they use and are shown that client's own steps, a row each, with the address to copy and the place to go. No
+// client takes a link that fills the address in except where a step says so. While the steps are open the page watches
+// for the connection and says when it lands, with a first thing to ask; shut, it watches for nothing.
 
 import { api, h } from './base.js';
 import { card, line } from './workspace-cards.js';
@@ -91,13 +92,16 @@ const CLIENTS = [
     steps: () => [
       ['Copy this address', { copy: address() }],
       ['Add it as a remote MCP server', null, 'Look for MCP or connectors in its settings. Choose HTTP, or streamable HTTP, if it asks.'],
-      ['Sign in here when asked, then Allow', null, 'A client that cannot sign in takes a token instead: With a token, below.'],
+      ['Sign in here when asked, then Allow', null, 'A client that cannot sign in takes a token instead: With a token, on the Agents card.'],
     ],
   },
 ];
 
-/** What the card remembers while the page is drawn again: the client chosen, and the name of one that has just landed. */
-const chosen = { client: 'claude', landed: null };
+/** What the card remembers while the page is drawn again: whether it is open, the client chosen, and the name of one that has just landed. */
+const chosen = { open: false, client: 'claude', landed: null };
+/** Open or shut the steps. */
+export const connecting = (open) => ((chosen.open = open), (chosen.landed = null));
+export const isConnecting = () => chosen.open;
 
 const copyButton = (text, label = 'Copy') => h('button', { class: 'primary', onclick: (e) => navigator.clipboard.writeText(text).then(() => (e.target.textContent = 'Copied')) }, label);
 const openButton = ({ open, label, same }) => h('a', { class: 'button', href: open, ...(!same && { target: '_blank', rel: 'noopener' }) }, label);
@@ -112,7 +116,7 @@ function stepRow(n, [words, action, tip]) {
 function watchFor(status, client, known, landed) {
   let asked = 0;
   const tick = async () => {
-    if (!status.isConnected) return;
+    if (!status.isConnected || !chosen.open) return;
     const tokens = await api('token_list').catch(() => null);
     const fresh = tokens?.find((t) => t.client && !t.revoked_at && !known.has(t.id));
     if (fresh) return landed(fresh);
@@ -124,7 +128,7 @@ function watchFor(status, client, known, landed) {
 
 function connectedRows(name) {
   return [
-    line(h('strong', { class: 'grow gist' }, `✓ ${name} is connected`)),
+    line(h('strong', { class: 'grow gist' }, `${name} is connected`)),
     line(h('span', { class: 'grow gist', title: FIRST_ASK }, 'Ask it something to try it'), copyButton(FIRST_ASK, 'Copy a first ask')),
   ];
 }
@@ -141,7 +145,8 @@ export function connectCard({ tokens, then, workspace: id }) {
       chosen.landed = fresh.name;
       then();
     });
-  return card(
+  const shut = h('button', { title: 'Put the steps away', onclick: () => (connecting(false), then()) }, chosen.landed ? 'Done' : 'Close');
+  const box = card(
     'Connect an agent',
     null,
     h(
@@ -153,4 +158,6 @@ export function connectCard({ tokens, then, workspace: id }) {
       chosen.landed ? connectedRows(chosen.landed) : line(status),
     ),
   );
+  box.querySelector('header').append(h('span', { class: 'grow' }), shut);
+  return box;
 }

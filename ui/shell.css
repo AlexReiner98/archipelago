@@ -345,13 +345,22 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .page-json { margin: var(--space-3) 0 0; font-size: var(--text-3); white-space: pre-wrap; overflow-wrap: anywhere; }
 #sheet .page-lines .change.line { padding-left: 0; padding-right: 0; }
 
-/* Buying a workspace (ui/signup.js): a card in the sheet, its two fields on a row. */
-.signup-card { max-width: var(--measure); }
-.signup-row { padding: var(--space-8); }
-.signup-row.top { padding-bottom: 0; }
-.signup-name { flex: 1; min-width: var(--field-least); }
-.signup-email { flex: 2; min-width: var(--field-least); }
-.signup-error { padding: 0 var(--space-8) var(--space-8); }
+/* A page for whoever is not in a workspace yet (gate, ui/base.js): sign in, agree, sign up, Allow a client. One column
+   in the middle of the page, and nothing of the app behind it: no canvas, bar, tabs, find or close. */
+body[data-gate] #canvas, body[data-gate] #nav, body[data-gate] #query, body[data-gate] #find, body[data-gate] #sheet-close, body[data-gate]::before { display: none; }
+body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; transform: none; visibility: visible; transition: none; }
+.gate { box-sizing: border-box; width: 100%; max-width: var(--dialog); margin: 0 auto; padding-top: var(--space-14); display: flex; flex-direction: column; gap: var(--space-7); }
+.gate-mark { width: var(--box-10); height: var(--box-10); border-radius: var(--radius-2); }
+.gate h1 { margin: 0 0 var(--space-4); }
+.gate-row { display: flex; align-items: center; gap: var(--space-6); min-width: 0; white-space: nowrap; }
+.gate-row > input { flex: 1; min-width: 0; }
+.gate-row > button, .gate-row > a { flex: none; }
+.gate-row > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.gate-others { display: flex; gap: var(--space-6); }
+.gate-error:empty { display: none; }
+.gate-fold > summary { cursor: pointer; }
+.gate-fold[open] > summary { margin-bottom: var(--space-5); }
+.gate-agree { display: flex; gap: var(--space-6); align-items: baseline; }
 
 /* Panes (ui/panes.js): the canvases of a tab, each with its name, a way to keep only it and to close it. Their
    frames are set by the layout as shares of the page; the line between two is dragged. */

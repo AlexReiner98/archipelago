@@ -25,6 +25,12 @@ async function base64(file) {
   return btoa(out);
 }
 
+/** Who can sign in to a workspace by email and manage it: its admins' addresses, or a warning where it has none. */
+const adminsMark = (admins) =>
+  admins.length
+    ? h('span', { class: 'muted small gist', style: 'min-width: 0', title: `Admins, who sign in by email:\n${admins.join('\n')}` }, admins.length === 1 ? admins[0] : `${admins[0]} +${admins.length - 1}`)
+    : h('span', { class: 'error small', title: 'No admin with an email address: nobody can sign in to it by email. Add one under its People, signed in with an owner token.' }, 'no email');
+
 export function workspacesCard(current) {
   const body = h('div');
   const error = h('div');
@@ -40,6 +46,8 @@ export function workspacesCard(current) {
     const list = await call('GET');
     const id = h('input', { type: 'text', placeholder: 'id (acme)', title: 'Its address: lowercase letters, digits and dashes', style: 'flex: 1; min-width: 0' });
     const name = h('input', { type: 'text', placeholder: 'Name', style: 'flex: 2; min-width: 0' });
+    // Every workspace is made with its owner's address, who signs in to it by email; one from a backup brings its own.
+    const email = h('input', { type: 'email', placeholder: 'Owner email', autocomplete: 'off', style: 'flex: 2; min-width: 0' });
     // With a backup file chosen, the new workspace starts as the map in that file.
     const file = fileInput('.gz,.json');
     const from = h('span', { class: 'muted small gist' });
@@ -51,7 +59,7 @@ export function workspacesCard(current) {
       button.textContent = 'Making…';
       try {
         const backup = file.files[0] && (await base64(file.files[0]));
-        await draw(await call('POST', { id: id.value.trim(), name: name.value.trim(), ...(backup && { backup }) }));
+        await draw(await call('POST', { id: id.value.trim(), name: name.value.trim(), ...(backup ? { backup } : { email: email.value.trim() }) }));
       } catch (err) {
         button.disabled = false;
         button.textContent = 'Make workspace';
@@ -67,8 +75,8 @@ export function workspacesCard(current) {
       h(
         'ul',
         { class: 'rows' },
-        list.map((w) => line(h('span', { class: 'grow gist', title: `${w.name} (${w.id})` }, h('strong', {}, w.name), ' ', h('span', { class: 'muted small' }, w.id === current ? `${w.id}, this one` : w.id)), menu('⋯', [['New owner token…', () => reissue(w)]]))),
-        line(id, name, from, h('button', { class: 'primary', title: 'An empty workspace, or the map in the backup file chosen; its owner token is shown once', onclick: create }, 'Make workspace'), menu('⋯', [['From a backup file…', () => file.click()], ['Forget the secret', () => ((secret = ''), draw())]])),
+        list.map((w) => line(h('span', { class: 'grow gist', title: `${w.name} (${w.id})` }, h('strong', {}, w.name), ' ', h('span', { class: 'muted small' }, w.id === current ? `${w.id}, this one` : w.id)), adminsMark(w.admins ?? []), menu('⋯', [['New owner token…', () => reissue(w)]]))),
+        line(id, name, email, from, h('button', { class: 'primary', title: 'An empty workspace, or the map in the backup file chosen; its owner token is shown once', onclick: create }, 'Make workspace'), menu('⋯', [['From a backup file…', () => file.click()], ['Forget the secret', () => ((secret = ''), draw())]])),
       ),
       file,
     );

@@ -109,9 +109,10 @@ export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad, r
   const placed = new Set(ports.filter((p) => !ORDERED.includes(p.side)).map((p) => p.id));
   // A port the topology ordered keeps its column, and stands past everything on its side, the header too: its wire,
   // straight down its column, only grows longer.
+  // One that several wires come to stands further out by room for each to turn in under it (`jogUnder`).
   for (const p of ports.filter((q) => ORDERED.includes(q.side))) {
-    const [axis, out] = SIDES[p.side], n = nodes.get(p.id), at = [x.get(p.id), y.get(p.id)];
-    at[axis] = (out < 0 ? (axis ? all.t : all.l) : axis ? all.b : all.r) + out * (pad + (axis ? n.h : n.w) / 2);
+    const [axis, out] = SIDES[p.side], n = nodes.get(p.id), at = [x.get(p.id), y.get(p.id)], many = tosOf(p).length;
+    at[axis] = (out < 0 ? (axis ? all.t : all.l) : axis ? all.b : all.r) + out * (pad + (axis ? n.h : n.w) / 2 + 0);
     (x.set(p.id, at[0]), y.set(p.id, at[1]));
     // Its wires' ends go out with it, each where it landed along the port (a bundle's readers land apart on its bar), so
     // the last stretch stays straight.
@@ -143,6 +144,38 @@ export function setPorts({ nodes, x, y, routes, ties, ports, extras, gap, pad, r
   }
   inward.placed = placed;
   return inward;
+}
+
+/**
+ * After the shape, each wire that comes in with others at a port on an island's top or foot turns once just inside it,
+ * by a hair, toward the side the solve will take its way on past what stands below (the nearer side of the first box
+ * it runs beside): its drop from the port and the rest of its way are then two stretches, and the solve keeps the drops
+ * side by side on the port while what runs on parts round the boxes. Of those turning one way, the one nearest the
+ * port's end turns first, a wire's room deeper for each, so none crosses another's drop.
+ */
+export function jogUnder(routes, inward, { nodes, x, y, run, wire }) {
+  const on = new Map(), boxes = [...x.keys()].map((id) => ({ id, ...rectOf([x.get(id), y.get(id)], [nodes.get(id).w, nodes.get(id).h]) }));
+  for (const [k, r] of routes) for (const id of k.split('|')) if (inward.has(id) && !inward.placed.has(id)) (on.get(id) ?? on.set(id, []).get(id)).push(r);
+  for (const [id, rs] of on) {
+    if (rs.length < 2) continue;
+    const [axis, sign] = inward.get(id), across = 1 - axis, depth = (axis ? nodes.get(id).h : nodes.get(id).w) / 2 + run;
+    const at = (u, v) => { const c = []; c[across] = u; c[axis] = v; return c; };
+    const lo = across ? 't' : 'l', hi = across ? 'b' : 'r', near = axis ? 't' : 'l', far = axis ? 'b' : 'r';
+    const drops = rs.map((r) => ({ r, line: r.from === id ? r.points : [...r.points].reverse() })).filter(({ line: [p, q] }) => q && Math.abs(p[across] - q[across]) < 0.5 && (q[axis] - p[axis]) * sign > depth);
+    for (const d of drops) {
+      const [p, q] = d.line, [a, b] = [Math.min(p[axis], q[axis]), Math.max(p[axis], q[axis])];
+      const met = boxes.filter((o) => o.id !== id && o[lo] < p[across] && o[hi] > p[across] && o[near] < b && o[far] > a).sort((u, v) => (sign > 0 ? u[near] - v[near] : v[far] - u[far]))[0];
+      d.side = met ? (p[across] < (met[lo] + met[hi]) / 2 ? -1 : 1) : 0;
+    }
+    for (const side of [-1, 1]) {
+      const these = drops.filter((d) => d.side === side).sort((u, v) => (u.line[0][across] - v.line[0][across]) * -side);
+      these.forEach((d, k) => {
+        const [p, q, ...more] = d.line, v = p[axis] + sign * (depth + k * wire), hair = side / 2;
+        const made = [p, at(p[across], v), at(p[across] + hair, v), at(q[across] + hair, q[axis]), ...more];
+        d.r.points = d.r.from === id ? made : made.reverse();
+      });
+    }
+  }
 }
 
 /**

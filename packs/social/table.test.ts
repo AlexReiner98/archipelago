@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 
 const pack = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
-const laid = mkdtempSync(join(tmpdir(), 'table-'));
+const laid = mkdtempSync(join(tmpdir(), 'pelago-table-'));
 for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'social.table').modules as Record<string, string>)) copyFileSync(join(import.meta.dirname, file), join(laid, name));
 const { picture, sums } = await import(pathToFileURL(join(laid, 'index.js')).href);
 

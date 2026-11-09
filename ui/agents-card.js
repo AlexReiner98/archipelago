@@ -19,25 +19,28 @@ export function tokenRow(t, { me, personName, then, fail }) {
   const revoke = async () => (await ask({ title: `Revoke the token "${t.name}"?`, message: 'Whoever uses it is signed out at once.', action: 'Revoke', danger: true })) && api('token_revoke', { id: t.id }).then(then, fail);
   return line(
     h('span', { class: 'grow', title: tip.filter(Boolean).join('\n') }, h('strong', {}, t.name), ' ', h('span', { class: 'muted small' }, t.last_used ? ['used ', ago(t.last_used)] : 'never used')),
-    t.admin && h('span', { class: 'pill' }, 'admin'),
-    mine && h('span', { class: 'pill ok' }, 'this session'),
+    t.admin && h('span', { class: 'muted small' }, 'admin'),
+    mine && h('span', { class: 'muted small', title: 'The token this browser is signed in with' }, 'this browser'),
     scopePills(t),
     mine ? h('span', { class: 'menu-room' }) : menu('⋯', [['Revoke', revoke, 'danger']]),
   );
 }
 
-/** What is connected, and the older way in, folded: a token, for Claude Code's hooks or a client that cannot sign in. */
-export function tokensCard({ tokens, row, then, fail, say, workspace }) {
+/**
+ * What is connected, first: a row each, or a line saying none is. Connect an agent opens the steps under it
+ * (ui/connect-agent.js). The older way in, folded: a token, for Claude Code's hooks or a client that cannot sign in.
+ */
+export function tokensCard({ tokens, row, then, fail, say, workspace, connect }) {
   // Named on the button and in the box that shows the token: one browser may be signed in to two workspaces.
   const name = h('input', { type: 'text', placeholder: 'Name (claude-code)', style: 'flex: 1 1 0; min-width: 0' });
   // A new agent token ends by itself unless it is said not to. One within an item is made on that item's page.
   const life = h('select', { title: 'When the token stops working by itself' }, [[90, '90 days'], [30, '30 days'], [365, 'A year'], [0, 'Never expires']].map(([days, label]) => h('option', { value: days }, label)));
   const token = (fallback) => ({ kind: 'agent', name: name.value.trim() || fallback, ...(Number(life.value) > 0 && { expires_days: Number(life.value) }) });
   const make = (fallback, show) => api('token_create', token(fallback)).then((made) => then().then(() => say(show(made))), fail);
-  return card(
-    'Connected agents',
+  const box = card(
+    'Agents',
     'Each acts for you: it sees what you see and proposes to you.',
-    h('ul', { class: 'rows' }, tokens.map(row)),
+    h('ul', { class: 'rows' }, tokens.length ? tokens.map(row) : line(h('span', { class: 'muted grow' }, 'None connected yet'))),
     h(
       'details',
       { class: 'fold-bar' },
@@ -52,6 +55,8 @@ export function tokensCard({ tokens, row, then, fail, say, workspace }) {
       ),
     ),
   );
+  if (connect) box.querySelector('header').append(h('span', { class: 'grow' }), h('button', { class: 'primary', title: 'Pick the app your agent runs in and follow its steps', onclick: connect }, 'Connect an agent'));
+  return box;
 }
 
 /** What the owner lets agents do: whether their changes wait, and the three things each asked for in turn. */

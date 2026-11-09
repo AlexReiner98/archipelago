@@ -70,7 +70,7 @@ export function countCalls(make: (key: string | undefined, at: Parameters<typeof
 
 /** A map in memory with its own copy of the packs, as the tests make one. */
 async function throwaway(): Promise<{ l: Archipelago; done: () => Promise<void> }> {
-  const packs = mkdtempSync(join(tmpdir(), 'reader-eval-packs-'));
+  const packs = mkdtempSync(join(tmpdir(), 'pelago-reader-eval-packs-'));
   cpSync(join(ROOT, 'packs'), packs, { recursive: true });
   const db = await openDb();
   const l = new Archipelago(db, new Registry(packs));

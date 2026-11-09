@@ -6,7 +6,7 @@ import { freeId, signedByLemon } from '../src/signup.ts';
 import { serve } from './serve.ts';
 
 const SECRET = 'a-fake-signing-secret';
-const env = { PELAGO_LEMON_CHECKOUT: 'https://example.lemonsqueezy.com/checkout/buy/variant-uuid', PELAGO_LEMON_SECRET: SECRET, PELAGO_SIGNUP_PRICE: '$46 a month' };
+const env = { PELAGO_MAIL_FROM: 'Archipelago <signin@example.test>', PELAGO_LEMON_CHECKOUT: 'https://example.lemonsqueezy.com/checkout/buy/variant-uuid', PELAGO_LEMON_SECRET: SECRET, PELAGO_SIGNUP_PRICE: '$46 a month' };
 before(() => Object.assign(process.env, env));
 after(() => {
   for (const key of Object.keys(env)) delete process.env[key];

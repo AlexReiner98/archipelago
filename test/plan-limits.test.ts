@@ -31,7 +31,7 @@ test('over each limit what would add to it is refused, naming the plan, and read
   const { workspaces, call } = await serve('tokens');
   const pack = loadServerPacks([FIXTURES]).packs[0].file;
   const act = (name: string, input: Record<string, unknown>) => runAct(workspaces, pack, name, input);
-  const { workspace } = (await act('workspace.create', { name: 'Plan Co' })) as { workspace: { id: string } };
+  const { workspace } = (await act('workspace.create', { name: 'Plan Co', email: 'ola@plan.example' })) as { workspace: { id: string } };
   const ws = await workspaces.get(workspace.id);
   const person = ((await act('workspace.admit', { workspace: ws.id, email: 'ola@plan.example', admin: true })) as { person: string }).person;
   const owner = (await createToken(ws.pelago.db, ws.id, { kind: 'human', name: 'ola@plan.example', entity: person, admin: true })).token;
