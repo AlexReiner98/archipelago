@@ -358,8 +358,6 @@ body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; 
 .gate-row > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .gate-others { display: flex; gap: var(--space-6); }
 .gate-error:empty { display: none; }
-.gate-fold > summary { cursor: pointer; }
-.gate-fold[open] > summary { margin-bottom: var(--space-5); }
 .gate-agree { display: flex; gap: var(--space-6); align-items: baseline; }
 
 /* Panes (ui/panes.js): the canvases of a tab, each with its name, a way to keep only it and to close it. Their

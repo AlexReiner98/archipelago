@@ -262,17 +262,6 @@ export function signIn(message, title = 'Sign in', { back = false } = {}) {
   send.onclick = sendLink;
   email.addEventListener('keydown', (e) => e.key === 'Enter' && sendLink());
 
-  // The older way in, for an agent or a workspace's first sign-in: folded.
-  const token = h('input', { type: 'text', placeholder: 'pel_…', autocomplete: 'off', spellcheck: false });
-  const useToken = async () => {
-    store.token = token.value.trim();
-    const res = await fetch('/whoami', { headers: authHeaders() });
-    if (!res.ok) return (store.token = ''), fail('That token was not accepted.');
-    state.schema = undefined;
-    route();
-  };
-  token.addEventListener('keydown', (e) => e.key === 'Enter' && useToken());
-
   // Where a person with no account begins, if this server offers it; a client waiting to connect is returned to after.
   const begin = h('div', { hidden: true });
   fetch('/connect/start').then((r) => r.json()).then(({ url }) => {
@@ -291,7 +280,6 @@ export function signIn(message, title = 'Sign in', { back = false } = {}) {
       error,
       others.length > 0 && gateRow(h('span', { class: 'muted' }, 'Signed in before'), h('span', { class: 'grow gist gate-others' }, others.map((w) => h('a', { href: '#', title: `Open ${w.name}`, onclick: (e) => (e.preventDefault(), enter(w.token)) }, w.name)))),
       begin,
-      h('details', { class: 'gate-fold' }, h('summary', { class: 'muted small', title: 'For an agent, or a workspace’s first sign-in' }, 'With a token'), gateRow(token, h('button', { onclick: useToken }, 'Sign in'))),
       back && gateRow(h('a', { href: '#', class: 'small', onclick: (e) => (e.preventDefault(), ungate(), route()) }, 'Back')),
     );
     email.focus();
