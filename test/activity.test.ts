@@ -51,7 +51,7 @@ delete from schema_version where version >= 34;`);
   const { rows: stored } = await db.query<{ facts: unknown }>(`select facts from log_op where stream = 'activity' and seq = $1`, [push]);
   assert.ok(!JSON.stringify(stored[0].facts).includes('main'), 'sealed, not in clear');
   // The sequence it numbered from stays: what comes after is numbered after the carried rows.
-  await make(l, [{ op: 'create', type: 'note', title: 'After' }]);
+  await make(l, [{ op: 'create', type: 'record', title: 'After' }]);
   assert.ok((await lastSeq(db)) > call);
 });
 

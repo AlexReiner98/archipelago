@@ -10,6 +10,7 @@
 
 import { SYSTEM } from './head.ts';
 import { ISLAND, islandPack, onIslands } from './island-items.ts';
+import { islandFindings, SHORE_MOST } from './findings.ts';
 import type { Archipelago } from './pelago.ts';
 import { checkedAfter, holding, wordConditions, type Narrowing, type Word } from './query-only.ts';
 import { heldIds } from './query-held.ts';
@@ -305,6 +306,8 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
     types: items.filter((e) => onIsle.get(e.id) === isle).map((e) => e.type),
     links: relations.filter((r) => onIsle.get(r.from_id) === isle && onIsle.get(r.to_id) === isle).map((r) => r.type),
   });
+  // What each island stands by: its published findings, a few, drawn on its shore (task e_p27ddjqt).
+  const shore = new Map(await Promise.all(islandIds.map(async (id) => [id, (await islandFindings(l, id, SHORE_MOST, 0)).published] as const)));
   const named = new Map(isles.map((r) => [r.id, r.title])), packOf = new Map(isles.map((r) => [r.id, r.pack ? islandPack(l.registry, r.pack, usedOn(r.id)) : undefined]));
   const why = frontierRead && (await frontierRead);
   // An end said by name goes back in the lens as its id.
@@ -341,7 +344,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
     }),
     // A link that extends another says what it is a flavour of (`is`, nearest first), so a drawing treats it as its root.
     links: relations.map((r) => ({ id: r.id, type: r.type, ...(flavourOf(l, r.type).length && { is: flavourOf(l, r.type) }), from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
-    ...(islandIds.length && { islands: islandIds.map((id) => ({ id, ...(named.has(id) && { title: named.get(id) }), ...(packOf.get(id) && { pack: packOf.get(id) }) })) }),
+    ...(islandIds.length && { islands: islandIds.map((id) => ({ id, ...(named.has(id) && { title: named.get(id) }), ...(packOf.get(id) && { pack: packOf.get(id) }), ...(shore.get(id)?.rows.length && { findings: shore.get(id)!.rows }), ...(shore.get(id)?.more && { findings_more: shore.get(id)!.more }) })) }),
     ...(filed && { lanes: filed.lanes, streams: filed.streams }),
     ...(cut && { cut: true }),
     ...(matched !== undefined && { matched }),

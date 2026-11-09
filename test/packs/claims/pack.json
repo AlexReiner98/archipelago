@@ -1,0 +1,36 @@
+{
+ "id": "claims",
+ "version": "0.1.0",
+ "title": "Claims",
+ "description": "A question settled by evidence, for the approvals table (test/approvals.ts) once the science pack left for the hosted service.",
+ "requires": [
+  "core"
+ ],
+ "types": [
+  {
+   "id": "conjecture",
+   "title": "Conjecture",
+   "description": "A claim settled by evidence, as science's hypothesis is (now a hosted pack): for the tests of who may settle one.",
+   "extends": "question",
+   "capabilities": {
+    "settles": {
+     "by": "evidence",
+     "whose": "owner"
+    }
+   },
+   "statuses": {
+    "open": [
+     "untested",
+     "testing"
+    ],
+    "closed": [
+     "supported",
+     "refuted"
+    ],
+    "phases": {
+     "refuted": "finished"
+    }
+   }
+  }
+ ]
+}

@@ -189,10 +189,8 @@ export function drawingsGiven<T extends Frozen>(l: Archipelago, lenses: Record<s
       const style = frozen.style ?? {};
       // One drawn by a layout's code is drawn by its shape's drawing here, as the page drew it by its shape before.
       if (style.drawing) return [id, frozen];
-      // A picture on a time axis was drawn along it, unless it was a grid or a flow.
-      const shape = frozen.lens?.time && !['grid', 'flow'].includes(String(style.shape)) ? 'time' : String(style.shape);
-      const drawing = layoutFor(l.registry, { shape }, []) ?? layoutFor(l.registry, { shape: 'flow' }, []);
-      return [id, drawing ? { ...frozen, style: { ...style, drawing } } : frozen];
+      const drawing = layoutFor(l.registry, { shape: style.shape }, []);
+      return [id, drawing ? { ...frozen, style: { ...style, shape: drawing.shape, drawing } } : frozen];
     }),
   );
 }

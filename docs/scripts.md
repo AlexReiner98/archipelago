@@ -38,9 +38,6 @@ page is where to find the one you need. Every `.ts` script is type-checked with 
 | `bench-log.ts` | the log at size, read and written as the server does (`docs/log.md`, section 9) |
 | `bench-rebuild.ts` | `npm run bench:rebuild`: the projections rebuilt from the log at scale |
 | `measure-plan.ts` | what the limits per plan (`src/plan.ts`) rest on, measured on a copy of a map |
-| `layout-bench.ts` | how fast a picture drawn by a drawing is, in a real browser |
-| `flow-bench.ts` | how long the flow drawing takes on a saved answer, behind the sandbox |
-| `plane-bench.ts` | how the canvas moves with many items on it |
 | `hero-bench.ts` | how soon the landing page's hero is on screen over a slowed network |
 
 ## Looking at drawings and pages
@@ -48,9 +45,6 @@ page is where to find the one you need. Every `.ts` script is type-checked with 
 | script | what it does |
 | --- | --- |
 | `look.ts` | a page as a reader sees it, kept as a PNG for an agent to read |
-| `flow-shots.ts` | pictures of the flow drawing for each case of `test/layout-cases.ts`, with what a reader meets |
-| `flow-stages.ts` | what each stage of the flow's layout does to its wires, fingerprinted on real views |
-| `flow-replay.ts` | a view captured from a page and drawn again in Node, checked against the page's scene |
 | `stable-page.ts` | whether an item's page stays still while agents write to the map under it |
 
 ## Pictures and fonts

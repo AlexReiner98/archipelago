@@ -31,7 +31,8 @@ export function sidesOf(list, outerAt, number, s, t) {
   const left = new Map(), right = new Map(), LEFT = -1, RIGHT = -2, seen = new Set([outerAt]);
   const other = (e, i) => (byEdge.get(e) ?? []).find((f) => f !== i);
   const visit = (i, e, isRight) => {
-    if (seen.has(i)) return;
+    // A stretch on the outer face alone (a graph with no inner face) has no face beyond it to visit.
+    if (i === undefined || seen.has(i)) return;
     seen.add(i);
     const [a, b] = chains(list[i]), near = a.includes(e) ? a : b, far = near === a ? b : a;
     for (const x of near) (isRight ? right : left).set(x, i);

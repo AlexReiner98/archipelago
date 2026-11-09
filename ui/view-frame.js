@@ -1,5 +1,5 @@
 // A kept view beside a picture: the `view` mark a drawing may make (ui/marks.js), as a story's player does for the
-// milestone a step reaches (packs/core/layouts/architecture/play.js). A drawing names only the view; the page draws it.
+// milestone a step reaches (packs/core/layouts/architecture/play.js, used by the map). A drawing names only the view; the page draws it.
 // On a canvas, it is drawn in a pane of its own beside the drawing's (hooks.besidePane, ui/panes.js), so the reader
 // slides the sash between them (the owner, 2 Nov 2026, e_dnewbxxh); the frame itself stays empty. Elsewhere (a
 // document), it is drawn in the frame as it is kept (keptView, ui/canvases.js), in the sandbox as every picture is:

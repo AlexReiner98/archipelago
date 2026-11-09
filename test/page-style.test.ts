@@ -51,11 +51,11 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
   await assert.rejects(of('e_nothing0'), /No item/);
 });
 
-test('the form chosen in the view band reaches the style read, with its drawing; the pages ask for notes whole', async () => {
+test('the layout chosen in the view band reaches the style read, with its drawing; one no pack draws is drawn as the map', async () => {
   const l = await fresh();
   const read = async (input: Record<string, unknown>) => ((await VIEWS.style.run(l, { ...input, have: [] })) as { style: any }).style;
-  assert.equal((await read({ shape: 'grid' })).drawing.id, 'core.grid');
-  const pages = (await read({ shape: 'pages' })).drawing;
-  assert.deepEqual([pages.id, pages.notes], ['core.pages', 'whole']);
-  assert.equal((await read({ shape: 'grid' })).drawing.notes, undefined, 'a drawing that reads the start of each note asks for nothing more');
+  assert.equal((await read({ shape: 'map' })).drawing.id, 'core.map');
+  const retired = await read({ shape: 'grid' });
+  assert.deepEqual([retired.shape, retired.drawing.id], ['map', 'core.map'], 'a layout retired on 9 Nov 2026 draws as the map');
+  assert.equal(retired.drawing.notes, undefined, 'a drawing that reads the start of each note asks for nothing more');
 });

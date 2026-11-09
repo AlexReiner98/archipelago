@@ -21,10 +21,6 @@ details.menu > .menu-items.start { right: auto; left: 0; }
 /* The view switcher's panel (ui/view-panel.js): a field, the scopes in a row set apart by a line, then a row per view, one line each. */
 .view-panel { width: var(--menu-item-most); max-height: var(--scroll-most); grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; }
 .view-find { margin: var(--space-2) var(--space-4) var(--space-4); padding: var(--space-3) var(--space-5); font: inherit; color: var(--text); background: none; border: var(--border-1) solid var(--line); border-radius: var(--radius-2); }
-.view-scopes { display: flex; gap: var(--space-8); padding: var(--space-2) var(--space-6) var(--space-4); border-bottom: var(--border-1) solid var(--line); margin-bottom: var(--space-3); }
-.view-scopes > button { border: 0; padding: 0; background: none; font: inherit; color: var(--muted); cursor: pointer; white-space: nowrap; }
-.view-scopes > button[aria-pressed="true"] { color: var(--text); text-decoration: underline; text-underline-offset: var(--space-3); }
-.view-scopes > button.up::after { content: ' •'; color: var(--accent); }
 .view-list { display: grid; align-content: start; overflow-y: auto; min-height: 0; }
 .view-row { display: flex; gap: var(--space-5); align-items: center; min-width: 0; text-align: left; border: 0; border-radius: var(--radius-2); background: none; padding: var(--space-3) var(--space-6); color: var(--text); font: inherit; text-decoration: none; cursor: pointer; white-space: nowrap; }
 .view-row > .gist { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

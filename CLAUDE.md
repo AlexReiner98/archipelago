@@ -11,10 +11,11 @@ that is belongs to whoever is working; `CLAUDE.local.md` (not tracked) says
 where, and how that server is run.
 
 - **If your pelago tools are connected to a map that tracks this
-  repository,** start with `query`, name `handoff`, and the repository. One
-  answer holds the last push, what has happened lately, what sessions left
-  unpushed, what nobody has seen working, the traps in the repository's
-  files, and the open work. Say what you take on with `report` action
+  repository,** start with `query`, name `handoff`, and the repository, where
+  the map has the software pack (a hosted pack); without it, `brief`,
+  `attention` and `story`. The handoff holds the last push, what has happened
+  lately, what sessions left unpushed, what nobody has seen working, the traps
+  in the repository's files, and the open work. Say what you take on with `report` action
   `session_update`, and keep the map true as you go: there is no handoff
   note to write.
 - **The pelago tools are ten.** `query` reads (a view, a query, or a read
@@ -150,18 +151,13 @@ reply ending) is `docs/agents.md`.
 - **The UI has no build step and no framework.** Plain files in `ui/`.
 - **Dependencies stay at four** (`@electric-sql/pglite`,
   `@modelcontextprotocol/sdk`, `zod`, and since 18 Oct 2026 `pg`, for a
-  Postgres server) unless the owner agrees to another. Two libraries are kept as files, not
-  dependencies. One is `ui/three.module.min.js` (three.js 0.160, MIT, since 13 Oct
+  Postgres server) unless the owner agrees to another. One library is kept as a file, not
+  a dependency: `ui/three.module.min.js` (three.js 0.160, MIT, since 13 Oct
   2026 at the owner's asking), offered to a layout's drawing code and to
   a drawing that paints on a surface (`ui/surface.js`, since 23 Oct 2026, for
   the landing page's relief), loaded only when one asks for it, in the
-  sandbox. The app's own pages do not use it. The other is
-  `ui/cola.module.min.js` (WebCola 3.4.0, MIT, its licence in
-  `ui/cola.LICENSE`, since 8 Nov 2026 at the owner's word): the authors'
-  `cola.min.js` wrapped as a module, not edited. Core's cola layout
-  (`packs/core/layouts/cola/`) loads it through the drawing's tools
-  (`cola()` in `ui/draw-marks.js`), so it runs only in the drawing's
-  sandboxed worker; nothing else loads it.
+  sandbox. The app's own pages do not use it. WebCola went with the cola
+  layout on 9 Nov 2026 (git tag `archive/layouts-2026-11-09`).
 - **A layout's code runs behind two walls, and only there.** A layout item
   (core's `layout` type, apart from `style` since 4 Nov 2026) carries a drawing
   module (`code`). It runs in a worker inside the sandboxed
@@ -183,7 +179,7 @@ reply ending) is `docs/agents.md`.
 The page is one flat canvas with a sheet over it. Its principles, and the
 modules they lead to, are `docs/canvas.md`; what each surface is for is
 `docs/ui-strategy.md`. Read both before adding or changing a screen. How a
-pack sets how the canvas looks is `packs/canvas/README.md`.
+pack sets how the canvas looks is the canvas pack's README (a hosted pack).
 
 The canvas keeps to these (the flat canvas, 25 Oct 2026: document
 "Rework: the canvas as a flat graph"):
@@ -253,7 +249,7 @@ spatial where it can be):
   corners do not meet it (the owner, 27 Oct 2026; rule e_vgs9vt5j on the map).
 - **One or two actions in sight.** What is done rarely goes in a `menu`.
 - **Connections are drawn, never listed.** What an item is tied to is a
-  wire on the canvas (the flow, by the canvas pack's preset, or a view's own
+  wire on the canvas (the flow, by a pack's preset, or a view's own
   drawing), and no page lists an item's links (the owner, 24 Oct 2026).
 - **A name is a few words.** An item's title is read in a row, in a box on a
   chart and in a tooltip: name the thing, in 60 characters at most (the

@@ -17,6 +17,7 @@ import { time } from './time.js';
 import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
 import { turnsPiece } from './turns.js';
+import { findingsPiece } from './findings.js';
 import { isA, label, link, statusMark, typeMark, unfolded } from './words.js';
 
 /** The screens shown on an item of this type, in the order the packs load. */
@@ -192,6 +193,11 @@ const PIECES = {
     const node = h('div');
     return ctx.e && { node, later: () => turnsPiece(node, ctx.e, section) };
   },
+  // An island's findings, one line each (ui/findings.js): a section of the bare page, as the turns are.
+  findings: (ctx) => {
+    const node = h('div');
+    return ctx.e && { node, later: () => findingsPiece(node, ctx.e, section) };
+  },
   figure: () => null,
   document: () => null,
 };
@@ -227,7 +233,7 @@ const draw = (ctx, p) => (Object.hasOwn(PIECES, p.piece) ? PIECES[p.piece](ctx, 
 const PAGES = { time };
 
 /** A piece that draws something of an item has nothing to draw on a screen of its own. */
-const OF_ITEM = ['fields', 'token', 'button', 'count', 'turns'];
+const OF_ITEM = ['fields', 'token', 'button', 'count', 'turns', 'findings'];
 
 /** The column a screen of its own draws: its pieces, with no item. */
 export function drawScreen(screen, redraw) {
@@ -280,6 +286,6 @@ export const sectionsOn = (data) =>
     })
     .filter(Boolean);
 /** The pieces the bare page draws as sections of its own. */
-const SECTIONS = ['turns', 'picture'];
+const SECTIONS = ['turns', 'findings', 'picture'];
 /** The count a screen on this item declares: it stands at the foot of its note while it is written (ui/note-count.js). */
 export const countOn = (data) => piecesOn(data).find((p) => p.piece === 'count');

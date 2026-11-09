@@ -21,7 +21,7 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
     { op: 'create', ref: 'u', type: 'task', title: 'Other task' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
-  await a.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'finding', title: 'Proposed' }] });
+  await a.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'finding', title: 'Proposed', props: { value: 1, value_type: 'number' } }] });
   // Each map has its own vault: a copy carries the vault's backup beside it.
   const snapshot = async (l: Archipelago) => ({ ...JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' }))), vault: await dumpVault(l.db) });
   // b starts as a copy of a, then each goes its own way.

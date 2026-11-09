@@ -21,13 +21,9 @@ export const SLOW: Record<string, string> = {
   'test/canvas-replica.test.ts': 'browser',
   'test/canvas-wires.test.ts': 'browser',
   'test/canvas-zoom.test.ts': 'browser',
-  'test/docs-beside.test.ts': 'browser',
-  'test/layouts-moved.test.ts': 'browser',
   'test/layout-asks.test.ts': 'browser',
   'test/code-style-starts.test.ts': 'browser',
   'test/layouts.test.ts': 'browser',
-  'test/layouts-architecture.test.ts': 'browser',
-  'test/layouts-flow.test.ts': 'browser',
   'test/layouts-open.test.ts': 'browser',
   'test/layouts-queued.test.ts': 'browser',
   'test/find-query.test.ts': 'browser',
@@ -71,15 +67,16 @@ export const SLOW: Record<string, string> = {
   'test/approvals-dev-2.test.ts': 'table',
   'test/approvals-mixed-1.test.ts': 'table',
   'test/approvals-mixed-2.test.ts': 'table',
-  // A flow of a few hundred items drawn whole through its budget, three times over and timed: about 25 seconds.
-  'packs/core/flow-time.test.ts': 'timed',
+  // The map of a few hundred items drawn whole through its budget, timed: about 22 seconds.
+  'packs/core/map-time.test.ts': 'timed',
+  // Dense pictures drawn six times over, each checked: about 22 seconds.
+  'packs/core/map-routing.test.ts': 'long',
   // Many tests in one file, past LONG seconds of one process in CI (test/weights.json, 8 Nov 2026).
   'test/sessions.test.ts': 'long',
   'test/oauth.test.ts': 'long',
   'test/server-auth.test.ts': 'long',
   'test/query-flat.test.ts': 'long',
   'test/new-workspace.test.ts': 'long',
-  'packs/core/flow.test.ts': 'long',
   'test/seeing.test.ts': 'long',
   'test/handoff.test.ts': 'long',
   'test/setup.test.ts': 'long',

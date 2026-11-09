@@ -3,8 +3,8 @@
 // (ui/query-bar.js) while its pane is in focus: every change of what is drawn is a change of that lens. A click on an
 // item opens its page and leaves the lens as it was (decision e_jedng69e); the find bar sets its words. It is drawn in the drawing its style names (the
 // flow, by the canvas pack's preset, unless a nearer style says otherwise), so a canvas has no look of its own: it keeps
-// which lens is up, lights the item whose page is open, and moves as the reader chose in the settings menu: fitted on
-// every change until they move it themselves (a page opened or shut then leaves it be), or left where they put it.
+// which lens is up, lights the item whose page is open, and is fitted on every change until the reader moves it
+// themselves (a page opened or shut then leaves it be).
 
 import { api, hooks, idsOf, state } from './base.js';
 import { wiresOn } from './canvas-wires.js';
@@ -107,9 +107,6 @@ export function canvasIn(host, pane) {
     show(lens, here, asked = {}) {
       const isHome = !lens;
       lens ??= home();
-      // Home is drawn in the shape the style names for it (home_shape: the house's draws the work agents left as a
-      // flow), unless another was asked for.
-      if (isHome && !asked.shape && !asked.style && !asked.canvas && typeof state.style?.home_shape === 'string') asked = { ...asked, shape: state.style.home_shape };
       const key = JSON.stringify([lens, asked]);
       if (at?.key === key && at.view.isConnected) return c.mark(here);
       const style = { ...asked, ...(here && { here }), ...(asked.canvas && { play: 'asked' }) };
@@ -150,12 +147,11 @@ export function canvasIn(host, pane) {
     /** The frame the drawing moves in now, and what moves it (ui/pan-zoom.js). */
     moves: () => at?.view?.querySelector('.lens-view')?.moves,
     /**
-     * All of it in sight, beside the sheet and between the bars, when the reader asked for that and has not moved it
-     * since its lens was drawn: a page opened or shut, or the window resized, does not undo their move. `force` (the
-     * setting turned on) fits it whatever they did.
+     * All of it in sight, beside the sheet and between the bars, unless the reader has moved it since its lens was
+     * drawn: a page opened or shut, or the window resized, does not undo their move.
      */
-    fit(force = false) {
-      if (!settings.fit || (!force && at?.kept)) return;
+    fit() {
+      if (at?.kept) return;
       if (at) at.kept = null;
       c.moves()?.fit(0, ...bars(host));
       if (at) at.fitted = c.moves()?.state();
@@ -230,15 +226,8 @@ hooks.touched = async (touched) => {
   }
 };
 
-// ---- What the reader chose for the canvas, in the view band's menu (decision e_yxp78scv): kept in this browser, the same for every pane.
+// ---- Where a canvas fits: always all of it in sight, until the reader moves it (the owner, 9 Nov 2026: no Fit toggle).
 
-/** fit: all of it brought into sight on every change until the reader moves it; else the reader alone moves it. The key is the style's (key). */
-const settings = { fit: true };
-try {
-  Object.assign(settings, JSON.parse(localStorage.getItem('pelago-canvas') ?? '{}'));
-} catch {
-  // Without storage, as it comes.
-}
 /** What the bars cover of a canvas above and below: the query bar's foot, and the find bar's top, in the canvas's own frame. */
 const bars = (host) => {
   const edge = (id, side) => { const el = document.getElementById(id); return el && !el.hidden ? el.getBoundingClientRect()[side] : undefined; };
@@ -249,16 +238,5 @@ const bars = (host) => {
   return [Math.max(0, foot - box.top), find === undefined ? 0 : Math.max(0, box.bottom - find)];
 };
 const fitAll = () => all.forEach((c) => c.fit());
-function toggle(name) {
-  settings[name] = !settings[name];
-  try {
-    localStorage.setItem('pelago-canvas', JSON.stringify(settings));
-  } catch {
-    // Kept until the page is reloaded.
-  }
-  all.forEach((c) => c.fit(true));
-}
-// What the band's menu (ui/canvas-menu.js) acts on: the reader's toggles.
-hooks.canvasNow = { settings, toggle };
 // The window resized, or the panes drawn again as the sheet opens or shuts (ui/panes.js), change the room each is fitted to.
 addEventListener('resize', fitAll);

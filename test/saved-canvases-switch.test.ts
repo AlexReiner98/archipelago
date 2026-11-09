@@ -30,8 +30,8 @@ test('in a browser, a saved canvas is opened from Home and switched to from the 
     assert.ok(await page.until(`[...document.querySelectorAll('#find .q-id, #find .q-more')].some((c) => (c.textContent + c.title).includes('Another task'))`), 'its lens in the bar');
     // From the switcher's panel, its scope All.
     await page.evaluate(`document.querySelector('#query .q-pick').click()`);
-    assert.ok(await page.until(`Boolean(document.querySelector('.view-panel:popover-open .view-scopes button'))`), 'the panel opens');
-    await page.evaluate(`(() => { [...document.querySelectorAll('.view-scopes button')].find((b) => b.textContent.startsWith('All')).click(); [...document.querySelectorAll('.view-panel .view-row')].find((r) => r.dataset.title === 'Saved at 1280').click(); })()`);
+    assert.ok(await page.until(`Boolean(document.querySelector('.view-panel:popover-open .view-find'))`), 'the panel opens');
+    await page.evaluate(`(() => { [...document.querySelectorAll('.view-panel .view-row')].find((r) => r.dataset.title === 'Saved at 1280').click(); })()`);
     assert.ok(await page.until(drawn(made.a)), 'switched from the bar');
     assert.ok(await page.until(`${picked} === 'Saved at 1280'`));
 
@@ -49,7 +49,7 @@ test('in a browser, a saved canvas is opened from Home and switched to from the 
     await page.go(`${base}/#/you`);
     assert.ok(await page.until(`Boolean(document.querySelector('.canvases .old-views'))`));
     // On Home, and in the switcher's panel, its scope All.
-    const listed = `(() => { const p = document.querySelector('.view-panel'); if (!p.matches(':popover-open')) document.querySelector('#query .q-pick').click(); [...p.querySelectorAll('.view-scopes button')].find((b) => b.textContent.startsWith('All'))?.click(); return [...document.querySelectorAll('.canvases a'), ...p.querySelectorAll('.view-row')].map((a) => a.dataset.title ?? a.textContent); })()`;
+    const listed = `(() => { const p = document.querySelector('.view-panel'); if (!p.matches(':popover-open')) document.querySelector('#query .q-pick').click(); return [...document.querySelectorAll('.canvases a'), ...p.querySelectorAll('.view-row')].map((a) => a.dataset.title ?? a.textContent); })()`;
     assert.ok(!(await page.evaluate<string[]>(listed)).includes('A page’s picture'), 'not on Home');
     await page.go(`${base}/#/v?canvas=${other}`);
     assert.ok(await page.until(`${picked} === 'The other one'`));

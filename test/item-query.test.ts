@@ -24,13 +24,13 @@ test('a view kept on the map is drawn from its flat lens, with its pins, and can
     { op: 'link', type: 'part_of', from: 'irap', to: 'p' },
   ]);
   Object.assign(made, await make(l, [
-    { op: 'create', ref: 'v', type: 'lens', title: 'Funding map', props: { filter: { find: [`id ${made.p}`, `id ${made.other}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'list' } } },
+    { op: 'create', ref: 'v', type: 'lens', title: 'Funding map', props: { filter: { find: [`id ${made.p}`, `id ${made.other}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'map' } } },
     { op: 'link', type: 'about', from: 'v', to: made.p },
   ]));
   const { keptPicture } = await import('../src/query-saved.ts');
   const answer = await keptPicture(l, made.v);
   assert.deepEqual(answer.items.map((i) => i.id).sort(), [made.p, made.irap, made.other].sort());
-  assert.equal(answer.style.shape, 'list', 'drawn in the shape it keeps');
+  assert.equal(answer.style.shape, 'map', 'drawn in the shape it keeps');
   await assert.rejects(keptPicture(l, made.p), /not a view kept on the map/);
   const png = Buffer.from('89504e470d0a1a0a', 'hex').toString('base64');
   assert.equal(((await callTool(l, human, 'picture_put', { result: made.v, data: png, content_type: 'image/png' })) as { size: number }).size, 8);

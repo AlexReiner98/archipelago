@@ -246,7 +246,7 @@ export interface ScreenDef {
  * A count stands under the note while it is written: how long it is, against the limit its field's value picks.
  * Turns are a run's, along time: each turn a row, its beats among them.
  */
-export const PIECES = { figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [], button: ['label', 'tip'], count: [], turns: [] } as const;
+export const PIECES = { figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [], button: ['label', 'tip'], count: [], turns: [], findings: [] } as const;
 
 /** The pages the kernel still draws itself, which a screen can hold as a piece until a pack draws them from pieces. */
 export const PAGES = ['time'];

@@ -47,7 +47,7 @@ test('an agent can point the human\'s screen, and its changes point it too', asy
   const read = await last();
   assert.deepEqual([read.kind, read.did, read.hash], ['read', 'is reading this', `e/${note}`]);
   assert.ok(read.at > searched.at);
-  await call('/agent/view', undefined, { actor: 'robot', name: 'flat', params: { filter: { find: ['type note'] } } });
+  await call('/agent/view', undefined, { actor: 'robot', name: 'flat', params: { filter: { find: ['type record'] } } });
   assert.deepEqual([(await last()).kind, (await last()).did, (await last()).hash], ['view', 'asked for flat', 'graph?lens']);
   await call('/agent/proposals', undefined, { actor: 'robot' });
   assert.deepEqual([(await last()).kind, (await last()).did], ['read', 'proposals']);

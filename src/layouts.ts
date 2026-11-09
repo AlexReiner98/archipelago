@@ -43,7 +43,7 @@ const hashOf = (modules: Record<string, string>) => createHash('sha256').update(
 
 /**
  * The drawing a style is drawn by: its shape's, as the pack ships it under the owner's version of it (`versions`:
- * layouts kept with a drawing's id as preset). A style whose layout has code is drawn by that, and a shape no pack draws by the kernel.
+ * layouts kept with a drawing's id as preset). A style whose layout has code is drawn by that, and a shape no pack draws by the first drawing shipped.
  */
 export function layoutFor(
   packs: { folderOf(pack: string): string; packs: { id: string; layouts?: LayoutDef[] }[] },
@@ -52,7 +52,9 @@ export function layoutFor(
   have: string[] = [],
 ): Layout | undefined {
   if (typeof style.code === 'string' && style.code.trim()) return undefined;
-  const d = layoutsOf(packs.packs).find((one) => one.shape === style.shape);
+  // A shape no pack draws (one retired, or none said) is drawn by the first drawing the packs ship: core's.
+  const shipped = layoutsOf(packs.packs);
+  const d = shipped.find((one) => one.shape === style.shape) ?? shipped[0];
   if (!d) return undefined;
   const mine = versions.find((v) => v.props.preset === d.id);
   if (mine && !mine.is_open) return undefined;

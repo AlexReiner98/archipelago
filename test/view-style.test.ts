@@ -9,11 +9,11 @@ import { fresh, make } from './map.ts';
 test("a view's own style gives its shape, what it lights and the order of its rows; a view that says none keeps reading order", async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'v', type: 'lens', title: 'Findings', props: { filter: { find: ['type finding'] }, style: { shape: 'pages', lit: 'blocked', order: 'title' } } },
-    { op: 'create', ref: 'w', type: 'lens', title: 'Findings, as read', props: { filter: { find: ['type finding'] }, style: { shape: 'pages' } } },
+    { op: 'create', ref: 'v', type: 'lens', title: 'Findings', props: { filter: { find: ['type finding'] }, style: { shape: 'map', lit: 'blocked', order: 'title' } } },
+    { op: 'create', ref: 'w', type: 'lens', title: 'Findings, as read', props: { filter: { find: ['type finding'] }, style: { shape: 'map' } } },
   ]);
   const { style } = await pageStyle(l, { view: made.v });
-  assert.deepEqual([style.shape, style.lit, style.order], ['pages', 'blocked', 'title']);
+  assert.deepEqual([style.shape, style.lit, style.order], ['map', 'blocked', 'title']);
   assert.equal((await pageStyle(l, { view: made.w })).style.order, undefined, 'the drawing reads no order as reading order');
 });
 
@@ -23,17 +23,17 @@ test("a style named outright, or a view's own shape, draws as it says: a task's 
     { op: 'create', ref: 'p', type: 'task', title: 'Rebuild', status: 'doing' },
     { op: 'create', ref: 'ridges', type: 'layout', title: 'Ridges', props: { code: 'export default function draw() {}' } },
     { op: 'link', type: 'about', from: 'ridges', to: 'p' },
-    { op: 'create', ref: 'flow', type: 'style', title: 'Flow', props: { shape: 'flow' } },
-    { op: 'create', ref: 'v', type: 'lens', title: 'Plan', props: { filter: { find: ['type task'] }, style: { shape: 'flow' } } },
+    { op: 'create', ref: 'flow', type: 'style', title: 'Map', props: { shape: 'map' } },
+    { op: 'create', ref: 'v', type: 'lens', title: 'Plan', props: { filter: { find: ['type task'] }, style: { shape: 'map' } } },
     { op: 'create', ref: 'w', type: 'lens', title: 'Ridges view', props: { filter: { find: ['type task'] } } },
   ]);
   const plain = await pageStyle(l, { of: made.p });
   assert.equal(plain.coder, made.ridges, 'with nothing nearer, the task draws by its code');
   const named = await pageStyle(l, { of: made.p, style: made.flow, have: [] });
-  assert.deepEqual([named.style.code, named.coder, named.style.shape, (named.style.drawing as { shape?: string } | undefined)?.shape], [undefined, undefined, 'flow', 'flow']);
+  assert.deepEqual([named.style.code, named.coder, named.style.shape, (named.style.drawing as { shape?: string } | undefined)?.shape], [undefined, undefined, 'map', 'map']);
   const own = await pageStyle(l, { of: made.p, view: made.v });
   assert.deepEqual([own.style.code, own.coder], [undefined, undefined]);
   assert.equal((await pageStyle(l, { of: made.p, view: made.w })).coder, made.ridges, 'a view that says no shape draws by the code');
-  const switched = await pageStyle(l, { of: made.p, shape: 'list' });
+  const switched = await pageStyle(l, { of: made.p, shape: 'map' });
   assert.deepEqual([switched.style.code, switched.coder], [undefined, undefined]);
 });

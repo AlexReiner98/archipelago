@@ -129,13 +129,13 @@ test('what the page follows moves when a change is proposed, decided or applied,
 test('policy can let agents apply some ops directly, or forbid them', async () => {
   const l = await fresh();
   const loose = new Archipelago(l.db, l.registry, { create: 'auto', merge: 'forbidden' });
-  const made = await loose.change(agent, { ops: [{ op: 'create', ref: 'x', type: 'finding', title: 'X' }], reason: 'test' });
+  const made = await loose.change(agent, { ops: [{ op: 'create', ref: 'x', type: 'finding', title: 'X', props: { value: 1, value_type: 'number' } }], reason: 'test' });
   assert.equal(made.status, 'applied');
   const x = (made as { created: Record<string, string> }).created.x;
   const y = (await make(l, [{ op: 'create', ref: 'y', type: 'finding', title: 'Y' }])).y;
   await assert.rejects(loose.change(agent, { ops: [{ op: 'merge', keep: x, drop: y }], reason: 'test' }), /forbids/);
   const mixed = await loose.change(agent, {
-    ops: [{ op: 'create', type: 'finding', title: 'Z' }, { op: 'archive', id: y }],
+    ops: [{ op: 'create', type: 'finding', title: 'Z', props: { value: 1, value_type: 'number' } }, { op: 'archive', id: y }],
     reason: 'test',
   });
   assert.equal(mixed.status, 'proposed', 'one op needing approval holds the whole change');
