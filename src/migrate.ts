@@ -9,7 +9,7 @@
 
 import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
-import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, HOLDS_OFF_READ, ITEM_HIDDEN, MEMBER, ORDERED, SCHEMA, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
+import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, HOLDS_OFF_READ, ITEM_HIDDEN, LINK_SNAPSHOT, MEMBER, ORDERED, SCHEMA, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
 import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';
 import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH, SHARE_PUBLISHABLE } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
@@ -83,6 +83,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 34, name: 'the event table, carried into the activity stream and gone', sql: EVENT_GONE + FORGET_STORES, before: carryEventTable },
   { version: 35, name: 'a get says hidden, not missing', sql: ITEM_HIDDEN },
   { version: 36, name: 'a view shared with a guest, read live and nothing else', sql: GUEST_READER },
+  { version: 37, name: 'a link keeps its view frozen, read by a short token', sql: LINK_SNAPSHOT },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

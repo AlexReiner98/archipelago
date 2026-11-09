@@ -34,8 +34,7 @@ import { join } from 'node:path';
 import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './auth.ts'; import { firstStart } from './first-start.ts';
 import { notify } from './notify.ts'; import { alertOnCrash } from './alert.ts';
 import { backupAll, parseBackup, parseVault } from './backup.ts'; import { adminEmails, admitMember, configureMembers, memberLimit, ownerEmail } from './members.ts'; import { configureEnded, readEnded } from './ended.ts'; import { askedAs, configurePlan, requestWait, slowTokensAt, storageBytes, tooManyRequests } from './plan.ts';
-import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
-import { env } from './env.ts';
+import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts'; import { env } from './env.ts';
 import { serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
@@ -50,7 +49,7 @@ import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, ty
 import { servePublic } from './public-route.ts'; import { serveSite, siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
 import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
 import { sharedPicture } from './documents.ts'; import { sharedAnswer } from './share-view.ts'; import { guestMap, ShareEnded } from './guests.ts';
-import { configureSecrets } from './secrets.ts';
+import { serveLink } from './share-link-route.ts'; import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
@@ -228,6 +227,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture|drawing|live)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
       if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces, named, sites, from: addressOf(req) }));
+      // A frozen link's secret traded for a reader token, and that token's reads, from the link's snapshot alone (src/share-link-route.ts).
+      if (await serveLink(req, res, url.pathname, { workspaces, tooOften: () => tooOften(req, res, open), local: () => local(req), body: () => readJson(req) })) return;
 
       // A document given as a link: open to whoever holds it, with no login. The secret in the path is the only key, so
       // the page is never cached, never framed and never says where it was read from. What it shows is read through one

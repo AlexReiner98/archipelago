@@ -90,8 +90,8 @@ const hash = sha256Hex;
 /** Where a link is read: a path on this server. */
 export const sharePath = (workspace: string, secret: string) => `/s/${workspace}/${secret}`;
 
-/** A link to a document for someone with no login. The secret is in the path it returns, shown once. */
-export async function createShare(l: Archipelago, actor: Actor, id: string) {
+/** A link to a document for someone with no login, with the view it shows frozen (`snapshot`, src/share-link.ts). The secret is in the path it returns, shown once. */
+export async function createShare(l: Archipelago, actor: Actor, id: string, snapshot?: unknown) {
   const doc = await l.entity(id);
   if (!doc || doc.type === SHARED || !(await import('./share-view.ts')).readWhole(l).includes(doc.type)) throw new Error(`"${id}" is not a document of this workspace: only one can be given as a link.`);
   if (doc.archived_at) throw new Error(`"${doc.title}" is archived.`);
@@ -99,7 +99,7 @@ export async function createShare(l: Archipelago, actor: Actor, id: string) {
   const share = newId('s');
   const by = actor.person ?? `${actor.kind}:${actor.name}`;
   await l.db.transaction(async (tx: Q) => {
-    await tx.query(`insert into share (id, workspace, hash, hint, entity_id, made_by) values ($1, $2, $3, $4, $5, $6)`, [share, l.workspace, hash(secret), `…${secret.slice(-6)}`, id, by]);
+    await tx.query(`insert into share (id, workspace, hash, hint, entity_id, made_by, snapshot) values ($1, $2, $3, $4, $5, $6, $7::jsonb)`, [share, l.workspace, hash(secret), `…${secret.slice(-6)}`, id, by, snapshot === undefined ? null : JSON.stringify(snapshot)]);
     await l.log(tx, { actor: `${actor.kind}:${actor.name}`, action: 'share.create', target: id, reason: 'A link was made to read it with no login', detail: { share } });
   });
   return { share, path: sharePath(l.workspace, secret), note: 'Anyone with this link can read the document and what it brings in. Keep it now: it is not stored and cannot be shown again.' };
