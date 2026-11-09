@@ -40,7 +40,7 @@ export function normalEmail(email: unknown): string | undefined {
 }
 
 /** Whether this server sends mail, or only writes it to its log. */
-export const mailConfigured = () => Boolean(env('MAIL_FROM'));
+export const mailConfigured = () => Boolean(mailer || env('MAIL_FROM'));
 
 /** A header's value in words a mail program reads whatever the letters: plain when it is plain ASCII. */
 const word = (s: string) => (/^[\x20-\x7e]*$/.test(s) ? s : `=?UTF-8?B?${Buffer.from(s).toString('base64')}?=`);

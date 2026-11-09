@@ -9,7 +9,7 @@ export default {
     ],
   }),
   async make(input, ctx) {
-    const { workspace } = await ctx.act('workspace.create', { name: input.name });
+    const { workspace } = await ctx.act('workspace.create', { name: input.name, email: input.members[0] });
     for (const email of input.members) await ctx.act('workspace.admit', { workspace: workspace.id, email, admin: true });
     return { answer: { workspace: workspace.id } };
   },

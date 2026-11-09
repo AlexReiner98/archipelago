@@ -41,7 +41,7 @@ test('an admin adds a member by email; the invitation signs them in once, for a 
 test('anyone may ask for a sign-in link at an address, and is told nothing of who is a member where', async () => {
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
-  const acme = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const acme = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
   const main = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   await call('/api/member_add', main, { email: 'alex@example.com', name: 'Alex', admin: true });
   await call('/api/member_add', acme, { email: 'alex@example.com', name: 'Alex' });
@@ -114,7 +114,7 @@ test('an admin changes a member’s standing or removes them, and their sign-ins
 test('a sign-in opens only the workspaces its address belongs to, as the index says, after a restore too', async () => {
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
-  const acme = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const acme = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
   const main = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   await call('/api/member_add', main, { email: 'dee@example.com' });
   await call('/api/member_add', acme, { email: 'ann@example.com' });
