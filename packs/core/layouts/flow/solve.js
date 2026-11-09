@@ -14,6 +14,9 @@ const TOUCH = 0.5;
 /** How many times the arcs are gone over, at most: past it they ask for more than can be. */
 const PASSES = 400;
 
+/** How far a number must go to count as moved: a ring that adds no more each time round is kept. */
+const MOVE = 1e-6;
+
 /** How far each distance gives way, in turn, where what is held leaves too little room. */
 const SQUEEZE = [1, 0.5, 0.25];
 
@@ -56,16 +59,46 @@ function unringed(n, arcs, told) {
   return arcs.filter((_, k) => !gone.has(k));
 }
 
-/** The least numbers that keep every arc [from, to, length], which may be negative; with those still moving, if they cannot all be kept. */
-function least(n, arcs) {
-  const at = new Array(n).fill(0);
+/**
+ * The least numbers that keep every arc [from, to, length], which may be negative; with those still moving, if they cannot
+ * all be kept. `only` asks just whether they can: then a ring that asks for more each time round answers no as soon as it
+ * shows, where the passes would only find it at their end (a failing solve of thousands of arcs was most of a picture's
+ * time). Where they can be kept, the numbers are the same either way.
+ */
+function least(n, arcs, only = false) {
+  const at = new Array(n).fill(0), by = only ? new Array(n).fill(-1) : null;
   for (let pass = 0; pass < PASSES; pass++) {
     const moved = new Set();
-    for (const [p, q, l] of arcs) if (at[p] + l > at[q] + 1e-6) ((at[q] = at[p] + l), moved.add(q));
+    for (let k = 0; k < arcs.length; k++) {
+      const [p, q, l] = arcs[k];
+      if (at[p] + l > at[q] + MOVE) ((at[q] = at[p] + l), moved.add(q), by && (by[q] = k));
+    }
     if (!moved.size) return { at, moved };
-    if (pass === PASSES - 1) return { at: null, moved };
+    // Looked for after passes 1, 2, 4, 8...: a ring shows within twice the passes it took, for a handful of looks in all.
+    if (pass === PASSES - 1 || (by && !(pass & (pass + 1)) && growing(n, arcs, by))) return { at: null, moved };
   }
   return { at, moved: new Set() };
+}
+
+/**
+ * Whether the arcs that last moved each number (`by`) close a ring longer than nothing: one such ring moves on for ever,
+ * so the arcs cannot all be kept.
+ */
+function growing(n, arcs, by) {
+  const state = new Uint8Array(n);
+  for (let v = 0; v < n; v++) {
+    if (state[v]) continue;
+    const path = [];
+    let u = v;
+    while (u >= 0 && !state[u]) ((state[u] = 1), path.push(u), (u = by[u] >= 0 ? arcs[by[u]][0] : -1));
+    if (u >= 0 && state[u] === 1) {
+      let length = 0, w = u;
+      do ((length += arcs[by[w]][2]), (w = arcs[by[w]][0])); while (w !== u);
+      if (length > MOVE) return true;
+    }
+    for (const w of path) state[w] = 2;
+  }
+  return false;
 }
 
 /** The longest way from `low` to `high` over what stands between them in `order`: the least a box can measure. */
@@ -137,7 +170,7 @@ function freely(places, given, boxes, told, fixed = []) {
     // Where the held ends cannot all be kept, the one whose letting go keeps the rest; failing that, every one goes.
     if (!freed && fixed.length) {
       const holds = [...new Set(fixed.map((a) => a.hold).filter((h) => h !== undefined))];
-      const one = holds.find((h) => least(places.length, [...arcs, ...rigid.values(), ...fixed.filter((a) => a.hold !== h)]).at);
+      const one = holds.find((h) => least(places.length, [...arcs, ...rigid.values(), ...fixed.filter((a) => a.hold !== h)], true).at);
       fixed = one === undefined ? [] : fixed.filter((a) => a.hold !== one);
       told.loose = (told.loose ?? 0) + 1;
       continue;
