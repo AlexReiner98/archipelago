@@ -35,7 +35,6 @@ test('the island rules take it, and each type comes from a starter as the work i
   assert.deepEqual(own.map((id) => reg.type(id)?.starter), ['work', 'work', 'work', 'occurrence', 'place', 'record', 'place', 'place', 'work']);
   assert.ok(own.every((id) => reg.type(id)?.pack === 'code'), 'each is the code pack’s');
   assert.ok(reg.type('repo')!.capabilities.where?.address, 'a repository is found by its remote');
-  assert.equal(reg.type('commit')!.capabilities.accounts?.field, 'sha');
   const root = (id: string) => reg.relations.get(id)?.root;
   assert.deepEqual(['settles', 'fixes', 'calls', 'ships', 'defers'].map(root), ['about', 'about', 'uses', 'produced', 'about']);
   assert.ok(reg.trees.has('code.roadmap'));

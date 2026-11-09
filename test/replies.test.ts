@@ -77,7 +77,7 @@ test('a reply that did what a rule names is asked once a turn, the asking kept i
   await assert.rejects(callTool(l, owner, 'workspace_set', { lifted: { reply_nothing: true } }), /No rule here is turned off by "reply_nothing"/);
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: true } });
   const info = (await callTool(l, owner, 'workspace_info', {})) as any;
-  assert.deepEqual(info.lifted, { reply_draw_answers: false, reply_record_findings: false, reply_show_changes: true, reply_account_commits: false });
+  assert.deepEqual(info.lifted, { reply_draw_answers: false, reply_record_findings: false, reply_show_changes: true });
   assert.deepEqual(info.reply_rules.find((r: any) => r.rule === 'checks.show_changes'), { rule: 'checks.show_changes', say: SHOW.say, lifted: 'reply_show_changes', off: true, asked: 2 }, 'the owner’s switch, with how often it asked this week');
   assert.deepEqual(await stop(l, { session_id: 's1', turn: 'u4', reply: changed }), {}, 'turned off');
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: false } });

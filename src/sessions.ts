@@ -8,8 +8,8 @@ import { livesIn, livesInFor, placeFor } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
 import { cutTitle, mintName, saidTitle, sessionLabelled, sessionTitle } from './session-name.ts';
-import { commitRule } from './commit-rule.ts'; import { openTargets } from './close-offer.ts'; import { roomForSession, workspaceName } from './plan.ts'; import { wholeMap } from './outbox.ts'; import { took } from './presence.ts';
-import { VIEWS } from './views.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts'; import { unaccountedBy } from './commits.ts';
+import { roomForSession, workspaceName } from './plan.ts'; import { wholeMap } from './outbox.ts'; import { took } from './presence.ts';
+import { VIEWS } from './views.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts';
 import { hookRunHere, isChat, resolveRun, sessionsAwake, takeUp } from './chat-run.ts'; import { parentOps, parentRun } from './session-parent.ts';
 export { resolveRun, sessionPrompted, sessionsAwake } from './chat-run.ts';
 export { recordRun } from './run-record.ts';
@@ -108,7 +108,6 @@ export async function sessionStart(
     note: blocked.length
       ? 'Do not start work that needs the resources listed under blocked. Take work that does not need them, or wait.'
       : 'Call report with action session_update and a note when something worth knowing happens, and report with action session_end when you finish.',
-    commit: task ? commitRule(task.id, (await openTargets(l.db, l.registry, [task.id])).map((o) => o.id)) : undefined,
     joined: hooked ? true : undefined,
   };
 }
@@ -270,7 +269,6 @@ export async function sessionUpdate(l: Archipelago, actor: Actor, input: { run: 
   return {
     run: run.id,
     status: input.status ?? run.status,
-    ...(task && { commit: commitRule(task.id, (await openTargets(l.db, l.registry, [task.id])).map((o) => o.id)) }),
     ...(unestimated && { estimate: `"${task.title}" has no estimate. Say how many tokens you expect it to take (one number: input and output together, not counting cached re-reads): change, update ${task.id}, props.tokens_estimated. What it actually uses is measured for you.` }),
   };
 }
@@ -396,8 +394,6 @@ export async function sessionEnd(
   // A chat that has said where its work stands and is then ended for it: what it said stands as its last word.
   const said_already = !stays && !input.reconcile && run.status === 'waiting' && isChat(run);
   const unsaid = outcome === 'finished' && !said_already ? await unreconciled(l, run) : [];
-  // Beside them, the commits it made that the map does not account for yet (src/commits.ts).
-  const commits = outcome === 'finished' && !said_already ? await unaccountedBy(l, run.id) : [];
   const vouched = unsaid.filter((i) => input.still_true?.includes(i.id));
   // "Cannot tell" is an answer too: the item is left exactly as it was, last known true when it was, and the run says so.
   const named = unsaid.filter((i) => !vouched.includes(i) && input.cannot_tell?.includes(i.id));
@@ -406,21 +402,19 @@ export async function sessionEnd(
   // The rest are counted, not listed: a session that never looked at thirty items has nothing to say of each.
   const rest = unknown.length - named.length;
   const left = unsaid.filter((i) => !vouched.includes(i) && !unknown.includes(i));
-  if (input.reconcile && (left.length || commits.length)) {
+  if (input.reconcile && left.length) {
     return {
       run: run.id,
       status: run.status,
       ended: false,
       unreconciled: left,
-      unaccounted_commits: commits.length ? commits : undefined,
-      note: (commits.length ? 'Its commits listed in unaccounted_commits are not accounted for: for each, in one change, create its commit record (its full sha) with a settles link to each item it settles, or none. ' : '') + 'Not ended yet. First, what you built and nobody has seen working: say so on the item (seen_working false, to_see); and what bit you that nothing can fix: an instruction about this repository, for: file:<glob>. These are open in the repository this session worked in or were touched by it (read, shown or changed: marked touched, and listed first), and nobody has changed them since it began. For each: if it is done or no longer as written, change it with change; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell (or send cannot_tell_rest: true for all you have not otherwise named and did not touch), and do not vouch for what you did not look at. Then call report with action session_end again.',
+      note: 'Not ended yet. First, what you built and nobody has seen working: say so on the item (seen_working false, to_see); and what bit you that nothing can fix: an instruction about this repository, for: file:<glob>. These are open in the repository this session worked in or were touched by it (read, shown or changed: marked touched, and listed first), and nobody has changed them since it began. For each: if it is done or no longer as written, change it with change; if you checked it and it is still true as written, name its id in still_true; if this session had nothing to do with it and cannot check it from here, name its id in cannot_tell (or send cannot_tell_rest: true for all you have not otherwise named and did not touch), and do not vouch for what you did not look at. Then call report with action session_end again.',
     };
   }
   const said = [
     vouched.length && `Said still true: ${vouched.map((i) => `${i.title} (${i.id})`).join('; ')}.`,
     unknown.length && `Could not tell from here, left as found: ${[...named.map((i) => `${i.title} (${i.id})`), ...(rest ? [`${rest} ${named.length ? 'more' : rest === 1 ? 'item' : 'items'} it did not look at`] : [])].join('; ')}.`,
     // A session closed for it has said nothing of anything: past a few, the count says as much as the list.
-    commits.length && `Commits not accounted for: ${commits.map((c) => c.slice(0, 7)).join(', ')}.`,
     left.length && (left.length > 8 ? `Not reconciled: ${left.length} open items left unsaid.` : `Not reconciled, open and left unsaid: ${left.map((i) => `${i.title} (${i.id})`).join('; ')}.`),
   ].filter(Boolean);
   const summary = said_already ? '' : [input.summary, ...said].filter(Boolean).join('\n');
@@ -449,5 +443,5 @@ export async function sessionEnd(
   // The owner's page closes its tab (ui/tab-life.js); a page that missed this finds it ended when it next reads the sessions.
   // One that stays, waiting, lets its tab go until it next shows something.
   await took((await wholeMap(l)).db, l, { kind: 'other', actor: actorId(actor), did: stays ? 'waiting' : (input.reason ?? 'ended'), ...(stays ? { rests: true } : { ends: true }), run: run.id }, true).catch((err) => console.error(`session_end ${run.id}: the owner's page could not be told: ${(err as Error).message}`));
-  return { run: run.id, status: stays ? 'waiting' : outcome, released: held.length, unaccounted_commits: commits.length ? commits : undefined, note: stays ? 'Kept. The session stays open, under its name, until its chat ends.' : undefined };
+  return { run: run.id, status: stays ? 'waiting' : outcome, released: held.length, note: stays ? 'Kept. The session stays open, under its name, until its chat ends.' : undefined };
 }

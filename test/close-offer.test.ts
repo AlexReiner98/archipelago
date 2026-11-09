@@ -44,12 +44,9 @@ test('what the same change closes or keeps open is not offered again, and a chan
   assert.equal(retitle.still_open, undefined);
 });
 
-test('a held close offers them too, and the commit line names them', async () => {
+test('a held close offers them too', async () => {
   const { l, task, a, b } = await setup();
   const held = (await callTool(l, agent, 'change', { reason: 'done', hold: true, ops: [{ op: 'update', id: task, status: 'done' }] })) as any;
   assert.equal(held.status, 'proposed');
   assert.equal(held.still_open.items.length, 2);
-  const started = await sessionStart(l, agent, { task, session_id: 'close-offer' });
-  assert.match(started.commit!, new RegExp(`linked settles to ${task}.`));
-  for (const id of [a, b]) assert.match(started.commit!, new RegExp(`meant to fix [^"]*${id}`));
 });

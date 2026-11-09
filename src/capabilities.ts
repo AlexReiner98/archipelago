@@ -76,15 +76,6 @@ export interface Watch {
 }
 
 /**
- * Each item of this type accounts for one commit of a repository: the field holds the commit's full id. An item
- * whose boolean field `accounted` (when named) is false was only heard of, from a push: it accounts for nothing yet.
- */
-export interface Accounts {
-  field: string;
-  accounted?: string;
-}
-
-/**
  * A promise to whatever reads it (a link of a type that crosses, as core's reads): these fields are kept current,
  * and when one moves after a reader last changed or checked itself, attention says so on the reader (src/moved.ts).
  */
@@ -99,7 +90,6 @@ export interface Capabilities {
   capacity?: Capacity;
   settles?: Settles;
   watch?: Watch;
-  accounts?: Accounts;
   promised?: Promised;
   /** Someone answers for it: it has an owner, kept in its row (src/head.ts, ownHead). */
   owned?: true;
@@ -111,7 +101,7 @@ export interface Capabilities {
   kernel?: true;
 }
 
-export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch', 'accounts', 'promised', 'owned', 'actionable', 'plannable', 'kernel'] as const;
+export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch', 'promised', 'owned', 'actionable', 'plannable', 'kernel'] as const;
 
 const DATES = ['date', 'datetime'];
 
@@ -125,7 +115,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     else if (!types.includes(def.type)) problems.push(`${what} reads "${field}", a ${def.type}, not a ${types.join(' or ')}`);
   };
   for (const name of Object.keys(caps)) if (!(CAPABILITIES as readonly string[]).includes(name)) problems.push(`"${name}" is not a capability: one of ${CAPABILITIES.join(', ')}`);
-  const { bound, when, where, capacity, settles, watch, accounts, promised } = caps;
+  const { bound, when, where, capacity, settles, watch, promised } = caps;
   if (bound) {
     if (!bound.field) problems.push('bound needs a field');
     if (bound.limit !== undefined && bound.below !== undefined) problems.push('bound has a limit or a field it stays above, not both');
@@ -177,12 +167,10 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     has('watch.commit', watch.commit, ['string']);
   }
   for (const flag of ['owned', 'actionable', 'plannable', 'kernel'] as const) if (caps[flag] !== undefined && caps[flag] !== true) problems.push(`${flag} is true, or left out`);
-  if (accounts) has('accounts', accounts.field, ['string']);
   if (promised) {
     if (!Array.isArray(promised.fields) || !promised.fields.length) problems.push('promised names the fields its readers rely on');
     else for (const f of promised.fields) if (!fields[f]) problems.push(`promised reads "${f}", which it has no field of`);
   }
-  if (accounts?.accounted) has('accounts.accounted', accounts.accounted, ['boolean']);
   return problems;
 }
 
