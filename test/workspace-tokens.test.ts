@@ -3,19 +3,46 @@ import { request } from 'node:http';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
 import { limiter } from '../src/limit.ts';
+import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { PACKS } from './map.ts';
 import { serve } from './serve.ts';
 
+// Core, and beside it: a repository found by its remote (test/packs/checkout), a pack whose action writes
+// (test/packs/reacher), and one with a public kind of work, which has a page of its own, a question an agent may settle
+// on the evidence, and a webhook that is counted. No other pack: what the kernel does here, it does with these alone.
+const bench = {
+  id: 'bench',
+  version: '0.1.0',
+  title: 'Bench',
+  description: 'A public product, a question settled by evidence, and a webhook, for the tests.',
+  requires: ['core'],
+  types: [
+    { id: 'showcase', extends: 'work', public: true, title: 'Product', description: 'Work shown in public on a page of its own.' },
+    { id: 'conjecture', extends: 'question', title: 'Conjecture', description: 'A belief that could be wrong.', capabilities: { settles: { by: 'evidence', whose: 'owner' } }, statuses: { open: ['untested'], closed: ['supported', 'refuted'], phases: { refuted: 'finished' } } },
+  ],
+  handlers: [{ webhook: 'bench.count', records: ['visit.counted'] }],
+  reach: { webhooks: [{ id: 'bench.count', secret: 'count' }] },
+};
+const PACKS_DIR = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
+cpSync(join(PACKS, 'core'), join(PACKS_DIR, 'core'), { recursive: true });
+for (const name of ['checkout', 'reacher']) cpSync(join(PACKS, '..', 'test', 'packs', name), join(PACKS_DIR, name), { recursive: true });
+mkdirSync(join(PACKS_DIR, 'bench'));
+writeFileSync(join(PACKS_DIR, 'bench', 'pack.json'), JSON.stringify(bench));
+writeFileSync(join(PACKS_DIR, 'bench', 'handler.js'), 'export default {};\n');
+
 test('an agent\'s token can be limited to some repositories, and its owner hears when a token is used from a new place', async () => {
-  const { workspaces, call, base } = await serve('tokens');
+  const { workspaces, call, base } = await serve('tokens', undefined, undefined, PACKS_DIR);
   const db = (await workspaces.get('default')).pelago.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const made = (
     await call('/api/change', admin, {
       reason: 'x',
       ops: [
-        { op: 'create', ref: 'r', type: 'repo', title: 'Site repo', props: { remote: 'https://github.com/acme/site' } },
-        { op: 'create', ref: 'other', type: 'repo', title: 'Books repo', props: { remote: 'https://github.com/acme/books' } },
-        { op: 'create', ref: 'p', type: 'project', title: 'Site' },
+        { op: 'create', ref: 'r', type: 'checkout', title: 'Site repo', props: { remote: 'https://github.com/acme/site' } },
+        { op: 'create', ref: 'other', type: 'checkout', title: 'Books repo', props: { remote: 'https://github.com/acme/books' } },
+        { op: 'create', ref: 'p', type: 'work', title: 'Site' },
         { op: 'create', ref: 't', type: 'task', title: 'Fix the footer' },
         { op: 'create', ref: 'o', type: 'task', title: 'Close the year' },
         { op: 'link', type: 'lives_in', from: 'p', to: 'r' },
@@ -50,7 +77,8 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
   assert.match((await change(site, [{ op: 'define_type', type: { id: 'local.x', title: 'X', description: 'x' } }])).error, /cannot define a type/);
   // Nor speak for another repository, or take on work that is not its own.
   assert.match((await call('/agent/rechecked', site, { repo: 'acme/books' })).error, /cannot speak for another repository/);
-  assert.equal((await call('/agent/rechecked', site, { repo: 'acme/site' })).status, 200);
+  // Its own it may speak for (what a re-check reads is a pack's view, so with core alone the call has nothing more to do).
+  assert.doesNotMatch((await call('/agent/rechecked', site, { repo: 'acme/site' })).error ?? '', /another repository|limited to/);
   const run = (await call('/agent/session_start', site, { title: 'On the site' })).result.run;
   assert.match((await call('/agent/session_update', site, { run, task: made.o })).error, /cannot take it on/);
   assert.equal((await call('/agent/session_update', site, { run, task: made.t })).status, 200);
@@ -60,14 +88,9 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
     await call('/api/change', admin, {
       reason: 'x',
       ops: [
-        { op: 'create', ref: 'q', type: 'proof', title: 'Does the footer stay down?' },
-        { op: 'create', ref: 'mine', type: 'test', title: 'Footer stays down', props: { entrypoint: 'Footer.StaysDown' } },
-        { op: 'create', ref: 'theirs', type: 'test', title: 'Books balance', props: { entrypoint: 'Books.Balance' } },
         { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'The one browser' },
         { op: 'create', ref: 'press', type: 'place', props: { exclusive: true }, title: 'The printing press' },
         { op: 'create', ref: 'shared', type: 'place', props: { exclusive: true }, title: 'The one lane' },
-        { op: 'link', type: 'part_of', from: 'q', to: made.p },
-        { op: 'link', type: 'answers', from: 'mine', to: 'q' },
         { op: 'link', type: 'needs', from: made.t, to: 'lane' },
         { op: 'link', type: 'needs', from: made.o, to: 'press' },
       ],
@@ -78,17 +101,11 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
     assert.match((await call(`/agent/${tool}`, site, input)).error, new RegExp(`limited to the work of Site repo\\. It cannot call ${tool}\\.`));
   }
   for (const tool of ['schema', 'search', 'proposals']) assert.equal((await call(`/agent/${tool}`, site, {})).status, 200, `${tool} only reads`);
-  // A test's results: for a test that helps answer a question of its work, not for another's.
-  const report = (results: unknown[]) => call('/agent/test_report', site, { build: '1.0.0', results });
-  assert.match((await report([{ test: 'Books.Balance', passed: true }])).error, /"Books balance" is not part of it/);
-  assert.match((await report([{ test: 'Footer.StaysDown', passed: true }, { test: more.theirs, passed: true }])).error, /is not part of it/);
-  assert.equal((await report([{ test: 'Footer.StaysDown', passed: true }])).status, 200);
-  assert.deepEqual((await report([{ test: 'Nobody.KnowsThis', passed: true }])).result.answer.unknown, ['Nobody.KnowsThis'], 'a test the map does not know is named, as for any token');
-  const theirResult = (await call('/api/test_report', admin, { build: '1.0.0', results: [{ test: 'Books.Balance', passed: true }] })).result;
-  assert.equal(theirResult.answer.recorded, 1);
+  // A pack's action is let through, and what it would write is held to the token's work as a change is.
+  assert.match((await call('/agent/reacher_rename', site, { id: made.o, title: 'Close the year, renamed' })).error, /"Close the year" is not part of it/);
+  assert.equal((await call('/agent/reacher_rename', site, { id: made.t, title: 'Fix the footer, renamed' })).result.status, 'proposed');
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString('base64');
-  const resultOf = async (test: string) => (await call('/api/get', admin, { id: test })).result.outgoing.find((r: any) => r.type === 'produced')?.id;
-  assert.match((await call('/agent/picture_put', site, { result: await resultOf(more.theirs), data: png, content_type: 'image/png' })).error, /is not part of it, so this token cannot keep a picture/);
+  assert.match((await call('/agent/picture_put', site, { result: made.o, data: png, content_type: 'image/png' })).error, /is not part of it, so this token cannot keep a picture/);
   // A resource: one its work needs or that no work is said to need, held for its work; not one that is other work's.
   assert.equal((await call('/agent/claim', site, { resource: more.shared, holder: run, reason: 'x' })).status, 200);
   assert.equal((await call('/agent/release', site, { resource: more.shared, holder: run, reason: 'x' })).status, 200);
@@ -132,7 +149,7 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
 });
 
 test('a workspace chooses whether agents’ changes are applied as made or held, the answer to a question with them', async () => {
-  const { workspaces, call } = await serve('tokens');
+  const { workspaces, call } = await serve('tokens', undefined, undefined, PACKS_DIR);
   const db = (await workspaces.get('default')).pelago.db;
   const admin = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const member = (await createToken(db, 'default', { kind: 'human', name: 'sam' })).token;
@@ -146,12 +163,12 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
 
   assert.equal((await call('/api/workspace_info', admin)).result.agent_changes, 'apply', 'a new workspace applies them as made');
   assert.equal((await call('/api/workspace_set', admin, { agent_changes: 'hold' })).result.agent_changes, 'hold', 'until its admin says otherwise');
-  assert.equal((await change(robot, [{ op: 'create', type: 'note', title: 'One', visibility: 'shared' }])).result.status, 'proposed');
+  assert.equal((await change(robot, [{ op: 'create', type: 'record', title: 'One', visibility: 'shared' }])).result.status, 'proposed');
   assert.match((await call('/api/workspace_set', member, { agent_changes: 'apply' })).error, /admin/);
   assert.match((await call('/agent/workspace_set', robot, { agent_changes: 'apply' })).error, /humans only/, 'an agent cannot let itself through');
 
   assert.equal((await call('/api/workspace_set', admin, { agent_changes: 'apply' })).result.agent_changes, 'apply');
-  const applied = (await change(robot, [{ op: 'create', type: 'note', title: 'Two', visibility: 'shared' }])).result;
+  const applied = (await change(robot, [{ op: 'create', type: 'record', title: 'Two', visibility: 'shared' }])).result;
   assert.equal(applied.status, 'applied');
   assert.equal((await change(robot, [{ op: 'merge', keep: made.a, drop: made.b }])).result.status, 'applied', 'merging too');
   assert.equal((await change(robot, [{ op: 'archive', id: made.a }])).result.status, 'applied', 'and archiving');
@@ -174,10 +191,10 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   const said = (await call('/agent/confirmed', robot, { upto: asked.to_confirm.upto, basis: 'Alex, in chat on 9 Oct: "yes, green"' })).result;
   assert.deepEqual([said.questions, said.left], [1, 0]);
   // What an agent settled on its own judgment comes first and is counted apart: it is what the owner has not seen.
-  const guessed = (await change(admin, [{ op: 'create', ref: 'h', type: 'hypothesis', title: 'Green fades', visibility: 'shared' }, { op: 'create', ref: 'd', type: 'decision', title: 'Which brush?', visibility: 'shared' }])).result.created;
+  const guessed = (await change(admin, [{ op: 'create', ref: 'h', type: 'conjecture', title: 'Green fades', visibility: 'shared' }, { op: 'create', ref: 'd', type: 'decision', title: 'Which brush?', visibility: 'shared' }])).result.created;
   await change(robot, [{ op: 'update', id: guessed.d, status: 'decided', props: { outcome: 'The wide one', rationale: 'It is the one we have.' } }], word);
   await change(robot, [{ op: 'update', id: guessed.h, status: 'refuted' }], { of: 'agent', basis: 'A month of photos' });
-  await change(robot, [{ op: 'create', type: 'note', title: 'Three', visibility: 'shared' }]);
+  await change(robot, [{ op: 'create', type: 'record', title: 'Three', visibility: 'shared' }]);
   const sorted = await toConfirm();
   assert.deepEqual([sorted.to_confirm.on_agents_judgment, sorted.to_confirm.on_owners_word, sorted.items.map((q: any) => q.title)], [1, 1, ['Green fades', 'Which brush?']]);  const relayed = ((await call('/agent/events', robot, { limit: 50 })).result as any[]).find((e) => e.action === 'questions.confirmed');
   assert.deepEqual(relayed.detail.authority, { of: 'human', basis: 'Alex, in chat on 9 Oct: "yes, green"', stated_by: 'agent:robot/script' });
@@ -185,14 +202,14 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   const byRobot = (await call('/agent/events', robot, { by: 'agent:robot/script', limit: 50 })).result as any[];
   assert.ok(byRobot.length > 0 && byRobot.every((e) => e.actor === 'agent:robot/script'));
   assert.ok(((await call('/agent/events', robot, { before: byRobot[0].seq, limit: 50 })).result as any[]).every((e) => e.seq < byRobot[0].seq));
-  const guess = (await change(admin, [{ op: 'create', ref: 'h', type: 'hypothesis', title: 'Green hides dirt', visibility: 'shared' }])).result.created.h;
-  assert.equal((await change(robot, [{ op: 'update', id: guess, status: 'supported' }], { of: 'agent', basis: 'Two weeks of photos' })).result.status, 'applied', 'and a hypothesis');
+  const guess = (await change(admin, [{ op: 'create', ref: 'h', type: 'conjecture', title: 'Green hides dirt', visibility: 'shared' }])).result.created.h;
+  assert.equal((await change(robot, [{ op: 'update', id: guess, status: 'supported' }], { of: 'agent', basis: 'Two weeks of photos' })).result.status, 'applied', 'and a question settled on the evidence');
   // Every change says on whose authority it was made: the human's own, a human's word as an agent reports it, or the agent's judgment.
   const authorityOf = async (id: string) => ((await call('/api/events', admin, { target: id, limit: 1 })).result as any[])[0].detail.authority;
   assert.deepEqual(await authorityOf(made.d), onWord);
   assert.deepEqual(await authorityOf(guess), { of: 'agent', who: 'agent:robot/script', basis: 'Two weeks of photos' });
   assert.deepEqual(await authorityOf(applied.created['#1']), { of: 'agent', who: 'agent:robot/script' }, 'unsaid, it is the agent\u2019s own');
-  const mine = (await change(admin, [{ op: 'create', ref: 'n', type: 'note', title: 'Mine', visibility: 'shared' }], { of: 'agent' })).result.created.n;
+  const mine = (await change(admin, [{ op: 'create', ref: 'n', type: 'record', title: 'Mine', visibility: 'shared' }], { of: 'agent' })).result.created.n;
   assert.deepEqual([(await authorityOf(mine)).of, /alex/.test((await authorityOf(mine)).who)], ['human', true], 'a human\u2019s own change is theirs, whatever it claims');
 
   // What was applied is on the record, with who made it, and can be put back.
@@ -203,10 +220,10 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   assert.match((await call('/agent/seen', robot, { upto: logged[0].seq })).error, /humans only/);
   assert.equal((await call('/api/seen', admin, { upto: logged[0].seq })).result.seen_upto, logged[0].seq);
   const looked = ((await call('/api/events', admin, { limit: 5 })).result as any[]).find((e) => e.action === 'changes.seen');
-  assert.deepEqual([looked.detail.upto, /alex/.test(looked.actor), logged[0].target_type], [logged[0].seq, true, 'note']);
+  assert.deepEqual([looked.detail.upto, /alex/.test(looked.actor), logged[0].target_type], [logged[0].seq, true, 'record']);
 
   await call('/api/workspace_set', admin, { agent_changes: 'hold' });
-  assert.equal((await change(robot, [{ op: 'create', type: 'note', title: 'Three', visibility: 'shared' }])).result.status, 'proposed');
+  assert.equal((await change(robot, [{ op: 'create', type: 'record', title: 'Three', visibility: 'shared' }])).result.status, 'proposed');
   const [held] = (await call('/api/proposals', admin)).result as any[];
   const let_in = (await call('/api/decide', admin, { proposal: held.id, approve: true })).result;
   const by = (await authorityOf(Object.values(let_in.created)[0] as string)) as any;
@@ -216,22 +233,24 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
 });
 
 test('a product\u2019s public page is open to anyone, and says nothing until something is made public', async () => {
-  const { call, base } = await serve('off');
+  const { call, base } = await serve('off', undefined, undefined, PACKS_DIR);
   const made = await call('/api/change', undefined, {
     reason: 'x',
     ops: [
-      { op: 'create', ref: 'app', type: 'project', title: 'App', body: 'An internal note' },
-      { op: 'create', ref: 'sun', type: 'proof', title: 'How do we know the sun is correct?' },
+      { op: 'create', ref: 'app', type: 'showcase', title: 'App', body: 'An internal note' },
+      { op: 'create', ref: 'sun', type: 'question', title: 'How do we know the sun is correct?' },
       { op: 'link', type: 'part_of', from: 'sun', to: 'app' },
     ],
   });
   const app = made.result.created.app;
   const get = (path: string) => call(path, undefined, undefined, 'GET');
   assert.equal((await get(`/p/default/${app}/data`)).status, 404);
-  await call('/api/change', undefined, { reason: 'x', ops: [{ op: 'update', id: app, visibility: 'public' }, { op: 'update', id: made.result.created.sun, visibility: 'public' }] });
+  await call('/api/change', undefined, { reason: 'x', ops: [{ op: 'update', id: app, visibility: 'public' }] });
   const page = await get(`/p/default/${app}/data`);
-  assert.deepEqual([page.status, page.title, page.questions.map((q: any) => q.title)], [200, 'App', ['How do we know the sun is correct?']]);
-  assert.ok(!JSON.stringify(page).includes('internal note'));
+  // What its tests found is a pack's to say (its proof view): with core alone the page has its title, and a question under
+  // it that is not public is not there.
+  assert.deepEqual([page.status, page.title, page.questions], [200, 'App', []]);
+  assert.ok(!JSON.stringify(page).includes('internal note') && !JSON.stringify(page).includes('the sun'));
   // The page itself is a shell that asks for the data; it carries nothing of the map, and may load nothing from elsewhere.
   const shell = await fetch(`${base}/p/default/${app}`);
   assert.equal(shell.status, 200);
@@ -254,7 +273,7 @@ test('what answers without a token is asked only so often: by one address, and b
   clock = 60_000;
   assert.equal(count.take('a'), 0);
 
-  const { base, call } = await serve('tokens', { open: { each: 3, all: 5 }, deliveries: { each: 2 } });
+  const { base, call } = await serve('tokens', { open: { each: 3, all: 5 }, deliveries: { each: 2 } }, undefined, PACKS_DIR);
   const get = (path: string, address: string) => fetch(base + path, { headers: { 'x-forwarded-for': address } });
   const statuses = async (path: string, address: string, times: number) => {
     const seen: number[] = [];
@@ -273,7 +292,7 @@ test('what answers without a token is asked only so often: by one address, and b
   assert.deepEqual(await statuses('/connect/setup.mjs', '198.51.100.2', 2), [200, 200]);
   assert.equal((await get('/connect/setup.mjs', '198.51.100.3')).status, 429);
   // Deliveries are counted apart, and an unsigned one is refused as unsigned until it is asked too often.
-  const deliver = async () => (await fetch(base + '/hook/default/social/social.count', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.1' }, body: '{}' })).status;
+  const deliver = async () => (await fetch(base + '/hook/default/bench/bench.count', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.1' }, body: '{}' })).status;
   assert.deepEqual([await deliver(), await deliver(), await deliver()], [401, 401, 429]);
   // What needs a token, and health, are not counted.
   assert.equal((await get('/health', '198.51.100.1')).status, 200);
@@ -281,10 +300,10 @@ test('what answers without a token is asked only so often: by one address, and b
 });
 
 test('a request larger than any honest one is refused, before it is known who sent it', async () => {
-  const { base } = await serve('tokens');
+  const { base } = await serve('tokens', undefined, undefined, PACKS_DIR);
   const send = (headers: Record<string, string>, megabytes: number, whole = true) =>
     new Promise<number | 'ended'>((resolve, reject) => {
-      const req = request(base + '/hook/default/social/social.count', { method: 'POST', agent: false, headers: { 'content-type': 'application/json', ...headers } }, (res) => {
+      const req = request(base + '/hook/default/bench/bench.count', { method: 'POST', agent: false, headers: { 'content-type': 'application/json', ...headers } }, (res) => {
         res.resume();
         resolve(res.statusCode ?? 0);
         if (!whole) req.destroy();

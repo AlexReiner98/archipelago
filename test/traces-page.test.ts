@@ -19,7 +19,7 @@ test("in a browser, an agent's change is traced in its session's hue and clears 
     return res.result.created as Record<string, string>;
   };
   const made = await change([
-    { op: 'create', ref: 'p', type: 'project', title: 'Traced' },
+    { op: 'create', ref: 'p', type: 'task', title: 'Traced' },
     { op: 'create', ref: 'a', type: 'task', title: 'Tail the log' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
   ]);

@@ -15,17 +15,6 @@
       "fields": {"diagram": {"type": "json", "description": "The page as data: its boxes with where each is, its wires, the draw.io file and page it is (key), the commit it was drawn from, and that file at the commit (drawio) when it was committed as drawn.", "system": true}}
     }
   ],
-  "rules": [
-    {
-      "id": "account_commits",
-      "on": "reply_ended",
-      "when": { "reply": { "unaccounted": true } },
-      "then": "ask",
-      "say": "This reply made commits the map does not account for. In one change: a commit (full sha) each, a settles link per item it settles, or none; one heard from a push: accounted true.",
-      "record": { "type": "commit", "field": "sha" },
-      "lifted": "reply_account_commits"
-    }
-  ],
   "views": [
     {
       "id": "software.handoff",

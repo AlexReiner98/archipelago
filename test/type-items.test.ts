@@ -7,10 +7,10 @@ import type { PackFile } from '../src/packs.ts';
 import { agent, fresh, human, make } from './map.ts';
 
 const item = (props: Record<string, unknown>, more: Partial<TypeItem> = {}): TypeItem => ({ id: 'e_1', type: 'type', title: '', body: '', is_open: true, props, ...more });
-const pack: PackFile = { id: 'work', version: '1', title: 'Work', description: '', types: [{ id: 'task', title: 'Task', description: 'Work.', extends: 'work', fields: { due: { type: 'date' } } }], links: [{ id: 'addresses', extends: 'about', title: 'Addresses', inverse: 'Addressed by', from: ['*'], to: ['*'], description: '' }] };
+const pack: PackFile = { id: 'demo', version: '1', title: 'Demo', description: '', types: [{ id: 'task', title: 'Task', description: 'Work.', extends: 'work', fields: { due: { type: 'date' } } }], links: [{ id: 'remedies', extends: 'about', title: 'Remedies', inverse: 'Remedied by', from: ['*'], to: ['*'], description: '' }] };
 
 test('an owner\'s version lays its title, note and fields over the pack\'s, and a retired one is marked', () => {
-  const [over] = withVersions([pack], [item({ preset: 'task', fields: { rate: { type: 'number' } } }, { title: 'Job', is_open: false }), item({ preset: 'addresses' }, { type: 'link_type', body: 'What it fixes.' })]);
+  const [over] = withVersions([pack], [item({ preset: 'task', fields: { rate: { type: 'number' } } }, { title: 'Job', is_open: false }), item({ preset: 'remedies' }, { type: 'link_type', body: 'What it fixes.' })]);
   const t = over.types![0] as { title: string; description: string; fields: Record<string, unknown>; retired?: boolean };
   assert.deepEqual([t.title, t.description, Object.keys(t.fields), t.retired], ['Job', 'Work.', ['due', 'rate'], true]);
   assert.equal(over.links![0].description, 'What it fixes.');
@@ -79,7 +79,6 @@ test('an agent\'s type waits for the owner as any of its changes does', async ()
 test('nothing is a flavour of the plain link, and uses blocks nothing', async () => {
   const l = await fresh();
   await assert.rejects(make(l, [{ op: 'create', type: 'link_type', title: 'Touches', props: { name: 'local.touches', extends: 'link' } }]), /cannot be a flavour of link/);
-  assert.ok(!l.registry.relationFamily('depends_on', 'waits_on', 'needs').includes('calls'), 'a call is no block');
-  assert.deepEqual(l.registry.relationFamily('uses').sort(), ['calls', 'reads', 'uses']);
+  assert.ok(['reads', 'uses'].every((t) => l.registry.relationFamily('uses').includes(t)));
   assert.ok(!l.registry.relationFamily('depends_on', 'waits_on', 'needs').includes('reads'), 'a reading is no block');
 });

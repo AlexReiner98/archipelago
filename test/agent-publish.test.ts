@@ -2,7 +2,6 @@
 // the allowance is a human admin's to give, and taking a document down stays a human's.
 import assert from 'node:assert/strict';
 import { doneEvents } from '../src/activity.ts';
-import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { openDb } from '../src/db.ts';
 import { migrate } from '../src/migrate.ts';
@@ -10,21 +9,24 @@ import { hostFor } from '../src/packtools.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { callTool } from '../src/tools.ts';
+import { packsWith } from './map.ts';
 import { OLD_EVENT } from './old-event.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner', admin: true };
 const member: Actor = { kind: 'human', name: 'member' };
 const agent: Actor = { kind: 'agent', name: 'test', admin: true };
 
+// The repository's packs and a test pack whose writing can be published (test/packs/reader).
+const PACKS = packsWith('reader');
 const registries: Registry[] = [];
 after(() => registries.forEach((r) => hostFor(r).stop()));
 
 async function withDocument() {
-  const reg = new Registry(join(import.meta.dirname, '..', 'packs'));
+  const reg = new Registry(PACKS);
   registries.push(reg);
   const db = await openDb();
   const l = new Archipelago(db, reg);
-  const made = await l.change(owner, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'document', title: 'Landing', visibility: 'shared', body: 'What it is, in a line.' }] });
+  const made = await l.change(owner, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'writing', title: 'Landing', visibility: 'shared', body: 'What it is, in a line.' }] });
   return { l, db, doc: (made as { created: Record<string, string> }).created.d };
 }
 

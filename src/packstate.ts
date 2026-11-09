@@ -96,7 +96,7 @@ async function keptManifests(l: Archipelago): Promise<Set<string>> {
 /** A pack's presence as a fact: its version and manifest hash, and the manifest's text the first time this log meets that hash. */
 function present(l: Archipelago, pack: { id: string; version: string }, kept: Set<string>): Fact {
   const manifest = l.registry.hashes.get(pack.id);
-  const file = join(l.registry.dir, pack.id, 'pack.json');
+  const file = join(l.registry.folderOf(pack.id), 'pack.json');
   const text = manifest && !kept.has(manifest) && existsSync(file) ? readFileSync(file, 'utf8') : undefined;
   const same = text !== undefined && createHash('sha256').update(text).digest('hex') === manifest;
   if (same) kept.add(manifest!);

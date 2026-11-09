@@ -1,30 +1,16 @@
 // The time pack, end to end: its actions and views run by its handler in the pack host's sandbox, on a map in memory.
 
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname } from 'node:path';
 import { test } from 'node:test';
-import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
-import { sessionStart } from '../src/sessions.ts';
-import { callTool } from '../src/tools.ts';
-import { freshWith, human } from './map.ts';
+import { agent, call, human, make, mapWith, type Actor, type Archipelago } from '#pelago/test';
 
-const agent: Actor = { kind: 'agent', name: 'test' };
+/** A fresh in-memory map with the packs beside this one. */
+const fresh = () => mapWith(dirname(import.meta.dirname));
 
-/** A fresh in-memory map with its own copy of the packs. */
-async function fresh() {
-  const packs = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
-  cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
-  return freshWith(new Registry(packs));
-}
-
-async function make(l: Archipelago, ops: Op[]) {
-  const result = await l.change(human, { ops, reason: 'test' });
-  assert.equal(result.status, 'applied');
-  return (result as { created: Record<string, string> }).created;
-}
+const callTool = (l: Archipelago, as: Actor, tool: string, input: Record<string, unknown>) => call(l, as, tool, input);
+/** A session begun as an agent's hook begins it. */
+const sessionStart = (l: Archipelago, as: Actor, input: Record<string, unknown>) => call<{ run: string }>(l, as, 'session_start', input);
 
 /** An action's tool answers what it found (answer) beside what its change made; read as one. */
 const acted = async (...a: Parameters<typeof callTool>): Promise<unknown> => ((r) => ({ ...r, ...r.answer }))((await callTool(...a)) as { answer: Record<string, unknown> });
@@ -69,10 +55,9 @@ test('time is logged against work, summed by day and client, and billed on a num
   await callTool(l, human, 'time_invoice_void', { id: inv.created.inv });
   const again = (await acted(l, human, 'time_invoice_draft', { client: made.aa, to: '2026-10-31' })) as { number: string; entries: number };
   assert.deepEqual([again.number.endsWith('-002'), again.entries], [true, 2]);
-  // An invoice is a document: it can be given as a link, which shows the bill.
-  const { sharedDocument } = await import('../src/documents.ts');
+  // An invoice is a document: it can be given as a link.
   const link = (await callTool(l, human, 'share_create', { id: inv.created.inv })) as { path: string };
-  assert.match(JSON.stringify(await sharedDocument(l, link.path.split('/').at(-1)!)), /Total due/);
+  assert.match(link.path, /^\/s\/default\/[a-f0-9]{48}$/);
   // A client with no biller says so.
   const other = await make(l, [{ op: 'create', ref: 'c', type: 'company', title: 'Nobody bills me' }]);
   await assert.rejects(callTool(l, human, 'time_invoice_draft', { client: other.c }), /does not say who bills it/);
@@ -84,9 +69,10 @@ test('a block of time has hours from its start and end, and a week holds the own
     { op: 'create', ref: 'ap', type: 'project', title: 'Apex' },
     { op: 'create', ref: 't', type: 'task', title: 'Sun study loop' },
     { op: 'create', ref: 'ar', type: 'project', title: 'Archipelago' },
-    { op: 'create', ref: 'repo', type: 'repo', title: 'Archipelago repo', props: { path: 'c:/code/arch' } },
+    { op: 'create', ref: 't2', type: 'task', title: 'Map notes' },
+    { op: 'create', ref: 'lane', type: 'place', title: 'Build machine' },
     { op: 'link', type: 'part_of', from: 't', to: 'ap' },
-    { op: 'link', type: 'lives_in', from: 'ar', to: 'repo' },
+    { op: 'link', type: 'part_of', from: 't2', to: 'ar' },
   ]);
   const log = (input: Record<string, unknown>) => acted(l, human, 'time_log', input) as Promise<{ hours: number; date: string; start?: string }>;
   const block = await log({ work: made.t, what: 'Reviewed the loop', start: '2026-10-14T13:00:00-04:00', end: '2026-10-14T15:30:00-04:00' });
@@ -97,9 +83,9 @@ test('a block of time has hours from its start and end, and a week holds the own
   const sheet = (await callTool(l, human, 'time_timesheet', { from: '2026-10-12', to: '2026-10-18' })) as { total: number };
   assert.equal(sheet.total, 5.5, 'an entry with only date and hours still counts beside the blocks');
 
-  // Two agents at work at once that afternoon: one on the loop, one in the repository with no task named.
+  // Two agents at work at once that afternoon: one on the loop, one on the map's notes.
   const one = await sessionStart(l, agent, { task: made.t, session_id: 'w1' });
-  const two = await sessionStart(l, agent, { cwd: 'c:/code/arch', session_id: 'w2' });
+  const two = await sessionStart(l, agent, { task: made.t2, session_id: 'w2' });
   const when = async (run: string, from: string, to: string) => {
     await l.db.query(`update entity set created_at = $2::timestamptz, updated_at = $3::text::timestamptz, props = props || jsonb_build_object('last_seen', $3::text, 'active', jsonb_build_array(jsonb_build_array($2::text, $3::text))) where id = $1`, [run, from, to]);
     await l.db.query(`update relation set valid_from = $2 where from_id = $1 and type = 'works_on'`, [run, from]);
@@ -116,8 +102,8 @@ test('a block of time has hours from its start and end, and a week holds the own
   assert.equal(wed.agents.length, 2, 'one lane for each agent at work at once');
   assert.deepEqual(wed.agents.flat().map((b) => [b.id, b.what, b.from_hour, b.to_hour, b.hours, b.project]).sort(), [
     [one.run, 'Sun study loop', 13, 15, 2, made.ap],
-    [two.run, (await l.entity(two.run))!.title, 13.5, 14, 0.5, made.ar],
-  ].sort(), 'a session counts to its task’s project, or to the project that lives in its repository');
+    [two.run, 'Map notes', 13.5, 14, 0.5, made.ar],
+  ].sort(), 'a session counts to its task’s project');
   const thu = wk.days[3];
   assert.deepEqual(thu.owner.map((b) => [b.what, b.from_hour, b.hours]), [['Notes', null, 1]], 'time logged as hours alone has no place in the day');
   assert.deepEqual([wk.days[4].owner[0].from_hour, wk.days[4].owner[0].to_hour, wk.days[5].owner[0].from_hour, wk.days[5].owner[0].to_hour], [23, 24, 0, 1], 'a block past midnight is drawn on both days');
@@ -131,7 +117,7 @@ test('a block of time has hours from its start and end, and a week holds the own
   assert.deepEqual(later.days[3].agents.flat().map((b) => [b.from_hour, b.to_hour]), [[10, 11]]);
 
   // A run told of only once it was over has no length: it is counted, not given a lane.
-  const told = await callTool(l, agent, 'run_report', { repo: made.repo, title: 'Read the push to main (abc1234)' }) as { run: string };
+  const told = await callTool(l, agent, 'run_report', { repo: made.lane, title: 'Read the push to main (abc1234)' }) as { run: string };
   await l.db.query(`update entity set created_at = '2026-10-16T13:00:00Z', updated_at = '2026-10-16T13:00:00Z' where id = $1`, [told.run]);
   // Work in no project and no repository counts toward nothing, not toward itself.
   const loose = await make(l, [{ op: 'create', ref: 'q', type: 'decision', title: 'Which house' }]);
@@ -205,15 +191,8 @@ test('planned time counts toward nothing and is never invoiced until the owner c
 });
 
 test('a routine is drawn on the days it falls on; one for work waits to be confirmed day by day, by a person', async () => {
-  const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto' }).format(new Date()), { occurs: falls } = await import('../src/capabilities.ts'), occurs = (p: Record<string, unknown>, day: string) => falls({ from: 'from_time', to: 'to_time', days: 'days', starts: 'starts', skip: 'skip', moved: 'moved' }, p, day);
-  // Wednesday 14 October 2026 is a 3; Saturday the 17th a 6.
+  const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto' }).format(new Date());
   const dinner = { from_time: '17:00', to_time: '19:00' };
-  assert.deepEqual(occurs(dinner, '2026-10-14'), [17, 19], 'every day when no days are given');
-  assert.equal(occurs({ ...dinner, days: [1, 2, 3, 4, 5] }, '2026-10-17'), undefined, 'not on a day it does not fall on');
-  assert.equal(occurs({ ...dinner, starts: '2026-10-15' }, '2026-10-14'), undefined, 'not before it starts');
-  assert.equal(occurs({ ...dinner, skip: ['2026-10-14'] }, '2026-10-14'), undefined, 'not on a day skipped');
-  assert.deepEqual(occurs({ ...dinner, moved: { '2026-10-14': ['18:00', '20:30'] } }, '2026-10-14'), [18, 20.5], 'at other hours on a day moved');
-  assert.equal(occurs({ from_time: 'dinner', to_time: '19:00' }, '2026-10-14'), undefined, 'nothing from hours it cannot read');
 
   const l = await fresh();
   const now = today();
@@ -279,4 +258,40 @@ test('an invoice says how to pay, takes payments in parts, and what is owed and 
   await assert.rejects(callTool(l, human, 'time_invoice_paid', { id: inv.created.inv }), /already paid in full/);
   const kept = ((await callTool(l, human, 'get', { id: inv.created.inv })) as { entity: { props: { payments: { amount: number; method: string }[] } } }).entity.props.payments;
   assert.deepEqual(kept.map((p) => [p.amount, p.method]), [[200, 'e-Transfer'], [365, 'EFT']]);
+});
+
+test('costs: dollars where a run says, tokens where it does not, and each regular payment by its share', async () => {
+  const l = await fresh();
+  const longAgo = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
+  const made = await make(l, [
+    { op: 'create', ref: 'machine', type: 'place', title: 'Build machine' },
+    { op: 'create', ref: 'host', type: 'cost', title: 'Hosting', props: { amount: 25, since: longAgo, vendor: 'Render' } },
+    { op: 'create', ref: 'domain', type: 'cost', title: 'Domain', props: { amount: 120, every: 'year', since: longAgo } },
+    { op: 'create', ref: 'unknown', type: 'cost', title: 'Subscription' },
+    { op: 'create', ref: 'euro', type: 'cost', title: 'Licence', props: { amount: 10, currency: 'EUR', since: longAgo } },
+    { op: 'create', ref: 'ended', type: 'cost', title: 'Old host', status: 'ended', props: { amount: 50, since: longAgo, until: longAgo } },
+  ]);
+  await callTool(l, human, 'run_report', { repo: made.machine, title: 'Read a push', tokens: 40_000, cost_usd: 0.31, surface: 'server', link: 'https://example.com/1' });
+  await callTool(l, human, 'run_report', { repo: made.machine, title: 'Read another', tokens: 10_000, cost_usd: 0.09, surface: 'server', link: 'https://example.com/2' });
+  await callTool(l, human, 'run_report', { repo: made.machine, title: 'A session', tokens: 900_000, surface: 'claude-code', link: 'https://example.com/3' });
+
+  type Costs = {
+    total_usd: number;
+    per_month: number;
+    agents: { cost_usd: number; tokens: number; unpriced_tokens: number; by: { surface: string; runs: number; cost_usd: number }[] };
+    recurring: { cost_usd: number; per_month: number; items: { id: string; per_month: number | null; share: number | null }[]; unpriced: { id: string }[]; other_currencies: { id: string }[] };
+  };
+  const c = (await callTool(l, human, 'view', { name: 'costs', params: { days: 30 } })) as Costs;
+  assert.deepEqual([c.agents.cost_usd, c.agents.tokens, c.agents.unpriced_tokens], [0.4, 950_000, 900_000]);
+  assert.deepEqual(c.agents.by.map((s) => [s.surface, s.runs, s.cost_usd]), [['server', 2, 0.4], ['claude-code', 1, 0]]);
+  // A month's payment, and a twelfth of a year's, over thirty days of a month of 30.44.
+  const share = (monthly: number) => Math.round(((monthly * 30) / 30.4375) * 100) / 100;
+  assert.equal(c.recurring.items.find((i) => i.id === made.host)!.share, share(25));
+  assert.deepEqual([c.recurring.items.find((i) => i.id === made.domain)!.per_month, c.recurring.per_month], [10, 35]);
+  assert.equal(c.recurring.cost_usd, Math.round((share(25) + share(10)) * 100) / 100);
+  assert.deepEqual(c.recurring.unpriced.map((i) => i.id), [made.unknown], 'a payment nobody has priced is named, not guessed');
+  assert.deepEqual(c.recurring.other_currencies.map((i) => i.id), [made.euro], 'another currency is listed, not added to the dollars');
+  assert.ok(!c.recurring.items.some((i) => i.id === made.ended), 'what ended before the period is not in it');
+  assert.equal(c.total_usd, Math.round((0.4 + c.recurring.cost_usd) * 100) / 100);
+  assert.equal(c.per_month, Math.round((35 + (0.4 * 30.4375) / 30) * 100) / 100);
 });

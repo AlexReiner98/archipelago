@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import { gzipSync } from 'node:zlib';
 import { clientAddress, trustedProxies } from '../src/address.ts';
 import { createToken } from '../src/auth.ts';
+import { packsWith } from './map.ts';
 import { serve, closers } from './serve.ts';
 
 test('the hook says which repository a session is in without the name and password its address may carry', async () => {
@@ -121,13 +122,14 @@ test('refused tokens are counted by address, a backup unpacks only so far, and t
   assert.match(await (await fetch(`${base}/draw.html`)).text(), new RegExp(`src="/draw\\.js\\?v=${version}"`));
 });
 
-test('a link to a document opens its page and its text with no login, until it is revoked', async () => {
-  const { call, base } = await serve('off');
+test('a link to a writing opens its page and its text with no login, until it is revoked', async () => {
+  // A test pack's writing is what can be given as a link (test/packs/reader).
+  const { call, base } = await serve('off', undefined, undefined, packsWith('reader'));
   const made = await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'n', type: 'note', title: 'IRAP', body: 'Call first.' },
-      { op: 'create', ref: 'd', type: 'document', title: 'Funding', body: 'Intro.\n\n{n}' },
+      { op: 'create', ref: 'n', type: 'clipping', title: 'IRAP', body: 'Call first.' },
+      { op: 'create', ref: 'd', type: 'writing', title: 'Funding', body: 'Intro.\n\n{n}' },
     ],
   });
   const { d } = made.result.created;
@@ -151,9 +153,9 @@ test('a link to a document opens its page and its text with no login, until it i
   assert.equal((await fetch(`${base}/read/not-an-id`)).status === 200, false);
   // A section's figure is shown through the link; a figure of anything the document does not bring in is not.
   const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex').toString('base64');
-  const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'note', title: 'Not in it' }] })).result.created.o;
+  const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'clipping', title: 'Not in it' }] })).result.created.o;
   for (const id of [made.result.created.n, other]) assert.equal((await call('/api/picture_put', undefined, { result: id, data: png, content_type: 'image/png' })).status, 200);
-  assert.match((await call('/api/picture_put', undefined, { result: d, data: png, content_type: 'image/png' })).error, /is of type document, and a picture is kept only on a type whose page shows one/);
+  assert.match((await call('/api/picture_put', undefined, { result: d, data: png, content_type: 'image/png' })).error, /is of type writing, and a picture is kept only on a type whose page shows one/);
   const pictured = (await (await fetch(`${base}${link.path}/data`)).json()) as { parts: { section?: { picture: boolean } }[] };
   assert.equal(pictured.parts[1].section?.picture, true);
   const figure = await fetch(`${base}${link.path}/picture/${made.result.created.n}`);

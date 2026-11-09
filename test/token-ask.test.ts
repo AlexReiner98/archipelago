@@ -5,13 +5,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
+import { packsWith } from './map.ts';
 import { serve } from './serve.ts';
 
 async function setUp() {
-  const { workspaces, call, base } = await serve('tokens');
+  const { workspaces, call, base } = await serve('tokens', undefined, undefined, packsWith('watched'));
   const db = (await workspaces.get('default')).pelago.db;
   const owner = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
-  const made = await call('/api/change', owner, { reason: 'test', ops: [{ op: 'create', ref: 'app', type: 'component', title: 'App', status: 'up', visibility: 'shared', props: { url: 'https://app.example.com/health' } }] });
+  const made = await call('/api/change', owner, { reason: 'test', ops: [{ op: 'create', ref: 'app', type: 'service', title: 'App', status: 'up', visibility: 'shared', props: { url: 'https://app.example.com/health' } }] });
   const app = made.result.created.app as string;
   const ask = (body: unknown) => call('/connect/request', undefined, body);
   const poll = (asked: { poll: { url: string; secret: string } }, secret = asked.poll.secret) => call(new URL(asked.poll.url).pathname, secret);
@@ -116,8 +117,8 @@ test('a deploy names both colours, and its token is within both', async () => {
   const made = await call('/api/change', owner, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'blue', type: 'component', title: 'App, blue', status: 'up', visibility: 'shared', props: { url: 'http://app-blue:3100/health' } },
-      { op: 'create', ref: 'green', type: 'component', title: 'App, green', status: 'planned', visibility: 'shared', props: { url: 'http://app-green:3100/health' } },
+      { op: 'create', ref: 'blue', type: 'service', title: 'App, blue', status: 'up', visibility: 'shared', props: { url: 'http://app-blue:3100/health' } },
+      { op: 'create', ref: 'green', type: 'service', title: 'App, green', status: 'planned', visibility: 'shared', props: { url: 'http://app-green:3100/health' } },
     ],
   });
   const { blue, green } = made.result.created;

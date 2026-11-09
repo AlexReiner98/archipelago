@@ -86,6 +86,14 @@ one is off there, and its state says which.
 
 Core, the kernel's pack, is never judged.
 
+## Where packs are found
+
+A server reads its packs from `packs/`, then from each folder `PELAGO_PACKS`
+names (separated as `PATH` is): a pack kept off this repository, as the hosted
+service keeps the packs it sells, is a folder there. A pack is its id wherever
+it is found, so one moved between folders is the same pack to every
+workspace. The same id in two folders stops the server from starting.
+
 ## In time
 
 Adding or taking out a pack is a fact on the workspace's log, kept forever:

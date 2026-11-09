@@ -7,13 +7,39 @@ import { wholeMap } from '../src/outbox.ts';
 import { presence } from '../src/presence.ts';
 import { VIEWS } from '../src/views.ts';
 import { askView } from '../src/askview.ts';
-import { human, agent, fresh, attend, make, laneSetup } from './map.ts';
+import { join } from 'node:path';
+import { Registry } from '../src/packs.ts';
+import { human, agent, fresh, freshWith, attend, make, PACKS } from './map.ts';
+
+/** A map with core and a type of repository found by its folder or its remote (test/packs/checkout), and no other pack. */
+const laneMap = () => freshWith(new Registry([PACKS, join(import.meta.dirname, 'packs')], ['core', 'checkout']));
+
+/** Work in a repository, with one task that needs the live lane and one that does not. */
+async function laneSetup(l: Parameters<typeof make>[0]) {
+  return make(l, [
+    { op: 'create', ref: 'tree', type: 'checkout', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } },
+    { op: 'create', ref: 'proj', type: 'work', title: 'Apex' },
+    { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Live lane' },
+    { op: 'create', ref: 'rule', type: 'decision', title: 'One live lane.', status: 'decided', props: { outcome: 'Only one session drives the CAD app.' } },
+    { op: 'create', ref: 'live', type: 'task', title: 'Capture probe' },
+    { op: 'create', ref: 'offline', type: 'task', title: 'Write unit tests' },
+    { op: 'create', ref: 'q', type: 'decision', title: 'Which target?' },
+    { op: 'create', ref: 'gated', type: 'task', title: 'Tune the solver' },
+    { op: 'link', type: 'lives_in', from: 'proj', to: 'tree' },
+    { op: 'link', type: 'part_of', from: 'live', to: 'proj' },
+    { op: 'link', type: 'part_of', from: 'offline', to: 'proj' },
+    { op: 'link', type: 'part_of', from: 'gated', to: 'proj' },
+    { op: 'link', type: 'depends_on', from: 'gated', to: 'q' },
+    { op: 'link', type: 'needs', from: 'live', to: 'lane' },
+    { op: 'link', type: 'about', from: 'lane', to: 'rule' },
+  ]);
+}
 
 /** A view asked by its name, as the view tool asks it. */
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
 test('a session registers, takes the lane its task needs, and gives it back when it ends', async () => {
-  const l = await fresh();
+  const l = await laneMap();
   const made = await laneSetup(l);
 
   const one = await sessionStart(l, agent, { task: made.live, cwd: 'c:/code/apex/src', session_id: 's1' });
@@ -102,10 +128,10 @@ test('a run with no chat is ended by its agent, and a person ends a chat’s run
   assert.equal((await l.entity(chat.run))!.is_open, false);
 });
 
-test('a project’s open questions are what needs the owner in it, and its next release says where it stands', async () => {
+test('a project’s open questions are what needs the owner in it', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Shadows', status: 'active' },
+    { op: 'create', ref: 'p', type: 'work', title: 'Shadows', status: 'doing' },
     { op: 'create', ref: 'q', type: 'decision', title: 'Which licence?', status: 'open', props: { options: ['MIT', 'Apache'] } },
     { op: 'link', type: 'part_of', from: 'q', to: 'p' },
     { op: 'create', ref: 'a', type: 'task', title: 'Write the installer', status: 'todo' },
@@ -113,25 +139,18 @@ test('a project’s open questions are what needs the owner in it, and its next 
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
     { op: 'link', type: 'part_of', from: 'b', to: 'p' },
     { op: 'link', type: 'depends_on', from: 'a', to: 'q' },
-    { op: 'create', ref: 'r', type: 'release', title: 'First release', status: 'upcoming' },
-    { op: 'link', type: 'part_of', from: 'r', to: 'p' },
-    { op: 'link', type: 'depends_on', from: 'r', to: 'a' },
-    { op: 'link', type: 'depends_on', from: 'r', to: 'b' },
-    { op: 'create', ref: 'quiet', type: 'project', title: 'Quiet one', status: 'active' },
+    { op: 'create', ref: 'quiet', type: 'work', title: 'Quiet one', status: 'doing' },
   ]);
   const asked = await attend(l, { reasons: ['unsettled'], within: made.p });
   assert.deepEqual(asked.items.map((q: any) => [q.title, q.reasons[0].by, q.top.title]), [['Which licence?', 'word', 'Shadows']]);
   assert.deepEqual((await attend(l, { reasons: ['unsettled'], within: made.quiet })).items, []);
-  const gate = (await ask(l, 'gate', { event: made.r })) as any;
-  const items = gate.streams.flatMap((s: any) => s.items);
-  assert.deepEqual([items.filter((i: any) => i.done).length, items.length, items.filter((i: any) => i.blocked).map((i: any) => i.title)], [1, 2, ['Write the installer']]);
 });
 
 test('a session tells the story of its work, beat by beat, and can take a beat back', async () => {
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'a', type: 'task', title: 'Fix the halo' },
-    { op: 'create', ref: 'b', type: 'issue', title: 'Labels clip' },
+    { op: 'create', ref: 'b', type: 'task', title: 'Labels clip' },
     { op: 'link', type: 'depends_on', from: 'a', to: 'b' },
     { op: 'create', ref: 'c', type: 'task', title: 'Unrelated' },
   ]);
@@ -175,7 +194,7 @@ test('a session that goes quiet is shown as stale', async () => {
 });
 
 test('a brief gathers a task\'s context, blockers, needs and rules', async () => {
-  const l = await fresh();
+  const l = await laneMap();
   const made = await laneSetup(l);
   const holder = await sessionStart(l, agent, { title: 'Other session' });
   await l.claim(agent, { resource: made.lane, holder: holder.run, reason: 'busy' });
@@ -191,19 +210,14 @@ test('a brief gathers a task\'s context, blockers, needs and rules', async () =>
   assert.deepEqual(gated.root_blockers.map((b: any) => b.title), ['Which target?']);
 });
 
-test('the session-start hook registers the session and hands it the repo\'s work and the lane state', async () => {
-  const l = await fresh();
+test('the session-start hook registers the session and names its repository and the lane state', async () => {
+  const l = await laneMap();
   const made = await laneSetup(l);
   const text = await hookSessionStart(l, { session_id: 'abc', cwd: 'C:\\code\\Apex' });
   assert.match(text, /registered in Archipelago/);
   const repoId = /Repository: Apex repo \((e_\w+)\)/.exec(text)?.[1];
   assert.ok(repoId, 'the repository comes with its id');
   assert.match(await hookSessionStart(l, { session_id: 'abc', cwd: 'C:\\code\\Apex' }), new RegExp(`Repository: Apex repo \\(${repoId}\\)`), 'a session that is resumed is told its repository again');
-  // What the session was told is enough to ask for the repository's work; asked for none, the view says which there are.
-  for (const repo of [repoId, 'apex repo']) assert.equal(((await callTool(l, human, 'view', { name: 'repo_work', params: { repo } })) as any).repo.id, repoId);
-  await assert.rejects(async () => callTool(l, human, 'view', { name: 'repo_work', params: {} }), new RegExp(`repo_work needs "repo".*Repositories here: Apex repo \\(${repoId}\\)`));
-  assert.match(text, new RegExp(`Write unit tests \\(${made.offline}\\)`));
-  assert.match(text, /Tune the solver .* waiting on: Which target\?/);
   assert.match(text, /"Live lane" .* is free/);
 
   const other = await sessionStart(l, agent, { title: 'Lane holder' });
@@ -214,7 +228,6 @@ test('the session-start hook registers the session and hands it the repo\'s work
   await make(l, [{ op: 'update', id: repoId!, props: { remote: 'https://github.com/Acme/Apex' } }]);
   const far = await hookSessionStart(l, { session_id: 'far', cwd: '/home/someone/work/apex', remote: 'git@github.com:acme/apex.git' });
   assert.match(far, new RegExp(`Repository: Apex repo \\(${repoId}\\)`));
-  assert.match(far, new RegExp(`Write unit tests \\(${made.offline}\\)`));
   assert.equal(((await VIEWS.sessions.run(l, {})) as any).open.find((r: any) => r.cwd === '/home/someone/work/apex').repo.id, repoId);
   assert.match(await hookSessionStart(l, { session_id: 'stranger', cwd: '/tmp/x', remote: 'https://github.com/acme/other' }), /does not know a repository for this folder \(a checkout of https:\/\/github\.com\/acme\/other\)/);
   for (const id of ['far', 'stranger']) await hookSessionEnd(l, { session_id: id });
@@ -226,7 +239,7 @@ test('the session-start hook registers the session and hands it the repo\'s work
 });
 
 test('a session that finishes says where the repository\'s open work stands', async () => {
-  const l = await fresh();
+  const l = await laneMap();
   const made = await laneSetup(l);
   const { run } = await sessionStart(l, agent, { cwd: 'C:\\code\\Apex', session_id: 'r1' });
 
@@ -254,49 +267,19 @@ test('a session that finishes says where the repository\'s open work stands', as
   // What nobody has changed or confirmed for longest comes first, with its age; the session is told of it at the start.
   await l.db.query(`update entity set updated_at = now() - interval '40 days' where id = $1`, [made.gated]);
   await l.db.query(`update entity set updated_at = now() - interval '20 days' where id = $1`, [made.live]);
-  const old = await attend(l, { reasons: ['stale'], within: made.repo });
+  const old = await attend(l, { reasons: ['stale'], within: made.tree });
   assert.deepEqual(old.items.map((i: any) => [i.title, i.reasons[0].days]).sort(), [['Capture probe', 20], ['Tune the solver', 40]]);
-  assert.equal((await attend(l, { reasons: ['stale'], stale_days: 30, within: made.repo })).items.length, 1, 'only those older than asked for');
-  const told = await hookSessionStart(l, { session_id: 'r0', cwd: 'C:\\code\\Apex' });
-  assert.match(told, /Capture probe \(e_\w+\), not confirmed for 20 days/);
-  assert.doesNotMatch(told, /Write unit tests.*not confirmed/);
+  assert.equal((await attend(l, { reasons: ['stale'], stale_days: 30, within: made.tree })).items.length, 1, 'only those older than asked for');
   // Saying it is still true takes it off the list.
   await make(l, [{ op: 'update', id: made.gated }]);
-  assert.deepEqual((await attend(l, { reasons: ['stale'], within: made.repo })).items.map((i: any) => i.title), ['Capture probe']);
-  await callTool(l, { kind: 'human', name: 'owner' }, 'session_end', { run: 'r0', outcome: 'cancelled' });
+  assert.deepEqual((await attend(l, { reasons: ['stale'], within: made.tree })).items.map((i: any) => i.title), ['Capture probe']);
 
-  // A scheduled re-check asks what is due: a project says how often, weekly when it does not.
-  let due = (await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.repo } })) as any;
-  assert.deepEqual([due.due, due.projects[0].every_days, due.projects[0].items.map((i: any) => i.title)], [true, 7, ['Capture probe']]);
-  await make(l, [{ op: 'update', id: made.proj, props: { recheck_days: 30 } }]);
-  assert.equal(((await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.repo } })) as any).due, false, 'nothing here has gone 30 days');
-  await make(l, [{ op: 'update', id: made.proj, props: { recheck_days: 0 } }]);
-  assert.equal(((await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.repo } })) as any).due, false, '0 turns it off');
-  // Once done, the project waits out its interval again, even with old items left.
-  await make(l, [{ op: 'update', id: made.proj, props: { recheck_days: 7 } }]);
-  const done = (await callTool(l, agent, 'rechecked', { repo: made.repo, summary: 'One left for the owner' })) as any;
-  assert.deepEqual(done.rechecked.map((p: any) => p.title), ['Apex']);
-  due = (await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.repo } })) as any;
-  assert.deepEqual([due.due, typeof due.projects[0].rechecked_at], [false, 'string']);
-  await l.db.query(`update entity set props = props || '{"rechecked_at":"2020-01-01T00:00:00Z"}' where id = $1`, [made.proj]);
-  assert.equal(((await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.repo } })) as any).due, true, 'and is due again when it has');
-  // Asked for now, it does not wait: the interval and the items' age are set aside.
-  await callTool(l, agent, 'rechecked', { repo: made.repo });
-  const atOnce = (await callTool(l, human, 'view', { name: 'recheck', params: { repo: made.repo, now: true } })) as any;
-  assert.deepEqual([atOnce.due, atOnce.projects[0].items.length], [true, 2]);
-  // An issue filed as about a project, not as part of it, is the repository's work all the same.
-  const { drift } = await make(l, [
-    { op: 'create', ref: 'drift', type: 'issue', title: 'The carve reads origins' },
-    { op: 'link', type: 'about', from: 'drift', to: made.proj },
-  ]);
-  assert.ok(((await callTool(l, human, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any).ready.some((i: any) => i.id === drift));
-
-  // An open issue in the repository is its work too: shown at the start, asked about at the end.
+  // New open work in the repository is asked about at the end.
   const { leak } = await make(l, [
-    { op: 'create', ref: 'leak', type: 'issue', title: 'The probe leaks handles' },
+    { op: 'create', ref: 'leak', type: 'task', title: 'The probe leaks handles' },
     { op: 'link', type: 'part_of', from: 'leak', to: made.proj },
   ]);
-  assert.match(await hookSessionStart(l, { session_id: 'r5', cwd: 'C:\\code\\Apex' }), new RegExp(`- Issue: The probe leaks handles \\(${leak}\\)`));
+  await hookSessionStart(l, { session_id: 'r5', cwd: 'C:\\code\\Apex' });
   assert.ok(((await callTool(l, agent, 'session_end', { run: 'r5' })) as any).unreconciled.some((i: any) => i.id === leak));
   await callTool(l, { kind: 'human', name: 'owner' }, 'session_end', { run: 'r5', outcome: 'cancelled' });
   await make(l, [{ op: 'archive', id: leak }]);
@@ -315,7 +298,7 @@ test('a session that finishes says where the repository\'s open work stands', as
 });
 
 test('work that waits on a person is blocked by them, needs them, and is not asked of a session; a session can say it cannot tell', async () => {
-  const l = await fresh();
+  const l = await laneMap();
   const made = await laneSetup(l);
   const { me, sam } = await make(l, [
     { op: 'create', ref: 'me', type: 'person', title: 'Owner' },
@@ -330,13 +313,11 @@ test('work that waits on a person is blocked by them, needs them, and is not ask
   ]);
 
   // It is blocked, by the person; it needs them though it is not theirs; and its owner is waiting on them.
-  const offline = (await attend(l, { within: made.repo })).items.find((b: any) => b.id === made.offline);
+  const offline = (await attend(l, { within: made.tree })).items.find((b: any) => b.id === made.offline);
   assert.deepEqual(offline.reasons.map((r: any) => [r.why, r.who ?? r.by]), [['waits_on', 'Owner'], ['blocked', ['Owner']]]);
   assert.deepEqual((await attend(l, { person: 'me', reasons: ['waits_on'] })).items.map((e: any) => e.title), ['Write unit tests']);
   assert.deepEqual((await attend(l, { person: sam, reasons: ['blocked'] })).items.map((r: any) => r.reasons[0].by), [['Owner']]);
-  assert.ok(!(await attend(l, { reasons: ['ready'], within: made.repo })).items.some((t: any) => t.id === made.offline), 'what waits on a person is not ready');
-  const work = (await callTool(l, human, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any;
-  assert.deepEqual(work.blocked.find((b: any) => b.id === made.offline).waiting_on, ['Owner']);
+  assert.ok(!(await attend(l, { reasons: ['ready'], within: made.tree })).items.some((t: any) => t.id === made.offline), 'what waits on a person is not ready');
 
   // A session ending there is not asked about it: nothing it did could have settled it.
   const { run } = await sessionStart(l, agent, { cwd: 'C:\\code\\Apex', session_id: 'w1' });
@@ -361,7 +342,7 @@ test('work that waits on a person is blocked by them, needs them, and is not ask
   // Once they have answered, the link is removed and the work is free again.
   const link = (await l.get(made.offline)).outgoing.find((r: any) => r.type === 'waits_on') as any;
   await make(l, [{ op: 'unlink', relation: link.relation }]);
-  assert.ok(((await callTool(l, human, 'view', { name: 'repo_work', params: { repo: made.repo } })) as any).ready.some((i: any) => i.id === made.offline));
+  assert.ok((await attend(l, { reasons: ['ready'], within: made.tree })).items.some((t: any) => t.id === made.offline));
 });
 
 
@@ -431,7 +412,7 @@ test('a held change says what it would make', async () => {
 
 test('a list tells an agent of a long field and a hub\'s links without reading them whole', async () => {
   const l = await fresh();
-  const ops = [{ op: 'create', ref: 'hub', type: 'project', title: 'Hub' }, { op: 'create', ref: 'look', type: 'layout', title: 'Long look', props: { code: 'x'.repeat(3000) } }, ...Array.from({ length: 25 }, (_, k) => ({ op: 'create', ref: `t${k}`, type: 'task', title: `Task ${k}` })), ...Array.from({ length: 25 }, (_, k) => ({ op: 'link', type: 'part_of', from: `t${k}`, to: 'hub' }))];
+  const ops = [{ op: 'create', ref: 'hub', type: 'work', title: 'Hub' }, { op: 'create', ref: 'look', type: 'layout', title: 'Long look', props: { code: 'x'.repeat(3000) } }, ...Array.from({ length: 25 }, (_, k) => ({ op: 'create', ref: `t${k}`, type: 'task', title: `Task ${k}` })), ...Array.from({ length: 25 }, (_, k) => ({ op: 'link', type: 'part_of', from: `t${k}`, to: 'hub' }))];
   const { created } = (await callTool(l, human, 'change', { reason: 'test', ops })) as any;
   const [found] = (await callTool(l, agent, 'search', { q: 'Long look', type: 'layout' })) as any[];
   assert.match(String(found.props.code), /3000 characters/);

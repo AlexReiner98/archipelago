@@ -14,7 +14,7 @@ test('in a browser, a scene drawn again moves its marks by key', { skip: !browse
   const { base, call } = await serve('off');
   const change = async (ops: unknown[]) => (await call('/api/change', undefined, { reason: 'test', ops })).result;
   const made = (await change([
-    { op: 'create', ref: 'p', type: 'project', title: 'Moving here' },
+    { op: 'create', ref: 'p', type: 'task', title: 'Moving here' },
     { op: 'create', ref: 'a', type: 'task', title: 'First step' },
     { op: 'create', ref: 'b', type: 'task', title: 'Second step' },
     { op: 'create', ref: 'c', type: 'task', title: 'Third step' },

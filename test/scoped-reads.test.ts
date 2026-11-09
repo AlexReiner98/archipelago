@@ -15,16 +15,16 @@ const view = (l: Awaited<ReturnType<typeof fresh>>, who: typeof human, name: str
 test('a lens reads only what its filter includes: one that includes nothing is refused', async () => {
   const l = await fresh();
   await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'House' },
-    { op: 'create', ref: 'f', type: 'feature', title: 'Roof' },
+    { op: 'create', ref: 'p', type: 'record', title: 'House' },
+    { op: 'create', ref: 'f', type: 'event', title: 'Roof' },
     { op: 'create', ref: 't', type: 'task', title: 'Tiles' },
-    { op: 'create', ref: 'q', type: 'project', title: 'Garden' },
+    { op: 'create', ref: 'q', type: 'record', title: 'Garden' },
     { op: 'link', type: 'part_of', from: 'f', to: 'p' },
     { op: 'link', type: 'part_of', from: 't', to: 'f' },
     { op: 'link', type: 'part_of', from: 'q', to: 't' },
   ]);
   await assert.rejects(view(l, human, 'flat'), /includes something/, 'never the whole map');
-  const top = await view(l, human, 'flat', { filter: { find: ['type project'] } });
+  const top = await view(l, human, 'flat', { filter: { find: ['type record'] } });
   assert.deepEqual(top.items.map((i: any) => i.title).sort(), ['Garden', 'House'], 'the types it names');
   const tasks = await view(l, human, 'flat', { filter: { find: ['type task'] } });
   assert.deepEqual(tasks.items.map((i: any) => i.title), ['Tiles']);
@@ -77,7 +77,7 @@ test('a link to an item someone may not see is no event of theirs: its far end i
   const people = await make(l, [{ op: 'create', ref: 'bo', type: 'person', title: 'Bo' }]);
   const shared = await make(l, [{ op: 'create', ref: 's', type: 'task', title: 'Shared work', visibility: 'shared' }]);
   const bo = l.as(people.bo);
-  const mine = (await bo.change({ kind: 'human', name: 'bo', person: people.bo }, { ops: [{ op: 'create', ref: 'p', type: 'note', title: 'Mine', visibility: 'private' }, { op: 'link', type: 'link', from: shared.s, to: 'p' }], reason: 'test' })) as { created: Record<string, string> };
+  const mine = (await bo.change({ kind: 'human', name: 'bo', person: people.bo }, { ops: [{ op: 'create', ref: 'p', type: 'finding', title: 'Mine', visibility: 'private' }, { op: 'link', type: 'link', from: shared.s, to: 'p' }], reason: 'test' })) as { created: Record<string, string> };
   const seen = async (who: typeof l) => JSON.stringify(await callTool(who, human, 'events', { limit: 50 }));
   assert.ok((await seen(bo)).includes(mine.created.p), 'Bo sees his own link');
   assert.ok(!(await seen(l.as('someone else'))).includes(mine.created.p), 'nobody else is told the id of what it reaches');

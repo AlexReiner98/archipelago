@@ -109,5 +109,5 @@ test('a client connected over MCP goes on through a deploy with the session it h
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'query', arguments: { name: 'search', params: { q: 'anything' } } } }),
   });
   assert.equal(res.status, 200);
-  assert.match(await res.text(), /"result"/);
+  assert.match(await res.text(), /"(result)"/);
 });

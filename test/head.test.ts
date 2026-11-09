@@ -44,7 +44,7 @@ test('an undeclared field, a head field its kind lacks, and a large value on the
   const l = await fresh();
   const { t, b, p, s } = await make(l, [
     { op: 'create', ref: 't', type: 'task', title: 'Pour the slab' },
-    { op: 'create', ref: 'b', type: 'bug', title: 'The slab cracks' },
+    { op: 'create', ref: 'b', type: 'decision', title: 'Which slab?' },
     { op: 'create', ref: 'p', type: 'person', title: 'Sam' },
     { op: 'create', ref: 's', type: 'layout', title: 'A drawing' },
   ]);
@@ -53,8 +53,8 @@ test('an undeclared field, a head field its kind lacks, and a large value on the
   await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'create', type: 'lens', title: 'Sure?', confidence: 0.5 }] }), /lens has no field "confidence"/);
   await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: t, props: { owner: p } }] }), /task has no field "owner"/);
   const big = 'x'.repeat(LARGE + 1);
-  await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: b, props: { repro: big } }] }), /bug.repro is too large/);
-  await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'create', type: 'bug', title: 'Big', props: { repro: big } }] }), /too large/);
+  await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: b, props: { outcome: big } }] }), /decision.outcome is too large/);
+  await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'create', type: 'decision', title: 'Big', props: { outcome: big } }] }), /too large/);
   // A system item's field declared large holds it.
   await make(l, [{ op: 'update', id: s, props: { code: `export default () => [] // ${big}` } }]);
   assert.equal(((await l.entity(s))!.props.code as string).length > LARGE, true);

@@ -49,10 +49,10 @@ test('a reader reads a finding; reads points at a finding only, and crosses', as
   const made = await make(l, [
     { op: 'create', ref: 'f', type: 'finding', title: 'Hosting a month', props: { value: 400, value_type: 'number' } },
     { op: 'create', ref: 'budget', type: 'task', title: 'Set the budget' },
-    { op: 'create', ref: 'note', type: 'note', title: 'Costs' },
+    { op: 'create', ref: 'costs', type: 'record', title: 'Costs' },
     { op: 'link', type: 'reads', from: 'budget', to: 'f' },
   ]);
-  const read = await l.change(agent, { ops: [{ op: 'link', type: 'reads', from: made.note, to: made.f }], reason: 'test' });
+  const read = await l.change(agent, { ops: [{ op: 'link', type: 'reads', from: made.costs, to: made.f }], reason: 'test' });
   assert.notEqual(read.status, 'refused');
   await refused(l, [{ op: 'link', type: 'reads', from: made.f, to: made.budget }], /"reads" must point to finding/);
   const reads = l.registry.relations.get('reads');

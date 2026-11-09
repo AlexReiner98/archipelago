@@ -1,7 +1,7 @@
 // Packs: versioned bundles of types and relation types, stored as files. A type may extend another (a "flavour"); it
 // inherits the parent's fields and statuses, and anything that queries the parent also sees its flavours.
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts'; import { capabilityOf, holds, unknownEnd, within } from './link-ends.ts';
 import { checkDeclared, KERNEL_VERBS, presetsOf, screensOf, stylesOf, toolName, type ActionDef, type TreeDef, type VerbDef, type ViewDef } from './declared.ts';
@@ -11,8 +11,8 @@ import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
 import { islandsOff } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
-import { isServerPack, parts, readManifest, withoutAbsent, type Manifest } from './manifest.ts';
-import { createHash } from 'node:crypto';
+import { parts, withoutAbsent, type Manifest } from './manifest.ts';
+import { readPackFolders } from './pack-folders.ts';
 import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from './phases.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
@@ -108,7 +108,12 @@ export type ResolvedRelation = Omit<RelationDef, 'root'> & { pack: string; root:
 export { SYSTEM } from './head.ts';
 
 export class Registry {
+  /** The first folder packs are read from: the server's own (`packsDir`). */
   readonly dir: string;
+  /** Every folder packs are read from, in order: the server's own, then those `PELAGO_PACKS` names. */
+  readonly dirs: string[];
+  /** The folder each pack was found in. */
+  private where = new Map<string, string>();
   readonly only: string[] | undefined;
   /** The types this workspace defined for itself (define_type), in order: its database keeps them (src/control.ts). */
   private local: TypeDef[]; /** The types and link types kept on the map (src/type-items.ts). */ private items: TypeItem[] = [];
@@ -136,31 +141,18 @@ export class Registry {
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
-  constructor(dir: string, only?: string[], local: TypeDef[] = []) {
-    this.dir = dir;
+  constructor(dirs: string | string[], only?: string[], local: TypeDef[] = []) {
+    this.dirs = [dirs].flat();
+    this.dir = this.dirs[0];
     this.only = only;
     this.local = [...local];
     this.reload();
   }
 
   reload(): void {
-    const found = new Map<string, PackFile>();
     // A workspace's own types are in its database, never in a folder another server started from here would read.
-    const folders = readdirSync(this.dir)
-      .filter((name) => name !== LOCAL_PACK)
-      .map((name) => [name, join(this.dir, name, 'pack.json')]);
-    const hashes = new Map<string, string>();
-    for (const [name, file] of folders) {
-      if (!existsSync(file)) continue;
-      const text = readFileSync(file, 'utf8');
-      const pack = readManifest(text, `packs/${name}/pack.json`);
-      // A server pack kept beside the workspace packs is the server's (src/server-packs.ts), never a workspace's.
-      if (isServerPack(pack)) continue;
-      if (pack.id !== name) throw new Error(`Pack folder "${name}" contains pack id "${pack.id}"`);
-      found.set(pack.id, pack);
-      hashes.set(pack.id, createHash('sha256').update(text).digest('hex'));
-    }
-    if (!found.has('core')) throw new Error(`No core pack in ${this.dir}`);
+    const { found, hashes, where } = readPackFolders<PackFile>(this.dirs, LOCAL_PACK);
+    this.where = where;
     const own = ownPack(this.localPack(), this.items, LOCAL_PACK); if (own) found.set(LOCAL_PACK, own);
 
     // Load in dependency order what is on and has what it requires; the rest waits or is off.
@@ -281,7 +273,7 @@ export class Registry {
     const verbs = ordered.flatMap((pack) => parts(pack).verbs);
     const tools = new Map<string, { pack: string; call: 'action' | 'view'; def: ActionDef | ViewDef }>();
     for (const pack of ordered) {
-      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), pack.id !== LOCAL_PACK && existsSync(join(this.dir, pack.id, 'handler.js')));
+      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), pack.id !== LOCAL_PACK && existsSync(join(this.folderOf(pack.id), 'handler.js')));
       if (declared.length) throw new Error(`Pack "${pack.id}": ${declared.join('; ')}`);
       for (const def of parts(pack).actions) tools.set(toolName(def.id), { pack: pack.id, call: 'action', def });
       // A lens preset is asked through the view tool, as any lens is: it is no tool of its own.
@@ -455,7 +447,9 @@ export class Registry {
   /** Take in the types and link types kept on the map; one that does not load leaves the registry as it was, and says why. */
   takeItems(items: TypeItem[]): void { const was = this.items; this.items = items; try { this.reload(); } catch (err) { this.items = was; this.reload(); throw err; } }
   /** A registry like this one with these type items in place of its own: what a change that makes or changes one is checked against. */
-  trial(items: TypeItem[]): Registry { const r = new Registry(this.dir, this.only, this.local); r.turnedOff = this.turnedOff; r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
+  /** The folder a pack's files are in: where it was found, or the first folder for one not found. */
+  folderOf(pack: string): string { return join(this.where.get(pack) ?? this.dir, pack); }
+  trial(items: TypeItem[]): Registry { const r = new Registry(this.dirs, this.only, this.local); r.turnedOff = this.turnedOff; r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
   /** Take up the types defined here by another server on the same database. Returns whether any were new. */
   followLocal(defs: TypeDef[]): boolean {
     const added = defs.filter((t) => !this.local.some((l) => l.id === t.id));

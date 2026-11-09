@@ -16,7 +16,7 @@ test('in a browser, the query line says the lens in one line at both widths', { 
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'site', type: 'project', title: 'Site works' },
+      { op: 'create', ref: 'site', type: 'task', title: 'Site works' },
       { op: 'create', ref: 'roof', type: 'task', title: 'Roof the shed' },
       { op: 'create', ref: 'tiles', type: 'task', title: 'Roof tiles bought' },
       { op: 'create', ref: 'gutter', type: 'task', title: 'Gutters' },

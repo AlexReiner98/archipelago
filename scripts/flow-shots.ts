@@ -17,7 +17,7 @@ const packs = args.includes('--packs') ? args.splice(args.indexOf('--packs'), 2)
 const base = args[0] ?? 'http://127.0.0.1:3100';
 const out = args[1] ?? join(import.meta.dirname, '..', 'runs', 'flow-shots');
 mkdirSync(out, { recursive: true });
-const drawing = layoutFor({ dir: packs, packs: [JSON.parse(readFileSync(join(packs, 'core', 'pack.json'), 'utf8'))] }, { shape: 'flow' }, []);
+const drawing = layoutFor({ folderOf: (p: string) => join(packs, p), packs: [JSON.parse(readFileSync(join(packs, 'core', 'pack.json'), 'utf8'))] }, { shape: 'flow' }, []);
 
 /** Two thousand steps of work, part of one project, in chains each depending on the one before, some across. */
 function big(chain: number) {

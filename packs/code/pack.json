@@ -65,7 +65,6 @@
     {
       "id": "commit",
       "moved_from": ["software.commit", "code_commit"],
-      "capabilities": {"accounts": {"field": "sha", "accounted": "accounted"}},
       "extends": "record",
       "title": "Commit",
       "description": "A commit accounted for: it lives in its repository and says which items it settles, each by a settles link, and none when it has none.",

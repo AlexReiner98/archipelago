@@ -14,7 +14,7 @@ Every sentence an agent is asked to keep is an `instruction` item: a pack
 ships it as a preset, and the owner changes it by keeping their own version
 on the map (its `preset` field names the one it replaces; retired, it is not
 said). Its `for` says where it is said: `session_start`,
-`unaccounted_commits`, `working_rules` (the rules file a project is handed),
+`working_rules` (the rules file a project is handed),
 `tool:<name>`, `guide:<name>` (a guide an agent reads when it asks: core
 view `instructions` with that `for`), `file:<glob>`. Each working rule is worded once, in its preset, and said in
 one place only. Nothing an agent is told is written in kernel code or
@@ -75,36 +75,15 @@ number on the check's row (`workspace_set` `asks_at`, kept as the setting
   session-start text says the map, not the chat, is the record, and that
   telling is checked".
 
-### 4. Every commit is accounted for before main
-A commit is accounted for once the map holds a `commit` item for
-its full sha, with a `settles` link to each item it settles (none
-when it settles nothing); a record still held for the owner counts for the
-session. Each commit a session makes
-names its run in an `Archipelago-Run` trailer. A reply that committed or
-pushed commits nobody accounted for is asked to (the software pack's reply
-rule `account_commits`, lifted by `reply_account_commits`); an agent's
-`session_end` does not end while its own commits are unaccounted for; and
-the next session in the checkout is told of any left over.
+### 4. A commit names its session
+Each commit a session makes names its run in an `Archipelago-Run` trailer.
+The kernel does not account for commits: nothing asks a session to record
+them, and nothing lists the ones nobody recorded (removed 9 Nov 2026,
+decision e_xtgbfhdj). A pack may give commits a type of their own.
 
-What nobody accounts for reaches the owner: a `commit` with `accounted: false`
-(one made for a commit seen and not accounted for) is put before the owner by
-the code pack's attention reason `unaccounted` (joining `waits_on`), until it
-is accounted for, setting `accounted` true with its links. Nothing hears
-pushes since the GitHub pack and the GitHub App went (9 Nov 2026).
-
-- `test/pushed-commits.test.ts`: "a pushed commit nobody accounted for is
-  the owner’s attention, by the reason its pack declares, until it is
-  accounted for".
 - `test/commit-run.test.ts`: "a commit a session makes names its run, and
   one made by anybody else does not; the setup puts the hook in and takes it
   out".
-- `test/commits.test.ts`: "a reply that committed and did not account for it
-  is asked once, naming the commits, until one change accounts for them";
-  "a session’s end lists its commits not accounted for, and ends once they
-  are"; "the hook reads the session’s commits from what git answered, by
-  their full ids".
-- `test/unaccounted.test.ts`: "a session starting in a repository is asked
-  to account for the commits the map holds no item for".
 
 ### 5. What a session touched is kept with its run
 The items a session read, showed or changed, and the commits it made, are
@@ -158,30 +137,25 @@ SessionStart's `source` and SessionEnd's `reason`.
 | --- | --- |
 | `src/instructions.ts` | what is said where: presets under the workspace's under a repository's (core view `instructions`) |
 | `src/working-rules.ts` | the rules file a project is handed: `examples/working-rules.md` with the `working_rules` presets at its marker |
-| `src/hook-answers.ts` | what each hook is answered; keeps what was touched and the commits made, asks the reply rules at stop |
+| `src/hook-answers.ts` | what each hook is answered; keeps what was touched, asks the reply rules at stop |
 | `src/sessions.ts` | session start and end; the session-start text |
 | `src/reply-rules.ts`, `src/replies.ts` | a reply rule checked as data and when it holds; asking once a turn, kept in the story; how often each asked |
 | `src/touched.ts`, `src/reconcile.ts` | the set a run touched; what a session has left unsaid when it ends |
-| `src/commits.ts` | the commits a run made, and which no record accounts for |
-| `src/unaccounted.ts` | the checkout's newest commits the map holds no record for, said at session start |
 | `src/workspace-tools.ts`, `ui/workspace-cards.js` | `workspace_info.reply_rules`, and the Checks card that draws it with its switches |
 
 ### In `packs/`
 | Pack | What it adds |
 | --- | --- |
 | `core` | the `instruction` type and its presets; the reply rules `draw_answers` and `record_findings` |
-| `software` | `commit` (with the `accounts` capability) and `settles`; the reply rule `account_commits`, naming its record; the instructions `build_first` (lay a build out as items and have the owner agree it before the first edit) and `drawing_on_map` (a drawing is a style on the map), and the guide `guide:style_code` |
+| `software` | the instructions `build_first` (lay a build out as items and have the owner agree it before the first edit) and `drawing_on_map` (a drawing is a style on the map), and the guide `guide:style_code` |
 | `github` | `account.js`: the check on main, answered from the map |
 | `github_app` | `checks.js`: posts the check, keeps it while red, asks again each minute |
 
 ## How a session is told
-1. The SessionStart hook sends the session id, folder, remote and the
-   checkout's 40 newest commits; the server registers a run and says its id
+1. The SessionStart hook sends the session id, folder and remote; the server registers a run and says its id
    in the `x-pelago-run` header, which the hook keeps in `pelago-runs/`.
 2. `hookSessionStart` builds the text from the map: the repository, what
-   waits, answers to confirm, the commits nobody accounted for (the
-   `unaccounted_commits` instructions, naming five and counting the rest),
-   then `instructionsFor('session_start')` with `{run}` filled in.
+   waits, answers to confirm, then `instructionsFor('session_start')` with `{run}` filled in.
 3. The rules file (`.claude/pelago.md`) is the frame in
    `examples/working-rules.md` with each `working_rules` preset as one
    bullet, handed out by `src/connect.ts`.
@@ -189,14 +163,9 @@ SessionStart's `source` and SessionEnd's `reason`.
 ## How a reply is checked
 1. At each turn's end the stop hook reads the transcript since the owner's
    last message: `read`, `surveyed`, `showed`, `changed`, `told`, `worked`,
-   `edited`, `committed`, `pushed`, with the turn's id, the items touched, the
-   session's commits and those the reply made (`turn_commits`: all of them
-   when it pushed), found in what git answered and in the checkout's HEAD
-   log. A call to another workspace's server (one named `pelago-<name>`)
+   `edited`, `committed`, `pushed`, with the turn's id and the items touched. A call to another workspace's server (one named `pelago-<name>`)
    counts as a read, change or tell too; its items are not this map's.
-2. `askOnReply` reads one fact of the map, `unaccounted` (which of the
-   reply's commits no record accounts for), when a rule asks for it. It takes
-   the reply rules not lifted whose `when.reply` holds and that have not
+2. `askOnReply` takes the reply rules not lifted whose `when.reply` holds and that have not
    asked this run and turn, and answers `{decision: "block", reason}` with
    their `say`; each asking is a beat with `asked`.
 3. The agent goes on with `stop_hook_active` set, so nothing asks again
@@ -205,12 +174,7 @@ SessionStart's `source` and SessionEnd's `reason`.
 ## How a session is reconciled
 1. Each commit carries `Archipelago-Run: <run>`, added by the commit-msg
    hook from the session's run file.
-2. A commit is accounted for with one change: a `commit` with its
-   sha and `settles` links. The reply that made it is asked to, and
-   the next session in the checkout is told of any left over.
-3. `session_end` lists the run's commits not accounted for
-   (`unaccounted_commits`) and does not end until they are; then what the
-   session touched, then the repository's open work nobody changed since it
+2. `session_end` lists what the session touched, then the repository's open work nobody changed since it
    began, to change, vouch for or say it cannot tell. The sets are kept a
    week after.
 

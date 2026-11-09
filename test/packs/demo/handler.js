@@ -35,17 +35,17 @@ export default {
   },
   // Told the price list: records it.
   async 'demo.priced'(input) {
-    return { ops: [{ op: 'create', type: 'note', title: `Prices: ${Object.keys(input.body).join(', ')}` }] };
+    return { ops: [{ op: 'create', type: 'record', title: `Prices: ${Object.keys(input.body).join(', ')}` }] };
   },
   // Told the order went through.
   async 'demo.bought'(input) {
-    return { ops: [{ op: 'create', type: 'note', title: `Bought, order ${input.body.order}` }] };
+    return { ops: [{ op: 'create', type: 'record', title: `Bought, order ${input.body.order}` }] };
   },
   // A delivery came in from outside.
   async 'demo.delivered'(input) {
     // What kind of delivery it is, as its sender said in a header the webhook declares; an event of a kind it does not declare is refused.
     const action = input.headers['x-demo-kind'] === 'stray' ? 'demo.stray' : 'demo.arrived';
-    return { ops: [{ op: 'create', type: 'note', title: `Delivered: ${input.payload.item}` }], log: [{ action, reason: `${input.payload.item} arrived` }] };
+    return { ops: [{ op: 'create', type: 'record', title: `Delivered: ${input.payload.item}` }], log: [{ action, reason: `${input.payload.item} arrived` }] };
   },
   // Runs by itself: reads the prices.
   async 'demo.tick'() {

@@ -17,7 +17,7 @@ test('the types with the kernel flag are the types of the system kind', async ()
   assert.deepEqual(flagged, ofKind);
   assert.deepEqual(l.registry.having('kernel').sort(), ofKind, 'the flag is a capability, inherited by flavours');
   for (const t of ['lens', 'style', 'run', 'instruction', 'screen', 'automation']) assert.ok(flagged.includes(t), `${t} is the kernel's own`);
-  for (const t of ['task', 'project', 'decision', 'person', 'note']) assert.ok(!flagged.includes(t), `${t} is not`);
+  for (const t of ['task', 'aim', 'decision', 'person', 'record']) assert.ok(!flagged.includes(t), `${t} is not`);
   const schema = l.registry.describe().types;
   assert.ok(schema.find((t) => t.id === 'lens')?.system, 'the schema the page reads says so');
   assert.ok(!schema.find((t) => t.id === 'task')?.system);
@@ -33,7 +33,7 @@ test('a type outside the kernel packs cannot carry the kernel flag, its own or b
 test('kind system in a query reads the flag: left out by default, by the term, and kept when asked', async () => {
   const l = await fresh();
   const { p, t, v } = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Apex' },
+    { op: 'create', ref: 'p', type: 'aim', title: 'Apex' },
     { op: 'create', ref: 't', type: 'task', title: 'Ship it' },
     { op: 'create', ref: 'v', type: 'lens', title: 'Apex at a glance' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },

@@ -23,7 +23,7 @@ const server = process.env.PELAGO_TEST_DATABASE_URL;
 async function aMap(l: Archipelago) {
   const me = (await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }])).me;
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Move it' },
+    { op: 'create', ref: 'p', type: 'task', title: 'Move it' },
     { op: 'create', ref: 't', type: 'task', title: 'Replay the log', owner: me, body: 'Entry by entry.' },
     { op: 'create', ref: 'u', type: 'task', title: 'Compare both sides' },
     { op: 'create', ref: 'q', type: 'decision', title: 'Where does it move?' },
@@ -37,7 +37,7 @@ async function aMap(l: Archipelago) {
   await l.decide(human, { proposal: asked.proposal, approve: true, note: 'Yes' });
   const no = (await l.change(agent, { reason: 'Rename', ops: [{ op: 'update', id: made.p, title: 'Elsewhere' }] })) as { proposal: string };
   await l.decide(human, { proposal: no.proposal, approve: false, note: 'Keep it' });
-  await l.change(agent, { reason: 'Later', ops: [{ op: 'update', id: made.p, props: { hub_at: 4 } }] });
+  await l.change(agent, { reason: 'Later', ops: [{ op: 'update', id: made.p, props: { priority: 'low' } }] });
   const edit = (await l.change(human, { reason: 'Reshape', ops: [{ op: 'update', id: made.u, title: 'Compare' }, { op: 'archive', id: made.u }] })) as { changeset: string };
   await undo(l, human, { changeset: edit.changeset });
   const twin = (await make(l, [{ op: 'create', ref: 'x', type: 'task', title: 'Replay it' }, { op: 'link', type: 'part_of', from: 'x', to: made.p }])).x;
