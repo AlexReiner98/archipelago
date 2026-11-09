@@ -90,14 +90,6 @@ export const viewsOn = (typeId, id) =>
       return { id: p.id, title: p.title, at: `#/v?${addressOf(lens, style)}` };
     });
 
-/** Open a saved canvas named with no lens beside it: its lens and style put in the address, in place of the one asked. */
-export async function openCanvas(id) {
-  const got = await api('get', { id }).catch(() => null);
-  if (!got || !isA(got.entity.type, TYPE)) return void location.replace('#/');
-  const { lens, style } = viewParts(got.entity);
-  location.replace(`#/v?${addressOf(lens, style)}`);
-}
-
 /**
  * A saved canvas drawn where something brings it in (a document's section, a screen's piece): its lens and style read
  * from the map, drawn with the style of what it is about.

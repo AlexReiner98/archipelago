@@ -60,10 +60,6 @@ export const ARROW = { either: '↔', out: '→', in: '←' };
 export const NEXT_WAY = { either: 'out', out: 'in', in: 'either' };
 
 export const when = (ts) => new Date(ts).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-export const daysAgo = (ts) => {
-  const days = Math.floor((Date.now() - new Date(ts).getTime()) / 86_400_000);
-  return days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
-};
 // ---- Saying things briefly -------------------------------------------------
 // The screens show what agents write, and agents write paragraphs. These keep
 // a row to one line: a short name, a few words, a mark. The whole of it is
@@ -209,16 +205,6 @@ export const idsAsLinks = (text) => {
 export const idsIn = (text) => [...new Set(text.match(/\be_[a-z0-9]{8}\b/g) ?? [])];
 export const link = (e) => (e ? (titles.set(e.id, e.title), h('a', { href: `#/e/${e.id}` }, e.title)) : h('span', { class: 'muted' }, '(missing)'));
 
-/** The usual one-line rendering of an entity. */
-export function entityRow(e, sub) {
-  return h(
-    'li',
-    {},
-    h('div', { class: 'row-top' }, chip(e.type), h('span', { class: 'grow' }, link(e)), e.due && h('span', { class: 'pill warn' }, `due ${e.due}`), pill(e.type, e.status)),
-    sub && h('div', { class: 'row-sub' }, sub),
-  );
-}
-
 export function card(title, { wide } = {}) {
   const count = h('span', { class: 'n' });
   const body = h('div', {}, h('div', { class: 'empty' }, 'Loading…'));
@@ -238,8 +224,6 @@ export function card(title, { wide } = {}) {
   };
 }
 
-export const WHY = { depends_on: 'depends on', waits_on: 'waits on', resource_unavailable: 'needs (unavailable)', resource_held: 'needs (held by another)' };
-
 /** A small menu for what is done rarely: the page keeps one or two actions in sight. */
 export function menu(label, items) {
   const box = h('details', { class: 'menu' }, h('summary', {}, label), h('div', { class: 'menu-items' }, items.filter(Boolean).map(([text, onclick, cls]) => h('button', { class: cls ?? '', onclick: (ev) => ((box.open = false), onclick(ev)) }, text))));
@@ -254,14 +238,6 @@ document.addEventListener('click', (ev) => {
   for (const open of document.querySelectorAll('details.menu[open]')) if (!open.contains(ev.target) || (option && open.contains(option))) open.open = false;
 });
 
-/** When an open item was last changed or confirmed, as a mark that turns as it ages. */
-export function ageChip(e) {
-  const days = Math.floor((Date.now() - new Date(e.updated_at).getTime()) / 86_400_000);
-  return h('span', { class: `mark ${days >= 14 ? 'mark-old' : 'mark-human'}`, title: `Last changed or confirmed ${when(e.updated_at)}` }, days === 0 ? 'true today' : days === 1 ? 'true yesterday' : `${days} days unconfirmed`);
-}
-
-/** Where a run was, as a person says it. */
-export const RAN = { 'github-actions': 'Sync agent', server: 'Server agent', 'claude-code': 'Session' };
 /** Which of each item's sections are unfolded, kept while the page is open. */
 export const unfolded = new Map();
 /** A sentence of explanation, kept behind a small mark: there to be asked for, not to be read past. */
