@@ -104,7 +104,8 @@ async function kept(db: Q, person: string): Promise<string> {
 export async function actingIn(db: Q, found: PersonToken): Promise<Actor | undefined> {
   for (const email of found.emails) {
     const member = await memberOf(db, email);
-    if (member) return { kind: 'agent', name: found.name, person: await kept(db, member.person_id), admin: false, token: found.id, ...(found.may !== 'change' && { may: found.may }) };
+    // A guest reads one view in the page; a person token is not theirs to reach a workspace by.
+    if (member && !member.reads) return { kind: 'agent', name: found.name, person: await kept(db, member.person_id), admin: false, token: found.id, ...(found.may !== 'change' && { may: found.may }) };
   }
   return undefined;
 }

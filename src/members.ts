@@ -32,6 +32,8 @@ export interface Member {
   person_id: string;
   admin: boolean;
   added_at: string;
+  /** A guest's: the share whose view alone they read (src/guests.ts). */
+  reads?: string | null;
 }
 
 /** A workspace's limits (src/plan.ts), members among them: the name it had when members were all a plan limited. */
@@ -75,7 +77,7 @@ async function roomForOneMore(db: Q, workspace: string, added = 0): Promise<void
 }
 
 export async function memberOf(db: Q, email: string): Promise<Member | undefined> {
-  const { rows } = await db.query<Member>(`select email, person_id, admin, added_at from member where email = $1 and removed_at is null`, [email]);
+  const { rows } = await db.query<Member>(`select email, person_id, admin, added_at, reads from member where email = $1 and removed_at is null`, [email]);
   return rows[0];
 }
 

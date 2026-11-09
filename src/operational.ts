@@ -29,6 +29,7 @@ export const STORES: Record<string, string> = {
   type_bytes: 'The bytes of item_bytes summed by type: kept with it.',
   mention: "What names an item in its note or fields: a projection of items' text, kept by the projector as each is written (src/mentions.ts), made again whole after a restore.",
   proposal: 'The review queue, a projection of the log: a held change’s record in the pending stream makes its row, the entry that decides it in the fact stream says what became of it (src/replay.ts).',
+  reach: "What a view shared with a guest holds now, by share: worked out by the server as the person who shared it whenever the log has moved (src/guests.ts), and read by the reader role's policies; never a fact, never backed up.",
   published: 'A document as it was published, frozen: written only when a human publishes.',
   picture: 'The picture a test drew, kept for a public result: one per result, replaced when the test runs again; its hash appended to the observations stream.',
   act: 'A request a pack made outside the map: one that cannot be taken back waits for a person; once made it is logged, never undone.',
