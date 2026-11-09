@@ -231,8 +231,8 @@ SessionStart's `source` and SessionEnd's `reason`.
    only its person revokes it, everywhere at once.
 
 ## What is not yet so
-- The Settings page cannot make a person token yet: `token_create` with
-  `everywhere` can.
+- A person token is made on Settings, Agents, With a token, ⋯ (Set up for
+  all my workspaces); adding another address (`reach`) has no button yet.
 - `tool:<name>` instructions are declared but no tool description reads them
   yet.
 - The rules file is filled from the packs' presets in the checkout, not the
