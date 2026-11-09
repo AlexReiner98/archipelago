@@ -213,13 +213,13 @@ export const gateRow = (...kids) => h('div', { class: 'gate-row' }, ...kids);
 
 const postJson = (path, body) => fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
-/** `back`: drawn from inside a workspace (Sign in to another…), so there is a way back to it. */
-export function signIn(message, title = 'Sign in', { back = false } = {}) {
+/** `back`: drawn from inside a workspace (Another workspace, in the menu), so there is a way back to it; `email`: the address to start from. */
+export function signIn(message, title = 'Sign in', { back = false, email: given = '' } = {}) {
   const error = h('div', { class: 'error gate-error' }, message ?? '');
   const fail = (text) => (error.textContent = text);
   // Someone a client sent here to connect, with no account yet, came by MCP: where they begin says so (?ref=mcp).
   const ref = waitingOnSignIn() ? 'mcp' : undefined;
-  const email = h('input', { type: 'email', placeholder: 'Email', autocomplete: 'email', spellcheck: false });
+  const email = h('input', { type: 'email', placeholder: 'Email', autocomplete: 'email', spellcheck: false, value: given });
   const send = h('button', { class: 'primary' }, 'Email me a link');
 
   // Step two: the link and a code are in the mail. The code is typed here, in whichever browser asked.
@@ -271,7 +271,8 @@ export function signIn(message, title = 'Sign in', { back = false } = {}) {
     begin.replaceWith(gateRow(h('span', { class: 'muted grow' }, 'New here?'), h('a', { href: to.href, title: 'Make a workspace of your own; a client waiting to connect is asked again once you are in' }, 'Start a workspace')));
   }, () => undefined);
 
-  const others = Object.values(known.all());
+  // From inside a workspace the menu lists them already; signed out, they are the quickest way back in.
+  const others = back ? [] : Object.values(known.all());
   const first = () => {
     if (error.textContent !== (message ?? '')) fail('');
     gate(
@@ -280,7 +281,7 @@ export function signIn(message, title = 'Sign in', { back = false } = {}) {
       error,
       others.length > 0 && gateRow(h('span', { class: 'muted' }, 'Signed in before'), h('span', { class: 'grow gist gate-others' }, others.map((w) => h('a', { href: '#', title: `Open ${w.name}`, onclick: (e) => (e.preventDefault(), enter(w.token)) }, w.name)))),
       begin,
-      back && gateRow(h('a', { href: '#', class: 'small', onclick: (e) => (e.preventDefault(), ungate(), route()) }, 'Back')),
+      back && gateRow(h('a', { href: '#', class: 'small', onclick: (e) => (e.preventDefault(), ungate(), route()) }, state.workspace?.name ? `Back to ${state.workspace.name}` : 'Back')),
     );
     email.focus();
   };
@@ -337,37 +338,25 @@ export async function showIdentity() {
     const until = ended && h('a', { class: 'small error', href: '#/workspace?at=backup', title: `Ended ${ended.since.slice(0, 10)}: read-only, and deleted from the server on ${ended.delete_at.slice(0, 10)}. Download its backup before then.${ended.note ? ` ${ended.note}` : ''}` }, `Deleted on ${new Date(ended.delete_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`);
     document.querySelector('#nav .brand').replaceChildren('Archipelago', h('div', { class: 'workspace-name' }, me.workspace.name), until || '');
     document.title = `${me.workspace.name} · Archipelago`;
-    const others = Object.entries(known.all()).filter(([id]) => id !== me.workspace.id);
+    // Every workspace this browser is signed in to, a row each: this one marked, another a click away; then a way into
+    // one more, by email, and out of this one.
+    const shut = () => slot.closest('details')?.removeAttribute('open');
+    const go = (fn) => (e) => (e.preventDefault(), shut(), fn());
+    const row = ([id, w]) =>
+      id === me.workspace.id
+        ? h('div', { class: 'ws-row here', title: `${w.name}: the workspace this page is in` }, h('span', { class: 'gist' }, w.name), h('span', { class: 'ws-mark', 'aria-label': 'this one' }, '✓'))
+        : h('a', { href: '#', class: 'ws-row', title: `Open ${w.name}`, onclick: go(() => enter(w.token)) }, h('span', { class: 'gist' }, w.name));
+    const signedOut = () => {
+      known.forget(me.workspace.id);
+      store.token = '';
+      state.schema = undefined;
+      route();
+    };
+    const who = /@/.test(me.actor.name) ? me.actor.name : '';
     slot.replaceChildren(
-      h('div', {}, h('strong', {}, me.workspace.name)),
-      h('div', { class: 'muted small' }, `${me.actor.name} (${me.actor.kind})`),
-      h(
-        'select',
-        {
-          class: 'small',
-          title: 'Workspaces this browser has signed in to',
-          onchange: (e) => (e.target.value === '+' ? signIn('', 'Sign in', { back: true }) : e.target.value && enter(known.all()[e.target.value].token)),
-        },
-        h('option', { value: '' }, 'Switch workspace…'),
-        others.map(([id, w]) => h('option', { value: id }, w.name)),
-        h('option', { value: '+' }, 'Sign in to another…'),
-      ),
-      h(
-        'a',
-        {
-          href: '#',
-          class: 'small',
-          title: 'Forget this workspace on this browser',
-          onclick: (e) => {
-            e.preventDefault();
-            known.forget(me.workspace.id);
-            store.token = '';
-            state.schema = undefined;
-            route();
-          },
-        },
-        'Sign out',
-      ),
+      h('div', { class: 'ws-rows', role: 'group', 'aria-label': 'Workspaces' }, Object.entries({ [me.workspace.id]: me.workspace, ...known.all() }).map(row)),
+      h('a', { href: '#', class: 'ws-row ws-add', title: 'Sign in by email to a workspace you belong to; this one stays a click away', onclick: go(() => signIn('', 'Sign in to another workspace', { back: true, email: who })) }, '+ Another workspace'),
+      h('div', { class: 'ws-foot' }, h('span', { class: 'muted small gist', title: `Signed in as ${me.actor.name}` }, me.actor.name), h('a', { href: '#', class: 'small', title: `Sign out of ${me.workspace.name} on this browser`, onclick: go(signedOut) }, 'Sign out')),
     );
   } catch {
     slot.replaceChildren();
