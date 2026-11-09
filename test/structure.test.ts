@@ -33,7 +33,7 @@ const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
 const lines = (text: string) => text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
 const codeFiles = ['src', 'ui', 'test', 'packs', 'scripts', 'examples'].flatMap(walk).filter((f) => CODE.test(f) && !VENDORED.includes(f));
 const kernelFiles = [...walk('src'), ...walk('ui')].filter((f) => /\.(ts|js)$/.test(f) && !VENDORED.includes(f));
-const packIds = readdirSync(join(ROOT, 'packs')).filter((p) => statSync(join(ROOT, 'packs', p)).isDirectory());
+const packIds = readdirSync(join(ROOT, 'packs')).filter((p) => statSync(join(ROOT, 'packs', p)).isDirectory()), LEFT = JSON.parse(read('test/fixtures/left-packs.json')) as Record<string, string[]>; // LEFT: the packs gone to hosted (9 Nov 2026)
 /** The kernel's own packs: the kinds, the root relations and the system tier. */
 const KERNEL_PACKS = ['core', 'local'];
 
@@ -69,7 +69,7 @@ test(`no file is over ${MAX_LINES} lines`, () => {
 const NAMES_PACKS: Record<string, number> = {};
 
 test('the kernel names no pack', () => {
-  const ids = packIds.filter((p) => !KERNEL_PACKS.includes(p));
+  const ids = [...new Set([...packIds.filter((p) => !KERNEL_PACKS.includes(p)), ...Object.keys(LEFT)])];
   const named = count(kernelFiles, new RegExp(`['"\`](?:${ids.join('|')})\\.[a-z_]+['"\`]`, 'g'));
   assert.deepEqual(ratchet(named, NAMES_PACKS), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
 });
@@ -90,7 +90,7 @@ test("the kernel names no pack's type by its bare name", () => {
   const ids = packIds.filter((p) => !KERNEL_PACKS.includes(p) && existsSync(join(ROOT, 'packs', p, 'pack.json'))).flatMap((p) => {
     const m = JSON.parse(read(`packs/${p}/pack.json`)) as { types?: { id?: string }[]; links?: { id: string }[] };
     return [...(m.types ?? []), ...(m.links ?? [])].flatMap((t) => (t.id ? [t.id] : []));
-  });
+  }).concat(Object.values(LEFT).flat());
   const named = count(kernelFiles, new RegExp(`['"\`](?:${ids.join('|')})['"\`]`, 'g'));
   assert.deepEqual(ratchet(named, NAMES_PACK_TYPES), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
 });
@@ -437,7 +437,7 @@ const LENGTHS_IN_DRAWINGS: Record<string, number> = {
   'architecture/route.js': 8, 'architecture/says.js': 3, 'architecture/sides.js': 1, 'architecture/story.js': 3, 'flow/combs.js': 1, 'flow/direction.js': 1, 'flow/faults.js': 4,
   'flow/index.js': 13, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/search.js': 1,
   'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 4, 'flow/wrap.js': 2, 'grid/index.js': 6,
-  'pages/index.js': 5, 'time/index.js': 28, 'packs/plan/layouts/meters/index.js': 8,
+  'pages/index.js': 5, 'time/index.js': 28,
 };
 const BARE = /(?<![\w.$#])\d+(?:\.\d+)?(?![\w.])/g;
 

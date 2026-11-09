@@ -18,7 +18,7 @@ const fixture = (name: string) => keptFor(`${name}.kernel`);
 
 /** The drawing a picture kept in this shape is sent, and what it draws of each case, captured in the page. */
 async function drawn(shape: string, cases: DrawingCase[]) {
-  const { call, base } = await serve('off');
+  const { call, base } = await serve('off', undefined, undefined, [join(import.meta.dirname, 'fixtures', 'systems')]);
   const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'style', title: shape, status: 'current', props: { shape } }] })).result.created;
   const { drawing } = (await call('/api/view', undefined, { name: 'style', params: { style: made.s, have: [] } })).result.style;
   assert.equal(drawing.id, `core.${shape}`);

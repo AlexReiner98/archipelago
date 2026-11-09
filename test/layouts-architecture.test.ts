@@ -1,6 +1,7 @@
 // The architecture drawing the core pack ships, in a real browser (skipped where there is no Chrome): it draws what the
 // kernel drew before it, mark for mark, look for look, and draws in the app as a kept view.
 
+import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
@@ -11,7 +12,7 @@ import { serve } from './serve.ts';
 const browser = chrome();
 
 test('in a browser, the architecture drawing draws what the kernel drew: the same marks, looks, hovering, lighting and key', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
-  const { call, base } = await serve('off');
+  const { call, base } = await serve('off', undefined, undefined, [join(import.meta.dirname, 'fixtures', 'systems')]);
   const { l, s } = await system(call);
   const { drawing } = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [] } })).result.style;
   const page = await open(`${base}/`);
