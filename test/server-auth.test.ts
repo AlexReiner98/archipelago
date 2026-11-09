@@ -12,10 +12,10 @@ test('with auth off, one workspace and the surface decides who is calling', asyn
   assert.equal((await call('/api/init', undefined, { name: 'Alex' })).status, 200, '/api is the human');
   assert.equal((await call('/api/workspace_info')).result.owner.title, 'Alex');
   // What the agents of a new workspace change takes effect as they make it, owner or no owner.
-  const applied = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'note', title: 'M' }] });
+  const applied = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'record', title: 'M' }] });
   assert.equal(applied.result.status, 'applied', 'a new workspace applies what agents change');
   await call('/api/workspace_set', undefined, { agent_changes: 'hold' });
-  const proposed = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'note', title: 'N' }] });
+  const proposed = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'record', title: 'N' }] });
   assert.equal(proposed.result.status, 'proposed', '/agent is an agent');
   await call('/api/init', undefined, { name: 'Alex' });
   assert.equal((await call('/api/workspace_info')).result.agent_changes, 'hold', 'an owner set again keeps the workspace as it chose');
@@ -55,7 +55,7 @@ test('a token fixes identity and authority, whichever surface is used', async ()
   assert.match(made.result.note, /cannot be shown again/);
 
   // An agent token is an agent on every surface, including the one the CLI uses.
-  const proposed = await call('/api/change', agent, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'From the agent' }] });
+  const proposed = await call('/api/change', agent, { reason: 'x', ops: [{ op: 'create', type: 'record', title: 'From the agent' }] });
   assert.equal(proposed.result.status, 'proposed');
   assert.match((await call('/api/decide', agent, { proposal: proposed.result.proposal, approve: true })).error, /humans only/);
   assert.match((await call('/api/token_create', agent, { kind: 'human', name: 'sneaky' })).error, /humans only/);
@@ -106,8 +106,8 @@ test('each workspace is its own database: tokens, data and local types do not cr
   assert.deepEqual((await call('/operator/workspaces', operator, undefined, 'GET')).result.find((w: any) => w.id === 'acme').admins, ['owner@acme.test']);
   assert.equal((await call('/api/search', operator)).status, 401, 'the operator cannot read any map');
 
-  await call('/api/change', mine, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'My secret plan' }] });
-  await call('/api/change', theirs, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'Acme bid' }] });
+  await call('/api/change', mine, { reason: 'x', ops: [{ op: 'create', type: 'record', title: 'My secret plan' }] });
+  await call('/api/change', theirs, { reason: 'x', ops: [{ op: 'create', type: 'record', title: 'Acme bid' }] });
   const titles = async (token: string) => ((await call('/api/search', token)).result as any[]).map((e) => e.title);
   assert.deepEqual(await titles(mine), ['My secret plan']);
   assert.deepEqual(await titles(theirs), ['Acme bid', 'owner@acme.test'], 'its own note and its owner');
@@ -149,7 +149,7 @@ test('inside a workspace, private things are hidden from other members by the da
 
   // New things are private to their author unless they say otherwise.
   const mine = await api(alex, 'change', { reason: 'x', ops: [
-    { op: 'create', ref: 'p', type: 'project', title: 'Launch', visibility: 'shared' },
+    { op: 'create', ref: 'p', type: 'work', title: 'Launch', visibility: 'shared' },
     { op: 'create', ref: 's', type: 'task', title: 'Shared task', visibility: 'shared', owner: me },
     { op: 'create', ref: 'x', type: 'task', title: 'Alex private', owner: me },
     { op: 'link', type: 'part_of', from: 's', to: 'p' },
@@ -170,8 +170,8 @@ test('inside a workspace, private things are hidden from other members by the da
   assert.match((await call('/api/change', sam, { reason: 'x', ops: [{ op: 'update', id: mine.created.x, title: 'Hijacked' }] })).error, /no entity/);
   assert.match((await call('/api/change', sam, { reason: 'x', ops: [{ op: 'link', type: 'depends_on', from: mine.created.s, to: mine.created.x }] })).error, /no entity or ref/);
 
-  // A picture is as private as the result it is of.
-  const shot = await api(alex, 'change', { reason: 'x', ops: [{ op: 'create', ref: 'r', type: 'test_result', title: 'Alex private result' }] });
+  // A picture is as private as the item it is of (a lens keeps one).
+  const shot = await api(alex, 'change', { reason: 'x', ops: [{ op: 'create', ref: 'r', type: 'lens', title: 'Alex private view' }] });
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]).toString('base64');
   await api(alex, 'picture_put', { result: shot.created.r, data: png, content_type: 'image/png' });
   assert.equal((await api(alex, 'picture', { result: shot.created.r })).data, png);

@@ -1,5 +1,5 @@
 // The small surface for agents (Rule 7): query, change, undo, the six verbs and draw are all MCP offers, every tool an
-// agent called before answers by its old name for one release with the call that replaces it, and a session's work
+// agent called before answers by its old name until the next version with the call that replaces it, and a session's work
 // is done through the ten alone.
 
 import assert from 'node:assert/strict';
@@ -9,18 +9,23 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { canAsk } from '../src/askview.ts';
 import { QUERY_READS, route, SURFACE } from '../src/surface.ts';
 import { callTool, replacementOf, surfaceFor, TOOLS } from '../src/tools.ts';
-import { agent, fresh } from './map.ts';
+import { Registry } from '../src/packs.ts';
+import { agent, fresh, freshWith, packsWith } from './map.ts';
 import { closers, serve } from './serve.ts';
 
-/** Every tool an agent was offered before the surface was made small (main at 391a4be), and Kuma's old name. */
-const OLD = [
-  'schema', 'search', 'get', 'view', 'events', 'proposals', 'backup', 'watch', 'show', 'claim', 'release', 'session_start', 'session_update',
-  'tell', 'run_report', 'picture_put', 'picture', 'session_end', 'notify', 'check_connections', 'rechecked', 'import_audit', 'packs', 'acts',
-  'document', 'publish', 'publish_all', 'publish_plan', 'publish_ask', 'published', 'share_figure', 'backup_download', 'confirmed', 'restart',
-  'health_report', 'software_test_report', 'software_handoff', 'software_gate', 'software_repo_work', 'software_recheck', 'software_proof',
-  'software_changelog', 'software_agent_usage', 'time_costs', 'time_log', 'time_invoice_draft',
-  'time_invoice_paid', 'time_invoice_void', 'time_today', 'time_timesheet', 'time_week',
-];
+/** Every kernel tool an agent was offered before the surface was made small (main at 391a4be), and Kuma's old name. */
+const OLD = `schema search get view events proposals backup watch show claim release session_start session_update
+  tell run_report picture_put picture session_end notify check_connections rechecked import_audit packs acts
+  document publish publish_all publish_plan publish_ask published share_figure backup_download confirmed restart health_report`.split(/\s+/);
+/** A pack's actions and views were tools of their own too, named <pack>_<name>: a pack of one of each stands in for them. */
+const OLD_PACK = ['olden_log', 'olden_week'];
+const olden = {
+  id: 'olden', version: '0.1.0', title: 'Olden', description: 'A pack whose action and view were once tools of their own.', requires: ['core'],
+  views: [{ id: 'olden.week', description: 'The week.', shape: 'data', input: { type: 'object', properties: {} } }],
+  actions: [{ id: 'olden.log', title: 'Log', description: 'Log a thing.', verb: 'capture', input: { type: 'object', properties: {} } }],
+  handlers: [], // an empty one: packsWith writes it a handler.js
+} as any;
+const withOlden = () => freshWith(new Registry(packsWith(olden)));
 
 test('the surface is exactly query, change, undo, the six verbs and draw, over MCP too', async () => {
   const l = await fresh();
@@ -71,8 +76,8 @@ test('the tool list stays small, and what it leaves out is one call away', async
 });
 
 test('every old name answers with its replacement, and the replacement reaches the same tool', async () => {
-  const l = await fresh();
-  for (const old of OLD) {
+  const l = await withOlden();
+  for (const old of [...OLD, ...OLD_PACK]) {
     const moved = replacementOf(l.registry, old);
     assert.ok(moved, `${old} names its replacement`);
     if (old === 'view') {
@@ -105,7 +110,7 @@ test('an old name called as plain JSON still answers, saying the call that repla
 });
 
 test('an agent does a session’s work through the surface: start, change, tell, end', async () => {
-  const l = await fresh();
+  const l = await withOlden();
   const start = (await callTool(l, agent, 'capture', { action: 'session_start', params: { title: 'Surface test', session_id: 'surface-1' } })) as { run: string; status: string };
   assert.equal(start.status, 'running');
   const made = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: 'Try the surface', status: 'todo' }] })) as { status: string };
@@ -126,7 +131,7 @@ test('an agent does a session’s work through the surface: start, change, tell,
   // A pack's action by its name, its tool's name or its short name.
   const verbs = (await callTool(l, agent, 'query', { name: 'actions', params: { verb: 'capture' } })) as { action: string; params: unknown }[];
   assert.ok(verbs.some((a) => a.action === 'session_start' && a.params));
-  assert.ok(verbs.some((a) => a.action === 'time.log'));
+  assert.ok(verbs.some((a) => a.action === 'olden.log'));
   const listed = (await callTool(l, agent, 'query', {})) as { reads: Record<string, string>; views: Record<string, string> };
   assert.ok(listed.reads.get && listed.views.attention);
 });
