@@ -99,7 +99,7 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
         // Who they are goes with them: their tokens, what is private to them, and owning the workspace.
         await whole.db.transaction(async (tx) => {
           await tx.query(`update token set entity_id = $1 where entity_id = $2`, [owners.file.id, owners.here.id]);
-          for (const table of ['entity', 'proposal', 'event']) await tx.query(`update ${table} set private_to = $1 where private_to = $2`, [owners.file.id, owners.here.id]);
+          for (const table of ['entity', 'proposal']) await tx.query(`update ${table} set private_to = $1 where private_to = $2`, [owners.file.id, owners.here.id]);
           await tx.query(`update setting set value = to_jsonb($1::text) where key = 'me'`, [owners.file.id]);
         });
         owners.made_one = true;

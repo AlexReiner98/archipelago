@@ -21,7 +21,6 @@ import { beginApplying } from './rules.ts';
 import { followPacks, islandsOn, packsOff, syncPacks } from './packstate.ts';
 import { hostFor } from './packtools.ts';
 import { syncTypes } from './typetable.ts';
-import { carryEvents } from './activity.ts';
 import { onTypesChanged, typeItems } from './type-items.ts';
 
 // The type table follows the types kept on the map as it follows the packs.
@@ -260,9 +259,6 @@ export class Workspaces {
       pelago.registry.turnOff(await packsOff(pelago), await islandsOn(pelago));
       await takeTypeItems(pelago);
       await syncTypes(pelago);
-      // The event table's rows, carried into the activity stream once (src/activity.ts); a backup's with them.
-      // One that fails is said and tried again at the next opening: the workspace opens all the same.
-      await carryEvents(db, id, pelago.registry.rules).catch((err: Error) => console.error(`${id}: the event table's rows were not carried into the activity stream: ${err.message}`));
       if (begins) await pelago.record('settings', 'system', await beginApplying(db));
       const ws = { id, name: isDefault ? 'Default' : (this.known.get(id) ?? id), pelago, automations: new Automations(pelago) };
       if (this.leading) this.clocks(ws, true);

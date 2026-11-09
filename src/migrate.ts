@@ -17,9 +17,10 @@ import { ITEM_KIND } from './head.ts';
 import { ISLAND_INDEX } from './island-items.ts';
 import { SEARCH_ANY, SEARCH_INDEX } from './search.ts';
 import { LOG } from './log.ts';
-import { ACTIVITY, ACTIVITY_STREAM, PRE_LOG_ACTIVITY } from './activity-steps.ts';
+import { ACTIVITY, ACTIVITY_STREAM, EVENT_GONE, PRE_LOG_ACTIVITY } from './activity-steps.ts';
+import { carryEventTable } from './activity.ts';
 import { VAULT } from './vault.ts';
-import { FORGET } from './forget.ts';
+import { FORGET, FORGET_STORES } from './forget.ts';
 import { OPLOG, OPLOG_GUARDED, OPLOG_SERVER } from './oplog.ts';
 import { PARTITION } from './partitions.ts';
 import { SNAPSHOT } from './snapshot.ts';
@@ -35,6 +36,11 @@ interface Migration {
   sql: string;
   /** Run on a Postgres server only, after sql: what many connections need and PGlite does not. */
   server?: string;
+  /**
+   * Run first, in transactions of its own, when what the step's SQL removes must be carried somewhere only the app can
+   * write (a sealed stream). It must be safe to run again: a step that fails after it is begun again whole.
+   */
+  before?: (db: Database) => Promise<unknown>;
 }
 
 export const MIGRATIONS: Migration[] = [
@@ -73,6 +79,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 31, name: 'an agent reads whether holds are off', sql: HOLDS_OFF_READ },
   { version: 32, name: 'what lives on an island', sql: ISLAND_INDEX },
   { version: 33, name: 'what was done outside change sets, in the activity stream', sql: ACTIVITY_STREAM },
+  { version: 34, name: 'the event table, carried into the activity stream and gone', sql: EVENT_GONE + FORGET_STORES, before: carryEventTable },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;
@@ -98,6 +105,7 @@ export async function migrate(db: Database, server: boolean): Promise<{ from: nu
   for (const m of MIGRATIONS.filter((m) => m.version > from)) {
     const sql = m.sql + (server && m.server ? `\n${m.server}` : '');
     try {
+      await m.before?.(db);
       await db.exec(`begin;\n${sql}\ninsert into schema_version (version, name) values (${m.version}, '${m.name.replaceAll("'", "''")}');\ncommit;`);
     } catch (err) {
       await db.exec('rollback').catch(() => {});

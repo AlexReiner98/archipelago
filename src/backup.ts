@@ -30,7 +30,7 @@ import { mentionedAll } from './mentions.ts';
 import { databaseFor } from './pg.ts';
 import { analyzeAll, analyzeDue } from './stats.ts';
 import { FACT_ACTIONS, factEvents } from './eventlog.ts';
-import { bringIn, doneEvents } from './activity.ts';
+import { bringIn, CARRIED, carryRows, doneEvents, type EventRow } from './activity.ts';
 import { openTables, sealTables, sealedDump } from './backup-seal.ts';
 import { projectBackup } from './backup-log.ts';
 import { liveSnapshot } from './snapshot.ts';
@@ -39,7 +39,7 @@ import type { Workspaces } from './workspaces.ts';
 import { makePartitions } from './partitions.ts';
 
 /** Every table, parents before the rows that point at them. */
-const TABLES = ['entity', 'relation', 'event', 'proposal', 'token', 'share', 'setting', 'picture', 'type_def', 'act', 'member', 'published', 'log_entry', 'log_fact', 'log_op'] as const;
+const TABLES = ['entity', 'relation', 'proposal', 'token', 'share', 'setting', 'picture', 'type_def', 'act', 'member', 'published', 'log_entry', 'log_fact', 'log_op'] as const;
 /** What the log makes, and a backup since format 3 does not carry but makes again. */
 const PROJECTIONS: readonly string[] = ['entity', 'relation', 'proposal'];
 
@@ -67,10 +67,10 @@ export async function dump(db: Db, workspace: { id: string; name: string }, loca
     // The projections go in as one snapshot of them at the head of the log, sealed, hashed and anchored to it.
     snapshot = await liveSnapshot(tx, workspace.id);
     // A merge does not take another map's log, so what its change sets did goes in as well, as the events it reads
-    // as (a restore leaves those out).
+    // as (a restore leaves those out). There is no event table since step 34: these are all a backup's events.
     // What was done outside change sets is in log_op, read the same way: a restore leaves those out too.
     const done = [...(await factEvents(tx, {}, Number.MAX_SAFE_INTEGER)), ...(await doneEvents(tx, {}, Number.MAX_SAFE_INTEGER))];
-    tables.event.push(...done.map(({ target_title: _t, target_type: _y, ...ev }) => ({ ...ev, workspace: workspace.id, private_to: null })));
+    tables.event = done.map(({ target_title: _t, target_type: _y, ...ev }) => ({ ...ev, workspace: workspace.id, private_to: null }));
     await sealTables(tx, workspace.id, tables);
   });
   // A secret stored before secrets were sealed has not been read since, and so is still as it was typed: it does not leave like that.
@@ -122,7 +122,9 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
     const logged = new Set((backup.tables.log_entry ?? []).map((e) => e.id as string));
     // And what log_op holds is read from there: an event row numbered as one of its entries is that entry, for a merge.
     const numbered = new Set((backup.tables.log_op ?? []).map((o) => Number(o.seq)).filter((n) => n > 0));
-    backup.tables.event = (backup.tables.event ?? []).filter((ev) => !(logged.has(ev.changeset as string) && FACT_ACTIONS.includes(ev.action as string)) && !numbered.has(Number(ev.seq)));
+    // A backup from before 9 Nov 2026 holds the event table: its rows not yet in the activity stream are carried into
+    // it once the stream is in (src/activity.ts), as step 34 carried the table's own.
+    const events = (backup.tables.event ?? []).filter((ev) => !(logged.has(ev.changeset as string) && FACT_ACTIONS.includes(ev.action as string)) && !numbered.has(Number(ev.seq)));
     // The log goes into the years it was written in, in order: each entry follows the one before (src/partitions.ts),
     // the compacted streams' too, whose rows a forget has rewritten out of their order on disk.
     const logAt = new Map((backup.tables.log_entry ?? []).map((e) => [`${e.stream} ${e.pos}`, e.at]));
@@ -136,7 +138,9 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
       if (rows.length) await tx.query(`insert into ${table} select * from jsonb_populate_recordset(null::${table}, $1::jsonb)`, [JSON.stringify(rows)]);
       counts[table] = rows.length;
     }
-    await tx.query(`select setval(pg_get_serial_sequence('event', 'seq'), greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact), (select coalesce(max(seq), 0) from log_op where seq is not null), 1)) -- index log_fact_seq, log_op_seq`);
+    counts.event = await carryRows(tx, as ?? given.workspace?.id ?? 'default', [], events as unknown as EventRow[]);
+    await tx.query(`delete from setting where key = $1`, [CARRIED]);
+    await tx.query(`select setval('event_seq_seq', greatest((select coalesce(max(seq), 0) from log_fact), (select coalesce(max(seq), 0) from log_op where seq is not null), 1)) -- index log_fact_seq, log_op_seq`);
     // What is inside what is a projection of the links just written: made again whole.
     await regatherAll(tx, ['part_of']);
     await mentionedAll(tx);
@@ -144,7 +148,7 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
     // The types it defined for itself go in its database, where the server looks for them.
     for (const def of (given.local_pack as { types?: { id: string }[] } | null)?.types ?? []) await addLocalType(tx, def);
     if (as !== undefined && as !== given.workspace?.id) {
-      for (const table of ['entity', 'relation', 'event', 'proposal', 'share', 'picture', 'act', 'published']) await tx.query(`update ${table} set workspace = $1`, [as]);
+      for (const table of ['entity', 'relation', 'proposal', 'share', 'picture', 'act', 'published']) await tx.query(`update ${table} set workspace = $1`, [as]);
       await tx.query(`update token set revoked_at = now() where revoked_at is null`);
     }
   });

@@ -39,7 +39,7 @@ export function connectBox(made, workspace = state.workspace) {
       h(
         'div',
         { class: 'toolbar' },
-        h('strong', { class: 'grow gist', title: workspace && `The token acts in the workspace ${workspace.name} (${workspace.id}) alone` }, `Connect Claude Code as "${made.name}"${workspace ? ` to ${workspace.name}` : ''}`),
+        h('strong', { class: 'grow gist', title: made.everywhere ? `The token acts as you in every workspace you are a member of; a call names its workspace, else it acts in ${made.home}` : workspace && `The token acts in the workspace ${workspace.name} (${workspace.id}) alone` }, `Connect Claude Code as "${made.name}"${made.everywhere ? ' to all your workspaces' : workspace ? ` to ${workspace.name}` : ''}`),
         h('span', { class: 'switch', title: 'The machine the agent will work on' }, [['windows', 'Windows'], ['unix', 'Mac or Linux']].map(([key, label]) => h('button', { class: os === key ? 'on' : '', onclick: () => draw(key) }, label))),
       ),
       h('div', { class: 'muted small' }, `1. On that machine, in ${os === 'windows' ? 'PowerShell' : 'a terminal'}, in the project's folder. Then quit Claude Code completely and open it in that folder.`),

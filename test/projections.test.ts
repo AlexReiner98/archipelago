@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { agent, fresh, human, make, replayed } from './map.ts';
 import { callTool, humanChanges, latestSeq } from '../src/tools.ts';
-import { FACT_ACTIONS, readEvents } from '../src/eventlog.ts';
+import { readEvents } from '../src/eventlog.ts';
 import { undo } from '../src/undo.ts';
 
 test('every projection made again from the log is the live one', async () => {
@@ -100,8 +100,6 @@ test('what a change set did is read from the log, not kept a second time as even
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
   await l.change(human, { reason: 'Started', ops: [{ op: 'update', id: made.t, status: 'doing', title: 'Read it back from the log' }] });
-  const { rows } = await l.db.query(`select action from event where action = any($1::text[])`, [FACT_ACTIONS]);
-  assert.deepEqual(rows, [], 'the event table keeps no change set');
 
   // An item's history: its making, its link, its edit with the values before, its title as it was then.
   const history = (await l.get(made.t)).recent_events;

@@ -165,7 +165,7 @@ async function pull() {
   }
   const { counts, paused, vault } = await takeIn(dataDir, parseBackup(file), keys);
   if (vault) writeFileSync(saved.replace('.json.gz', '.vault.json.gz'), gzipSync(JSON.stringify(vault)));
-  console.log(`Pulled ${url} as of ${answer.result.taken}: ${counts.entity} items, ${counts.relation} links, ${counts.event} events; ${paused} automations paused. Kept as ${saved}`);
+  console.log(`Pulled ${url} as of ${answer.result.taken}: ${counts.entity} items, ${counts.relation} links, ${counts.log_entry} log entries; ${paused} automations paused. Kept as ${saved}`);
 
   try {
     console.log(await putInPlace(dataDir, port));

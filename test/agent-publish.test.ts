@@ -10,6 +10,7 @@ import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { callTool } from '../src/tools.ts';
 import { packsWith } from './map.ts';
+import { OLD_EVENT } from './old-event.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner', admin: true };
 const member: Actor = { kind: 'human', name: 'member' };
@@ -73,10 +74,11 @@ test('only a human admin turns agent publishing on, and the database refuses any
 
 test('a database made before step 12 lets an agent read the allowance once it takes that step', async () => {
   const { l, db } = await withDocument();
-  // As a database at step 11 is: the read rule of step 1, without the allowance in it.
+  // As a database at step 11 is: the read rule of step 1, without the allowance in it, and the event table step 34 drops.
   await db.exec(`drop policy member_setting_read on setting;
     create policy member_setting_read on setting for select to pelago_member using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups'));
-    delete from schema_version where version >= 12`);
+    delete from schema_version where version >= 12;
+    ${OLD_EVENT}`);
   await callTool(l, owner, 'workspace_set', { agent_publish: true });
   assert.equal(await l.as('e_agentx').setting('agent_publish'), undefined, 'hidden from a member before the step');
   await migrate(db, false);

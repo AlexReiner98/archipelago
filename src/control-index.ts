@@ -14,6 +14,8 @@ let control: (() => Promise<Q>) | undefined;
 export function configureIndex(given: () => Promise<Q>) {
   control = given;
 }
+/** The server's own database, for what else is kept beside the workspaces (src/person-tokens.ts). */
+export const controlDb = async (): Promise<Q | undefined> => control?.();
 
 const memberKey = (email: string) => `member_in:${email}`;
 const tokenKey = (hash: string) => `token_for:${hash}`;
