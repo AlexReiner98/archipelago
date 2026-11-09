@@ -248,7 +248,7 @@ body[data-sheet="open"] #find { left: calc(var(--active-left, 0%) + (100% - var(
 #sheet { position: fixed; z-index: 4; top: var(--band); right: 0; bottom: 0; width: min(var(--sheet), 50%); overflow: auto; background: var(--bg); border-left: var(--border-1) solid var(--line); box-shadow: 0 0 var(--space-13) rgb(0 0 0 / 0.14); transform: translateX(100%); visibility: hidden; transition: transform 0.18s ease, visibility 0s 0.18s; }
 body[data-sheet="open"] #sheet { transform: none; visibility: visible; transition: transform 0.18s ease; }
 @media (prefers-reduced-motion: reduce) { #sheet, body[data-sheet="open"] #sheet { transition: none; } }
-#sheet-close { position: sticky; z-index: 1; top: var(--space-6); float: right; margin: var(--space-6) var(--space-6) 0 0; width: var(--box-8); height: var(--box-8); padding: 0; border-radius: var(--radius-pill); font-size: var(--text-8); line-height: 1; }
+#sheet-close { position: sticky; z-index: 1; top: var(--space-6); float: right; margin: var(--space-6) var(--space-6) 0 0; width: var(--box-8); height: var(--box-8); padding: 0; border: 0; background: none; font-size: var(--text-8); line-height: 1; }
 #main { padding: var(--space-11) var(--space-11) var(--space-14); }
 /* The sheet reads as a document: a title, one quiet line of marks, the note, and what a pack adds as plain sections
    under small headings. No cards, no borders between parts: space and type set them apart. */

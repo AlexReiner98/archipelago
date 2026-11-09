@@ -2,7 +2,7 @@
 // at the top, muted. The same rows on Home, for you, and on an item's page, for what is that item's.
 
 import { api, h } from './base.js';
-import { ago, chip, link, when } from './words.js';
+import { ago, typeMark, link, when } from './words.js';
 
 /** The order Needs you is read in, kept for this browser: the strongest reason first, or the latest change first. */
 const ORDER_KEY = 'pelago-needs-order';
@@ -33,12 +33,12 @@ export function attentionRow(item, latest = false) {
     'li',
     // One line at any width: the title gives way first, then what it sits in; the marks keep their size.
     { class: 'row-top' },
-    item.type && chip(item.type),
+    item.type && typeMark(item.type),
     h('span', { class: 'grow gist', title: item.title }, link(item)),
     item.top && h('a', { class: 'gist muted small cut', href: `#/e/${item.top.id}`, title: item.top.title, style: 'max-width: 25%; flex-shrink: 2' }, item.top.title),
     item.reasons.map((r) => {
       const [said, tone, tip] = mark(r);
-      return h('span', { class: `pill ${tone}`.trim(), title: tip, style: 'flex: none' }, said);
+      return h('span', { class: `mark ${tone}`.trim(), title: tip, style: 'flex: none' }, said);
     }),
     latest && item.changed && h('span', { class: 'muted small nowrap' }, ago(item.changed)),
   );
@@ -76,7 +76,7 @@ export function moveRow(item, latest = false, under = false) {
   return h(
     'li',
     { class: 'row-top' },
-    !under && h('span', { class: `pill ${why === 'due' || why === 'to_confirm' ? 'warn' : ''}`.trim(), style: 'flex: none', title: item.reasons.map((r) => mark(r)[2]).filter(Boolean).join('\n') }, verb),
+    !under && h('span', { class: `mark ${why === 'due' || why === 'to_confirm' ? 'warn' : ''}`.trim(), style: 'flex: none', title: item.reasons.map((r) => mark(r)[2]).filter(Boolean).join('\n') }, verb),
     h('a', { class: 'grow', href: `#/e/${item.id}`, title: said ? `${sentence(said)}\n${item.title}` : item.title }, sentence(said) || item.title),
     aside && h('span', { class: 'muted small cut', title: aside, style: 'max-width: 35%; flex-shrink: 2' }, aside),
     item.top && h('a', { class: 'muted small cut', href: `#/e/${item.top.id}`, title: item.top.title, style: 'max-width: 20%; flex-shrink: 3' }, item.top.title),

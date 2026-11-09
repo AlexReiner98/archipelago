@@ -69,8 +69,8 @@ export async function time() {
         h('a', { class: 'gist tq-what-text', href: `#/e/${e.id}`, title: [e.what, e.note].filter(Boolean).join('\n') }, e.what),
         e.note && h('span', { class: 'gist muted small tq-note-text', title: e.note }, e.note),
         e.work_id ? h('a', { class: 'gist muted small tq-work-text', href: `#/e/${e.work_id}`, title: e.client ? `${e.work} \u2192 billed to ${e.client}` : `${e.work}: no client` }, e.work) : h('span', { class: 'muted small tq-work-text', title: 'Not tied to any work, so it has no client' }, 'no work'),
-        e.billable === false && h('span', { class: 'pill closed', title: 'Not invoiced' }, 'not billable'),
-        e.status !== 'logged' && h('span', { class: 'pill closed', title: 'On an invoice' }, e.status),
+        e.billable === false && h('span', { class: 'mark closed', title: 'Not invoiced' }, 'not billable'),
+        e.status !== 'logged' && h('span', { class: 'mark closed', title: 'On an invoice' }, e.status),
         h('span', { class: 'tq-h' }, hoursText(e.hours)),
         e.status === 'logged' &&
           menu('\u22ef', [
@@ -258,7 +258,7 @@ export async function time() {
           'li',
           { class: 'row-top' },
           h('a', { class: 'gist grow', href: `#/e/${i.id}`, title: `${i.number} to ${i.client}: ${moneyText(i.total, i.currency)}, ${moneyText(i.paid, i.currency)} paid` }, `${i.number} \u00b7 ${i.client}`),
-          i.overdue_days ? h('span', { class: 'pill bad', title: `Due ${i.due}` }, `${i.overdue_days} d late`) : h('span', { class: 'muted small', title: 'Due' }, i.due ? dayName(i.due, { day: 'numeric', month: 'short' }) : ''),
+          i.overdue_days ? h('span', { class: 'mark bad', title: `Due ${i.due}` }, `${i.overdue_days} d late`) : h('span', { class: 'muted small', title: 'Due' }, i.due ? dayName(i.due, { day: 'numeric', month: 'short' }) : ''),
           h('span', { class: 'tq-h' }, moneyText(i.owing, i.currency)),
           h('button', { onclick: () => paid(i) }, 'Mark paid'),
         ),

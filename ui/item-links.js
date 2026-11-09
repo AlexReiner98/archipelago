@@ -1,7 +1,7 @@
 // Linking an item to another: done rarely, so the form opens from its menu.
 
 import { api, h, state } from './base.js';
-import { chip, fits, kept, pill, typeTitle } from './words.js';
+import { fits, kept, statusMark, typeMark, typeTitle } from './words.js';
 
 /**
  * The form that links an item to another, hidden until `open` is called. `change` sends ops and draws the page again;
@@ -44,9 +44,9 @@ export function linkAdder(e, change, redraw) {
                   h(
                     'li',
                     { class: 'row-top' },
-                    chip(x.type),
+                    typeMark(x.type),
                     h('span', { class: 'grow' }, x.title),
-                    pill(x.type, x.status),
+                    statusMark(x.type, x.status),
                     h('button', { onclick: () => change([{ op: 'link', type: p.rel, from: p.out ? id : x.id, to: p.out ? x.id : id }], 'Link added in the UI') }, 'Link'),
                   ),
                 ),

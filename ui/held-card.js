@@ -2,7 +2,7 @@
 // declined (the Look of a held change's band on an item's sheet, ui/item-held.js).
 
 import { api, ask, h } from './base.js';
-import { ago, chip, gist, link, loadSchema, relations, statusesOf, typeTitle, who } from './words.js';
+import { ago, typeMark, gist, link, loadSchema, relations, statusesOf, typeTitle, who } from './words.js';
 
 /** The change `p`, drawn as a table of its parts; `names` says what its ids are (id to item), `done` is told once it is decided. */
 export function proposalCard(p, names, done) {
@@ -106,7 +106,7 @@ export function proposalCard(p, names, done) {
       );
     let kind, what, st;
     if (op.op === 'create') {
-      kind = chip(op.type);
+      kind = typeMark(op.type);
       what = [
         h('input', {
           type: 'text',
@@ -128,7 +128,7 @@ export function proposalCard(p, names, done) {
     } else if (op.op === 'update') {
       const target = names.get(op.id);
       const { op: _op, id: _id, status: newStatus, ...changes } = op;
-      kind = target ? chip(target.type) : 'update';
+      kind = target ? typeMark(target.type) : 'update';
       what = [
         h('div', {}, nameOf(op.id), op.title && op.title !== target?.title && [' ', h('span', { class: 'arrow' }, '→'), ` ${op.title}`]),
         target && newStatus && h('div', { class: 'detail' }, `status: ${target.status} → ${newStatus}`),

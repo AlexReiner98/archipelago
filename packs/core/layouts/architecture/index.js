@@ -1,4 +1,4 @@
-// A lens answer drawn as a system: every part a box (a store a cylinder, a client a pill), each place that holds
+// A lens answer drawn as a system: every part a box (a store a cylinder, a client a capsule), each place that holds
 // parts (a host, a cloud, a machine) a box around them, and wires at right angles from a part down to what it calls,
 // broken where one passes under another, as in the flow. It is for seeing how the system is as it is wired up and
 // run: each part's dot says its health (up, degraded, down, being wired, on standby, planned), each wire whether it
@@ -16,7 +16,7 @@ import { litCount, queryTree } from './tree.js';
 /** What each health and wire state is called, in the order the bar and the key give them. */
 const HEALTHS = [['ok', 'Up'], ['warn', 'Degraded'], ['down', 'Down'], ['building', 'Being wired'], ['standby', 'On standby'], ['planned', 'Planned'], ['unknown', 'Not known'], ['gone', 'Retired']];
 const WIRES = [['wired', 'Wired'], ['planned', 'Not yet wired'], ['broken', 'Broken'], ['standby', 'On standby']];
-/** The pill each health is counted in. */
+/** The tone of the mark each health is counted in. */
 const PILL = { ok: 'ok', warn: 'warn', down: 'bad', building: '', standby: 'closed', planned: 'closed', unknown: 'closed', gone: 'closed' };
 const said = (list, key) => list.find(([k]) => k === key)?.[1] ?? key;
 
@@ -24,7 +24,7 @@ const said = (list, key) => list.find(([k]) => k === key)?.[1] ?? key;
 function outline(shape, x, y, w, hgt, rx, lid) {
   const l = x - w / 2, r = x + w / 2, t = y - hgt / 2, b = y + hgt / 2;
   if (shape === 'diamond') return m('path', { d: `M${x} ${t}L${r} ${y}L${x} ${b}L${l} ${y}Z`, class: 'ar-shape' });
-  if (shape === 'pill') return m('rect', { x: l, y: t, width: w, height: hgt, rx: hgt / 2, class: 'ar-shape' });
+  if (shape === 'mark') return m('rect', { x: l, y: t, width: w, height: hgt, rx: hgt / 2, class: 'ar-shape' });
   // A store: a cylinder, its lid drawn over its body.
   if (shape === 'store') {
     const ry = lid;
@@ -126,7 +126,7 @@ export function picture({ answer, style, reduced, width }, tools) {
   const key = (inner, label) => ({ glyph: m('svg', { width: 22, height: 14, viewBox: '0 0 22 14' }, inner), label });
   const healths = new Set([...parts, ...g.boxes].map((n) => n.health)), states = new Set(g.chains.map((c) => c.state));
   const entries = [
-    [['box', 'Part'], ['store', 'Store'], ['pill', 'Client'], ['diamond', 'Question']].filter(([shape]) => parts.some((n) => n.shape === shape)).map(([shape, label]) => key(m('g', { class: 'ar-part' }, outline(shape, 11, 7, 20, shape === 'diamond' ? 12 : 13, CORNER, 3)), label)),
+    [['box', 'Part'], ['store', 'Store'], ['mark', 'Client'], ['diamond', 'Question']].filter(([shape]) => parts.some((n) => n.shape === shape)).map(([shape, label]) => key(m('g', { class: 'ar-part' }, outline(shape, 11, 7, 20, shape === 'diamond' ? 12 : 13, CORNER, 3)), label)),
     g.boxes.length > 0 && key(m('rect', { x: 1, y: 1, width: 20, height: 12, rx: 3, class: 'ar-place-box' }), 'Where it runs'),
     HEALTHS.filter(([k]) => healths.has(k)).map(([k, label]) => key(m('circle', { cx: 11, cy: 7, r: 4, class: `ar-dot ${k}` }), label)),
     WIRES.filter(([k]) => states.has(k)).map(([k, label]) => key(m('path', { d: 'M1 7H21', class: `ar-wire ${k}` }), label)),
@@ -140,8 +140,8 @@ export function picture({ answer, style, reduced, width }, tools) {
   const bar = m(
     'span',
     { class: 'ar-tally' },
-    HEALTHS.filter(([k]) => count(k)).map(([k, label]) => m('span', { class: `pill ${PILL[k]}`, title: `${label}: ${parts.filter((n) => n.health === k).map((n) => n.item.title).join(', ')}` }, `${count(k)} ${label.toLowerCase()}`)),
-    running.length > 0 && m('span', { class: `pill ${running.some((c) => c.state === 'broken') ? 'bad' : running.every((c) => c.state === 'wired') ? 'ok' : 'closed'}`, title: WIRES.map(([k, label]) => `${label}: ${g.chains.filter((c) => c.state === k).length}`).join('\n') }, `${running.filter((c) => c.state === 'wired').length} of ${running.length} wired`),
+    HEALTHS.filter(([k]) => count(k)).map(([k, label]) => m('span', { class: `mark ${PILL[k]}`, title: `${label}: ${parts.filter((n) => n.health === k).map((n) => n.item.title).join(', ')}` }, `${count(k)} ${label.toLowerCase()}`)),
+    running.length > 0 && m('span', { class: `mark ${running.some((c) => c.state === 'broken') ? 'bad' : running.every((c) => c.state === 'wired') ? 'ok' : 'closed'}`, title: WIRES.map(([k, label]) => `${label}: ${g.chains.filter((c) => c.state === k).length}`).join('\n') }, `${running.filter((c) => c.state === 'wired').length} of ${running.length} wired`),
   );
 
   // What stays lit, as the style says: the rest dimmed.

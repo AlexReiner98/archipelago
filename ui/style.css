@@ -41,7 +41,7 @@ details.fold > summary .n { color: var(--muted); font-size: var(--text-2); }
 .body-text.whole h4.part-title:first-child { margin-top: 0; }
 /* What an item delivers: one line under its title, each deliverable a way to its own page. */
 .page-head .delivers { display: flex; flex-basis: 100%; width: 100%; align-items: center; gap: var(--space-6); margin-top: var(--space-5); white-space: nowrap; overflow: hidden; }
-.page-head .delivers .deliverable { display: inline-flex; align-items: center; gap: var(--space-4); min-width: 0; padding: var(--space-3) var(--space-6); border: var(--border-1) solid var(--line); border-radius: var(--radius-pill); }
+.page-head .delivers .deliverable { display: inline-flex; align-items: center; gap: var(--space-4); min-width: 0; }
 .page-head .delivers .deliverable .gist { overflow: hidden; text-overflow: ellipsis; }
 .page-head a.deliverable { text-decoration: none; }
 .page-head a.deliverable:hover { border-color: var(--accent); }
@@ -97,12 +97,15 @@ img.doc-figure { display: block; max-width: 100%; height: auto; margin: var(--sp
 .row-sub { margin-top: var(--space-3); color: var(--muted); font-size: var(--text-3); }
 .grow { flex: 1; min-width: 0; }
 
-.chip { font-size: var(--text-1); padding: var(--space-1) var(--space-5); border-radius: var(--radius-4); background: var(--closed-soft); color: var(--muted); white-space: nowrap; }
-.pill { font-size: var(--text-1); padding: var(--space-1) var(--space-5); border-radius: var(--radius-4); white-space: nowrap; background: var(--accent-soft); color: var(--accent); }
-.pill.closed { background: var(--closed-soft); color: var(--closed); }
-.pill.ok { background: var(--ok-soft); color: var(--ok); }
-.pill.warn { background: var(--warn-soft); color: var(--warn); }
-.pill.bad { background: var(--bad-soft); color: var(--bad); }
+/* A mark: a state, a kind or a count as a word on the surface, its tone a colour, never a box around it (rule e_vgs9vt5j). */
+.mark { font-size: var(--text-1); color: var(--muted); white-space: nowrap; }
+.mark.open { color: var(--accent); }
+.mark.closed { color: var(--closed); }
+.mark.ok, .mark-human { color: var(--ok); }
+.mark.warn, .mark-old { color: var(--warn); }
+.mark.bad { color: var(--bad); font-weight: 600; }
+.mark-none { font-style: italic; }
+a.mark:hover { color: var(--accent); }
 
 button, select, input[type="text"], input[type="email"], input[type="password"], input[type="search"] {
   font: inherit; color: var(--text);
@@ -246,9 +249,6 @@ details.folded[open] > summary::before { content: "\25BE  "; }
 .who-human::before { background: var(--ok); }
 .who-github::before { background: var(--muted); }
 .ago { color: var(--muted); font-size: var(--text-2); min-width: var(--ago); text-align: right; }
-.mark { font-size: var(--text-1); padding: var(--space-1) var(--space-5); border-radius: var(--radius-4); border: var(--border-1) solid var(--line); color: var(--muted); }
-.mark-human { border-color: var(--ok); color: var(--ok); }
-.mark-none { border-style: dashed; }
 .effect { font-size: var(--text-2); }
 button.quiet-button { padding: var(--space-2) var(--space-6); font-size: var(--text-2); }
 
@@ -312,7 +312,6 @@ button.quiet:hover { color: var(--accent); text-decoration: underline; }
 /* The item page: facts to glance at in one row, the note as a page at a readable width, rare actions in a menu. */
 .toolbar.facts { margin-bottom: var(--space-8); gap: var(--space-6); }
 .fact { font-size: var(--text-3); white-space: nowrap; }
-.mark-old { border-color: var(--warn); color: var(--warn); }
 .body-text { white-space: normal; max-width: var(--measure); line-height: 1.55; border-top: 0; }
 .body-text p { margin: 0 0 var(--space-6); }
 .body-text ul { margin: 0 0 var(--space-6); padding-left: var(--space-3); list-style: none; }

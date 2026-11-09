@@ -89,7 +89,7 @@ export function fieldValue(v, field, style) {
     const block = code(v);
     if (block) return block;
   }
-  if (field?.type === 'enum' && typeof v === 'string') return h('span', { class: 'pill field-pill', title: field.description ?? '' }, v.replaceAll('_', ' '));
+  if (field?.type === 'enum' && typeof v === 'string') return h('span', { class: 'mark field-word', title: field.description ?? '' }, v.replaceAll('_', ' '));
   if (field?.type === 'datetime' && typeof v === 'string') return ago(v);
   if (field?.type === 'date' && typeof v === 'string' && DAY.test(v)) return day(v);
   if (field?.type === 'url' && typeof v === 'string' && WEB.test(v)) return address(v);

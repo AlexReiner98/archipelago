@@ -38,7 +38,7 @@ export async function startPiece(host, title) {
     h(
       'li',
       { class: 'row-top' },
-      h('span', { class: `pill${s.done ? ' ok' : ''}` }, s.done ? 'done' : 'to do'),
+      h('span', { class: `mark${s.done ? ' ok' : ''}` }, s.done ? 'done' : 'to do'),
       h('a', { class: `grow gist${s.done ? ' muted' : ''}`, href: s.href, title: s.tip }, s.title),
     );
   host.replaceChildren(

@@ -158,7 +158,7 @@ export function githubRow() {
     const heard = s.repos.filter((r) => r.last_push).sort((a, b) => (a.last_push.at < b.last_push.at ? 1 : -1));
     const repos = s.repos.map((r) => `${r.title}: ${!r.github ? 'no GitHub address' : r.last_push ? `pushed ${when(r.last_push.at)}` : 'no push heard yet'}`).join('\n');
     row.replaceChildren(
-      h('span', { class: `pill ${on ? 'ok' : 'warn'}`, title: on ? 'An agent on this server reads each push against the open work' : 'Pushes are recorded, but nothing reads them until a model account is connected, under Agents' }, on ? 'read' : 'not read'),
+      h('span', { class: `mark ${on ? 'ok' : 'warn'}`, title: on ? 'An agent on this server reads each push against the open work' : 'Pushes are recorded, but nothing reads them until a model account is connected, under Agents' }, on ? 'read' : 'not read'),
       h('span', { class: 'grow', title: repos || 'No repository on the map yet' }, h('strong', {}, 'Pushes'), ' ', h('span', { class: 'muted small' }, `${s.repos.length} repositor${s.repos.length === 1 ? 'y' : 'ies'}`, heard[0] && ` · ${heard[0].title} pushed ${when(heard[0].last_push.at)}`)),
       menu('⋯', [[s.connected ? 'New webhook secret' : 'Use a webhook', fresh], s.connected && ['Copy the webhook address', () => navigator.clipboard.writeText(url)]]),
     );
@@ -283,11 +283,11 @@ export function serverPacksCard() {
       plate({
         name: p.title,
         title: `${p.title} ${p.version}, at /x/${p.id}`,
-        marks: [h('span', { class: 'muted small' }, p.version), h('span', { class: 'pill', title: `What it may ask the server for:\n${p.acts.join('\n') || 'nothing'}` }, `${p.acts.length} act${p.acts.length === 1 ? '' : 's'}`)],
+        marks: [h('span', { class: 'muted small' }, p.version), h('span', { class: 'mark', title: `What it may ask the server for:\n${p.acts.join('\n') || 'nothing'}` }, `${p.acts.length} act${p.acts.length === 1 ? '' : 's'}`)],
         says: `At /x/${p.id}`,
         foot: offers(p).length > 0 && { text: offers(p).join(' · '), title: offers(p).join('\n') },
       });
-    const left = (r) => plate({ name: r.folder.split(/[\\/]/).pop(), title: r.folder, off: true, marks: h('span', { class: 'pill bad', title: r.why.join('\n') }, 'left out'), says: r.why.join(' · ') });
+    const left = (r) => plate({ name: r.folder.split(/[\\/]/).pop(), title: r.folder, off: true, marks: h('span', { class: 'mark bad', title: r.why.join('\n') }, 'left out'), says: r.why.join(' · ') });
     box.append(plates(packs.map(served), refused.map(left)));
     box.hidden = false;
   }, () => null);
