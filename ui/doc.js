@@ -156,6 +156,15 @@ function invoiceHead(d) {
 }
 
 
+/** Whether a page ends with a way to start a map of one's own: read with no login, and the style gives it words. */
+const startsOwn = (d) => !own && !preview && !d.site?.host && typeof d.start === 'string' && Boolean(d.start);
+/** That way: where this server says a person with no account begins (src/connect.ts), else its front page. */
+function startLink(words) {
+  const link = h('a', { class: 'start-own', href: '/' }, words);
+  fetch('/connect/start').then((res) => (res.ok ? res.json() : null)).then((r) => r?.url && link.setAttribute('href', r.url), () => null);
+  return link;
+}
+
 /** The address word of a site's front page (src/site.ts). */
 const FRONT = 'home';
 // A link followed takes where the reader came from with it (?ref=), set as it is followed so every link drawn has it.
@@ -191,12 +200,14 @@ function draw(d) {
   // A page is one column (ui/doc-lens.css). Only a front page whose first section is a figure leaves it: that figure runs from edge to edge, with no title over it (its title is its words).
   const hero = d.parts.find((p) => p.section)?.section;
   const lead = d.path === FRONT && hero?.picture && !d.lenses?.[hero.id] ? hero.id : null;
+  // A page that is one item alone (a view or an item given as a link) has its title once, over the page.
+  const alone = d.parts.length === 1 && hero?.title === d.title ? hero.id : null;
   const part = (p) =>
     p.section
       ? h(
           'section',
           { id: p.section.id, ...(p.section.id === lead && { class: 'lead' }) },
-          p.section.id !== lead && h('h2', {}, p.section.title),
+          p.section.id !== lead && p.section.id !== alone && h('h2', {}, p.section.title),
           // A lens is its picture, drawn from what was frozen when it was published (or, for a draft read with a sign-in, now); otherwise a section shows its figure.
           d.lenses?.[p.section.id]
             ? h('div', { class: 'doc-lens', 'data-lens': p.section.id })
@@ -231,8 +242,9 @@ function draw(d) {
     parts(),
     // A site's pages each end with what its footer page says (src/site.ts).
     d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, titles, 3)),
-    // A published page is read on the web: only a link's or an invoice's has a way to print it.
-    !published && !d.site && h('footer', { class: 'muted' }, h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF')),
+    // A published page is read on the web: only a link's or an invoice's has a way to print it. One read with no login
+    // (a link's, a published one's, not one on its site's own domain) ends with a quiet way to start a map of one's own, in the style's words.
+    ((!published && !d.site) || startsOwn(d)) && h('footer', { class: 'muted' }, !published && !d.site && h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF'), startsOwn(d) && startLink(d.start)),
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
   document.body.classList.toggle('invoice', d.head === 'invoice');

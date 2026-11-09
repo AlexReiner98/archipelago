@@ -308,7 +308,6 @@ test('a document brings items in by id, and a link shows it and them to anyone h
   // An agent may read it, but only a person makes a link, and only to what they can see.
   await assert.rejects(callTool(ann, { kind: 'agent', name: 'a', person: people.ann }, 'share_create', { id: doc }), /humans only/);
   await assert.rejects(callTool(bo, boActor, 'share_create', { id: doc }), /not a document/);
-  await assert.rejects(callTool(ann, annActor, 'share_create', { id: hers.all }), /not a document/);
 
   const made = (await callTool(ann, annActor, 'share_create', { id: doc })) as { share: string; path: string };
   const secret = made.path.split('/').at(-1)!;

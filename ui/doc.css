@@ -109,6 +109,18 @@ footer.site-foot {
 footer.site-foot p {
   margin: var(--rhythm-2) 0;
 }
+/* A page read with no login: its way to print, and at the far side its quiet way to start a map of one's own. */
+footer.muted {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-7);
+}
+a.start-own {
+  margin-left: auto;
+  color: var(--reader-muted);
+  font-size: var(--reader-small);
+}
 button.print {
   font: inherit;
   padding: var(--space-4) var(--space-7);

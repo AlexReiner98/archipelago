@@ -49,12 +49,12 @@ import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
 import { servePublic } from './public-route.ts'; import { serveSite, siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
 import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
-import { sharedDocument, sharedPicture } from './documents.ts';
+import { sharedPicture } from './documents.ts'; import { sharedView } from './share-view.ts';
 import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
-import { UI_FILES, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY } from './page-policies.ts';
+import { UI_FILES, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY, SHARED_POLICY } from './page-policies.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
@@ -238,7 +238,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         const [, wsId, secret, data, figure] = shared;
         const guard = UNLISTED;
         if (!data) {
-          res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
+          res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': SHARED_POLICY });
           return res.end(await uiPage('doc.html'));
         }
         if (data === 'picture') {
@@ -246,7 +246,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           if (!picture) return send(res, 404, { error: 'Not found' }, guard);
           return res.writeHead(200, { ...guard, 'content-type': picture.content_type, 'content-security-policy': "default-src 'none'" }).end(picture.bytes);
         }
-        const doc = (await workspaces.has(wsId)) ? await sharedDocument((await workspaces.get(wsId)).pelago, secret) : null;
+        const doc = (await workspaces.has(wsId)) ? await sharedView((await workspaces.get(wsId)).pelago, secret) : null;
         if (!doc) return send(res, 404, { error: 'This link does not open anything: it may have been revoked.' }, guard);
         return send(res, 200, { ...doc, ...(await pageLook((await workspaces.get(wsId)).pelago, doc)) }, guard);
       }
