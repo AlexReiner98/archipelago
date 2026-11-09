@@ -261,7 +261,23 @@ export class Archipelago {
 
   async setting<T>(key: string): Promise<T | undefined> {
     const { rows } = await this.db.query<{ value: T }>(`select value from setting where key = $1`, [key]);
-    return rows[0]?.value;
+    const value = rows[0]?.value;
+    // The owner is a person: one merged into another is that other, so what waits on the owner still finds them.
+    return key === 'me' && typeof value === 'string' ? ((await this.mergedInto(value)) as T) : value;
+  }
+
+  /** The item an id now is: itself, or the item it was merged into (a few merges deep at most). */
+  private async mergedInto(id: string): Promise<string> {
+    for (let hop = 0; hop < 5; hop++) {
+      const { rows } = await this.db.query<{ into: string }>(
+        `select f.value #>> '{}' as into from log_fact f join entity e on e.id = f.id and e.archived_at is not null
+         where f.stream = 'facts' and f.id = $1 and f.field = 'merged_into' order by f.pos desc limit 1 -- index log_fact_history`,
+        [id],
+      );
+      if (!rows.length) return id;
+      id = rows[0].into;
+    }
+    return id;
   }
 
   /**

@@ -12,7 +12,7 @@ const TOP = 'ghost top', FOOT = 'ghost foot';
 /** How much an order wire outweighs a wish of the numbering's own, when one of them has to go. */
 const ORDER_WEIGHT = 4;
 /** The strength of a wire of the order itself, which nothing passes under; what a weak link running up counts for, against a headed one. */
-const STRONG = 3, WEAK = 0.02;
+export const STRONG = 3, WEAK = 0.02;
 /** How many wires times items may be spent on trying tops and feet. */
 const WORK = 3e6;
 /** Past this many items and points in a part, only what the order holds passes under a tie: on a big map of ties it brings crossings and takes long. */

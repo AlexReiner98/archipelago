@@ -54,7 +54,7 @@ test('the owner downloads the whole map by a link that works once', async () => 
 
 test('an agent downloads a backup only once the owner allows it', async () => {
   const l = await map();
-  await assert.rejects(callTool(l, agent, 'backup_download', {}), /the owner allows it on the Workspace page/);
+  await assert.rejects(callTool(l, agent, 'backup_download', {}), /the owner allows it in Settings/);
   await callTool(l, owner, 'workspace_set', { agent_backups: true });
   assert.equal(((await callTool(l, owner, 'workspace_info', {})) as { agent_backups: boolean }).agent_backups, true);
   const made = (await callTool(l, agent, 'backup_download', {})) as Made;

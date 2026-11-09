@@ -7,7 +7,7 @@ import { drawScreen } from './screens.js';
 export async function home() {
   const main = part('you');
   const screens = (state.schema?.screens ?? []).filter((s) => s.at === 'home');
-  if (!screens.length) return main.replaceChildren(h('div', { class: 'empty' }, 'Nothing is on Home. ', h('a', { href: '#/workspace' }, 'Screens are on the Workspace page.')));
+  if (!screens.length) return main.replaceChildren(h('div', { class: 'empty' }, 'Nothing is on Home. ', h('a', { href: '#/workspace' }, 'Screens are in Settings.')));
   const drawn = screens.map((s) => drawScreen(s, home));
   main.replaceChildren(...drawn.map((d) => d.column));
   for (const d of drawn) d.after();

@@ -22,9 +22,9 @@ export async function startPiece(host, title) {
   const steps = [
     { id: 'model', title: 'Connect your AI account', done: model?.runs_on === 'workspace', href: '#/workspace?at=model', tip: 'Anthropic, OpenAI or any OpenAI-compatible address: agents on the server run on it. The Model card, on the Workspace page.' },
     // What the server offers to connect (the GitHub App, say), once it is set up for the server.
-    ...offered.packs.filter((p) => p.ready).map((p) => ({ id: p.pack, title: `Connect ${p.title}`, done: Boolean(p.connected), href: '#/workspace?at=connections', tip: `Choose outside what ${p.title} is given; what it hears reaches this map. The Connections card, on the Workspace page.` })),
+    ...offered.packs.filter((p) => p.ready).map((p) => ({ id: p.pack, title: `Connect ${p.title}`, done: Boolean(p.connected), href: '#/workspace?at=connections', tip: `Choose outside what ${p.title} is given; what it hears reaches this map. The Connections card, in Settings.` })),
     { id: 'agent', title: 'Connect an agent', done: tokens.some((t) => t.kind === 'agent' && !t.revoked_at && t.last_used), href: '#/workspace?at=agent', tip: 'Pick your client and follow its steps' },
-    room !== 1 && { id: 'team', title: 'Invite your team', done: members.length > 1, href: '#/workspace?at=team', tip: 'Add people by their email address; each is sent an invitation. On the Workspace page.' },
+    room !== 1 && { id: 'team', title: 'Invite your team', done: members.length > 1, href: '#/workspace?at=team', tip: 'Add people by their email address; each is sent an invitation. In Settings.' },
   ].filter(Boolean);
   const left = steps.filter((s) => !s.done).length;
   if (!left) return host.remove();

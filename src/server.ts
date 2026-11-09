@@ -173,7 +173,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     if (identity.newPlace)
       await notify(ws.pelago, { kind: 'agent', name: 'pelago' }, {
         title: `The token "${identity.actor.name}" was used from a new place`,
-        body: `It was used from ${identity.newPlace}, where it had not been used before. A machine that has moved networks does this. If it is not one of yours, revoke the token on the Workspace screen: whoever has it can act as that ${identity.actor.kind}.`,
+        body: `It was used from ${identity.newPlace}, where it had not been used before. A machine that has moved networks does this. If it is not one of yours, revoke the token in Settings: whoever has it can act as that ${identity.actor.kind}.`,
         level: 'warning',
       }).catch((err) => console.error(`notify: ${(err as Error).message}`));
     // A token's identity is fixed; an agent may add a label to say which session it is.
@@ -277,12 +277,12 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         // A file named by the UI's current version is kept for good (src/ui-files.ts); the pages, and the rest, never.
         res.writeHead(200, {
           'content-type': `${MIME[file.split('.').pop()!]}; charset=utf-8`,
-          'cache-control': served?.keep ? 'public, max-age=31536000, immutable' : file === 'three.module.min.js' ? 'public, max-age=604800' : 'no-store',
+          'cache-control': served?.keep ? 'public, max-age=31536000, immutable' : file === 'three.module.min.js' || file === 'cola.module.min.js' ? 'public, max-age=604800' : 'no-store',
           ...GUARD,
           ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
           ...(file === 'draw.html' && { 'content-security-policy': drawPolicy(open, Boolean(options.unsandboxed)) }),
           // The frame has an origin of its own, so what it loads from here it loads as a stranger.
-          ...((file === 'draw.js' || file === 'draw-marks.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
+          ...((file === 'draw.js' || file === 'draw-marks.js' || file === 'three.module.min.js' || file === 'cola.module.min.js') && { 'access-control-allow-origin': '*' }),
         });
         const html = page && (await uiPage(file));
         if (html && (options.unsandboxed || open)) return res.end(markPage(html, { open, unsandboxed: options.unsandboxed }));

@@ -46,7 +46,7 @@ export async function authorizePage(given) {
     gateRow(
       h('a', { href: '#', class: 'grow small', title: 'Allow it on another workspace you belong to', onclick: (e) => (e.preventDefault(), signIn('', `Sign in to connect ${client}`)) }, 'Another workspace'),
       h('button', { onclick: answer(false) }, 'Deny'),
-      h('button', { class: 'primary', title: 'It sees what you see and acts under this workspace’s rules, until you revoke it under Workspace → Agents', onclick: answer(true) }, 'Allow'),
+      h('button', { class: 'primary', title: 'It sees what you see and acts under this workspace’s rules, until you revoke it under Settings → Agents', onclick: answer(true) }, 'Allow'),
     ),
     error,
   );

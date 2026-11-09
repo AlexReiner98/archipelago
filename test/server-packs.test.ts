@@ -103,7 +103,7 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
   const ended = (await post('/x/demo/end', { workspace: 'acme', days: 30, note: 'Pay again.' })).result;
   assert.equal(ended.ended, true);
   const write = () => call('/api/change', token, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'After the end' }] });
-  assert.match((await write()).error, /ended on \d{4}-\d{2}-\d{2} and is read-only: it is deleted on \d{4}-\d{2}-\d{2}\. Download its backup on the Workspace page\. Pay again\./);
+  assert.match((await write()).error, /ended on \d{4}-\d{2}-\d{2} and is read-only: it is deleted on \d{4}-\d{2}-\d{2}\. Download its backup in Settings. Pay again\./);
   assert.match((await call('/api/member_add', token, { email: 'late@acme.example' })).error, /read-only/);
   assert.equal((await call('/api/workspace_info', token)).result.ended.delete_at, ended.delete_at);
   assert.ok((await call('/api/search', token, { q: 'Bob' })).result, 'still readable');

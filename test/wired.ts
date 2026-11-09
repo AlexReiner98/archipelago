@@ -6,6 +6,8 @@ import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, wri
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+// @ts-ignore: WebCola, vendored (ui/cola.LICENSE)
+import cola from '../ui/cola.module.min.js';
 
 const ROOT = join(import.meta.dirname, '..');
 
@@ -86,6 +88,20 @@ export const WIRED: Record<string, { gap: (sizes: Record<string, number>) => num
     gap: (sizes) => sizes.flow_wire_gap,
     draw(layout, { items, links }) {
       const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn });
+      return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
+    },
+  },
+  'core.rows': {
+    gap: (sizes) => sizes.rows_track,
+    draw(layout, { items, links }) {
+      const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn });
+      return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
+    },
+  },
+  'core.cola': {
+    gap: (sizes) => sizes.cola_channel,
+    draw(layout, { items, links }) {
+      const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn, cola });
       return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
     },
   },
