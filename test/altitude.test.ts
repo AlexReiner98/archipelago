@@ -5,18 +5,27 @@ import { test } from 'node:test';
 import { Registry, type PackFile } from '../src/packs.ts';
 import { packsWith } from './map.ts';
 
-test('a project, its streams and their steps each sit at their own level', () => {
-  const reg = new Registry(packsWith());
+const levels: PackFile = {
+  id: 'levels', version: '1', title: 'Levels', requires: ['core'],
+  types: [
+    { id: 'levels.project', title: 'Project', description: 'x', extends: 'work', altitude: 'project' },
+    { id: 'levels.stream', title: 'Stream', description: 'x', extends: 'work', altitude: 'stream' },
+    { id: 'levels.part', title: 'Part', description: 'x', extends: 'levels.stream' },
+  ],
+};
+
+test('an aim, a project, its streams and their steps each sit at their own level', () => {
+  const reg = new Registry(packsWith(levels));
   const at = (id: string) => reg.type(id)!.altitude;
-  assert.equal(at('goal'), 'workspace');
-  assert.equal(at('project'), 'project');
-  for (const id of ['feature', 'component', 'release', 'document']) assert.equal(at(id), 'stream', id);
-  for (const id of ['task', 'issue', 'bug', 'decision', 'hypothesis', 'note']) assert.equal(at(id), 'step', id);
+  assert.equal(at('aim'), 'workspace');
+  assert.equal(at('levels.project'), 'project', 'a type sets its own');
+  assert.equal(at('levels.part'), 'stream', 'a flavour inherits it');
+  for (const id of ['task', 'decision', 'question', 'finding', 'event']) assert.equal(at(id), 'step', id);
   // People and places are not in the hierarchy.
   assert.equal(at('person'), undefined);
-  assert.equal(at('repo'), undefined);
+  assert.equal(at('place'), undefined);
   // The UI is told it with the schema.
-  assert.equal(reg.describe().types.find((t) => t.id === 'project')?.altitude, 'project');
+  assert.equal(reg.describe().types.find((t) => t.id === 'levels.project')?.altitude, 'project');
 });
 
 test('a type with a level that is not one stops the registry', () => {

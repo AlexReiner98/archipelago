@@ -20,6 +20,8 @@ const SHOP: PackFile = {
   types: [
     { id: 'shop.stock', title: 'Stock', description: '', extends: 'place', fields: { on_hand: { type: 'number' }, reorder_at: { type: 'number' } }, capabilities: { bound: { field: 'on_hand', below: 'reorder_at' } } },
     { id: 'shop.room', title: 'Room', description: '', extends: 'place', fields: { seats: { type: 'number' } }, capabilities: { capacity: { field: 'seats' } } },
+    { id: 'shop.order', title: 'Order', description: '', extends: 'task' },
+    { id: 'shop.verdict', title: 'Verdict', description: '', extends: 'decision' },
   ],
 };
 
@@ -48,19 +50,20 @@ test('a capability naming a field the type lacks stops its pack from loading', (
   assert.equal(checkCapabilities({ settles: { by: 'word', on: 'decided_on' } }, { decided_on: { type: 'string' } }, new Set()).length, 1);
 });
 
-test('every shipped deadline is a bound, and a flavour inherits its parent capabilities', async () => {
-  const l = await map();
-  assert.deepEqual(l.registry.type('program')!.capabilities.bound, { field: 'deadline', limit: 'today' });
-  assert.deepEqual(l.registry.type('experiment')!.capabilities.bound, { field: 'due', limit: 'today' });
-  assert.equal(l.registry.type('release')!.capabilities.when?.start, 'at');
-  assert.deepEqual(l.registry.having('settles').sort(), ['decision', 'hypothesis']);
+test('every core deadline is a bound, and a flavour inherits its parent capabilities', async () => {
+  const l = await map(SHOP);
+  assert.deepEqual(l.registry.type('task')!.capabilities.bound, { field: 'due', limit: 'today' });
+  assert.deepEqual(l.registry.type('decision')!.capabilities.bound, { field: 'due', limit: 'today' });
+  assert.deepEqual(l.registry.type('shop.order')!.capabilities.bound, { field: 'due', limit: 'today' });
+  assert.equal(l.registry.type('event')!.capabilities.when?.start, 'at');
+  assert.deepEqual(l.registry.having('settles').filter((t) => ['core', 'shop'].includes(l.registry.type(t)!.pack)).sort(), ['decision', 'shop.verdict']);
 });
 
 test('at risk is what crosses its bound, whatever the field is called', async () => {
   const l = await map(SHOP);
   const soon = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
   const made = await make(l, [
-    { op: 'create', ref: 'grant', type: 'program', title: 'Seed grant', props: { deadline: soon } },
+    { op: 'create', ref: 'grant', type: 'decision', title: 'Which flour', props: { due: soon } },
     { op: 'create', ref: 'task', type: 'task', title: 'Send the forms', props: { due: soon } },
     { op: 'create', ref: 'low', type: 'shop.stock', title: 'Flour', props: { on_hand: 3, reorder_at: 10 } },
     { op: 'create', ref: 'ok', type: 'shop.stock', title: 'Salt', props: { on_hand: 30, reorder_at: 10 } },
@@ -88,15 +91,12 @@ test('a resource holds as many as its capacity, and blocks what needs it once fu
 });
 
 test('settling is held for a person on what declares settles, and by word needs what was chosen', async () => {
-  const l = await map();
+  const l = await map(SHOP);
   const made = await make(l, [
     { op: 'create', ref: 'd', type: 'decision', title: 'Which oven' },
-    { op: 'create', ref: 'h', type: 'hypothesis', title: 'Gas is cheaper' },
+    { op: 'create', ref: 'h', type: 'shop.verdict', title: 'Gas or wood' },
   ]);
-  for (const id of [made.d, made.h]) {
-    const status = id === made.d ? 'decided' : 'supported';
-    assert.equal((await l.change(agent, { reason: 'test', ops: [{ op: 'update', id, status }] })).status, 'proposed');
-  }
+  for (const id of [made.d, made.h]) assert.equal((await l.change(agent, { reason: 'test', ops: [{ op: 'update', id, status: 'decided' }] })).status, 'proposed');
 });
 
 test('a repeat falls on the days its fields say', () => {
