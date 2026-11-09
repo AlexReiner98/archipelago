@@ -2,7 +2,6 @@
 // a report taking a part down and back up through the write path, with the monitor's words as the reason.
 
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { checkCapabilities } from '../src/capabilities.ts';
 import { openDb } from '../src/db.ts';
@@ -12,6 +11,7 @@ import { hostFor } from '../src/packtools.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { callTool } from '../src/tools.ts';
 import { readEvents } from '../src/eventlog.ts';
+import { packsWith } from './map.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner' };
 const kuma: Actor = { kind: 'agent', name: 'Uptime Kuma' };
@@ -52,17 +52,17 @@ test('watch must name a field the type has and statuses it has', () => {
   assert.match(checkCapabilities({ watch: { field: 'where', up: 'up', down: 'down' } }, fields, new Set(), ['up', 'down']).join(), /no field/);
 });
 
-test('a monitor’s report takes a component down and back up, logged with what it said', async () => {
-  const reg = new Registry(join(import.meta.dirname, '..', 'packs'));
+test('a monitor’s report takes a service down and back up, logged with what it said', async () => {
+  const reg = new Registry(packsWith('watched'));
   registries.push(reg);
   const l = new Archipelago(await openDb(), reg);
   const made = (
     (await l.change(owner, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'llm', type: 'component', title: 'LiteLLM', status: 'up', props: { url: 'http://litellm:4000/health/liveliness' } },
-        { op: 'create', ref: 'pg', type: 'component', title: 'Postgres 17', status: 'up' },
-        { op: 'create', ref: 'green', type: 'component', title: 'App, green', status: 'planned', props: { url: 'http://app-green:3100/health' } },
+        { op: 'create', ref: 'llm', type: 'service', title: 'LiteLLM', status: 'up', props: { url: 'http://litellm:4000/health/liveliness' } },
+        { op: 'create', ref: 'pg', type: 'service', title: 'Postgres 17', status: 'up' },
+        { op: 'create', ref: 'green', type: 'service', title: 'App, green', status: 'planned', props: { url: 'http://app-green:3100/health' } },
       ],
     })) as { created: Record<string, string> }
   ).created;

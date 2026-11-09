@@ -1,0 +1,18 @@
+{
+  "id": "watched",
+  "version": "0.1.0",
+  "title": "Watched",
+  "description": "A pack for testing what a running system reports: one type whose status a monitor watches, at its url.",
+  "requires": ["core"],
+  "types": [
+    {
+      "id": "service",
+      "title": "Service",
+      "description": "A part of a running system; its status is its health, standby is stopped on purpose.",
+      "extends": "place",
+      "capabilities": { "watch": { "field": "url", "up": "up", "down": "down", "also": ["degraded"], "idle": "standby", "commit": "commit" } },
+      "statuses": { "open": ["planned", "wiring", "up", "standby", "degraded", "down"], "closed": ["retired"], "phases": { "planned": "not_started", "wiring": "under_way", "up": "standing", "standby": "standing", "degraded": "trouble", "down": "trouble", "retired": "ended" } },
+      "fields": { "url": { "type": "url" }, "commit": { "type": "string", "system": true }, "host": { "type": "string" } }
+    }
+  ]
+}
