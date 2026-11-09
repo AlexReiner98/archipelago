@@ -23,10 +23,11 @@ after(async () => {
   for (const close of closers) await close();
 });
 
-/** A server on its own port with in-memory databases and the repository's packs, read in place (test/map.ts). */
-export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; token?: Limit; signIn?: Limit }, sites?: Record<string, string>) {
+/** A server on its own port with in-memory databases and the repository's packs, read in place (test/map.ts), or those
+ * in the folder given (packsWith). */
+export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; token?: Limit; signIn?: Limit }, sites?: Record<string, string>, packsDir = join(import.meta.dirname, '..', 'packs')) {
   const root = mkdtempSync(join(tmpdir(), 'pelago-platform-'));
-  const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(import.meta.dirname, '..', 'packs') });
+  const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir });
   // The server checks the Host header against its port, so the port must be known first.
   const probe = createHttpServer(workspaces, 0);
   await new Promise<void>((r) => probe.listen(0, '127.0.0.1', r));
