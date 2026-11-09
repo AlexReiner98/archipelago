@@ -5,6 +5,10 @@
 import { hookFor } from './hooks.ts';
 import { hasPackSecret, setPackSecret } from './outside.ts';
 import type { Entity, Archipelago } from './pelago.ts';
+import { doneEvents } from './activity.ts';
+
+/** How many pushes are read back to find each repository's last: a repository quiet for longer shows none. */
+const PUSHES_READ = 500;
 
 /**
  * "owner/name" from any way of writing a GitHub repository's address, or from
@@ -31,13 +35,16 @@ export async function repoByName(l: Archipelago, name: string | undefined): Prom
 
 /** When each repository was last pushed to, as GitHub told us. */
 export async function lastPushes(l: Archipelago): Promise<Map<string, { at: string; branch: string; head?: string; subject: string }>> {
-  const { rows } = await l.db.query<{ target_id: string; ts: string; reason: string; detail: { branch?: string; after?: string } }>(
+  // The pushes heard, newest first: what each says is sealed with its repository's key, so it is read opened.
+  const heard = await doneEvents(l.db, { action: 'repo.push' }, PUSHES_READ);
+  const out = new Map<string, { at: string; branch: string; head?: string; subject: string }>();
+  for (const r of heard) {
+    const d = r.detail as { branch?: string; after?: string; deleted?: unknown };
     // A tag, or a branch that was deleted, is heard but is not a push of work to a branch.
-    `select distinct on (target_id) target_id, ts, reason, detail from event
-     where action = 'repo.push' and target_id is not null and coalesce(detail->>'branch', '') <> '' and detail->>'deleted' is null
-     order by target_id, seq desc -- index event_pushes`,
-  );
-  return new Map(rows.map((r) => [r.target_id, { at: r.ts, branch: r.detail?.branch ?? '', head: r.detail?.after?.slice(0, 7), subject: r.reason }]));
+    if (!r.target_id || out.has(r.target_id) || !d.branch || d.deleted != null) continue;
+    out.set(r.target_id, { at: new Date(r.ts).toISOString(), branch: d.branch, head: d.after?.slice(0, 7), subject: r.reason });
+  }
+  return out;
 }
 
 export async function githubStatus(l: Archipelago) {

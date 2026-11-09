@@ -273,8 +273,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
       const asked = await toConfirm(l, { limit: 500 });
       const answered = asked.questions.filter((q) => q.seq <= input.upto).map((q) => q.id);
       const authority = actor.kind === 'human' ? { of: 'human' as const, who: actorId(actor) } : { of: 'human' as const, basis: input.basis, stated_by: actorId(actor) };
+      // The owner's word on what agents settled: something done, on whose authority, kept in the activity stream.
       await l.log(l.db, { actor: actorId(actor), action: 'questions.confirmed', reason: input.basis, detail: { upto: input.upto, questions: answered.length, authority } });
-      await l.record('settings', actorId(actor), [['+', actorId(actor), 'questions.confirmed', input.upto]], input.basis);
       // The notices that said each one was settled have been answered with them.
       const { rows } = await l.db.query<{ id: string }>(
         `select n.id from entity n join relation r on r.from_id = n.id and r.type = 'about' and r.valid_to is null

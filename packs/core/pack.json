@@ -598,7 +598,7 @@
         },
         "on_action": {
           "type": "string",
-          "description": "For trigger event: an event action such as proposal.create, or a prefix such as resource.*"
+          "description": "For trigger event: an event action such as entity.create or repo.push, or a prefix such as resource.*"
         },
         "action": {
           "type": "enum",
@@ -1145,6 +1145,14 @@
         "forever": true
       },
       "say": "How many readers each source tag brought to a public site, per day: counts only, every entry kept."
+    },
+    {
+      "id": "activity",
+      "stream": "activity",
+      "keep": {
+        "forever": true
+      },
+      "say": "What was done that is no change to the map and is kept nowhere else: a push heard, a share made, a pack turned on, an act made outside. Every entry kept."
     },
     {
       "id": "pack",

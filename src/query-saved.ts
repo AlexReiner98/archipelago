@@ -174,6 +174,7 @@ export async function moveQueries(l: Archipelago): Promise<{ moved: number; reti
   const reason = 'Views kept before the flat lens are flat lenses now: what each said that a flat lens cannot is in this event';
   await l.db.transaction(async (tx) => {
     await l.moved(tx, 'lens.moved', reason, facts);
+    // What each view said that a flat lens cannot is in no fact: it is kept as something done.
     await l.log(tx, { actor: 'system', action: 'lens.moved', reason, detail: { moved: out.moved, retired: out.retired, lost: out.lost } });
   });
   return out;

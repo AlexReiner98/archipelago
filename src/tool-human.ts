@@ -158,7 +158,6 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
     humanOnly: true,
     input: { upto: z.number().int().nonnegative().describe('The seq of the newest event looked at.') },
     run: async (l, actor, input) => {
-      await l.log(l.db, { actor: actorId(actor), action: 'changes.seen', reason: 'Looked at what agents changed', detail: { upto: input.upto } });
       await l.record('settings', actorId(actor), [['+', actorId(actor), 'changes.seen', input.upto]]);
       return { seen_upto: input.upto };
     },

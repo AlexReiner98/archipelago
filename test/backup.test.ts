@@ -47,11 +47,11 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   const session = await sessionStart(a, agent, { title: 'Still running in a', surface: 'test' });
   const from = await snapshot(a);
   const count = async (l: Archipelago, table: string) => (await l.db.query<{ n: number }>(`select count(*)::int as n from ${table}`)).rows[0].n;
-  const before = [await count(b, 'entity'), await count(b, 'event')];
+  const before = [await count(b, 'entity'), await count(b, 'log_op')];
 
   const options = { workspace: 'default', sessionTypes: b.registry.family('run') };
   const preview = await merge(b.db, from, options);
-  assert.deepEqual([preview.applied, await count(b, 'entity'), await count(b, 'event')], [false, ...before], 'looking changes nothing');
+  assert.deepEqual([preview.applied, await count(b, 'entity'), await count(b, 'log_op')], [false, ...before], 'looking changes nothing');
   const done = await merge(b.db, from, { ...options, apply: true });
   assert.deepEqual({ ...done, applied: false, events: { ...done.events, first_seq: 0, last_seq: 0 } }, { ...preview, events: { ...preview.events, first_seq: 0, last_seq: 0 } }, 'and it does what it said it would');
   assert.deepEqual([done.entities.added, done.entities.updated, done.entities.kept_newer_here], [1, 2, 1], 'the new task; the renamed and the archived one; and the project b renamed stays');

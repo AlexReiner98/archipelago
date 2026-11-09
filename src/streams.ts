@@ -14,7 +14,7 @@ import { kept, ruleFor, type OpEntry, type Retention } from './retention.ts';
 import { makePartitions, partitionMade } from './partitions.ts';
 import { hashed, openOps, sealOp } from './opseal.ts';
 
-export type OpStream = 'sessions' | 'claims' | 'notifications' | 'automations' | 'settings' | 'access' | 'observations' | 'places' | 'visits' | `pack:${string}`;
+export type OpStream = 'sessions' | 'claims' | 'notifications' | 'automations' | 'settings' | 'access' | 'observations' | 'places' | 'visits' | 'activity' | `pack:${string}`;
 export type OpFact = ['+', string, string, unknown] | ['-', string, string];
 
 export interface Light {
@@ -36,7 +36,7 @@ const ruleId = (rules: Retention[] | undefined, stream: string, field: string) =
  * Append facts to a compacted stream at once, in the transaction given. Facts kept by different rules go in entries
  * of their own, so each is compacted whole by one rule. Returns the entries appended.
  */
-export async function record(tx: Q, ws: string, stream: OpStream, actor: string, facts: OpFact[], opts: { rules?: Retention[]; reason?: string } = {}): Promise<Light[]> {
+export async function record(tx: Q, ws: string, stream: OpStream, actor: string, facts: OpFact[], opts: { rules?: Retention[]; reason?: string; at?: string; seq?: number } = {}): Promise<Light[]> {
   if (!facts.length) return [];
   const groups = new Map<string, OpFact[]>();
   for (const f of facts) {
@@ -49,15 +49,18 @@ export async function record(tx: Q, ws: string, stream: OpStream, actor: string,
      from (select 1) one left join lateral pelago_log_op_last($1) l on true`,
     [stream],
   );
+  // An entry carried in from before (src/activity.ts) keeps its own time, when no later entry is there before it; its
+  // carrier makes the partitions of the years it reaches first.
+  const given = opts.at ? new Date(opts.at).getTime() : undefined;
   if (!rows[0].made) await makePartitions(tx);
   let pos = rows[0].pos ?? 0;
   // Never before the last entry: a day's entries are one run of positions, so a segment is a range of them.
-  const at = new Date(Math.max(new Date(rows[0].now).getTime(), rows[0].at ? new Date(rows[0].at).getTime() : 0)).toISOString();
+  const at = new Date(Math.max(given ?? new Date(rows[0].now).getTime(), rows[0].at ? new Date(rows[0].at).getTime() : 0)).toISOString();
   const out: Light[] = [];
   for (const [rule, of] of groups) {
     const e: Light = { v: 1, ws, stream, pos: ++pos, at, actor: { id: actor }, rule, facts: of, ...(opts.reason && { reason: opts.reason }) };
     const stored = await sealOp(tx, ws, stream, { v: 1, ws, actor: e.actor, rule, ...(opts.reason && { reason: opts.reason }) }, of);
-    await tx.query(`insert into log_op (stream, pos, at, head, facts) values ($1, $2, $3, $4::jsonb, $5::jsonb)`, [stream, e.pos, at, JSON.stringify(stored.head), JSON.stringify(stored.facts)]);
+    await tx.query(`insert into log_op (stream, pos, at, head, facts, seq) values ($1, $2, $3, $4::jsonb, $5::jsonb, coalesce($6, nextval('event_seq_seq')))`, [stream, e.pos, at, JSON.stringify(stored.head), JSON.stringify(stored.facts), opts.seq ?? null]);
     out.push(e);
   }
   return out;

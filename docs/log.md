@@ -543,6 +543,7 @@ kept forever as facts instead: a run's start, end and the task it is on
 | `access` | a token's last use (at most hourly), backup downloads (the grants themselves are facts) | `latest`, `history: P365D` |
 | `pack:<id>` | a pack's own keys and values (today's `pack_store`), read only while the pack is active | `latest`; the pack may declare more |
 | `observations` | readings from monitors and reports, connection reachability, imported external tool calls (`audit.import`), a test's picture (as a blob's hash) | `latest`, `thin: [["P1D", "PT1H"], ["P30D", "P1D"]]`; pictures `latest` only |
+| `activity` | what was done that is no change to the map and is state nowhere else: a push heard, a share made or revoked, a document published, a pack turned on or off, an act made outside, an external tool call imported, a backup merged (each until it has a fact shape of its own, section 10); and the event table's rows from before, carried in once (9 Nov 2026) | `forever` |
 | `places` | retired (the owner, 3 Nov 2026: a view is drawn from its query alone): where a person once put an item on a canvas, the field `place:<canvas>` on the item, its value `[x, y]`. Nothing appends to it; the name stays so entries and backups from before still read | `history` a day |
 
 ### Blobs
@@ -600,7 +601,7 @@ live in one partition, and reading one reads only it.
   keeps it near 1.5 ms (the numbers are on the task). `pelago_log_unit()`
   names the length.
 
-### Where this stands (24 Oct 2026)
+### Where this stands (24 Oct 2026; the activity, 9 Nov 2026)
 
 The compacted streams are sealed, guarded by row security, reached by a
 forget, carried in backups and by a move, and partitioned by year, as the
@@ -614,6 +615,18 @@ itself (still facts through `apply`), a run's heartbeat (still on the run's
 row, in no stream), `pack_store` (the server's own log, `e_8g9feum7`), and
 `log_blob` (a picture's bytes stay in `picture`). `transient` is unlogged on a
 Postgres server.
+
+The event table is written no more (bug `e_n6rhygfk`, 9 Nov 2026). What it
+said again of a change set (`proposal.*`, `changeset.undo`, `type.moved`,
+`lens.moved`, `types.sync`) is read from the log; what it said again of a
+stream's state (a setting, `changes.seen`, a claim, a backup download, a
+picture, a firing, a session gone quiet) is read from that stream; the rest
+is the `activity` stream (`src/activity.ts`). Every `log_op` entry is
+numbered from the sequence `log_fact` is (step 33), so the activity log
+reads all of them in one order. The table's rows were carried into the
+`activity` stream when each workspace opened, with their numbers and times;
+the table stays, read only to carry rows, until the app before no longer
+reads it, and a later step drops it.
 
 ---
 

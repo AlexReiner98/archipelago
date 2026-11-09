@@ -40,7 +40,7 @@ test('an event is not seen before one numbered ahead of it that is still being w
   open();
   await Promise.all([first, after]);
   assert.ok(waited, 'the later event waits for the earlier one to be written');
-  const { rows } = await l.db.query<{ action: string }>(`select action from event where action like 'test.%' order by seq`);
+  const { rows } = await l.db.query<{ action: string }>(`select facts->0->>2 as action from log_op where stream = 'activity' and facts->0->>2 like 'test.%' order by seq`);
   assert.deepEqual(rows.map((r) => r.action), ['test.first', 'test.second']);
 });
 

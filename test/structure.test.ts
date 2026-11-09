@@ -344,7 +344,7 @@ test('every pack file is in the manifest shape, and every old key is mapped', as
 // (the part_of closure), a person, a time or place in the log, or a limit; or names the index it goes by
 // (`-- index <name>`), one the schema makes (src/read-indexes.ts has those made for it). What already broke it on 24 Oct is listed, and may only shrink.
 const WHOLE_READS: Record<string, number> = {
-  'src/backup.ts': 2,
+  'src/backup.ts': 1,
   'src/forget.ts': 2,
   'src/log.ts': 2,
   'src/mentions.ts': 1,

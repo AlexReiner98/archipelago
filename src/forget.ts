@@ -129,9 +129,7 @@ export async function mentions(q: Q, item: string): Promise<{ id: string; reason
   const plain = [item, ...(found[0]?.title.trim().length > 3 ? [found[0].title.trim()] : [])];
   const words = plain.map((w) => `%${w.replace(/[%_\\]/g, (c) => `\\${c}`)}%`);
   const { rows } = await q.query<{ id: string; reason: string }>(
-    `select distinct coalesce(changeset, detail->>'proposal') as id, reason from event
-       where coalesce(changeset, detail->>'proposal') is not null and (reason ilike any($1::text[]) or detail->'authority'->>'basis' ilike any($1::text[]))
-     union select id, reason from proposal where reason ilike any($1::text[])`,
+    `select id, reason from proposal where reason ilike any($1::text[])`,
     [words],
   );
   const says = (text: unknown) => typeof text === 'string' && plain.some((w) => text.toLowerCase().includes(w.toLowerCase()));

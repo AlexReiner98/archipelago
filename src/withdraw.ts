@@ -66,6 +66,5 @@ export async function withdraw(l: Archipelago, actor: Actor, input: { proposal: 
   const note = input.reason ?? (by ? `Covered by ${by}` : 'Withdrawn by its proposer');
   const done = await l.db.transaction((tx) => rejection(tx, l.workspace, p.id, { outcome: 'withdrawn', actor: me, by: me, reason: p.reason, note }));
   if (!done) throw new Error(`Proposal ${p.id} was decided first`);
-  await l.log(l.db, { actor: me, action: 'proposal.withdraw', reason: note, detail: { proposal: p.id, proposed_by: p.actor, ...(by && { by }) } });
   return { proposal: p.id, status: 'withdrawn', note };
 }
