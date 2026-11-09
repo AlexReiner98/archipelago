@@ -214,7 +214,25 @@ SessionStart's `source` and SessionEnd's `reason`.
    began, to change, vouch for or say it cannot tell. The sets are kept a
    week after.
 
+## Which workspace an agent acts in
+1. A workspace's token (`pel_<workspace>_…`) acts in that workspace alone, for
+   one person there; a call naming another is refused.
+2. A person token (`pep_…`, `src/person-tokens.ts`) reaches every workspace
+   its person is a member of, as their member record in each, so it sees what
+   is private to them (the owner, 9 Nov 2026, bug e_94ag6443). It is kept in
+   the server's own database, holds the sign-in addresses it acts for, and is
+   always an agent's, never an admin's.
+3. A call names its workspace: in an MCP call's arguments (`workspace`), else
+   the `x-pelago-workspace` header, else the address (`/mcp/<workspace>`);
+   naming none, the token's home. `session_start` answers with the workspace.
+4. Made with `token_create` (`everywhere: true`) by the person signed in;
+   `reach` with its secret, signed in at another address, adds that address.
+   Membership is asked on every call, so removing a member cuts it off there;
+   only its person revokes it, everywhere at once.
+
 ## What is not yet so
+- The Settings page cannot make a person token yet: `token_create` with
+  `everywhere` can.
 - `tool:<name>` instructions are declared but no tool description reads them
   yet.
 - The rules file is filled from the packs' presets in the checkout, not the
