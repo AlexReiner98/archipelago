@@ -164,6 +164,18 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
     assert.ok(await reader.until(shown('The login plan'), 20000), `the link opens with no login: ${reader.logs().join('\n').slice(0, 600)}`);
     assert.ok(await reader.until(shown('Login form'), 20000), `the view is drawn: ${reader.logs().join('\n').slice(0, 600)} | ${await reader.evaluate<string>(`JSON.stringify({ text: document.body.innerText.slice(0, 400), frames: [...document.querySelectorAll('iframe')].map((f) => [f.src, f.getAttribute('sandbox'), f.offsetWidth, f.offsetHeight]), svgs: document.querySelectorAll('svg').length, html: document.body.innerHTML.slice(0, 1200) })`)}`);
     assert.ok(await reader.until(`[...document.querySelectorAll('a')].some((a) => a.textContent.includes('Start a map of your own'))`), 'with a way to start your own');
+    // An item in the view opens its page, read only, in a sheet over the shared page, and closes again.
+    const part = `[...document.querySelectorAll('.doc-lens a[href="#/e/${ids.form}"]')][0]`;
+    assert.ok(await reader.until(`Boolean(${part})`, 10000), 'the view’s part is a way to its page');
+    await reader.evaluate(`${part}.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))`);
+    assert.ok(await reader.until(`document.querySelector('.doc-sheet h2')?.textContent === 'Login form'`, 10000), `the item opens in a sheet: ${reader.logs().join(' ').slice(0, 400)}`);
+    assert.ok(await reader.evaluate<boolean>(`!document.querySelector('.doc-sheet input, .doc-sheet textarea, .doc-sheet [contenteditable]')`), 'read only');
+    assert.ok((await reader.evaluate<string>(`location.pathname`)).startsWith('/s/'), 'the reader stays on the link');
+    await reader.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    assert.ok(await reader.until(`!document.querySelector('.doc-sheet')`), 'and closes');
+    // What the link does not show cannot be opened through it.
+    const refused = await fetch(`${base}${link.path}/data?item=e_zzzzzzzz`);
+    assert.equal(refused.status, 404, 'an item the link does not show is not read through it');
     assert.ok(!reader.logs().some((line) => /Uncaught|TypeError|ReferenceError/.test(line)), `no errors: ${reader.logs().join('\n').slice(0, 600)}`);
   } finally {
     await reader.close();

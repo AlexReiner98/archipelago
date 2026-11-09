@@ -49,7 +49,7 @@ import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
 import { servePublic } from './public-route.ts'; import { serveSite, siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
 import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
-import { sharedPicture } from './documents.ts'; import { sharedView } from './share-view.ts';
+import { sharedPicture } from './documents.ts'; import { sharedAnswer } from './share-view.ts';
 import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
@@ -246,9 +246,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           if (!picture) return send(res, 404, { error: 'Not found' }, guard);
           return res.writeHead(200, { ...guard, 'content-type': picture.content_type, 'content-security-policy': "default-src 'none'" }).end(picture.bytes);
         }
-        const doc = (await workspaces.has(wsId)) ? await sharedView((await workspaces.get(wsId)).pelago, secret) : null;
+        const doc = (await workspaces.has(wsId)) ? await sharedAnswer((await workspaces.get(wsId)).pelago, secret, url.searchParams.get('item')) : null;
         if (!doc) return send(res, 404, { error: 'This link does not open anything: it may have been revoked.' }, guard);
-        return send(res, 200, { ...doc, ...(await pageLook((await workspaces.get(wsId)).pelago, doc)) }, guard);
+        return send(res, 200, 'item' in doc ? doc : { ...doc, ...(await pageLook((await workspaces.get(wsId)).pelago, doc)) }, guard);
       }
 
       // A document read by someone signed in, to print or save as a PDF: the same page a link opens, which reads the

@@ -4,6 +4,7 @@
 
 import { SignInNeeded, authHeaders, call, h } from './base.js';
 import { drawFrozen } from './doc-lens.js';
+import { openItem } from './doc-sheet.js';
 import { carried } from './doc-ref.js';
 import { warmLayouts } from './layout.js';
 import { sayLook } from './look.js';
@@ -28,6 +29,13 @@ const post = (at, input) =>
     throw err instanceof SignInNeeded ? new Error('Sign in to Archipelago in this browser first, then open this again.') : err;
   });
 const api = (tool, input) => post(`/api/${tool}`, input);
+/** One item a link shows, read through the link (src/share-view.ts, sharedItem). */
+const readItem = (id) =>
+  fetch(`${here}/data?item=${id}`).then(async (res) => {
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error ?? 'This item cannot be opened here.');
+    return body;
+  });
 /** A section's figure: from the link's own address, or fetched with the reader's sign-in. */
 const figureSrc = (id) => (own || preview ? '' : `${here}/picture/${id}`);
 
@@ -169,8 +177,9 @@ function startLink(words) {
 const FRONT = 'home';
 // A link followed takes where the reader came from with it (?ref=), set as it is followed so every link drawn has it.
 const carry = (e) => {
+  // A page's own links only: a part of a drawing is an SVG link, whose address is not a string to rewrite.
   const link = e.target.closest?.('a[href]');
-  if (link) link.href = carried(link.href, location.href, document.referrer);
+  if (link instanceof HTMLAnchorElement) link.href = carried(link.href, location.href, document.referrer);
 };
 addEventListener('click', carry, true);
 addEventListener('auxclick', carry, true);
@@ -249,7 +258,9 @@ function draw(d) {
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
   document.body.classList.toggle('invoice', d.head === 'invoice');
   // Its pictures, with the text: a drawing's first frame is kept with the picture, and the drawing takes it over once started.
-  for (const el of main.querySelectorAll('[data-lens]')) drawFrozen(el, d.lenses[el.dataset.lens], d.types);
+  // On a link's page, a part of a view opens its page, read only, in a sheet (ui/doc-sheet.js), read through the link.
+  const onItem = here.startsWith('/s/') ? (id) => openItem(id, readItem, (text) => blocks(text, titles, 3)) : null;
+  for (const el of main.querySelectorAll('[data-lens]')) drawFrozen(el, d.lenses[el.dataset.lens], d.types, { onItem });
   // Read with the reader's sign-in, a figure is fetched the same way.
   if (own || preview) for (const img of main.querySelectorAll('img[data-figure]')) (img.dataset.via ? api('share_figure', { via: img.dataset.via, id: img.dataset.figure }) : api('picture', { result: img.dataset.figure })).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
 }

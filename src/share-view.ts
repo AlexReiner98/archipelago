@@ -3,7 +3,7 @@
 // in, read through the same narrow function (pelago_shared_document in src/schema.ts). A view a link brings in is
 // drawn live, from what the whole workspace may see of its answer, as publishing would freeze it.
 
-import { SHARED, sharedDocument } from './documents.ts';
+import { SHARED, sharedDocument, shownOf } from './documents.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { picturesOf } from './published-pictures.ts';
 import { bringersIn, isKept, keptPicture } from './query-saved.ts';
@@ -79,3 +79,27 @@ export async function privateIn(l: Archipelago, id: string): Promise<{ id: strin
   const { rows } = await l.db.query<{ id: string; title: string }>(`select id, title from entity where id = any($1::text[]) and (visibility = 'private' or private_to is not null) and archived_at is null`, [ids]);
   return rows;
 }
+
+/**
+ * One item a link shows, read as its page reads it, for the sheet a reader opens it in: only an item the link already
+ * shows (a section of its document, or a part of a view it draws, never what the view leaves out as private), its
+ * title, state, fields and note, an id in the note that the link does not show cut out. Null for anything else.
+ */
+export async function sharedItem(l: Archipelago, secret: string, id: string) {
+  if (!/^e_[a-z0-9]{8}$/.test(id)) return null;
+  const view = await sharedView(l, secret);
+  if (!view) return null;
+  const lenses = ('lenses' in view ? view.lenses : {}) as Record<string, { items: { id: string }[] }>;
+  const shown = new Set([...view.parts.flatMap((p) => ('section' in p ? [p.section.id] : [])), ...Object.values(lenses).flatMap((v) => v.items.map((i) => i.id))]);
+  if (!shown.has(id)) return null;
+  const { rows: [e] } = await l.db.query<{ id: string; type: string; title: string; status: string; body: string; props: Record<string, unknown>; updated_at: Date }>(
+    `select id, type, title, status, body, props, updated_at from entity where id = $1 and visibility <> 'private' and private_to is null and archived_at is null`,
+    [id],
+  );
+  if (!e) return null;
+  const body = (e.body ?? '').replace(/[ \t]*\(?\b(e_[a-z0-9]{8})\b\)?/g, (found, ref) => (shown.has(ref) ? found : ''));
+  return { item: { id: e.id, type: l.registry.type(e.type)?.title ?? e.type, title: e.title, status: e.status, fields: shownOf(l, e.type, e.props), body, updated_at: e.updated_at } };
+}
+
+/** What a link's data address answers: the document, or with `item`, the one item it shows that a reader opened. */
+export const sharedAnswer = (l: Archipelago, secret: string, item: string | null) => (item ? sharedItem(l, secret, item) : sharedView(l, secret));
