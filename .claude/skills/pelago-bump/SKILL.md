@@ -1,6 +1,7 @@
 ---
 name: pelago-bump
-description: Record friction with Archipelago on the Archipelago map, the moment it happens. Use this whenever Archipelago itself gets in the way while you work, in any repository: a pelago tool errors or refuses something reasonable, you need a second call or a workaround to do one thing, a view lacks what you needed or answers with something stale or wrong, a tool description misled you, the web UI shows something badly, a hook or the GitHub workflow misbehaves, or the owner complains about how Archipelago behaves or looks. Also use it when the owner says "bump", "note that", "that was annoying" or "record that" about Archipelago. Do not wait to be asked: a bump nobody wrote down is hit again by the next session.
+description: >-
+  Record friction with Archipelago on the Archipelago map, the moment it happens. Use this whenever Archipelago itself gets in the way while you work, in any repository: a pelago tool errors or refuses something reasonable, you need a second call or a workaround to do one thing, a view lacks what you needed or answers with something stale or wrong, a tool description misled you, the web UI shows something badly, a hook or the GitHub workflow misbehaves, or the owner complains about how Archipelago behaves or looks. Also use it when the owner says "bump", "note that", "that was annoying" or "record that" about Archipelago. Do not wait to be asked: a bump nobody wrote down is hit again by the next session.
 ---
 
 # Archipelago bump
