@@ -10,6 +10,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { alertOwner } from './alert.ts';
 import { signedWith } from './hashes.ts';
+import { json as reply, PRIVATE as GUARD } from './reply.ts';
 import { serverPacksOf } from './server-host.ts';
 import { hostBase, serverSecret } from './server-requests.ts';
 import type { ActPlaces } from './server-acts.ts';
@@ -18,7 +19,6 @@ import type { ActPlaces } from './server-acts.ts';
 const pagePolicy = (form = "'none'") => `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action ${form}; frame-ancestors 'none'`;
 const TYPES: Record<string, string> = { js: 'text/javascript', css: 'text/css', svg: 'image/svg+xml', png: 'image/png', webp: 'image/webp' };
 const ASSET = /^[a-z0-9][a-z0-9_.-]{0,60}\.(js|css|svg|png|webp)$/;
-const GUARD = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store' };
 
 export interface ServerRoutes {
   workspaces: ActPlaces;
@@ -35,7 +35,7 @@ async function tellOwner(workspaces: ActPlaces, pack: string, hook: string, what
 }
 
 export async function serveServerPack(req: IncomingMessage, res: ServerResponse, path: string, at: ServerRoutes): Promise<unknown> {
-  const json = (status: number, body: unknown) => res.writeHead(status, { ...GUARD, 'content-type': 'application/json' }).end(JSON.stringify(body));
+  const json = (status: number, body: unknown) => reply(res, status, body, GUARD);
   const [, , id = '', name = '', more = '', extra] = path.split('/');
   const packs = serverPacksOf(at.workspaces);
   const pack = packs.find(id);

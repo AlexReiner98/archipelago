@@ -9,6 +9,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Registry } from './packs.ts';
 import { hostFor } from './packtools.ts';
 import type { Actor, Archipelago } from './pelago.ts';
+import { json } from './reply.ts';
 import { unseal } from './secrets.ts';
 
 const asPack = (pack: string): Actor => ({ kind: 'agent', name: `pack:${pack}` });
@@ -17,10 +18,7 @@ const HOOK_MAX = 1_000_000;
 
 /** Answer a POST to /hook/... for the workspace's map (unscoped: a webhook is no one's session). */
 export async function serveHook(req: IncomingMessage, res: ServerResponse, l: Archipelago, pack: string, id: string): Promise<void> {
-  const reply = (status: number, body: unknown) => {
-    res.writeHead(status, { 'content-type': 'application/json' });
-    res.end(JSON.stringify(body));
-  };
+  const reply = (status: number, body: unknown) => void json(res, status, body);
   const file = l.registry.packs.find((p) => p.id === pack);
   const hook = file && parts(file).webhooks.find((w) => w.id === id);
   // Gone, as the contract says, when the pack is off or does not declare it.

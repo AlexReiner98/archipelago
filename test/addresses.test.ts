@@ -92,6 +92,11 @@ test('refused tokens are counted by address, a backup unpacks only so far, and t
   assert.match(page.headers.get('content-security-policy') ?? '', /default-src 'none'; script-src 'self'; style-src 'self';.*frame-ancestors 'none'/);
   assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
   assert.equal((await fetch(base + '/app.js')).headers.get('x-content-type-options'), 'nosniff');
+  // An answer in JSON is never sniffed either, refused or not (src/reply.ts).
+  for (const r of [await fetch(base + '/agent/search', { method: 'POST', headers: { authorization: `Bearer ${good}`, 'content-type': 'application/json' }, body: '{}' }), await fetch(base + '/agent/search', { method: 'POST', body: '{}' })]) {
+    assert.equal(r.headers.get('x-content-type-options'), 'nosniff', `${r.status}`);
+    assert.match(r.headers.get('content-type') ?? '', /^application\/json/);
+  }
   // A style's own code is drawn in a frame of the page's own, which is sandboxed, may reach nothing outside itself, and may be framed only here.
   assert.match(page.headers.get('content-security-policy') ?? '', /frame-src 'self'/);
   const frame = await fetch(base + '/draw.html');

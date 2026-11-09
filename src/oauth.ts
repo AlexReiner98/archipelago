@@ -13,6 +13,7 @@ import { ACCESS_MINUTES, grantToken, rotateGrant, workspaceOfGrant } from './aut
 import type { ConnectRoutes } from './connect.ts';
 import type { Q } from './db.ts';
 import { clientOf, listedRedirect, registerClient, returnsTo, type Client } from './oauth-clients.ts';
+import { json as reply, PRIVATE } from './reply.ts';
 import { keep, take } from './transient.ts';
 
 /** How long a code waits to be traded. */
@@ -93,7 +94,7 @@ function back(asked: Asked, origin: string, said: Record<string, string>): strin
   return url.href;
 }
 
-const json = (res: ServerResponse, status: number, body: unknown) => res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', 'access-control-allow-origin': '*' }).end(JSON.stringify(body));
+const json = (res: ServerResponse, status: number, body: unknown) => reply(res, status, body, { ...PRIVATE, 'access-control-allow-origin': '*' });
 const oauthError = (res: ServerResponse, status: number, error: string, description: string) => json(res, status, { error, error_description: description });
 
 /** The page's request for a code: Allow from a signed-in person, or Deny. Answers where the browser goes next. */

@@ -15,6 +15,7 @@ import { recordAgreement } from './agreements.ts';
 import { workspacesOf } from './control-index.ts';
 import { emailOfLink, LINK_MINUTES, redeem, redeemTyped, requestSignIn, triesSpent, typedWorks, workspaceOfCode } from './members.ts';
 import { serveOAuth } from './oauth.ts';
+import { json, PRIVATE } from './reply.ts';
 import type { Actor } from './pelago.ts';
 import { serverPacksOf } from './server-host.ts';
 import { serveServerPack } from './server-routes.ts';
@@ -95,7 +96,7 @@ const withRef = (address: string, ref: unknown) => {
   return url.href;
 };
 
-const reply = (res: ServerResponse, status: number, body: unknown) => res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(body));
+const reply = (res: ServerResponse, status: number, body: unknown) => json(res, status, body, PRIVATE);
 
 /**
  * Everything under /connect/ and /x/, none of it behind a token: the setup script, a system's request for a token (POST
