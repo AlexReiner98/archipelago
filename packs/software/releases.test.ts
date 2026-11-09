@@ -164,7 +164,7 @@ test('public: only a human makes it so, only some kinds can be, and anyone then 
   const fields = async (id: string) => (await anyoneDb.query<{ props: Record<string, unknown> | null }>(`select pelago_public_props($1) as props`, [id])).rows[0].props;
   assert.deepEqual(await fields(results[made.sun]), { build: '1.0.0', passed: true, value: '0.004 degrees' });
   assert.equal(await fields(results[made.areas]), null, 'and of what is not public, none');
-  await assert.rejects(anyoneDb.query(`select * from event`), /permission denied/);
+  await assert.rejects(anyoneDb.query(`select * from log_op`), /permission denied/);
   await assert.rejects(anyoneDb.query(`select * from setting`), /permission denied/);
   await assert.rejects(anyoneDb.query(`update entity set title = 'x'`), /permission denied/);
   assert.equal((await anyoneDb.query<{ n: number }>(`select count(*)::int as n from picture`)).rows[0].n, 1);

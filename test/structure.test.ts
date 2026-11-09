@@ -140,8 +140,7 @@ test('every approval is decided by a rule', () => {
   assert.deepEqual(policy, {}, "The server's policy is read only by the rules: what it lifts, and what it forbids (serverRules).");
 });
 
-// 4. A pack's code imports only its own files and Node's built-ins: never the kernel's source. Its tests may also use
-// the kernel's test harness, by its one name (#pelago/test), to try the pack's rules on a real map (the owner, 9 Nov 2026).
+// 4. A pack's code imports only its own files and Node's built-ins, never the kernel's; its tests also #pelago/test.
 test("a pack's code imports nothing of the kernel", () => {
   const reaching: string[] = [];
   for (const file of walk('packs').filter((f) => /\.(ts|js|mjs)$/.test(f))) {
