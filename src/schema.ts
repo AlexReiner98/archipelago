@@ -478,3 +478,17 @@ grant execute on function pelago_item_hidden(text) to pelago_member;
 
 /** Step 16 (src/migrate.ts): a held change keeps the rule that held it (src/rules.ts, decide). */
 export const HELD_BY = `alter table proposal add column if not exists held_by jsonb;`;
+
+/**
+ * Step 36 (src/migrate.ts): a link keeps the view it shows, frozen when it was made (src/share-link.ts), and a reader
+ * token reads that and nothing else, while the token is good and the link stands.
+ */
+export const LINK_SNAPSHOT = `
+alter table share add column if not exists snapshot jsonb;
+create or replace function pelago_link_read(reader_hash text) returns jsonb
+language sql stable security definer set search_path = public as $fn$
+  select s.snapshot from transient t join share s on s.id = t.value ->> 'share'
+  where t.key = 'linkreader:' || reader_hash and t.until >= now() and s.revoked_at is null and s.snapshot is not null
+$fn$;
+grant execute on function pelago_link_read(text) to pelago_public;
+`;
