@@ -202,8 +202,6 @@ table.list { width: 100%; border-collapse: collapse; }
 table.list td, table.list th { padding: var(--space-5) var(--space-8); border-bottom: var(--border-1) solid var(--line); text-align: left; vertical-align: top; }
 table.list th { font-size: var(--text-1); font-family: var(--type-region-family); font-weight: var(--type-region-weight); font-style: var(--type-region-style); text-transform: var(--type-region-case); letter-spacing: var(--type-region-track); color: var(--muted); }
 table.list tr:last-child td { border-bottom: 0; }
-table.list td.act { width: 1%; white-space: nowrap; text-align: right; }
-.add-relation { border-top: var(--border-1) solid var(--line); }
 .add-relation > .toolbar { padding: var(--space-7) var(--space-8); }
 .add-relation input[type="search"] { flex: 1; min-width: var(--select-least); }
 .add-relation .rows { border-top: var(--border-1) solid var(--line); }
