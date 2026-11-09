@@ -17,7 +17,7 @@ const CODE = `export default function draw({ field, change, on }) {
   on('field', async ({ value, done }) => {
     if (!done) return;
     const mine = await change([{ op: 'create', type: 'work.task', title: value }], 'Typed in the drawing');
-    const other = await change([{ op: 'create', type: 'work.note', title: 'Not its to write' }], 'Asked by the drawing');
+    const other = await change([{ op: 'create', type: 'record', title: 'Not its to write' }], 'Asked by the drawing');
     field('name', { ...at, value: [mine.status, other.status, other.held ? 'held' : ''].join(' ') });
   });
 }`;

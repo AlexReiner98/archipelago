@@ -9,7 +9,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { Archipelago, type Actor, type ChangeInput, type Op, type Policy } from '../src/pelago.ts';
-import { fresh, human } from './map.ts';
+import { Registry } from '../src/packs.ts';
+import { freshWith, human, PACKS } from './map.ts';
 
 const FILE = join(import.meta.dirname, 'fixtures', 'approvals.json');
 const agent: Actor = { kind: 'agent', name: 'table' };
@@ -61,10 +62,12 @@ interface Case {
 const said = { of: 'agent' as const, basis: 'the table' };
 const task = (ref = 't', extra: Partial<Op> = {}): Op => ({ op: 'create', ref, type: 'task', title: `Task ${ref}`, ...extra }) as Op;
 const decision: Op = { op: 'create', ref: 'd', type: 'decision', title: 'Which way?' };
-const hypothesis: Op = { op: 'create', ref: 'h', type: 'hypothesis', title: 'It is faster' };
+// A question settled by evidence and a type that can be public, from test packs (test/packs/claims, test/fixtures/packs/pages)
+// now that science's hypothesis and work's document are the hosted service's.
+const hypothesis: Op = { op: 'create', ref: 'h', type: 'conjecture', title: 'It is faster' };
 const style = (ref = 's'): Op => ({ op: 'create', ref, type: 'style', title: `Style ${ref}` });
 const layout = (ref = 's'): Op => ({ op: 'create', ref, type: 'layout', title: `Layout ${ref}` });
-const doc: Op = { op: 'create', ref: 'doc', type: 'document', title: 'Guide' };
+const doc: Op = { op: 'create', ref: 'doc', type: 'page', title: 'Guide' };
 const automation: Op = { op: 'create', ref: 'a', type: 'automation', title: 'Nightly', status: 'paused', props: { trigger: 'daily', at: '03:00', action: 'notify', message: 'hi' } };
 
 const CASES: Record<string, Case> = {
@@ -135,7 +138,7 @@ export function checkPolicy(policyName: string, part: number) {
     const table: Record<string, string> = {};
     for (const settingName of settings) {
       const setting = SETTINGS[settingName];
-      const base = await fresh();
+      const base = await freshWith(new Registry([PACKS, join(import.meta.dirname, 'packs'), join(import.meta.dirname, 'fixtures', 'packs')], ['core', 'claims', 'pages']));
       const l = new Archipelago(base.db, base.registry, policy);
       for (const [key, value] of Object.entries(setting)) await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb)`, [key, JSON.stringify(value)]);
       for (const [actorName, who] of Object.entries(ACTORS))
