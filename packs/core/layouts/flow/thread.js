@@ -55,11 +55,11 @@ const roundFace = (f, a, b) => {
  * `add(path, visible, link)` makes a wire. With `onward(link)`, that link only ever goes on through `number`, so it runs
  * from u to v the way the numbers do; with `oneWay`, every other link does too, from whichever end comes first, so no
  * wire turns back and any can be taken out again. The stretch `keep` is never crossed. It keeps count in `tally`: { ghosts, crossings,
- * unthreaded }. `cost(w)` is what passing wire `w` costs: by default 1 where it is seen and little where it is not; `tag`
+ * unthreaded, work: what its searches looked at, counted }, and past `most` of that work it throws (tooMuch). `cost(w)` is what passing wire `w` costs: by default 1 where it is seen and little where it is not; `tag`
  * names its points apart from another threader's on the same graph.
  */
-export function threader(list, owner, add, { number, keep, onward = () => false, oneWay = false, cost: price = (w) => (w?.visible ? 1 : HIDDEN), tag = '' }) {
-  const tally = { ghosts: [], crossings: 0, unthreaded: 0 }, at = (v) => number.get(v), around = new Map(), seats = seating(list), { name } = seats;
+export function threader(list, owner, add, { number, keep, onward = () => false, oneWay = false, cost: price = (w) => (w?.visible ? 1 : HIDDEN), tag = '', most = Infinity }) {
+  const tally = { ghosts: [], crossings: 0, unthreaded: 0, work: 0 }, at = (v) => number.get(v), around = new Map(), seats = seating(list), { name } = seats;
   let made = 0;
   const tie = (a, b) => {
     (around.get(a) ?? around.set(a, new Set()).get(a)).add(b);
@@ -114,8 +114,13 @@ export function threader(list, owner, add, { number, keep, onward = () => false,
     const dist = new Map(), reach = new Map(), prev = new Map(), open = [];
     for (const f of list) if (f.includes(u)) (dist.set(f, 0), reach.set(f, strict ? at(u) : 0), open.push(f));
     const nearer = (f, d, h) => !dist.has(f) || d < dist.get(f) || (d === dist.get(f) && h < reach.get(f));
+    tally.work += list.length;
+    // Past `most`, the picture is too large to thread: the caller is told, and draws it another way.
+    if (tally.work > most) throw Object.assign(new Error('Too many wires to thread'), { tooMuch: tally.work });
     while (open.length) {
+      tally.work += open.length;
       const f = nextOf(open, dist, reach);
+      tally.work += f.length;
       if (f.includes(v)) {
         const steps = [], rooms = [f];
         for (let i = f; prev.has(i); i = prev.get(i)[0]) (steps.unshift(prev.get(i)[1]), rooms.unshift(prev.get(i)[0]));

@@ -58,6 +58,18 @@ test('trunks: one type and one way only, crossing a shore once', async () => {
   assert.equal(wires.filter((w: any) => w.trunk === 0 && [w.u, w.v].includes(far.id) && ![w.u, w.v].some((v: string) => v.startsWith('x'))).length, 1, 'one stretch of the trunk crosses to the far island');
 });
 
+test('embedding: as many tries as the first one\'s work allows, and past the most work it says so', async () => {
+  const { embedding } = await mod('embedding.js');
+  const items = [...['a1', 'a2', 'a3', 'a4'].map((id) => item(id, 'A')), ...['b1', 'b2', 'b3'].map((id) => item(id, 'B'))];
+  const links = [link('depends_on', 'a2', 'a1'), link('depends_on', 'a3', 'a2'), link('depends_on', 'b2', 'b1'), link('about', 'a4', 'b3'), link('about', 'a1', 'b1'), link('about', 'a3', 'b2')];
+  const m = await graph(items, links), islandOf = (id: string) => m.nodes.get(id)?.item?.island ?? null;
+  const e = embedding(m, { sizes: house.sizes, headless: house.headless, islandOf });
+  const { planarize_work: work, planarize_tries_least: least, planarize_tries_most: most } = house.sizes;
+  assert.equal(e.counts.tries, Math.max(least, Math.min(most, Math.floor(work / e.counts.work))), 'tries from the work counted, never timed');
+  assert.deepEqual(embedding(m, { sizes: house.sizes, headless: house.headless, islandOf }).counts, e.counts, 'the same each run');
+  assert.throws(() => embedding(m, { sizes: { ...house.sizes, planarize_most_work: 1 }, headless: house.headless, islandOf }), (err: any) => err.tooMuch > 1);
+});
+
 test('embedding: islands closed, each wire across one crosses each border once, the order runs down', async () => {
   const { embedding } = await mod('embedding.js');
   const { visibility } = await mod('plain.js');
@@ -149,4 +161,15 @@ test('format: a border runs clockwise with its island on the right, with ports o
       assert.ok(items.some((i: any) => i.island === island.id && held.has(i.id)), `${island.id}: the face on the right of its border is inside`);
     }
   }
+});
+
+test('a picture too large to wire is drawn plainly, island by island, and says how many links it leaves out', async () => {
+  const { drawings, setOut } = await import('./wired.ts');
+  const items = [...['a1', 'a2', 'a3'].map((id) => item(id, 'A')), ...['b1', 'b2'].map((id) => item(id, 'B'))];
+  const links = [link('depends_on', 'a2', 'a1'), link('about', 'a3', 'b1'), link('about', 'b2', 'a1')];
+  const style = { ...house, sizes: { ...house.sizes, planarize_most_work: 1 } };
+  const out = await setOut(drawings.find((d) => d.id === 'core.map')!, async (url) => (await import(url('index.js'))).picture({ answer: { items, links, islands: [] }, style, width: 1200, height: 750 }, { measure }));
+  assert.ok(out.scene.key.some((row: any) => row.label === '3 links not drawn: too many to wire'), JSON.stringify(out.scene.key));
+  const text = JSON.stringify(out.scene.svg);
+  for (const id of ['a1', 'a2', 'a3', 'b1', 'b2']) assert.ok(text.includes(`#/e/${id}`), `${id} is drawn`);
 });

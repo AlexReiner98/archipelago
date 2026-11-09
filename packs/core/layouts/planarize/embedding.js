@@ -30,7 +30,7 @@ const asLink = (w) => Object.assign(w.firm ? [w.top, w.foot, w.order ? FIRM.orde
 const cost = (w) => (w?.link?.border !== undefined ? SHORE : w?.visible ? SEEN : UNSEEN);
 
 /** One try, the `k`th: the line leaning its own way, the two sides filled, the rest threaded. */
-function attempt({ ids, wires, placeOf, made, islands, tighten }, k, oneWay) {
+function attempt({ ids, wires, placeOf, made, islands, tighten, most }, k, oneWay) {
   const index = new Map(), idx = (v) => index.get(v) ?? index.set(v, index.size).get(v);
   ids.forEach(idx);
   const noise = (v) => (k ? keyed(k, idx(v), -1) : 0);
@@ -49,14 +49,15 @@ function attempt({ ids, wires, placeOf, made, islands, tighten }, k, oneWay) {
   const faces = facesOf(line, sides), [s, t] = [line[0], line.at(-1)], run = stHere ? [s, t] : [t, s];
   const isOuter = (f) => f.some((v, j) => (v === run[0] && f[(j + 1) % f.length] === run[1]) || (v === run[1] && f[(j + 1) % f.length] === run[0]));
   // The order's wires first, then the rest; each the way the numbers run, and only where none can, the shortest way.
-  const strict = threader(faces, owner, add, { number, keep: pair(s, t), onward: (l) => oneWay && (l[2] ?? 0) > 0, oneWay, cost, tag: 'w' });
+  const strict = threader(faces, owner, add, { number, keep: pair(s, t), onward: (l) => oneWay && (l[2] ?? 0) > 0, oneWay, cost, tag: 'w', most });
   strict.through([...left].sort((p, q) => Number(q[2] ?? 0) - Number(p[2] ?? 0)));
   const done = () => new Set(all.map((w) => w.link)), failed = left.filter((l) => !done().has(l));
-  if (failed.length) threader(faces, owner, add, { number, keep: pair(s, t), cost, tag: 's' }).through(failed);
+  const shortest = failed.length ? threader(faces, owner, add, { number, keep: pair(s, t), cost, tag: 's', most: most - strict.tally.work }) : null;
+  shortest?.through(failed);
   // Then tightened as the flow's are, but only the wires of links: a border is never threaded again.
   if (!failed.length) (strict.prune(all), strict.again(all.filter((w) => w.link?.wire), tighten));
-  const live = [...new Set(owner.values())];
-  return { g: { wires: live, owner, faces }, number, s, t, outerAt: faces.findIndex(isOuter), loose: failed.length, lost: left.filter((l) => !done().has(l)).length, line, ways };
+  const live = [...new Set(owner.values())], work = strict.tally.work + (shortest?.tally.work ?? 0) + faces.length;
+  return { g: { wires: live, owner, faces }, number, s, t, outerAt: faces.findIndex(isOuter), loose: failed.length, lost: left.filter((l) => !done().has(l)).length, line, ways, work };
 }
 
 /** What a tried embedding comes to: wires against their way, crossings, ports, and wires that cross a border twice. */
@@ -99,12 +100,17 @@ export function embedding(m, { headless = [], islandOf = () => null, trunks: joi
   const where = new Map([...steps.map((id) => [id, islandOf(id) ?? null]), ...junctions.map((j) => [j.id, j.island])]);
   const placeOf = (id) => where.get(id) ?? null, madeOf = new Map([...steps.map((id) => [id, made(id)]), ...junctions.map((j) => [j.id, made(j.end)])]);
   const islands = [...new Set([...where.values()].filter((i) => i !== null))], ids = [...where.keys()];
-  // As many lines are tried as the work allows, in wires squared, within the least and the most.
-  const count = tries ?? Math.max(sizes.planarize_tries_least, Math.min(sizes.planarize_tries_most, Math.ceil(sizes.planarize_work / Math.max(1, wires.length ** 2))));
-  let best = null;
+  // As many lines are tried as the work allows, counted in what the first try's searches looked at (never timed, so a
+  // picture is the same each time), within the least and the most. The least is cut too where one try alone spends
+  // the work: a big picture takes one line, not eight of them.
+  const countFor = (work) => tries ?? Math.max(work * sizes.planarize_tries_least > sizes.planarize_work ? 1 : sizes.planarize_tries_least, Math.min(sizes.planarize_tries_most, Math.floor(sizes.planarize_work / Math.max(1, work))));
+  let best = null, count = 1;
   const less = (a, b) => { for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return a[k] < b[k]; return false; };
   for (let k = 0; k < count; k++) {
-    const tried = attempt({ ids, wires, placeOf, made: (id) => madeOf.get(id), islands, tighten: sizes.planarize_tighten }, k, oneWay), seen = measured(tried);
+    // The first try may spend no more than planarize_most_work, where the style says it: past that it throws (tooMuch).
+    const most = !k && typeof sizes.planarize_most_work === 'number' ? sizes.planarize_most_work : Infinity;
+    const tried = attempt({ ids, wires, placeOf, made: (id) => madeOf.get(id), islands, tighten: sizes.planarize_tighten, most }, k, oneWay), seen = measured(tried);
+    if (!k) count = countFor(tried.work);
     const score = [seen.twice, tried.lost, seen.up.length, seen.crossings.length];
     if (!best || less(score, best.score)) best = { ...tried, ...seen, score, k };
   }
@@ -122,7 +128,7 @@ export function embedding(m, { headless = [], islandOf = () => null, trunks: joi
     counts: {
       steps: steps.length, wires: wires.length, turned: best.ways.filter((w) => w.turned).length, byIslands: best.ways.filter((w) => w.byIslands).length,
       ties: ways.filter((w) => !w.directed).length, trunks, crossings: best.crossings.length, up: best.up.length, twice: best.twice, loose: best.loose,
-      lost: best.lost, ports: Object.fromEntries([...ports].map(([island, list]) => [island, list.length])), tried: best.k,
+      lost: best.lost, tries: count, work: best.work, ports: Object.fromEntries([...ports].map(([island, list]) => [island, list.length])), tried: best.k,
     },
   };
   stage('planarized', { line: out.line, faces: out.faces, crossings: out.crossings, ports: out.ports, counts: out.counts });

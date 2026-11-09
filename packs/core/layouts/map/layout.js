@@ -54,6 +54,36 @@ function landOf(lines) {
 }
 
 /**
+ * A picture too large to wire (bug e_a9w5jeme), placed plainly: each island's boxes in rows inside its frame, the
+ * islands side by side in shelves toward the picture's shape, and no wire. `unwired` says how many links were left out.
+ */
+function plainly(args, m, islandOf, heads) {
+  const { sizes } = args, GAP = sizes.flow_node_gap, PAD = sizes.flow_island_pad, SEA = sizes.flow_island_sea, M = sizes.flow_margin;
+  const groups = new Map();
+  for (const [id, n] of m.nodes) (groups.get(islandOf(id) ?? null) ?? groups.set(islandOf(id) ?? null, []).get(islandOf(id) ?? null)).push(n);
+  const blocks = [...groups].map(([island, list]) => {
+    const cw = Math.max(...list.map((n) => n.w)) + GAP, ch = Math.max(...list.map((n) => n.h)) + GAP, columns = Math.max(1, Math.round(Math.sqrt(list.length * ch / cw * 2)));
+    const rows = Math.ceil(list.length / columns), pad = island === null ? 0 : PAD, top = pad + (island === null ? 0 : heads.get(island) ?? 0);
+    return { island, list, cw, ch, columns, top, pad, w: Math.min(columns, list.length) * cw - GAP + 2 * pad, h: top + rows * ch - GAP + pad };
+  });
+  // Shelves as wide as the whole would be at the picture's shape.
+  const area = blocks.reduce((s, b) => s + (b.w + SEA) * (b.h + SEA), 0), wide = Math.max(...blocks.map((b) => b.w), Math.sqrt(area * (args.aspect ?? 1.6)));
+  const x = new Map(), y = new Map(), islands = [];
+  let cx = M, cy = M, shelf = 0;
+  for (const b of blocks) {
+    if (cx > M && cx + b.w > M + wide) (cx = M), (cy += shelf + SEA), (shelf = 0);
+    b.list.forEach((n, k) => {
+      x.set(n.id, cx + b.pad + (k % b.columns) * b.cw + n.w / 2);
+      y.set(n.id, cy + b.top + Math.floor(k / b.columns) * b.ch + n.h / 2);
+    });
+    if (b.island !== null) islands.push({ id: b.island, rect: [cx, cy, cx + b.w, cy + b.h], land: [{ l: cx, t: cy, r: cx + b.w, b: cy + b.h }] });
+    cx += b.w + SEA;
+    shelf = Math.max(shelf, b.h);
+  }
+  return { m, nodes: m.nodes, x, y, chains: [], ties: [], islands, ports: [], unwired: m.chains.length + m.ties.length };
+}
+
+/**
  * The whole picture of `args` (as the flow's layout is given them): `islandOf(id)` where a step lives, `heads(island)`
  * how tall its name and legend stand over what it holds. Answers the kit's graph, the relaxed places, the model's
  * `x`, `y`, `nodes`, `chains` and `ties`, and each island's frame and ports.
@@ -65,8 +95,14 @@ export function laidOut(args, { islandOf = () => null, heads = new Map() } = {})
     const x = new Map([...m.nodes].map(([id, n]) => [id, sizes.flow_margin + n.w / 2])), y = new Map([...m.nodes].map(([id, n]) => [id, sizes.flow_margin + n.h / 2]));
     return { m, nodes: m.nodes, x, y, chains: [], ties: [], islands: [], ports: [] };
   }
-  const e = embedding(m, { sizes, headless, islandOf: (id) => islandOf(id) ?? null });
-  const input = asInput(e, m), afford = (work) => spend(args.effort, work), sketch = shape(input, { afford });
+  let e;
+  try {
+    e = embedding(m, { sizes, headless, islandOf: (id) => islandOf(id) ?? null });
+  } catch (err) {
+    if (!err?.tooMuch) throw err;
+    return plainly(args, m, islandOf, heads);
+  }
+  const input = asInput(e, m), afford = (work) => spend(args.effort, work), sketch = shape(input, { afford, span: sizes.shape_back_run, batch: sizes.shape_flow_batch });
   stage('shaped', { bends: sketch.bends, nodes: sketch.nodes.length, wires: sketch.wires.length });
   const r = relax(sketch, { size: (n) => (m.nodes.has(n.id) ? [m.nodes.get(n.id).w, m.nodes.get(n.id).h] : [0, 0]), sizes, heads, afford });
   const M = sizes.flow_margin, to = ([px, py]) => [px + M, py + M];
@@ -118,5 +154,5 @@ export function layout(args) {
   const a = laidOut(args);
   const done = finish({ nodes: a.nodes, x: a.x, y: a.y, chains: a.chains, ties: a.ties, potential: a.m.potential, margin: args.sizes.flow_margin });
   stage('finish', { chains: done.chains.map((w) => w.points), ties: done.ties.map((w) => w.points) });
-  return Object.assign(done, { raw: { args } });
+  return Object.assign(done, { raw: { args }, ...(a.unwired && { unwired: a.unwired }) });
 }

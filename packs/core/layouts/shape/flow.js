@@ -26,10 +26,10 @@ function heap() {
 
 /**
  * The cheapest flow over `n` nodes: `supply[v]` is what v gives (below zero, what it takes), and each arc is
- * { from, to, low?, cap?, cost? }. Answers the flow on each arc, in their order, and its cost; throws where no flow
- * meets every need, saying how much was left unmet.
+ * { from, to, low?, cap?, cost? }; from `batch` arcs up, every shortest path a search finds is sent at once. Answers the
+ * flow on each arc, in their order, and its cost; throws where no flow meets every need, saying how much was left unmet.
  */
-export function minCostFlow(n, supply, arcs) {
+export function minCostFlow(n, supply, arcs, { batch = Infinity } = {}) {
   const give = supply.slice();
   let total = 0;
   for (const a of arcs) {
@@ -53,7 +53,7 @@ export function minCostFlow(n, supply, arcs) {
     add(a.from, a.to, Math.min(big, (a.cap ?? Infinity) - (a.low ?? 0)), a.cost ?? 0);
   }
   give.forEach((g, v) => { if (g > 0) add(S, v, g, 0); else if (g < 0) add(v, T, -g, 0); });
-  const pot = new Array(size).fill(0), dist = new Array(size), prev = new Array(size);
+  const pot = new Array(size).fill(0), dist = new Array(size), prev = new Array(size), level = new Array(size), next = new Array(size);
   let sent = 0, spent = 0;
   while (sent < total) {
     dist.fill(Infinity);
@@ -77,10 +77,58 @@ export function minCostFlow(n, supply, arcs) {
     // Each potential rises by its distance, but no further than the sink's, so an arc from a node not reached keeps a
     // reduced cost of zero or more.
     for (let v = 0; v < size; v++) pot[v] += Math.min(dist[v], dist[T]);
-    let push = total - sent;
-    for (let v = T; v !== S; v = to[prev[v] ^ 1]) push = Math.min(push, cap[prev[v]]);
-    for (let v = T; v !== S; v = to[prev[v] ^ 1]) { cap[prev[v]] -= push; cap[prev[v] ^ 1] += push; spent += push * cost[prev[v]]; }
-    sent += push;
+    // Every shortest path the search found is sent along at once: a blocking flow over the arcs whose reduced cost is now
+    // zero, as many as they hold, before the next search (primal-dual). One path a search was the 34,882 searches of bug e_a9w5jeme.
+    const tight = (k, u) => cap[k] > 0 && cost[k] + pot[u] - pot[to[k]] === 0, had = sent;
+    if (arcs.length >= batch) for (;;) {
+      level.fill(-1);
+      level[S] = 0;
+      const queue = [S];
+      for (let q = 0; q < queue.length && level[T] < 0; q++) {
+        const u = queue[q];
+        for (const k of head[u]) if (level[to[k]] < 0 && tight(k, u)) { level[to[k]] = level[u] + 1; queue.push(to[k]); }
+      }
+      if (level[T] < 0) break;
+      next.fill(0);
+      for (let pushed = true; pushed && sent < total;) {
+        pushed = false;
+        // One path down the levels, each node's arcs tried from where it last left off.
+        const path = [];
+        let u = S;
+        while (u !== T) {
+          const arcs = head[u];
+          while (next[u] < arcs.length) {
+            const k = arcs[next[u]];
+            if (level[to[k]] === level[u] + 1 && tight(k, u)) break;
+            next[u]++;
+          }
+          if (next[u] === arcs.length) {
+            if (u === S) break;
+            level[u] = -1;
+            u = to[path.pop() ^ 1];
+            next[u]++;
+            continue;
+          }
+          const k = arcs[next[u]];
+          path.push(k);
+          u = to[k];
+        }
+        if (u !== T) break;
+        let push = total - sent;
+        for (const k of path) push = Math.min(push, cap[k]);
+        for (const k of path) { cap[k] -= push; cap[k ^ 1] += push; spent += push * cost[k]; }
+        sent += push;
+        pushed = true;
+      }
+      if (sent >= total) break;
+    }
+    // Costs that are not whole numbers may leave no arc exactly tight: then the one path the search found is sent.
+    if (sent === had) {
+      let push = total - sent;
+      for (let v = T; v !== S; v = to[prev[v] ^ 1]) push = Math.min(push, cap[prev[v]]);
+      for (let v = T; v !== S; v = to[prev[v] ^ 1]) { cap[prev[v]] -= push; cap[prev[v] ^ 1] += push; spent += push * cost[prev[v]]; }
+      sent += push;
+    }
   }
   const flow = arcs.map((a, i) => (a.low ?? 0) + cap[slot[i] + 1]);
   return { flow, cost: spent + arcs.reduce((s, a) => s + (a.low ?? 0) * (a.cost ?? 0), 0) };

@@ -31,6 +31,18 @@ test('flow: a least on an arc is carried, and a circulation costs what its least
   assert.equal(cost, 2 * 2);
 });
 
+test('flow: every shortest path sent at once costs what one at a time does', () => {
+  // A grid of arcs with ties in cost, many givers and takers: the batched solve (bug e_a9w5jeme) finds a flow as cheap.
+  const n = 36, arcs: { from: number; to: number; cap: number; cost: number }[] = [];
+  for (let v = 0; v < n; v++) for (const u of [v + 1, v + 6]) if (u < n && (u !== v + 1 || u % 6)) arcs.push({ from: v, to: u, cap: 3 + (v % 4), cost: (v * 7 + u) % 3 }, { from: u, to: v, cap: 2, cost: 1 + (u % 2) });
+  const supply = Array.from({ length: n }, (_, v) => (v < 6 ? 4 : v >= 30 ? -4 : 0));
+  const one = minCostFlow(n, supply, arcs), many = minCostFlow(n, supply, arcs, { batch: 0 });
+  assert.equal(many.cost, one.cost);
+  const net = new Array(n).fill(0);
+  arcs.forEach((a, i) => { assert.ok(many.flow[i] >= 0 && many.flow[i] <= a.cap); net[a.from] -= many.flow[i]; net[a.to] += many.flow[i]; });
+  assert.deepEqual(net.map((x, v) => x + supply[v]), new Array(n).fill(0), 'every need met');
+});
+
 test('flow: a need nothing can meet is said, not hidden', () => {
   assert.throws(() => minCostFlow(2, [2, -2], [{ from: 0, to: 1, cap: 1 }]), /unmet/);
   assert.throws(() => minCostFlow(2, [1, -2], []), /balance/);

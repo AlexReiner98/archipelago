@@ -379,7 +379,11 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
   });
   const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, isles.layer, tieLayer, wireLayer, stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark));
   // The picture's key; on an archipelago none, each island carrying its own.
-  const key = parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 });
+  const key = [
+    // A picture too large to wire says so, and how many links it leaves out (bug e_a9w5jeme).
+    ...(g.unwired ? [{ label: `${g.unwired} link${g.unwired === 1 ? '' : 's'} not drawn: too many to wire` }] : []),
+    ...(parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 })),
+  ];
 
   // What stays lit, as the style says: the rest dimmed. Where the lens's words found some of what is drawn and not all,
   // what they found is lit.
