@@ -1,5 +1,5 @@
-// A plan's usage drawn as meters: a band for each limit (core's usage view answers them as items, each part part_of
-// its limit), its name and how much is used of what the plan allows, a bar filled to that share, warn or bad when
+// A workspace's usage drawn as meters: a band for each limit (core's usage view answers them as items, each part part_of
+// its limit), its name and how much is used of what its limit allows, a bar filled to that share, warn or bad when
 // near or over, and under it what the use is made of. Storage's parts are shares of its bar, each in a colour, and
 // listed first under it in that colour (Made of); every other part is a row in a list under its bar (by type, the
 // largest items, the sessions at work, who asked), its name, a small bar of its share and its number, leading to its
@@ -40,7 +40,7 @@ export function picture({ answer, style = {} }) {
     const parts = partsOf.get(limit.id);
     const shares = parts.filter((p) => p.use.as === 'share');
     const rows = parts.filter((p) => p.use.as === 'row');
-    // The bar: the plan's allowance as its track, filled to what is used, by its shares where it has them.
+    // The bar: the limit as its track, filled to what is used, by its shares where it has them.
     let x = 0;
     const fill = shares.length
       ? shares.map((p, n) => {
@@ -74,7 +74,7 @@ export function picture({ answer, style = {} }) {
   };
 
   const when = answer.as_of ? new Date(answer.as_of) : null;
-  const head = m('div', { class: 'mt-head' }, m('span', {}, 'Limits'), when && m('span', { title: when.toISOString() }, `as of ${when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`));
+  const head = m('div', { class: 'mt-head' }, m('span', {}, 'Usage'), when && m('span', { title: when.toISOString() }, `as of ${when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`));
   const stage = m('div', { class: 'mt-stage' }, head, limits.map(band));
   return { scene: { css: [css, ...rules].join('\n'), svg: stage, key: [] }, on: () => [] };
 }

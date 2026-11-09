@@ -27,7 +27,6 @@ test('a band for each limit: its number, a bar filled to its share, and its shar
     part('use:sessions:e_bbbb0000', 'sessions', 'Iona', { as: 'row', list: 'At work', used: 1, shown: '1', share: 0.2, item: 'e_bbbb0000' }),
   ];
   const answer = {
-    plan: 'Solo',
     as_of: '2026-10-29T12:00:00.000Z',
     items: [limit('storage', { used: 350e6, shown: '350 MB', of: 500e6, of_shown: '500 MB', share: 0.7 }), limit('sessions', { used: 5, shown: '5', of: 5, of_shown: '5 agent sessions at once', share: 1, near: true, over: true }), ...pieces.map((p) => p[0])],
     links: pieces.map((p) => p[1]),
@@ -53,10 +52,10 @@ test('a band for each limit: its number, a bar filled to its share, and its shar
 });
 
 test('with no limits there is no allowance, and with no limits to draw it says so', () => {
-  const { scene } = picture({ answer: { plan: null, items: [limit('storage', { used: 10e6, shown: '10 MB', share: 1 })], links: [] }, style: {} });
+  const { scene } = picture({ answer: { items: [limit('storage', { used: 10e6, shown: '10 MB', share: 1 })], links: [] }, style: {} });
   const all = marks(scene.svg);
   assert.ok(all.some((x) => x[0] === 'strong' && x[2] === '10 MB'));
   assert.ok(!JSON.stringify(scene.svg).includes(' of '), 'no "of" where nothing is allowed');
-  assert.ok(all.some((x) => x[2] === 'No plan limits'));
+  assert.ok(all.some((x) => x[2] === 'Usage'));
   assert.ok(picture({ answer: { items: [], links: [] }, style: {} }).scene.message);
 });
