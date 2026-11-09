@@ -996,14 +996,14 @@
       "when": { "actor": "agent", "op": "publish" },
       "then": "refuse",
       "lifted": "agent_publish",
-      "say": "Publishing is the owner’s here: they allow agents on the Workspace page, under Publishing. Ask them with publish_ask."
+      "say": "Publishing is the owner’s here: they allow agents in Settings, under Agents. Ask them with publish_ask."
     },
     {
       "id": "agent_backups",
       "when": { "actor": "agent", "op": "backup_download" },
       "then": "refuse",
       "lifted": "agent_backups",
-      "say": "Agents may not download this workspace’s backups: the owner allows it on the Workspace page, under Backups."
+      "say": "Agents may not download this workspace’s backups: the owner allows it in Settings, under Agents."
     },
     {
       "id": "draw_answers",

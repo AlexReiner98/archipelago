@@ -82,10 +82,12 @@ export async function workspace() {
   // Each section drawn only when it is open: some of its cards read the server.
   const sections = {
     people: () => [
-      (admin || !info.owner) && card('Owner', null, h('ul', { class: 'rows' }, ownerRow(info.owner, workspace))),
+      // With sign-in, the owner is whoever the workspace was made for, by their address (marked under Members); with
+      // none, the person at this machine says who they are here.
+      !tokensOn && card('Owner', null, h('ul', { class: 'rows' }, ownerRow(info.owner, workspace))),
       tokensOn && me.actor.admin && planCard(info.member_limit, info.use, info.ended),
       // A workspace for one person (its limit is one, and it has no more) has no members to manage.
-      tokensOn && me.actor.admin && !(info.member_limit?.members === 1 && members.length <= 1) && at('team', membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow: row, then: workspace, fail, say })),
+      tokensOn && me.actor.admin && !(info.member_limit?.members === 1 && members.length <= 1) && at('team', membersCard({ me, owner: info.owner?.id, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow: row, then: workspace, fail, say })),
     ],
     // What is connected first; the steps to connect another only once asked for (or a step of Start here leads to them).
     agents: () => [
@@ -98,10 +100,10 @@ export async function workspace() {
     connections: () => [at('connections', connectionsCard(...githubRow(), notificationsRow(info, workspace, fail)))],
   };
   // What a person who is not an admin may change is only their own agent tokens.
-  const shown = SECTIONS.filter(([key]) => admin || (key === 'agents' && tokensOn) || (key === 'people' && !info.owner));
+  const shown = SECTIONS.filter(([key]) => admin || (key === 'agents' && tokensOn) || (key === 'people' && !tokensOn && !info.owner));
   if (!shown.some(([key]) => key === open)) open = shown[0]?.[0] ?? 'agents';
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name, ' ', me.actor.admin && me.workspace.id !== 'default' && h('a', { href: '#/workspace', title: 'Give this workspace another name', onclick: rename }, 'Rename'))),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Settings'), h('p', { class: 'muted' }, me.workspace.name, ' ', me.actor.admin && me.workspace.id !== 'default' && h('a', { href: '#/workspace', title: 'Give this workspace another name', onclick: rename }, 'Rename'))),
     shown.length > 1 && h('div', { class: 'switch ws-sections', role: 'tablist' }, shown.map(([key, label, tip]) => h('button', { class: key === open ? 'on' : '', role: 'tab', title: tip, onclick: () => go(key) }, label))),
     h('div', { class: 'ws-notice' }, notice),
     h('div', { class: 'grid' }, sections[open]()),

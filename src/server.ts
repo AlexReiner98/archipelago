@@ -177,7 +177,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     if (identity.newPlace)
       await notify(ws.pelago, { kind: 'agent', name: 'pelago' }, {
         title: `The token "${identity.actor.name}" was used from a new place`,
-        body: `It was used from ${identity.newPlace}, where it had not been used before. A machine that has moved networks does this. If it is not one of yours, revoke the token on the Workspace screen: whoever has it can act as that ${identity.actor.kind}.`,
+        body: `It was used from ${identity.newPlace}, where it had not been used before. A machine that has moved networks does this. If it is not one of yours, revoke the token in Settings: whoever has it can act as that ${identity.actor.kind}.`,
         level: 'warning',
       }).catch((err) => console.error(`notify: ${(err as Error).message}`));
     // A token's identity is fixed; an agent may add a label to say which session it is.

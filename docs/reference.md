@@ -780,9 +780,12 @@ change that:
   or an application's own scheme. It needs `PELAGO_PUBLIC_HOST` for an https
   address, and a server with `auth` off offers none of it. A token pasted by
   hand works as ever, for a client that cannot sign in.
-- **First start gives two secrets, once:** your human token for the default
-  workspace, and the operator secret. At a terminal they are printed; with
-  nobody at one (a container, a service) they are written to
+- **First start needs the owner's address and mail:** set
+  `PELAGO_OWNER_EMAIL` and `PELAGO_MAIL_FROM`; without them a server with
+  tokens on does not start. The owner becomes the default workspace's first
+  admin and is mailed a link to sign in: people sign in by email, never by
+  pasting a token. The operator secret is given once: printed at a terminal,
+  or with nobody at one (a container, a service) written to
   `first-start-secrets.txt` beside the data folder, readable only by the
   server's user, and the log says only where. Read it, then delete it.
 - **Tokens** are made with `token_create`, listed with `token_list` and
@@ -825,7 +828,7 @@ change that:
   hook on to that server with the token, or to the server on this machine
   when the variables are not set. So a session registers, hears what the
   owner did and closes on the same map its tools write to.
-- **Using a token:** paste it into the web UI's sign-in screen; set
+- **Using a token:** a person signs in by email, not with a token; set
   `PELAGO_TOKEN` for the CLI; for Claude Code by hand, add
   `"headers": { "Authorization": "Bearer ${PELAGO_AGENT_TOKEN}" }` to the
   `pelago` entry in `.mcp.json`, and the same header to each hook.

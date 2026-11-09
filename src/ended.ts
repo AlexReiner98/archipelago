@@ -46,7 +46,7 @@ const day = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 export async function stillWritable(workspace: string): Promise<void> {
   const ended = await endedOf(workspace);
   if (!ended) return;
-  throw new Error(`This workspace ended on ${day(ended.since)} and is read-only: it is deleted on ${day(ended.delete_at)}. Download its backup on the Workspace page.${ended.note ? ` ${ended.note}` : ''}`);
+  throw new Error(`This workspace ended on ${day(ended.since)} and is read-only: it is deleted on ${day(ended.delete_at)}. Download its backup in Settings.${ended.note ? ` ${ended.note}` : ''}`);
 }
 
 /** The control values: read, set and lifted only by the server and its packs. */

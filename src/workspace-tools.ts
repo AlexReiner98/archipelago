@@ -62,7 +62,7 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
     humanOnly: true,
     input: {},
     run: async (l) => {
-      const { rows } = await l.db.query<{ id: string; title: string }>(`select e.id, e.title from setting s join entity e on e.id = s.value #>> '{}' where s.key = 'me'`);
+      const { rows } = await l.db.query<{ id: string; title: string }>(`select id, title from entity where id = $1`, [(await l.setting<string>('me')) ?? '']);
       const limits = await limitOf(l.workspace);
       // Whether anything has been put here yet beyond who is in it and how the app is set up.
       const started = (await l.db.query(`select 1 from entity where type <> all($1::text[]) and ${notKernel(l.registry)} and archived_at is null limit 1`, [l.registry.family('actor')])).rows.length > 0;

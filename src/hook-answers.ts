@@ -76,7 +76,7 @@ const HEARD_MS = 7 * 86_400_000;
 const heardKey = (session: string | undefined) => `heard:${session ?? ''}`;
 
 const LIMITED =
-  'This machine’s Archipelago token is limited to some repositories, and this folder is not a checkout of one that is theirs: the session is not registered in Archipelago, and its work is not kept there. Tell the owner in your first reply; a token for this repository is made on the Workspace screen.';
+  'This machine’s Archipelago token is limited to some repositories, and this folder is not a checkout of one that is theirs: the session is not registered in Archipelago, and its work is not kept there. Tell the owner in your first reply; a token for this repository is made in Settings.';
 
 const actionsKey = (session: string | undefined) => `actions:${session ?? ''}`;
 
