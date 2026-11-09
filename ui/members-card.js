@@ -5,8 +5,8 @@
 import { api, ask, h } from './base.js';
 import { ago, menu } from './words.js';
 
-/** members: from member_list. others: the live human tokens of nobody listed. then: draw the page again; say: put a word at its top. */
-export function membersCard({ me, members, others, tokenRow, then, fail, say }) {
+/** members: from member_list. owner: the person the workspace was made for. others: the live human tokens of nobody listed. then: draw the page again; say: put a word at its top. */
+export function membersCard({ me, owner, members, others, tokenRow, then, fail, say }) {
   const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', style: 'flex: 2; min-width: var(--input-least)', autocomplete: 'off' });
   const name = h('input', { type: 'text', placeholder: 'Name (optional)', style: 'flex: 1; min-width: var(--input-least)' });
   const admin = h('input', { type: 'checkbox' });
@@ -26,8 +26,8 @@ export function membersCard({ me, members, others, tokenRow, then, fail, say }) 
       'li',
       { class: 'one' },
       h('span', { class: 'grow', title: m.email }, h('strong', {}, m.name ?? m.email), ' ', h('span', { class: 'muted small' }, m.last_used ? ['signed in ', ago(m.last_used)] : 'not signed in yet')),
-      m.admin && h('span', { class: 'pill' }, 'admin'),
-      you && h('span', { class: 'pill ok' }, 'you'),
+      m.person_id === owner ? h('span', { class: 'muted small', title: 'The workspace was made for them' }, 'owner') : m.admin && h('span', { class: 'muted small' }, 'admin'),
+      you && h('span', { class: 'muted small' }, 'you'),
       you
         ? h('span', { class: 'menu-room' })
         : menu('⋯', [

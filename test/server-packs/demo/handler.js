@@ -7,7 +7,7 @@ export default {
   },
   async paid(body, ctx) {
     const request = await ctx.store.get(`request:${body.request}`);
-    const { workspace } = await ctx.act('workspace.create', { name: request.name });
+    const { workspace } = await ctx.act('workspace.create', { name: request.name, email: request.email });
     await ctx.act('workspace.admit', { workspace: workspace.id, email: request.email, admin: true });
     await ctx.store.put(`made:${body.request}`, { workspace: workspace.id, email: request.email });
     return { answer: { workspace: workspace.id } };

@@ -12,7 +12,7 @@ import { createToken } from './auth.ts';
 import { controlValue, setControlValue, takeControlValue } from './control.ts';
 import { stillWritable } from './ended.ts';
 import type { Q } from './db.ts';
-import { normalEmail, sendMail } from './mail.ts';
+import { mailConfigured, normalEmail, sendMail } from './mail.ts';
 import { configurePlan, limitOf, limitsChanged, type Limits } from './plan.ts';
 import { indexMember } from './control-index.ts';
 import { wholeMap } from './outbox.ts';
@@ -94,6 +94,23 @@ export async function admitMember(whole: Archipelago, email: string, admin: bool
   );
   await noted(email, whole.workspace, true);
   return person;
+}
+
+/**
+ * A new workspace's owner, by their address: every workspace is made with one, on a server that sends mail, so
+ * someone can always sign in to it by email (the owner, 8 Nov 2026). Every way a workspace is made asks here first.
+ */
+export function ownerEmail(given: unknown): string {
+  if (!mailConfigured()) throw new Error('This server sends no mail (set PELAGO_MAIL_FROM): a workspace is made only where its owner can sign in by email.');
+  const email = normalEmail(given);
+  if (!email) throw new Error("A workspace is made with its owner's email address (email), so they can sign in to it.");
+  return email;
+}
+
+/** The addresses of a workspace's admins: whoever can sign in to it by email and manage it (the operator's list). */
+export async function adminEmails(whole: Archipelago): Promise<string[]> {
+  const { rows } = await whole.db.query<{ email: string }>(`select email from member where admin and removed_at is null order by added_at`);
+  return rows.map((r) => r.email);
 }
 
 /** On a workspace with a member limit a person signs in as a member: a human token for anyone else would be a seat unpaid for. */
@@ -182,7 +199,7 @@ async function redeemWith(db: Q, workspace: string, key: string): Promise<string
  * to an address in none, where to begin one (start) if this server offers that. Nothing is said back either way, so
  * the page cannot be used to learn who is a member where.
  */
-export async function requestSignIn(workspaces: { id: string; name: string; db: () => Promise<Q> }[], email: string, origin: string, start?: string): Promise<void> {
+export async function requestSignIn(workspaces: { id: string; name: string; db: () => Promise<Q> }[], email: string, origin: string = site.origin, start?: string): Promise<void> {
   const links: string[] = [];
   for (const ws of workspaces) {
     const db = await ws.db();

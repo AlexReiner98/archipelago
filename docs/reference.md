@@ -703,9 +703,12 @@ change that:
   or an application's own scheme. It needs `PELAGO_PUBLIC_HOST` for an https
   address, and a server with `auth` off offers none of it. A token pasted by
   hand works as ever, for a client that cannot sign in.
-- **First start gives two secrets, once:** your human token for the default
-  workspace, and the operator secret. At a terminal they are printed; with
-  nobody at one (a container, a service) they are written to
+- **First start needs the owner's address and mail:** set
+  `PELAGO_OWNER_EMAIL` and `PELAGO_MAIL_FROM`; without them a server with
+  tokens on does not start. The owner becomes the default workspace's first
+  admin and is mailed a link to sign in: people sign in by email, never by
+  pasting a token. The operator secret is given once: printed at a terminal,
+  or with nobody at one (a container, a service) written to
   `first-start-secrets.txt` beside the data folder, readable only by the
   server's user, and the log says only where. Read it, then delete it.
 - **Tokens** are made with `token_create`, listed with `token_list` and
@@ -748,7 +751,7 @@ change that:
   hook on to that server with the token, or to the server on this machine
   when the variables are not set. So a session registers, hears what the
   owner did and closes on the same map its tools write to.
-- **Using a token:** paste it into the web UI's sign-in screen; set
+- **Using a token:** a person signs in by email, not with a token; set
   `PELAGO_TOKEN` for the CLI; for Claude Code by hand, add
   `"headers": { "Authorization": "Bearer ${PELAGO_AGENT_TOKEN}" }` to the
   `pelago` entry in `.mcp.json`, and the same header to each hook.
@@ -759,12 +762,16 @@ change that:
   In the web UI: signed in to the default workspace as its admin, open the
   Workspace screen, **Packs**, and the **Workspaces** card. Type the operator
   secret there (the page keeps it in its memory alone, never stored, so a
-  reload asks again), give an id and a name, and press **Make workspace**:
-  its owner token is shown once. The request does the same from the
+  reload asks again), give an id, a name and the owner's email address, and
+  press **Make workspace**: the owner is its first admin and signs in by
+  email, and an owner token is shown once. A workspace is made only on a
+  server that sends mail (`PELAGO_MAIL_FROM`), and always with its owner's
+  address; one made from a backup brings its members. The list shows each
+  workspace's admins, and **no email** on one nobody can sign in to by email. The request does the same from the
   server's own machine, or from anywhere the page's address is:
 
   ```bash
-  curl -X POST http://127.0.0.1:3100/operator/workspaces -H "content-type: application/json" -H "Authorization: Bearer <operator secret>" -d '{"id":"acme","name":"Acme Architects"}'
+  curl -X POST http://127.0.0.1:3100/operator/workspaces -H "content-type: application/json" -H "Authorization: Bearer <operator secret>" -d '{"id":"acme","name":"Acme Architects","email":"owner@acme.example"}'
   ```
 
   The operator secret can create and list workspaces, and issue a workspace a
@@ -867,5 +874,10 @@ on your own laptop.
 npm test            # the fast set: all but the slow files test/sets.ts names
 npm run test:full   # every file, as CI runs them (CI is the gate: not needed before a push)
 npm run test:changed  # what this branch's changes can reach
+npm test -- test/a.test.ts  # just those files: what to run while working
 npm run typecheck
 ```
+
+One run uses the machine at a time: a second, from any worktree, waits for it
+(`test/lock.ts`). A run of a set skips the files that passed on the same code
+before (`test/passes.ts`); `--no-cache` runs them all.

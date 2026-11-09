@@ -194,81 +194,108 @@ export async function api(tool, input = {}) {
 // Signed out, the style is not read with the rest: its colours are asked for on their own.
 const themeSignedOut = () => fetch('/connect/theme').then((r) => r.json()).then(applyTheme, () => undefined);
 
-export function signIn(message, title = 'Sign in') {
+/**
+ * A page for whoever is not in a workspace yet, or is asked something before they are (sign in, agree, sign up,
+ * Allow a client): one column in the middle, with no canvas, tabs or find behind it (ui/shell.css, [data-gate]).
+ */
+export function gate(title, ...kids) {
   themeSignedOut();
-  const email = h('input', { type: 'text', inputmode: 'email', placeholder: 'Email', style: 'flex: 1; min-width: var(--input-wide)', autocomplete: 'email' });
-  const input = h('input', { type: 'text', placeholder: 'pel_…', style: 'flex: 1; min-width: var(--input-wide)', autocomplete: 'off' });
-  const error = h('div', { class: 'error', style: 'padding: 0 var(--space-8) var(--space-8)' }, message ?? '');
-  const byEmail = h('div', { class: 'toolbar', style: 'padding: var(--space-8)' });
+  document.body.dataset.gate = 'on';
+  document.body.dataset.sheet = 'open';
+  document.querySelector('#nav .brand').replaceChildren('Archipelago');
+  document.title = title === 'Sign in' ? 'Archipelago' : `${title} · Archipelago`;
+  main.replaceChildren(h('div', { class: 'gate' }, h('img', { class: 'gate-mark', src: '/favicon.png', alt: '' }), h('h1', {}, title), ...kids));
+}
+/** Into the workspace: the page is the app again. */
+export const ungate = () => delete document.body.dataset.gate;
+/** One line of a gate's page: a field and its button, or words and a link; never wraps. */
+export const gateRow = (...kids) => h('div', { class: 'gate-row' }, ...kids);
+
+const postJson = (path, body) => fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+/** `back`: drawn from inside a workspace (Another workspace, in the menu), so there is a way back to it; `email`: the address to start from. */
+export function signIn(message, title = 'Sign in', { back = false, email: given = '' } = {}) {
+  const error = h('div', { class: 'error gate-error' }, message ?? '');
+  const fail = (text) => (error.textContent = text);
   // Someone a client sent here to connect, with no account yet, came by MCP: where they begin says so (?ref=mcp).
   const ref = waitingOnSignIn() ? 'mcp' : undefined;
-  const sendLink = async () => {
-    const res = await fetch('/connect/sign-in', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email.value.trim(), ref }) });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) return (error.textContent = body.error ?? 'That did not work.');
-    error.textContent = '';
-    // The mail's link opens in the browser mail opens in; its code can be typed here, in whichever browser asked.
-    const code = h('input', { type: 'text', placeholder: 'Code from the email', style: 'flex: 1', autocomplete: 'one-time-code', autocapitalize: 'characters' });
-    const typed = async () => {
-      const res = await fetch('/connect/code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: body.sent_to, code: code.value }) });
+  const email = h('input', { type: 'email', placeholder: 'Email', autocomplete: 'email', spellcheck: false, value: given });
+  const send = h('button', { class: 'primary' }, 'Email me a link');
+
+  // Step two: the link and a code are in the mail. The code is typed here, in whichever browser asked.
+  const codeStep = (sentTo) => {
+    const code = h('input', { type: 'text', placeholder: 'Code from the email', autocomplete: 'one-time-code', autocapitalize: 'characters', spellcheck: false });
+    const go = h('button', { class: 'primary' }, 'Sign in');
+    const typed = async (agree) => {
+      go.disabled = true;
+      const res = await postJson('/connect/code', { email: sentTo, code: code.value.trim(), ...(agree && { agree }) });
       const given = await res.json().catch(() => ({}));
-      if (!res.ok) return (error.textContent = given.error ?? 'That code was not accepted.');
-      if (given.agree) return agreeFirst(given.agree, (agree) => fetch('/connect/code', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: body.sent_to, code: code.value, agree }) }));
+      go.disabled = false;
+      if (!res.ok) return fail(given.error ?? 'That code was not accepted.');
+      if (given.agree) return agreeFirst(given.agree, (agree) => postJson('/connect/code', { email: sentTo, code: code.value.trim(), agree }));
       enter(given.token);
     };
+    go.onclick = () => typed();
     code.addEventListener('keydown', (e) => e.key === 'Enter' && typed());
-    byEmail.replaceChildren(h('span', { class: 'muted grow', title: `A sign-in link and a code are on their way to ${body.sent_to}, or where to start, if it has no workspace here` }, `Check ${body.sent_to}`), code, h('button', { class: 'primary', onclick: typed }, 'Sign in'));
+    const again = h('a', { href: '#', title: 'Send the link and a new code again' }, 'Send again');
+    again.onclick = (e) => (e.preventDefault(), ask(sentTo).then(() => (again.textContent = 'Sent'), () => undefined));
+    const change = h('a', { href: '#', title: 'Use another email address' }, 'Change');
+    change.onclick = (e) => (e.preventDefault(), first());
+    gate(
+      'Check your email',
+      gateRow(h('span', { class: 'muted grow gist', title: `A sign-in link and a code are on their way to ${sentTo}, or where to start, if it has no workspace here` }, sentTo), change, again),
+      gateRow(code, go),
+      error,
+    );
     code.focus();
   };
-  const submit = async () => {
-    store.token = input.value.trim();
-    const res = await fetch('/whoami', { headers: authHeaders() });
-    if (!res.ok) {
-      store.token = '';
-      return (error.textContent = 'That token was not accepted.');
-    }
-    state.schema = undefined;
-    route();
+  const ask = async (address) => {
+    send.disabled = true;
+    const res = await postJson('/connect/sign-in', { email: address, ref });
+    const body = await res.json().catch(() => ({}));
+    send.disabled = false;
+    if (!res.ok) throw fail(body.error ?? 'That did not work.');
+    fail('');
+    return body.sent_to;
   };
+  const sendLink = () => email.value.trim() && ask(email.value.trim()).then(codeStep, () => undefined);
+  send.onclick = sendLink;
   email.addEventListener('keydown', (e) => e.key === 'Enter' && sendLink());
-  input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
-  byEmail.replaceChildren(email, h('button', { class: 'primary', onclick: sendLink }, 'Email me a link'));
+
   // Where a person with no account begins, if this server offers it; a client waiting to connect is returned to after.
-  const begin = h('div');
+  const begin = h('div', { hidden: true });
   fetch('/connect/start').then((r) => r.json()).then(({ url }) => {
     if (!url) return;
     const to = new URL(url, location.origin);
     if (ref) to.searchParams.set('ref', ref);
-    begin.replaceWith(h('div', { class: 'toolbar', style: 'padding: 0 var(--space-8) var(--space-8)' }, h('span', { class: 'muted grow' }, 'New here?'), h('a', { href: to.href, title: 'Make a workspace of your own; a client waiting to connect is asked again once you are in' }, 'Start a workspace')));
+    begin.replaceWith(gateRow(h('span', { class: 'muted grow' }, 'New here?'), h('a', { href: to.href, title: 'Make a workspace of your own; a client waiting to connect is asked again once you are in' }, 'Start a workspace')));
   }, () => undefined);
-  const others = Object.entries(known.all());
-  document.querySelector('#nav .brand').replaceChildren('Archipelago');
-  document.title = 'Archipelago';
-  // The form is drawn in the sheet, which is shut on the canvas: opened from Home (the workspace switch), it opens too.
-  document.body.dataset.sheet = 'open';
-  main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, title)),
-    h(
-      'section',
-      { class: 'card', style: 'max-width: var(--card-most)' },
-      others.length > 0 && h('div', { class: 'toolbar', style: 'padding: var(--space-8) var(--space-8) 0' }, h('span', { class: 'muted' }, 'Signed in before:'), others.map(([, w]) => h('button', { onclick: () => enter(w.token) }, w.name))),
-      byEmail,
-      begin,
-      h('details', { class: 'fold-bar' }, h('summary', { class: 'muted small', title: 'For an agent, or a workspace’s first sign-in' }, 'With a token'), h('div', { class: 'toolbar fold-bar' }, input, h('button', { onclick: submit }, 'Sign in'))),
+
+  // From inside a workspace the menu lists them already; signed out, they are the quickest way back in.
+  const others = back ? [] : Object.values(known.all());
+  const first = () => {
+    if (error.textContent !== (message ?? '')) fail('');
+    gate(
+      title,
+      gateRow(email, send),
       error,
-    ),
-  );
-  email.focus();
+      others.length > 0 && gateRow(h('span', { class: 'muted' }, 'Signed in before'), h('span', { class: 'grow gist gate-others' }, others.map((w) => h('a', { href: '#', title: `Open ${w.name}`, onclick: (e) => (e.preventDefault(), enter(w.token)) }, w.name)))),
+      begin,
+      back && gateRow(h('a', { href: '#', class: 'small', onclick: (e) => (e.preventDefault(), ungate(), route()) }, state.workspace?.name ? `Back to ${state.workspace.name}` : 'Back')),
+    );
+    email.focus();
+  };
+  first();
 }
 
 /** Open a sign-in link: its code is traded once for this person's token, which the browser keeps. */
 export async function join(code) {
   // The code leaves the address at once: it is not left in the history for the next person at this machine.
   history.replaceState(null, '', '#/');
-  const res = await fetch('/connect/join', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
+  const res = await postJson('/connect/join', { code });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) return signIn(body.error ?? 'That sign-in link did not work.');
-  if (body.agree) return agreeFirst(body.agree, (agree) => fetch('/connect/join', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, agree }) }));
+  if (body.agree) return agreeFirst(body.agree, (agree) => postJson('/connect/join', { code, agree }));
   enter(body.token);
 }
 
@@ -277,9 +304,8 @@ export async function join(code) {
  * one box to tick for all of them, and the sign-in sent again with what was agreed to.
  */
 function agreeFirst(documents, again) {
-  themeSignedOut();
   const box = h('input', { type: 'checkbox', id: 'agree' });
-  const error = h('div', { class: 'error' });
+  const error = h('div', { class: 'error gate-error' });
   const go = h('button', { class: 'primary', disabled: true }, 'Continue');
   box.addEventListener('change', () => (go.disabled = !box.checked));
   const link = (d) => h('a', { href: d.url, target: '_blank', rel: 'noopener' }, d.title);
@@ -294,18 +320,7 @@ function agreeFirst(documents, again) {
     error.textContent = body.error ?? 'That did not work.';
     go.disabled = false;
   };
-  document.querySelector('#nav .brand').replaceChildren('Archipelago');
-  document.body.dataset.sheet = 'open';
-  main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, documents.length === 1 ? `Agree to the ${documents[0].title}` : 'Agree to our terms')),
-    h(
-      'section',
-      { class: 'card', style: 'max-width: var(--card-most)' },
-      h('div', { class: 'toolbar', style: 'padding: var(--space-8)' }, box, h('label', { for: 'agree', class: 'grow' }, 'I agree to the ', ...links)),
-      h('div', { class: 'toolbar', style: 'padding: 0 var(--space-8) var(--space-8)' }, h('span', { class: 'grow' }), go),
-      h('div', { style: 'padding: 0 var(--space-8) var(--space-8)' }, error),
-    ),
-  );
+  gate(documents.length === 1 ? `Agree to the ${documents[0].title}` : 'Agree to our terms', h('label', { class: 'gate-agree' }, box, h('span', {}, 'I agree to the ', ...links)), gateRow(h('span', { class: 'grow' }), go), error);
 }
 
 export async function showIdentity() {
@@ -323,37 +338,26 @@ export async function showIdentity() {
     const until = ended && h('a', { class: 'small error', href: '#/workspace?at=backup', title: `Ended ${ended.since.slice(0, 10)}: read-only, and deleted from the server on ${ended.delete_at.slice(0, 10)}. Download its backup before then.${ended.note ? ` ${ended.note}` : ''}` }, `Deleted on ${new Date(ended.delete_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`);
     document.querySelector('#nav .brand').replaceChildren('Archipelago', h('div', { class: 'workspace-name' }, me.workspace.name), until || '');
     document.title = `${me.workspace.name} · Archipelago`;
-    const others = Object.entries(known.all()).filter(([id]) => id !== me.workspace.id);
+    // Every workspace this browser is signed in to, a row each: this one marked, another a click away; then a way into
+    // one more, by email, and out of this one.
+    const shut = () => slot.closest('details')?.removeAttribute('open');
+    const go = (fn) => (e) => (e.preventDefault(), shut(), fn());
+    const row = ([id, w]) =>
+      id === me.workspace.id
+        ? h('div', { class: 'ws-row here', title: `${w.name}: the workspace this page is in` }, h('span', { class: 'gist' }, w.name), h('span', { class: 'ws-mark', 'aria-label': 'this one' }, '✓'))
+        : h('a', { href: '#', class: 'ws-row', title: `Open ${w.name}`, onclick: go(() => enter(w.token)) }, h('span', { class: 'gist' }, w.name));
+    const signedOut = () => {
+      known.forget(me.workspace.id);
+      store.token = '';
+      state.schema = undefined;
+      route();
+    };
+    const who = /@/.test(me.actor.name) ? me.actor.name : '';
     slot.replaceChildren(
-      h('div', {}, h('strong', {}, me.workspace.name)),
-      h('div', { class: 'muted small' }, `${me.actor.name} (${me.actor.kind})`),
-      h(
-        'select',
-        {
-          class: 'small',
-          title: 'Workspaces this browser has signed in to',
-          onchange: (e) => (e.target.value === '+' ? signIn() : e.target.value && enter(known.all()[e.target.value].token)),
-        },
-        h('option', { value: '' }, 'Switch workspace…'),
-        others.map(([id, w]) => h('option', { value: id }, w.name)),
-        h('option', { value: '+' }, 'Sign in to another…'),
-      ),
-      h(
-        'a',
-        {
-          href: '#',
-          class: 'small',
-          title: 'Forget this workspace on this browser',
-          onclick: (e) => {
-            e.preventDefault();
-            known.forget(me.workspace.id);
-            store.token = '';
-            state.schema = undefined;
-            route();
-          },
-        },
-        'Sign out',
-      ),
+      h('div', { class: 'ws-head', id: 'ws-head' }, 'Signed in to'),
+      h('div', { class: 'ws-rows', role: 'group', 'aria-labelledby': 'ws-head' }, Object.entries({ [me.workspace.id]: me.workspace, ...known.all() }).map(row)),
+      h('a', { href: '#', class: 'ws-row ws-add', title: 'Sign in by email to a workspace you belong to; this one stays a click away', onclick: go(() => signIn('', 'Sign in to another workspace', { back: true, email: who })) }, h('span', { class: 'gist' }, '+ Sign in to another workspace')),
+      h('div', { class: 'ws-foot' }, h('span', { class: 'muted small gist', title: `Signed in as ${me.actor.name}` }, me.actor.name), h('a', { href: '#', class: 'small gist', title: `Sign out of ${me.workspace.name} on this browser; the others stay signed in`, onclick: go(signedOut) }, `Sign out of ${me.workspace.name}`)),
     );
   } catch {
     slot.replaceChildren();

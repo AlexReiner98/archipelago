@@ -32,7 +32,7 @@ test('pages asked too often from everywhere leave signing in open, and the other
 test('a token nobody made is refused before its workspace is opened', async () => {
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
-  const acme = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const acme = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
   assert.equal((await call('/agent/search', acme, {})).status, 200, 'a token made for it is good');
   await workspaces.closeIdle(0);
   const opened: string[] = [];

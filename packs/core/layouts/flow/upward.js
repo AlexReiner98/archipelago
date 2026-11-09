@@ -16,7 +16,7 @@ const TIGHTEN = 3;
 const ties = (p, q, r, s) => (p < r && r < q && q < s) || (r < p && p < s && s < q);
 
 /** A number in [0, 1) for a try and two numbers: the same for the same item or link however many others there are. */
-const keyed = (k, a, b) => {
+export const keyed = (k, a, b) => {
   let h = Math.imul(k + 1, 0x9e3779b1) ^ Math.imul(a + 1, 0x85ebca77) ^ Math.imul(b + 1, 0xc2b2ae3d);
   h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
   h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
@@ -29,7 +29,7 @@ const keyed = (k, a, b) => {
  * `ends` holds what must come first and last, each in its own order (an island's rise and top ports, its foot ports
  * and fall): one of the first is taken whenever it is ready, and one of the last only once nothing else is.
  */
-function lineUp(items, links, noise, ends = { first: [], last: [] }) {
+export function lineUp(items, links, noise, ends = { first: [], last: [] }) {
   const near = new Map(items.map((v) => [v, new Set()])), after = new Map(items.map((v) => [v, []])), waits = new Map(items.map((v) => [v, 0]));
   for (const [u, v, order] of links) {
     near.get(u).add(v);
@@ -39,10 +39,15 @@ function lineUp(items, links, noise, ends = { first: [], last: [] }) {
   const first = new Map(items.map((v, k) => [v, k])), at = new Map(), line = [], ready = new Set(items.filter((v) => !waits.get(v)));
   const firstAt = new Map(ends.first.map((v, k) => [v, k])), lastAt = new Map(ends.last.map((v, k) => [v, k]));
   const byEnd = (at, pool) => [...pool].filter((v) => at.has(v)).sort((p, q) => at.get(p) - at.get(q))[0];
+  // What a port is tied to stands near its side: tied to one of the first, it is taken as soon as it is ready; tied to
+  // one of the last, only once nothing else is but the last themselves.
+  const tiedTo = (at) => new Set(items.filter((v) => !firstAt.has(v) && !lastAt.has(v) && [...near.get(v)].some((w) => at.has(w))));
+  const [high, low] = [tiedTo(firstAt), tiedTo(lastAt)];
+  const soonest = (pool) => pool.sort((p, q) => first.get(p) - first.get(q))[0];
   while (ready.size) {
-    let best = byEnd(firstAt, ready), most = -Infinity;
-    const rest = [...ready].filter((v) => !lastAt.has(v));
-    if (best === undefined && !rest.length) best = byEnd(lastAt, ready);
+    let best = byEnd(firstAt, ready) ?? soonest([...ready].filter((v) => high.has(v) && !low.has(v))), most = -Infinity;
+    const rest = [...ready].filter((v) => !lastAt.has(v) && !low.has(v));
+    if (best === undefined && !rest.length) best = soonest([...ready].filter((v) => low.has(v) && !lastAt.has(v))) ?? byEnd(lastAt, ready);
     if (best === undefined) for (const v of rest) {
       let last = -1, older = 0;
       const mine = first.get(v);
@@ -61,9 +66,13 @@ function lineUp(items, links, noise, ends = { first: [], last: [] }) {
   return line;
 }
 
-/** The links that fit on the two sides of `line`, the order's first and short ones before long, and those that do not. `noise(l)` picks a side where both fit. */
-function pages(line, links, noise) {
-  const at = new Map(line.map((v, k) => [v, k])), sides = [[], []], left = [];
+/**
+ * The links that fit on the two sides of `line`, the order's first and short ones before long, and those that do not.
+ * `noise(l)` picks a side where both fit. `placed` holds links already on each side, before any other.
+ */
+export function pages(line, links, noise, placed = [[], []]) {
+  const at = new Map(line.map((v, k) => [v, k])), left = [];
+  const sides = placed.map((list) => list.map((l) => ({ l, p: Math.min(at.get(l[0]), at.get(l[1])), q: Math.max(at.get(l[0]), at.get(l[1])) })));
   const ranked = links.map((l) => ({ l, p: Math.min(at.get(l[0]), at.get(l[1])), q: Math.max(at.get(l[0]), at.get(l[1])) }));
   ranked.sort((a, b) => Number(b.l[2]) - Number(a.l[2]) || a.q - a.p - (b.q - b.p));
   for (const arc of ranked) {
@@ -76,7 +85,7 @@ function pages(line, links, noise) {
 }
 
 /** The numbering's start and end, and hidden arcs until nothing else starts or ends: each hugs the arc it sits under. */
-function close(line, sides) {
+export function close(line, sides) {
   const last = line.length - 1, hidden = [], enters = new Set(), leaves = new Set();
   for (const { p, q } of sides.flat()) (leaves.add(p), enters.add(q));
   const whole = sides.flat().find((a) => a.p === 0 && a.q === last);
@@ -99,7 +108,7 @@ function close(line, sides) {
 }
 
 /** The faces of the two sides, each a cycle keeping its face on its left as it goes. */
-function facesOf(line, sides) {
+export function facesOf(line, sides) {
   const round = line.map(() => [[], [], [], []]);
   sides.forEach((arcs, k) => {
     for (const { p, q } of arcs) (round[p][k ? 1 : 2].push(q), round[q][k ? 0 : 3].push(p));

@@ -200,7 +200,7 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #listening[hidden] { display: none; }
 /* The bar's own controls are marks on it, as a tab's are: no box of their own (rule e_vgs9vt5j). */
 #more > summary { display: inline-grid; place-items: center; width: var(--box-8); height: var(--box-8); padding: 0; border: 0; border-radius: var(--radius-2); background: none; color: var(--muted); }
-#more > .menu-items { min-width: var(--menu-least); }
+#more > .menu-items { min-width: var(--menu-least); width: max-content; max-width: var(--menu-item-most); }
 #menu-pages { display: grid; }
 #menu-pages > a { padding: var(--space-5) var(--space-6); border-radius: var(--radius-2); color: var(--text); text-decoration: none; }
 #menu-pages > a:hover { background: var(--accent-soft); }
@@ -209,9 +209,20 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #canvas-settings > label { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-4) var(--space-6); border-radius: var(--radius-2); color: var(--text); font-size: var(--text-4); cursor: pointer; }
 #canvas-settings > label:hover { background: var(--accent-soft); }
 #canvas-settings > button { margin: var(--space-3) var(--space-6); justify-self: start; }
-#whoami { padding: var(--space-6); border-top: var(--border-1) solid var(--line); display: grid; gap: var(--space-2); }
+/* Who you are, under the pages: the workspaces this browser is in, a row each and this one marked, a way into another, and out. */
+#whoami { padding: var(--space-4) 0 0; margin-top: var(--space-4); border-top: var(--border-1) solid var(--line); display: grid; }
 #whoami:empty { display: none; }
-#whoami select { width: 100%; padding: var(--space-3) var(--space-4); margin: var(--space-2) 0; }
+#whoami .ws-head { padding: var(--space-3) var(--space-6) var(--space-2); color: var(--muted); font-size: var(--text-2); }
+#whoami .ws-rows { display: grid; }
+#whoami .ws-row { display: flex; align-items: center; gap: var(--space-5); min-width: 0; padding: var(--space-5) var(--space-6); border-radius: var(--radius-2); color: var(--text); text-decoration: none; white-space: nowrap; }
+#whoami .ws-row > .gist { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#whoami a.ws-row:hover { background: var(--accent-soft); }
+#whoami .ws-row.here { font-weight: 600; }
+#whoami .ws-mark { color: var(--accent); }
+#whoami .ws-add { color: var(--muted); }
+#whoami .ws-foot { display: flex; align-items: center; gap: var(--space-6); min-width: 0; padding: var(--space-5) var(--space-6) var(--space-3); margin-top: var(--space-3); border-top: var(--border-1) solid var(--line); white-space: nowrap; }
+#whoami .ws-foot > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#whoami .ws-foot > span.gist { flex: 1; }
 
 /* Find: one bar at the canvas's foot that is the query's (decision e_2a4mddx8): at rest the lens in a line; open, its rows above it; typed, the choices of what the words could be. */
 #find { position: fixed; z-index: 3; left: calc(var(--active-left, 0%) + (100% - var(--active-left, 0%) - var(--active-right, 0%)) / 2); bottom: calc(var(--active-bottom, 0%) + var(--space-9)); transform: translateX(-50%); width: min(var(--find-most), calc(100% - var(--active-left, 0%) - var(--active-right, 0%) - 2 * var(--space-9))); margin: 0; }
@@ -288,7 +299,9 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 .rows > li.one > .grow, .rows > li.one > input[type='text'] { flex: 1 1 0; }
 .rows > li.one .menu-room { width: var(--box-7); }
 /* The Workspace page: its sections, one shown at a time; the theme as swatches, each painted in its own colours. */
-#sheet .ws-sections { margin: 0 0 var(--space-10); }
+/* The sections as one row that never runs past the sheet: on a narrow one each tab gives up room, its name cut, whole in its tooltip. */
+#sheet .ws-sections { display: flex; max-width: 100%; margin: 0 0 var(--space-10); }
+#sheet .ws-sections > button { flex: 0 1 auto; min-width: 0; padding-left: var(--space-4); padding-right: var(--space-4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #sheet .ws-notice:not(:empty) { margin: 0 0 var(--space-8); }
 .card > .rows + .rows:not(:empty) { border-top: var(--border-1) solid var(--line); }
 /* Plates: a grid of small cards, each a thing with what it holds set in it, drawn like the theme swatches but larger.
@@ -345,6 +358,20 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .page-json { margin: var(--space-3) 0 0; font-size: var(--text-3); white-space: pre-wrap; overflow-wrap: anywhere; }
 #sheet .page-lines .change.line { padding-left: 0; padding-right: 0; }
 
+/* A page for whoever is not in a workspace yet (gate, ui/base.js): sign in, agree, Allow a client. One column
+   in the middle of the page, and nothing of the app behind it: no canvas, bar, tabs, find or close. */
+body[data-gate] #canvas, body[data-gate] #nav, body[data-gate] #query, body[data-gate] #find, body[data-gate] #sheet-close, body[data-gate]::before { display: none; }
+body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; transform: none; visibility: visible; transition: none; }
+.gate { box-sizing: border-box; width: 100%; max-width: var(--dialog); margin: 0 auto; padding-top: var(--space-14); display: flex; flex-direction: column; gap: var(--space-7); }
+.gate-mark { width: var(--box-10); height: var(--box-10); border-radius: var(--radius-2); }
+.gate h1 { margin: 0 0 var(--space-4); }
+.gate-row { display: flex; align-items: center; gap: var(--space-6); min-width: 0; white-space: nowrap; }
+.gate-row > input { flex: 1; min-width: 0; }
+.gate-row > button, .gate-row > a { flex: none; }
+.gate-row > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.gate-others { display: flex; gap: var(--space-6); }
+.gate-error:empty { display: none; }
+.gate-agree { display: flex; gap: var(--space-6); align-items: baseline; }
 
 /* Panes (ui/panes.js): the canvases of a tab, each with its name, a way to keep only it and to close it. Their
    frames are set by the layout as shares of the page; the line between two is dragged. */

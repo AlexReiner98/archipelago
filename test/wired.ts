@@ -6,6 +6,8 @@ import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, wri
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+// @ts-ignore: WebCola, vendored (ui/cola.LICENSE)
+import cola from '../ui/cola.module.min.js';
 
 const ROOT = join(import.meta.dirname, '..');
 
@@ -82,6 +84,27 @@ export const WIRED: Record<string, { gap: (sizes: Record<string, number>) => num
       return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
     },
   },
+  'core.strips': {
+    gap: (sizes) => sizes.flow_wire_gap,
+    draw(layout, { items, links }) {
+      const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn });
+      return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
+    },
+  },
+  'core.rows': {
+    gap: (sizes) => sizes.rows_track,
+    draw(layout, { items, links }) {
+      const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn });
+      return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
+    },
+  },
+  'core.cola': {
+    gap: (sizes) => sizes.cola_channel,
+    draw(layout, { items, links }) {
+      const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn, cola });
+      return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
+    },
+  },
   'core.architecture': {
     gap: (sizes) => sizes.arch_track,
     draw(layout, { items, links }) {
@@ -131,7 +154,7 @@ export const ranks = (file: string) => (saysLayer(file) ?? owedLayer(file) ?? ''
 
 /** `use` run with a drawing's modules set out as the page loads them, by the names in `modules`: `url(name)` is how to import one. */
 export async function setOut<T>({ pack, modules }: Layout, use: (url: (name: string) => string) => T | Promise<T>): Promise<T> {
-  const dir = mkdtempSync(join(tmpdir(), 'wired-'));
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-wired-'));
   try {
     writeFileSync(join(dir, 'package.json'), '{"type":"module"}');
     for (const [name, file] of Object.entries(modules)) cpSync(join(ROOT, 'packs', pack, file), join(dir, name));
