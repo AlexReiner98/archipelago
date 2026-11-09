@@ -131,7 +131,7 @@
     { "form": "screen", "id": "science.figure", "title": "Figure", "on": ["experiment"], "pieces": [{ "piece": "figure" }] }
   ],
   "styles": [
-    { "id": "science.undermined", "type": "lens", "title": "Resting on what was refuted", "props": { "filter": { "find": ["type hypothesis"], "only": ["status refuted"] }, "walk": { "over": ["assumes<"], "steps": 1 }, "style": { "shape": "flow" } } },
+    { "id": "science.undermined", "type": "lens", "title": "Resting on what was refuted", "props": { "filter": { "find": ["type hypothesis"], "only": ["status refuted"] }, "walk": { "over": ["assumes<"], "steps": 1 }, "style": {  } } },
     {
       "id": "science.hours",
       "type": "instruction",

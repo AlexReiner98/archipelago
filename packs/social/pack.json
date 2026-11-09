@@ -82,7 +82,7 @@
         "filter": { "find": ["type post"], "only": [], "not": [] },
         "walk": { "over": [], "steps": 0 },
         "limit": 200,
-        "style": { "shape": "list", "show": ["status", "channel", "asked", "begun", "paid", "replies", "conversations"] }
+        "style": { "show": ["status", "channel", "asked", "begun", "paid", "replies", "conversations"] }
       }
     },
     {

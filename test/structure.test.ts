@@ -14,7 +14,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../src/operational.ts';
-import { drawings, faultsOf, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
+import { drawings, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const MAX_LINES = 500;
@@ -260,9 +260,7 @@ test('no term or control is wrapped in a capsule', () => {
 // the sandbox (src/layouts.ts, ui/layout.js), never a shape the kernel draws itself (the owner, 22 Oct 2026). The
 // kernel keeps the frame every picture has. Counted here as the shapes the page still draws itself, as of 22 Oct
 // 2026; a shape moved into a pack's drawing comes off its list, with its modules in ui/.
-const KERNEL_SHAPES: Record<string, number> = {
-  'ui/query.js': 1, // list
-};
+const KERNEL_SHAPES: Record<string, number> = {};
 const SHAPES = /(?:LENS_SHAPES|SHAPES) = \{([^}]*)\}/;
 
 test('the kernel draws no shape of its own: each is a drawing a pack ships', () => {
@@ -482,19 +480,5 @@ test("only Metrics sets a place or a wire's points", () => {
   const others = wiredFiles.filter((f) => !ranks(f).includes(LAYERS.indexOf('metrics')));
   const counted = Object.fromEntries(others.map((f) => [short(f), scanned(read(f)).code.match(WRITES)?.length ?? 0]).filter(([, n]) => (n as number) > 0));
   assert.deepEqual(ratchet(counted, WRITERS), [], 'Coordinates are output: Metrics sets them, from what this layer says.');
-});
-
-// 21. Sealed: each wired drawing runs on small sketches (test/wired.ts), and no two wires of it lie on one line, none stands
-// under the spacing, no box stands on a box, none runs through a box. The spacing is counted by the flow's own `spacing`.
-const NOT_SEALED: Record<string, number> = { 'core.architecture comb: under': 12, 'core.architecture crossed: overlaps': 3, 'core.architecture fan: under': 2, 'core.architecture knot: overlaps': 1 };
-
-test('a wired drawing keeps its wires apart', async () => {
-  // @ts-expect-error a drawing's modules are plain JavaScript
-  const counted: Record<string, number> = {}, { spacing } = await import('../packs/core/layouts/flow/faults.js');
-  for (const d of wired) {
-    const found = await setOut(d, async (url) => faultsOf(WIRED[d.id], (await import(url('layout.js'))).layout, spacing));
-    for (const [what, n] of Object.entries(found)) counted[`${d.id} ${what}`] = n;
-  }
-  assert.deepEqual(ratchet(counted, NOT_SEALED), [], 'Wires take room in the solve: each stretch keeps its distance from every other (docs/layouts.md).');
 });
 

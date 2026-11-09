@@ -6,7 +6,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { join } from 'node:path';
 
 /** The app's own modules, each a part of the page (ui/app.js imports them), served at /<name>.js. */
-const APP_MODULES = ['doc-ref', 'base', 'words', 'body', 'home', 'held', 'held-card', 'item-held', 'canvas', 'pinch', 'query-bar', 'find', 'find-choices', 'menu-place', 'draft', 'note-count', 'item', 'item-doc', 'item-read', 'item-links', 'item-sections', 'screens', 'attention', 'nav', 'query', 'query-base', 'list', 'style-code', 'pan-zoom', 'live', 'settle', 'week', 'time', 'workspace', 'workspace-cards', 'workspaces-card', 'connections-card', 'members-card', 'styles-card', 'themes-card', 'agents-card', 'connect-agent', 'plates', 'theme', 'token-piece', 'token-ask', 'turns', 'canvases', 'diagram', 'start', 'limits-card', 'doc-lens', 'marks', 'reader-frame', 'view-frame', 'sheet-follow', 'layout', 'layout-tip', 'tip', 'surface', 'replica', 'membership', 'changes', 'traces', 'catch-up', 'catch-up-steps', 'thumbs', 'thumb-keep', 'thumb-still', 'ghosts', 'canvas-wires', 'authorize', 'text', 'fields', 'field-edit', 'look', 'look-marks', 'panes', 'pane-drag', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'tab-count', 'tab-life', 'pane-land', 'pane-web', 'picker-rank', 'term-pick', 'look-switch', 'view-panel', 'canvas-menu', 'only-words', 'term-kinds'];
+const APP_MODULES = ['doc-ref', 'base', 'words', 'body', 'home', 'held', 'held-card', 'item-held', 'canvas', 'pinch', 'query-bar', 'find', 'find-choices', 'menu-place', 'draft', 'note-count', 'item', 'item-doc', 'item-read', 'item-links', 'item-sections', 'screens', 'attention', 'nav', 'query', 'query-base', 'style-code', 'pan-zoom', 'live', 'settle', 'week', 'time', 'workspace', 'workspace-cards', 'workspaces-card', 'connections-card', 'members-card', 'styles-card', 'themes-card', 'agents-card', 'connect-agent', 'plates', 'theme', 'token-piece', 'token-ask', 'turns', 'canvases', 'diagram', 'start', 'limits-card', 'doc-lens', 'marks', 'reader-frame', 'view-frame', 'sheet-follow', 'layout', 'layout-tip', 'tip', 'surface', 'replica', 'membership', 'changes', 'traces', 'catch-up', 'catch-up-steps', 'thumbs', 'thumb-keep', 'thumb-still', 'ghosts', 'canvas-wires', 'authorize', 'text', 'fields', 'field-edit', 'look', 'look-marks', 'panes', 'pane-drag', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'tab-count', 'tab-life', 'pane-land', 'pane-web', 'picker-rank', 'term-pick', 'look-switch', 'view-panel', 'canvas-menu', 'only-words', 'term-kinds'];
 
 export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
@@ -18,7 +18,6 @@ export const UI_FILES: Record<string, string> = {
   '/shell.css': 'shell.css',
   '/flow.css': 'flow.css',
   '/diagram.css': 'diagram.css',
-  '/list.css': 'list.css',
   '/notes.css': 'notes.css',
   '/story.css': 'story.css',
   '/menus.css': 'menus.css',

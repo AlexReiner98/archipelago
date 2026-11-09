@@ -398,7 +398,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   if (story) {
     const marks = {
       steps: new Map(steps.map((n) => [`s:${n.id}`, [n.item.id]])),
-      wires: [...g.chains.map((c, n) => ({ keys: [`w:${n}`, `h:${n}`], from: [c.a], to: [g.nodes.get(c.b).item.id], pair: [c.a, c.b].sort().join(' ') })), ...g.ties.map((t, n) => ({ keys: headless.has(t.type) ? [`n:${n}`] : [`n:${n}`, `nh:${n}`], from: [t.a], to: [t.b], pair: [t.a, t.b].sort().join(' ') }))],
+      wires: [...g.chains.map((c, n) => ({ keys: [`w:${n}`, `h:${n}`], from: [c.a], to: [g.nodes.get(c.b)?.item.id ?? c.b], pair: [c.a, c.b].sort().join(' ') })), ...g.ties.map((t, n) => ({ keys: headless.has(t.type) ? [`n:${n}`] : [`n:${n}`, `nh:${n}`], from: [t.a], to: [t.b], pair: [t.a, t.b].sort().join(' ') }))],
       says: new Map([...said.values()].map((c) => [g.chains.indexOf(c), `t:${g.chains.indexOf(c)}`])),
       flags: new Map(steps.filter((n) => !n.stub).map((n) => [n.item.id, `f:${n.id}`])),
       dots: new Map(steps.filter((n) => !n.stub).map((n) => [n.item.id, `d:${n.id}`])),

@@ -135,7 +135,7 @@
         "filter": { "find": ["type post"], "only": ["status posted"], "not": [] },
         "walk": { "over": [], "steps": 0 },
         "limit": 200,
-        "style": { "shape": "list", "show": ["status", "channel", "posted", "visits", "asked", "begun", "paid", "replies", "conversations"] }
+        "style": { "show": ["status", "channel", "posted", "visits", "asked", "begun", "paid", "replies", "conversations"] }
       }
     },
     {
@@ -146,7 +146,7 @@
         "filter": { "find": ["type channel"], "only": [], "not": [] },
         "walk": { "over": ["goes_out_on<", "came_out_of<"], "steps": 1 },
         "limit": 300,
-        "style": { "shape": "list", "show": ["status", "visits", "asked", "begun", "paid", "conversations"] }
+        "style": { "show": ["status", "visits", "asked", "begun", "paid", "conversations"] }
       }
     },
     {
@@ -156,7 +156,7 @@
       "props": {
         "filter": { "find": ["type post"], "only": ["status to_write", "status ready"], "not": [] },
         "walk": { "over": [], "steps": 0 },
-        "style": { "shape": "list", "show": ["status", "channel", "tag"] }
+        "style": { "show": ["status", "channel", "tag"] }
       }
     },
     {

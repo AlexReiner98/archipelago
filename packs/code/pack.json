@@ -179,9 +179,9 @@
     }
   ],
   "styles": [
-    { "id": "code.roadmap_flow", "type": "lens", "title": "Roadmap", "props": { "filter": { "find": ["type feature"], "not": ["done"] }, "walk": { "over": ["depends_on>"], "steps": 1 }, "style": { "shape": "flow" } } },
-    { "id": "code.releases", "type": "lens", "title": "Release gate", "props": { "filter": { "find": ["type release"], "not": ["done"] }, "walk": { "over": ["depends_on>", "ships>", "defers>"], "steps": 1 }, "style": { "shape": "flow" } } },
-    { "id": "code.running", "type": "lens", "title": "The running system", "props": { "filter": { "find": ["type environment", "type component"], "not": ["done"] }, "walk": { "over": ["calls>"], "steps": 1 }, "style": { "shape": "flow" } } },
+    { "id": "code.roadmap_flow", "type": "lens", "title": "Roadmap", "props": { "filter": { "find": ["type feature"], "not": ["done"] }, "walk": { "over": ["depends_on>"], "steps": 1 }, "style": {  } } },
+    { "id": "code.releases", "type": "lens", "title": "Release gate", "props": { "filter": { "find": ["type release"], "not": ["done"] }, "walk": { "over": ["depends_on>", "ships>", "defers>"], "steps": 1 }, "style": {  } } },
+    { "id": "code.running", "type": "lens", "title": "The running system", "props": { "filter": { "find": ["type environment", "type component"], "not": ["done"] }, "walk": { "over": ["calls>"], "steps": 1 }, "style": {  } } },
     {
       "id": "code.tending",
       "type": "instruction",

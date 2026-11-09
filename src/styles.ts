@@ -126,7 +126,7 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, give
 /** A picture's style with the drawing it is drawn by, if a pack draws its shape: its modules left out when the page has them (`have`, hashes). */
 export async function drawn(l: Archipelago, style: Record<string, unknown>, have: unknown): Promise<Record<string, unknown>> {
   const drawing = layoutFor(l.registry, style, await versionsOf(l, 'layout'), Array.isArray(have) ? have.map(String) : []);
-  return drawing ? { ...style, drawing } : style;
+  return drawing ? { ...style, shape: drawing.shape, drawing } : style;
 }
 
 /** The schema with its style presets as the map keeps them: each with the owner's version, when there is one. */

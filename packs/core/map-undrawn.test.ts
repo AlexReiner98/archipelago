@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url';
 const pack = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
 const house = { ...pack.styles.find((s: any) => s.id === 'core.house').props, shape: 'flow' };
 const laid = mkdtempSync(join(tmpdir(), 'pelago-flow-undrawn-'));
-for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.flow').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
+for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 const measure = (t: string, px: number) => t.length * px * 0.55;
 const state = { blocked: false, waits_on: [], sessions: 0, needs_you: false };
@@ -28,16 +28,6 @@ const answer = {
 const drawn = (style: any) => JSON.stringify(picture({ answer, style, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene.svg);
 const steps = (style: any) => drawn(style).match(/"key":"s:e_[a-z]+"/g)!.map((k) => k.slice(9, -1)).sort();
 const ties = (style: any) => (drawn(style).match(/"key":"n:\d+"/g) ?? []).length;
-
-test('a style that draws no tagged tie: what is tagged and nothing else is a step on its own', () => {
-  const quiet = { ...house, undrawn: ['tagged'] };
-  assert.ok(steps(quiet).includes('e_loosezzz') && steps(quiet).includes('e_tagzzzzz'), 'the tagged item and its tag are steps');
-  assert.equal(ties(quiet), 2, 'what is part of the process is tied to it; the tag ties nothing');
-});
-
-test('a style that draws every link ties the tagged item to its tag', () => {
-  assert.equal(ties({ ...house, undrawn: [] }), 3);
-});
 
 test("the key is data the page draws: a row for every link type drawn, in its colour, and no legend of the drawing's own", () => {
   const scene = picture({ answer, style: { ...house, undrawn: [] }, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene;

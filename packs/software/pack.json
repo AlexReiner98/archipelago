@@ -135,10 +135,10 @@
     }
   ],
   "styles": [
-    { "id": "software.roadmap", "type": "lens", "title": "Roadmap", "on": ["project"], "props": { "filter": { "find": ["in {here}"], "only": ["type feature"] }, "walk": { "over": ["depends_on"], "steps": 1 }, "style": { "shape": "flow" } } },
-    { "id": "software.gate", "type": "lens", "title": "Gate", "on": ["release"], "props": { "filter": { "find": ["id {here}"] }, "walk": { "over": ["depends_on", "defers"], "steps": 1 }, "style": { "shape": "flow" } } },
-    { "id": "software.proof", "type": "lens", "title": "How we know", "on": ["project", "feature", "proof"], "props": { "filter": { "find": ["id {here}", "in {here}", "about {here}"], "only": ["type proof"] }, "walk": { "over": ["answers<"], "steps": 1 }, "style": { "shape": "flow" } } },
-    { "id": "software.usage", "type": "lens", "title": "Sessions here", "on": ["repo"], "props": { "filter": { "find": ["lives_in {here}"], "only": ["type run"] }, "walk": { "over": [], "steps": 0 }, "time": { "from": "-30d", "to": "1d" }, "style": { "shape": "time" } } },
+    { "id": "software.roadmap", "type": "lens", "title": "Roadmap", "on": ["project"], "props": { "filter": { "find": ["in {here}"], "only": ["type feature"] }, "walk": { "over": ["depends_on"], "steps": 1 }, "style": {  } } },
+    { "id": "software.gate", "type": "lens", "title": "Gate", "on": ["release"], "props": { "filter": { "find": ["id {here}"] }, "walk": { "over": ["depends_on", "defers"], "steps": 1 }, "style": {  } } },
+    { "id": "software.proof", "type": "lens", "title": "How we know", "on": ["project", "feature", "proof"], "props": { "filter": { "find": ["id {here}", "in {here}", "about {here}"], "only": ["type proof"] }, "walk": { "over": ["answers<"], "steps": 1 }, "style": {  } } },
+    { "id": "software.usage", "type": "lens", "title": "Sessions here", "on": ["repo"], "props": { "filter": { "find": ["lives_in {here}"], "only": ["type run"] }, "walk": { "over": [], "steps": 0 }, "time": { "from": "-30d", "to": "1d" }, "style": {  } } },
     {
       "id": "software.public_colours",
       "title": "A product's public page colours",

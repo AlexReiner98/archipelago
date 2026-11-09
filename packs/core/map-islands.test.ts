@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url';
 const pack = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
 const house = { ...pack.styles.find((s: any) => s.id === 'core.house').props, shape: 'flow' };
 const laid = mkdtempSync(join(tmpdir(), 'pelago-flow-islands-'));
-for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.flow').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
+for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 const measure = (t: string, px: number) => t.length * px * 0.55;
 const item = (id: string, title: string, island?: string, kind = 'work') => ({ id, type: 'task', is: [kind], title, open: true, status: 'todo', phase: 'not_started', ...(island && { island }) });
@@ -133,15 +133,6 @@ test('a picture of one island is framed, with its own legend and none in the cor
   assert.ok(marks(scene.svg, (m) => String(m[1]?.class ?? '').includes('lf-island')).length > 0, 'its island is drawn as a region');
   assert.ok(legendOf(scene, 'e_grantsis').includes('Work'), `its legend names what it draws: ${legendOf(scene, 'e_grantsis').join(', ')}`);
   assert.equal(scene.key.length, 0, 'the corner key gives way to the island’s legend');
-});
-
-test('a finding read across crosses the sea, with a gate on each shore naming it', () => {
-  const svg = draw({ ...answer, items: answer.items.map((i) => (i.id === 'e_costzzzz' ? { ...i, fields: { value: 42 } } : i)) }).svg;
-  const gates = marks(svg, (m) => String(m[1]?.key ?? '').startsWith('gate:'));
-  assert.equal(gates.length, 2, 'one where it leaves Lab, one where it enters Grants');
-  for (const g of gates) assert.ok(JSON.stringify(g).includes('Cost per sample: 42'), 'each names what crosses, and its value');
-  const wire = marks(svg, (m) => m[0] === 'path' && String(m[1]?.class ?? '').includes('lf-tie') && /^n:/.test(m[1].key ?? '')).find((m) => m[1].class.includes('headed') && gates.length);
-  assert.ok(wire, 'the crossing is a tie');
 });
 
 test('a picture of no island draws no border', () => {

@@ -1,5 +1,5 @@
 // The layout up, in the view band beside the view up (decision e_47pjkbxb): how this pane is arranged, kept as its query
-// changes. Its choices are the layouts the packs ship and those kept on the map; Default is what is drawn with neither. A
+// changes. Its choices are the layouts the packs ship and those kept on the map; the first a pack ships is the default. A
 // saved view brings its own when it is opened, and Save keeps it. A style drawn here, by Use here on its page, is one
 // more choice while it is.
 
@@ -51,15 +51,16 @@ const chosenOf = (style) => (style.style ? `style:${style.style}` : style.shape 
 /** The switch: choosing goes to the same query with the layout chosen, the view and what is lit kept. */
 export function lookSwitch(lens, style, open) {
   const pick = h('select', { class: 'q-pick q-look', 'aria-label': 'Layout' });
-  const shapes = [{ shape: 'list', title: 'List' }, ...(state.schema?.shapes ?? [])];
+  // The first layout shipped is what is drawn when none is chosen: it is the choice of none.
+  const [first, ...shapes] = state.schema?.shapes ?? [];
   const fill = (listed) => {
     const now = chosenOf(style);
     const kept = style.style && !listed.some((s) => s.id === style.style) ? [...listed, { id: style.style, title: titles.get(style.style) ?? 'Style' }] : listed;
     // Cut short in a narrow pane, the style chosen is still named in its tooltip.
-    const said = [...shapes.map((s) => [`shape:${s.shape}`, s.title]), ...kept.map((s) => [`style:${s.id}`, s.title])].find(([value]) => value === now)?.[1] ?? 'Default';
+    const said = [...shapes.map((s) => [`shape:${s.shape}`, s.title]), ...kept.map((s) => [`style:${s.id}`, s.title])].find(([value]) => value === now)?.[1] ?? first?.title ?? 'Default';
     pick.title = `Layout: ${said}`;
     pick.replaceChildren(
-      h('option', { value: '', selected: !now }, 'Default'),
+      h('option', { value: '', selected: !shapes.some((s) => now === `shape:${s.shape}`) && !kept.some((s) => now === `style:${s.id}`) }, first?.title ?? 'Default'),
       ...shapes.map((s) => h('option', { value: `shape:${s.shape}`, selected: now === `shape:${s.shape}` }, s.title)),
       ...kept.map((s) => h('option', { value: `style:${s.id}`, selected: now === `style:${s.id}` }, s.title)),
     );

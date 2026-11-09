@@ -100,13 +100,13 @@
       "id": "design.open",
       "type": "lens",
       "title": "Design: what is still open",
-      "props": { "filter": { "find": ["decision", "concept"], "not": ["done"] }, "walk": { "over": ["bears_on<", "alternative_for<", "rests_on>"], "steps": 1 }, "style": { "shape": "flow" } }
+      "props": { "filter": { "find": ["decision", "concept"], "not": ["done"] }, "walk": { "over": ["bears_on<", "alternative_for<", "rests_on>"], "steps": 1 }, "style": {  } }
     },
     {
       "id": "design.grounds",
       "type": "lens",
       "title": "Design: what each element rests on",
-      "props": { "filter": { "find": ["element"], "not": ["done"] }, "walk": { "over": ["rests_on>", "depends_on>"], "steps": 1 }, "style": { "shape": "flow" } }
+      "props": { "filter": { "find": ["element"], "not": ["done"] }, "walk": { "over": ["rests_on>", "depends_on>"], "steps": 1 }, "style": {  } }
     }
   ]
 }

@@ -15,7 +15,7 @@ const preset = (id: string) => pack.styles.find((s: any) => s.id === id);
 const house = { ...preset('core.house').props, ...preset('core.sessions_look').props, shape: 'flow' };
 // The drawing's modules laid out by name in one folder, as the sandbox has them.
 const laid = mkdtempSync(join(tmpdir(), 'pelago-flow-session-'));
-for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.flow').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
+for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 const { sessionItems, sessionMarks } = await import(pathToFileURL(join(laid, 'session.js')).href);
 const measure = (t: string, px: number) => t.length * px * 0.55;
