@@ -10,7 +10,7 @@ import { Registry } from '../src/packs.ts';
 import { hookSessionStart } from '../src/session-hook.ts';
 import { surfaceFor } from '../src/tools.ts';
 import { workingRules } from '../src/working-rules.ts';
-import { freshWith, PACKS } from './map.ts';
+import { freshWith, PACKS, packsWith } from './map.ts';
 
 const short = (id: string) => id.slice(id.indexOf('.') + 1);
 
@@ -32,12 +32,14 @@ function lacking(text: string, lacks: Set<string>): string[] {
   return [...new Set(named.filter((n) => lacks.has(n) && !INPUTS.has(n)))];
 }
 
+/** Names other packs have (the software and work packs, which live outside this repository): core has none of them. */
+const ELSEWHERE = ['issue', 'hub_at', 'handoff', 'repo', 'repo_work', 'traps', 'based_on'];
+
 test('a core-only map is told nothing it lacks: rules, MCP words, tools and the session start', async () => {
   const core = new Registry(PACKS, ['core']);
   const have = namesOf(core);
-  const lacks = new Set([...namesOf(new Registry(PACKS))].filter((n) => !have.has(n)));
-  // The names the audit found, each another pack's, are seen where the old words named them.
-  for (const n of ['issue', 'hub_at', 'handoff', 'repo']) assert.ok(lacks.has(n), `${n} is not core's`);
+  for (const n of ELSEWHERE) assert.ok(!have.has(n), `${n} is not core's`);
+  const lacks = new Set(ELSEWHERE);
   assert.deepEqual(lacking('Read with query: name handoff with repo. Record it as an issue; set its `hub_at` to 1.', lacks).sort(), ['handoff', 'hub_at', 'issue']);
 
   const rules = workingRules(core.packs);
@@ -58,13 +60,22 @@ test('a core-only map is told nothing it lacks: rules, MCP words, tools and the 
   assert.doesNotMatch(start, /repository|as an issue/);
 });
 
-test('with its pack on, a pack says it in its own types: the work pack’s bump is an issue, the software pack reads the handoff', async () => {
-  const l = await freshWith(new Registry(PACKS));
-  const start = await hookSessionStart(l, { session_id: 'all-packs', cwd: 'C:\\code\\new' });
+/** A small pack of the work pack's shape: its own issue type, and its word on bumps in place of core's. */
+const TRACKER = {
+  id: 'tracker',
+  version: '0.1.0',
+  title: 'Tracker',
+  description: 'A pack for testing that a pack’s instruction stands in for core’s.',
+  requires: ['core'],
+  types: [{ id: 'issue', title: 'Issue', description: 'Something wrong.', extends: 'work' }],
+  styles: [{ id: 'tracker.bumps', type: 'instruction', title: 'Record what gets in the way', body: 'When Archipelago itself gets in your way, record it on the map as an issue when it happens.', props: { for: ['session_start'], order: 30, replaces: 'core.bumps' } }],
+};
+
+test('with its pack on, a pack says it in its own types: its bump is an issue, in place of core’s', async () => {
+  const l = await freshWith(new Registry(packsWith(TRACKER as never)));
+  const start = await hookSessionStart(l, { session_id: 'tracker', cwd: 'C:\\code\\new' });
   assert.match(start, /record it on the map as an issue/);
   assert.doesNotMatch(start, /a finding about the item it concerns/, 'core’s wording is replaced, not said beside it');
-  assert.match(start, /query with name handoff and params repo/);
-  assert.match(connectText(l.registry), /handoff with repo for where a repository stands/);
 });
 
 test('a link refused for its ends says which links do join them', () => {

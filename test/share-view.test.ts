@@ -16,9 +16,9 @@ test('a view or an item is given as a link through a document that brings it in 
   const made = ((await ann.change(annActor, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'open', type: 'note', title: 'SR&ED', body: 'Claimed after the work.', visibility: 'shared' },
-      { op: 'create', ref: 'hidden', type: 'note', title: 'IRAP', body: 'Call the advisor first.', visibility: 'private' },
-      { op: 'create', ref: 'lens', type: 'lens', title: 'Notes', visibility: 'shared', props: { filter: { find: ['type note'], not: [] }, walk: { over: [], steps: 0 }, style: { shape: 'list' } } },
+      { op: 'create', ref: 'open', type: 'question', title: 'SR&ED', body: 'Claimed after the work.', visibility: 'shared' },
+      { op: 'create', ref: 'hidden', type: 'question', title: 'IRAP', body: 'Call the advisor first.', visibility: 'private' },
+      { op: 'create', ref: 'lens', type: 'lens', title: 'Notes', visibility: 'shared', props: { filter: { find: ['type question'], not: [] }, walk: { over: [], steps: 0 }, style: { shape: 'list' } } },
     ],
   })) as { created: Record<string, string> }).created;
 
@@ -37,7 +37,7 @@ test('a view or an item is given as a link through a document that brings it in 
   assert.deepEqual((link as { private?: { title: string }[] }).private?.map((i) => i.title), ['IRAP'], 'the one making the link is told which, to share them or not');
 
   // Live: what is added to the map later is in it the next time the link is opened.
-  await ann.change(annActor, { reason: 'test', ops: [{ op: 'create', type: 'note', title: 'SBIR', body: 'Later.', visibility: 'shared' }] });
+  await ann.change(annActor, { reason: 'test', ops: [{ op: 'create', type: 'question', title: 'SBIR', body: 'Later.', visibility: 'shared' }] });
   const again = (await sharedView(l, secretOf(link.path))) as unknown as { lenses: Record<string, { items: { title: string }[] }> };
   assert.deepEqual(again.lenses[made.lens].items.map((i) => i.title).sort(), ['SBIR', 'SR&ED']);
 
