@@ -60,6 +60,10 @@ export const ARROW = { either: '↔', out: '→', in: '←' };
 export const NEXT_WAY = { either: 'out', out: 'in', in: 'either' };
 
 export const when = (ts) => new Date(ts).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+/** A day as a person reads it: a time, or a day as kept (2026-11-08, read where it is, not in UTC). */
+export const day = (ts, dateStyle = 'medium') => new Date(/^\d{4}-\d{2}-\d{2}$/.test(ts) ? `${ts}T12:00` : ts).toLocaleDateString(undefined, { dateStyle });
+/** The hour and minute of a time. */
+export const clock = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 // ---- Saying things briefly -------------------------------------------------
 // The screens show what agents write, and agents write paragraphs. These keep
 // a row to one line: a short name, a few words, a mark. The whole of it is

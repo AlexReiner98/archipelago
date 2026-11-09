@@ -2,7 +2,7 @@
 
 import { api, ask, h, part, state, tell } from './base.js';
 import { CAL_FULL, LAST_WORK, atHour, blockDialog, calHidden, choose, clockText, confirmEntryOps, confirmRoutineOps, dayName, happenedDialog, hoursText, localDay, mondayOf, moneyText, remember, shiftDay, timeState, weekCalendar, workPicker } from './week.js';
-import { menu } from './words.js';
+import { clock, menu } from './words.js';
 
 export async function time() {
   const main = part('time');
@@ -172,7 +172,6 @@ export async function time() {
 
   // Planned time whose end has passed: the owner says it happened (and it counts), or drops it.
   const due = wk.to_confirm ?? [];
-  const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const confirmRow = (b) =>
     h(
       'li',

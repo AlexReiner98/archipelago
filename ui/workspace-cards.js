@@ -106,9 +106,9 @@ function importer(done) {
         return done?.();
       }
       if (nothing)
-        return say('muted small', `Nothing to import: this map already has everything in the backup of "${p.from.name}" taken ${new Date(p.taken).toLocaleString()}.`);
+        return say('muted small', `Nothing to import: this map already has everything in the backup of "${p.from.name}" taken ${when(p.taken)}.`);
       const message = [
-        `From the backup of "${p.from.name}" taken ${new Date(p.taken).toLocaleString()}.`,
+        `From the backup of "${p.from.name}" taken ${when(p.taken)}.`,
         `Added: ${e.added}${list(p.examples.added, e.added)}`,
         `Replaced by the file's later edit: ${e.updated}${list(p.examples.updated, e.updated)}`,
         `Kept, because edited later here: ${e.kept_newer_here}${list(p.examples.kept_newer_here, e.kept_newer_here)}`,

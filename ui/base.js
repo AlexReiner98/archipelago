@@ -115,6 +115,7 @@ export const store = {
   },
   set token(value) {
     this.memory = value;
+    asked = undefined;
     try {
       if (value) localStorage.setItem('pelago-token', value);
       else localStorage.removeItem('pelago-token');
@@ -124,6 +125,17 @@ export const store = {
   },
 };
 export const authHeaders = () => (store.token ? { authorization: `Bearer ${store.token}` } : {});
+
+/** Who this page is signed in as (/whoami), asked once a sign-in: its answer, or null where it is refused; a failure to reach the server rejects. */
+let asked;
+export const whoami = () =>
+  (asked ??= fetch('/whoami', { headers: authHeaders() }).then(
+    (r) => (r.ok ? r.json() : null),
+    (err) => {
+      asked = undefined;
+      throw err;
+    },
+  ));
 
 // The workspaces this browser has signed in to, so moving between them does
 // not mean finding and pasting a token each time. Kept beside the token.
@@ -183,13 +195,17 @@ export function enter(token) {
 
 export class SignInNeeded extends Error {}
 
-export async function api(tool, input = {}) {
-  const res = await fetch(`/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', ...authHeaders() }, body: JSON.stringify(input) });
+/** A JSON body posted: the response, for the caller to read. */
+export const postJson = (path, body, headers = {}) => fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+/** A tool called at this address with these headers: its result, or an error saying why not. */
+export async function call(path, input, headers) {
+  const res = await postJson(path, input, headers);
   const body = await res.json();
   if (res.status === 401) throw new SignInNeeded(body.error);
   if (!res.ok) throw new Error(body.error);
   return body.result;
 }
+export const api = (tool, input = {}) => call(`/api/${tool}`, input, authHeaders());
 
 // Signed out, the style is not read with the rest: its colours are asked for on their own.
 const themeSignedOut = () => fetch('/connect/theme').then((r) => r.json()).then(applyTheme, () => undefined);
@@ -210,8 +226,6 @@ export function gate(title, ...kids) {
 export const ungate = () => delete document.body.dataset.gate;
 /** One line of a gate's page: a field and its button, or words and a link; never wraps. */
 export const gateRow = (...kids) => h('div', { class: 'gate-row' }, ...kids);
-
-const postJson = (path, body) => fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
 /** `back`: drawn from inside a workspace (Sign in to another…), so there is a way back to it. */
 export function signIn(message, title = 'Sign in', { back = false } = {}) {
@@ -266,8 +280,7 @@ export function signIn(message, title = 'Sign in', { back = false } = {}) {
   const token = h('input', { type: 'text', placeholder: 'pel_…', autocomplete: 'off', spellcheck: false });
   const useToken = async () => {
     store.token = token.value.trim();
-    const res = await fetch('/whoami', { headers: authHeaders() });
-    if (!res.ok) return (store.token = ''), fail('That token was not accepted.');
+    if (!(await whoami().catch(() => null))) return (store.token = ''), fail('That token was not accepted.');
     state.schema = undefined;
     route();
   };
@@ -337,10 +350,8 @@ function agreeFirst(documents, again) {
 export async function showIdentity() {
   const slot = document.getElementById('whoami');
   try {
-    const res = await fetch('/whoami', { headers: authHeaders() });
-    if (!res.ok) return slot.replaceChildren();
-    const me = await res.json();
-    if (me.auth !== 'tokens') return slot.replaceChildren();
+    const me = await whoami();
+    if (me?.auth !== 'tokens') return slot.replaceChildren();
     known.remember(me.workspace);
     state.workspace = me.workspace; // a token made here names it (ui/workspace-cards.js)
     // Which workspace this is, where it cannot be missed: under the name at the top, and on the tab.

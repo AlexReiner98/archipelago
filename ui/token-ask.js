@@ -3,7 +3,7 @@
 // so a mistyped address is seen and refused. The token goes to the system's poll, never to this page. An answered
 // request stays as one line until it runs out, linking to the items its token is within, whose page lists the token.
 
-import { api, ask, authHeaders, h } from './base.js';
+import { api, ask, h, whoami } from './base.js';
 import { link, when } from './words.js';
 import { seekTokens } from './token-piece.js';
 
@@ -15,7 +15,7 @@ export async function tokenAskPiece(host, e) {
   if (!host.isConnected) return;
   // What could not be read is said in the card, and looked for again: a card that draws nothing is never a failure.
   let failed;
-  const me = await fetch('/whoami', { headers: authHeaders() }).then((r) => r.json()).catch((err) => ((failed = `Could not ask who you are: ${err.message}`), null));
+  const me = await whoami().catch((err) => ((failed = `Could not ask who you are: ${err.message}`), null));
   if ((!failed && me?.auth !== 'tokens') || e?.archived_at) return host.remove();
   const asks = failed ? [] : await api('token_requests', { ...(e && { within: e.id }), answered: true }).catch((err) => ((failed = `Could not read the requests: ${err.message}`), []));
   const waiting = asks.filter((a) => a.state === 'pending');

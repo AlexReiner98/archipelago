@@ -1,7 +1,7 @@
 // An item read whole, as its reader meets it (drawn by the reading page, ui/doc.js), and the links that let someone
 // read it with no login, and its shares with other workspaces.
 
-import { api, ask, h, known, tell } from './base.js';
+import { api, ask, call as callAt, h, known, tell } from './base.js';
 import { secretBox } from './workspace-cards.js';
 
 /** The item as a reader meets it, and the links to it that still work. */
@@ -18,12 +18,7 @@ export async function readDocument(id) {
 export async function homeOf(doc) {
   const token = doc?.from && doc.source && known.all()[doc.from]?.token;
   if (!token) return null;
-  const call = async (tool, input) => {
-    const res = await fetch(`/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(input) });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error);
-    return body.result;
-  };
+  const call = (tool, input) => callAt(`/api/${tool}`, input, { authorization: `Bearer ${token}` });
   const item = await call('get', { id: doc.source }).then((got) => got.entity, () => null);
   return item && { call, item };
 }

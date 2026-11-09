@@ -1,4 +1,4 @@
-import { authHeaders, state } from './base.js';
+import { state, whoami as signedIn } from './base.js';
 import { said, touched } from './changes.js';
 import { numberOf } from './query-base.js';
 import { gist, sessionHue } from './words.js';
@@ -22,10 +22,10 @@ let me;
 let asking;
 const actorOf = (a) => (typeof a === 'string' ? a : a?.kind ? `${a.kind}:${a.name}` : undefined);
 export const whoami = () =>
-  (asking ??= fetch('/whoami', { headers: authHeaders() })
-    .then((r) => (r.ok ? r.json() : {}))
-    .catch(() => ({}))
+  (asking ??= signedIn()
+    .catch(() => null)
     .then((j) => {
+      j ??= {};
       me = { ws: j.workspace?.id ?? null, actor: actorOf(j.actor) };
       load(me.ws);
       return me;

@@ -3,7 +3,7 @@
 // within the item are listed here too, each with when it was last used, and revocable; all of them stay listed on
 // the Workspace screen.
 
-import { api, ask, authHeaders, h, state } from './base.js';
+import { api, ask, h, state, whoami } from './base.js';
 import { ago, unfolded, when } from './words.js';
 import { connectBox, secretBox } from './workspace-cards.js';
 
@@ -28,7 +28,7 @@ const MAY = [
 
 /** The piece: drawn into host, folded until asked for, on a server where tokens sign people in. */
 export async function tokenPiece(host, e, fold, made) {
-  const me = await fetch('/whoami', { headers: authHeaders() }).then((r) => r.json()).catch(() => null);
+  const me = await whoami().catch(() => null);
   if (me?.auth !== 'tokens' || e.archived_at) return host.remove();
   const tokens = (await api('token_list', { within: e.id }).catch(() => [])).filter((t) => !t.revoked_at && t.within?.length);
   if (!host.isConnected) return;
