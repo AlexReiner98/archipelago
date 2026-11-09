@@ -9,8 +9,8 @@
 
 // As the hook reads them: the map's tools (and any other workspace's), an item's id, the tools that write a file,
 // a commit command, a line of the transcript's text, and a message its person wrote.
-const MAP_TOOL = /^mcp__pelago__/;
-const ANY_MAP_TOOL = /^mcp__pelago([-_][\w-]*?)?__/;
+const MAP_TOOL = /^mcp__(plugin_[\w-]+?_)?pelago__/;
+const ANY_MAP_TOOL = /^mcp__(plugin_[\w-]+?_)?pelago([-_][\w-]*?)?__/;
 const ITEM = /\be_[a-z0-9]{8}\b/g;
 const EDITS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 const COMMIT = new RegExp(String.raw`(^|[\s;&|(])git(\s+(-[Cc]\s+("[^"]*"|'[^']*'|\S+)|--?[\w-]+(=\S+)?))*\s+commit(?![\w-])`);

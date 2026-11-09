@@ -1,0 +1,18 @@
+{
+  "name": "archipelago",
+  "version": "0.2.0",
+  "description": "A map of your work your agent keeps and you can read: sessions, plans, decisions and what waits on what, drawn in your browser.",
+  "author": {
+    "name": "Aperture Design Tools Inc."
+  },
+  "homepage": "https://app.archipelago.tools",
+  "repository": "https://github.com/AlexReiner98/archipelago",
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "map",
+    "tasks",
+    "decisions",
+    "mcp"
+  ]
+}

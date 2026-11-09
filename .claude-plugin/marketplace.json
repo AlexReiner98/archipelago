@@ -1,0 +1,17 @@
+{
+  "name": "archipelago",
+  "owner": {
+    "name": "Aperture Design Tools Inc."
+  },
+  "metadata": {
+    "description": "Archipelago for Claude Code."
+  },
+  "plugins": [
+    {
+      "name": "archipelago",
+      "source": "./plugins/archipelago",
+      "description": "A map of your work your agent keeps and you can read: sessions, plans, decisions and what waits on what, drawn in your browser.",
+      "category": "productivity"
+    }
+  ]
+}
