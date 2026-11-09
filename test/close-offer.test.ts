@@ -50,6 +50,6 @@ test('a held close offers them too, and the commit line names them', async () =>
   assert.equal(held.status, 'proposed');
   assert.equal(held.still_open.items.length, 2);
   const started = await sessionStart(l, agent, { task, session_id: 'close-offer' });
-  assert.match(started.commit!, new RegExp(`Closes: ${task}"`));
+  assert.match(started.commit!, new RegExp(`linked settles to ${task}.`));
   for (const id of [a, b]) assert.match(started.commit!, new RegExp(`meant to fix [^"]*${id}`));
 });

@@ -195,17 +195,14 @@ its switch on the Workspace page's Checks card. In the code:
 **run trailer.** The line `Archipelago-Run: <run>` at the end of a commit a
 session makes, naming the run it is registered as, so the commit can be
 traced to its session. Added by the commit-msg hook the setup installs. In
-the code: `scripts/pelago-setup.mjs`, read by `packs/github/account.js`.
+the code: `scripts/pelago-setup.mjs`.
 
 **accounted for.** A commit is accounted for once the map holds a commit item
-for its full sha, with a settles link to each item it settles, or none. The
-check "Every commit accounted for" on the main branch is red until every
-commit in a push or pull request is; a session is asked to account for
-its own commits before its reply and its run end. A pushed commit nobody
-accounted for within an hour is made a commit item with `accounted` false,
-which is the owner's attention (reason `unaccounted`) until someone sets it
-true with its links. In the code: `commit` and
-`settles` (`packs/software/pack.json`), `packs/github/account.js`.
+for its full sha, with a settles link to each item it settles, or none. A
+session is asked to account for its own commits before its reply and its run
+end. A commit item with `accounted` false is the owner's attention (reason
+`unaccounted`) until someone sets it true with its links. In the code:
+`commit` and `settles` (`packs/software/pack.json`).
 
 ## Retired words
 

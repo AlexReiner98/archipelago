@@ -80,12 +80,12 @@ test('every pack here is in the manifest shape, and reads as it did', () => {
 });
 
 test('a server pack is a pack that asks for server reach: never a workspace pack, and read as the server’s', () => {
-  const reg = new Registry(join(ROOT, 'packs'));
+  const dir = packsWith({ id: 'hub', version: '1', title: 'Hub', reach: { server: {} } } as unknown as PackFile);
+  const reg = new Registry(dir);
   registries.push(reg);
-  assert.ok(!reg.found.some((p) => p.id === 'github_app'), "a workspace's registry leaves it out");
-  const { packs } = loadServerPacks([OWN_PACKS]);
-  assert.deepEqual(packs.map((p) => [p.file.id, Boolean(p.file.reach.server)]), [['github_app', true]]);
-  assert.deepEqual(parts(packs[0].file).schedules.map((s) => s.id), ['refresh', 'recheck'], 'its schedules are handlers like any pack’s');
+  assert.ok(!reg.found.some((p) => p.id === 'hub'), "a workspace's registry leaves it out");
+  assert.deepEqual(loadServerPacks([dir]).packs.map((p) => [p.file.id, Boolean(p.file.reach.server)]), [['hub', true]]);
+  assert.deepEqual(loadServerPacks([OWN_PACKS]).packs, [], 'the kernel ships none of its own');
 });
 
 test('a pack waits while what it requires is missing, and what names a pack it uses registers only while that one is active', async () => {
@@ -187,7 +187,6 @@ test('a pack that took over words a pack the owner added held is added with them
   for (const id of ['code', 'proof']) rmSync(join(before, id), { recursive: true });
   const kept = (pack: { types: { id: string }[] }, id: string) => ({ ...pack.types.find((t) => t.id === id)!, moved_from: undefined, moved_statuses: undefined, belongs_with: undefined });
   writeFileSync(join(before, 'software', 'pack.json'), JSON.stringify({ id: 'software', version: '0.0.1', title: software.title, description: software.description, requires: ['core', 'work'], types: [kept(code, 'feature'), kept(proof, 'test')] }));
-  for (const id of ['github']) rmSync(join(before, id), { recursive: true });
   const old = await mapOf(before);
   await syncPacks(old);
   await syncTypes(old);

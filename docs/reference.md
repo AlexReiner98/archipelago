@@ -70,9 +70,8 @@ The web UI has five places, and one page for each thing.
   links, views, styles, instructions, rules, actions, runs and reach, each
   counted; a click opens a group in the card, each thing in it one line by name
   and what it is, with its controls where it is changed here: styles, screens,
-  checks), and **Connections** (the
-  GitHub App, pushes and the webhook, the other workspaces that may notify
-  this one). Each setting is one row; what is done rarely is in its ⋯ menu.
+  checks), and **Connections** (the server packs it may connect, and the
+  other workspaces that may notify this one). Each setting is one row; what is done rarely is in its ⋯ menu.
 
 Every item has a single page, and every way to it leads there: its head,
 its note folded to the first paragraph, each field drawn by its kind, where
@@ -493,77 +492,24 @@ it.
   repository on the server's own machine.
 - What answers without a token is asked only so often (`src/limit.ts`): a
   product's public page and the setup script, 120 requests a minute from one
-  address and 1,200 from all together; GitHub's deliveries, 300 a minute from
-  one address. Beyond that the answer is 429 with `Retry-After`. The count
+  address and 1,200 from all together; a pack's webhook deliveries, 300 a
+  minute from one address. Beyond that the answer is 429 with `Retry-After`. The count
   for all together is what holds if the proxies are not named
   (`PELAGO_TRUSTED_PROXIES`) and a caller's address cannot be told.
 
-## GitHub: pushes keep the map current
+## GitHub: an agent reads each push
 
-A push is the moment reality moved, whoever did the work. Two things act on
-it.
-
-**The GitHub App is the short way to connect.** One app serves the whole
-server, and may only read (contents and metadata). It is a server pack
-(`packs/github_app`), run in the sandbox like any pack:
-
-1. The server's owner creates it once: Workspace, Connections, **Set up**
-   beside GitHub App, in the default workspace. Archipelago sends GitHub a
-   manifest, GitHub asks for a name, and hands over the app's id, key,
-   signing secret, client id and client secret. The kernel keeps those,
-   sealed, in the default workspace's database, where every server on it
-   reads them; the pack never sees them. They may be given by hand instead,
-   as `PELAGO_GITHUB_APP_ID`, `_KEY`, `_SECRET`, `_CLIENT_ID` and
-   `_CLIENT_SECRET` (the name is then asked of GitHub).
-2. A workspace's admin presses **Connect** and chooses repositories on
-   GitHub, which signs them in as it installs the app ("Request user
-   authorization (OAuth) during installation", its callback URL
-   `/x/github_app/installed`). The installation is tied to that workspace (a
-   connection, in the control plane) only if GitHub, asked as them, says they
-   can manage it: an installation id is only what the browser said. Each
-   repository chosen is put in the map with its address.
-3. Every push to a chosen repository arrives at `/x/github_app/hook/events`
-   (or `/github/app/hook`, for an app created before it was a pack), signed
-   with the app's secret, and is handed to the GitHub pack of the workspace
-   it is tied to, which takes it in exactly as below. Nothing is set up in
-   the repository itself.
-
-The kernel's part is generic: a server pack may declare hosts whose token
-the kernel signs with a key it keeps for the pack (RS256) and trades for an
-account's token; secrets kept at run time from a host's answer; what a
-workspace's admin may connect it to; and, once connected, two acts on that
-workspace only: adding items it does not have by their address, and handing a
-delivery to the pack there that takes that kind of event in.
-
-Nothing on the server reads a push with a model: an agent does, as below (the
-server's push reader and the workspace's model account went on 8 Nov 2026).
+The server hears nothing from GitHub: the GitHub pack, the GitHub App and the
+server's push reader went in Nov 2026. A commit is accounted for when a session
+records it on the map, a commit item with its sha linked `settles` to what it
+finished, in the same change that closes it. An agent in the repository reads
+the pushes it did not make.
 
 A call the server makes to an address someone gave it (a connection checked,
 a client's sign-in) follows no redirect, and `PELAGO_PRIVATE_URLS=off` (or
 `PELAGO_MODEL_PRIVATE_URLS=off`, its first name) refuses one on the server's
 own network (loopback, private and link-local addresses), held to on every
 call by the address it connects to (`src/outbound.ts`).
-
-**Or the server hears the push through a webhook added by hand.** Pushes are
-taken in by the GitHub pack (`packs/github`), at the webhook it declares. On
-the Workspace screen, under Connections, the **Pushes** row's menu makes the pack's secret and shows the address
-to give GitHub (`/hook/<workspace>/github/github.push`): in each repository,
-Settings, Webhooks, Add webhook, content type `application/json`, that secret,
-push events only. (Until 22 Oct 2026 the address was `/github/<workspace>`;
-a webhook still pointed there gets no answer.) A repository is matched to the
-one in the map whose `remote` is its GitHub address. From then on:
-
-- every push, on any branch, is recorded against the repository in the
-  activity log, and `repo_work` and the GitHub card say when it was last
-  pushed to;
-- on any branch, a commit message that says what it finished
-  (`Closes: e_abc12345` on a line of its own, `fixes e_...`, `done: e_...`)
-  closes that item the way an agent would: held for you to confirm unless
-  policy lets it through. Decisions and hypotheses are left alone; a commit
-  cannot say what was decided. An agent session that names its task in
-  action `session_start` or `session_update` is told to end the commit that finishes
-  it with that line, and says its branch, so whoever reads the push knows
-  what the branch was for.
 
 **An agent reads the push.** [examples/github/pelago.yml](../examples/github/pelago.yml)
 is a GitHub Actions workflow: on every push it runs Claude in the repository,
@@ -610,8 +556,8 @@ What the server knows and must not give up is of two kinds.
   the key; vault backups are kept apart from the data and for 30 days only,
   so a forgotten item cannot be read back after that.
 - **What it has to use is sealed** (AES-256-GCM, `src/secrets.ts`): the
-  secret a GitHub webhook signs with, and the
-  GitHub App's key and signing secret. The sealing key is
+  secrets a pack's webhooks sign with, and a server pack's keys. The sealing
+  key is
   `PELAGO_SECRETS_KEY` (32 bytes, base64) when that is set, and otherwise a
   file the server makes beside the workspaces (`secrets.key`). A server on
   Postgres makes no such file: every server sharing the database must seal

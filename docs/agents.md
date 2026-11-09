@@ -79,27 +79,19 @@ number on the check's row (`workspace_set` `asks_at`, kept as the setting
 A commit is accounted for once the map holds a `commit` item for
 its full sha, with a `settles` link to each item it settles (none
 when it settles nothing); a record still held for the owner counts for the
-session, and the check waits until it applies. Each commit a session makes
+session. Each commit a session makes
 names its run in an `Archipelago-Run` trailer. A reply that committed or
 pushed commits nobody accounted for is asked to (the software pack's reply
 rule `account_commits`, lifted by `reply_account_commits`); an agent's
 `session_end` does not end while its own commits are unaccounted for; and
-the next session in the checkout is told of any left over. The check "Every
-commit accounted for" on a push to main or a pull request into it is red
-until every commit is, and turns green by itself.
+the next session in the checkout is told of any left over.
 
-What nobody accounts for reaches the owner, whoever made it (the owner, 26
-Oct 2026: held to account in the loop, nothing to set up on GitHub). Each
-push the GitHub App hears keeps its commits; an hour on, the GitHub pack's
-schedule `github.commits` makes a `commit` with `accounted: false`
-for each that still has none, and the code pack's attention reason
-`unaccounted` (joining `waits_on`) puts it before the owner. An hour, because
-a session that pushes partway through a reply accounts at the reply's end:
-the owner hears only of what nobody did. Accounting for one is setting
-`accounted` true with its links; one with settles links, or beside another
-item for the same sha, is tidied by the schedule.
-- `packs/github/heard.test.ts`: "a commit pushed past the grace period with
-  no item is made one, accounted false, in its repository".
+What nobody accounts for reaches the owner: a `commit` with `accounted: false`
+(one made for a commit seen and not accounted for) is put before the owner by
+the code pack's attention reason `unaccounted` (joining `waits_on`), until it
+is accounted for, setting `accounted` true with its links. Nothing hears
+pushes since the GitHub pack and the GitHub App went (9 Nov 2026).
+
 - `test/pushed-commits.test.ts`: "a pushed commit nobody accounted for is
   the owner’s attention, by the reason its pack declares, until it is
   accounted for".
@@ -113,13 +105,6 @@ item for the same sha, is tidied by the schedule.
   their full ids".
 - `test/unaccounted.test.ts`: "a session starting in a repository is asked
   to account for the commits the map holds no item for".
-- `packs/github/account.test.ts`: "a push to main is checked: red while a
-  commit has no commit item on the map, and says which, with its run"; "a
-  pull request into main is checked by its commits; one elsewhere, or
-  closed, is not"; "the run a commit names is read from its trailer only".
-- `packs/github_app/github_app.test.ts`: "the check on main: posted as the
-  installation, kept while red, asked again each minute until green, and on
-  Re-run".
 
 ### 5. What a session touched is kept with its run
 The items a session read, showed or changed, and the commits it made, are
@@ -228,10 +213,6 @@ SessionStart's `source` and SessionEnd's `reason`.
    session touched, then the repository's open work nobody changed since it
    began, to change, vouch for or say it cannot tell. The sets are kept a
    week after.
-4. A push to main, or a pull request into it, is checked by
-   `packs/github/account.js` and posted by the GitHub App; while red the app
-   asks the workspace again each minute (a question, logged nowhere) until
-   it is green.
 
 ## What is not yet so
 - `tool:<name>` instructions are declared but no tool description reads them

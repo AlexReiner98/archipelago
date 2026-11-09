@@ -128,8 +128,8 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
   const notes = (await call('/api/search', owner, { type: 'notification' })).result as any[];
   assert.deepEqual(notes.map((n) => n.title), [`The demo pack's webhook "paid" refused a delivery`]);
   const listed = (await call('/api/server_packs', owner)).result;
-  // Those that ship with the kernel (the GitHub App) are listed beside those the configuration names.
-  assert.deepEqual(listed.packs.map((p: any) => p.id), ['github_app', 'demo']);
+  // Those the configuration names are listed (the kernel ships none of its own).
+  assert.deepEqual(listed.packs.map((p: any) => p.id), ['demo']);
   assert.deepEqual(listed.packs.find((p: any) => p.id === 'demo').acts, ['workspace.create', 'workspace.admit', 'workspace.limit', 'workspace.end', 'signin.link']);
   assert.equal(listed.refused.length, 1);
   assert.match((await call('/api/server_packs', me.actor && token)).error, /default workspace/);

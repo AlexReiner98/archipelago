@@ -378,7 +378,7 @@ test('no read of the whole map', () => {
 // screen names (ui/screens.js calls it by the name its pack declares) is the pack's, and is not counted. `undo`, one of
 // the agents' ten tools, came on 2 Nov 2026 at the owner's word: the page takes a change back as an agent does.
 const PAGE_CALLS = [
-  'backup_download', 'change', 'connections', 'decide', 'document', 'events', 'get', 'github', 'import_backup', 'init',
+  'backup_download', 'change', 'connections', 'decide', 'document', 'events', 'get', 'import_backup', 'init',
   'launch', 'member_add', 'member_list', 'member_set', 'pack_set', 'packs', 'picture',
   'proposals', 'publish', 'publish_all', 'publish_plan', 'published', 'schema', 'search', 'server_packs',
   'session_end', 'share_create', 'share_figure', 'share_list', 'share_revoke', 'share_workspace', 'tail',
