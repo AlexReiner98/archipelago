@@ -40,7 +40,7 @@ async function lay(tx: Q, e: Entry, at: string, prev: string): Promise<string> {
 async function aged() {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Years' },
+    { op: 'create', ref: 'p', type: 'aim', title: 'Years' },
     { op: 'create', ref: 't', type: 'task', title: 'Cut the log', body: 'A year at a time.' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);

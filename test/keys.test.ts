@@ -27,11 +27,11 @@ async function all(l: Archipelago, read = entries) {
 
 const raw = async (l: Archipelago, id: string) => (await l.db.query<{ field: string; value: unknown }>(`select field, value from log_fact where id = $1 order by pos, n`, [id])).rows;
 
-/** A person, a project, a task about the person with words in every place, and a link with a field into the person. */
+/** A person, an aim, a task about the person with words in every place, and a link with a field into the person. */
 async function setup(l: Archipelago) {
   const made = await make(l, [
     { op: 'create', ref: 'sam', type: 'person', title: 'Sam Quill', body: 'Salary talks in March.' },
-    { op: 'create', ref: 'p', type: 'project', title: 'Hiring' },
+    { op: 'create', ref: 'p', type: 'aim', title: 'Hiring' },
     { op: 'create', ref: 't', type: 'task', title: 'Offer letter', body: 'For {sam}.', owner: 'sam', props: { priority: 'high' } },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
     { op: 'link', type: 'waits_on', from: 't', to: 'sam', props: { for: 'Quill to sign' } },

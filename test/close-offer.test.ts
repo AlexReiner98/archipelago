@@ -2,27 +2,35 @@
 // with the op that closes it, and the line a commit closes its task by names them too. Nothing is closed unasked.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { sessionStart } from '../src/sessions.ts';
+import { Registry, type PackFile } from '../src/packs.ts';
 import { callTool } from '../src/tools.ts';
-import { agent, fresh, human, make } from './map.ts';
+import { agent, freshWith, human, make, packsWith } from './map.ts';
+
+// A link that offers to close what it runs to, and a type for it to run to: a pack's, as any such link is.
+const MENDS = {
+  id: 'mending', version: '1', title: 'Mending', requires: ['core'],
+  types: [{ id: 'bump', extends: 'work', title: 'Bump', description: 'A problem met.', statuses: { open: ['open', 'investigating'], closed: ['resolved', 'wontfix'] } }],
+  links: [{ id: 'mends', extends: 'about', title: 'mends', inverse: 'is mended by', from: ['*'], to: ['bump'], offers_close: true, description: 'Work meant to fix the bump.' }],
+} as PackFile;
+const registry = new Registry(packsWith(MENDS));
 
 async function setup() {
-  const l = await fresh();
+  const l = await freshWith(registry);
   const made = await make(l, [
     { op: 'create', ref: 'task', type: 'task', title: 'Fix the bumps' },
-    { op: 'create', ref: 'a', type: 'issue', title: 'Bump A' },
-    { op: 'create', ref: 'b', type: 'issue', title: 'Bump B' },
-    { op: 'create', ref: 'c', type: 'issue', title: 'Bump C', status: 'resolved' },
-    { op: 'create', ref: 'd', type: 'issue', title: 'Bump D' },
-    { op: 'link', type: 'addresses', from: 'task', to: 'a' },
-    { op: 'link', type: 'addresses', from: 'task', to: 'b' },
-    { op: 'link', type: 'addresses', from: 'task', to: 'c' },
+    { op: 'create', ref: 'a', type: 'bump', title: 'Bump A' },
+    { op: 'create', ref: 'b', type: 'bump', title: 'Bump B' },
+    { op: 'create', ref: 'c', type: 'bump', title: 'Bump C', status: 'resolved' },
+    { op: 'create', ref: 'd', type: 'bump', title: 'Bump D' },
+    { op: 'link', type: 'mends', from: 'task', to: 'a' },
+    { op: 'link', type: 'mends', from: 'task', to: 'b' },
+    { op: 'link', type: 'mends', from: 'task', to: 'c' },
     { op: 'link', type: 'about', from: 'task', to: 'd' },
   ]);
   return { l, task: made.task, a: made.a, b: made.b };
 }
 
-test('closing a task names the open issues it addresses, with the ops that close them, and closes none', async () => {
+test('closing a task names the open bumps it mends, with the ops that close them, and closes none', async () => {
   const { l, task, a, b } = await setup();
   const answer = (await callTool(l, human, 'change', { reason: 'done', ops: [{ op: 'update', id: task, status: 'done' }] })) as any;
   assert.equal(answer.status, 'applied');

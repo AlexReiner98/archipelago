@@ -7,6 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { cssProblem } from '../src/css-check.ts';
+import { packsWith } from './map.ts';
 import { serve } from './serve.ts';
 
 test('a sheet is refused for what could fetch or reach out of where it is read, and the line it is on is named', () => {
@@ -32,13 +33,14 @@ test('the page checks a sheet by the same file the server does', async () => {
 });
 
 test('a bad page_css is refused when it is written, and a published page keeps the look it was published in', async () => {
-  const { call, base } = await serve('off');
+  // A test pack's writing is what can be published (test/packs/reader).
+  const { call, base } = await serve('off', undefined, undefined, packsWith('reader'));
   const made = (
     await call('/api/change', undefined, {
       reason: 'test',
       ops: [
         { op: 'create', ref: 'look', type: 'style', title: 'The site', status: 'current', props: { page_css: 'h2 { letter-spacing: 3px; }' } },
-        { op: 'create', ref: 'd', type: 'document', title: 'A page', visibility: 'shared', body: 'Its words.' },
+        { op: 'create', ref: 'd', type: 'writing', title: 'A page', visibility: 'shared', body: 'Its words.' },
       ],
     })
   ).result.created as Record<string, string>;
