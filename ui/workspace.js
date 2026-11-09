@@ -101,7 +101,7 @@ export async function workspace() {
   const shown = SECTIONS.filter(([key]) => admin || (key === 'agents' && tokensOn) || (key === 'people' && !info.owner));
   if (!shown.some(([key]) => key === open)) open = shown[0]?.[0] ?? 'agents';
   main.replaceChildren(
-    h('div', { class: 'page-head' }, h('h1', {}, 'Workspace'), h('p', { class: 'muted' }, me.workspace.name, ' ', me.actor.admin && me.workspace.id !== 'default' && h('a', { href: '#/workspace', title: 'Give this workspace another name', onclick: rename }, 'Rename'))),
+    h('div', { class: 'page-head' }, h('h1', {}, 'Settings'), h('p', { class: 'muted' }, me.workspace.name, ' ', me.actor.admin && me.workspace.id !== 'default' && h('a', { href: '#/workspace', title: 'Give this workspace another name', onclick: rename }, 'Rename'))),
     shown.length > 1 && h('div', { class: 'switch ws-sections', role: 'tablist' }, shown.map(([key, label, tip]) => h('button', { class: key === open ? 'on' : '', role: 'tab', title: tip, onclick: () => go(key) }, label))),
     h('div', { class: 'ws-notice' }, notice),
     h('div', { class: 'grid' }, sections[open]()),
