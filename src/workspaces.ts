@@ -329,7 +329,7 @@ export class Workspaces {
 
   /** Make the operator secret if there is none. Returns it only at that moment, on the one server that made it. */
   async ensureOperator(): Promise<string | undefined> {
-    const secret = newSecret('latop');
+    const secret = newSecret('pelop');
     return (await claimControlValue(await this.control(), OPERATOR, hashSecret(secret))) ? secret : undefined;
   }
 
@@ -358,7 +358,7 @@ export class Workspaces {
       good = Boolean(proof && expected.length >= 32 && sameSecret(proof, hashSecret(expected)));
     } else return undefined;
     if (!good) return undefined;
-    const secret = newSecret('latop');
+    const secret = newSecret('pelop');
     await setControlValue(db, OPERATOR, hashSecret(secret));
     return secret;
   }

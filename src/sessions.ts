@@ -200,7 +200,7 @@ async function heard(l: Archipelago, run: Entity, why: string): Promise<void> {
   await l.operational(run.id, { unset: ['stale_flagged'] });
   const { rows } = await l.db.query<{ id: string }>(
     `select n.id from entity n join relation r on r.from_id = n.id and r.type = 'about' and r.valid_to is null
-     where r.to_id = $1 and n.type = 'notification' and n.is_open and n.archived_at is null and n.props->>'from' in ('agent:pelago', 'agent:lattice')`,
+     where r.to_id = $1 and n.type = 'notification' and n.is_open and n.archived_at is null and n.props->>'from' = 'agent:pelago'`,
     [run.id],
   );
   if (rows.length) await l.apply('agent:pelago', { ops: rows.map((n): Op => ({ op: 'update', id: n.id, status: 'read' })), reason: why });

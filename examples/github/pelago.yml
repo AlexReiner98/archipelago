@@ -17,8 +17,7 @@
 #   variable PELAGO_URL            the server, e.g. https://pelago.example.com
 #   secret   PELAGO_AGENT_TOKEN    an agent token from the Workspace screen
 #   secret   ANTHROPIC_API_KEY      or CLAUDE_CODE_OAUTH_TOKEN, used below
-# It does nothing until PELAGO_URL is set. A repository connected while this
-# was called Lattice has LATTICE_URL and LATTICE_AGENT_TOKEN: those are read too.
+# It does nothing until PELAGO_URL is set.
 
 name: Archipelago
 
@@ -37,14 +36,14 @@ permissions:
 
 jobs:
   reconcile:
-    if: ${{ github.event_name == 'push' && (vars.PELAGO_URL || vars.LATTICE_URL) != '' && !github.event.deleted }}
+    if: ${{ github.event_name == 'push' && vars.PELAGO_URL != '' && !github.event.deleted }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Everything the steps need from the event comes in through the
     # environment, so a branch name is never read as part of a command.
     env:
-      PELAGO_URL: ${{ vars.PELAGO_URL || vars.LATTICE_URL }}
-      PELAGO_AGENT_TOKEN: ${{ secrets.PELAGO_AGENT_TOKEN || secrets.LATTICE_AGENT_TOKEN }}
+      PELAGO_URL: ${{ vars.PELAGO_URL }}
+      PELAGO_AGENT_TOKEN: ${{ secrets.PELAGO_AGENT_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       REPO: ${{ github.repository }}
@@ -189,12 +188,12 @@ jobs:
           '
 
   recheck:
-    if: ${{ github.event_name != 'push' && (vars.PELAGO_URL || vars.LATTICE_URL) != '' }}
+    if: ${{ github.event_name != 'push' && vars.PELAGO_URL != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      PELAGO_URL: ${{ vars.PELAGO_URL || vars.LATTICE_URL }}
-      PELAGO_AGENT_TOKEN: ${{ secrets.PELAGO_AGENT_TOKEN || secrets.LATTICE_AGENT_TOKEN }}
+      PELAGO_URL: ${{ vars.PELAGO_URL }}
+      PELAGO_AGENT_TOKEN: ${{ secrets.PELAGO_AGENT_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       REPO: ${{ github.repository }}

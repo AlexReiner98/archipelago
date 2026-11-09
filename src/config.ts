@@ -101,11 +101,10 @@ export function startedFrom(): string | undefined {
 }
 
 /**
- * Defaults, overridden by pelago.config.json, overridden by the PELAGO_* environment variables. The names both
- * had while this was called Lattice (lattice.config.json, LATTICE_*) are still read.
+ * Defaults, overridden by pelago.config.json, overridden by the PELAGO_* environment variables.
  */
 export function loadConfig(): Config {
-  const file = [join(ROOT, 'pelago.config.json'), join(ROOT, 'lattice.config.json')].find((path) => existsSync(path)) ?? '';
+  const file = existsSync(join(ROOT, 'pelago.config.json')) ? join(ROOT, 'pelago.config.json') : '';
   const fromFile: Partial<Config> = file ? JSON.parse(readFileSync(file, 'utf8')) : {};
   const auth = (env('AUTH') ?? fromFile.auth) === 'tokens' ? 'tokens' : 'off';
   const dev = env('DEV') !== undefined ? env('DEV') === '1' : fromFile.dev === true;

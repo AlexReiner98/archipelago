@@ -45,7 +45,7 @@ test('the setup shows what it will change and waits for a yes, keeps a copy of w
       child.stderr.on('data', (d) => (out += d));
       child.on('close', (code) => done({ out, code }));
     });
-  const first = { PELAGO_AGENT_TOKEN: 'lat_default_secret', PELAGO_SETUP_SAVE: '1' };
+  const first = { PELAGO_AGENT_TOKEN: 'pel_default_secret', PELAGO_SETUP_SAVE: '1' };
 
   // With nobody to ask and no yes, a first setup is shown and refused.
   const refused = await setup();
@@ -59,7 +59,7 @@ test('the setup shows what it will change and waits for a yes, keeps a copy of w
   assert.equal(dry.code, 0, dry.out);
   assert.ok(dry.out.includes(`keep       PELAGO_URL and PELAGO_AGENT_TOKEN in ${at('profile')}, outside this folder`), dry.out);
   assert.match(dry.out, /Nothing was written \(--dry-run\)/);
-  assert.ok(!dry.out.includes('lat_default_secret'));
+  assert.ok(!dry.out.includes('pel_default_secret'));
   untouched();
   assert.equal((await setup(['--force'])).code, 1, 'an option it does not know stops it');
   untouched();
@@ -67,7 +67,7 @@ test('the setup shows what it will change and waits for a yes, keeps a copy of w
   // With a yes it writes, and what it changed of theirs has a copy beside it holding what was there.
   const done = await setup(['--yes'], first);
   assert.equal(done.code, 0, done.out);
-  assert.ok(!done.out.includes('lat_default_secret'));
+  assert.ok(!done.out.includes('pel_default_secret'));
   for (const path of Object.keys(theirs)) assert.equal(file(`${path}.pelago-backup`), theirs[path as keyof typeof theirs], `${path} is copied as it was`);
   assert.ok(JSON.parse(file('.mcp.json')).mcpServers.pelago && JSON.parse(file('.mcp.json')).mcpServers.other);
   assert.deepEqual(Object.keys(JSON.parse(file('.claude/pelago-setup.json')).files).sort(), ['.claude/pelago-events.mjs', '.claude/pelago-hook.mjs', '.claude/pelago.md', '.claude/skills/pelago-bump/SKILL.md', '.claude/skills/pelago-bump/references/home.md']);
@@ -194,18 +194,12 @@ test('the hook script takes a Claude Code hook to whichever server the machine i
 test('beyond this machine the server needs tokens, and answers only to the names it is given', async () => {
   const before = { ...process.env };
   after(() => {
-    for (const key of ['PELAGO_HOST', 'PELAGO_AUTH', 'PELAGO_DEV', 'PELAGO_PUBLIC_HOST', 'PORT', 'PELAGO_PORT', 'LATTICE_HOST', 'LATTICE_AUTH']) {
+    for (const key of ['PELAGO_HOST', 'PELAGO_AUTH', 'PELAGO_DEV', 'PELAGO_PUBLIC_HOST', 'PORT', 'PELAGO_PORT']) {
       if (before[key] === undefined) delete process.env[key];
       else process.env[key] = before[key];
     }
   });
   for (const key of ['PELAGO_AUTH', 'PELAGO_DEV', 'PELAGO_PORT']) delete process.env[key];
-  // A server set up while this was called Lattice is still started with those names, and they are still read.
-  process.env.LATTICE_HOST = '0.0.0.0';
-  assert.throws(() => loadConfig(), /needs auth "tokens"/);
-  process.env.LATTICE_AUTH = 'tokens';
-  assert.deepEqual([loadConfig().host, loadConfig().auth], ['0.0.0.0', 'tokens']);
-  for (const key of ['LATTICE_HOST', 'LATTICE_AUTH']) delete process.env[key];
   process.env.PELAGO_HOST = '0.0.0.0';
   assert.throws(() => loadConfig(), /needs auth "tokens"/);
   process.env.PELAGO_AUTH = 'tokens';

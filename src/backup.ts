@@ -355,10 +355,7 @@ export function parseBackup(bytes: Uint8Array): Dump {
     throw new Error('That is not an Archipelago backup file (a .json.gz written by the server).');
   }
   try {
-    const dump = JSON.parse(text) as Dump;
-    // A backup written while this was called Lattice says so on each event of its own.
-    for (const event of dump.tables?.event ?? []) if (event.origin === 'lattice') event.origin = 'pelago';
-    return dump;
+    return JSON.parse(text) as Dump;
   } catch {
     throw new Error('That is not an Archipelago backup file (a .json.gz written by the server).');
   }
