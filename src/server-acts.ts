@@ -7,7 +7,7 @@
 import { recordAgreement, type Agreement } from './agreements.ts';
 import { setControlValue, controlValue } from './control.ts';
 import { normalEmail, sendMail } from './mail.ts';
-import { admitMember, linkFor, memberOf, setMemberLimit } from './members.ts';
+import { admitMember, linkFor, memberOf, ownerEmail, setMemberLimit } from './members.ts';
 import { setEnded } from './ended.ts';
 import { LIMITS, limitsFrom } from './plan.ts';
 import type { ServerAct, ServerPackFile } from './server-packs.ts';
@@ -64,9 +64,12 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
   switch (act as ServerAct) {
     case 'workspace.create': {
       const name = text(input.name, 60, 'A workspace name');
+      // Made with its owner, by their address: there is no workspace nobody can sign in to by email.
+      const email = ownerEmail(input.email);
       const ws = await at.create(await freeId(at, name), name);
       await setControlValue(owner.db, madeKey(ws.id), pack.id);
-      await log(`Made the workspace "${name}"`, { workspace: ws.id });
+      await admitMember(ws.pelago, email, true);
+      await log(`Made the workspace "${name}" for ${email}`, { workspace: ws.id, email });
       return { workspace: { id: ws.id, name: ws.name } };
     }
     case 'workspace.admit': {

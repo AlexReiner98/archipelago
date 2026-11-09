@@ -22,7 +22,7 @@ test('a member reads their workspace’s use and what it is made of, and nothing
   const { workspaces, call } = await serve('tokens');
   const pack = loadServerPacks([FIXTURES]).packs[0].file;
   const act = (name: string, input: Record<string, unknown>) => runAct(workspaces, pack, name, input);
-  const { workspace } = (await act('workspace.create', { name: 'Use Co' })) as { workspace: { id: string } };
+  const { workspace } = (await act('workspace.create', { name: 'Use Co', email: 'ola@use.example' })) as { workspace: { id: string } };
   const ws = await workspaces.get(workspace.id);
   const admit = async (email: string, admin: boolean) => ((await act('workspace.admit', { workspace: ws.id, email, admin })) as { person: string }).person;
   const ola = await admit('ola@use.example', true);

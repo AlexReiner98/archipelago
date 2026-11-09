@@ -95,19 +95,22 @@ test('each workspace is its own database: tokens, data and local types do not cr
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex' })).token;
 
   assert.equal((await call('/operator/workspaces', mine, { id: 'acme', name: 'Acme' })).status, 401, 'a workspace token is not the operator');
-  assert.match((await call('/operator/workspaces', operator, { id: 'Bad Id', name: 'x' })).error, /lowercase letters/);
-  const created = await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme Architects' });
+  assert.match((await call('/operator/workspaces', operator, { id: 'Bad Id', name: 'x', email: 'owner@acme.test' })).error, /lowercase letters/);
+  const created = await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme Architects', email: 'owner@acme.test' });
   const theirs = created.result.owner_token as string;
   assert.equal(workspaceOf(theirs), 'acme');
-  assert.match((await call('/operator/workspaces', operator, { id: 'acme', name: 'Again' })).error, /already exists/);
+  assert.match((await call('/operator/workspaces', operator, { id: 'acme', name: 'Again', email: 'owner@acme.test' })).error, /already exists/);
   assert.deepEqual((await call('/operator/workspaces', operator, undefined, 'GET')).result.map((w: any) => w.id), ['default', 'acme']);
+  // Every workspace is made with its owner's address, and the list says each one's admins (the owner's audit).
+  assert.match((await call('/operator/workspaces', operator, { id: 'nomail', name: 'No Mail' })).error, /owner's email address/);
+  assert.deepEqual((await call('/operator/workspaces', operator, undefined, 'GET')).result.find((w: any) => w.id === 'acme').admins, ['owner@acme.test']);
   assert.equal((await call('/api/search', operator)).status, 401, 'the operator cannot read any map');
 
   await call('/api/change', mine, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'My secret plan' }] });
   await call('/api/change', theirs, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'Acme bid' }] });
   const titles = async (token: string) => ((await call('/api/search', token)).result as any[]).map((e) => e.title);
   assert.deepEqual(await titles(mine), ['My secret plan']);
-  assert.deepEqual(await titles(theirs), ['Acme bid']);
+  assert.deepEqual(await titles(theirs), ['Acme bid', 'owner@acme.test'], 'its own note and its owner');
   assert.equal((await call('/whoami', theirs, undefined, 'GET')).workspace.name, 'Acme Architects');
 
   // A token is only good in the workspace that issued it, whatever its prefix says.
@@ -277,7 +280,7 @@ test('a workspace receives notifications only from workspaces its admin accepts'
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
-  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
   const send = (token: string, workspace: string) => call('/api/notify_workspace', token, { workspace, title: 'The shadow study is ready', level: 'warning' });
 
   // Refused the same way whether the workspace is closed to us or does not exist.

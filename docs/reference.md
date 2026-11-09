@@ -836,12 +836,16 @@ change that:
   In the web UI: signed in to the default workspace as its admin, open the
   Workspace screen, **Packs**, and the **Workspaces** card. Type the operator
   secret there (the page keeps it in its memory alone, never stored, so a
-  reload asks again), give an id and a name, and press **Make workspace**:
-  its owner token is shown once. The request does the same from the
+  reload asks again), give an id, a name and the owner's email address, and
+  press **Make workspace**: the owner is its first admin and signs in by
+  email, and an owner token is shown once. A workspace is made only on a
+  server that sends mail (`PELAGO_MAIL_FROM`), and always with its owner's
+  address; one made from a backup brings its members. The list shows each
+  workspace's admins, and **no email** on one nobody can sign in to by email. The request does the same from the
   server's own machine, or from anywhere the page's address is:
 
   ```bash
-  curl -X POST http://127.0.0.1:3100/operator/workspaces -H "content-type: application/json" -H "Authorization: Bearer <operator secret>" -d '{"id":"acme","name":"Acme Architects"}'
+  curl -X POST http://127.0.0.1:3100/operator/workspaces -H "content-type: application/json" -H "Authorization: Bearer <operator secret>" -d '{"id":"acme","name":"Acme Architects","email":"owner@acme.example"}'
   ```
 
   The operator secret can create and list workspaces, and issue a workspace a

@@ -16,7 +16,7 @@ test('in a browser, a document is written beside its draft, shared or not', { sk
   const { workspaces, call, base } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
-  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
   const api = async (token: string, tool: string, input: unknown = {}) => {
     const answer = await call(`/api/${tool}`, token, input);
     if (answer.error) throw new Error(answer.error);

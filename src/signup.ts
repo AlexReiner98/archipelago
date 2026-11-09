@@ -15,7 +15,7 @@ import { validWorkspaceId } from './auth.ts';
 import { claimControlValue, controlValue, setControlValue } from './control.ts';
 import { newId, type Q } from './db.ts';
 import { env } from './env.ts';
-import { normalEmail } from './mail.ts';
+import { mailConfigured, normalEmail } from './mail.ts';
 import { admitOwner, memberToken } from './members.ts';
 import { notify } from './notify.ts';
 import { keep, kept, take } from './transient.ts';
@@ -39,8 +39,8 @@ const requestKey = (id: string) => `signup:${id}`;
 const subscriptionKey = (id: string) => `lemon_subscription:${id}`;
 const home = async (at: Places) => (await at.get('default')).pelago;
 
-/** Whether this server sells workspaces, and what the page says one costs. */
-export const signupOffer = () => ({ open: Boolean(env('LEMON_CHECKOUT') && env('LEMON_SECRET')), price: env('SIGNUP_PRICE') ?? null });
+/** Whether this server sells workspaces, and what the page says one costs. Never without mail: a buyer signs in again by email. */
+export const signupOffer = () => ({ open: Boolean(env('LEMON_CHECKOUT') && env('LEMON_SECRET') && mailConfigured()), price: env('SIGNUP_PRICE') ?? null });
 
 /** A workspace id from a name: its words, lowercase and joined by hyphens, with a number added if it is taken. */
 export async function freeId(at: Pick<Workspaces, 'has'>, name: string): Promise<string> {

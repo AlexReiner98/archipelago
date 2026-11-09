@@ -9,6 +9,9 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { gzipSync } from 'node:zlib';
 import { createToken, OPERATOR_RESET_FILE } from '../src/auth.ts';
+
+/** A workspace made bare, as no person makes one, for a test about a file taken of it: an admin token, no owner. */
+const bareMap = async (at: { create(id: string, name: string): Promise<{ pelago: { db: any } }> }, id: string, name: string) => (await createToken((await at.create(id, name)).pelago.db, id, { kind: 'human', name: 'owner', admin: true })).token;
 import { dump } from '../src/backup.ts';
 import { loadConfig } from '../src/config.ts';
 import { linkFor } from '../src/members.ts';
@@ -239,7 +242,7 @@ test('beyond this machine the server needs tokens, and answers only to the names
 test('the operator can issue a workspace a new owner token, and nobody else can', async () => {
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
-  const made = await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' });
+  const made = await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' });
   assert.equal((await call('/operator/workspaces/acme/owner-token', made.result.owner_token)).status, 401, 'not the workspace\'s own owner');
   assert.equal((await call('/operator/workspaces/nope/owner-token', operator)).status, 404);
   const again = await call('/operator/workspaces/acme/owner-token', operator);
@@ -312,7 +315,7 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
   const { workspaces, call, member: join } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
   // Where the file comes from: another map, with a type of its own and things its owner did.
-  const there = (await call('/operator/workspaces', operator, { id: 'laptop', name: 'Laptop' })).result.owner_token as string;
+  const there = await bareMap(workspaces, 'laptop', 'Laptop'); // a map to take a file of, with no owner yet
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'define_type', type: { id: 'local.site_visit', title: 'Site visit', description: 'A visit.', extends: 'event' } }] });
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }, { op: 'create', type: 'task', title: 'Order the stone' }] });
   const laptop = await workspaces.get('laptop');
@@ -347,7 +350,7 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
 test('an import can make the owner in the file and the owner here one person, and they keep their token and what is theirs', async () => {
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
-  const there = (await call('/operator/workspaces', operator, { id: 'laptop', name: 'Laptop' })).result.owner_token as string;
+  const there = await bareMap(workspaces, 'laptop', 'Laptop'); // a map to take a file of, with no owner yet
   const theirs = (await call('/api/init', there, { name: 'Alex Reiner' })).result.me as string;
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'From the laptop', owner: theirs }] });
   const backup = gzipSync(JSON.stringify(await dump((await workspaces.get('laptop')).pelago.db, { id: 'laptop', name: 'Laptop' }))).toString('base64');

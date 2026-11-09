@@ -12,7 +12,7 @@ test('a document is previewed as publishing it would give it, before it is publi
   const { workspaces, call, base } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
-  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
   const api = async (token: string, tool: string, input: unknown = {}) => {
     const answer = await call(`/api/${tool}`, token, input);
     if (answer.error) throw new Error(answer.error);
@@ -86,7 +86,7 @@ test('a document shared only to be read is previewed nowhere, and its views are 
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
-  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
   const api = async (token: string, tool: string, input: unknown = {}) => {
     const answer = await call(`/api/${tool}`, token, input);
     if (answer.error) throw new Error(answer.error);
@@ -113,7 +113,7 @@ test('a document shared only to be read is previewed nowhere, and its views are 
 test('a draft keeps the sections it holds on a workspace other than default', async () => {
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
-  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme' })).result.owner_token as string;
+  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
   const made = (
     await call('/api/change', theirs, {
       reason: 'test',
