@@ -223,13 +223,13 @@
        "why": "ready"
       }
      ],
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
      "top": {
       "id": "<app>",
       "title": "App"
      },
-     "type": "feature"
+     "type": "x.feature"
     },
     {
      "changed": "<time>",
@@ -246,18 +246,18 @@
        "why": "ready"
       }
      ],
-     "status": "planned",
+     "status": "todo",
      "title": "Docs",
      "top": {
       "id": "<app>",
       "title": "App"
      },
-     "type": "feature"
+     "type": "x.feature"
     },
     {
      "changed": "<time>",
      "due": null,
-     "id": "<bug>",
+     "id": "<crash>",
      "open": true,
      "owner": null,
      "reasons": [
@@ -269,13 +269,13 @@
        "why": "ready"
       }
      ],
-     "status": "open",
+     "status": "todo",
      "title": "Crash on thin walls",
      "top": {
       "id": "<app>",
       "title": "App"
      },
-     "type": "issue"
+     "type": "x.issue"
     },
     {
      "changed": "<time>",
@@ -289,10 +289,10 @@
        "why": "stale"
       }
      ],
-     "status": "planned",
+     "status": "todo",
      "title": "App",
      "top": null,
-     "type": "project"
+     "type": "x.project"
     },
     {
      "changed": "<time>",
@@ -309,13 +309,13 @@
        "why": "ready"
       }
      ],
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
      "top": {
       "id": "<app>",
       "title": "App"
      },
-     "type": "feature"
+     "type": "x.feature"
     }
    ],
    "person": null,
@@ -418,13 +418,13 @@
        "why": "ready"
       }
      ],
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
      "top": {
       "id": "<app>",
       "title": "App"
      },
-     "type": "feature"
+     "type": "x.feature"
     },
     {
      "changed": "<time>",
@@ -453,7 +453,7 @@
     {
      "changed": "<time>",
      "due": null,
-     "id": "<release>",
+     "id": "<launch>",
      "open": true,
      "owner": null,
      "reasons": [
@@ -468,7 +468,7 @@
      "status": "upcoming",
      "title": "Version 1.0",
      "top": null,
-     "type": "release"
+     "type": "event"
     },
     {
      "changed": "<time>",
@@ -583,13 +583,13 @@
        "why": "ready"
       }
      ],
-     "status": "planned",
+     "status": "todo",
      "title": "Price plans",
      "top": {
       "id": "<business>",
       "title": "Business"
      },
-     "type": "feature"
+     "type": "x.feature"
     },
     {
      "changed": "<time>",
@@ -629,18 +629,18 @@
        "why": "ready"
       }
      ],
-     "status": "planned",
+     "status": "todo",
      "title": "Docs",
      "top": {
       "id": "<app>",
       "title": "App"
      },
-     "type": "feature"
+     "type": "x.feature"
     },
     {
      "changed": "<time>",
      "due": null,
-     "id": "<bug>",
+     "id": "<crash>",
      "open": true,
      "owner": null,
      "reasons": [
@@ -652,13 +652,13 @@
        "why": "ready"
       }
      ],
-     "status": "open",
+     "status": "todo",
      "title": "Crash on thin walls",
      "top": {
       "id": "<app>",
       "title": "App"
      },
-     "type": "issue"
+     "type": "x.issue"
     },
     {
      "changed": "<time>",
@@ -672,10 +672,10 @@
        "why": "stale"
       }
      ],
-     "status": "planned",
+     "status": "todo",
      "title": "Business",
      "top": null,
-     "type": "project"
+     "type": "x.project"
     },
     {
      "changed": "<time>",
@@ -689,10 +689,10 @@
        "why": "stale"
       }
      ],
-     "status": "planned",
+     "status": "todo",
      "title": "App",
      "top": null,
-     "type": "project"
+     "type": "x.project"
     },
     {
      "changed": "<time>",
@@ -709,13 +709,13 @@
        "why": "ready"
       }
      ],
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
      "top": {
       "id": "<app>",
       "title": "App"
      },
-     "type": "feature"
+     "type": "x.feature"
     }
    ],
    "person": "<me>",
@@ -746,24 +746,17 @@
    "part_of": [
     {
      "id": "<addin>",
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
-     "type": "feature"
+     "type": "x.feature"
     },
     {
      "id": "<app>",
-     "status": "planned",
+     "status": "todo",
      "title": "App",
-     "type": "project"
+     "type": "x.project"
     }
    ],
-   "repo": {
-    "id": "<repo>",
-    "path": "C:\\code\\Apex",
-    "status": "active",
-    "title": "Apex repo",
-    "type": "repo"
-   },
    "root_blockers": [
     {
      "due": null,
@@ -780,7 +773,7 @@
     "title": "Hover cards",
     "type": "task"
    },
-   "text": "# Hover cards\nTask, doing. Archipelago id: <hover>\n\nPart of: Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Bo (person, active)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <hover>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done.",
+   "text": "# Hover cards\nTask, doing. Archipelago id: <hover>\n\nPart of: Add-in > App\n\n## Blocked\nThis cannot finish until:\n- Bo (person, active)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <hover>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done.",
    "ties": []
   },
   "brief installer": {
@@ -789,32 +782,25 @@
    "part_of": [
     {
      "id": "<addin>",
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
-     "type": "feature"
+     "type": "x.feature"
     },
     {
      "id": "<app>",
-     "status": "planned",
+     "status": "todo",
      "title": "App",
-     "type": "project"
+     "type": "x.project"
     }
    ],
-   "repo": {
-    "id": "<repo>",
-    "path": "C:\\code\\Apex",
-    "status": "active",
-    "title": "Apex repo",
-    "type": "repo"
-   },
    "root_blockers": [],
    "task": {
     "id": "<installer>",
-    "status": "building",
+    "status": "doing",
     "title": "Installer",
-    "type": "feature"
+    "type": "x.feature"
    },
-   "text": "# Installer\nFeature, building. Archipelago id: <installer>\n\nPart of: Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <installer>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done.",
+   "text": "# Installer\nFeature, doing. Archipelago id: <installer>\n\nPart of: Add-in > App\n\n## Reporting\nRegister with pelago (capture, action session_start, task <installer>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done.",
    "ties": []
   },
   "brief sign": {
@@ -843,30 +829,23 @@
    "part_of": [
     {
      "id": "<installer>",
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
-     "type": "feature"
+     "type": "x.feature"
     },
     {
      "id": "<addin>",
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
-     "type": "feature"
+     "type": "x.feature"
     },
     {
      "id": "<app>",
-     "status": "planned",
+     "status": "todo",
      "title": "App",
-     "type": "project"
+     "type": "x.project"
     }
    ],
-   "repo": {
-    "id": "<repo>",
-    "path": "C:\\code\\Apex",
-    "status": "active",
-    "title": "Apex repo",
-    "type": "repo"
-   },
    "root_blockers": [
     {
      "due": null,
@@ -883,7 +862,7 @@
     "title": "Sign the package",
     "type": "task"
    },
-   "text": "# Sign the package\nTask, todo. Archipelago id: <sign>\n\nPart of: Installer > Add-in > App\nRepository: Apex repo (C:\\code\\Apex)\n\n## Blocked\nThis cannot finish until:\n- Which certificate? (decision, open)\n\n## Needs\n- Live lane: available (exclusive: claim it before use, release it after)\n\n## Is about\n- One live lane. (decided) Only one session drives the CAD app.\n\n## Is linked to\n- Is the cert enough? (open)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <sign>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done.",
+   "text": "# Sign the package\nTask, todo. Archipelago id: <sign>\n\nPart of: Installer > Add-in > App\n\n## Blocked\nThis cannot finish until:\n- Which certificate? (decision, open)\n\n## Needs\n- Live lane: available (exclusive: claim it before use, release it after)\n\n## Is about\n- One live lane. (decided) Only one session drives the CAD app.\n\n## Is linked to\n- Is the cert enough? (open)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <sign>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done.",
    "ties": [
     {
      "id": "<rule>",
@@ -898,167 +877,6 @@
      "status": "open",
      "title": "Is the cert enough?",
      "type": "decision"
-    }
-   ]
-  },
-  "gate events": {
-   "events": [
-    {
-     "at": null,
-     "holding": 2,
-     "id": "<release>",
-     "status": "upcoming",
-     "title": "Version 1.0",
-     "type": "release"
-    }
-   ]
-  },
-  "gate release": {
-   "can_follow": [
-    {
-     "id": "<hover>",
-     "open": true,
-     "relation": "<link>",
-     "status": "doing",
-     "title": "Hover cards",
-     "type": "task"
-    }
-   ],
-   "clear": false,
-   "counts": {
-    "can_follow": 1,
-    "holding": 5,
-    "open": 4,
-    "to_sort": 3,
-    "yours": 3
-   },
-   "event": {
-    "at": null,
-    "id": "<release>",
-    "open": true,
-    "status": "upcoming",
-    "title": "Version 1.0",
-    "type": "release"
-   },
-   "how": "To sort an item: link the event to it with depends_on (the event waits for it) or defers (it can follow). To move one across, unlink the link given here and link the other.",
-   "proof": null,
-   "streams": [
-    {
-     "id": "<installer>",
-     "items": [
-      {
-       "blocked": true,
-       "done": false,
-       "id": "<sign>",
-       "status": "todo",
-       "title": "Sign the package",
-       "type": "task",
-       "waiting_on": [
-        {
-         "id": "<cert>",
-         "status": "open",
-         "title": "Which certificate?",
-         "type": "decision"
-        }
-       ],
-       "yours": true
-      },
-      {
-       "blocked": false,
-       "done": false,
-       "id": "<cert>",
-       "status": "open",
-       "title": "Which certificate?",
-       "type": "decision",
-       "waiting_on": [],
-       "yours": true
-      },
-      {
-       "blocked": false,
-       "done": false,
-       "id": "<q>",
-       "status": "open",
-       "title": "Is the cert enough?",
-       "type": "decision",
-       "waiting_on": [],
-       "yours": false
-      },
-      {
-       "blocked": false,
-       "done": true,
-       "id": "<clean>",
-       "status": "done",
-       "title": "Uninstall leaves it clean",
-       "type": "task",
-       "waiting_on": [],
-       "yours": false
-      }
-     ],
-     "progress": {
-      "done": 1,
-      "total": 4
-     },
-     "relation": "<link>",
-     "status": "building",
-     "title": "Installer",
-     "type": "feature",
-     "yours": 2
-    },
-    {
-     "id": "<business>",
-     "items": [
-      {
-       "blocked": false,
-       "done": false,
-       "id": "<pricing>",
-       "relation": "<link>",
-       "status": "open",
-       "title": "What does it cost?",
-       "type": "decision",
-       "waiting_on": [],
-       "yours": true
-      }
-     ],
-     "progress": {
-      "done": 0,
-      "total": 1
-     },
-     "status": "planned",
-     "title": "Business",
-     "type": "project",
-     "yours": 1
-    }
-   ],
-   "to_sort": [
-    {
-     "id": "<extras>",
-     "status": "todo",
-     "stream": {
-      "id": "<addin>",
-      "title": "Add-in"
-     },
-     "title": "Capture extras",
-     "type": "task"
-    },
-    {
-     "id": "<bug>",
-     "status": "open",
-     "stream": {
-      "id": "<docs>",
-      "title": "Docs"
-     },
-     "title": "Crash on thin walls",
-     "type": "issue"
-    },
-    {
-     "id": "<guide>",
-     "status": "todo",
-     "stream": {
-      "id": "<docs>",
-      "title": "Docs"
-     },
-     "title": "Write the guide",
-     "type": "task"
     }
    ]
   },
@@ -1085,7 +903,7 @@
     {
      "from": "<app>",
      "id": "<link>",
-     "to": "<repo>",
+     "to": "<home>",
      "type": "lives_in"
     },
     {
@@ -1137,7 +955,7 @@
      "type": "part_of"
     },
     {
-     "from": "<bug>",
+     "from": "<crash>",
      "id": "<link>",
      "to": "<docs>",
      "type": "part_of"
@@ -1191,28 +1009,28 @@
      "type": "link"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<addin>",
-     "type": "ships"
+     "type": "produced"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<installer>",
      "type": "depends_on"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<pricing>",
      "type": "depends_on"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<hover>",
-     "type": "defers"
+     "type": "link"
     }
    ],
    "focus": "<addin>",
@@ -1224,9 +1042,9 @@
      "id": "<addin>",
      "open": true,
      "order": 2,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
      "tokens": {
       "assumed": true,
@@ -1234,7 +1052,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -1243,9 +1061,9 @@
      "estimated": false,
      "id": "<app>",
      "open": true,
-     "root": "project",
+     "root": "x.project",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "App",
      "tokens": {
       "assumed": true,
@@ -1253,7 +1071,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "project",
+     "type": "x.project",
      "work": true
     },
     {
@@ -1263,16 +1081,16 @@
      "id": "<installer>",
      "open": true,
      "order": 1,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
      "tokens": {
       "assumed": true,
       "estimated": 5000,
       "used": 1000
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -1281,16 +1099,16 @@
      "estimated": false,
      "id": "<docs>",
      "open": true,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Docs",
      "tokens": {
       "estimated": 2000,
       "partial": true,
       "used": 500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -1330,13 +1148,13 @@
     {
      "blocked": true,
      "created": "<time>",
-     "id": "<release>",
+     "id": "<launch>",
      "open": true,
-     "root": "release",
+     "root": "event",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "release"
+     "type": "event"
     },
     {
      "blocked": false,
@@ -1352,13 +1170,13 @@
     {
      "blocked": false,
      "created": "<time>",
-     "id": "<repo>",
+     "id": "<home>",
      "open": true,
-     "root": "repo",
+     "root": "place",
      "starter": "place",
-     "status": "active",
+     "status": "available",
      "title": "Apex repo",
-     "type": "repo"
+     "type": "place"
     },
     {
      "blocked": true,
@@ -1409,17 +1227,17 @@
      "blocked": false,
      "created": "<time>",
      "estimated": false,
-     "id": "<bug>",
+     "id": "<crash>",
      "open": true,
-     "root": "issue",
+     "root": "x.issue",
      "starter": "work",
-     "status": "open",
+     "status": "todo",
      "title": "Crash on thin walls",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "issue",
+     "type": "x.issue",
      "work": true
     },
     {
@@ -1478,15 +1296,15 @@
      "estimated": false,
      "id": "<business>",
      "open": true,
-     "root": "project",
+     "root": "x.project",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Business",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "project",
+     "type": "x.project",
      "work": true
     },
     {
@@ -1548,13 +1366,13 @@
      "type": "link"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<addin>",
-     "type": "ships"
+     "type": "produced"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<installer>",
      "type": "depends_on"
@@ -1569,16 +1387,16 @@
      "id": "<installer>",
      "open": true,
      "order": 1,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
      "tokens": {
       "assumed": true,
       "estimated": 5000,
       "used": 1000
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -1588,9 +1406,9 @@
      "id": "<addin>",
      "open": true,
      "order": 2,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
      "tokens": {
       "assumed": true,
@@ -1598,7 +1416,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -1661,13 +1479,13 @@
     {
      "blocked": true,
      "created": "<time>",
-     "id": "<release>",
+     "id": "<launch>",
      "open": true,
-     "root": "release",
+     "root": "event",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "release"
+     "type": "event"
     }
    ],
    "preset": "all"
@@ -1777,28 +1595,28 @@
      "type": "link"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<addin>",
-     "type": "ships"
+     "type": "produced"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<installer>",
      "type": "depends_on"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<pricing>",
      "type": "depends_on"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<hover>",
-     "type": "defers"
+     "type": "link"
     }
    ],
    "focus": "<installer>",
@@ -1810,16 +1628,16 @@
      "id": "<installer>",
      "open": true,
      "order": 1,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
      "tokens": {
       "assumed": true,
       "estimated": 5000,
       "used": 1000
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -1829,9 +1647,9 @@
      "id": "<addin>",
      "open": true,
      "order": 2,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
      "tokens": {
       "assumed": true,
@@ -1839,7 +1657,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -1902,13 +1720,13 @@
     {
      "blocked": true,
      "created": "<time>",
-     "id": "<release>",
+     "id": "<launch>",
      "open": true,
-     "root": "release",
+     "root": "event",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "release"
+     "type": "event"
     },
     {
      "blocked": false,
@@ -1927,9 +1745,9 @@
      "estimated": false,
      "id": "<app>",
      "open": true,
-     "root": "project",
+     "root": "x.project",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "App",
      "tokens": {
       "assumed": true,
@@ -1937,7 +1755,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "project",
+     "type": "x.project",
      "work": true
     },
     {
@@ -1946,16 +1764,16 @@
      "estimated": false,
      "id": "<docs>",
      "open": true,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Docs",
      "tokens": {
       "estimated": 2000,
       "partial": true,
       "used": 500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -2085,13 +1903,13 @@
      "type": "link"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<addin>",
-     "type": "ships"
+     "type": "produced"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<installer>",
      "type": "depends_on"
@@ -2123,16 +1941,16 @@
      "id": "<installer>",
      "open": true,
      "order": 1,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
      "tokens": {
       "assumed": true,
       "estimated": 5000,
       "used": 1000
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -2186,9 +2004,9 @@
      "id": "<addin>",
      "open": true,
      "order": 2,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
      "tokens": {
       "assumed": true,
@@ -2196,19 +2014,19 @@
       "partial": true,
       "used": 1500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
      "blocked": true,
      "created": "<time>",
-     "id": "<release>",
+     "id": "<launch>",
      "open": true,
-     "root": "release",
+     "root": "event",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "release"
+     "type": "event"
     }
    ],
    "preset": "all"
@@ -2276,13 +2094,13 @@
      "type": "link"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<addin>",
-     "type": "ships"
+     "type": "produced"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<installer>",
      "type": "depends_on"
@@ -2315,16 +2133,16 @@
      "id": "<installer>",
      "open": true,
      "order": 1,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
      "tokens": {
       "assumed": true,
       "estimated": 5000,
       "used": 1000
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -2351,9 +2169,9 @@
      "id": "<addin>",
      "open": true,
      "order": 2,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
      "tokens": {
       "assumed": true,
@@ -2361,7 +2179,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -2398,16 +2216,16 @@
      "estimated": false,
      "id": "<docs>",
      "open": true,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Docs",
      "tokens": {
       "estimated": 2000,
       "partial": true,
       "used": 500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -2424,13 +2242,13 @@
     {
      "blocked": true,
      "created": "<time>",
-     "id": "<release>",
+     "id": "<launch>",
      "open": true,
-     "root": "release",
+     "root": "event",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "release"
+     "type": "event"
     }
    ],
    "preset": "all"
@@ -2440,7 +2258,7 @@
     {
      "from": "<app>",
      "id": "<link>",
-     "to": "<repo>",
+     "to": "<home>",
      "type": "lives_in"
     },
     {
@@ -2492,7 +2310,7 @@
      "type": "part_of"
     },
     {
-     "from": "<bug>",
+     "from": "<crash>",
      "id": "<link>",
      "to": "<docs>",
      "type": "part_of"
@@ -2518,9 +2336,9 @@
      "estimated": false,
      "id": "<app>",
      "open": true,
-     "root": "project",
+     "root": "x.project",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "App",
      "tokens": {
       "assumed": true,
@@ -2528,19 +2346,19 @@
       "partial": true,
       "used": 1500
      },
-     "type": "project",
+     "type": "x.project",
      "work": true
     },
     {
      "blocked": false,
      "created": "<time>",
-     "id": "<repo>",
+     "id": "<home>",
      "open": true,
-     "root": "repo",
+     "root": "place",
      "starter": "place",
-     "status": "active",
+     "status": "available",
      "title": "Apex repo",
-     "type": "repo"
+     "type": "place"
     },
     {
      "blocked": false,
@@ -2549,9 +2367,9 @@
      "id": "<addin>",
      "open": true,
      "order": 2,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
      "tokens": {
       "assumed": true,
@@ -2559,7 +2377,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -2586,16 +2404,16 @@
      "id": "<installer>",
      "open": true,
      "order": 1,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
      "tokens": {
       "assumed": true,
       "estimated": 5000,
       "used": 1000
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -2604,16 +2422,16 @@
      "estimated": false,
      "id": "<docs>",
      "open": true,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Docs",
      "tokens": {
       "estimated": 2000,
       "partial": true,
       "used": 500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -2699,17 +2517,17 @@
      "blocked": false,
      "created": "<time>",
      "estimated": false,
-     "id": "<bug>",
+     "id": "<crash>",
      "open": true,
-     "root": "issue",
+     "root": "x.issue",
      "starter": "work",
-     "status": "open",
+     "status": "todo",
      "title": "Crash on thin walls",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "issue",
+     "type": "x.issue",
      "work": true
     },
     {
@@ -2737,14 +2555,8 @@
     {
      "from": "<app>",
      "id": "<link>",
-     "to": "<repo>",
+     "to": "<home>",
      "type": "lives_in"
-    },
-    {
-     "from": "<bug>",
-     "id": "<link>",
-     "to": "<docs>",
-     "type": "part_of"
     },
     {
      "from": "<cert>",
@@ -2757,6 +2569,12 @@
      "id": "<link>",
      "to": "<me>",
      "type": "owned_by"
+    },
+    {
+     "from": "<crash>",
+     "id": "<link>",
+     "to": "<docs>",
+     "type": "part_of"
     },
     {
      "from": "<docs>",
@@ -2807,6 +2625,30 @@
      "type": "part_of"
     },
     {
+     "from": "<launch>",
+     "id": "<link>",
+     "to": "<addin>",
+     "type": "produced"
+    },
+    {
+     "from": "<launch>",
+     "id": "<link>",
+     "to": "<hover>",
+     "type": "link"
+    },
+    {
+     "from": "<launch>",
+     "id": "<link>",
+     "to": "<installer>",
+     "type": "depends_on"
+    },
+    {
+     "from": "<launch>",
+     "id": "<link>",
+     "to": "<pricing>",
+     "type": "depends_on"
+    },
+    {
      "from": "<loose>",
      "id": "<link>",
      "to": "<app>",
@@ -2835,30 +2677,6 @@
      "id": "<link>",
      "to": "<installer>",
      "type": "part_of"
-    },
-    {
-     "from": "<release>",
-     "id": "<link>",
-     "to": "<addin>",
-     "type": "ships"
-    },
-    {
-     "from": "<release>",
-     "id": "<link>",
-     "to": "<hover>",
-     "type": "defers"
-    },
-    {
-     "from": "<release>",
-     "id": "<link>",
-     "to": "<installer>",
-     "type": "depends_on"
-    },
-    {
-     "from": "<release>",
-     "id": "<link>",
-     "to": "<pricing>",
-     "type": "depends_on"
     },
     {
      "from": "<run>",
@@ -2917,9 +2735,9 @@
      "id": "<addin>",
      "open": true,
      "order": 2,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
      "tokens": {
       "assumed": true,
@@ -2927,7 +2745,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -2936,9 +2754,9 @@
      "estimated": false,
      "id": "<app>",
      "open": true,
-     "root": "project",
+     "root": "x.project",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "App",
      "tokens": {
       "assumed": true,
@@ -2946,24 +2764,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "project",
-     "work": true
-    },
-    {
-     "blocked": false,
-     "created": "<time>",
-     "estimated": false,
-     "id": "<bug>",
-     "open": true,
-     "root": "issue",
-     "starter": "work",
-     "status": "open",
-     "title": "Crash on thin walls",
-     "tokens": {
-      "estimated": 0,
-      "used": 0
-     },
-     "type": "issue",
+     "type": "x.project",
      "work": true
     },
     {
@@ -2972,15 +2773,32 @@
      "estimated": false,
      "id": "<business>",
      "open": true,
-     "root": "project",
+     "root": "x.project",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Business",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "project",
+     "type": "x.project",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<crash>",
+     "open": true,
+     "root": "x.issue",
+     "starter": "work",
+     "status": "todo",
+     "title": "Crash on thin walls",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "x.issue",
      "work": true
     },
     {
@@ -2989,16 +2807,16 @@
      "estimated": false,
      "id": "<docs>",
      "open": true,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Docs",
      "tokens": {
       "estimated": 2000,
       "partial": true,
       "used": 500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -3008,16 +2826,16 @@
      "id": "<installer>",
      "open": true,
      "order": 1,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
      "tokens": {
       "assumed": true,
       "estimated": 5000,
       "used": 1000
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -3043,15 +2861,15 @@
      "estimated": false,
      "id": "<plans>",
      "open": true,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Price plans",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -3113,6 +2931,17 @@
     {
      "blocked": false,
      "created": "<time>",
+     "id": "<home>",
+     "open": true,
+     "root": "place",
+     "starter": "place",
+     "status": "available",
+     "title": "Apex repo",
+     "type": "place"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
      "id": "<lane>",
      "open": true,
      "root": "place",
@@ -3153,17 +2982,6 @@
      "status": "open",
      "title": "Is the cert enough?",
      "type": "decision"
-    },
-    {
-     "blocked": false,
-     "created": "<time>",
-     "id": "<repo>",
-     "open": true,
-     "root": "repo",
-     "starter": "place",
-     "status": "active",
-     "title": "Apex repo",
-     "type": "repo"
     },
     {
      "blocked": false,
@@ -3241,13 +3059,13 @@
     {
      "blocked": true,
      "created": "<time>",
-     "id": "<release>",
+     "id": "<launch>",
      "open": true,
-     "root": "release",
+     "root": "event",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "release"
+     "type": "event"
     }
    ],
    "preset": "all"
@@ -3267,13 +3085,13 @@
      "type": "waits_on"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<installer>",
      "type": "depends_on"
     },
     {
-     "from": "<release>",
+     "from": "<launch>",
      "id": "<link>",
      "to": "<pricing>",
      "type": "depends_on"
@@ -3299,16 +3117,16 @@
      "id": "<installer>",
      "open": true,
      "order": 1,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
      "tokens": {
       "assumed": true,
       "estimated": 5000,
       "used": 1000
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -3409,13 +3227,13 @@
     {
      "blocked": true,
      "created": "<time>",
-     "id": "<release>",
+     "id": "<launch>",
      "open": true,
-     "root": "release",
+     "root": "event",
      "starter": "occurrence",
      "status": "upcoming",
      "title": "Version 1.0",
-     "type": "release"
+     "type": "event"
     }
    ],
    "preset": "blocking"
@@ -3431,14 +3249,8 @@
     {
      "from": "<app>",
      "id": "<link>",
-     "to": "<repo>",
+     "to": "<home>",
      "type": "lives_in"
-    },
-    {
-     "from": "<bug>",
-     "id": "<link>",
-     "to": "<docs>",
-     "type": "part_of"
     },
     {
      "from": "<cert>",
@@ -3450,6 +3262,12 @@
      "from": "<clean>",
      "id": "<link>",
      "to": "<installer>",
+     "type": "part_of"
+    },
+    {
+     "from": "<crash>",
+     "id": "<link>",
+     "to": "<docs>",
      "type": "part_of"
     },
     {
@@ -3539,9 +3357,9 @@
      "id": "<addin>",
      "open": true,
      "order": 2,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
      "tokens": {
       "assumed": true,
@@ -3549,7 +3367,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -3558,9 +3376,9 @@
      "estimated": false,
      "id": "<app>",
      "open": true,
-     "root": "project",
+     "root": "x.project",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "App",
      "tokens": {
       "assumed": true,
@@ -3568,24 +3386,7 @@
       "partial": true,
       "used": 1500
      },
-     "type": "project",
-     "work": true
-    },
-    {
-     "blocked": false,
-     "created": "<time>",
-     "estimated": false,
-     "id": "<bug>",
-     "open": true,
-     "root": "issue",
-     "starter": "work",
-     "status": "open",
-     "title": "Crash on thin walls",
-     "tokens": {
-      "estimated": 0,
-      "used": 0
-     },
-     "type": "issue",
+     "type": "x.project",
      "work": true
     },
     {
@@ -3594,15 +3395,32 @@
      "estimated": false,
      "id": "<business>",
      "open": true,
-     "root": "project",
+     "root": "x.project",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Business",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "project",
+     "type": "x.project",
+     "work": true
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
+     "estimated": false,
+     "id": "<crash>",
+     "open": true,
+     "root": "x.issue",
+     "starter": "work",
+     "status": "todo",
+     "title": "Crash on thin walls",
+     "tokens": {
+      "estimated": 0,
+      "used": 0
+     },
+     "type": "x.issue",
      "work": true
     },
     {
@@ -3611,16 +3429,16 @@
      "estimated": false,
      "id": "<docs>",
      "open": true,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Docs",
      "tokens": {
       "estimated": 2000,
       "partial": true,
       "used": 500
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -3630,16 +3448,16 @@
      "id": "<installer>",
      "open": true,
      "order": 1,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
      "tokens": {
       "assumed": true,
       "estimated": 5000,
       "used": 1000
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -3665,15 +3483,15 @@
      "estimated": false,
      "id": "<old>",
      "open": false,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "shipped",
+     "status": "done",
      "title": "Old feature",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -3682,15 +3500,15 @@
      "estimated": false,
      "id": "<plans>",
      "open": true,
-     "root": "feature",
+     "root": "x.feature",
      "starter": "work",
-     "status": "planned",
+     "status": "todo",
      "title": "Price plans",
      "tokens": {
       "estimated": 0,
       "used": 0
      },
-     "type": "feature",
+     "type": "x.feature",
      "work": true
     },
     {
@@ -3759,6 +3577,17 @@
     {
      "blocked": false,
      "created": "<time>",
+     "id": "<home>",
+     "open": true,
+     "root": "place",
+     "starter": "place",
+     "status": "available",
+     "title": "Apex repo",
+     "type": "place"
+    },
+    {
+     "blocked": false,
+     "created": "<time>",
      "id": "<pricing>",
      "open": true,
      "root": "decision",
@@ -3777,17 +3606,6 @@
      "status": "open",
      "title": "Is the cert enough?",
      "type": "decision"
-    },
-    {
-     "blocked": false,
-     "created": "<time>",
-     "id": "<repo>",
-     "open": true,
-     "root": "repo",
-     "starter": "place",
-     "status": "active",
-     "title": "Apex repo",
-     "type": "repo"
     },
     {
      "blocked": true,
@@ -3843,120 +3661,6 @@
    ],
    "preset": "structure"
   },
-  "handoff repo": {
-   "from": "a week back",
-   "how": "Everything here is read off the map as it is now, and nothing is written down for the next session. What nobody has seen working is said on the item (seen_working false, what would show it in to_see) and listed as unseen: set it true once someone has. What sessions left on no remote or not committed is read off their checkouts (left). What bites in a file is an instruction kept about this repository with for: file:<glob> (traps), said in brief and when a session opens a file it names: make one when something bites and nothing can fix it, an issue when something can, and retire it when a change to its file makes it untrue. What comes next is read off the open work, by attention within this repository.",
-   "last_push": null,
-   "open": {
-    "blocked": [
-     {
-      "id": "<sign>",
-      "status": "todo",
-      "title": "Sign the package",
-      "type": "task",
-      "waiting_on": [
-       "Which certificate?"
-      ]
-     },
-     {
-      "id": "<hover>",
-      "status": "doing",
-      "title": "Hover cards",
-      "type": "task",
-      "waiting_on": [
-       "Bo"
-      ]
-     },
-     {
-      "id": "<extras>",
-      "status": "todo",
-      "title": "Capture extras",
-      "type": "task",
-      "waiting_on": [
-       "Bo"
-      ]
-     }
-    ],
-    "ready": [
-     {
-      "id": "<guide>",
-      "status": "todo",
-      "title": "Write the guide",
-      "type": "task"
-     },
-     {
-      "id": "<cert>",
-      "status": "open",
-      "title": "Which certificate?",
-      "type": "decision"
-     },
-     {
-      "id": "<loose>",
-      "status": "todo",
-      "title": "Loose task in app",
-      "type": "task"
-     },
-     {
-      "id": "<q>",
-      "status": "open",
-      "title": "Is the cert enough?",
-      "type": "decision"
-     },
-     {
-      "id": "<bug>",
-      "status": "open",
-      "title": "Crash on thin walls",
-      "type": "issue"
-     }
-    ]
-   },
-   "repo": {
-    "id": "<repo>",
-    "title": "Apex repo"
-   },
-   "since": "<time>",
-   "since_then": {
-    "counts": {
-     "opened": 0,
-     "pushes": 0,
-     "sessions": 0,
-     "settled": 0
-    },
-    "opened": [],
-    "pushes": [],
-    "sessions": [],
-    "settled": []
-   },
-   "to_shape": {
-    "how": "Each of these holds enough to be the hub of its problem and has no view of its own. Give it its views: for each, a lens item (change, type lens) linked about it, named for the question it answers, with place for its order, controls for what the person may change (lit, far, closed), and a style about it if it should look its own way. A lens with from set to another item is a shortcut to there. The view named hubs lists every hub.",
-    "hubs": [
-     {
-      "at": 2,
-      "id": "<addin>",
-      "inside": 9,
-      "title": "Add-in",
-      "type": "feature",
-      "views": 0
-     },
-     {
-      "at": 2,
-      "id": "<installer>",
-      "inside": 3,
-      "title": "Installer",
-      "type": "feature",
-      "views": 0
-     },
-     {
-      "at": 2,
-      "id": "<docs>",
-      "inside": 2,
-      "title": "Docs",
-      "type": "feature",
-      "views": 0
-     }
-    ]
-   }
-  },
   "hubs app": {
    "at": 12,
    "hubs": [
@@ -3965,7 +3669,7 @@
      "id": "<app>",
      "inside": 11,
      "title": "App",
-     "type": "project",
+     "type": "x.project",
      "views": 1
     },
     {
@@ -3973,7 +3677,7 @@
      "id": "<addin>",
      "inside": 9,
      "title": "Add-in",
-     "type": "feature",
+     "type": "x.feature",
      "views": 0
     },
     {
@@ -3981,7 +3685,7 @@
      "id": "<installer>",
      "inside": 3,
      "title": "Installer",
-     "type": "feature",
+     "type": "x.feature",
      "views": 0
     },
     {
@@ -3989,13 +3693,13 @@
      "id": "<docs>",
      "inside": 2,
      "title": "Docs",
-     "type": "feature",
+     "type": "x.feature",
      "views": 0
     }
    ],
    "within": "<app>"
   },
-  "hubs repo": {
+  "hubs home": {
    "at": 12,
    "hubs": [
     {
@@ -4003,7 +3707,7 @@
      "id": "<app>",
      "inside": 11,
      "title": "App",
-     "type": "project",
+     "type": "x.project",
      "views": 1
     },
     {
@@ -4011,7 +3715,7 @@
      "id": "<addin>",
      "inside": 9,
      "title": "Add-in",
-     "type": "feature",
+     "type": "x.feature",
      "views": 0
     },
     {
@@ -4019,7 +3723,7 @@
      "id": "<installer>",
      "inside": 3,
      "title": "Installer",
-     "type": "feature",
+     "type": "x.feature",
      "views": 0
     },
     {
@@ -4027,11 +3731,11 @@
      "id": "<docs>",
      "inside": 2,
      "title": "Docs",
-     "type": "feature",
+     "type": "x.feature",
      "views": 0
     }
    ],
-   "within": "<repo>"
+   "within": "<home>"
   },
   "tree addin": {
    "branches": [
@@ -4047,9 +3751,9 @@
       "total": 2
      },
      "sessions": [],
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
-     "type": "feature",
+     "type": "x.feature",
      "work": [
       {
        "active": false,
@@ -4085,9 +3789,9 @@
       "total": 2
      },
      "sessions": [],
-     "status": "planned",
+     "status": "todo",
      "title": "Docs",
-     "type": "feature",
+     "type": "x.feature",
      "work": [
       {
        "active": false,
@@ -4102,19 +3806,19 @@
       {
        "active": false,
        "blocked": false,
-       "id": "<bug>",
+       "id": "<crash>",
        "open": true,
        "sessions": [],
-       "status": "open",
+       "status": "todo",
        "title": "Crash on thin walls",
-       "type": "issue"
+       "type": "x.issue"
       }
      ]
     }
    ],
    "by_status": {
-    "building": 1,
-    "planned": 1
+    "doing": 1,
+    "todo": 1
    },
    "depends": [
     {
@@ -4134,9 +3838,9 @@
      "open": true,
      "path": [],
      "sessions": [],
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
-     "type": "feature"
+     "type": "x.feature"
     },
     {
      "active": true,
@@ -4161,12 +3865,12 @@
    },
    "root": {
     "id": "<addin>",
-    "status": "planned",
+    "status": "todo",
     "title": "Add-in",
-    "type": "feature"
+    "type": "x.feature"
    },
    "tree": {
-    "id": "software.roadmap",
+    "id": "x.roadmap",
     "title": "Roadmap"
    },
    "unplaced": [
@@ -4215,9 +3919,9 @@
         "total": 2
        },
        "sessions": [],
-       "status": "building",
+       "status": "doing",
        "title": "Installer",
-       "type": "feature",
+       "type": "x.feature",
        "work": [
         {
          "active": false,
@@ -4253,9 +3957,9 @@
         "total": 2
        },
        "sessions": [],
-       "status": "planned",
+       "status": "todo",
        "title": "Docs",
-       "type": "feature",
+       "type": "x.feature",
        "work": [
         {
          "active": false,
@@ -4270,12 +3974,12 @@
         {
          "active": false,
          "blocked": false,
-         "id": "<bug>",
+         "id": "<crash>",
          "open": true,
          "sessions": [],
-         "status": "open",
+         "status": "todo",
          "title": "Crash on thin walls",
-         "type": "issue"
+         "type": "x.issue"
         }
        ]
       }
@@ -4288,9 +3992,9 @@
       "total": 6
      },
      "sessions": [],
-     "status": "planned",
+     "status": "todo",
      "title": "Add-in",
-     "type": "feature",
+     "type": "x.feature",
      "work": [
       {
        "active": true,
@@ -4331,16 +4035,16 @@
       "total": 0
      },
      "sessions": [],
-     "status": "shipped",
+     "status": "done",
      "title": "Old feature",
-     "type": "feature",
+     "type": "x.feature",
      "work": []
     }
    ],
    "by_status": {
-    "building": 1,
-    "planned": 2,
-    "shipped": 1
+    "doing": 1,
+    "done": 1,
+    "todo": 2
    },
    "depends": [
     {
@@ -4362,9 +4066,9 @@
       "Add-in"
      ],
      "sessions": [],
-     "status": "building",
+     "status": "doing",
      "title": "Installer",
-     "type": "feature"
+     "type": "x.feature"
     },
     {
      "active": true,
@@ -4391,12 +4095,12 @@
    },
    "root": {
     "id": "<app>",
-    "status": "planned",
+    "status": "todo",
     "title": "App",
-    "type": "project"
+    "type": "x.project"
    },
    "tree": {
-    "id": "software.roadmap",
+    "id": "x.roadmap",
     "title": "Roadmap"
    },
    "unplaced": [
@@ -4426,9 +4130,9 @@
       "total": 1
      },
      "sessions": [],
-     "status": "planned",
+     "status": "todo",
      "title": "Price plans",
-     "type": "feature",
+     "type": "x.feature",
      "work": [
       {
        "active": false,
@@ -4444,7 +4148,7 @@
     }
    ],
    "by_status": {
-    "planned": 1
+    "todo": 1
    },
    "depends": [],
    "now": [],
@@ -4454,12 +4158,12 @@
    },
    "root": {
     "id": "<business>",
-    "status": "planned",
+    "status": "todo",
     "title": "Business",
-    "type": "project"
+    "type": "x.project"
    },
    "tree": {
-    "id": "software.roadmap",
+    "id": "x.roadmap",
     "title": "Roadmap"
    },
    "unplaced": []
@@ -4469,20 +4173,20 @@
     {
      "branches": 2,
      "id": "<app>",
-     "status": "planned",
+     "status": "todo",
      "title": "App",
-     "type": "project"
+     "type": "x.project"
     },
     {
      "branches": 1,
      "id": "<business>",
-     "status": "planned",
+     "status": "todo",
      "title": "Business",
-     "type": "project"
+     "type": "x.project"
     }
    ],
    "tree": {
-    "id": "software.roadmap",
+    "id": "x.roadmap",
     "title": "Roadmap"
    }
   }
