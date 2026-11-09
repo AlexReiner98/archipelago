@@ -26,7 +26,7 @@ test('each operational write lands in its stream, at once, with the light header
     { op: 'create', ref: 'task', type: 'task', title: 'Hold it' },
     { op: 'create', ref: 'n', type: 'notification', title: 'Look' },
     { op: 'create', ref: 'conn', type: 'connection', title: 'Nowhere', props: { url: 'http://127.0.0.1:1/' } },
-    { op: 'create', ref: 'note', type: 'note', title: 'Drawn' },
+    { op: 'create', ref: 'note', type: 'lens', title: 'Drawn' },
   ]);
   await l.operational(run, { add: { tokens_used: 40 }, props: { story: [{ n: 1, said: 'began' }], last_seen: 'now' } });
   await l.operational(run, { add: { tokens_used: 2 } });

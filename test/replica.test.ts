@@ -63,8 +63,8 @@ test("the page's projector makes the server's rows from the log, row for row", a
   const l = await fresh();
   const me = (await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }])).me;
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Replica' },
-    { op: 'create', ref: 'q', type: 'project', title: 'Elsewhere' },
+    { op: 'create', ref: 'p', type: 'task', title: 'Replica' },
+    { op: 'create', ref: 'q', type: 'task', title: 'Elsewhere' },
     { op: 'create', ref: 't', type: 'task', title: 'Project in the page', owner: me, body: 'Facts in, rows out.' },
     { op: 'create', ref: 'u', type: 'task', title: 'Tail the log' },
     { op: 'create', ref: 'd', type: 'decision', title: 'Keep the pulse?' },
@@ -104,8 +104,8 @@ test('the facts after a position are read only on what is held, as the viewer ma
   const l = await fresh();
   const people = await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }, { op: 'create', ref: 'bo', type: 'person', title: 'Bo' }]);
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Held' },
-    { op: 'create', ref: 'q', type: 'project', title: 'Not held' },
+    { op: 'create', ref: 'p', type: 'task', title: 'Held' },
+    { op: 'create', ref: 'q', type: 'task', title: 'Not held' },
   ]);
   const mine = l.as(people.me);
   const shared = ((await mine.change(human, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'task', title: 'Shared, held', visibility: 'shared' }] })) as { created: Record<string, string> }).created.s;
@@ -142,7 +142,7 @@ test('the facts after a position are read only on what is held, as the viewer ma
 test("an agent's change reaches a view of the store with no lens read; what may move its answer asks again", async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Canvas' },
+    { op: 'create', ref: 'p', type: 'task', title: 'Canvas' },
     { op: 'create', ref: 'a', type: 'task', title: 'Flat lens' },
     { op: 'create', ref: 'b', type: 'task', title: 'Tags' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
@@ -160,7 +160,7 @@ test("an agent's change reaches a view of the store with no lens read; what may 
   const heard: any[] = [];
   view.on((changed: unknown) => heard.push(changed));
 
-  // An agent renames a task, adds one under the project, and ends a link: approved, as under `npm start`.
+  // An agent renames a task, adds one under the hub, and ends a link: approved, as under `npm start`.
   const asked = (await l.change(agent, {
     reason: 'Rework the canvas',
     ops: [
@@ -180,7 +180,7 @@ test("an agent's change reaches a view of the store with no lens read; what may 
   assert.equal(view.item(made.b), undefined, 'the archived task leaves the answer');
   assert.deepEqual([changed.items.changed.includes(made.a), changed.items.removed], [true, [made.b]]);
   assert.equal(heard.length, 1, 'listeners are told once');
-  assert.equal(heard[0].ask, true, 'a new task linked under the project may be found by the walk: the view asks again');
+  assert.equal(heard[0].ask, true, 'a new task linked under the hub may be found by the walk: the view asks again');
   assert.equal(view.answer().items.some((i: any) => i.title === 'Replica'), false, 'the store never judges what the query finds');
   assert.ok(![...store.items.values()].some((r: any) => r.title === 'Replica'), 'what no view holds is not kept');
 
@@ -197,7 +197,7 @@ test("an agent's change reaches a view of the store with no lens read; what may 
 test('two views share one store: a fact folds in once and both are told; each asks again only for what its query reads', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Panes' },
+    { op: 'create', ref: 'p', type: 'task', title: 'Panes' },
     { op: 'create', ref: 'a', type: 'task', title: 'Shared item' },
     { op: 'create', ref: 'b', type: 'task', title: 'Only in the walk' },
     { op: 'create', ref: 'x', type: 'task', title: 'Not in either' },

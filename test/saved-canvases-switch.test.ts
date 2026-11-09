@@ -45,7 +45,7 @@ test('in a browser, a saved canvas is opened from Home and switched to from the 
 
     // A view a document brings in is a part of that page: in neither list, and named in the bar only while it is up.
     const held = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'A page’s picture', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } } }, { op: 'link', type: 'about', from: 'v', to: made.p }] })).result.created.v as string;
-    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'document', title: 'A page', body: `Words.\n\n${held}` }] });
+    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'record', title: 'A page', body: `Words.\n\n${held}` }] });
     await page.go(`${base}/#/you`);
     assert.ok(await page.until(`Boolean(document.querySelector('.canvases .old-views'))`));
     // On Home, and in the switcher's panel, its scope All.

@@ -279,7 +279,7 @@ test('the operator can create a workspace from a backup file: the map, its types
   assert.deepEqual(tokens.filter((t) => !t.revoked_at).map((t) => t.name), ['owner']);
 
   // It carries on from there, and the original is untouched.
-  await call('/api/change', made.owner_token, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'Written after the move' }] });
+  await call('/api/change', made.owner_token, { reason: 'x', ops: [{ op: 'create', type: 'record', title: 'Written after the move' }] });
   assert.equal(((await call('/api/search', old, { q: 'Written after the move' })).result as any[]).length, 0);
   assert.match((await call('/operator/workspaces', operator, { id: 'moved', backup })).error, /already exists/);
 });
@@ -321,7 +321,7 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
   const admin = (await createToken(main.pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const member = await join(admin, { email: 'sam@example.com', name: 'Sam' });
   const robot = (await createToken(main.pelago.db, 'default', { kind: 'agent', name: 'robot' })).token;
-  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'note', title: 'Already here', visibility: 'shared' }] });
+  await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'record', title: 'Already here', visibility: 'shared' }] });
   assert.match((await call('/api/import_backup', member, { backup })).error, /Only a workspace admin/);
   assert.match((await call('/agent/import_backup', robot, { backup })).error, /humans only/);
   assert.match((await call('/api/import_backup', admin, { backup: 'bm90IGEgYmFja3Vw' })).error, /not an Archipelago backup/);

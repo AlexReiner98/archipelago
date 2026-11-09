@@ -46,7 +46,7 @@ test('over each limit what would add to it is refused, in the pack’s words, an
     assert.match(backup.result.path, /^\/backup-file\//);
   };
   assert.ok((await write('Kept')).result.created, 'a write within the plan');
-  const note = (await call('/api/change', owner, { reason: 'test', ops: [{ op: 'create', ref: 'n', type: 'note', title: 'A figure' }] })).result.created.n;
+  const note = (await call('/api/change', owner, { reason: 'test', ops: [{ op: 'create', ref: 'n', type: 'lens', title: 'A figure' }] })).result.created.n;
 
   // Storage: the log and pictures take more than the plan has, so nothing more is written, a picture included.
   assert.deepEqual(await limit({ storage: 1 }), { workspace: ws.id, storage: 1 });

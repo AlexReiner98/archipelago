@@ -15,7 +15,7 @@ test('a style about a view moves into it and is retired', () => {
 
 test('a style about an item moves into every view of it, and one about the view lies over it', () => {
   const styles = [{ id: 'near', props: { shape: 'flow' } }, { id: 'far', props: { shape: 'grid', gap: 3 } }];
-  const { held } = stylesMoved(styles, [tie('near', 'v', 'lens'), tie('far', 'item', 'project')], new Map([['item', ['v', 'w']]]), isView, new Map());
+  const { held } = stylesMoved(styles, [tie('near', 'v', 'lens'), tie('far', 'item', 'task')], new Map([['item', ['v', 'w']]]), isView, new Map());
   assert.deepEqual(held.get('v'), { shape: 'flow', gap: 3 });
   assert.deepEqual(held.get('w'), { shape: 'grid', gap: 3 });
 });
@@ -26,8 +26,8 @@ test('a layout stays, and a view it is about that holds no style names it', () =
   assert.deepEqual(retired, []);
 });
 
-test("a layout about a project is never written into that project's views, nor over a view's own style", () => {
-  const ties = [tie('k', 'item', 'project'), tie('k', 'w', 'lens')];
+test("a layout about a task is never written into that task's views, nor over a view's own style", () => {
+  const ties = [tie('k', 'item', 'task'), tie('k', 'w', 'lens')];
   const { held, retired } = stylesMoved([{ id: 'k', props: { code: 'x' } }], ties, new Map([['item', ['v']]]), isView, new Map([['v', {}], ['w', { style: { shape: 'flow' } }]]));
   assert.equal(held.size, 0);
   assert.deepEqual(retired, []);
@@ -40,7 +40,7 @@ test('a view that names another layout keeps it', () => {
 
 test('a style about only what is archived is retired; one with no view yet, or that sets a page, stays', () => {
   const styles = [{ id: 'dead', props: { shape: 'flow' } }, { id: 'waits', props: { shape: 'flow' } }, { id: 'page', props: { theme: {} } }, { id: 'free', props: { shape: 'list' } }];
-  const ties = [tie('dead', 'v', 'lens', true), tie('waits', 'item', 'project'), tie('page', 'doc', 'document')];
+  const ties = [tie('dead', 'v', 'lens', true), tie('waits', 'item', 'task'), tie('page', 'doc', 'finding')];
   const { held, retired } = stylesMoved(styles, ties, new Map(), isView, new Map());
   assert.equal(held.size, 0);
   assert.deepEqual(retired, ['dead']);

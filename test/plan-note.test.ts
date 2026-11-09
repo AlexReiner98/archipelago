@@ -30,6 +30,6 @@ test('change says it back to an agent on a plan and on findings, and not when th
   const { q } = await make(l, [{ op: 'create', ref: 'q', type: 'question', title: 'Which way?' }]);
   assert.match((await run([{ op: 'update', id: q!, append: plan }])).structure ?? '', /op 1 \(update\): 4 sections/);
   const { q: q2 } = await make(l, [{ op: 'create', ref: 'q', type: 'question', title: 'Which other way?' }]);
-  await make(l, [1, 2, 3, 4].flatMap((n) => [{ op: 'create', ref: `o${n}`, type: 'idea', title: `Option ${n}` }, { op: 'link', type: 'bears_on', from: `o${n}`, to: q2! }]) as never);
+  await make(l, [1, 2, 3, 4].flatMap((n) => [{ op: 'create', ref: `o${n}`, type: 'finding', title: `Option ${n}` }, { op: 'link', type: 'bears_on', from: `o${n}`, to: q2! }]) as never);
   assert.equal((await run([{ op: 'update', id: q2!, append: plan }])).structure, undefined);
 });

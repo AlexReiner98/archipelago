@@ -88,13 +88,13 @@ test('a member reads their workspace’s use and what it is made of, and nothing
 test('the bytes counted as the log is written are what a count made again from the log gives', async () => {
   const { workspaces, call } = await serve('off');
   const ws = await workspaces.get('default');
-  const done = await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'goal', title: 'Counted', body: 'Words. '.repeat(200) }, { op: 'create', ref: 'b', type: 'event', title: 'Also' }, { op: 'link', type: 'depends_on', from: 'a', to: 'b' }] });
+  const done = await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'aim', title: 'Counted', body: 'Words. '.repeat(200) }, { op: 'create', ref: 'b', type: 'event', title: 'Also' }, { op: 'link', type: 'depends_on', from: 'a', to: 'b' }] });
   assert.ok(done.result, done.error);
   const read = async () => (await ws.pelago.db.query<{ id: string; type: string; bytes: string }>(`select id, type, bytes from item_bytes order by id`)).rows;
   const types = async () => (await ws.pelago.db.query<{ type: string; bytes: string }>(`select type, bytes from type_bytes order by type`)).rows;
   await foldBytes(ws.pelago.db);
   const [kept, keptTypes] = [await read(), await types()];
-  assert.ok(kept.some((r) => r.type === 'goal') && kept.some((r) => r.type === 'links'), 'items by type, links as one');
+  assert.ok(kept.some((r) => r.type === 'aim') && kept.some((r) => r.type === 'links'), 'items by type, links as one');
   await ws.pelago.db.transaction((tx) => recountBytes(tx));
   assert.deepEqual(await read(), kept);
   assert.deepEqual(await types(), keptTypes);
