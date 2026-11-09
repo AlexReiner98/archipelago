@@ -2,7 +2,7 @@
 // declined (the Look of a held change's band on an item's sheet, ui/item-held.js).
 
 import { api, ask, h } from './base.js';
-import { ago, chip, gist, link, loadSchema, relations, statusesOf, who } from './words.js';
+import { ago, chip, gist, link, loadSchema, relations, statusesOf, typeTitle, who } from './words.js';
 
 /** The change `p`, drawn as a table of its parts; `names` says what its ids are (id to item), `done` is told once it is decided. */
 export function proposalCard(p, names, done) {
@@ -14,7 +14,7 @@ export function proposalCard(p, names, done) {
     const local = refs.get(key);
     if (local) return h('span', {}, local.title);
     const e = names.get(key);
-    return e ? link(e) : h('span', { class: 'muted' }, key);
+    return e ? link(e) : h('span', { class: 'muted', title: key }, 'an item');
   };
   // An excluded create takes its links with it, as the server will.
   const dead = (op) => op.op === 'link' && [op.from, op.to].some((k) => refs.has(k) && !included[ops.indexOf(refs.get(k))]);
@@ -147,8 +147,8 @@ export function proposalCard(p, names, done) {
           : op.op === 'archive' || op.op === 'restore'
             ? nameOf(op.id)
             : op.op === 'define_type'
-              ? [h('strong', {}, op.type.id), op.type.extends && ` (flavour of ${op.type.extends})`, fold(i, op.type.description)]
-              : JSON.stringify(op);
+              ? [h('strong', { title: op.type.id }, op.type.title ?? op.type.id), op.type.extends && ` (flavour of ${typeTitle(op.type.extends)})`, fold(i, op.type.description)]
+              : (op.title ?? '');
     }
     return h('tr', { class: off ? 'off' : '' }, h('td', { class: 'check' }, check), mark(h('td', { class: 'kind' }, kind)), h('td', {}, what), h('td', { class: 'status' }, st ?? ''));
   }

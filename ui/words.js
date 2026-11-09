@@ -144,7 +144,7 @@ export function eventLine(ev) {
     'div',
     { class: 'change line' },
     who(ev.actor, ev.detail?.run_name),
-    h('span', { class: 'gist', title: ev.reason ?? '' }, h('span', { class: 'muted' }, `${verb(ev)} `), ev.target_id ? h('a', { href: `#/e/${ev.target_id}` }, ev.target_title ?? ev.target_id) : gist(ev.reason) || about),
+    h('span', { class: 'gist', title: ev.reason ?? '' }, h('span', { class: 'muted' }, `${verb(ev)} `), ev.target_id ? h('a', { href: `#/e/${ev.target_id}`, title: ev.target_id }, ev.target_title ?? nameOr(ev.target_id)) : gist(ev.reason) || about),
     ago(ev.ts),
   );
 }
@@ -172,7 +172,7 @@ export function changeRow(g, { undone, onUndo, attention, onRead, here, fresh })
   // reading what was said.
   const ids = [...new Set(touched.map((e) => e.target_id).filter(Boolean))];
   const read = () => attention?.length && onRead?.(attention, row);
-  const nameOf = (id) => touched.find((e) => e.target_id === id)?.target_title ?? named(id);
+  const nameOf = (id) => touched.find((e) => e.target_id === id)?.target_title ?? nameOr(id);
   // On the page of the thing it changed, the line does not name that thing again.
   const only = subject?.target_id ?? (ids.length === 1 ? ids[0] : undefined);
   const one = only === here ? undefined : only;
@@ -193,7 +193,8 @@ export const chip = (typeId) => h('span', { class: 'chip', title: typeId }, type
 export const pill = (typeId, status) => h('span', { class: `pill${isClosed(typeId, status) ? ' closed' : ''}` }, status);
 /** Titles of the items the pages have shown, so a line that only holds an id can still say a name. */
 export const titles = new Map();
-export const named = (id) => titles.get(id) ?? id;
+/** An item's name where the page knows it, else a word for it: never its id. */
+export const nameOr = (id, word = 'an item') => titles.get(id) ?? word;
 /** Text an agent wrote, with each item id in it as a link by the item's name: an id is something to follow, never something to read. */
 export const idsAsLinks = (text) => {
   const out = [];
@@ -267,14 +268,14 @@ export function describeEvent(ev) {
         .map(([k, c]) => (k === 'body' ? 'notes rewritten' : `${k.replace(/^props./, '')}: ${short(c.from)} → ${short(c.to)}`))
         .join('; ') || 'checked: still true as written'
     );
-  if (ev.action === 'changeset.undo') return `undid ${d.undoes}${d.skipped?.length ? `, ${d.skipped.length} left alone` : ''}`;
-  if (ev.action === 'relation.link' || ev.action === 'relation.unlink') return `${relations.get(d.type)?.title ?? d.type} ${named(d.to)}`;
+  if (ev.action === 'changeset.undo') return `undid a change${d.skipped?.length ? `, ${d.skipped.length} left alone` : ''}`;
+  if (ev.action === 'relation.link' || ev.action === 'relation.unlink') return `${relations.get(d.type)?.title ?? d.type} ${nameOr(d.to)}`;
   if (ev.action === 'entity.create') return `${typeTitle(d.type)}, ${d.status ?? ''}`;
-  if (ev.action === 'proposal.supersede') return `${d.proposal} asked only for what ${d.by} had already made so`;
-  if (ev.action === 'proposal.withdraw') return `${d.proposal}${d.by ? `, covered by ${d.by}` : ''}`;
-  if (ev.action.startsWith('proposal.')) return `${d.proposal}${d.revised ? ', with corrections' : ''}`;
+  if (ev.action === 'proposal.supersede') return 'it asked only for what a newer change had already made so';
+  if (ev.action === 'proposal.withdraw') return d.by ? 'covered by a newer change' : 'a held change';
+  if (ev.action.startsWith('proposal.')) return `a held change${d.revised ? ', with corrections' : ''}`;
   if (ev.action === 'connection.check') return `${d.from} → ${d.to}`;
-  if (ev.action.startsWith('resource.')) return d.holder_title ?? d.holder ?? '';
+  if (ev.action.startsWith('resource.')) return d.holder_title ?? (d.holder ? nameOr(d.holder, 'someone') : '');
   return '';
 }
 
