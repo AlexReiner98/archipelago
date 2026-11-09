@@ -54,12 +54,43 @@
     const blob = (code) => URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
     const data = (code) => `data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(code)))}`;
 
+    /**
+     * The gestures a drawing opts into (decision e_qpaqnmrc, axis F): drag one item onto another to link them, and add
+     * an item on an island. The drawing says which of its marks are items and islands; the page tells it of a drop
+     * (`drop`, from the mark grabbed) and an add, and this asks the page for the change, as data (`change`), which the
+     * page puts to the person before it sends it as theirs (ui/layout-asks.js). A session that may not write is given
+     * no events to ask for, so the drawing draws no handle.
+     */
+    const gesturesOf = (may, change) => ({ item = () => null, island = () => null } = {}) => {
+      const writes = Array.isArray(may) && may.includes('write');
+      return {
+        /** The events a mark asks for besides its own: an item can be grabbed and dropped on, an island added to. */
+        on: (key) => (!writes ? [] : item(key) ? ['grab'] : island(key) ? ['add'] : []),
+        /** Whether this event was a gesture, and if so the change asked for; what came of it is the page's to say. */
+        hear(event) {
+          if (!writes) return false;
+          const from = event.name === 'drop' && item(event.from), to = event.name === 'drop' && item(event.key);
+          const on = event.name === 'add' && island(event.key);
+          if (from && to && from !== to) change([{ op: 'link', from, to }], 'Wired on the canvas');
+          else if (on) change([{ op: 'create', ref: 'new', props: { island: on } }], 'Added on the canvas');
+          else return false;
+          return true;
+        },
+      };
+    };
+
     /** One picture, over its own channel. */
     function serve(port) {
-      let drawn, ended = false;
+      let drawn, ended = false, may = [];
       const waiting = [];
       const send = (message) => !ended && port.postMessage(message);
+      // A change asked of the page, answered by number: what came of it, or why not.
+      const asked = new Map();
+      let asks = 0;
+      const change = (ops, reason) => new Promise((resolve) => (asked.set(++asks, resolve), send({ type: 'change', asked: asks, ops, reason: String(reason ?? '') })));
       const tools = {
+        change,
+        gestures: (spec) => gesturesOf(may, change)(spec),
         measure,
         patch: (list) => send({ type: 'patch', list }),
         open: (id) => send({ type: 'open', id: String(id) }),
@@ -91,6 +122,13 @@
       let view = null;
       port.onmessage = (ev) => {
         const said = ev.data ?? {};
+        // What came of a change it asked for is answered at once: the drawing may be waiting on it inside an event.
+        if (said.type === 'changed') {
+          const { type: _t, asked: n, ...came } = said;
+          asked.get(n)?.(came);
+          return void asked.delete(n);
+        }
+        if (said.type === 'start') may = Array.isArray(said.input?.may) ? said.input.may : [];
         if (said.type === 'viewport') {
           const told = view;
           view = Object.fromEntries(['x', 'y', 'width', 'height', 'scale'].map((k) => [k, Number(said.view?.[k]) || 0]));

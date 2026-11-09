@@ -18,6 +18,9 @@ export const css = `
 .lf-step.closed text, .lf-step.stub text { fill: var(--ln-muted); }
 .lf-step.stub text { font-size: var(--ln-flow-stub-text); }
 .lf-step.dim { opacity: var(--ln-dim); }
+/* A step dragged to link (the gestures): it, and the one it would land on, lit as the step whose page is open is. */
+.lf-step:is(.grabbing, .drop-on) .lf-shape { stroke: var(--accent, var(--ln-text)); stroke-width: var(--ln-flow-stroke-hover); }
+.lf-step.grabbing { cursor: grabbing; }
 /* Where a step stands, by its phase's mark (phase_marks): a ring not started, half filled under way, a disc finished;
    what has ended is a disc in the closed grey, and trouble or a step held up is its mark in the trouble colour. */
 .lf-dot, .lf-dot circle { fill: none; stroke: var(--ln-text); stroke-width: var(--ln-flow-dot-ring); }
