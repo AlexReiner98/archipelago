@@ -2,14 +2,19 @@
 // on both sides of a share, with the site's header, for someone signed in. Nothing is published by reading it.
 
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
 import { wouldPublish } from '../src/published.ts';
-import { fresh, make } from './map.ts';
+import { Registry } from '../src/packs.ts';
+import { freshWith, make, PACKS } from './map.ts';
 import { serve } from './serve.ts';
 
+/** A pack with a document the kernel can publish: core keeps none of its own (test/fixtures/packs/pages). */
+const PAGES = [join(import.meta.dirname, 'fixtures', 'packs')];
+
 test('a document is previewed as publishing it would give it, before it is public, on both sides of a share', async () => {
-  const { workspaces, call, base } = await serve('tokens');
+  const { workspaces, call, base } = await serve('tokens', undefined, undefined, PAGES);
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
@@ -23,11 +28,11 @@ test('a document is previewed as publishing it would give it, before it is publi
     await api(mine, 'change', {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'd', type: 'document', title: 'A page', visibility: 'shared', body: 'Opening words.\n\n{s}\n\n{l}\n\n{x}' },
-        { op: 'create', ref: 's', type: 'note', title: 'Costs', visibility: 'shared', body: 'Twenty an hour.' },
+        { op: 'create', ref: 'd', type: 'page', title: 'A page', visibility: 'shared', body: 'Opening words.\n\n{s}\n\n{l}\n\n{x}' },
+        { op: 'create', ref: 's', type: 'plate', title: 'Costs', visibility: 'shared', body: 'Twenty an hour.' },
         { op: 'create', ref: 't', type: 'task', title: 'Write it', visibility: 'shared' },
-        { op: 'create', ref: 'x', type: 'note', title: 'Our margin', visibility: 'private', body: 'Secret.' },
-        { op: 'create', ref: 'p', type: 'document', title: 'Notes to self', visibility: 'shared', body: 'Mine.' },
+        { op: 'create', ref: 'x', type: 'plate', title: 'Our margin', visibility: 'private', body: 'Secret.' },
+        { op: 'create', ref: 'p', type: 'page', title: 'Notes to self', visibility: 'shared', body: 'Mine.' },
         { op: 'create', ref: 'l', type: 'lens', title: 'What it holds', visibility: 'shared', props: { filter: { find: ['type task'] } } },
         { op: 'link', type: 'part_of', from: 's', to: 'd' },
         { op: 'link', type: 'part_of', from: 'l', to: 'd' },
@@ -45,12 +50,12 @@ test('a document is previewed as publishing it would give it, before it is publi
   assert.equal(own.site.name, 'Default');
   assert.ok(own.theme, "the workspace's look");
   // A page it links to by address leads to that page's preview, though neither is published yet.
-  const pages = (await api(mine, 'change', { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'document', title: 'Links out', visibility: 'shared', body: 'See [the guide](/guide), [home](/) and [nothing](/missing).' }, { op: 'create', ref: 'g', type: 'document', title: 'Guide', visibility: 'shared', props: { path: 'guide' } }, { op: 'create', ref: 'h', type: 'document', title: 'Front', visibility: 'shared', props: { path: 'home' } }] })).created;
+  const pages = (await api(mine, 'change', { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'page', title: 'Links out', visibility: 'shared', body: 'See [the guide](/guide), [home](/) and [nothing](/missing).' }, { op: 'create', ref: 'g', type: 'page', title: 'Guide', visibility: 'shared', props: { path: 'guide' } }, { op: 'create', ref: 'h', type: 'page', title: 'Front', visibility: 'shared', props: { path: 'home' } }] })).created;
   assert.deepEqual((await preview(mine, pages.a)).result.paths, { [pages.g]: 'guide', [pages.h]: 'home' });
   // A draft takes its address from an old page still published there, as publishing it will have to.
   await api(mine, 'change', { reason: 'test', ops: [{ op: 'update', id: pages.g, props: { path: 'guide-old' } }] });
   await api(mine, 'publish', { id: pages.g });
-  const again = (await api(mine, 'change', { reason: 'test', ops: [{ op: 'update', id: pages.g, props: { path: 'guide' } }, { op: 'create', ref: 'n', type: 'document', title: 'New guide', visibility: 'shared', props: { path: 'guide-old' } }, { op: 'create', ref: 'b', type: 'document', title: 'Back', visibility: 'shared', body: 'See [it](/guide-old).' }] })).created;
+  const again = (await api(mine, 'change', { reason: 'test', ops: [{ op: 'update', id: pages.g, props: { path: 'guide' } }, { op: 'create', ref: 'n', type: 'page', title: 'New guide', visibility: 'shared', props: { path: 'guide-old' } }, { op: 'create', ref: 'b', type: 'page', title: 'Back', visibility: 'shared', body: 'See [it](/guide-old).' }] })).created;
   assert.deepEqual((await preview(mine, again.b)).result.paths, { [again.n]: 'guide-old' });
   // Reading a preview publishes nothing and makes nothing public.
   assert.equal((await api(mine, 'published', { id: made.d })).published, false);
@@ -83,7 +88,7 @@ test('a document is previewed as publishing it would give it, before it is publi
 });
 
 test('a document shared only to be read is previewed nowhere, and its views are not drawn through the share', async () => {
-  const { workspaces, call } = await serve('tokens');
+  const { workspaces, call } = await serve('tokens', undefined, undefined, PAGES);
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
@@ -96,8 +101,8 @@ test('a document shared only to be read is previewed nowhere, and its views are 
     await api(mine, 'change', {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'd', type: 'document', title: 'A page', visibility: 'shared', body: 'Words.\n\n{l}' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What it holds', visibility: 'shared', props: { filter: { find: ['type document'] } } },
+        { op: 'create', ref: 'd', type: 'page', title: 'A page', visibility: 'shared', body: 'Words.\n\n{l}' },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What it holds', visibility: 'shared', props: { filter: { find: ['type page'] } } },
         { op: 'link', type: 'part_of', from: 'l', to: 'd' },
       ],
     })
@@ -111,15 +116,15 @@ test('a document shared only to be read is previewed nowhere, and its views are 
 });
 
 test('a draft keeps the sections it holds on a workspace other than default', async () => {
-  const { workspaces, call } = await serve('tokens');
+  const { workspaces, call } = await serve('tokens', undefined, undefined, PAGES);
   const operator = (await workspaces.ensureOperator())!;
   const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
   const made = (
     await call('/api/change', theirs, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'd', type: 'document', title: 'A page', visibility: 'shared', body: 'Opening words.\n\n{s}' },
-        { op: 'create', ref: 's', type: 'note', title: 'Costs', visibility: 'shared', body: 'Twenty an hour.' },
+        { op: 'create', ref: 'd', type: 'page', title: 'A page', visibility: 'shared', body: 'Opening words.\n\n{s}' },
+        { op: 'create', ref: 's', type: 'plate', title: 'Costs', visibility: 'shared', body: 'Twenty an hour.' },
         { op: 'link', type: 'part_of', from: 's', to: 'd' },
       ],
     })
@@ -134,8 +139,8 @@ test('a draft keeps the sections it holds on a workspace other than default', as
 });
 
 test('a private document has no preview: it says so, by name', async () => {
-  const l = await fresh();
-  const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'document', title: 'Notes to self', visibility: 'private', body: 'Mine.' }]);
+  const l = await freshWith(new Registry([PACKS, ...PAGES]));
+  const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'page', title: 'Notes to self', visibility: 'private', body: 'Mine.' }]);
   await l.db.query(`update entity set private_to = 'e_owner' where id = $1`, [p]);
   await assert.rejects(wouldPublish(l, p), /"Notes to self" is private: share it/);
 });

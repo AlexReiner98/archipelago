@@ -43,7 +43,7 @@ test('search through the indexes answers as reading every row did, for each view
     l,
     Array.from({ length: 180 }, (_, n) => ({
       op: 'create' as const,
-      type: n % 3 ? 'task' : 'note',
+      type: n % 3 ? 'task' : 'record',
       title: `${word(n)} ${word(n * 7 + 1)}${n % 11 === 0 ? ' the' : ''}`,
       body: n % 4 ? `About the ${word(n * 3)} of ${word(n * 5)}. ${'More words follow here. '.repeat(n % 6)}` : '',
       visibility: 'shared' as const,
@@ -77,8 +77,8 @@ test('search through the indexes answers as reading every row did, for each view
 test('a search whose words are not all in one item finds those with any of them, the most words first', async () => {
   const l = await fresh();
   await make(l, [
-    { op: 'create', type: 'issue', title: 'The map goes stale outside its sessions', visibility: 'shared' },
-    { op: 'create', type: 'issue', title: 'Work left unpushed', body: 'Seen when commits are stale.', visibility: 'shared' },
+    { op: 'create', type: 'finding', title: 'The map goes stale outside its sessions', visibility: 'shared' },
+    { op: 'create', type: 'finding', title: 'Work left unpushed', body: 'Seen when commits are stale.', visibility: 'shared' },
     { op: 'create', type: 'task', title: 'Draw the map', visibility: 'shared' },
   ]);
   const titles = (await l.search({ q: 'stale map unpushed commits' })).map((e) => e.title);
