@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { callTool } from '../src/tools.ts';
 import { chrome, open } from './browser.ts';
+import { heard } from './tab-page.ts';
 import { fresh, human, make } from './map.ts';
 import { serve } from './serve.ts';
 
@@ -53,14 +54,9 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
     { op: 'link', type: 'part_of', from: 'u', to: 'q' },
   ]);
   const page = await open(`${base}/#/e/${made.p}`);
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const until = async (expression: string) => {
-    for (const end = Date.now() + 15000; Date.now() < end; await wait(200)) if (await page.evaluate(expression)) return true;
-    return false;
-  };
   try {
-    assert.ok(await until(`document.querySelector('.part[data-part="item"] h1')?.textContent === 'Read here' && document.querySelector('main').textContent.includes('On the page')`), 'the page is drawn');
-    await wait(2500);
+    assert.ok(await page.until(`document.querySelector('.part[data-part="item"] h1')?.textContent === 'Read here' && document.querySelector('main').textContent.includes('On the page')`), 'the page is drawn');
+    await heard(page);
     await page.evaluate(`(() => {
       window.stillMark = 1;
       window.swaps = 0;
@@ -71,14 +67,13 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
     // Three agents at once, each changing what is not on the page, for a few pulses.
     for (let n = 1; n <= 4; n++) {
       await Promise.all(['agent:a', 'agent:b', 'agent:c'].map((actor, k) => change(actor, [{ op: 'update', id: k === 2 ? made.q : made.u, title: `Away ${actor} ${n}` }])));
-      await wait(1000);
+      await heard(page);
     }
-    await wait(2500);
     const still = await page.evaluate<{ mark: number; swaps: number; hash: string }>(`({ mark: window.stillMark, swaps: window.swaps, hash: location.hash })`);
     assert.deepEqual(still, { mark: 1, swaps: 0, hash: `#/e/${made.p}` }, 'not reloaded, not drawn again, not taken elsewhere: with three agents at work, a change moves no pane its session has not shown into (ui/pane-route.js)');
     // A change to what is on the page shows on it, in place.
     await change('agent:a', [{ op: 'update', id: made.t, title: 'Renamed on the page' }]);
-    assert.ok(await until(`document.querySelector('main').textContent.includes('Renamed on the page')`), 'the change shows');
+    assert.ok(await page.until(`document.querySelector('main').textContent.includes('Renamed on the page')`), 'the change shows');
     const after = await page.evaluate<{ mark: number; open: boolean }>(`({ mark: window.stillMark, open: [...document.querySelectorAll('.part[data-part="item"] details.section')].at(-1).open })`);
     assert.deepEqual(after, { mark: 1, open: true }, 'not reloaded, the open fold still open');
   } finally {
@@ -100,13 +95,8 @@ test("in a browser, an agent's change reaches a view of the store with no lens r
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
   ]);
   const page = await open(`${base}/#/e/${made.p}`);
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const until = async (expression: string) => {
-    for (const end = Date.now() + 15000; Date.now() < end; await wait(200)) if (await page.evaluate(expression)) return true;
-    return false;
-  };
   try {
-    assert.ok(await until(`document.querySelector('.part[data-part="item"] h1')?.textContent === 'Canvas'`), 'the page is drawn');
+    assert.ok(await page.until(`document.querySelector('.part[data-part="item"] h1')?.textContent === 'Canvas'`), 'the page is drawn');
     // The page's own modules, as it loaded them: a store from live.js, holding the flat lens around the project.
     await page.evaluate(`(async () => {
       const at = (name) => document.querySelector('link[rel="modulepreload"][href^="/' + name + '.js"]').getAttribute('href');
@@ -121,7 +111,7 @@ test("in a browser, an agent's change reaches a view of the store with no lens r
     })()`);
     assert.equal(await page.evaluate(`window.store.answer().items.length`), 2);
     await change([{ op: 'update', id: made.a, title: 'A flat lens' }]);
-    assert.ok(await until(`window.store.item('${made.a}')?.title === 'A flat lens'`), 'the change reaches the store');
+    assert.ok(await page.until(`window.store.item('${made.a}')?.title === 'A flat lens'`), 'the change reaches the store');
     const renamed = await page.evaluate<{ reads: number; asked: boolean; changed: string[] }>(`({ reads: window.reads, asked: window.heard.some((c) => c.ask), changed: window.heard.flatMap((c) => c.items.changed) })`);
     assert.deepEqual(renamed, { reads: 0, asked: false, changed: [made.a] }, 'with no lens read, the listener told what changed');
     // A new task linked under it may change what the walk finds: the server is asked, not the store.
@@ -129,7 +119,7 @@ test("in a browser, an agent's change reaches a view of the store with no lens r
       { op: 'create', ref: 'r', type: 'task', title: 'Replica' },
       { op: 'link', type: 'part_of', from: 'r', to: made.p },
     ]);
-    assert.ok(await until(`window.heard.some((c) => c.ask)`), 'the view is told to ask again');
+    assert.ok(await page.until(`window.heard.some((c) => c.ask)`), 'the view is told to ask again');
     assert.equal(await page.evaluate(`window.store.item('${more.r}')`), undefined, 'what the view finds is the server’s to say');
   } finally {
     await page.close();

@@ -22,11 +22,6 @@ test('in a browser, a pan follows the pointer natively, and a click stays a clic
     ],
   })).result.created as Record<string, string>;
   const page = await open(`${base}/#/v?from=${made.p}`);
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const until = async (expression: string) => {
-    for (const end = Date.now() + 20000; Date.now() < end; await wait(50)) if (await page.evaluate(expression)) return true;
-    return false;
-  };
   const mouse = (type: string, x: number, y: number, buttons = 0) => page.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' && !buttons ? 'none' : 'left', buttons, clickCount: type === 'mouseMoved' ? 0 : 1 });
   const stage = `document.querySelector('#canvas .lf-stage')`;
   const moves = `document.querySelector('#canvas .lens-view').moves`;
@@ -35,8 +30,8 @@ test('in a browser, a pan follows the pointer natively, and a click stays a clic
   const step = `document.querySelector('#canvas svg a[href="#/e/${made.a}"]')`;
   const free = `!document.pointerLockElement && !${stage}.classList.contains('moving')`;
   try {
-    assert.ok(await until(`Boolean(${step}) && Boolean(${moves})`), `the steps are drawn: ${page.logs().join('\n')}`);
-    await wait(300);
+    assert.ok(await page.until(`Boolean(${step}) && Boolean(${moves})`), `the steps are drawn: ${page.logs().join('\n')}`);
+    assert.ok(await page.still(`${step}.getBoundingClientRect()`), 'the picture stands still');
     const [x, y] = await page.evaluate<[number, number]>(`(() => {
       const fr = ${stage}.getBoundingClientRect();
       for (let y = fr.top + 80; y < fr.bottom - 100; y += 17) for (let x = fr.left + 200; x < fr.right - 200; x += 23) {
@@ -74,8 +69,8 @@ test('in a browser, a pan follows the pointer natively, and a click stays a clic
     // Let go: nothing left behind, and the release clicks nothing under it.
     await page.evaluate(`window.clicked = 0; ${stage}.parentElement.addEventListener('click', () => clicked++)`);
     await mouse('mouseReleased', x + 80, y + 30);
-    assert.ok(await until(free), 'let go, the pan is over');
-    await wait(50);
+    assert.ok(await page.until(free), 'let go, the pan is over');
+    await page.evaluate(`new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`);
     assert.equal(await page.evaluate(`clicked`), 0, 'and its release is no click on what is under it');
     assert.deepEqual(page.logs().filter((l) => /exceptionDetails/.test(l)), [], 'and nothing is left unhandled');
   } finally {

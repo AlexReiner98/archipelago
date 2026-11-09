@@ -6,6 +6,12 @@ import { workspacesOf } from '../src/control-index.ts';
 import { CODE_TRIES } from '../src/members.ts';
 import { dumpVault } from '../src/vault.ts';
 import { codeSentTo, mailbox, serve } from './serve.ts';
+import { until } from './wait.ts';
+
+// A sign-in mail goes out after the answer (which is the same for a member and for nobody), so a test waits for it.
+// Where no mail is owed none is ever started: the server knows that before it answers (an address in no workspace,
+// one asked for within the minute, one removed), so there is nothing to wait for.
+const mailed = async (to: string, since: number) => assert.ok(await until(() => mailbox.slice(since).some((m) => m.to === to), 10_000), `a mail to ${to}`);
 
 test('an admin adds a member by email; the invitation signs them in once, for a month, as an admin or not', async () => {
   const { workspaces, call } = await serve('tokens');
@@ -51,7 +57,7 @@ test('anyone may ask for a sign-in link at an address, and is told nothing of wh
   const alex = await call('/connect/sign-in', undefined, { email: 'Alex@Example.com' });
   assert.deepEqual([nobody.status, alex.status], [200, 200], 'the same answer for a member and for nobody');
   assert.equal((await call('/connect/sign-in', undefined, { email: 'nope' })).status, 400);
-  await new Promise((r) => setTimeout(r, 200));
+  await mailed('alex@example.com', before);
   const sent = mailbox.slice(before);
   assert.deepEqual(sent.map((m) => m.to), ['alex@example.com'], 'only a member is sent mail');
   assert.equal((sent[0].text.match(/#\/join\//g) ?? []).length, 2, 'one mail, with a link for each workspace');
@@ -59,7 +65,6 @@ test('anyone may ask for a sign-in link at an address, and is told nothing of wh
 
   // Asking again within the minute sends nothing more.
   await call('/connect/sign-in', undefined, { email: 'alex@example.com' });
-  await new Promise((r) => setTimeout(r, 200));
   assert.equal(mailbox.length, before + 1);
 
   const codes = [...sent[0].text.matchAll(/#\/join\/(\S+)/g)].map((m) => m[1]);
@@ -73,7 +78,7 @@ test('a code from the sign-in mail, typed with its address, signs in once; a few
   await call('/api/member_add', main, { email: 'kim@example.com', name: 'Kim' });
   const before = mailbox.length;
   await call('/connect/sign-in', undefined, { email: 'kim@example.com' });
-  await new Promise((r) => setTimeout(r, 200));
+  await mailed('kim@example.com', before);
   const code = /type this code on the sign-in page: ([0-9A-Z]{4}-[0-9A-Z]{4})/.exec(mailbox.slice(before)[0].text)![1];
 
   assert.equal((await call('/connect/code', undefined, { email: 'someone@example.com', code })).status, 410, 'only with the address it was sent to');
@@ -106,7 +111,6 @@ test('an admin changes a member’s standing or removes them, and their sign-ins
   assert.equal((await call('/agent/query', robot, { name: 'schema' })).status, 401, 'and so is every agent of theirs');
   const before = mailbox.length;
   await call('/connect/sign-in', undefined, { email: 'sam@example.com' });
-  await new Promise((r) => setTimeout(r, 200));
   assert.equal(mailbox.length, before, 'and are sent no link');
   assert.deepEqual((await call('/api/member_list', alex)).result, []);
 });
@@ -120,7 +124,6 @@ test('a sign-in opens only the workspaces its address belongs to, as the index s
   await call('/api/member_add', acme, { email: 'ann@example.com' });
   // The first ask on a database that never had the index makes it, from every workspace, once.
   await call('/connect/sign-in', undefined, { email: 'first@example.com' });
-  await new Promise((r) => setTimeout(r, 200));
   const opened: string[] = [];
   const get = workspaces.get.bind(workspaces);
   workspaces.get = (id) => (opened.push(id), get(id));
@@ -129,11 +132,10 @@ test('a sign-in opens only the workspaces its address belongs to, as the index s
   // Random addresses, the attack: no workspace's database is opened for them.
   for (let i = 0; i < 5; i++) await call('/connect/sign-in', undefined, { email: `stranger${i}@example.com` });
   await call('/connect/code', undefined, { email: 'stranger9@example.com', code: 'AAAA-AAAA' });
-  await new Promise((r) => setTimeout(r, 200));
   assert.ok(!opened.includes('acme'), 'an unknown address opens no workspace');
   const before = mailbox.length;
   await call('/connect/sign-in', undefined, { email: 'ann@example.com' });
-  await new Promise((r) => setTimeout(r, 200));
+  await mailed('ann@example.com', before);
   assert.equal(mailbox.length, before + 1, 'a member is still sent their link');
   assert.ok(opened.includes('acme'));
 

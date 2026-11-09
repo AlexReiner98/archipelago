@@ -6,6 +6,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
+import { ready } from './tab-page.ts';
+import { until as holds } from './wait.ts';
 import { serve } from './serve.ts';
 
 test('a show names the pane it goes to, and the page is told it with the step', async () => {
@@ -39,11 +41,8 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     ],
   })).result.created as Record<string, string>;
   const page = await open(`${base}/`);
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const until = async (what: string, ok: () => Promise<boolean>) => {
-    for (let n = 0; n < 60; n++) if (await ok()) return;
-    else await wait(250);
-    assert.fail(`${what}: ${JSON.stringify(await panes())} ${await page.evaluate<string>('location.hash')} ${page.logs().join('\n')}`);
+    if (!(await holds(ok, 20_000, 250))) assert.fail(`${what}: ${JSON.stringify(await panes())} ${await page.evaluate<string>('location.hash')} ${page.logs().join('\n')}`);
   };
   const show = (params: Record<string, unknown>) => call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { focus: false, ...params } }).then((r) => r.result);
   /** The panes as the reader sees them, in order: each one's name, its left edge, whose it is, and whether it is in focus. */
@@ -60,7 +59,7 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
   };
   const find = (words: string) => page.evaluate(`(() => { const input = document.querySelector('#find input[type=search]'); input.value = ${JSON.stringify(words)}; input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); document.getElementById('find').requestSubmit(); })()`);
   try {
-    await wait(3000);
+    await ready(page);
     // A session's show opens a tab of its own, out of sight: the reader's pane, the bar and the address stay theirs.
     await show({ entity: views.f });
     await until('a tab of its own', () => page.evaluate<boolean>(`document.querySelectorAll('#tabs .tab').length === 2`));

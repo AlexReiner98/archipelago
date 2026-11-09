@@ -190,6 +190,7 @@ test('in a browser, a part hovered says what it is in a tip its drawing makes, b
       const left = { after: tip().hidden, back: part.querySelector('title') !== null };
       // A place says what it is from its name only: its box, around its parts, says nothing.
       document.querySelector('[data-lens] svg rect.ar-place-box[opacity="1"]').dispatchEvent(new MouseEvent('mouseenter'));
+      // Asked is that nothing comes: the drawing is given a moment in which it would (wrongly) show a tip.
       await new Promise((r) => setTimeout(r, 300));
       const boxSays = !tip().hidden;
       document.querySelector('[data-lens] svg a.ar-place[opacity="1"]').dispatchEvent(new MouseEvent('mouseenter'));

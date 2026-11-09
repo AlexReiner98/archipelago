@@ -5,13 +5,11 @@ import { cpSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { openDb } from '../src/db.ts';
 import { PackHost, Sandbox, type Answerer } from '../src/packhost.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { readEvents } from '../src/eventlog.ts';
+import { freshWith, human } from './map.ts';
 
-const human: Actor = { kind: 'human', name: 'test' };
 const dir = mkdtempSync(join(tmpdir(), 'pelago-host-'));
 cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
 cpSync(join(import.meta.dirname, 'packs', 'demo'), join(dir, 'demo'), { recursive: true });
@@ -19,7 +17,7 @@ const host = new PackHost((pack) => join(dir, pack));
 after(() => host.stop());
 
 test("an action reads the map and its ops are applied as one change set with the action's name", async () => {
-  const l = new Archipelago(await openDb(), new Registry(dir));
+  const l = await freshWith(new Registry(dir));
   const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: 'Survey the barn' }] })) as { created: Record<string, string> };
   const result = (await host.act(l, human, 'demo', 'demo.plan_visit', { task: made.created.t, site: 'Barn' })) as { answer: { earlier: number; by: string }; changeset: string; created: Record<string, string> };
   assert.deepEqual(result.answer, { earlier: 0, by: 'test', visit: result.created.v }, 'a {ref} in its answer is the id of what it made');
@@ -33,7 +31,7 @@ test("an action reads the map and its ops are applied as one change set with the
 });
 
 test('a handler that overruns is stopped, and the next call starts it again', async () => {
-  const l = new Archipelago(await openDb(), new Registry(dir));
+  const l = await freshWith(new Registry(dir));
   await assert.rejects(host.call(l, human, 'demo', 'action', 'demo.spin', {}, 500), /took longer than 500 ms and was stopped/);
   process.env.PELAGO_TEST_SECRET = 'not for packs';
   const env = ((await host.call(l, human, 'demo', 'action', 'demo.env', {})) as { answer: string[] }).answer;
@@ -52,7 +50,7 @@ test("a limit is the handler's own time: its process starting and the kernel ans
 });
 
 test("a handler reads as the actor: another person's private item is not there for it", async () => {
-  const l = new Archipelago(await openDb(), new Registry(dir));
+  const l = await freshWith(new Registry(dir));
   const people = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'ann', type: 'person', title: 'Ann', visibility: 'shared' }, { op: 'create', ref: 'bo', type: 'person', title: 'Bo', visibility: 'shared' }] })) as { created: Record<string, string> };
   const ann = l.as(people.created.ann);
   const mine = (await ann.change(human, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: "Ann's own", visibility: 'private' }] })) as { created: Record<string, string> };
@@ -61,7 +59,7 @@ test("a handler reads as the actor: another person's private item is not there f
 });
 
 test('a handler cannot read outside its own folder', async () => {
-  const l = new Archipelago(await openDb(), new Registry(dir));
+  const l = await freshWith(new Registry(dir));
   await assert.rejects(host.call(l, human, 'demo', 'action', 'demo.peek', {}), /ERR_ACCESS_DENIED|Access to this API has been restricted/);
   await assert.rejects(host.call(l, human, 'demo', 'action', 'demo.nothing', {}), /The handler has no "demo.nothing"/);
 });

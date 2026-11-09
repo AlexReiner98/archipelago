@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { serve } from './serve.ts';
+import { until } from './wait.ts';
 
 test('an agent can point the human\'s screen, and its changes point it too', async () => {
   const { call } = await serve('off');
@@ -67,8 +68,7 @@ test('an agent hears what the human does: by waiting for it, and with the owner\
   assert.deepEqual(await call('/hooks/prompt', undefined, { session_id: 's1' }), { status: 200 }, 'nothing to tell');
 
   const waiting = call('/agent/watch', undefined, { after: latest, wait_seconds: 20 });
-  await new Promise((r) => setTimeout(r, 300));
-  assert.equal((await call('/api/tail')).result.listening, 1, 'the UI can see someone is listening');
+  assert.ok(await until(async () => (await call('/api/tail')).result.listening === 1, 10_000), 'the UI can see someone is listening');
   await call('/agent/change', undefined, { actor: 'robot', reason: 'noise', ops: [{ op: 'create', type: 'note', title: 'An agent\'s own change' }] });
   await call('/api/change', undefined, { reason: 'Decided in the UI', ops: [{ op: 'update', id, status: 'decided', props: { outcome: 'This one' } }] });
   const heard = (await waiting).result;

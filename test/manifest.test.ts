@@ -3,8 +3,7 @@
 // kept to) and in time (a pack's presence a fact on the log, its registrations derived from the set of packs).
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { openDb } from '../src/db.ts';
@@ -18,23 +17,13 @@ import { decide } from '../src/rules.ts';
 import { loadServerPacks, OWN_PACKS } from '../src/server-packs.ts';
 import { callTool } from '../src/tools.ts';
 import { syncTypes } from '../src/typetable.ts';
-import { human } from './map.ts';
+import { human, packsWith } from './map.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const registries: Registry[] = [];
 after(() => registries.forEach((r) => hostFor(r).stop()));
 
 /** A copy of the packs, with more put beside them: a fixture's folder, or a pack file of its own. */
-function packsWith(...more: (string | PackFile)[]): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pelago-manifest-'));
-  cpSync(join(ROOT, 'packs'), dir, { recursive: true });
-  for (const m of more) {
-    if (typeof m === 'string') cpSync(join(ROOT, 'test', 'packs', m), join(dir, m), { recursive: true });
-    else (mkdirSync(join(dir, m.id)), writeFileSync(join(dir, m.id, 'pack.json'), JSON.stringify(m)));
-  }
-  return dir;
-}
-
 async function mapOf(dir: string) {
   const reg = new Registry(dir);
   registries.push(reg);

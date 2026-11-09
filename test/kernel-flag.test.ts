@@ -2,22 +2,11 @@
 // styles, screens, runs) carry the kernel flag, and every view that left out kind system reads it. Core's system kind
 // declares it, so the same types are fenced as before, and the term `kind system` the kept views hold still works.
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { test } from 'node:test';
 import { Registry, type PackFile } from '../src/packs.ts';
 import { flatRead } from '../src/query-flat.ts';
 import { kernelTypes, notKernel } from '../src/head.ts';
-import { fresh, make, PACKS } from './map.ts';
-
-function packsWith(extra: PackFile): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pelago-kernel-'));
-  cpSync(PACKS, dir, { recursive: true });
-  mkdirSync(join(dir, extra.id));
-  writeFileSync(join(dir, extra.id, 'pack.json'), JSON.stringify(extra));
-  return dir;
-}
+import { fresh, make, packsWith } from './map.ts';
 
 test('the types with the kernel flag are the types of the system kind', async () => {
   const l = await fresh();

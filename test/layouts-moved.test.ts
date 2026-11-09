@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { chrome, open } from './browser.ts';
+import { chrome, open, pageModule } from './browser.ts';
 import { gridCases, timeCases, type DrawingCase } from './layout-cases.ts';
 import { serve } from './serve.ts';
 
@@ -25,7 +25,7 @@ async function drawn(shape: string, cases: DrawingCase[]) {
   try {
     await page.evaluate(readFileSync(join(import.meta.dirname, 'layout-capture.js'), 'utf8'));
     // The page's registry is loaded, so a card's colour follows the order its type declares.
-    await page.evaluate(`new Promise((r) => setTimeout(r, 1500))`);
+    assert.ok(await page.until(`${pageModule('words.js')}.then((w) => w.types.size > 0)`), 'the page has its registry');
     const sent = cases.map((c) => ({ ...c, style: { ...c.style, drawing } }));
     return (await page.evaluate(`(async () => { const { drawWith } = await import('/layout.js'); return captureDrawings(drawWith, ${JSON.stringify(sent)}); })()`)) as Record<string, any>;
   } finally {

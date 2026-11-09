@@ -4,20 +4,18 @@ import { cpSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { openDb } from '../src/db.ts';
 import '../src/views.ts';
 import { answerRead } from '../src/packreads.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { flatRead } from '../src/query-flat.ts';
 import { dayStart, resolveAxis } from '../src/timeaxis.ts';
+import { freshWith, human } from './map.ts';
 
-const human: Actor = { kind: 'human', name: 'test' };
 
 async function map() {
   const dir = mkdtempSync(join(tmpdir(), 'pelago-axis-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
-  return new Archipelago(await openDb(), new Registry(dir));
+  return freshWith(new Registry(dir));
 }
 
 type Item = { id: string; title: string; time?: { start: string; end: string; by: string }[] };

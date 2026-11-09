@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { chrome, open } from './browser.ts';
+import { chrome, open, wait } from './browser.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
@@ -37,7 +37,6 @@ test('in a browser, a style’s code reaches nothing in the sandbox, and with th
     ],
   })).result.created as Record<string, string>;
   await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.c, props: { style: { style: made.s } } }] });
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
   // What the code said, read in its frame: through the page when it shares the page's origin, else by attaching to it.
   const said = async (page: Awaited<ReturnType<typeof open>>) => {
     for (let n = 0; n < 100; n++, await wait(200)) {

@@ -8,13 +8,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { REPLACED } from '../src/attention.ts';
-import { openDb } from '../src/db.ts';
-import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
+import { type Actor, type Op } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { sessionStart } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
+import { freshWith, human } from './map.ts';
 
-const human: Actor = { kind: 'human', name: 'test' };
 const agent: Actor = { kind: 'agent', name: 'test' };
 
 /** The map the demo is seeded with too: two projects, and something of every reason in the first. */
@@ -46,7 +45,7 @@ type Answer = { person: string | null; counts: Record<string, number>; items: It
 test('attention finds every reason, for the right person, within a scope, and the old views say where to look', async () => {
   const packs = mkdtempSync(join(tmpdir(), 'pelago-attention-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
-  const l = new Archipelago(await openDb(), new Registry(packs));
+  const l = await freshWith(new Registry(packs));
   const me = ((await callTool(l, human, 'init', { name: 'Alex' })) as { me: string }).me;
   const soon = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
   const ops = scenario(soon).map((o) => (o.op === 'link' && o.to === 'ME' ? { ...o, to: me } : o));
@@ -108,7 +107,7 @@ test('attention finds every reason, for the right person, within a scope, and th
 test('attention can be read latest first, each item saying when it last changed', async () => {
   const packs = mkdtempSync(join(tmpdir(), 'pelago-attention-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
-  const l = new Archipelago(await openDb(), new Registry(packs));
+  const l = await freshWith(new Registry(packs));
   const me = ((await callTool(l, human, 'init', { name: 'Alex' })) as { me: string }).me;
   const soon = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
   const made = ((await l.change(human, { reason: 'test', ops: [

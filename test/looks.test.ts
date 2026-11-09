@@ -7,11 +7,10 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 import { createToken } from '../src/auth.ts';
-import { chromeBinary } from '../src/chrome.ts';
 import { askedFace, fellBack, stopLayout } from '../src/look-draw.ts';
 import { passFor } from '../src/looks.ts';
 import { contentOf } from '../src/mcp.ts';
-import { open } from './browser.ts';
+import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
 
 after(stopLayout);
@@ -61,7 +60,7 @@ test('a face asked for is the first named in its family, and fell back when Chro
   assert.equal(fellBack('Georgia', []), false);
 });
 
-const browser = chromeBinary();
+const browser = chrome();
 const PNG = /^iVBORw0KGgo/;
 
 test('in a browser, a look is the view as drawn: a flow, a style’s own code, a lens that finds nothing', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {

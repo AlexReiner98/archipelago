@@ -8,12 +8,12 @@ import { after, test } from 'node:test';
 import { checkCapabilities } from '../src/capabilities.ts';
 import { openDb } from '../src/db.ts';
 import { hostFor } from '../src/packtools.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
+import { Archipelago } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { addressKey, sameAddress } from '../src/places.ts';
 import { callTool } from '../src/tools.ts';
+import { human } from './map.ts';
 
-const human: Actor = { kind: 'human', name: 'test' };
 const PACKS = join(import.meta.dirname, '..', 'packs');
 
 const registries: Registry[] = [];

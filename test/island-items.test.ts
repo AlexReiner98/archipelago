@@ -6,14 +6,12 @@ import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { openDb } from '../src/db.ts';
 import { Registry } from '../src/packs.ts';
 import { setIslands } from '../src/packstate.ts';
 import { Archipelago, type Op } from '../src/pelago.ts';
 import { linkOnLegend, typeOnLegend } from '../src/island-items.ts';
 import { flatRead } from '../src/query-flat.ts';
-import { syncTypes } from '../src/typetable.ts';
-import { human, make } from './map.ts';
+import { freshWith, human, make } from './map.ts';
 
 /** A pack of the island shape: one type of its own on work, a link type marked crosses (a stand-in for core's reading of a finding), and an instruction. */
 const pack = (id: string) => ({
@@ -27,8 +25,7 @@ async function islandMap(on = true) {
   const dir = mkdtempSync(join(tmpdir(), 'pelago-island-items-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
   for (const id of ['plain', 'other']) (mkdirSync(join(dir, id)), writeFileSync(join(dir, id, 'pack.json'), JSON.stringify(pack(id))));
-  const l = new Archipelago(await openDb(), new Registry(dir));
-  await syncTypes(l);
+  const l = await freshWith(new Registry(dir));
   if (on) await setIslands(l, human, true);
   return l;
 }

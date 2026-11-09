@@ -6,7 +6,6 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { openDb } from '../src/db.ts';
 import { answerHook } from '../src/hook-answers.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
@@ -14,7 +13,7 @@ import { checkRules, type RuleDef } from '../src/rules.ts';
 import { sessionStart, story } from '../src/sessions.ts';
 import { hookSessionStart } from '../src/session-hook.ts';
 import { callTool } from '../src/tools.ts';
-import { syncTypes } from '../src/typetable.ts';
+import { freshWith } from './map.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner', admin: true };
 const agent: Actor = { kind: 'agent', name: 'test' };
@@ -35,8 +34,7 @@ async function map() {
   cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
   mkdirSync(join(dir, 'checks'));
   writeFileSync(join(dir, 'checks', 'pack.json'), JSON.stringify(CHECKS));
-  const l = new Archipelago(await openDb(), new Registry(dir), { create: 'auto', update: 'auto', link: 'auto' });
-  return (await syncTypes(l), l);
+  return freshWith(new Registry(dir), { create: 'auto', update: 'auto', link: 'auto' });
 }
 
 const stop = (l: Archipelago, body: Record<string, unknown>) =>

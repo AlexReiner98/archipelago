@@ -1,7 +1,7 @@
 // The type table: a pack removed under live items leaves them dormant, not frozen. They keep their kind, statuses,
 // fields and capabilities; a person may edit and close them; an agent's edit waits; the pack's tools are gone.
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -13,11 +13,11 @@ import { Registry } from '../src/packs.ts';
 import { callTool } from '../src/tools.ts';
 import { syncTypes } from '../src/typetable.ts';
 import { askView } from '../src/askview.ts';
+import { human } from './map.ts';
 
 /** A view asked by its name, as the view tool asks it. */
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
-const human: Actor = { kind: 'human', name: 'test' };
 const agent: Actor = { kind: 'agent', name: 'test' };
 
 test('a pack removed under live items leaves them dormant: editable by a person, closable, still at risk, its tools gone', async () => {

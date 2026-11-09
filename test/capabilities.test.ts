@@ -1,32 +1,18 @@
 // The five capabilities: declared per type with the field each reads, checked when the pack loads, and what the
 // kernel computes from instead of from field names.
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { test } from 'node:test';
 import { callTool } from '../src/tools.ts';
 import { checkCapabilities, occurs } from '../src/capabilities.ts';
-import { openDb } from '../src/db.ts';
 import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
 import { askView } from '../src/askview.ts';
+import { freshWith, human, packsWith } from './map.ts';
 
 /** A view asked by its name, as the view tool asks it. */
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
 
-const human: Actor = { kind: 'human', name: 'test' };
 const agent: Actor = { kind: 'agent', name: 'test' };
-
-function packsWith(extra?: PackFile): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pelago-caps-'));
-  cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
-  if (extra) {
-    mkdirSync(join(dir, extra.id));
-    writeFileSync(join(dir, extra.id, 'pack.json'), JSON.stringify(extra));
-  }
-  return dir;
-}
 
 /** A pack of a shop's stock and a room with seats, to try what the shipped packs do not use. */
 const SHOP: PackFile = {
@@ -38,7 +24,7 @@ const SHOP: PackFile = {
 };
 
 async function map(extra?: PackFile) {
-  return new Archipelago(await openDb(), new Registry(packsWith(extra)));
+  return freshWith(new Registry(packsWith(extra)));
 }
 
 async function make(l: Archipelago, ops: Op[]) {

@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
-import { chrome, open } from './browser.ts';
+import { chrome, open, wait } from './browser.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
@@ -38,11 +38,6 @@ test('in a browser, a document is written beside its draft, shared or not', { sk
   const ids = [site.a, site.b, offer.id, site.t].map((id) => `find=id+${id}`).join('&');
 
   const page = await open(`${base}/`);
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const until = async (expression: string) => {
-    for (const end = Date.now() + 20000; Date.now() < end; await wait(100)) if (await page.evaluate(expression)) return true;
-    return false;
-  };
   const view = `document.querySelector('#canvas .lens-view.beside-sheet')`;
   const frame = (id: string) => `document.querySelector('.rd.draft[data-item="${id}"] iframe:not(.rd-next)')`;
   const reads = (id: string, words: string) => `Boolean(${frame(id)}?.contentDocument?.body?.textContent.includes(${JSON.stringify(words)}))`;
@@ -53,22 +48,22 @@ test('in a browser, a document is written beside its draft, shared or not', { sk
   try {
     await page.evaluate(`(localStorage.setItem('pelago-token', ${JSON.stringify(theirs)}), localStorage.setItem('pelago-workspaces', ${JSON.stringify(JSON.stringify({ default: { name: 'Default', token: mine }, acme: { name: 'Acme', token: theirs } }))}))`);
     await page.go(`${base}/#/e/${site.a}?${ids}&shape=pages`);
-    assert.ok(await until(`Boolean(${view}) && ${reads(site.a, 'first paragraph 3')}`), `the draft is read: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(`Boolean(${view}) && ${reads(site.a, 'first paragraph 3')}`), `the draft is read: ${page.logs().join('\n')}`);
 
     // Beside the sheet: the words open to write, the scrollbar in sight, what is published out of the way.
-    assert.ok(await until(`Boolean(${area}) && !${area}.hidden`), 'the note opens as words to write');
+    assert.ok(await page.until(`Boolean(${area}) && !${area}.hidden`), 'the note opens as words to write');
     assert.ok(await page.evaluate(`${view}.getBoundingClientRect().right <= document.getElementById('sheet').getBoundingClientRect().left + 1`), 'the view stops where the sheet starts');
     assert.equal(await page.evaluate(`document.querySelector('.rd.published')`), null);
 
     // Saving keeps the place and the other documents' frames, and reads the one changed.
     await page.evaluate(`(${view}.scrollTop = 500, window.other = ${frame(site.b)}, 0)`);
-    await wait(500);
+    assert.ok(await page.still(`${view}.scrollTop`), 'scrolled');
     await write('Written here. ');
     await page.evaluate(`${area}.setSelectionRange(7, 7)`);
     const place = await page.evaluate<number>(`${view}.scrollTop`);
     await save();
-    assert.ok(await until(reads(site.a, 'Written here.')), 'the draft reads what was saved');
-    await wait(500);
+    assert.ok(await page.until(reads(site.a, 'Written here.')), 'the draft reads what was saved');
+    assert.ok(await page.still(`${view}.scrollTop`), 'drawn again');
     assert.equal(await page.evaluate(`${view}.scrollTop`), place, 'the place is kept');
     assert.ok(await page.evaluate(`window.other === ${frame(site.b)} && window.other.isConnected`), 'the other documents are not read again');
     assert.ok(await page.evaluate(`document.activeElement === ${area} && ${area}.selectionStart === 7`), 'the cursor stays where it was');
@@ -76,17 +71,18 @@ test('in a browser, a document is written beside its draft, shared or not', { sk
 
     // The sheet follows what is scrolled to, but not away from words not saved.
     await scrollTo(site.b);
-    assert.ok(await until(`location.hash.startsWith('#/e/${site.b}')`), `the sheet moves on: ${await page.evaluate('location.hash')}`);
-    assert.ok(await until(`${area}?.value.startsWith('second')`), 'to its words');
-    assert.ok(await until(`document.querySelector('.pg-row.here .pg-title')?.textContent === 'Next page'`), 'the page open is lit');
+    assert.ok(await page.until(`location.hash.startsWith('#/e/${site.b}')`), `the sheet moves on: ${await page.evaluate('location.hash')}`);
+    assert.ok(await page.until(`${area}?.value.startsWith('second')`), 'to its words');
+    assert.ok(await page.until(`document.querySelector('.pg-row.here .pg-title')?.textContent === 'Next page'`), 'the page open is lit');
     // Saved from a page the sheet followed to, as well as one it opened on: the place stays.
     await page.evaluate(`(window.first = ${frame(site.a)}, 0)`);
     await write('Second words. ');
     await save();
-    assert.ok(await until(reads(site.b, 'Second words.')), 'the draft it moved to reads what was saved');
+    assert.ok(await page.until(reads(site.b, 'Second words.')), 'the draft it moved to reads what was saved');
     assert.ok(await page.evaluate(`window.first === ${frame(site.a)}`), 'and nothing else is read again');
     await write('Waiting. ');
     await scrollTo(site.a);
+    // Asked is that the sheet does not follow the scroll: it is given the time it would take to (wrongly) move.
     await wait(600);
     assert.ok(await page.evaluate(`location.hash.startsWith('#/e/${site.b}')`), 'words not saved hold the sheet');
     await page.evaluate(`[...document.querySelectorAll('#sheet .draft-bar:not([hidden]) button')].find((b) => b.textContent === 'Discard').click()`);
@@ -94,18 +90,18 @@ test('in a browser, a document is written beside its draft, shared or not', { sk
     // A shared document is written on the map it lives on, by the person, and its draft reads that.
     await page.evaluate(`document.querySelector('#canvas .lens-view').dispatchEvent(new Event('scroll'))`);
     await scrollTo(offer.id);
-    assert.ok(await until(`location.hash.startsWith('#/e/${offer.id}')`), `the sheet moves to the shared page: ${await page.evaluate('location.hash')}`);
-    assert.ok(await until(`${area}?.value.startsWith('shared')`), 'its words, as they stand on its own map');
+    assert.ok(await page.until(`location.hash.startsWith('#/e/${offer.id}')`), `the sheet moves to the shared page: ${await page.evaluate('location.hash')}`);
+    assert.ok(await page.until(`${area}?.value.startsWith('shared')`), 'its words, as they stand on its own map');
     await write('From the site. ');
     await save();
-    assert.ok(await until(reads(offer.id, 'From the site.')), `its draft reads what was saved: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(reads(offer.id, 'From the site.')), `its draft reads what was saved: ${page.logs().join('\n')}`);
     const written = (await api(mine, 'get', { id: home })).entity;
     assert.ok(written.body.startsWith('From the site. '), 'written on its own map');
     assert.ok((await api(theirs, 'get', { id: offer.id })).entity.body.startsWith('From the workspace'), 'the share itself is as it was');
 
     // An item that is not a document is read by its note, as its reader sees it, not refused.
     await scrollTo(site.t);
-    assert.ok(await until(reads(site.t, 'A task read by its note.')), `an item that is not a document is read by its note: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(reads(site.t, 'A task read by its note.')), `an item that is not a document is read by its note: ${page.logs().join('\n')}`);
   } finally {
     await page.close();
   }

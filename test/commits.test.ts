@@ -13,6 +13,7 @@ import { checkRules } from '../src/rules.ts';
 import { sessionStart, story } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { agent, fresh, make } from './map.ts';
+import { until } from './wait.ts';
 
 const hook = (l: Archipelago, event: string, body: Record<string, unknown>) => answerHook(event, { whole: l.db, pelago: l, within: [], body, running: { started: new Date().toISOString() }, origin: 'http://127.0.0.1' });
 const A = 'a'.repeat(40);
@@ -79,7 +80,10 @@ test('the hook reads the session’s commits from what git answered, by their fu
   git('commit', '-q', '--allow-empty', '-m', 'Two');
   const two = git('rev-parse', 'HEAD');
   // A quiet commit answers nothing: what it made is in the HEAD log, at the time the command ran.
-  await new Promise((done) => setTimeout(done, 2500));
+  // The HEAD log keeps whole seconds and the hook gives a command a second either side, so the third is made once the
+  // clock is past the second the second was logged in and that margin: about time passing, so a wait for the clock.
+  const logged = Number(git('log', '-1', '--format=%ct')) * 1000;
+  await until(() => Date.now() > logged + 1100, 5000, 25);
   const before = new Date().toISOString();
   git('commit', '-q', '--allow-empty', '-m', 'Three');
   const three = git('rev-parse', 'HEAD');
