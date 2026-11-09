@@ -8,7 +8,7 @@ import { counted, sectionOf, weigh } from '../ui/note-count.js';
 const piece = {
   piece: 'count',
   section: 'Text',
-  by: 'channel',
+  by: 'venue',
   limits: { linkedin: { max: 3000, low: 1200, high: 1900 }, x: { max: 280, split: 'paragraph', emoji: 2, link: 23 }, bluesky: { max: 300 } },
 };
 
@@ -32,19 +32,19 @@ test('the section under its heading, to the next heading as high', () => {
 
 test('a LinkedIn post is marked in its best length, past it, and over its limit', () => {
   const post = (n: number) => `Facts the post is drawn from.\n\n## Text\n${'a'.repeat(n)}`;
-  const at = (n: number) => counted(post(n), piece, { channel: 'linkedin' });
+  const at = (n: number) => counted(post(n), piece, { venue: 'linkedin' });
   assert.deepEqual([at(500).state, at(1500).state, at(2000).state, at(3001).state], ['', 'best', 'near', 'over']);
   assert.equal(at(1500).n, 1500);
   assert.equal(at(1500).limit.max, 3000);
 });
 
 test('an X thread counts each post, the longest against 280', () => {
-  const c = counted(`## Text\n${'a'.repeat(100)}\n\n${'b'.repeat(290)}\n\n${'c'.repeat(10)}`, piece, { channel: 'x' });
+  const c = counted(`## Text\n${'a'.repeat(100)}\n\n${'b'.repeat(290)}\n\n${'c'.repeat(10)}`, piece, { venue: 'x' });
   assert.deepEqual([c.n, c.posts, c.state], [290, 3, 'over']);
 });
 
 test('a channel with no limit, or a note with no count piece, is counted whole and quiet', () => {
-  assert.deepEqual(counted('## Text\nHello', piece, { channel: 'hn' }), { n: 5, posts: 1, limit: null, state: '' });
+  assert.deepEqual(counted('## Text\nHello', piece, { venue: 'hn' }), { n: 5, posts: 1, limit: null, state: '' });
   assert.equal(counted('  A note.  ', undefined).n, 7);
-  assert.equal(counted('A post with no text yet', piece, { channel: 'x' }), null);
+  assert.equal(counted('A post with no text yet', piece, { venue: 'x' }), null);
 });
