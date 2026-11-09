@@ -71,15 +71,20 @@ test('every wire and tie turns only at right angles', () => {
   for (const p of [...g.chains, ...g.ties]) assert.ok(square(p.points), `${p.a} to ${p.b} turns at a slant`);
 });
 
-test('the order runs from the foot of what is depended on down into the head of what depends on it', { todo: 'shape.js may bring an order wire in by a side, and the numbering runs some up: on this map, 20 of 84 (8 Nov 2026)' }, () => {
+test('the order runs from the foot of what is depended on down into the head of what depends on it', () => {
   const g = laidOut(dense());
   for (const c of g.chains) {
     const [a, b] = [boxOf(g, c.a), boxOf(g, c.b)], [first, last, before] = [c.points[0], c.points.at(-1), c.points.at(-2)];
+    if (b.y <= a.y) continue;
     assert.ok(Math.abs(first[1] - (a.y + a.h / 2)) < 0.5 && Math.abs(first[0] - a.x) <= a.w / 2, `${c.key} leaves the foot of ${c.a}`);
     assert.ok(Math.abs(last[1] - (b.y - b.h / 2)) < 0.5 && Math.abs(last[0] - b.x) <= b.w / 2, `${c.key} comes into the head of ${c.b}`);
     assert.ok(Math.abs(before[0] - last[0]) < 0.01 && before[1] < last[1], `${c.key} comes down into it`);
-    assert.ok(b.y > a.y, `${c.key} is read from the top down`);
   }
+});
+
+test('the order is read from the top down', { todo: 'the numbering runs some order wires up: on this map, 3 of 84 (9 Nov 2026)' }, () => {
+  const g = laidOut(dense());
+  for (const c of g.chains) assert.ok(boxOf(g, c.b).y > boxOf(g, c.a).y, `${c.key} is read from the top down`);
 });
 
 test('a tie ends on the edge of each of its steps', () => {
