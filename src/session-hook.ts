@@ -60,7 +60,9 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
         ...owed.slice(0, 8).map((h) => `- ${h.title} (${h.id}), holding ${h.inside}`),
       );
   } else if (!repo) {
-    lines.push(`Archipelago does not know a repository for this folder${input.remote ? ` (a checkout of ${input.remote})` : ''}. If its work belongs in the map, give a repository there this address as its remote.`);
+    // Only a map with a type of place that knows an address (a repository, in the code pack) is told to make one.
+    const place = [...l.registry.types.values()].find((t) => t.capabilities.where?.address);
+    if (place) lines.push(`Archipelago does not know a ${place.title.toLowerCase()} for this folder${input.remote ? ` (a checkout of ${input.remote})` : ''}. If its work belongs in the map, give a ${place.title.toLowerCase()} there this address as its ${place.capabilities.where!.address}.`);
   }
   // The owner is here, in chat, and mostly nowhere else: what agents settled since they last answered is put to them now.
   const ask = await toConfirm(l, { limit: 15 });

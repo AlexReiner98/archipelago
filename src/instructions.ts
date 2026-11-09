@@ -5,7 +5,9 @@
 // Layers, the nearest last, each over one of the same name (its preset, or else its own id):
 //   a preset, an instruction kept about nothing (the workspace's), one kept about the repository a session is in.
 // One kept with a preset's id (preset) is the owner's version of it: its note and fields over the preset's, in the
-// preset's place; retired, it is not said. Read each time, so a change is said to the next session.
+// preset's place; retired, it is not said. A pack's preset that replaces another (its prop `replaces`, a preset's id) is
+// said in that one's place when its pack is on, so core can word a rule in its own types and a pack in its richer ones.
+// Read each time, so a change is said to the next session.
 
 import { presetsOf, type StyleDef } from './declared.ts';
 import type { Archipelago } from './pelago.ts';
@@ -50,10 +52,16 @@ const globsOf = (fors: string[]) => fors.filter((f) => f.startsWith(FILE)).map((
 /** What is said where (`for`), to a session about `about`: the presets under what the map keeps, in order. Pure: what is read is handed in. */
 export function said(presets: StyleDef[], kept: KeptInstruction[], where: string, about?: string): Said[] {
   const named = new Map<string, { weight: number; at: number; id: string; title: string; open: boolean; text: string; props: Record<string, unknown>; preset?: string }>();
-  presets.forEach((p, at) => named.set(p.id, { weight: 0, at, id: p.id, title: p.title, open: true, text: p.body ?? '', props: p.props, preset: p.id }));
+  presets.forEach((p, at) => {
+    const key = typeof p.props.replaces === 'string' ? p.props.replaces : p.id;
+    // A preset that replaces another takes its place; the one replaced, if it comes later, does not take it back.
+    if (key !== p.id || !named.has(key)) named.set(key, { weight: 0, at: named.get(key)?.at ?? at, id: p.id, title: p.title, open: true, text: p.body ?? '', props: p.props, preset: p.id });
+  });
   const weighed = kept.map((one, i) => ({ one, i, weight: !one.about.length ? 1 : about !== undefined && one.about.includes(about) ? 2 : -1 }));
   for (const { one, i, weight } of weighed.filter((w) => w.weight > 0).sort((a, b) => a.weight - b.weight)) {
-    const key = typeof one.props.preset === 'string' ? one.props.preset : one.id;
+    const namedAs = typeof one.props.preset === 'string' ? one.props.preset : one.id;
+    // The owner's version of a preset that replaces another stands where that one does.
+    const key = [...named.entries()].find(([, n]) => n.preset === namedAs)?.[0] ?? namedAs;
     const under = named.get(key);
     const props = { ...under?.props, ...Object.fromEntries(Object.entries(one.props).filter(([, v]) => v != null)) };
     named.set(key, { weight, at: under?.at ?? presets.length + i, id: one.id, title: one.title || under?.title || '', open: one.is_open, text: one.body?.trim() ? one.body : (under?.text ?? ''), props, ...(under?.preset && { preset: under.preset }) });

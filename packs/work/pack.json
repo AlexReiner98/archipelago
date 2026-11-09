@@ -114,6 +114,8 @@
     }
   ],
   "styles": [
+    {"id": "work.bumps", "type": "instruction", "title": "Record what gets in the way", "body": "When Archipelago itself gets in your way (a tool that fails or misleads, a workaround, an answer that is stale or too big, something the owner finds bad in its screens), record it on the map as an issue when it happens, after searching for it: say what you were doing, what happened, and what would have made it smooth. That is how it gets fixed.", "props": {"for": ["session_start"], "order": 30, "replaces": "core.bumps"}},
+    {"id": "work.hub_at", "type": "instruction", "title": "A project being shaped is all hubs", "body": "While a project is still being shaped, set its hub_at to 1: nearly everything in it is then a hub, and query hubs names those with no views.", "props": {"for": ["session_start"], "order": 90}},
     {
       "id": "work.reading",
       "title": "Reading a document",
