@@ -75,7 +75,7 @@ export function contentOf(result: unknown) {
 }
 
 /** What any client is told on connecting: one with no hooks has nothing else to go by. */
-const INSTRUCTIONS = 'Archipelago is a shared map of people, work and what waits on what. To work here: start with capture, action session_start, params cwd, remote, session_id and title (what your chat is called), and keep the run it gives; when the chat is renamed, report session_update with title. Read with query: name handoff with repo for where things stand, brief with task for one task; query with name actions says what each action takes. Write only with change, giving run and authority. Say what you conclude with report, action tell. Finish with report, action session_end, and a summary; when the chat itself ends, add its reason (closed, archived), and its tab on the owner’s page closes.';
+const INSTRUCTIONS = 'Archipelago is a shared map of people, work and what waits on what. To work here: start with capture, action session_start, params cwd, remote, session_id and title (what your chat is called), and keep the run it gives; when the chat is renamed, report session_update with title. Read with query: name handoff with repo for where things stand, brief with task for one task; query with name actions says what each action takes. Write only with change, giving run and authority. Say what you conclude with report, action tell. Finish with report, action session_end, and a summary; when the chat itself ends, add its reason (closed, archived), and its tab on the owner’s page closes. A person token reaches every workspace its person is a member of: connect at /mcp/<workspace id>, or give any call a workspace argument (its id); else it acts in its home workspace.';
 
 /** A server for one request, with the tools the caller's workspace offers now. */
 function serverFor(caller: Caller): McpServer {
@@ -83,7 +83,9 @@ function serverFor(caller: Caller): McpServer {
   registerView(mcp);
   for (const [name, tool] of offered(caller.pelago.registry))
     mcp.registerTool(name, { description: tool.description, inputSchema: inputsOf(tool), annotations: ANNOTATIONS[name], ...toolView(name) }, async (args: Record<string, unknown>) => {
-      const { actor, ...input } = args;
+      // A workspace named in the arguments was read by the server before the call was answered (src/server.ts): it is
+      // in no tool's inputs, which every request pays for, and is said once in INSTRUCTIONS.
+      const { actor, workspace: _routed, ...input } = args;
       try {
         const result = await callTool(caller.pelago, caller.actor(actor as string | undefined), name, input);
         return { content: contentOf(result) };
