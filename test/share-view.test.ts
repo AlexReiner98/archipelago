@@ -33,6 +33,8 @@ test('a view or an item is given as a link through a document that brings it in 
   const picture = (shown as { lenses?: Record<string, { items: { title: string }[] }> }).lenses?.[made.lens];
   assert.ok(picture, 'the view is drawn');
   assert.deepEqual(picture.items.map((i) => i.title), ['SR&ED'], 'what is private to someone is not in a view anyone with the link sees');
+  assert.equal((picture as { hidden?: number }).hidden, 1, 'and the page is told how many it leaves out');
+  assert.deepEqual((link as { private?: { title: string }[] }).private?.map((i) => i.title), ['IRAP'], 'the one making the link is told which, to share them or not');
 
   // Live: what is added to the map later is in it the next time the link is opened.
   await ann.change(annActor, { reason: 'test', ops: [{ op: 'create', type: 'note', title: 'SBIR', body: 'Later.', visibility: 'shared' }] });

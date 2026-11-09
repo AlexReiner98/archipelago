@@ -55,7 +55,9 @@ export async function picturesOf(l: Archipelago, sections: { id: string; type: s
     );
     const shown = new Map(rows.map((r) => [r.id, r.body]));
     const kept = { ...answer, items: answer.items.filter((i) => shown.has(i.id)), links: answer.links.filter((k) => shown.has(k.from) && shown.has(k.to)) };
-    lenses[section.id] = freezeQuery(kept, shown, l.registry.relationFamily('part_of'));
+    // What a reader with no login is not shown is counted, so the page can say the view is not empty, only private.
+    const hidden = answer.items.length - kept.items.length;
+    lenses[section.id] = { ...freezeQuery(kept, shown, l.registry.relationFamily('part_of')), ...(shared && hidden && { hidden }) };
     for (const i of kept.items) types[i.type] = l.registry.type(i.type)?.title ?? i.type;
   }
   // Each picture's first frame, so a reader's page has it on screen with the text.

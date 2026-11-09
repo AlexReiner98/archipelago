@@ -81,11 +81,11 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
     run: run1,
     reason: 'Plan the login',
     ops: [
-      { op: 'create', ref: 'hub', type: 'task', title: 'Add login', visibility: 'shared' },
-      { op: 'create', ref: 'table', type: 'task', title: 'User table', visibility: 'shared' },
-      { op: 'create', ref: 'form', type: 'task', title: 'Login form', visibility: 'shared' },
-      { op: 'create', ref: 'hash', type: 'decision', title: 'Which hashing library?', visibility: 'shared' },
-      { op: 'create', ref: 'auth', type: 'decision', title: 'Sessions or tokens?', status: 'decided', visibility: 'shared', props: { outcome: 'Signed cookie sessions', rationale: 'One server, nothing to revoke elsewhere' } },
+      { op: 'create', ref: 'hub', type: 'task', title: 'Add login' },
+      { op: 'create', ref: 'table', type: 'task', title: 'User table' },
+      { op: 'create', ref: 'form', type: 'task', title: 'Login form' },
+      { op: 'create', ref: 'hash', type: 'decision', title: 'Which hashing library?' },
+      { op: 'create', ref: 'auth', type: 'decision', title: 'Sessions or tokens?', status: 'decided', props: { outcome: 'Signed cookie sessions', rationale: 'One server, nothing to revoke elsewhere' } },
       ...['table', 'form', 'hash', 'auth'].map((ref) => ({ op: 'link', type: 'part_of', from: ref, to: 'hub' })),
       { op: 'link', type: 'depends_on', from: 'form', to: 'table' },
     ],
@@ -108,7 +108,7 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
 
   // 4. Correct: the person edits a step and adds one; a change the agent held is approved. The agent hears all of it.
   await person('change', { reason: 'Email must be unique', ops: [{ op: 'update', id: ids.table, title: 'User table, email unique' }] });
-  const added = ((await person('change', { reason: 'Add a step', ops: [{ op: 'create', ref: 'reset', type: 'task', title: 'Password reset', visibility: 'shared' }, { op: 'link', type: 'part_of', from: 'reset', to: ids.hub }] })) as { created: Record<string, string> }).created.reset;
+  const added = ((await person('change', { reason: 'Add a step', ops: [{ op: 'create', ref: 'reset', type: 'task', title: 'Password reset' }, { op: 'link', type: 'part_of', from: 'reset', to: ids.hub }] })) as { created: Record<string, string> }).created.reset;
   const held = (await agent('change', { run: run1, reason: 'Start the table', hold: true, ops: [{ op: 'update', id: ids.table, status: 'doing' }] })) as { status: string; proposal: string };
   assert.equal(held.status, 'proposed');
   await person('decide', { proposal: held.proposal, approve: true });
@@ -148,6 +148,9 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
     assert.ok(await sharer.until(`Boolean(document.querySelector('dialog.ask textarea'))`), 'asked for a name');
     await sharer.evaluate(`(() => { const d = document.querySelector('dialog.ask'); d.querySelector('textarea').value = 'The login plan'; d.querySelector('button[value="ok"]').click(); })()`);
     assert.ok(await sharer.until(`document.querySelector('dialog.ask h2')?.textContent.startsWith('Make a link to')`, 10000), 'asked to make the link');
+    await sharer.evaluate(`document.querySelector('dialog.ask button[value="ok"]').click()`);
+    // On a new map what the agent made is private: the person is told the link would leave it out, and shares it.
+    assert.ok(await sharer.until(`/private/.test(document.querySelector('dialog.ask h2')?.textContent ?? '')`, 10000), 'told what the link leaves out as private');
     await sharer.evaluate(`document.querySelector('dialog.ask button[value="ok"]').click()`);
     assert.ok(await sharer.until(`(document.querySelector('dialog.ask .ask-message')?.textContent ?? '').includes('/s/')`, 10000), `the link is shown: ${sharer.logs().join(' ').slice(0, 400)}`);
     const message = await sharer.evaluate<string>(`document.querySelector('dialog.ask .ask-message').textContent`);

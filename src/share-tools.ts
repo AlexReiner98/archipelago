@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { createShare, listShares } from './documents.ts';
-import { shareable } from './share-view.ts';
+import { privateIn, shareable } from './share-view.ts';
 import { picturesOf, publish, publishAll, publishAsk, publishedState, publishPlan, unpublish } from './published.ts';
 import type { Tool } from './tools.ts';
 import { endShare, readAny, sharedFigure, sharedPictures, shareWithWorkspace } from './workspace-share.ts';
@@ -36,7 +36,8 @@ export const SHARE_TOOLS: Record<string, Tool> = {
     description: 'Make a link that lets someone with no login read one document and the items it brings in, or one view (a lens, drawn live as the workspace may see it) or one item: either is given as a document that brings it in alone, made about it the first time. The link is shown once.',
     humanOnly: true,
     input: { id: z.string().describe('The document, view or item.') },
-    run: async (l, actor, input) => createShare(l, actor, await shareable(l, actor, input.id)),
+    // With the items it leaves out as private, so the page can ask whether to share them.
+    run: async (l, actor, input) => ({ ...(await createShare(l, actor, await shareable(l, actor, input.id))), private: await privateIn(l, input.id) }),
   },
   share_workspace: {
     description: 'Share one document with another workspace on this server, for those there to read and nobody else. It arrives there as an offer to accept, if that workspace accepts shares from this one. An admin’s.',

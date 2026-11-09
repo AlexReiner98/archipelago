@@ -169,6 +169,10 @@ async function shareView(lens, style, current, open) {
   try {
     const made = await api('share_create', { id: kept.id });
     const url = `${location.origin}${made.path}`;
+    // What is private is left out of a link: on a new map, where private is the default, that may be all of it.
+    const hidden = made.private ?? [];
+    if (hidden.length && (await ask({ title: `${hidden.length} ${hidden.length === 1 ? 'item' : 'items'} in it ${hidden.length === 1 ? 'is' : 'are'} private`, message: `The link leaves out what is private: ${hidden.slice(0, 5).map((i) => i.title).join(', ')}${hidden.length > 5 ? '…' : ''}. Make ${hidden.length === 1 ? 'it' : 'them'} shared, so the link shows ${hidden.length === 1 ? 'it' : 'them'}?`, action: 'Make shared', cancel: 'Leave private' })))
+      await api('change', { ops: hidden.map((i) => ({ op: 'update', id: i.id, visibility: 'shared' })), reason: 'Shared, to be seen through a link' });
     const copied = await navigator.clipboard?.writeText(url).then(() => true, () => false);
     tell(copied ? 'Link copied' : 'Link made', `${url}
 

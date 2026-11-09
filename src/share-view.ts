@@ -6,7 +6,7 @@
 import { SHARED, sharedDocument } from './documents.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { picturesOf } from './published-pictures.ts';
-import { bringersIn } from './query-saved.ts';
+import { bringersIn, isKept, keptPicture } from './query-saved.ts';
 
 /**
  * The types a screen reads whole, as a document is, that a link may open (not one another workspace shares). On a map
@@ -64,4 +64,18 @@ export async function sharedView(l: Archipelago, secret: string) {
   const sections = doc.parts.flatMap((p) => ('section' in p ? [p.section] : []));
   const { lenses, types } = await picturesOf(l, sections, true);
   return Object.keys(lenses).length ? { ...doc, lenses: (await import('./published.ts')).drawingsGiven(l, lenses), types } : doc;
+}
+
+/**
+ * The items a link to `id` leaves out because they are private: a view's that are, or the item itself. Told to the
+ * person as they make the link, so a view whose items are all private (a new map's, where private is the default) is
+ * not given as an empty page without their knowing; whether to share them is theirs.
+ */
+export async function privateIn(l: Archipelago, id: string): Promise<{ id: string; title: string }[]> {
+  const item = await l.entity(id);
+  if (!item) return [];
+  const ids = isKept(l, item.type) ? ((await keptPicture(l, id).catch(() => null))?.items ?? []).map((i) => i.id) : [id];
+  if (!ids.length) return [];
+  const { rows } = await l.db.query<{ id: string; title: string }>(`select id, title from entity where id = any($1::text[]) and (visibility = 'private' or private_to is not null) and archived_at is null`, [ids]);
+  return rows;
 }

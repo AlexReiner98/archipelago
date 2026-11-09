@@ -36,6 +36,8 @@ export function drawFrozen(host, answer, typeTitles = {}, { inApp = false } = {}
   // Every picture has a drawing: src/published.ts gives one to a picture frozen without.
   if (style.drawing) drawWith(body, answer, style, () => {});
   else body.replaceChildren(h('div', { class: 'empty' }, 'This view cannot be drawn here.'));
+  // A link leaves out what is private; the page says so, rather than reading as a view with nothing in it.
+  if (answer.hidden) host.append(h('p', { class: 'muted small' }, `${answer.hidden} ${answer.hidden === 1 ? 'item here is' : 'items here are'} private and not shown.`));
   const byId = new Map(answer.items.map((item) => [item.id, item]));
   // A part is a way to its page in the app; here it leads nowhere.
   body.addEventListener('click', (ev) => ev.target.closest?.('a') && ev.preventDefault());
