@@ -37,7 +37,7 @@ test('a note can name what the same change makes, and an agent can ask for its c
   assert.equal((await l.entity(made.t))!.body, `Written up in ${made.t} itself.`);
   assert.equal((await l.entity(made.q))!.title, `Before ${made.t}?`);
   // Held, a change keeps its refs as written, and they become ids when it is applied.
-  const held = (await l.change(agent, { ops: [{ op: 'create', ref: 'n', type: 'finding', title: 'Later', body: 'This is {n}.' }], reason: 'test' })) as any;
+  const held = (await l.change(agent, { ops: [{ op: 'create', ref: 'n', type: 'finding', title: 'Later', body: 'This is {n}.', props: { value: 1, value_type: 'number' } }], reason: 'test' })) as any;
   const applied = (await l.decide(human, { proposal: held.proposal, approve: true })) as any;
   assert.equal((await l.entity(applied.created.n))!.body, `This is ${applied.created.n}.`);
 

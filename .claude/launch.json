@@ -59,6 +59,20 @@
         "PELAGO_UNSANDBOXED": "1"
       },
       "port": 3111
+    },
+    {
+      "name": "archipelago-findread",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "env": {
+        "PELAGO_PORT": "3112",
+        "PELAGO_DATA": "runs/data-findread",
+        "PELAGO_UNSANDBOXED": "1"
+      },
+      "port": 3112
     }
   ]
 }

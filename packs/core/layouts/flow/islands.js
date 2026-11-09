@@ -11,6 +11,17 @@
 /** An island's name as its header says it: its title, and the pack it speaks. */
 export const nameOf = (i) => `${i?.title ?? ''}${i?.pack?.title ? ` · ${i.pack.title}` : ''}`;
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** A day as a shore says it: its date and month, read from the answer alone, so the drawing is the same each time. */
+const dayOf = (asOf) => { const [, mo, d] = String(asOf ?? '').split('-'); return mo && d ? `${Number(d)} ${MONTHS[Number(mo) - 1] ?? mo}` : ''; };
+
+/**
+ * A finding an island stands by, as one line on its shore (task e_p27ddjqt): its claim, its value with its unit, how
+ * sure only when less than sure, as of when, and how many read it. The answer's `islands` give each its published ones.
+ */
+export const findingTail = (f) => [f.value, f.confidence < 1 && `${Math.round(f.confidence * 100)}%`, dayOf(f.as_of), `⇠${f.readers ?? 0}`].filter(Boolean).join(' · ');
+export const findingSaid = (f) => `${f.title} · ${findingTail(f)}`;
+
 /** What a link across names: what it points to, and its value. */
 export function saidOf(to) {
   const value = to?.fields?.value;
@@ -44,10 +55,11 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
     const shore = m('g', { class: 'lf-shore' }, ...rects.map((r) => m('rect', r)));
     const title = named.get(isle.id);
     const name = title && titled(m('a', { href: `#/e/${isle.id}`, class: 'lf-island-name' }, m('text', { x: isle.name[0] + z('island_name_x'), y: isle.name[1] }, title)), title);
-    // Its legend: each row's mark, then its words.
+    // Its legend: each row's mark, then its words. A finding it publishes is a row too, a link to its page with its whole line as a tip.
     const legend = (legends.get(isle.id) ?? []).map((row, n) => {
       const [ex, ey] = isle.entries[n], [tag, attrs, ...inner] = row.glyph;
-      return m('g', { class: 'lf-island-key' }, m(tag, { ...attrs, x: ex, y: ey + (ROW - KEY_H) / 2 }, ...inner), m('text', { x: ex + KEY_W + MARK_GAP, y: ey + ROW / 2 }, row.label));
+      const key = m('g', { class: row.href ? 'lf-island-key lf-island-finding' : 'lf-island-key' }, m(tag, { ...attrs, x: ex, y: ey + (ROW - KEY_H) / 2 }, ...inner), m('text', { x: ex + KEY_W + MARK_GAP, y: ey + ROW / 2 }, row.label));
+      return row.href ? titled(m('a', { href: row.href }, key), row.tip ?? row.label) : key;
     });
     return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, land, shore, name, legend);
   });
@@ -86,6 +98,9 @@ export const css = `
 .lf-shore rect { fill: none; stroke: var(--lf-island, var(--ln-line)); stroke-width: var(--ln-flow-island-stroke); }
 .lf-island-name { pointer-events: auto; cursor: pointer; }
 .lf-island-name text { fill: color-mix(in srgb, var(--lf-island, var(--ln-muted)), var(--ln-text) var(--ln-flow-lit-mix)); font-size: var(--ln-flow-island-text); font-family: var(--type-region-family, var(--ln-font)); font-weight: var(--type-region-weight, 400); font-style: var(--type-region-style, normal); text-transform: var(--type-region-case, none); letter-spacing: var(--type-region-track, 0); dominant-baseline: central; }
+.lf-island-finding { pointer-events: auto; cursor: pointer; }
+.lf-island-finding text { fill: var(--ln-text); }
+.lf-island-finding .lf-finding-mark { fill: var(--lf-island, var(--ln-text)); }
 .lf-island-key text { fill: var(--ln-muted); font-size: var(--ln-flow-island-legend-text); font-family: var(--ln-font); dominant-baseline: central; }
 /* A gate: a bar on the shore in the island's colour. A finding read across: its outline in its island's colour. */
 .lf-gate-bar { fill: none; stroke: var(--lf-island, var(--ln-text)); stroke-width: var(--ln-flow-island-gate-stroke); stroke-linecap: round; }
