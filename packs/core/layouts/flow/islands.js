@@ -33,7 +33,7 @@ export function saidOf(to) {
  * and `found`: the class each finding read across takes, by its id, for its outline in its island's colour.
  * `legends` holds each island's rows ({ glyph, label }); `isHex` says what is a colour.
  */
-export function islandMarks({ g, legends, islands = [], style, z, m, titled, isHex }) {
+export function islandMarks({ g, folds = [], legends, islands = [], style, z, m, titled, isHex }) {
   if (!g.islands?.length) return { layer: [], gates: [], rules: [], tips: new Map(), found: new Map() };
   const given = Array.isArray(style.island_hues) && style.island_hues.length ? style.island_hues : Array.isArray(style.hues) ? style.hues : [];
   const hues = given.filter(isHex);
@@ -48,7 +48,9 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
   });
   const [PAD, CORNER, ROW, KEY_W, KEY_H, MARK_GAP] = ['island_pad', 'island_corner', 'island_legend_row', 'key_width', 'key_height', 'island_legend_mark_gap'].map(z);
   const rectOf = (r) => ({ x: r.l, y: r.t, width: r.r - r.l, height: r.b - r.t, rx: CORNER });
-  const layer = g.islands.map((isle) => {
+  // An island folded to one step (../map/fold.js) has no frame: the step is drawn in its colour instead.
+  const folded = new Set(folds);
+  const layer = g.islands.filter((isle) => !folded.has(isle.id)).map((isle) => {
     const rects = isle.land.map(rectOf);
     // The land a tint of the island's colour, its shore a line of it round the frame.
     const land = m('g', { class: 'lf-land' }, ...rects.map((r) => m('rect', r)));
@@ -68,13 +70,13 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
   // crossing is of the grammar every island shares, so no legend says what a gate is: each gate answers a hover with a
   // tip (`tips`, by the mark's key) saying what crosses and which way.
   const BAR = z('island_gate_bar');
-  const tips = new Map(), found = new Map();
+  const tips = new Map(), found = new Map(g.islands.filter((isle) => folded.has(isle.id)).flatMap((isle) => [...isle.steps].map((id) => [id, `lf-folded ${classes.get(isle.id)}`])));
   const tip = (key, said, what) => tips.set(key, m('div', { class: 'lf-tip' }, m('b', {}, said), m('span', {}, what)));
   const islandOf = new Map(g.islands.flatMap((isle) => [...isle.steps].map((id) => [id, isle.id]))), barred = new Set();
   const gates = g.ties.filter((t) => t.crossing && t.gates.length).flatMap((t, n) => {
     const to = g.nodes.get(t.b)?.item, value = to?.fields?.value, said = saidOf(to);
     const [reader, source] = [t.a, t.b].map((id) => named.get(g.nodes.get(id)?.item?.island));
-    if (islandOf.has(t.b)) found.set(t.b, `lf-found ${classes.get(islandOf.get(t.b)) ?? ''}`);
+    if (islandOf.has(t.b) && !folded.has(islandOf.get(t.b))) found.set(t.b, `lf-found ${classes.get(islandOf.get(t.b)) ?? ''}`);
     // A finding's reads that leave by one port share its bar there: drawn once.
     const bars = t.gates.map((gate, k) => [gate, k]).filter(([gate]) => !barred.has(gate.at.join()) && barred.add(gate.at.join())).map(([gate, k]) => {
       const [gx, gy] = gate.at, half = Math.max(BAR, gate.span ?? 0) / 2, d = gate.way[0] ? `M${gx} ${gy - half}V${gy + half}` : `M${gx - half} ${gy}H${gx + half}`;
@@ -104,6 +106,7 @@ export const css = `
 .lf-island-key text { fill: var(--ln-muted); font-size: var(--ln-flow-island-legend-text); font-family: var(--ln-font); dominant-baseline: central; }
 /* A gate: a bar on the shore in the island's colour. A finding read across: its outline in its island's colour. */
 .lf-gate-bar { fill: none; stroke: var(--lf-island, var(--ln-text)); stroke-width: var(--ln-flow-island-gate-stroke); stroke-linecap: round; }
+.lf-step.lf-folded .lf-shape { fill: var(--lf-land); stroke: var(--lf-island, var(--ln-line)); stroke-width: var(--ln-flow-stroke-lit); }
 .lf-step.lf-found .lf-shape { stroke: var(--lf-island, var(--ln-line)); stroke-width: var(--ln-flow-stroke-lit); }
 /* A pulse: a dash of the finding's island's colour, unseen but while the page runs it to a reader. */
 .lf-pulse { fill: none; stroke: var(--lf-island, var(--ln-text)); stroke-width: var(--ln-flow-island-pulse-stroke); stroke-dasharray: var(--ln-flow-island-pulse-dash); stroke-linecap: round; opacity: 0; pointer-events: none; }

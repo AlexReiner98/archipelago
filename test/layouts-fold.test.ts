@@ -45,7 +45,7 @@ test('a folded island: one step of its count that opens it, the links on it, one
   const answer = study(), out = folded(answer, sized(100, 0));
   assert.deepEqual(out.folds.sort(), ['C0', 'C1', 'C2', 'C3', 'C4']);
   const shape = out.items.find((i: any) => i.opens === 'C2');
-  assert.equal(shape.title, '3 items');
+  assert.equal(shape.title, 'Company 2 · 3');
   assert.equal(shape.island, 'C2', 'it stands on its island, framed and named as one');
   assert.equal(out.items.filter((i: any) => i.island === 'C2').length, 1);
   assert.equal(out.links.filter((l: any) => l.to === shape.id).length, 4, 'two reads from each home step are one wire');
@@ -62,5 +62,5 @@ test('the Map draws a folded island as one step that opens it, with no legend of
   for (let k = 0; k < 5; k++) assert.ok(text.includes(`#/e/C${k}`), `C${k} opens from its step`);
   assert.ok(!text.includes('#/e/c1_0'), 'a folded island’s items are not drawn');
   assert.ok(text.includes('#/e/h0'), 'home stays whole');
-  assert.equal((text.match(/lf-step folded/g) ?? []).length, 5);
+  assert.equal((text.match(/lf-folded/g) ?? []).length, 5);
 });

@@ -39,8 +39,8 @@ export function foldsOf(items, home, { most, whole }) {
 }
 
 /**
- * The answer as drawn: each folded island holds one step, how many of its items the answer holds, that opens the
- * island's page (`opens`); its items gone, the links to and from them on it, one per type and way, those within it gone.
+ * The answer as drawn: each folded island holds one step, its name and how many of its items the answer holds, that
+ * opens the island's page (`opens`), drawn in the island's colour with no frame round it; its items gone, the links to and from them on it, one per type and way, those within it gone.
  */
 export function folded(answer, sizes) {
   const most = sizes.flow_fold_most, whole = sizes.flow_fold_whole;
@@ -52,7 +52,7 @@ export function folded(answer, sizes) {
   const onto = new Map(items.filter((i) => folds.has(i.island)).map((i) => [i.id, `fold:${i.island}`]));
   const shapes = [...folds].map((id) => {
     const n = counts.get(id), title = named.get(id) ?? id;
-    return { id: `fold:${id}`, type: 'island', title: `${n} item${n === 1 ? '' : 's'}`, said: `${title}: ${n} of its item${n === 1 ? '' : 's'} here, folded`, open: true, status: 'current', phase: 'standing', island: id, folded: n, opens: id };
+    return { id: `fold:${id}`, type: 'island', title: `${title} · ${n}`, said: `${title}: ${n} of its item${n === 1 ? '' : 's'} here, folded`, open: true, status: 'current', phase: 'standing', island: id, folded: n, opens: id };
   });
   const seen = new Set(), links = [];
   for (const l of answer.links ?? []) {

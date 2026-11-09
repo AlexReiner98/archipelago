@@ -151,7 +151,7 @@ A read across is drawn as three wires: from its reader to the reader's port, acr
 
 ### Far islands folded
 
-A picture across more islands than it can read whole folds the far ones (`map/fold.js`, task e_yn9f9zpn): past `flow_fold_whole` company islands, or past `flow_fold_most` items in all, each island it does not keep whole holds one step, how many of its items the answer holds, which opens the island's page, and every link to its items ends on that step, one per type and way. The island the view is about (the lens's `from`, else where most of what its find found lives) never folds; the rest are kept whole smallest first. It is counted from the answer alone, so the picture is the same each time.
+A picture across more islands than it can read whole folds the far ones (`map/fold.js`, task e_yn9f9zpn): past `flow_fold_whole` company islands, or past `flow_fold_most` items in all, each island it does not keep whole is one step in its colour, with no frame: its name and how many of its items the answer holds, opening the island's page, and every link to its items ends on that step, one per type and way. The island the view is about (the lens's `from`, else where most of what its find found lives) never folds; the rest are kept whole smallest first. It is counted from the answer alone, so the picture is the same each time.
 
 ### Adding a wired drawing
 

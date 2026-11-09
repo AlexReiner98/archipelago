@@ -290,7 +290,7 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
   const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region');
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
-  if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, effort });
+  if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].filter((id) => !answer.folds?.includes(id)).map((id) => [id, nameWidth(id)])), sizes: style.sizes, effort });
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
@@ -336,7 +336,7 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
   };
   // On an archipelago each island a region round what lives on it, under everything, and a gate where a link crosses its
   // shore; a finding read across outlined in its island's colour (./islands.js).
-  const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)) });
+  const isles = islandMarks({ g, folds: answer.folds, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)) });
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
@@ -344,7 +344,7 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : z('text_x'));
     const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
     const ghost = !n.stub && i.pending?.op === 'create';
-    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', i.folded && 'folded', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && isles.found.get(n.id)].filter(Boolean).join(' ');
+    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && isles.found.get(n.id)].filter(Boolean).join(' ');
     const body = [
       outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
