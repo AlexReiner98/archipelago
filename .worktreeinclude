@@ -2,5 +2,6 @@
 .mcp.json
 .claude/settings.json
 .claude/pelago-hook.mjs
+.claude/pelago-events.mjs
 .claude/pelago.md
 .claude/skills/pelago-bump/references/home.md
