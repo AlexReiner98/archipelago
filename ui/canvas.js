@@ -16,11 +16,13 @@ import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
 
 /**
- * Home: open projects (what stands at a project's altitude) and whatever waits on the viewer, with no walk and a short
- * limit, so the first canvas answers one question (decision e_5stjvfvb). Growing it is a step taken from an item.
+ * Home: what agents' recent work reaches that needs attention now (the frontier, the same answer a session starts
+ * with: decision e_gsxbzvxe), whatever waits on the viewer, and open projects (what stands at a project's altitude),
+ * with no walk and a short limit, so the first canvas answers one question (decision e_5stjvfvb). Growing it is a step
+ * taken from an item.
  */
 export const home = () => ({
-  filter: { find: ['waits_on me', ...(state.schema?.types ?? []).filter((t) => !t.dormant && t.altitude === 'project').map((t) => `type ${t.id}`)], not: ['done', 'kind system'] },
+  filter: { find: ['frontier', 'waits_on me', ...(state.schema?.types ?? []).filter((t) => !t.dormant && t.altitude === 'project').map((t) => `type ${t.id}`)], not: ['done', 'kind system'] },
   limit: numberOf(state.style, 'home_limit'),
 });
 /** The canvas an item's address opens when no lens is asked: the item and what it holds, depends on and waits on. */
@@ -105,6 +107,9 @@ export function canvasIn(host, pane) {
     show(lens, here, asked = {}) {
       const isHome = !lens;
       lens ??= home();
+      // Home is drawn in the shape the style names for it (home_shape: the house's draws the work agents left as a
+      // flow), unless another was asked for.
+      if (isHome && !asked.shape && !asked.style && !asked.canvas && typeof state.style?.home_shape === 'string') asked = { ...asked, shape: state.style.home_shape };
       const key = JSON.stringify([lens, asked]);
       if (at?.key === key && at.view.isConnected) return c.mark(here);
       const style = { ...asked, ...(here && { here }), ...(asked.canvas && { play: 'asked' }) };

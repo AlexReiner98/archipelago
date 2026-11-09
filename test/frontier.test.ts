@@ -121,3 +121,42 @@ test('the first thing the owner asks narrows the start to what is settled on it,
   assert.equal(askedBy('<task-notification>done</task-notification>'), undefined, 'an event is not the owner asking');
   assert.equal(askedBy('Another Claude session sent a message: hi'), undefined);
 });
+
+test('Home reads the frontier of the whole workspace, each item with why; a session is read for what it worked on', async () => {
+  const packs = mkdtempSync(join(tmpdir(), 'pelago-frontier-'));
+  cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
+  const l = await freshWith(new Registry(packs));
+  await callTool(l, human, 'init', { name: 'Alex' });
+  await l.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"') on conflict (key) do update set value = excluded.value`);
+  const run = (await sessionStart(l, agent, { session_id: 'plan', cwd: '/srv/todo' })).run;
+  const made = ((await l.change(agent, {
+    run,
+    reason: 'Plan',
+    ops: [
+      { op: 'create', ref: 'hub', type: 'task', title: 'Add login' },
+      { op: 'create', ref: 'form', type: 'task', title: 'Login form' },
+      { op: 'create', ref: 'hash', type: 'decision', title: 'Which hashing library?' },
+      { op: 'link', type: 'part_of', from: 'form', to: 'hub' },
+      { op: 'link', type: 'part_of', from: 'hash', to: 'hub' },
+    ],
+  })) as { created: Record<string, string> }).created;
+  await sessionEnd(l, agent, { run, outcome: 'finished' });
+
+  // Asked from no place (a person's Home), the frontier is every recent session's.
+  const f = await frontier(l, {});
+  assert.equal(f.before.sessions, 1);
+  assert.ok(f.items.some((i) => i.id === made.hash));
+
+  // The same, as a term of the flat query Home draws: each item with its reasons, the strongest first.
+  type Flat = { items: { id: string; reasons?: { why: string; said: string }[] }[] };
+  const home = (await callTool(l, human, 'view', { name: 'flat', params: { filter: { find: ['frontier', 'waits_on me'] } } })) as Flat;
+  const hash = home.items.find((i) => i.id === made.hash);
+  assert.equal(hash?.reasons?.[0].why, 'unsettled');
+  assert.equal(hash?.reasons?.[0].said, 'not decided');
+  assert.ok(home.items.some((i) => i.id === made.form && i.reasons?.some((r) => r.why === 'open')));
+
+  // A session's page draws what it worked on: all it made, open or not.
+  const worked = (await callTool(l, human, 'view', { name: 'flat', params: { filter: { find: [`worked ${run}`] } } })) as Flat;
+  assert.deepEqual(new Set(worked.items.map((i) => i.id)), new Set(Object.values(made)));
+  assert.ok(worked.items.every((i) => !i.reasons), 'only the frontier says why');
+});

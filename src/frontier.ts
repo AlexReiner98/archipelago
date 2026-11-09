@@ -30,7 +30,7 @@ export const folderKey = (path: string) =>
     .replace(/\/\.claude\/worktrees\/[^/]+$/, '');
 
 export interface FrontierInput {
-  /** The session asking: its place is read from it, and it is left out of the sessions before. */
+  /** The session asking: its place is read from it, and it is left out of the sessions before. With no run, cwd or remote, the place is the whole workspace: its recent sessions wherever they ran (Home). */
   run?: string;
   cwd?: string;
   remote?: string;
@@ -53,14 +53,15 @@ async function placed(l: Archipelago, input: FrontierInput) {
   const here = cwd ? folderKey(cwd) : undefined;
   const { rows } = await l.db.query<Entity>(`select * from entity where type = 'run' and archived_at is null and updated_at > $1 order by updated_at desc limit 300 -- index entity_type`, [new Date(Date.now() - DAYS * 86_400_000)]);
   const inRepo = repo ? new Set((await l.db.query<{ id: string }>(`select from_id as id from relation where to_id = $1 and type = any($2::text[]) and valid_to is null`, [repo.id, livesIn(l)])).rows.map((r) => r.id)) : new Set<string>();
-  const runs = rows.filter((r) => r.id !== self?.id && (inRepo.has(r.id) || (here !== undefined && typeof r.props.cwd === 'string' && folderKey(r.props.cwd) === here))).slice(0, RUNS);
+  // Asked from nowhere in particular (a person's Home), every place is theirs: the workspace's recent sessions.
+  const anywhere = !input.run && !input.cwd && !input.remote;
+  const runs = rows.filter((r) => r.id !== self?.id && (anywhere || inRepo.has(r.id) || (here !== undefined && typeof r.props.cwd === 'string' && folderKey(r.props.cwd) === here))).slice(0, RUNS);
   return { repo, folder: here, runs };
 }
 
-/** What the sessions before worked on: what they changed (the log keeps each change's run), touched, or were set to work on. */
-async function workedOn(l: Archipelago, runs: Entity[]): Promise<string[]> {
-  if (!runs.length) return [];
-  const ids = runs.map((r) => r.id);
+/** What sessions worked on: what they changed (the log keeps each change's run), touched, or were set to work on. */
+export async function workedOn(l: Archipelago, ids: string[]): Promise<string[]> {
+  if (!ids.length) return [];
   const { rows: changed } = await l.db.query<{ id: string }>(
     `select distinct f.id from log_entry e join log_fact f on f.stream = e.stream and f.pos = e.pos and f.at = e.at
      where e.stream = 'facts' and e.at > $2 and e.head->>'run' = any($1::text[]) and f.id like 'e\\_%' -- index log_entry_at`,
@@ -101,7 +102,7 @@ async function corrections(l: Archipelago, ids: string[]) {
 export async function frontier(l: Archipelago, input: FrontierInput) {
   const { repo, folder, runs } = await placed(l, input);
   const reg = l.registry;
-  const worked = await workedOn(l, runs);
+  const worked = await workedOn(l, runs.map((r) => r.id));
   const scope = await around(l, worked);
   const { rows: rows } = await l.db.query<{ id: string; type: string; title: string; status: string; is_open: boolean; props: Record<string, unknown> }>(
     `select id, type, title, status, is_open, props from entity where id = any($1::text[]) and archived_at is null`,
@@ -169,8 +170,8 @@ export async function frontier(l: Archipelago, input: FrontierInput) {
   };
 }
 
-/** A reason as a few words, for a line of text. */
-function said(r: FrontierItem['reasons'][number]): string {
+/** A reason as a few words, for a line of text or a tip. */
+export function said(r: FrontierItem['reasons'][number]): string {
   switch (r.why) {
     case 'corrected':
       return r.added ? `added by ${r.by}, not yet seen by an agent` : `changed by ${r.by} since an agent last did${(r.fields as string[]).length ? ` (${(r.fields as string[]).join(', ')})` : ''}`;
