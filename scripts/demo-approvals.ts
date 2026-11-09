@@ -7,7 +7,7 @@
 // built. Two agent sessions are at work on it, and one change waits for you.
 // `npm run demo:approvals -- --fresh` throws the map away and makes it again.
 
-import { spawn } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -16,9 +16,9 @@ const DIR = join(ROOT, 'demo-approvals');
 const PORT = 3201;
 const BASE = `http://127.0.0.1:${PORT}`;
 
-/** The process map's style as the one module a style keeps: the built-in flow layout joined in before its drawing. */
+/** The process map's style as the one module a style keeps: the flow layout (retired 9 Nov 2026, read from its tag) joined in before its drawing. */
 function processCode(): string {
-  const layout = readFileSync(join(ROOT, 'packs', 'core', 'layouts', 'flow', 'layout.js'), 'utf8').replace(/^export function layout/m, 'function layout');
+  const layout = execSync('git show archive/layouts-2026-11-09:packs/core/layouts/flow/layout.js', { cwd: ROOT, encoding: 'utf8' }).replace(/^export function layout/m, 'function layout');
   const drawing = readFileSync(join(ROOT, 'examples', 'approvals', 'process.js'), 'utf8');
   return `${layout}\n${drawing.replace(/^import \{ layout \} from .*\n/m, '')}`;
 }

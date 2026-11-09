@@ -6,8 +6,6 @@ import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, wri
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-// @ts-ignore: WebCola, vendored (ui/cola.LICENSE)
-import cola from '../ui/cola.module.min.js';
 
 const ROOT = join(import.meta.dirname, '..');
 
@@ -75,46 +73,19 @@ const boxesOf = (g: any): Box[] => g.all.filter((n: any) => !n.dummy).map((n: an
 });
 const linesOf = (wires: any[]): Line[] => wires.filter((w) => w.points?.length > 1).map((w) => ({ ends: [w.a, w.b], points: w.points }));
 
-/** What every wired drawing draws of a sketch, with its layout, and the spacing it keeps its wires at. A new wired drawing is added here. */
+/** What every wired drawing draws of a sketch, with its layout, and the spacing it keeps its wires at. A new wired
+ *  drawing is added here; those retired on 9 Nov 2026 are at git tag archive/layouts-2026-11-09. */
 export const WIRED: Record<string, { gap: (sizes: Record<string, number>) => number; draw: (layout: any, s: Sketch) => { boxes: Box[]; lines: Line[] } }> = {
-  'core.flow': {
+  'core.map': {
     gap: (sizes) => sizes.flow_wire_gap,
     draw(layout, { items, links }) {
       const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn });
       return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
-    },
-  },
-  'core.strips': {
-    gap: (sizes) => sizes.flow_wire_gap,
-    draw(layout, { items, links }) {
-      const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn });
-      return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
-    },
-  },
-  'core.rows': {
-    gap: (sizes) => sizes.rows_track,
-    draw(layout, { items, links }) {
-      const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn });
-      return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
-    },
-  },
-  'core.cola': {
-    gap: (sizes) => sizes.cola_channel,
-    draw(layout, { items, links }) {
-      const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn, cola });
-      return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
-    },
-  },
-  'core.architecture': {
-    gap: (sizes) => sizes.arch_track,
-    draw(layout, { items, links }) {
-      const inside = [{ ...item('root', 'place'), inside: null }, ...items.map((i) => ({ ...i, inside: 'root' }))], g = layout({ items: inside, links, rootId: 'root', measure, sizes: house().sizes });
-      return { boxes: boxesOf(g), lines: linesOf(g.chains) };
     },
   },
 };
 
-/** How each sketch fails a drawing, counted: `count` is spacing from flow's faults.js, run on its lines at `gap`. */
+/** How each sketch fails a drawing, counted: `spacing` (test/spacing.ts) run on its lines at `gap`. */
 export function faultsOf(wired: (typeof WIRED)[string], layout: any, spacing: (lines: Line[], gap: number) => any) {
   const gap = wired.gap(house().sizes), found: Record<string, number> = {};
   for (const [name, s] of Object.entries(SKETCHES)) {

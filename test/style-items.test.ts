@@ -18,7 +18,7 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     reason: 'test',
     ops: [
       { op: 'create', ref: 't', type: 'task', title: 'Pour the slab' },
-      { op: 'create', ref: 's', type: 'style', title: 'Harbour blueprint', props: { shape: 'list' } },
+      { op: 'create', ref: 's', type: 'style', title: 'Harbour blueprint', props: { shape: 'map' } },
     ],
   })).result.created as Record<string, string>;
   const page = await open(`${base}/#/v?find=id+${made.t}`);
@@ -76,7 +76,7 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     const own = (await call('/api/change', undefined, {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'o', type: 'style', title: 'Slab section look', props: { shape: 'list' } },
+        { op: 'create', ref: 'o', type: 'style', title: 'Slab section look', props: { shape: 'map' } },
         { op: 'create', ref: 'k', type: 'layout', title: 'Board layout', props: { code: 'export default function draw() {}' } },
       ],
     })).result.created as Record<string, string>;
@@ -84,7 +84,7 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     const options = `((s) => (s ? [...s.options].map((o) => o.textContent) : []))(${look})`;
     assert.ok(await page.until(`${options}.includes('Board layout')`), 'the switch offers a layout kept on the map');
     assert.ok(!(await page.evaluate(`${options}.includes('Slab section look')`)), 'and no style');
-    assert.equal(await page.evaluate(`${look}.selectedOptions[0].textContent`), 'Default', 'and a layout draws only where it is chosen');
+    assert.equal(await page.evaluate(`${look}.selectedOptions[0].textContent`), 'Map', 'and a layout draws only where it is chosen: the map, the first shipped, is the choice of none');
     await type('style slab');
     assert.ok(await page.until(`Boolean(${choice('Style', 'Slab section look')})`), `find still lists it: ${await page.evaluate(`${list}.textContent`)}`);
     await take('Style', 'Slab section look');
@@ -103,22 +103,22 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     assert.ok(await page.until(onPage(made.s)), 'its page opens');
     assert.ok(!(await page.evaluate(applied(made.s))), 'nothing applied');
     await shut();
-    await type('style list');
-    assert.ok(await page.until(`Boolean(${choice('Layout', 'List')})`), 'a drawing is offered under Style');
-    await take('Layout', 'List');
-    assert.ok(await page.until(`${hash}.get('shape') === 'list'`), `a drawing draws: ${await page.evaluate('location.hash')}`);
+    await type('style map');
+    assert.ok(await page.until(`Boolean(${choice('Layout', 'Map')})`), 'a drawing is offered under Style');
+    await take('Layout', 'Map');
+    assert.ok(await page.until(`${hash}.get('shape') === 'map'`), `a drawing draws: ${await page.evaluate('location.hash')}`);
     await shut();
     assert.ok(await page.until(`!${hash}.has('shape')`), 'back to the house’s');
 
     // A button is the screen's, not the kernel's: one more declared on any type stands on its pages. The first is in
     // sight, the next in the menu.
-    await page.evaluate(`import(performance.getEntriesByType('resource').map((r) => r.name).find((n) => n.includes('/base.js'))).then(({ state }) => void state.schema.screens.push({ id: 'test.buttons', title: 'T', on: ['work'], pieces: [{ piece: 'button', label: 'Draw as a list', tip: 'As a list', draw: { shape: 'list' } }, { piece: 'button', label: 'Draw as it is', tip: 'Here', draw: { style: '{here}' } }] }))`);
+    await page.evaluate(`import(performance.getEntriesByType('resource').map((r) => r.name).find((n) => n.includes('/base.js'))).then(({ state }) => void state.schema.screens.push({ id: 'test.buttons', title: 'T', on: ['work'], pieces: [{ piece: 'button', label: 'Draw as a list', tip: 'As a list', draw: { shape: 'map' } }, { piece: 'button', label: 'Draw as it is', tip: 'Here', draw: { style: '{here}' } }] }))`);
     await page.evaluate(`(location.hash = '#/e/${made.t}?find=id+${made.t}')`);
     assert.ok(await page.until(`${onPage(made.t)} && ${button}?.textContent === 'Draw as a list'`), `a declared button stands on the page: ${page.logs().join('\n')}`);
     assert.equal(await page.evaluate(`document.querySelectorAll('#sheet .item-button').length`), 1, 'one in sight');
     assert.ok(await page.evaluate(`[...document.querySelectorAll('#sheet .menu-items button')].some((b) => b.textContent === 'Draw as it is')`), 'the next in the menu');
     await page.evaluate(`${button}.click()`);
-    assert.ok(await page.until(`${hash}.get('shape') === 'list'`), 'and does what it says');
+    assert.ok(await page.until(`${hash}.get('shape') === 'map'`), 'and does what it says');
   } finally {
     await page.close();
   }

@@ -6,7 +6,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { join } from 'node:path';
 
 /** The app's own modules, each a part of the page (ui/app.js imports them), served at /<name>.js. */
-const APP_MODULES = ['doc-ref', 'base', 'words', 'body', 'home', 'held', 'held-card', 'item-held', 'canvas', 'pinch', 'query-bar', 'find', 'find-choices', 'menu-place', 'draft', 'note-count', 'item', 'item-doc', 'item-read', 'item-links', 'item-sections', 'screens', 'attention', 'nav', 'query', 'query-base', 'list', 'style-code', 'pan-zoom', 'live', 'settle', 'week', 'time', 'workspace', 'workspace-cards', 'workspaces-card', 'connections-card', 'members-card', 'styles-card', 'themes-card', 'agents-card', 'connect-agent', 'plates', 'theme', 'token-piece', 'token-ask', 'turns', 'findings', 'canvases', 'diagram', 'start', 'limits-card', 'doc-lens', 'marks', 'reader-frame', 'view-frame', 'sheet-follow', 'layout', 'layout-tip', 'tip', 'surface', 'replica', 'membership', 'changes', 'traces', 'catch-up', 'catch-up-steps', 'thumbs', 'thumb-keep', 'thumb-still', 'ghosts', 'canvas-wires', 'authorize', 'text', 'fields', 'field-edit', 'look', 'look-marks', 'panes', 'pane-drag', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'tab-count', 'tab-life', 'pane-land', 'pane-web', 'picker-rank', 'term-pick', 'look-switch', 'view-panel', 'canvas-menu', 'only-words', 'term-kinds'];
+const APP_MODULES = ['doc-ref', 'base', 'words', 'body', 'home', 'held', 'held-card', 'item-held', 'canvas', 'pinch', 'query-bar', 'find', 'find-choices', 'menu-place', 'draft', 'note-count', 'item', 'item-doc', 'item-read', 'item-links', 'item-sections', 'screens', 'attention', 'nav', 'query', 'query-base', 'style-code', 'pan-zoom', 'live', 'settle', 'week', 'time', 'workspace', 'workspace-cards', 'workspaces-card', 'connections-card', 'members-card', 'styles-card', 'themes-card', 'agents-card', 'connect-agent', 'plates', 'theme', 'token-piece', 'token-ask', 'turns', 'findings', 'canvases', 'diagram', 'start', 'limits-card', 'doc-lens', 'marks', 'reader-frame', 'view-frame', 'sheet-follow', 'layout', 'layout-tip', 'tip', 'surface', 'replica', 'membership', 'changes', 'traces', 'catch-up', 'catch-up-steps', 'thumbs', 'thumb-keep', 'thumb-still', 'ghosts', 'canvas-wires', 'authorize', 'text', 'fields', 'field-edit', 'look', 'look-marks', 'panes', 'pane-drag', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'tab-count', 'tab-life', 'pane-land', 'pane-web', 'picker-rank', 'term-pick', 'look-switch', 'view-panel', 'canvas-menu', 'only-words', 'term-kinds'];
 
 export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
@@ -18,7 +18,6 @@ export const UI_FILES: Record<string, string> = {
   '/shell.css': 'shell.css',
   '/flow.css': 'flow.css',
   '/diagram.css': 'diagram.css',
-  '/list.css': 'list.css',
   '/notes.css': 'notes.css',
   '/story.css': 'story.css',
   '/menus.css': 'menus.css',
@@ -44,8 +43,6 @@ export const UI_FILES: Record<string, string> = {
   '/source-tag.js': 'source-tag.js',
   // three.js as its authors build it (MIT), offered to a layout's code; loaded only when one asks for it.
   '/three.js': 'three.module.min.js',
-  // WebCola as its authors build it (MIT, ui/cola.LICENSE), wrapped as a module, offered to a layout's code (core's cola).
-  '/cola.js': 'cola.module.min.js',
 };
 
 const UI_DIR = join(import.meta.dirname, '..', 'ui');
@@ -79,7 +76,7 @@ async function current() {
   const text = new Map<string, string>();
   for (const [f, body] of raw) {
     if (f.endsWith('.html')) text.set(f, body.replace(/\b(href|src)="(\/[\w.-]+)"/g, (all, attr, path) => (named(path) ? `${attr}="${at(path)}"` : all)));
-    else if (f.endsWith('.js') && f !== 'three.module.min.js' && f !== 'cola.module.min.js')
+    else if (f.endsWith('.js') && f !== 'three.module.min.js')
       // An import of another of the UI's modules, or a quoted address of one of its files ('/draw.html').
       text.set(f, body.replace(/(\bfrom\s*|\bimport\s*\(\s*)?(['"])(\.?\/)([\w.-]+)\2/g, (all, imp, q, dot, name) => ((dot === '/' || imp) && named(`/${name}`) ? `${imp ?? ''}${q}${dot}${name}?v=${version}${q}` : all)));
     else text.set(f, body);
@@ -95,7 +92,7 @@ export const uiVersion = async () => (await current()).version;
 function reached(text: Map<string, string>, from: string[]): string[] {
   const seen = new Set<string>();
   const visit = (path: string) => {
-    if (seen.has(path) || !named(path) || !path.endsWith('.js') || path === '/three.js' || path === '/cola.js') return;
+    if (seen.has(path) || !named(path) || !path.endsWith('.js') || path === '/three.js') return;
     seen.add(path);
     for (const m of (text.get(UI_FILES[path]) ?? '').matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*)['"]\.?(\/[\w.-]+\.js)\?v=/g)) visit(m[1]);
   };

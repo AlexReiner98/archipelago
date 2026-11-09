@@ -28,10 +28,16 @@ const mod = (a) => ((a % QUARTERS) + QUARTERS) % QUARTERS;
  * one way and s more c the other; λ are the shortest paths it leaves.
  */
 export function tension(n, terms) {
-  const supply = new Array(n).fill(0), arcs = [];
+  const supply = new Array(n).fill(0), arcs = [], same = new Map();
+  // Arcs with the same ends and cost are one arc holding what both hold: the same flow, far fewer arcs to search.
+  const put = (from, to, cap, cost) => {
+    const key = `${from} ${to} ${cost}`, had = same.get(key);
+    if (had) had.cap += cap;
+    else { const a = { from, to, cap, cost }; same.set(key, a); arcs.push(a); }
+  };
   const arc = (from, to, cap, cost) => {
     // An arc that pays to run is run full from the start, and what is left of it runs back.
-    if (cost < 0) { supply[from] -= cap; supply[to] += cap; arcs.push({ from: to, to: from, cap, cost: -cost }); } else arcs.push({ from, to, cap, cost });
+    if (cost < 0) { supply[from] -= cap; supply[to] += cap; put(to, from, cap, -cost); } else put(from, to, cap, cost);
   };
   for (const { from, to, c, w, s = 0 } of terms) {
     if (!w || from === to) continue;
@@ -123,9 +129,10 @@ function costs(emb, F, S, nA, h0) {
 /**
  * The heading every dart leaves its tail with (`out`, N E S W as 0 to 3), the turns along every edge from its `from`
  * (`turns`), how many there are on wires (`bends`), and how many border edges turn otherwise than the network had them
- * (`bent`), which leaves an island no rectangle.
+ * (`bent`), which leaves an island no rectangle. The polish past the first solves asks `afford(work)` of the picture's
+ * budget first, each try a solve over every term at every node: once it says no, the turns found stand.
  */
-export function headings(emb, F, S) {
+export function headings(emb, F, S, afford = () => true) {
   const { tail, leaving } = F, D = tail.length, N = emb.nodes.length;
   const nA = emb.edges.map((_, k) => S.rights[k] - S.lefts[k]), h0 = frame(F, S, nA);
   // Each box with sides asked is held turned so they face as asked.
@@ -145,9 +152,10 @@ export function headings(emb, F, S) {
     const whole = tension(N, terms.flatMap((e) => wholeTurns(val(e), e.w, e.s).map((t) => ({ from: e.from, to: e.to, ...t }))));
     turn.forEach((t, v) => { turn[v] = t + QUARTERS * whole[v]; });
   };
-  /** The two solves in turn until neither gains: every other node's turn with the boxes held, then whole turns. */
+  /** The two solves in turn until neither gains: every other node's turn with the boxes held, then whole turns. Each
+   *  round past the first spends from the picture's budget. */
   const settle = () => {
-    for (let last = Infinity, now = price(); now < last; last = now, now = price()) {
+    for (let last = Infinity, now = price(), round = 0; now < last && (!round || afford(2 * terms.length * N)); last = now, now = price(), round++) {
       const more = tension(index.size + 1, terms.map((e) => ({ from: at(e.from), to: at(e.to), c: val(e), w: e.w, s: e.s })));
       index.forEach((i, v) => { turn[v] += more[i]; });
       lift();
@@ -171,6 +179,7 @@ export function headings(emb, F, S) {
     for (const v of new Set(doubled.flatMap((e) => e.nodes ?? [e.from, e.to]).filter((u) => !held.has(u)))) {
       const before = turn.slice(), was = price();
       let better = false;
+      if (!afford(terms.length * N)) { gained = false; break; }
       for (let t = 1; t < QUARTERS && !better; t++) {
         turn.splice(0, N, ...before);
         for (const u of barOf[v]) turn[u] += t;

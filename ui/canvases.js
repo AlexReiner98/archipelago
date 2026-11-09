@@ -1,10 +1,9 @@
 // Saved canvases (task e_uq77ps44): a flat lens and a style kept on the map as an item of core's `lens` type, so a
 // person opens it anywhere and it draws the same. Its id travels in the address beside the lens (`canvas=`, ui/query.js),
 // so what is moved on it goes to its own places (the places stream, under its id, apart from the map's) and the bar
-// names it. The bar switches between them and keeps what is up as one; Home lists them, one line each.
-// The views kept before the flat lens were translated into such canvases when the workspace opened
-// (src/query-saved.ts); a view kept about an item is listed on Home under the views of items, folded, and one a
-// document brings in is a part of that page, in neither list unless it is up.
+// names it. The bar switches between them and keeps what is up as one; Home lists them, one line each, as one list
+// (the owner, 9 Nov 2026): the kept, newest first, then agents' working views folded; what a pack ships is found by
+// its name. One a document brings in is a part of that page, in neither list unless it is up.
 
 import { api, ask, h, hooks, idsOf, state, tell, wordsOf, withIds } from './base.js';
 import { addressOf, flatView, stepsOf } from './query.js';
@@ -28,7 +27,7 @@ export function savedCanvases(fresh = false) {
       const said = new Map((views?.pictures ?? []).map((p) => [p.lens, p]));
       // A working view about what has closed is retired with it (src/saved-views.ts).
       const ended = new Set(views?.ended ?? []);
-      const marked = rows.filter((r) => !ended.has(r.id)).map((r) => ({ ...r, ofItem: Boolean(said.get(r.id)?.of), of: said.get(r.id)?.of ?? null, project: said.get(r.id)?.project ?? null, note: said.get(r.id)?.note ?? null, cannot: said.get(r.id)?.cannot ?? null, inDocument: Boolean(said.get(r.id)?.document) }));
+      const marked = rows.filter((r) => !ended.has(r.id)).map((r) => ({ ...r, note: said.get(r.id)?.note ?? null, cannot: said.get(r.id)?.cannot ?? null, inDocument: Boolean(said.get(r.id)?.document) }));
       const kept = new Set(rows.map((r) => r.props?.preset).filter(Boolean));
       // A pack's view of one item (`on` its types) is offered on that item's page alone (viewsOn).
       const offered = (state.schema?.canvases ?? []).filter((p) => !kept.has(p.id) && !p.on?.length).map((p) => ({ id: p.id, title: p.title, preset: true, props: { ...p.props, preset: p.id } }));
@@ -39,21 +38,6 @@ export function savedCanvases(fresh = false) {
 
 /** The views a person picks from: not those a document brings in, unless up (`up`, an id). */
 const pickable = (all, up) => all.filter((c) => !c.inDocument || c.id === up);
-
-/**
- * The views in their groups (task e_v3crze82): the workspace's own first (about nothing, and the packs'), then those of
- * each project by its name, then those of items in no project. Each group keeps the order the views came in.
- */
-const groupsOf = (views) => {
-  const groups = new Map([['', { title: 'Workspace', views: [] }]]);
-  for (const c of views) {
-    const key = !c.ofItem ? '' : c.project?.id ?? '~';
-    if (!groups.has(key)) groups.set(key, { title: !c.ofItem ? 'Workspace' : c.project?.title ?? 'Other items', views: [] });
-    groups.get(key).views.push(c);
-  }
-  const [workspace, ...rest] = [...groups.values()];
-  return [workspace, ...rest.sort((a, b) => Number(a.title === 'Other items') - Number(b.title === 'Other items') || a.title.localeCompare(b.title, undefined, { numeric: true }))];
-};
 
 /** What a saved canvas draws: its filter, its walk and its limit; and its style, with its own id. */
 export function viewParts(item) {
@@ -201,11 +185,9 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
   listed.then((all) => {
     const current = upOf(all, lens, style);
     const changed = current && edited(current, lens, style);
-    // Not saved, it is named as its tab and its pane are: by what its filter finds. The item up is what the view is
-    // about, else the first item its filter names.
+    // Not saved, it is named as its tab and its pane are: by what its filter finds.
     const label = current ? current.title : isHome ? 'Home' : filterSaid(lens.filter, () => {}) || 'View';
-    const item = current?.of?.id ?? (lens.filter?.find ?? []).map((t) => /^id (e_[a-z0-9]+)$/.exec(t)?.[1]).find(Boolean) ?? null;
-    const pick = viewPicker({ all: pickable(all, current?.id), current, label, changed, item, isHome, at: canvasAt, parts: viewParts, open, title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not saved: Save keeps it' });
+    const pick = viewPicker({ all: pickable(all, current?.id), current, label, changed, isHome, at: canvasAt, parts: viewParts, open, title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not saved: Save keeps it' });
     // In a browser's order: back and forward, then the canvas up, as its address, and its style, with Save beside them, Split, and the canvas's menu at the end.
     const own = hooks.paneButtons?.() ?? [];
     const travel = own.filter((b) => b.classList.contains('q-travel'));
@@ -235,27 +217,30 @@ const row = (c, now) =>
     thumbOf({ id: c.id, ...viewParts(c) }),
     h('a', { class: 'gist', href: canvasAt(c), title: c.title }, c.title),
     h('span', { class: 'muted small gist', title: lensWords(viewParts(c).lens) }, lensWords(viewParts(c).lens)),
-    working(c) && h('span', { class: 'muted small', title: 'Working: an agent’s view, retired with what it is about unless you keep it' }, 'working'),
     c.cannot && h('span', { class: 'muted small', title: `It cannot draw here: ${c.cannot}` }, 'cannot draw'),
     c.id === now && h('span', { class: 'mark ok', title: 'The view up now' }, 'up'),
   );
 
-/** Home's list: the saved canvases of the workspace, then, folded, those kept as views of an item. */
+/** Newest first: a view changed or kept lately is the one most likely looked for. */
+const newest = (a, b) => String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? ''));
+
+/** Home's list: the views kept, newest first; agents' working views folded under them; what packs ship folded last. */
 export async function canvasesPiece(host, title) {
   const all = await savedCanvases(true);
   if (!host.isConnected) return;
   const now = up;
   const listed = pickable(all, now);
-  const [workspace, ...projects] = groupsOf(listed);
+  const kept = listed.filter((c) => !c.preset && c.status !== 'working').sort(newest);
+  const fold = (views, name, tip) =>
+    views.length > 0 && h('details', { class: 'old-views', ...(views.some((c) => c.id === now) && { open: true }) }, h('summary', { class: 'muted small', title: tip }, `${name} (${views.length})`), h('ul', { class: 'rows' }, views.map((c) => row(c, now))));
   host.replaceChildren(
     h(
       'section',
       { class: 'card wide canvases', style: 'margin-bottom: var(--space-8); min-width: 0' },
       h('header', {}, h('h2', {}, title)),
-      h('div', { class: 'muted small', title: 'Views about nothing: the workspace’s own' }, workspace.title),
-      workspace.views.length ? h('ul', { class: 'rows' }, workspace.views.map((c) => row(c, now))) : h('div', { class: 'empty', title: 'Save in the bar keeps what is up as a view' }, 'None saved yet.'),
-      // Those of each project, folded, the one holding the view up open.
-      projects.map((g) => h('details', { class: 'old-views', ...(g.views.some((c) => c.id === now) && { open: true }) }, h('summary', { class: 'muted small', title: `Views kept about ${g.title} and what is in it` }, `${g.title} (${g.views.length})`), h('ul', { class: 'rows' }, g.views.map((c) => row(c, now))))),
+      kept.length ? h('ul', { class: 'rows' }, kept.map((c) => row(c, now))) : h('div', { class: 'empty', title: 'Save in the bar keeps what is up as a view' }, 'None saved yet.'),
+      fold(listed.filter(working).sort(newest), 'Agents’', 'Agents’ views: each retires with what it is about, or after two weeks untouched, unless you keep it'),
+      fold(listed.filter((c) => c.preset), 'From packs', 'Views the packs ship: Save one under its own name to keep your version'),
     ),
   );
 }

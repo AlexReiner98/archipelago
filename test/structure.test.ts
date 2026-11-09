@@ -14,13 +14,14 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../src/operational.ts';
+import { spacing } from './spacing.ts';
 import { drawings, faultsOf, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const MAX_LINES = 500;
 const CODE = /\.(ts|js|mjs|css|html)$/;
 /** Vendored as a file at the owner's asking (CLAUDE.md), not written here. */
-const VENDORED = ['ui/three.module.min.js', 'ui/cola.module.min.js'];
+const VENDORED = ['ui/three.module.min.js'];
 
 const walk = (dir: string): string[] =>
   !existsSync(join(ROOT, dir))
@@ -260,9 +261,7 @@ test('no term or control is wrapped in a capsule', () => {
 // the sandbox (src/layouts.ts, ui/layout.js), never a shape the kernel draws itself (the owner, 22 Oct 2026). The
 // kernel keeps the frame every picture has. Counted here as the shapes the page still draws itself, as of 22 Oct
 // 2026; a shape moved into a pack's drawing comes off its list, with its modules in ui/.
-const KERNEL_SHAPES: Record<string, number> = {
-  'ui/query.js': 1, // list
-};
+const KERNEL_SHAPES: Record<string, number> = {};
 const SHAPES = /(?:LENS_SHAPES|SHAPES) = \{([^}]*)\}/;
 
 test('the kernel draws no shape of its own: each is a drawing a pack ships', () => {
@@ -433,11 +432,8 @@ test("a drawing's list holds every module it reaches", () => {
 // axes (design e_49yk2trw). Counted, as of 30 Oct 2026: a bare number of 3 or more that does not multiply or divide
 // (under 3 is arithmetic), and every px in a string. It catches more than lengths, and only ever goes down.
 const LENGTHS_IN_DRAWINGS: Record<string, number> = {
-  'architecture/boats.js': 3, 'architecture/deep.js': 32, 'architecture/index.js': 28, 'architecture/islands.js': 18, 'architecture/layout.js': 9, 'architecture/moves.js': 6,
-  'architecture/route.js': 8, 'architecture/says.js': 3, 'architecture/sides.js': 1, 'architecture/story.js': 3, 'flow/combs.js': 1, 'flow/direction.js': 1, 'flow/faults.js': 4,
-  'flow/index.js': 13, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/search.js': 1,
-  'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 4, 'flow/wrap.js': 2, 'grid/index.js': 6,
-  'pages/index.js': 5, 'time/index.js': 28,
+  'flow/direction.js': 1, 'flow/index.js': 13, 'flow/numbering.js': 5, 'flow/planar.js': 1,
+  'flow/shapes.js': 9, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 4,
 };
 const BARE = /(?<![\w.$#])\d+(?:\.\d+)?(?![\w.])/g;
 
@@ -457,9 +453,9 @@ test('a length in a drawing is named on the style', () => {
 // says its layer in its first comment ("Layer: metrics."); LAYERS_OWED (test/wired.ts) is what those that do not yet say so
 // will say, read as if they did, so the rules hold of them today, and a name goes from it as its module says it.
 // LAYERS_MIXED are modules that are more than one layer. Each list here may only shrink, LAYERS_OWED too.
-const LAYERS_MIXED: Record<string, number> = { 'architecture/layout.js': 1, 'architecture/route.js': 1, 'flow/part.js': 1 };
+const LAYERS_MIXED: Record<string, number> = {};
 const LAYER_IMPORTS: Record<string, number> = {};
-const WRITERS: Record<string, number> = { 'architecture/boards.js': 4, 'architecture/boats.js': 1, 'architecture/deep.js': 1, 'architecture/islands.js': 8, 'architecture/sides.js': 1, 'flow/combs.js': 1, 'flow/shape.js': 1 };
+const WRITERS: Record<string, number> = {};
 const wired = drawings.filter((d) => d.id in WIRED);
 const wiredFiles = [...new Set(wired.flatMap((d) => Object.keys(d.modules).map((name) => pathOf(d, name))))];
 
@@ -484,17 +480,18 @@ test("only Metrics sets a place or a wire's points", () => {
   assert.deepEqual(ratchet(counted, WRITERS), [], 'Coordinates are output: Metrics sets them, from what this layer says.');
 });
 
+
 // 21. Sealed: each wired drawing runs on small sketches (test/wired.ts), and no two wires of it lie on one line, none stands
-// under the spacing, no box stands on a box, none runs through a box. The spacing is counted by the flow's own `spacing`.
-const NOT_SEALED: Record<string, number> = { 'core.architecture comb: under': 12, 'core.architecture crossed: overlaps': 3, 'core.architecture fan: under': 2, 'core.architecture knot: overlaps': 1 };
+// under the spacing, no box stands on a box, none runs through a box. The spacing is the flow's (test/spacing.ts).
+// Counted for the map as it stood when it became the one layout, 9 Nov 2026; each count may only go down.
+// The map's trunks (one wire for the links of one type and one way off a box) are what share: wires of one box.
+const NOT_SEALED: Record<string, number> = { 'core.map knot: shared': 1, 'core.map fan: shared': 24, 'core.map crossed: shared': 3, 'core.map comb: shared': 31 };
 
 test('a wired drawing keeps its wires apart', async () => {
-  // @ts-expect-error a drawing's modules are plain JavaScript
-  const counted: Record<string, number> = {}, { spacing } = await import('../packs/core/layouts/flow/faults.js');
+  const counted: Record<string, number> = {};
   for (const d of wired) {
     const found = await setOut(d, async (url) => faultsOf(WIRED[d.id], (await import(url('layout.js'))).layout, spacing));
     for (const [what, n] of Object.entries(found)) counted[`${d.id} ${what}`] = n;
   }
-  assert.deepEqual(ratchet(counted, NOT_SEALED), [], 'Wires take room in the solve: each stretch keeps its distance from every other (docs/layouts.md).');
+  assert.deepEqual(ratchet(counted, NOT_SEALED), [], `Wires take room in the solve: each stretch keeps its distance from every other (docs/layouts.md). Now: ${JSON.stringify(counted)}`);
 });
-

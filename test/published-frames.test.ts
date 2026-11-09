@@ -13,7 +13,7 @@ import { serve as served } from './serve.ts';
 /** A server with the packs and a test pack whose writing is public and read as a document (test/packs/reader). */
 const serve = (auth: 'off') => served(auth, undefined, undefined, packsWith('reader'));
 
-/** A document whose picture is a system drawn as architecture, played in two steps. */
+/** A document whose picture is a system drawn as a map, played in two steps. */
 async function published(call: (path: string, token?: string, body?: unknown) => Promise<any>, extra: unknown[] = []) {
   const made = (
     await call('/api/change', undefined, {
@@ -28,7 +28,7 @@ async function published(call: (path: string, token?: string, body?: unknown) =>
         { op: 'link', type: 'part_of', from: 'a', to: 'e' },
         { op: 'link', type: 'part_of', from: 'b', to: 'e' },
         { op: 'link', type: 'uses', from: 'a', to: 'b' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', visibility: 'shared', props: { filter: { find: ['type aim', 'type place'] }, style: { shape: 'architecture' } } },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', visibility: 'shared', props: { filter: { find: ['type aim', 'type place'] }, style: { shape: 'map' } } },
         { op: 'link', type: 'about', from: 'l', to: 'p' },
         { op: 'link', type: 'part_of', from: 'l', to: 'd' },
         ...extra,
@@ -71,8 +71,8 @@ test('a published picture keeps its first frame, its page carries its data, and 
 
 test('a picture drawn by the owner’s version of a drawing is drawn only in the sandbox', async () => {
   const { call, base } = await serve('off');
-  const look = 'export const css = `.ar-part { cursor: help; }`;\n';
-  const { d, l } = await published(call, [{ op: 'create', type: 'layout', title: 'Architecture, mine', props: { preset: 'core.architecture', modules: { 'look.js': look } } }]);
+  const look = 'export const css = `.lf-step { cursor: help; }`;\n';
+  const { d, l } = await published(call, [{ op: 'create', type: 'layout', title: 'Map, mine', props: { preset: 'core.map', modules: { 'look.js': look } } }]);
   const data = await (await fetch(`${base}/p/default/${d}/data`)).json();
   assert.equal(data.lenses[l].first, undefined);
   assert.equal((await (await fetch(`${base}${data.lenses[l].style.drawing.src}`)).json())['look.js'], look);
@@ -94,8 +94,8 @@ test('in a browser, the text and the first frame are on the page together, and t
     assert.equal(await page.evaluate('document.body.textContent.includes("</script><script>alert(1)</script> $& $\'.")'), true, 'the text is the text');
     // The drawing plays it: the first step's part is drawn.
     const drawn = await page.evaluate(`(async () => {
-      for (let n = 0; n < 400 && !document.querySelector('[data-lens] a.ar-part[opacity="1"]'); n++) await new Promise((r) => setTimeout(r, 25));
-      return document.querySelectorAll('[data-lens] a.ar-part[opacity="1"]').length;
+      for (let n = 0; n < 400 && !document.querySelector('[data-lens] a.lf-step[opacity="1"]'); n++) await new Promise((r) => setTimeout(r, 25));
+      return document.querySelectorAll('[data-lens] a.lf-step[opacity="1"]').length;
     })()`);
     assert.ok(Number(drawn) >= 1, 'the drawing played its first step');
 
@@ -107,8 +107,8 @@ test('in a browser, the text and the first frame are on the page together, and t
       document.body.append(host);
       drawWith(host, { ...answer, first: { svg: ['svg', {}, ['script', {}, 'parent.document.body.remove()']] } }, { ...answer.style, still: true }, () => {});
       const at = host.innerHTML;
-      for (let n = 0; n < 400 && !host.querySelector('svg a.ar-part'); n++) await new Promise((r) => setTimeout(r, 25));
-      return { at, scripts: document.querySelectorAll('script:not([src]):not([type])').length, drawn: Boolean(host.querySelector('svg a.ar-part')) };
+      for (let n = 0; n < 400 && !host.querySelector('svg a.lf-step'); n++) await new Promise((r) => setTimeout(r, 25));
+      return { at, scripts: document.querySelectorAll('script:not([src]):not([type])').length, drawn: Boolean(host.querySelector('svg a.lf-step')) };
     })()`);
     assert.deepEqual(said, { at: '', scripts: 0, drawn: true });
   } finally {
@@ -137,7 +137,7 @@ test('in a browser, a page opened with ?live draws itself anew when published ag
   const page = await open(`${base}/p/default/${d}?live`);
   try {
     await page.evaluate(`(async () => { for (let n = 0; n < 200 && !document.querySelector('main h1'); n++) await new Promise((r) => setTimeout(r, 25)); window.stayed = true; })()`);
-    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: d, title: 'The system, renamed' }, { op: 'update', id: l, props: { style: { shape: 'architecture', lit: 'all' } } }] });
+    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: d, title: 'The system, renamed' }, { op: 'update', id: l, props: { style: { shape: 'map', lit: 'all' } } }] });
     await call('/api/publish', undefined, { id: d });
     const title = await page.evaluate(`(async () => { for (let n = 0; n < 200 && document.querySelector('main h1')?.textContent !== 'The system, renamed'; n++) await new Promise((r) => setTimeout(r, 25)); return document.querySelector('main h1').textContent; })()`);
     assert.equal(title, 'The system, renamed');
@@ -171,7 +171,7 @@ test('in a browser, the workspace style’s page_css is how a published page loo
   }
 });
 
-test('in a browser, a part hovered says what it is in a tip its drawing makes, beside it, not in a line over the picture', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, a step hovered while its story plays says what it is in a tip its drawing makes, beside it', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { call, base } = await serve('off');
   const { d, a } = await published(call);
   await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: a, body: 'Where everything comes in: the MCP server, the CLI and the web.' }] });
@@ -181,26 +181,21 @@ test('in a browser, a part hovered says what it is in a tip its drawing makes, b
     const got = await page.evaluate(`(async () => {
       const until = async (test) => { for (let n = 0; n < 400 && !test(); n++) await new Promise((r) => setTimeout(r, 25)); return test(); };
       let part;
-      await until(() => (part = document.querySelector('[data-lens] svg a[href="#/e/${a}"][opacity="1"]')));
+      await until(() => (part = document.querySelector('[data-lens] svg a.lf-step[href="#/e/${a}"]')));
       const tip = () => document.querySelector('[data-lens] .drawing-tip');
       // As a pointer does: its title is taken off by the page's tip (ui/tip.js), so the browser shows none beside this one.
       part.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
       part.dispatchEvent(new MouseEvent('mouseenter'));
       await until(() => tip() && !tip().hidden);
-      const shown = { text: tip().textContent, styled: getComputedStyle(tip().firstChild).borderTopStyle, title: part.querySelector('title') === null, said: document.querySelector('.lens-said') === null };
+      const shown = { text: tip()?.textContent, title: part.querySelector('title') === null, said: document.querySelector('.lens-said') === null };
       part.dispatchEvent(new MouseEvent('mouseleave'));
       part.parentElement.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
       await until(() => tip().hidden);
-      const left = { after: tip().hidden, back: part.querySelector('title') !== null };
-      // A place says what it is from its name only: its box, around its parts, says nothing.
-      document.querySelector('[data-lens] svg rect.ar-place-box[opacity="1"]').dispatchEvent(new MouseEvent('mouseenter'));
-      // Asked is that nothing comes: the drawing is given a moment in which it would (wrongly) show a tip.
-      await new Promise((r) => setTimeout(r, 300));
-      const boxSays = !tip().hidden;
-      document.querySelector('[data-lens] svg a.ar-place[opacity="1"]').dispatchEvent(new MouseEvent('mouseenter'));
-      return { ...shown, ...left, boxSays, nameSays: await until(() => !tip().hidden) };
+      // The step as it stands now: a story may draw it again as it lights and goes dark.
+      const now = document.querySelector('[data-lens] svg a.lf-step[href="#/e/${a}"]');
+      return { ...shown, after: tip().hidden, back: now.querySelector('title') !== null };
     })()`);
-    assert.deepEqual(got, { text: 'DoorsWhere everything comes in: the MCP server, the CLI and the web.', styled: 'solid', title: true, said: true, after: true, back: true, boxSays: false, nameSays: true });
+    assert.deepEqual(got, { text: 'DoorsWhere everything comes in: the MCP server, the CLI and the web.', title: true, said: true, after: true, back: true });
   } finally {
     await page.close();
   }

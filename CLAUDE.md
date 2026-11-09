@@ -151,18 +151,13 @@ reply ending) is `docs/agents.md`.
 - **The UI has no build step and no framework.** Plain files in `ui/`.
 - **Dependencies stay at four** (`@electric-sql/pglite`,
   `@modelcontextprotocol/sdk`, `zod`, and since 18 Oct 2026 `pg`, for a
-  Postgres server) unless the owner agrees to another. Two libraries are kept as files, not
-  dependencies. One is `ui/three.module.min.js` (three.js 0.160, MIT, since 13 Oct
+  Postgres server) unless the owner agrees to another. One library is kept as a file, not
+  a dependency: `ui/three.module.min.js` (three.js 0.160, MIT, since 13 Oct
   2026 at the owner's asking), offered to a layout's drawing code and to
   a drawing that paints on a surface (`ui/surface.js`, since 23 Oct 2026, for
   the landing page's relief), loaded only when one asks for it, in the
-  sandbox. The app's own pages do not use it. The other is
-  `ui/cola.module.min.js` (WebCola 3.4.0, MIT, its licence in
-  `ui/cola.LICENSE`, since 8 Nov 2026 at the owner's word): the authors'
-  `cola.min.js` wrapped as a module, not edited. Core's cola layout
-  (`packs/core/layouts/cola/`) loads it through the drawing's tools
-  (`cola()` in `ui/draw-marks.js`), so it runs only in the drawing's
-  sandboxed worker; nothing else loads it.
+  sandbox. The app's own pages do not use it. WebCola went with the cola
+  layout on 9 Nov 2026 (git tag `archive/layouts-2026-11-09`).
 - **A layout's code runs behind two walls, and only there.** A layout item
   (core's `layout` type, apart from `style` since 4 Nov 2026) carries a drawing
   module (`code`). It runs in a worker inside the sandboxed

@@ -3,7 +3,6 @@ import { kinds, replicate } from './live.js';
 import { unfollow } from './replica.js';
 import { drawWith, layouts, warmLayouts } from './layout.js';
 import { dress, layered } from './query-base.js';
-import { drawList } from './list.js';
 import { drawCode } from './style-code.js';
 import { saidDrawn } from './look.js';
 import { ago, idsAsLinks, isA, titles } from './words.js';
@@ -24,7 +23,7 @@ export function storyPart(data) {
   const found = data.beats.find((b) => b.n === data.finding);
   if (!found) return '';
   // What the finding is about, and nothing else: no walk.
-  const picture = found.about.length ? flatView({ lens: { filter: { find: found.about.map((id) => `id ${id}`), not: [] } }, style: { shape: 'list' }, key: `story:${data.run.id}` }) : h('div', { hidden: true });
+  const picture = found.about.length ? flatView({ lens: { filter: { find: found.about.map((id) => `id ${id}`), not: [] } }, style: {}, key: `story:${data.run.id}` }) : h('div', { hidden: true });
   // The finding names items by their ids; they read as names once the picture has said what each is called.
   const said = h('p', { class: 'finding' }, idsAsLinks(found.said));
   picture.ready?.then(() => {
@@ -84,9 +83,6 @@ export const keptStyle = (key) => {
     return {};
   }
 };
-
-/** The shapes the kernel draws. Each reads only what a lens answers with. */
-export const LENS_SHAPES = { list: drawList };
 
 // ---- The flat lens: a filter, a walk and a limit (decision e_sdsaxxq4) ------------------------------------------
 
@@ -242,11 +238,12 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     for (const name of Object.keys(chosen)) delete chosen[name];
     Object.assign(chosen, layered(look.style, keptStyle(key), style), { noLit: true });
     dress(body, chosen);
-    const drawn = chosen.drawing && (chosen.drawing.shape ?? chosen.shape) === chosen.shape;
+    // The server names the drawing a pack ships for the shape asked, or the first it ships for one no pack draws.
+    const drawn = Boolean(chosen.drawing);
     const coded = typeof chosen.code === 'string' && chosen.code.trim();
-    (coded ? drawCode : drawn ? drawWith : (LENS_SHAPES[chosen.shape] ?? LENS_SHAPES.list))(body, asDrawn(shown), chosen, keep, place, look.coder);
-    // A drawing or a layout's code says when it has drawn; a shape drawn here has drawn now.
-    if (!coded && !drawn) saidDrawn(body, 'drawn');
+    if (coded || drawn) return void (coded ? drawCode : drawWith)(body, asDrawn(shown), chosen, keep, place, look.coder);
+    body.replaceChildren(h('div', { class: 'empty', title: 'No pack ships a layout this workspace can draw with' }, 'Nothing draws this view.'));
+    saidDrawn(body, 'drawn');
   };
   const load = async (refreshing = false) => {
     if (lens.view) return loadView(refreshing);

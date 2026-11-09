@@ -1,12 +1,16 @@
 // Saved views: every picture kept on the map, named, with what it is a picture of, so a person finds it without
 // knowing which item it hangs on (docs/ui-strategy.md). A picture is a kept lens, named by its own title; the shape
 // it is drawn in comes from the style or layout it names, else one kept about it. The kept first, then the newest. A working view lives as long as what it is about: once all of that has closed, it is retired with
-// it, and left out (task e_gkv58kqb).
+// it, and left out (task e_gkv58kqb); so is one nobody has touched for WORKING_DAYS (the owner, 9 Nov 2026: views
+// were piling up).
 
 import { keptOf } from './query-kept.ts';
 import { bringersIn, viewQuery } from './query-saved.ts';
 import { readFlat } from './query-flat.ts';
 import type { Archipelago } from './pelago.ts';
+
+/** How long a working view nobody keeps or changes stays among the views. */
+const WORKING_DAYS = 14;
 
 export interface Picture {
   /** The lens: the picture opens with it, from what it is of. */
@@ -34,12 +38,13 @@ export async function savedViews(l: Archipelago, input: { limit?: number } = {})
   const ofIds = [...new Set(all.flatMap((x) => x.about))];
   const { rows } = ofIds.length ? await l.db.query<{ id: string; title: string; type: string; is_open: boolean }>(`select id, title, type, is_open from entity where id = any($1::text[]) and archived_at is null`, [ofIds]) : { rows: [] };
   const items = new Map(rows.map((r) => [r.id, r]));
-  const { rows: lives } = all.length ? await l.db.query<{ id: string; status: string; note: string | null }>(`select id, status, left(split_part(btrim(body), E'
+  const { rows: lives } = all.length ? await l.db.query<{ id: string; status: string; note: string | null; stale: boolean }>(`select id, status, updated_at < now() - make_interval(days => ${WORKING_DAYS}) as stale, left(split_part(btrim(body), E'
 ', 1), 200) as note from entity where id = any($1::text[])`, [all.map((x) => x.id)]) : { rows: [] };
   const notes = new Map(lives.filter((r) => r.note).map((r) => [r.id, r.note!]));
   const kept = new Set(lives.filter((r) => r.status === 'kept').map((r) => r.id));
-  // A working view about items that have all closed (or gone) is retired with them.
-  const ended = all.filter((x) => !kept.has(x.id) && x.about.length > 0 && x.about.every((id) => !items.get(id)?.is_open)).map((x) => x.id);
+  const stale = new Set(lives.filter((r) => r.stale).map((r) => r.id));
+  // A working view about items that have all closed (or gone) is retired with them, and one left untouched retires too.
+  const ended = all.filter((x) => !kept.has(x.id) && (stale.has(x.id) || (x.about.length > 0 && x.about.every((id) => !items.get(id)?.is_open)))).map((x) => x.id);
   const lenses = all.filter((x) => !ended.includes(x.id));
   // The layouts the views name that the map has: one named and gone draws nothing.
   const asked = [...new Set(lenses.map((x) => (x.props.style as Record<string, unknown> | undefined)?.style).filter((s): s is string => typeof s === 'string'))];
