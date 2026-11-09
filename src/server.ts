@@ -407,7 +407,7 @@ if (import.meta.main) {
   const rootDir = join(config.dataDir, '..', 'workspaces');
   // Before anything reads a secret: where the key they are sealed with is kept.
   configureSecrets(rootDir, !config.databaseUrl);
-  const workspaces = new Workspaces({ dataDir: config.dataDir, databaseUrl: config.databaseUrl, rootDir, packsDir: config.packsDir, packs: config.packs, policy: config.policy, backupsDir: config.backup ? config.backup.dir : undefined });
+  const workspaces = new Workspaces({ dataDir: config.dataDir, databaseUrl: config.databaseUrl, rootDir, packsDir: config.packsDir, packDirs: config.packDirs, packs: config.packs, policy: config.policy, backupsDir: config.backup ? config.backup.dir : undefined });
   if (config.launch) configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
 
   // One server per data folder, whatever port each is on: two of them writing

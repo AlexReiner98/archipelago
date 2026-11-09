@@ -26,10 +26,10 @@ export interface Layout {
 const NAME = /^[a-z][a-z0-9_-]*\.js$/;
 const read = new Map<string, string>();
 /** A pack's drawing's modules, read from its folder once. */
-function modulesOf(dir: string, pack: string, d: LayoutDef): Record<string, string> {
+function modulesOf(folder: string, d: LayoutDef): Record<string, string> {
   return Object.fromEntries(
     Object.entries(d.modules).map(([name, file]) => {
-      const path = join(dir, pack, file);
+      const path = join(folder, file);
       if (!read.has(path)) read.set(path, readFileSync(path, 'utf8'));
       return [name, read.get(path)!];
     }),
@@ -46,7 +46,7 @@ const hashOf = (modules: Record<string, string>) => createHash('sha256').update(
  * layouts kept with a drawing's id as preset). A style whose layout has code is drawn by that, and a shape no pack draws by the kernel.
  */
 export function layoutFor(
-  packs: { dir: string; packs: { id: string; layouts?: LayoutDef[] }[] },
+  packs: { folderOf(pack: string): string; packs: { id: string; layouts?: LayoutDef[] }[] },
   style: Record<string, unknown>,
   versions: { is_open: boolean; props: Record<string, unknown> }[],
   have: string[] = [],
@@ -57,7 +57,7 @@ export function layoutFor(
   const mine = versions.find((v) => v.props.preset === d.id);
   if (mine && !mine.is_open) return undefined;
   const changed = mine?.props.modules && typeof mine.props.modules === 'object' ? Object.entries(mine.props.modules as Record<string, unknown>).filter(([name, text]) => NAME.test(name) && typeof text === 'string') : [];
-  const modules = { ...modulesOf(packs.dir, d.pack, d), ...Object.fromEntries(changed) } as Record<string, string>;
+  const modules = { ...modulesOf(packs.folderOf(d.pack), d), ...Object.fromEntries(changed) } as Record<string, string>;
   const hash = hashOf(modules);
   return { id: d.id, title: d.title, shape: d.shape, hash, ...(d.notes === 'whole' && { notes: d.notes }), ...(d.flat === true && { flat: true }), ...(!have.includes(hash) && { modules }) };
 }
@@ -68,12 +68,12 @@ export function layoutFor(
  * shared with another drawing) the modules are laid out by name in a folder of their own, kept by the hash. Code kept
  * by the hash is the pack's own.
  */
-export function packLayout(packs: { dir: string; packs: { id: string; layouts?: LayoutDef[] }[] }, id: string): { hash: string; entry?: string } | undefined {
+export function packLayout(packs: { folderOf(pack: string): string; packs: { id: string; layouts?: LayoutDef[] }[] }, id: string): { hash: string; entry?: string } | undefined {
   const d = layoutsOf(packs.packs).find((one) => one.id === id);
   if (!d) return undefined;
-  const files = Object.entries(d.modules).map(([name, file]) => [name, join(packs.dir, d.pack, file)]);
+  const files = Object.entries(d.modules).map(([name, file]) => [name, join(packs.folderOf(d.pack), file)]);
   const folder = dirname(files.find(([name]) => name === 'index.js')?.[1] ?? '');
-  const modules = modulesOf(packs.dir, d.pack, d), hash = hashOf(modules);
+  const modules = modulesOf(packs.folderOf(d.pack), d), hash = hashOf(modules);
   if (files.every(([name, path]) => path === join(folder, name))) return { hash, entry: join(folder, 'index.js') };
   const laid = join(tmpdir(), 'pelago-drawings', hash);
   mkdirSync(laid, { recursive: true });

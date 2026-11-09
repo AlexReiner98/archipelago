@@ -69,6 +69,8 @@ interface WorkspacesConfig {
   /** Where other workspaces' folders are kept, and the files the server kept before its database held them. */
   rootDir: string;
   packsDir: string;
+  /** The folders packs are read from, packsDir first (src/config.ts); packsDir alone when left out. */
+  packDirs?: string[];
   packs?: string[];
   policy?: Partial<Policy>;
   /** Start each workspace's automation runner and schedules when it opens: while this process leads (lead). */
@@ -234,7 +236,7 @@ export class Workspaces {
   }
 
   private async load(id: string, backup?: Dump): Promise<Workspace> {
-    const { dataDir, databaseUrl, rootDir, packsDir, packs, policy } = this.config;
+    const { dataDir, databaseUrl, rootDir, packsDir, packDirs, packs, policy } = this.config;
     const isDefault = id === DEFAULT_WORKSPACE;
     let db: Database;
     if (isDefault) db = await this.control();
@@ -248,7 +250,7 @@ export class Workspaces {
       if (backup) await indexWorkspace(await this.control(), id, db);
       // Types a workspace defines for itself are in its own database. Those kept in a folder before are taken in once.
       if (dataDir !== null) await importLocalPack(db, isDefault ? join(packsDir, LOCAL_PACK, 'pack.json') : join(rootDir, id, 'local-pack', 'pack.json'));
-      const registry = new Registry(packsDir, packs, await localTypes<TypeDef>(db));
+      const registry = new Registry(packDirs ?? packsDir, packs, await localTypes<TypeDef>(db));
       registry.keepLocal = (def) => addLocalType(db, def);
       const pelago = new Archipelago(db, registry, policy, id);
       // Nothing on its log and nothing brought in: a new workspace, opened for the first time. Any other keeps what it has.

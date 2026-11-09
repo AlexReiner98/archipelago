@@ -15,7 +15,7 @@ const args = process.argv.slice(2);
 const base = args.find((a) => a.startsWith('http')) ?? 'http://127.0.0.1:3100';
 const count = Number(args.includes('--items') ? args[args.indexOf('--items') + 1] : 2000);
 const root = join(import.meta.dirname, '..');
-const drawing = layoutFor({ dir: join(root, 'packs'), packs: [JSON.parse(readFileSync(join(root, 'packs', 'core', 'pack.json'), 'utf8'))] }, { shape: 'flow' }, []);
+const drawing = layoutFor({ folderOf: (p: string) => join(root, 'packs', p), packs: [JSON.parse(readFileSync(join(root, 'packs', 'core', 'pack.json'), 'utf8'))] }, { shape: 'flow' }, []);
 
 const quiet = { blocked: false, waits_on: [] as string[], sessions: 0, needs_you: false };
 const within = { items: 0, work: 0, blocked: 0, waiting: 0, sessions: 0, tokens: { estimated: 0, used: 0 }, waits_on: {}, needs_you: 0, not_sent: 0 };
