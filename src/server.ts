@@ -220,7 +220,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // What a project needs to work with this server, and a running system's request for its token: no token needed.
       // A server pack answers at the addresses it had before it was a pack, too (a GitHub App set up then still sends there).
       const packPath = serverPacks.aliased(url.pathname) ?? url.pathname;
-      if (/^\/(connect|x|oauth|\.well-known)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : /^\/connect\/(sign-in|code|join|signup)$/.test(packPath) ? signIn : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX), person: () => resolve(req, res, 'human') });
+      if (/^\/(connect|x|oauth|\.well-known)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : /^\/connect\/(sign-in|code|join)$/.test(packPath) ? signIn : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX), person: () => resolve(req, res, 'human') });
 
       // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture|drawing|live)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;

@@ -155,7 +155,6 @@
   "test/show-lands.test.ts": { "pglite": 15.6, "postgres": 15.7 },
   "test/show-tab-life.test.ts": { "pglite": 18.9, "postgres": 19 },
   "test/show-web.test.ts": { "pglite": 14.3, "postgres": 14.4 },
-  "test/signup.test.ts": { "pglite": 5, "postgres": 1.8 },
   "test/site.test.ts": { "pglite": 7.9, "postgres": 4 },
   "test/snapshots.test.ts": { "pglite": 10.3, "postgres": 7.9 },
   "test/stable-page.test.ts": { "pglite": 20.3, "postgres": 17 },

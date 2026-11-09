@@ -29,13 +29,6 @@ test('pages asked too often from everywhere leave signing in open, and the other
   assert.equal(await signIn('198.51.100.8'), 200);
 });
 
-test('a buyer’s page polling for its workspace is counted with the pages, not against signing in', async () => {
-  const { base } = await serve('tokens', { signIn: { each: 2 } });
-  const headers = { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.40' };
-  for (let i = 0; i < 3; i++) await fetch(base + '/connect/signup/su_abcdefgh', { method: 'POST', headers });
-  assert.equal((await fetch(base + '/connect/sign-in', { method: 'POST', headers, body: JSON.stringify({ email: 'b@example.com' }) })).status, 200);
-});
-
 test('a token nobody made is refused before its workspace is opened', async () => {
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
