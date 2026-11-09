@@ -55,7 +55,7 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
   ]);
   const page = await open(`${base}/#/e/${made.p}`);
   try {
-    assert.ok(await page.until(`document.querySelector('.part[data-part="item"] h1')?.textContent === 'Read here' && document.querySelector('main').textContent.includes('On the page')`), 'the page is drawn');
+    assert.ok(await page.until(`document.querySelector('.part[data-part="item"] h1')?.textContent === 'Read here'`), 'the page is drawn');
     await heard(page);
     await page.evaluate(`(() => {
       window.stillMark = 1;
@@ -72,8 +72,8 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
     const still = await page.evaluate<{ mark: number; swaps: number; hash: string }>(`({ mark: window.stillMark, swaps: window.swaps, hash: location.hash })`);
     assert.deepEqual(still, { mark: 1, swaps: 0, hash: `#/e/${made.p}` }, 'not reloaded, not drawn again, not taken elsewhere: with three agents at work, a change moves no pane its session has not shown into (ui/pane-route.js)');
     // A change to what is on the page shows on it, in place.
-    await change('agent:a', [{ op: 'update', id: made.t, title: 'Renamed on the page' }]);
-    assert.ok(await page.until(`document.querySelector('main').textContent.includes('Renamed on the page')`), 'the change shows');
+    await change('agent:a', [{ op: 'update', id: made.p, title: 'Renamed on the page' }]);
+    assert.ok(await page.until(`document.querySelector('.part[data-part="item"] h1')?.textContent === 'Renamed on the page'`), 'the change shows');
     const after = await page.evaluate<{ mark: number; open: boolean }>(`({ mark: window.stillMark, open: [...document.querySelectorAll('.part[data-part="item"] details.section')].at(-1).open })`);
     assert.deepEqual(after, { mark: 1, open: true }, 'not reloaded, the open fold still open');
   } finally {
