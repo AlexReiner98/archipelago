@@ -118,9 +118,12 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
   // task's brief gives a session about to work on it (task e_p27ddjqt).
   const island = l.registry.isA(task.type, ISLAND);
   const found = island ? await islandFindings(l, task.id) : undefined;
+  // What it stands by first, whole; its working findings apart after, a few.
   if (found) {
-    lines.push('', `## Findings (${found.rows.length + found.more})`, ...(found.rows.length ? found.rows.map(findingLine) : ['None published.']));
-    if (found.more) lines.push(`- and ${found.more} more`);
+    const { published: p, working: w } = found;
+    lines.push('', `## Published (${p.rows.length + p.more})`, ...(p.rows.length ? p.rows.map(findingLine) : ['None: no finding here is marked published.']));
+    if (p.more) lines.push(`- and ${p.more} more`);
+    if (w.rows.length) lines.push('', `## Working, read here only (${w.rows.length + w.more})`, ...w.rows.map(findingLine), ...(w.more ? [`- and ${w.more} more`] : []));
   }
   const traps = island ? [] : await instructionsFor(l, FILE, { ...(repo && { about: repo.id }) });
   const named = task.body?.match(/[\w.*-]+(?:\/[\w.*-]+)+|[\w*-]+\.(?:[cm]?[jt]s|json|css|html|md|sql|ya?ml|py|cs)\b/gi) ?? [];
@@ -137,7 +140,7 @@ export async function brief(l: Archipelago, input: { task?: string }, read: Brie
     root_blockers: roots.map((id) => names.get(id)),
     needs: needs.map((n) => ({ ...slim(n), exclusive: (l.registry.capacity(n) ?? Infinity) !== Infinity, held_by: held.find((h) => h.to_id === n.id)?.title })),
     ties: ties.map(({ rel, e }) => ({ relation: rel, ...slim(e) })),
-    ...(found && { findings: found.rows, ...(found.more > 0 && { findings_more: found.more }) }),
+    ...(found && { findings: found.published.rows, ...(found.published.more > 0 && { findings_more: found.published.more }), ...(found.working.rows.length > 0 && { working: found.working.rows }), ...(found.working.more > 0 && { working_more: found.working.more }) }),
     ...(traps.length > 0 && { traps: traps.map(({ id, title, files }) => ({ id, title, files })) }),
     text: lines.join('\n'),
   };

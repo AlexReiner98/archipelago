@@ -33,11 +33,27 @@ function row(f) {
   );
 }
 
-/** The island's findings in place of `host`: a section of its page, left out when it publishes none. */
+/** Rows as a list, with how many more there are past them. */
+const list = (rows, more) => h('ul', { class: 'findings' }, rows.map(row), more > 0 && h('li', { class: 'muted small turn-more' }, `${more} more`));
+
+/**
+ * The island's findings in place of `host`: a section of its page, what it stands by (published) first, its working
+ * findings folded under them. Left out when it has none of either.
+ */
 export async function findingsPiece(host, island, section) {
   const answer = await api('view', { name: 'brief', params: { task: island.id } });
   const rows = answer?.findings ?? [];
-  if (!rows.length) return host.remove();
+  const working = answer?.working ?? [];
+  if (!rows.length && !working.length) return host.remove();
   const more = answer.findings_more ?? 0;
-  host.replaceWith(section('findings', 'Findings', `${rows.length + more}`, h('ul', { class: 'findings' }, rows.map(row), more > 0 && h('li', { class: 'muted small turn-more' }, `${more} more`))));
+  const workingMore = answer.working_more ?? 0;
+  const folded =
+    working.length > 0 &&
+    h(
+      'details',
+      { class: 'find-working' },
+      h('summary', { title: 'Working findings: read on this island only, until it marks them published' }, 'Working', h('span', { class: 'n' }, `${working.length + workingMore}`)),
+      list(working, workingMore),
+    );
+  host.replaceWith(section('findings', 'Published', `${rows.length + more}`, rows.length ? list(rows, more) : h('p', { class: 'muted small find-none' }, 'None marked published'), folded));
 }

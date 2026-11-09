@@ -37,3 +37,6 @@
 .finding-row .find-claim, .finding-row .find-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .finding-row .find-value { font-variant-numeric: tabular-nums; }
 .finding-row .find-readers, .finding-row .ago { color: var(--muted); font-size: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; }
+.find-working > summary { display: flex; align-items: baseline; gap: var(--space-5); padding: var(--space-4) var(--space-8); color: var(--muted); font-size: var(--text-2); cursor: pointer; }
+.find-working > summary .n { font-weight: normal; }
+.find-none { margin: 0; padding: var(--space-4) var(--space-8); }
