@@ -108,7 +108,7 @@ test('a release is not clear until what it ships is proven on its own build, and
   assert.equal(log.features.find((f) => f.id === made.old)!.release, null);
 });
 
-test('public: only a human makes it so, only some kinds can be, and anyone then sees little of it', async () => {
+test('a public product shows its proofs, their tests and what is built, and nothing internal', async () => {
   const l = await fresh();
   const made = await make(l, [
     { op: 'create', ref: 'app', type: 'project', title: 'App', body: 'Internal plan: the secret margin' },
