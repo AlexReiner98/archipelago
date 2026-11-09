@@ -53,9 +53,7 @@ create table if not exists event (
   reason    text not null default '',
   detail    jsonb not null default '{}'
 );
--- A database made while this was called Lattice named its own events so.
 alter table event alter column origin set default 'pelago';
-update event set origin = 'pelago' where origin = 'lattice';
 create index if not exists event_ts on event(ts);
 create index if not exists event_target on event(target_id);
 -- One claim of a resource at a time. PGlite has one connection, so nothing to wait for; a server makes it a lock (src/pg.ts).
@@ -365,12 +363,6 @@ create policy member_proposal on proposal for all to pelago_member
   using (private_to is null or private_to = current_setting('pelago.viewer', true))
   with check (true);
 
--- A database made while this was called Lattice: its roles and functions go, now that those above stand in their place.
-drop function if exists lattice_active_holds(boolean, text), lattice_external_dependents(text, text), lattice_public_props(text), lattice_public_under(text), lattice_is_public(text);
-do $$ begin
-  if exists (select 1 from pg_roles where rolname = 'lattice_member') then drop owned by lattice_member; drop role lattice_member; end if;
-  if exists (select 1 from pg_roles where rolname = 'lattice_public') then drop owned by lattice_public; drop role lattice_public; end if;
-end $$;
 `;
 
 // What only many connections need. Events are read in the order they are numbered (watch, the prompt hook,

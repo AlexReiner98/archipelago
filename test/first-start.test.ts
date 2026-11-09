@@ -18,9 +18,9 @@ test('with nobody at a terminal, the first start writes its secrets to a file an
     const file = await firstStart(workspaces, main, root, false);
     assert.equal(file, join(root, FIRST_START_FILE));
     const held = readFileSync(file!, 'utf8');
-    assert.match(held, /latop_[0-9a-f]+/, 'the operator secret is in the file');
+    assert.match(held, /pelop_[0-9a-f]+/, 'the operator secret is in the file');
     assert.match(held, /pel_default_[0-9a-f]{40}/, 'and the owner token');
-    assert.doesNotMatch(logged.join('\n'), /latop_|pel_default_/, 'the log holds neither');
+    assert.doesNotMatch(logged.join('\n'), /pelop_|pel_default_/, 'the log holds neither');
     assert.match(logged.join('\n'), /first-start-secrets\.txt/);
     assert.equal(await firstStart(workspaces, main, root, false), undefined, 'given once: a second start has nothing to give');
   } finally {

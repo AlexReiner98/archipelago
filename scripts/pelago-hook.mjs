@@ -3,8 +3,7 @@
 // reads the answer from stdout; this passes both through to the Archipelago
 // server the machine is connected to (PELAGO_URL and PELAGO_AGENT_TOKEN,
 // the same two that .mcp.json reads), or to the one on this machine when
-// those are not set. A machine connected while this was called Lattice has
-// them as LATTICE_URL and LATTICE_AGENT_TOKEN, and those are read too.
+// those are not set.
 //
 //   node scripts/pelago-hook.mjs session-start | prompt | stop | session-end | file-used
 //
@@ -56,17 +55,17 @@ import { dirname, resolve } from 'node:path';
 const SETUP = '';
 
 const name = process.argv[2];
-const base = (process.env.PELAGO_URL || process.env.LATTICE_URL || 'http://127.0.0.1:3100').replace(/\/$/, '');
-const token = process.env.PELAGO_AGENT_TOKEN || process.env.LATTICE_AGENT_TOKEN;
+const base = (process.env.PELAGO_URL || 'http://127.0.0.1:3100').replace(/\/$/, '');
+const token = process.env.PELAGO_AGENT_TOKEN;
 
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
 
-// The map's tools, as the setup names their server (pelago; lattice before it), and an item's id. A session may be
+// The map's tools, as the setup names their server (pelago), and an item's id. A session may be
 // connected to other workspaces too, each its own server named after this one (pelago-site): what the reply read,
 // changed or told there counts for what it did, while the items it named there are not this map's to ask about.
-const MAP_TOOL = /^mcp__(pelago|lattice)__/;
-const ANY_MAP_TOOL = /^mcp__(pelago|lattice)([-_][\w-]*?)?__/;
+const MAP_TOOL = /^mcp__pelago__/;
+const ANY_MAP_TOOL = /^mcp__pelago([-_][\w-]*?)?__/;
 const ITEM = /\be_[a-z0-9]{8}\b/g;
 // A git command, past the options that come before its subcommand (git -C dir commit, git -c a=b push).
 const GIT = (sub) => new RegExp(String.raw`(^|[\s;&|(])git(\s+(-[Cc]\s+("[^"]*"|'[^']*'|\S+)|--?[\w-]+(=\S+)?))*\s+` + sub + String.raw`(?![\w-])`);
@@ -110,7 +109,7 @@ function readTranscript(text) {
     for (const id of JSON.stringify(said ?? '').match(ITEM) ?? []) touched.add(id);
   };
   for (const line of text.split('\n')) {
-    const calls = line.includes('"mcp__pelago') || line.includes('"mcp__lattice');
+    const calls = line.includes('"mcp__pelago');
     const answered = (changes.size > 0 || committing.size > 0) && line.includes('"tool_result"');
     const asked = line.includes('"user"') && !line.includes('"tool_result"');
     if (line.includes('"custom-title"') || line.includes('"ai-title"')) {

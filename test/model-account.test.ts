@@ -35,7 +35,7 @@ async function withEnv(set: Record<string, string | undefined>, run: () => Promi
     put(before);
   }
 }
-const noServerModel = { PELAGO_MODEL_URL: undefined, PELAGO_MODEL_KEY: undefined, PELAGO_MODEL_SHARED: undefined, LATTICE_MODEL_URL: undefined };
+const noServerModel = { PELAGO_MODEL_URL: undefined, PELAGO_MODEL_KEY: undefined, PELAGO_MODEL_SHARED: undefined };
 
 test('an account is tried before it is kept: by its model for Anthropic and OpenAI, by one token for a compatible server', async () => {
   const anthropic = fake(json({ id: 'claude-sonnet-5-5' }), json({ error: { type: 'authentication_error', message: 'invalid x-api-key' } }, 401), json({ error: { message: 'model: nope' } }, 404), new TypeError('fetch failed'));

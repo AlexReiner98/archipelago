@@ -139,7 +139,7 @@ test('a project with nothing of Archipelago\'s in it is connected by one command
   assert.deepEqual(settings.hooks.UserPromptSubmit.map((h: any) => h.hooks[0].command), ['node .claude/pelago-hook.mjs prompt'], 'a hook registered at another place is pointed at the one the setup wrote');
   assert.equal(settings.hooks.SessionStart[0].hooks[0].command, 'node .claude/pelago-hook.mjs session-start');
   assert.equal(settings.hooks.Stop[0].hooks[0].command, 'node .claude/pelago-hook.mjs stop', 'the end of a turn is heard too');
-  assert.ok(file('.claude/pelago-hook.mjs').includes(`process.env.PELAGO_URL || process.env.LATTICE_URL || "${base}"`), 'the hook falls back on the server that handed it out');
+  assert.ok(file('.claude/pelago-hook.mjs').includes(`process.env.PELAGO_URL || "${base}"`), 'the hook falls back on the server that handed it out');
   assert.match(file('.claude/skills/pelago-bump/SKILL.md'), /^---\nname: pelago-bump/);
   assert.match(file('.claude/pelago.md'), /query` with name `handoff`/);
   assert.match(file('CLAUDE.md'), /^# Their project\n\nTheir own rules\.\n\n## Archipelago\n[\s\S]*@\.claude\/pelago\.md\n$/);
@@ -151,17 +151,17 @@ test('a project with nothing of Archipelago\'s in it is connected by one command
   // The first time on a machine the command carries the token in and asks for it to be kept: it is, with the
   // address, where the shell finds them, an older token replaced and nothing else there disturbed. It is not printed.
   const profile = join(project, 'profile');
-  writeFileSync(profile, 'export PATH="$PATH:/opt/bin"\nexport PELAGO_AGENT_TOKEN="lat_default_old"\n');
+  writeFileSync(profile, 'export PATH="$PATH:/opt/bin"\nexport PELAGO_AGENT_TOKEN="pel_default_old"\n');
   const kept = await new Promise<string>((done) => {
-    const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, '--', '--yes'], { cwd: project, env: { ...process.env, PELAGO_AGENT_TOKEN: 'lat_default_new', PELAGO_SETUP_SAVE: '1', PELAGO_SETUP_PROFILE: profile } });
+    const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, '--', '--yes'], { cwd: project, env: { ...process.env, PELAGO_AGENT_TOKEN: 'pel_default_new', PELAGO_SETUP_SAVE: '1', PELAGO_SETUP_PROFILE: profile } });
     let out = '';
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (out += d));
     child.on('close', () => done(out));
   });
   assert.match(kept, /kept {7}the server\u2019s address and the token, for this machine[\s\S]*Connected to/);
-  assert.ok(!kept.includes('lat_default_new'));
-  assert.equal(file('profile'), `export PATH="$PATH:/opt/bin"\nexport PELAGO_URL="${base}"\nexport PELAGO_AGENT_TOKEN="lat_default_new"\n`);
+  assert.ok(!kept.includes('pel_default_new'));
+  assert.equal(file('profile'), `export PATH="$PATH:/opt/bin"\nexport PELAGO_URL="${base}"\nexport PELAGO_AGENT_TOKEN="pel_default_new"\n`);
 
   // And the hook it wrote reaches the server from that folder.
   const hooked = await new Promise<string>((done) => {
@@ -172,65 +172,6 @@ test('a project with nothing of Archipelago\'s in it is connected by one command
     child.stdin.end(JSON.stringify({ session_id: 'c1', cwd: project }));
   });
   assert.match(hooked, new RegExp(`${base.replace(/[.:/]/g, '\\$&')} answered 401`), 'it called this server, which wants the token the machine does not have yet');
-});
-
-test('a project connected while this was called Lattice is moved over by the setup, with nobody to ask', async () => {
-  const { base } = await serve('tokens');
-  const project = mkdtempSync(join(tmpdir(), 'pelago-before-'));
-  const at = (path: string) => join(project, path);
-  const file = (path: string) => readFileSync(at(path), 'utf8');
-  // As a setup left it then: the tools, the hook and its four entries, the rules, the skill, and one section.
-  const old = {
-    '.mcp.json': JSON.stringify({ mcpServers: { other: { type: 'http', url: 'https://example.test/mcp' }, lattice: { type: 'http', url: `\${LATTICE_URL:-${base}}/mcp`, headers: { Authorization: 'Bearer ${LATTICE_AGENT_TOKEN:-none}' } } } }),
-    '.claude/settings.json': JSON.stringify({ hooks: { SessionStart: [{ matcher: 'startup|resume|clear', hooks: [{ type: 'command', command: 'node .claude/lattice-hook.mjs session-start' }] }], UserPromptSubmit: [{ hooks: [{ type: 'command', command: 'node .claude/lattice-hook.mjs prompt' }] }], Stop: [{ hooks: [{ type: 'command', command: 'node .claude/lattice-hook.mjs stop' }] }], SessionEnd: [{ hooks: [{ type: 'command', command: 'echo bye' }] }, { hooks: [{ type: 'command', command: 'node .claude/lattice-hook.mjs session-end' }] }] } }),
-    '.claude/lattice-hook.mjs': '// the hook as it was\n',
-    '.claude/lattice.md': '# Working with Lattice in this project\n',
-    '.claude/skills/lattice-bump/SKILL.md': '---\nname: lattice-bump\n---\n',
-    '.claude/skills/lattice-bump/references/home.md': 'where the map is\n',
-    'CLAUDE.md': `# Their project\n\nTheir own rules.\n\n## Lattice\n\nThis project's work is kept in Lattice (${base}). How to work with it:\n\n@.claude/lattice.md\n`,
-    'CLAUDE.local.md': 'Mine alone.\n\n@.claude/lattice.md\n',
-    profile: 'export PATH="$PATH:/opt/bin"\nexport LATTICE_URL="https://old.example.test"\nexport LATTICE_AGENT_TOKEN="lat_default_kept"\n',
-  };
-  mkdirSync(at('.claude/skills/lattice-bump/references'), { recursive: true });
-  for (const [path, text] of Object.entries(old)) writeFileSync(at(path), text);
-  const setup = (flags: string[], env: Record<string, string>) =>
-    new Promise<{ out: string; code: number | null }>((done) => {
-      const child = spawn(process.execPath, ['-e', `fetch('${base}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))`, ...(flags.length ? ['--', ...flags] : [])], { cwd: project, env: { ...process.env, PELAGO_SETUP_PROFILE: at('profile'), ...env } });
-      let out = '';
-      child.stdout.on('data', (d) => (out += d));
-      child.stderr.on('data', (d) => (out += d));
-      child.on('close', (code) => done({ out, code }));
-    });
-
-  // The machine still has its token under the old name, as a session opened before the move does.
-  const moved = await setup([], { LATTICE_URL: 'https://old.example.test', LATTICE_AGENT_TOKEN: 'lat_default_kept' });
-  assert.equal(moved.code, 0, moved.out);
-  assert.ok(!moved.out.includes('lat_default_kept'));
-  assert.doesNotMatch(moved.out, /not done|needs a yes/, 'all of it was the setup’s own');
-  assert.match(moved.out, /run this once more/);
-  for (const path of ['.claude/lattice-hook.mjs', '.claude/lattice.md', '.claude/skills/lattice-bump']) assert.ok(!existsSync(at(path)), `${path} is gone`);
-  assert.match(file('.claude/skills/pelago-bump/SKILL.md'), /^---\nname: pelago-bump/);
-  const mcp = JSON.parse(file('.mcp.json')).mcpServers;
-  assert.deepEqual(Object.keys(mcp).sort(), ['other', 'pelago']);
-  assert.equal(mcp.pelago.headers.Authorization, 'Bearer ${LATTICE_AGENT_TOKEN:-none}', 'until Claude Code is opened again it has the token under the old name only');
-  const hooks = JSON.parse(file('.claude/settings.json')).hooks;
-  assert.deepEqual(hooks.SessionEnd.map((h: any) => h.hooks[0].command), ['echo bye', 'node .claude/pelago-hook.mjs session-end']);
-  assert.deepEqual([hooks.SessionStart, hooks.UserPromptSubmit, hooks.Stop].map((list) => list.map((h: any) => h.hooks[0].command)), [['node .claude/pelago-hook.mjs session-start'], ['node .claude/pelago-hook.mjs prompt'], ['node .claude/pelago-hook.mjs stop']]);
-  assert.match(file('CLAUDE.md'), /^# Their project\n\nTheir own rules\.\n\n## Archipelago\n\nThis project's work is kept in Archipelago [\s\S]*@\.claude\/pelago\.md\n$/);
-  assert.equal(file('CLAUDE.local.md'), 'Mine alone.\n\n@.claude/pelago.md\n');
-  assert.equal(file('profile'), `${old.profile}export PELAGO_URL="https://old.example.test"\nexport PELAGO_AGENT_TOKEN="lat_default_kept"\n`);
-
-  // Opened again, the machine has the token under the new name, and the tools read that.
-  const settled = await setup([], { PELAGO_AGENT_TOKEN: 'lat_default_kept', LATTICE_AGENT_TOKEN: 'lat_default_kept' });
-  assert.equal(settled.code, 0, settled.out);
-  assert.equal(JSON.parse(file('.mcp.json')).mcpServers.pelago.headers.Authorization, 'Bearer ${PELAGO_AGENT_TOKEN:-none}');
-  assert.doesNotMatch((await setup([], { PELAGO_AGENT_TOKEN: 'lat_default_kept' })).out, /written|changed|deleted/);
-
-  // Taken out, neither name is left on the machine.
-  const out = await setup(['--remove', '--machine', '--yes'], {});
-  assert.equal(out.code, 0, out.out);
-  assert.equal(file('profile'), 'export PATH="$PATH:/opt/bin"\n');
-  assert.deepEqual(Object.keys(JSON.parse(file('.mcp.json')).mcpServers), ['other']);
 });
 
 test('a project whose settings file is not JSON is left as it was: the setup writes nothing at all', async () => {

@@ -106,7 +106,6 @@
   "test/keys.test.ts": { "pglite": 7, "postgres": 3.2 },
   "test/kindless.test.ts": { "pglite": 4.6, "postgres": 1.6 },
   "test/kinds.test.ts": { "pglite": 3, "postgres": 1.5 },
-  "test/lattice.test.ts": { "pglite": 2.3, "postgres": 3.7 },
   "test/layout-asks.test.ts": { "pglite": 5.9, "postgres": 3.7 },
   "test/layout-move.test.ts": { "pglite": 0, "postgres": 0 },
   "test/layouts-architecture.test.ts": { "pglite": 11.9, "postgres": 7.9 },

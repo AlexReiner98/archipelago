@@ -25,10 +25,6 @@
 //
 // With nobody to ask (no terminal) and no --yes, it brings up to date only what Archipelago wrote here before, and
 // refuses to set a project up for the first time.
-//
-// A project connected while this was called Lattice holds the same files under that name (lattice-hook.mjs,
-// lattice.md, the lattice-bump skill, the lattice tools in .mcp.json). They are the setup's own: a run moves the
-// project over to the names above, and --remove takes out either.
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -52,18 +48,16 @@ const abs = (path) => join(here, path);
 const read = (file) => (existsSync(file) ? readFileSync(file, 'utf8') : null);
 const sha = (text) => createHash('sha256').update(text).digest('hex');
 const COPY = '.pelago-backup';
-const copied = (file) => existsSync(file + COPY) || existsSync(file + '.lattice-backup');
+const copied = (file) => existsSync(file + COPY);
 const MANIFEST = '.claude/pelago-setup.json';
 const HOOK = '.claude/pelago-hook.mjs';
 const RULES = '.claude/pelago.md';
 const EVENTS = '.claude/pelago-events.mjs';
 // The files that are Archipelago's own, whole: written by the setup and replaced by it when the server's change.
 const OWN = { [HOOK]: FILES.hook, [EVENTS]: FILES.events, '.claude/skills/pelago-bump/SKILL.md': FILES.skill, '.claude/skills/pelago-bump/references/home.md': FILES.home, [RULES]: FILES.rules };
-const SECTION = /(^|\n+)## (Archipelago|Lattice)\n\nThis project's work is kept in \2 \([^)\n]*\)\. How to work with it:\n\n@\.claude\/(pelago|lattice)\.md\n*$/;
+const SECTION = /(^|\n+)## Archipelago\n\nThis project's work is kept in Archipelago \([^)\n]*\)\. How to work with it:\n\n@\.claude\/pelago\.md\n*$/;
 const section = `## Archipelago\n\nThis project's work is kept in Archipelago (${ORIGIN}). How to work with it:\n\n@${RULES}\n`;
-// The same things as a setup wrote them while this was called Lattice.
-const OLD = { hook: '.claude/lattice-hook.mjs', manifest: '.claude/lattice-setup.json', rules: '.claude/lattice.md', skill: ['.claude/skills/lattice-bump/SKILL.md', '.claude/skills/lattice-bump/references/home.md'] };
-const ourHook = /(pelago|lattice)-hook\.mjs/;
+const ourHook = /pelago-hook\.mjs/;
 // The git hook that names the run of the session making a commit. The hook script keeps each session's run in the
 // checkout's git folder (pelago-runs/<session id>, shared by its worktrees); Claude Code gives every command a
 // session runs its id (CLAUDE_CODE_SESSION_ID). A commit made by a person has no session, and one made by a session
@@ -93,7 +87,7 @@ const withoutCarried = (text) => {
   while (end < lines.length && CARRIED.includes(lines[end])) end++;
   return [...lines.slice(0, at), ...lines.slice(end)].join('\n').replace(/\n{3,}/g, '\n\n').trim();
 };
-const reads = (text) => /@\.claude\/(pelago|lattice)\.md/.test(text ?? '');
+const reads = (text) => /@\.claude\/pelago\.md/.test(text ?? '');
 
 // Every change is worked out first and made only once all of them are known: a file that cannot be read stops
 // the run with nothing written. A step is one change: what will be done (will), what is said once it is (say),
@@ -155,7 +149,7 @@ function gitFolder() {
 }
 
 const json = (value) => JSON.stringify(value, null, 2) + '\n';
-const hasServer = (config) => Boolean(config.mcpServers?.pelago || config.mcpServers?.lattice);
+const hasServer = (config) => Boolean(config.mcpServers?.pelago);
 const hasHooks = (config) => ourHook.test(JSON.stringify(config.hooks ?? {}));
 
 // Where the address and the token are kept for this person on this machine: on Windows the user's
@@ -164,14 +158,8 @@ const profile = process.env.PELAGO_SETUP_PROFILE;
 const inEnvironment = process.platform === 'win32' && !profile;
 const startup = profile || join(homedir(), process.platform === 'darwin' || (process.env.SHELL ?? '').endsWith('zsh') ? '.zshenv' : '.profile');
 const kept = /^export PELAGO_(URL|AGENT_TOKEN)=/;
-const keptEver = /^export (PELAGO|LATTICE)_(URL|AGENT_TOKEN)=/;
 const NAMES = ['PELAGO_URL', 'PELAGO_AGENT_TOKEN'];
-const OLD_NAMES = ['LATTICE_URL', 'LATTICE_AGENT_TOKEN'];
-// A machine connected while this was called Lattice keeps its token under the old name. Claude Code is given a
-// machine's environment when it is opened, not when it changes, so .mcp.json goes on reading the old names
-// until a run finds the token under the new one; this run keeps it there as well.
-const carried = !process.env.PELAGO_AGENT_TOKEN && Boolean(process.env.LATTICE_AGENT_TOKEN);
-const [URL_NAME, TOKEN_NAME] = carried ? OLD_NAMES : NAMES;
+const [URL_NAME, TOKEN_NAME] = NAMES;
 const token = process.env[TOKEN_NAME];
 const MACHINE_STEP = 'the address and token for this machine';
 const notKept = (err) => console.error(`The address and token could not be kept for this machine (${err.message}). Set PELAGO_URL and PELAGO_AGENT_TOKEN yourself, then run this again.`);
@@ -180,12 +168,10 @@ function connect() {
   const mcp = parsed('.mcp.json');
   const mcpOwn = hasServer(mcp);
   mcp.mcpServers ??= {};
-  delete mcp.mcpServers.lattice;
   mcp.mcpServers.pelago = { type: 'http', url: `\${${URL_NAME}:-${ORIGIN}}/mcp`, headers: { Authorization: `Bearer \${${TOKEN_NAME}:-none}` } };
   put('.mcp.json', json(mcp), { own: mcpOwn, note: mcpOwn ? '' : '(adds the pelago tools)' });
 
   put(HOOK, FILES.hook, { own: true });
-  if (existsSync(abs(OLD.hook))) take(OLD.hook, null, '(it is now pelago-hook.mjs)', true);
 
   const settings = parsed('.claude/settings.json');
   const settingsOwn = hasHooks(settings);
@@ -231,20 +217,18 @@ function connect() {
   const includeOwn = include === null || include.includes(INCLUDE_MARK);
   put(INCLUDE, `${rest ? `${rest}\n\n` : ''}${[INCLUDE_MARK, ...CARRIED].join('\n')}\n`, { own: includeOwn, verb: include ? 'added to ' : 'written  ', note: include?.includes(INCLUDE_MARK) ? '' : '(so a worktree Claude Code makes has the hooks)' });
   put(MANIFEST, json({ files: Object.fromEntries(Object.entries(OWN).map(([path, text]) => [path, sha(text)])) }), { own: true });
-  for (const path of [...OLD.skill, OLD.rules, OLD.manifest]) if (existsSync(abs(path))) take(path, null, '(it has a new name, above)', true);
 
   // The first time on a machine, the command that runs this carries the token in and asks for it to be kept
   // (PELAGO_SETUP_SAVE): Claude Code and the hook find it there from then on. The token is never printed.
-  if ((process.env.PELAGO_SETUP_SAVE && token) || carried) {
-    const keep = { PELAGO_URL: carried ? process.env.LATTICE_URL || ORIGIN : ORIGIN, PELAGO_AGENT_TOKEN: token };
-    const say = `kept       the server’s address and the token${carried ? ' under their new names' : ''}, for this machine`;
+  if (process.env.PELAGO_SETUP_SAVE && token) {
+    const keep = { PELAGO_URL: ORIGIN, PELAGO_AGENT_TOKEN: token };
+    const say = 'kept       the server’s address and the token, for this machine';
     if (inEnvironment) {
       plan.push({
         will: `keep       ${NAMES.join(' and ')} in your Windows user environment, outside this folder`,
         say,
         path: MACHINE_STEP,
         machine: true,
-        own: carried,
         make: () => {
           for (const [name, value] of Object.entries(keep)) execFileSync('setx', [name, value], { stdio: 'ignore' });
         },
@@ -257,14 +241,13 @@ function connect() {
         const rest = lines.filter((line) => !kept.test(line));
         while (rest.length && rest.at(-1) === '') rest.pop();
         // The copy is of the file before Archipelago first added to it: once its lines are there, no copy is made.
-        const copy = was !== null && !lines.some((line) => keptEver.test(line)) && !copied(startup);
+        const copy = was !== null && !lines.some((line) => kept.test(line)) && !copied(startup);
         plan.push({
           will: `keep       ${NAMES.join(' and ')} in ${startup}, outside this folder${copy ? `  (a copy is kept: ${startup}${COPY})` : ''}`,
           say,
           path: MACHINE_STEP,
           machine: true,
-          own: carried,
-          make: () => {
+            make: () => {
             if (copy) writeFileSync(startup + COPY, was, { mode: 0o600 });
             writeFileSync(startup, [...rest, ...Object.entries(keep).map(([name, value]) => `export ${name}="${value}"`), ''].join('\n'), { mode: 0o600 });
             if (process.platform === 'darwin' && !profile) for (const [name, value] of Object.entries(keep)) try { execFileSync('launchctl', ['setenv', name, value], { stdio: 'ignore' }); } catch { /* only apps opened from the Dock miss it */ }
@@ -280,9 +263,8 @@ function connect() {
   // keeps its own setup out of git reads the rules in from CLAUDE.local.md instead.
   const had = read(abs('CLAUDE.md')) ?? '';
   const local = read(abs('CLAUDE.local.md'));
-  // Where the rules are read in under their old name, the section the setup wrote is written again; in words
-  // that are not the setup's, only the file's name is changed.
-  const renamed = (text) => (SECTION.test(text) ? text.replace(SECTION, (all, lead) => lead + section) : text.replaceAll('@.claude/lattice.md', `@${RULES}`));
+  // Where the rules are read in, the section the setup wrote is written again; words that are not the setup's stay.
+  const renamed = (text) => (SECTION.test(text) ? text.replace(SECTION, (all, lead) => lead + section) : text);
   if (!reads(had) && !reads(local)) put('CLAUDE.md', `${had ? had.trimEnd() + '\n\n' : ''}${section}`, { verb: had ? 'added to ' : 'written  ', note: `(one section, which reads ${RULES} in)` });
   else for (const [path, text] of [['CLAUDE.md', had], ['CLAUDE.local.md', local ?? '']]) if (reads(text)) put(path, renamed(text), { own: true, verb: 'changed  ' });
 }
@@ -291,7 +273,6 @@ function remove() {
   const mcp = parsed('.mcp.json');
   if (hasServer(mcp)) {
     delete mcp.mcpServers.pelago;
-    delete mcp.mcpServers.lattice;
     if (!Object.keys(mcp.mcpServers).length) delete mcp.mcpServers;
     const empty = !Object.keys(mcp).length;
     take('.mcp.json', empty ? null : json(mcp), empty ? '(it holds nothing else)' : '(takes the pelago tools out)');
@@ -338,8 +319,6 @@ function remove() {
   const git = gitFolder();
   if (git && read(abs(git.hook))?.includes(COMMIT_MARK)) take(git.hook, null);
   if (git && existsSync(abs(git.runs))) plan.push({ will: `delete     ${git.runs}/  (the runs kept for the commit-msg hook)`, say: `deleted    ${git.runs}/`, path: git.runs, make: () => rmSync(abs(git.runs), { recursive: true, force: true }) });
-  // What a setup wrote under the old name left no list, or one of files nobody is handed any more: all of it goes.
-  for (const path of [OLD.hook, ...OLD.skill, OLD.rules, OLD.manifest]) if (existsSync(abs(path))) take(path, null);
 
   for (const path of ['CLAUDE.md', 'CLAUDE.local.md']) {
     const had = read(abs(path));
@@ -353,7 +332,7 @@ function remove() {
   if (!MACHINE) return;
   const say = 'forgot     the server’s address and the token, on this machine';
   if (inEnvironment) {
-    const there = [...NAMES, ...OLD_NAMES].filter((name) => {
+    const there = NAMES.filter((name) => {
       try {
         execFileSync('reg', ['query', 'HKCU\\Environment', '/v', name], { stdio: 'ignore' });
         return true;
@@ -373,21 +352,21 @@ function remove() {
   } else {
     const was = read(startup);
     const lines = (was ?? '').split('\n');
-    if (lines.some((line) => keptEver.test(line)))
+    if (lines.some((line) => kept.test(line)))
       plan.push({
         will: `forget     ${NAMES.join(' and ')} in ${startup}, outside this folder`,
         say,
         path: MACHINE_STEP,
         make: () => {
-          writeFileSync(startup, lines.filter((line) => !keptEver.test(line)).join('\n'), { mode: 0o600 });
-          if (process.platform === 'darwin' && !profile) for (const name of [...NAMES, ...OLD_NAMES]) try { execFileSync('launchctl', ['unsetenv', name], { stdio: 'ignore' }); } catch { /* it was not set there */ }
+          writeFileSync(startup, lines.filter((line) => !kept.test(line)).join('\n'), { mode: 0o600 });
+          if (process.platform === 'darwin' && !profile) for (const name of NAMES) try { execFileSync('launchctl', ['unsetenv', name], { stdio: 'ignore' }); } catch { /* it was not set there */ }
         },
       });
   }
 }
 
 // What was here before this run says whether it is a first setup: the hook is the one file every setup wrote.
-const before = existsSync(abs(HOOK)) || existsSync(abs(OLD.hook));
+const before = existsSync(abs(HOOK));
 if (REMOVE) remove();
 else connect();
 
@@ -441,16 +420,14 @@ for (const step of plan) {
 
 if (REMOVE) {
   // A folder the setup made and has now emptied goes too; one that holds anything else stays.
-  for (const path of ['.claude/skills/pelago-bump/references', '.claude/skills/pelago-bump', '.claude/skills/lattice-bump/references', '.claude/skills/lattice-bump', '.claude/skills', '.claude']) try { rmdirSync(abs(path)); } catch { /* not empty, or not there */ }
+  for (const path of ['.claude/skills/pelago-bump/references', '.claude/skills/pelago-bump', '.claude/skills', '.claude']) try { rmdirSync(abs(path)); } catch { /* not empty, or not there */ }
   console.log(did.length ? did.join('\n') : 'Nothing of the setup’s is in this folder.');
-  const copies = ['.mcp.json', '.claude/settings.json', 'CLAUDE.md'].flatMap((path) => [path + COPY, path + '.lattice-backup']).filter((path) => existsSync(abs(path)));
+  const copies = ['.mcp.json', '.claude/settings.json', 'CLAUDE.md'].map((path) => path + COPY).filter((path) => existsSync(abs(path)));
   if (todo.length) console.log(`\nArchipelago is out of ${here}. The map on the server was not touched.${copies.length ? ` The copies the setup kept are still here: ${copies.join(', ')}.` : ''}`);
   if (!MACHINE) console.log(`\nThe address and token kept for this machine were left: add --machine to forget them, and revoke the token on the Workspace screen at ${ORIGIN} to end it.`);
   process.exit(0);
 }
 
-// The folders of the skill under its old name, emptied above, go too.
-for (const path of ['.claude/skills/lattice-bump/references', '.claude/skills/lattice-bump']) try { rmdirSync(abs(path)); } catch { /* not empty, or not there */ }
 console.log(did.join('\n'));
 if (go.length < todo.length) console.log(`\nSome of it was left, because nobody was here to say yes. To do the rest, ${AGAIN}.`);
 
@@ -465,7 +442,6 @@ if (!top || !same(top, here))
   console.log(
     `\nMind: ${here} is not the top folder of a git repository${top ? ` (that is ${top})` : ''}. A session reports to Archipelago only when Claude Code is opened in the folder this was run in: run it in each repository's own folder.`,
   );
-if (carried && !DRY) console.log(`\nThis machine kept its token as ${OLD_NAMES[1]}. It is now kept as ${NAMES[1]} as well, and .mcp.json reads the old name until Claude Code has been opened again: run this once more after that.`);
 console.log(
   token || !TOKENS
     ? `\nConnected to ${ORIGIN}${token ? '' : ', which asks for no token'}. Quit Claude Code completely${process.platform === 'win32' ? ' (from the system tray too)' : ''}, open it again in this folder, and the session will say it is registered in Archipelago.`

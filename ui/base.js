@@ -93,17 +93,6 @@ export function ask({ title, message, input, choices, action = 'OK', cancel = 'C
 }
 export const tell = (title, message) => ask({ title, message, cancel: null });
 
-// What this browser kept while this was called Lattice (the token, the workspaces, two choices) is carried over.
-try {
-  for (const key of ['token', 'workspaces', 'roadmap-as', 'follow']) {
-    const was = localStorage.getItem(`lattice-${key}`);
-    if (was !== null && localStorage.getItem(`pelago-${key}`) === null) localStorage.setItem(`pelago-${key}`, was);
-    localStorage.removeItem(`lattice-${key}`);
-  }
-} catch {
-  // Storage can be blocked: then nothing was kept to carry.
-}
-
 // The token, when the server wants one. Kept for this browser only.
 export const store = {
   get token() {

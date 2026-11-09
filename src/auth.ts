@@ -60,9 +60,9 @@ export const validWorkspaceId = (id: string) => WORKSPACE_ID.test(id);
 
 const hash = sha256Hex;
 
-/** Which workspace a token claims to be for. Says nothing about whether it is valid. One made while this was called Lattice begins lat_. */
+/** Which workspace a token claims to be for. Says nothing about whether it is valid. */
 export function workspaceOf(token: string): string | undefined {
-  const match = /^(?:pel|lat)_([a-z0-9][a-z0-9-]{0,39})_[a-f0-9]{40}$/.exec(token);
+  const match = /^pel_([a-z0-9][a-z0-9-]{0,39})_[a-f0-9]{40}$/.exec(token);
   return match?.[1];
 }
 
