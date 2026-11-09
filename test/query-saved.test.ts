@@ -10,9 +10,9 @@ import { fresh, make } from './map.ts';
 test('a view kept before the flat lens is translated once into the flat lens its fields say', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'P' },
-    { op: 'create', ref: 'q', type: 'project', title: 'Q' },
-    { op: 'create', ref: 'f', type: 'feature', title: 'F' },
+    { op: 'create', ref: 'p', type: 'work', title: 'P' },
+    { op: 'create', ref: 'q', type: 'work', title: 'Q' },
+    { op: 'create', ref: 'f', type: 'event', title: 'F' },
     { op: 'create', ref: 't', type: 'task', title: 'T' },
     { op: 'create', ref: 'd', type: 'task', title: 'Done', status: 'done' },
     { op: 'create', ref: 'x', type: 'task', title: 'Elsewhere' },
@@ -23,7 +23,7 @@ test('a view kept before the flat lens is translated once into the flat lens its
     { op: 'link', type: 'depends_on', from: 'f', to: 'x' },
     { op: 'create', ref: 'about', type: 'lens', title: 'Everything in P' },
     { op: 'create', ref: 'cut', type: 'lens', title: 'Shortcut to Q' },
-    { op: 'create', ref: 'whole', type: 'lens', title: 'Features' },
+    { op: 'create', ref: 'whole', type: 'lens', title: 'Events' },
     { op: 'create', ref: 'none', type: 'lens', title: 'The whole map' },
     { op: 'create', ref: 'st', type: 'style', title: 'As a map', props: { shape: 'map' } },
     { op: 'link', type: 'about', from: 'about', to: 'p' },
@@ -35,7 +35,7 @@ test('a view kept before the flat lens is translated once into the flat lens its
     l.moved(tx, 'test', 'test: views as they were kept', [
       ['+', made.about, 'controls', ['lit', 'far']], ['+', made.about, 'place', 1], ['+', made.about, 'kinds', ['task']], ['+', made.about, 'lanes', 'stage'],
       ['+', made.cut, 'from', made.q], ['+', made.cut, 'far', 0], ['+', made.cut, 'over', []],
-      ['+', made.whole, 'kinds', ['feature', '-task', 'work', 'nothing.like_it']], ['+', made.whole, 'fold', ['closed', 'system', 'unlinked']],
+      ['+', made.whole, 'kinds', ['event', '-task', 'work', 'nothing.like_it']], ['+', made.whole, 'fold', ['closed', 'system', 'unlinked']],
       ['+', made.none, 'far', 2],
     ]),
   );
@@ -48,7 +48,7 @@ test('a view kept before the flat lens is translated once into the flat lens its
   // A shortcut starts where it said; far 0 is the start alone.
   assert.deepEqual(await props(made.cut), { filter: { find: [`id ${made.q}`], only: [], not: ['done', 'kind system'] }, walk: { over: [], steps: 0 } });
   // Of the whole map: the types it kept (work, the kind, is a type with every work type its flavour); one with a "-" left out.
-  assert.deepEqual(await props(made.whole), { filter: { find: ['type feature', 'type work'], only: [], not: ['done', 'kind system', 'type task'] }, walk: { over: ['depends_on', 'waits_on'], steps: 1 } });
+  assert.deepEqual(await props(made.whole), { filter: { find: ['type event', 'type work'], only: [], not: ['done', 'kind system', 'type task'] }, walk: { over: ['depends_on', 'waits_on'], steps: 1 } });
   assert.deepEqual(moved.lost[made.whole], ['kinds nothing.like_it', 'leaving out what is linked to nothing']);
   assert.equal((await l.entity(made.none))!.status, 'retired', 'nothing a filter can include: retired');
   assert.deepEqual(await props(made.none), {});
@@ -70,12 +70,12 @@ test('a view kept before the flat lens is translated once into the flat lens its
 test('a translation keeps the start a view names, and a type it renames follows a pack that took it over', () => {
   const l = { registry: { types: new Map([['task', {}]]), relations: new Map([['part_of', {}], ['depends_on', {}], ['waits_on', {}]]) } } as never;
   assert.equal(oldQuery(l, { from: '{env}' }, []).lens, null, 'a start that is no id, and nothing it is about');
-  assert.deepEqual(renamedQuery({ filter: { find: ['type hypothesis', 'assumes me', 'assumes< e_x'] }, walk: { over: ['assumes'], steps: 1 } }, 'assumes', 'presumes', 'relation'), {
-    walk: { over: ['presumes'], steps: 1 },
-    filter: { find: ['type hypothesis', 'presumes me', 'presumes< e_x'] },
+  assert.deepEqual(renamedQuery({ filter: { find: ['type finding', 'reads me', 'reads< e_x'] }, walk: { over: ['reads'], steps: 1 } }, 'reads', 'consults', 'relation'), {
+    walk: { over: ['consults'], steps: 1 },
+    filter: { find: ['type finding', 'consults me', 'consults< e_x'] },
   });
-  assert.deepEqual(renamedQuery({ walk: { over: ['part_of'] } }, 'hypothesis', 'hypothesis', 'entity'), {});
-  assert.deepEqual(renamedQuery({ walk: { over: ['assumes>', 'part_of<'], steps: 2 } }, 'assumes', 'presumes', 'relation'), { walk: { over: ['presumes>', 'part_of<'], steps: 2 } }, 'a way said is kept');
+  assert.deepEqual(renamedQuery({ walk: { over: ['part_of'] } }, 'finding', 'finding', 'entity'), {});
+  assert.deepEqual(renamedQuery({ walk: { over: ['reads>', 'part_of<'], steps: 2 } }, 'reads', 'consults', 'relation'), { walk: { over: ['consults>', 'part_of<'], steps: 2 } }, 'a way said is kept');
 });
 
 // What the old lens drew of each, read on this fixture from the old lens itself (src/query.ts at 84433ae, the last
@@ -83,18 +83,18 @@ test('a translation keeps the start a view names, and a type it renames follows 
 test('views that kept types inside an item draw only what they drew under the old lens', async () => {
   const l = await fresh();
   const m = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'P' },
-    { op: 'create', ref: 'f1', type: 'feature', title: 'F1' },
-    { op: 'create', ref: 'f2', type: 'feature', title: 'F2 nested' },
-    { op: 'create', ref: 'f3', type: 'feature', title: 'F3 outside' },
+    { op: 'create', ref: 'p', type: 'work', title: 'P' },
+    { op: 'create', ref: 'f1', type: 'event', title: 'F1' },
+    { op: 'create', ref: 'f2', type: 'event', title: 'F2 nested' },
+    { op: 'create', ref: 'f3', type: 'event', title: 'F3 outside' },
     { op: 'create', ref: 't1', type: 'task', title: 'T1' },
     { op: 'create', ref: 't2', type: 'task', title: 'T2 direct' },
     { op: 'create', ref: 't3', type: 'task', title: 'T3 done', status: 'done' },
     { op: 'create', ref: 't4', type: 'task', title: 'T4 outside' },
-    { op: 'create', ref: 'i', type: 'issue', title: 'I deep' },
+    { op: 'create', ref: 'i', type: 'record', title: 'I deep' },
     { op: 'create', ref: 'd', type: 'decision', title: 'D open' },
     { op: 'create', ref: 'd2', type: 'decision', title: 'D2 decided', status: 'decided', props: { outcome: 'x', rationale: 'y' } },
-    { op: 'create', ref: 'h', type: 'hypothesis', title: 'H deep' },
+    { op: 'create', ref: 'h', type: 'aim', title: 'H deep' },
     { op: 'create', ref: 'q', type: 'decision', title: 'Q outside' },
     { op: 'link', type: 'part_of', from: 'f1', to: 'p' },
     { op: 'link', type: 'part_of', from: 'f2', to: 'f1' },
@@ -110,7 +110,7 @@ test('views that kept types inside an item draw only what they drew under the ol
     { op: 'link', type: 'part_of', from: 'h', to: 'f2' },
     { op: 'link', type: 'depends_on', from: 'd', to: 't1' },
     { op: 'create', ref: 'oq', type: 'lens', title: 'Open questions' },
-    { op: 'create', ref: 'fe', type: 'lens', title: 'Features' },
+    { op: 'create', ref: 'fe', type: 'lens', title: 'Events' },
     { op: 'create', ref: 'td', type: 'lens', title: 'To do' },
     { op: 'link', type: 'about', from: 'oq', to: 'p' },
     { op: 'link', type: 'about', from: 'fe', to: 'p' },
@@ -118,9 +118,9 @@ test('views that kept types inside an item draw only what they drew under the ol
   ]);
   await l.db.transaction((tx) =>
     l.moved(tx, 'test', 'test: views as they were kept', [
-      ['+', m.oq, 'kinds', ['decision', 'hypothesis']], ['+', m.oq, 'over', []],
-      ['+', m.fe, 'kinds', ['feature']], ['+', m.fe, 'far', 1], ['+', m.fe, 'over', ['depends_on']],
-      ['+', m.td, 'kinds', ['task', 'issue']], ['+', m.td, 'over', ['depends_on']],
+      ['+', m.oq, 'kinds', ['decision', 'aim']], ['+', m.oq, 'over', []],
+      ['+', m.fe, 'kinds', ['event']], ['+', m.fe, 'far', 1], ['+', m.fe, 'over', ['depends_on']],
+      ['+', m.td, 'kinds', ['task', 'record']], ['+', m.td, 'over', ['depends_on']],
     ]),
   );
   const moved = await moveQueries(l);
@@ -139,15 +139,15 @@ test('views that kept types inside an item draw only what they drew under the ol
   }
   // The same, but for what its links reached of the types it kept, which a walk cannot narrow: said in the log.
   assert.deepEqual(now, { oq: old.oq, fe: ['F1', 'P'], td: ['I deep', 'P', 'T1', 'T2 direct'] });
-  assert.deepEqual([moved.lost[m.oq], moved.lost[m.fe], moved.lost[m.td]], [undefined, ['what its links reach of the types it kept (feature)'], ['what its links reach of the types it kept (task, issue)']]);
-  assert.deepEqual((await l.entity(m.fe))!.props.filter, { find: [`part_of ${m.p}`], only: ['feature'], not: ['done', 'kind system'] }, 'one step down: only those types of what is part of it');
-  assert.deepEqual((await l.entity(m.oq))!.props.filter, { find: ['type decision', 'type hypothesis'], only: [`in ${m.p}`], not: ['done', 'kind system'] }, 'every step down: those types within it');
+  assert.deepEqual([moved.lost[m.oq], moved.lost[m.fe], moved.lost[m.td]], [undefined, ['what its links reach of the types it kept (event)'], ['what its links reach of the types it kept (task, record)']]);
+  assert.deepEqual((await l.entity(m.fe))!.props.filter, { find: [`part_of ${m.p}`], only: ['event'], not: ['done', 'kind system'] }, 'one step down: only those types of what is part of it');
+  assert.deepEqual((await l.entity(m.oq))!.props.filter, { find: ['type decision', 'type aim'], only: [`in ${m.p}`], not: ['done', 'kind system'] }, 'every step down: those types within it');
 });
 
 test('a view kept in the old words is said in terms once, and the log keeps what it said', async () => {
   const l = await fresh();
   const { p, v, q } = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'P' },
+    { op: 'create', ref: 'p', type: 'work', title: 'P' },
     { op: 'create', ref: 'v', type: 'lens', title: 'Tasks in P', props: { filter: { types: ['task'], within: ['e_aaaaaaaa'], exclude: ['closed'] } } },
     { op: 'create', ref: 'q', type: 'lens', title: 'Already', props: { filter: { find: ['type task'] } } },
   ]);

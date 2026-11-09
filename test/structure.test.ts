@@ -34,7 +34,7 @@ const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
 const lines = (text: string) => text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
 const codeFiles = ['src', 'ui', 'test', 'packs', 'scripts', 'examples'].flatMap(walk).filter((f) => CODE.test(f) && !VENDORED.includes(f));
 const kernelFiles = [...walk('src'), ...walk('ui')].filter((f) => /\.(ts|js)$/.test(f) && !VENDORED.includes(f));
-const packIds = readdirSync(join(ROOT, 'packs')).filter((p) => statSync(join(ROOT, 'packs', p)).isDirectory());
+const packIds = readdirSync(join(ROOT, 'packs')).filter((p) => statSync(join(ROOT, 'packs', p)).isDirectory()), LEFT = JSON.parse(read('test/fixtures/left-packs.json')) as Record<string, string[]>; // LEFT: the packs gone to hosted (9 Nov 2026)
 /** The kernel's own packs: the kinds, the root relations and the system tier. */
 const KERNEL_PACKS = ['core', 'local'];
 
@@ -70,7 +70,7 @@ test(`no file is over ${MAX_LINES} lines`, () => {
 const NAMES_PACKS: Record<string, number> = {};
 
 test('the kernel names no pack', () => {
-  const ids = packIds.filter((p) => !KERNEL_PACKS.includes(p));
+  const ids = [...new Set([...packIds.filter((p) => !KERNEL_PACKS.includes(p)), ...Object.keys(LEFT)])];
   const named = count(kernelFiles, new RegExp(`['"\`](?:${ids.join('|')})\\.[a-z_]+['"\`]`, 'g'));
   assert.deepEqual(ratchet(named, NAMES_PACKS), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
 });
@@ -91,7 +91,7 @@ test("the kernel names no pack's type by its bare name", () => {
   const ids = packIds.filter((p) => !KERNEL_PACKS.includes(p) && existsSync(join(ROOT, 'packs', p, 'pack.json'))).flatMap((p) => {
     const m = JSON.parse(read(`packs/${p}/pack.json`)) as { types?: { id?: string }[]; links?: { id: string }[] };
     return [...(m.types ?? []), ...(m.links ?? [])].flatMap((t) => (t.id ? [t.id] : []));
-  });
+  }).concat(Object.values(LEFT).flat());
   const named = count(kernelFiles, new RegExp(`['"\`](?:${ids.join('|')})['"\`]`, 'g'));
   assert.deepEqual(ratchet(named, NAMES_PACK_TYPES), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
 });
@@ -141,13 +141,13 @@ test('every approval is decided by a rule', () => {
   assert.deepEqual(policy, {}, "The server's policy is read only by the rules: what it lifts, and what it forbids (serverRules).");
 });
 
-// 4. A pack's code imports only its own files and Node's built-ins: never the kernel's source.
+// 4. A pack's code imports only its own files and Node's built-ins, never the kernel's; its tests also #pelago/test.
 test("a pack's code imports nothing of the kernel", () => {
   const reaching: string[] = [];
   for (const file of walk('packs').filter((f) => /\.(ts|js|mjs)$/.test(f))) {
     for (const [, spec] of read(file).matchAll(/(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/g)) {
       const own = spec.startsWith('./') || (spec.startsWith('../') && !relative(join(ROOT, 'packs', file.split('/')[1]), join(ROOT, file, '..', spec)).startsWith('..'));
-      if (!own && !spec.startsWith('node:')) reaching.push(`${file} imports ${spec}`);
+      if (!own && !(spec === '#pelago/test' && /\.test\.ts$/.test(file)) && !spec.startsWith('node:')) reaching.push(`${file} imports ${spec}`);
     }
   }
   assert.deepEqual(reaching, [], 'A pack is handed what it reads and answers with ops and requests.');
@@ -433,7 +433,7 @@ test("a drawing's list holds every module it reaches", () => {
 // (under 3 is arithmetic), and every px in a string. It catches more than lengths, and only ever goes down.
 const LENGTHS_IN_DRAWINGS: Record<string, number> = {
   'flow/direction.js': 1, 'flow/index.js': 13, 'flow/numbering.js': 5, 'flow/planar.js': 1,
-  'flow/shapes.js': 9, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 4, 'packs/plan/layouts/meters/index.js': 8,
+  'flow/shapes.js': 9, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 4,
 };
 const BARE = /(?<![\w.$#])\d+(?:\.\d+)?(?![\w.])/g;
 

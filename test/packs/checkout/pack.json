@@ -1,0 +1,18 @@
+{
+  "id": "checkout",
+  "version": "0.1.0",
+  "title": "Checkout",
+  "description": "A pack for testing where a session works: one type of place found by the address it was cloned from or the folder it is in.",
+  "requires": ["core"],
+  "types": [
+    {
+      "id": "checkout",
+      "title": "Checkout",
+      "description": "A source repository: where work lives (lives_in), found by its remote.",
+      "extends": "place",
+      "capabilities": { "where": { "address": "remote", "folder": "path" } },
+      "statuses": { "open": ["active"], "closed": ["archived"], "phases": { "archived": "ended" } },
+      "fields": { "path": { "type": "string" }, "remote": { "type": "url" }, "default_branch": { "type": "string" } }
+    }
+  ]
+}

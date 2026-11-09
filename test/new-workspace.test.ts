@@ -10,13 +10,16 @@ import { callTool } from '../src/tools.ts';
 import { Workspaces } from '../src/workspaces.ts';
 import type { Actor, Op } from '../src/pelago.ts';
 import { mayDo } from '../src/rules.ts';
+import { packsWith } from './map.ts';
 
 const agent: Actor = { kind: 'agent', name: 'robot' };
 const person: Actor = { kind: 'human', name: 'alex' };
 const task = { op: 'create', type: 'task', title: 'Paint the fence' } as const;
+// The repository's packs and a test pack with a type that can be public (test/packs/reader).
+const PACKS = packsWith('reader');
 const servers = () => {
   const root = mkdtempSync(join(tmpdir(), 'pelago-new-'));
-  return { rootDir: join(root, 'workspaces'), dataDir: join(root, 'data'), packsDir: join(import.meta.dirname, '..', 'packs') };
+  return { rootDir: join(root, 'workspaces'), dataDir: join(root, 'data'), packsDir: PACKS };
 };
 
 test('a new workspace applies what its agents change before it has an owner, and its log says why', async () => {
@@ -80,7 +83,7 @@ test('a new workspace still keeps from its agents what the core rules keep', asy
   const at = new Workspaces({ ...servers(), dataDir: null });
   const { pelago: l } = await at.create('acme', 'Acme');
   const made = async (ops: Op[]) => (await l.change(agent, { ops, reason: 'the core rules' })).status;
-  assert.equal(await made([{ op: 'create', type: 'document', title: 'Guide', visibility: 'public' }]), 'proposed', 'what is public');
+  assert.equal(await made([{ op: 'create', type: 'writing', title: 'Guide', visibility: 'public' }]), 'proposed', 'what is public');
   assert.equal(await made([{ op: 'create', type: 'layout', title: 'Loud', props: { code: 'export default () => []' } }]), 'proposed', 'code that runs');
   assert.equal(await made([{ op: 'create', type: 'screen', title: 'Board' }]), 'proposed', 'screens');
   assert.equal(await made([{ op: 'create', type: 'automation', title: 'Nightly', status: 'paused', props: { trigger: 'daily', at: '03:00', action: 'notify', message: 'hi' } }]), 'proposed', 'automations');

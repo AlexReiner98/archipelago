@@ -14,10 +14,12 @@ actions; `query` with name `actions` gives their inputs whole.
 ## At the start
 
 1. Handed a task, `query` with name `brief` and params `task`: it holds what that
-   task needs. Otherwise `query` with name `handoff` and params `repo` (the id
-   the session hook gave). One answer holds the last push, what has happened lately, what sessions left
-   unpushed (`left`), what nobody has seen working (`unseen`), the traps in
-   the repository's files (`traps`), and the open work. If it has `for_owner` with questions settled on an
+   task needs. Otherwise, where the map has the software pack,
+   `query` with name `handoff` and params `repo` (the id the session hook gave):
+   one answer holds the last push, what has happened lately, what sessions left unpushed (`left`), what
+   nobody has seen working (`unseen`), the traps in the repository's files
+   (`traps`), and the open work. Without it, `query` with name `attention` for what
+   waits, and `story` for what has happened lately. If the handoff has `for_owner` with questions settled on an
    agent's own judgment, show the owner those in your first reply and ask
    them to confirm or correct; record their answer with `settle`, action `confirmed`.
    If the session opened with no word from Archipelago, the

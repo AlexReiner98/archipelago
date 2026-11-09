@@ -7,13 +7,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
 import { chrome, open, wait } from './browser.ts';
+import { packsWith } from './map.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
 const long = (word: string) => Array.from({ length: 60 }, (_, i) => `${word} paragraph ${i}.`).join('\n\n');
 
 test('in a browser, a document is written beside its draft, shared or not', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
-  const { workspaces, call, base } = await serve('tokens');
+  // A test pack's writing is what is written beside its draft (test/packs/reader).
+  const { workspaces, call, base } = await serve('tokens', undefined, undefined, packsWith('reader'));
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
@@ -22,7 +24,7 @@ test('in a browser, a document is written beside its draft, shared or not', { sk
     if (answer.error) throw new Error(answer.error);
     return answer.result;
   };
-  const home = (await api(mine, 'change', { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'document', title: 'Shared page', visibility: 'shared', body: long('shared') }] })).created.s as string;
+  const home = (await api(mine, 'change', { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'writing', title: 'Shared page', visibility: 'shared', body: long('shared') }] })).created.s as string;
   await api(theirs, 'workspace_set', { accepts_from: ['default'] });
   await api(mine, 'share_workspace', { id: home, workspace: 'acme', publish: true });
   const [offer] = await api(theirs, 'search', { type: 'shared_document' });
@@ -30,8 +32,8 @@ test('in a browser, a document is written beside its draft, shared or not', { sk
     reason: 'test',
     ops: [
       { op: 'update', id: offer.id, status: 'accepted', props: { path: 'shared' } },
-      { op: 'create', ref: 'a', type: 'document', title: 'Own page', visibility: 'shared', status: 'draft', body: long('first'), props: { path: 'own', menu: 1 } },
-      { op: 'create', ref: 'b', type: 'document', title: 'Next page', visibility: 'shared', status: 'draft', body: long('second'), props: { path: 'next', menu: 2 } },
+      { op: 'create', ref: 'a', type: 'writing', title: 'Own page', visibility: 'shared', status: 'draft', body: long('first'), props: { path: 'own', menu: 1 } },
+      { op: 'create', ref: 'b', type: 'writing', title: 'Next page', visibility: 'shared', status: 'draft', body: long('second'), props: { path: 'next', menu: 2 } },
       { op: 'create', ref: 't', type: 'task', title: 'Task, not a page', visibility: 'shared', body: 'A task read by its note.' },
     ],
   })).created as Record<string, string>;

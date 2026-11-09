@@ -52,6 +52,8 @@ export interface RuleDef {
     visibility?: OneOrMany;
     /** A field against a number or another field, as the item will be: "total > 500", "paid < total". */
     compare?: string;
+    /** Patterns what the op itself writes must match, each field its own (the title and body read from the op, never from the item as it was). */
+    matches?: Record<string, string>;
     /** Written to a type or link type whose pack is gone. */
     dormant?: boolean;
     /** The change asks to wait for a person. */
@@ -74,8 +76,6 @@ export interface RuleDef {
     reply?: Record<string, boolean | number>;
   };
   then?: 'hold' | 'refuse' | 'ask' | { require: string[] };
-  /** For a rule on a reply's end that reads unaccounted: what accounts for a commit, a type and its field holding the full sha. */
-  record?: { type: string; field: string };
   /** Fields whose values together may belong to one item of the type only. */
   unique?: string[];
   /** For unique: the type it holds within, flavours included. */
@@ -179,6 +179,7 @@ export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): stri
     if (rule.when && 'kind' in rule.when) problems.push(`${at}: when names a type or a capability, not a kind`);
     for (const t of list(rule.when?.type) ?? []) if (!known(t)) problems.push(`${at}: no type "${t}"`);
     if (rule.when?.compare !== undefined && !COMPARE.test(rule.when.compare)) problems.push(`${at}: compare reads like "total > 500"`);
+    for (const [f, pattern] of Object.entries(rule.when?.matches ?? {})) if (!pattern || !regex(pattern)) problems.push(`${at}: matches.${f} is no pattern`);
     if (rule.when?.reach !== undefined && rule.when.reach !== 'outside') problems.push(`${at}: reach is "outside", for what a pack writes outside its reach`);
     if (rule.lifted !== undefined && !LIFTS.includes(rule.lifted)) problems.push(`${at}: lifted is one of ${LIFTS.join(', ')}`);
     if (rule.server && !rule.lifted) problems.push(`${at}: server says what lifts it where the workspace has not set lifted, so it needs lifted`);
@@ -236,7 +237,26 @@ function applies(rule: RuleDef, reg: Registry, who: Who, w: Written, targets: Ta
     if (props[field] == null || Number.isNaN(a) || Number.isNaN(b)) return false;
     if (!{ '>': a > b, '>=': a >= b, '<': a < b, '<=': a <= b, '=': a === b, '!=': a !== b }[op]) return false;
   }
+  if (when.matches) {
+    // Only what this op writes is read: an item already unreadable may still be withdrawn or said still true.
+    const written = { ...w.props, ...(w as unknown as Record<string, unknown>) };
+    for (const [f, pattern] of Object.entries(when.matches)) {
+      const value = written[f];
+      if (typeof value !== 'string' || !regex(pattern)!.test(value)) return false;
+    }
+  }
   return true;
+}
+
+/** A rule's pattern, compiled once; undefined when it is none. */
+const patterns = new Map<string, RegExp | undefined>();
+function regex(pattern: string): RegExp | undefined {
+  if (!patterns.has(pattern)) {
+    let re: RegExp | undefined;
+    try { re = new RegExp(pattern, 'u'); } catch { re = undefined; }
+    patterns.set(pattern, re);
+  }
+  return patterns.get(pattern);
 }
 
 /**

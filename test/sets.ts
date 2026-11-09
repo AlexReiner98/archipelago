@@ -72,6 +72,8 @@ export const SLOW: Record<string, string> = {
   'packs/core/map-routing.test.ts': 'long',
   // Many tests in one file, past LONG seconds of one process in CI (test/weights.json, 8 Nov 2026).
   'test/sessions.test.ts': 'long',
+  'test/oauth.test.ts': 'long',
+  'test/server-auth.test.ts': 'long',
   'test/query-flat.test.ts': 'long',
   'test/new-workspace.test.ts': 'long',
   'test/seeing.test.ts': 'long',
@@ -168,13 +170,18 @@ export function shard(part: string, weights = readWeights()): string[] {
   return parts[k - 1].files.sort();
 }
 
+const HARNESS = /['"]#pelago\/test['"]/;
 const SPECIFIER = /(?:^|[\s;])(?:import|export)\s[^'"]*?from\s*['"](\.{1,2}\/[^'"]+)['"]|import\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)|^import\s*['"](\.{1,2}\/[^'"]+)['"]/gm;
 
 const direct = new Map<string, string[]>();
 /** The files of this repository a module imports itself. */
 function importsOf(file: string): string[] {
-  if (!direct.has(file))
-    direct.set(file, !existsSync(join(ROOT, file)) ? [] : [...readFileSync(join(ROOT, file), 'utf8').matchAll(SPECIFIER)].map((m) => relative(ROOT, resolve(ROOT, dirname(file), m[1] ?? m[2] ?? m[3])).replaceAll('\\', '/')).filter((to) => !to.startsWith('..')));
+  if (!direct.has(file)) {
+    const text = !existsSync(join(ROOT, file)) ? '' : readFileSync(join(ROOT, file), 'utf8');
+    const own = [...text.matchAll(SPECIFIER)].map((m) => relative(ROOT, resolve(ROOT, dirname(file), m[1] ?? m[2] ?? m[3])).replaceAll('\\', '/')).filter((to) => !to.startsWith('..'));
+    // A pack's test reaches the kernel through the harness's one name (package.json imports).
+    direct.set(file, HARNESS.test(text) ? [...own, 'test/pack-harness.ts'] : own);
+  }
   return direct.get(file)!;
 }
 

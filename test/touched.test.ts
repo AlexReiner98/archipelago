@@ -10,7 +10,8 @@ import type { Archipelago } from '../src/pelago.ts';
 import { sessionStart } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { touchedBy } from '../src/touched.ts';
-import { agent, fresh, laneSetup, make } from './map.ts';
+import { Registry } from '../src/packs.ts';
+import { agent, fresh, freshWith, laneSetup, make, PACKS } from './map.ts';
 
 /** A hook as Claude Code sends it, answered by this map. */
 const hook = (l: Archipelago, event: string, body: Record<string, unknown>) => answerHook(event, { whole: l.db, pelago: l, within: [], body, running: { started: new Date().toISOString() }, origin: 'http://127.0.0.1' });
@@ -43,7 +44,7 @@ test('what a session touched is kept with its run, apart from another session of
 });
 
 test('in a repository, what the session touched is asked about first', async () => {
-  const l = await fresh();
+  const l = await freshWith(new Registry([PACKS, join(import.meta.dirname, 'packs')], ['core', 'checkout']));
   const made = await laneSetup(l);
   const { run } = await sessionStart(l, agent, { cwd: 'C:\\code\\Apex', session_id: 'r1' });
   await hook(l, 'stop', { session_id: 'r1', touched: [made.gated, made.repo] });

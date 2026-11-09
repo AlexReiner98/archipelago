@@ -83,6 +83,22 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
   };
   const crossing = (where: string, a: Where, b: Where) =>
     a.island && b.island && a.island !== b.island ? `${where}: "${a.title}" lives on the island ${a.island} and "${b.title}" on ${b.island}: no link joins two islands; publish a finding instead` : undefined;
+  /** The field an item read across islands must mark true (its type's promised.published), and the item as this change leaves it. */
+  const markOf = async (key: string) => {
+    const ref = made.get(key);
+    const found = ref ?? (await map.entity(key));
+    const mark = found && reg.type(found.type)?.capabilities.promised?.published;
+    if (!found || !mark) return undefined;
+    const set = ops.find((op) => op.op === 'update' && op.id === key && op.props?.[mark] !== undefined) as { props: Record<string, unknown> } | undefined;
+    return { mark, published: (set ? set.props[mark] : found.props[mark]) === true, title: found.title };
+  };
+  /** A link that crosses may only end, across islands, on what its island stands by: an item it marks published. */
+  const unpublished = async (where: string, from: string, to: string) => {
+    const [a, b] = [await whereIs(from), await whereIs(to)];
+    if (!a?.island || !b?.island || a.island === b.island) return undefined;
+    const m = await markOf(to);
+    if (m && !m.published) return `${where}: "${m.title}" is a working finding of its island: another island reads only what it marks published (props.${m.mark}: true)`;
+  };
   /** What is wrong with putting an item of this type on this island. */
   const placing = async (where: string, type: ResolvedType, island: unknown): Promise<string | undefined> => {
     if (typeof island !== 'string' || !island) return `${where}: a ${type.id} lives on an island here: name it in props.island`;
@@ -105,6 +121,12 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
       const type = before && reg.type(before.type);
       if (!before || !type) continue;
       if (reg.isA(type.id, ISLAND) && op.props.pack !== undefined && op.props.pack !== before.props.pack) problem(`${where}: an island’s pack is fixed once it is made`);
+      const mark = type.capabilities.promised?.published;
+      if (mark && op.props[mark] === false && before.props[mark] === true) {
+        // Taken back, it may no longer be read across: its readers on other islands unlink first.
+        const { rows } = await map.db.query<{ from_id: string }>(`select from_id from relation where to_id = $1 and valid_to is null and type = any($2::text[]) and id <> all($3::text[]) limit 50`, [op.id, crosses, cut]);
+        for (const { from_id } of rows) { const there = await whereIs(from_id); if (there?.island && there.island !== before.props.island) { problem(`${where}: "${before.title}" is read from the island ${there.island} ("${there.title}"): unlink that reading before taking it back`); break; } }
+      }
       if (!livesOnIsland(type) || op.props.island === undefined || op.props.island === before.props.island) continue;
       const placed = bare(where, op.props.island) ?? (await placing(where, type, islandKey(op.props.island)));
       if (placed) { problem(placed); continue; }
@@ -112,6 +134,8 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
       // What it is linked to stays where this change leaves it: a move that would leave a link joining two islands is refused.
       const { rows } = await map.db.query<{ other: string }>(`select case when from_id = $1 then to_id else from_id end as other from relation where (from_id = $1 or to_id = $1) and valid_to is null and id <> all($2::text[]) and type <> all($3::text[])`, [op.id, cut, crosses]);
       for (const { other } of rows) { const there = await whereIs(other); if (there) problem(crossing(where, here, there)); }
+    } else if (op.op === 'link' && crosses.includes(op.type)) {
+      problem(await unpublished(where, op.from, op.to));
     } else if ((op.op === 'link' && !crosses.includes(op.type)) || op.op === 'merge') {
       const [a, b] = op.op === 'link' ? [op.from, op.to] : [op.keep, op.drop];
       const [x, y] = [await whereIs(a), await whereIs(b)];

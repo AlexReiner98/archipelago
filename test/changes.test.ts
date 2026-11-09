@@ -8,20 +8,28 @@ import { callTool } from '../src/tools.ts';
 import { importAudit } from '../src/audit.ts';
 import { human, agent, fresh, make } from './map.ts';
 
-test('flavours inherit fields and statuses, and are found through the parent', async () => {
+/** A flavour of task with a field of its own, defined on the map as the owner would. */
+const EXPERIMENT = { id: 'local.experiment', title: 'Experiment', description: 'A test of a guess.', extends: 'task', fields: { method: { type: 'string' } } } as const;
+const withExperiment = async () => {
   const l = await fresh();
-  const experiment = l.registry.type('experiment')!;
-  assert.deepEqual(experiment.lineage, ['experiment', 'task', 'work']);
+  await make(l, [{ op: 'define_type', type: EXPERIMENT }]);
+  return l;
+};
+
+test('flavours inherit fields and statuses, and are found through the parent', async () => {
+  const l = await withExperiment();
+  const experiment = l.registry.type('local.experiment')!;
+  assert.deepEqual(experiment.lineage, ['local.experiment', 'task', 'work']);
   assert.ok(experiment.fields.priority, 'inherits task.priority');
   assert.ok(experiment.fields.method, 'adds its own field');
   assert.deepEqual(experiment.statuses, l.registry.type('task')!.statuses);
 
   await make(l, [
-    { op: 'create', type: 'experiment', title: 'Shadows at noon', props: { priority: 'high' } },
+    { op: 'create', type: 'local.experiment', title: 'Shadows at noon', props: { priority: 'high' } },
     { op: 'create', type: 'task', title: 'Slow builds' },
   ]);
   assert.equal((await l.search({ type: 'task' })).length, 2);
-  assert.equal((await l.search({ type: 'experiment' })).length, 1);
+  assert.equal((await l.search({ type: 'local.experiment' })).length, 1);
 });
 
 test('a flavour can override an inherited default', async () => {
@@ -69,7 +77,7 @@ test('an agent change becomes a proposal; a human approves it, minus exclusions'
     reason: 'Read the handoff doc',
     source: { uri: 'docs/handoff.md', kind: 'file' },
     ops: [
-      { op: 'create', ref: 'proj', type: 'project', title: 'Shadow' },
+      { op: 'create', ref: 'proj', type: 'aim', title: 'Shadow' },
       { op: 'create', ref: 'a', type: 'task', title: 'Fix parity' },
       { op: 'create', ref: 'b', type: 'task', title: 'Wrong guess' },
       { op: 'link', type: 'part_of', from: 'a', to: 'proj' },
@@ -121,22 +129,22 @@ test('what the page follows moves when a change is proposed, decided or applied,
 test('policy can let agents apply some ops directly, or forbid them', async () => {
   const l = await fresh();
   const loose = new Archipelago(l.db, l.registry, { create: 'auto', merge: 'forbidden' });
-  const made = await loose.change(agent, { ops: [{ op: 'create', ref: 'x', type: 'note', title: 'X' }], reason: 'test' });
+  const made = await loose.change(agent, { ops: [{ op: 'create', ref: 'x', type: 'finding', title: 'X', props: { value: 1, value_type: 'number' } }], reason: 'test' });
   assert.equal(made.status, 'applied');
   const x = (made as { created: Record<string, string> }).created.x;
-  const y = (await make(l, [{ op: 'create', ref: 'y', type: 'note', title: 'Y' }])).y;
+  const y = (await make(l, [{ op: 'create', ref: 'y', type: 'finding', title: 'Y' }])).y;
   await assert.rejects(loose.change(agent, { ops: [{ op: 'merge', keep: x, drop: y }], reason: 'test' }), /forbids/);
   const mixed = await loose.change(agent, {
-    ops: [{ op: 'create', type: 'note', title: 'Z' }, { op: 'archive', id: y }],
+    ops: [{ op: 'create', type: 'finding', title: 'Z', props: { value: 1, value_type: 'number' } }, { op: 'archive', id: y }],
     reason: 'test',
   });
   assert.equal(mixed.status, 'proposed', 'one op needing approval holds the whole change');
 });
 
 test('possible duplicates are flagged, across flavours', async () => {
-  const l = await fresh();
+  const l = await withExperiment();
   await make(l, [{ op: 'create', type: 'task', title: 'Mask misregistration' }]);
-  const result = await l.change(agent, { ops: [{ op: 'create', type: 'experiment', title: 'mask misregistration' }], reason: 'test' });
+  const result = await l.change(agent, { ops: [{ op: 'create', type: 'local.experiment', title: 'mask misregistration' }], reason: 'test' });
   assert.match(result.warnings[0], /possible duplicate of existing task "Mask misregistration"/);
 });
 
@@ -221,9 +229,9 @@ test('each fact can carry its own source within one change', async () => {
     reason: 'test',
     source: { uri: 'docs/roadmap.md' },
     ops: [
-      { op: 'create', ref: 'a', type: 'note', title: 'From the roadmap' },
-      { op: 'create', ref: 'b', type: 'note', title: 'From the readme', source: { uri: 'README.md', kind: 'file' } },
-      { op: 'create', ref: 'c', type: 'note', title: 'Also from the readme', source: { uri: 'README.md' } },
+      { op: 'create', ref: 'a', type: 'finding', title: 'From the roadmap' },
+      { op: 'create', ref: 'b', type: 'finding', title: 'From the readme', source: { uri: 'README.md', kind: 'file' } },
+      { op: 'create', ref: 'c', type: 'finding', title: 'Also from the readme', source: { uri: 'README.md' } },
     ],
   });
   const made = (result as { created: Record<string, string> }).created;
@@ -236,18 +244,18 @@ test('a reviewer can correct a proposal while approving it', async () => {
   const l = await fresh();
   const proposed = await l.change(agent, {
     reason: 'test',
-    ops: [{ op: 'create', ref: 'f', type: 'feature', title: 'Presets', status: 'planned' }],
+    ops: [{ op: 'create', ref: 'f', type: 'task', title: 'Presets', status: 'todo' }],
   });
   const id = (proposed as { proposal: string }).proposal;
   await assert.rejects(
-    l.decide(human, { proposal: id, approve: true, ops: [{ op: 'create', type: 'feature', title: 'Presets', status: 'nonsense' }] }),
+    l.decide(human, { proposal: id, approve: true, ops: [{ op: 'create', type: 'task', title: 'Presets', status: 'nonsense' }] }),
     /status "nonsense"/,
   );
   assert.equal((await l.proposals()).length, 1, 'a rejected correction leaves the proposal pending');
 
-  await l.decide(human, { proposal: id, approve: true, ops: [{ op: 'create', ref: 'f', type: 'feature', title: 'Presets', status: 'shipped' }] });
-  const [feature] = await l.search({ type: 'feature' });
-  assert.equal(feature.status, 'shipped');
+  await l.decide(human, { proposal: id, approve: true, ops: [{ op: 'create', ref: 'f', type: 'task', title: 'Presets', status: 'done' }] });
+  const [feature] = await l.search({ type: 'task' });
+  assert.equal(feature.status, 'done');
   const [event] = (await l.events({ target: feature.id })) as any[];
   assert.equal(event.actor, 'agent:test');
   assert.equal(event.detail.revised_by, 'human:test');

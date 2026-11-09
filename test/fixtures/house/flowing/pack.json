@@ -1,0 +1,8 @@
+{
+  "id": "flowing",
+  "version": "0.1.0",
+  "title": "Flowing",
+  "description": "The canvas drawn as a flow unless a nearer style says otherwise, as the canvas pack (now the hosted service's) does: the look the browser tests were written against. Loaded by test/serve.ts.",
+  "requires": ["core"],
+  "styles": [{ "id": "flowing.house", "title": "Flowing", "over": "workspace", "props": { "shape": "flow" } }]
+}

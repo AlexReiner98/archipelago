@@ -1,0 +1,91 @@
+{
+ "aperture": [
+  "aperture_setup"
+ ],
+ "canvas": [],
+ "code": [
+  "bug",
+  "calls",
+  "commit",
+  "component",
+  "defers",
+  "environment",
+  "feature",
+  "fixes",
+  "product",
+  "pull_request",
+  "release",
+  "repo",
+  "settles",
+  "ships"
+ ],
+ "design": [
+  "alternative_for",
+  "concept",
+  "element",
+  "goes_against",
+  "research",
+  "rests_on",
+  "study",
+  "tenet",
+  "writeup"
+ ],
+ "funding": [
+  "could_fund",
+  "program",
+  "requires"
+ ],
+ "outreach": [
+  "came_out_of",
+  "channel",
+  "channel_month",
+  "conversation",
+  "goes_out_on",
+  "post"
+ ],
+ "plan": [],
+ "proof": [
+  "action",
+  "answers",
+  "proof",
+  "rule",
+  "test",
+  "test_result"
+ ],
+ "ridges": [
+  "ridges_setup"
+ ],
+ "science": [
+  "assumes",
+  "experiment",
+  "hypothesis",
+  "investigation",
+  "refutes",
+  "result",
+  "supports",
+  "tests"
+ ],
+ "social": [],
+ "software": [
+  "diagram"
+ ],
+ "themes": [],
+ "time": [
+  "bills",
+  "cost",
+  "invoice",
+  "meeting",
+  "routine",
+  "time_entry"
+ ],
+ "work": [
+  "addresses",
+  "document",
+  "file",
+  "goal",
+  "idea",
+  "issue",
+  "note",
+  "project"
+ ]
+}

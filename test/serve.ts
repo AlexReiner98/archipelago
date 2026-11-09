@@ -23,10 +23,18 @@ after(async () => {
   for (const close of closers) await close();
 });
 
-/** A server on its own port with in-memory databases and the repository's packs, read in place (test/map.ts). */
-export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; token?: Limit; signIn?: Limit }, sites?: Record<string, string>) {
+/**
+ * A server on its own port with in-memory databases and the repository's packs, read in place (test/map.ts). A folder
+ * given is read in their place (packsWith in test/map.ts, for a test pack beside them); a list is read after them, as
+ * PELAGO_PACKS names more folders (src/config.ts).
+ */
+export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; token?: Limit; signIn?: Limit }, sites?: Record<string, string>, packs: string | string[] = []) {
   const root = mkdtempSync(join(tmpdir(), 'pelago-platform-'));
-  const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(import.meta.dirname, '..', 'packs') });
+  const packsDir = typeof packs === 'string' ? packs : join(import.meta.dirname, '..', 'packs');
+  // Every server here also draws the canvas as a flow by default, as the canvas pack did before it went to the hosted
+  // service (test/fixtures/house/flowing): the look these browser tests were written against.
+  const more = [...(typeof packs === 'string' ? [] : packs), join(import.meta.dirname, 'fixtures', 'house')];
+  const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir, packDirs: [packsDir, ...more] });
   // The server checks the Host header against its port, so the port must be known first.
   const probe = createHttpServer(workspaces, 0);
   await new Promise<void>((r) => probe.listen(0, '127.0.0.1', r));

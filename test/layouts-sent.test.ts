@@ -71,12 +71,12 @@ test('a picture is sent the drawing its shape is drawn by, once, and the ownerâ€
 test('a picture with steps is sent them, and the finished parts they name, whatever it leaves out', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'A system' },
-    { op: 'create', ref: 'a', type: 'component', title: 'Doors', status: 'up' },
-    { op: 'create', ref: 'o', type: 'component', title: 'Old backups', status: 'retired' },
+    { op: 'create', ref: 'p', type: 'task', title: 'A system' },
+    { op: 'create', ref: 'a', type: 'place', title: 'Doors', status: 'available' },
+    { op: 'create', ref: 'o', type: 'place', title: 'Old backups', status: 'retired' },
     { op: 'link', type: 'part_of', from: 'a', to: 'p' },
     { op: 'link', type: 'part_of', from: 'o', to: 'p' },
-    { op: 'link', type: 'calls', from: 'a', to: 'o' },
+    { op: 'link', type: 'uses', from: 'a', to: 'o' },
   ]);
   const steps = [{ chapter: { name: 'Then', when: '7 Oct', count: 1 }, add: [made.a, made.o], titles: { [made.a]: 'Old doors' }, lines: [{ by: 'Alex', text: 'Back it up.' }] }, { remove: [made.o], lines: [{ by: 'Agent', text: 'It is gone.' }] }];
   Object.assign(made, await make(l, [{ op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', props: { filter: { find: [`part_of ${made.p}`], not: ['done', 'kind system'] }, steps } }]));

@@ -20,7 +20,7 @@ test('the canonical form is RFC 8785, and a sealed value is hashed by its digest
 test('every change set is appended as facts, chained, in the transaction that writes it', async () => {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Log' },
+    { op: 'create', ref: 'p', type: 'aim', title: 'Log' },
     { op: 'create', ref: 't', type: 'task', title: 'Chain it', body: 'Part of {p}.', props: { priority: 'high' } },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
@@ -66,7 +66,7 @@ test('the log takes no update and no delete, from anyone', async () => {
 
 test('a held change waits on a known position; approving appends what it showed, rejecting appends that', async () => {
   const l = await fresh();
-  const made = await make(l, [{ op: 'create', ref: 'p', type: 'project', title: 'Log' }]);
+  const made = await make(l, [{ op: 'create', ref: 'p', type: 'aim', title: 'Log' }]);
   const held = (await l.change(agent, { reason: 'More work', ops: [{ op: 'create', ref: 'n', type: 'task', title: 'New' }, { op: 'link', type: 'part_of', from: 'n', to: made.p }], source: { uri: 'docs/log.md' } })) as { proposal: string; held_by: { rule: string } };
   const record = (await entry(l.db, held.proposal))!;
   assert.deepEqual([record.stream, record.pos, record.base, (record.held_by as { rule: string }).rule], ['pending', 1, 1, held.held_by.rule]);
@@ -127,7 +127,7 @@ test('undo appends the opposite change set, and the facts replay into the rows t
   const me = (await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }])).me;
   const mine = l.as(me);
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Rework' },
+    { op: 'create', ref: 'p', type: 'aim', title: 'Rework' },
     { op: 'create', ref: 'a', type: 'task', title: 'Write the spec', owner: me, props: { priority: 'high' } },
     { op: 'create', ref: 'b', type: 'task', title: 'Write the spec again' },
     { op: 'create', ref: 'c', type: 'task', title: 'Build it', confidence: 0.6 },

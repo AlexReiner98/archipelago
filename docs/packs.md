@@ -1,7 +1,13 @@
 # The pack manifest
 
-A pack is one folder under `packs/` with a `pack.json`, its manifest, and a
-`handler.js` when it runs code. The manifest says what the pack declares, in
+A pack is one folder with a `pack.json`, its manifest, and a `handler.js` when
+it runs code. The open core ships one, `core`, under `packs/`: the starter
+types, task, decision, finding and event, actors, the system's own types and
+the root links. Every other pack (work, code, software, proof, science, time,
+design, the canvas's look and the rest) is the hosted service's, kept in
+`archipelago-hosted` and read from a folder `PELAGO_PACKS` names (decision
+e_8jd82drh, 9 Nov 2026). A pack's tests live beside it and reach the kernel
+only through `#pelago/test`. The manifest says what the pack declares, in
 sixteen keys and no others (Rule 8 of the target model; `src/manifest.ts`
 reads it, `test/structure.test.ts` refuses any other key).
 
@@ -85,6 +91,14 @@ one is off there, and its state says which.
   is not taken) cannot be built on: a pack that does waits.
 
 Core, the kernel's pack, is never judged.
+
+## Where packs are found
+
+A server reads its packs from `packs/`, then from each folder `PELAGO_PACKS`
+names (separated as `PATH` is): a pack kept off this repository, as the hosted
+service keeps the packs it sells, is a folder there. A pack is its id wherever
+it is found, so one moved between folders is the same pack to every
+workspace. The same id in two folders stops the server from starting.
 
 ## In time
 

@@ -1,13 +1,36 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
+import { packsWith } from './map.ts';
 import { serve } from './serve.ts';
+
+// What is shared is a type whose page reads it whole (a document piece), and a section of it may keep a picture (a
+// figure piece): a pack made for the test gives both, so the sharing is tried on core's kernel alone.
+const PACKS_DIR = packsWith({
+  id: 'paper',
+  version: '0.1.0',
+  title: 'Paper',
+  description: 'Writing for a reader, and the leaves it brings in.',
+  requires: ['core'],
+  types: [
+    {
+      id: 'paper', extends: 'record', title: 'Paper', public: true, deliverable: true, description: 'Writing for a reader: its note is the text, and a line holding only an item id brings that item in.',
+      statuses: { open: ['draft', 'ready'], closed: ['final', 'withdrawn'], phases: { final: 'finished', withdrawn: 'ended' } },
+      fields: { path: { type: 'string' }, menu: { type: 'number' } },
+    },
+    { id: 'leaf', extends: 'record', title: 'Leaf', description: 'A part a paper brings in, with a picture.' },
+  ],
+  views: [
+    { form: 'screen', id: 'paper.reading', title: 'Reading', on: ['paper'], pieces: [{ piece: 'document' }] },
+    { form: 'screen', id: 'paper.figure', title: 'Figure', on: ['leaf'], pieces: [{ piece: 'figure' }] },
+  ],
+} as any);
 
 // A one-pixel PNG.
 const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
 test('a document shared with another workspace is read there once accepted, and by nobody else', async () => {
-  const { workspaces, call } = await serve('tokens');
+  const { workspaces, call } = await serve('tokens', undefined, undefined, PACKS_DIR);
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
@@ -22,9 +45,9 @@ test('a document shared with another workspace is read there once accepted, and 
     await api(mine, 'change', {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'd', type: 'document', title: 'Proposal for Acme', visibility: 'shared', body: 'Why us.\n\n{s}\n\nNot for them: {x}' },
-        { op: 'create', ref: 's', type: 'note', title: 'Costs', visibility: 'shared', body: 'Twenty an hour.' },
-        { op: 'create', ref: 'x', type: 'note', title: 'Our margin', visibility: 'shared', body: 'Secret.' },
+        { op: 'create', ref: 'd', type: 'paper', title: 'Proposal for Acme', visibility: 'shared', body: 'Why us.\n\n{s}\n\nNot for them: {x}' },
+        { op: 'create', ref: 's', type: 'leaf', title: 'Costs', visibility: 'shared', body: 'Twenty an hour.' },
+        { op: 'create', ref: 'x', type: 'leaf', title: 'Our margin', visibility: 'shared', body: 'Secret.' },
         { op: 'link', type: 'part_of', from: 's', to: 'd' },
       ],
     })
@@ -95,7 +118,7 @@ test('a document shared with another workspace is read there once accepted, and 
 });
 
 test('the receiver ends a share on its side, and the sender can share again', async () => {
-  const { workspaces, call } = await serve('tokens');
+  const { workspaces, call } = await serve('tokens', undefined, undefined, PACKS_DIR);
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
@@ -104,7 +127,7 @@ test('the receiver ends a share on its side, and the sender can share again', as
     if (answer.error) throw new Error(answer.error);
     return answer.result;
   };
-  const doc = (await api(mine, 'change', { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'document', title: 'Plan', body: 'The plan.' }] })).created.d;
+  const doc = (await api(mine, 'change', { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'paper', title: 'Plan', body: 'The plan.' }] })).created.d;
   await api(theirs, 'workspace_set', { accepts_from: ['default'] });
   await api(mine, 'share_workspace', { id: doc, workspace: 'acme' });
   const [item] = await api(theirs, 'search', { type: 'shared_document' });
@@ -115,7 +138,7 @@ test('the receiver ends a share on its side, and the sender can share again', as
 });
 
 test('a shared document is published where it is read only if its sender says so, as the sender gives it, until the share ends', async () => {
-  const { workspaces, call, base } = await serve('tokens');
+  const { workspaces, call, base } = await serve('tokens', undefined, undefined, PACKS_DIR);
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
   const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
@@ -128,12 +151,12 @@ test('a shared document is published where it is read only if its sender says so
     await api(mine, 'change', {
       reason: 'test',
       ops: [
-        { op: 'create', ref: 'p', type: 'document', title: 'A principle', visibility: 'shared', body: 'Held by what serves it.\n\n{l}' },
-        { op: 'create', ref: 'e', type: 'document', title: 'The principles', visibility: 'shared', body: 'Read {p} first.' },
-        { op: 'create', ref: 'f', type: 'feature', title: 'The rule', visibility: 'shared', body: 'Holds a change.' },
+        { op: 'create', ref: 'p', type: 'paper', title: 'A principle', visibility: 'shared', body: 'Held by what serves it.\n\n{l}' },
+        { op: 'create', ref: 'e', type: 'paper', title: 'The principles', visibility: 'shared', body: 'Read {p} first.' },
+        { op: 'create', ref: 'f', type: 'aim', title: 'The rule', visibility: 'shared', body: 'Holds a change.' },
         { op: 'create', ref: 't', type: 'task', title: 'A test of it', visibility: 'shared', body: 'Checks it.' },
         { op: 'create', ref: 'x', type: 'task', title: 'Not for them', visibility: 'private', body: 'Secret.' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What holds it', visibility: 'shared', props: { filter: { find: ['type task', 'type feature'] } } },
+        { op: 'create', ref: 'l', type: 'lens', title: 'What holds it', visibility: 'shared', props: { filter: { find: ['type task', 'type aim'] } } },
         { op: 'link', type: 'part_of', from: 't', to: 'f' },
         { op: 'link', type: 'part_of', from: 'x', to: 'f' },
         { op: 'link', type: 'about', from: 'l', to: 'f' },

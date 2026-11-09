@@ -1,7 +1,7 @@
 // A session finds where it works through the where capability: the kernel asks the types of place that say what
 // they are known by (an address, a folder), and with no such type a session is tied to no place.
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
@@ -9,12 +9,18 @@ import { checkCapabilities } from '../src/capabilities.ts';
 import { openDb } from '../src/db.ts';
 import { hostFor } from '../src/packtools.ts';
 import { Archipelago } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
+import { Registry, type PackFile } from '../src/packs.ts';
 import { addressKey, sameAddress } from '../src/places.ts';
 import { callTool } from '../src/tools.ts';
-import { human } from './map.ts';
+import { human, packsWith } from './map.ts';
 
 const PACKS = join(import.meta.dirname, '..', 'packs');
+
+/** A pack whose place is known by its remote and its folder, as a repository is. */
+const YARD: PackFile = {
+  id: 'yard', version: '1', title: 'Yard', requires: ['core'],
+  types: [{ id: 'yard.checkout', title: 'Checkout', description: '', extends: 'place', fields: { remote: { type: 'url' }, path: { type: 'string' } }, capabilities: { where: { address: 'remote', folder: 'path' } } }],
+};
 
 const registries: Registry[] = [];
 after(() => registries.forEach((r) => hostFor(r).stop()));
@@ -35,18 +41,18 @@ test('an address is one key however it is written', () => {
   assert.ok(!sameAddress('github.com/owner/name', 'github.com/other-owner/name'));
 });
 
-test('with the software pack a session lands on its repository, by its remote or its folder', async () => {
-  const l = await map();
+test('with a pack that knows places, a session lands on its place, by its remote or its folder', async () => {
+  const l = await map(packsWith(YARD));
   const made = (await l.change(human, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'a', type: 'repo', title: 'A repo', props: { remote: 'https://github.com/me/a', path: 'C:\\code\\a' } },
-      { op: 'create', ref: 'b', type: 'repo', title: 'B repo', props: { remote: 'https://github.com/me/b' } },
+      { op: 'create', ref: 'a', type: 'yard.checkout', title: 'A repo', props: { remote: 'https://github.com/me/a', path: 'C:\\code\\a' } },
+      { op: 'create', ref: 'b', type: 'yard.checkout', title: 'B repo', props: { remote: 'https://github.com/me/b' } },
     ],
   })) as { created: Record<string, string> };
   const byRemote = (await callTool(l, human, 'session_start', { remote: 'git@github.com:me/b.git', cwd: 'C:\\code\\a' })) as { run: string; repo: { id: string } };
   assert.equal(byRemote.repo.id, made.created.b, 'the address wins over the folder: it is the same on every machine');
-  assert.deepEqual(await linksOf(l, byRemote.run), [{ type: 'lives_in', to_id: made.created.b }], 'tied by the flavour of lives_in a repository is made for');
+  assert.deepEqual(await linksOf(l, byRemote.run), [{ type: 'lives_in', to_id: made.created.b }], 'tied to it by lives_in');
   const byFolder = (await callTool(l, human, 'session_start', { cwd: 'c:/code/a/src' })) as { run: string; repo: { id: string } };
   assert.equal(byFolder.repo.id, made.created.a);
   const nowhere = (await callTool(l, human, 'session_start', { cwd: 'D:\\elsewhere' })) as { run: string; repo?: unknown };
@@ -55,8 +61,7 @@ test('with the software pack a session lands on its repository, by its remote or
 
 test('without a pack that knows places, a session starts tied to no place', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'pelago-places-'));
-  cpSync(PACKS, dir, { recursive: true });
-  rmSync(join(dir, 'software'), { recursive: true });
+  cpSync(join(PACKS, 'core'), join(dir, 'core'), { recursive: true });
   const l = await map(dir);
   const started = (await callTool(l, human, 'session_start', { remote: 'https://github.com/me/a', cwd: 'C:\\code\\a', title: 'Here' })) as { run: string; repo?: unknown };
   assert.ok(started.run);

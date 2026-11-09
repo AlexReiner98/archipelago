@@ -56,8 +56,9 @@ export async function make(l: Archipelago, ops: Op[]) {
 /** A project in a repo, with one task that needs the live lane and one that does not. */
 export async function laneSetup(l: Archipelago) {
   return make(l, [
-    { op: 'create', ref: 'repo', type: 'repo', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } },
-    { op: 'create', ref: 'proj', type: 'project', title: 'Apex' },
+    // A checkout found by its folder where the map has the test pack for it (test/packs/checkout), else a plain place.
+    l.registry.types.has('checkout') ? { op: 'create', ref: 'repo', type: 'checkout', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } } : { op: 'create', ref: 'repo', type: 'place', title: 'Apex repo' },
+    { op: 'create', ref: 'proj', type: 'aim', title: 'Apex' },
     { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Live lane' },
     { op: 'create', ref: 'rule', type: 'decision', title: 'One live lane.', status: 'decided', props: { outcome: 'Only one session drives the CAD app.' } },
     { op: 'create', ref: 'live', type: 'task', title: 'Capture probe' },

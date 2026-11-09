@@ -54,11 +54,11 @@ test('a tab following a chat takes its shows, in the pane held for it', () => {
 });
 
 test('one session keeps two panes by name in its tab, each drawn in again when named', () => {
-  const tabs = [chat('e_aaaaaaaa', {}, [{ id: 'p1', slot: 'tests', by: 'e_aaaaaaaa' }])];
-  assert.deepEqual(route(step('e_aaaaaaaa', 'tests'), tabs, at), { tab: 't0', pane: 'p1', front: true });
+  const tabs = [chat('e_aaaaaaaa', {}, [{ id: 'p1', slot: 'checks', by: 'e_aaaaaaaa' }])];
+  assert.deepEqual(route(step('e_aaaaaaaa', 'checks'), tabs, at), { tab: 't0', pane: 'p1', front: true });
   assert.deepEqual(route(step('e_aaaaaaaa', 'map'), tabs, at), { tab: 't0', split: { slot: 'map', side: 'right' }, front: true });
-  assert.deepEqual(route(step('e_bbbbbbbb', 'tests'), tabs, at), { open: { follows: 'e_bbbbbbbb', slot: 'tests' }, front: false });
-  assert.deepEqual(route(step('e_bbbbbbbb', 'tests'), [...tabs, tab('t1', 'e_bbbbbbbb', { slot: 'tests' })], at), { tab: 't1', pane: 'p0', front: false });
+  assert.deepEqual(route(step('e_bbbbbbbb', 'checks'), tabs, at), { open: { follows: 'e_bbbbbbbb', slot: 'checks' }, front: false });
+  assert.deepEqual(route(step('e_bbbbbbbb', 'checks'), [...tabs, tab('t1', 'e_bbbbbbbb', { slot: 'checks' })], at), { tab: 't1', pane: 'p0', front: false });
 });
 
 test("a side moves the session's pane in its tab; alone and a page that is not a canvas only where the tab follows it", () => {

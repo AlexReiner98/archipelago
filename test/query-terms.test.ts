@@ -14,8 +14,8 @@ const titles = (answer: { items: { title: string }[] }) => answer.items.map((i) 
 async function project() {
   const l = await fresh();
   const made = await make(l, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Rework' },
-    { op: 'create', ref: 'f', type: 'feature', title: 'The bar' },
+    { op: 'create', ref: 'p', type: 'record', title: 'Rework' },
+    { op: 'create', ref: 'f', type: 'event', title: 'The bar' },
     { op: 'create', ref: 'a', type: 'task', title: 'Find in' },
     { op: 'create', ref: 'q', type: 'decision', title: 'Which words?' },
     { op: 'create', ref: 'x', type: 'task', title: 'Done already', status: 'done' },
@@ -110,7 +110,7 @@ test("Only's plain words: each must hold of every seed, and the walk is not narr
 test('a name is never guessed: one item so named is answered by its id, two are refused', async () => {
   const { l, made } = await project();
   const more = await make(l, [
-    { op: 'create', ref: 'u', type: 'goal', title: 'Urgent' },
+    { op: 'create', ref: 'u', type: 'aim', title: 'Urgent' },
     { op: 'create', ref: 'sam', type: 'person', title: 'Sam' },
     { op: 'create', ref: 'sam2', type: 'person', title: 'sam' },
     { op: 'create', ref: 'bo', type: 'person', title: 'Bo' },
@@ -121,7 +121,7 @@ test('a name is never guessed: one item so named is answered by its id, two are 
   assert.deepEqual([titles(served), served.lens.find], [['Find in'], [`serves ${more.u}`]], 'the end named is said back by its id');
   const owned = await flatRead(l, { filter: { find: [`id ${made.o}`, `id ${made.a}`], only: ['owner Bo'] } });
   assert.deepEqual([titles(owned), owned.lens.only], [['Elsewhere'], [`owner ${more.bo}`]]);
-  await make(l, [{ op: 'create', type: 'goal', title: 'URGENT' }]);
+  await make(l, [{ op: 'create', type: 'aim', title: 'URGENT' }]);
   await assert.rejects(flatRead(l, { filter: { find: ['serves Urgent'] } }), /2 items are named "Urgent".*by its id/);
   await assert.rejects(flatRead(l, { filter: { find: [`in ${made.p}`], only: ['owner Sam'] } }), /2 items are named "Sam".*by its id/);
   assert.deepEqual(titles(await flatRead(l, { filter: { find: [`in ${made.p}`], only: [`owner ${more.sam}`] } })), [], 'by its id, the one meant');
@@ -131,7 +131,7 @@ test('the same terms in every part: Find adds, Only keeps, Not takes away', asyn
   const { l, made } = await project();
   const more = await make(l, [
     { op: 'create', ref: 'ann', type: 'person', title: 'Ann' },
-    { op: 'create', ref: 't', type: 'goal', title: 'Urgent' },
+    { op: 'create', ref: 't', type: 'aim', title: 'Urgent' },
     { op: 'link', type: 'waits_on', from: made.a, to: 'ann' },
     { op: 'link', type: 'serves', from: made.o, to: 't' },
     { op: 'update', id: made.o, owner: 'ann' },
@@ -154,14 +154,14 @@ test('a preview says what a term would change, reading nothing else', async () =
   const { l, made } = await project();
   const drawn = (await flatRead(l, { filter: { find: ['type task'] } })).items.map((i) => i.id);
   const ask = (part: string, terms: string[]) => flatRead(l, { filter: { find: ['type task'] }, preview: { part, terms, ids: drawn } }) as unknown as Promise<{ preview: Record<string, string[]> }>;
-  const { preview: found } = await ask('find', ['type project', `id ${made.p}`]);
-  assert.deepEqual([found['type project'], found[`id ${made.p}`]], [[made.p], [made.p]], 'what it would find');
+  const { preview: found } = await ask('find', ['type record', `id ${made.p}`]);
+  assert.deepEqual([found['type record'], found[`id ${made.p}`]], [[made.p], [made.p]], 'what it would find');
   const { preview: only } = await ask('only', ['done']);
   assert.ok(!only.done.some((id) => id === made.x) && only.done.length === drawn.length - 1, 'only says which it would leave out');
   const { preview: not } = await ask('not', ['done', 'blocked']);
   assert.deepEqual(not.done, [made.x], 'not says which it would take away');
   assert.ok(not.blocked.includes(made.a), 'one that can only be checked, too');
-  assert.deepEqual((await (flatRead(l, { filter: {}, preview: { part: 'find', terms: ['type project'] } }) as unknown as Promise<{ preview: Record<string, string[]> }>)).preview['type project'], [made.p], 'an empty canvas may ask');
+  assert.deepEqual((await (flatRead(l, { filter: {}, preview: { part: 'find', terms: ['type record'] } }) as unknown as Promise<{ preview: Record<string, string[]> }>)).preview['type record'], [made.p], 'an empty canvas may ask');
   await assert.rejects(flatRead(l, { filter: {}, preview: { part: 'nope', terms: [] } }), /preview\.part/);
 });
 

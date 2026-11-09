@@ -132,9 +132,13 @@ item's page (or a new item, the Workspace page, a screen, For you). In the
 code: `#sheet` in `ui/index.html`, routed by `ui/app.js`.
 
 **finding.** What an island has found, published for others to read: an item
-of core's `finding` type, its title the name, its note what it means, its
-`value` of the simple type `value_type` says (text, number, boolean, date),
-checked on write, true `as_of` a date. A reader ties itself to one with a
+of core's `finding` type, read in one line: its title the claim as a
+sentence, its `value` the fact (of the simple type `value_type` says: text,
+number, boolean, date; checked on write) with its `unit`, its confidence, and
+`as_of` the date it was true. Its note says how it was found, in three lines
+at most. Marked `published`, it is what its island stands by, and only then
+may another island read it; the rest are its working findings. An option, a
+bug or working research is not a finding. A reader ties itself to one with a
 `reads` link, the one link that crosses between islands (`crosses`).
 
 **place.** Where a drawing's layout puts an item: never set by hand (the
@@ -186,23 +190,15 @@ description). In the code: core's `instruction` type, `src/instructions.ts`,
 stops: how many times it read and surveyed the map, showed the owner
 something, changed the map, edited a file, committed and pushed, as its
 session's hook counts them from the transcript. A rule with `on:
-"reply_ended"` reads those (and one fact of the map, which of the reply's
-commits are unaccounted for) and asks the agent, once a turn, to go on
+"reply_ended"` reads those and asks the agent, once a turn, to go on
 before it stops; it never decides a change. The owner turns one off with
 its switch on the Workspace page's Checks card. In the code:
-`src/reply-rules.ts`, `src/replies.ts`, `src/commits.ts`.
+`src/reply-rules.ts`, `src/replies.ts`.
 
 **run trailer.** The line `Archipelago-Run: <run>` at the end of a commit a
 session makes, naming the run it is registered as, so the commit can be
 traced to its session. Added by the commit-msg hook the setup installs. In
 the code: `scripts/pelago-setup.mjs`.
-
-**accounted for.** A commit is accounted for once the map holds a commit item
-for its full sha, with a settles link to each item it settles, or none. A
-session is asked to account for its own commits before its reply and its run
-end. A commit item with `accounted` false is the owner's attention (reason
-`unaccounted`) until someone sets it true with its links. In the code:
-`commit` and `settles` (`packs/software/pack.json`).
 
 ## Retired words
 

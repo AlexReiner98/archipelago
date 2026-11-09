@@ -9,24 +9,19 @@ import { backupAll, dump, merge, newestBackup, readable, readBackup, restore } f
 import { openDb } from '../src/db.ts';
 import { Archipelago } from '../src/pelago.ts';
 import { sessionEnd, sessionStart } from '../src/sessions.ts';
-import { callTool } from '../src/tools.ts';
-import { askView } from '../src/askview.ts';
 import { Workspaces } from '../src/workspaces.ts';
 import { dumpVault } from '../src/vault.ts';
 import { human, agent, fresh, make } from './map.ts';
 
-/** A view asked by its name, as the view tool asks it. */
-const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
-
 test('a backup merges into a map that has moved on: nothing is lost, the later edit wins, and twice is the same as once', async () => {
   const a = await fresh();
   const made = await make(a, [
-    { op: 'create', ref: 'p', type: 'project', title: 'Proj' },
+    { op: 'create', ref: 'p', type: 'aim', title: 'Proj' },
     { op: 'create', ref: 't', type: 'task', title: 'Task' },
     { op: 'create', ref: 'u', type: 'task', title: 'Other task' },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
-  await a.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'note', title: 'Proposed' }] });
+  await a.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'finding', title: 'Proposed', props: { value: 1, value_type: 'number' } }] });
   // Each map has its own vault: a copy carries the vault's backup beside it.
   const snapshot = async (l: Archipelago) => ({ ...JSON.parse(JSON.stringify(await dump(l.db, { id: 'default', name: 'Default' }))), vault: await dumpVault(l.db) });
   // b starts as a copy of a, then each goes its own way.
@@ -34,7 +29,7 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   await restore(b.db, await snapshot(a));
   const partOf = ((await a.get(made.t)) as any).outgoing[0].relation;
 
-  await make(b, [{ op: 'update', id: made.p, title: 'Proj, renamed in b' }, { op: 'create', type: 'note', title: 'Only in b' }]);
+  await make(b, [{ op: 'update', id: made.p, title: 'Proj, renamed in b' }, { op: 'create', type: 'finding', title: 'Only in b' }]);
   await make(a, [
     { op: 'update', id: made.t, title: 'Task, renamed in a' },
     { op: 'unlink', relation: partOf },
@@ -54,7 +49,7 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   assert.deepEqual([preview.applied, await count(b, 'entity'), await count(b, 'log_op')], [false, ...before], 'looking changes nothing');
   const done = await merge(b.db, from, { ...options, apply: true });
   assert.deepEqual({ ...done, applied: false, events: { ...done.events, first_seq: 0, last_seq: 0 } }, { ...preview, events: { ...preview.events, first_seq: 0, last_seq: 0 } }, 'and it does what it said it would');
-  assert.deepEqual([done.entities.added, done.entities.updated, done.entities.kept_newer_here], [1, 2, 1], 'the new task; the renamed and the archived one; and the project b renamed stays');
+  assert.deepEqual([done.entities.added, done.entities.updated, done.entities.kept_newer_here], [1, 2, 1], 'the new task; the renamed and the archived one; and the aim b renamed stays');
   assert.deepEqual([done.relations, done.proposals, done.left_out.open_sessions], [{ added: 1, ended: 1 }, { added: 0, decided: 1 }, 1]);
   assert.ok(done.events.added > 0 && done.events.last_seq! - done.events.first_seq! === done.events.added - 1, 'its history arrives as one run of events');
 
@@ -129,10 +124,10 @@ test('backups are written per workspace, read back, and only the newest are kept
 test('search puts the best match first and forgives a slip of the keys', async () => {
   const l = await fresh();
   await make(l, [
-    { op: 'create', type: 'note', title: 'Roadmap for the garden app' },
-    { op: 'create', type: 'note', title: 'Hosting', body: 'Where the deployment runs.' },
-    { op: 'create', type: 'note', title: 'Unrelated', body: 'Mentions hosting once, in passing, among many other words about something else entirely.' },
-    { op: 'create', type: 'note', title: 'Nothing to do with it' },
+    { op: 'create', type: 'finding', title: 'Roadmap for the garden app' },
+    { op: 'create', type: 'finding', title: 'Hosting', body: 'Where the deployment runs.' },
+    { op: 'create', type: 'finding', title: 'Unrelated', body: 'Mentions hosting once, in passing, among many other words about something else entirely.' },
+    { op: 'create', type: 'finding', title: 'Nothing to do with it' },
   ]);
   const titles = async (q: string) => (await l.search({ q })).map((e) => e.title);
   assert.deepEqual(await titles('hosting'), ['Hosting', 'Unrelated'], 'a title match outranks a newer mention in the notes');
@@ -168,148 +163,3 @@ test('a workspace nobody is using is closed, and opens again with its data', asy
   assert.equal(workspaces.isOpen('acme'), false, 'a backup closes what it had to open');
   await workspaces.closeAll();
 });
-
-test('an event is a gate: what holds it by stream, what can follow, and what is not yet sorted', async () => {
-  const l = await fresh();
-  const made = await make(l, [
-    { op: 'create', ref: 'me', type: 'person', title: 'Owner' },
-    { op: 'create', ref: 'app', type: 'project', title: 'App' },
-    { op: 'create', ref: 'business', type: 'project', title: 'Business' },
-    { op: 'create', ref: 'addin', type: 'feature', title: 'Add-in' },
-    { op: 'create', ref: 'installer', type: 'feature', title: 'Installer' },
-    { op: 'create', ref: 'docs', type: 'feature', title: 'Docs' },
-    { op: 'create', ref: 'sign', type: 'task', title: 'Sign the package' },
-    { op: 'create', ref: 'cert', type: 'decision', title: 'Which certificate?', owner: 'me' },
-    { op: 'create', ref: 'clean', type: 'task', title: 'Uninstall leaves it clean', status: 'done' },
-    { op: 'create', ref: 'hover', type: 'task', title: 'Hover cards' },
-    { op: 'create', ref: 'extras', type: 'task', title: 'Capture extras' },
-    { op: 'create', ref: 'guide', type: 'task', title: 'Write the guide' },
-    { op: 'create', ref: 'pricing', type: 'decision', title: 'What does it cost?', owner: 'me' },
-    { op: 'create', ref: 'release', type: 'release', title: 'Version 1.0' },
-    { op: 'link', type: 'part_of', from: 'addin', to: 'app' },
-    { op: 'link', type: 'part_of', from: 'installer', to: 'addin' },
-    { op: 'link', type: 'part_of', from: 'docs', to: 'addin' },
-    { op: 'link', type: 'part_of', from: 'sign', to: 'installer' },
-    { op: 'link', type: 'part_of', from: 'cert', to: 'installer' },
-    { op: 'link', type: 'part_of', from: 'clean', to: 'installer' },
-    { op: 'link', type: 'part_of', from: 'hover', to: 'addin' },
-    { op: 'link', type: 'part_of', from: 'extras', to: 'addin' },
-    { op: 'link', type: 'part_of', from: 'guide', to: 'docs' },
-    { op: 'link', type: 'part_of', from: 'pricing', to: 'business' },
-    { op: 'link', type: 'depends_on', from: 'sign', to: 'cert' },
-    { op: 'link', type: 'ships', from: 'release', to: 'addin' },
-    // A feature that holds the event brings its work; a single item sits under the stream it is part of.
-    { op: 'link', type: 'depends_on', from: 'release', to: 'installer' },
-    { op: 'link', type: 'depends_on', from: 'release', to: 'pricing' },
-    { op: 'link', type: 'defers', from: 'release', to: 'hover' },
-  ]);
-  await l.init(human, { name: 'Owner' });
-  type Gate = {
-    counts: Record<string, number>;
-    clear: boolean;
-    to_sort: { id: string; stream: { title: string } | null }[];
-    streams: { id: string | null; title: string | null; yours: number; progress: { done: number; total: number }; items: { id: string; yours: boolean; done: boolean; relation?: string }[] }[];
-    can_follow: { id: string; relation: string }[];
-  };
-  const gate = (await ask(l, 'gate', { event: made.release })) as Gate;
-  assert.deepEqual(gate.counts, { holding: 4, open: 3, yours: 3, to_sort: 2, can_follow: 1 });
-  assert.equal(gate.clear, false);
-  // Not sorted: open work under what ships that is on neither side. What is held, deferred or outside what ships is not asked about.
-  assert.deepEqual(gate.to_sort.map((x) => x.id).sort(), [made.extras, made.guide].sort());
-  assert.equal(gate.to_sort.find((x) => x.id === made.guide)!.stream!.title, 'Docs');
-  const installer = gate.streams.find((s) => s.id === made.installer)!;
-  assert.deepEqual(installer.progress, { done: 1, total: 3 });
-  // The decision is the owner's, and so is the task that cannot move until it is made.
-  assert.equal(installer.yours, 2);
-  assert.equal(installer.items.at(-1)!.id, made.clean, 'what is done comes last');
-  const business = gate.streams.find((s) => s.id === made.business)!;
-  assert.equal(business.items[0].id, made.pricing);
-  assert.ok(business.items[0].relation, 'an item that holds the event itself says by which link');
-  assert.deepEqual(gate.can_follow.map((x) => x.id), [made.hover]);
-
-  // Sorting is two links; moving one across is an unlink and a link.
-  await make(l, [
-    { op: 'link', type: 'depends_on', from: made.release, to: made.guide },
-    { op: 'link', type: 'defers', from: made.release, to: made.extras },
-  ]);
-  const sorted = (await ask(l, 'gate', { event: made.release })) as Gate;
-  assert.equal(sorted.counts.to_sort, 0);
-  assert.equal(sorted.streams.find((s) => s.id === made.docs)!.items[0].id, made.guide);
-
-  await assert.rejects(ask(l, 'gate', { event: made.app }), /needs an event/);
-  await assert.rejects(l.change(human, { ops: [{ op: 'link', type: 'defers', from: made.app, to: made.hover }], reason: 'test' }), /must start from occurrence/);
-  const listed = (await ask(l, 'gate', {})) as { events: { id: string }[] };
-  assert.deepEqual(listed.events.map((e) => e.id), [made.release]);
-});
-
-test('a proof question is answered on a build when every test of it passed there', async () => {
-  const l = await fresh();
-  const made = await make(l, [
-    { op: 'create', ref: 'app', type: 'project', title: 'App' },
-    { op: 'create', ref: 'solver', type: 'feature', title: 'Solver' },
-    { op: 'create', ref: 'sun', type: 'proof', title: 'How do we know the sun is correct?' },
-    { op: 'create', ref: 'areas', type: 'proof', title: 'How do we know the areas are correct?' },
-    { op: 'create', ref: 'noaa', type: 'test', title: 'Sun position against NOAA', status: 'current', props: { entrypoint: 'Sun.MatchesNoaa', tolerance: 'within 0.01 degrees' } },
-    { op: 'create', ref: 'pole', type: 'test', title: 'Shadow of a pole', status: 'current', props: { entrypoint: 'Sun.PoleShadow' } },
-    { op: 'create', ref: 'square', type: 'test', title: 'Area of a square' },
-    { op: 'link', type: 'part_of', from: 'solver', to: 'app' },
-    { op: 'link', type: 'part_of', from: 'sun', to: 'solver' },
-    { op: 'link', type: 'about', from: 'areas', to: 'app' },
-    { op: 'link', type: 'answers', from: 'noaa', to: 'sun' },
-    { op: 'link', type: 'answers', from: 'pole', to: 'sun' },
-    { op: 'link', type: 'answers', from: 'square', to: 'areas' },
-  ]);
-  type Proof = {
-    build: string | null;
-    builds: string[];
-    counts: Record<string, number>;
-    proofs: { id: string; answered: boolean; passed: number; failed: number; not_run: number; tests: { id: string; result: { id: string; passed: boolean; value: string | null; picture: string | null } | null; before: { build: string } | null }[] }[];
-  };
-  const view = async (build?: string) => (await callTool(l, human, 'view', { name: 'proof', params: { of: made.app, build } })) as Proof;
-  const none = await view();
-  assert.equal(none.build, null);
-  assert.deepEqual(none.counts, { questions: 2, answered: 0, tests: 3, passed: 0, failed: 0, not_run: 3 });
-
-  // A harness knows its tests by name. One it names that the map does not know is said back, and nothing is made for it.
-  const first = (await callTool(l, human, 'test_report', {
-    build: '1.0.0',
-    results: [
-      { test: 'Sun.MatchesNoaa', passed: true, value: '0.004 degrees', picture: '.proof/1.0.0/noaa.png' },
-      { test: made.pole, passed: false, value: '3 mm out' },
-      { test: 'Sun.Nobody', passed: true },
-    ],
-  })) as { answer: { recorded: number; passed: number; failed: number; unknown: string[] } };
-  assert.deepEqual({ recorded: first.answer.recorded, passed: first.answer.passed, failed: first.answer.failed, unknown: first.answer.unknown }, { recorded: 2, passed: 1, failed: 1, unknown: ['Sun.Nobody'] });
-  const one = await view();
-  assert.equal(one.build, '1.0.0');
-  const sun = one.proofs.find((p) => p.id === made.sun)!;
-  assert.deepEqual({ answered: sun.answered, passed: sun.passed, failed: sun.failed }, { answered: false, passed: 1, failed: 1 });
-  assert.equal(sun.tests[0].id, made.pole, 'what failed comes first');
-  assert.equal(sun.tests[1].result!.picture, '.proof/1.0.0/noaa.png');
-
-  // Reported again on the same build, a result is replaced, not added to; what the new run does not say is cleared.
-  await callTool(l, human, 'test_report', { build: '1.0.0', results: [{ test: made.pole, passed: true }] });
-  const two = await view();
-  const again = two.proofs.find((p) => p.id === made.sun)!;
-  assert.equal(again.answered, true);
-  assert.equal(again.tests.find((t) => t.id === made.pole)!.result!.id, sun.tests[0].result!.id);
-  assert.equal(again.tests.find((t) => t.id === made.pole)!.result!.value, null);
-  // A test that is wanted and not written leaves its question unanswered.
-  assert.equal(two.proofs.find((p) => p.id === made.areas)!.answered, false);
-  assert.deepEqual(two.counts, { questions: 2, answered: 1, tests: 3, passed: 2, failed: 0, not_run: 1 });
-
-  // A new build starts from nothing: what was proven on the last one is not proven on this one.
-  await callTool(l, human, 'test_report', { build: '1.0.1', results: [{ test: made.noaa, passed: true }] });
-  const next = await view();
-  assert.equal(next.build, '1.0.1');
-  assert.deepEqual(next.builds, ['1.0.1', '1.0.0']);
-  const later = next.proofs.find((p) => p.id === made.sun)!;
-  assert.equal(later.answered, false);
-  assert.equal(later.tests.find((t) => t.id === made.pole)!.before!.build, '1.0.0');
-  assert.equal((await view('1.0.0')).proofs.find((p) => p.id === made.sun)!.answered, true);
-
-  const listed = (await callTool(l, human, 'view', { name: 'proof', params: {} })) as { products: { id: string; questions: number }[] };
-  assert.deepEqual(listed.products.map((p) => [p.id, p.questions]), [[made.app, 2]]);
-  await assert.rejects(callTool(l, human, 'test_report', { build: '1.0.1', results: [{ test: made.noaa, passed: true }, { test: 'Sun.MatchesNoaa', passed: true }] }), /reported twice/);
-});
-

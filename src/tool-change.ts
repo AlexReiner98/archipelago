@@ -53,6 +53,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       'A create\u2019s ref lets later ops link to it, and a title or note in the same change names what it makes as {ref}. Give the source the facts came from. ' +
       'To add to a note or change a passage, send append or replace, not the whole body. An update of only the id says it is still true. ' +
       'A plan or findings are items with a view, not one note. ' +
+      'A published finding (type finding) is one line: its title the claim as a sentence, value the fact with its unit, confidence, as_of; its note how it was found, three lines at most. ' +
       'Checked as a whole, then applied or held as a proposal for a human, by policy. A refused change is kept for a few minutes under a name the refusal gives: send retry and fixes (the ops that were wrong, by number), not all of it again. ' +
       'Closing a decision or hypothesis is held for the human, unless the workspace applies agents\u2019 changes: then a decision must carry props.outcome and props.rationale, and is put to the owner later (attention, to_confirm).',
     input: {

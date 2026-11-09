@@ -28,10 +28,10 @@ test('every shipped type comes from one of core’s starter types, the system ti
     else if (KERNEL_OF_WORK.includes(type.id)) assert.ok(type.starter !== 'system' && type.system, `${type.id} is the kernel's, on a starter of the work`);
     else assert.ok(type.starter !== 'system' && !type.system, `${type.id} is of the work`);
   }
-  assert.equal(reg.type('experiment')!.starter, 'work');
+  assert.equal(reg.type('task')!.starter, 'work');
   assert.equal(reg.type('connection')!.starter, 'place');
-  assert.equal(reg.type('invoice')!.starter, 'record');
-  assert.deepEqual(reg.ancestry('experiment'), { root: 'task', starter: 'work' });
+  assert.equal(reg.type('finding')!.starter, 'record');
+  assert.deepEqual(reg.ancestry('decision'), { root: 'decision', starter: 'question' });
   assert.deepEqual(reg.ancestry('run'), { root: 'run', starter: 'system' });
 });
 
@@ -40,7 +40,7 @@ test('every relation extends one of the thirteen roots', () => {
   assert.deepEqual([...reg.relations.values()].filter((r) => r.root === r.id).map((r) => r.id).sort(), [...ROOTS].sort());
   for (const rel of reg.relations.values()) assert.ok(ROOTS.includes(rel.root), `${rel.id} reads as ${rel.root}`);
   assert.equal(reg.relations.get('lives_in')!.root, 'lives_in');
-  assert.equal(reg.relations.get('supports')!.root, 'bears_on');
+  assert.equal(reg.relations.get('owned_by')!.root, 'involves');
   assert.ok(reg.relationFamily('lives_in').includes('lives_in'));
 });
 
@@ -104,7 +104,7 @@ test("the roots name kinds at their ends, so a pack's own actor can be waited on
   assert.deepEqual(ends('holds'), [['*'], ['place']]);
   assert.deepEqual(ends('serves'), [['*'], ['aim']]);
   assert.deepEqual(ends('bears_on'), [['*'], ['question']]);
-  assert.deepEqual(ends('defers'), [['occurrence'], ['*']]);
+  assert.deepEqual(ends('lives_in'), [['*'], ['place']]);
   const core = new Set([...reg.types.keys()].filter((t) => reg.type(t)!.pack === 'core' && reg.type(t)!.starter !== t));
   for (const r of reg.relations.values()) if (r.root === r.id) for (const end of [...r.from, ...r.to]) assert.ok(!core.has(end), `${r.id} names the kind, not core's ${end}`);
   assert.equal(reg.checkRelation('waits_on', 'task', 'x.crew'), undefined);
@@ -131,7 +131,7 @@ test('views of the work leave the system kind out by default', async () => {
   const made = await l.change(human, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'p', type: 'project', title: 'House' },
+      { op: 'create', ref: 'p', type: 'aim', title: 'House' },
       { op: 'create', ref: 't', type: 'task', title: 'Pour the slab' },
       { op: 'link', type: 'part_of', from: 't', to: 'p' },
       { op: 'create', ref: 'v', type: 'lens', title: 'Everything' },

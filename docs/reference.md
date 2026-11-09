@@ -83,8 +83,8 @@ stands: pick one of its options and say why. The whole log of
 changes is at `#/activity`.
 
 The roadmap is the `tree` view, which agents can call too. The tree is
-declared in the software pack (a view of `form: "tree"` in
-[packs/software/pack.json](../packs/software/pack.json)): which types are roots,
+declared by a pack (the software pack's, a hosted pack, as a view of
+`form: "tree"`): which types are roots,
 branches and work, which field orders them, and which statuses mean "now". A
 pack can declare another tree the same way, with no code.
 
@@ -323,10 +323,10 @@ The questions the map exists to answer. `npm run pelago -- view` lists them.
 | `sessions` | Which agent sessions are open, on what, holding what? |
 | `brief` | What does a session need to know to start on this task? |
 | `repo_work` | What open work belongs to this repository? |
-| `handoff` | Where does this repository's work stand for whoever picks it up? |
+| `handoff` | Where does this repository's work stand for whoever picks it up? (software pack) |
 | `home` | Each project's open questions and next release |
 | `questions` | What is still to be decided in a project? |
-| `gate` | What does a release wait for, and what can follow it? |
+| `gate` | What does a release wait for, and what can follow it? (software pack) |
 | `tree` | A project's roadmap |
 | `flat` | What is in a view: the flat query |
 | `to_confirm` | What did agents settle that I have not confirmed? |
@@ -386,7 +386,9 @@ and what bites in the repository's files, kept as instructions `for`
 
 ## Packs and flavours
 
-Types live in files under `packs/`, one folder per pack:
+Types live in packs, one folder each. The open core ships `core` under
+`packs/`; the others are the hosted service's, read from `PELAGO_PACKS`
+(docs/packs.md):
 
 - `core`: the starter types (the kinds of the work and the system kind), the
   four every island speaks (task, decision, finding, event), actors (person,
@@ -394,7 +396,11 @@ Types live in files under `packs/`, one folder per pack:
   the primitives source, connection, run, notification and automation) and the
   root links, which name kinds or capabilities at their ends (`owned_by` goes
   from `has:owned`, whatever declares owned). A place that says `exclusive` is
-  a resource. It is the one pack always on.
+  a resource. It is the one pack always on, and the only one in this
+  repository.
+
+The hosted service's:
+
 - `work`: project, issue, goal, idea, note, file and document, with
   addresses.
 - `science`: investigation, hypothesis, experiment and result, with tests,
@@ -500,9 +506,7 @@ it.
 ## GitHub: an agent reads each push
 
 The server hears nothing from GitHub: the GitHub pack, the GitHub App and the
-server's push reader went in Nov 2026. A commit is accounted for when a session
-records it on the map, a commit item with its sha linked `settles` to what it
-finished, in the same change that closes it. An agent in the repository reads
+server's push reader went in Nov 2026. An agent in the repository reads
 the pushes it did not make.
 
 A call the server makes to an address someone gave it (a connection checked,

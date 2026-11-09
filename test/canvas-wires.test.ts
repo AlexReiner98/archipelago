@@ -15,7 +15,7 @@ test('in a browser, opening a step keeps the canvas still and lights it, and a h
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'p', type: 'project', title: 'Wired here' },
+      { op: 'create', ref: 'p', type: 'aim', title: 'Wired here' },
       { op: 'create', ref: 'a', type: 'task', title: 'First step' },
       { op: 'create', ref: 'b', type: 'task', title: 'Second step' },
       { op: 'create', ref: 'd', type: 'task', title: 'Third step' },
@@ -24,7 +24,7 @@ test('in a browser, opening a step keeps the canvas still and lights it, and a h
       { op: 'link', type: 'part_of', from: 'd', to: 'p' },
     ],
   })).result.created as Record<string, string>;
-  const page = await open(`${base}/#/v?from=${made.p}`);
+  const page = await open(`${base}/#/v?from=${made.p}&shape=flow`);
   const step = (id: string) => `document.querySelector('#canvas svg a[href="#/e/${id}"]')`;
   const rect = (el: string) => page.evaluate<{ x: number; y: number; w: number; h: number }>(`(() => { const r = ${el}.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; })()`);
   const mouse = (type: string, at: [number, number], buttons = 1) => page.send('Input.dispatchMouseEvent', { type, x: at[0], y: at[1], button: 'left', buttons, clickCount: type === 'mouseMoved' ? 0 : 1 });
