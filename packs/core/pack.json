@@ -627,7 +627,7 @@
         },
         "input": {
           "type": "json",
-          "description": "For action tool: the tool's input. For action launch: {task, mode, instructions, budget_usd}."
+          "description": "For action tool: the tool's input. For action launch: {task, mode, instructions}."
         },
         "last_fired": {
           "type": "datetime",

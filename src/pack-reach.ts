@@ -1,10 +1,9 @@
-// What a workspace pack reaches beyond its own map, each given by the server, so the pack host imports none of it:
-// a server pack's host read as this workspace's connection to that pack (a pack's via), and a model run it asks for
-// (its runs), made by the kernel. And the hold that keeps a workspace open while what a pack started still runs.
+// What a workspace pack reaches beyond its own map, given by the server, so the pack host imports none of it:
+// a server pack's host read as this workspace's connection to that pack (a pack's via). And the hold that keeps a workspace open while what a pack started still runs.
 
 import type { PackFile } from './packs.ts';
 import { parts } from './manifest.ts';
-import type { Actor, Archipelago } from './pelago.ts';
+import type { Archipelago } from './pelago.ts';
 
 /** How the server reaches its server packs for a workspace: the connection the workspace made, and a read through it. */
 export interface Reach {
@@ -14,52 +13,11 @@ export interface Reach {
   via(workspace: string, pack: string, host: string, path: string): Promise<{ status: number; body: unknown }>;
 }
 
-/** A model run a pack asks for: the kernel asks the workspace's model, and answers its tools, until it is done. */
-export interface RunAsk {
-  title: string;
-  system: string;
-  task: string;
-  /** The pack's own tools, each answered by its handler's entry "tool" (given name, input and context). */
-  tools?: { name: string; description: string; input_schema: Record<string, unknown> }[];
-  /** The map's tools offered as they are, of those the pack declares in runs. */
-  map_tools?: string[];
-  /** What the run is held to; the run is recorded in the first. */
-  within: string[];
-  link?: string;
-  /** Handed to each of its tool calls, and to then. */
-  context?: unknown;
-  /** What started it, in words ("a push to main"), when a person did not. */
-  by?: string;
-  /** The entry told how it ended, which may answer calls of the map's tools the pack declares in runs. */
-  then?: string;
-  /**
-   * What it is a run of, to be run once (a push, by repository and head): whichever server asks first takes it, and
-   * another asking is refused while it runs and for good once it has ended. One cut off is taken again after a while.
-   */
-  once?: string;
-}
-
-export interface RunStart {
-  started: boolean;
-  title: string;
-  reason?: string;
-}
-
-/** Starts the runs a call asked for, given how it was called; each runs on after this answers. */
-export type Runner = (l: Archipelago, actor: Actor, pack: PackFile, call: string, runs: RunAsk[]) => Promise<RunStart[]>;
-
 let reach: Reach | undefined;
-let runner: Runner | undefined;
 export const setReach = (r: Reach | undefined) => void (reach = r);
-export const setRunner = (r: Runner | undefined) => void (runner = r);
 
 /** Keep a workspace open until what is returned is called. */
 export const holdWorkspace = (workspace: string): (() => void) => reach?.hold(workspace) ?? (() => {});
-
-export function startRuns(l: Archipelago, actor: Actor, pack: PackFile, call: string, runs: RunAsk[]): Promise<RunStart[]> {
-  if (!runner) return Promise.resolve(runs.map((r) => ({ started: false, title: String(r.title), reason: 'This server runs no models for packs.' })));
-  return runner(l, actor, pack, call, runs);
-}
 
 /** Not a question for here: the map's own reads answer it. */
 export const NOT_BEYOND = Symbol('not beyond');

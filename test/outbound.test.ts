@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, test } from 'node:test';
-import { asker } from '../src/model.ts';
 import { guardedFetch, isPrivate } from '../src/outbound.ts';
 import { fresh, human, make } from './map.ts';
 
@@ -42,8 +41,7 @@ const refused = { PELAGO_PRIVATE_URLS: undefined, PELAGO_MODEL_PRIVATE_URLS: 'of
 test('a redirect is never followed, even where private addresses are allowed', async () => {
   await withEnv(open, async () => {
     heard.length = 0;
-    const ask = asker('k', { url: `http://127.0.0.1:${port()}/hop` }, guardedFetch, 2000);
-    await assert.rejects(ask({ model: 'm', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }), /could not be reached/);
+    await assert.rejects(guardedFetch(`http://127.0.0.1:${port()}/hop`, { signal: AbortSignal.timeout(2000) }));
     assert.ok(!heard.some((h) => h.includes('/inside')), 'the redirect’s target is never asked');
     assert.equal((await guardedFetch(`http://127.0.0.1:${port()}/ok`)).status, 200, 'an address that answers, answers');
   });

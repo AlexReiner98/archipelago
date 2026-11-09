@@ -150,7 +150,7 @@ reply ending, commits accounted for) is `docs/agents.md`.
 - **The UI has no build step and no framework.** Plain files in `ui/`.
 - **Dependencies stay at four** (`@electric-sql/pglite`,
   `@modelcontextprotocol/sdk`, `zod`, and since 18 Oct 2026 `pg`, for a
-  Postgres server; model calls are plain fetch, in `src/model.ts`) unless the owner agrees to another. One library is kept as a file, not a
+  Postgres server) unless the owner agrees to another. One library is kept as a file, not a
   dependency: `ui/three.module.min.js` (three.js 0.160, MIT, since 13 Oct
   2026 at the owner's asking), offered to a layout's drawing code and to
   a drawing that paints on a surface (`ui/surface.js`, since 23 Oct 2026, for

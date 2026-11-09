@@ -5,8 +5,6 @@ import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
 import { dump } from '../src/backup.ts';
-import { configureModels } from '../src/model-account.ts';
-import { runSchedule } from '../src/hooks.ts';
 import { serverPacksOf } from '../src/server-host.ts';
 import { serve, closers } from './serve.ts';
 
@@ -32,6 +30,15 @@ test('the GitHub pack hears a push: it is recorded against its repository, and w
   assert.match((await call('/agent/github', robot, { new_secret: true })).error, /humans only/);
   const connected = (await call('/api/github', admin, { new_secret: true })).result;
   assert.deepEqual([connected.connected, connected.webhook_path, connected.repos[0].github], [true, '/hook/default/github/github.push', 'acme/site']);
+  // A secret is sealed where it is stored, so neither the database nor a backup of it holds it; one stored before
+  // secrets were sealed (a webhook secret kept as github_secret, say) leaves in a backup sealed all the same.
+  const legacy = 'whsec-' + 'x'.repeat(30);
+  await (await workspaces.get('default')).pelago.setSecret('github_secret', legacy);
+  assert.match((await db.query<{ value: string }>(`select value from setting where key = 'github_secret'`)).rows[0].value, /^sealed:v1:/);
+  assert.ok(!JSON.stringify(await dump(db, { id: 'default', name: 'Default' })).includes(legacy));
+  await db.query(`update setting set value = $1::jsonb where key = 'github_secret'`, [JSON.stringify(legacy)]);
+  assert.ok(!JSON.stringify(await dump(db, { id: 'default', name: 'Default' })).includes(legacy));
+  await (await workspaces.get('default')).pelago.setSecret('github_secret', undefined);
 
   const deliver = async (
     payload: unknown,
@@ -267,95 +274,6 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   assert.deepEqual(await recheck(), { asked: 1, green: ['Acme/Tools@aaaaaaa'] });
   assert.deepEqual([checks[1].method, checks[1].url, checks[1].body.conclusion, checks[1].body.output.title], ['PATCH', '/repos/Acme/Tools/check-runs/900', 'success', 'All one commit accounted for']);
   assert.deepEqual(await recheck(), { asked: 0, green: [] }, 'and let go');
-  // 4. With a model account, the reader pack reads the push: it hears what the GitHub pack recorded, looks at the commits
-  // through the app, and the kernel runs the model over its tools. Here the model is a script, so what is tried is everything around it.
-  const runsOn = async () => (await call('/api/model_account', admin)).result.runs_on;
-  // The reader hears the push after GitHub is answered, holding the workspace open until it has asked for its run.
-  const heardOut = async () => {
-    for (let i = 0; i < 100 && (workspaces as unknown as { held: Map<string, number> }).held.get('default'); i++) await new Promise((r) => setTimeout(r, 50));
-  };
-  await heardOut();
-  assert.equal(await runsOn(), null);
-  assert.match((await call('/agent/model_account', robot, { provider: 'anthropic', key: 'sk-ant-' + 'x'.repeat(30) })).error, /humans only/);
-  // Something that is not this repository's: the reader is held to the repository it reads, whatever it is told there.
-  const outside = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Pay the invoice' }] })).result.created['#1'];
-  const asks: any[] = [];
-  // The push is read with five narrow tools, what changed and the open work handed over first (src/reader-push.ts).
-  const script = [
-    { stop_reason: 'tool_use', content: [{ type: 'text', text: 'Reading the push.' }, { type: 'tool_use', id: 'tu_1', name: 'diff', input: { sha: 'b'.repeat(40) } }, { type: 'tool_use', id: 'tu_2', name: 'find', input: { words: 'whetstone' } }, { type: 'tool_use', id: 'tu_3', name: 'no_such_tool', input: {} }] },
-    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_4', name: 'update', input: { id: outside, title: 'Steered by a file in the repository', why: 'The file said to' } }] },
-    { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu_5', name: 'create', input: { type: 'task', title: 'Oil the whetstone', why: 'The commit says the whetstone still needs oiling' } }] },
-    { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Made one task: Oil the whetstone.' }] },
-  ];
-  configureModels({ ask: (key) => async (params) => {
-    asks.push({ key, ...params, messages: structuredClone(params.messages) }); // as they stood when asked: the run goes on adding to them
-    return { id: `msg_${asks.length}`, type: 'message', role: 'assistant', model: params.model, usage: { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 5000, cache_creation_input_tokens: 0 }, ...script[asks.length - 1] } as any;
-  }, fetch: (async (_url: string, init?: RequestInit) => new Response('{}', { status: String((init?.headers as Record<string, string>)['x-api-key']).includes('revoked') ? 401 : 200 })) as typeof fetch });
-  // A key is tried when it is given: one Anthropic will not take is not saved, and a sign-in token is told from an API key.
-  assert.match((await call('/api/model_account', admin, { provider: 'anthropic', key: 'sk-ant-api03-revoked-' + 'x'.repeat(20) })).error, /Anthropic refused that key, so it was not saved/);
-  assert.match((await call('/api/model_account', admin, { provider: 'anthropic', key: 'sk-ant-oat01-' + 'x'.repeat(30) })).error, /sign-in token[\s\S]*needs an API key/);
-  assert.equal(await runsOn(), null);
-  // The Anthropic key set before there were model accounts is read as one.
-  await (await workspaces.get('default')).pelago.setSecret('anthropic_key', 'sk-ant-' + 'x'.repeat(30));
-  assert.deepEqual([await runsOn(), (await call('/api/model_account', admin)).result.account.model], ['workspace', 'claude-sonnet-5-5']);
-  // The key is sealed where it is stored, so neither the database nor a backup of it holds it; nor does the log of its being set.
-  const sealed = (await db.query<{ value: string }>(`select value from setting where key = 'anthropic_key'`)).rows[0].value;
-  assert.match(sealed, /^sealed:v1:/);
-  assert.ok(!JSON.stringify(await dump(db, { id: 'default', name: 'Default' })).includes('sk-ant-'));
-  // One stored before secrets were sealed leaves in a backup sealed all the same, and is sealed where it lies once it is read.
-  await db.query(`update setting set value = $1::jsonb where key = 'anthropic_key'`, [JSON.stringify('sk-ant-' + 'x'.repeat(30))]);
-  assert.ok(!JSON.stringify(await dump(db, { id: 'default', name: 'Default' })).includes('sk-ant-'));
-  assert.equal(await runsOn(), 'workspace');
-  assert.match((await db.query<{ value: string }>(`select value from setting where key = 'anthropic_key'`)).rows[0].value, /^sealed:v1:/);
-  // Connected as an account on the Workspace page, it replaces that key, sealed the same way; the page sees its last four characters.
-  const connectedModel = (await call('/api/model_account', admin, { provider: 'anthropic', key: 'sk-ant-' + 'x'.repeat(30) })).result;
-  assert.deepEqual(connectedModel.account, { provider: 'anthropic', name: 'Anthropic', model: 'claude-sonnet-5-5', url: null, price: { input: 2, output: 10 }, key: '…xxxx' }, 'Anthropic priced as it lists its model');
-  // Its price can be set on its own, keeping the key: what each run is said to cost.
-  assert.match((await call('/api/model_account', admin, { price_in: 1 })).error, /Give both prices/);
-  assert.deepEqual((await call('/api/model_account', admin, { price_in: 3, price_out: 15 })).result.account.price, { input: 3, output: 15 });
-  assert.match((await db.query<{ value: string }>(`select value from setting where key = 'model_account'`)).rows[0].value, /^sealed:v1:/);
-  assert.equal((await db.query(`select 1 from setting where key = 'anthropic_key'`)).rows.length, 0);
-  assert.ok(!JSON.stringify(await dump(db, { id: 'default', name: 'Default' })).includes('sk-ant-'));
-  const read = (await deliver('push', { ...push(42), before: 'a'.repeat(40), after: 'b'.repeat(40) })).result;
-  assert.equal(read.recorded, true);
-  let runs: any[] = [];
-  for (let i = 0; i < 50 && !runs.length; i++) {
-    await new Promise((r) => setTimeout(r, 100));
-    runs = (await call('/api/view', admin, { name: 'agent_usage', params: { repo: 'acme/tools' } })).result.runs;
-  }
-  assert.deepEqual(runs.map((r) => [r.title, r.surface, r.status, r.tokens, r.turns]), [['Read the push to main (bbbbbbb)', 'server', 'finished', 4800, 4]], 'the push heard without a model account was recorded and not read');
-  // A change that reached outside the repository was refused whole, and the reader was told why; nothing outside was touched.
-  assert.match(asks[2].messages.at(-1).content[0].content, /limited to the work of Tools repo\. "Pay the invoice" is not part of it/);
-  assert.equal(asks[2].messages.at(-1).content[0].is_error, true);
-  assert.equal((await call('/api/get', admin, { id: outside })).result.entity.title, 'Pay the invoice');
-  // It asked with the workspace's key, on the model chosen, with the push's narrow tools, starting from what the push changed.
-  assert.deepEqual([asks[0].key, asks[0].model, asks[0].fallbacks], ['sk-ant-' + 'x'.repeat(30), 'claude-sonnet-5-5', 'default']);
-  assert.deepEqual(asks[0].tools.map((t: any) => t.name), ['decide', 'update', 'create', 'look', 'find', 'diff', 'file']);
-  assert.ok(JSON.stringify(asks[0].tools).length < 3000, 'small enough to send every turn');
-  assert.match(asks[0].messages[0].content, /Branch "main"[\s\S]*a{40}\.\.b{40}[\s\S]*whetstone still needs oiling[\s\S]*tools\/sharpen\.ts[\s\S]*Other open items of this repository/);
-  // What it asked for was done, all of a turn answered together, and a tool that is not there said so without ending the run.
-  const answers = asks[1].messages.at(-1).content;
-  assert.deepEqual(answers.map((a: any) => [a.tool_use_id, Boolean(a.is_error)]), [['tu_1', false], ['tu_2', false], ['tu_3', true]]);
-  assert.match(answers[0].content, /whetstone still needs oiling|tools\/sharpen\.ts/);
-  // What it sent is an agent's change like any other: here, where agents' changes are held, it waits for the owner.
-  const held = (await call('/api/proposals', admin)).result;
-  assert.deepEqual(held.map((p: any) => [p.actor, p.ops[0].title]), [['agent:reader', 'Oil the whetstone']]);
-  // And it would wait wherever agents' changes are applied: a push started the run, not the owner. The run says so.
-  const { rows: started } = await db.query<{ by: unknown }>(`select props->'started_by' as by from entity where title = 'Read the push to main (bbbbbbb)'`);
-  assert.deepEqual(started.map((r) => r.by), [{ kind: 'webhook', name: 'a push to main' }]);
-  // The same push said twice (a webhook left in the repository beside the app) is taken in once, and read once.
-  assert.deepEqual((await deliver('push', { ...push(42), before: 'a'.repeat(40), after: 'b'.repeat(40) })).result.recorded, false);
-  // A push recorded while its reading was cut off (the server stopped) has no run: the next server reads it, with any
-  // pushed before it that were not read either, as one. What was read, even badly, is not read again.
-  const whole = (await workspaces.get('default')).pelago;
-  await whole.log(whole.db, { actor: 'github:sam', action: 'repo.push', target: heard.repo.id, origin: 'github', reason: '1 commit to main: Hone', detail: { repo: 'acme/tools', branch: 'main', before: 'b'.repeat(40), after: 'c'.repeat(40), commits: [{ sha: 'ccccccc' }] } });
-  await whole.log(whole.db, { actor: 'github:sam', action: 'repo.push', target: heard.repo.id, origin: 'github', reason: '1 commit to main: Strop', detail: { repo: 'acme/tools', branch: 'main', before: 'c'.repeat(40), after: 'd'.repeat(40), commits: [{ sha: 'ddddddd' }] } });
-  script.push({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Nothing needed changing.' }] });
-  const before = asks.length;
-  assert.deepEqual((await runSchedule(whole, 'reader', 'catch_up')).runs, [{ started: true, title: 'Read the push to main (ddddddd)' }]);
-  for (let i = 0; i < 50 && (await call('/api/view', admin, { name: 'agent_usage', params: { repo: 'acme/tools' } })).result.runs.length < 2; i++) await new Promise((r) => setTimeout(r, 100));
-  assert.match(asks[before].messages[0].content, new RegExp(`${'b'.repeat(40)}\\.\\.${'d'.repeat(40)}`), 'from the last push that was read to the newest');
-  assert.equal((await runSchedule(whole, 'reader', 'catch_up')).runs, undefined, 'and once');
   // The installation's token was traded for once, and kept.
   assert.equal(asked.filter((a) => a === 'POST /app/installations/42/access_tokens').length, 1);
 
@@ -366,29 +284,6 @@ test('the GitHub App, a server pack: the server\'s owner creates it once, a work
   assert.deepEqual(await refresh(), { changed: true, slug: 'pelago-renamed', name: 'Archipelago (renamed)' });
   assert.equal((await theApp()).name, 'Archipelago (renamed)');
   assert.match((await call('/api/connections', admin, { pack: 'github_app', start: true })).result.url, /^https:\/\/github\.test\/apps\/pelago-renamed\/installations\/new\?state=/);
-
-  // Its admin can ask for a re-check of a repository now; only of one the app was given, and no agent can.
-  assert.match((await call('/agent/reader_recheck', robot, { repo: heard.repo.id })).error, /admins only/);
-  assert.match((await call('/api/reader_recheck', admin, { repo: 'e_notarepo' })).error, /not a repository the GitHub App was given/);
-  assert.deepEqual((await call('/api/reader_recheck', admin, { repo: heard.repo.id })).result.answer, { repo: 'Acme/Tools', reason: 'Nothing is due for a re-check.' }, 'nothing lives there to re-check');
-  const project = (await call('/api/change', admin, { reason: 'x', ops: [{ op: 'create', ref: 'p', type: 'project', title: 'Tools' }, { op: 'link', type: 'lives_in', from: 'p', to: heard.repo.id }, { op: 'create', ref: 't', type: 'task', title: 'Hone the chisel' }, { op: 'link', type: 'part_of', from: 't', to: 'p' }] })).result.created.p;
-  assert.deepEqual((await call('/api/reader_recheck', admin, { repo: heard.repo.id })).result.runs, [{ started: true, title: 'Re-check asked for by hand' }]);
-  // The script has no more turns, so the run breaks: it is recorded as failed, and the wait starts again all the same.
-  let rechecked: unknown;
-  for (let i = 0; i < 50 && !rechecked; i++) {
-    await new Promise((r) => setTimeout(r, 100));
-    rechecked = (await call('/api/get', admin, { id: project })).result.entity.props.rechecked_at;
-  }
-  assert.ok(rechecked, 'the pack was told how it ended, and called rechecked');
-  const byHand = (await call('/api/view', admin, { name: 'agent_usage', params: { repo: 'acme/tools' } })).result.runs.find((r: any) => r.title === 'Re-check asked for by hand');
-  assert.equal(byHand.status, 'failed');
-  assert.equal(asks.at(-1).tools.length, 15, 'the repository’s six tools and the map’s nine');
-
-  // The key is never given back, and removing the account stops the reading.
-  assert.ok(!JSON.stringify((await call('/api/connections', admin)).result).includes('sk-ant-'));
-  assert.ok(!JSON.stringify((await call('/api/model_account', admin)).result).includes('sk-ant-'));
-  assert.equal((await call('/api/model_account', admin, { remove: true })).result.account, null);
-  assert.equal(await runsOn(), null);
 
   assert.deepEqual((await deliver('installation_repositories', { action: 'added', installation: { id: 42, account: { login: 'acme' } }, repositories_added: [{ full_name: 'Acme/Docs' }, { full_name: 'Acme/Site' }] })).result, { added: ['Docs repo'], known: ['Site repo'] });
   // Chosen again on GitHub later, they come back with no word: the installation is known, and the map is brought up to date.

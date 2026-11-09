@@ -64,8 +64,7 @@ The web UI has five places, and one page for each thing.
   seen" records that you looked.
 - **Workspace** sets the workspace up, in five sections shown one at a time
   (`#/workspace?at=<section>`): **People** (the owner, members, the plan),
-  **Agents** (agent tokens, what agents may do, the model account they run
-  on), **Map** (the theme as swatches, tried on your screen and then kept;
+  **Agents** (agent tokens and what agents may do), **Map** (the theme as swatches, tried on your screen and then kept;
   whether new things start private; the backup), **Packs** (each pack a card with
   its on/off switch and what it touches, its manifest's keys grouped as types,
   links, views, styles, instructions, rules, actions, runs and reach, each
@@ -536,36 +535,14 @@ workspace's admin may connect it to; and, once connected, two acts on that
 workspace only: adding items it does not have by their address, and handing a
 delivery to the pack there that takes that kind of event in.
 
-**An agent on the server reads each push that arrives through the app.**
-Once the workspace's admin has connected a model account (the Model card on
-the Workspace page; kept sealed on the server, never shown again), every push of
-commits to a branch is read against the repository's open items by an agent
-that runs on the Archipelago server (the reader pack, `packs/reader`), and every
-hour it asks whether a re-check of old items is due. The pack hears each push the
-GitHub pack records and asks the kernel for a model run (`src/agent-run.ts`),
-answering the run's tools itself. It has no checkout: it reads commits,
-diffs, files and history through the app, which may only read. It does what
-the workflow below does, sends its changes as any agent does (held or applied
-as the workspace says), stops at 40 turns or 600k tokens, and records each run
-in the repository with what it used. The model is `claude-sonnet-5-5`
-(`PELAGO_DEFAULT_MODEL`, or `PELAGO_READER_MODEL` as it was first named, changes it). Without a key, pushes are recorded and
-not read. A repository connected both ways hears each push once.
+Nothing on the server reads a push with a model: an agent does, as below (the
+server's push reader and the workspace's model account went on 8 Nov 2026).
 
-Every model call goes through `src/model.ts`, with plain fetch, on the
-workspace's own model account: Anthropic (an API key), OpenAI (an API key and
-a model) or any OpenAI-compatible server (its address up to its version, a key
-if it needs one, and a model). An account is tried when it is connected (its
-model is looked up, or a compatible server is asked for one token) and is not
-kept if it does not answer. A workspace with no account runs on the server's
-model, if it has one: set `PELAGO_MODEL_URL` to an OpenAI-compatible base
-(LiteLLM: `http://litellm:4000/v1`) and `PELAGO_MODEL_KEY` to its key.
-`PELAGO_MODEL_SHARED=off` keeps that model from workspaces (a hosted server, so
-none runs on the operator's bill), and `PELAGO_PRIVATE_URLS=off` (or
-`PELAGO_MODEL_PRIVATE_URLS=off`, its first name) refuses a compatible server on
-the server's own network (loopback, private and link-local addresses), and a
-connection checked there: held to on every call, by the address each call
-connects to. No such call follows a redirect. Prompt caching is Anthropic's alone, and a run's cost
-is still priced at Anthropic's rates.
+A call the server makes to an address someone gave it (a connection checked,
+a client's sign-in) follows no redirect, and `PELAGO_PRIVATE_URLS=off` (or
+`PELAGO_MODEL_PRIVATE_URLS=off`, its first name) refuses one on the server's
+own network (loopback, private and link-local addresses), held to on every
+call by the address it connects to (`src/outbound.ts`).
 
 **Or the server hears the push through a webhook added by hand.** Pushes are
 taken in by the GitHub pack (`packs/github`), at the webhook it declares. On
@@ -585,8 +562,8 @@ one in the map whose `remote` is its GitHub address. From then on:
   policy lets it through. Decisions and hypotheses are left alone; a commit
   cannot say what was decided. An agent session that names its task in
   action `session_start` or `session_update` is told to end the commit that finishes
-  it with that line, and says its branch, so the push reader knows what the
-  branch was for.
+  it with that line, and says its branch, so whoever reads the push knows
+  what the branch was for.
 
 **An agent reads the push.** [examples/github/pelago.yml](../examples/github/pelago.yml)
 is a GitHub Actions workflow: on every push it runs Claude in the repository,
@@ -632,8 +609,8 @@ What the server knows and must not give up is of two kinds.
   vault (`src/vault.ts`) wrapped with the sealing key below. A forget deletes
   the key; vault backups are kept apart from the data and for 30 days only,
   so a forgotten item cannot be read back after that.
-- **What it has to use is sealed** (AES-256-GCM, `src/secrets.ts`): a
-  workspace's model account, the secret a GitHub webhook signs with, and the
+- **What it has to use is sealed** (AES-256-GCM, `src/secrets.ts`): the
+  secret a GitHub webhook signs with, and the
   GitHub App's key and signing secret. The sealing key is
   `PELAGO_SECRETS_KEY` (32 bytes, base64) when that is set, and otherwise a
   file the server makes beside the workspaces (`secrets.key`). A server on

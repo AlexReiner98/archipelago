@@ -65,7 +65,10 @@ export function sealingKey(make = true): Buffer {
   return key;
 }
 
-/** The settings that are secrets. A backup never holds one of these unsealed, whenever it was stored. */
+/**
+ * The settings that are secrets. A backup never holds one of these unsealed, whenever it was stored. Nothing sets
+ * model_account or anthropic_key since the workspace model account went (8 Nov 2026), but a map may still hold one.
+ */
 export const SECRET_SETTINGS = ['model_account', 'anthropic_key', 'github_secret'];
 
 export const isSealed = (value: unknown): value is string => typeof value === 'string' && value.startsWith(MARK);
