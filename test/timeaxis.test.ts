@@ -1,22 +1,25 @@
 // A time axis, read by packs (placed): items placed by when and bound, repeats as their occurrences, sessions where they ran.
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { test } from 'node:test';
 import '../src/views.ts';
 import { answerRead } from '../src/packreads.ts';
-import { Registry } from '../src/packs.ts';
+import { Registry, type PackFile } from '../src/packs.ts';
 import { flatRead } from '../src/query-flat.ts';
 import { dayStart, resolveAxis } from '../src/timeaxis.ts';
-import { freshWith, human } from './map.ts';
+import { freshWith, human, packsWith } from './map.ts';
 
+/** A pack written for the test with one type that repeats: hours on days of the week, from a day on. */
+const DRILLS = {
+  id: 'drills', version: '1', title: 'Drills', description: 'What is done at set hours each week.', requires: ['core'],
+  types: [{
+    id: 'drill', title: 'Drill', description: 'Something done at the same hours on days of the week.', extends: 'occurrence',
+    statuses: { open: ['active'], closed: ['ended'] },
+    capabilities: { when: { repeat: { from: 'from_time', to: 'to_time', days: 'days', starts: 'starts', until: 'until', skip: 'skip', moved: 'moved', done: 'done' } } },
+    fields: { from_time: { type: 'string' }, to_time: { type: 'string' }, days: { type: 'json' }, starts: { type: 'date' }, until: { type: 'date' }, skip: { type: 'json' }, moved: { type: 'json' }, done: { type: 'json' } },
+  }],
+} as unknown as PackFile;
 
-async function map() {
-  const dir = mkdtempSync(join(tmpdir(), 'pelago-axis-'));
-  cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
-  return freshWith(new Registry(dir));
-}
+const map = () => freshWith(new Registry(packsWith(DRILLS)));
 
 type Item = { id: string; title: string; time?: { start: string; end: string; by: string }[] };
 
@@ -34,11 +37,11 @@ test('a read placed in time places what falls in its window, repeats as their da
       { op: 'create', ref: 'task', type: 'task', title: 'Send the forms', props: { due: '2026-10-15' } },
       { op: 'create', ref: 'meet', type: 'event', title: 'Board meeting', props: { at: '2026-10-14T14:00:00Z', ends: '2026-10-14T15:30:00Z' } },
       { op: 'create', ref: 'later', type: 'event', title: 'Next year', props: { at: '2027-03-01T14:00:00Z' } },
-      { op: 'create', ref: 'gym', type: 'routine', title: 'Gym', props: { from_time: '07:00', to_time: '08:00', days: [1, 3, 5], starts: '2026-10-01' } },
+      { op: 'create', ref: 'gym', type: 'drill', title: 'Gym', props: { from_time: '07:00', to_time: '08:00', days: [1, 3, 5], starts: '2026-10-01' } },
       { op: 'create', ref: 'loose', type: 'task', title: 'No date' },
     ],
   })) as { created: Record<string, string> };
-  const kinds = ['task', 'event', 'routine'];
+  const kinds = ['task', 'event', 'drill'];
   const placed = (time: Record<string, unknown>) => answerRead(l, { placed: { types: kinds, ...time } as never }) as Promise<Item[]>;
   const items = await placed({ from: '2026-10-12', to: '2026-10-18' });
   const of = (ref: string) => items.find((i) => i.id === made.created[ref]);
@@ -65,11 +68,11 @@ test('a flat lens on a time axis places each item it sends, and says its window 
   const made = (await l.change(human, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'gym', type: 'routine', title: 'Gym', props: { from_time: '07:00', to_time: '08:00', days: [1, 3, 5], starts: '2026-10-01' } },
+      { op: 'create', ref: 'gym', type: 'drill', title: 'Gym', props: { from_time: '07:00', to_time: '08:00', days: [1, 3, 5], starts: '2026-10-01' } },
       { op: 'create', ref: 'meet', type: 'event', title: 'Board meeting', props: { at: '2026-10-14T14:00:00Z', ends: '2026-10-14T15:30:00Z' } },
     ],
   })) as { created: Record<string, string> };
-  const answer = (await flatRead(l, { filter: { find: ['type routine', 'type event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lens: { time: unknown }; items: Item[] };
+  const answer = (await flatRead(l, { filter: { find: ['type drill', 'type event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lens: { time: unknown }; items: Item[] };
   const of = (ref: string) => answer.items.find((i) => i.id === made.created[ref]);
   assert.deepEqual(answer.lens.time, { from: '2026-10-12', to: '2026-10-18', zone: 'America/Toronto' }, 'its days counted in the workspace’s zone');
   assert.equal(of('gym')!.time!.length, 3, 'a repeat on each of its days');
@@ -77,17 +80,17 @@ test('a flat lens on a time axis places each item it sends, and says its window 
 
 
   // Filed by who each is for: what no one holds is the workspace owner's, and the agents' sessions a lane of their own.
-  const lanes = (await flatRead(l, { filter: { find: ['type routine', 'type event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lanes: { key: string | null; title: string }[]; items: (Item & { lane?: string | null })[] };
+  const lanes = (await flatRead(l, { filter: { find: ['type drill', 'type event'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lanes: { key: string | null; title: string }[]; items: (Item & { lane?: string | null })[] };
   assert.deepEqual(lanes.lanes, [{ key: null, title: 'No one' }], 'with no owner set, what no one holds is no one’s');
   assert.ok(lanes.items.every((i) => i.lane === null));
   const alex = ((await l.change(human, { reason: 'test', ops: [{ op: 'create', type: 'person', title: 'Alex' }] })) as { created: Record<string, string> }).created['#1'];
   await l.db.query(`insert into setting (key, value) values ('me', $1::jsonb)`, [JSON.stringify(alex)]);
-  const mine = (await flatRead(l, { filter: { find: ['type routine'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lanes: unknown[]; items: { lane?: string }[] };
+  const mine = (await flatRead(l, { filter: { find: ['type drill'] }, time: { from: '2026-10-12', to: '2026-10-18' } })) as unknown as { lanes: unknown[]; items: { lane?: string }[] };
   assert.deepEqual([mine.lanes, mine.items[0].lane], [[{ key: alex, title: 'Alex' }], alex], 'the owner’s lane, by name');
 
   // Coloured by what it counts toward: the group it sits in just under the outermost item, named in streams.
   const set = ((await l.change(human, { reason: 'test', ops: [
-    { op: 'create', ref: 'p', type: 'project', title: 'Launch' },
+    { op: 'create', ref: 'p', type: 'aim', title: 'Launch' },
     { op: 'create', ref: 't', type: 'task', title: 'Rehearse' },
     { op: 'create', ref: 'e', type: 'event', title: 'Dress rehearsal', props: { at: '2026-10-15T14:00:00Z' } },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
@@ -97,8 +100,8 @@ test('a flat lens on a time axis places each item it sends, and says its window 
   assert.deepEqual(coloured.streams, [{ key: set.t, title: 'Rehearse' }]);
   assert.deepEqual([coloured.items.find((i) => i.id === set.e)!.stream, coloured.items.find((i) => i.id === made.created.meet)!.stream], [set.t, null], 'what sits in nothing counts toward nothing');
 
-  const plain = (await flatRead(l, { filter: { find: ['type routine'] } })) as unknown as { lens: { time?: unknown }; items: Item[] };
+  const plain = (await flatRead(l, { filter: { find: ['type drill'] } })) as unknown as { lens: { time?: unknown }; items: Item[] };
   assert.equal(plain.lens.time, undefined, 'no window, no axis');
   assert.equal(plain.items[0].time, undefined);
-  await assert.rejects(flatRead(l, { filter: { find: ['type routine'] }, time: { from: 'soon', to: '7d' } }), /time is/);
+  await assert.rejects(flatRead(l, { filter: { find: ['type drill'] }, time: { from: 'soon', to: '7d' } }), /time is/);
 });
