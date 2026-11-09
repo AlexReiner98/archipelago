@@ -164,6 +164,9 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
     assert.ok(await reader.until(shown('The login plan'), 20000), `the link opens with no login: ${reader.logs().join('\n').slice(0, 600)}`);
     assert.ok(await reader.until(shown('Login form'), 20000), `the view is drawn: ${reader.logs().join('\n').slice(0, 600)} | ${await reader.evaluate<string>(`JSON.stringify({ text: document.body.innerText.slice(0, 400), frames: [...document.querySelectorAll('iframe')].map((f) => [f.src, f.getAttribute('sandbox'), f.offsetWidth, f.offsetHeight]), svgs: document.querySelectorAll('svg').length, html: document.body.innerHTML.slice(0, 1200) })`)}`);
     assert.ok(await reader.until(`[...document.querySelectorAll('a')].some((a) => a.textContent.includes('Start a map of your own'))`), 'with a way to start your own');
+    // Drawn at its own size, as in the app, never stretched to the column: a view of a few steps reads as one.
+    const size = JSON.parse(await reader.evaluate<string>(`JSON.stringify((() => { const s = document.querySelector('.doc-lens .lf-stage svg'); return [s.getBoundingClientRect().width, Number(s.getAttribute('viewBox').split(' ')[2])]; })())`));
+    assert.ok(size[0] <= size[1] + 1, `the view is drawn at its own size, not stretched: ${size.join(' drawn, own ')}`);
     // An item in the view opens its page, read only, in a sheet over the shared page, and closes again.
     const part = `[...document.querySelectorAll('.doc-lens a[href="#/e/${ids.form}"]')][0]`;
     assert.ok(await reader.until(`Boolean(${part})`, 10000), 'the view’s part is a way to its page');
