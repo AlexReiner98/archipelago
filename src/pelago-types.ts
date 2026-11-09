@@ -152,6 +152,8 @@ export interface Proposal {
   decided_by: string | null;
   decided_at: Date | null;
   note: string | null;
+  /** Whom it was held for: the viewer of the map it was proposed on, or null. What it makes private is private to them. */
+  private_to: string | null;
   /** The rule that held it (src/rules.ts): null for one held before rules named themselves. */
   held_by: Ruled | null;
 }

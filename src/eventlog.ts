@@ -17,6 +17,8 @@ export type EventQuery = {
   since?: string; before?: number; after?: number; target?: string; actor?: string; origin?: string; action?: string; limit?: number;
   /** Actors whose id matches this pattern (`human:%`). */
   actorLike?: string;
+  /** With actorLike, also a held change approved by one whose id matches it: the approval is theirs, the change its proposer's. */
+  approvedToo?: boolean;
   /** Oldest first, for a cursor read forward. */
   oldest?: boolean;
   /** Only what was written here: an event that arrived in a merged backup is history, not news. */
@@ -61,7 +63,8 @@ async function groups(db: Q, input: EventQuery, limit: number): Promise<Group[]>
   const add = (sql: string, value: unknown) => where.push(sql.replaceAll('?', `$${params.push(value)}`));
   if (input.since) add(`e.at >= ?::timestamptz`, input.since);
   if (input.actor) add(`e.head->'actor'->>'id' = ?`, input.actor);
-  if (input.actorLike) add(`e.head->'actor'->>'id' like ?`, input.actorLike);
+  // An approval is the approver's: the entry's actor is the proposer, its rule says who applied it (src/proposals.ts).
+  if (input.actorLike) add(input.approvedToo ? `(e.head->'actor'->>'id' like ? or (e.head #>> '{rule,outcome}' = 'approved' and e.head #>> '{rule,by}' like ?))` : `e.head->'actor'->>'id' like ?`, input.actorLike);
   if (input.before) add(`e.pos <= coalesce((select f.pos from log_fact f where f.stream = 'facts' and f.seq < ? order by f.seq desc limit 1), 0)`, input.before);
   if (input.after !== undefined) add(`e.pos >= coalesce((select f.pos from log_fact f where f.stream = 'facts' and f.seq > ? order by f.seq limit 1), 1e18)`, input.after);
   // About an item: what was said of it, of the links from it, and of what was merged into it.
@@ -143,9 +146,9 @@ async function expand(db: Q, found: Group[]): Promise<Omit<LoggedEvent, 'target_
     const e = entries.get(g.pos)!;
     const fs = said.get(`${g.pos} ${g.id}`) ?? [];
     const h = e.head;
-    const rule = h.rule as { outcome?: string; by?: string; revised?: boolean } | undefined;
+    const rule = h.rule as { outcome?: string; by?: string; revised?: boolean; proposal?: string } | undefined;
     const extra = {
-      ...(rule?.outcome === 'approved' && { approved_by: rule.by, ...(rule.revised && { revised_by: rule.by }) }),
+      ...(rule?.outcome === 'approved' && { approved_by: rule.by, proposal: rule.proposal, ...(rule.revised && { revised_by: rule.by }) }),
       ...(h.authority && { authority: h.authority }),
       ...(h.action && { action: h.action }),
       ...(h.run && { run: h.run }),
