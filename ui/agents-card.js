@@ -20,6 +20,8 @@ export function tokenRow(t, { me, personName, then, fail }) {
   return line(
     h('span', { class: 'grow', title: tip.filter(Boolean).join('\n') }, h('strong', {}, t.name), ' ', h('span', { class: 'muted small' }, t.last_used ? ['used ', ago(t.last_used)] : 'never used')),
     t.admin && h('span', { class: 'muted small' }, 'admin'),
+    // A person token (src/person-tokens.ts): one for every workspace its person is a member of, by these addresses.
+    t.everywhere && h('span', { class: 'muted small', title: `Acts as you in every workspace you are a member of, as ${t.emails.join(', ')}; at home in ${t.home}. Revoking it ends it in all of them.` }, 'all workspaces'),
     mine && h('span', { class: 'muted small', title: 'The token this browser is signed in with' }, 'this browser'),
     scopePills(t),
     mine ? h('span', { class: 'menu-room' }) : menu('⋯', [['Revoke', revoke, 'danger']]),
@@ -35,8 +37,8 @@ export function tokensCard({ tokens, row, then, fail, say, workspace, connect })
   const name = h('input', { type: 'text', placeholder: 'Name (claude-code)', style: 'flex: 1 1 0; min-width: 0' });
   // A new agent token ends by itself unless it is said not to. One within an item is made on that item's page.
   const life = h('select', { title: 'When the token stops working by itself' }, [[90, '90 days'], [30, '30 days'], [365, 'A year'], [0, 'Never expires']].map(([days, label]) => h('option', { value: days }, label)));
-  const token = (fallback) => ({ kind: 'agent', name: name.value.trim() || fallback, ...(Number(life.value) > 0 && { expires_days: Number(life.value) }) });
-  const make = (fallback, show) => api('token_create', token(fallback)).then((made) => then().then(() => say(show(made))), fail);
+  const token = (fallback, everywhere) => ({ kind: 'agent', name: name.value.trim() || fallback, ...(Number(life.value) > 0 && { expires_days: Number(life.value) }), ...(everywhere && { everywhere: true }) });
+  const make = (fallback, show, everywhere) => api('token_create', token(fallback, everywhere)).then((made) => then().then(() => say(show(made))), fail);
   const box = card(
     'Agents',
     'Each acts for you: it sees what you see and proposes to you.',
@@ -51,7 +53,11 @@ export function tokensCard({ tokens, row, then, fail, say, workspace, connect })
         name,
         life,
         h('button', { class: 'gist cut', style: 'flex: 0 1 auto', title: `Claude Code setup: a command that sets up Claude Code in a project, with sessions on the map of ${workspace.name} (${workspace.id})`, onclick: () => make('claude-code', (made) => connectBox(made, workspace)) }, `Set up in ${workspace.name}`),
-        menu('⋯', [[`Token only, for ${workspace.name}`, () => make('agent', (made) => secretBox(`Token for ${made.name}, in ${workspace.name}`, made.token, workspace))]]),
+        menu('⋯', [
+          [`Token only, for ${workspace.name}`, () => make('agent', (made) => secretBox(`Token for ${made.name}, in ${workspace.name}`, made.token, workspace))],
+          // One token for every workspace you are a member of: a call names its workspace, else it acts here.
+          ['Set up for all my workspaces', () => make('claude-code', (made) => connectBox(made, null), true)],
+        ]),
       ),
     ),
   );

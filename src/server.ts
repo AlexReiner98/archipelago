@@ -41,7 +41,7 @@ import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
 import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts';
 import type { Actor, Archipelago } from './pelago.ts';
-import { configureOutbox } from './outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from './control-index.ts';
+import { configureOutbox } from './outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from './control-index.ts'; import { isPersonToken, personAt } from './person-tokens.ts';
 import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { setReach } from './pack-reach.ts';
 import { pgLeader, soleLeader, type Leader } from './leader.ts'; import { drained } from './drain.ts';
 import { serverDuties } from './duties.ts'; import { keepVisits, onSitePage } from './visits.ts';
@@ -74,10 +74,8 @@ async function readBody(req: IncomingMessage, most = BODY_MAX): Promise<Buffer> 
   return Buffer.concat(chunks);
 }
 
-async function readJson(req: IncomingMessage, most = BODY_MAX): Promise<unknown> {
-  const text = (await readBody(req, most)).toString('utf8');
-  try { return text ? JSON.parse(text) : undefined; } catch { throw new Refused(400, 'The body is not JSON.'); }
-}
+const bodies = new WeakMap<IncomingMessage, Promise<unknown>>(); // read once: a person token's call is routed by what its body names
+const readJson = (req: IncomingMessage, most = BODY_MAX): Promise<unknown> => bodies.get(req) ?? (bodies.set(req, readBody(req, most).then((b) => { const text = b.toString('utf8'); try { return text ? JSON.parse(text) : undefined; } catch { throw new Refused(400, 'The body is not JSON.'); } })), bodies.get(req)!);
 
 const MIME: Record<string, string> = { html: 'text/html', js: 'text/javascript', css: 'text/css' };
 
@@ -128,7 +126,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   };
 
   /** The workspace a request is for and who is making it. */
-  async function resolve(req: IncomingMessage, res: ServerResponse, surface: 'human' | 'agent'): Promise<{ ws: Workspace; pelago: Archipelago; actor: (label?: string) => Actor; look?: true }> {
+  async function resolve(req: IncomingMessage, res: ServerResponse, surface: 'human' | 'agent', asks?: () => Promise<string | undefined>): Promise<{ ws: Workspace; pelago: Archipelago; actor: (label?: string) => Actor; look?: true }> {
     // A look pass reads as the agent it was made for, for one drawing by this server's Chrome, and only through /api.
     const pass = bearer(req.headers.authorization), passFor = passWorkspace(pass);
     if (passFor) {
@@ -156,7 +154,16 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (token || !toMcp) refusedTokens.take(address); if (toMcp) res.setHeader('www-authenticate', challenge(req.headers.host ?? '', named, toMcp.workspace));
       return new Refused(401, 'A valid token is required. Send it as: Authorization: Bearer <token>');
     };
-    if (!token || !id || !(await workspaces.has(id)) || (mcpAddress(req.url?.split('?')[0] ?? '')?.workspace ?? id) !== id) throw deny();
+    // The workspace a call names: in its arguments, else its header, else its address; a person token's home, else.
+    const header = req.headers['x-pelago-workspace'], asked = async () => (await asks?.()) || (typeof header === 'string' && header) || mcpAddress(req.url?.split('?')[0] ?? '')?.workspace;
+    if (isPersonToken(token)) {
+      const at = await personAt(token, asked, async (w) => ((await workspaces.has(w)) ? (await workspaces.get(w)).pelago.db : undefined));
+      if (!at) throw deny(); // not a member there: the same answer as a token nobody made
+      res.once('close', workspaces.hold(at.workspace)); const ws = await workspaces.get(at.workspace), as = at.actor;
+      const slow = await requestWait(ws.id, token, askedAs(as)); if (slow) throw new Refused(429, await tooManyRequests(ws.id, slow), slow);
+      return { ws, pelago: ws.pelago.as(as.person ?? '', false), actor: (label) => (label ? { ...as, name: `${as.name}/${label}` } : as) };
+    }
+    if (!token || !id || !(await workspaces.has(id))) throw deny();
     // A token nobody made for that workspace is refused before its database is opened (src/control-index.ts).
     const control = await workspaces.control(), every = async () => (await workspaces.list()).map((w) => ({ id: w.id, db: async () => (await workspaces.get(w.id)).pelago.db }));
     if (!(await tokenKnown(control, hashSecret(token), id, every))) throw deny();
@@ -168,7 +175,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     if (!identity) {
       await unindexToken(control, hashSecret(token));
       throw deny();
-    }
+    } else if (((await asked()) || id) !== id) throw deny(); // its own workspace alone, asked once it is known good
     const slow = await requestWait(ws.id, token, askedAs(identity.actor)); if (slow) throw new Refused(429, await tooManyRequests(ws.id, slow), slow);
     if (identity.newPlace)
       await notify(ws.pelago, { kind: 'agent', name: 'pelago' }, {
@@ -301,7 +308,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (hook) return (await workspaces.has(hook[1] ?? DEFAULT_WORKSPACE)) ? await serveHook(req, res, (await workspaces.get(hook[1] ?? DEFAULT_WORKSPACE)).pelago, hook[2], hook[3]) : send(res, 410, { error: 'No such workspace.' });
 
       if (mcpAddress(url.pathname)) {
-        const { ws, pelago, actor } = await resolve(req, res, 'agent');
+        const asks = async () => { const w = (req.method === 'POST' ? ((await readJson(req)) as { params?: { arguments?: { workspace?: unknown } } } | undefined) : undefined)?.params?.arguments?.workspace; return typeof w === 'string' ? w : undefined; };
+        const { ws, pelago, actor } = await resolve(req, res, 'agent', asks);
         return await serveMcp(req, res, { workspace: ws.id, pelago, actor }, hosts, req.method === 'POST' ? await readJson(req) : undefined);
       }
 
