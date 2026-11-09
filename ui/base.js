@@ -11,7 +11,21 @@ export const state = { workspace: undefined, schema: undefined, may: undefined, 
  */
 export const may = (what) => state.may?.includes(what) === true;
 /** What this session may do, asked of the server once a sign-in (the page's route waits for it before drawing). */
-export const loadMay = async () => (state.may ??= (await whoami())?.may ?? ['read']);
+export const loadMay = async () => (state.may ??= link ? ['read'] : (await whoami())?.may ?? ['read']);
+
+/**
+ * A frozen link opened at /s/<workspace>/<secret> (decision e_qpaqnmrc, axis B): the page reads as a short reader token
+ * its secret is traded for, held in memory only and traded again when it runs out. Null on any other address.
+ */
+const linked = /^\/s\/([^/]+)\/([^/]+?)\/?$/.exec(location.pathname);
+export const link = linked ? { ws: linked[1], secret: linked[2], token: '', of: '' } : null;
+if (link) document.documentElement.dataset.reader = 'link';
+export async function openLink() {
+  const res = await postJson(`/s/${link.ws}/${link.secret}/token`, {});
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error);
+  return Object.assign(link, { token: body.token, of: body.of });
+}
 export const hooks = {};
 export const route = (pulse) => hooks.route(pulse);
 
@@ -121,7 +135,7 @@ export const store = {
     }
   },
 };
-export const authHeaders = () => (store.token ? { authorization: `Bearer ${store.token}` } : {});
+export const authHeaders = () => (link ? { authorization: `Bearer ${link.token}` } : store.token ? { authorization: `Bearer ${store.token}` } : {});
 
 // A dev server lets a page try a narrower session than its sign-in (?may=read in the page's address, before the #): the
 // server answers only that much, and the page draws as such a session would. Elsewhere the server ignores it.
@@ -208,7 +222,13 @@ export async function call(path, input, headers) {
   if (!res.ok) throw new Error(body.error);
   return body.result;
 }
-export const api = (tool, input = {}) => call(`/api/${tool}`, input, authHeaders());
+export const api = (tool, input = {}) =>
+  call(`/api/${tool}`, input, authHeaders()).catch(async (err) => {
+    // A link's reader token has run out: trade the secret again, once.
+    if (!link || !(err instanceof SignInNeeded)) throw err;
+    await openLink();
+    return call(`/api/${tool}`, input, authHeaders());
+  });
 
 // Signed out, the style is not read with the rest: its colours are asked for on their own.
 const themeSignedOut = () => fetch('/connect/theme').then((r) => r.json()).then(applyTheme, () => undefined);

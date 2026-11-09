@@ -76,9 +76,16 @@ test('over HTTP a link is traded at its address, and its token is good only for 
   const link = (await call('/api/share_create', human, { id: lens })).result as { path: string; share: string };
   // Today's page goes on answering at the link's address.
   assert.equal((await fetch(`${base}${link.path}/data`)).status, 200);
+  // The link's own address is the app, which trades the secret for a token itself; a secret no link has, the old page.
+  const page = await fetch(`${base}${link.path}`);
+  assert.match(await page.text(), /src="\/app\.js/);
+  assert.doesNotMatch(await (await fetch(`${base}/s/default/${'a'.repeat(48)}`)).text(), /src="\/app\.js/);
+  // What it would leave out as private is asked before a link is made, since what it shows is frozen then.
+  assert.deepEqual((await call('/api/share_private', human, { id: lens })).result, []);
 
   const traded = await call(`${link.path}/token`);
   assert.equal(traded.status, 200);
+  assert.equal(traded.of, lens, 'the view it opens on');
   const reader = traded.token as string;
   assert.equal((await call('/s/default/' + 'a'.repeat(48) + '/token')).status, 404);
 

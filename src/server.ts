@@ -48,7 +48,7 @@ import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
 import { servePublic } from './public-route.ts'; import { serveSite, siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
 import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
-import { sharedPicture } from './documents.ts'; import { sharedAnswer } from './share-view.ts'; import { guestMap, ShareEnded } from './guests.ts'; import { serveLink } from './share-link-route.ts';
+import { sharedPicture } from './documents.ts'; import { sharedAnswer } from './share-view.ts'; import { guestMap, ShareEnded } from './guests.ts'; import { serveLink } from './share-link-route.ts'; import { frozen } from './share-link.ts';
 import { configureSecrets } from './secrets.ts'; import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
@@ -236,10 +236,10 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (shared) {
         if (tooOften(req, res, open)) return;
         const [, wsId, secret, data, figure] = shared;
-        const guard = UNLISTED;
+        const guard = UNLISTED, app = !data && (await workspaces.has(wsId)) && (await frozen((await workspaces.get(wsId)).pelago, secret)); // a frozen link opens the app, read only
         if (!data) {
-          res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': SHARED_POLICY });
-          return res.end(await uiPage('doc.html'));
+          res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': app ? PAGE_POLICY : SHARED_POLICY });
+          return res.end(app && options.unsandboxed ? markPage(await uiPage('index.html'), { open: false, unsandboxed: true }) : await uiPage(app ? 'index.html' : 'doc.html'));
         }
         if (data === 'picture') {
           const picture = figure && (await workspaces.has(wsId)) ? await sharedPicture((await workspaces.get(wsId)).pelago, secret, figure) : null;

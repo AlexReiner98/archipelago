@@ -12,7 +12,7 @@
 
 import { api, h, hooks, state } from './base.js';
 import { readAddress } from './query.js';
-import { lookMode } from './look.js';
+import { still } from './look.js';
 import { placeBy } from './menu-place.js';
 import { windowOf, windows } from './pane-busy.js';
 import { followable, heard, hearOpen, nameOf } from './pane-route.js';
@@ -372,8 +372,8 @@ let started = false;
 export function startTabs() {
   if (started) return;
   started = true;
-  // A look's page (the server's own, ui/look.js) draws the view it was asked for alone, in one pane, with no tabs.
-  if (lookMode) {
+  // A look's page (the server's own, ui/look.js), and a frozen link's, draw the view they were asked for alone, in one pane, with no tabs.
+  if (still) {
     tabs.list = [freshTab(location.hash || '#/')];
     tabs.front = tabs.list[0].id;
     return startPanes();

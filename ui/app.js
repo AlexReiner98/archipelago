@@ -4,7 +4,7 @@
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
 import { authorizePage } from './authorize.js';
-import { SignInNeeded, h, hooks, join, loadMay, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
+import { SignInNeeded, h, hooks, join, link, loadMay, main, openLink, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { mayLeave, newItem, unsaved } from './draft.js';
 import { drawFind } from './find.js';
@@ -46,6 +46,9 @@ async function route(pulse = false) {
   if (name === 'graph') return void (location.hash = arg ? `#/v?from=${arg}` : `#/v?${query}`);
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/');
   try {
+    // A frozen link: its reader token first, and the view it shows when the address names nothing else.
+    if (link && !link.token) await openLink();
+    if (link && (name === '' || name === 'home')) return void location.replace(`#/v?canvas=${link.of}`);
     if (!state.schema) await loadSchema();
     // What this session may do, before anything is drawn: each control is drawn only where it may (ui/base.js may).
     await loadMay();

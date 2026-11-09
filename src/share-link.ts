@@ -38,7 +38,7 @@ type FlatLink = Flat['links'][number];
 
 /** One item as the link's sheet reads it: what get answers, of the snapshot alone. */
 interface Page {
-  entity: { id: string; type: string; title: string; body: string; status: string; is_open: boolean; visibility: string; props: Props; created_at: string; updated_at: string; archived_at: null };
+  entity: { id: string; type: string; title: string; body: string; status: string; is_open: boolean; visibility: string; confidence: number | null; props: Props; created_at: string; updated_at: string; archived_at: null };
   trail: never[];
   mentioned_in: never[];
   shown_in: never[];
@@ -69,8 +69,8 @@ export async function freeze(l: Archipelago, id: string): Promise<Snapshot> {
     ? await (async () => { const { style: _style, ...rest } = await keptPicture(l, id); return rest as Flat; })()
     : await flatRead(l, { filter: { find: [id, ...sectionIds(root.body ?? '')].map((x) => `id ${x}`) }, limit: 200 });
   const ids = [...new Set([id, ...answer.items.map((i) => i.id)])];
-  const { rows } = await l.db.query<{ id: string; type: string; title: string; body: string; status: string; is_open: boolean; visibility: string; props: Props; created_at: Date; updated_at: Date }>(
-    `select id, type, title, body, status, is_open, visibility, props, created_at, updated_at from entity
+  const { rows } = await l.db.query<{ id: string; type: string; title: string; body: string; status: string; is_open: boolean; visibility: string; confidence: number | null; props: Props; created_at: Date; updated_at: Date }>(
+    `select id, type, title, body, status, is_open, visibility, confidence, props, created_at, updated_at from entity
      where id = any($1::text[]) and archived_at is null and (id = $2 or (visibility <> 'private' and private_to is null))`,
     [ids, id],
   );
@@ -88,7 +88,7 @@ export async function freeze(l: Archipelago, id: string): Promise<Snapshot> {
   for (const r of rows) {
     pages[r.id] = {
       // The view shared keeps its query and look whole (its page is how the canvas reads it); any other item its shown fields.
-      entity: { id: r.id, type: r.type, title: r.title, body: scrub(r.body ?? ''), status: r.status, is_open: r.is_open, visibility: r.visibility, props: r.id === id && view ? r.props : shownOf(l, r.type, r.props), created_at: new Date(r.created_at).toISOString(), updated_at: new Date(r.updated_at).toISOString(), archived_at: null },
+      entity: { id: r.id, type: r.type, title: r.title, body: scrub(r.body ?? ''), status: r.status, is_open: r.is_open, visibility: r.visibility, confidence: r.confidence, props: r.id === id && view ? r.props : shownOf(l, r.type, r.props), created_at: new Date(r.created_at).toISOString(), updated_at: new Date(r.updated_at).toISOString(), archived_at: null },
       trail: [], mentioned_in: [], shown_in: [],
       outgoing: links.filter((k) => k.from === r.id).map((k) => tie(k, k.to)),
       incoming: links.filter((k) => k.to === r.id).map((k) => tie(k, k.from)),
@@ -106,13 +106,20 @@ export async function freeze(l: Archipelago, id: string): Promise<Snapshot> {
  * A reader token for a link's secret, or nothing when no standing link has it (or it was made before links were
  * frozen). Read with the whole database: a token is made here, never by the reader.
  */
-export async function trade(l: Archipelago, secret: string): Promise<{ token: string; expires_in: number } | null> {
+export async function trade(l: Archipelago, secret: string): Promise<{ token: string; expires_in: number; of: string } | null> {
   if (!/^[a-f0-9]{48}$/.test(secret)) return null;
-  const { rows } = await l.db.query<{ id: string }>(`select id from share where hash = $1 and revoked_at is null and snapshot is not null`, [hash(secret)]);
+  const { rows } = await l.db.query<{ id: string; of: string }>(`select id, snapshot ->> 'of' as of from share where hash = $1 and revoked_at is null and snapshot is not null`, [hash(secret)]);
   if (!rows[0]) return null;
   const token = workspaceSecret('link', l.workspace);
   await keep(l.db, `linkreader:${hash(token)}`, { share: rows[0].id }, READER_MINUTES * 60_000);
-  return { token, expires_in: READER_MINUTES * 60 };
+  return { token, expires_in: READER_MINUTES * 60, of: rows[0].of };
+}
+
+/** Whether a link's secret opens a frozen link, which the app reads (a link made before links froze opens its own page). */
+export async function frozen(l: Archipelago, secret: string): Promise<boolean> {
+  if (!/^[a-f0-9]{48}$/.test(secret)) return false;
+  const { rows } = await l.db.query(`select 1 from share where hash = $1 and revoked_at is null and snapshot is not null`, [hash(secret)]);
+  return rows.length > 0;
 }
 
 /** The snapshot a reader token reads, through the one function the database answers it with: null once it is not good. */

@@ -445,3 +445,8 @@ body:not([data-panes="1"]) #query .q-view { margin: 0 calc(var(--space-5) + (var
 .thumb > img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .thumb-stage { position: fixed; top: 0; left: 100%; width: var(--thumb-frame); height: var(--thumb-frame-high); overflow: hidden; visibility: hidden; pointer-events: none; contain: strict; }
 .thumb-stage .lens-wrap, .thumb-stage .lens-view { width: 100%; height: 100%; }
+
+/* A frozen link's page (ui/base.js `link`, decision e_qpaqnmrc): the view it shows alone, without the tabs, menu, other
+   views or panes of whoever opens it; its query in sight and not to be changed, since the answer is frozen. */
+:root[data-reader] #tabs, :root[data-reader] #more, :root[data-reader] #listening, :root[data-reader] #query .q-travel, :root[data-reader] #query .q-split, :root[data-reader] #query .q-band-menu, :root[data-reader] #query .q-view-pick > :last-child { display: none; }
+:root[data-reader] #query .q-view-pick, :root[data-reader] #find { pointer-events: none; }

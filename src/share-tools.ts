@@ -40,6 +40,12 @@ export const SHARE_TOOLS: Record<string, Tool> = {
     // With the items it leaves out as private, so the page can ask whether to share them.
     run: async (l, actor, input) => ({ ...(await createShare(l, actor, await shareable(l, actor, input.id), await freeze(l, input.id))), private: await privateIn(l, input.id) }),
   },
+  share_private: {
+    description: 'What a link to a view, document or item would leave out because it is private, asked before the link is made: a link freezes what it shows.',
+    humanOnly: true,
+    input: { id: z.string().describe('The document, view or item.') },
+    run: (l, _actor, input) => privateIn(l, input.id),
+  },
   share_workspace: {
     description: 'Share one document with another workspace on this server, for those there to read and nobody else. It arrives there as an offer to accept, if that workspace accepts shares from this one. An admin’s.',
     humanOnly: true,

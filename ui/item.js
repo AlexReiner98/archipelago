@@ -2,7 +2,7 @@
 // holds, a section for each (ui/item-sections.js), under its title. What it is tied to is not on it: the canvas
 // behind draws that, with this item lit. Rare actions are in one menu; the page names no pack's type.
 
-import { api, ask, h, may, part, state, tell } from './base.js';
+import { api, ask, h, link, may, part, state, tell } from './base.js';
 import { drawIn, goQuery, openHere, queryNow } from './canvas.js';
 import { viewsOn } from './canvases.js';
 import { draftOf } from './draft.js';
@@ -31,7 +31,8 @@ export async function entity(id, here) {
   let data;
   let past;
   try {
-    [data, past] = await Promise.all([api('get', { id }), api('events', { target: id, limit: 40 })]);
+    // A frozen link keeps no history: what it shows is as it was when shared.
+    [data, past] = await Promise.all([api('get', { id }), link ? [] : api('events', { target: id, limit: 40 })]);
   } catch (err) {
     return page.replaceChildren(h('div', { class: 'error' }, err.message));
   }
@@ -178,11 +179,11 @@ export async function entity(id, here) {
         h('span', { class: 'grow' }),
         writes && session && h('button', { class: 'quiet-button', title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
         buttons[0] && h('button', { class: 'quiet-button item-button', title: buttons[0].tip, onclick: () => press(buttons[0]) }, buttons[0].label),
-        !e.archived_at && along.length > 0 && h('button', { class: 'quiet-button walk-from', title: `Draw it and what it links to, along ${walkSaid}, in place of the canvas's lens`, onclick: () => walkFrom(false) }, 'Walk from it'),
+        !link && !e.archived_at && along.length > 0 && h('button', { class: 'quiet-button walk-from', title: `Draw it and what it links to, along ${walkSaid}, in place of the canvas's lens`, onclick: () => walkFrom(false) }, 'Walk from it'),
       menu('⋯', [
         ...buttons.slice(1).map((b) => [b.label, () => press(b)]),
         writes && !e.archived_at && ties.any && ['Link to…', ties.open],
-        !e.archived_at && along.length > 0 && ['Walk from it, added to the lens', () => walkFrom(true)],
+        !link && !e.archived_at && along.length > 0 && ['Walk from it, added to the lens', () => walkFrom(true)],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
         // What packs offer to do with this kind of item.
         ...(e.archived_at || !writes ? [] : actionsFor(e.type).filter((tool) => !buttons.some((b) => b.action === tool.action)).map((tool) => [tool.title ?? tool.tool, () => act(tool)])),
