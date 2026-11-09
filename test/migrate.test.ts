@@ -91,6 +91,8 @@ test('step 27 drops the activity written before the log began, and keeps the res
   const { PRE_LOG_ACTIVITY } = await import('../src/activity-steps.ts');
   const l = await fresh();
   await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'After the log began' }]);
+  // The event table as it stood then: step 34 has dropped it since.
+  await l.db.query(`create table event (seq bigint primary key default nextval('event_seq_seq'), actor text not null, action text not null, target_id text, changeset text, reason text not null default '', detail jsonb not null default '{}')`);
   const add = (seq: number | null, action: string) =>
     l.db.query(`insert into event (${seq === null ? '' : 'seq, '}actor, action, reason, detail) values (${seq === null ? '' : `${seq}, `}'human:test', $1, 'test', '{}')`, [action]);
   // Numbered before the log's first fact, as a map's rows were before it had a log.

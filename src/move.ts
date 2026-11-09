@@ -200,7 +200,7 @@ export async function move(from: Db, to: Db, registry: Registry): Promise<MoveRe
       left = failed;
     }
     // Numbers drawn from a sequence go on after the highest carried.
-    await tx.query(`select setval('event_seq_seq', greatest((select coalesce(max(seq), 0) from event), (select coalesce(max(seq), 0) from log_fact), (select coalesce(max(seq), 0) from log_op where seq is not null), 1)) -- index log_fact_seq, log_op_seq`);
+    await tx.query(`select setval('event_seq_seq', greatest((select coalesce(max(seq), 0) from log_fact), (select coalesce(max(seq), 0) from log_op where seq is not null), 1)) -- index log_fact_seq, log_op_seq`);
     if (there.has('local_type')) await tx.query(`select setval(pg_get_serial_sequence('local_type', 'n'), greatest((select coalesce(max(n), 0) from local_type), 1))`);
 
     // Checked before it is committed: a target that does not agree is left as it was.

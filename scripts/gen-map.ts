@@ -402,7 +402,7 @@ await regatherAll(db, ['part_of']);
 await mentionedAll(db);
 process.stderr.write('analysing\n');
 await db.query('analyze');
-const counts = (await db.query<Record<string, number>>(`select (select count(*) from entity)::int as items, (select count(*) from relation)::int as links, (select count(*) from event)::int as events, (select count(*) from proposal)::int as proposals`)).rows[0];
+const counts = (await db.query<Record<string, number>>(`select (select count(*) from entity)::int as items, (select count(*) from relation)::int as links, (select count(*) from log_op where stream = 'activity')::int as events, (select count(*) from proposal)::int as proposals`)).rows[0];
 const facts = (await db.query<{ n: number }>(`select count(*)::int as n from entity where type not in ('run', 'notification', 'component', 'connection', 'resource')`)).rows[0].n;
 console.log(JSON.stringify({ seed: SEED, end: iso(END), days: DAYS, ...counts, facts, seconds: Math.round((performance.now() - t0) / 1000) }));
 await db.close();

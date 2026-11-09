@@ -4,8 +4,9 @@
 // what else was said. Every entry of log_op is numbered from the sequence the fact stream's facts are, so the activity
 // log (src/eventlog.ts) reads change sets, this stream and what the other streams say worth showing in one order.
 //
-// Before 9 Nov 2026 these were rows of the event table. Each is carried into the stream once, keeping its number and
-// its time (carryEvents), and the table is written no more; a backup from before is carried the same way.
+// Before 9 Nov 2026 these were rows of the event table. Each was carried into the stream, keeping its number and its
+// time (carryRows), and schema step 34 carried the last and dropped the table; a backup from before is carried the
+// same way as it is restored.
 
 import type { Db, Q } from './db.ts';
 import { makePartitions } from './partitions.ts';
@@ -42,36 +43,73 @@ export function doneFact(e: Done): OpFact {
   return ['+', e.target ?? WORKSPACE, e.action, value];
 }
 
-/** Where in the event table the carrying has reached. */
-const CARRIED = 'activity.carried';
+/** A row of the event table, written until 9 Nov 2026: what an old backup holds, and what step 34 carries. */
+export interface EventRow {
+  seq: number | string;
+  ts: Date | string;
+  origin?: string | null;
+  actor: string;
+  action: string;
+  target_id?: string | null;
+  changeset?: string | null;
+  reason?: string | null;
+  detail?: Record<string, unknown> | null;
+}
 
 /**
- * Carry the event table's rows into the activity stream, those after where it last reached, in order: each keeps its
- * number, its time (unless an entry is there after it) and all it said. Run when a workspace opens and after a backup
- * is restored; a row an older app wrote while this one took over is carried the next time. Returns how many it carried.
+ * Event rows carried into the activity stream in the order of their numbers: each keeps its number, its time (unless
+ * an entry is there after it) and all it said. The one way an event row reaches the activity stream: the table's last
+ * rows as step 34 drops it, and an old backup's as it is restored (docs/log.md, section 6). Returns how many.
  */
-export async function carryEvents(db: Db, ws: string, rules: Retention[]): Promise<number> {
-  const { rows: at } = await db.query<{ value: number }>(`select value from setting where key = $1`, [CARRIED]);
+export async function carryRows(tx: Q, ws: string, rules: Retention[], given: EventRow[]): Promise<number> {
+  const rows = [...given].sort((a, b) => Number(a.seq) - Number(b.seq));
+  if (!rows.length) return 0;
+  await makePartitions(tx, new Date(rows.reduce((min, r) => Math.min(min, new Date(r.ts).getTime()), Infinity)));
+  for (const r of rows) {
+    const ts = new Date(r.ts).toISOString();
+    const fact = doneFact({ actor: r.actor, action: r.action, target: r.target_id ?? undefined, changeset: r.changeset ?? undefined, detail: r.detail ?? undefined, origin: r.origin ?? undefined, ts });
+    await record(tx, ws, 'activity', r.actor, [fact], { rules, ...(r.reason && { reason: r.reason }), at: ts, seq: Number(r.seq) });
+  }
+  return rows.length;
+}
+
+/** Where in the event table the app of 9 Nov 2026 had carried its rows to, as each workspace opened. */
+export const CARRIED = 'activity.carried';
+
+/**
+ * Step 34, before its table goes: the event table's rows not carried yet (a workspace not opened since 9 Nov 2026, or
+ * a row the app before wrote while that one took over), carried 500 at a time, each batch with where it reached, so
+ * one that fails is taken up again where it stopped. They are the workspace's that its log names; every activity
+ * entry is kept by core's rule of that stream, which names it as the stream does.
+ */
+export async function carryEventTable(db: Db): Promise<number> {
+  if (!(await db.query<{ t: string | null }>(`select to_regclass('event')::text as t`)).rows[0].t) return 0;
+  const { rows: at } = await db.query<{ value: unknown }>(`select value from setting where key = $1`, [CARRIED]);
   let after = Number(at[0]?.value ?? 0);
+  let ws: string | undefined;
   let carried = 0;
   for (;;) {
-    const { rows } = await db.query<{ seq: number; ts: Date; origin: string; actor: string; action: string; target_id: string | null; changeset: string | null; reason: string; detail: Record<string, unknown> }>(
+    const { rows } = await db.query<EventRow>(
       `select seq::int8 as seq, ts, origin, actor, action, target_id, changeset, reason, detail from event where seq > $1 order by seq limit 500`,
       [after],
     );
     if (!rows.length) return carried;
+    ws ??= await workspaceOf(db);
     await db.transaction(async (tx) => {
-      await makePartitions(tx, new Date(Math.min(...rows.map((r) => new Date(r.ts).getTime()))));
-      for (const r of rows) {
-        const ts = new Date(r.ts).toISOString();
-        const fact = doneFact({ actor: r.actor, action: r.action, target: r.target_id ?? undefined, changeset: r.changeset ?? undefined, detail: r.detail, origin: r.origin, ts });
-        await record(tx, ws, 'activity', r.actor, [fact], { rules, ...(r.reason && { reason: r.reason }), at: ts, seq: Number(r.seq) });
-      }
+      await carryRows(tx, ws!, [], rows);
       after = Number(rows.at(-1)!.seq);
       await tx.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [CARRIED, JSON.stringify(after)]);
     });
     carried += rows.length;
   }
+}
+
+/** The workspace a database is, as its log or its key vault names it: a database is one workspace's. */
+async function workspaceOf(db: Q): Promise<string> {
+  const { rows } = await db.query<{ ws: string | null }>(
+    `select coalesce((select head->>'ws' from log_entry limit 1), (select head->>'ws' from log_op limit 1), (select ws from vault_key limit 1)) as ws`,
+  );
+  return rows[0].ws ?? 'default';
 }
 
 type Row = { seq?: unknown; ts?: unknown; origin?: unknown; actor?: unknown; action?: unknown; target_id?: unknown; changeset?: unknown; reason?: unknown; detail?: unknown };

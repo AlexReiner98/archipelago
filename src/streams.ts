@@ -9,7 +9,8 @@
 import { createHash } from 'node:crypto';
 import { jcs } from './jcs.ts';
 import { append, type Fact } from './log.ts';
-import { newId, type Db, type Q } from './db.ts';
+import type { Db, Q } from './db.ts';
+import { newId } from './ids.ts';
 import { kept, ruleFor, type OpEntry, type Retention } from './retention.ts';
 import { makePartitions, partitionMade } from './partitions.ts';
 import { hashed, openOps, sealOp } from './opseal.ts';
