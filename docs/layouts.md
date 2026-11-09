@@ -149,6 +149,10 @@ A read across is drawn as three wires: from its reader to the reader's port, acr
 
 `flow/ports.js` holds what a level needs for ports: the frame, the items of an island with its ports, where a port first stands (`setPorts`, `holdPorts`), and the island read back without them (`apart`). `flow/islands.js` draws each island's frame, its name and legend, a bar at each port, the class that outlines each finding read across in its island's colour (`found`), and the pulse that runs across the sea when a finding moves.
 
+### Far islands folded
+
+A picture across more islands than it can read whole folds the far ones (`map/fold.js`, task e_yn9f9zpn): past `flow_fold_whole` company islands, or past `flow_fold_most` items in all, each island it does not keep whole is one step in its colour, with no frame: its name and how many of its items the answer holds, opening the island's page, and every link to its items ends on that step, one per type and way. The island the view is about (the lens's `from`, else where most of what its find found lives) never folds; the rest are kept whole smallest first. It is counted from the answer alone, so the picture is the same each time.
+
 ### Adding a wired drawing
 
 1. List its modules in `pack.json`, entered at `index.js`.
