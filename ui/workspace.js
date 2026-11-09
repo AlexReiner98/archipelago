@@ -9,7 +9,7 @@ import { screenRows } from './nav.js';
 import { themesCard } from './themes-card.js';
 import { packsCard } from './packs.js';
 import { membersCard } from './members-card.js';
-import { planCard } from './plan-card.js';
+import { limitsCard } from './limits-card.js';
 import { connectionsCard } from './connections-card.js';
 import { agentsMayCard, tokenRow, tokensCard } from './agents-card.js';
 import { connectCard } from './connect-agent.js';
@@ -81,7 +81,7 @@ export async function workspace() {
   const sections = {
     people: () => [
       (admin || !info.owner) && card('Owner', null, h('ul', { class: 'rows' }, ownerRow(info.owner, workspace))),
-      tokensOn && me.actor.admin && planCard(info.member_limit, info.use, info.ended),
+      tokensOn && me.actor.admin && limitsCard(info.member_limit, info.use, info.ended),
       // A workspace for one person (its limit is one, and it has no more) has no members to manage.
       tokensOn && me.actor.admin && !(info.member_limit?.members === 1 && members.length <= 1) && at('team', membersCard({ me, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow: row, then: workspace, fail, say })),
     ],

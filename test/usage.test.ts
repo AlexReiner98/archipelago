@@ -42,11 +42,10 @@ test('a member reads their workspace’s use and what it is made of, and nothing
   const seen = await read(member);
   const said = JSON.stringify(seen);
   assert.ok(!said.includes(SECRET) && !said.includes(big), 'the private item is neither named nor pointed at');
-  assert.ok(!said.includes('seller.example'), 'where the plan is managed is the admin’s');
+  assert.ok(!said.includes('seller.example') && !said.includes('Solo'), 'how the pack sells is not kept');
   const limit = (answer: any, name: string) => answer.items.find((i: any) => i.id === `use:${name}`);
   const partsOf = (answer: any, name: string) => answer.links.filter((k: any) => k.to === `use:${name}`).map((k: any) => answer.items.find((i: any) => i.id === k.from));
   assert.deepEqual(seen.items.filter((i: any) => i.use.as === 'limit').map((i: any) => i.id), ['use:storage', 'use:requests', 'use:sessions', 'use:looks'], 'members are the admin’s');
-  assert.equal(seen.plan, 'Solo');
   const storage = limit(seen, 'storage');
   assert.equal(storage.use.of, 500e6);
   assert.equal(storage.use.of_shown, '500 MB');
@@ -78,9 +77,9 @@ test('a member reads their workspace’s use and what it is made of, and nothing
   assert.deepEqual(its.items.filter((i: any) => i.use.as === 'limit').map((i: any) => i.id), ['use:storage', 'use:requests', 'use:sessions', 'use:looks']);
   assert.ok(!JSON.stringify(its).includes(SECRET));
 
-  // The admin also reads the members and where the plan is managed; their own private item is named for them.
+  // The admin also reads the members; their own private item is named for them.
   const theirs = await read(owner);
-  assert.equal(theirs.manage, 'https://seller.example/billing');
+  assert.ok(!JSON.stringify(theirs).includes('seller.example'), 'nor shown to the admin');
   assert.deepEqual(partsOf(theirs, 'members').map((p: any) => p.use.item).sort(), [ola, kim].sort());
   assert.equal(limit(theirs, 'members').use.of_shown, '3 members');
   assert.ok(partsOf(theirs, 'storage').some((p: any) => p.use.item === big && p.title === SECRET), 'the owner sees their own item by name');

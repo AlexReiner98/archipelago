@@ -1,10 +1,11 @@
-// What a workspace's plan allows: members, storage, requests a minute, agent sessions at once and looks an hour. Like
-// whether it has ended (src/ended.ts), it is the server's to keep, set by the server pack that sold the workspace (its
+// What a workspace may use: members, storage, requests a minute, agent sessions at once and looks an hour. Like
+// whether it has ended (src/ended.ts), it is the server's to keep, set by the server pack that made the workspace (its
 // act workspace.limit, src/server-acts.ts) in the control values of the default workspace's database. Each limit is
-// optional, and one left out is no limit at all, as on a server nobody sells.
+// optional, and one left out is no limit at all, as on a server that sets none. How a limit is sold (a plan, a trial,
+// where to pay) is the pack's, never the kernel's: the pack may say what to do in a note, and nothing more.
 //
-// Over a limit, what would add to it is refused with a plain answer naming the plan and where to change it; what is
-// there is never hidden or lost: reads, export and the backup download go on working, so a customer can always leave.
+// Over a limit, what would add to it is refused with a plain answer and the pack's note; what is there is never hidden
+// or lost: reads, export and the backup download go on working, so a workspace can always leave.
 // The write path (src/pelago.ts) asks roomToStore, a session starting (src/sessions.ts) roomForSession, a look
 // (src/looks.ts) looksAllowed, a signed-in request (src/server.ts) requestWait, and adding a member src/members.ts.
 
@@ -22,24 +23,18 @@ export interface Limits {
   sessions?: number;
   /** The most looks an hour. */
   looks?: number;
-  /** What to say to whoever meets a limit (how to make room), what the workspace is on ("Solo"), and where its admin manages that. */
+  /** What to say to whoever meets a limit: how to make room. */
   note?: string;
-  plan?: string;
-  manage?: string;
-  /** What the link to manage it says, when not the usual. */
-  manage_says?: string;
-  /** The day a plan with an end runs out (a trial's): the pack that sold it ends the workspace then. */
-  until?: string;
 }
 
-/** The limits a plan can set, each with how much of it is one: what workspace.limit takes and the Plan card shows. */
+/** The limits a pack can set: what workspace.limit takes and the Limits card shows. */
 export const LIMITS = ['members', 'storage', 'requests', 'sessions', 'looks'] as const;
 export type LimitName = (typeof LIMITS)[number];
 /** The largest each may be set to. */
 const MOST: Record<LimitName, number> = { members: 10_000, storage: 2 ** 50, requests: 1_000_000, sessions: 10_000, looks: 100_000 };
 /** A session not heard from for this long is not at work: it holds no place among those at once. */
 export const SESSION_AWAKE_MS = 60 * 60_000;
-/** A share of a limit past which its workspace is told, on its Plan card. */
+/** A share of a limit past which its workspace is told, on its Limits card. */
 export const NEAR = 0.8;
 /** How long a workspace's storage, once measured, is taken as it was: every write asks. */
 const STORAGE_KEEP_MS = 60_000;
@@ -87,9 +82,6 @@ export function limitsFrom(input: Record<string, unknown>, said: Omit<Limits, Li
   return { ...limits, ...Object.fromEntries(Object.entries(said).filter(([, v]) => v)) };
 }
 
-/** Days until a plan's end, counting the day it is in: what its Plan card shows. */
-export const daysLeft = (until: string, now = Date.now()) => Math.max(0, Math.ceil((Date.parse(until) - now) / 86_400_000));
-
 const UNIT: Record<LimitName, (n: number) => string> = {
   members: (n) => `${n} member${n === 1 ? '' : 's'}`,
   storage: (n) => bytes(n),
@@ -100,12 +92,10 @@ const UNIT: Record<LimitName, (n: number) => string> = {
 /** A number of bytes as a person reads it. */
 export const bytes = (n: number) => (n >= 1e9 ? `${+(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${+(n / 1e6).toFixed(1)} MB` : n >= 1e3 ? `${Math.round(n / 1e3)} kB` : `${n} bytes`);
 
-/** The refusal at a limit: what the plan has room for, what is used, and how to make room. */
+/** The refusal at a limit: what there is room for, what is used, and how to make room. */
 export async function overLimit(workspace: string, limits: Limits, name: LimitName, used: number, what: string): Promise<Error> {
   const room = UNIT[name](limits[name]!);
-  const on = limits.plan ? ` on the ${limits.plan} plan` : '';
-  const manage = limits.manage ? ` Change the plan at ${limits.manage}.` : '';
-  return new Error(`${await site.nameOf(workspace)} has room for ${room}${on}, and ${name === 'storage' ? `holds ${bytes(used)}` : `has ${used}`}: ${what}.${limits.note ? ` ${limits.note}` : ''}${manage}`);
+  return new Error(`${await site.nameOf(workspace)} has room for ${room}, and ${name === 'storage' ? `holds ${bytes(used)}` : `has ${used}`}: ${what}.${limits.note ? ` ${limits.note}` : ''}`);
 }
 
 /**
@@ -154,7 +144,7 @@ export async function awakeSessions(db: Q, runs: string[]): Promise<number> {
   return rows[0].n;
 }
 
-/** Refuse one more agent session past the plan's, counting those at work (`awake`) now. */
+/** Refuse one more agent session past the limit, counting those at work (`awake`) now. */
 export async function roomForSession(workspace: string, awake: () => Promise<number>): Promise<void> {
   const limits = await limitOf(workspace);
   if (!limits?.sessions) return;
@@ -162,14 +152,14 @@ export async function roomForSession(workspace: string, awake: () => Promise<num
   if (n >= limits.sessions) throw await overLimit(workspace, limits, 'sessions', n, 'end one, or let one go quiet for an hour, before another starts');
 }
 
-/** The looks a workspace may have in an hour: its plan's, else `otherwise`. */
+/** The looks a workspace may have in an hour: its limit, else `otherwise`. */
 export async function looksAllowed(workspace: string, otherwise: number): Promise<{ most: number; limits?: Limits }> {
   const limits = await limitOf(workspace);
   return limits?.looks ? { most: limits.looks, limits } : { most: otherwise };
 }
 
 // Signed-in requests are counted a minute at a time: each token against TOKEN_LIMIT (one agent in a loop is slowed
-// before it slows its neighbours), and all of a workspace's together against its plan's, when it has one.
+// before it slows its neighbours), and all of a workspace's together against its limit, when it has one.
 let perToken = TOKEN_LIMIT;
 let byToken = limiter(perToken);
 /** What one token may ask a minute, as the server is started with. */
@@ -205,7 +195,7 @@ export async function requestWait(workspace: string, token: string, who?: string
   return 0;
 }
 
-/** The refusal of a request past the plan's or a token's rate. */
+/** The refusal of a request past the workspace's or a token's rate. */
 export async function tooManyRequests(workspace: string, wait: number): Promise<string> {
   const limits = await limitOf(workspace);
   const plan = limits?.requests && byWorkspace.count(workspace) >= limits.requests;
@@ -213,7 +203,7 @@ export async function tooManyRequests(workspace: string, wait: number): Promise<
 }
 
 /**
- * How much of each limit a workspace uses, as its Plan card shows it: near from NEAR of it, over at all of it. Seats
+ * How much of each limit a workspace uses, as its Limits card shows it: near from NEAR of it, over at all of it. Seats
  * are paid for to be filled: they are over only past the limit, and a plan of one seat is never near it.
  */
 export function useOf(limits: Limits, used: Record<LimitName, number>) {

@@ -12,14 +12,15 @@ const FIXTURES = join(import.meta.dirname, 'server-packs');
 before(() => Object.assign(process.env, { PELAGO_SERVER_PACKS: FIXTURES }));
 after(() => void delete process.env.PELAGO_SERVER_PACKS);
 
+// What the pack sends: its note is said at a limit; how it sells (a plan's name, where to pay) is its own, and not kept.
 const PLAN = { plan: 'Solo', note: 'Move to Team for more.', manage: 'https://seller.example/billing' };
-/** The refusal names the plan, says how to make room, and where to change it. */
-const NAMES_PLAN = /on the Solo plan.*Move to Team for more\. Change the plan at https:\/\/seller\.example\/billing\./;
+/** The refusal says how to make room, in the pack's words, and names no plan and no seller. */
+const NAMES_PLAN = /Move to Team for more\.$/;
 
 test('a plan’s limits are read from what the pack sends: each optional, and none at all is no limit', () => {
-  assert.deepEqual(limitsFrom({ members: 1, storage: 1e9, requests: 300, sessions: 5, looks: 30 }, { plan: 'Solo' }), { members: 1, storage: 1e9, requests: 300, sessions: 5, looks: 30, plan: 'Solo' });
+  assert.deepEqual(limitsFrom({ members: 1, storage: 1e9, requests: 300, sessions: 5, looks: 30 }, { note: 'More on Team.' }), { members: 1, storage: 1e9, requests: 300, sessions: 5, looks: 30, note: 'More on Team.' });
   assert.deepEqual(limitsFrom({ storage: 5e9, members: null }, {}), { storage: 5e9 });
-  assert.equal(limitsFrom({ members: null }, { plan: 'Solo' }), null);
+  assert.equal(limitsFrom({ members: null }, { note: 'More on Team.' }), null);
   assert.throws(() => limitsFrom({ sessions: 0 }, {}), /sessions: a whole number from 1/);
   assert.throws(() => limitsFrom({ requests: 2.5 }, {}), /requests: a whole number/);
   assert.equal(bytes(1_500_000_000), '1.5 GB');
@@ -27,7 +28,7 @@ test('a plan’s limits are read from what the pack sends: each optional, and no
   assert.deepEqual(use.map(({ name, shown, of, near, over }) => [name, shown, of, near, over]), [['storage', '850 MB', '1 GB', true, false], ['sessions', '5', '5 agent sessions at once', true, true]]);
 });
 
-test('over each limit what would add to it is refused, naming the plan, and reads, export and backup go on working', async () => {
+test('over each limit what would add to it is refused, in the pack’s words, and reads, export and backup go on working', async () => {
   const { workspaces, call } = await serve('tokens');
   const pack = loadServerPacks([FIXTURES]).packs[0].file;
   const act = (name: string, input: Record<string, unknown>) => runAct(workspaces, pack, name, input);
@@ -51,12 +52,12 @@ test('over each limit what would add to it is refused, naming the plan, and read
   assert.deepEqual(await limit({ storage: 1 }), { workspace: ws.id, storage: 1 });
   const refused = await write('One too many');
   assert.equal(refused.status, 400);
-  assert.match(refused.error, /Plan Co has room for 1 bytes on the Solo plan, and holds .*: nothing more is written until there is room/);
+  assert.match(refused.error, /Plan Co has room for 1 bytes, and holds .*: nothing more is written until there is room/);
   assert.match(refused.error, NAMES_PLAN);
   assert.match((await call('/api/picture_put', owner, { result: note, data: 'iVBORw0KGgo=', content_type: 'image/png' })).error, /Plan Co has room for 1 bytes/);
   await reads();
   const info = (await call('/api/workspace_info', owner)).result;
-  assert.deepEqual(info.use.map((u: any) => [u.name, u.over]), [['storage', true]], 'the Plan card is told');
+  assert.deepEqual(info.use.map((u: any) => [u.name, u.over]), [['storage', true]], 'the Limits card is told');
   await limit({ storage: 10e9 });
   assert.equal((await write('Room again')).status, 200, 'more room, and it writes');
 
@@ -65,7 +66,7 @@ test('over each limit what would add to it is refused, naming the plan, and read
   const start = (session_id: string) => call('/agent/capture', agent, { action: 'session_start', params: { session_id } });
   assert.ok((await start('first')).result.run);
   const second = await start('second');
-  assert.match(second.error, /room for 1 agent session at once on the Solo plan, and has 1: end one/);
+  assert.match(second.error, /room for 1 agent session at once, and has 1: end one/);
   assert.match(second.error, NAMES_PLAN);
   assert.ok((await start('first')).result.resumed, 'the session at work is heard again');
   await reads();
@@ -74,9 +75,9 @@ test('over each limit what would add to it is refused, naming the plan, and read
   await limit({ looks: 2 });
   await countLook(ws.id);
   await countLook(ws.id);
-  await assert.rejects(countLook(ws.id), (err: Error) => /room for 2 looks an hour on the Solo plan, and has 2: read one again/.test(err.message) && NAMES_PLAN.test(err.message));
+  await assert.rejects(countLook(ws.id), (err: Error) => /room for 2 looks an hour, and has 2: read one again/.test(err.message) && NAMES_PLAN.test(err.message));
 
-  // Members, as before, and the Plan card at 80% of a limit.
+  // Members, as before, and the Limits card at 80% of a limit.
   await limit({ members: 1, storage: 10e9 });
   assert.match((await call('/api/member_add', owner, { email: 'kim@plan.example' })).error, /Plan Co has room for 1 member\. Move to Team/);
   const use = (await call('/api/workspace_info', owner)).result.use;
@@ -90,7 +91,7 @@ test('over each limit what would add to it is refused, naming the plan, and read
   assert.equal((await call('/api/search', agent, { q: 'Kept' })).status, 200);
   const over = await call('/api/search', owner, { q: 'Kept' });
   assert.equal(over.status, 429);
-  assert.match(over.error, /room for .* requests a minute on the Solo plan.*try again in \d+ seconds/);
+  assert.match(over.error, /room for .* requests a minute, and has .*try again in \d+ seconds/);
   await limit({});
   assert.equal((await call('/api/search', owner, { q: 'Kept' })).status, 200, 'lifted');
 });

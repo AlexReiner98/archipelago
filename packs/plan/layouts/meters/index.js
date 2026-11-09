@@ -74,7 +74,7 @@ export function picture({ answer, style = {} }) {
   };
 
   const when = answer.as_of ? new Date(answer.as_of) : null;
-  const head = m('div', { class: 'mt-head' }, m('span', {}, answer.plan ? `${answer.plan} plan` : 'No plan limits'), when && m('span', { title: when.toISOString() }, `as of ${when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`));
+  const head = m('div', { class: 'mt-head' }, m('span', {}, 'Limits'), when && m('span', { title: when.toISOString() }, `as of ${when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`));
   const stage = m('div', { class: 'mt-stage' }, head, limits.map(band));
   return { scene: { css: [css, ...rules].join('\n'), svg: stage, key: [] }, on: () => [] };
 }
