@@ -3,6 +3,8 @@
 // names them. A card's colour and the grid's columns are classes the drawing writes rules for (hues, columns): a
 // drawing sets no style on a mark.
 
+import { hues } from './marks.js';
+
 export const css = `
 .lg-card.here { outline: var(--ln-here-ring) solid var(--accent); outline-offset: var(--ln-here-ring); }
 .lg-stage { position: relative; background: var(--ln-sea); padding: var(--ln-grid-pad); overflow-x: auto; }
@@ -26,8 +28,7 @@ a.lg-row:hover { text-decoration: underline; }
 `;
 
 /** The class a colour is drawn by, and its rule: named by the colour itself, so two pictures on a page never differ on one. */
-export const hueClass = (hex) => `lg-h-${hex.slice(1).toLowerCase()}`;
-export const hueRule = (hex) => `.${hueClass(hex)} { --lg-hue: ${hex}; }`;
+export const { hueClass, hueRule } = hues('lg-h', '--lg-hue');
 
 /** The class a grid's columns are laid out by, and its rule: named by what it lays out, as hueClass is. */
 const n = (v) => String(v).replace('.', '_');

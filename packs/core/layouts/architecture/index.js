@@ -11,6 +11,7 @@ import { partBoxes, saysSpots } from './says.js';
 import { css } from './look.js';
 import { addClass, m, titled } from './marks.js';
 import { story } from './story.js';
+import { litCount, queryTree } from './tree.js';
 
 /** What each health and wire state is called, in the order the bar and the key give them. */
 const HEALTHS = [['ok', 'Up'], ['warn', 'Degraded'], ['down', 'Down'], ['building', 'Being wired'], ['standby', 'On standby'], ['planned', 'Planned'], ['unknown', 'Not known'], ['gone', 'Retired']];
@@ -18,27 +19,6 @@ const WIRES = [['wired', 'Wired'], ['planned', 'Not yet wired'], ['broken', 'Bro
 /** The pill each health is counted in. */
 const PILL = { ok: 'ok', warn: 'warn', down: 'bad', building: '', standby: 'closed', planned: 'closed', unknown: 'closed', gone: 'closed' };
 const said = (list, key) => list.find(([k]) => k === key)?.[1] ?? key;
-
-/** A lens answer as a tree, each thing with what it says of itself and of all that is inside it. */
-function queryTree(answer) {
-  const byId = new Map(answer.items.map((item) => [item.id, { ...item, kids: [] }]));
-  const root = { kids: [] };
-  for (const n of byId.values()) (byId.get(n.inside) ?? root).kids.push(n);
-  for (const n of byId.values()) {
-    n.you = (n.state.needs_you ? 1 : 0) + (n.within.needs_you ?? 0);
-    n.blk = (n.state.blocked ? 1 : 0) + n.within.blocked;
-  }
-  return byId;
-}
-/** How much of a thing stays lit: what was asked for by name (style.only), else what the style's lit says. */
-function litCount(n, style) {
-  if (Array.isArray(style.only)) {
-    const only = new Set(style.only);
-    const any = (x) => only.has(x.id) || x.kids.some(any);
-    return any(n) ? 1 : 0;
-  }
-  return style.lit === 'you' ? n.you : style.lit === 'blocked' ? n.blk : 1;
-}
 
 /** A part's outline, centred on x, y, its corners as round as rx and a store's lid as deep as lid. */
 function outline(shape, x, y, w, hgt, rx, lid) {
@@ -60,7 +40,7 @@ function outline(shape, x, y, w, hgt, rx, lid) {
 export function picture({ answer, style, reduced, width }, tools) {
   // A picture with steps plays how it came to be, and ends on the map as it is.
   if (Array.isArray(answer.steps) && answer.steps.length) return story({ answer, style, reduced, width }, tools);
-  const byId = queryTree(answer);
+  const { byId } = queryTree(answer);
   // Every length is the style's (sizes, arch_*), named by the house style; so is the typeface.
   const z = (name) => {
     const v = style.sizes?.[`arch_${name}`];

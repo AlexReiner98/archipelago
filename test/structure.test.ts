@@ -427,9 +427,9 @@ test("a drawing's list holds every module it reaches", () => {
 const LENGTHS_IN_DRAWINGS: Record<string, number> = {
   'architecture/boats.js': 3, 'architecture/deep.js': 32, 'architecture/index.js': 28, 'architecture/islands.js': 18, 'architecture/layout.js': 9, 'architecture/moves.js': 6,
   'architecture/route.js': 8, 'architecture/says.js': 3, 'architecture/sides.js': 1, 'architecture/story.js': 3, 'flow/combs.js': 1, 'flow/direction.js': 1, 'flow/faults.js': 4,
-  'flow/index.js': 15, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/search.js': 1,
-  'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 4, 'flow/wrap.js': 2, 'grid/index.js': 8, 'grid/look.js': 1,
-  'pages/index.js': 5, 'time/index.js': 30, 'packs/plan/layouts/meters/index.js': 10,
+  'flow/index.js': 13, 'flow/layout.js': 1, 'flow/numbering.js': 5, 'flow/planar.js': 1, 'flow/search.js': 1,
+  'flow/shapes.js': 9, 'flow/solve.js': 2, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 4, 'flow/wrap.js': 2, 'grid/index.js': 6, 'grid/look.js': 1,
+  'pages/index.js': 5, 'time/index.js': 28, 'packs/plan/layouts/meters/index.js': 8,
 };
 const BARE = /(?<![\w.$#])\d+(?:\.\d+)?(?![\w.])/g;
 

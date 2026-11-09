@@ -13,3 +13,14 @@ export const m = (tag, attrs = {}, ...kids) => {
 export const titled = (mark, text) => (mark.splice(2, 0, m('title', {}, text)), mark);
 /** A class put on a mark, after those it has. */
 export const addClass = (mark, name) => (mark[1].class = mark[1].class ? `${mark[1].class} ${name}` : name);
+
+/** A colour a style may name: a hex of three to eight digits (a pattern, not a length, so it is written as text). */
+export const HEX = new RegExp('^#[0-9a-f]{3,8}$', 'i');
+/**
+ * The class a colour is drawn by, and its rule setting `variable` to it: named by the colour itself under `prefix`, so
+ * two pictures on a page never differ on one, and a drawing sets no style on a mark.
+ */
+export const hues = (prefix, variable) => {
+  const hueClass = (hex) => `${prefix}-${hex.slice(1).toLowerCase()}`;
+  return { hueClass, hueRule: (hex) => `.${hueClass(hex)} { ${variable}: ${hex}; }` };
+};

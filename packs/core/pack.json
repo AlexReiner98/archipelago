@@ -1318,7 +1318,8 @@
         "deep.js": "layouts/architecture/deep.js",
         "boats.js": "layouts/architecture/boats.js",
         "boards.js": "layouts/architecture/boards.js",
-        "moves.js": "layouts/architecture/moves.js"
+        "moves.js": "layouts/architecture/moves.js",
+        "tree.js": "layouts/architecture/tree.js"
       }
     },
     {
@@ -1329,6 +1330,7 @@
         "index.js": "layouts/grid/index.js",
         "look.js": "layouts/grid/look.js",
         "story.js": "layouts/grid/story.js",
+        "tree.js": "layouts/architecture/tree.js",
         "marks.js": "layouts/architecture/marks.js",
         "play.js": "layouts/architecture/play.js",
         "story-look.js": "layouts/architecture/story-look.js"
