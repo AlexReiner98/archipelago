@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { after, before, test } from 'node:test';
 import { createToken } from '../src/auth.ts';
-import { freeId, signedByLemon } from '../src/signup.ts';
+import { signedByLemon } from '../src/signup.ts';
 import { serve } from './serve.ts';
 
 const SECRET = 'a-fake-signing-secret';
@@ -76,11 +76,8 @@ test('without the checkout and its secret, nothing is sold', async () => {
   }
 });
 
-test('a workspace id is made from its name', async () => {
-  const taken = new Set(['acme', 'default']);
-  const at = { has: async (id: string) => taken.has(id) };
-  assert.equal(await freeId(at, 'Acme'), 'acme-2');
-  assert.equal(await freeId(at, 'Café Ünïon & Co.'), 'cafe-union-co');
-  assert.equal(await freeId(at, 'Default'), 'default-2');
-  assert.equal(await freeId(at, '!!!'), 'workspace');
+test('a signature of the right length in characters but not in bytes is refused, not thrown on', () => {
+  const body = Buffer.from('{}');
+  assert.equal(signedByLemon(body, sign('{}'), SECRET), true);
+  assert.equal(signedByLemon(body, 'é'.repeat(64), SECRET), false);
 });

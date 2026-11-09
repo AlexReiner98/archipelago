@@ -4,7 +4,7 @@
 // with the vault as it is now, its rows have no key and are left out.
 
 import type { Q } from './db.ts';
-import { isSealed, open, seal } from './seal.ts';
+import { isSealed, open, SealBroken, seal } from './seal.ts';
 import { keysFor, keysIn, keysOf, type Key, type VaultDump } from './vault.ts';
 
 type Row = Record<string, unknown>;
@@ -66,7 +66,16 @@ export async function openTables(q: Q, tables: Record<string, Row[]>, vault?: Va
   for (const [table, parts] of Object.entries(SEALED)) for (const r of tables[table] ?? []) for (const p of parts) { const id = p.key(r); if (id) ids.add(id); }
   for (const r of tables.event ?? []) { const c = r.changeset as string | null; if (c) ids.add(c); }
   const ring = new Map([...(vault ? keysIn(vault, ids) : []), ...(await keysOf(q, [...ids]))]);
-  const read = (keys: Key[] | undefined, field: string, v: unknown) => (isSealed(v) ? open(keys, field, v) : v);
+  // A row sealed under another vault's key of the same id does not open with this one's: it is left out as one with no key.
+  const read = (keys: Key[] | undefined, field: string, v: unknown) => {
+    if (!isSealed(v)) return v;
+    try {
+      return open(keys, field, v);
+    } catch (err) {
+      if (err instanceof SealBroken) return undefined;
+      throw err;
+    }
+  };
   const gone = new Set<string>();
   const out: Record<string, Row[]> = { ...tables };
   out.entity = (tables.entity ?? []).filter((r) => {

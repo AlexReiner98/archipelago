@@ -3,6 +3,7 @@
 // workspace receives only from workspaces its admin has chosen to accept, and
 // only a human can send, because this is one organisation speaking to another.
 
+import { needHuman } from './actor-checks.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { notify } from './notify.ts';
 
@@ -31,7 +32,7 @@ export async function acceptedSenders(l: Archipelago): Promise<string[]> {
 }
 
 export async function notifyWorkspace(l: Archipelago, actor: Actor, input: { workspace: string; title: string; body?: string; level?: 'info' | 'warning' | 'urgent' }) {
-  if (actor.kind !== 'human') throw new Error('Only a human can send a notification to another workspace.');
+  needHuman(actor, 'Only a human can send a notification to another workspace.');
   if (input.workspace === l.workspace) throw new Error('That is this workspace. Use notify.');
   const target = await lookup?.(input.workspace);
   // One answer for "no such workspace" and "it does not accept you": nothing to probe.

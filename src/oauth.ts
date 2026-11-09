@@ -6,12 +6,14 @@
 // everyone. A client that keeps one connection to an address (Claude's connectors do) cannot hold two workspaces at it,
 // so each also has an address of its own, /mcp/<workspace>, which takes only that workspace's sign-ins and tokens.
 
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash } from 'node:crypto';
+import { sameBytes, sha256Hex, workspaceSecret } from './hashes.ts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ACCESS_MINUTES, grantToken, rotateGrant, workspaceOfGrant } from './auth.ts';
 import type { ConnectRoutes } from './connect.ts';
 import type { Q } from './db.ts';
 import { clientOf, listedRedirect, registerClient, returnsTo, type Client } from './oauth-clients.ts';
+import { json as reply, PRIVATE } from './reply.ts';
 import { keep, take } from './transient.ts';
 
 /** How long a code waits to be traded. */
@@ -20,7 +22,7 @@ const CODE_MINUTES = 5;
 const SCOPE = 'map';
 const KEY = 'oauth-code:';
 
-const hash = (secret: string) => createHash('sha256').update(secret).digest('hex');
+const hash = sha256Hex;
 const originOf = (host: string, named: string[]) => `${named.includes(host) ? 'https' : 'http'}://${host}`;
 
 const MCP = /^\/mcp(?:\/([a-z0-9][a-z0-9-]{0,39}))?$/;
@@ -92,7 +94,7 @@ function back(asked: Asked, origin: string, said: Record<string, string>): strin
   return url.href;
 }
 
-const json = (res: ServerResponse, status: number, body: unknown) => res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', 'access-control-allow-origin': '*' }).end(JSON.stringify(body));
+const json = (res: ServerResponse, status: number, body: unknown) => reply(res, status, body, { ...PRIVATE, 'access-control-allow-origin': '*' });
 const oauthError = (res: ServerResponse, status: number, error: string, description: string) => json(res, status, { error, error_description: description });
 
 /** The page's request for a code: Allow from a signed-in person, or Deny. Answers where the browser goes next. */
@@ -111,7 +113,7 @@ async function answerAsked(res: ServerResponse, origin: string, at: ConnectRoute
   const named = workspaceNamed(query.get('resource'), origin);
   if (named && named !== ws.id) return json(res, 403, { error: `This address is for the workspace "${named}": sign in to that one.` });
   if (body.allow !== true) return json(res, 200, { redirect: back(asked, origin, { error: 'access_denied' }) });
-  const code = `oac_${ws.id}_${randomBytes(20).toString('hex')}`;
+  const code = workspaceSecret('oac', ws.id);
   await keep(ws.pelago.db, KEY + hash(code), { client: asked.client.id, name: asked.client.name, redirect: asked.redirect, challenge: asked.challenge, person: who.person ?? null, resource: query.get('resource') }, CODE_MINUTES * 60_000);
   return json(res, 200, { redirect: back(asked, origin, { code }), workspace: ws.id });
 }
@@ -124,11 +126,7 @@ interface Waiting {
   person: string | null;
 }
 
-const samePkce = (verifier: string, challenge: string) => {
-  const given = Buffer.from(createHash('sha256').update(verifier).digest('base64url'));
-  const wanted = Buffer.from(challenge);
-  return given.length === wanted.length && timingSafeEqual(given, wanted);
-};
+const samePkce = (verifier: string, challenge: string) => sameBytes(createHash('sha256').update(verifier).digest('base64url'), challenge);
 
 /** The token endpoint's form, or JSON from a client that sends that. */
 async function formOf(req: IncomingMessage, at: ConnectRoutes): Promise<URLSearchParams> {

@@ -48,7 +48,7 @@ import { serverDuties } from './duties.ts'; import { keepVisits, onSitePage } fr
 import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
 import { servePublic } from './public-route.ts'; import { serveSite, siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
-import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts';
+import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
 import { sharedDocument, sharedPicture } from './documents.ts';
 import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
@@ -77,10 +77,6 @@ async function readBody(req: IncomingMessage, most = BODY_MAX): Promise<Buffer> 
 async function readJson(req: IncomingMessage, most = BODY_MAX): Promise<unknown> {
   const text = (await readBody(req, most)).toString('utf8');
   try { return text ? JSON.parse(text) : undefined; } catch { throw new Refused(400, 'The body is not JSON.'); }
-}
-
-function send(res: ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
 }
 
 const MIME: Record<string, string> = { html: 'text/html', js: 'text/javascript', css: 'text/css' };
@@ -127,7 +123,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   /** True, and the request answered, when its address has asked too often. */
   const tooOften = (req: IncomingMessage, res: ServerResponse, count: ReturnType<typeof limiter>) => {
     const wait = count.take(addressOf(req));
-    if (wait) res.writeHead(429, { 'content-type': 'application/json', 'retry-after': String(wait) }).end(JSON.stringify({ error: `Asked too often. Try again in ${wait} seconds.` }));
+    if (wait) send(res, 429, { error: `Asked too often. Try again in ${wait} seconds.` }, { 'retry-after': String(wait) });
     return wait > 0;
   };
 
@@ -233,32 +229,32 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (shared) {
         if (tooOften(req, res, open)) return;
         const [, wsId, secret, data, figure] = shared;
-        const guard = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' };
+        const guard = UNLISTED;
         if (!data) {
           res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
           return res.end(await uiPage('doc.html'));
         }
         if (data === 'picture') {
           const picture = figure && (await workspaces.has(wsId)) ? await sharedPicture((await workspaces.get(wsId)).pelago, secret, figure) : null;
-          if (!picture) return res.writeHead(404, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Not found' }));
+          if (!picture) return send(res, 404, { error: 'Not found' }, guard);
           return res.writeHead(200, { ...guard, 'content-type': picture.content_type, 'content-security-policy': "default-src 'none'" }).end(picture.bytes);
         }
         const doc = (await workspaces.has(wsId)) ? await sharedDocument((await workspaces.get(wsId)).pelago, secret) : null;
-        if (!doc) return res.writeHead(404, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'This link does not open anything: it may have been revoked.' }));
-        return res.writeHead(200, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ ...doc, ...(await pageLook((await workspaces.get(wsId)).pelago, doc)) }));
+        if (!doc) return send(res, 404, { error: 'This link does not open anything: it may have been revoked.' }, guard);
+        return send(res, 200, { ...doc, ...(await pageLook((await workspaces.get(wsId)).pelago, doc)) }, guard);
       }
 
       // A document read by someone signed in, to print or save as a PDF: the same page a link opens, which reads the
       // document with the reader's own token. The page holds nothing; what it shows is what that token may see.
       if (req.method === 'GET' && /^\/read\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
         // Framed by this server's own page alone, to read a private document on the canvas (ui/reader-frame.js).
-        res.writeHead(200, { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'" });
+        res.writeHead(200, { ...PRIVATE, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'" });
         return res.end(await uiPage('doc.html'));
       }
       // A document's preview, for someone signed in: the published page, drawn from what publishing would freeze now
       // (src/published-preview.ts), its site's other pages each led to by their own preview.
       if (req.method === 'GET' && /^\/preview\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
-        res.writeHead(200, { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PREVIEW_POLICY });
+        res.writeHead(200, { ...UNLISTED, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PREVIEW_POLICY });
         return res.end(markPage(await uiPage('doc.html'), { unsandboxed: options.unsandboxed }));
       }
       const preview = req.method === 'POST' ? /^\/preview\/(e_[a-z0-9]{8})\/data$/.exec(url.pathname) : null;
@@ -282,8 +278,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         res.writeHead(200, {
           'content-type': `${MIME[file.split('.').pop()!]}; charset=utf-8`,
           'cache-control': served?.keep ? 'public, max-age=31536000, immutable' : file === 'three.module.min.js' ? 'public, max-age=604800' : 'no-store',
-          'x-content-type-options': 'nosniff',
-          'referrer-policy': 'no-referrer',
+          ...GUARD,
           ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
           ...(file === 'draw.html' && { 'content-security-policy': drawPolicy(open, Boolean(options.unsandboxed)) }),
           // The frame has an origin of its own, so what it loads from here it loads as a stranger.

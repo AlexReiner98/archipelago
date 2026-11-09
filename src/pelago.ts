@@ -10,7 +10,7 @@ import { isSealed, seal, unseal } from './secrets.ts';
 import { KEPT_FIELDS } from './operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from './streams.ts';
 import { search, type SearchInput } from './search.ts'; import { layoutOf } from './layout-changes.ts';
 import { append, headOf, type Fact } from './log.ts'; import { projectDecision, projectFacts, stamp } from './replay.ts'; import { linkFacts } from './facts.ts';
-import { decideProposal } from './proposals.ts'; import { guardedFetch } from './outbound.ts';
+import { decideProposal } from './proposals.ts'; import { guardedFetch } from './outbound.ts'; import { needHuman } from './actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
 import { planChange } from './change-plan.ts'; import { applyChange, letThrough } from './change-apply.ts';
 
@@ -296,7 +296,7 @@ export class Archipelago {
 
   /** Create (or find) the person this workspace belongs to and make them the default for views. */
   async init(actor: Actor, input: { name: string; email?: string }) {
-    if (actor.kind !== 'human') throw new Error('Only a human can set the workspace owner.');
+    needHuman(actor, 'Only a human can set the workspace owner.');
     const found = await this.db.query<{ id: string }>(`select id from entity where type = 'person' and lower(title) = lower($1) and archived_at is null -- index entity_type_title`, [input.name]);
     let id = found.rows[0]?.id;
     if (!id) id = (await this.apply(actorId(actor), { ops: [{ op: 'create', ref: 'me', type: 'person', title: input.name, props: input.email ? { email: input.email } : {} }], reason: 'Workspace owner' })).created.me;

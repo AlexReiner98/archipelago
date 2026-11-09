@@ -10,21 +10,19 @@
 // both in the default workspace's database. Configured by PELAGO_LEMON_CHECKOUT (the variant's checkout link),
 // PELAGO_LEMON_SECRET (the webhook's signing secret) and PELAGO_SIGNUP_PRICE (what the page says it costs).
 
-import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { validWorkspaceId } from './auth.ts';
 import { claimControlValue, controlValue, setControlValue } from './control.ts';
 import { newId, type Q } from './db.ts';
 import { env } from './env.ts';
+import { randomHex, sameBytes, sha256Hex, signedWith } from './hashes.ts';
 import { mailConfigured, normalEmail } from './mail.ts';
 import { admitOwner, memberToken } from './members.ts';
 import { notify } from './notify.ts';
 import { keep, kept, take } from './transient.ts';
+import { freeId } from './workspace-id.ts';
 import type { Workspace, Workspaces } from './workspaces.ts';
 
 /** How long a request waits for its payment. */
 const REQUEST_MS = 2 * 86_400_000;
-/** Ids nobody signs up for. */
-const RESERVED = ['default', 'www', 'app', 'api', 'admin', 'mail', 'staging', 'archipelago'];
 
 type Places = Pick<Workspaces, 'has' | 'get' | 'create'>;
 interface Request {
@@ -34,23 +32,13 @@ interface Request {
   workspace?: string;
 }
 
-const hash = (s: string) => createHash('sha256').update(s).digest('hex');
+const hash = sha256Hex;
 const requestKey = (id: string) => `signup:${id}`;
 const subscriptionKey = (id: string) => `lemon_subscription:${id}`;
 const home = async (at: Places) => (await at.get('default')).pelago;
 
 /** Whether this server sells workspaces, and what the page says one costs. Never without mail: a buyer signs in again by email. */
 export const signupOffer = () => ({ open: Boolean(env('LEMON_CHECKOUT') && env('LEMON_SECRET') && mailConfigured()), price: env('SIGNUP_PRICE') ?? null });
-
-/** A workspace id from a name: its words, lowercase and joined by hyphens, with a number added if it is taken. */
-export async function freeId(at: Pick<Workspaces, 'has'>, name: string): Promise<string> {
-  const base = name.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30).replace(/-+$/, '') || 'workspace';
-  for (let n = 1; n < 1000; n++) {
-    const id = n === 1 ? base : `${base}-${n}`;
-    if (validWorkspaceId(id) && !RESERVED.includes(id) && !(await at.has(id))) return id;
-  }
-  throw new Error('No free workspace id for that name.');
-}
 
 /** Begin: keep the request and give the checkout to send the browser to, with the secret it keeps to be signed in. */
 export async function startSignup(at: Places, input: { name?: unknown; email?: unknown }) {
@@ -61,7 +49,7 @@ export async function startSignup(at: Places, input: { name?: unknown; email?: u
   const name = String(input.name ?? '').trim();
   if (!name || name.length > 60) throw new Error('Give the workspace a name of up to 60 characters.');
   const id = newId('su');
-  const secret = randomBytes(24).toString('hex');
+  const secret = randomHex(24);
   await keep((await home(at)).db, requestKey(id), { email, name, secret: hash(secret) } satisfies Request, REQUEST_MS);
   const url = new URL(checkout);
   url.searchParams.set('checkout[email]', email);
@@ -74,7 +62,7 @@ export async function startSignup(at: Places, input: { name?: unknown; email?: u
 export async function pollSignup(at: Places, id: string, secret: string): Promise<{ state: 'waiting' } | { state: 'ready'; workspace: { id: string; name: string }; token: string } | { state: 'gone' }> {
   const db = (await home(at)).db;
   const request = await kept<Request>(db, requestKey(id));
-  if (!request || !secret || !same(request.secret, hash(secret))) return { state: 'gone' };
+  if (!request || !secret || !sameBytes(request.secret, hash(secret))) return { state: 'gone' };
   if (!request.workspace) return { state: 'waiting' };
   // Given once: whichever poll takes it first is signed in.
   if (!(await take(db, requestKey(id)))) return { state: 'gone' };
@@ -83,12 +71,9 @@ export async function pollSignup(at: Places, id: string, secret: string): Promis
   return token ? { state: 'ready', workspace: { id: ws.id, name: ws.name }, token } : { state: 'gone' };
 }
 
-const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
-
 /** Whether a delivery was signed with the webhook's secret: X-Signature is the HMAC-SHA256 of the raw body, in hex. */
 export function signedByLemon(raw: Buffer, signature: string | undefined, secret = env('LEMON_SECRET')): boolean {
-  if (!secret || !signature) return false;
-  return same(createHmac('sha256', secret).update(raw).digest('hex'), signature.trim());
+  return Boolean(secret && signature) && signedWith(secret!, raw, signature, 'hex');
 }
 
 interface Delivery {
