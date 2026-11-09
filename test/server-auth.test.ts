@@ -143,19 +143,21 @@ test('inside a workspace, private things are hidden from other members by the da
 
   // The first admin becomes a person; then adds a colleague.
   const me = (await api(alex, 'init', { name: 'Alex' })).me;
+  // A workspace whose things are private unless they say otherwise (a new one starts shared): what this test is of.
+  await api(alex, 'workspace_set', { default_visibility: 'private' });
   const sam = await member(alex, { email: 'sam@example.com', name: 'Sam' });
   const samPerson = (await call('/whoami', sam, undefined, 'GET')).actor.person;
   assert.deepEqual(await titles(sam, 'person'), ['Alex', 'Sam'], 'people are shared so colleagues can refer to each other');
 
-  // New things are private to their author unless they say otherwise.
+  // A new workspace makes things shared unless they say otherwise; private is said, and kept from the others.
   const mine = await api(alex, 'change', { reason: 'x', ops: [
     { op: 'create', ref: 'p', type: 'work', title: 'Launch', visibility: 'shared' },
     { op: 'create', ref: 's', type: 'task', title: 'Shared task', visibility: 'shared', owner: me },
-    { op: 'create', ref: 'x', type: 'task', title: 'Alex private', owner: me },
+    { op: 'create', ref: 'x', type: 'task', title: 'Alex private', owner: me, visibility: 'private' },
     { op: 'link', type: 'part_of', from: 's', to: 'p' },
     { op: 'link', type: 'part_of', from: 'x', to: 'p' },
   ] });
-  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Sam private', owner: samPerson }] });
+  await api(sam, 'change', { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'Sam private', owner: samPerson, visibility: 'private' }] });
   assert.deepEqual(await titles(alex), ['Alex private', 'Shared task']);
   assert.deepEqual(await titles(sam), ['Sam private', 'Shared task']);
 
@@ -230,12 +232,14 @@ test('nothing can depend on a private item from outside it, and a held resource 
   };
   const refused = async (token: string, ops: unknown[]) => (await call('/api/change', token, { reason: 'x', ops })).error as string;
   const owner = (await api(alex, 'init', { name: 'Alex' })).me;
+  // Private unless said otherwise, as this test's workspace is (a new one starts shared).
+  await api(alex, 'workspace_set', { default_visibility: 'private' });
   const sam = await member(alex, { email: 'sam@example.com', name: 'Sam' });
 
   const made = (await api(alex, 'change', { reason: 'x', ops: [
     { op: 'create', ref: 'pub', type: 'task', title: 'Public task', visibility: 'shared' },
-    { op: 'create', ref: 'priv', type: 'task', title: 'Private prep' },
-    { op: 'create', ref: 'priv2', type: 'task', title: 'Private follow-up' },
+    { op: 'create', ref: 'priv', type: 'task', title: 'Private prep', visibility: 'private' },
+    { op: 'create', ref: 'priv2', type: 'task', title: 'Private follow-up', visibility: 'private' },
     { op: 'create', ref: 'base', type: 'task', title: 'Shared base', visibility: 'shared' },
     { op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Live lane', visibility: 'shared' },
     { op: 'create', ref: 'live', type: 'task', title: 'Live work', visibility: 'shared' },
@@ -292,7 +296,7 @@ test('a workspace receives notifications only from workspaces its admin accepts'
 
   const set = await call('/api/workspace_set', theirs, { accepts_from: ['default'] });
   const { reply_rules, ...settings } = set.result;
-  assert.deepEqual(settings, { id: 'acme', default_visibility: 'private', agent_changes: 'apply', accepts_from: ['default'], agent_backups: false, agent_publish: false, agent_code: false, drawings_open: false, islands: false, holds_off: false, lifted: { reply_draw_answers: false, reply_record_findings: false } });
+  assert.deepEqual(settings, { id: 'acme', default_visibility: 'shared', agent_changes: 'apply', accepts_from: ['default'], agent_backups: false, agent_publish: false, agent_code: false, drawings_open: false, islands: false, holds_off: false, lifted: { reply_draw_answers: false, reply_record_findings: false } });
   assert.deepEqual(reply_rules.map((r: { rule: string; off: boolean }) => [r.rule, r.off]), [['core.draw_answers', false], ['core.record_findings', false]]);
   assert.deepEqual((await send(mine, 'acme')).result, { delivered_to: 'acme' });
 

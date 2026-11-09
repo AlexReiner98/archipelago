@@ -72,7 +72,7 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
     },
   },
   workspace_set: {
-    description: 'Change workspace settings. default_visibility: whether new things are private to their author (the default) or shared unless they say otherwise. agent_changes: "apply" to have what agents change take effect as they make it, each change logged and undoable, or "hold" to have it wait for a human. With "apply" an agent can also settle a decision or a hypothesis: it must say what was chosen and why, and the human is notified. accepts_from: which other workspaces may send this one notifications. Admins only.',
+    description: 'Change workspace settings. default_visibility: whether new things are shared unless they say otherwise (how a new workspace starts) or private to their author. agent_changes: "apply" to have what agents change take effect as they make it, each change logged and undoable, or "hold" to have it wait for a human. With "apply" an agent can also settle a decision or a hypothesis: it must say what was chosen and why, and the human is notified. accepts_from: which other workspaces may send this one notifications. Admins only.',
     humanOnly: true,
     input: {
       default_visibility: z.enum(['private', 'shared']).optional(),

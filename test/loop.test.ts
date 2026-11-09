@@ -149,9 +149,8 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
     await sharer.evaluate(`(() => { const d = document.querySelector('dialog.ask'); d.querySelector('textarea').value = 'The login plan'; d.querySelector('button[value="ok"]').click(); })()`);
     assert.ok(await sharer.until(`document.querySelector('dialog.ask h2')?.textContent.startsWith('Make a link to')`, 10000), 'asked to make the link');
     await sharer.evaluate(`document.querySelector('dialog.ask button[value="ok"]').click()`);
-    // On a new map what the agent made is private: the person is told the link would leave it out, and shares it.
-    assert.ok(await sharer.until(`/private/.test(document.querySelector('dialog.ask h2')?.textContent ?? '')`, 10000), 'told what the link leaves out as private');
-    await sharer.evaluate(`document.querySelector('dialog.ask button[value="ok"]').click()`);
+    // A new map makes things shared, so nothing the agent made is left out and nothing is asked about it (what a link
+    // leaves out as private, and the asking, is test/share-view.test.ts's).
     assert.ok(await sharer.until(`(document.querySelector('dialog.ask .ask-message')?.textContent ?? '').includes('/s/')`, 10000), `the link is shown: ${sharer.logs().join(' ').slice(0, 400)}`);
     const message = await sharer.evaluate<string>(`document.querySelector('dialog.ask .ask-message').textContent`);
     link = { path: new URL(message.trim().split(/\s+/)[0]).pathname };
