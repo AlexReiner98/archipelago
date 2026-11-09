@@ -58,9 +58,7 @@ const count = (files: string[], pattern: RegExp) =>
   Object.fromEntries(files.map((f) => [f, read(f).match(pattern)?.length ?? 0]).filter(([, n]) => (n as number) > 0));
 
 // 1. No file over 500 lines.
-const LONG_FILES: Record<string, number> = {
-  'ui/style.css': 583,
-};
+const LONG_FILES: Record<string, number> = {};
 
 test(`no file is over ${MAX_LINES} lines`, () => {
   const counted = Object.fromEntries(codeFiles.map((f) => [f, lines(read(f))]));
@@ -237,7 +235,7 @@ const LOOKS_IN_KERNEL: Record<string, number> = {
   'ui/draw.html': 6,
   'ui/list.css': 2,
   'ui/public.css': 1,
-  'ui/style.css': 14,
+  'ui/style.css': 8,
   'ui/token-ask.js': 1,
   'ui/week.js': 1,
 };

@@ -70,7 +70,7 @@ export function ask({ title, message, input, choices, action = 'OK', cancel = 'C
         h('h2', {}, title),
         message && h('p', { class: 'ask-message' }, message),
         field,
-        choices && h('div', { class: 'ask-choices', style: 'display: flex; flex-direction: column; gap: var(--space-3)' }, choices.map(([value, label, hint], n) => h('button', { value: `choice:${n}`, title: hint ?? label, class: n === 0 ? 'primary' : '', style: 'text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis' }, label))),
+        choices && h('div', { class: 'ask-choices', style: 'display: flex; flex-direction: column; gap: var(--space-3)' }, choices.map(([value, label, hint], n) => h('button', { value: `choice:${n}`, title: hint ?? label, class: n === 0 ? 'primary cut' : 'cut', style: 'text-align: left' }, label))),
         h('div', { class: 'toolbar' }, cancel && h('button', { value: 'cancel' }, cancel), !choices && h('button', { value: 'ok', class: danger ? 'danger' : 'primary' }, action)),
       ),
     );
