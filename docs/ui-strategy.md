@@ -28,7 +28,8 @@ canvas as a flat graph", with its decisions.
   always in sight in **find**, at the canvas's foot: one line at rest, a
   row for each part while it is open (e_2a4mddx8).
 - **A style says how it looks,** and which drawing draws it: the core flow,
-  by the canvas pack's preset, unless a nearer style says otherwise.
+  by a pack's preset (the canvas pack's, hosted), unless a nearer style says
+  otherwise.
 - **Home (`#/`) is the map's top:** what stands at the altitude of the
   workspace or a project, open, with what is directly in each.
 
