@@ -59,6 +59,11 @@ function landOf(lines) {
  */
 export function laidOut(args, { islandOf = () => null, heads = new Map() } = {}) {
   const { sizes } = args, headless = args.headless ?? [], m = model(args);
+  // One step alone has nothing to embed (its s and t would be itself): it stands at the margin.
+  if (m.nodes.size < 2 && !m.chains.length && !m.ties.length) {
+    const x = new Map([...m.nodes].map(([id, n]) => [id, sizes.flow_margin + n.w / 2])), y = new Map([...m.nodes].map(([id, n]) => [id, sizes.flow_margin + n.h / 2]));
+    return { m, nodes: m.nodes, x, y, chains: [], ties: [], islands: [], ports: [] };
+  }
   const e = embedding(m, { sizes, headless, islandOf: (id) => islandOf(id) ?? null });
   const input = asInput(e, m), sketch = shape(input);
   stage('shaped', { bends: sketch.bends, nodes: sketch.nodes.length, wires: sketch.wires.length });

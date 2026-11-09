@@ -1,12 +1,11 @@
 # The canvas pack
 
 How the canvas the app opens on is drawn, as a pack of its own. Its one
-preset, `canvas.house`, draws every view as a flow (core's drawing, kept as it
-is on the owner's word, 25 Oct 2026) unless a nearer style says otherwise.
+preset, `canvas.house`, draws every view as a map (core's one drawing since
+9 Nov 2026, the owner's word) unless a nearer style says otherwise.
 It lies over the workspace's own style (`over: "workspace"`), so a
-workspace style kept from before the canvas that says `shape: list` does not
-turn the canvas back into lists (the owner, 26 Oct 2026: the flow is the
-default for now). A style on a kind, a type, an item or a view still wins.
+workspace style kept from before the canvas does not turn it into another
+shape. A style on a kind, a type, an item or a view still wins.
 Take the pack out and views are drawn as before.
 
 ## Why a pack
@@ -23,6 +22,6 @@ kernel's page (`ui/canvas.js`, `ui/app.js`) holds no look of its own.
 A pack that changes how the map looks has a `pack.json` that `requires`
 core, and its `styles`. One that draws a new form adds `layouts` (its
 modules, entered at `index.js`, with tests run with no page), as
-`packs/core/layouts/flow/` is: see `docs/layouts.md`. Check a drawing in a real
+`packs/core/layouts/map/` is: see `docs/layouts.md`. Check a drawing in a real
 browser before you push. The browser pane will not load the sandbox, so use
 headless Chrome (`test/browser.ts`).
