@@ -19,14 +19,14 @@ const facts = async (l: Archipelago, stream: OpStream) => (await readOps(l.db, s
 
 test('each operational write lands in its stream, at once, with the light header', async () => {
   const l = await fresh();
-  const { run, auto, res, task, n, conn, note } = await make(l, [
+  const { run, auto, res, task, n, conn, drawn } = await make(l, [
     { op: 'create', ref: 'run', type: 'run', title: 'A run' },
     { op: 'create', ref: 'auto', type: 'automation', title: 'Nightly', props: { trigger: 'every', every_minutes: 60, action: 'notify' } },
     { op: 'create', ref: 'res', type: 'place', props: { exclusive: true }, title: 'The lane' },
     { op: 'create', ref: 'task', type: 'task', title: 'Hold it' },
     { op: 'create', ref: 'n', type: 'notification', title: 'Look' },
     { op: 'create', ref: 'conn', type: 'connection', title: 'Nowhere', props: { url: 'http://127.0.0.1:1/' } },
-    { op: 'create', ref: 'note', type: 'lens', title: 'Drawn' },
+    { op: 'create', ref: 'drawn', type: 'lens', title: 'Drawn' },
   ]);
   await l.operational(run, { add: { tokens_used: 40 }, props: { story: [{ n: 1, said: 'began' }], last_seen: 'now' } });
   await l.operational(run, { add: { tokens_used: 2 } });
@@ -37,7 +37,7 @@ test('each operational write lands in its stream, at once, with the light header
   await l.checkConnections(human);
   await l.setSecret('model_key', 'sk-test');
   await callTool(l, { ...human, admin: true }, 'workspace_set', { default_visibility: 'shared' });
-  await putPicture(l, human, { result: note, data: Buffer.from('png').toString('base64'), content_type: 'image/png' });
+  await putPicture(l, human, { result: drawn, data: Buffer.from('png').toString('base64'), content_type: 'image/png' });
   const token = (await createToken(l.db, 'default', { kind: 'agent', name: 'bot' })).token;
   await verifyToken(l.db, token);
   await verifyToken(l.db, token); // used again within the hour: not again in the stream

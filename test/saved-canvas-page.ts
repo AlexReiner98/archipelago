@@ -1,20 +1,21 @@
-// What the browser tests of saved canvases share (test/saved-canvases*.test.ts): a map with a project, a step of it, a
-// view kept about it and another project; a page on it; and one pass of saving a canvas from the bar at a width.
+// What the browser tests of saved canvases share (test/saved-canvases*.test.ts): a map with a task, a step of it, a
+// view kept about it and another task, with a type of page that can bring a view in; a page on it; and one pass of saving a canvas from the bar at a width.
 
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import { open } from './browser.ts';
 import { serve } from './serve.ts';
 
-/** The map, and a page in a Chrome of its own opened on the project and its parts. */
+/** The map, and a page in a Chrome of its own opened on the task and its parts. */
 export async function savedCanvasPage() {
-  const { base, call } = await serve('off');
+  const { base, call } = await serve('off', undefined, undefined, [join(import.meta.dirname, 'fixtures', 'packs')]);
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'p', type: 'project', title: 'Saved here' },
+      { op: 'create', ref: 'p', type: 'task', title: 'Saved here' },
       { op: 'create', ref: 'a', type: 'task', title: 'A step of it' },
       { op: 'link', type: 'part_of', from: 'a', to: 'p' },
-      { op: 'create', ref: 'q', type: 'project', title: 'Another project' },
+      { op: 'create', ref: 'q', type: 'task', title: 'Another task' },
     ],
   })).result.created as Record<string, string>;
   await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'A view of it', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 2 } } }, { op: 'link', type: 'about', from: 'v', to: made.p }] });
@@ -24,7 +25,7 @@ export async function savedCanvasPage() {
   const picked = `document.querySelector('#query .q-pick')?.dataset.title`;
   const canvases = async () => (await call('/api/search', undefined, { type: 'lens', limit: 50 })).result as { id: string; title: string; props: Record<string, any> }[];
   const width = (w: number) => page.send('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 1, mobile: false });
-  /** A canvas of the project and its parts, kept as the bar keeps one saved at `at` px: what a pass before this one left. */
+  /** A canvas of the task and its parts, kept as the bar keeps one saved at `at` px: what a pass before this one left. */
   const keptBefore = (at: number) => call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: `Saved at ${at}`, props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } } }] });
 
   /** At `w` px: a canvas saved from the bar and listed on Home one line each. */

@@ -1,0 +1,31 @@
+{
+  "id": "pages",
+  "version": "1",
+  "title": "Pages",
+  "description": "For the kernel's publishing tests: a document it can publish, and a part of one that shows a picture. Core keeps no such type of its own; the packs that do are not in the open repository.",
+  "requires": ["core"],
+  "types": [
+    {
+      "id": "page",
+      "extends": "record",
+      "title": "Page",
+      "public": true,
+      "description": "Writing for a reader: its note is the text, and a line holding only an item's id brings that item in as a section.",
+      "statuses": { "open": ["draft", "ready"], "closed": ["final", "superseded", "withdrawn"], "phases": { "final": "finished", "superseded": "ended", "withdrawn": "ended" } },
+      "fields": {
+        "path": { "type": "string", "description": "Its address word once published.", "shown": true },
+        "menu": { "type": "number", "description": "Its place in the site's header, lowest first.", "shown": true }
+      }
+    },
+    {
+      "id": "plate",
+      "extends": "record",
+      "title": "Plate",
+      "description": "A part of a page that shows a picture."
+    }
+  ],
+  "views": [
+    { "form": "screen", "id": "pages.reading", "title": "Reading", "on": ["page"], "pieces": [{ "piece": "document" }] },
+    { "form": "screen", "id": "pages.plate", "title": "Plate", "on": ["plate"], "pieces": [{ "piece": "figure" }] }
+  ]
+}
