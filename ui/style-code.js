@@ -1,6 +1,6 @@
 // A layout's code: the drawing a person or an agent wrote for their own project.
 
-import { api, drawingsOpen, frameSandbox, h } from './base.js';
+import { api, drawingsOpen, frameSandbox, h, may } from './base.js';
 import { STYLE_COLORS, litSwitch } from './query-base.js';
 import { saidDrawn } from './look.js';
 
@@ -54,6 +54,7 @@ export function drawCode(host, answer, style, keep, _place, coder) {
     const answerIt = (result) => run.frame?.contentWindow?.postMessage({ type: 'changed', asked: said.asked, ...result }, '*');
     const ops = Array.isArray(said.ops) ? said.ops.slice(0, mostOps) : [];
     if (!coder) return answerIt({ error: 'This drawing is not kept on the map, so it may not change it.' });
+    if (!may('write')) return answerIt({ error: 'This session may only read the map.' });
     if (!ops.length) return answerIt({ error: 'A change needs ops.' });
     try {
       const made = await api('change', { ops, reason: String(said.reason || 'Asked for by a drawing').slice(0, 300), drawing: coder });

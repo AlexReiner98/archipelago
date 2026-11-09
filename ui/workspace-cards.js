@@ -1,7 +1,7 @@
 // The Workspace screen's cards for the workspace itself and what is outside it: the owner, connecting an agent, backups
 // and importing, GitHub's webhook, the server's packs and the workspace's own settings. Each setting is one row.
 
-import { api, ask, drawingsChanged, h, state } from './base.js';
+import { api, ask, drawingsChanged, h, may, state } from './base.js';
 import { hint, link, menu } from './words.js';
 import { plate, plates } from './plates.js';
 
@@ -142,7 +142,7 @@ export const fileInput = (accept) => h('input', { type: 'file', accept, hidden: 
 // Whose workspace this is. "Needs you now" and the other standing questions
 // are asked about the owner, so a new workspace is not much use until one is set.
 export function ownerRow(owner, redraw) {
-  if (owner) return line(h('span', { class: 'grow' }, link(owner)));
+  if (owner || !may('write')) return line(h('span', { class: 'grow' }, owner ? link(owner) : '—'));
   const name = h('input', { type: 'text', placeholder: 'Your name', style: 'flex: 1; min-width: 0' });
   const email = h('input', { type: 'text', placeholder: 'Email (optional)', style: 'flex: 1; min-width: 0' });
   const set = () =>
@@ -155,7 +155,7 @@ export function ownerRow(owner, redraw) {
 
 /** A switch for one thing the owner lets agents do (a workspace setting), asked again before it is turned on. */
 export function allowance(info, key, label, tip, question) {
-  const allow = h('input', { type: 'checkbox', checked: Boolean(info[key]) });
+  const allow = h('input', { type: 'checkbox', checked: Boolean(info[key]), disabled: !may('admin') });
   const name = h('span', { class: 'grow', title: tip }, label);
   allow.onchange = async () => {
     const on = allow.checked;
@@ -180,6 +180,7 @@ export function backupCard(done, ...before) {
     }
     ev.target.disabled = false;
   };
+  if (!may('admin')) return card('Settings', null, h('ul', { class: 'rows' }, before));
   const merge = importer(done);
   return card(
     'Settings',
@@ -194,7 +195,7 @@ export function backupCard(done, ...before) {
 export function visibilityRow(info, redraw, fail) {
   return line(
     h('span', { class: 'grow', title: 'Who sees what is made here, unless its author says otherwise' }, 'New things are'),
-    h('select', { onchange: (e) => api('workspace_set', { default_visibility: e.target.value }).then(redraw, fail) }, [['private', 'Private unless shared'], ['shared', 'Shared unless private']].map(([v, label]) => h('option', { value: v, selected: v === info.default_visibility }, label))),
+    h('select', { disabled: !may('admin'), onchange: (e) => api('workspace_set', { default_visibility: e.target.value }).then(redraw, fail) }, [['private', 'Private unless shared'], ['shared', 'Shared unless private']].map(([v, label]) => h('option', { value: v, selected: v === info.default_visibility }, label))),
   );
 }
 
@@ -203,7 +204,7 @@ export function visibilityRow(info, redraw, fail) {
  * while nothing is on the map yet (workspace_info started), since the packs it would refuse would leave work dormant.
  */
 export function islandsRow(info, redraw, fail) {
-  if (info.started) return null;
+  if (info.started || !may('admin')) return null;
   const on = h('input', { type: 'checkbox', checked: Boolean(info.islands) });
   const name = h('span', { class: 'grow', title: 'Each pack is an island: it is taken only if its file holds its vocabulary, views and instructions and it builds on the shared set alone, and every item lives on one island. Islands meet only through findings. Set on a new map, before anything is on it.' }, 'Islands');
   on.onchange = async () => {
@@ -223,7 +224,7 @@ export function notificationsRow(info, redraw, fail) {
   };
   return line(
     h('span', { class: 'grow', title: `Other workspaces on this server that may send this one notifications. This workspace's id is "${info.id}".` }, h('strong', {}, 'Other workspaces'), ' ', h('span', { class: 'muted small' }, from ? `notify it: ${from}` : 'none may notify it')),
-    menu('⋯', [['Change…', accept]]),
+    may('admin') ? menu('⋯', [['Change…', accept]]) : h('span', { class: 'menu-room' }),
   );
 }
 

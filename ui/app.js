@@ -4,7 +4,7 @@
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
 import { authorizePage } from './authorize.js';
-import { SignInNeeded, h, hooks, join, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
+import { SignInNeeded, h, hooks, join, loadMay, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { mayLeave, newItem, unsaved } from './draft.js';
 import { drawFind } from './find.js';
@@ -47,6 +47,8 @@ async function route(pulse = false) {
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/');
   try {
     if (!state.schema) await loadSchema();
+    // What this session may do, before anything is drawn: each control is drawn only where it may (ui/base.js may).
+    await loadMay();
   } catch (err) {
     document.body.dataset.sheet = 'open';
     if (err instanceof SignInNeeded) return signIn(store.token ? 'Your sign-in has run out. Sign in again.' : '');

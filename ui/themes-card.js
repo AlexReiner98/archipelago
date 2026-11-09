@@ -3,7 +3,7 @@
 // this screen alone; Keep makes it the workspace's and retires any other kept theme; the house swatch lets the kept
 // one go. Nothing here is a colour of the page's own: each swatch is painted from its preset.
 
-import { api, ask, h, state, tell } from './base.js';
+import { api, ask, h, may, state, tell } from './base.js';
 import { loadSchema } from './words.js';
 
 const dark = matchMedia('(prefers-color-scheme: dark)');
@@ -79,7 +79,7 @@ export function themesCard(then) {
       {
         on: !kept && !state.trying ? 'kept' : '',
         title: kept ? 'The house colours: let the kept theme go' : 'The house colours, which the workspace uses',
-        pick: () => (state.trying ? tryTheme(null, then) : kept && letGo()),
+        pick: () => (state.trying ? tryTheme(null, then) : kept && may('write') && letGo()),
       },
     );
   const tried = themes.find((s) => s.id === state.trying);
@@ -96,7 +96,7 @@ export function themesCard(then) {
           'li',
           { class: 'one' },
           h('span', { class: 'grow muted small' }, `${tried.title} on your screen only`),
-          h('button', { class: 'primary', title: 'Use this theme for the whole workspace', onclick: () => keep(tried) }, 'Keep'),
+          may('write') && h('button', { class: 'primary', title: 'Use this theme for the whole workspace', onclick: () => keep(tried) }, 'Keep'),
           h('button', { title: 'Back to the workspace’s own colours', onclick: () => tryTheme(null, then) }, 'Stop'),
         ),
       ),

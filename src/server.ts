@@ -39,7 +39,7 @@ import { env } from './env.ts';
 import { serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
-import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts';
+import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts'; import { pageMay } from './may.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from './control-index.ts'; import { isPersonToken, personAt } from './person-tokens.ts';
 import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { setReach } from './pack-reach.ts';
@@ -298,8 +298,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       if (req.method === 'GET' && url.pathname === '/whoami') {
         if (!local(req, false)) return send(res, 403, { error: 'Local requests only.' });
-        const { ws, actor } = await resolve(req, res, 'human');
-        return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name }, actor: actor() });
+        const { ws, actor, look } = await resolve(req, res, 'human'), me = actor(); // what it may do draws the page's controls (src/may.ts)
+        return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name }, actor: me, may: pageMay(me, Boolean(look), devMode() ? url.searchParams.get('may') : null) });
       }
 
       // A pack's webhook: /hook/<pack>/<id> in the default workspace, /hook/<workspace>/<pack>/<id> in another.

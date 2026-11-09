@@ -73,6 +73,20 @@
         "PELAGO_UNSANDBOXED": "1"
       },
       "port": 3112
+    },
+    {
+      "name": "archipelago-perms",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "env": {
+        "PELAGO_PORT": "3115",
+        "PELAGO_DATA": "runs/data-perms",
+        "PELAGO_UNSANDBOXED": "1"
+      },
+      "port": 3115
     }
   ]
 }
