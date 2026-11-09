@@ -43,18 +43,24 @@ export function lineUp(items, links, noise, ends = { first: [], last: [] }) {
   // one of the last, only once nothing else is but the last themselves.
   const tiedTo = (at) => new Set(items.filter((v) => !firstAt.has(v) && !lastAt.has(v) && [...near.get(v)].some((w) => at.has(w))));
   const [high, low] = [tiedTo(firstAt), tiedTo(lastAt)];
-  const soonest = (pool) => pool.sort((p, q) => first.get(p) - first.get(q))[0];
-  while (ready.size) {
-    let best = byEnd(firstAt, ready) ?? soonest([...ready].filter((v) => high.has(v) && !low.has(v))), most = -Infinity;
-    const rest = [...ready].filter((v) => !lastAt.has(v) && !low.has(v));
-    if (best === undefined && !rest.length) best = soonest([...ready].filter((v) => low.has(v) && !lastAt.has(v))) ?? byEnd(lastAt, ready);
-    if (best === undefined) for (const v of rest) {
+  // Of those it may take, the one nearest what is already on the line: a pool taken in the order items came in, not by
+  // what they are tied to, crossed twice as many wires on an island where most are tied to a port.
+  const nearest = (pool) => {
+    let best, most = -Infinity;
+    for (const v of pool) {
       let last = -1, older = 0;
       const mine = first.get(v);
       for (const w of near.get(v)) if (at.has(w)) last = Math.max(last, at.get(w)); else if (first.get(w) < mine) older++;
       const score = last * 100 - older + noise(v) * 3;
       if (score > most || (score === most && first.get(v) < first.get(best))) ((most = score), (best = v));
     }
+    return best;
+  };
+  while (ready.size) {
+    let best = byEnd(firstAt, ready) ?? nearest([...ready].filter((v) => high.has(v) && !low.has(v)));
+    const rest = [...ready].filter((v) => !lastAt.has(v) && !low.has(v));
+    if (best === undefined && !rest.length) best = nearest([...ready].filter((v) => low.has(v) && !lastAt.has(v))) ?? byEnd(lastAt, ready);
+    if (best === undefined) best = nearest(rest);
     ready.delete(best);
     at.set(best, line.length);
     line.push(best);
