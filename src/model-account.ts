@@ -105,8 +105,6 @@ export async function anthropicAccount(l: Archipelago): Promise<{ key: string; m
   return a?.provider === 'anthropic' && a.key ? { key: a.key, model: a.model || DEFAULT_MODEL } : undefined;
 }
 
-export const hasModel = async (l: Archipelago): Promise<boolean> => Boolean(await connection(l));
-
 /** What the page is told: which account and model, a key's last four characters at most, and what runs when there is none. */
 export async function modelStatus(l: Archipelago, admin = true) {
   const a = await stored(l);

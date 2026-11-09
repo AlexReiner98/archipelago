@@ -8,6 +8,7 @@
 // stopped when none has come for IDLE_MS.
 
 import { openBrowser, type Browser, type Tab } from './chrome.ts';
+import { logged } from './logged.ts';
 
 /** How long Chrome is kept after the last look. */
 const IDLE_MS = 5 * 60_000;
@@ -152,6 +153,7 @@ async function drawNow(address: string, pass: string, width: number, height: num
     await tab.send('Page.navigate', { url: address });
     let said: { state?: string; why?: string } = {};
     for (const until = Date.now() + DRAW_MS; Date.now() < until; await wait(150)) {
+      // Asked again until it answers: while the page loads there is nothing yet to ask.
       said = (await tab.evaluate<{ state?: string; why?: string }>(`({ state: document.documentElement.dataset.look, why: document.documentElement.dataset.lookWhy })`).catch(() => ({}))) ?? {};
       if (said.state && said.state !== 'drawing') break;
     }
@@ -166,8 +168,8 @@ async function drawNow(address: string, pass: string, width: number, height: num
       last = now;
     }
     const jpeg = last.length > PNG_MOST;
-    const made = marks && state === 'drawn' ? await tab.evaluate<Marks | null>('window.lookMarks()').catch(() => null) : null;
-    const fell_back = await facesOf(tab).catch(() => undefined);
+    const made = marks && state === 'drawn' ? await tab.evaluate<Marks | null>('window.lookMarks()').catch(logged(`look ${address}: its marks could not be read`, null)) : null;
+    const fell_back = await facesOf(tab).catch(logged(`look ${address}: its faces could not be read`));
     const why = state === 'late' ? `The view did not say it had drawn within ${DRAW_MS / 1000} s: this is how it stood.` : said.why;
     return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }) };
   } catch (err) {
@@ -177,6 +179,7 @@ async function drawNow(address: string, pass: string, width: number, height: num
     await tab.close();
     clearTimeout(idle);
     idle = setTimeout(async () => {
+      // A browser that never started has nothing to close: its failure was the look's.
       const b = await browser?.catch(() => null);
       browser = null;
       b?.close();
@@ -188,6 +191,7 @@ async function drawNow(address: string, pass: string, width: number, height: num
 /** Stop the Chrome this process started, if any: for a server closing, and for tests. */
 export async function stopLayout() {
   clearTimeout(idle);
+  // A browser that never started has nothing to close: its failure was the look's.
   const b = await browser?.catch(() => null);
   browser = null;
   b?.close();

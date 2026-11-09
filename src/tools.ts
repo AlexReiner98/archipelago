@@ -136,6 +136,6 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
   // A step that could not be kept costs the page a step, never the agent its answer.
   // A session that has just started is named by the run its answer gives, so its first step is already its own.
   const begun = name === 'session_start' && typeof (answer as { run?: unknown })?.run === 'string' ? { run: (answer as { run: string }).run } : {};
-  if (actor.kind === 'agent' && !surface) await step(l, actor, name, { ...(parsed.data as Record<string, unknown>), ...begun }).catch(() => {});
+  if (actor.kind === 'agent' && !surface) await step(l, actor, name, { ...(parsed.data as Record<string, unknown>), ...begun }).catch((err) => console.error(`${name}: the session's step could not be kept: ${(err as Error).message}`));
   return answer;
 }

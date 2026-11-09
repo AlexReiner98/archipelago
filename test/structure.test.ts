@@ -326,8 +326,8 @@ test('every kernel view is a lens preset or named as operational', async () => {
 });
 
 // 14. A small pack manifest (Rule 8 of the target model): a pack file says what it declares in the manifest's keys
-// (src/manifest.ts), and nothing else. A key of the shape before is one LEGACY maps, read for one release with a
-// warning; here no pack file uses one. A key that is neither is refused.
+// (src/manifest.ts), and nothing else. A key of the shape before is one LEGACY maps, refused with where it went;
+// here no pack file uses one. A key that is neither is refused.
 test('every pack file is in the manifest shape, and every old key is mapped', async () => {
   const { LEGACY, MANIFEST_KEYS, REACH_KEYS, SERVER_KEYS } = await import('../src/manifest.ts');
   const unmapped: string[] = [];

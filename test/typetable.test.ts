@@ -11,7 +11,7 @@ import { openDb } from '../src/db.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry } from '../src/packs.ts';
 import { callTool } from '../src/tools.ts';
-import { syncTypes } from '../src/typetable.ts';
+import { movesAgain, syncTypes } from '../src/typetable.ts';
 import { askView } from '../src/askview.ts';
 
 /** A view asked by its name, as the view tool asks it. */
@@ -128,6 +128,8 @@ test('a relation a pack took over takes its links with it, and the work at risk 
     ],
   })) as { created: Record<string, string> };
 
+  // Its views were kept in the filter's old words, so it is a map from before the migrations were done once.
+  await movesAgain(old);
   const dir = mkdtempSync(join(tmpdir(), 'pelago-moved-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
   const now = new Archipelago(db, new Registry(dir));
@@ -164,4 +166,21 @@ test('a type that takes another over says what its statuses are here, and the it
   assert.deepEqual((await syncTypes(now)).moved, { part: 2 });
   const [a, b] = [(await now.entity(made.created.a))!, (await now.entity(made.created.b))!];
   assert.deepEqual([a.type, a.status, a.is_open, b.type, b.status, b.is_open], ['component', 'up', true, 'component', 'retired', false]);
+});
+
+test('the migrations a workspace runs when it opens run once, and again after a merge asks for them', async () => {
+  const db = await openDb();
+  const l = new Archipelago(db, new Registry(join(import.meta.dirname, '..', 'packs')));
+  await syncTypes(l);
+  const stamp = async () => (await db.query<{ value: { done: string[] } }>(`select value from setting where key = 'moves_done'`)).rows[0]?.value;
+  assert.deepEqual((await stamp())!.done.sort(), ['kinds', 'layouts', 'lives', 'owners', 'pins', 'queries', 'styles', 'terms']);
+  // A view in the filter's old words, as one from before: a second open leaves it, since the migration is done here.
+  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'Old words', props: { filter: { types: ['task'] } } }] })) as { created: Record<string, string> };
+  await syncTypes(l);
+  assert.deepEqual((await l.entity(made.created.v))!.props.filter, { types: ['task'] }, 'done once, not asked again');
+  await movesAgain(l);
+  assert.equal(await stamp(), undefined);
+  await syncTypes(l);
+  assert.deepEqual((await l.entity(made.created.v))!.props.filter, { find: ['type task'], only: [] }, 'asked again, it runs');
+  assert.equal((await stamp())!.done.length, 8);
 });

@@ -11,7 +11,7 @@ import { readManifest } from '../src/manifest.ts';
 import { Registry } from '../src/packs.ts';
 
 const PACKS = join(import.meta.dirname, '..', 'packs');
-const manifest = (id: string) => readManifest(readFileSync(join(PACKS, id, 'pack.json'), 'utf8'), id).manifest;
+const manifest = (id: string) => readManifest(readFileSync(join(PACKS, id, 'pack.json'), 'utf8'), id);
 
 /** What each type stands on: the starter it is a flavour of, through the shared set. */
 const STANDS_ON: Record<string, string> = {

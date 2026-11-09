@@ -16,6 +16,7 @@ import { covering } from './withdraw.ts';
 import { holdsOff } from './rules.ts';
 import { type Noted, PLAN_SECTIONS, sections, structureAsText, tiedInChange, type TieTypes } from './plan-note.ts';
 import { closeOffers } from './close-offer.ts';
+import { logged } from './logged.ts';
 
 // Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
 export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string, pane?: string, run?: string, focus?: boolean): Promise<Focus> {
@@ -168,7 +169,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         const target = made ?? touched;
         // A lens or a style that was changed is seen in the picture it changes, not on its own page.
         const picture = result.status !== 'proposed' && target ? await pictureOf(l, target) : undefined;
-        await point(l, actor, 'change', result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason, undefined, input.run).catch(() => {});
+        await point(l, actor, 'change', result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason, undefined, input.run).catch(logged("change: the owner's page could not be pointed at it"));
       }
       // What it closes was meant to fix what is still open: the answer names each, with the op that closes it.
       const offers = await closeOffers(l.db, l.registry, input.ops as { op: string; id?: string; status?: string }[]);

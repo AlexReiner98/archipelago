@@ -44,7 +44,7 @@ function packsWith(...more: Manifest[]): string {
   return dir;
 }
 
-const core = () => readManifest(readFileSync(join(ROOT, 'packs', 'core', 'pack.json'), 'utf8'), 'core').manifest;
+const core = () => readManifest(readFileSync(join(ROOT, 'packs', 'core', 'pack.json'), 'utf8'), 'core');
 
 test('the shared set is core’s list: the eight starter types, task, decision and finding', () => {
   const shared = sharedOf([core()]);

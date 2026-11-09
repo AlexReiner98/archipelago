@@ -19,6 +19,7 @@ import { freezeShared } from './published-share.ts';
 import { republished } from './published-live.ts';
 import { mayDo } from './rules.ts';
 import { pageLook } from './styles.ts';
+import { logged } from './logged.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
 
@@ -153,7 +154,7 @@ export async function publishedState(l: Archipelago, id: string) {
   if (item && (!readable(l).includes(item.type) || item.private_to || item.visibility === 'private')) return { published: false, publishable: false };
   const { rows } = await l.db.query<{ given: Record<string, unknown>; published_by: string; published_at: Date }>(`select given, published_by, published_at from published where entity_id = $1`, [id]);
   if (!rows[0]) return { published: false };
-  const now = await freeze(l, id).catch(() => null);
+  const now = await freeze(l, id).catch(logged(`published ${id}: its draft could not be frozen to compare, so it reads as changed`, null));
   const { style_at: _, look: _look, ...given } = rows[0].given;
   return { published: true, at: rows[0].published_at, by: rows[0].published_by, changed: !now || !same(now, given) };
 }
@@ -213,12 +214,7 @@ export async function sitePages(l: Archipelago): Promise<{ id: string; title: st
 /** The open or finished documents an item holds, at any depth, of the types that can be public: what Publish all publishes. */
 async function heldDocuments(l: Archipelago, within: string) {
   const { rows } = await l.db.query<{ id: string; title: string }>(
-    `with recursive down(id, depth) as (
-       select $1::text, 0
-       union select r.from_id, d.depth + 1 from relation r join down d on r.to_id = d.id
-       where r.type = 'part_of' and r.valid_to is null and d.depth < 8
-     )
-     select e.id, e.title from entity e where e.id in (select id from down where depth > 0)
+    `select e.id, e.title from entity e where e.id in (select descendant from part_closure where ancestor = $1)
        and e.type = any($2::text[]) and (e.is_open or e.type || ':' || e.status = any($3::text[])) and e.archived_at is null order by e.title`,
     [within, readable(l), finishedStatuses(l)],
   );
