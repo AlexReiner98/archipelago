@@ -18,9 +18,11 @@ export interface Actor {
   within?: string[];
   /** What it may write: only reports (measurements), proposals that always wait, or changes. Absent: change. */
   may?: May;
+  /** A guest's: the share whose view alone it reads (src/guests.ts). With it, may is read. */
+  reads?: string;
 }
 
-export type May = 'report' | 'propose' | 'change';
+export type May = 'read' | 'report' | 'propose' | 'change';
 
 type Props = Record<string, unknown>;
 

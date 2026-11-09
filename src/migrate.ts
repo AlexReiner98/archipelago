@@ -28,6 +28,7 @@ import { CLOSURE } from './closure.ts';
 import { MENTIONS } from './mentions.ts';
 import { ITEM_BYTES } from './bytes.ts';
 import { ACTIVE_HOLDS_BY_KEY, READ_INDEXES, ROW_POLICIES } from './read-indexes.ts';
+import { GUEST_READER } from './guest-schema.ts';
 
 interface Migration {
   version: number;
@@ -81,6 +82,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 33, name: 'what was done outside change sets, in the activity stream', sql: ACTIVITY_STREAM },
   { version: 34, name: 'the event table, carried into the activity stream and gone', sql: EVENT_GONE + FORGET_STORES, before: carryEventTable },
   { version: 35, name: 'a get says hidden, not missing', sql: ITEM_HIDDEN },
+  { version: 36, name: 'a view shared with a guest, read live and nothing else', sql: GUEST_READER },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

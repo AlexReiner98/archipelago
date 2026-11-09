@@ -3,7 +3,7 @@
 
 import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, type Policy } from './rules.ts'; import { renamedQuery } from './query-names.ts';
 import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.ts'; import { authorityOf } from './authority.ts';
-import { anyone, newId, scoped, type Db, type Q } from './db.ts';
+import { anyone, newId, reader, scoped, type Db, type Q } from './db.ts';
 import { once } from './merge.ts'; import { readEvents, type EventQuery } from './eventlog.ts'; import { doneFact, type Done } from './activity.ts';
 import type { Registry } from './packs.ts'; import { currentNames } from './type-items.ts'; import { noTwins } from './view-twins.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
@@ -41,6 +41,9 @@ export class Archipelago {
    */
   readonly props: string;
 
+  /** The share a guest reads under (src/guests.ts): set only on a guest's map, which reads and never writes. */
+  readonly reads?: string;
+
   constructor(db: Db, registry: Registry, policy: Partial<Policy> = {}, workspace = 'default', viewer?: string, props = 'props') {
     this.db = db;
     this.registry = registry;
@@ -58,6 +61,11 @@ export class Archipelago {
   /** This map as one person sees it. An empty viewer sees only what is shared; an admin also sees every token and setting. */
   as(viewer: string, admin = false): Archipelago {
     return new Archipelago(scoped(this.db, viewer, admin), this.registry, this.policy, this.workspace, viewer);
+  }
+
+  /** This map as a guest reads it: only the view of the share they were given, as it is now, and only reading. */
+  asReader(share: string, guest: string): Archipelago {
+    return Object.assign(new Archipelago(reader(this.db, share, guest), this.registry, this.policy, this.workspace, guest), { reads: share });
   }
 
   /** Whether new things are private to their author unless they say otherwise. */
