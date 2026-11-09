@@ -18,7 +18,9 @@ test('a merge of two people moves what is private to the dropped one, and its to
   const token = (await createToken(l.db, 'default', { kind: 'agent', name: 'bot', entity: b })).token;
   assert.equal((await l.as(a).entity(mine)), undefined, 'not yet theirs');
 
-  await make(l, [{ op: 'merge', keep: a, drop: b }]);
+  // Merged by the kept person, as the live server runs it: under their row-level security, which hides the rows to move.
+  const merged = await l.as(a).change({ ...human, person: a }, { ops: [{ op: 'merge', keep: a, drop: b }], reason: 'test' });
+  assert.equal(merged.status, 'applied');
   assert.equal((await l.as(a).entity(mine))?.title, 'Mine alone', 'the kept person reads it');
   assert.equal((await l.entity(mine))?.private_to, a);
   assert.equal((await verifyToken(l.db, token))?.actor.person, a, 'the token acts as the kept person');
