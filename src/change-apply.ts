@@ -7,7 +7,7 @@ import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.
 import { typesAfter, typesApplied } from './type-items.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { append, type Decision, type Fact } from './log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
-import { supersede } from './proposals.ts'; import { unwaitFollows, whoseWord, type Unwaited } from './unwait.ts'; import { asOwner, forgetIn } from './forget.ts';
+import { supersede } from './proposals.ts'; import { unwaitFollows, whoseWord, type Unwaited } from './unwait.ts'; import { asOwner, forgetIn, ownerRows } from './forget.ts';
 import type { Authority, ChangeInput, SourceSpec } from './pelago-types.ts';
 import type { Archipelago } from './pelago.ts';
 import type { Verdict } from './rules.ts';
@@ -127,9 +127,12 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
             else if (seen.add(what) && (from !== r.from_id || to !== r.to_id)) moves.push(['+', r.id, 'link', [r.type, from, to]]);
           }
           const { rows: owned } = await tx.query<{ id: string }>(`select id from entity where owner = $1`, [op.drop]);
-          await said([...moves, ...owned.map((o): Fact => ['+', o.id, 'owner', op.keep])]);
+          // Two people made one: what was private to the dropped one is the kept one's, or nobody could read it again.
+          const mine = await ownerRows<{ id: string }>(tx, `select id from entity where private_to = $1 -- index entity_private_to`, [op.drop]);
+          await said([...moves, ...owned.map((o): Fact => ['+', o.id, 'owner', op.keep]), ...mine.map((o): Fact => ['+', o.id, 'private_to', op.keep])]);
           const now = (await map.entity(op.keep, tx))!;
-          await said(changedFacts(now, { ...now, props: { ...drop.props, ...keep.props }, body: [keep.body, drop.body].filter(Boolean).join('\n\n') }));
+          const body = drop.body && keep.body.includes(drop.body) ? keep.body : [keep.body, drop.body].filter(Boolean).join('\n\n'); // a merge finished again adds nothing twice
+          await said(changedFacts(now, { ...now, props: { ...drop.props, ...keep.props }, body }));
           break;
         }
         case 'forget': // for good: its key, its words in the log and beside it, then its rows, whoever could see them
