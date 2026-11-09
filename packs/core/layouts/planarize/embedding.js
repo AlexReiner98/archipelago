@@ -30,11 +30,11 @@ const asLink = (w) => Object.assign(w.firm ? [w.top, w.foot, w.order ? FIRM.orde
 const cost = (w) => (w?.link?.border !== undefined ? SHORE : w?.visible ? SEEN : UNSEEN);
 
 /** One try, the `k`th: the line leaning its own way, the two sides filled, the rest threaded. */
-function attempt({ ids, wires, placeOf, made, islands, tighten, most }, k, oneWay) {
+function attempt({ ids, wires, placeOf, made, islands, tighten, most, order }, k, oneWay) {
   const index = new Map(), idx = (v) => index.get(v) ?? index.set(v, index.size).get(v);
   ids.forEach(idx);
   const noise = (v) => (k ? keyed(k, idx(v), -1) : 0);
-  const { line, wires: ways } = lineOf(ids, wires, placeOf, made, noise);
+  const { line, wires: ways } = lineOf(ids, wires, placeOf, made, noise, order);
   const links = ways.map(asLink), borders = islands.flatMap(borderArcs);
   const { sides, at, left } = pages(line, links, (l) => keyed(k, idx(l[0]), idx(l[1])), [borders.filter((b) => b.side === 0), borders.filter((b) => b.side !== 0)]);
   const number = new Map(at), { hidden, stHere } = close(line, sides), owner = new Map(), all = [];
@@ -91,7 +91,7 @@ function measured({ g, number }) {
  * style's, which say how many tries the work allows.
  */
 export function embedding(m, { headless = [], islandOf = () => null, trunks: joinTrunks = true, oneWay = true, tries, down = 'all', sizes } = {}) {
-  for (const name of ['planarize_tries_least', 'planarize_tries_most', 'planarize_work', 'planarize_tighten']) if (typeof sizes?.[name] !== 'number') throw new Error(`The style names no size "${name}": the house style (packs/core/pack.json) names every one planarize uses`);
+  for (const name of ['planarize_tries_least', 'planarize_tries_most', 'planarize_work', 'planarize_tighten', 'planarize_order_rounds']) if (typeof sizes?.[name] !== 'number') throw new Error(`The style names no size "${name}": the house style (packs/core/pack.json) names every one planarize uses`);
   const made = (id) => m.nodes.get(id)?.made ?? Infinity, steps = [...m.nodes.keys()];
   const { wires: ways } = directed(joined(m, headless), steps, made);
   const joinedUp = joinTrunks ? withTrunks(ways, made, islandOf) : { wires: ways, junctions: [], trunks: 0 }, { junctions, trunks } = joinedUp;
@@ -109,7 +109,7 @@ export function embedding(m, { headless = [], islandOf = () => null, trunks: joi
   for (let k = 0; k < count; k++) {
     // The first try may spend no more than planarize_most_work, where the style says it: past that it throws (tooMuch).
     const most = !k && typeof sizes.planarize_most_work === 'number' ? sizes.planarize_most_work : Infinity;
-    const tried = attempt({ ids, wires, placeOf, made: (id) => madeOf.get(id), islands, tighten: sizes.planarize_tighten, most }, k, oneWay), seen = measured(tried);
+    const tried = attempt({ ids, wires, placeOf, made: (id) => madeOf.get(id), islands, tighten: sizes.planarize_tighten, most, order: sizes.planarize_order_rounds }, k, oneWay), seen = measured(tried);
     if (!k) count = countFor(tried.work);
     const score = [seen.twice, tried.lost, seen.up.length, seen.crossings.length];
     if (!best || less(score, best.score)) best = { ...tried, ...seen, score, k };
