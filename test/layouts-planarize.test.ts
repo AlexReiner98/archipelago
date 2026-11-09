@@ -173,3 +173,18 @@ test('a picture too large to wire is drawn plainly, island by island, and says h
   const text = JSON.stringify(out.scene.svg);
   for (const id of ['a1', 'a2', 'a3', 'b1', 'b2']) assert.ok(text.includes(`#/e/${id}`), `${id} is drawn`);
 });
+
+test('island order: islands joined by many wires stand together, within the firm order, the same each run', async () => {
+  const { sifted } = await mod('sift.js');
+  const runs: Record<string, string[]> = { H: ['h'], A: ['a1', 'a2', 'a3'], X: ['x'], B: ['b1', 'b2', 'b3'] };
+  const runOf = (u: string) => runs[u];
+  const links = [['a1', 'b1'], ['a2', 'b2'], ['a3', 'b3'], ['h', 'x'], ['h', 'a1']];
+  const firm = [['H', 'A'], ['H', 'X'], ['H', 'B'], ['X', 'B']];
+  const order = sifted(['H', 'A', 'X', 'B'], runOf, links, firm, house.sizes.planarize_order_rounds);
+  const at = (u: string) => order.indexOf(u);
+  assert.equal(Math.abs(at('A') - at('B')), 1, 'A and B, joined by three wires, stand next to each other');
+  for (const [u, v] of firm) assert.ok(at(u) < at(v), `${u} stays before ${v}`);
+  assert.deepEqual(sifted(['H', 'A', 'X', 'B'], runOf, links, firm, house.sizes.planarize_order_rounds), order, 'the same each run');
+  assert.deepEqual(sifted(['H', 'A', 'X', 'B'], runOf, links, firm, 0), ['H', 'A', 'X', 'B'], 'no rounds, no move');
+  assert.deepEqual(sifted(['H', 'A', 'X', 'B'], runOf, [], [], 4), ['H', 'A', 'X', 'B'], 'nothing reads across, nothing moves');
+});

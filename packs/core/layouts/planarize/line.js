@@ -2,10 +2,12 @@
 // e_snvzsxj4): its top and a second top, then what lives on it, then its foot. Its border is three arcs on that line,
 // from its top round the left to its foot and from its foot round the right to the second top, then back to the top,
 // so what stands between its tops and its foot is inside it and nothing else is. The islands and what lives at sea are
-// put in order first, as one step each, every ring among them broken by turning the fewest wires (./direct.js); then
-// each island's own steps in their order. Layer: topology. Pure: wires in, a line out.
+// put in order first, as one step each, every ring among them broken by turning the fewest wires (./direct.js), and
+// moved to where the wires between them interleave least (./sift.js); each island's own steps keep their order.
+// Layer: topology. Pure: wires in, a line out.
 
 import { feedback } from './direct.js';
+import { sifted } from './sift.js';
 import { lineUp } from './upward.js';
 
 export const topOf = (island) => `top ${island}`, secondOf = (island) => `top2 ${island}`, footOf = (island) => `foot ${island}`;
@@ -22,11 +24,12 @@ export function borderArcs(island) {
 }
 
 /**
- * The line: `wires` (each with `top` and `foot`, of ./direct.js, and `firm` where it must run down), `placeOf(id)` where each step lives (null
- * at sea), `made(id)` when it was made, `noise(id)` how each leans in this try. Answers the line, top first, and the
- * wires with their ways set again: a wire between islands that would run against the islands' order is turned.
+ * The line: `wires` (each with `top` and `foot`, of ./direct.js, and `firm` where it must run down), `placeOf(id)` where
+ * each step lives (null at sea), `made(id)` when it was made, `noise(id)` how each leans in this try, `rounds` how many
+ * times the runs are sifted by what reads across (./sift.js). Answers the line, top first, and the wires with their ways
+ * set again: a wire between islands that would run against the islands' order is turned.
  */
-export function lineOf(ids, wires, placeOf, made, noise) {
+export function lineOf(ids, wires, placeOf, made, noise, rounds = 0) {
   const unit = (v) => (placeOf(v) === null ? v : `island ${placeOf(v)}`);
   const units = [...new Set(ids.map(unit))], madeOf = new Map();
   for (const v of ids) madeOf.set(unit(v), Math.min(madeOf.get(unit(v)) ?? Infinity, made(v)));
@@ -41,12 +44,16 @@ export function lineOf(ids, wires, placeOf, made, noise) {
     const [a, b] = [unit(w.firm ? w.top : w.u), unit(w.firm ? w.foot : w.v)];
     if (a !== b && !quotient.get(`${a} ${b}`)?.[2]) quotient.set(`${a} ${b}`, [a, b, Boolean(w.firm)]);
   }
-  const order = lineUp([...units].sort((p, q) => madeOf.get(p) - madeOf.get(q)), [...quotient.values()], noise);
-  const line = order.flatMap((u) => {
+  const runOf = (u) => {
     if (!u.startsWith('island ')) return [u];
     const island = u.slice('island '.length), own = ids.filter((v) => placeOf(v) === island).sort((p, q) => made(p) - made(q));
     const set = new Set(own), inside = linked((w) => set.has(w.u) && set.has(w.v));
     return [topOf(island), secondOf(island), ...lineUp(own, inside, noise), footOf(island)];
-  });
+  };
+  const runs = new Map(units.map((u) => [u, runOf(u)]));
+  // Then each moved to where what reads across interleaves least (./sift.js), its own steps in their order.
+  const firm = [...quotient.values()].filter((q) => q[2]), ends = ways.map((w) => [w.u, w.v]);
+  const order = sifted(lineUp([...units].sort((p, q) => madeOf.get(p) - madeOf.get(q)), [...quotient.values()], noise), (u) => runs.get(u), ends, firm, rounds);
+  const line = order.flatMap((u) => runs.get(u));
   return { line, wires: ways };
 }
