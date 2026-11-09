@@ -211,7 +211,7 @@ test('a backup holds every row, and restores into an empty database that then ca
     { op: 'create', ref: 't', type: 'task', title: 'Task', props: { due: '2026-11-01' } },
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
   ]);
-  await l.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'finding', title: 'Proposed' }] });
+  await l.change(agent, { reason: 'waiting', ops: [{ op: 'create', type: 'finding', title: 'Proposed', props: { value: 1, value_type: 'number' } }] });
 
   const taken = await dump(l.db, { id: 'default', name: 'Default' }, { id: 'local', types: [] });
   const copy = new Archipelago(await openDb(), l.registry);
