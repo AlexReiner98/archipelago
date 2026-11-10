@@ -1,5 +1,10 @@
 {
  "unordered": [
+  ".attention app.items[].reasons[].by",
+  ".attention me.items[].reasons[].by",
+  ".brief hover.blocked_by",
+  ".brief installer.blocked_by",
+  ".brief sign.blocked_by",
   ".graph newest all system.edges",
   ".graph newest all system.nodes",
   ".graph newest blocking.edges",
@@ -457,8 +462,8 @@
      "reasons": [
       {
        "by": [
-        "What does it cost?",
-        "Installer"
+        "Installer",
+        "What does it cost?"
        ],
        "why": "blocked"
       }
