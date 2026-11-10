@@ -31,7 +31,7 @@
     "repository": "https://github.com/AlexReiner98/archipelago",
     "privacy": "https://app.archipelago.tools/x/legal/privacy",
     "terms": "https://app.archipelago.tools/x/legal/terms",
-    "support": null
+    "support": "mailto:support@aperture.tools"
   },
-  "icon": "brand/emblem.png"
+  "icon": "brand/emblem-profile.png"
 }

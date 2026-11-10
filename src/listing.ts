@@ -21,7 +21,8 @@ export type Listing = {
   categories: string[];
   keywords: string[];
   license: string;
-  urls: { site: string; app: string; install: string; mcp: string; repository: string; privacy: string; terms: string; support: string | null };
+  urls: { site: string; app: string; install: string; mcp: string; repository: string; privacy: string; terms: string; support: string };
+  /** A square PNG of 512 to 2048 px, under 2 MB: the plugin directory's bounds, the tightest any takes. */
   icon: string;
 };
 

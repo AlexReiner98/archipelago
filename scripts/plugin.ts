@@ -6,7 +6,7 @@
 //
 //   claude plugin install archipelago --marketplace AlexReiner98/archipelago
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { LISTING } from '../src/listing.ts';
 import { workingRules } from '../src/working-rules.ts';
@@ -20,6 +20,8 @@ export const HOSTED = 'https://app.archipelago.tools';
 export const PLUGIN = 'archipelago';
 export const SERVER = 'pelago';
 export const FOLDER = `plugins/${PLUGIN}`;
+/** Where the plugin directory looks for the listing's icon. */
+export const PLUGIN_ICON = `${FOLDER}/.claude-plugin/icon.png`;
 /** Where the marketplace is, as Claude Code is told it. */
 export const MARKETPLACE = 'AlexReiner98/archipelago';
 export const installCommand = `claude plugin install ${PLUGIN} --marketplace ${MARKETPLACE}`;
@@ -100,4 +102,7 @@ if (import.meta.main) {
     writeFileSync(join(ROOT, path), text);
     console.log(`written  ${path}`);
   }
+  // The listing's icon, as the plugin directory takes it: a square PNG in the plugin's own folder.
+  copyFileSync(join(ROOT, LISTING.icon), join(ROOT, PLUGIN_ICON));
+  console.log(`written  ${PLUGIN_ICON}`);
 }

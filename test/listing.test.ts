@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { LIMITS, LISTING } from '../src/listing.ts';
 import { installPage, llmsTxt } from '../src/install.ts';
-import { FOLDER, pluginFiles } from '../scripts/plugin.ts';
+import { FOLDER, PLUGIN_ICON, pluginFiles } from '../scripts/plugin.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 
@@ -14,7 +14,11 @@ test('the listing fits every directory', () => {
   for (const [field, most] of Object.entries(LIMITS)) assert.ok((LISTING as Record<string, unknown> & typeof LISTING)[field as keyof typeof LIMITS].length <= most, `${field} is over ${most} characters`);
   assert.ok(LISTING.title.startsWith(LISTING.name), 'the title is the name, then what tells it apart');
   assert.ok(LISTING.summary.startsWith(LISTING.tagline), 'the summary leads with the tagline');
-  for (const url of Object.values(LISTING.urls)) assert.ok(url === null || url.startsWith('https://'), `${url} is not https`);
+  for (const url of Object.values(LISTING.urls)) assert.ok(/^(https:\/\/|mailto:)/.test(url), `${url} is not https or mailto`);
+  const icon = readFileSync(join(ROOT, LISTING.icon));
+  const [width, height] = [icon.readUInt32BE(16), icon.readUInt32BE(20)];
+  assert.ok(icon.subarray(1, 4).toString() === 'PNG' && width === height && width >= 512 && width <= 2048 && icon.length < 2_000_000, 'the icon is a square PNG of 512 to 2048 px, under 2 MB');
+  assert.ok(readFileSync(join(ROOT, PLUGIN_ICON)).equals(icon), 'the plugin carries the listing icon: run npm run plugin');
 });
 
 test('the plugin and its marketplace say what the listing says', () => {
