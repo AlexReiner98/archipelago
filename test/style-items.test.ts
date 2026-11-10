@@ -55,6 +55,8 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
       assert.ok(await page.until(onPage(made.s)), `its page opens: ${await page.evaluate('location.hash')} ${page.logs().join('\n')}`);
       assert.equal(await page.evaluate(`${hash}.get('find')`), `id ${made.t}`, 'over the lens as it was');
       assert.ok(!(await page.evaluate(applied(made.s))), 'with nothing applied');
+      // The switch is drawn with the view's bar, which may come after the page: waited for, then read.
+      assert.ok(await page.until(`Boolean(${look})`), 'the switch is drawn');
       assert.equal(await page.evaluate(`${look}.value`), '', 'the switch still says the house’s');
 
       // Apply stands in the page's head, says what it does, and draws the canvas in the style as the switch does.

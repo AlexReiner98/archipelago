@@ -13,22 +13,23 @@ interface Edge {
 // person, company or agent to answer or act (until the link is removed); x
 // needs a resource that is unavailable; or x needs a resource held by
 // others (not for x) as many times as its capacity allows.
-const EDGES = (only: string) => `
-  select r.from_id as x, r.to_id as y, 'depends_on' as why
+// In the order the links were made, so an item's blockers are said in one order on every engine and plan.
+const EDGES = (only: string) => `select x, y, why from (
+  select r.from_id as x, r.to_id as y, 'depends_on' as why, r.valid_from as made, r.id as rel
     from relation r join entity x on x.id = r.from_id join entity y on y.id = r.to_id
    where r.type = any($1::text[]) and r.valid_to is null
      and x.is_open and x.archived_at is null and y.is_open and y.archived_at is null${only}
   union all
-  select r.from_id, r.to_id, 'waits_on'
+  select r.from_id, r.to_id, 'waits_on', r.valid_from, r.id
     from relation r join entity x on x.id = r.from_id join entity y on y.id = r.to_id
    where r.type = any($2::text[]) and r.valid_to is null
      and x.is_open and x.archived_at is null and y.archived_at is null${only}
   union all
-  select r.from_id, r.to_id, 'resource_unavailable'
+  select r.from_id, r.to_id, 'resource_unavailable', r.valid_from, r.id
     from relation r join entity x on x.id = r.from_id join entity y on y.id = r.to_id
    where r.type = any($3::text[]) and r.valid_to is null
      and x.is_open and x.archived_at is null and y.status = 'unavailable' and y.archived_at is null${only}
-`;
+) edges order by made, rel`;
 const HELD = (only: string) => `
   select n.from_id as x, n.to_id as y, 'resource_held' as why, res.type, res.props, count(*)::int as held
     from relation n join entity x on x.id = n.from_id join entity res on res.id = n.to_id
