@@ -81,7 +81,7 @@ test('on an island map, a pack made there is judged by the island rules', async 
   await make(l, [recipes()]);
   await setPack(l, human, { pack: 'recipes', on: true });
   assert.equal(l.registry.states.get('recipes')?.state, 'active', 'built on the shared set alone, it is taken');
-  await assert.rejects(make(l, [{ ...recipes({ requires: ['core', 'work'], types: RECIPES.types }), ref: 'q', props: { name: 'menus', manifest: { requires: ['core', 'work'], types: [{ id: 'menus.menu', title: 'Menu', description: '', extends: 'record' }] } } }]), /not taken on an island map: it requires work/);
+  await assert.rejects(make(l, [{ ...recipes({ requires: ['core', 'work'], types: RECIPES.types }), ref: 'q', props: { name: 'menus', manifest: { requires: ['core', 'work'], types: [{ id: 'menus.menu', title: 'Menu', description: '', extends: 'record' }] } } }]), /not taken on an island map: it is both an island pack \(types menus\.menu\) and a map pack \(requires work\): split it/);
 });
 
 test('a pack kept as an item cannot take a name a server pack declares, even one off here', async () => {
@@ -105,15 +105,20 @@ test('a rule in a pack kept as an item only tightens: it lets nothing through th
   assert.equal(dish.status, 'proposed');
 });
 
-// A look names no type and runs no code: a pack kept as an item may bring one, and on an island map the island rules judge it.
+// A look names no type and runs no code: a pack kept as an item may bring one. On an island map a pack of looks alone is a
+// map pack and is taken (decision e_ubd8satd); one that also holds types is told to split.
 const LOOK = { id: 'recipes.look', title: 'Kitchen look', on: ['recipes.dish'], props: { session_marks: { done: { shape: 'disc', hue: 'done' } } } };
 
-test('a pack kept as an item may bring a look; an island map judges it by the island rules', async () => {
+test('a pack kept as an item may bring a look; on an island map a pack of looks alone is taken', async () => {
   const l = await fresh();
   await make(l, [recipes({ ...RECIPES, styles: [...RECIPES.styles, LOOK] })]);
   await setPack(l, human, { pack: 'recipes', on: true });
   assert.equal(l.registry.states.get('recipes')?.state, 'active');
   const isl = await fresh();
   await setIslands(isl, human, true);
-  await assert.rejects(make(isl, [recipes({ ...RECIPES, styles: [...RECIPES.styles, LOOK] })]), /not taken on an island map: styles holds looks/);
+  await assert.rejects(make(isl, [recipes({ ...RECIPES, styles: [...RECIPES.styles, LOOK] })]), /not taken on an island map: it is both an island pack .* and a map pack \(looks \(recipes\.look\)\): split it/);
+  const { on: _on, ...plain } = LOOK;
+  await make(isl, [recipes({ requires: ['core'], styles: [plain] })]);
+  await setPack(isl, human, { pack: 'recipes', on: true });
+  assert.equal(isl.registry.states.get('recipes')?.state, 'active', 'a pack of looks alone is a map pack');
 });

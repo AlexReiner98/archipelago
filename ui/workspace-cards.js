@@ -206,7 +206,7 @@ export function visibilityRow(info, redraw, fail) {
 export function islandsRow(info, redraw, fail) {
   if (!may('admin')) return null;
   const on = h('input', { type: 'checkbox', checked: Boolean(info.islands) });
-  const name = h('span', { class: 'grow', title: 'Each pack is an island: it is taken only if its file holds its vocabulary, views and instructions and it builds on the shared set alone, and every item lives on one island. Islands meet only through findings.' }, 'Islands');
+  const name = h('span', { class: 'grow', title: 'Every item lives on one island, which speaks an island pack: words, views and instructions on the shared set alone. A map pack brings looks, layouts and tools to the whole map and owns no type on an island; a pack that is both is turned off. Islands meet only through findings.' }, 'Islands');
   on.onchange = async () => {
     const want = on.checked;
     const message = info.started ? 'What is on the map moves onto an island for each pack it speaks, in one change you can undo. Packs that do not keep the rules are turned off; if one is in use, nothing changes.' : 'Packs that do not keep to them are turned off, and every item made from now on lives on an island.';

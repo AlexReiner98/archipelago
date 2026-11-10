@@ -118,7 +118,7 @@ export interface ChangeInput {
   /** From an agent: have this change wait for a human even where agents' changes are applied as made. */
   hold?: boolean;
   /** The pack action that made it, named on every event it logs ("time.log made this"). */
-  action?: string; /** The pack whose action or handler made it: what it writes is kept to the pack's reach (core's pack_reach). */ pack?: string; /** From the page: the layout whose code asked for it (src/layout-changes.ts). */ drawing?: string;
+  action?: string; /** The island a pack action was given (its `island` input): where what it makes goes when nothing it is tied to in the change says (src/island-items.ts). */ island?: string; /** The pack whose action or handler made it: what it writes is kept to the pack's reach (core's pack_reach). */ pack?: string; /** From the page: the layout whose code asked for it (src/layout-changes.ts). */ drawing?: string;
   /** The change set this one reverses: undo's own. */
   undoes?: string; /** The session it was made in (a run's id), kept in the log's entry: where it came from, never on whose authority. */ run?: string;
 }

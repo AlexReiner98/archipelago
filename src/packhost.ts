@@ -224,13 +224,13 @@ export class PackHost {
     const file = l.registry.packs.find((p) => p.id === pack)!;
     // Refused whole, before anything is written: an event of a kind its pack does not declare.
     for (const e of done.log ?? []) if (!parts(file).events.includes(e.action)) throw new Error(`The ${pack} pack declares no event "${e.action}"`);
-    const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name, pack }) : undefined;
+    const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name, pack, ...islandIn(input) }) : undefined;
     const action = call === 'action' ? parts(file).actions.find((a) => a.id === name) : undefined;
     const outside = done.requests?.length ? await handleRequests(this, l, actor, file, action, done.requests, (changed as { changeset?: string } | undefined)?.changeset) : undefined;
     const made = (changed as { created?: Record<string, string> } | undefined)?.created ?? {};
     const answer = done.answer === undefined ? null : JSON.parse(JSON.stringify(done.answer).replace(/\{([^{}\s"]+)\}/g, (whole, ref: string) => made[ref] ?? whole));
     const dropped = changed?.status === 'applied' && done.drop_pictures?.length ? await dropPictures(l, actor, done.drop_pictures, done.reason?.trim() || name) : undefined;
-    const others = await further(l, actor, file, name, done);
+    const others = await further(l, actor, file, name, done, input);
     for (const e of done.log ?? []) this.tell(l, file.id, e);
     return { answer, ...changed, ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }) };
   }
@@ -261,18 +261,24 @@ export class PackHost {
  * What a call answered beyond its own ops: the events it records (of the kinds its pack declares, checked first), what the owner is
  * told, and further change sets, each with its own reason, so a person approves or declines each on its own.
  */
-async function further(l: Archipelago, actor: Actor, file: PackFile, name: string, done: Done) {
+async function further(l: Archipelago, actor: Actor, file: PackFile, name: string, done: Done, input: unknown) {
   for (const e of done.log ?? []) {
     await l.log(l.db, { actor: actorId(actor), action: e.action, target: e.target, reason: e.reason, detail: { ...e.detail, pack: file.id } });
   }
   for (const n of done.notify ?? []) await notify(l, actor, n);
   const results = [];
   for (const c of done.changes ?? []) {
-    const result = await l.change(actor, { ops: c.ops, reason: c.reason?.trim() || name, action: name, pack: file.id, ...(c.authority && { authority: c.authority }), ...(c.source && { source: c.source }) });
+    const result = await l.change(actor, { ops: c.ops, reason: c.reason?.trim() || name, action: name, pack: file.id, ...islandIn(input), ...(c.authority && { authority: c.authority }), ...(c.source && { source: c.source }) });
     results.push({ status: result.status, ...('changeset' in result && { changeset: result.changeset }), ...('proposal' in result && { proposal: result.proposal }) });
   }
   return results;
 }
+
+/** The island an action was given, as its input `island`: where what it makes goes, on a map of islands, when nothing it is tied to says. */
+const islandIn = (input: unknown): { island?: string } => {
+  const island = (input as { island?: unknown } | null)?.island;
+  return typeof island === 'string' && island ? { island } : {};
+};
 
 /** Remove the kept pictures of these items, those the actor can see, each logged. */
 async function dropPictures(l: Archipelago, actor: Actor, ids: string[], reason: string): Promise<number> {
