@@ -91,7 +91,9 @@ function serverFor(caller: Caller): McpServer {
   const mcp = new McpServer({ name: 'pelago', version: '0.1.0' }, { capabilities: { tools: { listChanged: true }, extensions: VIEW_CAPABILITY }, instructions: connectText(caller.pelago.registry) });
   registerView(mcp);
   for (const [name, tool] of offered(caller.pelago.registry))
-    mcp.registerTool(name, { description: tool.description, inputSchema: inputsOf(tool), annotations: ANNOTATIONS[name], ...toolView(name) }, async (args: Record<string, unknown>) => {
+    // The title is said twice, as the tool's own and among its annotations: MCP reads either, and the connectors
+    // directory's review asks for a title without saying which.
+    mcp.registerTool(name, { title: ANNOTATIONS[name].title, description: tool.description, inputSchema: inputsOf(tool), annotations: ANNOTATIONS[name], ...toolView(name) }, async (args: Record<string, unknown>) => {
       // A workspace named in the arguments was read by the server before the call was answered (src/server.ts): it is
       // in no tool's inputs, which every request pays for, and is said once in connectText.
       const { actor, workspace: _routed, ...input } = args;

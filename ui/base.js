@@ -301,7 +301,26 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
   };
   const sendLink = () => email.value.trim() && ask(email.value.trim()).then(codeStep, () => undefined);
   send.onclick = sendLink;
-  email.addEventListener('keydown', (e) => e.key === 'Enter' && sendLink());
+  email.addEventListener('keydown', (e) => e.key === 'Enter' && (password.value ? withPassword() : sendLink()));
+
+  // Or the address and its password, for whoever set one (src/passwords.ts). A member of several picks one.
+  const password = h('input', { type: 'password', placeholder: 'Password', autocomplete: 'current-password', title: 'If you set a password; otherwise ask for an email' });
+  const passwordGo = h('button', { title: 'Sign in with your email and password' }, 'Sign in');
+  const withPassword = async (more = {}) => {
+    const address = email.value.trim();
+    if (!address || !password.value) return fail(address ? 'Type your password, or ask for an email.' : 'Type your email address.');
+    const post = (agree) => postJson('/connect/password', { email: address, password: password.value, ...more, ...(agree && { agree }) });
+    passwordGo.disabled = true;
+    const res = await post();
+    const body = await res.json().catch(() => ({}));
+    passwordGo.disabled = false;
+    if (!res.ok) return fail(body.error ?? 'That did not work.');
+    if (body.workspaces) return gate('Open which workspace?', ...body.workspaces.map((w) => gateRow(h('span', { class: 'grow gist', title: w.name }, w.name), h('button', { class: 'primary', onclick: () => withPassword({ workspace: w.id }) }, 'Open'))), error);
+    if (body.agree) return agreeFirst(body.agree, post);
+    enter(body.token);
+  };
+  passwordGo.onclick = () => withPassword();
+  password.addEventListener('keydown', (e) => e.key === 'Enter' && withPassword());
 
   // Where a person with no account begins, if this server offers it; a client waiting to connect is returned to after.
   const begin = h('div', { hidden: true });
@@ -319,6 +338,7 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
     gate(
       title,
       gateRow(email, send),
+      gateRow(password, passwordGo),
       error,
       others.length > 0 && gateRow(h('span', { class: 'muted' }, 'Signed in before'), h('span', { class: 'grow gist gate-others' }, others.map((w) => h('a', { href: '#', title: `Open ${w.name}`, onclick: (e) => (e.preventDefault(), enter(w.token)) }, w.name)))),
       begin,
@@ -396,6 +416,7 @@ export async function showIdentity() {
       h('div', { class: 'ws-head', id: 'ws-head' }, 'Signed in to'),
       h('div', { class: 'ws-rows', role: 'group', 'aria-labelledby': 'ws-head' }, Object.entries({ [me.workspace.id]: me.workspace, ...known.all() }).map(row)),
       h('a', { href: '#', class: 'ws-row ws-add', title: 'Sign in by email to a workspace you belong to; this one stays a click away', onclick: go(() => signIn('', 'Sign in to another workspace', { back: true, email: who })) }, h('span', { class: 'gist' }, '+ Sign in to another workspace')),
+      me.actor.kind === 'human' && who && h('a', { href: '#', class: 'ws-row', title: `Sign in as ${who} with a password as well as by email`, onclick: go(() => import('./password.js').then((m) => m.passwordPage())) }, h('span', { class: 'gist' }, 'Password')),
       h('div', { class: 'ws-foot' }, h('span', { class: 'muted small gist', title: `Signed in as ${me.actor.name}` }, me.actor.name), h('a', { href: '#', class: 'small gist', title: `Sign out of ${me.workspace.name} on this browser; the others stay signed in`, onclick: go(signedOut) }, `Sign out of ${me.workspace.name}`)),
     );
   } catch {

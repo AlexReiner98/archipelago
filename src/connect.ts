@@ -7,7 +7,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { bearer } from './auth.ts';
 import { normalEmail } from './mail.ts';
 import { workspacesOf } from './control-index.ts';
-import { emailOfLink, LINK_MINUTES, redeem, redeemTyped, requestSignIn, triesSpent, typedWorks, workspaceOfCode } from './members.ts';
+import type { Q } from './db.ts';
+import { emailOfLink, LINK_MINUTES, memberOf, redeem, redeemTyped, requestSignIn, signedIn, triesSpent, typedWorks, workspaceOfCode } from './members.ts';
+import { clearPassword, passwordProblem, passwordSet, passwordTriesSpent, passwordWorks, setPassword, TRIES_MINUTES } from './passwords.ts';
 import { installPage, installPs1, installScript, installSh, llmsTxt } from './install.ts';
 import { serveOAuth } from './oauth.ts';
 import { json, PRIVATE } from './reply.ts';
@@ -39,7 +41,7 @@ export interface ConnectRoutes {
   /** Where the request comes from, for what is counted by address (a pack's stream). */
   from?: string;
   /** Who is signed in, as any request with a token says; refused if nobody is. */
-  person: () => Promise<{ ws: Workspace; actor: () => Actor }>;
+  person: () => Promise<{ ws: Workspace; actor: () => Actor; look?: true }>;
 }
 
 /** One sign-in mail a minute to an address, whoever asks: the form cannot be used to flood someone's inbox. */
@@ -128,7 +130,26 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     return reply(res, 200, { url: startOf(at) ?? null });
   }
   // Signing in by email: a link asked for at an address, and a link opened, its code traded once for a token.
-  if (req.method === 'POST' && (path === '/connect/sign-in' || path === '/connect/join' || path === '/connect/code')) {
+  // A person signed in keeps a password for their address, or takes it away; an agent or a look pass never does.
+  if (req.method === 'POST' && path === '/connect/password/set') {
+    if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in.' });
+    if (at.tooOften()) return;
+    const { ws, actor, look } = await at.person();
+    const who = actor();
+    if (look || who.kind !== 'human' || !who.person) return reply(res, 403, { error: 'Only the person signed in keeps a password, not an agent.' });
+    const { rows } = await ws.pelago.db.query<{ email: string }>(`select email from member where person_id = $1 and removed_at is null limit 1`, [who.person]);
+    const email = rows[0]?.email;
+    if (!email) return reply(res, 403, { error: 'A password is kept for a member’s address, and this sign-in has none.' });
+    const control = await at.workspaces.control();
+    const body = ((await at.body()) ?? {}) as { password?: unknown };
+    if (body.password === undefined) return reply(res, 200, { email, set: (await passwordSet(control, email)) ?? null });
+    if (body.password === null) return (await clearPassword(control, email), reply(res, 200, { email, set: null }));
+    const problem = passwordProblem(body.password);
+    if (problem) return reply(res, 400, { error: problem });
+    await setPassword(control, email, body.password as string);
+    return reply(res, 200, { email, set: await passwordSet(control, email) });
+  }
+  if (req.method === 'POST' && (path === '/connect/sign-in' || path === '/connect/join' || path === '/connect/code' || path === '/connect/password')) {
     if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in.' });
     if (at.tooOften()) return;
     const body = ((await at.body()) ?? {}) as { email?: unknown; code?: unknown; agree?: unknown; ref?: unknown };
@@ -151,6 +172,26 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
       const begin = start && withRef(`${origin}${start}`, body.ref);
       if (!askedLately(email)) void requestSignIn(await theirs(email), email, origin, begin).catch((err) => console.error(`sign-in mail to ${email} failed:`, (err as Error).message));
       return reply(res, 200, { sent_to: email });
+    }
+    // An address and its password. Its workspace is the one named, or the only one; for several, the answer lists them.
+    if (path === '/connect/password') {
+      const email = normalEmail(body.email);
+      if (!email) return reply(res, 400, { error: 'That is not an email address.' });
+      const control = await at.workspaces.control();
+      const wait = `Too many wrong passwords for this address. Wait ${TRIES_MINUTES} minutes, or ask for an email instead.`;
+      if (await passwordTriesSpent(control, email)) return reply(res, 429, { error: wait });
+      const refused = () => reply(res, 401, { error: 'That email and password do not match.' });
+      if (!(await passwordWorks(control, email, (body as { password?: unknown }).password))) return (await passwordTriesSpent(control, email)) ? reply(res, 429, { error: wait }) : refused();
+      const mine: { id: string; name: string; db: () => Promise<Q> }[] = [];
+      for (const w of await theirs(email)) if (await memberOf(await w.db(), email)) mine.push(w);
+      if (!mine.length) return reply(res, 403, { error: 'This address is a member of no workspace here.' });
+      const named = (body as { workspace?: unknown }).workspace;
+      const ws = mine.length === 1 ? mine[0] : mine.find((w) => w.id === named);
+      if (!ws) return reply(res, 200, { workspaces: mine.map(({ id, name }) => ({ id, name })) });
+      const owed = await owes(email);
+      if (owed.length) return reply(res, 200, { agree: owed });
+      const db = await ws.db();
+      return reply(res, 200, { token: await signedIn(db, ws.id, (await memberOf(db, email))!) });
     }
     // A code from the mail, typed with the address it was sent to.
     if (path === '/connect/code') {
