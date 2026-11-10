@@ -4,15 +4,15 @@
 // is no script, no style attribute and no event handler, and its stylesheet is kept to its own host (cssFor).
 //
 // A mark is [tag, attributes, ...what is in it], a string being text. Two attributes are not drawn: `key`, the name
-// a patch uses for it, and `on`, the events the drawing is told of (enter, leave, click, and the gestures grab and
-// add, ui/marks-grab.js); a third, `pulse`, is kept on
+// a patch uses for it, and `on`, the events the drawing is told of (enter, leave, click), or `add`, a button the
+// page answers itself (ui/marks-add.js); a third, `pulse`, is kept on
 // the mark as words, for the page to run it along its line when they change (ui/transition.js). A mark says the item it
 // stands for with `item` (an id), which a link to the item says too: the page lights marks by it (ui/query-light.js),
 // whatever drew them. Two tags are the page's own, made from an item's id alone: `reader`, a document as its reader
 // meets it (ui/reader-frame.js), and `view`, a kept view drawn as it is kept (ui/view-frame.js).
 
 import { cssProblem, uncommented } from './css-check.js';
-import { addable, grabbable } from './marks-grab.js';
+import { addable } from './marks-add.js';
 import { readerFrame } from './reader-frame.js';
 import { viewFrame } from './view-frame.js';
 
@@ -22,9 +22,9 @@ const HTML_TAGS = new Set(['div', 'span', 'p', 'b', 'strong', 'em', 'i', 'small'
 const ITEM_ID = /^e_[a-z0-9]{8}$/;
 const ATTRS = new Set(['class', 'd', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'dx', 'dy', 'width', 'height', 'viewBox', 'points', 'transform', 'text-anchor', 'dominant-baseline', 'pathLength', 'offset', 'preserveAspectRatio', 'role', 'aria-label', 'aria-hidden', 'title', 'hidden', 'href', 'stroke-dasharray', 'stroke-dashoffset', 'aria-live', 'opacity', 'fill-opacity', 'stroke-opacity', 'gradientUnits']);
 /** The events a drawing may be told of, by the page's name for each; `seen` is told once, when the mark is first scrolled into sight. */
-const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click', seen: 'seen', grab: 'grab', add: 'add' };
-/** The events the page tells of in its own way: once in sight, and the gestures. */
-const OWN = { seen: (el, key, tell) => seen(el, () => tell(key, 'seen')), grab: grabbable, add: addable };
+const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click', seen: 'seen', add: 'add' };
+/** The events the page answers in its own way: once in sight, and the add button. */
+const OWN = { seen: (el, key, tell) => seen(el, () => tell(key, 'seen')), add: addable };
 const seen = (el, fn) => {
   const sight = new IntersectionObserver((all) => all.some((e) => e.isIntersecting) && (sight.disconnect(), fn()), { threshold: 0.5 });
   sight.observe(el);
