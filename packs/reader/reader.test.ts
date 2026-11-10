@@ -116,6 +116,17 @@ test('a document is described by the first paragraph it opens on, cut short', ()
   assert.equal(describe([]), '');
 });
 
+test('a page says its words with no script run: an agent that fetches it reads them', () => {
+  const text = 'Get going.\n\n## Connect\n\nAsk it to [install](https://app.example/connect/install), `one line`, **now**.\n\n- one\n- two\n\n```bash\nnpm <start>\n```\n\n[not this](javascript:alert(1)) <script>';
+  const html = publishedPage(TEMPLATE, { title: 'Quick <start>', parts: [{ text }, { section: { id: SEC, title: 'A figure', picture: true, body: '' } }] }, 'https://x.example/', undefined, {});
+  const main = /<main id="main">([\s\S]*?)<\/main>/.exec(html)![1];
+  assert.ok(main.startsWith('<h1>Quick &#60;start&#62;</h1>'));
+  assert.ok(main.includes('<h2>Connect</h2>') && main.includes('<a href="https://app.example/connect/install">install</a>') && main.includes('<code>one line</code>') && main.includes('<b>now</b>'));
+  assert.ok(main.includes('<ul><li>one</li><li>two</li></ul>') && main.includes('<pre>npm &#60;start&#62;</pre>'));
+  assert.ok(!main.includes('<script') && !main.includes('href="javascript'), 'only words and safe links');
+  assert.ok(!main.includes('Loading'));
+});
+
 test("nothing a document says closes the page's data or is read as a pattern", () => {
   const html = publishedPage(TEMPLATE, { title: '$& $\'', parts: [] }, 'https://x.example/', undefined, { said: '</script><!--' });
   assert.match(html, /<title>\$&#38; \$&#39;<\/title>/);

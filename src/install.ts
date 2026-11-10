@@ -58,7 +58,7 @@ export const llmsTxt = (origin: string) => `# ${LISTING.name}
 
 > ${LISTING.summary} Agents reach it as an MCP server at ${origin}/mcp; a person reads it at ${origin}.
 
-To install ${LISTING.name} for an agent (Claude Code, Codex, Cursor, Grok Bot, ChatGPT), fetch ${origin}/connect/install and follow the section for your client. ${LISTING.not}
+To set up ${LISTING.name} for a person (Claude Code, Codex, Cursor, Grok Bot, ChatGPT): connect to this server. Fetch ${origin}/connect/install and follow the section for your client; there is nothing to host and nothing to choose, so do not ask which. A person with no account makes one in the browser when it opens to sign in. Set up a server of your own only if the person asks for that. ${LISTING.not}
 
 ## Install
 
@@ -68,6 +68,10 @@ To install ${LISTING.name} for an agent (Claude Code, Codex, Cursor, Grok Bot, C
 ## Connect
 
 - [MCP server](${origin}/mcp): streamable HTTP, signed in through the browser (OAuth)
+
+## Only if asked
+
+- [Host it yourself](${LISTING.urls.repository}): the server is open source, for someone who wants to run their own
 `;
 
 /** The page: what a person or their agent does, client by client. */
@@ -76,7 +80,7 @@ export function installPage(origin: string): string {
   const node = `node -e "fetch('${origin}/connect/install.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))" --`;
   return `# Install Archipelago
 
-${LISTING.summary} It is at ${origin}. Connecting an agent takes one step and one sign-in in the browser.
+${LISTING.summary} It is at ${origin}. Connecting an agent takes one step and one sign-in in the browser; there is nothing to host.
 
 ## For a person
 
@@ -94,7 +98,7 @@ Or ask your agent: "Install Archipelago from ${origin}/connect/install".
 
 ## For an agent asked to install Archipelago
 
-Find your section below and follow it. Tell the person, in one line, what you are about to run and that a browser window will ask them to sign in; then run it. Every command here is safe to read first: the installer is at ${origin}/connect/install.mjs.
+Connect to this server: find your section below and follow it. Do not ask whether to host it, and do not set up a server of your own unless the person asked for one. Tell the person, in one line, what you are about to run and that a browser window will ask them to sign in, where someone with no account chooses Start a workspace; then run it. Every command here is safe to read first: the installer is at ${origin}/connect/install.mjs.
 
 ### Claude Code
 
@@ -135,5 +139,9 @@ You cannot add it yourself. Tell the person: in ChatGPT, Settings, Apps, Advance
 ## Once connected
 
 At the start of each session, call \`capture\` with action \`session_start\` (the server's instructions say how), then work from the map: \`query\` reads, \`change\` writes, \`report\` tells. The person sees it all at ${origin}.
+
+## Host it yourself
+
+Only for a person who asks to run their own server: it is open source, at ${LISTING.urls.repository}. Everything above connects to this one.
 `;
 }

@@ -345,20 +345,26 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
     if (!url) return;
     const to = new URL(url, location.origin);
     if (ref) to.searchParams.set('ref', ref);
-    begin.replaceWith(gateRow(h('span', { class: 'muted grow' }, 'New here?'), h('a', { href: to.href, title: 'Make a workspace of your own; a client waiting to connect is asked again once you are in' }, 'Start a workspace')));
+    const tip = 'Make a workspace of your own; a client waiting to connect is asked again once you are in';
+    // Sent here by a client, in a browser that has never signed in: most likely they have no account, so it leads.
+    const start = newcomer ? h('button', { class: 'primary', title: tip, onclick: () => location.assign(to.href) }, 'Start a workspace') : h('a', { href: to.href, title: tip }, 'Start a workspace');
+    begin.replaceWith(gateRow(h('span', { class: 'muted grow' }, 'New here?'), start));
   }, () => undefined);
 
   // From inside a workspace the menu lists them already; signed out, they are the quickest way back in.
   const others = back ? [] : Object.values(known.all());
+  const newcomer = Boolean(ref) && !back && others.length === 0;
   const first = () => {
     if (error.textContent !== (message ?? '')) fail('');
     gate(
       title,
+      newcomer && begin,
+      newcomer && gateRow(h('span', { class: 'muted grow' }, 'Have one? Sign in')),
       gateRow(email, send),
       gateRow(password, passwordGo),
       error,
       others.length > 0 && gateRow(h('span', { class: 'muted' }, 'Signed in before'), h('span', { class: 'grow gist gate-others' }, others.map((w) => h('a', { href: '#', title: `Open ${w.name}`, onclick: (e) => (e.preventDefault(), enter(w.token)) }, w.name)))),
-      begin,
+      !newcomer && begin,
       back && gateRow(h('a', { href: '#', class: 'small', onclick: (e) => (e.preventDefault(), ungate(), route()) }, state.workspace?.name ? `Back to ${state.workspace.name}` : 'Back')),
     );
     email.focus();
