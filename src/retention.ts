@@ -29,9 +29,15 @@ export interface Retention {
 }
 
 /** The streams the kernel appends to, besides the fact stream; a pack's own is `pack:<id>`. */
-export const STREAMS = ['sessions', 'claims', 'notifications', 'automations', 'settings', 'access', 'observations', 'places', 'visits', 'activity'] as const;
+export const STREAMS = ['sessions', 'claims', 'notifications', 'automations', 'settings', 'access', 'observations', 'places', 'activity'] as const;
 const PACK_STREAM = /^pack:([a-z][a-z0-9_]*|\*)$/;
-export const isStream = (s: string) => (STREAMS as readonly string[]).includes(s) || PACK_STREAM.test(s);
+/**
+ * A stream a server pack keeps its counts in (reach.server.counts, src/pack-counts.ts): a plain word no kernel stream
+ * has. A retention rule names it as counts:<word>, so a word that names no stream is still refused there.
+ */
+export const isCountStream = (s: string) => /^[a-z][a-z0-9_]{0,39}$/.test(s) && s !== 'facts' && !(STREAMS as readonly string[]).includes(s);
+const COUNTS_RULE = 'counts:';
+export const isStream = (s: string) => (STREAMS as readonly string[]).includes(s) || PACK_STREAM.test(s) || (s.startsWith(COUNTS_RULE) && isCountStream(s.slice(COUNTS_RULE.length)));
 
 const DURATION = /^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/;
 
@@ -47,7 +53,7 @@ export function duration(iso: string | undefined): number | undefined {
 export function checkRetention(rule: Retention & { then?: unknown }, at: string): string[] {
   const problems: string[] = [];
   if (rule.stream === undefined) return rule.keep ? [`${at}: keep needs the stream it keeps`] : [];
-  if (!isStream(rule.stream)) problems.push(`${at}: stream is one of ${STREAMS.join(', ')} or pack:<id>`);
+  if (!isStream(rule.stream)) problems.push(`${at}: stream is one of ${STREAMS.join(', ')}, pack:<id> or a pack's counts`);
   if (rule.then !== undefined) problems.push(`${at}: a retention rule has keep in place of then`);
   const keep = rule.keep;
   if (!keep || typeof keep !== 'object') return [...problems, `${at}: a stream's rule says what it keeps (keep)`];
@@ -67,7 +73,7 @@ export function checkRetention(rule: Retention & { then?: unknown }, at: string)
 
 /** The retention rule an entry's facts are kept by: the one naming one of their fields, else the stream's own. */
 export function ruleFor<R extends Retention>(rules: R[], stream: string, field: string): R | undefined {
-  const of = rules.filter((r) => r.stream === stream || (r.stream === 'pack:*' && stream.startsWith('pack:')));
+  const of = rules.filter((r) => r.stream === stream || r.stream === COUNTS_RULE + stream || (r.stream === 'pack:*' && stream.startsWith('pack:')));
   return of.find((r) => r.when?.fields?.includes(field)) ?? of.find((r) => !r.when?.fields);
 }
 

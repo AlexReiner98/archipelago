@@ -102,7 +102,7 @@ export class ServerPacks {
         if (!(pack.file.reach.server.acts ?? []).includes(q.act as never)) throw new Error(`The pack "${id}" did not declare the act "${q.act}".`);
         if (PUBLISHED_ACTS.includes(q.act as ServerAct)) return publishedAct(this.at, pack.file, q.act as ServerAct, input);
         if (CONNECT_ACTS.includes(q.act)) return connectAct(this.at, await this.control(), pack.file, q.act, input);
-        return runAct(this.at, pack.file, q.act, input, (ask) => signinGate(this, ask, id));
+        return runAct(this.at, pack.file, q.act, input, (ask) => signinGate(this, ask, id), this.packs.map((p) => p.file));
       }
       if (q.request && typeof q.request === 'object') return this.request(id, q.request as HostRequest);
       if (q.store === 'list') {

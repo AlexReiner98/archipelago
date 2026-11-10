@@ -22,7 +22,10 @@ export const SERVER_ACTS = [
   'workspace.create', 'workspace.admit', 'signin.link', 'mail.send',
   // What a buyer agreed to as they paid, handed to the packs that keep what a person agreed to (gates.signin).
   'agreement.record',
-  // How many readers each source tag brought to a public site (PELAGO_SITES), per day, after a position (src/visits.ts).
+  // What a pack counts on a public site's workspace (PELAGO_SITES), per key per day, in the stream it names (counts):
+  // added to, and read after a position, its own or another pack's (src/pack-counts.ts).
+  'count.add', 'count.read',
+  // Kept for one release, until the packs that read it ask count.read: the counts of the pack that takes the site mount.
   'site.visits',
   // On a workspace whose admin connected the pack (src/server-connect.ts).
   'begun.get', 'begun.take', 'connection.make', 'connection.get', 'connection.drop', 'workspace.add', 'workspace.deliver',
@@ -194,6 +197,8 @@ export function loadServerPacks(dirs = serverPackDirs()): { packs: ServerPack[];
       if (!why.length && packs.some((p) => p.file.id === file.id)) why.push(`another server pack is "${file.id}" already`);
       for (const path of Object.keys(file.reach?.server?.aliases ?? {})) if (packs.some((p) => p.file.reach.server.aliases?.[path])) why.push(`another server pack answers at "${path}" already`);
       for (const mount of Object.keys(file.reach?.server?.mounts ?? {})) if (packs.some((p) => p.file.reach.server.mounts?.[mount as never])) why.push(`another server pack takes the mount "${mount}" already`);
+      const counts = file.reach?.server?.counts;
+      if (counts && packs.some((p) => p.file.reach.server.counts === counts)) why.push(`another server pack keeps its counts in "${counts}" already`);
       const surface = file.reach?.server?.adapter?.surface;
       if (surface && packs.some((p) => p.file.reach.server.adapter?.surface === surface)) why.push(`another server pack translates the surface "${surface}" already`);
       if (why.length && dir === OWN_PACKS && !checkServerPack(file, folder).length) continue; // replaced

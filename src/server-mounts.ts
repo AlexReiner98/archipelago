@@ -39,8 +39,6 @@ export interface MountCall {
   host?: string;
   /** Where the request comes from, for the limit on how many listen from one address. */
   from?: string;
-  /** A site's page was read (src/visits.ts): a page found, never its data or its pictures. */
-  onPage?: () => void;
 }
 
 /** A public address in its parts: /p/<workspace>/<id>[/<what>[/<extra>]]. */
@@ -86,12 +84,24 @@ async function placeOf(mount: Mount, parts: Record<string, string>, at: MountCal
   return { ...(name && { name }), ...(at.named?.[0] && { named: at.named[0] }), ...(domain && { domain }) };
 }
 
+const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? '';
+/**
+ * What the request said that a page may answer by, handed to a public or site entry and kept by the kernel nowhere: its
+ * query, the name it was sent to (host), the page before (referrer), the browser's name for itself (agent), and whether
+ * it was fetched ahead (purpose).
+ */
+export function requestOf(req: Pick<IncomingMessage, 'url' | 'headers'>) {
+  const at = (req.url ?? '').indexOf('?');
+  const h = req.headers;
+  return { query: at < 0 ? '' : (req.url ?? '').slice(at + 1), host: one(h.host).toLowerCase(), referrer: one(h.referer), agent: one(h['user-agent']), purpose: one(h['sec-purpose']) || one(h.purpose) };
+}
+
 /** How long what was answered may be kept: whole seconds said, up to a year (then for good), else as otherwise. */
 const keptFor = (cache: unknown, otherwise: string) =>
   Number.isInteger(cache) && (cache as number) > 0 ? `public, max-age=${Math.min(cache as number, YEAR)}${(cache as number) >= YEAR ? ', immutable' : ''}` : otherwise;
 
 type Answer = { status?: unknown; html?: unknown; json?: unknown; picture?: unknown; text?: unknown; type?: unknown; redirect?: unknown; stream?: unknown; id?: unknown; pass?: unknown; cache?: unknown };
-type Sent = { pack?: string; workspace?: string; id?: string; site?: boolean; app?: string } & Pick<MountCall, 'workspaces' | 'from' | 'onPage'>;
+type Sent = { pack?: string; workspace?: string; id?: string; site?: boolean; app?: string } & Pick<MountCall, 'workspaces' | 'from'>;
 
 /** Send what a mounted entry answered, by its kind; anything else is the pack's fault. False when it passed. */
 export async function sendPage(res: ServerResponse, answer: unknown, at: Sent = {}): Promise<boolean> {
@@ -100,7 +110,6 @@ export async function sendPage(res: ServerResponse, answer: unknown, at: Sent = 
   const fault = (why: string) => (json(res, 502, { error: `The pack answered ${why}.` }, GUARD), true);
   if (a.pass === true) return false;
   if (typeof a.html === 'string') {
-    if (at.site && status === 200) at.onPage?.();
     res.writeHead(status, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': at.site ? POLICY : READER_POLICY }).end(await uiVersioned(a.html));
     return true;
   }
@@ -134,7 +143,7 @@ export async function sendPage(res: ServerResponse, answer: unknown, at: Sent = 
 }
 
 /** Answer an address at a mount a pack took; false when no pack took it, or it passed, and the kernel answers as before. */
-export async function serveMounted(_req: IncomingMessage, res: ServerResponse, mount: Mount, pathname: string, at: MountCall): Promise<boolean> {
+export async function serveMounted(req: IncomingMessage, res: ServerResponse, mount: Mount, pathname: string, at: MountCall): Promise<boolean> {
   const taken = mountedAt(at.packs, mount);
   if (!taken) return false;
   if (mount === 'setup') {
@@ -147,11 +156,11 @@ export async function serveMounted(_req: IncomingMessage, res: ServerResponse, m
   if (at.tooOften()) return true;
   let answer: unknown;
   try {
-    answer = await at.packs.call(taken.id, 'entry', taken.to, { ...parts, ...(await placeOf(mount, parts, at)) });
+    answer = await at.packs.call(taken.id, 'entry', taken.to, { ...parts, ...(await placeOf(mount, parts, at)), request: requestOf(req) });
   } catch (err) {
     console.error(`server pack ${taken.id} at ${mount}: ${(err as Error).message}`);
     json(res, 502, { error: 'The pack that answers here did not.' }, GUARD);
     return true;
   }
-  return sendPage(res, answer, { pack: taken.id, workspace: parts.workspace, id: parts.id, site: mount === 'site', app: at.packs.origin, workspaces: at.workspaces, from: at.from, onPage: at.onPage });
+  return sendPage(res, answer, { pack: taken.id, workspace: parts.workspace, id: parts.id, site: mount === 'site', app: at.packs.origin, workspaces: at.workspaces, from: at.from });
 }

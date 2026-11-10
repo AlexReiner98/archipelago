@@ -1,7 +1,7 @@
 // The server acts: the closed list of things a server pack may ask the kernel to do, each only if the pack declares
 // it (src/server-packs.ts). These act only on the workspaces the pack made itself: it can sell a workspace and sign its
-// buyer in, never reach into another; the one read beyond them is a public site's visit counts (site.visits),
-// logged on that site's map. What it may do on a workspace whose admin connected it is in src/server-connect.ts. Every act is logged on the default workspace's map with the pack that asked,
+// buyer in, never reach into another; beyond them, a pack keeps counts on a public site's map and reads them back
+// (count.add, count.read: how many, never of whom), each read logged on that site's map. What it may do on a workspace whose admin connected it is in src/server-connect.ts. Every act is logged on the default workspace's map with the pack that asked,
 // so what a server pack did is in the owner's history like anything else.
 
 import { setControlValue, controlValue } from './control.ts';
@@ -11,7 +11,7 @@ import { madeKey } from './server-gates.ts';
 import type { ServerAct, ServerPackFile } from './server-packs.ts';
 import { env } from './env.ts';
 import { readSites } from './site.ts';
-import { visitsSince } from './visits.ts';
+import { addCount, COUNT_KEY, countsSince } from './pack-counts.ts';
 import { freeId } from './workspace-id.ts';
 import type { Workspaces } from './workspaces.ts';
 
@@ -36,8 +36,30 @@ async function itsOwn(at: ActPlaces, pack: string, workspace: unknown) {
 /** Hands what an address agreed to to the packs that keep it (src/server-gates.ts), answering the documents it still owes. */
 export type Agrees = (ask: { email: string; agree: unknown; via: string }) => Promise<{ owes: { id: string; version: string }[] }>;
 
-/** Do one act for a pack, if it declared it, and log it on the default map. Answers what the act gives back. */
-export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, input: Record<string, unknown> = {}, agrees: Agrees = async () => ({ owes: [] })): Promise<unknown> {
+/** The workspace of a site this server serves, by its domain, or a refusal. */
+async function siteOf(at: ActPlaces, input: Record<string, unknown>) {
+  const site = String(input.site ?? '').toLowerCase();
+  const workspace = readSites(env('SITES'))[site];
+  if (!workspace || !(await at.has(workspace))) throw new Error(`"${site}" is not a site this server serves.`);
+  return { site, workspace };
+}
+
+/** Read the counts kept in a stream on a site's map after a position, logged there. */
+async function readCounts(at: ActPlaces, pack: ServerPackFile, act: string, input: Record<string, unknown>, stream: string | undefined) {
+  const { site, workspace } = await siteOf(at, input);
+  const after = input.after == null ? 0 : Number(input.after);
+  if (!(Number.isInteger(after) && after >= 0)) throw new Error('after: a position of the counts stream, a whole number.');
+  const { pelago } = await at.get(workspace);
+  const read = stream ? await countsSince(pelago, stream, after) : { counts: [], pos: after };
+  await pelago.log(pelago.db, { actor: `pack:${pack.id}`, action: `server.${act}`, reason: `Read the counts on ${site}: ${read.counts.length} rows`, detail: { site, after, rows: read.counts.length, pos: read.pos, ...(input.of != null && { of: String(input.of) }) } });
+  return read;
+}
+
+/**
+ * Do one act for a pack, if it declared it, and log it on the default map. Answers what the act gives back. `packs` are
+ * the server's packs, whose counts a pack may read.
+ */
+export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, input: Record<string, unknown> = {}, agrees: Agrees = async () => ({ owes: [] }), packs: ServerPackFile[] = [pack]): Promise<unknown> {
   if (!(pack.reach.server.acts ?? []).includes(act as ServerAct)) throw new Error(`The pack "${pack.id}" did not declare the act "${act}".`);
   const owner = (await at.get('default')).pelago;
   const log = (reason: string, detail: Record<string, unknown>) => owner.log(owner.db, { actor: `pack:${pack.id}`, action: `server.${act}`, reason, detail });
@@ -79,17 +101,26 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       await log(`${email} agreed to the documents in force`, { workspace: ws.id, email, owes: owes.map((a) => a.id) });
       return { owes: owes.map(({ id, version }) => ({ id, version })) };
     }
+    case 'count.add': {
+      // A pack's count on a site's map, held in memory and written down each minute (src/pack-counts.ts); the day is the server's.
+      const stream = pack.reach.server.counts;
+      if (!stream) throw new Error(`The pack "${pack.id}" names no stream for its counts (counts).`);
+      const key = String(input.key ?? '');
+      if (!COUNT_KEY.test(key)) throw new Error('key: 1 to 40 letters, digits, _ and -.');
+      const n = input.n == null ? 1 : Number(input.n);
+      if (!(Number.isInteger(n) && n >= 1 && n <= 1000)) throw new Error('n: a whole number from 1 to 1000.');
+      addCount((await siteOf(at, input)).workspace, stream, key, undefined, n);
+      return { counted: true };
+    }
+    case 'count.read': {
+      // Counts only, of a site this server serves: what was added to each key's day after `after`, its own or another pack's.
+      const of = input.of == null ? pack.id : String(input.of);
+      return readCounts(at, pack, act, input, packs.find((p) => p.id === of)?.reach.server.counts);
+    }
     case 'site.visits': {
-      // Counts only, of a site this server serves: the readers each tag brought, per day, added since `after`.
-      const site = String(input.site ?? '').toLowerCase();
-      const workspace = readSites(env('SITES'))[site];
-      if (!workspace || !(await at.has(workspace))) throw new Error(`"${site}" is not a site this server serves.`);
-      const after = input.after == null ? 0 : Number(input.after);
-      if (!(Number.isInteger(after) && after >= 0)) throw new Error('after: a position of the visits stream, a whole number.');
-      const { pelago } = await at.get(workspace);
-      const read = await visitsSince(pelago, after);
-      await pelago.log(pelago.db, { actor: `pack:${pack.id}`, action: `server.${act}`, reason: `Read the visits to ${site}: ${read.counts.length} rows`, detail: { site, after, rows: read.counts.length, pos: read.pos } });
-      return read;
+      // Kept for one release, until its readers ask count.read: the counts of the pack that takes the site mount, keys as tags.
+      const read = await readCounts(at, pack, act, input, packs.find((p) => p.reach.server.mounts?.site)?.reach.server.counts);
+      return { counts: read.counts.map(({ key, day, n }) => ({ tag: key, day, n })), pos: read.pos };
     }
     case 'mail.send': {
       const to = normalEmail(input.to);

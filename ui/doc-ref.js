@@ -1,17 +1,17 @@
-// Where a reader of a public page came from goes with them: a link they follow to this site, or to a name under it,
-// carries it on as ?ref=. Which tag that is is the one rule the server counts visits by (src/source-tag.ts). Nothing
-// is kept, and a link anywhere else is left as it is.
+// What a public page's data says its links carry on (data.carry, set by the pack that answered the page): a link its
+// reader follows to this site, or to a name under it, takes those words with it as its query. Nothing is kept, and a
+// link anywhere else is left as it is.
 
-import { sourceOf, within } from './source-tag.js';
+const within = (host, site) => host === site || host.endsWith(`.${site}`);
 
-/** A link's address as the reader of the page at `here`, sent there by `referrer`, follows it. */
-export function carried(href, here, referrer = '') {
+/** A link's address as the reader of the page at `here` follows it, carrying the words `carry` names. */
+export function carried(href, here, carry) {
+  const words = Object.entries(carry && typeof carry === 'object' ? carry : {}).filter(([k, v]) => typeof k === 'string' && typeof v === 'string' && v);
+  if (!words.length) return href;
   const from = new URL(here);
   const site = from.hostname.replace(/^www\./, '');
-  const ref = sourceOf(from, site, referrer);
-  if (!ref) return href;
   const to = new URL(href, from);
   if (!/^https?:$/.test(to.protocol) || !within(to.hostname, site)) return href;
-  to.searchParams.set('ref', ref);
+  for (const [k, v] of words) to.searchParams.set(k, v);
   return to.href;
 }
