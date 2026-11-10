@@ -14,7 +14,7 @@ import { looksBy, looksThisHour } from './looks.ts';
 import { limitOf } from './members.ts';
 import { wholeMap } from './outbox.ts';
 import type { Actor, Archipelago } from './pelago.ts';
-import { awakeSessions, bytes, LIMITS, NEAR, requestsBy, requestsThisMinute, SESSION_AWAKE_MS, storageOf, storageParts, useOf, type LimitName } from './plan.ts';
+import { LIMITS, NEAR, useOf, type LimitName } from './standing.ts'; import { awakeSessions, bytes, requestsBy, requestsThisMinute, SESSION_AWAKE_MS, storageOf, storageParts } from './workspace-use.ts';
 
 /** How many of the largest items are named, and how many types. */
 const LARGEST = 12;

@@ -10,7 +10,7 @@ import { randomHex, sha256Hex, workspaceSecret } from './hashes.ts';
 import type { Q } from './db.ts';
 import { drawLook, type Marks } from './look-draw.ts';
 import { whose, type Whose } from './presence.ts';
-import { looksAllowed, overLimit } from './plan.ts';
+import { looksAllowed, overLimit } from './standing.ts';
 import { headPos } from './tail.ts';
 import { keep, kept, keptWith } from './transient.ts';
 import { uiVersion } from './ui-files.ts';

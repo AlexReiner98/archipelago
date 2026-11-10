@@ -38,8 +38,8 @@ export async function askedLately(whole: Q, l: Archipelago): Promise<Map<string,
 }
 
 /**
- * The answer to a reply's end: the rules whose when holds and that have not asked this turn ask, once, as a block
- * with their reasons, each kept as a beat of the run's story. Undefined when none does.
+ * The answer to a reply's end: the rules whose when holds and that have not asked this turn ask, once: their reasons,
+ * one a line, each kept as a beat of the run's story. Undefined when none does.
  */
 export async function askOnReply(whole: Q, l: Archipelago, run: Entity | undefined, body: { session_id?: string; turn?: unknown; reply?: unknown; stop_hook_active?: unknown }) {
   const facts = replyFacts(body.reply);
@@ -62,5 +62,5 @@ export async function askOnReply(whole: Q, l: Archipelago, run: Entity | undefin
     );
   }
   await tellStamp(whole, l.workspace);
-  return { decision: 'block', reason: asking.map((r) => r.say).join('\n') };
+  return asking.map((r) => r.say).join('\n');
 }

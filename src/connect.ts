@@ -11,7 +11,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { bearer } from './auth.ts';
 import { normalEmail } from './mail.ts';
-import { recordAgreement } from './agreements.ts';
 import { workspacesOf } from './control-index.ts';
 import { emailOfLink, LINK_MINUTES, redeem, redeemTyped, requestSignIn, triesSpent, typedWorks, workspaceOfCode } from './members.ts';
 import { installPage, installPs1, installScript, installSh } from './install.ts';
@@ -19,6 +18,7 @@ import { serveOAuth } from './oauth.ts';
 import { json, PRIVATE } from './reply.ts';
 import type { Actor } from './pelago.ts';
 import { serverPacksOf } from './server-host.ts';
+import { documentsInForce, signinGate } from './server-gates.ts';
 import { serveServerPack } from './server-routes.ts';
 import { pageStyle } from './styles.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
@@ -141,7 +141,7 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
   // The documents a person agrees to before they are signed in, for a page that asks for them first (a signup).
   if (req.method === 'GET' && path === '/connect/agreements') {
     if (at.tooOften()) return;
-    return reply(res, 200, { agreements: await serverPacksOf(at.workspaces).agreements() });
+    return reply(res, 200, { agreements: await documentsInForce(serverPacksOf(at.workspaces)) });
   }
   // Where a person with no account begins, for the sign-in page to offer: a pack's start page.
   if (req.method === 'GET' && path === '/connect/start') {
@@ -159,13 +159,10 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
       const ids = new Set(await workspacesOf(await at.workspaces.control(), email, all));
       return (await at.workspaces.list()).filter((w) => ids.has(w.id)).map((w) => ({ ...w, db: async () => (await at.workspaces.get(w.id)).pelago.db }));
     };
-    // Before a code is traded, the documents this person has not agreed to at their current version: recorded if the
-    // request agrees to them, else answered so the page can ask. The code is not spent while anything is owed.
-    const owes = async (email: string) => {
-      const current = await serverPacksOf(at.workspaces).agreements();
-      if (!current.length) return [];
-      return recordAgreement((await at.workspaces.get(at.fallback)).pelago.db, email, body.agree, current, 'sign-in');
-    };
+    // Before a code is traded, the documents this person has not agreed to at their current version, as the signin
+    // gates say (src/server-gates.ts): recorded there if the request agrees to them, else answered so the page can
+    // ask. The code is not spent while anything is owed.
+    const owes = async (email: string) => (await signinGate(serverPacksOf(at.workspaces), { email, agree: body.agree, via: 'sign-in' })).owes;
     if (path === '/connect/sign-in') {
       const email = normalEmail(body.email);
       if (!email) return reply(res, 400, { error: 'That is not an email address.' });

@@ -102,7 +102,7 @@ resort).
 |---|---|
 | 1. Raw session events (e_7frke95h) | `src/session-events.ts`, the `/hooks/events` route, `src/operational.ts`, the stream's retention in `packs/core/pack.json` `rules` |
 | 2. Turns from events (e_xhvdjnj8) | `packs/core/sessions/turns.js` and its test |
-| 3. Claude Code's adapter (e_4n6kxmd9) | `scripts/pelago-hook.mjs`, the setup that registers hooks |
+| 3. Claude Code's adapter (e_4n6kxmd9) | `scripts/pelago-hook.mjs`, the setup that registers hooks, `src/claude-code.ts` (the shape of a hook's answer), core's instructions for `server_restarted` and `setup_behind` |
 | 4. A session's parent (e_ghdxec3h) | the link type in `packs/core/pack.json` `relations`, `src/sessions.ts` |
 | 5. States (e_ees7hr6q) | `packs/core/sessions/states.js` and its test |
 

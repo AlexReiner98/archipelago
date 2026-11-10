@@ -11,11 +11,9 @@ import { sha256Hex, workspaceSecret } from './hashes.ts';
 import { z } from 'zod';
 import { needAdmin } from './actor-checks.ts';
 import { createToken } from './auth.ts';
-import { controlValue, setControlValue, takeControlValue } from './control.ts';
-import { stillWritable } from './ended.ts';
 import type { Q } from './db.ts';
 import { mailConfigured, normalEmail, sendMail } from './mail.ts';
-import { configurePlan, limitOf, limitsChanged, type Limits } from './plan.ts';
+import { configureStanding, limitOf, stillWritable, type Limits, type Standing } from './standing.ts';
 import { indexMember } from './control-index.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
@@ -36,34 +34,23 @@ export interface Member {
   reads?: string | null;
 }
 
-/** A workspace's limits (src/plan.ts), members among them: the name it had when members were all a plan limited. */
+/** A workspace's limits (src/standing.ts), members among them: the name it had when members were all a plan limited. */
 export type MemberLimit = Limits;
 
 let site = { origin: 'http://127.0.0.1:3100', nameOf: async (id: string) => id, rename: async (_id: string, _name: string): Promise<void> => {} };
-/** Where the links in the mail lead, a workspace's name to put in it, how to change it, and its limits: the server says, when it starts. */
-export function configureMembers(given: Partial<typeof site> & { limitOf?: (id: string) => Promise<Limits | undefined> }) {
-  const { limitOf: limits, ...rest } = given;
+/** Where the links in the mail lead, a workspace's name to put in it, how to change it, and its standing: the server says, when it starts. */
+export function configureMembers(given: Partial<typeof site> & { standingOf?: (id: string) => Promise<Standing | undefined> }) {
+  const { standingOf: read, ...rest } = given;
   site = { ...site, ...rest };
-  configurePlan({ ...(limits && { limitOf: limits }), ...(rest.nameOf && { nameOf: rest.nameOf }) });
+  configureStanding({ ...(read && { read }), ...(rest.nameOf && { nameOf: rest.nameOf }) });
 }
 /** Give a workspace another name, where the server keeps them. */
 export const renameWorkspace = (workspace: string, name: string) => site.rename(workspace, name);
 /** Which workspaces each address belongs to is kept beside the workspaces too, so a sign-in opens only those (src/control-index.ts). */
 const noted = indexMember;
 
-/**
- * A workspace's limits are the server's, not its map's: a server pack sets them on a workspace it made (a plan with
- * room for so many), in the control values of the default workspace's database, where no workspace admin can reach.
- * They are kept under the name they had when members were all a plan limited.
- */
-const limitKey = (workspace: string) => `member_limit:${workspace}`;
+// A workspace's limits are the server's, not its map's: the server pack that made it says them (src/standing.ts).
 export { limitOf };
-export const memberLimit = (control: Q, workspace: string) => controlValue<Limits>(control, limitKey(workspace));
-export async function setMemberLimit(control: Q, workspace: string, limit: Limits | null): Promise<void> {
-  if (limit) await setControlValue(control, limitKey(workspace), limit);
-  else await takeControlValue(control, limitKey(workspace));
-  limitsChanged(workspace);
-}
 
 /** Refuse one more member past the limit, saying how to make room. Those already in stay when a limit is lowered. */
 async function roomForOneMore(db: Q, workspace: string, added = 0): Promise<void> {

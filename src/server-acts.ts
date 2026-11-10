@@ -1,15 +1,13 @@
 // The server acts: the closed list of things a server pack may ask the kernel to do, each only if the pack declares
 // it (src/server-packs.ts). These act only on the workspaces the pack made itself: it can sell a workspace and sign its
 // buyer in, never reach into another; the one read beyond them is a public site's visit counts (site.visits),
-// logged on that site's map.What it may do on a workspace whose admin connected it is in src/server-connect.ts. Every act is logged on the default workspace's map with the pack that asked,
+// logged on that site's map. What it may do on a workspace whose admin connected it is in src/server-connect.ts. Every act is logged on the default workspace's map with the pack that asked,
 // so what a server pack did is in the owner's history like anything else.
 
-import { recordAgreement, type Agreement } from './agreements.ts';
 import { setControlValue, controlValue } from './control.ts';
 import { normalEmail, sendMail } from './mail.ts';
-import { admitMember, linkFor, memberOf, ownerEmail, setMemberLimit } from './members.ts';
-import { setEnded } from './ended.ts';
-import { LIMITS, limitsFrom } from './plan.ts';
+import { admitMember, linkFor, memberOf, ownerEmail } from './members.ts';
+import { madeKey } from './server-gates.ts';
 import type { ServerAct, ServerPackFile } from './server-packs.ts';
 import { env } from './env.ts';
 import { readSites } from './site.ts';
@@ -22,7 +20,6 @@ export type ActPlaces = Pick<Workspaces, 'has' | 'get' | 'create' | 'hold'>;
 /** The longest a sign-in link a pack asks for works. */
 const LINK_MOST_MINUTES = 7 * 24 * 60;
 
-const madeKey = (workspace: string) => `server_pack_made:${workspace}`;
 const text = (v: unknown, most: number, what: string) => {
   const s = String(v ?? '').trim();
   if (!s || s.length > most) throw new Error(`${what}: up to ${most} characters.`);
@@ -36,8 +33,11 @@ async function itsOwn(at: ActPlaces, pack: string, workspace: unknown) {
   return at.get(id);
 }
 
+/** Hands what an address agreed to to the packs that keep it (src/server-gates.ts), answering the documents it still owes. */
+export type Agrees = (ask: { email: string; agree: unknown; via: string }) => Promise<{ owes: { id: string; version: string }[] }>;
+
 /** Do one act for a pack, if it declared it, and log it on the default map. Answers what the act gives back. */
-export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, input: Record<string, unknown> = {}, agreements: () => Promise<Agreement[]> = async () => []): Promise<unknown> {
+export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, input: Record<string, unknown> = {}, agrees: Agrees = async () => ({ owes: [] })): Promise<unknown> {
   if (!(pack.reach.server.acts ?? []).includes(act as ServerAct)) throw new Error(`The pack "${pack.id}" did not declare the act "${act}".`);
   const owner = (await at.get('default')).pelago;
   const log = (reason: string, detail: Record<string, unknown>) => owner.log(owner.db, { actor: `pack:${pack.id}`, action: `server.${act}`, reason, detail });
@@ -60,34 +60,6 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       await log(`Added ${email} to "${ws.name}"`, { workspace: ws.id, email, admin: Boolean(input.admin) });
       return { person };
     }
-    case 'workspace.limit': {
-      // Each limit (src/plan.ts) is sent whole every time: one left out is lifted. None at all lifts them all. How it is
-      // sold (a plan's name, a trial's end, where to pay) is the pack's to keep: only its note is shown.
-      const ws = await itsOwn(at, pack.id, input.workspace);
-      const note = input.note == null || input.note === '' ? undefined : text(input.note, 300, 'The note');
-      const limits = limitsFrom(input, { note });
-      await setMemberLimit(owner.db, ws.id, limits);
-      const set = Object.fromEntries(LIMITS.filter((name) => limits?.[name]).map((name) => [name, limits![name]]));
-      await log(limits ? `Set the limits of "${ws.name}": ${Object.entries(set).map(([n, v]) => `${n} ${v}`).join(', ')}` : `Lifted the limits of "${ws.name}"`, { workspace: ws.id, ...set });
-      return { workspace: ws.id, ...set };
-    }
-    case 'workspace.end': {
-      // Ended, the workspace is read-only and deleted after `days`; ended: false makes it writable again.
-      const ws = await itsOwn(at, pack.id, input.workspace);
-      if (input.ended === false) {
-        await setEnded(owner.db, ws.id, null);
-        await log(`"${ws.name}" is writable again`, { workspace: ws.id });
-        return { workspace: ws.id, ended: false };
-      }
-      const days = Number(input.days ?? 30);
-      if (!(Number.isInteger(days) && days >= 1 && days <= 365)) throw new Error('days: a whole number from 1 to 365.');
-      const note = input.note == null || input.note === '' ? undefined : text(input.note, 300, 'The note');
-      const since = new Date();
-      const ended = { since: since.toISOString(), delete_at: new Date(since.getTime() + days * 86_400_000).toISOString(), ...(note && { note }) };
-      await setEnded(owner.db, ws.id, ended);
-      await log(`"${ws.name}" ended: read-only, deleted on ${ended.delete_at.slice(0, 10)}`, { workspace: ws.id, delete_at: ended.delete_at });
-      return { workspace: ws.id, ended: true, delete_at: ended.delete_at };
-    }
     case 'signin.link': {
       const ws = await itsOwn(at, pack.id, input.workspace);
       const email = normalEmail(input.email);
@@ -103,7 +75,7 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       const ws = await itsOwn(at, pack.id, input.workspace);
       const email = normalEmail(input.email);
       if (!email || !(await memberOf(ws.pelago.db, email))) throw new Error(`${input.email} is not a member of "${ws.name}".`);
-      const owes = await recordAgreement(owner.db, email, input.agreed, await agreements(), `pack:${pack.id}`);
+      const { owes } = await agrees({ email, agree: input.agreed, via: `pack:${pack.id}` });
       await log(`${email} agreed to the documents in force`, { workspace: ws.id, email, owes: owes.map((a) => a.id) });
       return { owes: owes.map(({ id, version }) => ({ id, version })) };
     }

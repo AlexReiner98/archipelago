@@ -19,7 +19,7 @@ after(() => void delete process.env.PELAGO_SERVER_PACKS);
 const SECRET = 'Acquisition of Brightwater';
 
 test('a member reads their workspace’s use and what it is made of, and nothing private of anyone else', async () => {
-  const { workspaces, call } = await serve('tokens');
+  const { workspaces, call, base } = await serve('tokens');
   const pack = loadServerPacks([FIXTURES]).packs[0].file;
   const act = (name: string, input: Record<string, unknown>) => runAct(workspaces, pack, name, input);
   const { workspace } = (await act('workspace.create', { name: 'Use Co', email: 'ola@use.example' })) as { workspace: { id: string } };
@@ -30,7 +30,7 @@ test('a member reads their workspace’s use and what it is made of, and nothing
   const owner = (await createToken(ws.pelago.db, ws.id, { kind: 'human', name: 'ola@use.example', entity: ola, admin: true })).token;
   const member = (await createToken(ws.pelago.db, ws.id, { kind: 'human', name: 'kim@use.example', entity: kim })).token;
   const agent = (await createToken(ws.pelago.db, ws.id, { kind: 'agent', name: 'claude', entity: kim })).token;
-  await act('workspace.limit', { workspace: ws.id, plan: 'Solo', manage: 'https://seller.example/billing', storage: 500e6, sessions: 5, requests: 300, looks: 30, members: 3 });
+  await fetch(`${base}/x/demo/limit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workspace: ws.id, plan: 'Solo', manage: 'https://seller.example/billing', storage: 500e6, sessions: 5, requests: 300, looks: 30, members: 3 }) });
 
   // The owner keeps a large private item; the member a shared one.
   const made = await call('/api/change', owner, { reason: 'test', ops: [{ op: 'create', ref: 'x', type: 'place', props: { exclusive: true }, title: SECRET, visibility: 'private', body: 'Terms. '.repeat(3000) }] });

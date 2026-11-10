@@ -6,9 +6,8 @@
 // that writes is on it with its check, the tools that only read are named,
 // and anything else is refused.
 
-import { repoByName, repoName } from './github.ts';
 import { packTool } from './packtools.ts';
-import { livesIn } from './places.ts';
+import { livesIn, placeFor } from './places.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { resolveRun } from './sessions.ts';
 import { refuser, scopeWithin } from './within.ts';
@@ -23,7 +22,7 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
     if (typeof id === 'string' && !scope.has(id)) refuse(`${await named(id)} is not part of it, so this token cannot ${doing}.`);
   };
   const isRepo = async (given: unknown) => {
-    const id = typeof given === 'string' && /^e_[a-z0-9]{8}$/.test(given) ? given : (await repoByName(l, repoName(String(given ?? ''))))?.id;
+    const id = typeof given === 'string' && /^e_[a-z0-9]{8}$/.test(given) ? given : (await placeFor(l, { remote: String(given ?? '') }))?.id;
     if (!id || !scope.has(id)) refuse('It cannot speak for another repository.');
   };
 
