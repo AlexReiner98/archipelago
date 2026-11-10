@@ -171,10 +171,11 @@ export async function attention(l: Archipelago, input: Input, read?: Read) {
   const confirm = wanted.has('to_confirm') && (me === null || me === owner) ? await toConfirm(l, { limit: 40 }) : undefined;
   // What was settled is closed: whether it is within is asked of the whole scope, for those few.
   const settledWithin = confirm && input.within ? await scopeOf(l, input.within, false, confirm.questions.map((q) => q.id)) : confirm && input.among ? new Set(input.among) : null;
+  // The items settled, read at once: one read for them all, not one each.
+  const settledRows = confirm?.questions.length ? new Map((await l.db.query<Row>(`select id, type, title, status, owner, is_open, props->>'due' as due, updated_at from entity where id = any($1::text[])`, [confirm.questions.map((q) => q.id)])).rows.map((e) => [e.id, e])) : new Map<string, Row>();
   for (const q of confirm?.questions ?? []) {
     const row = { id: q.id, type: '', title: q.title, status: '', owner: null, is_open: false, due: null, updated_at: q.settled } as Row;
-    const { rows: [e] } = await l.db.query<Row>(`select id, type, title, status, owner, is_open, props->>'due' as due, updated_at from entity where id = $1`, [q.id]);
-    if (!settledWithin || settledWithin.has(q.id)) add(e ?? row, 'to_confirm', { answer: q.answer, on: q.on, seq: q.seq, settled: q.settled, by: q.by, ...(q.basis && { basis: q.basis }) });
+    if (!settledWithin || settledWithin.has(q.id)) add(settledRows.get(q.id) ?? row, 'to_confirm', { answer: q.answer, on: q.on, seq: q.seq, settled: q.settled, by: q.by, ...(q.basis && { basis: q.basis }) });
   }
 
   // A pack's reason ranks just after the kernel's it joins.

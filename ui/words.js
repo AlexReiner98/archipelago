@@ -1,7 +1,7 @@
 // The lookups every screen shares (types, relations, titles) and the ways of saying things briefly: a row, a mark, a word.
 
 import { applyTheme } from './theme.js';
-import { api, h, state } from './base.js';
+import { api, apiFirst, h, state } from './base.js';
 // A menu (below) is placed in sight each time it opens.
 import './menu-place.js';
 
@@ -13,7 +13,9 @@ export const relations = new Map();
 export async function loadSchema() {
   // The schema, and the workspace's style: what a page that is not a picture is drawn by, until it asks for its own;
   // with the theme being tried on this screen over it (ui/themes-card.js), which nothing keeps.
-  [state.schema, state.style] = await Promise.all([api('schema'), api('view', { name: 'style', params: state.trying ? { try: state.trying } : {} }).then((r) => r.style)]);
+  // The first time, as the page started (ui/early.js).
+  const style = state.trying ? api('view', { name: 'style', params: { try: state.trying } }) : apiFirst('style', () => api('view', { name: 'style', params: {} }));
+  [state.schema, state.style] = await Promise.all([apiFirst('schema', () => api('schema')), style.then((r) => r.style)]);
   applyTheme(state.style);
   types.clear();
   relations.clear();
