@@ -200,16 +200,17 @@ export function visibilityRow(info, redraw, fail) {
 }
 
 /**
- * Whether the packs here are held to the island rules (workspace_set islands): a row of the Map section, offered only
- * while nothing is on the map yet (workspace_info started), since the packs it would refuse would leave work dormant.
+ * Whether the packs here are held to the island rules (workspace_set islands): a row of the Map section. A new map
+ * starts with it on; turned on for a map with work, what is on no island moves onto islands (src/island-start.ts).
  */
 export function islandsRow(info, redraw, fail) {
-  if (info.started || !may('admin')) return null;
+  if (!may('admin')) return null;
   const on = h('input', { type: 'checkbox', checked: Boolean(info.islands) });
-  const name = h('span', { class: 'grow', title: 'Each pack is an island: it is taken only if its file holds its vocabulary, views and instructions and it builds on the shared set alone, and every item lives on one island. Islands meet only through findings. Set on a new map, before anything is on it.' }, 'Islands');
+  const name = h('span', { class: 'grow', title: 'Each pack is an island: it is taken only if its file holds its vocabulary, views and instructions and it builds on the shared set alone, and every item lives on one island. Islands meet only through findings.' }, 'Islands');
   on.onchange = async () => {
     const want = on.checked;
-    if (want && !(await ask({ title: 'Hold this map to the island rules?', message: 'Packs that do not keep to them are turned off, and every item made from now on lives on an island. It can be set only while the map is empty.', action: 'Turn on' }))) return void (on.checked = false);
+    const message = info.started ? 'What is on the map moves onto an island for each pack it speaks, in one change you can undo. Packs that do not keep the rules are turned off; if one is in use, nothing changes.' : 'Packs that do not keep to them are turned off, and every item made from now on lives on an island.';
+    if (want && !(await ask({ title: 'Hold this map to the island rules?', message, action: 'Turn on' }))) return void (on.checked = false);
     api('workspace_set', { islands: want }).then(redraw, (err) => ((on.checked = !want), (name.title = err.message), fail(err)));
   };
   return line(name, on);

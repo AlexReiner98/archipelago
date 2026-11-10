@@ -25,7 +25,8 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
   const type = (q: string) => page.evaluate(`(() => { if (!document.getElementById('find').classList.contains('open')) document.getElementById('find-lens').click(); const i = document.querySelector('#find input[type=search]'); i.value = ${JSON.stringify(q)}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   const list = `document.querySelector('#find .find-choices')`;
   const choice = (kind: string, name: string) => `[...${list}.querySelectorAll('.find-choice')].find((c) => c.querySelector('.q-label').textContent === ${JSON.stringify(kind)} && c.querySelector('.find-name').textContent === ${JSON.stringify(name)})`;
-  const take = (kind: string, name: string) => page.evaluate(`${choice(kind, name)}.click()`);
+  // The choices are drawn again when their counts come, so a choice is found and clicked in one step, once it is there.
+  const take = (kind: string, name: string) => page.until(`(() => { const c = ${choice(kind, name)}; c?.click(); return Boolean(c); })()`);
   const hash = `new URLSearchParams(location.hash.split('?')[1] ?? '')`;
   const applied = (id: string) => `(${hash}.get('style') === ${JSON.stringify(id)})`;
   const onPage = (id: string) => `document.body.dataset.sheet === 'open' && location.hash.startsWith('#/e/${id}?')`;

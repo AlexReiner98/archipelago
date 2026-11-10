@@ -28,7 +28,8 @@ async function beginShared(q: Q): Promise<['+', string, string, unknown][]> {
   const { rows } = await q.query(`insert into setting (key, value) values ('default_visibility', '"shared"'::jsonb) on conflict (key) do nothing returning key`);
   return rows.length ? [['+', 'setting', 'default_visibility', 'shared']] : [];
 }
-import { followPacks, islandsOn, packsOff, syncPacks } from './packstate.ts';
+import { followPacks, islandsOn, packsOff, setIslands, syncPacks } from './packstate.ts';
+import { firstIsland } from './island-start.ts';
 import { hostFor } from './packtools.ts';
 import { syncTypes } from './typetable.ts';
 import { onTypesChanged, typeItems } from './type-items.ts';
@@ -325,7 +326,13 @@ export class Workspaces {
     const named = name.trim() || backup?.workspace?.name || id;
     if (!(await addWorkspace(control, { id, name: named }))) throw new Error(`Workspace "${id}" already exists`);
     this.known.set(id, named);
-    if (!backup) return this.get(id);
+    if (!backup) {
+      // Every new map is on islands, with one to start on (the owner, 10 Nov 2026, e_44rbfwxp); one from a backup is as it was.
+      const ws = await this.get(id);
+      await setIslands(ws.pelago, 'system', true);
+      await firstIsland(ws.pelago, named);
+      return ws;
+    }
     try {
       this.touched.set(id, Date.now());
       const opening = this.load(id, backup);

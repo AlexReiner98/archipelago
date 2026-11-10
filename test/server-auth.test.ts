@@ -107,10 +107,11 @@ test('each workspace is its own database: tokens, data and local types do not cr
   assert.equal((await call('/api/search', operator)).status, 401, 'the operator cannot read any map');
 
   await call('/api/change', mine, { reason: 'x', ops: [{ op: 'create', type: 'record', title: 'My secret plan' }] });
-  await call('/api/change', theirs, { reason: 'x', ops: [{ op: 'create', type: 'record', title: 'Acme bid' }] });
+  const isle = ((await call('/api/search', theirs, { type: 'island' })).result as any[])[0].id; // a new workspace starts on islands, with one
+  await call('/api/change', theirs, { reason: 'x', ops: [{ op: 'create', type: 'record', title: 'Acme bid', props: { island: isle } }] });
   const titles = async (token: string) => ((await call('/api/search', token)).result as any[]).map((e) => e.title);
   assert.deepEqual(await titles(mine), ['My secret plan']);
-  assert.deepEqual(await titles(theirs), ['Acme bid', 'owner@acme.test'], 'its own note and its owner');
+  assert.deepEqual((await titles(theirs)).sort(), ['Acme Architects', 'Acme bid', 'owner@acme.test'], 'its own note, its first island and its owner');
   assert.equal((await call('/whoami', theirs, undefined, 'GET')).workspace.name, 'Acme Architects');
 
   // A token is only good in the workspace that issued it, whatever its prefix says.
@@ -296,7 +297,7 @@ test('a workspace receives notifications only from workspaces its admin accepts'
 
   const set = await call('/api/workspace_set', theirs, { accepts_from: ['default'] });
   const { reply_rules, ...settings } = set.result;
-  assert.deepEqual(settings, { id: 'acme', default_visibility: 'shared', agent_changes: 'apply', accepts_from: ['default'], agent_backups: false, agent_publish: false, agent_code: false, drawings_open: false, islands: false, holds_off: false, lifted: { reply_draw_answers: false, reply_record_findings: false } });
+  assert.deepEqual(settings, { id: 'acme', default_visibility: 'shared', agent_changes: 'apply', accepts_from: ['default'], agent_backups: false, agent_publish: false, agent_code: false, drawings_open: false, islands: true, holds_off: false, lifted: { reply_draw_answers: false, reply_record_findings: false } });
   assert.deepEqual(reply_rules.map((r: { rule: string; off: boolean }) => [r.rule, r.off]), [['core.draw_answers', false], ['core.record_findings', false]]);
   assert.deepEqual((await send(mine, 'acme')).result, { delivered_to: 'acme' });
 

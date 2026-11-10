@@ -58,6 +58,48 @@ test('trunks: one type and one way only, crossing a shore once', async () => {
   assert.equal(wires.filter((w: any) => w.trunk === 0 && [w.u, w.v].includes(far.id) && ![w.u, w.v].some((v: string) => v.startsWith('x'))).length, 1, 'one stretch of the trunk crosses to the far island');
 });
 
+test('embedding: one try, mended, the same each run, and past the most work it says so', async () => {
+  const { embedding } = await mod('embedding.js');
+  const items = [...['a1', 'a2', 'a3', 'a4'].map((id) => item(id, 'A')), ...['b1', 'b2', 'b3'].map((id) => item(id, 'B'))];
+  const links = [link('depends_on', 'a2', 'a1'), link('depends_on', 'a3', 'a2'), link('depends_on', 'b2', 'b1'), link('about', 'a4', 'b3'), link('about', 'a1', 'b1'), link('about', 'a3', 'b2')];
+  const m = await graph(items, links), islandOf = (id: string) => m.nodes.get(id)?.item?.island ?? null;
+  const e = embedding(m, { sizes: house.sizes, headless: house.headless, islandOf });
+  assert.equal(typeof e.counts.moves, 'number', 'it says how many passes the mending made');
+  assert.deepEqual(embedding(m, { sizes: house.sizes, headless: house.headless, islandOf }).counts, e.counts, 'the same each run');
+  assert.throws(() => embedding(m, { sizes: { ...house.sizes, planarize_most_work: 1 }, headless: house.headless, islandOf }), (err: any) => err.tooMuch > 1);
+});
+
+test('mending: wires threaded in a poor order are threaded again until fewer cross, never against their way', async () => {
+  const { embedding } = await mod('embedding.js');
+  // Three hubs, each fanning out to the same five steps at sea in turn: threaded one by one, the fans tangle.
+  const hubs = ['h1', 'h2', 'h3'], ends = ['e1', 'e2', 'e3', 'e4', 'e5'];
+  const items = [...hubs, ...ends, 'r'].map((id) => item(id));
+  const links = [...hubs.flatMap((h) => ends.map((e) => link('depends_on', e, h))), ...hubs.map((h) => link('about', h, 'r'))];
+  const m = await graph(items, links);
+  const unmended = embedding(m, { sizes: { ...house.sizes, planarize_repair_rounds: 0, planarize_repair_work: 0 }, headless: house.headless });
+  const mended = embedding(m, { sizes: house.sizes, headless: house.headless });
+  assert.ok(mended.counts.crossings <= unmended.counts.crossings, `${mended.counts.crossings} crossings mended, ${unmended.counts.crossings} not`);
+  assert.equal(mended.counts.up, 0, 'no wire runs against its way');
+  assert.equal(mended.counts.lost, 0, 'no wire is lost');
+  for (const c of mended.crossings) assert.equal([...mended.owner.keys()].filter((k: string) => k.split('|').includes(c)).length, 2 * 2, 'a crossing still joins two wires, each passing');
+});
+
+test('island steps: each moves within its island to where its wires interleave least, keeping the firm order', async () => {
+  const { siftedWithin } = await mod('sift.js');
+  // Island I holds a, b, c; a goes far down to z, c just below to y: a above c crosses nothing only when nested.
+  const line = ['top I', 'top2 I', 'a', 'b', 'c', 'foot I', 'x', 'y', 'z'];
+  const islandOf = (v: string) => (['a', 'b', 'c'].includes(v) ? 'I' : null);
+  const links = [['a', 'y'], ['c', 'z'], ['b', 'x']];
+  const moved = siftedWithin([...line], islandOf, links, [], 4);
+  assert.deepEqual(moved.slice(0, 2), ['top I', 'top2 I'], 'the borders stay');
+  assert.deepEqual(moved.slice(5), ['foot I', 'x', 'y', 'z'], 'what is at sea stays');
+  const at = (v: string) => moved.indexOf(v);
+  assert.ok(at('c') < at('a') && at('a') < at('b'), `nested: ${moved.join(' ')}`);
+  const held = siftedWithin([...line], islandOf, links, [['a', 'b'], ['b', 'c']], 4);
+  assert.deepEqual(held, line, 'a firm order inside the island holds');
+  assert.deepEqual(siftedWithin([...line], islandOf, links, [], 4), moved, 'the same each run');
+});
+
 test('embedding: islands closed, each wire across one crosses each border once, the order runs down', async () => {
   const { embedding } = await mod('embedding.js');
   const { visibility } = await mod('plain.js');
@@ -149,4 +191,43 @@ test('format: a border runs clockwise with its island on the right, with ports o
       assert.ok(items.some((i: any) => i.island === island.id && held.has(i.id)), `${island.id}: the face on the right of its border is inside`);
     }
   }
+});
+
+test('a picture too large to wire is drawn plainly, island by island, and says how many links it leaves out', async () => {
+  const { drawings, setOut } = await import('./wired.ts');
+  const items = [...['a1', 'a2', 'a3'].map((id) => item(id, 'A')), ...['b1', 'b2'].map((id) => item(id, 'B'))];
+  const links = [link('depends_on', 'a2', 'a1'), link('about', 'a3', 'b1'), link('about', 'b2', 'a1')];
+  const style = { ...house, sizes: { ...house.sizes, planarize_most_work: 1 } };
+  const out = await setOut(drawings.find((d) => d.id === 'core.map')!, async (url) => (await import(url('index.js'))).picture({ answer: { items, links, islands: [] }, style, width: 1200, height: 750 }, { measure }));
+  assert.ok(out.scene.key.some((row: any) => row.label === '3 links not drawn: too many to wire'), JSON.stringify(out.scene.key));
+  const text = JSON.stringify(out.scene.svg);
+  for (const id of ['a1', 'a2', 'a3', 'b1', 'b2']) assert.ok(text.includes(`#/e/${id}`), `${id} is drawn`);
+});
+
+test('island order: islands joined by many wires stand together, within the firm order, the same each run', async () => {
+  const { sifted } = await mod('sift.js');
+  const runs: Record<string, string[]> = { H: ['h'], A: ['a1', 'a2', 'a3'], X: ['x'], B: ['b1', 'b2', 'b3'] };
+  const runOf = (u: string) => runs[u];
+  const links = [['a1', 'b1'], ['a2', 'b2'], ['a3', 'b3'], ['h', 'x'], ['h', 'a1']];
+  const firm = [['H', 'A'], ['H', 'X'], ['H', 'B'], ['X', 'B']];
+  const order = sifted(['H', 'A', 'X', 'B'], runOf, links, firm, house.sizes.planarize_order_rounds);
+  const at = (u: string) => order.indexOf(u);
+  assert.equal(Math.abs(at('A') - at('B')), 1, 'A and B, joined by three wires, stand next to each other');
+  for (const [u, v] of firm) assert.ok(at(u) < at(v), `${u} stays before ${v}`);
+  assert.deepEqual(sifted(['H', 'A', 'X', 'B'], runOf, links, firm, house.sizes.planarize_order_rounds), order, 'the same each run');
+  assert.deepEqual(sifted(['H', 'A', 'X', 'B'], runOf, links, firm, 0), ['H', 'A', 'X', 'B'], 'no rounds, no move');
+  assert.deepEqual(sifted(['H', 'A', 'X', 'B'], runOf, [], [], 4), ['H', 'A', 'X', 'B'], 'nothing reads across, nothing moves');
+});
+
+test('every wire has a head: part_of up into the whole, and a type the style draws both ways a head at each end', async () => {
+  const { drawings, setOut } = await import('./wired.ts');
+  const items = [{ ...item('hub'), type: 'aim' }, item('part'), item('rel')];
+  const links = [link('part_of', 'part', 'hub'), link('link', 'part', 'rel')];
+  const out = await setOut(drawings.find((d) => d.id === 'core.map')!, async (url) => (await import(url('index.js'))).picture({ answer: { items, links, islands: [] }, style: house, reduced: true, width: 1200, height: 750 }, { measure }));
+  const svg = JSON.stringify(out.scene.svg);
+  const ties = [...svg.matchAll(/"key":"n:(\d+)","d":"[^"]+","class":"([^"]+)"/g)].map((m) => [m[1], m[2]]);
+  const headOf = (n: string) => svg.match(new RegExp(`"key":"nh:${n}","d":"([^"]+)"`))?.[1];
+  const part = ties.find(([, c]) => c.includes('near')), rel = ties.find(([, c]) => !c.includes('near'));
+  assert.ok(part && headOf(part[0]), 'part_of is drawn with a head');
+  assert.equal(rel && headOf(rel[0])?.match(/M/g)?.length, 2, 'a link has a head at each end');
 });
