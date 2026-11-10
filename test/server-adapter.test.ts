@@ -50,6 +50,6 @@ test('a surface’s hooks are answered in its own shape; Claude Code’s as befo
   assert.equal(claude.hookSpecificOutput.hookEventName, 'SessionStart');
   assert.equal(typeof claude.hookSpecificOutput.additionalContext, 'string');
 
-  // TODO(server.ts): 410 once the hook route sends it for a surface no pack translates; until then it falls through.
-  assert.notEqual((await hook('/hooks/nobody/begin', {})).status, 200);
+  // A surface no pack translates is gone, as a pack's route is once the pack is.
+  assert.equal((await hook('/hooks/nobody/begin', {})).status, 410);
 });

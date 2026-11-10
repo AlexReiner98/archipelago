@@ -61,9 +61,9 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
   if (!pack || (extra !== undefined && !stream)) return json(404, { error: 'Not found' });
   if (at.tooOften()) return;
   const { file, folder } = pack;
-  if (stream) return serveStream(res, file, stream.id, { workspace: more, id: extra!, from: at.from });
+  if (stream) return serveStream(res, file, stream.id, { workspace: more, id: extra!, from: at.from, workspaces: at.workspaces });
   // A file it hands out, filled with this server's values (src/server-files.ts).
-  if (req.method === 'GET' && name === 'files' && more) return serveFile(res, file, more, { origin: packs.origin, tokens: at.tokens ?? true });
+  if (req.method === 'GET' && name === 'files' && more) return serveFile(res, file, more, { origin: packs.origin, tokens: at.tokens ?? true, folder });
 
   if (req.method === 'GET') {
     const page = !more && file.reach.server.pages?.find((p) => p.id === name);

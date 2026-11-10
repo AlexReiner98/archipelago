@@ -74,6 +74,8 @@ export interface ConnectRoutes {
   body: () => Promise<unknown>;
   /** The body as it came, for what is signed over its bytes. Read it or body, not both. */
   raw: () => Promise<Buffer>;
+  /** Where the request comes from, for what is counted by address (a pack's stream). */
+  from?: string;
   /** Who is signed in, as any request with a token says; refused if nobody is. */
   person: () => Promise<{ ws: Workspace; actor: () => Actor }>;
 }
