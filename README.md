@@ -4,7 +4,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="brand/hero-dark.svg">
-  <img alt="A living map of all your work: islands drawn in stacked rows, parting round the title and its line, from a chat to a structured model that keeps you, your team, and your agents on the same page." src="brand/hero-light.svg">
+  <img alt="Agent memory for human brains: islands drawn in stacked rows, the water opening round the title and its line, your agent's plans and decisions as a map you read, correct, share." src="brand/hero-light.svg">
 </picture>
 
 **Agent memory for human brains: your agent's plans and decisions as a map you read, correct, share.**
