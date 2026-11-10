@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { dump } from '../src/backup.ts';
-import { setIslands } from '../src/packstate.ts';
+import { islandsOn, setIslands } from '../src/packstate.ts';
 import { dumpVault } from '../src/vault.ts';
 import { callTool } from '../src/tools.ts';
 import { Workspaces } from '../src/workspaces.ts';
@@ -39,6 +39,26 @@ test('the default workspace of a new server begins the same way', async () => {
   const at = new Workspaces({ ...servers(), dataDir: null });
   assert.equal(await (await at.get('default')).pelago.agentChanges(), 'apply');
   await at.closeAll();
+});
+
+test('a server’s fresh default map starts on islands, with one to start on; one opened again keeps what it has', async () => {
+  const config = { ...servers(), defaultOnIslands: true };
+  const one = new Workspaces(config);
+  const { pelago: l } = await one.get('default');
+  assert.equal(await islandsOn(l), true);
+  const islandsOf = async (at: Workspaces) => ((await callTool((await at.get('default')).pelago, person, 'search', { type: 'island' })) as { title: string }[]).map((i) => i.title);
+  const islands = await islandsOf(one);
+  assert.deepEqual(islands, ['Default']);
+  assert.equal((await l.change(agent, { ops: [task], reason: 'first write' })).status, 'applied', 'an agent’s first change just works');
+  await one.closeAll();
+  // Opened again it is not begun again: no second island.
+  const two = new Workspaces(config);
+  assert.deepEqual(await islandsOf(two), ['Default']);
+  await two.closeAll();
+  // Without it (the tests), a fresh default map is plain.
+  const plain = new Workspaces({ ...servers(), dataDir: null });
+  assert.equal(await islandsOn((await plain.get('default')).pelago), false);
+  await plain.closeAll();
 });
 
 test('an owner who chose hold keeps it, through their first sign-in and opening again', async () => {
