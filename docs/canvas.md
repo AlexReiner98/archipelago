@@ -54,7 +54,7 @@ some steps, a click on its arrow in the bar turning it (e_gue6cg6q); Limit
 caps it. A filter that includes nothing is refused, so no canvas reads the
 whole map. Words typed in find are a Find term, the filter's text. A query may instead name a view whose answer is items and links
 (`view`, in the address `?view=usage`), drawn in place of what a filter
-finds: the plan pack's Usage canvas draws core's `usage` view, asked by the
+finds: a pack's Usage canvas draws core's `usage` view, asked by the
 page as an agent asks it (the owner, 29 Oct 2026, e_7frmyj2q). It is not a
 replica of the log: it is asked again when the canvas is drawn again, and a
 term added in find makes it a filter of the map.

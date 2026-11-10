@@ -50,7 +50,7 @@ async function replyRules(l: Archipelago, lifted: Record<string, boolean>, set: 
 }
 
 /** How much of what its limits cap the workspace uses now (src/standing.ts), each said as the Limits card shows it. */
-async function planUse(l: Archipelago, limits: Limits) {
+async function limitUse(l: Archipelago, limits: Limits) {
   const { db } = await wholeMap(l);
   const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from member where removed_at is null`);
   return useOf(limits, { members: rows[0].n, storage: await storageOf(l.workspace), requests: requestsThisMinute(l.workspace), sessions: await sessionsAwake(l), looks: looksThisHour(l.workspace) });
@@ -68,7 +68,7 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       const started = (await l.db.query(`select 1 from entity where type <> all($1::text[]) and ${notKernel(l.registry)} and archived_at is null limit 1`, [l.registry.family('actor')])).rows.length > 0;
       // Whether any agent session has ever been here: until one has, an empty page points at connecting one.
       const agents = (await l.db.query(`select 1 from entity where type = 'run' limit 1 -- index entity_type`)).rows.length > 0;
-      return { ...(await settings(l)), started, agents, owner: rows[0] ?? null, member_limit: limits ?? null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
+      return { ...(await settings(l)), started, agents, owner: rows[0] ?? null, member_limit: limits ?? null, ...(limits && { use: await limitUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
     },
   },
   workspace_set: {

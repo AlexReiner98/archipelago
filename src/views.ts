@@ -116,7 +116,7 @@ export const VIEWS: Record<string, View> = {
     run: spent,
   },
   usage: {
-    description: 'How much of each limit of its plan the workspace uses, and what that use is made of, answered as a query is (items and links), so the plan pack’s Usage canvas draws it. Each limit (storage, agent sessions at once, requests this minute, looks this hour; members for an admin) is an item whose use says used, shown, of and of_shown (what the plan allows, where it limits it), share, near and over; each part of it is an item part_of it: storage by what it is made of (facts, change sets, streams, images), then by type and the largest items (the bytes each has added to the log); sessions by name; requests and looks by who asked. A part that is an item names it (use.item). What you cannot see is summed with no title. Where no plan limits it, of is left out. Params: none.',
+    description: 'How much of each of its limits the workspace uses, and what that use is made of, answered as a query is (items and links), so a lens can draw it. Each limit (storage, agent sessions at once, requests this minute, looks this hour; members for an admin) is an item whose use says used, shown, of and of_shown (what the limit allows, where there is one), share, near and over; each part of it is an item part_of it: storage by what it is made of (facts, change sets, streams, images), then by type and the largest items (the bytes each has added to the log); sessions by name; requests and looks by who asked. A part that is an item names it (use.item). What you cannot see is summed with no title. Where nothing limits it, of is left out. Params: none.',
     run: usage,
   },
   notifications: {
