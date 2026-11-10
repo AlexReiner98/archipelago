@@ -93,6 +93,10 @@ export function pluginFiles(): Record<string, string> {
     license: LISTING.license,
     keywords: LISTING.keywords,
     privacyPolicyUrl: LISTING.urls.privacy,
+    // The directory's other links, read for the listing as privacyPolicyUrl is.
+    termsOfServiceUrl: LISTING.urls.terms,
+    supportUrl: LISTING.urls.support,
+    documentationUrl: LISTING.urls.docs,
   });
   return {
     // The MCP Registry's entry (registry.modelcontextprotocol.io), published with mcp-publisher under the domain's name.
