@@ -8,7 +8,7 @@
 // their names and states only. Nothing private (a section shows once it is shared with the workspace), nothing archived,
 // nothing of another workspace. What it does not give is scrubbed from the text as a link's is.
 
-import { forReader, sectionIds, type Given, type Part } from './documents.ts';
+import { forReader, sectionIds, type Given } from './documents.ts';
 import type { Archipelago } from './pelago.ts';
 
 // What the database gives of it is pelago_public_document (src/public-schema.ts).
@@ -62,55 +62,9 @@ export async function publicDocumentPicture(l: Archipelago, id: string, section:
   return rows[0] ? { content_type: rows[0].content_type, bytes: Buffer.from(rows[0].data, 'base64') } : null;
 }
 
-/** What a search engine shows under the title: the first paragraph the document opens on, as plain words, cut short. */
-export function describe(parts: Part[], most = 160): string {
-  for (const part of parts) {
-    const text = 'text' in part ? part.text : 'section' in part ? part.section.body : '';
-    for (const block of text.split(/\n[ \t]*\n/)) {
-      const lines = block.split('\n').map((line) => line.trim()).filter((line) => line && !/^#/.test(line) && !/^\|/.test(line));
-      // A short line on its own above a paragraph is that paragraph's title (as ui/doc.js draws it).
-      if (lines.length > 1 && lines[0].length <= 90 && !/[.;,:!?]$/.test(lines[0]) && !/^(-|\*|\d+\.)\s/.test(lines[0])) lines.shift();
-      const words = lines
-        .map((line) => line.replace(/^(-|\*|\d+\.)\s+/, ''))
-        .join(' ')
-        .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-        .replace(/\*\*([^*]+)\*\*/g, '$1')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (!words) continue;
-      if (words.length <= most) return words;
-      const cut = words.slice(0, most - 1);
-      return `${cut.slice(0, cut.lastIndexOf(' ') > most / 2 ? cut.lastIndexOf(' ') : cut.length).replace(/[\s.,;:]+$/, '')}…`;
-    }
-  }
-  return '';
-}
-
 /** What every public page and its data are sent with: never sniffed, never telling where a reader came from (src/reply.ts). */
 export { GUARD } from './reply.ts';
 /** A public page loads its own scripts and styles, talks only to this server, frames only the sandbox its pictures are drawn in, and is never framed. */
 export const POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 /** A published document's page, which this server's own page may also frame, to read it on the canvas (ui/reader-frame.js). */
 export const READER_POLICY = POLICY.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
-
-const escape = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-
-/**
- * The shared document page (ui/doc.html) as a public document's: its own title, a description from its first
- * paragraph and the address to keep, and no request to be left out of a search engine's index.
- */
-export function publicHead(html: string, doc: { title: string; parts: Part[] }, canonical: string, site?: string, image?: string): string {
-  const description = describe(doc.parts);
-  // What a link to it shows where it is posted: its title, its first words, its address and the picture its style
-  // names (Open Graph, and a card, large when there is a picture). A picture is named only at a whole address.
-  const picture = image && /^https:\/\//.test(image) ? image : undefined;
-  const share: [string, string | undefined][] = [['og:type', 'article'], ['og:title', doc.title], ['og:description', description], ['og:url', canonical], ['og:site_name', site], ['og:image', picture]];
-  const head = [
-    description && `<meta name="description" content="${escape(description)}" />`,
-    `<link rel="canonical" href="${escape(canonical)}" />`,
-    ...share.filter(([, value]) => value).map(([name, value]) => `<meta property="${name}" content="${escape(value!)}" />`),
-    `<meta name="twitter:card" content="${picture ? 'summary_large_image' : 'summary'}" />`,
-  ].filter(Boolean).join('\n    ');
-  // Put in by functions, so nothing a document says is read as a replacement pattern ($&, $').
-  return html.replace(/<meta name="robots" content="noindex" \/>/, () => head).replace(/<title>[^<]*<\/title>/, () => `<title>${escape(doc.title)}</title>`);
-}

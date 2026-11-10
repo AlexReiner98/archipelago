@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fresh, make } from './map.ts';
-import { answerHook } from '../src/hook-answers.ts';
+import { answerHook } from './claude-hook.ts';
 import { VIEWS } from '../src/views.ts';
 import '../src/session-turns.ts';
 import type { Archipelago } from '../src/pelago.ts';

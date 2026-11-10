@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { answerHook } from '../src/hook-answers.ts';
+import { answerHook } from './claude-hook.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
 import { checkRules, type RuleDef } from '../src/rules.ts';

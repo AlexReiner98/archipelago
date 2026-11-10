@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { heldResources } from '../src/blocking.ts';
-import { configureLauncher, launch } from '../src/launcher.ts';
+import { configureLauncher, launch, type Launcher } from '../src/launcher.ts';
+import { ServerPacks } from '../src/server-host.ts';
+import { packLauncher } from '../src/server-launch.ts';
+import { OWN_PACKS } from '../src/server-packs.ts';
 import { Archipelago } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
 import { configureSecrets, isSealed, seal, unseal } from '../src/secrets.ts';
@@ -91,6 +94,18 @@ test('a secret is sealed with a key that is not in the database, and without tha
   configureSecrets(null);
 });
 
+/** The claude_code pack's launcher, its CLI swapped for a stand-in: the rest of its argv and its read as shipped. */
+function claudeAs(bin: string[]): { via: Launcher; stop: () => void } {
+  const own = new ServerPacks({} as never, [OWN_PACKS]);
+  const real = own.find('claude_code')!;
+  const [headless] = real.file.reach.server.launchers!;
+  const server = { ...real.file.reach.server, launchers: [{ ...headless, argv: [...bin, ...headless.argv.slice(1)] }] };
+  const pack = { ...real, file: { ...real.file, reach: { ...real.file.reach, server } } };
+  const via = packLauncher({ find: (id: string) => (id === 'claude_code' ? pack : undefined), call: own.call.bind(own) } as never, 'claude_code');
+  if (typeof via === 'string') throw new Error(via);
+  return { via, stop: () => own.stop() };
+}
+
 test('launching runs a headless session on a task, holding the lane and recording the outcome', async () => {
   const l = await withYard();
   const dir = mkdtempSync(join(tmpdir(), 'pelago-launch-'));
@@ -110,7 +125,8 @@ test('launching runs a headless session on a task, holding the lane and recordin
          result: 'mode=' + process.argv[process.argv.indexOf('--permission-mode') + 1] + ' cwd=' + process.cwd() + ' saw=' + prompt.includes('# Capture probe') + '/' + prompt.includes('cannot edit files') }), 300);
      });`,
   );
-  configureLauncher({ mcpUrl: 'http://127.0.0.1:1/mcp', dir: join(dir, 'runs'), command: [process.execPath, cli] });
+  const claude = claudeAs([process.execPath, cli]);
+  configureLauncher({ mcpUrl: 'http://127.0.0.1:1/mcp', dir: join(dir, 'runs'), via: claude.via });
   const made = await make(l, [
     { op: 'create', ref: 'repo', type: 'yard.checkout', title: 'Repo', props: { path: dir } },
     { op: 'create', ref: 'proj', type: 'aim', title: 'Proj' },
@@ -142,7 +158,7 @@ test('launching runs a headless session on a task, holding the lane and recordin
   assert.equal(done.status, 'finished');
   assert.match(done.body, /mode=plan/);
   assert.match(done.body, /saw=true\/true/, 'the prompt carried the brief and the mode note');
-  assert.match(done.body, /3 turns, \$0\.50; transcript: /);
+  assert.match(done.body, /\(transcript: /);
   assert.ok(done.body.toLowerCase().includes(`cwd=${dir}`.toLowerCase()), 'it ran in the repository');
   assert.match(readFileSync((first as { transcript: string }).transcript, 'utf8'), /"type":"result"/);
   assert.equal((await heldResources(l)).length, 0, 'the lane came back');
@@ -156,7 +172,7 @@ test('launching runs a headless session on a task, holding the lane and recordin
   assert.match(failed.body, /mode=acceptEdits/);
 
   // Started by someone other than the owner, or by an automation, a session only proposes, and its run says who.
-  configureLauncher({ mcpUrl: 'http://127.0.0.1:1/mcp', dir: join(dir, 'runs'), command: [process.execPath, cli], auth: true });
+  configureLauncher({ mcpUrl: 'http://127.0.0.1:1/mcp', dir: join(dir, 'runs'), via: claude.via, auth: true });
   const people = await make(l, [{ op: 'create', ref: 'ann', type: 'person', title: 'Ann' }, { op: 'create', ref: 'bo', type: 'person', title: 'Bo' }]);
   await l.db.query(`insert into setting (key, value) values ('me', $1::jsonb) on conflict (key) do update set value = excluded.value`, [JSON.stringify(people.ann)]);
   const mayOf = async (run: string) => (await l.db.query<{ may: string }>(`select may from token where name = $1`, [`launched:${run}`])).rows[0]?.may;
@@ -169,6 +185,8 @@ test('launching runs a headless session on a task, holding the lane and recordin
   const nightly = await launch(l, { kind: 'human', name: 'automation:e_auto0001' }, { task: made.live }, { kind: 'automation', id: 'e_auto0001', name: 'Nightly' });
   assert.deepEqual([await mayOf(nightly.run), ((await l.entity(nightly.run))!.props.started_by as { kind: string }).kind], ['propose', 'automation']);
   await ended(nightly.run);
+  configureLauncher(undefined);
+  claude.stop();
 });
 
 test('tokens: an estimate is asked for, what a session uses goes to its work, and the graph adds up what is part of what', async () => {

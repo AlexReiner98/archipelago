@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fresh, make } from './map.ts';
-import { answerHook } from '../src/hook-answers.ts';
+import { answerHook } from './claude-hook.ts';
 import { checkEvent, sessionEvents } from '../src/session-events.ts';
 import { opEntries } from '../src/streams.ts';
 import { kept } from '../src/retention.ts';

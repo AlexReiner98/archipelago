@@ -100,7 +100,7 @@ test('capture session_start answers with where the session stands', async () => 
 });
 
 test('the first thing the owner asks narrows the start to what is settled on it, once', async () => {
-  const { answerHook } = await import('../src/hook-answers.ts');
+  const { answerHook } = await import('./claude-hook.ts');
   const { askedBy } = await import('../src/frontier-prompt.ts');
   const packs = mkdtempSync(join(tmpdir(), 'pelago-frontier-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });

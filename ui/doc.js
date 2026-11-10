@@ -286,5 +286,10 @@ if (!given) warmLayouts();
   .then(() => sayLook('drawn'), (err) => (main.replaceChildren(h('p', { class: 'error' }, err.message)), sayLook('error', err.message)));
 
 // Opened with ?live, a published page is drawn anew each time its document is published again (src/published-live.ts).
-if (given && new URLSearchParams(location.search).has('live'))
-  new EventSource(`${here}/live`).addEventListener('published', () => fetch(`${here}/data`).then((res) => res.json()).then(draw, () => null));
+// It reads again once its stream is open too: a publish between the first read and the stream is not missed.
+if (given && new URLSearchParams(location.search).has('live')) {
+  const fresh = () => fetch(`${here}/data`).then((res) => res.json()).then(draw, () => null);
+  const live = new EventSource(`${here}/live`);
+  live.addEventListener('open', fresh);
+  live.addEventListener('published', fresh);
+}
