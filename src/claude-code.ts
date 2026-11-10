@@ -16,3 +16,10 @@ export const toldAs = (event: string, text: string, extra: object = {}) => ({ ho
 
 /** A reply's end that asks the agent to go on, as Claude Code's Stop hook reads it. */
 export const goOn = (reason: string) => ({ decision: 'block' as const, reason });
+
+/** A neutral answer (src/hook-answers.ts) in the shape Claude Code's hooks read: told as additional context, go_on as a block. */
+export function claudeCodeAnswer(event: string, { told, go_on, ...rest }: { told?: string; go_on?: string; [more: string]: unknown }): object {
+  if (told !== undefined) return toldAs(event, told, rest);
+  if (go_on !== undefined) return { ...goOn(go_on), ...rest };
+  return rest;
+}

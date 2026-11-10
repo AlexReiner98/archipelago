@@ -1,4 +1,5 @@
-﻿// What Claude Code's hooks are answered (POST /hooks/<event>): a session started, was prompted, ended a turn, ended.
+﻿// What a session's hooks are answered, in no surface's shape (src/server-adapter.ts puts it in one): a session started,
+// was prompted, ended a turn, ended.
 // Where a session last heard up to is kept in the workspace's database (src/transient.ts), so its next prompt is
 // answered as well by a server it has not spoken to before.
 
@@ -20,7 +21,7 @@ import { seeingLine } from './seeing.ts';
 import { keep, kept } from './transient.ts';
 import { takeEvents } from './session-events.ts';
 import { instructionsFor } from './instructions.ts';
-import { CLAUDE_CODE, goOn, toldAs } from './claude-code.ts';
+import { CLAUDE_CODE, claudeCodeAnswer } from './claude-code.ts';
 
 export interface HookBody {
   session_id?: string;
@@ -89,21 +90,41 @@ const restarted = async (l: Archipelago, { started, commit }: HookCall['running'
     added?.length ? `Actions new since you were given the tools: ${added.join('; ')}. ` : added ? 'No action is new since you were given the tools. ' : ''
   }${await sayAt(l, 'server_restarted', {})}`.trimEnd();
 
-/** The answer to one hook, or undefined for an event there is none for. */
+/**
+ * What a session is told at a hook, the same for any surface: told, words added to what it reads next; go_on, why it
+ * is asked to go on at a reply's end; said, the ids told beside the words. Anything else (the events route's count)
+ * is passed as it is. A surface's adapter puts it in that surface's shape (src/server-adapter.ts).
+ */
+export interface Neutral {
+  told?: string;
+  go_on?: string;
+  said?: string[];
+  [more: string]: unknown;
+}
+
+const told = (text: string, extra: object = {}): Neutral => ({ told: text, ...extra });
+
+/** The answer to one hook in Claude Code's shape, as before there were surfaces: goes with the adapter cut. */
 export async function answerHook(event: string, call: HookCall): Promise<object | undefined> {
+  const neutral = await sessionAnswer(event, call);
+  return neutral && claudeCodeAnswer(event, neutral);
+}
+
+/** What a session is told at one hook, or undefined for an event there is none for. */
+export async function sessionAnswer(event: string, call: HookCall): Promise<Neutral | undefined> {
   const { whole, pelago, within, body, running } = call;
   if (call.may === 'report') return {};
   // A token within some items registers and speaks for sessions in the places that are theirs, and for no others.
   if (within.length && !(await hookWithin(pelago, within, body, event === 'session-start'))) {
-    return event === 'session-start' ? toldAs(event, LIMITED) : {};
+    return event === 'session-start' ? told(LIMITED) : {};
   }
   // A file read or changed: what bites there, said once (src/file-said.ts). The ids it said go back beside the answer, for the hook to keep.
   if (event === 'file-used') {
-    const told = await fileSaid(pelago, body).catch((err) => void console.error(`hook file: ${(err as Error).message}`));
-    return told ? toldAs(event, told.text, { said: told.ids }) : {};
+    const said = await fileSaid(pelago, body).catch((err) => void console.error(`hook file: ${(err as Error).message}`));
+    return said ? told(said.text, { said: said.ids }) : {};
   }
   // An adapter's batch of what the session did, kept as raw events on its run.
-  if (event === 'events') return takeEvents(pelago, body);
+  if (event === 'events') return (await takeEvents(pelago, body)) as Neutral;
   // Said in the server's log, so "did the hook run?" has an answer.
   console.log(`hook ${event} from session ${body.session_id ?? 'unknown'}`);
   // One chat is one session: a prompt takes up a run that was ended while the chat went on, before anything is kept on it.
@@ -124,7 +145,7 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     const heard = await kept<number>(whole, heardKey(body.session_id));
     const changes = heard === undefined ? [] : await humanChanges(pelago, heard);
     await keep(whole, heardKey(body.session_id), changes.at(-1)?.seq ?? heard ?? (await latestSeq(pelago)), HEARD_MS);
-    const told: string[] = [];
+    const lines: string[] = [];
     // A session that began before this server did has lived through a restart: after a deploy its client still
     // holds the tools as they were when it connected. Said once, at its first prompt after the restart.
     const restartKey = `restart:${running.started}:${body.session_id ?? ''}`;
@@ -134,7 +155,7 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
       // Which actions are new is told against what the session was given, or was last told of.
       const now = offeredActions(pelago.registry);
       const had = await kept<string[]>(whole, actionsKey(body.session_id));
-      told.push(await restarted(pelago, running, had && now.filter((a) => !had.includes(a))));
+      lines.push(await restarted(pelago, running, had && now.filter((a) => !had.includes(a))));
       await keep(whole, actionsKey(body.session_id), now, HEARD_MS);
     }
     // How many of each, and the newest few: the rest is one query away.
@@ -143,8 +164,8 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     // And what the owner is looking at now, so "this" in their message has a referent (src/seeing.ts).
     const asking = body.session_id ? await resolveRun(pelago, body.session_id, true) : undefined;
     const looking = await seeingLine(pelago, whole, asking?.id).catch(() => undefined);
-    if (looking) told.push(looking);
-    if (changes.length) told.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${tally}${describeChanges(newest)}`);
+    if (looking) lines.push(looking);
+    if (changes.length) lines.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${tally}${describeChanges(newest)}`);
     // The first thing the owner asks a session narrows where it stands: what the map has settled on it (src/frontier-prompt.ts).
     const asked = (await import('./frontier-prompt.ts')).askedBy(body.prompt);
     const narrowKey = `narrowed:${body.session_id ?? ''}`;
@@ -153,9 +174,9 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
       const { narrowed, narrowedText } = await import('./frontier-prompt.ts');
       const found = await narrowed(pelago, asked).catch((err) => console.error(`hook narrow: ${(err as Error).message}`));
       const on = found ? narrowedText(found) : undefined;
-      if (on) told.push(on);
+      if (on) lines.push(on);
     }
-    return told.length ? toldAs(event, told.join('\n\n')) : {};
+    return lines.length ? told(lines.join('\n\n')) : {};
   }
   if (event === 'session-start') {
     await keep(whole, heardKey(body.session_id), await latestSeq(pelago), HEARD_MS);
@@ -174,7 +195,7 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
       const behind = await sayAt(pelago, 'setup_behind', { command: setupCommand(call.origin) });
       if (behind) additionalContext += `\n\n${behind}`;
     }
-    return toldAs(event, additionalContext);
+    return told(additionalContext);
   }
   if (event === 'session-end') {
     await hookSessionEnd(pelago, body);
@@ -186,7 +207,7 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     await sessionHeard(pelago, body.session_id, 'until').catch((err) => console.error(`hook heard: ${(err as Error).message}`));
     const asking = body.session_id ? await resolveRun(pelago, body.session_id, true) : undefined;
     const ask = await askOnReply(whole, pelago, asking, body).catch((err) => void console.error(`hook reply rules: ${(err as Error).message}`));
-    return ask ? goOn(ask) : {};
+    return ask ? { go_on: ask } : {};
   }
   return undefined;
 }
