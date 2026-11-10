@@ -12,7 +12,7 @@ import { islandsOff } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesO
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 import { parts, withoutAbsent, type Manifest } from './manifest.ts';
-import { readPackFolders } from './pack-folders.ts'; import { madePacks, type MadePack } from './map-packs.ts';
+import { readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack } from './pack-items.ts';
 import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from './phases.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
@@ -138,7 +138,7 @@ export class Registry {
   /** Warnings said once: a pack file using the keys of the shape before the manifest. */
   /** Packs the owner turned off in this workspace. */
   private turnedOff: string[] = []; /** Whether this workspace holds its packs to the island rules (src/islands.ts). */ private islands = false; /** Whether this workspace has islands on: its items live on islands (src/island-items.ts). */ get onIslands() { return this.islands; }
-  /** The packs made on the map (src/map-packs.ts) by id, the pack items that are none with why, and those the owner added here. */ made = new Map<string, MadePack>(); madeWrong = new Map<string, string>(); private madeOn = new Set<string>();
+  /** The packs kept as items (src/pack-items.ts) by id, the pack items that are none with why, and those the owner added here. */ made = new Map<string, ItemPack>(); madeWrong = new Map<string, string>(); private madeOn = new Set<string>();
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
@@ -161,7 +161,7 @@ export class Registry {
     // Load in dependency order what is on and has what it requires; the rest waits or is off.
     const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK).map((id) => [id, 'not enabled on this server']));
     for (const id of this.turnedOff) off.set(id, 'turned off here');
-    for (const id of this.made.keys()) if (!this.madeOn.has(id)) off.set(id, 'made on the map: the owner has not added it here');
+    for (const id of this.made.keys()) if (!this.madeOn.has(id)) off.set(id, 'kept as an item: the owner has not added it here');
     if (this.islands) for (const [id, why] of islandsOff([...found.values()].filter((p) => !off.has(p.id) || KERNEL_PACKS.includes(p.id)), LOCAL_PACK)) off.set(id, why);
     const { ordered: loaded, states } = orderPacks(found, off, LOCAL_PACK);
     // What a pack names of a pack it uses is registered only while that one is active (src/manifest.ts, uses).
@@ -318,7 +318,7 @@ export class Registry {
   turnOff(packs: string[], islands = this.islands): string[] | undefined {
     const next = packs.filter((p) => !KERNEL_PACKS.includes(p));
     const newly = next.filter((p) => !this.turnedOff.includes(p));
-    // A pack made on the map is on once the owner adds it (it is not in the list), and off while it is new to this registry.
+    // a pack kept as an item is on once the owner adds it (it is not in the list), and off while it is new to this registry.
     const madeOn = new Set([...this.made.keys()].filter((p) => !next.includes(p))); const sameMade = madeOn.size === this.madeOn.size && [...madeOn].every((p) => this.madeOn.has(p));
     if (!newly.length && next.length === this.turnedOff.length && islands === this.islands && sameMade) return undefined;
     this.turnedOff = next; this.islands = islands; this.madeOn = madeOn;

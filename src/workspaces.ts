@@ -272,7 +272,7 @@ export class Workspaces {
       await syncPacks(pelago); // which packs are present, and as which manifests, is a fact on the log
       pelago.registry.turnOff(await packsOff(pelago), await islandsOn(pelago));
       await takeTypeItems(pelago);
-      // The packs made on the map are read with the type items: the log and the packs on take them in now.
+      // The packs kept as items are read with the type items: the log and the packs on take them in now.
       if (pelago.registry.made.size) await followMade(pelago);
       await syncTypes(pelago);
       if (begins) await pelago.record('settings', 'system', [...(await beginApplying(db)), ...(await beginShared(db))]);

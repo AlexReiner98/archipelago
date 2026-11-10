@@ -1,9 +1,9 @@
-// Packs authored on the map (src/map-packs.ts): an item of core's pack type is a pack of data alone, read beside the
+// Packs authored on the map (src/pack-items.ts): an item of core's pack type is a pack of data alone, read beside the
 // server's, off until the owner adds it, checked whole when it is written, and on the log as any pack is.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import '../src/workspaces.ts'; // as on a server: a change to a pack item makes the log and the packs on follow
-import { madeProblems } from '../src/map-packs.ts';
+import { madeProblems } from '../src/pack-items.ts';
 import { setIslands, setPack } from '../src/packstate.ts';
 import { Registry } from '../src/packs.ts';
 import { agent, fresh, freshWith, human, make, packsWith } from './map.ts';
@@ -15,7 +15,7 @@ const RECIPES = {
 };
 const recipes = (manifest: Record<string, unknown> = RECIPES) => ({ op: 'create', ref: 'p', type: 'pack', title: 'Recipes', body: 'What we cook.', props: { name: 'recipes', manifest } }) as const;
 
-test('a pack made on the map holds data alone, its own names, and rules that only tighten', () => {
+test('a pack kept as an item holds data alone, its own names, and rules that only tighten', () => {
   const taken = new Set(['core', 'local']);
   const said = (manifest: unknown, name = 'recipes') => madeProblems({ title: 'Recipes', props: { name, manifest } }, taken).join('; ');
   assert.equal(said(RECIPES), '');
@@ -28,7 +28,7 @@ test('a pack made on the map holds data alone, its own names, and rules that onl
   assert.match(said(RECIPES, 'Recipes!'), /lower case/);
 });
 
-test('the owner adds a pack made on the map, its types are used, and its manifest is on the log', async () => {
+test('the owner adds a pack kept as an item, its types are used, and its manifest is on the log', async () => {
   const l = await fresh();
   const { p } = await make(l, [recipes()]);
   assert.equal(l.registry.states.get('recipes')?.state, 'off', 'off until the owner adds it');
@@ -44,7 +44,7 @@ test('the owner adds a pack made on the map, its types are used, and its manifes
   assert.equal((await l.entity(a))!.kind, 'record');
   assert.ok(b);
   const { rows } = await l.db.query<{ value: { text?: string } }>(`select value from log_fact where id = 'pack:recipes' and op = '+'`);
-  assert.equal(JSON.parse(rows.at(-1)!.value.text!).types[0].id, 'recipes.dish', 'the manifest made on the map is kept on the log');
+  assert.equal(JSON.parse(rows.at(-1)!.value.text!).types[0].id, 'recipes.dish', 'the manifest of a pack item is kept on the log');
 
   // An edit to the added pack is said on the log again, and stays on.
   await make(l, [{ op: 'update', id: p, props: { manifest: { ...RECIPES, types: [{ ...RECIPES.types[0], fields: { serves: { type: 'number' }, spice: { type: 'string' } } }] } } }]);
@@ -60,7 +60,7 @@ test('the owner adds a pack made on the map, its types are used, and its manifes
   assert.equal((await l.entity(a))!.title, 'Soup');
 });
 
-test('a pack made on the map that would not load is refused when it is written', async () => {
+test('a pack kept as an item that would not load is refused when it is written', async () => {
   const l = await fresh();
   await assert.rejects(make(l, [recipes({ types: [{ id: 'recipes.dish', title: 'Dish', description: '', extends: 'no_such' }] })]), /as it would be once added: .*no_such/);
   await assert.rejects(make(l, [recipes({ handlers: [{ event: 'x' }] })]), /holds handlers/);
@@ -84,7 +84,7 @@ test('on an island map, a pack made there is judged by the island rules', async 
   await assert.rejects(make(l, [{ ...recipes({ requires: ['core', 'work'], types: RECIPES.types }), ref: 'q', props: { name: 'menus', manifest: { requires: ['core', 'work'], types: [{ id: 'menus.menu', title: 'Menu', description: '', extends: 'record' }] } } }]), /not taken on an island map: it requires work/);
 });
 
-test('a pack made on the map cannot take a name a server pack declares, even one off here', async () => {
+test('a pack kept as an item cannot take a name a server pack declares, even one off here', async () => {
   const other = { id: 'kitchen', version: '0.1.0', title: 'Kitchen', description: '', requires: ['core'], types: [{ id: 'recipes.dish', title: 'Dish', description: '', extends: 'record' }] };
   const l = await freshWith(new Registry(packsWith(other)));
   l.registry.turnOff(['kitchen']);
@@ -92,7 +92,7 @@ test('a pack made on the map cannot take a name a server pack declares, even one
   await assert.rejects(make(l, [recipes({ types: RECIPES.types })]), /a pack this server has declares recipes\.dish already/);
 });
 
-test('a rule in a pack made on the map only tightens: it lets nothing through that core holds', async () => {
+test('a rule in a pack kept as an item only tightens: it lets nothing through that core holds', async () => {
   const l = await fresh();
   await assert.rejects(make(l, [recipes({ rules: [{ id: 'recipes.go', when: { actor: 'agent' }, then: 'apply' }] })]), /then is hold, refuse/);
   await assert.rejects(make(l, [recipes({ rules: [{ id: 'agent_changes', when: { actor: 'agent' }, then: 'hold' }] })]), /named recipes\.<what>/);
@@ -105,10 +105,10 @@ test('a rule in a pack made on the map only tightens: it lets nothing through th
   assert.equal(dish.status, 'proposed');
 });
 
-// A look names no type and runs no code: a pack made on the map may bring one, and on an island map the island rules judge it.
+// A look names no type and runs no code: a pack kept as an item may bring one, and on an island map the island rules judge it.
 const LOOK = { id: 'recipes.look', title: 'Kitchen look', on: ['recipes.dish'], props: { session_marks: { done: { shape: 'disc', hue: 'done' } } } };
 
-test('a pack made on the map may bring a look; an island map judges it by the island rules', async () => {
+test('a pack kept as an item may bring a look; an island map judges it by the island rules', async () => {
   const l = await fresh();
   await make(l, [recipes({ ...RECIPES, styles: [...RECIPES.styles, LOOK] })]);
   await setPack(l, human, { pack: 'recipes', on: true });

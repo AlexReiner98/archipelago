@@ -115,10 +115,10 @@ one is off there, and its state says which.
 
 Core, the kernel's pack, is never judged.
 
-## Made on the map
+## Kept as an item
 
 A pack can also be authored on the map, by a person or their agent, with no
-access to the server: an item of core's `pack` type (`src/map-packs.ts`). Its
+access to the server: an item of core's `pack` type (`src/pack-items.ts`). Its
 `name` is the pack's id, its title and note the pack's, its `version` the
 pack's (0.1.0 unless said), and its `manifest` what it declares, as a
 `pack.json` holds it:

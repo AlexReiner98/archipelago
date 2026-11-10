@@ -3,16 +3,16 @@
 
 import type { Registry, TypeDef } from './packs.ts';
 import type { Archipelago, Op } from './pelago.ts';
-import { PACK_ITEM } from './map-packs.ts';
+import { PACK_ITEM } from './pack-items.ts';
 import { LINK_ITEM, TYPE_ITEM, type TypeItem } from './type-overlay.ts';
 
-/** What the registry reads from the map: types, link types, and packs made there (src/map-packs.ts). */
+/** What the registry reads from the map: types, link types, and packs made there (src/pack-items.ts). */
 const KINDS = [TYPE_ITEM, LINK_ITEM, PACK_ITEM];
 
 /** Told when the types kept on the map changed, so the type table follows (src/typetable.ts, set by src/workspaces.ts). */
 let typesChanged: (l: Archipelago) => Promise<unknown> = async () => {};
 export const onTypesChanged = (fn: (l: Archipelago) => Promise<unknown>) => (typesChanged = fn);
-/** Told when a pack made on the map was made or changed, so the log and the packs on follow (src/packstate.ts, set by src/workspaces.ts). */
+/** Told when a pack kept as an item was made or changed, so the log and the packs on follow (src/packstate.ts, set by src/workspaces.ts). */
 let packsChanged: (l: Archipelago) => Promise<unknown> = async () => {};
 export const onPacksChanged = (fn: (l: Archipelago) => Promise<unknown>) => (packsChanged = fn);
 
@@ -101,7 +101,7 @@ export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
 export async function typesApplied(l: Archipelago, ops: Op[], used: Registry): Promise<void> {
   if (used === l.registry) return;
   await typesTaken(l);
-  // A pack made on the map may have come, changed or gone with it: the log and the packs on follow.
+  // a pack kept as an item may have come, changed or gone with it: the log and the packs on follow.
   if (l.registry.made.size || used.made.size) await packsChanged(l);
 }
 

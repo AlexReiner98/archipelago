@@ -1,5 +1,5 @@
 // Packs authored on the map. A pack is a folder on the server or an item of core's `pack` type: its name the pack's
-// id, its title and note the pack's, its manifest what it declares. One made on the map is data alone: the keys of a
+// id, its title and note the pack's, its manifest what it declares. One kept as an item is data alone: the keys of a
 // pack on an island map (types, links, rules, views drawn by the kernel, and styles: looks, instructions and lenses),
 // so a person or their agent on a hosted map can author a way of working, or a look, without the server running
 // anything of theirs. On an island map the island rules judge it as any pack, looks included. A rule only
@@ -16,7 +16,7 @@ export const PACK_ITEM = 'pack';
 
 /** What it is, which the item says: its id (name), version, title and note. */
 const SAID = ['id', 'version', 'title', 'description'];
-/** The keys a pack made on the map may hold in its manifest: a pack's on an island map, but what the item says. */
+/** The keys a pack kept as an item may hold in its manifest: a pack's on an island map, but what the item says. */
 const HELD = ISLAND_KEYS.filter((k) => !SAID.includes(k));
 /** What a rule in one may not say: a stream kept and its keeping (retention), a setting that lifts it, the server's word. */
 const NOT_IN_RULES = ['stream', 'keep', 'lifted', 'server'];
@@ -24,8 +24,8 @@ const NOT_IN_RULES = ['stream', 'keep', 'lifted', 'server'];
 const DRAWN = ['tree', 'screen', 'attention'];
 const NAME = /^[a-z][a-z0-9_]*$/;
 
-/** A pack made on the map, as the registry takes it: the item it is kept in, its manifest, and that manifest's text and hash. */
-export interface MadePack {
+/** a pack kept as an item, as the registry takes it: the item it is kept in, its manifest, and that manifest's text and hash. */
+export interface ItemPack {
   item: string;
   manifest: Manifest;
   text: string;
@@ -50,7 +50,7 @@ export function madeProblems(item: Said, taken: Set<string>, declared: Set<strin
   if (!m || typeof m !== 'object' || Array.isArray(m)) return [...problems, 'its manifest is an object, as a pack.json holds it'];
   const manifest = m as Entry;
   const other = Object.keys(manifest).filter((k) => !HELD.includes(k));
-  if (other.length) problems.push(`its manifest holds ${other.join(', ')}: a pack made on the map holds ${HELD.join(', ')} alone (what it is comes from the item; code and reach are a server's packs')`);
+  if (other.length) problems.push(`its manifest holds ${other.join(', ')}: a pack kept as an item holds ${HELD.join(', ')} alone (what it is comes from the item; code and reach are a server's packs')`);
   const unnamed = [...all(manifest.types).filter((t) => !('of' in t)), ...all(manifest.links)].map((d) => String(d.id ?? '')).filter((id) => !id.startsWith(`${name}.`));
   if (unnamed.length) problems.push(`what it declares is named ${name}.<what>: ${unnamed.map((id) => id || 'one with no id').join(', ')}`);
   // A clash with a pack the server has, even one off here, would stop the registry loading once that one is on.
@@ -59,7 +59,7 @@ export function madeProblems(item: Said, taken: Set<string>, declared: Set<strin
   const misnamedRules = all(manifest.rules).map((r) => String(r.id ?? '')).filter((id) => !id.startsWith(`${name}.`));
   if (misnamedRules.length) problems.push(`its rules are named ${name}.<what>, so none is taken for a kernel rule: ${misnamedRules.map((id) => id || 'one with no id').join(', ')}`);
   const rules = all(manifest.rules).filter((r) => NOT_IN_RULES.some((k) => k in r)).map((r) => String(r.id ?? 'a rule'));
-  if (rules.length) problems.push(`its rules ${rules.join(', ')} say ${NOT_IN_RULES.join(', ')}: a rule in a pack made on the map only holds, refuses, requires or asks`);
+  if (rules.length) problems.push(`its rules ${rules.join(', ')} say ${NOT_IN_RULES.join(', ')}: a rule in a pack kept as an item only holds, refuses, requires or asks`);
   const views = all(manifest.views).filter((v) => !DRAWN.includes(String(v.form))).map((v) => String(v.id ?? 'a view'));
   if (views.length) problems.push(`its views ${views.join(', ')} are not drawn by the kernel: a view here is a tree, a screen or a reason for attention (form), and a view of a query is a lens in styles`);
   if (!problems.length) {
@@ -80,8 +80,8 @@ function manifestText(item: Said, name: string): string {
 }
 
 /** Each open pack item that is a pack, and why each other is not, by item, beside the packs found in the server's folders. */
-export function madePacks(items: TypeItem[], found: Map<string, Manifest>, local: string): { packs: MadePack[]; wrong: Map<string, string> } {
-  const packs: MadePack[] = [];
+export function madePacks(items: TypeItem[], found: Map<string, Manifest>, local: string): { packs: ItemPack[]; wrong: Map<string, string> } {
+  const packs: ItemPack[] = [];
   const wrong = new Map<string, string>();
   const seen = new Set([...found.keys(), local]);
   const declared = new Set([...found.values()].flatMap((p) => [...parts(p).types, ...parts(p).relations].map((d) => d.id)));

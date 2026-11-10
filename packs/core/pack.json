@@ -1202,7 +1202,7 @@
         "type": "pack"
       },
       "then": "hold",
-      "say": "A pack made on the map carries rules and words the owner may have added: changing one, or bringing one back, is theirs."
+      "say": "a pack kept as an item carries rules and words the owner may have added: changing one, or bringing one back, is theirs."
     },
     {
       "id": "agent_automations",
