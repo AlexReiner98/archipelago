@@ -295,3 +295,14 @@ test('the tail follows the islands a page names: what lives on them is read, hel
   assert.ok(!followed.has(off), 'not what lives on another');
   assert.equal((await named()).size, 0, 'with no island named, as with islands off: only what is held');
 });
+
+test("a session's state and line come from the latest answer, whatever its row's position (e_j7hdfq9m)", async () => {
+  const { replica } = await pageModules();
+  const store = new replica.Store({ lineage: () => [], phase: () => undefined, shown: () => true });
+  const run = (line: string) => ({ id: 'e_runaaaaa', type: 'run', title: 'A run', status: 'running', open: true, session: { state: 'working', line, since: '2026-11-10T00:00:00Z' } });
+  store.take({ items: [run('first beat')] }, 5);
+  // A beat is no fact: the lens read again at the same position says the session's new line.
+  store.take({ items: [run('second beat')] }, 5);
+  assert.equal(store.items.get('e_runaaaaa').session.line, 'second beat');
+  assert.equal(store.items.get('e_runaaaaa').title, 'A run');
+});

@@ -64,6 +64,9 @@ export function follow(steps = []) {
   for (const s of fresh) if (s.ends && s.run) hooks.sessionEnded?.(s.run, s.did);
   // One gone quiet or waiting lets its tab go too, until it next shows something.
   for (const s of fresh) if (s.rests && s.run) hooks.sessionRested?.(s.run);
+  // A beat told, or a session gone quiet, waiting or ended, moves its node on every canvas that draws it.
+  const moved = [...new Set(fresh.filter((s) => s.run && (s.kind === 'story' || s.rests || s.ends)).map((s) => s.run))];
+  if (moved.length) hooks.sessionsTold?.(moved);
   // A chat renamed is named anew on its tab.
   if (fresh.some((s) => s.did === 'titled')) hooks.drawStrip?.();
   // A later show takes the place of what waits, and its tab of its own, if it was owed one, stays owed; so does its tab brought into sight.

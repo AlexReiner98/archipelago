@@ -31,7 +31,7 @@ test('in a browser, the Follows menu lists the chats open now, by title', { skip
     await opened((names) => names.includes('Will end') && names.includes('Stays quiet'));
     await call('/agent/report', undefined, { actor: agent, action: 'session_end', params: { run: ending.run, reason: 'closed', cannot_tell_rest: true } });
     const names = await opened((list) => !list.includes('Will end'));
-    assert.deepEqual(names, ['Nobody', 'Stays quiet'], 'an ended chat leaves it; Everyone is gone, every chat having a tab of its own');
+    assert.deepEqual(names, ['Nobody', 'Sessions in what it draws', 'Stays quiet'], 'an ended chat leaves it; Everyone is gone, every chat having a tab of its own, and a tab may watch what it draws');
   } finally {
     await page.close();
   }
