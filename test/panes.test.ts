@@ -10,17 +10,6 @@ import { ready } from './tab-page.ts';
 import { until as holds } from './wait.ts';
 import { serve } from './serve.ts';
 
-test('a show names the pane it goes to, and the page is told it with the step', async () => {
-  const { call } = await serve('off');
-  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'work.task', title: 'Something to see' }] })).result.created as Record<string, string>;
-  const page = { page: 'p1', on: true };
-  await call('/api/tail', undefined, { page });
-  await call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { entity: made.t, pane: 'right' } });
-  const steps = (await call('/api/tail', undefined, { page })).result.steps;
-  assert.ok(steps.some((s: { kind: string; pane?: string }) => s.kind === 'show' && s.pane === 'right'));
-  assert.match((await call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { entity: made.t, pane: 'Not a pane!' } })).error ?? '', /pane/);
-});
-
 const browser = chrome();
 
 test('in a browser, every pane is alike: its own lens, history and address, an agent in a tab of its own', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
@@ -143,4 +132,17 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
   } finally {
     await page.close();
   }
+});
+
+// Last: the steps a show leaves are kept in this process for a page that opens within minutes (e_d8djfzmk), and the
+// browser test's page would land this one.
+test('a show names the pane it goes to, and the page is told it with the step', async () => {
+  const { call } = await serve('off');
+  const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'work.task', title: 'Something to see' }] })).result.created as Record<string, string>;
+  const page = { page: 'p1', on: true };
+  await call('/api/tail', undefined, { page });
+  await call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { entity: made.t, pane: 'right' } });
+  const steps = (await call('/api/tail', undefined, { page })).result.steps;
+  assert.ok(steps.some((s: { kind: string; pane?: string }) => s.kind === 'show' && s.pane === 'right'));
+  assert.match((await call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { entity: made.t, pane: 'Not a pane!' } })).error ?? '', /pane/);
 });
