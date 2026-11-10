@@ -39,3 +39,14 @@ test('what an agent reads, and the README, lead with the summary', () => {
   assert.ok(installPage(origin).includes(LISTING.summary), 'the install page');
   assert.ok(readFileSync(join(ROOT, 'README.md'), 'utf8').includes(LISTING.summary), 'README.md');
 });
+
+test('an agent asked to set it up connects to this server: it does not ask, and hosting its own comes last, if asked', () => {
+  const origin = 'https://app.archipelago.tools';
+  for (const [name, text] of [['/llms.txt', llmsTxt(origin)], ['the install page', installPage(origin)]]) {
+    assert.match(text, /do not ask|nothing to choose/i, `${name} says not to ask which`);
+    assert.match(text, /only if the person asks|unless the person asked/i, `${name}: a server of one's own only if asked`);
+    assert.ok(text.lastIndexOf(LISTING.urls.repository) > text.indexOf(`${origin}/connect/install`), `${name}: hosting comes after connecting`);
+  }
+  const readme = readFileSync(join(ROOT, 'README.md'), 'utf8');
+  assert.ok(readme.indexOf('## Connect your agent') < readme.indexOf('## Host it yourself'), 'README.md: connecting before hosting');
+});

@@ -152,6 +152,7 @@ test('a site’s pages each end with what its footer page says, and the sitemap 
   assert.ok(!(await visit(base, '/sitemap.xml', 'site.test')).body.includes('/footer'));
   const llms = (await visit(base, '/llms.txt', 'site.test')).body;
   assert.ok(llms.startsWith('# ') && !llms.includes('/footer'), 'llms.txt opens on the site’s name and lists its pages, not the footer');
+  if (llms.includes('/connect/install')) assert.ok(/nothing to ask/.test(llms) && llms.indexOf('/connect/install') < llms.indexOf('## Pages'), 'connecting to the app is said before the pages, one of which may be hosting it');
 });
 
 test('a site’s llms.txt leads with the words of its page at /llms, then lists its pages', async () => {
