@@ -8,7 +8,7 @@
 
 import { createHash } from 'node:crypto';
 import { ISLAND_KEYS } from './islands.ts';
-import { readManifest, type Manifest } from './manifest.ts';
+import { parts, readManifest, type Manifest } from './manifest.ts';
 import type { TypeItem } from './type-overlay.ts';
 
 export const PACK_ITEM = 'pack';
@@ -39,8 +39,8 @@ const all = (v: unknown): Entry[] => (Array.isArray(v) ? (v as Entry[]) : []);
 type Said = Pick<TypeItem, 'title' | 'props'> & { body?: string };
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
 
-/** Why a pack item is not a pack that may be taken, as sentences; none when it may. taken: the ids no pack made here may have. */
-export function madeProblems(item: Said, taken: Set<string>): string[] {
+/** Why a pack item is not a pack that may be taken, as sentences; none when it may. taken: the ids no pack made here may have; declared: the type and link ids the server's packs declare, on or off. */
+export function madeProblems(item: Said, taken: Set<string>, declared: Set<string> = new Set()): string[] {
   const name = text(item.props.name);
   if (!name) return ['a pack needs its id in props.name'];
   const problems: string[] = [];
@@ -54,6 +54,11 @@ export function madeProblems(item: Said, taken: Set<string>): string[] {
   if (other.length) problems.push(`its manifest holds ${other.join(', ')}: a pack made on the map holds ${HELD.join(', ')} alone (what it is comes from the item; code and reach are a server's packs')`);
   const unnamed = [...all(manifest.types).filter((t) => !('of' in t)), ...all(manifest.links)].map((d) => String(d.id ?? '')).filter((id) => !id.startsWith(`${name}.`));
   if (unnamed.length) problems.push(`what it declares is named ${name}.<what>: ${unnamed.map((id) => id || 'one with no id').join(', ')}`);
+  // A clash with a pack the server has, even one off here, would stop the registry loading once that one is on.
+  const clash = [...all(manifest.types), ...all(manifest.links)].map((d) => String(d.id ?? '')).filter((id) => declared.has(id));
+  if (clash.length) problems.push(`a pack this server has declares ${clash.join(', ')} already`);
+  const misnamedRules = all(manifest.rules).map((r) => String(r.id ?? '')).filter((id) => !id.startsWith(`${name}.`));
+  if (misnamedRules.length) problems.push(`its rules are named ${name}.<what>, so none is taken for a kernel rule: ${misnamedRules.map((id) => id || 'one with no id').join(', ')}`);
   const rules = all(manifest.rules).filter((r) => NOT_IN_RULES.some((k) => k in r)).map((r) => String(r.id ?? 'a rule'));
   if (rules.length) problems.push(`its rules ${rules.join(', ')} say ${NOT_IN_RULES.join(', ')}: a rule in a pack made on the map only holds, refuses, requires or asks`);
   const views = all(manifest.views).filter((v) => !DRAWN.includes(String(v.form))).map((v) => String(v.id ?? 'a view'));
@@ -77,13 +82,14 @@ function manifestText(item: Said, name: string): string {
   return JSON.stringify(manifest, null, 2);
 }
 
-/** Each open pack item that is a pack, and why each other is not, by item. taken: the ids no pack made here may have. */
-export function madePacks(items: TypeItem[], taken: Set<string>): { packs: MadePack[]; wrong: Map<string, string> } {
+/** Each open pack item that is a pack, and why each other is not, by item, beside the packs found in the server's folders. */
+export function madePacks(items: TypeItem[], found: Map<string, Manifest>, local: string): { packs: MadePack[]; wrong: Map<string, string> } {
   const packs: MadePack[] = [];
   const wrong = new Map<string, string>();
-  const seen = new Set(taken);
+  const seen = new Set([...found.keys(), local]);
+  const declared = new Set([...found.values()].flatMap((p) => [...parts(p).types, ...parts(p).relations].map((d) => d.id)));
   for (const item of items.filter((i) => i.type === PACK_ITEM && i.is_open)) {
-    const problems = madeProblems(item, seen);
+    const problems = madeProblems(item, seen, declared);
     if (problems.length) {
       wrong.set(item.id, problems.join('; '));
       continue;

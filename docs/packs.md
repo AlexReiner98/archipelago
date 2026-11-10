@@ -136,8 +136,11 @@ pack's (0.1.0 unless said), and its `manifest` what it declares, as a
   of `styles`, instructions and lenses. A rule in it holds, refuses,
   requires or asks: none keeps a stream (`stream`, `keep`), is lifted by a
   setting (`lifted`) or by the server (`server`).
-- **Its own names.** Every type and link type it declares is named
-  `<name>.<what>`, and its name is no pack's on this server.
+- **Its own names.** Every type, link type and rule it declares is named
+  `<name>.<what>`, so none takes a kernel rule's name; its name is no pack's
+  on this server, and nothing it declares is declared by a pack the server
+  has, on or off here (a clash would stop the registry loading once both are
+  on).
 - **Checked when written.** A change that makes or changes one is checked as
   the registry would be with the pack added, so a manifest that would not
   load, or that the island rules would not take, is refused then, with why.

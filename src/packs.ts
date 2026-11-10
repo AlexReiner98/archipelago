@@ -155,7 +155,7 @@ export class Registry {
     const { found, hashes, where } = readPackFolders<PackFile>(this.dirs, LOCAL_PACK);
     this.where = where;
     const own = ownPack(this.localPack(), this.items, LOCAL_PACK); if (own) found.set(LOCAL_PACK, own);
-    const made = madePacks(this.items, new Set([...found.keys(), LOCAL_PACK])); this.made = new Map(made.packs.map((p) => [p.manifest.id, p])); this.madeWrong = made.wrong;
+    const made = madePacks(this.items, found, LOCAL_PACK); this.made = new Map(made.packs.map((p) => [p.manifest.id, p])); this.madeWrong = made.wrong;
     for (const p of made.packs) found.set(p.manifest.id, p.manifest), hashes.set(p.manifest.id, p.hash);
 
     // Load in dependency order what is on and has what it requires; the rest waits or is off.

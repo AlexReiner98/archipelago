@@ -5,7 +5,8 @@ import { test } from 'node:test';
 import '../src/workspaces.ts'; // as on a server: a change to a pack item makes the log and the packs on follow
 import { madeProblems } from '../src/map-packs.ts';
 import { setIslands, setPack } from '../src/packstate.ts';
-import { agent, fresh, human, make } from './map.ts';
+import { Registry } from '../src/packs.ts';
+import { agent, fresh, freshWith, human, make, packsWith } from './map.ts';
 
 const RECIPES = {
   types: [{ id: 'recipes.dish', title: 'Dish', description: 'A dish we cook.', extends: 'record', fields: { serves: { type: 'number' } } }],
@@ -82,4 +83,25 @@ test('on an island map, a pack made there is judged by the island rules', async 
   await setPack(l, human, { pack: 'recipes', on: true });
   assert.equal(l.registry.states.get('recipes')?.state, 'active', 'built on the shared set alone, it is taken');
   await assert.rejects(make(l, [{ ...recipes({ requires: ['core', 'work'], types: RECIPES.types }), ref: 'q', props: { name: 'menus', manifest: { requires: ['core', 'work'], types: [{ id: 'menus.menu', title: 'Menu', description: '', extends: 'record' }] } } }]), /not taken on an island map: it requires work/);
+});
+
+test('a pack made on the map cannot take a name a server pack declares, even one off here', async () => {
+  const other = { id: 'kitchen', version: '0.1.0', title: 'Kitchen', description: '', requires: ['core'], types: [{ id: 'recipes.dish', title: 'Dish', description: '', extends: 'record' }] };
+  const l = await freshWith(new Registry(packsWith(other)));
+  l.registry.turnOff(['kitchen']);
+  assert.equal(l.registry.states.get('kitchen')?.state, 'off');
+  await assert.rejects(make(l, [recipes({ types: RECIPES.types })]), /a pack this server has declares recipes\.dish already/);
+});
+
+test('a rule in a pack made on the map only tightens: it lets nothing through that core holds', async () => {
+  const l = await fresh();
+  await assert.rejects(make(l, [recipes({ rules: [{ id: 'recipes.go', when: { actor: 'agent' }, then: 'apply' }] })]), /then is hold, refuse/);
+  await assert.rejects(make(l, [recipes({ rules: [{ id: 'agent_changes', when: { actor: 'agent' }, then: 'hold' }] })]), /named recipes\.<what>/);
+  const task = { op: 'create', type: 'task', title: 'A task' } as const;
+  const before = (await l.change(agent, { ops: [task], reason: 'test' })).status;
+  await make(l, [recipes({ ...RECIPES, rules: [{ id: 'recipes.hold', when: { actor: 'agent', type: 'recipes.dish' }, then: 'hold', say: 'Dishes are the cook’s.' }] })]);
+  await setPack(l, human, { pack: 'recipes', on: true });
+  assert.equal((await l.change(agent, { ops: [task], reason: 'test' })).status, before, 'what core decided stays as it was');
+  const dish = await l.change(agent, { ops: [{ op: 'create', type: 'recipes.dish', title: 'Soup' }], reason: 'test' });
+  assert.equal(dish.status, 'proposed');
 });
