@@ -1,5 +1,5 @@
 // The first start's operator secret reaches a person at a terminal, and with nobody at one a file, never the log; the
-// owner is named by their address and mailed a link to sign in, never handed a token to paste.
+// owner is named by their address and mailed a code to sign in, never handed a token to paste.
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,7 +27,7 @@ async function started(run: (workspaces: Workspaces, root: string, logged: strin
   }
 }
 
-test('with nobody at a terminal, the first start writes the operator secret to a file and mails the owner a sign-in link', () =>
+test('with nobody at a terminal, the first start writes the operator secret to a file and mails the owner a sign-in code', () =>
   started(async (workspaces, root, logged) => {
     const sent: Mail[] = [];
     setMailer(async (mail) => void sent.push(mail));
@@ -40,8 +40,9 @@ test('with nobody at a terminal, the first start writes the operator secret to a
     assert.doesNotMatch(held, /pel_default_/, 'and no token to paste');
     assert.deepEqual(await adminEmails(main.pelago), ['owner@example.test'], 'the owner is the first admin');
     assert.deepEqual(sent.map((m) => m.to), ['owner@example.test']);
-    assert.match(sent[0].text, /#\/join\/inv_default_/, 'mailed a link to sign in');
-    assert.doesNotMatch(logged.join('\n'), /pelop_|pel_default_|inv_default_/, 'the log holds no secret');
+    const code = /^Default: ([0-9A-Z]{4}-[0-9A-Z]{4})$/m.exec(sent[0].text)?.[1];
+    assert.ok(code, 'mailed a code to sign in');
+    assert.doesNotMatch(logged.join('\n'), new RegExp(`pelop_|pel_default_|${code}`), 'the log holds no secret');
     assert.equal(await firstStart(workspaces, main, root, false), undefined, 'given once: a second start has nothing to give');
     assert.equal(sent.length, 1, 'nor mails again');
   }));

@@ -50,7 +50,7 @@ test('a sign-in waits until the documents in force are agreed to, without spendi
   await post('/connect/sign-in', { email: 'sam@acme.example' });
   // The mail goes out after the answer: wait for it, however slow the database.
   for (let tries = 0; tries < 100 && !mailbox.some((m) => m.to === 'sam@acme.example'); tries++) await new Promise((r) => setTimeout(r, 50));
-  const typed = /type this code on the sign-in page: ([A-Z0-9]{4}-[A-Z0-9]{4})/.exec(mailbox.findLast((m) => m.to === 'sam@acme.example')!.text)![1];
+  const typed = /: ([A-Z0-9]{4}-[A-Z0-9]{4})$/m.exec(mailbox.findLast((m) => m.to === 'sam@acme.example')!.text)![1];
   assert.equal((await post('/connect/code', { email: 'sam@acme.example', code: 'AAAA-AAAA' })).status, 410);
   assert.ok((await post('/connect/code', { email: 'sam@acme.example', code: typed })).agree);
   assert.ok((await post('/connect/code', { email: 'sam@acme.example', code: typed, agree: both })).token);
@@ -62,7 +62,7 @@ test('a sign-in waits until the documents in force are agreed to, without spendi
   assert.match((await post('/x/shop/agreed', { workspace: 'default', email: 'kim@acme.example', agreed: both })).error, /not a workspace this pack made/);
 });
 
-test('an address in no workspace is mailed where to begin, tagged with where it came from; a member is mailed their link', async () => {
+test('an address in no workspace is mailed where to begin, tagged with where it came from; a member is mailed their code', async () => {
   const { base } = await serve('tokens');
   const post = (path: string, body: unknown) => fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, ...(await r.json()) }));
   const mailTo = async (to: string) => {

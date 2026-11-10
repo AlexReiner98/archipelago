@@ -1,4 +1,4 @@
-// The mail this server sends: an invitation and a sign-in link, plain text. It goes out from this server itself
+// The mail this server sends: an invitation and a sign-in code, plain text. It goes out from this server itself
 // (src/smtp.ts), signed with DKIM so the recipient's server can tell it really comes from our domain.
 //
 // Settings, from the environment:
@@ -123,7 +123,7 @@ const dkimKey = () => {
 export async function sendMail(mail: Mail): Promise<void> {
   if (mailer) return mailer(mail);
   const from = env('MAIL_FROM');
-  // Unsent, the log says only that it was not: its text holds sign-in links and codes, which a log must not keep.
+  // Unsent, the log says only that it was not: its text holds sign-in codes, which a log must not keep.
   if (!from) {
     console.log(`mail not sent (PELAGO_MAIL_FROM is not set): "${mail.subject}"`);
     return;
