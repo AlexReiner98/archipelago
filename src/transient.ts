@@ -33,6 +33,13 @@ export async function kept<T>(db: Q, key: string): Promise<T | undefined> {
   return rows[0]?.value;
 }
 
+/** What is kept under each of some keys, those that have not run out, in one read: by key. */
+export async function keptAll<T>(db: Q, keys: string[]): Promise<Map<string, T>> {
+  if (!keys.length) return new Map();
+  const { rows } = await db.query<{ key: string; value: T }>(`select key, value from transient where key = any($1::text[]) and until >= now()`, [keys]);
+  return new Map(rows.map((r) => [r.key, r.value]));
+}
+
 /** What is kept under a key, with its bytes, if it has not run out. */
 export async function keptWith<T>(db: Q, key: string): Promise<{ value: T; data?: Buffer } | undefined> {
   const { rows } = await db.query<{ value: T; data: Uint8Array | null }>(`select value, data from transient where key = $1 and until >= now()`, [key]);

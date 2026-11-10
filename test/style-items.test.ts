@@ -47,7 +47,11 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
       // Read once the counts have come: the choices are drawn again with them.
       await page.until(`[...${list}.querySelectorAll('.find-count')].length > 0 || !${list}.textContent.includes('Pour')`);
       assert.ok(await page.still(`${list}.innerHTML`), 'the choices are drawn');
-      const row = await page.evaluate<{ tall: number; bar: number; note: string; drawing: boolean }>(`(() => { const c = ${choice('Item', 'Harbour blueprint')}; return { tall: c.getBoundingClientRect().height, bar: document.querySelector('#find .find-row').getBoundingClientRect().height, note: c.querySelector('.find-note')?.textContent ?? '', drawing: [...${list}.querySelectorAll('.q-label')].some((l) => l.textContent === 'Style') }; })()`);
+      // Measured once the choice is there, asked again while the list is drawn again under it.
+      type Row = { tall: number; bar: number; note: string; drawing: boolean } | null;
+      let row: Row = null;
+      for (let n = 0; n < 100 && !row; n++) row = await page.evaluate<Row>(`(() => { const c = ${choice('Item', 'Harbour blueprint')}; if (!c) return null; return { tall: c.getBoundingClientRect().height, bar: document.querySelector('#find .find-row').getBoundingClientRect().height, note: c.querySelector('.find-note')?.textContent ?? '', drawing: [...${list}.querySelectorAll('.q-label')].some((l) => l.textContent === 'Style') }; })()`);
+      assert.ok(row, 'the choice is drawn');
       assert.equal(row.note, 'Style', 'it says its type');
       assert.ok(!row.drawing, 'and no choice in Find draws the canvas in it');
       assert.ok(row.tall <= row.bar, `one line at ${width} px`);
@@ -55,6 +59,8 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
       assert.ok(await page.until(onPage(made.s)), `its page opens: ${await page.evaluate('location.hash')} ${page.logs().join('\n')}`);
       assert.equal(await page.evaluate(`${hash}.get('find')`), `id ${made.t}`, 'over the lens as it was');
       assert.ok(!(await page.evaluate(applied(made.s))), 'with nothing applied');
+      // The switch is drawn with the view's bar, which may come after the page: waited for, then read.
+      assert.ok(await page.until(`Boolean(${look})`), 'the switch is drawn');
       assert.equal(await page.evaluate(`${look}.value`), '', 'the switch still says the house’s');
 
       // Apply stands in the page's head, says what it does, and draws the canvas in the style as the switch does.
