@@ -35,6 +35,8 @@ export const UI_FILES: Record<string, string> = {
   '/draw.html': 'draw.html',
   '/draw.js': 'draw.js',
   '/draw-marks.js': 'draw-marks.js',
+  // What runs in a drawing's worker: written in front of draw-marks.js, and into a drawing's service worker (drawInside).
+  '/draw-inside.js': 'draw-inside.js',
   // The projector's pure part, which the page runs on the facts it reads (ui/replica.js): served from the kernel's own file.
   '/project.js': 'project.js',
   // What a stylesheet from the map may say, which the page checks a sheet by and the server checks page_css by on write.
@@ -81,9 +83,14 @@ async function current() {
       text.set(f, body.replace(/(\bfrom\s*|\bimport\s*\(\s*)?(['"])(\.?\/)([\w.-]+)\2/g, (all, imp, q, dot, name) => ((dot === '/' || imp) && named(`/${name}`) ? `${imp ?? ''}${q}${dot}${name}?v=${version}${q}` : all)));
     else text.set(f, body);
   }
+  // The frame's script is two files: what runs in a worker (draw-inside.js, handed to the worker as its text) and the frame's own.
+  text.set('draw-marks.js', `${text.get('draw-inside.js')}\n${text.get('draw-marks.js')}`);
   held = { key, version, text };
   return held;
 }
+
+/** What runs in a drawing's worker (ui/draw-inside.js) as served now: a drawing's service worker is built around it. */
+export const drawInside = async () => (await current()).text.get('draw-inside.js')!;
 
 /** The UI's version as served now: it moves when one of its files is saved. */
 export const uiVersion = async () => (await current()).version;
