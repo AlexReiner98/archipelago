@@ -97,7 +97,7 @@ offered (`ui/picker-rank.js`, task e_css8swr9).
 
 ### 5. Views are items, drawn from their query alone
 A view is a query and a layout kept on the map, an item of core's
-system type `lens`, and Home lists them. It is drawn from its answer alone,
+system type `lens`, and the bar's switcher lists them. It is drawn from its answer alone,
 the same each time it is asked, and no node is dragged or put by hand (the
 owner, 3 Nov 2026: Home wore down under places kept from other pictures). Position never carries meaning; a grouping that matters is made
 as a link.
