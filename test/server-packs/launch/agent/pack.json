@@ -1,0 +1,26 @@
+{
+  "id": "agent",
+  "version": "1",
+  "title": "Agent",
+  "reach": {
+    "server": {
+      "launchers": [
+        {
+          "id": "probe",
+          "argv": [
+            "node",
+            "-e",
+            "let p=\"\";process.stdin.on(\"data\",(d)=>(p+=d)).on(\"end\",()=>{const s=(m)=>console.log(JSON.stringify(m));const cfg=JSON.parse(require(\"fs\").readFileSync(process.argv[1],\"utf8\"));const t=process.env.PELAGO_AGENT_TOKEN;s({kind:\"env\",token:Boolean(t),same:cfg.mcpServers.pelago.headers.Authorization===\"Bearer \"+t,others:Object.keys(process.env).filter((k)=>/^PELAGO_/.test(k)&&k!==\"PELAGO_AGENT_TOKEN\"),args:process.argv.slice(2)});s({kind:\"said\",text:\"Read the brief: \"+p.includes(\"# Launch probe\")});s({kind:\"usage\",tokens:1234});setTimeout(()=>{if(p.includes(\"HANG\"))return void setInterval(()=>{},1000);s({kind:\"end\",ok:!p.includes(\"FAIL\"),text:\"All done\"});},100);});",
+            "--",
+            "{mcp_config}",
+            "--tools",
+            "{tools}",
+            "--model",
+            "{model}"
+          ],
+          "read": "read"
+        }
+      ]
+    }
+  }
+}

@@ -1,7 +1,11 @@
-// Launching: start a headless Claude Code session on a task from the map.
-// The session is registered before it starts, so it holds whatever exclusive
-// resource the task needs (or is refused), and its outcome is written back to
-// its run when it ends. Only a human can launch.
+// Launching: start a headless agent session on a task from the map. The session is registered before it starts, so
+// it holds whatever exclusive resource the task needs (or is refused), and its outcome is written back to its run when
+// it ends. Only a human can launch.
+//
+// What is held stays here, whoever names the command: the run, the token the process is given (and revoked when it
+// ends), the MCP config, the spawn, and what is recorded of each line it prints. The command and how its lines are
+// read come from a server pack's launcher (src/server-launch.ts, decision e_885ztqkv), or, until the claude_code pack
+// ships, from the kernel's own Claude Code launcher below.
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -11,8 +15,8 @@ import { createInterface } from 'node:readline';
 import { createToken, revokeToken } from './auth.ts';
 import { needHuman } from './actor-checks.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
-import { sessionEnd, sessionStart, sessionUpdate } from './sessions.ts';
-import { briefFor, promptFor, type LaunchInput, type StartedBy } from './launch-brief.ts';
+import { recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
+import { briefFor, promptFor, type LaunchInput, type LaunchMode, type StartedBy } from './launch-brief.ts';
 
 export type { LaunchMode, StartedBy } from './launch-brief.ts';
 
@@ -20,27 +24,116 @@ export type { LaunchMode, StartedBy } from './launch-brief.ts';
 // here because agent changes are held as proposals.
 const ALLOWED_TOOLS = ['query', 'change', 'report', 'assign', 'revise', 'ask'].map((t) => `mcp__pelago__${t}`).join(',');
 
-interface LauncherConfig {
+/** What a launcher's reading of one line it printed answers: each part recorded on the run. */
+export interface Read {
+  /** The tokens it has used so far, in all. */
+  tokens?: number;
+  /** What it said: a beat of its story, and what its run ends with if it says nothing after. */
+  said?: string;
+  /** It has finished: what it said last is its result. */
+  done?: boolean;
+  outcome?: 'finished' | 'failed';
+}
+
+/** What the kernel fills a launcher's command with. */
+export interface Fills {
+  prompt: string;
+  mcp_config: string;
+  tools: string;
+  model?: string;
+  /** The kernel's own launcher's alone: no pack is given these. */
+  session_id: string;
+  mode: LaunchMode;
+}
+
+/** One launch's command, and how what it prints is read. */
+export interface Command {
+  argv: string[];
+  /** Started through a shell: only the kernel's own, whose CLI is a .cmd shim on Windows. */
+  shell?: boolean;
+  /** Its environment; left out, the server's own (the kernel's own launcher only). */
+  env?: NodeJS.ProcessEnv;
+  /** Given the prompt on its standard input, when its command does not name it. */
+  stdin?: boolean;
+  /** Each of its said is told as a beat of the run's story. */
+  tells?: boolean;
+  /** With no outcome read, it failed even if it exited cleanly. */
+  needsResult?: boolean;
+  read(line: string): Promise<Read | undefined> | Read | undefined;
+  /** What is added to its summary when it ends. */
+  detail?(): string;
+}
+
+/** How a launch is started: a server pack's launcher (pack, its id), or the kernel's own. */
+export interface Launcher {
+  pack?: string;
+  command(fill: Fills, token: string | undefined): Command;
+}
+
+export interface LauncherConfig {
   /** The pelago MCP endpoint to give the session. */
   mcpUrl: string;
   /** Where transcripts and the MCP config file are written. */
   dir: string;
-  /** argv prefix of the Claude Code CLI. */
+  /** argv prefix of the Claude Code CLI, for the kernel's own launcher. */
   command: string[];
   /** The server requires tokens, so each launched session is given one of its own. */
   auth?: boolean;
+  /** The model a launcher's {model} is filled with. */
+  model?: string;
+  /** A server pack's launcher, in place of the kernel's own (src/server-launch.ts). */
+  via?: Launcher;
 }
 
 let config: LauncherConfig | undefined;
-const running = new Map<string, ChildProcess>();
+const running = new Map<string, { child: ChildProcess; pack?: string }>();
 
-export function configureLauncher(next: LauncherConfig): void {
+/** Set how this server launches; undefined turns launching off. */
+export function configureLauncher(next: LauncherConfig | undefined): void {
   config = next;
+}
+
+/** The kernel's own launcher: Claude Code, its stream-json read here. Moves to the claude_code pack (the adapter cut). */
+function claudeCode(prefix: string[]): Launcher {
+  return {
+    command: (fill) => {
+      let result: { is_error?: boolean; result?: string; total_cost_usd?: number; num_turns?: number } | undefined;
+      let lastText = '';
+      let plan = '';
+      const args = ['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', fill.mode, '--session-id', fill.session_id, '--mcp-config', fill.mcp_config, '--allowedTools', fill.tools];
+      return {
+        argv: [...prefix, ...args],
+        // On Windows the CLI is a .cmd shim, which only a shell can start.
+        shell: process.platform === 'win32',
+        stdin: true,
+        needsResult: true,
+        read(line) {
+          let message;
+          try {
+            message = JSON.parse(line);
+          } catch {
+            return undefined; // Not every line is JSON; the transcript keeps it either way.
+          }
+          // In plan mode the answer arrives as a plan, or as the last thing said, and the result itself comes back empty.
+          for (const part of message.type === 'assistant' ? (message.message?.content ?? []) : []) {
+            if (part.type === 'text' && part.text?.trim()) lastText = part.text;
+            if (part.type === 'tool_use' && part.name === 'ExitPlanMode' && part.input?.plan) plan = part.input.plan;
+          }
+          if (message.type !== 'result') return lastText ? { said: plan || lastText } : plan ? { said: plan } : undefined;
+          result = message;
+          return { done: true, said: result!.result || plan || lastText || undefined, outcome: result!.is_error ? 'failed' : 'finished' };
+        },
+        detail: () => (result ? `${result.num_turns ?? '?'} turns${result.total_cost_usd != null ? `, $${result.total_cost_usd.toFixed(2)}` : ''}` : ''),
+      };
+    },
+  };
 }
 
 export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, by?: StartedBy) {
   needHuman(actor, 'Only a human can launch a session.');
-  if (!config) throw new Error('Launching is off on this server. It starts Claude Code in a repository on the machine the server runs on, so it works only on a server that listens on that machine alone.');
+  if (!config) throw new Error('Launching is off on this server. It starts an agent in a repository on the machine the server runs on, so it works only on a server that listens on that machine alone.');
+  const at = config;
+  const via = at.via ?? claudeCode(at.command);
   const mode = input.mode ?? 'plan';
   const { brief, started } = await briefFor(l, actor, input, by);
   const cwd = brief.repo?.path;
@@ -49,8 +142,9 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
 
   // Register first: this is what takes the lane, or tells us it is taken.
   const sessionId = randomUUID();
-  const agent: Actor = { kind: 'agent', name: 'claude-headless' };
-  const begun = await sessionStart(l, agent, { task: input.task, cwd, session_id: sessionId, surface: 'claude-headless', title: `Headless (${mode}): ${brief.task.title}` });
+  const surface = via.pack ? `pack:${via.pack}` : 'claude-headless';
+  const agent: Actor = { kind: 'agent', name: via.pack ? `launched:${via.pack}` : 'claude-headless' };
+  const begun = await sessionStart(l, agent, { task: input.task, cwd, session_id: sessionId, surface, title: `Headless (${mode}): ${brief.task.title}` });
   const run = begun.run;
   if (begun.status === 'waiting') {
     const why = (('blocked' in begun ? begun.blocked : undefined) ?? []).map((b) => b.why).join(' ');
@@ -58,86 +152,100 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
     throw new Error(`Not launched. ${why}`);
   }
 
-  mkdirSync(config.dir, { recursive: true });
+  mkdirSync(at.dir, { recursive: true });
   // With tokens on, the session gets its own agent token, good for a day and revoked the moment it ends; one someone
   // else started may only propose. The run says who. (With tokens off there is no identity to hold: everyone is the owner.)
-  const key = config.auth ? await createToken(l.db, l.workspace, { kind: 'agent', name: `launched:${run}`, expires_days: 1, entity: l.viewer || undefined, ...(started && { may: 'propose' as const }) }) : undefined;
+  const key = at.auth ? await createToken(l.db, l.workspace, { kind: 'agent', name: `launched:${run}`, expires_days: 1, entity: l.viewer || undefined, ...(started && { may: 'propose' as const }) }) : undefined;
   if (started) await l.apply(actorId(agent), { ops: [{ op: 'update', id: run, props: { started_by: started } }], reason: `Started by ${started.name}` });
-  const mcpFile = join(config.dir, `${run}.mcp.json`);
-  writeFileSync(mcpFile, JSON.stringify({ mcpServers: { pelago: { type: 'http', url: config.mcpUrl, ...(key && { headers: { Authorization: `Bearer ${key.token}` } }) } } }));
-  const transcript = join(config.dir, `${run}.jsonl`);
+  const mcpFile = join(at.dir, `${run}.mcp.json`);
+  writeFileSync(mcpFile, JSON.stringify({ mcpServers: { pelago: { type: 'http', url: at.mcpUrl, ...(key && { headers: { Authorization: `Bearer ${key.token}` } }) } } }));
+  const transcript = join(at.dir, `${run}.jsonl`);
   const prompt = promptFor(brief, mode, run, input.instructions);
+  const close = async (summary: string) => {
+    if (key) await revokeToken(l.db, key.id).catch(() => {});
+    rmSync(mcpFile, { force: true });
+    await sessionEnd(l, agent, { run, outcome: 'failed', summary });
+  };
 
-  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', mode, '--session-id', sessionId, '--mcp-config', mcpFile, '--allowedTools', ALLOWED_TOOLS];
-  // On Windows the CLI is a .cmd shim, which only a shell can start.
-  const shell = process.platform === 'win32';
-  const quote = (a: string) => (shell && /\s/.test(a) ? `"${a}"` : a);
-  const [bin, ...prefix] = config.command;
+  let command: Command;
   let child: ChildProcess;
   try {
-    child = spawn(quote(bin), [...prefix, ...args].map(quote), { cwd, shell, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    command = via.command({ prompt, mcp_config: mcpFile, tools: ALLOWED_TOOLS, model: at.model, session_id: sessionId, mode }, key?.token);
+    const quote = (a: string) => (command.shell && /\s/.test(a) ? `"${a}"` : a);
+    const [bin, ...rest] = command.argv;
+    child = spawn(quote(bin), rest.map(quote), { cwd, shell: Boolean(command.shell), env: command.env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   } catch (err) {
-    await sessionEnd(l, agent, { run, outcome: 'failed', summary: `Could not start: ${(err as Error).message}` });
+    await close(`Could not start: ${(err as Error).message}`);
     throw err;
   }
-  running.set(run, child);
-  child.stdin!.end(prompt);
+  running.set(run, { child, pack: via.pack });
+  child.stdin!.on('error', () => {});
+  child.stdin!.end(command.stdin ? prompt : undefined);
 
   const log = createWriteStream(transcript);
-  let result: { is_error?: boolean; result?: string; total_cost_usd?: number; num_turns?: number } | undefined;
-  let lastText = '';
-  let plan = '';
+  const last: Read = {};
   let stderr = '';
   let lastBeat = Date.now();
+  // Lines are read one after another, in the order printed, and the run ends only after the last is recorded.
+  let reading: Promise<void> = Promise.resolve();
+  const record = async (line: string) => {
+    const got = await command.read(line);
+    if (!got) return;
+    if (typeof got.tokens === 'number') await recordUsage(l, sessionId, got.tokens).catch(() => {});
+    if (typeof got.said === 'string' && got.said.trim()) {
+      last.said = got.said;
+      if (command.tells) await tell(l, agent, { run, said: got.said.trim().slice(0, 280) }).catch(() => {});
+    }
+    if (got.done) last.done = true;
+    if (got.outcome === 'finished' || got.outcome === 'failed') last.outcome = got.outcome;
+  };
   child.stderr!.on('data', (chunk: Buffer) => (stderr = (stderr + chunk.toString()).slice(-2000)));
   createInterface({ input: child.stdout! }).on('line', (line) => {
     log.write(line + '\n');
-    try {
-      const message = JSON.parse(line);
-      if (message.type === 'result') result = message;
-      // In plan mode the answer arrives as a plan, or as the last thing said,
-      // and the result itself comes back empty.
-      for (const part of message.type === 'assistant' ? (message.message?.content ?? []) : []) {
-        if (part.type === 'text' && part.text?.trim()) lastText = part.text;
-        if (part.type === 'tool_use' && part.name === 'ExitPlanMode' && part.input?.plan) plan = part.input.plan;
-      }
-    } catch {
-      // Not every line is JSON; the transcript keeps it either way.
-    }
+    reading = reading.then(() => record(line)).catch((err) => {
+      stderr = `${stderr}\nIts line could not be read: ${(err as Error).message}`.slice(-2000);
+      // A pack no longer on the server reads nothing more: its process is stopped.
+      if (/No server pack/.test((err as Error).message)) stopLaunched(run);
+    });
     if (Date.now() - lastBeat > 20_000) {
       lastBeat = Date.now();
       sessionUpdate(l, agent, { run }).catch(() => {});
     }
   });
 
-  const finish = async (problem?: string) => {
+  const finish = async (problem?: string, code?: number | null) => {
     if (!running.delete(run)) return;
+    await reading;
     log.end();
     if (key) await revokeToken(l.db, key.id).catch(() => {});
     rmSync(mcpFile, { force: true });
-    const ok = !problem && result && !result.is_error;
-    const detail = result ? `${result.num_turns ?? '?'} turns${result.total_cost_usd != null ? `, $${result.total_cost_usd.toFixed(2)}` : ''}` : '';
-    const text = problem ?? (result?.result || plan || lastText || stderr.trim() || 'The session ended without a result.');
-    await sessionEnd(l, agent, {
-      run,
-      outcome: ok ? 'finished' : 'failed',
-      summary: `${text.slice(0, 6000)}\n\n(${[detail, `transcript: ${transcript}`].filter(Boolean).join('; ')})`,
-    }).catch(() => {});
+    // What it read last decides; else it finished if it said it was done, or exited cleanly where no result is needed.
+    const outcome = problem ? 'failed' : (last.outcome ?? (last.done || (!command.needsResult && code === 0) ? 'finished' : 'failed'));
+    const text = problem ?? (last.said || stderr.trim() || 'The session ended without a result.');
+    const detail = command.detail?.() ?? '';
+    await sessionEnd(l, agent, { run, outcome, summary: `${text.slice(0, 6000)}\n\n(${[detail, `transcript: ${transcript}`].filter(Boolean).join('; ')})` }).catch(() => {});
   };
   child.on('error', (err) => void finish(`Could not start: ${err.message}`));
-  child.on('close', () => void finish());
+  child.on('close', (code) => void finish(undefined, code));
 
   return { run, session_id: sessionId, mode, cwd, transcript, claimed: ('claimed' in begun ? begun.claimed : undefined) ?? [] };
 }
 
 /** Kill a launched session's process, if this server started one for the run. */
 export function stopLaunched(run: string): boolean {
-  const child = running.get(run);
+  const child = running.get(run)?.child;
   if (!child) return false;
-  // With a shell in between, killing the child would orphan the CLI itself.
+  // With a shell in between, killing the child would orphan the CLI itself; and what it started goes with it.
   if (process.platform === 'win32' && child.pid) spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true });
   else child.kill();
   return true;
+}
+
+/** Stop every process a server pack's launcher started: the pack is gone. Their runs end as their processes do. */
+export function stopLaunchedOf(pack: string): string[] {
+  const runs = [...running].filter(([, r]) => r.pack === pack).map(([run]) => run);
+  for (const run of runs) stopLaunched(run);
+  return runs;
 }
 
 export function stopAllLaunched(): void {
