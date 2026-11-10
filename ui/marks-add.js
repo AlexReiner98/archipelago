@@ -7,7 +7,7 @@
 
 import { addOn } from './layout-asks.js';
 
-/** Make `el` a button that adds an item on the island it stands for; what it makes is read into the view at once. */
+/** Make `el` a button that adds an item on the island it stands for; what it makes stays in sight (ui/keep-in-view.js). */
 export function addable(el) {
   el.setAttribute('role', 'button');
   el.setAttribute('tabindex', '0');
@@ -15,7 +15,7 @@ export function addable(el) {
     ev.preventDefault();
     ev.stopPropagation();
     const island = el.dataset.item;
-    if (island && (await addOn(island))) el.dispatchEvent(new CustomEvent('lens-read', { bubbles: true }));
+    if (island) await addOn(island);
   };
   el.addEventListener('click', go);
   el.addEventListener('keydown', (ev) => (ev.key === 'Enter' || ev.key === ' ') && go(ev));

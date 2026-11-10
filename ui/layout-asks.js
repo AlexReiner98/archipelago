@@ -6,6 +6,7 @@
 // make one item and to link what is drawn, nothing more; a session that may not write is told so.
 
 import { api, ask, may, tell } from './base.js';
+import { keepInView } from './keep-in-view.js';
 import { store } from './live.js';
 import { fits, isA, kept, relations, typeChoice, types, workType } from './words.js';
 
@@ -108,11 +109,13 @@ async function putToPerson(said) {
 
 /**
  * Add an item on an island, from the page's own button by its legend: put to the person (its type, its name) and sent
- * as theirs. Answers whether it was made or held; a refusal is told.
+ * as theirs, and kept in sight on the canvas up, its query as it was but for the item (ui/keep-in-view.js). A refusal
+ * is told.
  */
 export async function addOn(island) {
   const came = await drawingAsked({ ops: [{ op: 'create', ref: 'new', props: { island } }], reason: 'Added on the canvas' });
   if (came.error && !/^Not added/.test(came.error)) await tell('Nothing was added', came.error);
   else if (came.proposal) await tell('Held for approval', came.held || 'A rule holds this change for a person to approve before it applies.');
-  return !came.error;
+  const id = came.created?.new;
+  if (id) await keepInView([{ id, term: `id ${id}` }]);
 }

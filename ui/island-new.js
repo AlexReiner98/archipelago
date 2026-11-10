@@ -3,19 +3,20 @@
 // because a picture draws an island round what lives on it: an empty one would stand nowhere to add to.
 
 import { api, ask, h, may, state, tell } from './base.js';
+import { keepInView } from './keep-in-view.js';
 import { askNew } from './layout-asks.js';
 
 /** Whether this map holds its packs to the island rules (workspace_info islands), read once a page. */
 let on;
 export const islandsOn = () => (on ??= api('workspace_info').then((info) => info?.islands === true, () => false));
 
-/** The band's button for it, where this session may write on a map with islands. `open` goes to an address. */
-export async function newIslandButton(open) {
+/** The band's button for it, where this session may write on a map with islands. */
+export async function newIslandButton() {
   if (!may('write') || !(await islandsOn())) return null;
-  return h('button', { type: 'button', class: 'q-save q-word q-island', title: 'A new island: its name, the pack it speaks and its first item', 'aria-label': 'New island', onclick: () => newIsland(open) }, h('span', { class: 'q-word-text' }, '+ Island'));
+  return h('button', { type: 'button', class: 'q-save q-word q-island', title: 'A new island: its name, the pack it speaks and its first item', 'aria-label': 'New island', onclick: newIsland }, h('span', { class: 'q-word-text' }, '+ Island'));
 }
 
-async function newIsland(open) {
+async function newIsland() {
   const title = await ask({ title: 'New island', input: { placeholder: 'Its name, a few words' }, action: 'Next' });
   if (!title) return;
   const packs = state.schema?.packs ?? [];
@@ -33,7 +34,8 @@ async function newIsland(open) {
     });
     const id = made.created?.island;
     if (made.status !== 'applied') await tell('Held for approval', made.held_by?.say ?? 'A rule holds this change for a person to approve before it applies.');
-    else if (id) open(`#/v?find=${encodeURIComponent(`island ${id}`)}`);
+    // The canvas up keeps its query, with the new island added where it would not find it (ui/keep-in-view.js).
+    else if (id) await keepInView([{ id: made.created.first, term: `island ${id}` }]);
   } catch (err) {
     tell('No island was made', err.message);
   }
