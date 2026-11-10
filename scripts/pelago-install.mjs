@@ -182,6 +182,6 @@ if (!DRY && done.includes('Claude Code')) {
 }
 
 say(done.length ? `\nDone: ${done.join(', ')} ${done.length > 1 ? 'are' : 'is'} connected. The next session there answers from your map.` : '\nNothing was connected.');
-if (done.includes('Claude Code')) say(`An agent in a session that was already open can reach the map now with:\n  node "${loginFile}" call query "{\\"name\\":\\"frontier\\"}"`);
+if (done.includes('Claude Code')) say(`An agent in a session that was already open can reach the map now with:\n  node "${loginFile}" call query name=frontier`);
 // Left to end by itself: on Windows, exiting while a fetch's socket is closing can crash node.
 process.exitCode = done.length ? 0 : 1;

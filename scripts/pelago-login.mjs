@@ -7,6 +7,7 @@
 //   node pelago-login.mjs sign-in [<origin>]          sign in, waiting for the browser (the installer runs it)
 //   node pelago-login.mjs headers                     the sign-in as headers, for Claude Code's headersHelper
 //   node pelago-login.mjs call <tool> '<json>'        one call to the map, for a session whose tools have not loaded
+//   node pelago-login.mjs call <tool> name=frontier   the same, its input as words, with no quotes for a shell to eat
 //   node pelago-login.mjs <origin> <folder> <port> <verifier> <state> <client id> [<address to open>]   (started by the hook, detached)
 
 import { execFile, execFileSync, spawn } from 'node:child_process';
@@ -232,8 +233,11 @@ if (process.argv[1] && existsSync(process.argv[1]) && same(fileURLToPath(import.
     process.stdout.write(JSON.stringify(token ? { Authorization: `Bearer ${token}` } : {}));
   } else if (what === 'sign-in') process.exit((await signInHere((rest[0] || originNamed()).replace(/\/$/, ''))) ? 0 : 1);
   else if (what === 'call') {
-    // node pelago-login.mjs call <tool> '<json>': the answer, never the token.
-    const { status, text } = await call(originNamed(), rest[0], JSON.parse(rest[1] || '{}'));
+    // node pelago-login.mjs call <tool> '<json>', or name=value words with no quotes to survive a shell (PowerShell
+    // drops the quotes inside an argument): the answer, never the token.
+    const words = rest.slice(1);
+    const input = !words.length ? {} : words[0].trim().startsWith('{') ? JSON.parse(words[0]) : Object.fromEntries(words.map((w) => (w.includes('=') ? [w.slice(0, w.indexOf('=')), w.slice(w.indexOf('=') + 1)] : [w, true])));
+    const { status, text } = await call(originNamed(), rest[0], input);
     process.stdout.write(text + '\n');
     process.exit(status < 300 ? 0 : 1);
   } else await waitForBrowser(process.argv.slice(2));
