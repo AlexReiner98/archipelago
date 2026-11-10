@@ -103,3 +103,20 @@ test('a pack’s drawing has a service worker beside its modules; one kept on th
   await serveDrawingFile(r, `/drawing/${mine.hash}/sw.js`, { tooOften: () => false, reader: async () => l });
   assert.deepEqual([none.status, none.body], [404, '']);
 });
+
+test('a pack’s drawing is served past the open limit, all its modules at once; a hash not the packs’ is counted', async () => {
+  const l = await fresh();
+  const pack = layoutFor(l.registry, { shape: 'map' }, [])!;
+  // A limit already reached: tooOften answers 429 itself, as the server's does, and says so.
+  let counted = 0;
+  const limited = (res: ServerResponse) => () => (counted++, res.writeHead(429, {}).end(), true);
+  for (const name of ['sw.js', 'index.js', 'look.js']) {
+    const { out, res } = written();
+    await serveDrawingFile(res, `/drawing/${pack.hash}/${name}`, { tooOften: limited(res), reader: async () => l });
+    assert.equal(out.status, 200, name);
+  }
+  assert.equal(counted, 0);
+  const { out, res } = written();
+  await serveDrawingFile(res, `/drawing/${'0'.repeat(64)}/index.js`, { tooOften: limited(res), reader: async () => l });
+  assert.deepEqual([out.status, counted], [429, 1]);
+});

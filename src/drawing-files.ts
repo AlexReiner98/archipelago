@@ -40,6 +40,9 @@ export async function drawingWorker(l: Archipelago, hash: string): Promise<strin
   return `import * as made from './index.js';\n${await drawInside()}\ninside(null, made);\n`;
 }
 
+/** Whether the drawing with this hash is a pack's own: read from what the packs ship, never from the map. */
+export const shippedDrawing = (l: Archipelago, hash: string) => HASH.test(hash) && shippedBy(l.registry).has(hash);
+
 /** The text of one module of the drawing with this hash, as this map shows it to its reader; null if there is none. */
 export async function drawingFile(l: Archipelago, hash: string, name: string): Promise<string | null> {
   if (!HASH.test(hash) || !NAME.test(name)) return null;
