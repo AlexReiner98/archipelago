@@ -33,7 +33,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './auth.ts'; import { firstStart } from './first-start.ts';
 import { notify } from './notify.ts'; import { alertOnCrash } from './alert.ts';
-import { backupAll, parseBackup, parseVault } from './backup.ts'; import { adminEmails, admitMember, configureMembers, memberLimit, ownerEmail } from './members.ts'; import { configureEnded, readEnded } from './ended.ts'; import { askedAs, configurePlan, requestWait, slowTokensAt, storageBytes, tooManyRequests } from './plan.ts';
+import { backupAll, parseBackup, parseVault } from './backup.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from './members.ts'; import { requestWait } from './standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from './workspace-use.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts'; import { env } from './env.ts';
 import { SHORT, serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
@@ -103,7 +103,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   serverPacks.origin = named[0] ? `https://${named[0]}` : origins[0];
   configureConnections(serverPacks);
   setReach({ hold: (id) => workspaces.hold(id), connection: async (id, pack) => { const c = await serverPacks.connectionOf(pack, id); return c ? { id: c.id, account: c.account } : null; }, via: (id, pack, host, path) => serverPacks.lent(pack, host, id, path) });
-  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), limitOf: async (id) => (id === 'default' ? undefined : memberLimit((await workspaces.get('default')).pelago.db, id)) }); configureIndex(() => workspaces.control()); configureEnded(async (id) => (id === 'default' ? undefined : readEnded((await workspaces.get('default')).pelago.db, id))); configurePlan({ storageOf: async (id) => storageBytes((await workspaces.get(id)).pelago.db) }); slowTokensAt(options.limits?.token);
+  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => dueForDeletion(serverPacks, await workspaces.control(), now); slowTokensAt(options.limits?.token);
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
   const running = { commit: startedFrom(), started: new Date().toISOString() };
@@ -158,7 +158,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       const at = await personAt(token, asked, async (w) => ((await workspaces.has(w)) ? (await workspaces.get(w)).pelago.db : undefined));
       if (!at) throw deny(); // not a member there: the same answer as a token nobody made
       res.once('close', workspaces.hold(at.workspace)); const ws = await workspaces.get(at.workspace), as = at.actor;
-      const slow = await requestWait(ws.id, token, askedAs(as)); if (slow) throw new Refused(429, await tooManyRequests(ws.id, slow), slow);
+      const slow = await requestWait(ws.id, token, askedAs(as)); if (slow.wait) throw new Refused(429, slow.refusal!, slow.wait);
       return { ws, pelago: ws.pelago.as(as.person ?? '', false), actor: (label) => (label ? { ...as, name: `${as.name}/${label}` } : as) };
     }
     if (!token || !id || !(await workspaces.has(id))) throw deny();
@@ -174,7 +174,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       await unindexToken(control, hashSecret(token));
       throw deny();
     } else if (((await asked()) || id) !== id) throw deny(); // its own workspace alone, asked once it is known good
-    const slow = await requestWait(ws.id, token, askedAs(identity.actor)); if (slow) throw new Refused(429, await tooManyRequests(ws.id, slow), slow);
+    const slow = await requestWait(ws.id, token, askedAs(identity.actor)); if (slow.wait) throw new Refused(429, slow.refusal!, slow.wait);
     if (identity.newPlace)
       await notify(ws.pelago, { kind: 'agent', name: 'pelago' }, {
         title: `The token "${identity.actor.name}" was used from a new place`,

@@ -333,7 +333,7 @@ if (name === 'session-start') {
     try {
       const said = JSON.parse(body);
       const git = gitState(said.cwd);
-      if (git) body = JSON.stringify({ ...said, git });
+      if (git) body = JSON.stringify({ ...said, stands: git });
     } catch {
       // Not JSON: it goes as it came.
     }

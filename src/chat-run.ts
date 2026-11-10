@@ -2,9 +2,10 @@
 // One chat is one session under one name; its agent saying it is done does not end it, the chat ending does.
 
 import { actorId, type Actor, type Entity, type Archipelago } from './pelago.ts';
-import { awakeSessions, roomForSession } from './plan.ts'; import { wholeMap } from './outbox.ts';
+import { roomForSession } from './standing.ts'; import { awakeSessions } from './workspace-use.ts'; import { wholeMap } from './outbox.ts';
+import { CLAUDE_CODE } from './claude-code.ts';
 
-/** How many sessions are at work in the workspace, whoever's they are (src/plan.ts). */
+/** How many sessions are at work in the workspace, whoever's they are (src/workspace-use.ts). */
 export const sessionsAwake = async (l: Archipelago) => awakeSessions((await wholeMap(l)).db, l.registry.family('run'));
 
 /** Find a run by its entity id or by the session id its surface gave it. */
@@ -30,7 +31,7 @@ export async function takeUp(l: Archipelago, actor: Actor, run: Entity): Promise
 /** The chat goes on: a prompt to a session that was ended, or that had said where its work stands, takes it up under its name. */
 export async function sessionPrompted(l: Archipelago, sessionId: string | undefined): Promise<void> {
   const run = sessionId ? await resolveRun(l, sessionId) : undefined;
-  if (run && isChat(run) && (!run.is_open || run.status === 'waiting')) await takeUp(l, { kind: 'agent', name: 'claude-code' }, run);
+  if (run && isChat(run) && (!run.is_open || run.status === 'waiting')) await takeUp(l, CLAUDE_CODE, run);
 }
 
 /** How long after its hook registered a chat a call to register it again is taken to be the same chat. */
@@ -48,7 +49,7 @@ export async function hookRunHere(l: Archipelago, input: { cwd?: string; branch?
     `select * from entity where type = any($1::text[]) and is_open and archived_at is null and props ? 'session_id' and created_at > $2 order by created_at desc limit 50 -- index entity_type`,
     [l.registry.family('run'), new Date(Date.now() - JOIN_MS).toISOString()],
   );
-  const branchOf = (run: Entity) => (run.props.branch ?? (run.props.git as { branch?: string } | undefined)?.branch) as string | undefined;
+  const branchOf = (run: Entity) => (run.props.branch ?? (run.props.stands as { branch?: string } | undefined)?.branch) as string | undefined;
   const here = rows.filter((run) => isChat(run) && typeof run.props.cwd === 'string' && folder(run.props.cwd) === folder(input.cwd!) && (!input.branch || !branchOf(run) || branchOf(run) === input.branch));
   const busy = here.filter((run) => run.props.busy === true);
   return here.length === 1 ? here[0] : busy.length === 1 ? busy[0] : undefined;

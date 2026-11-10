@@ -14,8 +14,8 @@
  */
 export const MAP_TABLES = ['entity', 'relation', 'log_entry', 'log_fact', 'log_op'];
 
-/** The fields operational may write on an item. Anything else on an item is a fact, and changes through change. */
-export const KEPT_FIELDS = ['last_seen', 'active', 'busy', 'git', 'tokens_used', 'story', 'stale_flagged', 'last_run', 'last_fired', 'last_result', 'rechecked_at'];
+/** The fields operational may write on an item. Anything else on an item is a fact, and changes through change. git is what stands was called on runs heard before 10 Nov 2026. */
+export const KEPT_FIELDS = ['last_seen', 'active', 'busy', 'stands', 'git', 'tokens_used', 'story', 'stale_flagged', 'last_run', 'last_fired', 'last_result', 'rechecked_at'];
 
 /** Tables beside the map, each with the rule it keeps. */
 export const STORES: Record<string, string> = {

@@ -60,15 +60,14 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
   assert.deepEqual([me.workspace.id, me.actor.name, me.actor.admin], ['acme', 'rosa@acme.example', true]);
   assert.equal((await post('/connect/join', { code })).status, 410, 'a link works once');
 
-  // A plan's member limit, set by the pack on its own workspace: one more past it is refused, saying how to make room.
-  assert.deepEqual((await post('/x/demo/limit', { workspace: 'acme', members: 1, note: 'Move to the larger plan for more.' })).result, { workspace: 'acme', members: 1 });
+  // A plan's member limit, said by the pack that made the workspace at its gate: one more past it is refused, saying how to make room.
+  assert.deepEqual((await post('/x/demo/limit', { workspace: 'acme', members: 1, note: 'Move to the larger plan for more.' })).result, { workspace: 'acme' });
   assert.match((await call('/api/member_add', token, { email: 'sam@acme.example' })).error, /Acme has room for 1 member\. Move to the larger plan for more\./);
-  assert.match((await post('/x/demo/limit', { workspace: 'default', members: 1 })).error, /not a workspace this pack made/);
-  assert.match((await post('/x/demo/limit', { workspace: 'acme', members: 0 })).error, /a whole number/);
+  assert.equal((await post('/x/demo/standing', { workspace: 'acme' })).status, 404, 'a gate is the kernel’s to ask, no one else’s');
   const bob = (await call('/api/change', token, { reason: 'test', ops: [{ op: 'create', ref: 'b', type: 'person', title: 'Bob' }] })).result.created.b;
   assert.match((await call('/api/token_create', token, { name: 'bob', kind: 'human', entity: bob })).error, /signs in as a member/, 'no seat by a token');
-  // How the pack sells (a plan's name, a trial's end, where to pay) is its own: the server keeps only the limits and the note.
-  await post('/x/demo/limit', { workspace: 'acme', members: 2, plan: 'Duo', until: new Date().toISOString(), manage: 'javascript:alert(1)' });
+  // How the pack sells (a plan's name, a trial's end, where to pay) is its own: the server reads only the limits and the note, and a limit that is no whole number from 1 is none.
+  await post('/x/demo/limit', { workspace: 'acme', members: 2, sessions: 0, plan: 'Duo', until: new Date().toISOString(), manage: 'javascript:alert(1)' });
   assert.deepEqual((await call('/api/workspace_info', token)).result.member_limit, { members: 2 });
   assert.equal((await call('/api/member_add', token, { email: 'sam@acme.example' })).result.email, 'sam@acme.example');
   assert.match((await call('/api/member_add', token, { email: 'kim@acme.example' })).error, /room for 2 members\.$/);
@@ -112,11 +111,6 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
     ['server.workspace.create', 'pack:demo'],
     ['server.workspace.admit', 'pack:demo'],
     ['server.signin.link', 'pack:demo'],
-    ['server.workspace.limit', 'pack:demo'],
-    ['server.workspace.limit', 'pack:demo'],
-    ['server.workspace.limit', 'pack:demo'],
-    ['server.workspace.end', 'pack:demo'],
-    ['server.workspace.end', 'pack:demo'],
   ]);
   // The refused delivery is told to the owner, once.
   const notes = (await call('/api/search', owner, { type: 'notification' })).result as any[];
@@ -124,7 +118,7 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
   const listed = (await call('/api/server_packs', owner)).result;
   // Those the configuration names are listed (the kernel ships none of its own).
   assert.deepEqual(listed.packs.map((p: any) => p.id), ['demo']);
-  assert.deepEqual(listed.packs.find((p: any) => p.id === 'demo').acts, ['workspace.create', 'workspace.admit', 'workspace.limit', 'workspace.end', 'signin.link']);
+  assert.deepEqual(listed.packs.find((p: any) => p.id === 'demo').acts, ['workspace.create', 'workspace.admit', 'signin.link']);
   assert.equal(listed.refused.length, 1);
   assert.match((await call('/api/server_packs', me.actor && token)).error, /default workspace/);
 

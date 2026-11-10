@@ -29,8 +29,13 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `shared` | Core's alone: the shared set, the type ids every pack on an island map may build on (below). |
 
 A **server pack** is a pack whose reach includes `server` (`acts`, `entries`,
-`pages`, `connect`, `aliases`, `agreements`). There is no other kind of
+`pages`, `connect`, `aliases`, `gates`). There is no other kind of
 pack: it is read by the server (`src/server-packs.ts`), never by a workspace.
+Its `gates` are where the kernel asks it before going ahead
+(`src/server-gates.ts`): `signin`, what a person agrees to before signing in,
+and `standing`, what a workspace it made may do (its limits, whether it has
+ended). It keeps what they answer from in its own store; with no gate, nothing
+is asked and nothing is limited.
 
 ## The keys before
 
@@ -45,7 +50,8 @@ warning, until the release after 0.1.0, and then refused.
 | `verbs` | `actions`, with `kernel: true` |
 | `schedules`, `hears`, `events` | `handlers` |
 | `hosts`, `secrets`, `webhooks`, `via` | `reach.*` |
-| `acts`, `entries`, `pages`, `connect`, `aliases`, `agreements` | `reach.server.*` |
+| `acts`, `entries`, `pages`, `connect`, `aliases` | `reach.server.*` |
+| `agreements` | `reach.server.gates.signin` |
 | `tier` | goes: `reach.server` makes a server pack |
 | `contract` | goes: nothing read it |
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { owed, recordAgreement, type Agreement } from '../src/agreements.ts';
+import { agreementsFrom, type Agreement } from '../src/server-gates.ts';
 import { checkServerPack } from '../src/server-packs.ts';
 import { mailbox, serve } from './serve.ts';
 
@@ -9,17 +9,12 @@ const FIXTURES = join(import.meta.dirname, 'agreement-packs');
 before(() => Object.assign(process.env, { PELAGO_SERVER_PACKS: FIXTURES }));
 after(() => delete process.env.PELAGO_SERVER_PACKS);
 
-test('a version agreed to is kept with every one before it; a new version is owed again, a stale one is not recorded', async () => {
-  const { workspaces } = await serve('off');
-  const control = (await workspaces.get('default')).pelago.db;
-  const v1: Agreement[] = [{ id: 'terms', title: 'Terms', url: '/t', version: '1' }];
-  const v2: Agreement[] = [{ ...v1[0], version: '2' }];
-  assert.deepEqual(await recordAgreement(control, 'rosa@acme.example', undefined, v1, 'test'), v1, 'nothing given, all owed');
-  assert.deepEqual(await recordAgreement(control, 'rosa@acme.example', [{ id: 'terms', version: '1' }], v1, 'test'), []);
-  assert.deepEqual(await recordAgreement(control, 'rosa@acme.example', [{ id: 'terms', version: '1' }], v2, 'test'), v2, 'the old version does not answer for the new');
-  assert.deepEqual(await recordAgreement(control, 'rosa@acme.example', [{ id: 'terms', version: '2' }], v2, 'test'), []);
-  assert.deepEqual(owed(v1, {}), v1);
-  assert.match(checkServerPack({ id: 'x', version: '1', title: 'X', reach: { server: { agreements: 'nowhere' } } }, FIXTURES).join(), /agreements name no entry/);
+test('a gate names a function of its handler that no one else can call', () => {
+  const gate = (gates: Record<string, string>, entries: { id: string }[] = []) => checkServerPack({ id: 'x', version: '1', title: 'X', reach: { server: { gates, entries } } } as never, join(FIXTURES, 'terms')).join();
+  assert.equal(gate({ signin: 'signin' }), '');
+  assert.match(gate({ signin: 'documents' }, [{ id: 'documents' }]), /is no entry or page/, 'an entry is anyone’s to call');
+  assert.match(gate({ sign_in: 'signin' }), /not a gate/);
+  assert.deepEqual(agreementsFrom([{ id: 'terms', title: 'T', url: '//elsewhere', version: '1' }, { id: 'ok', title: 'T', url: '/t', version: '1' }]).map((a) => a.id), ['ok']);
 });
 
 test('a sign-in waits until the documents in force are agreed to, without spending its link or code', async () => {
@@ -36,8 +31,8 @@ test('a sign-in waits until the documents in force are agreed to, without spendi
   assert.deepEqual(agreements[0].also, [{ title: "Conditions d'utilisation", url: '/x/terms/terms_fr' }], 'another language, named in its own; one that is no address is left out');
   assert.equal(agreements[1].also, undefined);
 
-  const { workspace } = (await post('/x/terms/make', { name: 'Acme', members: ['rosa@acme.example', 'sam@acme.example', 'kim@acme.example'] })).result;
-  const linkTo = async (email: string) => /#\/join\/(inv_[a-z0-9-]+_[0-9a-f]{40})$/.exec((await post('/x/terms/link', { workspace, email })).result.link)![1];
+  const { workspace } = (await post('/x/shop/make', { name: 'Acme', members: ['rosa@acme.example', 'sam@acme.example', 'kim@acme.example'] })).result;
+  const linkTo = async (email: string) => /#\/join\/(inv_[a-z0-9-]+_[0-9a-f]{40})$/.exec((await post('/x/shop/link', { workspace, email })).result.link)![1];
 
   // A link: asked to agree, and the link still works afterwards; agreed to, it signs in, once.
   const code = await linkTo('rosa@acme.example');
@@ -61,10 +56,10 @@ test('a sign-in waits until the documents in force are agreed to, without spendi
   assert.ok((await post('/connect/code', { email: 'sam@acme.example', code: typed, agree: both })).token);
 
   // A buyer who ticked the box at the signup is recorded by the pack, and not asked again; only a member of its own.
-  assert.deepEqual((await post('/x/terms/agreed', { workspace, email: 'kim@acme.example', agreed: both })).result, { owes: [] });
+  assert.deepEqual((await post('/x/shop/agreed', { workspace, email: 'kim@acme.example', agreed: both })).result, { owes: [] });
   assert.ok((await post('/connect/join', { code: await linkTo('kim@acme.example') })).token);
-  assert.match((await post('/x/terms/agreed', { workspace, email: 'stranger@example.com', agreed: both })).error, /not a member/);
-  assert.match((await post('/x/terms/agreed', { workspace: 'default', email: 'kim@acme.example', agreed: both })).error, /not a workspace this pack made/);
+  assert.match((await post('/x/shop/agreed', { workspace, email: 'stranger@example.com', agreed: both })).error, /not a member/);
+  assert.match((await post('/x/shop/agreed', { workspace: 'default', email: 'kim@acme.example', agreed: both })).error, /not a workspace this pack made/);
 });
 
 test('an address in no workspace is mailed where to begin, tagged with where it came from; a member is mailed their link', async () => {

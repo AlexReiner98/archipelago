@@ -2,11 +2,11 @@
 // (apply their changes, download backups, publish documents) is the owner's to give and take back.
 
 import { z } from 'zod';
-import { endedOf } from './ended.ts';
+import { endedOf, useOf, type Limits } from './standing.ts';
 import { limitOf, renameWorkspace } from './members.ts';
 import { looksThisHour } from './looks.ts';
 import { sessionsAwake } from './sessions.ts';
-import { requestsThisMinute, storageOf, useOf, type Limits } from './plan.ts';
+import { requestsThisMinute, storageOf } from './workspace-use.ts';
 import { acceptedSenders, wholeMap } from './outbox.ts';
 import { actorId, type Archipelago } from './pelago.ts';
 import { askedLately } from './replies.ts';
@@ -49,7 +49,7 @@ async function replyRules(l: Archipelago, lifted: Record<string, boolean>, set: 
   });
 }
 
-/** How much of what its limits cap the workspace uses now (src/plan.ts), each said as the Limits card shows it. */
+/** How much of what its limits cap the workspace uses now (src/standing.ts), each said as the Limits card shows it. */
 async function planUse(l: Archipelago, limits: Limits) {
   const { db } = await wholeMap(l);
   const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from member where removed_at is null`);

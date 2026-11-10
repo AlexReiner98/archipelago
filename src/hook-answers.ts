@@ -11,13 +11,15 @@ import { hookSessionEnd, hookSessionStart } from './session-hook.ts';
 import { sessionLabelled, sessionPromptNamed } from './session-name.ts';
 import { addTouched } from './touched.ts';
 import { fileSaid } from './file-said.ts';
-import { keepGit } from './git-state.ts';
+import { keepStands } from './stands.ts';
 import { sessionOpened } from './tool-change.ts';
 import { describeChanges, humanChanges, latestSeq, offeredActions } from './tools.ts';
 import { summed } from './summary.ts';
 import { seeingLine } from './seeing.ts';
 import { keep, kept } from './transient.ts';
 import { takeEvents } from './session-events.ts';
+import { instructionsFor } from './instructions.ts';
+import { CLAUDE_CODE, goOn, toldAs } from './claude-code.ts';
 
 export interface HookBody {
   session_id?: string;
@@ -42,7 +44,9 @@ export interface HookBody {
   /** At the file-used event: the file read or changed, and the instructions the session has been told about files already. */
   path?: unknown;
   said?: unknown;
-  /** At a turn's end and at the end: where the checkout stands (src/git-state.ts). */
+  /** At a turn's end and at the end: where the session's place stands, a small flat object its pack reads (src/stands.ts). */
+  stands?: unknown;
+  /** What stands was called until 10 Nov 2026, still sent by hooks set up before then: read as stands. */
   git?: unknown;
   /** At the events route: the adapter's batch of raw events, in the vocabulary of docs/sessions.md (src/session-events.ts). */
   events?: unknown;
@@ -75,12 +79,14 @@ const LIMITED =
 
 const actionsKey = (session: string | undefined) => `actions:${session ?? ''}`;
 
-// Claude Code lists the tools again when it reconnects after a restart (for some minutes after the stream drops), but
-// what its model already read of them (a tool loaded with ToolSearch) is the description as it was.
-const restarted = ({ started, commit }: HookCall['running'], added: string[] | undefined) =>
+/** What is said at `where` (an instruction's `for`), one after another: what to do about it is the instructions'. */
+const sayAt = async (l: Archipelago, where: string, fill: Record<string, string>) => (await instructionsFor(l, where, { fill })).map((one) => one.text).join(' ');
+
+// A client keeps the tools as they were when it connected; what to do about it is core's instruction for server_restarted.
+const restarted = async (l: Archipelago, { started, commit }: HookCall['running'], added: string[] | undefined) =>
   `The Archipelago server has restarted since this session began (at ${started}${commit ? `, now running commit ${commit.slice(0, 7)}` : ''}). ${
     added?.length ? `Actions new since you were given the tools: ${added.join('; ')}. ` : added ? 'No action is new since you were given the tools. ' : ''
-  }A pelago tool's description you read before the restart may be the old one: call an action by name under its verb even if that description lacks it (query with name actions gives its inputs), or load the tool again (ToolSearch for the verb: mcp__pelago__<verb>, or mcp__plugin_archipelago_pelago__<verb> where the plugin connected it) for the new one. If a pelago tool is missing altogether or answers that it is not connected, the client gave up reconnecting: ask the owner to reconnect it (in Claude Code: /mcp, pelago, Reconnect), and until then call it as plain JSON: POST /agent/<tool> on the same server with the same token. And if a pelago tool answers with a web page or "502" while the server is coming back, do not send it again through MCP (each such answer is a whole page in your context): wait until GET /health answers, then send it as plain JSON.`;
+  }${await sayAt(l, 'server_restarted', {})}`.trimEnd();
 
 /** The answer to one hook, or undefined for an event there is none for. */
 export async function answerHook(event: string, call: HookCall): Promise<object | undefined> {
@@ -88,12 +94,12 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   if (call.may === 'report') return {};
   // A token within some items registers and speaks for sessions in the places that are theirs, and for no others.
   if (within.length && !(await hookWithin(pelago, within, body, event === 'session-start'))) {
-    return event === 'session-start' ? { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: LIMITED } } : {};
+    return event === 'session-start' ? toldAs(event, LIMITED) : {};
   }
   // A file read or changed: what bites there, said once (src/file-said.ts). The ids it said go back beside the answer, for the hook to keep.
   if (event === 'file-used') {
     const told = await fileSaid(pelago, body).catch((err) => void console.error(`hook file: ${(err as Error).message}`));
-    return told ? { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: told.text }, said: told.ids } : {};
+    return told ? toldAs(event, told.text, { said: told.ids }) : {};
   }
   // An adapter's batch of what the session did, kept as raw events on its run.
   if (event === 'events') return takeEvents(pelago, body);
@@ -108,8 +114,8 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   if (run) await addTouched(whole, run.id, body.touched).catch((err) => console.error(`hook touched: ${(err as Error).message}`));
   if (run) await sessionLabelled(pelago, run, body.title).catch((err) => console.error(`hook title: ${(err as Error).message}`));
   if (run && event === 'prompt' && typeof body.title !== 'string') await sessionPromptNamed(pelago, run, body.prompt).catch((err) => console.error(`hook prompt title: ${(err as Error).message}`));
-  // Where its checkout stands, kept on the run while it is open: at the end, before the run is closed.
-  if (event === 'stop' || event === 'session-end') await keepGit(pelago, body.session_id, body.git).catch((err) => console.error(`hook git: ${(err as Error).message}`));
+  // Where its place stands, kept on the run while it is open: at the end, before the run is closed.
+  if (event === 'stop' || event === 'session-end') await keepStands(pelago, body.session_id, body.stands ?? body.git).catch((err) => console.error(`hook stands: ${(err as Error).message}`));
   if (event === 'prompt') {
     // Each time the owner sends a session a message, the session is told what the owner has done in the map since
     // it last heard: a decision made in the UI reaches the session with the next thing they say.
@@ -127,7 +133,7 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
       // Which actions are new is told against what the session was given, or was last told of.
       const now = offeredActions(pelago.registry);
       const had = await kept<string[]>(whole, actionsKey(body.session_id));
-      told.push(restarted(running, had && now.filter((a) => !had.includes(a))));
+      told.push(await restarted(pelago, running, had && now.filter((a) => !had.includes(a))));
       await keep(whole, actionsKey(body.session_id), now, HEARD_MS);
     }
     // How many of each, and the newest few: the rest is one query away.
@@ -148,7 +154,7 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
       const on = found ? narrowedText(found) : undefined;
       if (on) told.push(on);
     }
-    return told.length ? { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: told.join('\n\n') } } : {};
+    return told.length ? toldAs(event, told.join('\n\n')) : {};
   }
   if (event === 'session-start') {
     await keep(whole, heardKey(body.session_id), await latestSeq(pelago), HEARD_MS);
@@ -160,12 +166,14 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     if (run) call.ran?.(run.id);
     // A new one gets a tab of its own on the owner's page, or the tab of the one a clear ended in its chat; one taken up
     // again after it ended gets its tab back; one still open has its own already.
-    if (run && (!known || !known.is_open)) await sessionOpened(pelago, { kind: 'agent', name: 'claude-code' }, run.id, undefined, typeof run.props.took_over === 'string' ? run.props.took_over : undefined).catch((err) => console.error(`hook tab: ${(err as Error).message}`));
+    if (run && (!known || !known.is_open)) await sessionOpened(pelago, CLAUDE_CODE, run.id, undefined, typeof run.props.took_over === 'string' ? run.props.took_over : undefined).catch((err) => console.error(`hook tab: ${(err as Error).message}`));
     // A project keeps the files it was given when it was set up; the server moves on. A session is told when its
     // project is behind, since nothing else would: an old hook counts less, and old rules name tools as they were.
-    if (body.setup !== SETUP_VERSION)
-      additionalContext += `\n\nThis folder's Archipelago files (hooks, working rules, the bump skill) are older than the server's. Tell the owner in your first reply, and with their yes bring them up to date by running this in the folder (it holds no secret, and with nobody at a terminal it renews only what Archipelago wrote there before):${setupCommand(call.origin)} . What it changes takes effect in the next session.`;
-    return { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext } };
+    if (body.setup !== SETUP_VERSION) {
+      const behind = await sayAt(pelago, 'setup_behind', { command: setupCommand(call.origin) });
+      if (behind) additionalContext += `\n\n${behind}`;
+    }
+    return toldAs(event, additionalContext);
   }
   if (event === 'session-end') {
     await hookSessionEnd(pelago, body);
@@ -176,7 +184,8 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   if (event === 'stop') {
     await sessionHeard(pelago, body.session_id, 'until').catch((err) => console.error(`hook heard: ${(err as Error).message}`));
     const asking = body.session_id ? await resolveRun(pelago, body.session_id, true) : undefined;
-    return (await askOnReply(whole, pelago, asking, body).catch((err) => console.error(`hook reply rules: ${(err as Error).message}`))) ?? {};
+    const ask = await askOnReply(whole, pelago, asking, body).catch((err) => void console.error(`hook reply rules: ${(err as Error).message}`));
+    return ask ? goOn(ask) : {};
   }
   return undefined;
 }

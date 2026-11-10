@@ -8,8 +8,8 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { diagramSets, githubLink, readCheckout } from '../src/diagrams.ts';
-import { mxfile, pageData, type PageData } from '../src/diagram-xml.ts';
+import { diagramSets, githubLink, readCheckout } from './diagrams.ts';
+import { mxfile, pageData, type PageData } from './diagram-xml.ts';
 
 export const DOCUMENT = 'Architecture diagrams';
 

@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { createToken } from '../src/auth.ts';
 import { countLook } from '../src/looks.ts';
-import { bytes, limitsFrom, requestsThisMinute, useOf } from '../src/plan.ts';
+import { standingFrom, useOf } from '../src/standing.ts';
+import { bytes, requestsThisMinute } from '../src/workspace-use.ts';
 import { runAct } from '../src/server-acts.ts';
 import { loadServerPacks } from '../src/server-packs.ts';
 import { serve } from './serve.ts';
@@ -17,19 +18,20 @@ const PLAN = { plan: 'Solo', note: 'Move to Team for more.', manage: 'https://se
 /** The refusal says how to make room, in the pack's words, and names no plan and no seller. */
 const NAMES_PLAN = /Move to Team for more\.$/;
 
-test('a plan’s limits are read from what the pack sends: each optional, and none at all is no limit', () => {
-  assert.deepEqual(limitsFrom({ members: 1, storage: 1e9, requests: 300, sessions: 5, looks: 30 }, { note: 'More on Team.' }), { members: 1, storage: 1e9, requests: 300, sessions: 5, looks: 30, note: 'More on Team.' });
-  assert.deepEqual(limitsFrom({ storage: 5e9, members: null }, {}), { storage: 5e9 });
-  assert.equal(limitsFrom({ members: null }, { note: 'More on Team.' }), null);
-  assert.throws(() => limitsFrom({ sessions: 0 }, {}), /sessions: a whole number from 1/);
-  assert.throws(() => limitsFrom({ requests: 2.5 }, {}), /requests: a whole number/);
+test('a workspace’s standing is read from what its pack says: each limit optional, none at all no limit, and nothing else kept', () => {
+  assert.deepEqual(standingFrom({ limits: { members: 1, storage: 1e9, requests: 300, sessions: 5, looks: 30, note: 'More on Team.' } }), { limits: { members: 1, storage: 1e9, requests: 300, sessions: 5, looks: 30, note: 'More on Team.' } });
+  assert.deepEqual(standingFrom({ limits: { storage: 5e9, members: null, sessions: 0, requests: 2.5, plan: 'Solo' } }), { limits: { storage: 5e9 } }, 'what is no whole number from 1 is no limit');
+  assert.equal(standingFrom({ limits: { members: null, note: 'More on Team.' } }), undefined);
+  assert.equal(standingFrom(null), undefined, 'a pack that says nothing limits nothing');
+  assert.deepEqual(standingFrom({ ended: { since: '2026-11-01T00:00:00Z', delete_at: '2026-12-01T00:00:00Z', note: 'Pay again.' } }), { ended: { since: '2026-11-01T00:00:00.000Z', delete_at: '2026-12-01T00:00:00.000Z', note: 'Pay again.' } });
+  assert.equal(standingFrom({ ended: { since: 'soon' } }), undefined);
   assert.equal(bytes(1_500_000_000), '1.5 GB');
   const use = useOf({ storage: 1e9, sessions: 5 }, { members: 0, storage: 850e6, requests: 0, sessions: 5, looks: 0 });
   assert.deepEqual(use.map(({ name, shown, of, near, over }) => [name, shown, of, near, over]), [['storage', '850 MB', '1 GB', true, false], ['sessions', '5', '5 agent sessions at once', true, true]]);
 });
 
 test('over each limit what would add to it is refused, in the pack’s words, and reads, export and backup go on working', async () => {
-  const { workspaces, call } = await serve('tokens');
+  const { workspaces, call, base } = await serve('tokens');
   const pack = loadServerPacks([FIXTURES]).packs[0].file;
   const act = (name: string, input: Record<string, unknown>) => runAct(workspaces, pack, name, input);
   const { workspace } = (await act('workspace.create', { name: 'Plan Co', email: 'ola@plan.example' })) as { workspace: { id: string } };
@@ -37,7 +39,8 @@ test('over each limit what would add to it is refused, in the pack’s words, an
   const person = ((await act('workspace.admit', { workspace: ws.id, email: 'ola@plan.example', admin: true })) as { person: string }).person;
   const owner = (await createToken(ws.pelago.db, ws.id, { kind: 'human', name: 'ola@plan.example', entity: person, admin: true })).token;
   const agent = (await createToken(ws.pelago.db, ws.id, { kind: 'agent', name: 'claude' })).token;
-  const limit = (limits: Record<string, unknown>) => act('workspace.limit', { workspace: ws.id, ...PLAN, ...limits });
+  // The pack keeps the limits and says them at its gate (test/server-packs/demo).
+  const limit = (limits: Record<string, unknown>) => fetch(`${base}/x/demo/limit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workspace: ws.id, ...PLAN, ...limits }) }).then((r) => r.json());
   const write = (title: string) => call('/api/change', owner, { reason: 'test', ops: [{ op: 'create', type: 'task', title }] });
   const reads = async () => {
     assert.equal((await call('/api/search', owner, { q: 'Kept' })).status, 200, 'a read');
@@ -49,7 +52,7 @@ test('over each limit what would add to it is refused, in the pack’s words, an
   const note = (await call('/api/change', owner, { reason: 'test', ops: [{ op: 'create', ref: 'n', type: 'lens', title: 'A figure' }] })).result.created.n;
 
   // Storage: the log and pictures take more than the plan has, so nothing more is written, a picture included.
-  assert.deepEqual(await limit({ storage: 1 }), { workspace: ws.id, storage: 1 });
+  assert.deepEqual(await limit({ storage: 1 }), { result: { workspace: ws.id } });
   const refused = await write('One too many');
   assert.equal(refused.status, 400);
   assert.match(refused.error, /Plan Co has room for 1 bytes, and holds .*: nothing more is written until there is room/);

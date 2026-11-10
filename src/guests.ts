@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { needAdmin } from './actor-checks.ts';
 import { indexMember } from './control-index.ts';
 import { newId, type Q } from './db.ts';
-import { stillWritable } from './ended.ts';
+import { stillWritable } from './standing.ts';
 import type { Fact } from './log.ts';
 import { normalEmail, sendMail } from './mail.ts';
 import { LOOK_READS } from './looks.ts';

@@ -30,7 +30,6 @@ const AREAS: Record<'server' | 'browser', Array<[string, RegExp]>> = {
     ['Views and lenses', /^(views|askview|attention|blocking|brief|lens.*|pictures|places|timeaxis|spent|presence|documents|public)\.ts$/],
     ['Sessions and agents', /^(sessions|sessiontime|tools|share-tools|backup-tools|launcher|notify|outbox|automations|automation-rules|duties|transient|hook-answers|reader)\.ts$/],
     ['Database and tenancy', /^(db|pg|schema|migrate|deploy|workspaces|scope|backup|pull|leader|secrets)\.ts$/],
-    ['GitHub', /^github.*\.ts$/],
     ['Diagrams', /^diagram.*\.ts$/],
     ['Server and surfaces', /./],
   ],

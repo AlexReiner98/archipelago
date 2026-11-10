@@ -2,7 +2,7 @@
 // by the rules (src/rules.ts), then either applied or stored as a proposal for a human, and always logged.
 
 import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, type Policy } from './rules.ts'; import { renamedQuery } from './query-names.ts';
-import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.ts'; import { authorityOf } from './authority.ts';
+import { mayWrite } from './within.ts'; import { roomToStore, stillWritable } from './standing.ts'; import { authorityOf } from './authority.ts';
 import { anyone, newId, reader, scoped, type Db, type Q } from './db.ts';
 import { once } from './merge.ts'; import { readEvents, type EventQuery } from './eventlog.ts'; import { doneFact, type Done } from './activity.ts';
 import type { Registry } from './packs.ts'; import { currentNames } from './type-items.ts'; import { noTwins } from './view-twins.ts';
