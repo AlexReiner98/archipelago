@@ -6,8 +6,8 @@
 // handler runs in the same sandbox as any pack's (src/packhost.ts), one process for the server.
 //
 // What it may declare: public pages and entries, and webhooks, all under /x/<pack>/ (src/server-routes.ts); the
-// server acts it may ask for, from the kernel's closed list (src/server-acts.ts); the documents a person agrees to
-// before they are signed in (src/agreements.ts); hosts it may call, with the secrets the kernel adds
+// server acts it may ask for, from the kernel's closed list (src/server-acts.ts); the gates the kernel asks it at
+// (src/server-gates.ts: what a person agrees to before signing in, what a workspace it made may do); hosts it may call, with the secrets the kernel adds
 // (src/server-requests.ts); what a workspace's admin may connect it to (src/server-connect.ts); and schedules. It gets
 // no database, no map, no token and no secret: the kernel holds each secret, sealed, and adds it where it is needed.
 
@@ -18,7 +18,9 @@ import { isServerPack, parts, readManifest, type Manifest, type ReachDef } from 
 
 /** The acts a server pack may ask the kernel for, each only if it declares it. */
 export const SERVER_ACTS = [
-  'workspace.create', 'workspace.admit', 'workspace.limit', 'workspace.end', 'signin.link', 'mail.send', 'agreement.record',
+  'workspace.create', 'workspace.admit', 'signin.link', 'mail.send',
+  // What a buyer agreed to as they paid, handed to the packs that keep what a person agreed to (gates.signin).
+  'agreement.record',
   // How many readers each source tag brought to a public site (PELAGO_SITES), per day, after a position (src/visits.ts).
   'site.visits',
   // On a workspace whose admin connected the pack (src/server-connect.ts).
@@ -78,11 +80,13 @@ export interface ServerReach {
   /** Addresses it answered at before it was a pack, each to one of its own routes ("hook/<id>", an entry or a page). */
   aliases?: Record<string, string>;
   /**
-   * One of its entries, answering the documents a person agrees to before they are signed in, each { id, title, url,
-   * version, also? } (src/agreements.ts), also naming the same document in other languages. A new version is agreed to
-   * again at the next sign-in.
+   * Functions of its handler the kernel calls, never anyone else (src/server-gates.ts). signin is given { email?,
+   * agree?, via? } and answers { documents, owes? }: the documents a person agrees to before they are signed in, each
+   * { id, title, url, version, also? }, and of those, by id, what the address has not agreed to at its version, with
+   * agree recorded first. standing is given { workspace }, one the pack made, and answers what it may do: { limits?,
+   * ended? } (src/standing.ts). With no gate, nothing is asked and nothing is limited.
    */
-  agreements?: string;
+  gates?: { signin?: string; standing?: string };
 }
 
 /**
@@ -132,8 +136,11 @@ export function checkServerPack(p: Partial<Manifest>, folder: string): string[] 
     if (!/^\/[a-z0-9][a-z0-9/_-]*$/.test(path) || KERNEL_PATHS.test(path)) problems.push(`"${path}" cannot be an address of its own`);
     if (hook ? !webhooks.some((w) => w.id === hook[1]) : !names.includes(to)) problems.push(`"${path}" leads to no route of its own: "${to}"`);
   }
-  if (server.agreements !== undefined && !server.entries?.some((e) => e.id === server.agreements)) problems.push(`its agreements name no entry of its own: "${server.agreements}"`);
-  if ((server.entries?.length || webhooks.length || server.connect || schedules.length) && !existsSync(join(folder, 'handler.js'))) problems.push('it has entries or webhooks and no handler.js');
+  for (const [gate, name] of Object.entries(server.gates ?? {})) {
+    if (!['signin', 'standing'].includes(gate)) problems.push(`"${gate}" is not a gate: signin or standing`);
+    else if (!NAME.test(String(name)) || names.includes(String(name))) problems.push(`its gate ${gate} names a function of its handler that is no entry or page: "${name}"`);
+  }
+  if ((server.entries?.length || webhooks.length || server.connect || schedules.length || Object.keys(server.gates ?? {}).length) && !existsSync(join(folder, 'handler.js'))) problems.push('it has entries or webhooks and no handler.js');
   return problems;
 }
 

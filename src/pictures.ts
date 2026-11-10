@@ -3,7 +3,7 @@
 
 import { createHash } from 'node:crypto';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
-import { roomToStore } from './plan.ts';
+import { roomToStore } from './standing.ts';
 import { svgRefused } from './svg-figure.ts';
 
 /** The most a kept picture may weigh. A capture of a view at screen size is well under it. */

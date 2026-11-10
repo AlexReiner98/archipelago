@@ -14,7 +14,6 @@ import { addLocalType, addWorkspace, claimControlValue, controlValue, importCont
 import { startSchedules, stopSchedules } from './hooks.ts';
 import { openDb, type Database } from './db.ts';
 import { databaseFor, dropDatabaseFor } from './pg.ts';
-import { dueForDeletion, setEnded } from './ended.ts';
 import { Archipelago, type Policy } from './pelago.ts';
 import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
 import type { Q } from './db.ts';
@@ -102,6 +101,8 @@ export class Workspaces {
   private known = new Map<string, string>();
   private leading: boolean;
   private deleting: ReturnType<typeof setTimeout> | undefined;
+  /** The ended workspaces whose day to be deleted has come, as their server packs say (src/server-gates.ts): none unless the server says where to ask. */
+  dueForDeletion: (now: Date) => Promise<string[]> = async () => [];
 
   constructor(config: WorkspacesConfig) {
     this.config = config;
@@ -393,9 +394,8 @@ export class Workspaces {
     await this.closing.get(id)?.catch(() => {});
     const control = await this.control();
     await removeWorkspace(control, id);
-    for (const key of [`member_limit:${id}`, `server_pack_made:${id}`]) await takeControlValue(control, key);
+    await takeControlValue(control, `server_pack_made:${id}`);
     await control.query(`delete from control_value where key like 'connection:%' and value->>'workspace' = $1`, [id]);
-    await setEnded(control, id, null);
     this.known.delete(id);
     rmSync(join(this.config.rootDir, id), { recursive: true, force: true });
     if (this.config.backupsDir) rmSync(join(this.config.backupsDir, id), { recursive: true, force: true });
@@ -404,7 +404,7 @@ export class Workspaces {
 
   /** Delete every ended workspace whose day has come. Returns those deleted. */
   async deleteDue(now = new Date()): Promise<string[]> {
-    const due = await dueForDeletion(await this.control(), now);
+    const due = await this.dueForDeletion(now);
     for (const id of due) {
       await this.delete(id);
       console.log(`deleted the ended workspace ${id}`);

@@ -7,7 +7,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import pg from 'pg';
-import { readEnded, setEnded } from '../src/ended.ts';
 import { hashSecret } from '../src/auth.ts';
 import { ADOPT_APP, setControlValue, storeGet } from '../src/control.ts';
 import { seal } from '../src/secrets.ts';
@@ -135,14 +134,14 @@ test('an ended workspace whose day has come is deleted from Postgres, its databa
     await a.create('acme', 'Acme');
     await (await b.get('acme')).pelago.db.query('select 1');
     assert.equal(await exists(`${name}_acme`), true);
-    const control = (await a.get('default')).pelago.db;
-    await setEnded(control, 'acme', { since: new Date().toISOString(), delete_at: new Date(Date.now() + 86_400_000).toISOString() });
+    // Its server pack says it ended, to be deleted in a day (src/server-gates.ts): here, as the leader is told.
+    const deleteAt = Date.now() + 86_400_000;
+    a.dueForDeletion = async (now) => (now.getTime() >= deleteAt && (await a.has('acme')) ? ['acme'] : []);
     assert.deepEqual(await a.deleteDue(), [], 'not before its day');
     assert.deepEqual(await a.deleteDue(new Date(Date.now() + 2 * 86_400_000)), ['acme']);
     assert.equal(await exists(`${name}_acme`), false, 'its database is dropped');
     assert.equal(await a.has('acme'), false);
     assert.deepEqual((await b.list()).map((w) => w.id), ['default'], 'gone for the other server too');
-    assert.equal(await readEnded(control, 'acme'), undefined);
   } finally {
     await a.closeAll();
     await b.closeAll().catch(() => {});

@@ -3,7 +3,7 @@
 
 import { newId, type Q } from './db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts'; import { ownerFollows } from './owner-link.ts';
-import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.ts';
+import { roomToStore, stillWritable } from './standing.ts';
 import { typesAfter, typesApplied } from './type-items.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { append, type Decision, type Fact } from './log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
