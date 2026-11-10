@@ -342,17 +342,20 @@ export class Archipelago {
     // One the reader may not see is said to be hidden, not missing: an agent can tell a private item from a wrong id.
     if (!entity) throw new Error((await this.hidden(id)) ? `Item "${id}" is private to someone else: you cannot read it` : `No item "${id}"`);
     const rel = `r.id as relation, r.type, r.props, r.confidence, e.id, e.type as entity_type, e.title, e.status`;
-    const [out, inc, events, source] = await Promise.all([
+    // All at once: on a database over the network each read is a few round trips, and the trail is several reads.
+    const [out, inc, events, source, trail, mentioned_in] = await Promise.all([
       this.db.query(`select ${rel} from relation r join entity e on e.id = r.to_id where r.from_id = $1 and r.valid_to is null`, [id]),
       this.db.query(`select ${rel} from relation r join entity e on e.id = r.from_id where r.to_id = $1 and r.valid_to is null`, [id]),
       readEvents(this.db, { target: id, limit: 8 }),
       entity.source_id ? this.entity(entity.source_id) : undefined,
+      this.trail(id),
+      this.mentionedIn(id),
     ]);
     return {
       entity,
       source: source && { id: source.id, title: source.title, uri: source.props.uri },
-      trail: await this.trail(id),
-      mentioned_in: await this.mentionedIn(id),
+      trail,
+      mentioned_in,
       outgoing: out.rows,
       incoming: inc.rows,
       recent_events: events.map(({ seq, ts, actor, action, changeset, reason, detail }) => ({ seq, ts, actor, action, changeset, reason, detail })),
