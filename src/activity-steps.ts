@@ -57,3 +57,18 @@ alter sequence event_seq_seq owned by none;
 drop table if exists event;
 delete from setting where key = 'activity.carried';
 `;
+
+/**
+ * Step 38. What the compacted streams say about some items, by number, through log_op_about. A reader's row policy on
+ * log_op (pelago_op_seen) is asked before any condition that is not leakproof, and `facts->0->>1` is not, so a read by
+ * item under it walked every entry of log_op and asked the policy of each: 1.2 s of a `get` on a map of 5,000 entries
+ * (task e_h2ynbcva). This finds the numbers by the index as the table's owner, and the reader's own read then takes
+ * those numbers (`seq = any`, which is leakproof) through its policy as before: it is given only what it may see.
+ */
+export const OP_ABOUT = `
+create or replace function pelago_op_about(ids text[], after bigint default 0) returns setof bigint language sql stable security definer set search_path = public rows 20 as $fn$
+  select seq from log_op where seq is not null and seq > after and facts->0->>1 = any(ids) -- index log_op_about
+$fn$;
+revoke execute on function pelago_op_about(text[], bigint) from public;
+grant execute on function pelago_op_about(text[], bigint) to pelago_member;
+`;
