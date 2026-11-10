@@ -4,6 +4,7 @@
 // drawn live, from what the whole workspace may see of its answer, as publishing would freeze it.
 
 import { SHARED, sharedDocument, shownOf } from './documents.ts';
+import { WRAPS } from './head.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { picturesOf } from './published-pictures.ts';
 import { bringersIn, isKept, keptPicture } from './query-saved.ts';
@@ -38,17 +39,22 @@ export async function shareable(l: Archipelago, actor: Actor, id: string): Promi
   const type = documentType(l);
   if (!type) throw new Error('This map has no type to give it a link with.');
   // One made for an earlier link is used again: its note still brings in this item, and nothing else.
-  const { rows } = await l.db.query<{ id: string }>(
-    `select e.id from relation r join entity e on e.id = r.from_id
+  // It is marked as the link's own (`wraps`, where its type has the field), so views of its type leave it out.
+  const marks = (t: string) => Boolean(l.registry.type(t)?.fields[WRAPS]);
+  const { rows } = await l.db.query<{ id: string; type: string; marked: boolean }>(
+    `select e.id, e.type, e.props ? '${WRAPS}' as marked from relation r join entity e on e.id = r.from_id
      where r.to_id = $1 and r.type = 'about' and r.valid_to is null and e.type = any($2::text[]) and e.archived_at is null and trim(e.body) = $1
      order by e.created_at limit 1`,
     [item.id, docs],
   );
-  if (rows[0]) return rows[0].id;
+  if (rows[0]) {
+    if (!rows[0].marked && marks(rows[0].type)) await l.change(actor, { reason: `To mark it as the link's own`, ops: [{ op: 'update', id: rows[0].id, props: { [WRAPS]: item.id } }] });
+    return rows[0].id;
+  }
   const made = await l.change(actor, {
     reason: `To give "${item.title}" as a link`,
     ops: [
-      { op: 'create', ref: 'doc', type, title: item.title, body: item.id, visibility: item.visibility as 'private' | 'shared' | 'public' },
+      { op: 'create', ref: 'doc', type, title: item.title, body: item.id, visibility: item.visibility as 'private' | 'shared' | 'public', ...(marks(type) && { props: { [WRAPS]: item.id } }) },
       { op: 'link', type: 'about', from: 'doc', to: item.id },
     ],
   });

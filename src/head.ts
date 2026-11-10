@@ -13,6 +13,8 @@ import type { FieldDef, ResolvedType, TypeDef } from './packs.ts';
 
 /** The word for the app's own configuration (views, styles, screens, runs): core's kind of it, and the query term `kind system`, read as the kernel flag. */
 export const SYSTEM = 'system';
+/** The field that marks a document made to give a view or an item as a link (src/share-view.ts): the link's own, left out of views. */
+export const WRAPS = 'wraps';
 
 /** The kernel's own types: those carrying the kernel flag (src/capabilities.ts), kept types included. Views of the work leave their items out. */
 export const kernelTypes = (reg: { types: Map<string, ResolvedType> }) => [...reg.types.values()].filter((t) => t.system).map((t) => t.id);
