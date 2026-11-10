@@ -3,6 +3,7 @@
 // ({ pass: true }): the kernel answers it as it would with no reader (a product's page, the app's files).
 
 import { publishedPage } from './head.js';
+import { isVisit, tagOf } from './visit.js';
 
 /** The address word of a site's front page, read at /, and of the page every page of a site ends with. */
 export const HOME = 'home';
@@ -23,6 +24,19 @@ const PATH = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const WHATS = ['data', 'picture', 'drawing', 'live'];
 const NONE = { status: 404, json: { error: 'Not found' } };
 const PASS = { pass: true };
+
+/** A page's data as its reader is handed it: with the tag they came by, which its links to the site carry on. */
+const carrying = (data, parts) => {
+  const tag = tagOf(parts.request, parts.request?.host);
+  return tag ? { ...data, carry: { ref: tag } } : data;
+};
+
+/** The tag the visit a site's page answered is counted under, or null (not a page found, not a reader, no tag). */
+export function visitOf(parts, answer) {
+  if (typeof answer?.html !== 'string' || (answer.status ?? 200) !== 200 || !isVisit(parts.request)) return null;
+  const tag = tagOf(parts.request, parts.host ?? parts.request?.host);
+  return tag ?? null;
+}
 
 /** Where a public item's page is read, and a page of a site: its front page at /, every other at /<path>. */
 export const publicPath = (workspace, id) => `/p/${workspace}/${id}`;
@@ -89,7 +103,7 @@ export async function pageOf(parts, act, template) {
   const here = named ? `https://${named}${path}` : path;
   const canonical = domain && doc.path ? `https://${domain}${siteHref(doc.path)}` : here;
   const share = shareOf(doc, doc.share);
-  return { html: publishedPage(template, doc, canonical, site.name, data, share && pictureAt(here, share)) };
+  return { html: publishedPage(template, doc, canonical, site.name, carrying(data, parts), share && pictureAt(here, share)) };
 }
 
 const xml = (s) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -137,5 +151,5 @@ export async function siteOf(parts, act, template) {
   const own = shareOf(doc, doc.share);
   const front = own || doc.path === HOME || typeof doc.share !== 'string' ? undefined : shareOf((await act('published.at', { workspace, path: HOME })) ?? { parts: [] }, doc.share);
   const image = own ? pictureAt(origin + siteHref(doc.path), own) : front && pictureAt(origin, front);
-  return { html: publishedPage(template, doc, origin + siteHref(doc.path), site.name, data, image) };
+  return { html: publishedPage(template, doc, origin + siteHref(doc.path), site.name, carrying(data, parts), image) };
 }

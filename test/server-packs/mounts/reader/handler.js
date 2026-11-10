@@ -1,6 +1,7 @@
 // The tests' reader: says back the parts of the address it was handed, as a page; an id "broken" throws, and an id
-// "plain" answers no page at all. Other ids answer each kind a mount may send, and some it may not.
-const said = (parts) => Object.entries(parts).map(([k, v]) => `${k}=${v}`).join(';');
+// "plain" answers no page at all. Other ids answer each kind a mount may send, and some it may not. What the request
+// said comes after the parts, as JSON.
+const said = ({ request, ...parts }) => `${Object.entries(parts).map(([k, v]) => `${k}=${v}`).join(';')}</p><pre>${JSON.stringify(request)}</pre><p>`;
 const KINDS = {
   json: { json: { said: 'json' }, cache: 60 },
   forgood: { json: { said: 'kept' }, cache: 99_999_999 },

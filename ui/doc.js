@@ -175,11 +175,12 @@ function startLink(words) {
 
 /** The address word of a site's front page (src/site.ts). */
 const FRONT = 'home';
-// A link followed takes where the reader came from with it (?ref=), set as it is followed so every link drawn has it.
+// A link followed takes what the page's data says it carries (data.carry), set as it is followed so every link drawn has it.
+let carryOn;
 const carry = (e) => {
   // A page's own links only: a part of a drawing is an SVG link, whose address is not a string to rewrite.
   const link = e.target.closest?.('a[href]');
-  if (link instanceof HTMLAnchorElement) link.href = carried(link.href, location.href, document.referrer);
+  if (link instanceof HTMLAnchorElement) link.href = carried(link.href, location.href, carryOn);
 };
 addEventListener('click', carry, true);
 addEventListener('auxclick', carry, true);
@@ -197,6 +198,7 @@ const pageCss = (css) => {
 };
 
 function draw(d) {
+  if (d.carry) carryOn = d.carry;
   applyTheme(d);
   pageSheet.replaceSync(pageCss(d.page_css));
   document.title = d.head === 'invoice' && d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title;

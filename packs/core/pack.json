@@ -1156,11 +1156,11 @@
     },
     {
       "id": "visits",
-      "stream": "visits",
+      "stream": "counts:visits",
       "keep": {
         "forever": true
       },
-      "say": "How many readers each source tag brought to a public site, per day: counts only, every entry kept."
+      "say": "What the reader pack counts on a public site (its counts): how many readers each source tag brought, per day. Counts only, every entry kept."
     },
     {
       "id": "activity",

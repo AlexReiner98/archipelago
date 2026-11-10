@@ -43,7 +43,7 @@ import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from './control-index.ts'; import { isPersonToken, personAt } from './person-tokens.ts';
 import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { configureHookTool } from './hook-tool.ts'; import { setReach } from './pack-reach.ts';
 import { pgLeader, soleLeader, type Leader } from './leader.ts'; import { drained } from './drain.ts';
-import { serverDuties } from './duties.ts'; import { keepVisits, onSitePage } from './visits.ts';
+import { serverDuties } from './duties.ts'; import { keepCounts } from './pack-counts.ts';
 import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
 import { servePublic } from './public-route.ts'; import { siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
@@ -212,7 +212,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // A domain that serves a workspace's public site: its pages by the reader pack (packs/reader), its icon; the rest as on any name.
       const host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined;
       const mount = req.method === 'GET' ? mountOf(url.pathname, site) : undefined; // an address a server pack took from the kernel's list (src/server-mounts.ts)
-      if (mount && (await serveMounted(req, res, mount, url.pathname, { packs: serverPacks, site, tokens, workspaces, named, sites, host, from: addressOf(req), onPage: () => site && onSitePage(site, host, url, req), tooOften: () => tooOften(req, res, open) }))) return;
+      if (mount && (await serveMounted(req, res, mount, url.pathname, { packs: serverPacks, site, tokens, workspaces, named, sites, host, from: addressOf(req), tooOften: () => tooOften(req, res, open) }))) return;
       if (req.method === 'GET' && ICON.test(url.pathname)) return tooOften(req, res, open) || (await serveIcon(res, (await workspaces.get(site ?? DEFAULT_WORKSPACE)).pelago));
       if (req.method === 'GET' && url.pathname.startsWith('/backup-file/')) {
         if (tooOften(req, res, open)) return; // a guessed key would otherwise open the workspace it names, again and again
@@ -481,14 +481,14 @@ If that process is not a pelago server, delete ${lock}.`);
   let idle: ReturnType<typeof setInterval> | undefined;
   let leader: Leader | undefined;
   let stopDuties = () => {};
-  const stopVisits = keepVisits((id) => workspaces.get(id)); // the visits counted, written down each minute and on the way down
+  const stopCounts = keepCounts((id) => workspaces.get(id)); // what packs counted (count.add), written down each minute and on the way down
   const stop = async (code = 0) => {
     stopDuties();
     clearInterval(idle);
     await leader?.stop();
     stopAllLaunched();
     await drained(server, config.dev ? 1_000 : undefined); // the requests in hand answered before their databases close (src/drain.ts)
-    await stopVisits();
+    await stopCounts();
     await workspaces.closeAll();
     rmSync(lock, { force: true });
     process.exit(code);

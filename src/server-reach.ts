@@ -6,6 +6,7 @@
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { isCountStream } from './retention.ts';
 
 /** The addresses a server pack may take, each by at most one pack (decision e_wptrr6tf). /s/ stays the kernel's. */
 export const MOUNTS = ['public', 'site', 'setup'] as const;
@@ -31,6 +32,11 @@ export interface MoreReach {
   files?: { id: string; file: string; type: (typeof FILE_TYPES)[number]; fill?: (typeof FILLS)[number][] }[];
   /** Agents it may launch: argv with {fill}s, run with no shell; read, a function given each line it prints. */
   launchers?: { id: string; argv: string[]; read: string }[];
+  /**
+   * The stream on a site's workspace its counts are kept in (the acts count.add and count.read, src/pack-counts.ts): a
+   * plain word no kernel stream has, one pack's alone, kept by the retention rule a workspace pack gives it.
+   */
+  counts?: string;
   /** The surface whose hooks it translates (POST /hooks/<surface>/<event>): in and out, functions of its handler. */
   adapter?: { surface: string; in: string; out: string };
 }
@@ -63,6 +69,7 @@ export function checkMoreReach(server: MoreReach, folder: string, names: string[
     for (const v of f.fill ?? []) if (!(FILLS as readonly string[]).includes(v)) problems.push(`file "${f.id}" is filled with ${FILLS.join(', ')}, not "${v}"`);
   }
   if (new Set(files.map((f) => f.id)).size !== files.length) problems.push('two files share a name');
+  if (server.counts !== undefined && !isCountStream(String(server.counts))) problems.push(`"${server.counts}" cannot name the stream its counts are kept in`);
   const called = [...fns];
   for (const l of server.launchers ?? []) {
     if (!NAME.test(l.id) || !Array.isArray(l.argv) || !l.argv.length || l.argv.some((a) => typeof a !== 'string')) problems.push(`launcher "${l.id}" needs an id and a command as a list`);

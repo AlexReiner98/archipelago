@@ -39,15 +39,13 @@ export const UI_FILES: Record<string, string> = {
   '/project.js': 'project.js',
   // What a stylesheet from the map may say, which the page checks a sheet by and the server checks page_css by on write.
   '/css-check.js': 'css-check.js',
-  // Where a reader of a public page came from, as a tag: the page carries it on, the server counts a visit by it.
-  '/source-tag.js': 'source-tag.js',
   // three.js as its authors build it (MIT), offered to a layout's code; loaded only when one asks for it.
   '/three.js': 'three.module.min.js',
 };
 
 const UI_DIR = join(import.meta.dirname, '..', 'ui');
 /** Files served to the page from the kernel's source, as the page names them: TypeScript of erasable syntax only, its types stripped. */
-const FROM_SOURCE: Record<string, string> = { 'project.js': join(import.meta.dirname, 'project.ts'), 'css-check.js': join(import.meta.dirname, 'css-check.ts'), 'source-tag.js': join(import.meta.dirname, 'source-tag.ts') };
+const FROM_SOURCE: Record<string, string> = { 'project.js': join(import.meta.dirname, 'project.ts'), 'css-check.js': join(import.meta.dirname, 'css-check.ts') };
 const pathOf = (f: string) => FROM_SOURCE[f] ?? join(UI_DIR, f);
 const readText = async (f: string) => (FROM_SOURCE[f] ? stripTypeScriptTypes(await readFile(FROM_SOURCE[f], 'utf8')) : readFile(join(UI_DIR, f), 'utf8'));
 /** The pages a browser opens, and so asks for again on every visit; read whole, with the files they name versioned. */
