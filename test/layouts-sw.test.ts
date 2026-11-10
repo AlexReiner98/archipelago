@@ -21,20 +21,28 @@ test('in a browser, a pack drawing is drawn by a service worker kept between pag
   try {
     assert.ok(await page.until(drawn, 30000), 'the view is drawn');
     const workers = async () => ((await page.send('Target.getTargets')).result.targetInfos as { type: string; url: string; targetId: string }[]).filter((t) => t.type === 'service_worker' && t.url.includes('/drawing/'));
+    // The first page draws with a worker of the frame's own while the service worker installs, for the pages after it.
+    for (let n = 0; n < 100 && !(await workers()).length; n++) await new Promise((r) => setTimeout(r, 50));
     const [sw] = await workers();
-    assert.ok(sw, 'a service worker draws it');
+    assert.ok(sw, 'a service worker is installed for the drawing');
     const at = new URL(sw.url);
     assert.match(at.pathname, /^\/drawing\/[\w-]+\/sw\.js$/);
     assert.notEqual(at.origin, new URL(base).origin, 'on the drawing host, never the page’s origin');
 
-    // Opened again, the page finds the same worker: it is not started anew.
-    await page.go(view);
-    assert.ok(await page.until(drawn, 30000), 'the view is drawn again');
-    const again = await workers();
-    assert.deepEqual(again.map((t) => t.targetId), [sw.targetId]);
+    // Opened again, the page is drawn by it, and again by the same one: it is not started anew.
+    const session = (await page.send('Target.attachToTarget', { targetId: sw.targetId, flatten: true })).result.sessionId;
+    const pictures = async () => (await page.send('Runtime.evaluate', { expression: 'self.pictures ?? 0', returnByValue: true }, session)).result?.result?.value;
+    for (const n of [1, 2]) {
+      // Reloaded: the same address with its hash would only move the hash.
+      await page.evaluate('window.before = true');
+      await page.send('Page.reload');
+      assert.ok(await page.until(`!window.before && ${drawn}`, 30000), 'the view is drawn again');
+      const got = await pictures();
+      assert.ok(got >= n, `the service worker drew page ${n + 1} (${JSON.stringify(got)})`);
+      assert.deepEqual((await workers()).map((t) => t.targetId), [sw.targetId]);
+    }
 
     // Inside it, nothing reaches the network: not the page's server, not another.
-    const session = (await page.send('Target.attachToTarget', { targetId: sw.targetId, flatten: true })).result.sessionId;
     const tried = await page.send('Runtime.evaluate', { expression: `Promise.all(['${base}/health', '${at.origin}/draw.html', 'https://example.com/'].map((u) => fetch(u).then(() => 'reached', () => 'refused')))`, awaitPromise: true, returnByValue: true }, session);
     assert.deepEqual(tried.result?.result?.value, ['refused', 'refused', 'refused']);
   } finally {

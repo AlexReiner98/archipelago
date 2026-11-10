@@ -62,10 +62,12 @@
     new Promise((resolve, reject) => {
       if (!navigator.serviceWorker || location.origin === 'null' || refused.has(hash) || !/^[\w-]{8,128}$/.test(hash)) return reject(new Error('none'));
       const scope = `/drawing/${hash}/`;
-      setTimeout(() => reject(new Error('slow')), 3000);
+      setTimeout(() => reject(new Error('slow')), 1000);
       navigator.serviceWorker.register(`${scope}sw.js`, { type: 'module', scope }).then((reg) => {
         const active = () => reg.active ?? reg.waiting ?? reg.installing;
-        const ready = () => (reg.active ? Promise.resolve() : new Promise((done, fail) => active()?.addEventListener('statechange', (ev) => (ev.target.state === 'activated' ? done() : ev.target.state === 'redundant' && fail(new Error('redundant'))))));
+        // The first time, it is installed for the pages after this one, and this one draws with a worker of its own:
+        // installing fetches every module of the drawing, which a picture waiting for it would wait for too.
+        const ready = () => (reg.active ? Promise.resolve() : Promise.reject(new Error('installing')));
         return ready().then(() => {
           // Its answers come on a channel of the frame's: a service worker has no one to post to.
           const control = new MessageChannel();

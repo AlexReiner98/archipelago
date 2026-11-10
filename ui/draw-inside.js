@@ -99,6 +99,8 @@ function inside(home, given) {
         try {
           if (said.type === 'start') {
             drawn = await made.picture(said.input, tools);
+            // How many pictures this worker has drawn, for whoever looks into it: a service worker is kept between pages.
+            self.pictures = (self.pictures ?? 0) + 1;
             // How long the drawing took, for the page to tell whoever measures it.
             send({ type: 'scene', scene: drawn?.scene ?? {}, took: performance.now() - t0 });
           } else if (said.type === 'event' && drawn?.on) send({ type: 'patch', list: (await drawn.on(said.event)) ?? [], answers: said.event });
