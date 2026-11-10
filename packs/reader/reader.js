@@ -7,7 +7,12 @@ import { publishedPage } from './head.js';
 /** The address word of a site's front page, read at /, and of the page every page of a site ends with. */
 export const HOME = 'home';
 export const FOOTER = 'footer';
+/** The address word of the page whose words lead the site's /llms.txt (llmstxt.org), for an agent that lands here. */
+export const LLMS = 'llms';
 const PARAGRAPH = '\n\n';
+const textOf = (doc) => (doc?.parts ?? []).flatMap((part) => (typeof part.text === 'string' ? [part.text] : [])).join(PARAGRAPH);
+/** A page that is the site's own, not one of its shared parts. */
+const listed = (page) => page.path && page.path !== FOOTER && page.path !== LLMS;
 /** What a drawing's code and a picture may be kept for, in seconds: the code is the same for as long as its hash is. */
 const FOR_GOOD = 31_536_000;
 const PICTURE_KEPT = 300;
@@ -93,12 +98,24 @@ const xml = (s) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
  * a sitemap for search engines. An address no published page has is not the site's.
  */
 export async function siteOf(parts, act, template) {
-  const { workspace, path: pathname = '/', host, name } = parts;
+  const { workspace, path: pathname = '/', host, name, app } = parts;
   const origin = `https://${host}`;
   if (pathname === '/robots.txt') return { text: `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`, type: 'text/plain' };
   if (pathname === '/sitemap.xml') {
-    const urls = ((await act('site.pages', { workspace })) ?? []).filter((page) => page.path && page.path !== FOOTER).map((page) => `  <url><loc>${xml(origin + siteHref(page.path))}</loc><lastmod>${new Date(page.published_at).toISOString().slice(0, 10)}</lastmod></url>`);
+    const urls = ((await act('site.pages', { workspace })) ?? []).filter(listed).map((page) => `  <url><loc>${xml(origin + siteHref(page.path))}</loc><lastmod>${new Date(page.published_at).toISOString().slice(0, 10)}</lastmod></url>`);
     return { text: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`, type: 'application/xml', cache: PICTURE_KEPT };
+  }
+  // An agent told the site's name guesses /install: it is the app's install page and its scripts, unless a page has that address.
+  const install = /^\/install(\.md|\.ps1|\.sh)?$/.exec(pathname);
+  if (install && app && !(install[1] === undefined && (await act('published.at', { workspace, path: 'install' })))) return { redirect: `${app}/connect${pathname}`, status: 302 };
+  // For an agent: the words of the page published at /llms, as published, then every page by its title and address.
+  if (pathname === '/llms.txt') {
+    const pages = ((await act('site.pages', { workspace })) ?? []).filter(listed);
+    const lead = textOf(await act('published.at', { workspace, path: LLMS }));
+    const list = pages.map((page) => `- [${page.title}](${origin + siteHref(page.path)})`).join('\n');
+    const head = lead.startsWith('# ') ? lead : `# ${name ?? workspace}${lead ? PARAGRAPH + lead : ''}`;
+    const installs = app && !lead.includes('/connect/install') ? `${PARAGRAPH}## Install${PARAGRAPH}- [Install Archipelago for an agent](${app}/connect/install)` : '';
+    return { text: `${head}${installs}${PARAGRAPH}## Pages${PARAGRAPH}${list}\n`, type: 'text/plain', cache: PICTURE_KEPT };
   }
   const steps = pathname.split('/').filter(Boolean);
   // The front page's data and figures are read at /data and /picture/<id>, as any page's are below its own address.

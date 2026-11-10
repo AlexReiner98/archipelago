@@ -127,7 +127,7 @@ export async function bringIn(tx: Q, ws: string, rules: Retention[], given: Row[
   const { rows: held } = await tx.query<{ id: string }>(`select id from entity where id = any($1::text[])`, [targets]);
   const known = new Set([WORKSPACE, ...held.map((h) => h.id)]);
   const { rows } = await tx.query<{ stream: Light['stream']; pos: number; at: Date; head: Light; facts: OpFact[] }>(
-    `select stream, pos::int as pos, at, head, facts from log_op where stream = 'activity' and seq is not null and facts->0->>1 = any($1::text[]) -- index log_op_about`,
+    `select stream, pos::int as pos, at, head, facts from log_op where stream = 'activity' and seq = any(array(select pelago_op_about($1::text[]))) -- index log_op_about`,
     [targets],
   );
   const here = await openOps(tx, rows.map((r) => ({ ...r.head, stream: r.stream, pos: r.pos, at: new Date(r.at).toISOString(), facts: r.facts })));
@@ -208,14 +208,15 @@ export async function doneEvents(db: Q, input: EventQuery, limit: number): Promi
   if (input.since) add(`o.at >= ?::timestamptz`, input.since);
   if (input.before) add(`o.seq < ?`, input.before);
   if (input.after !== undefined) add(`o.seq > ?`, input.after);
-  if (input.target) add(`(o.facts->0->>1 = ? or (o.stream = 'claims' and (o.facts->0->3->>2 = ? or r.to_id = ?)))`, input.target);
+  // By number (pelago_op_about, src/activity-steps.ts): the reader's row policy keeps log_op_about from serving `facts->0->>1` itself.
+  if (input.target) add(`(o.seq = any(array(select pelago_op_about(array[?::text]))) or (o.stream = 'claims' and (o.facts->0->3->>2 = ? or o.facts->0->>1 in (select r.id from relation r where r.to_id = ?))))`, input.target);
   if (input.actor) add(`o.head->'actor'->>'id' = ?`, input.actor);
   if (input.actorLike) add(`o.head->'actor'->>'id' like ?`, input.actorLike);
   if (input.origin) add(`${ORIGIN} = ?`, input.origin);
   if (input.news) where.push(notImported('o'));
   const { rows } = await db.query<{ stream: Light['stream']; pos: number; at: Date; head: Light; facts: OpFact[]; seq: string; ended: string | null }>(
-    `select o.stream, o.pos::int as pos, o.at, o.head, o.facts, o.seq::int8 as seq, r.to_id as ended
-     from log_op o left join relation r on o.stream = 'claims' and r.id = o.facts->0->>1
+    `select o.stream, o.pos::int as pos, o.at, o.head, o.facts, o.seq::int8 as seq, case when o.stream = 'claims' then (select r.to_id from relation r where r.id = o.facts->0->>1) end as ended
+     from log_op o
      where ${where.join(' and ')} order by o.seq ${input.oldest ? 'asc' : 'desc'} limit $${params.push(limit)}`,
     params,
   );

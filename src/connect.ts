@@ -8,7 +8,7 @@ import { bearer } from './auth.ts';
 import { normalEmail } from './mail.ts';
 import { workspacesOf } from './control-index.ts';
 import { emailOfLink, LINK_MINUTES, redeem, redeemTyped, requestSignIn, triesSpent, typedWorks, workspaceOfCode } from './members.ts';
-import { installPage, installPs1, installScript, installSh } from './install.ts';
+import { installPage, installPs1, installScript, installSh, llmsTxt } from './install.ts';
 import { serveOAuth } from './oauth.ts';
 import { json, PRIVATE } from './reply.ts';
 import type { Actor } from './pelago.ts';
@@ -72,6 +72,16 @@ const INSTALL: Record<string, [string, (origin: string) => string]> = {
   '/connect/install.mjs': ['text/javascript', installScript],
   '/connect/install.ps1': ['text/plain', installPs1],
   '/connect/install.sh': ['text/x-shellscript', installSh],
+  '/connect/llms.txt': ['text/plain', llmsTxt],
+};
+
+/** The short addresses an agent finds or guesses at the root, each answered as the /connect/ path it stands for. */
+export const SHORT: Record<string, string> = {
+  '/install': '/connect/install',
+  '/install.md': '/connect/install.md',
+  '/install.ps1': '/connect/install.ps1',
+  '/install.sh': '/connect/install.sh',
+  '/llms.txt': '/connect/llms.txt',
 };
 
 /**

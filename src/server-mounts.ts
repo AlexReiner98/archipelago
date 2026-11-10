@@ -80,7 +80,8 @@ function partsOf(mount: Mount, pathname: string, site: string | undefined): Reco
 /** What the server says of where the address is, beside its parts: the workspace's name, the name to keep, its domain. */
 async function placeOf(mount: Mount, parts: Record<string, string>, at: MountCall): Promise<Record<string, string>> {
   const name = (await at.workspaces?.list?.().catch(() => []))?.find((ws) => ws.id === parts.workspace)?.name;
-  if (mount === 'site') return { ...(name && { name }), ...(at.host && { host: at.host }) };
+  // A site is told the app's own address too, where its /install leads (it is this server under its first name).
+  if (mount === 'site') return { ...(name && { name }), ...(at.host && { host: at.host }), ...(at.packs.origin && { app: at.packs.origin }) };
   const domain = Object.entries(at.sites ?? {}).find(([, ws]) => ws === parts.workspace)?.[0];
   return { ...(name && { name }), ...(at.named?.[0] && { named: at.named[0] }), ...(domain && { domain }) };
 }
@@ -90,7 +91,7 @@ const keptFor = (cache: unknown, otherwise: string) =>
   Number.isInteger(cache) && (cache as number) > 0 ? `public, max-age=${Math.min(cache as number, YEAR)}${(cache as number) >= YEAR ? ', immutable' : ''}` : otherwise;
 
 type Answer = { status?: unknown; html?: unknown; json?: unknown; picture?: unknown; text?: unknown; type?: unknown; redirect?: unknown; stream?: unknown; id?: unknown; pass?: unknown; cache?: unknown };
-type Sent = { pack?: string; workspace?: string; id?: string; site?: boolean } & Pick<MountCall, 'workspaces' | 'from' | 'onPage'>;
+type Sent = { pack?: string; workspace?: string; id?: string; site?: boolean; app?: string } & Pick<MountCall, 'workspaces' | 'from' | 'onPage'>;
 
 /** Send what a mounted entry answered, by its kind; anything else is the pack's fault. False when it passed. */
 export async function sendPage(res: ServerResponse, answer: unknown, at: Sent = {}): Promise<boolean> {
@@ -117,7 +118,7 @@ export async function sendPage(res: ServerResponse, answer: unknown, at: Sent = 
     return true;
   }
   if (typeof a.redirect === 'string') {
-    res.writeHead(status === 301 ? 301 : 302, { ...GUARD, location: onThisServer(a.redirect), 'content-type': 'text/plain; charset=utf-8' }).end('Moved');
+    res.writeHead(status === 301 ? 301 : 302, { ...GUARD, location: at.app && a.redirect.startsWith(`${at.app}/`) && !/[\u0000-\u001f\u007f]/.test(a.redirect) ? a.redirect : onThisServer(a.redirect), 'content-type': 'text/plain; charset=utf-8' }).end('Moved');
     return true;
   }
   if (a.stream === true) {
@@ -152,5 +153,5 @@ export async function serveMounted(_req: IncomingMessage, res: ServerResponse, m
     json(res, 502, { error: 'The pack that answers here did not.' }, GUARD);
     return true;
   }
-  return sendPage(res, answer, { pack: taken.id, workspace: parts.workspace, id: parts.id, site: mount === 'site', workspaces: at.workspaces, from: at.from, onPage: at.onPage });
+  return sendPage(res, answer, { pack: taken.id, workspace: parts.workspace, id: parts.id, site: mount === 'site', app: at.packs.origin, workspaces: at.workspaces, from: at.from, onPage: at.onPage });
 }

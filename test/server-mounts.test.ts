@@ -51,7 +51,7 @@ test('a pack mounted at site answers any address on a domain the server names', 
   for (const path of ['/', '/about/team']) {
     const r = await getAs(base, 'reader.example', path);
     assert.equal(r.status, 200, path);
-    assert.match(r.body, new RegExp(`site workspace=acme;path=${path};host=reader.example<`));
+    assert.match(r.body, new RegExp(`site workspace=acme;path=${path};host=reader.example;app=http://127\\.0\\.0\\.1:\\d+<`));
   }
 });
 
