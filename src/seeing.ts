@@ -121,7 +121,7 @@ export interface Sight {
  * pages counted in the last few seconds), and the tab in sight is the one its shows go to (`lands`, which the page says).
  */
 export async function inSight(l: Archipelago, db: Q, run: string | undefined, open: number): Promise<Sight> {
-  if (!open) return { looking: false, where: 'No page of theirs is open in sight: it waits there for them.' };
+  if (!open) return { looking: false, where: 'No page of theirs is open in sight: it lands when they open one within ten minutes; later, show it again.' };
   const s = await seenNow(db, l);
   if (!s || Date.now() - s.said > NOW_MS) return { looking: false, where: 'Their page has not said which tab is in sight.' };
   if (run && s.lands?.includes(run)) return { looking: true, where: 'In the tab they are looking at.' };
