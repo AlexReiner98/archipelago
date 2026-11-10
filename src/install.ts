@@ -57,7 +57,7 @@ export const llmsTxt = (origin: string) => `# Archipelago
 
 > A map of your work that your coding agent keeps and you can read: sessions, plans, decisions and what waits on what. Agents reach it as an MCP server at ${origin}/mcp; a person reads it at ${origin}.
 
-To install Archipelago for an agent (Claude Code, Codex, Cursor, Grok Bot, ChatGPT), fetch ${origin}/connect/install and follow the section for your client. This Archipelago is not the Archipelago multiworld randomizer (archipelago.gg).
+To install Archipelago for an agent (Claude Code, Codex, Cursor, Grok Bot, ChatGPT), fetch ${origin}/connect/install and follow the section for your client. The multiworld randomizer of the same name is another project, at archipelago.gg.
 
 ## Install
 
