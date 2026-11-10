@@ -90,6 +90,12 @@ export function pluginFiles(): Record<string, string> {
     [at('scripts/pelago-hook.mjs')]: read('scripts/pelago-hook.mjs').replace(`'http://127.0.0.1:3100'`, JSON.stringify(HOSTED)),
     [at('scripts/pelago-events.mjs')]: read('scripts/pelago-events.mjs'),
     [at('scripts/pelago-login.mjs')]: read('scripts/pelago-login.mjs').replace(`'http://127.0.0.1:3100'`, JSON.stringify(HOSTED)),
+    // The plugin's own README: the plugin directory's listing text, opening with the listing's summary, and what the
+    // plugin sends, for the directory's review.
+    [at('README.md')]: read('scripts/plugin-readme.md').replace(/\r\n/g, '\n').replace(/\{(\w+)\}/g, (all, key) => {
+      const value = key in LISTING.urls ? LISTING.urls[key as keyof typeof LISTING.urls] : (LISTING as Record<string, unknown>)[key];
+      return typeof value === 'string' ? value : all;
+    }),
     [at('pelago.md')]: workingRules(),
     [at('skills/pelago-bump/SKILL.md')]: read('.claude/skills/pelago-bump/SKILL.md'),
     [at('skills/pelago-bump/references/home.md')]: `# Where bumps live\n\nWorkspace: the one the map's tools are signed in to (${HOSTED} unless PELAGO_URL says another).\n\nFind the feature that gathers friction with Archipelago by search (type \`feature\`, q \`friction\`). If this workspace has none, make the bump an issue that is part of the project you are working in, and say in its first line that it is about Archipelago itself.\n`,
