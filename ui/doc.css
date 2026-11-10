@@ -10,6 +10,10 @@ body {
   color: var(--reader-ink, CanvasText);
   font: var(--reader-text)/1.6 Georgia, 'Iowan Old Style', 'Times New Roman', serif;
 }
+/* A published page's words for a reader that runs no script (packs/reader/head.js): the page itself is drawn in main. */
+.page-words {
+  display: none;
+}
 main {
   max-width: var(--reader-measure);
   margin: 0 auto;

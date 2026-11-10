@@ -1,7 +1,7 @@
 // A published page's head, for search engines and where a link to it is posted: its title, a description from the
 // first paragraph it opens on, the address to keep and the picture its style names. And its data in the page itself,
 // after its script, so the page draws its text and its pictures' first frames as soon as its scripts are here. Its words
-// are in the page as plain HTML too, which the script replaces: an agent's fetch runs no script, and read only a title.
+// are in the page as plain HTML too, never drawn: an agent's fetch runs no script, and read only a title.
 
 const escape = (s) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -73,13 +73,16 @@ export function wordsHtml(text) {
   return out.join('\n');
 }
 
-/** What the page says before its script draws it: its title and words, for an agent's fetch and a search engine. */
+/**
+ * What the page says for a reader that runs no script and reads no style (an agent's fetch, a search engine): its
+ * title and words, beside the page, never drawn (doc.css hides .page-words), so a person sees only the page as drawn.
+ */
 const wordsOf = (doc) =>
-  [`<h1>${escape(doc.title ?? '')}</h1>`, ...(doc.parts ?? []).map((part) => wordsHtml(typeof part.text === 'string' ? part.text : part.section?.body ?? ''))].filter(Boolean).join('\n');
+  `<article class="page-words">${[`<h1>${escape(doc.title ?? '')}</h1>`, ...(doc.parts ?? []).map((part) => wordsHtml(typeof part.text === 'string' ? part.text : part.section?.body ?? ''))].filter(Boolean).join('\n')}</article>`;
 
 /** The page sent for a published document: its head, its words, and its data (what /data answers) after its script. */
 export function publishedPage(template, doc, canonical, site, data, image) {
   return publicHead(template, doc, canonical, site, image)
-    .replace(/<main id="main">[\s\S]*?<\/main>/, () => `<main id="main">${wordsOf(doc)}</main>`)
-    .replace('</body>', () => `<script type="application/json" id="page-data">${inPage(data)}</script></body>`);
+    .replace(/<main id="main">[\s\S]*?<\/main>/, () => '<main id="main"></main>')
+    .replace('</body>', () => `${wordsOf(doc)}<script type="application/json" id="page-data">${inPage(data)}</script></body>`);
 }
