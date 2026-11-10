@@ -5,7 +5,7 @@
 // (the owner, 9 Nov 2026): the kept, newest first, then agents' working views folded; what a pack ships is found by
 // its name. One a document brings in is a part of that page, in neither list unless it is up.
 
-import { api, ask, h, hooks, idsOf, may, state, tell, wordsOf, withIds } from './base.js';
+import { api, ask, firstDrawn, h, hooks, idsOf, may, state, tell, wordsOf, withIds } from './base.js';
 import { addressOf, flatView, stepsOf } from './query.js';
 import { filterSaid, fitBar } from './query-bar.js';
 import { canvasMenu } from './canvas-menu.js';
@@ -24,7 +24,7 @@ const TYPE = 'lens';
 let known = null;
 export function savedCanvases(fresh = false) {
   if (fresh || !known)
-    known = Promise.all([api('search', { type: TYPE, open: true, limit: 200 }).catch(() => []), api('view', { name: 'saved_views', params: { limit: 200 } }).catch(() => null)]).then(([rows, views]) => {
+    known = firstDrawn.then(() => Promise.all([api('search', { type: TYPE, open: true, limit: 200 }).catch(() => []), api('view', { name: 'saved_views', params: { limit: 200 } }).catch(() => null)])).then(([rows, views]) => {
       const said = new Map((views?.pictures ?? []).map((p) => [p.lens, p]));
       // A working view about what has closed is retired with it (src/saved-views.ts).
       const ended = new Set(views?.ended ?? []);

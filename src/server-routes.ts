@@ -5,11 +5,14 @@
 // GET is where a person comes back to from another site: it answers where to send them on; one that answers html makes
 // a page per request, sent under the reader's policy with every header the kernel's. Every request is counted by
 // address, as the other open routes are.
+// A drawing's modules by hash (GET /drawing/<hash>/<module>.js, src/drawing-files.ts) are served here too.
 
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { alertOwner } from './alert.ts';
+import { drawingFile, drawingPath, drawingWorker, shippedDrawing } from './drawing-files.ts';
+import type { Archipelago } from './pelago.ts';
 import { signedWith } from './hashes.ts';
 import { json as reply, PRIVATE as GUARD, GUARD as OPEN } from './reply.ts';
 import { READER_POLICY } from './public-document.ts';
@@ -120,6 +123,39 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
   } catch (err) {
     return json(400, { error: (err as Error).message });
   }
+}
+
+/** What GET /drawing/<hash>/<module>.js is handed: the map it reads, as the person asking sees it. */
+export interface DrawingRoutes {
+  /** True, and the request answered, when its address has asked too often. */
+  tooOften: () => boolean;
+  reader: () => Promise<Archipelago>;
+}
+
+/**
+ * One module of a drawing, by its hash (src/drawing-files.ts): kept for good, since a hash is its content, and given
+ * nothing to run with. Its service worker (sw.js, a pack's drawing's alone) is asked again each time, since it holds a
+ * kernel file, and may import from this origin. What is not there is a 404 with nothing in it.
+ */
+export async function serveDrawingFile(res: ServerResponse, path: string, at: DrawingRoutes): Promise<unknown> {
+  const asked = drawingPath(path);
+  if (!asked) return res.writeHead(404, { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }).end();
+  const reader = await at.reader();
+  // A pack's own drawing is served from what the packs ship, and a service worker installing it asks for every module at
+  // once: only a read of the map (a drawing kept there, or a guess) is counted against the open limit.
+  if (!shippedDrawing(reader, asked.hash) && at.tooOften()) return;
+  const worker = asked.name === 'sw.js';
+  const text = worker ? await drawingWorker(reader, asked.hash) : await drawingFile(reader, asked.hash, asked.name);
+  if (text === null) return res.writeHead(404, { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }).end();
+  return res
+    .writeHead(200, {
+      'content-type': 'text/javascript; charset=utf-8',
+      'cache-control': worker ? 'no-cache' : 'public, max-age=31536000, immutable',
+      'x-content-type-options': 'nosniff',
+      // 'self' is the drawing host, which serves /three.js too (src/draw-host.ts): nothing of the page's origin is needed.
+      'content-security-policy': worker ? "default-src 'none'; script-src 'self'" : "default-src 'none'",
+    })
+    .end(text);
 }
 
 /**

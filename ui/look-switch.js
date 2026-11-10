@@ -3,14 +3,14 @@
 // saved view brings its own when it is opened, and Save keeps it. A style drawn here, by Use here on its page, is one
 // more choice while it is.
 
-import { api, ask, h, may, state, tell } from './base.js';
+import { api, ask, firstDrawn, h, may, state, tell } from './base.js';
 import { addressOf } from './query.js';
 import { titles } from './words.js';
 
 /** The layouts kept on the map (core's layout type, not the owner's versions of a pack's drawing), read once. */
 let named = null;
 const namedStyles = () =>
-  (named ??= api('search', { type: 'layout', open: true, limit: 100 })
+  (named ??= firstDrawn.then(() => api('search', { type: 'layout', open: true, limit: 100 }))
     .then((rows) => rows.filter((s) => !s.props?.preset).sort((a, b) => a.title.localeCompare(b.title)))
     .catch(() => []));
 

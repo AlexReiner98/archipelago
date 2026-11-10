@@ -15,10 +15,29 @@ const DRAW_POLICY = "sandbox allow-scripts; default-src 'none'; script-src 'self
 // server's page may frame it, so a stranger's page cannot hand it code to run as the person signed in here.
 const OPEN_DRAW_POLICY = "frame-ancestors 'self'";
 
-/** The policy draw.html is served with: opened, or sandboxed (and on a dev server started PELAGO_UNSANDBOXED=1, without the sandbox but with the rest). */
-export const drawPolicy = (open: boolean, unsandboxed: boolean) => (open ? OPEN_DRAW_POLICY : unsandboxed ? DRAW_POLICY.replace('sandbox allow-scripts; ', '') : DRAW_POLICY);
+/**
+ * The policy draw.html is served with: opened, or sandboxed (and on a dev server started PELAGO_UNSANDBOXED=1, without
+ * the sandbox but with the rest). Its own scripts, written into it (src/ui-files.ts drawPage), are allowed by their
+ * hashes, and no other script written in a page is. At the drawing host (src/draw-host.ts), framed by the pages it names.
+ */
+export function drawPolicy(open: boolean, unsandboxed: boolean, hashes: string[] = [], framedBy?: string[]): string {
+  if (open) return OPEN_DRAW_POLICY;
+  const policy = DRAW_POLICY.replace("script-src 'self' blob: data:", ["script-src 'self' blob: data:", ...hashes.map((h) => `'sha256-${h}'`)].join(' '));
+  if (framedBy?.length) return hosted(policy, framedBy);
+  return unsandboxed ? policy.replace('sandbox allow-scripts; ', '') : policy;
+}
+
+// At the drawing host the frame keeps an origin of its own, that host's and never the page's, so it may register a service
+// worker and start workers from its own files. Only the pages it names may frame it: framed by its own origin it would be
+// the page's, which is why 'self' is never one of them (and the page refuses to frame its own origin so, ui/base.js).
+const hosted = (policy: string, framedBy: string[]) =>
+  `${policy.replace('sandbox allow-scripts;', 'sandbox allow-scripts allow-same-origin;').replace('worker-src blob: data:', "worker-src 'self' blob: data:")}; frame-ancestors ${framedBy.join(' ')}`;
 
 /** A page a secret opens (a link's) asks not to be indexed in its markup, as its header does: either may be all a crawler reads. */
 export const unlisted = (html: string) => (html.includes('name="robots"') ? html : html.replace('<head>', '<head>\n    <meta name="robots" content="noindex" />'));
 /** A page marked as it is served: with no sandbox for its drawing frames (ui/base.js frameSandbox), and draw.html as opened (ui/draw.js). */
-export const markPage = (html: string, { open = false, unsandboxed = false }) => html.replace('<html', `<html${unsandboxed ? ' data-draw-sandbox="off"' : ''}${open ? ' data-draw-open="on"' : ''}`);
+export const markPage = (html: string, { open = false, unsandboxed = false, drawOrigin }: { open?: boolean; unsandboxed?: boolean; drawOrigin?: string }) => {
+  const marked = html.replace('<html', `<html${unsandboxed ? ' data-draw-sandbox="off"' : ''}${open ? ' data-draw-open="on"' : ''}${drawOrigin ? ` data-draw-origin="${drawOrigin}"` : ''}`);
+  // The frame the page starts with (ui/index.html), at the drawing host: the same frame ui/layout.js would make.
+  return drawOrigin ? marked.replace(/sandbox="allow-scripts" src="\/draw\.html(\?v=\w+)?"/, (_, v = '') => `sandbox="allow-scripts allow-same-origin" src="${drawOrigin}/draw.html${v}"`) : marked;
+};

@@ -35,6 +35,8 @@ export const UI_FILES: Record<string, string> = {
   '/draw.html': 'draw.html',
   '/draw.js': 'draw.js',
   '/draw-marks.js': 'draw-marks.js',
+  // What runs in a drawing's worker: written in front of draw-marks.js, and into a drawing's service worker (drawInside).
+  '/draw-inside.js': 'draw-inside.js',
   // The projector's pure part, which the page runs on the facts it reads (ui/replica.js): served from the kernel's own file.
   '/project.js': 'project.js',
   // What a stylesheet from the map may say, which the page checks a sheet by and the server checks page_css by on write.
@@ -60,7 +62,7 @@ const MADE = new Set(['/layout.css']);
 // moves when one is saved, under the dev server as on a deploy; an address with a version that is not the current
 // one is answered with what is current, and not kept.
 const named = (path: string) => !MADE.has(path) && UI_FILES[path] !== undefined && path !== '/';
-let held: { key: string; version: string; text: Map<string, string> } | undefined;
+let held: { key: string; version: string; text: Map<string, string>; draw?: { html: string; hashes: string[] } } | undefined;
 
 /** The UI as served now: its version, and each text file with the files it names versioned. */
 async function current() {
@@ -81,9 +83,14 @@ async function current() {
       text.set(f, body.replace(/(\bfrom\s*|\bimport\s*\(\s*)?(['"])(\.?\/)([\w.-]+)\2/g, (all, imp, q, dot, name) => ((dot === '/' || imp) && named(`/${name}`) ? `${imp ?? ''}${q}${dot}${name}?v=${version}${q}` : all)));
     else text.set(f, body);
   }
+  // The frame's script is two files: what runs in a worker (draw-inside.js, handed to the worker as its text) and the frame's own.
+  text.set('draw-marks.js', `${text.get('draw-inside.js')}\n${text.get('draw-marks.js')}`);
   held = { key, version, text };
   return held;
 }
+
+/** What runs in a drawing's worker (ui/draw-inside.js) as served now: a drawing's service worker is built around it. */
+export const drawInside = async () => (await current()).text.get('draw-inside.js')!;
 
 /** The UI's version as served now: it moves when one of its files is saved. */
 export const uiVersion = async () => (await current()).version;
@@ -119,6 +126,25 @@ function preloaded(page: string, version: string, text: Map<string, string>): st
   const scripts = [...page.matchAll(/<script[^>]*\bsrc="(\/[\w.-]+\.js)\?v=/g)].map((m) => m[1]);
   const preload = reached(text, scripts).map((path) => `<link rel="modulepreload" href="${path}?v=${version}" />`);
   return preload.length ? page.replace('</head>', `    ${preload.join('\n    ')}\n  </head>`) : page;
+}
+
+/**
+ * The frame drawings run in (draw.html) as served now: its scripts written into it, each with the hash its policy
+ * allows it by (src/page-policies.ts). The frame has an origin of its own, for which no cache keeps a file, so a script
+ * it named would be fetched again on every page, behind whatever the page is reading; written in, it runs as the
+ * frame is parsed. The file keeps its scripts by name, as every page does.
+ */
+export async function drawPage(): Promise<{ html: string; hashes: string[] }> {
+  const now = await current();
+  if (now.draw) return now.draw;
+  const hashes: string[] = [];
+  const html = now.text.get('draw.html')!.replace(/<script src="\/([\w.-]+\.js)\?v=\w+"><\/script>/g, (all, file) => {
+    const code = now.text.get(file);
+    if (code === undefined || code.includes('</script')) return all;
+    hashes.push(createHash('sha256').update(code).digest('base64'));
+    return `<script>${code}</script>`;
+  });
+  return (now.draw = { html, hashes });
 }
 
 /** One file of the UI as served now, and whether the address asked for may be kept (it names the current version). */
