@@ -3,6 +3,7 @@
 
 import { actorId, type Actor, type Entity, type Archipelago } from './pelago.ts';
 import { awakeSessions, roomForSession } from './plan.ts'; import { wholeMap } from './outbox.ts';
+import { CLAUDE_CODE } from './claude-code.ts';
 
 /** How many sessions are at work in the workspace, whoever's they are (src/plan.ts). */
 export const sessionsAwake = async (l: Archipelago) => awakeSessions((await wholeMap(l)).db, l.registry.family('run'));
@@ -30,7 +31,7 @@ export async function takeUp(l: Archipelago, actor: Actor, run: Entity): Promise
 /** The chat goes on: a prompt to a session that was ended, or that had said where its work stands, takes it up under its name. */
 export async function sessionPrompted(l: Archipelago, sessionId: string | undefined): Promise<void> {
   const run = sessionId ? await resolveRun(l, sessionId) : undefined;
-  if (run && isChat(run) && (!run.is_open || run.status === 'waiting')) await takeUp(l, { kind: 'agent', name: 'claude-code' }, run);
+  if (run && isChat(run) && (!run.is_open || run.status === 'waiting')) await takeUp(l, CLAUDE_CODE, run);
 }
 
 /** How long after its hook registered a chat a call to register it again is taken to be the same chat. */
