@@ -16,6 +16,8 @@ test('a hook called over the tools is answered as /hooks/ answers it, and a sess
   const first = await hook({ event: 'prompt', session_id: 'mcp-hook-1', cwd: process.cwd(), prompt: 'Where do things stand?' });
   assert.equal(first.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
   assert.match(first.hookSpecificOutput.additionalContext, /\S/, 'the session was told where it stands');
+  assert.match(first.hookSpecificOutput.additionalContext, /## Before you finish/, 'and handed the working rules, with no file read');
+  assert.doesNotMatch(first.hookSpecificOutput.additionalContext, /pelago-bump/, 'without the bump skill, which ships with no plugin');
   const run = await call('/agent/report', undefined, { action: 'session_update', params: { run: 'mcp-hook-1' } });
   assert.equal(run.status, 200, run.error);
   assert.match(run.result.run, /^e_/, 'the session is registered as a run');

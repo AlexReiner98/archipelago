@@ -19,11 +19,14 @@ export function configureHookTool(packs: ServerPacks, running: { commit?: string
 
 type Told = { hookSpecificOutput?: { hookEventName?: string; additionalContext?: string } } & Record<string, unknown>;
 
-/** Two answers to one prompt (the start, then the prompt), as one: their words one after the other. */
-const joined = (a: Told, b: Told): Told => {
-  const words = [a.hookSpecificOutput?.additionalContext, b.hookSpecificOutput?.additionalContext].filter(Boolean).join('\n\n');
-  return words ? { ...a, ...b, hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: words } } : { ...a, ...b };
+/** Answers to one hook (the working rules, the start, the prompt) as one, their words one after the other. */
+const joined = (hookEventName: string, ...answers: Told[]): Told => {
+  const words = answers.map((a) => a.hookSpecificOutput?.additionalContext).filter(Boolean).join('\n\n');
+  const all = Object.assign({}, ...answers) as Told;
+  return words ? { ...all, hookSpecificOutput: { hookEventName, additionalContext: words } } : all;
 };
+/** The working rules a session is handed as it starts: no file of the plugin's is read, since no script runs. */
+const rules = async (): Promise<Told> => ({ hookSpecificOutput: { additionalContext: (await import('./working-rules.ts')).shippedRules() } });
 
 export const HOOK_TOOLS: Record<string, Tool> = {
   hook: {
@@ -44,8 +47,11 @@ export const HOOK_TOOLS: Record<string, Tool> = {
       const { resolveRun } = await import('./chat-run.ts');
       const { wholeMap } = await import('./outbox.ts');
       const { db } = await wholeMap(l);
+      // A plugin keeps no files in the project, so none can be behind: it says it has the server's own.
+      const setup = (await import('./server-files.ts')).setupVersion();
       const body = {
         session_id: input.session_id,
+        ...(setup && { setup }),
         ...(input.cwd && { cwd: input.cwd }),
         ...(input.prompt !== undefined && { prompt: input.prompt }),
         ...(input.source && { source: input.source }),
@@ -53,7 +59,8 @@ export const HOOK_TOOLS: Record<string, Tool> = {
       };
       const answer = async (event: string, said: object) =>
         ((await answerAt(packs, SURFACE, event, { whole: db, pelago: l, within: actor.within ?? [], may: actor.may, body: said, running, origin: packs.origin ?? '' })) ?? {}) as Told;
-      if (input.event === 'prompt' && !(await resolveRun(l, input.session_id))) return joined(await answer('session-start', { ...body, source: 'startup' }), await answer('prompt', body));
+      if (input.event === 'prompt' && !(await resolveRun(l, input.session_id))) return joined('UserPromptSubmit', await rules(), await answer('session-start', { ...body, source: 'startup' }), await answer('prompt', body));
+      if (input.event === 'session-start') return joined('SessionStart', await rules(), await answer('session-start', body));
       return answer(input.event, body);
     },
   },
