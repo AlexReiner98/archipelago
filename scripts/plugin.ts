@@ -6,8 +6,9 @@
 //
 //   claude plugin install archipelago --marketplace AlexReiner98/archipelago
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { LISTING } from '../src/listing.ts';
 import { workingRules } from '../src/working-rules.ts';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -19,12 +20,14 @@ export const HOSTED = 'https://app.archipelago.tools';
 export const PLUGIN = 'archipelago';
 export const SERVER = 'pelago';
 export const FOLDER = `plugins/${PLUGIN}`;
+/** Where the plugin directory looks for the listing's icon. */
+export const PLUGIN_ICON = `${FOLDER}/.claude-plugin/icon.png`;
 /** Where the marketplace is, as Claude Code is told it. */
 export const MARKETPLACE = 'AlexReiner98/archipelago';
 export const installCommand = `claude plugin install ${PLUGIN} --marketplace ${MARKETPLACE}`;
 
 const json = (value: unknown) => JSON.stringify(value, null, 2) + '\n';
-const DESCRIPTION = 'A map of your work your agent keeps and you can read: sessions, plans, decisions and what waits on what, drawn in your browser.';
+const DESCRIPTION = LISTING.summary;
 
 /** The hooks, as the setup registers them in a project (scripts/pelago-setup.mjs), run from the plugin. */
 const HOOKS: [event: string, name: string, matcher?: string, timeout?: number, async?: boolean][] = [
@@ -50,21 +53,34 @@ export function pluginFiles(): Record<string, string> {
   const version = JSON.parse(read('package.json')).version as string;
   const at = (path: string) => `${FOLDER}/${path}`;
   return {
+    // The MCP Registry's entry (registry.modelcontextprotocol.io), published with mcp-publisher under the domain's name.
+    'server.json': json({
+      $schema: 'https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json',
+      name: LISTING.registry_name,
+      title: LISTING.title,
+      description: LISTING.summary,
+      version,
+      websiteUrl: LISTING.urls.site,
+      repository: { url: LISTING.urls.repository, source: 'github' },
+      remotes: [{ type: 'streamable-http', url: LISTING.urls.mcp }],
+    }),
     '.claude-plugin/marketplace.json': json({
       name: PLUGIN,
-      owner: { name: 'Aperture Design Tools Inc.' },
-      metadata: { description: 'Archipelago for Claude Code.' },
-      plugins: [{ name: PLUGIN, source: `./${FOLDER}`, description: DESCRIPTION, category: 'productivity' }],
+      owner: { name: LISTING.publisher },
+      metadata: { description: `${LISTING.name} for Claude Code.` },
+      plugins: [{ name: PLUGIN, source: `./${FOLDER}`, description: DESCRIPTION, category: LISTING.category }],
     }),
     [at('.claude-plugin/plugin.json')]: json({
       name: PLUGIN,
+      displayName: LISTING.title,
       version,
       description: DESCRIPTION,
-      author: { name: 'Aperture Design Tools Inc.' },
-      homepage: HOSTED,
-      repository: 'https://github.com/AlexReiner98/archipelago',
-      license: 'MIT',
-      keywords: ['memory', 'map', 'tasks', 'decisions', 'mcp'],
+      author: { name: LISTING.publisher, url: LISTING.urls.site },
+      homepage: LISTING.urls.app,
+      repository: LISTING.urls.repository,
+      license: LISTING.license,
+      keywords: LISTING.keywords,
+      privacyPolicyUrl: LISTING.urls.privacy,
     }),
     // No token in it: the tools take the machine's one sign-in (pelago-login.mjs headers), the one the installer and
     // the hooks use; with none, the helper says nothing and Claude Code signs in itself, at /mcp.
@@ -74,6 +90,12 @@ export function pluginFiles(): Record<string, string> {
     [at('scripts/pelago-hook.mjs')]: read('scripts/pelago-hook.mjs').replace(`'http://127.0.0.1:3100'`, JSON.stringify(HOSTED)),
     [at('scripts/pelago-events.mjs')]: read('scripts/pelago-events.mjs'),
     [at('scripts/pelago-login.mjs')]: read('scripts/pelago-login.mjs').replace(`'http://127.0.0.1:3100'`, JSON.stringify(HOSTED)),
+    // The plugin's own README: the plugin directory's listing text, opening with the listing's summary, and what the
+    // plugin sends, for the directory's review.
+    [at('README.md')]: read('scripts/plugin-readme.md').replace(/\r\n/g, '\n').replace(/\{(\w+)\}/g, (all, key) => {
+      const value = key in LISTING.urls ? LISTING.urls[key as keyof typeof LISTING.urls] : (LISTING as Record<string, unknown>)[key];
+      return typeof value === 'string' ? value : all;
+    }),
     [at('pelago.md')]: workingRules(),
     [at('skills/pelago-bump/SKILL.md')]: read('.claude/skills/pelago-bump/SKILL.md'),
     [at('skills/pelago-bump/references/home.md')]: `# Where bumps live\n\nWorkspace: the one the map's tools are signed in to (${HOSTED} unless PELAGO_URL says another).\n\nFind the feature that gathers friction with Archipelago by search (type \`feature\`, q \`friction\`). If this workspace has none, make the bump an issue that is part of the project you are working in, and say in its first line that it is about Archipelago itself.\n`,
@@ -86,4 +108,7 @@ if (import.meta.main) {
     writeFileSync(join(ROOT, path), text);
     console.log(`written  ${path}`);
   }
+  // The listing's icon, as the plugin directory takes it: a square PNG in the plugin's own folder.
+  copyFileSync(join(ROOT, LISTING.icon), join(ROOT, PLUGIN_ICON));
+  console.log(`written  ${PLUGIN_ICON}`);
 }

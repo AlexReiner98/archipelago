@@ -6,6 +6,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { LISTING } from './listing.ts';
 import { workingRules } from './working-rules.ts';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -53,11 +54,11 @@ if [ -t 1 ] && (: </dev/tty) 2>/dev/null; then node "$dir/pelago-install.mjs" "$
 `;
 
 /** /llms.txt (llmstxt.org): what this server is, for an agent that lands on it, pointing at the install. */
-export const llmsTxt = (origin: string) => `# Archipelago
+export const llmsTxt = (origin: string) => `# ${LISTING.name}
 
-> A map of your work that your coding agent keeps and you can read: sessions, plans, decisions and what waits on what. Agents reach it as an MCP server at ${origin}/mcp; a person reads it at ${origin}.
+> ${LISTING.summary} Agents reach it as an MCP server at ${origin}/mcp; a person reads it at ${origin}.
 
-To install Archipelago for an agent (Claude Code, Codex, Cursor, Grok Bot, ChatGPT), fetch ${origin}/connect/install and follow the section for your client. The multiworld randomizer of the same name is another project, at archipelago.gg.
+To install ${LISTING.name} for an agent (Claude Code, Codex, Cursor, Grok Bot, ChatGPT), fetch ${origin}/connect/install and follow the section for your client. ${LISTING.not}
 
 ## Install
 
@@ -75,7 +76,7 @@ export function installPage(origin: string): string {
   const node = `node -e "fetch('${origin}/connect/install.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))" --`;
   return `# Install Archipelago
 
-Archipelago is a map of your work that your agent keeps and you can read: sessions, plans, decisions and what waits on what, at ${origin}. Connecting an agent takes one step and one sign-in in the browser.
+${LISTING.summary} It is at ${origin}. Connecting an agent takes one step and one sign-in in the browser.
 
 ## For a person
 
