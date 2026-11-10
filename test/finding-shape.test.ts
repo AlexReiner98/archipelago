@@ -35,7 +35,7 @@ test('an option, a bug and a placeholder are refused with what to send', () => {
   assert.match(refused(finding('Option B: cache the shore'))[0], /a question part_of the decision/);
   assert.match(refused(finding('Alternative: split the read'))[0], /alternative_for/);
   assert.deepEqual(refused(finding('Optional fields are rare')), [], 'a word that only starts with option');
-  assert.match(refused(finding('Bug: the shore drops units'))[0], /Make it a bug/);
+  assert.match(refused(finding('Bug: the shore drops units'))[0], /Make it the work that fixes it/);
   assert.deepEqual(refused(finding('Debug logs are quiet')), []);
   assert.match(refused(finding('Peak load, as Energy reads it'))[0], /the claim itself, as a sentence/);
 });
