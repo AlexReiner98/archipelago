@@ -4,8 +4,9 @@
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
 import { authorizePage } from './authorize.js';
-import { SignInNeeded, api, h, hooks, join, link, loadMay, may, main, openLink, part, showIdentity, signIn, state, store, ungate } from './base.js';
+import { SignInNeeded, api, drawnNone, h, hooks, join, link, loadMay, may, main, openLink, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
+import { warmLayouts } from './layout.js';
 import { mayLeave, newItem, unsaved } from './draft.js';
 import { drawFind } from './find.js';
 import { home } from './home.js';
@@ -26,6 +27,9 @@ const GHOST = /^p_[a-z0-9]+:/;
 const SHEET = { e: 'item', held: 'item', new: 'item', s: 'screen', workspace: 'workspace', you: 'you' };
 const sheet = document.getElementById('sheet');
 startTips();
+// The frame drawings run in, and the drawing this browser drew last loaded in it, started before anything is read: the
+// worker is ready when the first answer comes.
+warmLayouts();
 // A sheet opened where the address stays (the sign-in form, from Home) is shut by drawing that address again.
 const close = () => (location.hash === hrefNow() ? route() : (location.hash = hrefNow()));
 document.getElementById('sheet-close').addEventListener('click', close);
@@ -98,6 +102,8 @@ async function route(pulse = false) {
   }
   if (!pulse) sheet.scrollTop = 0;
   showIdentity();
+  // A page drawn in the sheet lets what waits for a drawing be read, whether or not a canvas draws behind it.
+  drawnNone();
 }
 
 hooks.route = route;

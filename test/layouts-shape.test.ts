@@ -13,7 +13,9 @@ import { sidesOf } from '../packs/core/layouts/shape/sides.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { shape } from '../packs/core/layouts/shape/index.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { tension } from '../packs/core/layouts/shape/turns.js';
+import { descend, descent } from '../packs/core/layouts/shape/descend.js';
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { paired, swept } from '../packs/core/layouts/shape/tighten.js';
 
 type P = [number, number];
 
@@ -31,22 +33,99 @@ test('flow: a least on an arc is carried, and a circulation costs what its least
   assert.equal(cost, 2 * 2);
 });
 
+test('flow: every shortest path sent at once costs what one at a time does', () => {
+  // A grid of arcs with ties in cost, many givers and takers: the batched solve (bug e_a9w5jeme) finds a flow as cheap.
+  const n = 36, arcs: { from: number; to: number; cap: number; cost: number }[] = [];
+  for (let v = 0; v < n; v++) for (const u of [v + 1, v + 6]) if (u < n && (u !== v + 1 || u % 6)) arcs.push({ from: v, to: u, cap: 3 + (v % 4), cost: (v * 7 + u) % 3 }, { from: u, to: v, cap: 2, cost: 1 + (u % 2) });
+  const supply = Array.from({ length: n }, (_, v) => (v < 6 ? 4 : v >= 30 ? -4 : 0));
+  const one = minCostFlow(n, supply, arcs), many = minCostFlow(n, supply, arcs, { batch: 0 });
+  assert.equal(many.cost, one.cost);
+  const net = new Array(n).fill(0);
+  arcs.forEach((a, i) => { assert.ok(many.flow[i] >= 0 && many.flow[i] <= a.cap); net[a.from] -= many.flow[i]; net[a.to] += many.flow[i]; });
+  assert.deepEqual(net.map((x, v) => x + supply[v]), new Array(n).fill(0), 'every need met');
+});
+
+test('flow: the network simplex meets every need at the cost shortest paths find', () => {
+  let seed = 7;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  for (let k = 0; k < 150; k++) {
+    const n = 3 + Math.floor(rnd() * 40), arcs: any[] = [];
+    for (let i = n + Math.floor(rnd() * n * 4); i > 0; i--) {
+      const a = Math.floor(rnd() * n), b = (a + 1 + Math.floor(rnd() * (n - 1))) % n;
+      arcs.push({ from: a, to: b, cost: Math.floor(rnd() * 50), ...(rnd() < 0.8 && { cap: 1 + Math.floor(rnd() * 20) }), ...(rnd() < 0.1 && { low: 1 }) });
+    }
+    for (let v = 0; v < n; v++) arcs.push({ from: v, to: (v + 1) % n, cost: 60 });
+    const supply = new Array(n).fill(0);
+    for (let j = 0; j < n / 2; j++) { const q = Math.floor(rnd() * 10); supply[Math.floor(rnd() * n)] += q; supply[Math.floor(rnd() * n)] -= q; }
+    const paths = minCostFlow(n, supply, arcs, { batch: 0 }), tree = minCostFlow(n, supply, arcs, { simplex: 50 });
+    assert.equal(tree.cost, paths.cost, `problem ${k}`);
+    const net = supply.slice();
+    arcs.forEach((a, i) => {
+      assert.ok(tree.flow[i] >= (a.low ?? 0) && tree.flow[i] <= (a.cap ?? Infinity), `problem ${k}: arc ${i} within its bounds`);
+      ((net[a.from] -= tree.flow[i]), (net[a.to] += tree.flow[i]));
+    });
+    assert.deepEqual(net, new Array(n).fill(0), `problem ${k}: every need met`);
+  }
+});
+
+test('tighten: the lines swept in order stand where pairing every overlap put them', () => {
+  let seed = 11;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  for (let k = 0; k < 200; k++) {
+    const n = 2 + Math.floor(rnd() * 30), place = new Map<number, number>(), things: number[][] = [];
+    for (let l = 0; l < n; l++) place.set(l, Math.floor(rnd() * 8));
+    for (let l = 0; l < n; l++) for (let s = 1 + Math.floor(rnd() * 3); s > 0; s--) { const a = Math.floor(rnd() * 20), b = a + Math.floor(rnd() * 6); things.push([l, a, b]); }
+    const lines = [...place.keys()].sort((a, b) => place.get(a)! - place.get(b)! || a - b), pull = new Set(lines.filter(() => rnd() < 0.3));
+    // A few orders from stretches, either way along the lines.
+    const orders = Array.from({ length: Math.floor(rnd() * 4) }, () => [Math.floor(rnd() * n), Math.floor(rnd() * n)]).filter(([p, q]) => p !== q);
+    const made = () => { const after = new Map<number, Set<number>>(); for (const [p, q] of orders) (after.get(p) ?? after.set(p, new Set()).get(p)!).add(q); return after; };
+    const a1 = made(), add = (p: number, q: number) => { if (p !== q) (a1.get(p) ?? a1.set(p, new Set()).get(p)!).add(q); };
+    const want = paired(things.map((t) => [...t]), lines, a1, pull, place, add), got = swept(things, lines, made(), pull);
+    assert.deepEqual([...got].sort((p, q) => p[0] - q[0]), [...want].sort((p: number[], q: number[]) => p[0] - q[0]), `case ${k}`);
+  }
+});
+
 test('flow: a need nothing can meet is said, not hidden', () => {
   assert.throws(() => minCostFlow(2, [2, -2], [{ from: 0, to: 1, cap: 1 }]), /unmet/);
   assert.throws(() => minCostFlow(2, [1, -2], []), /balance/);
 });
 
-test('tension: the turns at each node that cost least, as every way of turning them would find', () => {
-  // Small graphs, every cost w · max(0, |c + λ(to) - λ(from)| - s), against all turns from -6 to 6.
+test('descent: the turns at each node that cost least, as every way of turning them would find', () => {
+  // Small graphs, every cost w · max(0, |c + q·(d(to) - d(from))| - s), against all turns from -6 to 6, for a unit of
+  // one and a whole turn of four.
   let seed = 7;
   const rnd = (n: number) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
-  for (let t = 0; t < 150; t++) {
-    const n = 2 + rnd(2 + 1), terms = Array.from({ length: 1 + rnd(2 * 2 + 2) }, () => ({ from: rnd(n), to: rnd(n), c: rnd(9) - 2 * 2, w: 1 + rnd(2 + 1), s: rnd(2) }));
-    const cost = (l: number[]) => terms.reduce((sum, x) => sum + x.w * Math.max(0, Math.abs(x.c + l[x.to] - l[x.from]) - x.s), 0);
+  for (let t = 0; t < 300; t++) {
+    const q = t % 2 ? 4 : 1, n = 2 + rnd(2 + 1), terms = Array.from({ length: 1 + rnd(2 * 2 + 2) }, () => ({ from: rnd(n), to: rnd(n), c: rnd(9) - 2 * 2, w: 1 + rnd(2 + 1), s: rnd(2) }));
+    const cost = (l: ArrayLike<number>) => terms.reduce((sum, x) => sum + x.w * Math.max(0, Math.abs(x.c + q * (l[x.to] - l[x.from])) - x.s), 0);
     let best = Infinity;
     const all = (l: number[]): void => { if (l.length === n) { best = Math.min(best, cost(l)); return; } for (let v = -6; v <= 6; v++) all([...l, v]); };
     all([0]);
-    assert.equal(cost(tension(n, terms)), best);
+    const { d, gain } = descend(n, terms, q);
+    assert.equal(cost(d), best);
+    assert.equal(gain, cost(new Array(n).fill(0)) - best);
+    assert.equal(d[0], 0);
+  }
+});
+
+test('descent: run again and again on costs that move, it finds each least as a fresh one does', () => {
+  // One descent kept and run on one cost after another, a few terms changed each time as a try changes them: the flow
+  // it keeps from run to run, and from cut to cut, must leave each answer what a descent made for it alone finds.
+  let seed = 11;
+  const rnd = (n: number) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  for (let g = 0; g < 20; g++) {
+    const n = 4 + rnd(12), m = n + rnd(3 * n), q = g % 2 ? 4 : 1;
+    const from = Int32Array.from({ length: m }, () => rnd(n)), to = Int32Array.from({ length: m }, () => rnd(n));
+    const w = Float64Array.from({ length: m }, () => [10, 30, 100, 1][rnd(4)]), s = Float64Array.from({ length: m }, () => rnd(2));
+    const kept = descent(n, from, to, w, s, q), c = Float64Array.from({ length: m }, () => rnd(13) - 6);
+    for (let r = 0; r < 30; r++) {
+      for (let k = rnd(4); k >= 0; k--) c[rnd(m)] += rnd(7) - 3;
+      const terms = Array.from({ length: m }, (_, i) => ({ from: from[i], to: to[i], c: c[i], w: w[i], s: s[i] }));
+      const cost = (l: ArrayLike<number>) => terms.reduce((sum, x) => sum + x.w * Math.max(0, Math.abs(x.c + q * (l[x.to] - l[x.from])) - x.s), 0);
+      const a = kept.run(c), b = descend(n, terms, q);
+      assert.equal(a.gain, b.gain);
+      assert.equal(cost(a.d), cost(b.d));
+    }
   }
 });
 
