@@ -5,15 +5,19 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after } from 'node:test';
 import type { Limit } from '../src/limit.ts';
-import { setMailer, type Mail } from '../src/mail.ts';
+import { normalEmail, setMailer, type Mail } from '../src/mail.ts';
+import { linkFor } from '../src/members.ts';
 import { createHttpServer } from '../src/server.ts';
 import { Workspaces } from '../src/workspaces.ts';
 
 // The mail the servers would send is kept here instead.
 export const mailbox: Mail[] = [];
 setMailer(async (mail) => void mailbox.push(mail));
-/** The code in the newest link sent to an address. */
-export const codeSentTo = (email: string) => /#\/join\/(inv_[a-z0-9-]+_[0-9a-f]{40})/.exec(mailbox.findLast((m) => m.to === email)?.text ?? '')?.[1];
+/** The code in the newest sign-in mail to an address, for its workspace named `name` (or the first). */
+export const codeSentTo = (email: string, name?: string) => {
+  const text = mailbox.findLast((m) => m.to === email)?.text ?? '';
+  return [...text.matchAll(/^(.+): ([0-9A-Z]{4}-[0-9A-Z]{4})$/gm)].find((m) => !name || m[1] === name)?.[2];
+};
 
 // What this machine keeps for its own sessions stays out of the tests: a setup run here would keep it again.
 for (const name of ['PELAGO_URL', 'PELAGO_AGENT_TOKEN']) delete process.env[name];
@@ -64,11 +68,16 @@ export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; del
     }
     return { status: res.status, ...json };
   };
-  /** Add a member as an admin does, and sign them in by the link they were sent: their token. */
+  /**
+   * Add a member as an admin does, and sign them in: their token. The mail carries only a code, and asking for one is
+   * limited to once a minute an address, so the sign-in is made here the way the server makes one, and traded at the door.
+   */
   const member = async (admin: string, body: { email: string; name?: string; admin?: boolean }) => {
     const added = await call('/api/member_add', admin, body);
     if (added.status !== 200) throw new Error(added.error);
-    return (await call('/connect/join', undefined, { code: codeSentTo(body.email) })).token as string;
+    const workspace = (await call('/whoami', admin, undefined, 'GET')).workspace.id as string;
+    const link = await linkFor((await workspaces.get(workspace)).pelago.db, workspace, normalEmail(body.email)!, 60_000);
+    return (await call('/connect/join', undefined, { code: link.split('/join/')[1] })).token as string;
   };
   return { workspaces, call, base, member };
 }

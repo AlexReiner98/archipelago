@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
 import { dump } from '../src/backup.ts';
 import { workspacesOf } from '../src/control-index.ts';
-import { CODE_TRIES } from '../src/members.ts';
+import { CODE_TRIES, linkFor } from '../src/members.ts';
 import { dumpVault } from '../src/vault.ts';
 import { codeSentTo, mailbox, serve } from './serve.ts';
 import { until } from './wait.ts';
@@ -27,11 +27,21 @@ test('an admin adds a member by email; the invitation signs them in once, for a 
   assert.match((await call('/api/member_add', alex, { email: 'rosa@acme.example' })).error, /a member already/);
   assert.match((await call('/api/member_add', alex, { email: 'not an address' })).error, /not an email address/);
 
-  const code = codeSentTo('rosa@acme.example');
-  const joined = await call('/connect/join', undefined, { code });
+  assert.doesNotMatch(invitation.text, /#\/join\/|https?:\/\//, 'no link: they sign in with their address and a code');
+  assert.match(invitation.text, /sign in with this email address \(rosa@acme\.example\)/);
+
+  const before = mailbox.length;
+  await call('/connect/sign-in', undefined, { email: 'rosa@acme.example' });
+  await mailed('rosa@acme.example', before);
+  const signInMail = mailbox.slice(before).find((m) => m.to === 'rosa@acme.example')!;
+  assert.doesNotMatch(signInMail.text, /#\/join\/|https?:\/\//, 'the sign-in mail carries a code, never a link');
+  const joined = await call('/connect/code', undefined, { email: 'rosa@acme.example', code: codeSentTo('rosa@acme.example') });
   assert.equal(joined.status, 200);
   const who = await call('/whoami', joined.token, undefined, 'GET');
   assert.deepEqual([who.actor.kind, who.actor.name, who.actor.admin, who.actor.person], ['human', 'rosa@acme.example', true, added.result.person]);
+  // A link is still made, but only handed over in the browser (a buyer's welcome page), never mailed.
+  const code = (await linkFor(db, 'default', 'rosa@acme.example', 60_000)).split('/join/')[1];
+  assert.equal((await call('/connect/join', undefined, { code })).status, 200);
   assert.equal((await call('/connect/join', undefined, { code })).status, 410, 'a link works once');
   assert.equal((await call('/connect/join', undefined, { code: 'inv_default_' + '0'.repeat(40) })).status, 410);
   const token = ((await call('/api/token_list', alex)).result as any[]).find((t) => t.name === 'rosa@acme.example');
@@ -44,7 +54,7 @@ test('an admin adds a member by email; the invitation signs them in once, for a 
   assert.ok(listed[0].last_used, 'when they last used a sign-in');
 });
 
-test('anyone may ask for a sign-in link at an address, and is told nothing of who is a member where', async () => {
+test('anyone may ask for a sign-in code at an address, and is told nothing of who is a member where', async () => {
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
   const acme = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
@@ -60,15 +70,18 @@ test('anyone may ask for a sign-in link at an address, and is told nothing of wh
   await mailed('alex@example.com', before);
   const sent = mailbox.slice(before);
   assert.deepEqual(sent.map((m) => m.to), ['alex@example.com'], 'only a member is sent mail');
-  assert.equal((sent[0].text.match(/#\/join\//g) ?? []).length, 2, 'one mail, with a link for each workspace');
-  assert.match(sent[0].text, /Default:\n.*\n\nAcme:\n/s);
+  assert.doesNotMatch(sent[0].text, /#\/join\/|https?:\/\//, 'codes, never links');
+  assert.match(sent[0].text, /^Default: [0-9A-Z]{4}-[0-9A-Z]{4}\nAcme: [0-9A-Z]{4}-[0-9A-Z]{4}$/m, 'one mail, with a code for each workspace');
 
   // Asking again within the minute sends nothing more.
   await call('/connect/sign-in', undefined, { email: 'alex@example.com' });
   assert.equal(mailbox.length, before + 1);
 
-  const codes = [...sent[0].text.matchAll(/#\/join\/(\S+)/g)].map((m) => m[1]);
-  const into = await Promise.all(codes.map(async (code) => (await call('/whoami', (await call('/connect/join', undefined, { code })).token, undefined, 'GET')).workspace.id));
+  const into = [];
+  for (const name of ['Default', 'Acme']) {
+    const signed = await call('/connect/code', undefined, { email: 'alex@example.com', code: codeSentTo('alex@example.com', name) });
+    into.push((await call('/whoami', signed.token, undefined, 'GET')).workspace.id);
+  }
   assert.deepEqual(into, ['default', 'acme']);
 });
 
@@ -79,7 +92,7 @@ test('a code from the sign-in mail, typed with its address, signs in once; a few
   const before = mailbox.length;
   await call('/connect/sign-in', undefined, { email: 'kim@example.com' });
   await mailed('kim@example.com', before);
-  const code = /type this code on the sign-in page: ([0-9A-Z]{4}-[0-9A-Z]{4})/.exec(mailbox.slice(before)[0].text)![1];
+  const code = codeSentTo('kim@example.com')!;
 
   assert.equal((await call('/connect/code', undefined, { email: 'someone@example.com', code })).status, 410, 'only with the address it was sent to');
   const signed = await call('/connect/code', undefined, { email: 'Kim@Example.com', code: ` ${code.toLowerCase().replace('-', ' ')} ` });

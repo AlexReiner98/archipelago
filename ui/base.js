@@ -293,9 +293,9 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
   // Someone a client sent here to connect, with no account yet, came by MCP: where they begin says so (?ref=mcp).
   const ref = waitingOnSignIn() ? 'mcp' : undefined;
   const email = h('input', { type: 'email', placeholder: 'Email', autocomplete: 'email', spellcheck: false, value: given });
-  const send = h('button', { class: 'primary' }, 'Email me a link');
+  const send = h('button', { class: 'primary' }, 'Email me a code');
 
-  // Step two: the link and a code are in the mail. The code is typed here, in whichever browser asked.
+  // Step two: a code is in the mail, typed here, in whichever browser asked.
   const codeStep = (sentTo) => {
     const code = h('input', { type: 'text', placeholder: 'Code from the email', autocomplete: 'one-time-code', autocapitalize: 'characters', spellcheck: false });
     const go = h('button', { class: 'primary' }, 'Sign in');
@@ -310,13 +310,13 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
     };
     go.onclick = () => typed();
     code.addEventListener('keydown', (e) => e.key === 'Enter' && typed());
-    const again = h('a', { href: '#', title: 'Send the link and a new code again' }, 'Send again');
+    const again = h('a', { href: '#', title: 'Send a new code' }, 'Send again');
     again.onclick = (e) => (e.preventDefault(), ask(sentTo).then(() => (again.textContent = 'Sent'), () => undefined));
     const change = h('a', { href: '#', title: 'Use another email address' }, 'Change');
     change.onclick = (e) => (e.preventDefault(), first());
     gate(
       'Check your email',
-      gateRow(h('span', { class: 'muted grow gist', title: `A sign-in link and a code are on their way to ${sentTo}, or where to start, if it has no workspace here` }, sentTo), change, again),
+      gateRow(h('span', { class: 'muted grow gist', title: `A sign-in code is on its way to ${sentTo}, or where to start, if it has no workspace here` }, sentTo), change, again),
       gateRow(code, go),
       error,
     );

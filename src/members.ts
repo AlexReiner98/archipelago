@@ -115,7 +115,13 @@ export async function humanTokenAllowed(l: Archipelago, person: string | undefin
 const KEY = 'signin:';
 const hash = sha256Hex;
 
-/** A one-time link that signs this member in. The code names its workspace, so the server knows where to trade it. */
+/**
+ * How an invitation says to come in: sign in at this server with the address, which is mailed a code. Never a sign-in
+ * link in a mail: from a young domain one reads to spam filters as phishing (the owner, 10 Nov 2026).
+ */
+export const signInBy = (email: string) => `go to ${new URL(site.origin).host} and sign in with this email address (${email}). You will be sent a code to type there.`;
+
+/** A one-time link that signs this member in, handed over in a browser, never mailed. The code names its workspace, so the server knows where to trade it. */
 export async function linkFor(db: Q, workspace: string, email: string, ms: number, origin = site.origin): Promise<string> {
   const code = workspaceSecret('inv', workspace);
   await keep(db, KEY + hash(code), { email }, ms);
@@ -200,7 +206,8 @@ export async function requestSignIn(workspaces: { id: string; name: string; db: 
     const db = await ws.db();
     if (!(await memberOf(db, email))) continue;
     const ms = LINK_MINUTES * 60_000;
-    links.push(`${ws.name}:\n${await linkFor(db, ws.id, email, ms, origin)}\nOr type this code on the sign-in page: ${await codeFor(db, email, ms)}`);
+    // A code, never a link: a mail from a young domain that carries a sign-in link reads to spam filters as phishing.
+    links.push(`${ws.name}: ${await codeFor(db, email, ms)}`);
   }
   if (!links.length) {
     if (!start) return;
@@ -218,12 +225,12 @@ export async function requestSignIn(workspaces: { id: string; name: string; db: 
   }
   await sendMail({
     to: email,
-    subject: 'Your Archipelago sign-in link',
+    subject: 'Your Archipelago sign-in code',
     text: [
       'Hello,',
-      `Here is the link you asked for to sign in to Archipelago. Open it, or type its code on the page where you asked. Either works once, for the next ${LINK_MINUTES} minutes, and keeps that browser signed in for ${SIGNED_IN_DAYS} days.`,
-      links.join('\n\n'),
-      'If you did not ask to sign in, you can ignore this email: nobody can sign in without the link or its code.',
+      `Here is the code you asked for to sign in to Archipelago. Type it on the page where you asked. It works once, for the next ${LINK_MINUTES} minutes, and keeps that browser signed in for ${SIGNED_IN_DAYS} days.`,
+      links.join('\n'),
+      'If you did not ask to sign in, you can ignore this email: nobody can sign in without the code.',
       '- Archipelago',
     ].join('\n\n'),
   });
@@ -277,10 +284,9 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
           text: [
             'Hello,',
             `${by} has invited you to ${name} on Archipelago, where its people and their AI agents keep track of their work together.`,
-            `To accept, open this link. It signs you in on this device and works once, for ${INVITE_DAYS} days:`,
-            await linkFor(whole.db, l.workspace, email, INVITE_DAYS * 86_400_000),
-            `Afterwards, sign in at ${site.origin} with this email address, and you will be sent a link each time you need one.`,
-            `You are getting this because ${by} added ${email} to ${name}. If you were not expecting it, you can ignore this email: nothing happens unless the link is opened.${replyTo ? ` Reply to it to reach ${by}.` : ''}`,
+            // No sign-in link (see requestSignIn): they ask for a code at the sign-in page, which is mailed to them.
+            `To accept, ${signInBy(email)}`,
+            `You are getting this because ${by} added ${email} to ${name}. If you were not expecting it, you can ignore this email.${replyTo ? ` Reply to it to reach ${by}.` : ''}`,
             '- Archipelago',
           ].join('\n\n'),
         });
