@@ -5,6 +5,7 @@ import { trace } from './traces.js';
 import { looked } from './catch-up.js';
 import { still } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
+import { numberOf } from './query-base.js';
 import { front, landsIn, poppedTab } from './tabs.js';
 import { relations, starterOf, types } from './words.js';
 
@@ -50,13 +51,38 @@ const thisPage = () => {
 let seenStep;
 /** Each session's last show not yet landed: it waits while a question is open over the page, or the reader is busy in its tab. */
 const waiting = new Map();
+/**
+ * How long a step waits for a page to open, as the style says (show_waits_ms): one sent while none was (e_d8djfzmk)
+ * lands when the next opens, within this. A style not yet read lets none wait.
+ */
+const waitsFor = () => {
+  try {
+    return numberOf(state.style ?? {}, 'show_waits_ms');
+  } catch {
+    return 0;
+  }
+};
+/** The last step this browser followed on this map, kept so a reload does not land again what it landed before. */
+const seenKey = `pelago-step-seen:${location.pathname}`;
+const seenBefore = () => {
+  try {
+    return Number(localStorage.getItem(seenKey)) || 0;
+  } catch {
+    return 0;
+  }
+};
 
 export function follow(steps = []) {
   // A look's page, and a popped-out tab, leave what agents show to the main page.
   if (still || poppedTab) return;
-  // The first answer only says where things stand; an old step is not followed.
-  const fresh = seenStep === undefined ? [] : steps.filter((s) => s.at > seenStep);
+  // The first answer follows what came while no page here was open, back to the last step this browser followed and
+  // no further than the style lets a step wait; what is older only says where things stand.
+  const since = seenStep ?? Math.max(seenBefore(), Date.now() - waitsFor());
+  const fresh = steps.filter((s) => s.at > since);
   seenStep = steps.at(-1)?.at ?? seenStep ?? 0;
+  try {
+    localStorage.setItem(seenKey, String(Math.max(seenStep, seenBefore())));
+  } catch {}
   for (const s of steps) hear(s);
   // What a session does may move its state, which the tab bar counts (ui/tab-bar.js).
   if (fresh.some((s) => s.run)) hooks.sessionsMoved?.();
