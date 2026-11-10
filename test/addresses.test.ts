@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -101,7 +102,14 @@ test('refused tokens are counted by address, a backup unpacks only so far, and t
   // A style's own code is drawn in a frame of the page's own, which is sandboxed, may reach nothing outside itself, and may be framed only here.
   assert.match(page.headers.get('content-security-policy') ?? '', /frame-src 'self'/);
   const frame = await fetch(base + '/draw.html');
-  assert.match(frame.headers.get('content-security-policy') ?? '', /^sandbox allow-scripts; default-src 'none'; script-src 'self' blob: data:; worker-src blob: data:;.*connect-src 'none'; webrtc 'block';/);
+  const framePolicy = frame.headers.get('content-security-policy') ?? '';
+  assert.match(framePolicy, /^sandbox allow-scripts; default-src 'none'; script-src 'self' blob: data: 'sha256-[\w+/=]+' 'sha256-[\w+/=]+'; worker-src blob: data:;.*connect-src 'none'; webrtc 'block';/);
+  // Its two scripts are written into it, each allowed by its hash and nothing else written in is.
+  const frameText = await frame.text();
+  const inline = [...frameText.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => createHash('sha256').update(m[1]).digest('base64'));
+  assert.equal(inline.length, 2);
+  for (const hash of inline) assert.ok(framePolicy.includes(`'sha256-${hash}'`), 'each script written in is allowed by its own hash');
+  assert.doesNotMatch(/script-src [^;]*/.exec(framePolicy)![0], /unsafe-inline/, 'and no other script written in is allowed');
   assert.equal((await fetch(base + '/draw.js')).headers.get('access-control-allow-origin'), '*');
   assert.equal((await fetch(base + '/draw-marks.js')).headers.get('access-control-allow-origin'), '*');
   assert.equal((await fetch(base + '/app.js')).headers.get('access-control-allow-origin'), null, 'and nothing else here is given to strangers');
@@ -119,7 +127,7 @@ test('refused tokens are counted by address, a backup unpacks only so far, and t
   assert.equal((await fetch(`${base}/app.js?v=old`)).headers.get('cache-control'), 'no-store', 'an address of another version is never kept');
   assert.equal((await fetch(`${base}/app.js`)).headers.get('cache-control'), 'no-store');
   assert.equal(page.headers.get('cache-control'), 'no-store', 'the page itself is asked for every time');
-  assert.match(await (await fetch(`${base}/draw.html`)).text(), new RegExp(`src="/draw\\.js\\?v=${version}"`));
+  assert.doesNotMatch(frameText, /<script src=/, 'the frame names no script to fetch: an origin of its own keeps none');
 });
 
 test('a link to a writing opens its page and its text with no login, until it is revoked', async () => {

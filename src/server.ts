@@ -54,7 +54,7 @@ import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
-import { UI_FILES, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY } from './page-policies.ts';
+import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY } from './page-policies.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
@@ -278,20 +278,20 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       if (req.method === 'GET' && UI_FILES[url.pathname]) {
         const file = UI_FILES[url.pathname];
-        const page = file.endsWith('.html'), open = file === 'draw.html' && url.searchParams.get('open') === '1';
+        const page = file.endsWith('.html'), open = file === 'draw.html' && url.searchParams.get('open') === '1', frame = file === 'draw.html' ? await drawPage() : null;
         const served = page || file === 'layout.css' ? null : await uiFile(file, url.searchParams.get('v'));
         // The page loads its own script and stylesheet and talks to this server: nothing else, from anywhere, and it is not framed.
-        // A file named by the UI's current version is kept for good (src/ui-files.ts); the pages, and the rest, never.
+        // A file named by the UI's current version is kept for good (src/ui-files.ts); the pages, and the rest, never. The drawing frame has its scripts written in (drawPage).
         res.writeHead(200, {
           'content-type': `${MIME[file.split('.').pop()!]}; charset=utf-8`,
           'cache-control': served?.keep ? 'public, max-age=31536000, immutable' : file === 'three.module.min.js' ? 'public, max-age=604800' : 'no-store',
           ...GUARD,
           ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
-          ...(file === 'draw.html' && { 'content-security-policy': drawPolicy(open, Boolean(options.unsandboxed)) }),
+          ...(file === 'draw.html' && { 'content-security-policy': drawPolicy(open, Boolean(options.unsandboxed), frame!.hashes) }),
           // The frame has an origin of its own, so what it loads from here it loads as a stranger.
           ...((file === 'draw.js' || file === 'draw-marks.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
         });
-        const html = page && (await uiPage(file));
+        const html = page && (frame?.html ?? (await uiPage(file)));
         if (html && (options.unsandboxed || open)) return res.end(markPage(html, { open, unsandboxed: options.unsandboxed }));
         return res.end(file === 'layout.css' ? lengthsSheet((await workspaces.get(DEFAULT_WORKSPACE)).pelago.registry.packs) : html || served!.body);
       }

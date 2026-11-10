@@ -25,6 +25,7 @@ export const SLOW: Record<string, string> = {
   'test/layouts-open.test.ts': 'browser',
   'test/layouts-queued.test.ts': 'browser',
   'test/find-query.test.ts': 'browser',
+  'test/first-drawing.test.ts': 'browser',
   'test/kept-views.test.ts': 'browser',
   'test/looks.test.ts': 'browser',
   'test/mcp-view-host.test.ts': 'browser',

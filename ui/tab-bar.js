@@ -10,7 +10,7 @@
 // A session's tab carries a mark for its state, and beside the strip a count of the sessions waiting on the owner goes
 // to the oldest one (ui/tab-count.js, e_82rggead).
 
-import { api, h, hooks, state } from './base.js';
+import { api, firstDrawn, h, hooks, state } from './base.js';
 import { readAddress } from './query.js';
 import { lookMode } from './look.js';
 import { placeBy } from './menu-place.js';
@@ -148,7 +148,7 @@ function nameOfTab(t) {
   const id = named(t.panes[focusOf(t)]?.at);
   if (/^e_[a-z0-9]{8}$/.test(id) && !titles.has(id) && !asked.has(id)) {
     asked.add(id);
-    api('get', { id }).then((got) => (titles.set(id, got.entity.title), drawStrip()), () => {});
+    firstDrawn.then(() => api('get', { id })).then((got) => (titles.set(id, got.entity.title), drawStrip()), () => {});
   }
   if (/^e_[a-z0-9]{8}$/.test(id)) return { name: titles.get(id) ?? '…' };
   const lens = id ? readAddress(id.split('?')[1] ?? '').lens : null;
@@ -383,7 +383,7 @@ export function startTabs() {
   keep();
   startPanes();
   drawStrip();
-  if (!poppedTab) readOpen();
+  if (!poppedTab) firstDrawn.then(readOpen);
   // Coming back to the page, what ended or began while it was out of sight is mirrored.
   document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && !poppedTab && readOpen());
 }

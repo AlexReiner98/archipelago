@@ -9,7 +9,7 @@
 // is a new lens, handed to `go` (the canvas puts it in the address and draws it). The menus lead with what this canvas
 // and its neighbourhood use (ui/picker-rank.js). No term or part is a box inside a box (rule e_vgs9vt5j).
 
-import { api, h, notOf, state, wordsOf } from './base.js';
+import { api, firstDrawn, h, notOf, state, wordsOf } from './base.js';
 import { numberOf } from './query-base.js';
 import { lightTerm, removedBy } from './query-light.js';
 import { ranked, around, uses } from './picker-rank.js';
@@ -43,7 +43,8 @@ function lookAround(lens, answer) {
   if (!ids.length || key === near.key) return;
   near = { key, uses: null };
   const { not } = lens.filter;
-  api('view', { name: 'flat', params: { filter: { find: ids.map((id) => `id ${id}`), ...(not && { not }) }, walk: { over: 'all', steps: 1 }, limit: numberOf(state.style, 'picker_around_most') } })
+  firstDrawn
+    .then(() => near.key === key && api('view', { name: 'flat', params: { filter: { find: ids.map((id) => `id ${id}`), ...(not && { not }) }, walk: { over: 'all', steps: 1 }, limit: numberOf(state.style, 'picker_around_most') } }))
     .then((wider) => near.key === key && ((near.uses = around(answer, wider)), last && drawQuery(...last)))
     .catch(() => {});
 }
@@ -81,7 +82,8 @@ function nameOf(id, redraw) {
   asking.set(id, new Set([redraw]));
   // Asked once more if the first answer does not come (a server still starting), then left as the mark.
   const ask = (again) =>
-    api('get', { id })
+    firstDrawn
+      .then(() => api('get', { id }))
       .then((got) => {
         titles.set(id, got.entity.title);
         drawSoon(asking.get(id) ?? []);

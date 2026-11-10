@@ -13,8 +13,16 @@ const DRAW_POLICY = "sandbox allow-scripts; default-src 'none'; script-src 'self
 // server's page may frame it, so a stranger's page cannot hand it code to run as the person signed in here.
 const OPEN_DRAW_POLICY = "frame-ancestors 'self'";
 
-/** The policy draw.html is served with: opened, or sandboxed (and on a dev server started PELAGO_UNSANDBOXED=1, without the sandbox but with the rest). */
-export const drawPolicy = (open: boolean, unsandboxed: boolean) => (open ? OPEN_DRAW_POLICY : unsandboxed ? DRAW_POLICY.replace('sandbox allow-scripts; ', '') : DRAW_POLICY);
+/**
+ * The policy draw.html is served with: opened, or sandboxed (and on a dev server started PELAGO_UNSANDBOXED=1, without
+ * the sandbox but with the rest). Its own scripts, written into it (src/ui-files.ts drawPage), are allowed by their
+ * hashes, and no other script written in a page is.
+ */
+export function drawPolicy(open: boolean, unsandboxed: boolean, hashes: string[] = []): string {
+  if (open) return OPEN_DRAW_POLICY;
+  const policy = DRAW_POLICY.replace("script-src 'self' blob: data:", ["script-src 'self' blob: data:", ...hashes.map((h) => `'sha256-${h}'`)].join(' '));
+  return unsandboxed ? policy.replace('sandbox allow-scripts; ', '') : policy;
+}
 
 /** A page marked as it is served: with no sandbox for its drawing frames (ui/base.js frameSandbox), and draw.html as opened (ui/draw.js). */
 export const markPage = (html: string, { open = false, unsandboxed = false }) => html.replace('<html', `<html${unsandboxed ? ' data-draw-sandbox="off"' : ''}${open ? ' data-draw-open="on"' : ''}`);
