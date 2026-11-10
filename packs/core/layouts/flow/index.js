@@ -23,7 +23,7 @@ import { lineageOf, shownOnly } from './graph.js';
 import { layout } from './layout.js';
 import { effortOf } from './effort.js';
 import { css } from './look.js';
-import { css as islandCss, findingSaid, findingTail, islandMarks, nameOf, saidOf } from './islands.js';
+import { css as islandCss, islandMarks, nameOf, saidOf } from './islands.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, HEX, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
@@ -289,19 +289,11 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     ...pack.links.filter((r) => group.links.some((l) => (l.type ?? l.kind) === r.id)).map((r) => mark(r.id === ORDER_TYPE ? m('path', { d: 'M1 7H21', class: `lf-wire${kind(r.id)}` }) : tieKey(r.id, kind(r.id)), r.title)),
   ];
   const packOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.pack;
-  // What an island stands by first, under its name: each finding it publishes one line, cut to what the style lets it take (./islands.js).
+  // An island's findings are items, drawn as any item is where its query holds them; its shore lists none (the owner, 10 Nov 2026).
   const [KW, KH] = ['key_width', 'key_height'].map(z);
-  // The claim is cut, never what follows it: its value, how sure, as of and readers stay whole.
-  const shoreLine = (f) => { const tail = ` · ${findingTail(f)}`, px = z('island_legend_text'); return `${fit(f.title, Math.max(z('island_finding_most') - measure(tail, px), measure('…', px)), px)}${tail}`; };
-  const findingRows = (id) => {
-    const isle = (answer.islands ?? []).find((i) => i.id === id);
-    const rows = (isle?.findings ?? []).map((f) => ({ glyph: m('svg', { width: KW, height: KH, viewBox: `0 0 ${KW} ${KH}` }, m('circle', { cx: KW / 2, cy: KH / 2, r: KH / 4, class: 'lf-finding-mark' })), label: shoreLine(f), tip: `${findingSaid(f)}
-Published: other islands may read it`, href: `#/e/${f.id}` }));
-    return isle?.findings_more ? [...rows, { glyph: m('svg', { width: KW, height: KH }), label: `${isle.findings_more} more published`, href: `#/e/${id}` }] : rows;
-  };
   // Its last row, where the session may add to it: a button that adds an item on it (./islands.js).
   const addRow = (id) => (gestures.on(`i:${id}`).includes('add') ? [{ glyph: m('svg', { width: KW, height: KH, viewBox: `0 0 ${KW} ${KH}` }, m('path', { d: `M${KW / 2 - KH / 3} ${KH / 2}H${KW / 2 + KH / 3}M${KW / 2} ${KH / 6}V${KH * 5 / 6}`, class: 'lf-add-mark' })), label: 'Add', tip: 'Add an item on this island', add: id }] : []);
-  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, [...findingRows(p.id), ...(packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...addRow(p.id)]]));
+  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, [...(packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...addRow(p.id)]]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
   const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region');
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
