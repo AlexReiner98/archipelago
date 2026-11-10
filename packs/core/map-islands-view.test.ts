@@ -29,7 +29,7 @@ const { result: answer } = JSON.parse(readFileSync(join(import.meta.dirname, '..
  */
 // Set for the map when it became the one layout (9 Nov 2026): the flow had 77 crossings here and nothing else; the map
 // has 15, and loose ends, jogs and the shared stretches of its trunks to bring down.
-const CEILING: Record<string, number> = { 'loose ends': 6, outside: 0, overlapping: 0, through: 0, shared: 108, jogs: 3, unbridged: 0, crossings: 15 };
+const CEILING: Record<string, number> = { 'loose ends': 6, outside: 0, overlapping: 0, through: 0, shared: 108, jogs: 0, unbridged: 0, crossings: 6 };
 
 const z = (name: string) => house.sizes[`flow_${name}`], measure = (t: string, px: number) => String(t).length * px * 0.55;
 /** The shapes a page lays the picture out to: tall, the house's, and wide. Each fault is counted in all three. */

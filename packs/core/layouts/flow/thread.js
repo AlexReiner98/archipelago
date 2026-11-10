@@ -112,6 +112,8 @@ function seating(list) {
     within(a, b, d) { for (const f of [...seat.get(name(a, b))]) { const k = f.findIndex((p, n) => name(p, f[(n + 1) % f.length]) === name(a, b)); leave(f); f.splice(k + 1, 0, d); sit(f); } },
     /** The point `d` out of its faces, the stretch through it one again. */
     without(d) { for (const f of list.filter((p) => p.includes(d))) { leave(f); f.splice(f.indexOf(d), 1); sit(f); } },
+    /** Every face of `list` seated afresh, once `list` has been put back as it was. */
+    reseat() { seat.clear(); list.forEach(sit); },
   };
 }
 
@@ -324,7 +326,32 @@ export function threader(list, owner, add, { number, keep, onward = () => false,
     }
   };
 
-  return { through, tally, nearest, put, again, prune };
+  /** The seen wires `w` crosses, one for each point where it does. */
+  const crossed = (w) => w.path.slice(1, -1).map((d) => owner.get(name(d, others(d, w)[0]))).filter((x) => x?.visible);
+  /** What is threaded, kept to be put back: the faces, which wire holds each stretch, each wire's path, the numbers. */
+  const save = () => ({
+    faces: list.map((f) => [...f]), owner: [...owner], number: [...number],
+    wires: [...new Set(owner.values())].map((w) => [w, [...w.path], w.visible, w.link]),
+    ghosts: [...tally.ghosts], crossings: tally.crossings, unthreaded: tally.unthreaded,
+  });
+  /** What `save` kept, put back in place: the caller's faces, owner and numbers are the same maps as before. */
+  const back = (kept) => {
+    list.splice(0, list.length, ...kept.faces);
+    seats.reseat();
+    owner.clear();
+    for (const [e, w] of kept.owner) owner.set(e, w);
+    number.clear();
+    for (const [v, n] of kept.number) number.set(v, n);
+    for (const [w, path, visible, link] of kept.wires) Object.assign(w, { path, visible, link });
+    around.clear();
+    for (const e of owner.keys()) tie(...seats.ends(e));
+    Object.assign(tally, { ghosts: kept.ghosts, crossings: kept.crossings, unthreaded: kept.unthreaded });
+  };
+
+  /** No more limit on the work: what comes after keeps its own count. */
+  const unbound = () => void (most = Infinity);
+
+  return { through, tally, nearest, put, again, prune, take, free, crossed, save, back, unbound, apart: (w) => w.path.slice(1).every((q, i) => { const [f, g] = seats.of(name(w.path[i], q)); return f && g && f !== g; }) };
 }
 
 /** Invisible edges that each join two of `sets` round an item they share, no set twice, as many of them as stay planar. */

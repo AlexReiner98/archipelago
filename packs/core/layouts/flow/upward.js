@@ -74,19 +74,25 @@ export function lineUp(items, links, noise, ends = { first: [], last: [] }) {
 
 /**
  * The links that fit on the two sides of `line`, the order's first and short ones before long, and those that do not.
- * `noise(l)` picks a side where both fit. `placed` holds links already on each side, before any other.
+ * `noise(l)` picks a side where both fit. `placed` holds links already on each side, before any other. With `ahead`, a
+ * link that fits both sides takes the one that leaves fewer of the links still to come with no side to go on, and
+ * `noise` only breaks a tie (task e_wayfga4d).
  */
-export function pages(line, links, noise, placed = [[], []]) {
+export function pages(line, links, noise, placed = [[], []], ahead = false) {
   const at = new Map(line.map((v, k) => [v, k])), left = [];
   const sides = placed.map((list) => list.map((l) => ({ l, p: Math.min(at.get(l[0]), at.get(l[1])), q: Math.max(at.get(l[0]), at.get(l[1])) })));
   const ranked = links.map((l) => ({ l, p: Math.min(at.get(l[0]), at.get(l[1])), q: Math.max(at.get(l[0]), at.get(l[1])) }));
   ranked.sort((a, b) => Number(b.l[2]) - Number(a.l[2]) || a.q - a.p - (b.q - b.p));
-  for (const arc of ranked) {
-    const free = [0, 1].filter((k) => !sides[k].some((o) => ties(arc.p, arc.q, o.p, o.q)));
-    if (!free.length) { left.push(arc.l); continue; }
-    const k = free.length > 1 ? (noise(arc.l) < 0.5 ? 0 : 1) : free[0];
+  const fits = (arc, k) => !sides[k].some((o) => ties(arc.p, arc.q, o.p, o.q));
+  ranked.forEach((arc, i) => {
+    const free = [0, 1].filter((k) => fits(arc, k));
+    if (!free.length) return void left.push(arc.l);
+    // What it would shut out: links to come that it ties with and that fit only the side it takes.
+    const shut = (k) => ranked.slice(i + 1).filter((o) => ties(arc.p, arc.q, o.p, o.q) && fits(o, k) && !fits(o, 1 - k)).length;
+    const [a, b] = ahead && free.length > 1 ? [shut(0), shut(1)] : [0, 0];
+    const k = free.length > 1 ? (a !== b ? (a < b ? 0 : 1) : noise(arc.l) < 0.5 ? 0 : 1) : free[0];
     sides[k].push(arc);
-  }
+  });
   return { at, sides, left };
 }
 

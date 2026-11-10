@@ -64,3 +64,49 @@ export function sifted(order, runOf, links, firm, rounds) {
   }
   return line;
 }
+
+/**
+ * The steps of `line` each moved, within its own island, to where its wires interleave least with all the others:
+ * `islandOf(v)` the island a step may move in (null for what stays: the sea's steps and the borders), `links` [a, b]
+ * between steps, `firm` [u, v] where u must stay before v. For at most `rounds` rounds, or until none moves. Answers
+ * the line, changed in place.
+ */
+export function siftedWithin(line, islandOf, links, firm, rounds) {
+  const at = new Map(line.map((v, k) => [v, k])), out = new Map(line.map((v) => [v, []])), before = new Map(line.map((v) => [v, new Set()]));
+  for (const [a, b] of links) if (a !== b && out.has(a) && out.has(b)) (out.get(a).push([a, b]), out.get(b).push([b, a]));
+  for (const [u, v] of firm) if (before.has(v)) before.get(v).add(u);
+  const crosses = (a, b, c, d) => {
+    const [p, q, r, s] = [at.get(a), at.get(b), at.get(c), at.get(d)], [lo, hi] = p < q ? [p, q] : [q, p];
+    if (r === p || r === q || s === p || s === q) return 0;
+    return (lo < r && r < hi) !== (lo < s && s < hi) ? 1 : 0;
+  };
+  const pairs = (a, b) => {
+    let n = 0;
+    for (const [x, y] of out.get(a)) for (const [z, w] of out.get(b)) if (!(x === w && y === z)) n += crosses(x, y, z, w);
+    return n;
+  };
+  const swap = (k) => {
+    const [a, b] = [line[k], line[k + 1]], was = pairs(a, b);
+    [line[k], line[k + 1]] = [b, a];
+    at.set(b, k).set(a, k + 1);
+    return was - pairs(a, b);
+  };
+  const movable = line.filter((v) => islandOf(v) !== null && out.get(v).length);
+  for (let round = 0; round < rounds; round++) {
+    let moved = false;
+    for (const v of movable) {
+      const home = islandOf(v), from = at.get(v);
+      let k = from, gain = 0, best = 0, bestAt = from;
+      while (k > 0 && islandOf(line[k - 1]) === home && !before.get(v).has(line[k - 1])) if (((gain += swap(--k)), gain > best)) ((best = gain), (bestAt = k));
+      while (k < from) swap(k++);
+      gain = 0;
+      while (k < line.length - 1 && islandOf(line[k + 1]) === home && !before.get(line[k + 1]).has(v)) if (((gain += swap(k++)), gain > best)) ((best = gain), (bestAt = k));
+      while (k > bestAt) swap(--k);
+      while (k < bestAt) swap(k++);
+      if (bestAt !== from) moved = true;
+    }
+    if (!moved) break;
+  }
+  return line;
+}
+
