@@ -124,3 +124,11 @@ test('the plugin directory’s build runs nothing on the machine: its hooks call
   assert.ok(files[`${DIRECTORY}/README.md`].startsWith(`# ${LISTING.title}\n\n${LISTING.summary}\n`));
   assert.doesNotMatch(files[`${DIRECTORY}/README.md`], /\{\w+\}/);
 });
+
+test('the plugin names every link the directory lists, from listing.json', () => {
+  const manifest = JSON.parse(pluginFiles()[`${FOLDER}/.claude-plugin/plugin.json`]);
+  assert.deepEqual(
+    [manifest.privacyPolicyUrl, manifest.termsOfServiceUrl, manifest.supportUrl, manifest.documentationUrl, manifest.homepage, manifest.repository],
+    [LISTING.urls.privacy, LISTING.urls.terms, LISTING.urls.support, LISTING.urls.docs, LISTING.urls.app, LISTING.urls.repository],
+  );
+});

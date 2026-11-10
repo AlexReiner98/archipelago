@@ -18,5 +18,8 @@
     "decisions",
     "mcp"
   ],
-  "privacyPolicyUrl": "https://app.archipelago.tools/x/legal/privacy"
+  "privacyPolicyUrl": "https://app.archipelago.tools/x/legal/privacy",
+  "termsOfServiceUrl": "https://app.archipelago.tools/x/legal/terms",
+  "supportUrl": "mailto:support@aperture.tools",
+  "documentationUrl": "https://archipelago.tools/quickstart"
 }
