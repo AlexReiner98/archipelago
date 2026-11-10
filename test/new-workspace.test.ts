@@ -84,7 +84,7 @@ test('a map brought in from a backup keeps what it was set to, or that it never 
 test('a new workspace still keeps from its agents what the core rules keep', async () => {
   const at = new Workspaces({ ...servers(), dataDir: null });
   const { pelago: l } = await at.create('acme', 'Acme');
-  await setIslands(l, person, false); // the test pack's types live on no core island; this is about the core rules
+  await setIslands(l, 'system', false); // the test pack's types live on no core island; this is about the core rules
   const made = async (ops: Op[]) => (await l.change(agent, { ops, reason: 'the core rules' })).status;
   assert.equal(await made([{ op: 'create', type: 'writing', title: 'Guide', visibility: 'public' }]), 'proposed', 'what is public');
   assert.equal(await made([{ op: 'create', type: 'layout', title: 'Loud', props: { code: 'export default () => []' } }]), 'proposed', 'code that runs');

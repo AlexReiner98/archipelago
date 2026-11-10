@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { setIslands } from '../src/packstate.ts';
 import { createToken } from '../src/auth.ts';
 import { wouldPublish } from '../src/published.ts';
 import { Registry } from '../src/packs.ts';
@@ -119,7 +120,7 @@ test('a draft keeps the sections it holds on a workspace other than default', as
   const { workspaces, call } = await serve('tokens', undefined, undefined, PAGES);
   const operator = (await workspaces.ensureOperator())!;
   const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
-  await call('/api/workspace_set', theirs, { islands: false }); // a plain map: this is about whose rows they are
+  await setIslands((await workspaces.get('acme')).pelago, 'system', false); // a plain map: this is about whose rows they are
   const made = (
     await call('/api/change', theirs, {
       reason: 'test',

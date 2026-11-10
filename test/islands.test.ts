@@ -134,7 +134,10 @@ test('the island rules are the owner’s to set, and a map with work moves onto 
   await setIslands(l, human, true);
   assert.equal(await islandsOn(l), true);
   assert.equal(reg.states.get('hooked')?.state, 'off');
-  await setIslands(l, human, false);
+  // One way (the owner, 10 Nov 2026): the owner cannot turn them off again; only the system makes a plain map.
+  await assert.rejects(setIslands(l, human, false), /cannot be turned off/);
+  assert.equal(await islandsOn(l), true);
+  await setIslands(l, 'system', false);
   assert.equal(reg.states.get('hooked')?.state, 'active');
 
   // Work of a pack the rules would switch off: refused, and nothing changes.
