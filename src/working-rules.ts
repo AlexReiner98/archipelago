@@ -26,3 +26,6 @@ export function workingRules(packs: PackFile[] = checkoutPacks().filter((p) => p
   const rules = said(presetsOf(packs, 'instruction'), [], 'working_rules').map((one) => `- **${one.title}.** ${one.text}`);
   return readFileSync(join(root, 'examples/working-rules.md'), 'utf8').replace(MARKER, rules.join('\n'));
 }
+
+/** The working rules as a plugin ships them: without the bump skill's line, a skill only Archipelago's own work has. */
+export const shippedRules = (): string => workingRules().replace(/^- \*\*When Archipelago gets in your way,\*\*.*\r?\n(?: {2}.*\r?\n)*/m, '');
