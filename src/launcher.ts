@@ -4,8 +4,7 @@
 //
 // What is held stays here, whoever names the command: the run, the token the process is given (and revoked when it
 // ends), the MCP config, the spawn, and what is recorded of each line it prints. The command and how its lines are
-// read come from a server pack's launcher (src/server-launch.ts, decision e_885ztqkv), or, until the claude_code pack
-// ships, from the kernel's own Claude Code launcher below.
+// read come from a server pack's launcher (src/server-launch.ts, decision e_885ztqkv): the kernel names no agent's CLI.
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -20,8 +19,8 @@ import { briefFor, promptFor, type LaunchInput, type LaunchMode, type StartedBy 
 
 export type { LaunchMode, StartedBy } from './launch-brief.ts';
 
-// The pelago tools a launched session may call unprompted. `change` is safe
-// here because agent changes are held as proposals.
+// The pelago tools a launched session may call unprompted, as an MCP client names them: a launcher's {tools}.
+// `change` is safe here because agent changes are held as proposals.
 const ALLOWED_TOOLS = ['query', 'change', 'report', 'assign', 'revise', 'ask'].map((t) => `mcp__pelago__${t}`).join(',');
 
 /** What a launcher's reading of one line it printed answers: each part recorded on the run. */
@@ -41,18 +40,17 @@ export interface Fills {
   mcp_config: string;
   tools: string;
   model?: string;
-  /** The kernel's own launcher's alone: no pack is given these. */
+  /** The id the run is registered under, for a CLI that takes its session's id. */
   session_id: string;
+  /** How the launch was asked to run: plan, or acceptEdits. */
   mode: LaunchMode;
 }
 
 /** One launch's command, and how what it prints is read. */
 export interface Command {
   argv: string[];
-  /** Started through a shell: only the kernel's own, whose CLI is a .cmd shim on Windows. */
-  shell?: boolean;
-  /** Its environment; left out, the server's own (the kernel's own launcher only). */
-  env?: NodeJS.ProcessEnv;
+  /** Its environment: its token and the system's own, never the server's secrets. */
+  env: NodeJS.ProcessEnv;
   /** Given the prompt on its standard input, when its command does not name it. */
   stdin?: boolean;
   /** Each of its said is told as a beat of the run's story. */
@@ -64,9 +62,9 @@ export interface Command {
   detail?(): string;
 }
 
-/** How a launch is started: a server pack's launcher (pack, its id), or the kernel's own. */
+/** How a launch is started: a server pack's launcher (pack, its id). */
 export interface Launcher {
-  pack?: string;
+  pack: string;
   command(fill: Fills, token: string | undefined): Command;
 }
 
@@ -75,14 +73,12 @@ export interface LauncherConfig {
   mcpUrl: string;
   /** Where transcripts and the MCP config file are written. */
   dir: string;
-  /** argv prefix of the Claude Code CLI, for the kernel's own launcher. */
-  command: string[];
   /** The server requires tokens, so each launched session is given one of its own. */
   auth?: boolean;
   /** The model a launcher's {model} is filled with. */
   model?: string;
-  /** A server pack's launcher, in place of the kernel's own (src/server-launch.ts). */
-  via?: Launcher;
+  /** The server pack's launcher the launch setting names (src/server-launch.ts). */
+  via: Launcher;
 }
 
 let config: LauncherConfig | undefined;
@@ -93,47 +89,11 @@ export function configureLauncher(next: LauncherConfig | undefined): void {
   config = next;
 }
 
-/** The kernel's own launcher: Claude Code, its stream-json read here. Moves to the claude_code pack (the adapter cut). */
-function claudeCode(prefix: string[]): Launcher {
-  return {
-    command: (fill) => {
-      let result: { is_error?: boolean; result?: string; total_cost_usd?: number; num_turns?: number } | undefined;
-      let lastText = '';
-      let plan = '';
-      const args = ['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', fill.mode, '--session-id', fill.session_id, '--mcp-config', fill.mcp_config, '--allowedTools', fill.tools];
-      return {
-        argv: [...prefix, ...args],
-        // On Windows the CLI is a .cmd shim, which only a shell can start.
-        shell: process.platform === 'win32',
-        stdin: true,
-        needsResult: true,
-        read(line) {
-          let message;
-          try {
-            message = JSON.parse(line);
-          } catch {
-            return undefined; // Not every line is JSON; the transcript keeps it either way.
-          }
-          // In plan mode the answer arrives as a plan, or as the last thing said, and the result itself comes back empty.
-          for (const part of message.type === 'assistant' ? (message.message?.content ?? []) : []) {
-            if (part.type === 'text' && part.text?.trim()) lastText = part.text;
-            if (part.type === 'tool_use' && part.name === 'ExitPlanMode' && part.input?.plan) plan = part.input.plan;
-          }
-          if (message.type !== 'result') return lastText ? { said: plan || lastText } : plan ? { said: plan } : undefined;
-          result = message;
-          return { done: true, said: result!.result || plan || lastText || undefined, outcome: result!.is_error ? 'failed' : 'finished' };
-        },
-        detail: () => (result ? `${result.num_turns ?? '?'} turns${result.total_cost_usd != null ? `, $${result.total_cost_usd.toFixed(2)}` : ''}` : ''),
-      };
-    },
-  };
-}
-
 export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, by?: StartedBy) {
   needHuman(actor, 'Only a human can launch a session.');
   if (!config) throw new Error('Launching is off on this server. It starts an agent in a repository on the machine the server runs on, so it works only on a server that listens on that machine alone.');
   const at = config;
-  const via = at.via ?? claudeCode(at.command);
+  const via = at.via;
   const mode = input.mode ?? 'plan';
   const { brief, started } = await briefFor(l, actor, input, by);
   const cwd = brief.repo?.path;
@@ -142,8 +102,8 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
 
   // Register first: this is what takes the lane, or tells us it is taken.
   const sessionId = randomUUID();
-  const surface = via.pack ? `pack:${via.pack}` : 'claude-headless';
-  const agent: Actor = { kind: 'agent', name: via.pack ? `launched:${via.pack}` : 'claude-headless' };
+  const surface = `pack:${via.pack}`;
+  const agent: Actor = { kind: 'agent', name: `launched:${via.pack}` };
   const begun = await sessionStart(l, agent, { task: input.task, cwd, session_id: sessionId, surface, title: `Headless (${mode}): ${brief.task.title}` });
   const run = begun.run;
   if (begun.status === 'waiting') {
@@ -171,9 +131,8 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
   let child: ChildProcess;
   try {
     command = via.command({ prompt, mcp_config: mcpFile, tools: ALLOWED_TOOLS, model: at.model, session_id: sessionId, mode }, key?.token);
-    const quote = (a: string) => (command.shell && /\s/.test(a) ? `"${a}"` : a);
     const [bin, ...rest] = command.argv;
-    child = spawn(quote(bin), rest.map(quote), { cwd, shell: Boolean(command.shell), env: command.env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    child = spawn(bin, rest, { cwd, shell: false, env: command.env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   } catch (err) {
     await close(`Could not start: ${(err as Error).message}`);
     throw err;
@@ -235,7 +194,7 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
 export function stopLaunched(run: string): boolean {
   const child = running.get(run)?.child;
   if (!child) return false;
-  // With a shell in between, killing the child would orphan the CLI itself; and what it started goes with it.
+  // What it started goes with it.
   if (process.platform === 'win32' && child.pid) spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true });
   else child.kill();
   return true;

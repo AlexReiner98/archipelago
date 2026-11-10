@@ -2,7 +2,7 @@
 // line, and query seeing reads it.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { answerHook } from '../src/hook-answers.ts';
+import { answerHook } from './claude-hook.ts';
 import { NOW_MS, seen, seenNow } from '../src/seeing.ts';
 import { keep } from '../src/transient.ts';
 import { whose } from '../src/presence.ts';

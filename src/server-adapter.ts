@@ -1,13 +1,14 @@
 // The hooks of a surface an agent works in (task e_chb65gx7, decision e_6t8f46u6): POST /hooks/<surface>/<event>,
-// and /hooks/<event> for hooks installed before there were surfaces. A server pack that translates a surface declares
-// two functions of its handler (reach.server.adapter): in, from the surface's body to the kernel's, and out, from the
-// kernel's neutral answer to the surface's shape. What a session is told stays the kernel's (src/hook-answers.ts); the
-// pack reads no map, and is asked as a gate is: by the kernel, asking for nothing.
-//
-// /hooks/<event> is Claude Code's, put in its shape by answerHook (src/claude-code.ts) until the claude_code pack takes it.
+// and /hooks/<event> for hooks installed before there were surfaces, which were Claude Code's (HOOKS_BEFORE). A server
+// pack that translates a surface declares two functions of its handler (reach.server.adapter): in, from the surface's
+// body to the kernel's, and out, from the kernel's neutral answer to the surface's shape. What a session is told stays
+// the kernel's (src/hook-answers.ts); the pack reads no map, and is asked as a gate is: by the kernel, asking for nothing.
 
-import { answerHook, sessionAnswer, type HookBody, type HookCall, type Neutral } from './hook-answers.ts';
+import { sessionAnswer, type HookBody, type HookCall, type Neutral } from './hook-answers.ts';
 import type { ServerPacks } from './server-host.ts';
+
+/** The surface /hooks/<event> is: the hooks set up before there were surfaces were Claude Code's (the claude_code pack's). */
+export const HOOKS_BEFORE = 'claude_code';
 
 /** The surface and the event an address under /hooks/ names: <event>, or <surface>/<event>. */
 export function hookAt(rest: string): { surface?: string; event: string } {
@@ -30,8 +31,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
  * event, the kernel's, and the neutral answer; what it answers is sent as it is, an object.
  */
 export async function answerAt(packs: ServerPacks, surface: string | undefined, event: string, call: HookCall): Promise<object | undefined> {
-  if (surface === undefined) return answerHook(event, call);
-  const adapter = adapterOf(packs, surface);
+  const adapter = adapterOf(packs, surface ?? HOOKS_BEFORE);
   if (!adapter) return undefined;
   const inward = await packs.call(adapter.id, 'entry', adapter.in, { event, body: call.body }, undefined, true);
   const kernel = isObject(inward) && typeof inward.event === 'string' ? inward.event : undefined;

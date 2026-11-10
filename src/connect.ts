@@ -1,14 +1,9 @@
-// What a machine with no Archipelago checkout needs to work with this server: the
-// hook script, the friction skill and the working rules are files in this
-// repository, so the server hands them out, wrapped in one script that puts
-// each where Claude Code looks for it (scripts/pelago-setup.mjs). Nothing in
-// it is secret: the token stays in the machine's environment. A running system
-// asks here for a token of its own, which a person approves (src/token-ask.ts).
+// What a machine with no Archipelago checkout needs to work with this server: the setup a surface's server pack hands
+// out at /connect/setup.mjs (its setup mount; the claude_code pack's for Claude Code), filled with this server's
+// address. Nothing in it is secret: the token stays in the machine's environment. A running system asks here for a
+// token of its own, which a person approves (src/token-ask.ts).
 
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { join } from 'node:path';
 import { bearer } from './auth.ts';
 import { normalEmail } from './mail.ts';
 import { workspacesOf } from './control-index.ts';
@@ -19,47 +14,14 @@ import { json, PRIVATE } from './reply.ts';
 import type { Actor } from './pelago.ts';
 import { serverPacksOf } from './server-host.ts';
 import { documentsInForce, signinGate } from './server-gates.ts';
-import { handsOut, serveFile, setupPack } from './server-files.ts';
+import { serveFile, setupPack } from './server-files.ts';
 import { serveServerPack } from './server-routes.ts';
 import { pageStyle } from './styles.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
-import { workingRules } from './working-rules.ts';
 import type { Workspace, Workspaces } from './workspaces.ts';
-
-const ROOT = join(import.meta.dirname, '..');
-const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
-/** The working rules as handed out: the file with the packs' instructions said in it, read once. */
-const RULES = workingRules();
-
-/**
- * Which hand-out this server gives: a mark that moves when any file the setup
- * writes does (the hook, the rules with the instructions said in them, the
- * skill, the setup itself and so the hooks it registers). The setup writes it
- * into the project's hook, which says it with every call, so a session can be
- * told its project is behind.
- */
-export const SETUP_VERSION = createHash('sha256')
-  .update([read('scripts/pelago-hook.mjs'), read('scripts/pelago-events.mjs'), read('.claude/skills/pelago-bump/SKILL.md'), RULES, read('scripts/pelago-setup.mjs')].join('\n'))
-  .digest('hex')
-  .slice(0, 12);
-// Said to the seam a session's folder is checked against (src/server-files.ts): the fallback while no pack hands the setup out.
-handsOut(SETUP_VERSION);
 
 /** The one command, with no secret in it, that sets a project up or brings its files up to date. */
 export const setupCommand = (origin: string) => `node -e "fetch('${origin}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"`;
-
-/** The setup script for a project that is to work with the server at this address; tokens says whether that server asks for one. */
-export function setupScript(origin: string, tokens = true): string {
-  const files = {
-    // Away from this repository the hook has no local server to fall back on: it calls the one that handed it out.
-    hook: read('scripts/pelago-hook.mjs').replace(`'http://127.0.0.1:3100'`, JSON.stringify(origin)).replace(`const SETUP = '';`, `const SETUP = '${SETUP_VERSION}';`),
-    events: read('scripts/pelago-events.mjs'),
-    skill: read('.claude/skills/pelago-bump/SKILL.md'),
-    home: `# Where bumps live\n\nWorkspace: ${origin}.\n\nFind the feature that gathers friction with Archipelago by search (type \`feature\`, q \`friction\`). If this workspace has none, make the bump an issue that is part of the project you are working in, and say in its first line that it is about Archipelago itself; with no issue type here, a finding about the item it concerns.\n`,
-    rules: RULES,
-  };
-  return `const ORIGIN = ${JSON.stringify(origin)};\nconst TOKENS = ${tokens};\nconst FILES = ${JSON.stringify(files)};\n${read('scripts/pelago-setup.mjs')}`;
-}
 
 /** What the /connect routes are handed by the server: its names, whether it signs in with tokens, and its counts. */
 export interface ConnectRoutes {
@@ -127,11 +89,10 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
   const origin = `${at.named.includes(host) ? 'https' : 'http'}://${host}`;
   if (req.method === 'GET' && path === '/connect/setup.mjs') {
     if (at.tooOften()) return;
-    // A pack that takes the setup mount hands out its own file; the kernel's setup only while none does.
+    // The pack that takes the setup mount hands out its own file; with none, this server hands out no setup.
     const setup = setupPack();
     if (setup) return serveFile(res, setup.pack.file, setup.id, { origin, tokens: at.tokens, folder: setup.pack.folder });
-    res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
-    return res.end(setupScript(origin, at.tokens));
+    return reply(res, 404, { error: 'No server pack here hands out a setup.' });
   }
   // Installing Archipelago, by a person or their agent (src/install.ts): the page, and what its one line fetches.
   const install = INSTALL[path];
