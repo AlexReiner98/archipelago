@@ -269,10 +269,16 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   const along = (way: 'out' | 'in') => (lens.walk.over === 'all' ? null : l.registry.relationFamily(...lens.walk.over.map(wayOf).filter((t) => t.way !== (way === 'out' ? 'in' : 'out')).map((t) => t.link)));
   // Out from an item is along its links (it is their from); in is back along the links to it. Every link goes both.
   const ways = ([['from_id', 'to_id', along('out')], ['to_id', 'from_id', along('in')]] as const).filter(([, , types]) => types?.length !== 0);
+  // Under the default Not, a walk back along works_on keeps the runs it reaches: the sessions at work on what the view
+  // draws are drawn on it (a plan watched, e_j7hdfq9m), and nothing else of the kernel's is let in.
+  const working = new Set(l.registry.relationFamily('works_on'));
+  const defaultNot = (input.filter as { not?: unknown } | undefined)?.not === undefined;
+  const sessions = defaultNot && lens.walk.over !== 'all' && lens.walk.over.map(wayOf).some((t) => t.way !== 'out' && working.has(l.registry.canonical(t.link))) ? l.registry.family('run') : [];
   for (let level = [...sent], n = 0; level.length && n < lens.walk.steps && room() > 0 && ways.length; n++) {
     const typed = ways.flatMap(([, , types]) => (types ? [types] : []));
-    const way = (k: string) => ways.map(([near, far, types], i) => `select e.id, e.updated_at from relation r join unnest($1::text[]) s(id) on s.id = r.${near} join entity e on e.id = r.${far} where r.valid_to is null${types ? ` and r.type = any($${4 + ways.slice(0, i).filter(([, , t]) => t).length}::text[])` : ''} and e.id <> all($2::text[]) and ${k}`).join(' union ');
-    level = await unless(await find((k) => `select id from (${way(k)}) w order by updated_at desc, id limit $3`, [level, [...sent], room(), ...typed]), notChecked);
+    const kept = (k: string) => (sessions.length ? `(${k} or (e.archived_at is null and e.type = any($${4 + typed.length}::text[])))` : k);
+    const way = (k: string) => ways.map(([near, far, types], i) => `select e.id, e.updated_at from relation r join unnest($1::text[]) s(id) on s.id = r.${near} join entity e on e.id = r.${far} where r.valid_to is null${types ? ` and r.type = any($${4 + ways.slice(0, i).filter(([, , t]) => t).length}::text[])` : ''} and e.id <> all($2::text[]) and ${kept(k)}`).join(' union ');
+    level = await unless(await find((k) => `select id from (${way(k)}) w order by updated_at desc, id limit $3`, [level, [...sent], room(), ...typed, ...(sessions.length ? [sessions] : [])]), notChecked);
     for (const id of level) if (!sent.has(id)) stepOf.set(id, n + 1);
     add(level);
   }
