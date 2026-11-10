@@ -74,9 +74,12 @@ async function eventsOf(l: Archipelago, runs: RunRow[]): Promise<Map<string, Ses
   const out = new Map<string, SessionEvent[]>(runs.map((r) => [r.id, []]));
   if (!runs.length) return out;
   const since = new Date(Math.min(...runs.map((r) => r.created_at.getTime())));
+  // Each entry's facts are read once and matched by run, not tested against every run in turn: a test of the whole
+  // facts per run opened them again each time, and a busy workspace's few thousand entries took seconds.
   const { rows } = await l.db.query<Row>(
-    `select stream, pos::int as pos, at, head, facts from log_op where stream = 'sessions' and at >= $1 and facts @> any($2::jsonb[]) order by at, pos`,
-    [since.toISOString(), runs.map((r) => JSON.stringify([['+', r.id, EVENT_FIELD]]))],
+    `select stream, pos::int as pos, at, head, facts from log_op where stream = 'sessions' and at >= $1
+     and exists (select 1 from jsonb_array_elements(facts) f where f->>0 = '+' and f->>2 = $3 and f->>1 = any($2::text[])) order by at, pos`,
+    [since.toISOString(), runs.map((r) => r.id), EVENT_FIELD],
   );
   const opened = await openOps(l.db, rows.map((r): Light => ({ ...r.head, stream: r.stream, pos: r.pos, at: new Date(r.at).toISOString(), facts: r.facts })));
   for (const e of opened)
