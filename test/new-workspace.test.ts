@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { dump } from '../src/backup.ts';
+import { setIslands } from '../src/packstate.ts';
+import { dumpVault } from '../src/vault.ts';
 import { callTool } from '../src/tools.ts';
 import { Workspaces } from '../src/workspaces.ts';
 import type { Actor, Op } from '../src/pelago.ts';
@@ -29,7 +31,7 @@ test('a new workspace applies what its agents change before it has an owner, and
   assert.equal(await l.setting('me'), undefined, 'nobody has signed in');
   assert.equal((await l.change(agent, { ops: [task], reason: 'first write' })).status, 'applied');
   const { rows } = await l.db.query<{ n: number }>(`select count(*)::int as n from log_op where stream = 'settings'`);
-  assert.equal(rows[0].n, 1);
+  assert.equal(rows[0].n, 2, 'what agents may do, and that it is on islands');
   await at.closeAll();
 });
 
@@ -74,7 +76,7 @@ test('a map brought in from a backup keeps what it was set to, or that it never 
   const at = new Workspaces({ ...servers(), dataDir: null });
   const { pelago: from } = await at.create('from', 'From');
   await from.db.query(`delete from setting where key = 'agent_changes'`);
-  const { pelago: l } = await at.create('to', 'To', await dump(from.db, { id: 'from', name: 'From' }));
+  const { pelago: l } = await at.create('to', 'To', { ...(await dump(from.db, { id: 'from', name: 'From' })), vault: await dumpVault(from.db) }); // its first island is sealed
   assert.equal(await l.agentChanges(), 'hold');
   await at.closeAll();
 });
@@ -82,6 +84,7 @@ test('a map brought in from a backup keeps what it was set to, or that it never 
 test('a new workspace still keeps from its agents what the core rules keep', async () => {
   const at = new Workspaces({ ...servers(), dataDir: null });
   const { pelago: l } = await at.create('acme', 'Acme');
+  await setIslands(l, person, false); // the test pack's types live on no core island; this is about the core rules
   const made = async (ops: Op[]) => (await l.change(agent, { ops, reason: 'the core rules' })).status;
   assert.equal(await made([{ op: 'create', type: 'writing', title: 'Guide', visibility: 'public' }]), 'proposed', 'what is public');
   assert.equal(await made([{ op: 'create', type: 'layout', title: 'Loud', props: { code: 'export default () => []' } }]), 'proposed', 'code that runs');

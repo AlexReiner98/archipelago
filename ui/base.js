@@ -215,16 +215,16 @@ export function waitingOnSignIn() {
   }
 }
 
-/** Become whoever a token says, starting from Home: nothing on the page belongs to the new workspace. */
+/**
+ * Become whoever a token says, starting from Home: nothing on the page belongs to the new workspace. The page is loaded
+ * again, so every part of it that holds what it read (the saved views, the replica, a drawing) starts empty: one kept
+ * from the workspace before showed its views in this one (10 Nov 2026).
+ */
 export function enter(token) {
   store.token = token;
-  state.schema = state.may = undefined;
-  // Where the page stood in the log was the other workspace's.
-  state.stamp = state.pos = state.seq = undefined;
   // A sign-in opens on Home, as the app does: a new workspace's first steps are there.
-  const next = waitingOnSignIn() ? '#/authorize' : '#/home';
-  if (location.hash && location.hash !== next) location.hash = next;
-  else route();
+  history.replaceState(null, '', waitingOnSignIn() ? '#/authorize' : '#/home');
+  location.reload();
 }
 
 export class SignInNeeded extends Error {}
