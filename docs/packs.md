@@ -96,10 +96,28 @@ screens and actions on them) is registered only while that pack is active.
 
 ## On an island map
 
-A workspace with the setting `islands` on (`workspace_set`; off unless set,
-and set only on a new workspace) holds its packs to the island rules
-(`src/islands.ts`; decisions e_pp5mu6xd and e_rf6q3q34). A pack that breaks
-one is off there, and its state says which.
+A workspace with the setting `islands` on (`workspace_set`; on for every new
+workspace) knows two kinds of pack, read off the file with no key of its own
+(`src/islands.ts`; decisions e_pp5mu6xd, e_rf6q3q34 and e_ubd8satd). The
+schema the page reads marks each pack's `kind`: `island`, `map`, or `kernel`
+for core. A pack that breaks its kind's rules is off there, and its state
+says why.
+
+- **An island pack** speaks on an island: it declares a type that lives on
+  one (any but an actor), a link type, or fields on another pack's type. An
+  island speaks one, and New island offers only these (core when there are
+  none). It is held to the island rules below.
+- **A map pack** owns no type that lives on an island. It brings looks,
+  layouts, views, actions, handlers, uses and reach to the whole map, and may
+  require other packs, island packs among them. The island rules do not judge
+  it: each part goes through the gate it already has (a layout runs in the
+  sandbox, code by the rule on code that runs, reach by core's pack reach
+  rule, and the owner adds the pack).
+- **Both is refused.** A pack with island types and a part that runs (tools,
+  code, looks, computed views, uses, reach, or another pack required) is off,
+  told to split into an island pack and a map pack.
+
+The island rules, for an island pack:
 
 - **Vocabulary, views, instructions.** The file holds only `id`, `version`,
   `title`, `description`, `requires`, `types`, `links`, `rules`, `views` and
@@ -108,8 +126,8 @@ one is off there, and its state says which.
 - **The shared set alone.** `requires` names core and no other pack, `uses`
   is not there, no `types` entry has `of`, and its types, link ends and rules
   name only its own types, the shared set (core's `shared`: the eight starter
-  types, task and decision), a capability or `*`. Its links extend core's or
-  its own.
+  types, task, decision and finding), a capability or `*`. Its links extend
+  core's or its own.
 - A shared type no pack taken there declares (task and decision, while work
   is not taken) cannot be built on: a pack that does waits.
 

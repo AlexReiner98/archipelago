@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { openDb } from '../src/db.ts';
-import { islandProblems, sharedOf } from '../src/islands.ts';
+import { islandProblems, packKind, sharedOf } from '../src/islands.ts';
 import { readManifest, type Manifest } from '../src/manifest.ts';
 import { Registry } from '../src/packs.ts';
 import { islandsOn, setIslands } from '../src/packstate.ts';
@@ -45,28 +45,65 @@ test('the shared set is core’s list: the eight starter types, task, decision a
 test('an island pack: vocabulary, views and instructions on the shared set', () => {
   const shared = sharedOf([core()]);
   assert.deepEqual(islandProblems(island('fine'), shared), []);
+  assert.equal(packKind(island('fine'), shared), 'island');
   const said = (m: Manifest) => islandProblems(m, shared).join('; ');
-  assert.match(said(island('h', { handlers: [HANDLER] })), /holds handlers/);
-  assert.match(said(island('a', { actions: [], reach: {}, layouts: [] })), /holds actions, reach, layouts/);
-  assert.match(said(island('s', { styles: [{ id: 's.colours', title: 'Colours', props: {} }] })), /styles holds looks \(s\.colours\)/);
-  assert.match(said(island('u', { uses: ['time'] })), /holds uses/);
-  assert.match(said(island('v', { views: [{ id: 'v.sums', shape: 'data' } as never] })), /views holds reads its code computes \(v\.sums\)/);
-  assert.match(said(island('w', { requires: ['core', 'fine'] })), /requires fine: a pack builds on the shared set alone/);
+  assert.match(said(island('w', { requires: ['core', 'fine'] })), /requires fine/);
   assert.match(said(island('o', { types: [ADDS] })), /adds fields to person/);
   assert.match(said(island('n', { types: [{ id: 'n_memo', title: 'Memo', extends: 'fine_thing' } as never] })), /names fine_thing, not its own nor in the shared set/);
   assert.match(said(island('l', { links: [{ id: 'l_r', extends: 'fine_answers', title: 'r', inverse: 'r', from: ['*'], to: ['*'], description: '' }] })), /extend another pack's \(l_r extends fine_answers\)/);
   assert.deepEqual(islandProblems(core(), shared), [], 'the kernel’s own pack is not judged');
+  assert.equal(packKind(core(), shared), 'kernel');
+});
+
+test('a pack is an island pack by what it speaks: a type on an island, a link type, or fields on another’s type', () => {
+  const shared = sharedOf([core()]);
+  const bare = (id: string, more: Partial<Manifest>): Manifest => ({ id, version: '1', title: id, requires: ['core'], ...more });
+  assert.equal(packKind(bare('t', { types: [{ id: 't_memo', title: 'Memo', extends: 'record' } as never] }), shared), 'island');
+  assert.equal(packKind(bare('k', { links: [{ id: 'k_r', title: 'r', inverse: 'r', from: ['*'], to: ['*'], description: '' }] }), shared), 'island');
+  assert.equal(packKind(bare('f', { types: [ADDS] }), shared), 'island');
+  assert.equal(packKind(bare('b', { types: [{ id: 'b_bot', title: 'Bot', extends: 'person' } as never] }), shared), 'map', 'an actor lives on no island');
+});
+
+test('a map pack: looks, layouts or code, taken whatever it holds', () => {
+  const shared = sharedOf([core()]);
+  const map = (id: string, more: Partial<Manifest>): Manifest => ({ id, version: '1', title: id, requires: ['core'], ...more });
+  const shapes: Record<string, Partial<Manifest>> = {
+    looks: { styles: [{ id: 'looks.colours', title: 'Colours', props: {} }] },
+    layout: { layouts: [{ shape: 'meters', title: 'Meters', code: 'export default () => []' } as never] },
+    code: { handlers: [HANDLER], actions: [], views: [{ id: 'code.sums', shape: 'data' } as never], uses: ['time'], reach: {} },
+    reader: { requires: ['core', 'fine'], styles: [{ id: 'reader.lens', type: 'lens', title: 'Fine things', props: { filter: { find: ['fine_thing'] } } }] },
+  };
+  for (const [id, more] of Object.entries(shapes)) {
+    assert.equal(packKind(map(id, more), shared), 'map', id);
+    assert.deepEqual(islandProblems(map(id, more), shared), [], id);
+  }
+});
+
+test('a pack that is both is refused, told to split, naming both parts', () => {
+  const shared = sharedOf([core()]);
+  const said = (m: Manifest) => islandProblems(m, shared).join('; ');
+  const both = said(island('mixed', { handlers: [HANDLER], styles: [{ id: 'mixed.colours', title: 'Colours', props: {} }] }));
+  assert.match(both, /both an island pack \(types mixed_thing; links mixed_answers\) and a map pack \(handlers, looks \(mixed\.colours\)\)/);
+  assert.match(both, /split it into an island pack/);
+  assert.match(said(island('a', { actions: [], reach: {}, layouts: [] })), /map pack \(actions, reach, layouts\)/);
+  assert.match(said(island('u', { uses: ['time'] })), /map pack \(uses\)/);
+  assert.match(said(island('v', { views: [{ id: 'v.sums', shape: 'data' } as never] })), /views its code computes \(v\.sums\)/);
+  assert.match(said(island('w', { requires: ['core', 'fine'] })), /map pack \(requires fine\)/);
 });
 
 test('a pack with a handler is refused on an island map and taken without it', () => {
-  const dir = packsWith(island('hooked', { handlers: [HANDLER] }), island('plain'), island('onwork', { requires: ['core', 'plain'] }), island('adds', { types: [ADDS] }));
+  const reader: Manifest = { id: 'reader2', version: '1', title: 'Reader', requires: ['core', 'plain'], handlers: [HANDLER], styles: [{ id: 'reader2.colours', title: 'Colours', props: {} }] };
+  const dir = packsWith(island('hooked', { handlers: [HANDLER] }), island('plain'), island('onwork', { requires: ['core', 'plain'] }), island('adds', { types: [ADDS] }), reader);
   const reg = new Registry(dir);
   for (const id of ['hooked', 'plain', 'onwork', 'adds']) assert.equal(reg.states.get(id)?.state, 'active', `${id}, setting off`);
   reg.turnOff([], true);
   assert.equal(reg.states.get('plain')?.state, 'active');
+  assert.equal(reg.states.get('reader2')?.state, 'active', 'a map pack requiring an island pack is taken');
+  const kinds = Object.fromEntries(reg.describe().packs.map((p) => [p.id, p.kind]));
+  assert.deepEqual([kinds.core, kinds.plain, kinds.reader2], ['kernel', 'island', 'map'], 'the schema marks each pack’s kind');
   assert.ok(reg.types.has('plain_thing') && reg.relations.has('plain_answers'));
   const why = (id: string) => (assert.equal(reg.states.get(id)?.state, 'off', id), reg.states.get(id)!.why!);
-  assert.match(why('hooked'), /holds handlers/);
+  assert.match(why('hooked'), /map pack \(handlers\): split it/);
   assert.match(why('onwork'), /requires plain/);
   assert.match(why('adds'), /adds fields to person/);
   assert.ok(!reg.types.has('hooked_thing'), 'a refused pack registers nothing');
@@ -76,7 +113,7 @@ test('a pack with a handler is refused on an island map and taken without it', (
 
 test('core declares the shared set, so a pack on task and decision is taken beside one that is not', () => {
   const on = { types: [{ id: 'ontask_step', title: 'Step', extends: 'task' } as never, { id: 'ontask_call', title: 'Call', extends: 'decision' } as never] };
-  const looks = { styles: [{ id: 'looks.colours', title: 'Colours', props: {} }], types: [{ id: 'looks_memo', title: 'Memo', extends: 'record' } as never] };
+  const looks = { styles: [{ id: 'looks.colours', title: 'Colours', props: {} }], types: [{ id: 'looks_memo', title: 'Memo', extends: 'record' } as never] }; // both kinds
   const reg = new Registry(packsWith(island('ontask', on), island('looks', looks)));
   for (const id of ['task', 'decision', 'question']) assert.equal(reg.type(id)!.pack, 'core', `${id} is core’s`);
   reg.turnOff([], true);
