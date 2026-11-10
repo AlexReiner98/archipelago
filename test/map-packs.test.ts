@@ -23,7 +23,6 @@ test('a pack made on the map holds data alone, its own names, and rules that onl
   assert.match(said({ types: [{ id: 'dish', title: 'Dish', description: '', extends: 'record' }] }), /named recipes\.<what>: dish/);
   assert.match(said({ rules: [{ id: 'keep', stream: 'facts', keep: { latest: true } }] }), /only holds, refuses/);
   assert.match(said({ rules: [{ id: 'mine', when: { actor: 'agent' }, then: 'hold', lifted: 'agent_mine' }] }), /only holds, refuses/);
-  assert.match(said({ styles: [{ id: 'recipes.look', settings: {} }] }), /are looks/);
   assert.match(said({ views: [{ id: 'recipes.read', shape: 'data' }] }), /not drawn by the kernel/);
   assert.match(said(RECIPES, 'core'), /already/);
   assert.match(said(RECIPES, 'Recipes!'), /lower case/);
@@ -104,4 +103,17 @@ test('a rule in a pack made on the map only tightens: it lets nothing through th
   assert.equal((await l.change(agent, { ops: [task], reason: 'test' })).status, before, 'what core decided stays as it was');
   const dish = await l.change(agent, { ops: [{ op: 'create', type: 'recipes.dish', title: 'Soup' }], reason: 'test' });
   assert.equal(dish.status, 'proposed');
+});
+
+// A look names no type and runs no code: a pack made on the map may bring one, and on an island map the island rules judge it.
+const LOOK = { id: 'recipes.look', title: 'Kitchen look', on: ['recipes.dish'], props: { session_marks: { done: { shape: 'disc', hue: 'done' } } } };
+
+test('a pack made on the map may bring a look; an island map judges it by the island rules', async () => {
+  const l = await fresh();
+  await make(l, [recipes({ ...RECIPES, styles: [...RECIPES.styles, LOOK] })]);
+  await setPack(l, human, { pack: 'recipes', on: true });
+  assert.equal(l.registry.states.get('recipes')?.state, 'active');
+  const isl = await fresh();
+  await setIslands(isl, human, true);
+  await assert.rejects(make(isl, [recipes({ ...RECIPES, styles: [...RECIPES.styles, LOOK] })]), /not taken on an island map: styles holds looks/);
 });

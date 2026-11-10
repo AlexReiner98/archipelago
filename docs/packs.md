@@ -133,7 +133,9 @@ pack's (0.1.0 unless said), and its `manifest` what it declares, as a
   (`requires`, `types`, `links`, `rules`, `views`, `styles`), whatever the
   workspace: no actions, handlers, layouts, reach or uses, so nothing of it
   runs on the server. Of `views`, trees, screens and reasons for attention;
-  of `styles`, instructions and lenses. A rule in it holds, refuses,
+  `styles` may hold looks as well as instructions and lenses, since a look
+  names no type and runs no code (on an island map the island rules judge
+  them, and today they take no looks: decision e_ubd8satd is open). A rule in it holds, refuses,
   requires or asks: none keeps a stream (`stream`, `keep`), is lifted by a
   setting (`lifted`) or by the server (`server`).
 - **Its own names.** Every type, link type and rule it declares is named

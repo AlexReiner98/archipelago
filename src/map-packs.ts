@@ -1,7 +1,8 @@
 // Packs authored on the map. A pack is a folder on the server or an item of core's `pack` type: its name the pack's
 // id, its title and note the pack's, its manifest what it declares. One made on the map is data alone: the keys of a
-// pack on an island map (types, links, rules, views drawn by the kernel, instructions and lenses), so a person or their
-// agent on a hosted map can author a way of working without the server running anything of theirs. A rule only
+// pack on an island map (types, links, rules, views drawn by the kernel, and styles: looks, instructions and lenses),
+// so a person or their agent on a hosted map can author a way of working, or a look, without the server running
+// anything of theirs. On an island map the island rules judge it as any pack, looks included. A rule only
 // tightens, a view is drawn by the kernel, and what runs code (actions, handlers, layouts, reach) stays a server's
 // pack's. The registry lays these beside the folder packs (src/packs.ts), off until the owner adds one, and judges
 // them as it judges any pack; a change that makes or changes one is checked here first (src/type-items.ts).
@@ -21,8 +22,6 @@ const HELD = ISLAND_KEYS.filter((k) => !SAID.includes(k));
 const NOT_IN_RULES = ['stream', 'keep', 'lifted', 'server'];
 /** The views it may hold: those the kernel draws. */
 const DRAWN = ['tree', 'screen', 'attention'];
-/** The presets it may hold in styles: what agents are told and views. How things look is kept on the map as styles. */
-const PRESETS = ['instruction', 'lens'];
 const NAME = /^[a-z][a-z0-9_]*$/;
 
 /** A pack made on the map, as the registry takes it: the item it is kept in, its manifest, and that manifest's text and hash. */
@@ -63,8 +62,6 @@ export function madeProblems(item: Said, taken: Set<string>, declared: Set<strin
   if (rules.length) problems.push(`its rules ${rules.join(', ')} say ${NOT_IN_RULES.join(', ')}: a rule in a pack made on the map only holds, refuses, requires or asks`);
   const views = all(manifest.views).filter((v) => !DRAWN.includes(String(v.form))).map((v) => String(v.id ?? 'a view'));
   if (views.length) problems.push(`its views ${views.join(', ')} are not drawn by the kernel: a view here is a tree, a screen or a reason for attention (form), and a view of a query is a lens in styles`);
-  const looks = all(manifest.styles).filter((s) => !PRESETS.includes(String(s.type ?? 'style'))).map((s) => String(s.id ?? 'a style'));
-  if (looks.length) problems.push(`its styles ${looks.join(', ')} are looks: here styles holds instructions and lenses, and a look is a style kept on the map`);
   if (!problems.length) {
     try {
       readManifest(manifestText(item, name), `the pack item ${name}`);
