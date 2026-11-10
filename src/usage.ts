@@ -1,11 +1,11 @@
-// How much of what its plan limits a workspace uses, and what that use is made of: the usage view, read alike by a
-// member, their agents and the page (a lens that names this view draws it on the canvas, the plan pack's Usage
-// canvas). It answers as a lens does, items and the links among them, so a drawing can draw it: an item for each
+// How much of what the server limits a workspace uses, and what that use is made of: the usage view, read alike by a
+// member, their agents and the page (a lens that names this view draws it on the canvas, as a
+// pack's Usage canvas does). It answers as a lens does, items and the links among them, so a drawing can draw it: an item for each
 // limit, and one for each part of it, part_of its limit. A part that stands for an item of the map (a session at
 // work, a person, an item that takes up storage) names it (`use.item`), so a click opens its page.
 //
 // Whoever reads it is told only what they may see: an item they cannot read is summed into one part with no title
-// or type of its own. Members, seats and where the plan is managed are an admin's (the owner, 29 Oct 2026). Nothing
+// or type of its own. Members are an admin's (the owner, 29 Oct 2026). Nothing
 // is read row by row: storage is the database's count of each table's size and the counts kept beside the log
 // (src/bytes.ts), sessions the open runs heard from in the hour, requests and looks the server's own counts.
 
@@ -26,12 +26,12 @@ const STORED: Record<string, string> = { log_fact: 'What was said: facts', log_e
 
 /** One measured thing, as the drawing reads it (`use`). */
 interface Use {
-  /** limit: a limit of the plan; share: a share of its limit, drawn in its bar; row: a line under it, in its list. */
+  /** limit: a limit the server sets (src/standing.ts); share: a share of its limit, drawn in its bar; row: a line under it, in its list. */
   as: 'limit' | 'share' | 'row';
   used: number;
   /** The words for used: "212 MB", "3". */
   shown: string;
-  /** What the plan allows, and in words, when it limits this. */
+  /** What the limit allows, and in words, when it limits this. */
   of?: number;
   of_shown?: string;
   /** Used over what it is drawn against: its limit, else its own use (its share of it); a limit with no allowance, 0. */
@@ -56,7 +56,7 @@ interface Item {
 
 const ratio = (n: number, of: number) => (of > 0 ? Math.min(n / of, 1) : 0);
 
-/** The usage view: every limit the workspace's plan sets (all of them where it sets none), with what each is made of. */
+/** The usage view: every limit the server sets the workspace (all of them where it sets none), with what each is made of. */
 export async function usage(l: Archipelago, _input: Record<string, unknown>, actor?: Actor) {
   const limits = await limitOf(l.workspace);
   const admin = Boolean(actor?.admin);
