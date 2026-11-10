@@ -1,0 +1,15 @@
+{
+  "id": "handout",
+  "version": "0.1.0",
+  "title": "Handout",
+  "description": "A server pack for the tests: hands out a setup script and a note, filled by the kernel.",
+  "reach": {
+    "server": {
+      "mounts": { "setup": "setup" },
+      "files": [
+        { "id": "setup", "file": "setup.mjs", "type": "text/javascript", "fill": ["origin", "tokens", "version", "rules"] },
+        { "id": "notes", "file": "notes.md", "type": "text/markdown", "fill": ["origin"] }
+      ]
+    }
+  }
+}
