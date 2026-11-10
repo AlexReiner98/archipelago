@@ -26,6 +26,7 @@ page is where to find the one you need. Every `.ts` script is type-checked with 
 | --- | --- |
 | `pelago-setup.mjs` | connects a project to a server, or takes it out again (served at `/connect/setup.mjs`) |
 | `pelago-install.mjs` | connects this computer's agents (Claude Code, Codex, Cursor) in one go; what `/connect/install`'s one line runs (served at `/connect/install.mjs`) |
+| `pelago-cursor.mjs` | Cursor's hooks said as Claude Code's, so `pelago-hook.mjs` answers them (written to ~/.pelago/bin by the installer) |
 | `pelago-login.mjs` | the machine's one browser sign-in, kept in ~/.pelago: `sign-in`, `headers` (the plugin's tools), `call` (before the tools load) |
 | `pelago-hook.mjs` | the Claude Code hook that tells the map about a session |
 | `pelago-events.mjs` | a session's events, read from its hooks and transcript, for the hook to send |

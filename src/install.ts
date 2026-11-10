@@ -6,6 +6,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { workingRules } from './working-rules.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
@@ -16,9 +17,21 @@ export const installLines = (origin: string) => ({
   unix: `curl -fsSL ${origin}/connect/install.sh | sh`,
 });
 
-/** The installer, with the address it connects to and the sign-in script it writes beside the person's sign-in. */
-export const installScript = (origin: string) =>
-  `const ORIGIN = ${JSON.stringify(origin)};\nconst LOGIN = ${JSON.stringify(read('scripts/pelago-login.mjs').replace(`'http://127.0.0.1:3100'`, JSON.stringify(origin)))};\n${read('scripts/pelago-install.mjs')}`;
+/**
+ * The installer, with the address it connects to and the files it writes beside the person's sign-in (~/.pelago/bin):
+ * the sign-in, and the hook with what it loads, for the clients whose hooks are not a plugin's (Codex, Cursor).
+ */
+export function installScript(origin: string): string {
+  const here = (path: string) => read(path).replace(`'http://127.0.0.1:3100'`, JSON.stringify(origin));
+  const files = {
+    'bin/pelago-login.mjs': here('scripts/pelago-login.mjs'),
+    'bin/pelago-hook.mjs': here('scripts/pelago-hook.mjs'),
+    'bin/pelago-events.mjs': read('scripts/pelago-events.mjs'),
+    'bin/pelago-cursor.mjs': read('scripts/pelago-cursor.mjs'),
+    'pelago.md': workingRules(),
+  };
+  return `const ORIGIN = ${JSON.stringify(origin)};\nconst FILES = ${JSON.stringify(files)};\n${read('scripts/pelago-install.mjs')}`;
+}
 
 /** For PowerShell: fetch the installer to a file, so it can be read, and run it with node. */
 export const installPs1 = (origin: string) => `# Archipelago's installer for Windows: ${origin}/connect/install says what it does.
@@ -83,7 +96,7 @@ Run:
 
     ${node} --client codex --yes
 
-It runs \`codex mcp add pelago --url ${origin}/mcp\` and then \`codex mcp login pelago\`, which opens the browser. The tools load with the next session.
+It runs \`codex mcp add pelago --url ${origin}/mcp\` and then \`codex mcp login pelago\`, which opens the browser, and writes the session hooks in ~/.codex/hooks.json. Tell the person to type \`/hooks\` in Codex once and allow the four Archipelago hooks. The tools load with the next session.
 
 ### Cursor
 
@@ -91,7 +104,7 @@ Run:
 
     ${node} --client cursor --yes
 
-It adds \`"pelago": { "url": "${origin}/mcp" }\` to ~/.cursor/mcp.json. Tell the person to open Settings, MCP, and press Connect beside pelago to sign in.
+It adds \`"pelago": { "url": "${origin}/mcp" }\` to ~/.cursor/mcp.json and the session hooks to ~/.cursor/hooks.json, and opens the browser once for the hooks' sign-in. Tell the person to open Settings, MCP, and press Connect beside pelago to sign in.
 
 ### Grok Bot
 

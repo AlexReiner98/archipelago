@@ -207,7 +207,9 @@ export async function call(origin, tool, input) {
 
 /** Sign in, waiting here until the browser comes back: what the installer runs. True once signed in. */
 export async function signInHere(origin, say = console.log) {
-  if ((await tokenFor(origin)) && (await call(origin, 'query', {})).status === 200) return say(`Already signed in to ${origin}.`), true;
+  // Signed in already, or a server that signs nobody in: nothing to ask.
+  const token = await tokenFor(origin);
+  if ((await call(origin, 'query', {})).status === 200) return say(token ? `Already signed in to ${origin}.` : `${origin} needs no sign-in.`), true;
   forget(origin);
   const { url, waiting } = await signIn(origin, folderOf(), { open: true });
   if (waiting) openBrowser(url);
