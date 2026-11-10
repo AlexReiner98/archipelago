@@ -19,11 +19,11 @@ export const FIRST_START_FILE = 'first-start-secrets.txt';
 export async function firstStart(workspaces: Workspaces, main: Workspace, dir: string, terminal = Boolean(process.stdout.isTTY)): Promise<string | undefined> {
   // A workspace with an admin, or one already signed in to the old way, has its owner.
   if (!(await adminEmails(main.pelago)).length && !(await hasHumanToken(main.pelago.db))) {
-    if (!env('OWNER_EMAIL')) throw new Error('First start: set PELAGO_OWNER_EMAIL to the owner’s address (and PELAGO_MAIL_FROM, so the server sends mail). They are mailed a link to sign in.');
+    if (!env('OWNER_EMAIL')) throw new Error('First start: set PELAGO_OWNER_EMAIL to the owner’s address (and PELAGO_MAIL_FROM, so the server sends mail). They are mailed a code to sign in.');
     const email = ownerEmail(env('OWNER_EMAIL'));
     await admitMember(main.pelago, email, true);
     await requestSignIn([{ id: main.id, name: main.name, db: async () => main.pelago.db }], email);
-    console.log(`\nFirst start: ${email} is the default workspace's owner, and was mailed a link to sign in.`);
+    console.log(`\nFirst start: ${email} is the default workspace's owner, and was mailed a code to sign in.`);
   }
   const operator = await workspaces.ensureOperator();
   if (!operator) return undefined;
