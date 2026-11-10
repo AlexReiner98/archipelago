@@ -35,6 +35,25 @@ export const onIslands = (param: string) => `e.props->>'island' = any(${param}::
 
 interface Where { island: string | null; title: string }
 
+/**
+ * A new item that names no island goes on the one island it fits, when the map has exactly one (a new workspace has
+ * its first: the owner, 10 Nov 2026, e_44rbfwxp, so a first change just works). Written into the op, so the log says
+ * where it went; with none or several that fit, it is left for islandRefusals to name them.
+ */
+export async function placeOnLoneIsland(map: Archipelago, reg: Registry, ops: Op[]): Promise<void> {
+  if (!reg.onIslands) return;
+  const bare = ops.filter((op): op is Extract<Op, { op: 'create' }> => op.op === 'create' && !op.props?.island && Boolean(reg.type(op.type) && livesOnIsland(reg.type(op.type)!)));
+  if (!bare.length || ops.some((op) => op.op === 'create' && reg.isA(op.type, ISLAND))) return;
+  const shared = sharedOf(reg.packs.filter((p) => KERNEL_PACKS.includes(p.id))).types;
+  const { rows } = await map.db.query<{ id: string; pack: string }>(`select id, props->>'pack' as pack from entity where type = $1 and archived_at is null order by created_at limit 50`, [ISLAND]);
+  // A copy of the op takes its place in the list: the caller's own object is not changed under it.
+  for (const op of bare) {
+    const type = reg.type(op.type)!;
+    const fits = rows.filter((r) => type.pack === r.pack || shared.has(type.id));
+    if (fits.length === 1) ops[ops.indexOf(op)] = { ...op, props: { ...op.props, island: fits[0].id } };
+  }
+}
+
 /** Why ops break the island rules, as sentences; none when they keep them, or when the map has islands off. */
 export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[]): Promise<string[]> {
   if (!reg.onIslands) return [];
@@ -101,7 +120,12 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
   };
   /** What is wrong with putting an item of this type on this island. */
   const placing = async (where: string, type: ResolvedType, island: unknown): Promise<string | undefined> => {
-    if (typeof island !== 'string' || !island) return `${where}: a ${type.id} lives on an island here: name it in props.island`;
+    if (typeof island !== 'string' || !island) {
+      // Which islands it could go on, so the change is put right in one go.
+      const { rows } = await map.db.query<{ id: string; title: string; pack: string }>(`select id, title, props->>'pack' as pack from entity where type = $1 and archived_at is null order by created_at limit 5`, [ISLAND]);
+      const there = rows.filter((r) => fits(type, r.pack)).map((r) => `${r.id} (${r.title}, ${r.pack})`);
+      return `${where}: a ${type.id} lives on an island here: name it in props.island${there.length ? `, such as ${there.join(', ')}` : ', on an island made first (type island, props.pack)'}`;
+    }
     const { pack, why } = await packOf(island);
     if (why) return `${where}: ${why}`;
     if (!fits(type, pack!)) return `${where}: a ${type.id} is ${type.pack}’s, and the island ${island} speaks ${pack}: an item there is of ${pack}’s types or the shared set`;

@@ -94,7 +94,7 @@ test('backups are written per workspace, read back, and only the newest are kept
   const read = readBackup(join(dir, 'acme', files.sort().at(-1)!));
   assert.ok(!JSON.stringify(read).includes('Theirs'), 'what items say is sealed in the file');
   const opened = await readable((await workspaces.get('acme')).pelago.db, read);
-  assert.deepEqual([read.workspace, opened.tables.entity.map((e) => e.title)], [{ id: 'acme', name: 'Acme' }, ['Theirs']]);
+  assert.deepEqual([read.workspace, opened.tables.entity.map((e) => e.title).sort()], [{ id: 'acme', name: 'Acme' }, ['Acme', 'Theirs']], 'its task, and the island it started with');
   assert.ok(Date.now() - newestBackup(dir)!.getTime() < 60_000, 'the newest backup\'s time is read from its name');
 
   // A copy of each new backup goes to a place that takes a file by POST with a key.

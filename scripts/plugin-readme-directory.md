@@ -20,21 +20,21 @@ nothing from your machine.
 ## What it adds
 
 - The map's tools (`map`) at {mcp}.
-- Three hooks, each a call to those same tools, with no script: at your first
-  prompt the session is started and handed the working rules and where your work
-  stands; each later prompt is told what you changed on the map since; at the
-  end of each turn the map is told the turn ended. After `/clear` the new
-  session starts the same way.
+- A skill, `archipelago`, that has the agent start each session on the map
+  (handed the working rules and where your work stands), say what it takes on,
+  and end the session with a summary.
+
+It has no hooks, so it reports less than the full plugin: nothing is noted at
+each prompt or turn's end, the agent is not told what you changed on the map
+since it last looked, and a session the agent forgets to start is not on the
+map. For all of that, install the full plugin with the one command on the
+[install page]({install}).
 
 ## What it sends
 
-Everything goes to {mcp} and nowhere else:
-
-- what Claude Code hands each hook: the session's id, its folder, and the text
-  of each prompt you send;
-- what the agent itself reads and writes on the map through the tools.
-
-It reads no transcript, no git and no file. The server is open source and MIT
-licensed: {repository}.
+Everything goes to {mcp} and nowhere else, and only what the agent sends
+through the tools: the session's folder and its git remote when it starts, and
+what it reads and writes on the map. The plugin runs no script and reads no
+file. The server is open source and MIT licensed: {repository}.
 
 Privacy: {privacy}

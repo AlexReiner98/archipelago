@@ -10,7 +10,9 @@ import { still } from './look.js';
 
 /** In a window popped out of the main one, the tab it draws. */
 export const poppedTab = window.name.startsWith('pelago-tab:') ? window.name.slice('pelago-tab:'.length) : null;
-const ws = () => Object.entries(known.all()).find(([, w]) => w.token && w.token === store.token)?.[0] ?? 'here';
+// Before the page has heard which workspace it is in, a sign-in's token names it (pel_<workspace>_…): a shared key
+// would hand one workspace's tabs to the next.
+const ws = () => Object.entries(known.all()).find(([, w]) => w.token && w.token === store.token)?.[0] ?? /^pel_([a-z0-9-]+)_/.exec(store.token ?? '')?.[1] ?? 'here';
 export const listKey = () => `pelago-tabs:${ws()}`;
 /** Where the window a tab is popped out into keeps it. */
 export const outKey = (id) => `pelago-tab:${ws()}:${id}`;

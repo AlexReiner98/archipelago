@@ -5,6 +5,8 @@
 // distance; the last round keeps each one exactly. Each round is told (`round(r, numbers, phase)`: the `grid`, its
 // `room` given, a `relax` round, every distance `kept`), so the relaxation can be watched. Layer: metrics. Pure but for the one listener.
 
+import { exactly } from './exact.js';
+
 /** The cost's terms on one axis: pulls between two roots ([p, q, by, weight]: q - p toward by) and holds toward a place. */
 function costOf(n, { stretches, centred, rigid, order }, start, w) {
   const pulls = [...stretches.map(([p, q, by]) => [p, q, by, w.pull]), ...centred.map(([p, q, by]) => [p, q, by, w.center]), ...rigid.map(([p, q, by]) => [p, q, by, w.rigid]), ...order.map(([p, q, l]) => [p, q, l, w.even])];
@@ -124,7 +126,18 @@ export function relaxed(given, z, round = () => {}) {
   round(0, at, 'grid');
   at.forEach((v, a) => giveWay(v, arcs[a], z.sweeps, z.near));
   round(0, at, 'room');
-  for (let r = 1; r <= z.rounds; r++) {
+  // Solved exactly, the costs in whole pixels off (./exact.js), where the style asks for it (relax_exact, the grain a
+  // weight is counted in): one solve, no rounds.
+  if (z.exact) {
+    axes.forEach((ax, a) => {
+      const R = ax.n, soft = [...ax.stretches.map(([p, q, by]) => [p, q, by, z.pull]), ...ax.centred.map(([p, q, by]) => [p, q, by, z.center]), ...ax.rigid.map(([p, q, by]) => [p, q, by, z.rigid]), ...ax.order.map(([p, q, l]) => [p, q, l, z.even]), ...ax.start.map((s, v) => [R, v, s, z.hold])];
+      const x = exactly(ax.n + 1, soft, arcs[a], z.exact, z.near, 0, z.simplex);
+      at[a] = x.slice(0, ax.n).map((v) => v - x[R]);
+    });
+    told.rounds = 1;
+    round(1, at, 'relax');
+  }
+  for (let r = 1; r <= (z.exact ? 0 : z.rounds); r++) {
     let most = 0;
     for (let a = 0; a < 2; a++) {
       most = Math.max(most, descend(at[a], costs[a], z.step));

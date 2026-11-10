@@ -119,6 +119,7 @@ test('a draft keeps the sections it holds on a workspace other than default', as
   const { workspaces, call } = await serve('tokens', undefined, undefined, PAGES);
   const operator = (await workspaces.ensureOperator())!;
   const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
+  await call('/api/workspace_set', theirs, { islands: false }); // a plain map: this is about whose rows they are
   const made = (
     await call('/api/change', theirs, {
       reason: 'test',

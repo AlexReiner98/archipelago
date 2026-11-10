@@ -52,7 +52,7 @@ import { sharedPicture } from './documents.ts'; import { sharedAnswer } from './
 import { configureSecrets } from './secrets.ts'; import { serveBackupFile } from './backup-tools.ts';
 import { answerAt, hookAt } from './server-adapter.ts'; import { mountOf, serveMounted } from './server-mounts.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
-import { UI_FILES, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, unlisted, PAGE_POLICY, PREVIEW_POLICY, SHARED_POLICY } from './page-policies.ts';
+import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, unlisted, PAGE_POLICY, PREVIEW_POLICY, SHARED_POLICY } from './page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from './draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
@@ -88,7 +88,7 @@ class Refused extends Error {
 }
 export { lenient } from './mcp.ts';
 
-export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; token?: Limit; signIn?: Limit }; proxies?: string; leading?: () => boolean; unsandboxed?: boolean } = {}): Server {
+export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; token?: Limit; signIn?: Limit }; proxies?: string; leading?: () => boolean; unsandboxed?: boolean; draw?: DrawHostOptions } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
   // The server's own Chrome may reach it by another name, from a container beside it (src/looks.ts).
@@ -96,7 +96,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   setLookOrigin(lookAt.origin);
   const [named, sites] = [options.publicHosts ?? [], options.sites ?? {}], hosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...named, lookAt.host];
   const origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...named.map((name) => `https://${name}`), lookAt.origin];
-  const tokens = options.auth === 'tokens';
+  const tokens = options.auth === 'tokens', drawing = drawHosts(port, origins, options.draw); // where the page frames its drawings (src/draw-host.ts)
   configureOutbox(async (id) => ((await workspaces.has(id)) ? (await workspaces.get(id)).pelago : undefined));
   // The address this server is reached at from outside: what a mailed link and the server packs (ctx.origin) name, never the look's.
   const serverPacks = serverPacksOf(workspaces);
@@ -207,10 +207,10 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
   return createServer(async (req, res) => {
     try {
-      const url = new URL(req.url ?? '/', 'http://localhost');
+      const url = new URL(req.url ?? '/', 'http://localhost'), host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined;
+      if (drawing.only(host) && !(req.method === 'GET' && drawHostServes(url.pathname))) return send(res, 404, { error: 'Not found' }); // the drawing host serves drawings only
       if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, data: devMode() ? (workspaces.config.dataDir ?? undefined) : undefined, leading: options.leading?.() ?? true });
       // A domain that serves a workspace's public site: its pages by the reader pack (packs/reader), its icon; the rest as on any name.
-      const host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined;
       const mount = req.method === 'GET' ? mountOf(url.pathname, site) : undefined; // an address a server pack took from the kernel's list (src/server-mounts.ts)
       if (mount && (await serveMounted(req, res, mount, url.pathname, { packs: serverPacks, site, tokens, workspaces, named, sites, host, from: addressOf(req), tooOften: () => tooOften(req, res, open) }))) return;
       if (req.method === 'GET' && ICON.test(url.pathname)) return tooOften(req, res, open) || (await serveIcon(res, (await workspaces.get(site ?? DEFAULT_WORKSPACE)).pelago));
@@ -277,24 +277,24 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         }
       }
 
+      if (req.method === 'GET' && url.pathname.startsWith('/drawing/')) return await serveDrawingFile(res, url.pathname, { tooOften: () => tooOften(req, res, open), reader: async () => ((ws) => (tokens ? ws.pelago.as('') : ws.pelago))(await workspaces.get(DEFAULT_WORKSPACE)) }); // a drawing's files by hash (src/drawing-files.ts), asked with no token: read as no one
       if (req.method === 'GET' && UI_FILES[url.pathname]) {
-        const file = UI_FILES[url.pathname];
-        const page = file.endsWith('.html'), open = file === 'draw.html' && url.searchParams.get('open') === '1';
+        const file = UI_FILES[url.pathname], framedBy = file === 'draw.html' ? drawing.framedBy(host, String(req.headers['sec-fetch-site'] ?? '')) : undefined;
+        const page = file.endsWith('.html'), open = file === 'draw.html' && !framedBy && url.searchParams.get('open') === '1', frame = file === 'draw.html' ? await drawPage() : null;
         const served = page || file === 'layout.css' ? null : await uiFile(file, url.searchParams.get('v'));
         // The page loads its own script and stylesheet and talks to this server: nothing else, from anywhere, and it is not framed.
-        // A file named by the UI's current version is kept for good (src/ui-files.ts); the pages, and the rest, never.
+        // A file named by the UI's current version is kept for good (src/ui-files.ts); the pages, and the rest, never. The drawing frame has its scripts written in (drawPage).
         res.writeHead(200, {
           'content-type': `${MIME[file.split('.').pop()!]}; charset=utf-8`,
           'cache-control': served?.keep ? 'public, max-age=31536000, immutable' : file === 'three.module.min.js' ? 'public, max-age=604800' : 'no-store',
           ...GUARD,
           ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
-          ...(file === 'draw.html' && { 'content-security-policy': drawPolicy(open, Boolean(options.unsandboxed)) }),
+          ...(file === 'draw.html' ? { 'content-security-policy': drawPolicy(open, Boolean(options.unsandboxed), frame!.hashes, framedBy) } : {}),
           // The frame has an origin of its own, so what it loads from here it loads as a stranger.
           ...((file === 'draw.js' || file === 'draw-marks.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
         });
-        const html = page && (await uiPage(file));
-        if (html && (options.unsandboxed || open)) return res.end(markPage(html, { open, unsandboxed: options.unsandboxed }));
-        return res.end(file === 'layout.css' ? lengthsSheet((await workspaces.get(DEFAULT_WORKSPACE)).pelago.registry.packs) : html || served!.body);
+        const html = page && (frame?.html ?? (await uiPage(file))), drawOrigin = file === 'index.html' && !options.unsandboxed && !(process.env.PELAGO_LOOK_ORIGIN && host === lookAt.host) ? drawing.originFor(host) : undefined; // a Chrome beside the server may not reach the drawing host: it draws sandboxed
+        return res.end(html && (options.unsandboxed || open || drawOrigin) ? markPage(html, { open, unsandboxed: options.unsandboxed, drawOrigin }) : file === 'layout.css' ? lengthsSheet((await workspaces.get(DEFAULT_WORKSPACE)).pelago.registry.packs) : html || served!.body);
       }
 
       if (req.method === 'GET' && url.pathname === '/whoami') {
@@ -443,7 +443,7 @@ If that process is not a pelago server, delete ${lock}.`);
   // Drawings with one wall, the worker: for a browser that loads no sandboxed frame. A dev server with no tokens only.
   const unsandboxed = config.dev && config.auth !== 'tokens' && env('UNSANDBOXED') === '1';
   if (unsandboxed) console.log('unsandboxed: drawing frames share the page’s origin (PELAGO_UNSANDBOXED=1)');
-  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, sites: config.sites, proxies: config.trustedProxies, leading: () => leader?.leading ?? false, unsandboxed });
+  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, sites: config.sites, proxies: config.trustedProxies, leading: () => leader?.leading ?? false, unsandboxed, draw: { host: config.drawHost, loopback: config.dev } });
   // The port is taken before any database is opened: a second server started
   // by mistake must fail here, never open data another server is writing.
   server.on('error', (err: NodeJS.ErrnoException) => {
@@ -454,7 +454,7 @@ If that process is not a pelago server, delete ${lock}.`);
     writeFileSync(lock, me);
     const main = await workspaces.get(DEFAULT_WORKSPACE);
     console.log(`pelago listening on http://${config.host}:${config.port}  (MCP at /mcp)`);
-    if (config.publicHosts.length) console.log(`answering to: ${config.publicHosts.join(', ')}`);
+    if (config.publicHosts.length) console.log(`answering to: ${config.publicHosts.join(', ')}${config.drawHost ? `, and drawings at ${config.drawHost}` : ''}`);
     if (config.trustedProxies) console.log(`proxies trusted for a caller's address: private networks, ${config.trustedProxies}`);
     console.log(`data: ${config.dataDir}`);
     console.log(`packs: ${main.pelago.registry.packs.map((p) => `${p.id}@${p.version}`).join(', ')}`);

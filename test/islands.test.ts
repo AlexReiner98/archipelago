@@ -88,7 +88,7 @@ test('core declares the shared set, so a pack on task and decision is taken besi
   assert.throws(() => readManifest(JSON.stringify(without), 'core'), /shared names decision: the shared set is of the types this pack declares/);
 });
 
-test('the island rules are set on a new workspace only, by the owner', async () => {
+test('the island rules are the owner’s to set, and a map with work moves onto islands unless a pack would go dormant', async () => {
   const reg = new Registry(packsWith(island('plain'), island('hooked', { handlers: [HANDLER] })));
   const l = new Archipelago(await openDb(), reg);
   await syncTypes(l);
@@ -99,7 +99,24 @@ test('the island rules are set on a new workspace only, by the owner', async () 
   assert.equal(reg.states.get('hooked')?.state, 'off');
   await setIslands(l, human, false);
   assert.equal(reg.states.get('hooked')?.state, 'active');
-  await l.change(human, { reason: 'test', ops: [{ op: 'create', type: 'plain_thing', title: 'A thing' }] });
-  await assert.rejects(setIslands(l, human, true), /already has items/);
+
+  // Work of a pack the rules would switch off: refused, and nothing changes.
+  const hooked = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'h', type: 'hooked_thing', title: 'A hooked thing' }] }) as any).created.h;
+  await assert.rejects(setIslands(l, human, true), /switch off the pack hooked/);
   assert.equal(await islandsOn(l), false);
+  await l.change(human, { reason: 'test', ops: [{ op: 'archive', id: hooked }] });
+
+  // Work of packs that keep the rules: moved onto an island speaking their pack, in one change.
+  const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'plain_thing', title: 'A thing' }, { op: 'create', ref: 'b', type: 'task', title: 'A task' }, { op: 'link', type: 'depends_on', from: 'b', to: 'a' }] }) as any).created;
+  await setIslands(l, human, true);
+  assert.equal(await islandsOn(l), true);
+  const [a, b] = [await l.entity(made.a), await l.entity(made.b)];
+  assert.ok(a?.props.island && a.props.island === b?.props.island, 'both on one island, the shared task with the pack’s thing');
+  assert.equal((await l.entity(String(a!.props.island)))?.props.pack, 'plain');
+
+  // A new item naming none goes on the one it fits; with two, it is asked where.
+  const lone = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'task', title: 'Placed' }] }) as any).created.c;
+  assert.equal((await l.entity(lone))?.props.island, a!.props.island);
+  await l.change(human, { reason: 'test', ops: [{ op: 'create', type: 'island', title: 'Another', props: { pack: 'core' } }] });
+  await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Nowhere' }] }), new RegExp(`name it in props.island, such as ${a!.props.island}`));
 });

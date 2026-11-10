@@ -14,8 +14,8 @@ import { newId } from './db.ts';
 import { env } from './env.ts';
 import { append, type Fact } from './log.ts';
 import { decideAct, listActs, setPackSecret } from './outside.ts';
-import { notKernel } from './head.ts';
 import { ISLANDS } from './islands.ts';
+import { islandBlockers, moveOntoIslands } from './island-start.ts';
 import { KERNEL_PACKS } from './packorder.ts';
 import { LOCAL_PACK, type PackFile } from './packs.ts';
 import { hostFor } from './packtools.ts';
@@ -60,21 +60,36 @@ export async function islandsOn(l: Archipelago): Promise<boolean> {
 }
 
 /**
- * Hold this workspace's packs to the island rules, or let them go. It is turned on only on a map with nothing on it
- * yet beyond who is in it and the kernel's own: on a map with work, the packs it refuses would leave that work dormant.
+ * Hold this workspace's packs to the island rules, or let them go (`actor` 'system' for a new workspace, as the server
+ * makes it). On a map with work it is turned on only if no pack in use would be switched off, and what is on no island
+ * is moved onto islands (src/island-start.ts); if that move is refused, the setting is put back. Set on again while
+ * it is on, what is on no island since is moved the same way.
  */
-export async function setIslands(l: Archipelago, actor: Actor, on: boolean) {
-  needHuman(actor, 'Holding the packs to the island rules is the owner’s.');
-  if (on && !(await islandsOn(l))) {
-    const { rows } = await l.db.query(`select 1 from entity where type <> all($1::text[]) and ${notKernel(l.registry)} limit 1`, [l.registry.family('actor')]);
-    if (rows.length) throw new Error('The island rules are set on a new workspace, before anything is put on it: this one already has items.');
+export async function setIslands(l: Archipelago, actor: Actor | 'system', on: boolean) {
+  if (actor !== 'system') needHuman(actor, 'Holding the packs to the island rules is the owner’s.');
+  const turning = on && !(await islandsOn(l));
+  if (turning) {
+    const blocked = await islandBlockers(l);
+    if (blocked) throw new Error(blocked);
   }
-  await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [ISLANDS, JSON.stringify(on)]);
-  await l.record('settings', actorId(actor), [['+', 'setting', ISLANDS, on]]);
-  l.registry.turnOff(await packsOff(l), on);
-  if (on) hostFor(l.registry).stop();
-  await syncTypes(l);
-  toolsChanged(l.workspace);
+  const put = async (value: boolean) => {
+    await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [ISLANDS, JSON.stringify(value)]);
+    await l.record('settings', actor === 'system' ? 'system' : actorId(actor), [['+', 'setting', ISLANDS, value]]);
+    l.registry.turnOff(await packsOff(l), value);
+    if (value) hostFor(l.registry).stop();
+    await syncTypes(l);
+    toolsChanged(l.workspace);
+  };
+  if (turning || !on) await put(on);
+  if (!on || actor === 'system') return;
+  // Set again while on, it moves what came in on no island since (an import, say).
+  try {
+    await moveOntoIslands(l, actor);
+  } catch (err) {
+    if (!turning) throw err;
+    await put(false);
+    throw new Error(`Islands stay off: what is on the map could not be moved onto islands. ${(err as Error).message}`);
+  }
 }
 
 /** Append a change set of pack facts, as who made it. */

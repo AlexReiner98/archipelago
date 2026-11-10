@@ -41,7 +41,8 @@ test('an item names its island, and its type is the island’s pack’s or of th
     { op: 'create', ref: 'c', type: 'island', title: 'Plans', props: { pack: 'core' } },
   ]);
   assert.equal((await l.entity(a))!.props.pack, 'plain', 'an island is the kernel’s own: it lives on none');
-  await refused(l, [{ op: 'create', type: 'plain_thing', title: 'Nowhere' }], /a plain_thing lives on an island here: name it in props\.island/);
+  const { n } = await make(l, [{ op: 'create', ref: 'n', type: 'plain_thing', title: 'Named none' }]);
+  assert.equal((await l.entity(n))!.props.island, a, 'naming none, it goes on the one island it fits');
   await refused(l, [{ op: 'create', type: 'plain_thing', title: 'Abroad', props: { island: b } }], /plain_thing is plain’s, and the island .* speaks other/);
   await refused(l, [{ op: 'create', type: 'event', title: 'Not shared', props: { island: a } }], /event is core’s/);
   await refused(l, [{ op: 'create', type: 'plain_thing', title: 'On a task', props: { island: 'e_nothere' } }], /"e_nothere" is no island/);

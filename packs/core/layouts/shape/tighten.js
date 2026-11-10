@@ -46,6 +46,28 @@ function squeeze(g, real, drawn, pos, other, level, pulled) {
   // A neck's line stands nearer its box than what is level with it, so it never shares that row.
   const placeOf = new Map(), half = 1 / 2, before = level ? 0 : QUARTERS - 1;
   for (const v of placed) placeOf.set(line[v], pos[v] + (necked.has(line[v]) ? (necked.get(line[v]) === before ? half : -half) : 0));
+  // The lines in order: what overlaps another across the axis stands before it if its place is less (by line, if the same).
+  const lines = [...placeOf.keys()].sort((a, b) => placeOf.get(a) - placeOf.get(b) || a - b);
+  // A box's near side, the necks that queue before it, and the steps aside of necks that leave its near side are drawn
+  // up to what follows them, so the box is as narrow as its wires let it be and a neck stays by its box.
+  const pull = new Set([...drawn.filter(pulled).map((v) => line[v]), ...[...necked].filter(([, from]) => from === before).map(([l]) => l)]);
+  const next = things.every((t) => placeOf.has(t[0])) && [...after].every(([p, qs]) => placeOf.has(p) && [...qs].every((q) => placeOf.has(q)))
+    ? swept(things, lines, after, pull)
+    : paired(things, lines, after, pull, placeOf, add);
+  for (const v of free) {
+    const h = g.slots[v].findIndex((i) => i >= 0 && g.stretches[i].cage !== undefined && g.stretches[i].a === v);
+    next.set(line[v], next.get(line[beyond(v, h)]));
+  }
+  return pos.map((p, v) => (next.has(line[v]) ? next.get(line[v]) : p));
+}
+
+/**
+ * Each line's least place, `things` ([line, from, to] across the axis) paired one with another where they overlap,
+ * each pair an order (`add`) in `lines`' order: one past the furthest of what comes before, then each line `pull`
+ * names drawn up to one before the nearest of what follows. Every pair is looked at, so it takes the square of the
+ * things: kept for a line that has no place, which `swept` cannot order.
+ */
+export function paired(things, lines, after, pull, placeOf, add) {
   things.sort((a, b) => a[1] - b[1]);
   for (let i = 0; i < things.length; i++) {
     for (let j = i + 1; j < things.length && things[j][1] <= things[i][2]; j++) {
@@ -54,22 +76,69 @@ function squeeze(g, real, drawn, pos, other, level, pulled) {
       if (placeOf.get(a) < placeOf.get(b) || (placeOf.get(a) === placeOf.get(b) && a < b)) add(a, b); else add(b, a);
     }
   }
-  // The least place each line can take: one past the furthest of what must come before it.
-  const lines = [...placeOf.keys()].sort((a, b) => placeOf.get(a) - placeOf.get(b) || a - b), next = new Map();
+  const next = new Map();
   for (const l of lines) next.set(l, 0);
   for (const l of lines) for (const q of after.get(l) ?? []) next.set(q, Math.max(next.get(q), next.get(l) + 1));
-  // A box's near side, the necks that queue before it, and the steps aside of necks that leave its near side are drawn
-  // up to what follows them, so the box is as narrow as its wires let it be and a neck stays by its box.
-  const pull = new Set([...drawn.filter(pulled).map((v) => line[v]), ...[...necked].filter(([, from]) => from === before).map(([l]) => l)]);
   for (const l of [...lines].reverse()) {
     const later = [...(after.get(l) ?? [])].map((q) => next.get(q));
     if (pull.has(l) && later.length) next.set(l, Math.min(...later) - 1);
   }
-  for (const v of free) {
-    const h = g.slots[v].findIndex((i) => i >= 0 && g.stretches[i].cage !== undefined && g.stretches[i].a === v);
-    next.set(line[v], next.get(line[beyond(v, h)]));
+  return next;
+}
+
+/**
+ * Across the axis, from what each part of it holds: `give(from, to, value)` keeps the most (`better` says which is
+ * more) of what has been given over any place in it, `best(from, to)` the most given anywhere it overlaps. A tree of
+ * halves: nothing pushed down, since giving only ever raises.
+ */
+function spans(size, worst, better) {
+  const at = new Float64Array(4 * size).fill(worst), all = new Float64Array(4 * size).fill(worst);
+  const give = (lo, hi, value, node = 1, l = 0, r = size - 1) => {
+    if (hi < l || r < lo) return;
+    at[node] = better(at[node], value);
+    if (lo <= l && r <= hi) return void (all[node] = better(all[node], value));
+    const mid = (l + r) >> 1;
+    (give(lo, hi, value, node * 2, l, mid), give(lo, hi, value, node * 2 + 1, mid + 1, r));
+  };
+  const best = (lo, hi, node = 1, l = 0, r = size - 1) => {
+    if (hi < l || r < lo) return worst;
+    if (lo <= l && r <= hi) return at[node];
+    const mid = (l + r) >> 1;
+    return better(all[node], better(best(lo, hi, node * 2, l, mid), best(lo, hi, node * 2 + 1, mid + 1, r)));
+  };
+  return { give, best };
+}
+
+/**
+ * What `paired` answers, without pairing (bug e_a9w5jeme: 330,000 pairs a call on 263 items, eight calls a picture).
+ * The lines are taken in order; each line's least place is one past the furthest of the lines before it that overlap
+ * it (asked of a tree over the axis) and of the orders `after` gave it, and is then given over its own stretches. Then
+ * back, each pulled line drawn up to one before the nearest of what follows: the overlaps asked of a second tree.
+ */
+export function swept(things, lines, after, pull) {
+  const ends = [...new Set(things.flatMap((t) => [t[1], t[2]]))].sort((a, b) => a - b), index = new Map(ends.map((x, i) => [x, i]));
+  const spansOf = new Map();
+  for (const [l, lo, hi] of things) (spansOf.get(l) ?? spansOf.set(l, []).get(l)).push([index.get(lo), index.get(hi)]);
+  const next = new Map(), owed = new Map(), most = spans(ends.length, -Infinity, Math.max);
+  for (const l of lines) {
+    let v = Math.max(0, owed.get(l) ?? 0);
+    for (const [lo, hi] of spansOf.get(l)) v = Math.max(v, most.best(lo, hi) + 1);
+    next.set(l, v);
+    for (const [lo, hi] of spansOf.get(l)) most.give(lo, hi, v);
+    // An order from the stretches: to a line not yet taken, it is owed; to one taken, it raises it as it stands.
+    for (const q of after.get(l) ?? []) next.has(q) ? next.set(q, Math.max(next.get(q), v + 1)) : owed.set(q, Math.max(owed.get(q) ?? 0, v + 1));
   }
-  return pos.map((p, v) => (next.has(line[v]) ? next.get(line[v]) : p));
+  const least = spans(ends.length, Infinity, Math.min);
+  for (const l of [...lines].reverse()) {
+    if (pull.has(l)) {
+      let low = Infinity;
+      for (const [lo, hi] of spansOf.get(l)) low = Math.min(low, least.best(lo, hi));
+      for (const q of after.get(l) ?? []) low = Math.min(low, next.get(q));
+      if (low < Infinity) next.set(l, low - 1);
+    }
+    for (const [lo, hi] of spansOf.get(l)) least.give(lo, hi, next.get(l));
+  }
+  return next;
 }
 
 /** Whether point v stands on a box's side with nothing drawn leaving it across `level`'s axis (the end of an unseen

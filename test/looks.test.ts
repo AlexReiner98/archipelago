@@ -5,6 +5,7 @@
 // the page says it has drawn, with no page of the owner's open.
 
 import assert from 'node:assert/strict';
+import { setIslands } from '../src/packstate.ts';
 import { after, test } from 'node:test';
 import { createToken } from '../src/auth.ts';
 import { askedFace, fellBack, stopLayout } from '../src/look-draw.ts';
@@ -146,7 +147,9 @@ test('in a browser, a look is the view as drawn: a flow, a style’s own code, a
 test('in a browser, a look of another workspace’s view draws it, and a writing as it would publish, saying a face that fell back', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   // A test pack's writing is what can be published (test/packs/reader).
   const { workspaces, call } = await serve('tokens', undefined, undefined, packsWith('reader'));
-  const db = (await workspaces.create('acme', 'Acme')).pelago.db;
+  const acme = await workspaces.create('acme', 'Acme');
+  await setIslands(acme.pelago, 'system', false); // the test pack's writing lives on no core island; this is about looks
+  const db = acme.pelago.db;
   const owner = (await createToken(db, 'acme', { kind: 'human', name: 'owner', admin: true })).token;
   const agent = (await createToken(db, 'acme', { kind: 'agent', name: 'robot' })).token;
   const made = (await call('/api/change', owner, {
