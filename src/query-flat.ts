@@ -18,6 +18,7 @@ import { movedIds } from './moved.ts';
 import { endsOf, frontierOf, readTerm, sayTerm, setOf, workedBy, type Term } from './query-terms.ts';
 import { rankSql, searchIds, slipsOf } from './search.ts';
 import { markOf, sessionStates } from './session-state.ts';
+import { headPos } from './tail.ts';
 import { fileOnAxis } from './timelanes.ts';
 import { placeAll, readAxis, resolveAxis, windowOf, zoneOf, type TimeAxis } from './timeaxis.ts';
 
@@ -117,6 +118,10 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   // How much of each note is sent is not the lens: the same items, their notes whole for a drawing that reads them.
   if (input.notes !== undefined && input.notes !== 'whole') throw new Error('notes must be "whole", or left out for the start of each note');
   const whole = input.notes === 'whole';
+  // Asked by a page that keeps the answer current: where the log stood before anything was read, so the facts after it
+  // that the page plays reach what this answer holds, and nothing said while it was read is missed (ui/live.js).
+  if (input.follow !== undefined && input.follow !== true) throw new Error('follow must be true, or left out');
+  const pos = input.follow ? await headPos(l.db) : undefined;
   // On a time axis its ends said from today are worked out now, in the workspace's zone; a seed is open, or changed
   // since the window began (as the old placed read had it), so the sessions of past months do not crowd it out.
   const zone = lens.time && (await zoneOf(l));
@@ -351,6 +356,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
     ...(matched !== undefined && { matched }),
     // The items whose notes are sent whole, so a page keeping the answer current keeps those whole too (ui/replica.js).
     ...(whole && { whole: items.filter((e) => wholeIds.has(e.id)).map((e) => e.id) }),
+    ...(pos !== undefined && { pos }),
   };
 }
 

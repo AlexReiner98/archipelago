@@ -139,6 +139,17 @@ test('the facts after a position are read only on what is held, as the viewer ma
   assert.ok(owners.entries.some((e) => e.facts.some((f) => f[2] === 'title' && f[3] === 'Mine now')), 'its owner reads it, opened');
 });
 
+test('a lens read to follow says where the log stood before it was read; asked plainly, it does not', async () => {
+  const l = await fresh();
+  const made = await make(l, [{ op: 'create', ref: 'p', type: 'task', title: 'Canvas' }]);
+  const params = { filter: { find: [`id ${made.p}`] } };
+  const before = await headPos(l.db);
+  const followed = (await callTool(l, human, 'view', { name: 'flat', params: { ...params, follow: true } })) as any;
+  assert.equal(followed.pos, before, 'the position the page plays the log from');
+  assert.equal(((await callTool(l, human, 'view', { name: 'flat', params })) as any).pos, undefined);
+  await assert.rejects(callTool(l, human, 'view', { name: 'flat', params: { ...params, follow: 'yes' } }), /follow must be true/);
+});
+
 test("an agent's change reaches a view of the store with no lens read; what may move its answer asks again", async () => {
   const l = await fresh();
   const made = await make(l, [

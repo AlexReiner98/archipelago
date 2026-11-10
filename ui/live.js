@@ -102,18 +102,17 @@ export const kinds = {
 export const store = new Store(kinds);
 
 /**
- * A view of what `read` answers (a flat lens's answer), its rows in the page's one store and kept current from the log
- * from then on: where the log stands is read first, so nothing said while the lens is read is missed. Stop with
- * `unfollow` (ui/replica.js).
+ * A view of what `read` answers (a flat lens's answer, asked with `follow`), its rows in the page's one store and kept
+ * current from the log from then on: the answer says where the log stood before the lens was read (`pos`), so nothing
+ * said while it was read is missed, and nothing waits for a read of the log first. Stop with `unfollow` (ui/replica.js).
  */
 export async function replicate(read) {
-  // A look draws once and is closed: it is kept current from nothing (and tail is the owner's page's, not an agent's).
-  const { pos, queue } = still ? {} : await api('tail', {});
   const view = new View(store);
   const [answer, held] = await Promise.all([read(), heldNow()]);
-  view.hold(answer, pos);
+  // A look draws once and is closed: it is kept current from nothing.
+  if (!still && !Number.isInteger(answer.pos)) throw new Error('A lens kept current is read with follow: true, so its answer says where the log stood');
+  view.hold(answer, still ? undefined : answer.pos);
   store.holdChanges(held);
-  heard.queue ??= queue;
   return keepCurrent(view);
 }
 /** The changes held for the owner, as this viewer may see them; none where they may not. */
