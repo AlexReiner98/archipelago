@@ -36,7 +36,7 @@ import { notify } from './notify.ts'; import { alertOnCrash } from './alert.ts';
 import { backupAll, parseBackup, parseVault } from './backup.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from './members.ts'; import { requestWait } from './standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from './workspace-use.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts'; import { env } from './env.ts';
 import { serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
-import { configureLauncher, stopAllLaunched } from './launcher.ts';
+import { stopAllLaunched } from './launcher.ts'; import { configureLaunch } from './server-launch.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
 import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts'; import { pageMay } from './may.ts';
 import type { Actor, Archipelago } from './pelago.ts';
@@ -50,7 +50,7 @@ import { servePublic } from './public-route.ts'; import { serveSite, siteNav } f
 import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
 import { sharedPicture } from './documents.ts'; import { sharedAnswer } from './share-view.ts'; import { guestMap, ShareEnded } from './guests.ts'; import { serveLink } from './share-link-route.ts'; import { frozen } from './share-link.ts';
 import { configureSecrets } from './secrets.ts'; import { serveBackupFile } from './backup-tools.ts';
-import { answerHook } from './hook-answers.ts';
+import { answerAt, hookAt } from './server-adapter.ts'; import { mountOf, serveMounted } from './server-mounts.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
 import { UI_FILES, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, unlisted, PAGE_POLICY, PREVIEW_POLICY, SHARED_POLICY } from './page-policies.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
@@ -211,7 +211,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, data: devMode() ? (workspaces.config.dataDir ?? undefined) : undefined, leading: options.leading?.() ?? true });
       // A domain that serves a workspace's public site: its pages by address word (src/site.ts), its icon; the rest as on any name.
       const host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined;
-      if (site && (tooOften(req, res, open) || (await serveSite(res, url.pathname, { host, workspace: site, workspaces, onPage: () => onSitePage(site, host, url, req) })))) return;
+      const mount = req.method === 'GET' ? mountOf(url.pathname, site) : undefined; // an address a server pack took from the kernel's list (src/server-mounts.ts)
+      if ((mount && (await serveMounted(req, res, mount, url.pathname, { packs: serverPacks, site, tooOften: () => tooOften(req, res, open) }))) || (site && (tooOften(req, res, open) || (await serveSite(res, url.pathname, { host, workspace: site, workspaces, onPage: () => onSitePage(site, host, url, req) }))))) return;
       if (req.method === 'GET' && ICON.test(url.pathname)) return tooOften(req, res, open) || (await serveIcon(res, (await workspaces.get(site ?? DEFAULT_WORKSPACE)).pelago));
       if (req.method === 'GET' && url.pathname.startsWith('/backup-file/')) {
         if (tooOften(req, res, open)) return; // a guessed key would otherwise open the workspace it names, again and again
@@ -338,8 +339,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         if (req.headers.origin || !hosts.includes(req.headers.host ?? '')) return send(res, 403, { error: 'Hooks are called by Claude Code, not from a web page, and at an address this server is known by.' });
         const { ws, pelago, actor } = await resolve(req, res, 'agent');
         const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; remote?: string; reason?: string; tokens?: number; setup?: string };
-        const host = req.headers.host ?? '';
-        const answer = await answerHook(url.pathname.slice('/hooks/'.length), { whole: ws.pelago.db, pelago, within: actor().within ?? [], may: actor().may, body, running, origin: `${named.includes(host) ? 'https' : 'http'}://${host}`, ran: (run) => res.setHeader('x-pelago-run', run) });
+        const host = req.headers.host ?? '', { surface, event } = hookAt(url.pathname.slice('/hooks/'.length)), answer = await answerAt(serverPacks, surface, event, { whole: ws.pelago.db, pelago, within: actor().within ?? [], may: actor().may, body, running, origin: `${named.includes(host) ? 'https' : 'http'}://${host}`, ran: (run) => res.setHeader('x-pelago-run', run) });
         if (answer) return send(res, 200, answer);
       }
 
@@ -416,7 +416,7 @@ if (import.meta.main) {
   // Before anything reads a secret: where the key they are sealed with is kept.
   configureSecrets(rootDir, !config.databaseUrl);
   const workspaces = new Workspaces({ dataDir: config.dataDir, databaseUrl: config.databaseUrl, rootDir, packsDir: config.packsDir, packDirs: config.packDirs, packs: config.packs, policy: config.policy, backupsDir: config.backup ? config.backup.dir : undefined });
-  if (config.launch) configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
+  if (config.launch) configureLaunch({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
 
   // One server per data folder, whatever port each is on: two of them writing
   // the same database files destroy it. The lock names the process that has it.

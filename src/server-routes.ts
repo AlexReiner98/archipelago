@@ -13,6 +13,8 @@ import { signedWith } from './hashes.ts';
 import { json as reply, PRIVATE as GUARD } from './reply.ts';
 import { serverPacksOf } from './server-host.ts';
 import { hostBase, serverSecret } from './server-requests.ts';
+import { serveFile } from './server-files.ts';
+import { serveStream } from './server-streams.ts';
 import type { ActPlaces } from './server-acts.ts';
 
 /** A page's policy: its own script and stylesheet, talking to this server and to nothing else, never framed; a form only to the site it names. */
@@ -26,6 +28,10 @@ export interface ServerRoutes {
   tooOften: () => boolean;
   body: () => Promise<unknown>;
   raw: () => Promise<Buffer>;
+  /** Where the request comes from, for what is counted by address. */
+  from?: string;
+  /** Whether this server asks for a token. */
+  tokens?: boolean;
 }
 
 /** Tell the owner of the server, on the default map and by mail, that a webhook refused a delivery or failed on it (src/alert.ts). */
@@ -36,12 +42,17 @@ async function tellOwner(workspaces: ActPlaces, pack: string, hook: string, what
 
 export async function serveServerPack(req: IncomingMessage, res: ServerResponse, path: string, at: ServerRoutes): Promise<unknown> {
   const json = (status: number, body: unknown) => reply(res, status, body, GUARD);
-  const [, , id = '', name = '', more = '', extra] = path.split('/');
+  const [, , id = '', name = '', more = '', extra, beyond] = path.split('/');
   const packs = serverPacksOf(at.workspaces);
   const pack = packs.find(id);
-  if (!pack || extra !== undefined) return json(404, { error: 'Not found' });
+  // A stream is the one route with two parts after its name: the workspace and the document it listens to.
+  const stream = req.method === 'GET' && extra !== undefined && beyond === undefined && pack?.file.reach.server.streams?.find((s) => s.id === name);
+  if (!pack || (extra !== undefined && !stream)) return json(404, { error: 'Not found' });
   if (at.tooOften()) return;
   const { file, folder } = pack;
+  if (stream) return serveStream(res, file, stream.id, { workspace: more, id: extra!, from: at.from });
+  // A file it hands out, filled with this server's values (src/server-files.ts).
+  if (req.method === 'GET' && name === 'files' && more) return serveFile(res, file, more, { origin: packs.origin, tokens: at.tokens ?? true });
 
   if (req.method === 'GET') {
     const page = !more && file.reach.server.pages?.find((p) => p.id === name);

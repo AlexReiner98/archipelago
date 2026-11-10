@@ -37,6 +37,22 @@ and `standing`, what a workspace it made may do (its limits, whether it has
 ended). It keeps what they answer from in its own store; with no gate, nothing
 is asked and nothing is limited.
 
+Since 10 Nov 2026 (e_nsruapq3) a server pack may also declare, each checked
+on load in `src/server-reach.ts` and acted on by the kernel alone:
+
+| Key | What the kernel does |
+|---|---|
+| `mounts` | Hands it an address from a closed list (decision e_wptrr6tf): `public` (`/p/`), `site` (a domain's whole space), `setup` (`/connect/setup.mjs`), each to at most one pack (`src/server-mounts.ts`). `/s/` stays the kernel's. |
+| entries' `answers: "html"` | Sends what the entry answers as a page, with headers and policy the kernel sets (`src/server-routes.ts`). |
+| `streams` | Holds a stream at `/x/<pack>/<id>/<workspace>/<id>` and tells it when that document is `published` again (`src/server-streams.ts`). |
+| `files` | Serves a file of its `files/` folder at `/x/<pack>/files/<id>`, filled with `{origin}`, `{tokens}`, `{version}`, `{rules}`, and tells a session when its copy is behind (`src/server-files.ts`). |
+| `launchers` | Starts an agent with its argv (no shell; `{prompt}`, `{mcp_config}`, `{tools}`, `{model}`), holding its token, when a person launches and the server's launch setting names the pack (decision e_885ztqkv, `src/server-launch.ts`). |
+| `adapter` | Translates one surface's hooks, at `/hooks/<surface>/<event>`, with two functions of its handler, `in` and `out`; what a session is told stays the kernel's (decision e_6t8f46u6, `src/server-adapter.ts`). |
+
+Acts `published.read`, `published.at`, `published.picture`, `published.drawing`
+and `site.pages` read what a person published, through the security-definer
+reads alone (`src/server-published.ts`). A server pack still reads no map.
+
 ## The keys before
 
 Pack files before 24 Oct 2026 used 32 keys. Each is read as below, with a

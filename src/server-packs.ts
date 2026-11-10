@@ -15,6 +15,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
 import { env } from './env.ts';
 import { isServerPack, parts, readManifest, type Manifest, type ReachDef } from './manifest.ts';
+import { checkMoreReach, runsMore, type MoreReach } from './server-reach.ts';
 
 /** The acts a server pack may ask the kernel for, each only if it declares it. */
 export const SERVER_ACTS = [
@@ -25,7 +26,11 @@ export const SERVER_ACTS = [
   'site.visits',
   // On a workspace whose admin connected the pack (src/server-connect.ts).
   'begun.get', 'begun.take', 'connection.make', 'connection.get', 'connection.drop', 'workspace.add', 'workspace.deliver',
+  // What a person published, and nothing else: read through the security-definer reads, as anyone (src/server-published.ts).
+  'published.read', 'published.at', 'published.picture', 'published.drawing', 'site.pages',
 ] as const;
+/** The acts answered in src/server-published.ts. */
+export const PUBLISHED_ACTS: readonly ServerAct[] = ['published.read', 'published.at', 'published.picture', 'published.drawing', 'site.pages'];
 export type ServerAct = (typeof SERVER_ACTS)[number];
 
 const ID = /^[a-z][a-z0-9_]{0,39}$/;
@@ -56,7 +61,7 @@ export interface ServerHost {
 }
 
 /** Server reach, as a manifest asks for it (reach.server): a pack that asks for it is a server pack. */
-export interface ServerReach {
+export interface ServerReach extends MoreReach {
   /** The server acts it may ask for. */
   acts?: ServerAct[];
   /**
@@ -64,7 +69,7 @@ export interface ServerReach {
    * is where a person is sent back to from outside: called with the address's query, it answers where to send them on
    * ({ redirect }), and a refusal is shown them as a page.
    */
-  entries?: { id: string; description?: string; limit_ms?: number; method?: 'GET' | 'POST' }[];
+  entries?: { id: string; description?: string; limit_ms?: number; method?: 'GET' | 'POST'; answers?: 'json' | 'html' }[];
   /**
    * Pages anyone may open, as GET /x/<pack>/<id>: an HTML file in its public/ folder, under a strict policy. A page may
    * send a form to one of its hosts (form_action), as when a person is handed to another site with what it asks for.
@@ -112,7 +117,7 @@ export function checkServerPack(p: Partial<Manifest>, folder: string): string[] 
   const { server = {}, hosts, secrets: declared, webhooks, schedules } = parts(p as Manifest);
   for (const act of server.acts ?? []) if (!(SERVER_ACTS as readonly string[]).includes(act)) problems.push(`"${act}" is not a server act: one of ${SERVER_ACTS.join(', ')}`);
   const names = [...(server.entries ?? []), ...(server.pages ?? [])].map((e) => e.id);
-  for (const name of names) if (!NAME.test(name) || name === 'hook' || name === 'public') problems.push(`"${name}" cannot name an entry or a page`);
+  for (const name of names) if (!NAME.test(name) || name === 'hook' || name === 'public' || name === 'files') problems.push(`"${name}" cannot name an entry or a page`);
   if (new Set(names).size !== names.length) problems.push('an entry and a page share a name');
   for (const page of server.pages ?? []) if (!FILE.test(page.file) || !existsSync(join(folder, 'public', page.file))) problems.push(`page "${page.id}" names no file in its public/ folder`);
   for (const page of server.pages ?? []) if (page.form_action && !hosts.some((h) => h.id === page.form_action)) problems.push(`page "${page.id}" sends a form to no host of its own`);
@@ -140,7 +145,10 @@ export function checkServerPack(p: Partial<Manifest>, folder: string): string[] 
     if (!['signin', 'standing'].includes(gate)) problems.push(`"${gate}" is not a gate: signin or standing`);
     else if (!NAME.test(String(name)) || names.includes(String(name))) problems.push(`its gate ${gate} names a function of its handler that is no entry or page: "${name}"`);
   }
-  if ((server.entries?.length || webhooks.length || server.connect || schedules.length || Object.keys(server.gates ?? {}).length) && !existsSync(join(folder, 'handler.js'))) problems.push('it has entries or webhooks and no handler.js');
+  const html = (server.entries ?? []).filter((e) => e.answers === 'html').map((e) => e.id);
+  for (const e of server.entries ?? []) if (e.answers !== undefined && !['json', 'html'].includes(e.answers)) problems.push(`entry "${e.id}" answers json or html`);
+  problems.push(...checkMoreReach(server, folder, names, html, Object.values(server.gates ?? {}).map(String)));
+  if ((server.entries?.length || runsMore(server) || webhooks.length || server.connect || schedules.length || Object.keys(server.gates ?? {}).length) && !existsSync(join(folder, 'handler.js'))) problems.push('it has entries or webhooks and no handler.js');
   return problems;
 }
 
@@ -182,6 +190,9 @@ export function loadServerPacks(dirs = serverPackDirs()): { packs: ServerPack[];
       const why = checkServerPack(file, folder);
       if (!why.length && packs.some((p) => p.file.id === file.id)) why.push(`another server pack is "${file.id}" already`);
       for (const path of Object.keys(file.reach?.server?.aliases ?? {})) if (packs.some((p) => p.file.reach.server.aliases?.[path])) why.push(`another server pack answers at "${path}" already`);
+      for (const mount of Object.keys(file.reach?.server?.mounts ?? {})) if (packs.some((p) => p.file.reach.server.mounts?.[mount as never])) why.push(`another server pack takes the mount "${mount}" already`);
+      const surface = file.reach?.server?.adapter?.surface;
+      if (surface && packs.some((p) => p.file.reach.server.adapter?.surface === surface)) why.push(`another server pack translates the surface "${surface}" already`);
       if (why.length) refused.push({ folder, why });
       else packs.push({ file: file as ServerPackFile, folder });
     }

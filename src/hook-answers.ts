@@ -2,7 +2,8 @@
 // Where a session last heard up to is kept in the workspace's database (src/transient.ts), so its next prompt is
 // answered as well by a server it has not spoken to before.
 
-import { SETUP_VERSION, setupCommand } from './connect.ts';
+import { setupCommand } from './connect.ts';
+import { setupBehind } from './server-files.ts';
 import type { Q } from './db.ts';
 import type { Archipelago, May } from './pelago.ts';
 import { askOnReply } from './replies.ts';
@@ -169,7 +170,7 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     if (run && (!known || !known.is_open)) await sessionOpened(pelago, CLAUDE_CODE, run.id, undefined, typeof run.props.took_over === 'string' ? run.props.took_over : undefined).catch((err) => console.error(`hook tab: ${(err as Error).message}`));
     // A project keeps the files it was given when it was set up; the server moves on. A session is told when its
     // project is behind, since nothing else would: an old hook counts less, and old rules name tools as they were.
-    if (body.setup !== SETUP_VERSION) {
+    if (setupBehind(body.setup)) {
       const behind = await sayAt(pelago, 'setup_behind', { command: setupCommand(call.origin) });
       if (behind) additionalContext += `\n\n${behind}`;
     }

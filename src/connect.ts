@@ -19,6 +19,7 @@ import { json, PRIVATE } from './reply.ts';
 import type { Actor } from './pelago.ts';
 import { serverPacksOf } from './server-host.ts';
 import { documentsInForce, signinGate } from './server-gates.ts';
+import { handsOut } from './server-files.ts';
 import { serveServerPack } from './server-routes.ts';
 import { pageStyle } from './styles.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
@@ -41,6 +42,8 @@ export const SETUP_VERSION = createHash('sha256')
   .update([read('scripts/pelago-hook.mjs'), read('scripts/pelago-events.mjs'), read('.claude/skills/pelago-bump/SKILL.md'), RULES, read('scripts/pelago-setup.mjs')].join('\n'))
   .digest('hex')
   .slice(0, 12);
+// Said to the seam a session's folder is checked against (src/server-files.ts), until a pack hands the setup out.
+handsOut(SETUP_VERSION);
 
 /** The one command, with no secret in it, that sets a project up or brings its files up to date. */
 export const setupCommand = (origin: string) => `node -e "fetch('${origin}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"`;
