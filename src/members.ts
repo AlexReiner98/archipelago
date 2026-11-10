@@ -2,7 +2,8 @@
 // they are sent an invitation, and from then on sign in by asking for a link at that address (POST /connect/sign-in).
 // The link (or the code beside it, typed: POST /connect/code) works once, for half an hour; opened, the page trades
 // its code (POST /connect/join) for a token that keeps
-// that browser signed in for a month. Whether a member is an admin is kept here, on the member, so every sign-in gets
+// that browser signed in for a month; a member who set a password may sign in with it instead (src/passwords.ts).
+// Whether a member is an admin is kept here, on the member, so every sign-in gets
 // it; removing a member ends their sign-ins at once. The table is read only through the whole database: no member's
 // role is granted it.
 
@@ -181,9 +182,12 @@ export async function typedWorks(workspaces: { id: string; db: () => Promise<Q> 
 async function redeemWith(db: Q, workspace: string, key: string): Promise<string | undefined> {
   const taken = await take<{ email: string }>(db, key);
   const member = taken && (await memberOf(db, taken.value.email));
-  if (!member) return undefined;
-  return (await createToken(db, workspace, { kind: 'human', name: member.email, entity: member.person_id, admin: member.admin, expires_days: SIGNED_IN_DAYS })).token;
+  return member && signedIn(db, workspace, member);
 }
+
+/** A member's sign-in in a browser: a month's token, an admin's if they are one. */
+export const signedIn = async (db: Q, workspace: string, member: Member) =>
+  (await createToken(db, workspace, { kind: 'human', name: member.email, entity: member.person_id, admin: member.admin, expires_days: SIGNED_IN_DAYS })).token;
 
 /**
  * Someone asks to sign in at an address: one mail, with a link and a code for each workspace it is a member of, or,

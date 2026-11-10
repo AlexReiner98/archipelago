@@ -39,7 +39,7 @@ test('the surface is exactly query, change, undo, the six verbs and draw, over M
   closers.push(() => client.close());
   const listed = (await client.listTools()).tools;
   assert.deepEqual(listed.map((t) => t.name), SURFACE);
-  for (const t of listed) assert.ok(t.annotations?.title && typeof t.annotations.readOnlyHint === 'boolean' && (t.annotations.readOnlyHint || t.annotations.destructiveHint !== undefined), `${t.name} says whether it reads, writes or destroys`);
+  for (const t of listed) assert.ok(t.title && t.title === t.annotations?.title && typeof t.annotations.readOnlyHint === 'boolean' && (t.annotations.readOnlyHint || t.annotations.destructiveHint !== undefined), `${t.name} says whether it reads, writes or destroys`);
   assert.deepEqual(listed.filter((t) => t.annotations?.readOnlyHint).map((t) => t.name), ['query', 'draw']);
   assert.deepEqual(listed.filter((t) => t.annotations?.destructiveHint).map((t) => t.name), ['change', 'undo', 'revise']);
   const found = await client.callTool({ name: 'query', arguments: { name: 'search', params: { q: 'anything' } } });
