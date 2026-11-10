@@ -35,6 +35,18 @@ test('the install page gives each client its step, and its line fetches an insta
   assert.ok(script.includes(`(process.env.PELAGO_URL || \\"${base}\\")`), 'and so does the hook it writes for Codex and Cursor');
 });
 
+test('an agent that lands on the root finds the install: /install is the page, /llms.txt points at it', async () => {
+  const { base } = await serve('off');
+  assert.equal(await (await fetch(`${base}/install`)).text(), await (await fetch(`${base}/connect/install`)).text());
+  assert.match(await (await fetch(`${base}/install.ps1`)).text(), /connect\/install\.mjs/);
+  const llms = await fetch(`${base}/llms.txt`);
+  assert.match(llms.headers.get('content-type') ?? '', /^text\/plain/);
+  const text = await llms.text();
+  assert.ok(text.startsWith('# Archipelago'), 'llms.txt opens on its name');
+  assert.ok(text.includes(`${base}/connect/install`), 'and names the install');
+  assert.match(await (await fetch(`${base}/`)).text(), /<noscript>.*href="\/install"/s, 'the page itself links there for a reader without scripts');
+});
+
 test('the installer connects Cursor, keeping its other servers, and names an unknown client', async () => {
   const { base } = await serve('off');
   const home = mkdtempSync(join(tmpdir(), 'pelago-install-'));
