@@ -1,0 +1,12 @@
+{
+  "id": "reader",
+  "version": "0.1.0",
+  "title": "Reader",
+  "description": "A server pack for the tests: answers the public addresses and a site's, from the parts the kernel parsed.",
+  "reach": {
+    "server": {
+      "entries": [{ "id": "page", "answers": "html" }, { "id": "site", "answers": "html" }],
+      "mounts": { "public": "page", "site": "site" }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "rover",
+  "version": "0.1.0",
+  "title": "Rover",
+  "description": "A server pack for the tests: translates the hooks of a made-up surface, rover.",
+  "reach": {
+    "server": {
+      "adapter": { "surface": "rover", "in": "inward", "out": "outward" }
+    }
+  }
+}
