@@ -35,7 +35,7 @@ import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './aut
 import { notify } from './notify.ts'; import { alertOnCrash } from './alert.ts';
 import { backupAll, parseBackup, parseVault } from './backup.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from './members.ts'; import { requestWait } from './standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from './workspace-use.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts'; import { env } from './env.ts';
-import { serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
+import { SHORT, serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
 import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts'; import { pageMay } from './may.ts';
@@ -211,7 +211,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, data: devMode() ? (workspaces.config.dataDir ?? undefined) : undefined, leading: options.leading?.() ?? true });
       // A domain that serves a workspace's public site: its pages by address word (src/site.ts), its icon; the rest as on any name.
       const host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined;
-      if (site && (tooOften(req, res, open) || (await serveSite(res, url.pathname, { host, workspace: site, workspaces, onPage: () => onSitePage(site, host, url, req) })))) return;
+      if (site && (tooOften(req, res, open) || (await serveSite(res, url.pathname, { host, workspace: site, workspaces, app: serverPacks.origin, onPage: () => onSitePage(site, host, url, req) })))) return;
       if (req.method === 'GET' && ICON.test(url.pathname)) return tooOften(req, res, open) || (await serveIcon(res, (await workspaces.get(site ?? DEFAULT_WORKSPACE)).pelago));
       if (req.method === 'GET' && url.pathname.startsWith('/backup-file/')) {
         if (tooOften(req, res, open)) return; // a guessed key would otherwise open the workspace it names, again and again
@@ -220,7 +220,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       }
       // What a project needs to work with this server, and a running system's request for its token: no token needed.
       // A server pack answers at the addresses it had before it was a pack, too (a GitHub App set up then still sends there).
-      const packPath = serverPacks.aliased(url.pathname) ?? url.pathname;
+      const packPath = (req.method === 'GET' && Object.hasOwn(SHORT, url.pathname) ? SHORT[url.pathname] : serverPacks.aliased(url.pathname)) ?? url.pathname;
       if (/^\/(connect|x|oauth|\.well-known)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : /^\/connect\/(sign-in|code|join)$/.test(packPath) ? signIn : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX), person: () => resolve(req, res, 'human') });
 
       // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
