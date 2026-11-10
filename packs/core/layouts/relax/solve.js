@@ -131,7 +131,7 @@ export function relaxed(given, z, round = () => {}) {
   if (z.exact) {
     axes.forEach((ax, a) => {
       const R = ax.n, soft = [...ax.stretches.map(([p, q, by]) => [p, q, by, z.pull]), ...ax.centred.map(([p, q, by]) => [p, q, by, z.center]), ...ax.rigid.map(([p, q, by]) => [p, q, by, z.rigid]), ...ax.order.map(([p, q, l]) => [p, q, l, z.even]), ...ax.start.map((s, v) => [R, v, s, z.hold])];
-      const x = exactly(ax.n + 1, soft, arcs[a], z.exact, z.near);
+      const x = exactly(ax.n + 1, soft, arcs[a], z.exact, z.near, 0, z.simplex);
       at[a] = x.slice(0, ax.n).map((v) => v - x[R]);
     });
     told.rounds = 1;

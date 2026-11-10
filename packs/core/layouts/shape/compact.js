@@ -13,7 +13,7 @@ import { allFaces } from './refine.js';
 const cost = (s) => (s.edge !== undefined && !s.unseen ? 1 : 0);
 
 /** Each point's place on one axis: `upright` the stretches that run along it (N and S, for y). */
-function along(g, faceOf, nFaces, upright, batch) {
+function along(g, faceOf, nFaces, upright, batch, simplex) {
   const forward = upright ? 2 : 1, arcs = [], which = [];
   g.stretches.forEach((s, i) => {
     if ((s.h % 2 === 0) !== upright) return;
@@ -22,7 +22,7 @@ function along(g, faceOf, nFaces, upright, batch) {
     which.push([i, s.h === forward]);
     arcs.push(upright ? { from: before, to: after, low: 1, cost: cost(s) } : { from: after, to: before, low: 1, cost: cost(s) });
   });
-  const { flow } = minCostFlow(nFaces, new Array(nFaces).fill(0), arcs, { batch });
+  const { flow } = minCostFlow(nFaces, new Array(nFaces).fill(0), arcs, { batch, simplex });
   const length = new Map(which.map(([i, fwd], j) => [i, fwd ? flow[j] : -flow[j]]));
   const at = new Array(g.slots.length).fill(null);
   for (let start = 0; start < at.length; start++) {
@@ -44,10 +44,10 @@ function along(g, faceOf, nFaces, upright, batch) {
 }
 
 /** Integer places for every point: { x, y }, each picture apart moved right of the one before. */
-export function compact(g, batch = Infinity) {
+export function compact(g, batch = Infinity, simplex = 0) {
   const faces = allFaces(g), faceOf = new Int32Array(g.stretches.length * 2);
   faces.forEach((f, i) => { for (const d of f.darts) faceOf[d] = i; });
-  const x = along(g, faceOf, faces.length, false, batch), y = along(g, faceOf, faces.length, true, batch), n = g.slots.length;
+  const x = along(g, faceOf, faces.length, false, batch, simplex), y = along(g, faceOf, faces.length, true, batch, simplex), n = g.slots.length;
   const root = Array.from({ length: n }, (_, v) => v), find = (v) => (root[v] === v ? v : (root[v] = find(root[v])));
   for (const s of g.stretches) root[find(s.a)] = find(s.b);
   const groups = new Map();

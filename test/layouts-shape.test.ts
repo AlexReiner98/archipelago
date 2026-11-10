@@ -43,6 +43,29 @@ test('flow: every shortest path sent at once costs what one at a time does', () 
   assert.deepEqual(net.map((x, v) => x + supply[v]), new Array(n).fill(0), 'every need met');
 });
 
+test('flow: the network simplex meets every need at the cost shortest paths find', () => {
+  let seed = 7;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  for (let k = 0; k < 150; k++) {
+    const n = 3 + Math.floor(rnd() * 40), arcs: any[] = [];
+    for (let i = n + Math.floor(rnd() * n * 4); i > 0; i--) {
+      const a = Math.floor(rnd() * n), b = (a + 1 + Math.floor(rnd() * (n - 1))) % n;
+      arcs.push({ from: a, to: b, cost: Math.floor(rnd() * 50), ...(rnd() < 0.8 && { cap: 1 + Math.floor(rnd() * 20) }), ...(rnd() < 0.1 && { low: 1 }) });
+    }
+    for (let v = 0; v < n; v++) arcs.push({ from: v, to: (v + 1) % n, cost: 60 });
+    const supply = new Array(n).fill(0);
+    for (let j = 0; j < n / 2; j++) { const q = Math.floor(rnd() * 10); supply[Math.floor(rnd() * n)] += q; supply[Math.floor(rnd() * n)] -= q; }
+    const paths = minCostFlow(n, supply, arcs, { batch: 0 }), tree = minCostFlow(n, supply, arcs, { simplex: 50 });
+    assert.equal(tree.cost, paths.cost, `problem ${k}`);
+    const net = supply.slice();
+    arcs.forEach((a, i) => {
+      assert.ok(tree.flow[i] >= (a.low ?? 0) && tree.flow[i] <= (a.cap ?? Infinity), `problem ${k}: arc ${i} within its bounds`);
+      ((net[a.from] -= tree.flow[i]), (net[a.to] += tree.flow[i]));
+    });
+    assert.deepEqual(net, new Array(n).fill(0), `problem ${k}: every need met`);
+  }
+});
+
 test('flow: a need nothing can meet is said, not hidden', () => {
   assert.throws(() => minCostFlow(2, [2, -2], [{ from: 0, to: 1, cap: 1 }]), /unmet/);
   assert.throws(() => minCostFlow(2, [1, -2], []), /balance/);

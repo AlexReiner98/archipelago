@@ -40,19 +40,19 @@ function corners(points) {
  * The sketch of `emb` (the embedding of step 1: nodes, edges, wires, rotation, faces, outer, islands): { nodes, wires,
  * islands, ports, bends }, every place in grid units, a box's at its middle, y running down.
  */
-export function shape(given, { afford, span, batch } = {}) {
+export function shape(given, { afford, span, batch, simplex } = {}) {
   // The outer face is named before the bars go in, by a dart along it that no bar moves.
   const F0 = facesOf(given), outer = F0.faces[[...F0.outerOf.values()][0]] ?? [], wide = new Set(given.nodes.filter((n) => n.kind === 'junction' && (given.rotation[n.id] ?? []).length > 2 + 1).map((n) => n.id));
   const along = outer.find((d) => !wide.has(given.nodes[F0.tail[d]].id) && !wide.has(given.nodes[F0.head[d]].id));
   const unseen = new Set(given.wires.filter((w) => w.type === 'unseen').flatMap((w) => w.edges));
   const emb = { ...barred(given), unseen, ...(along !== undefined && { outerDart: { edge: given.edges[along >> 1].id, from: given.nodes[F0.tail[along]].id } }) };
-  const F = facesOf(emb), S = orthogonal(emb, F), H = headings(emb, F, S, afford, { span, batch });
+  const F = facesOf(emb), S = orthogonal(emb, F), H = headings(emb, F, S, afford, { span, batch, simplex });
   // Read the grid, give a neck to each wire that stretches its box, and read it again, until none does.
   let g, chain, cage, x, y;
   for (let round = 0; ; round++) {
     ({ g, chain, cage } = shaped(emb, F, S, H));
     refine(g, chain);
-    const first = compact(g, batch);
+    const first = compact(g, batch, simplex);
     ({ x, y } = tighten(g, first.x, first.y));
     if (round === ROUNDS || !necks(emb, F, H, g, x, y)) break;
   }

@@ -102,7 +102,7 @@ export function laidOut(args, { islandOf = () => null, heads = new Map() } = {})
     if (!err?.tooMuch) throw err;
     return plainly(args, m, islandOf, heads);
   }
-  const input = asInput(e, m), afford = (work) => spend(args.effort, work), sketch = shape(input, { afford, span: sizes.shape_back_run, batch: sizes.shape_flow_batch });
+  const input = asInput(e, m), afford = (work) => spend(args.effort, work), sketch = shape(input, { afford, span: sizes.shape_back_run, batch: sizes.shape_flow_batch, simplex: sizes.shape_flow_simplex ?? 0 });
   stage('shaped', { bends: sketch.bends, nodes: sketch.nodes.length, wires: sketch.wires.length });
   const r = relax(sketch, { size: (n) => (m.nodes.has(n.id) ? [m.nodes.get(n.id).w, m.nodes.get(n.id).h] : [0, 0]), sizes, heads, afford });
   const M = sizes.flow_margin, to = ([px, py]) => [px + M, py + M];

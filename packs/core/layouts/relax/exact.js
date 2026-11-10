@@ -12,9 +12,9 @@ import { minCostFlow } from './flow.js';
  * over what the flow leaves, in the costs as they were. A weight is counted in `grain` whole units a unit (the flow
  * carries whole units). A least distance is taken down to a whole pixel (within `near`), so no loop of them asks for
  * more than it can hold (taken up, two of +0.3 and -0.3 made a loop of +1 and the flow ran on 52 million units); the
- * last pass of ./solve.js keeps each exactly. `batch` is as ./flow.js takes it.
+ * last pass of ./solve.js keeps each exactly. `batch` and `simplex` are as ./flow.js takes them.
  */
-export function exactly(n, softIn, hardIn, grain, near, batch = 0) {
+export function exactly(n, softIn, hardIn, grain, near, batch = 0, simplex = 0) {
   const soft = softIn.map(([p, q, by, w]) => [p, q, Math.round(by), w]), hard = hardIn.map(([p, q, l]) => [p, q, Math.floor(l + near)]);
   const pi = new Array(n).fill(0);
   for (let round = 0, changed = true; changed && round <= n; round++) {
@@ -34,7 +34,7 @@ export function exactly(n, softIn, hardIn, grain, near, batch = 0) {
   }
   const given = supply.reduce((s, g) => s + Math.max(0, g), 0);
   for (const [p, q, l] of hard) put(q, p, given + 1, -l);
-  const { flow } = minCostFlow(n, supply, arcs, { batch });
+  const { flow } = minCostFlow(n, supply, arcs, { batch, simplex });
   const left = [];
   arcs.forEach((a, i) => {
     if (flow[i] < a.cap) left.push([a.from, a.to, cost[i]]);

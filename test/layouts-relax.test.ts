@@ -12,7 +12,7 @@ import { setOut } from './wired.ts';
 const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs/core/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const sizes = house.sizes;
 /** The relaxation's modules, as a layout would list them. */
-export const RELAX = { pack: 'core', id: 'relax', modules: { 'relax.js': 'layouts/relax/relax.js', 'atoms.js': 'layouts/relax/atoms.js', 'order.js': 'layouts/relax/order.js', 'solve.js': 'layouts/relax/solve.js', 'exact.js': 'layouts/relax/exact.js', 'flow.js': 'layouts/shape/flow.js', 'stage.js': 'layouts/kit/stage.js' } };
+export const RELAX = { pack: 'core', id: 'relax', modules: { 'relax.js': 'layouts/relax/relax.js', 'atoms.js': 'layouts/relax/atoms.js', 'order.js': 'layouts/relax/order.js', 'solve.js': 'layouts/relax/solve.js', 'exact.js': 'layouts/relax/exact.js', 'flow.js': 'layouts/shape/flow.js', 'simplex.js': 'layouts/shape/simplex.js', 'stage.js': 'layouts/kit/stage.js' } };
 /** A step's drawn size: as wide as the shape gives it, a point nothing. */
 const size = (n: any) => (n.w ? [n.w * 30, 34] : [0, 0]);
 

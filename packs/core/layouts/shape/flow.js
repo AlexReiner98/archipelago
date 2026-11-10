@@ -2,6 +2,8 @@
 // and the cheapest flow that meets every node's need. Successive shortest paths, each found by Dijkstra over reduced
 // costs, so a cost must not be below zero. Nothing here knows a drawing. Layer: shape. Pure: numbers in, numbers out.
 
+import { simplex } from './simplex.js';
+
 /**
  * A binary heap of keys and values, the least key first, in typed arrays that grow as it fills: nothing is made per
  * push (bug e_a9w5jeme: the pairs it made were half a second of collecting garbage on 263 items).
@@ -51,10 +53,11 @@ function heap(room) {
 
 /**
  * The cheapest flow over `n` nodes: `supply[v]` is what v gives (below zero, what it takes), and each arc is
- * { from, to, low?, cap?, cost? }; from `batch` arcs up, every shortest path a search finds is sent at once. Answers the
+ * { from, to, low?, cap?, cost? }; from `batch` arcs up, every shortest path a search finds is sent at once, and with
+ * `simplex` (pivots allowed per node and arc) it is solved by the network simplex first. Answers the
  * flow on each arc, in their order, and its cost; throws where no flow meets every need, saying how much was left unmet.
  */
-export function minCostFlow(n, supply, arcs, { batch = Infinity } = {}) {
+export function minCostFlow(n, supply, arcs, { batch = Infinity, simplex: simplexed = 0 } = {}) {
   const give = supply.slice();
   let total = 0;
   for (const a of arcs) {
@@ -81,6 +84,16 @@ export function minCostFlow(n, supply, arcs, { batch = Infinity } = {}) {
     add(a.from, a.to, Math.min(big, (a.cap ?? Infinity) - (a.low ?? 0)), a.cost ?? 0);
   });
   give.forEach((g, v) => { if (g > 0) add(S, v, g, 0); else if (g < 0) add(v, T, -g, 0); });
+  // By the network simplex (./simplex.js), where asked: the same cost, found without a search for every length.
+  if (simplexed) {
+    const k = arcs.length, f = new Int32Array(k), t = new Int32Array(k), c = new Float64Array(k), w = new Float64Array(k);
+    for (let i = 0; i < k; i++) ((f[i] = from[slot[i]]), (t[i] = to[slot[i]]), (c[i] = cap[slot[i]]), (w[i] = cost[slot[i]]));
+    const got = simplex(n, give.slice(0, n), f, t, c, w, big, simplexed * (n + k));
+    if (got) {
+      const flow = arcs.map((a, i) => (a.low ?? 0) + got[i]);
+      return { flow, cost: arcs.reduce((s, a, i) => s + flow[i] * (a.cost ?? 0), 0) };
+    }
+  }
   const first = new Int32Array(size + 1), out = new Int32Array(made);
   for (let k = 0; k < made; k++) first[from[k] + 1]++;
   for (let v = 0; v < size; v++) first[v + 1] += first[v];

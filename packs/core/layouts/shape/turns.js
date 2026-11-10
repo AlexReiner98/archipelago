@@ -27,7 +27,7 @@ const mod = (a) => ((a % QUARTERS) + QUARTERS) % QUARTERS;
  * { from, to, c, w, s }, node 0 held at 0. Solved as its dual, a circulation φ, |φ| ≤ w, each unit costing s less c
  * one way and s more c the other; λ are the shortest paths it leaves.
  */
-export function tension(n, terms, batch = Infinity) {
+export function tension(n, terms, batch = Infinity, simplex = 0) {
   const supply = new Array(n).fill(0), arcs = [], same = new Map();
   // Arcs with the same ends and cost are one arc holding what both hold: the same flow, far fewer arcs to search.
   const put = (from, to, cap, cost) => {
@@ -44,7 +44,7 @@ export function tension(n, terms, batch = Infinity) {
     arc(from, to, w, s - c);
     arc(to, from, w, s + c);
   }
-  const { flow } = minCostFlow(n, supply, arcs, { batch });
+  const { flow } = minCostFlow(n, supply, arcs, { batch, simplex });
   const left = [];
   arcs.forEach((a, i) => {
     if (flow[i] < a.cap) left.push([a.from, a.to, a.cost]);
@@ -134,7 +134,7 @@ function costs(emb, F, S, nA, h0, span) {
  * (`bent`), which leaves an island no rectangle. The polish past the first solves asks `afford(work)` of the picture's
  * budget first, each try a solve over every term at every node: once it says no, the turns found stand.
  */
-export function headings(emb, F, S, afford = () => true, { span = Infinity, batch = Infinity } = {}) {
+export function headings(emb, F, S, afford = () => true, { span = Infinity, batch = Infinity, simplex = 0 } = {}) {
   const { tail, leaving } = F, D = tail.length, N = emb.nodes.length;
   const nA = emb.edges.map((_, k) => S.rights[k] - S.lefts[k]), h0 = frame(F, S, nA);
   // Each box with sides asked is held turned so they face as asked.
@@ -151,14 +151,14 @@ export function headings(emb, F, S, afford = () => true, { span = Infinity, batc
   const at = (v) => index.get(v) ?? 0;
   /** Whole turns of four at every node, boxes too, every node's turn kept up to four. */
   const lift = () => {
-    const whole = tension(N, terms.flatMap((e) => wholeTurns(val(e), e.w, e.s).map((t) => ({ from: e.from, to: e.to, ...t }))), batch);
+    const whole = tension(N, terms.flatMap((e) => wholeTurns(val(e), e.w, e.s).map((t) => ({ from: e.from, to: e.to, ...t }))), batch, simplex);
     turn.forEach((t, v) => { turn[v] = t + QUARTERS * whole[v]; });
   };
   /** The two solves in turn until neither gains: every other node's turn with the boxes held, then whole turns. Each
    *  round past the first spends from the picture's budget. */
   const settle = () => {
     for (let last = Infinity, now = price(), round = 0; now < last && (!round || afford(2 * terms.length * N)); last = now, now = price(), round++) {
-      const more = tension(index.size + 1, terms.map((e) => ({ from: at(e.from), to: at(e.to), c: val(e), w: e.w, s: e.s })), batch);
+      const more = tension(index.size + 1, terms.map((e) => ({ from: at(e.from), to: at(e.to), c: val(e), w: e.w, s: e.s })), batch, simplex);
       index.forEach((i, v) => { turn[v] += more[i]; });
       lift();
     }
