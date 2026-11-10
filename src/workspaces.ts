@@ -28,14 +28,15 @@ async function beginShared(q: Q): Promise<['+', string, string, unknown][]> {
   const { rows } = await q.query(`insert into setting (key, value) values ('default_visibility', '"shared"'::jsonb) on conflict (key) do nothing returning key`);
   return rows.length ? [['+', 'setting', 'default_visibility', 'shared']] : [];
 }
-import { followPacks, islandsOn, packsOff, setIslands, syncPacks } from './packstate.ts';
+import { followMade, followPacks, islandsOn, packsOff, setIslands, syncPacks } from './packstate.ts';
 import { firstIsland } from './island-start.ts';
 import { hostFor } from './packtools.ts';
 import { syncTypes } from './typetable.ts';
-import { onTypesChanged, typeItems } from './type-items.ts';
+import { onPacksChanged, onTypesChanged, typeItems } from './type-items.ts';
 
 // The type table follows the types kept on the map as it follows the packs.
 onTypesChanged(syncTypes);
+onPacksChanged(followMade);
 
 /** The type items each open workspace's registry last took, to follow another server's change to them. */
 const taken = new WeakMap<Archipelago, string>();
@@ -271,6 +272,8 @@ export class Workspaces {
       await syncPacks(pelago); // which packs are present, and as which manifests, is a fact on the log
       pelago.registry.turnOff(await packsOff(pelago), await islandsOn(pelago));
       await takeTypeItems(pelago);
+      // The packs kept as items are read with the type items: the log and the packs on take them in now.
+      if (pelago.registry.made.size) await followMade(pelago);
       await syncTypes(pelago);
       if (begins) await pelago.record('settings', 'system', [...(await beginApplying(db)), ...(await beginShared(db))]);
       const ws = { id, name: isDefault ? 'Default' : (this.known.get(id) ?? id), pelago, automations: new Automations(pelago) };

@@ -339,6 +339,18 @@
       }
     },
     {
+      "id": "pack",
+      "extends": "system",
+      "title": "Pack",
+      "description": "A pack authored on the map: a way of working made of data alone, read beside the packs the server has. Its title is the pack's, its note what it is for, its name its id, and its manifest what it declares: types, links, rules, views (trees, screens, reasons for attention) and styles (looks, instructions, lenses), as a pack.json holds them (docs/packs.md). Every type, link type and rule it declares is named <name>.<what>. It runs no code: actions, handlers, layouts and reach are a server's packs' alone, and a rule in it only tightens, never keeps a stream or is lifted. It is checked whole when it is written, and it is off until the owner adds it (pack_set); the island rules judge it as any pack. Retired, it is taken out of the registry and its items turn dormant. An agent's edit of one waits for the owner.",
+      "statuses": { "open": ["draft", "current"], "closed": ["retired"], "phases": { "draft": "under_way", "current": "standing", "retired": "ended" } },
+      "fields": {
+        "name": { "type": "string", "description": "The pack's id: lower case letters, digits and _, starting with a letter, and no pack's on this server (e.g. recipes)." },
+        "version": { "type": "string", "description": "Its version, e.g. 0.1.0: 0.1.0 unless said." },
+        "manifest": { "type": "json", "large": true, "description": "What it declares, as an object with the keys of a pack.json a pack on the map may hold: requires, types, links, rules, views and styles, e.g. {\"types\": [{\"id\": \"recipes.dish\", \"title\": \"Dish\", \"description\": \"A dish we cook.\", \"extends\": \"record\"}]}. query schema shows the types there are to extend." }
+      }
+    },
+    {
       "id": "screen",
       "extends": "system",
       "title": "Screen",
@@ -1178,6 +1190,19 @@
         "latest": true
       },
       "say": "What a pack keeps, as it last kept it."
+    },
+    {
+      "id": "agent_packs",
+      "when": {
+        "actor": "agent",
+        "op": [
+          "update",
+          "restore"
+        ],
+        "type": "pack"
+      },
+      "then": "hold",
+      "say": "a pack kept as an item carries rules and words the owner may have added: changing one, or bringing one back, is theirs."
     },
     {
       "id": "agent_automations",

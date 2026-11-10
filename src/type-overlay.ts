@@ -49,7 +49,7 @@ export function withVersions(packs: PackFile[], items: TypeItem[]): PackFile[] {
 
 /** The workspace's own types and link types (a name, no preset) as the pack `id`, with those defined before types were items. */
 export function ownPack(before: PackFile | undefined, items: TypeItem[], id: string): PackFile | undefined {
-  const own = items.filter((i) => text(i.props.name) && !text(i.props.preset));
+  const own = items.filter((i) => (i.type === TYPE_ITEM || isLink(i)) && text(i.props.name) && !text(i.props.preset));
   if (!own.length) return before;
   const types: TypeDef[] = own.filter((i) => !isLink(i)).map((i) => ({
     id: text(i.props.name)!, title: i.title, description: text(i.body) ?? i.title, ...(text(i.props.extends) && { extends: text(i.props.extends) }),
