@@ -134,6 +134,12 @@ reply ending) is `docs/agents.md`.
 - **Types live in pack files** under `packs/`, each a manifest of sixteen keys
   (`docs/packs.md`, read by `src/manifest.ts`). Fields the system maintains are
   marked `"system": true`.
+- **On an island map a pack is one of two kinds** (the owner, 10 Nov 2026,
+  e_ubd8satd; `src/islands.ts`, `docs/packs.md`). An island pack declares a
+  type that lives on an island, a link type or fields on another's type, and
+  is words only on the shared set. A map pack owns no such type and brings
+  looks, layouts, views, code and reach to the whole map, each under the gate
+  it already has. A pack that is both is turned off: split it.
 - **An item is a small head and its fields** (`src/head.ts`). The head is id,
   kind, type, title, body, visibility and its times; everything else is a
   field its type declares, checked on write, and an undeclared one is
