@@ -709,7 +709,7 @@ change that:
 - **First start needs the owner's address and mail:** set
   `PELAGO_OWNER_EMAIL` and `PELAGO_MAIL_FROM`; without them a server with
   tokens on does not start. The owner becomes the default workspace's first
-  admin and is mailed a link to sign in: people sign in by email, never by
+  admin and is mailed a code to sign in: people sign in by email, never by
   pasting a token. The operator secret is given once: printed at a terminal,
   or with nobody at one (a container, a service) written to
   `first-start-secrets.txt` beside the data folder, readable only by the
@@ -847,7 +847,10 @@ change that:
   recipient's mail servers, so it passes through no mail service elsewhere.
   `PELAGO_MAIL_FROM` names the sender (`Archipelago <signin@example.com>`);
   without it nothing is sent, and the server's log says only each message's
-  subject: never its text, which holds sign-in links and codes.
+  subject: never its text, which holds sign-in codes. No mail carries a
+  sign-in link: from a young domain, one reads to spam filters as phishing,
+  so a sign-in mail holds a code, and an invitation says to sign in with the
+  address.
   For it to arrive, and not as spam, the sending domain needs: an SPF record
   naming the server's address (`v=spf1 ip4:<address> -all`), a DKIM key
   (`openssl genrsa -out dkim.pem 2048`; the private key in `PELAGO_DKIM_KEY`,

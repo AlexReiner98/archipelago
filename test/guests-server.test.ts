@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
-import { codeSentTo, serve } from './serve.ts';
+import { linkFor } from '../src/members.ts';
+import { mailbox, serve } from './serve.ts';
 
-test('a guest signs in by the link they were sent, and the server reads for them as the view shared with them, live', async () => {
+test('a guest is invited with no link, signs in by their address, and the server reads for them as the view shared with them, live', async () => {
   const { workspaces, call } = await serve('tokens');
   const db = (await workspaces.get('default')).pelago.db;
   const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
@@ -18,7 +19,10 @@ test('a guest signs in by the link they were sent, and the server reads for them
   const given = (await call('/api/share_guest', alex, { id: made.lens, email: 'guest@example.com' })).result;
   assert.equal(given.invited, true, 'they are sent an invitation');
 
-  const guest = (await call('/connect/join', undefined, { code: codeSentTo('guest@example.com') })).token as string;
+  assert.doesNotMatch(mailbox.findLast((m) => m.to === 'guest@example.com')!.text, /#\/join\/|https?:\/\//, 'the invitation carries no link: they sign in with their address');
+  // Signed in as the sign-in page would, once they ask for a code: the sign-in made here, traded at the door.
+  const code = (await linkFor(db, 'default', 'guest@example.com', 60_000)).split('/join/')[1];
+  const guest = (await call('/connect/join', undefined, { code })).token as string;
   const who = (await call('/whoami', guest, undefined, 'GET')).actor;
   assert.deepEqual([who.kind, who.may, who.reads, who.admin, who.person], ['human', 'read', given.share, false, given.person], 'what the session may do says read');
 
