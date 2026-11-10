@@ -76,4 +76,17 @@ test('a map with only core on gives a view as a link too, through a record that 
   const shown = (await sharedView(l, secretOf(link.path)))!;
   assert.deepEqual(shown.parts.map((p) => ('section' in p ? p.section.id : 'text')), [made.lens]);
   assert.deepEqual((shown as { lenses?: Record<string, { items: { title: string }[] }> }).lenses?.[made.lens]?.items.map((i) => i.title), ['Ship the login']);
+
+  // The record that wraps the view is the link's own: a view of records, or a walk from the view, leaves it out.
+  const wrap = (await l.db.query<{ from_id: string; wraps: string }>(`select r.from_id, e.props->>'wraps' as wraps from relation r join entity e on e.id = r.from_id where r.type = 'about' and r.valid_to is null and r.to_id = $1`, [made.lens])).rows;
+  assert.deepEqual(wrap.map((w) => w.wraps), [made.lens], 'marked as the link to the view');
+  await l.change(human, { reason: 'test', ops: [{ op: 'create', type: 'record', title: 'Meeting notes', visibility: 'shared' }] });
+  const titles = async (params: Record<string, unknown>) => ((await callTool(l, human, 'view', { name: 'flat', params })) as { items: { title: string }[] }).items.map((i) => i.title);
+  assert.deepEqual(await titles({ filter: { find: ['type record'] } }), ['Meeting notes']);
+  assert.deepEqual(await titles({ filter: { find: [`id ${made.lens}`] }, walk: { over: ['about'], steps: 1 } }), ['Open work']);
+  assert.deepEqual(await titles({ filter: { find: [`id ${wrap[0].from_id}`] } }), ['Open work'], 'named by its id, it is still found');
+
+  // A second link to the view uses the same record.
+  await callTool(l, human, 'share_create', { id: made.lens });
+  assert.equal((await l.db.query(`select 1 from relation where type = 'about' and valid_to is null and to_id = $1`, [made.lens])).rows.length, 1);
 });

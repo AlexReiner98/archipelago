@@ -8,7 +8,7 @@
 // Every read is bounded by the ids in hand, an end of a link, the type index or the limit, and runs as the viewer:
 // row-level security keeps what they may not see out of the seeds, the walk and the links alike.
 
-import { SYSTEM } from './head.ts';
+import { SYSTEM, WRAPS } from './head.ts';
 import { ISLAND, islandPack, onIslands } from './island-items.ts';
 import { islandFindings, SHORE_MOST } from './findings.ts';
 import type { Archipelago } from './pelago.ts';
@@ -140,7 +140,8 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   const numbered = (list: Narrowing[], n: number) => list.map((t) => (t.param === undefined ? t.cond : t.cond.replaceAll('$?', `$${n++}`)));
   const leftOut = out.filter((t) => t.param !== undefined).map((t) => t.param);
   const narrowing = terms.filter((t) => t.param !== undefined).map((t) => t.param);
-  const keep = (n: number) => ['e.archived_at is null', ...numbered(out, n)].join(' and ');
+  // A document made to give a view or an item as a link is the link's own: no view finds it, unless it names it.
+  const keep = (n: number) => ['e.archived_at is null', `not (e.props ? '${WRAPS}')`, ...numbered(out, n)].join(' and ');
   const narrows = (n: number) => numbered(terms, n + leftOut.length);
   const narrowed = (n: number) => [keep(n), ...narrows(n), inWindow].filter(Boolean).join(' and ');
   // Each read finds ids only; what is sent of them is read once, at the end. A seed is found narrowed; a step of the walk is not.
