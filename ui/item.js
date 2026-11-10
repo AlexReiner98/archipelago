@@ -6,10 +6,9 @@ import { api, ask, h, link, may, part, state, tell } from './base.js';
 import { drawIn, goQuery, openHere, queryNow } from './canvas.js';
 import { viewsOn } from './canvases.js';
 import { draftOf } from './draft.js';
-import { documentMenu, figureOf, homeOf, readDocument, shareLinkOf } from './item-doc.js';
+import { documentMenu, figureOf, readDocument, shareLinkOf } from './item-doc.js';
 import { heldBand, heldOn } from './item-held.js';
 import { readingOf } from './item-read.js';
-import { readAgain } from './reader-frame.js';
 import { choicesOf } from './fields.js';
 import { choicesSection, fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
 import { linkAdder } from './item-links.js';
@@ -64,7 +63,6 @@ export async function entity(id, here) {
     !e.archived_at && data.incoming.some((r) => rootOf(r.type) === 'part_of' && readWhole(r.entity_type)) ? api('publish_plan', { within: id }).catch(() => null) : null,
   ]);
   // A document is read in public as it was last published: whether it is, and whether its draft says something else now.
-  // One shared from another workspace too, which publishes only where that workspace allows it (src/published-share.ts).
   const shown = doc && type?.public ? await api('published', { id }).catch(() => null) : null;
   // How its page looks is its style: the house style's, its kind's (a document reads through), its own.
   const looks = (await lookOf).style;
@@ -145,18 +143,14 @@ export async function entity(id, here) {
 
   redraw.inPlace = inPlace;
   // Its title and note, written in place and saved as one change (ui/draft.js).
-  // A document reads in its note's place as it will publish (ui/item-read.js); one shared from another workspace is
-  // read there, not written here.
+  // A document reads in its note's place as it will publish (ui/item-read.js).
   const reading = doc && readingOf(doc, looks);
   // Read beside its draft (the pages), a document opens as words to write: it reads on the left already.
   const writing = Boolean(doc && document.querySelector('.lens-view.beside-sheet'));
-  const draft = draftOf({ base: e, style: looks, editable: writes && !e.archived_at, reading, writing: writing && !doc.from, saved: again, count: countOn(data) });
-  // Shared by a map this browser is signed in to, its words are written there, as the person they are there.
-  const home = await homeOf(doc);
-  const words = writes && home && draftOf({ base: home.item, style: looks, reading, writing, call: home.call, saved: () => (readAgain(id), again()) });
+  const draft = draftOf({ base: e, style: looks, editable: writes && !e.archived_at, reading, writing, saved: again, count: countOn(data) });
   // The sheet can open before the canvas under it has drawn: told when it has.
-  if (doc && !writing) document.getElementById('sheet').addEventListener('beside', () => (words ?? (doc.from ? null : draft))?.open(), { once: true });
-  const note = section('note', 'Note', 0, keepsFigure(e.type) && figureOf(e, 'figure'), h('div', { class: 'note' }, words ? [...words.note, words.bar] : doc?.from ? reading : draft.note));
+  if (doc && !writing) document.getElementById('sheet').addEventListener('beside', () => draft.open(), { once: true });
+  const note = section('note', 'Note', 0, keepsFigure(e.type) && figureOf(e, 'figure'), h('div', { class: 'note' }, draft.note));
   // A field picked is changed at once; words written in a field wait with the note for its Save. A pick made while
   // words wait leaves the page as it stands, so they are not lost: it is drawn again when they are saved.
   const fieldEdit = writes && !e.archived_at && {
@@ -225,7 +219,7 @@ export async function entity(id, here) {
           ],
         publishable && !shown && e.visibility === 'public' && ['Stop being public', () => change([{ op: 'update', id, visibility: 'private' }], 'No longer public, set in the UI')],
         e.visibility === 'public' && type?.public && (Boolean(type?.capabilities?.plannable) || shown?.published) && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
-        ...(doc ? documentMenu(e, links, page, again, doc, writes) : []),
+        ...(doc ? documentMenu(e, links, page, again, writes) : []),
         writes && !doc && !e.archived_at && ['Make a link to see it', shareLinkOf(e, page, false)],
         ['Copy id', () => navigator.clipboard.writeText(e.id)],
         writes && !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],

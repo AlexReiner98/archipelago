@@ -200,33 +200,19 @@ export function visibilityRow(info, redraw, fail) {
 }
 
 /**
- * Whether the packs here are held to the island rules (workspace_set islands): a row of the Map section. A new map
- * starts with it on; turned on for a map with work, what is on no island moves onto islands (src/island-start.ts).
+ * Joining the island rules (workspace_set islands), for a map made before them: a row of the Map section, shown only
+ * while the map is off them. One way: once on, it stays on, and the row goes (the owner, 10 Nov 2026). What is on no
+ * island moves onto islands (src/island-start.ts).
  */
 export function islandsRow(info, redraw, fail) {
-  if (!may('admin')) return null;
-  const on = h('input', { type: 'checkbox', checked: Boolean(info.islands) });
-  const name = h('span', { class: 'grow', title: 'Every item lives on one island, which speaks an island pack: words, views and instructions on the shared set alone. A map pack brings looks, layouts and tools to the whole map and owns no type on an island; a pack that is both is turned off. Islands meet only through findings.' }, 'Islands');
-  on.onchange = async () => {
-    const want = on.checked;
-    const message = info.started ? 'What is on the map moves onto an island for each pack it speaks, in one change you can undo. Packs that do not keep the rules are turned off; if one is in use, nothing changes.' : 'Packs that do not keep to them are turned off, and every item made from now on lives on an island.';
-    if (want && !(await ask({ title: 'Hold this map to the island rules?', message, action: 'Turn on' }))) return void (on.checked = false);
-    api('workspace_set', { islands: want }).then(redraw, (err) => ((on.checked = !want), (name.title = err.message), fail(err)));
+  if (!may('admin') || info.islands) return null;
+  const name = h('span', { class: 'grow', title: 'Every item lives on one island, which speaks an island pack: words, views and instructions on the shared set alone. A map pack brings looks, layouts and tools to the whole map and owns no type on an island; a pack that is both is turned off. Islands meet only through findings. Once on, it stays on.' }, 'Islands', ' ', h('span', { class: 'muted small' }, 'off on this map'));
+  const join = async () => {
+    const message = info.started ? 'What is on the map moves onto an island for each pack it speaks, in one change you can undo. Packs that do not keep the rules are turned off; if one is in use, nothing changes. Islands cannot be turned off again.' : 'Packs that do not keep to them are turned off, and every item made from now on lives on an island. Islands cannot be turned off again.';
+    if (!(await ask({ title: 'Hold this map to the island rules?', message, action: 'Turn on' }))) return;
+    api('workspace_set', { islands: true }).then(redraw, (err) => ((name.title = err.message), fail(err)));
   };
-  return line(name, on);
-}
-
-/** Which other workspaces on this server may notify this one: a row of the Connections card, changed in its menu. */
-export function notificationsRow(info, redraw, fail) {
-  const from = info.accepts_from.join(', ');
-  const accept = async () => {
-    const said = await ask({ title: 'Accept notifications from', message: `Other workspaces on this server, by id, separated by commas. Now: ${from || 'none'}. This one is "${info.id}".`, input: { placeholder: from || 'workspace ids' }, action: 'Save' });
-    if (said != null) api('workspace_set', { accepts_from: said.split(',').map((s) => s.trim()).filter(Boolean) }).then(redraw, fail);
-  };
-  return line(
-    h('span', { class: 'grow', title: `Other workspaces on this server that may send this one notifications. This workspace's id is "${info.id}".` }, h('strong', {}, 'Other workspaces'), ' ', h('span', { class: 'muted small' }, from ? `notify it: ${from}` : 'none may notify it')),
-    may('admin') ? menu('⋯', [['Change…', accept]]) : h('span', { class: 'menu-room' }),
-  );
+  return line(name, h('button', { title: 'Move this map onto islands; it stays on them', onclick: join }, 'Turn on'));
 }
 
 /** The server's packs, for an admin of the default workspace: each a plate, with what it offers and may ask the server to do. Nothing when there are none. */

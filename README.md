@@ -50,28 +50,11 @@ can read and change it. [The agent tools](https://archipelago.tools/tools?ref=gi
 **One way to read.** A query is a filter, a walk and a limit, and a view is a
 query with its layout. You and your agents read the same query.
 
-## Host it yourself
-
-Archipelago is one Node 24 server and a persistent disk, MIT licensed, with
-everything included. The database is embedded; for a team, keep the maps on a
-Postgres server instead. If you'd rather not run a server, the
-[Quickstart](https://archipelago.tools/quickstart?ref=github) has it running for you in
-about five minutes.
-
-```bash
-git clone https://github.com/AlexReiner98/archipelago.git
-cd archipelago
-npm install
-npm start
-```
-
-Open `http://127.0.0.1:3100`, go to **Workspace** and type your name under
-Owner. To look around first, `npm run demo` opens a map of Archipelago itself
-on port 3200, its data kept apart.
-
 ## Connect your agent
 
-Ask it:
+Archipelago runs for you at
+[app.archipelago.tools](https://app.archipelago.tools): there is nothing to
+host. Ask your agent:
 
 > Install Archipelago from https://app.archipelago.tools/connect/install
 
@@ -88,8 +71,8 @@ curl -fsSL https://app.archipelago.tools/connect/install.sh | sh
 ```
 
 It connects Claude Code, Codex and Cursor where it finds them, and opens your
-browser once to sign in to your workspace on archipelago.tools (the
-[Quickstart](https://archipelago.tools/quickstart?ref=github) makes one).
+browser once to sign in to your workspace on archipelago.tools; with no
+account yet, choose **Start a workspace** there.
 ChatGPT and Grok Bot are connected in their own apps; the
 [install page](https://app.archipelago.tools/connect/install) says how. From
 then on each session starts on your map, handed the open work the sessions
@@ -105,8 +88,27 @@ Your tasks appear on the map right away. To take anything back, open
 **Changes** and choose **Undo**. Any other MCP client works the map at
 `/mcp` on the same server.
 
-To keep the hooks and working rules in the project's own files instead, run
-this in its folder with your server running:
+## Host it yourself
+
+Only if you want to run your own server.
+
+Archipelago is one Node 24 server and a persistent disk, MIT licensed, with
+everything included. The database is embedded; for a team, keep the maps on a
+Postgres server instead.
+
+```bash
+git clone https://github.com/AlexReiner98/archipelago.git
+cd archipelago
+npm install
+npm start
+```
+
+Open `http://127.0.0.1:3100`, go to **Workspace** and type your name under
+Owner. To look around first, `npm run demo` opens a map of Archipelago itself
+on port 3200, its data kept apart.
+
+To connect a project to your own server, with the hooks and working rules in
+the project's own files, run this in its folder with the server running:
 
 ```bash
 node -e "fetch('http://127.0.0.1:3100/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"

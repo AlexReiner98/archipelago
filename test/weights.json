@@ -210,7 +210,6 @@
   "test/walk-from.test.ts": { "pglite": 4.1, "postgres": 3 },
   "test/weekly-trigger.test.ts": { "pglite": 2.8, "postgres": 0.8 },
   "test/withdraw.test.ts": { "pglite": 2.8, "postgres": 0.8 },
-  "test/workspace-share.test.ts": { "pglite": 8.1, "postgres": 3.4 },
   "test/workspace-tokens.test.ts": { "pglite": 8.5, "postgres": 3.9 }
  },
  "steps": { "pglite": 2, "postgres": 26 }
