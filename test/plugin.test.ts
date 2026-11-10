@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
-import { FOLDER, pluginFiles } from '../scripts/plugin.ts';
+import { DIRECTORY, FOLDER, pluginFiles } from '../scripts/plugin.ts';
 import { LISTING } from '../src/listing.ts';
 import { serve } from './serve.ts';
 
@@ -104,4 +104,23 @@ test('the plugin README opens with the listing, every slot filled from listing.j
   const readme = pluginFiles()[`${FOLDER}/README.md`];
   assert.ok(readme.startsWith(`# ${LISTING.title}\n\n${LISTING.summary}\n`), 'it opens with the listing title and summary');
   assert.doesNotMatch(readme, /\{\w+\}/);
+});
+
+test('the plugin ships no bump skill: that is for working on Archipelago itself', () => {
+  const files = pluginFiles();
+  assert.ok(!Object.keys(files).some((path) => path.includes('pelago-bump')));
+  assert.doesNotMatch(files[`${FOLDER}/pelago.md`], /pelago-bump/);
+});
+
+test('the plugin directory’s build runs nothing on the machine: its hooks call the map’s own tools at a fixed address', () => {
+  const files = pluginFiles();
+  const mine = Object.keys(files).filter((path) => path.startsWith(`${DIRECTORY}/`));
+  assert.deepEqual(mine.map((path) => path.slice(DIRECTORY.length + 1)).sort(), ['.claude-plugin/plugin.json', '.mcp.json', 'README.md', 'hooks/hooks.json']);
+  assert.deepEqual(JSON.parse(files[`${DIRECTORY}/.mcp.json`]), { mcpServers: { map: { type: 'http', url: LISTING.urls.mcp } } }, 'no headersHelper, no PELAGO_URL');
+  assert.equal(files[`${DIRECTORY}/.claude-plugin/plugin.json`], files[`${FOLDER}/.claude-plugin/plugin.json`], 'the same listing');
+  const hooks = Object.values(JSON.parse(files[`${DIRECTORY}/hooks/hooks.json`]).hooks as Record<string, { hooks: Record<string, any>[] }[]>).flatMap((g) => g.flatMap((h) => h.hooks));
+  assert.ok(hooks.length >= 3 && hooks.every((h) => h.type === 'mcp_tool' && h.server === 'plugin:archipelago:map' && h.tool === 'report' && h.input.action === 'hook'));
+  assert.ok(hooks.every((h) => h.input.params.session_id === '${session_id}'));
+  assert.ok(files[`${DIRECTORY}/README.md`].startsWith(`# ${LISTING.title}\n\n${LISTING.summary}\n`));
+  assert.doesNotMatch(files[`${DIRECTORY}/README.md`], /\{\w+\}/);
 });

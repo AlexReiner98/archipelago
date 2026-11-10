@@ -41,7 +41,7 @@ import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
 import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts'; import { pageMay } from './may.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from './control-index.ts'; import { isPersonToken, personAt } from './person-tokens.ts';
-import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { setReach } from './pack-reach.ts';
+import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { configureHookTool } from './hook-tool.ts'; import { setReach } from './pack-reach.ts';
 import { pgLeader, soleLeader, type Leader } from './leader.ts'; import { drained } from './drain.ts';
 import { serverDuties } from './duties.ts'; import { keepVisits, onSitePage } from './visits.ts';
 import { clientAddress, trustedProxies } from './address.ts';
@@ -106,7 +106,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => dueForDeletion(serverPacks, await workspaces.control(), now); slowTokensAt(options.limits?.token);
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
-  const running = { commit: startedFrom(), started: new Date().toISOString() };
+  const running = { commit: startedFrom(), started: new Date().toISOString() }; configureHookTool(serverPacks, running);
 
   // What answers without a token is counted by address: the public pages and the setup script, and GitHub's deliveries.
   const open = limiter(options.limits?.open ?? PUBLIC_LIMIT);

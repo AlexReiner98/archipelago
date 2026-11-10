@@ -27,8 +27,7 @@ never written into a project.
   server `PELAGO_URL` names.
 - Hooks on a session's start, each prompt, the end of each turn and of the
   session, and each tool call.
-- The working rules the agent reads at the start (`pelago.md`), and a skill,
-  `pelago-bump`, for recording where Archipelago itself got in the way.
+- The working rules the agent reads at the start (`pelago.md`).
 
 ## What it sends
 

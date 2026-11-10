@@ -24,6 +24,7 @@ import { withinScope } from './scope.ts';
 import { viewsSaid } from './askview.ts';
 import { actionsOf, listedChange, movedTo, route, SURFACE, surfaceTools, type Action } from './surface.ts';
 import { ACT_TOOLS } from './tool-acts.ts';
+import { HOOK_TOOLS } from './hook-tool.ts';
 import { WRITE_TOOLS } from './tool-change.ts';
 import { devMode } from './tool-config.ts';
 import { HUMAN_TOOLS } from './tool-human.ts';
@@ -47,7 +48,7 @@ export interface Tool {
 
 // Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
 /** Tools that are no step of their own: those that point the screen themselves, and the one that only waits. */
-const UNWATCHED = new Set(['show', 'change', 'tell', 'watch']);
+const UNWATCHED = new Set(['show', 'change', 'tell', 'watch', 'hook']);
 const READS = new Set(['get', 'events', 'proposals', 'picture', 'schema']);
 async function step(l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>): Promise<void> {
   const params = (input.params ?? {}) as Record<string, unknown>;
@@ -69,7 +70,7 @@ async function step(l: Archipelago, actor: Actor, name: string, input: Record<st
 }
 
 export const TOOLS: Record<string, Tool> = {
-  ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...HUMAN_TOOLS,
+  ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...HOOK_TOOLS, ...HUMAN_TOOLS,
   ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
   ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS, ...WORKSPACE_TOOLS, ...CONNECTION_TOOLS, ...GUEST_TOOLS,
 };
