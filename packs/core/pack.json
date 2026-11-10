@@ -231,7 +231,8 @@
         "session_marks": { "type": "json", "description": "How the flow draws a run's session state (waiting, your_move, blocked, working, quiet, idle, done), by state: { shape, hue, lit }. shape: disc, ring, half, square, diamond or triangle; hue: one of the theme's colours by name (you, blocked, session, warn, muted, done...); lit: drawn as what waits on you, and laid out first. A run whose state is named shows its line in place of its title." },
         "link_hues": { "type": "json", "description": "The colours a link type not named in link_colours takes, as hex colours: by its name, stepping past one another type in the same picture has. hues when not set." },
         "key": { "type": "enum", "values": ["shown", "hidden"], "description": "Whether a picture's key is drawn: what each mark it uses means, as its layout says (the scene's key), always in sight on the canvas. shown unless said." },
-        "headless": { "type": "json", "description": "The link types whose ties are drawn with no head, as a list, e.g. [\"part_of\"]: every other tie has a head where its link points." },
+        "headless": { "type": "json", "description": "The link types laid out from what they tie to, as a list, e.g. [\"part_of\"]: the whole stands over its part, and the head where its link points goes up into it." },
+        "ends": { "type": "json", "description": "Which ends of a link type's wire carry an arrowhead, by type: end (where the link points), start (where it leaves) or both, e.g. {\"link\": \"both\"}. A type not named has its head at its end." },
         "island_hues": { "type": "json", "description": "The colours islands take, in the order a picture's answer names them, as hex colours: where a picture holds items of more than one island, the flow draws each as a region round what lives on it, its shore in its colour and its land a tint of it, and names it in the key. hues when not set." },
         "place_hues": { "type": "json", "description": "The colours places take, in order, as hex colours: the flow then draws no step for a place that holds parts (items of the place kind) in the picture, outlines each of its parts in its colour and names it in the key. Left out or empty, a place is a step tied to its parts." },
         "layout": { "type": "enum", "values": ["calendar", "bars"], "description": "time: a calendar of days, hours running down (calendar), or each lane a row of bars across the days (bars, a Gantt chart). calendar unless said." },
@@ -1337,6 +1338,7 @@
       "props": {
         "shape": "map",
         "headless": ["part_of"],
+        "ends": { "link": "both" },
         "island_hues": ["#2e7d4f", "#2f5fb3", "#a86a12", "#6f43b0", "#0f7c86", "#b5489a", "#4f8a2b", "#5b6b9a"],
         "place_hues": ["#2f5fb3", "#46785c", "#0f7c86", "#b5489a", "#4f8a2b", "#5b6b9a", "#6f43b0", "#8a8f2a"],
         "key": "shown",

@@ -218,3 +218,16 @@ test('island order: islands joined by many wires stand together, within the firm
   assert.deepEqual(sifted(['H', 'A', 'X', 'B'], runOf, links, firm, 0), ['H', 'A', 'X', 'B'], 'no rounds, no move');
   assert.deepEqual(sifted(['H', 'A', 'X', 'B'], runOf, [], [], 4), ['H', 'A', 'X', 'B'], 'nothing reads across, nothing moves');
 });
+
+test('every wire has a head: part_of up into the whole, and a type the style draws both ways a head at each end', async () => {
+  const { drawings, setOut } = await import('./wired.ts');
+  const items = [{ ...item('hub'), type: 'aim' }, item('part'), item('rel')];
+  const links = [link('part_of', 'part', 'hub'), link('link', 'part', 'rel')];
+  const out = await setOut(drawings.find((d) => d.id === 'core.map')!, async (url) => (await import(url('index.js'))).picture({ answer: { items, links, islands: [] }, style: house, reduced: true, width: 1200, height: 750 }, { measure }));
+  const svg = JSON.stringify(out.scene.svg);
+  const ties = [...svg.matchAll(/"key":"n:(\d+)","d":"[^"]+","class":"([^"]+)"/g)].map((m) => [m[1], m[2]]);
+  const headOf = (n: string) => svg.match(new RegExp(`"key":"nh:${n}","d":"([^"]+)"`))?.[1];
+  const part = ties.find(([, c]) => c.includes('near')), rel = ties.find(([, c]) => !c.includes('near'));
+  assert.ok(part && headOf(part[0]), 'part_of is drawn with a head');
+  assert.equal(rel && headOf(rel[0])?.match(/M/g)?.length, 2, 'a link has a head at each end');
+});
