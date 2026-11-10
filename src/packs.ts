@@ -8,7 +8,7 @@ import { checkDeclared, KERNEL_VERBS, presetsOf, screensOf, stylesOf, toolName, 
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts';
 import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
-import { islandsOff } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
+import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 import { parts, withoutAbsent, type Manifest } from './manifest.ts';
@@ -469,8 +469,9 @@ export class Registry {
   }
 
   describe() {
-    return {
-      packs: this.packs.map((p) => ({ id: p.id, version: p.version, title: p.title, description: p.description })),
+    const kernel = sharedOf(this.packs.filter((p) => KERNEL_PACKS.includes(p.id))), shared = { ...kernel, actors: actorsOf(this.packs, kernel.actors) };
+    return { // each pack with its kind (src/islands.ts): an island pack speaks on an island, a map pack brings the rest to the whole map
+      packs: this.packs.map((p) => ({ id: p.id, version: p.version, title: p.title, description: p.description, kind: packKind(p, shared) })),
       // The head every item has; status, owner, confidence and source are each type's columns, as its starter declares them.
       common_fields: { title: 'Required. A short name.', body: 'Free-form markdown detail.', visibility: 'private (default) or shared.' },
       types: [...this.types.values()].map((t) => ({

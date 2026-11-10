@@ -36,21 +36,75 @@ export const onIslands = (param: string) => `e.props->>'island' = any(${param}::
 interface Where { island: string | null; title: string }
 
 /**
- * A new item that names no island goes on the one island it fits, when the map has exactly one (a new workspace has
- * its first: the owner, 10 Nov 2026, e_44rbfwxp, so a first change just works). Written into the op, so the log says
- * where it went; with none or several that fit, it is left for islandRefusals to name them.
+ * Where a new item that names no island goes, written into its op so the log says where it went (task e_b8k453zf).
+ * First the island of what it is tied to in the same change: what it is part of, or else any link to an item on an
+ * island of its pack (never a link that crosses, which reads another island's finding). So a map pack's action that
+ * makes a test result part of a run puts it on the run's island. Failing that, the island the change was given (a
+ * pack action's `island` input), and failing that the lone island it fits, when the map has exactly one (a new
+ * workspace has its first: the owner, 10 Nov 2026, e_44rbfwxp, so a first change just works). With none that fits,
+ * or several, it is left for islandRefusals to name them.
  */
-export async function placeOnLoneIsland(map: Archipelago, reg: Registry, ops: Op[]): Promise<void> {
+export async function placeOnIslands(map: Archipelago, reg: Registry, ops: Op[], given?: string): Promise<void> {
   if (!reg.onIslands) return;
-  const bare = ops.filter((op): op is Extract<Op, { op: 'create' }> => op.op === 'create' && !op.props?.island && Boolean(reg.type(op.type) && livesOnIsland(reg.type(op.type)!)));
-  if (!bare.length || ops.some((op) => op.op === 'create' && reg.isA(op.type, ISLAND))) return;
+  const bare = new Set(ops.flatMap((op, i) => (op.op === 'create' && !op.props?.island && reg.type(op.type) && livesOnIsland(reg.type(op.type)!) ? [i] : [])));
+  if (!bare.size) return;
   const shared = sharedOf(reg.packs.filter((p) => KERNEL_PACKS.includes(p.id))).types;
+  const crosses = new Set([...reg.relations.values()].filter((r) => (r as { crosses?: boolean }).crosses).map((r) => r.id));
+  const partOf = reg.relationFamily('part_of');
+  const made = new Map(ops.flatMap((op, i) => (op.op === 'create' && op.ref ? [[op.ref, i] as const] : [])));
+  const fits = (t: ResolvedType, pack: string | undefined) => pack !== undefined && (t.pack === pack || shared.has(t.id));
+  const packs = new Map<string, string | undefined>();
+  /** The pack an island speaks, for an island by id or one made in this change as {ref}; none when it names no island. */
+  const packOf = async (island: string) => {
+    if (packs.has(island)) return packs.get(island);
+    const ref = /^\{([^{}\s]+)\}$/.exec(island)?.[1];
+    const op = ref !== undefined ? ops[made.get(ref) ?? -1] : undefined;
+    const found = op?.op === 'create' ? { type: op.type, props: op.props ?? {}, archived_at: null } : ref === undefined ? await map.entity(island) : undefined;
+    const pack = found && reg.isA(found.type, ISLAND) && !found.archived_at ? String(found.props.pack ?? '') : undefined;
+    packs.set(island, pack);
+    return pack;
+  };
+  /** The island an end of a link lives on, as this change leaves it so far. */
+  const islandOf = async (end: string): Promise<string | undefined> => {
+    const i = made.get(end);
+    if (i !== undefined) { const op = ops[i]; return op.op === 'create' ? (op.props?.island as string | undefined) : undefined; }
+    return ((await map.entity(end))?.props.island as string | undefined) ?? undefined;
+  };
+  const place = (i: number, island: string) => {
+    const op = ops[i] as Extract<Op, { op: 'create' }>;
+    // A copy of the op takes its place in the list: the caller's own object is not changed under it.
+    ops[i] = { ...op, props: { ...op.props, island } };
+    bare.delete(i);
+  };
+  /** The one island of these ends that the type fits, if there is exactly one. */
+  const oneOf = async (type: ResolvedType, ends: string[]) => {
+    const found = new Set<string>();
+    for (const end of ends) { const island = await islandOf(end); if (island && fits(type, await packOf(island))) found.add(island); }
+    return found.size === 1 ? [...found][0] : undefined;
+  };
+
+  // By its ties, again until nothing moves: a new run's island reaches the results made part of it in the same change.
+  for (let moved = true; moved; ) {
+    moved = false;
+    for (const i of [...bare]) {
+      const op = ops[i] as Extract<Op, { op: 'create' }>;
+      if (!op.ref) continue;
+      const type = reg.type(op.type)!;
+      const ties = ops.filter((o): o is Extract<Op, { op: 'link' }> => o.op === 'link' && !crosses.has(o.type) && (o.from === op.ref || o.to === op.ref));
+      const parents = ties.filter((o) => o.from === op.ref && partOf.includes(o.type)).map((o) => o.to);
+      const island = (await oneOf(type, parents)) ?? (await oneOf(type, ties.map((o) => (o.from === op.ref ? o.to : o.from))));
+      if (island) (place(i, island), (moved = true));
+    }
+  }
+  if (!bare.size) return;
+  // The island it was given: written even where it does not fit, so the refusal says why.
+  if (given) { for (const i of [...bare]) place(i, given); return; }
+  if (ops.some((op) => op.op === 'create' && reg.isA(op.type, ISLAND))) return;
   const { rows } = await map.db.query<{ id: string; pack: string }>(`select id, props->>'pack' as pack from entity where type = $1 and archived_at is null order by created_at limit 50`, [ISLAND]);
-  // A copy of the op takes its place in the list: the caller's own object is not changed under it.
-  for (const op of bare) {
-    const type = reg.type(op.type)!;
-    const fits = rows.filter((r) => type.pack === r.pack || shared.has(type.id));
-    if (fits.length === 1) ops[ops.indexOf(op)] = { ...op, props: { ...op.props, island: fits[0].id } };
+  for (const i of [...bare]) {
+    const type = reg.type((ops[i] as Extract<Op, { op: 'create' }>).type)!;
+    const there = rows.filter((r) => fits(type, r.pack));
+    if (there.length === 1) place(i, there[0].id);
   }
 }
 
@@ -124,7 +178,7 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
       // Which islands it could go on, so the change is put right in one go.
       const { rows } = await map.db.query<{ id: string; title: string; pack: string }>(`select id, title, props->>'pack' as pack from entity where type = $1 and archived_at is null order by created_at limit 5`, [ISLAND]);
       const there = rows.filter((r) => fits(type, r.pack)).map((r) => `${r.id} (${r.title}, ${r.pack})`);
-      return `${where}: a ${type.id} lives on an island here: name it in props.island${there.length ? `, such as ${there.join(', ')}` : ', on an island made first (type island, props.pack)'}`;
+      return `${where}: a ${type.id} lives on an island here: name it in props.island${there.length ? `, such as ${there.join(', ')}; or make it part of an item on one in this change` : ', on an island made first (type island, props.pack)'}`;
     }
     const { pack, why } = await packOf(island);
     if (why) return `${where}: ${why}`;

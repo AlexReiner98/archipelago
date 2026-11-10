@@ -19,7 +19,10 @@ export async function newIslandButton() {
 async function newIsland() {
   const title = await ask({ title: 'New island', input: { placeholder: 'Its name, a few words' }, action: 'Next' });
   if (!title) return;
-  const packs = state.schema?.packs ?? [];
+  // An island speaks an island pack (src/islands.ts); a map pack speaks nothing, so it is never offered. Core when none is.
+  const all = state.schema?.packs ?? [];
+  const island = all.filter((p) => p.kind === 'island');
+  const packs = island.length ? island : all.filter((p) => p.id === 'core');
   const pack = packs.length > 1 ? await ask({ title: `What does ${title.slice(0, 60)} speak?`, choices: packs.map((p) => [p.id, p.title, p.description]) }) : packs[0]?.id;
   if (!pack) return;
   const first = await askNew(pack);

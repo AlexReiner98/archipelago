@@ -1,10 +1,14 @@
-// Packs on an island map (decisions e_pp5mu6xd and e_rf6q3q34): a workspace with the setting `islands` on takes a pack
-// only if its file holds vocabulary (types, links, the rules on its own items), views and instructions, and builds on
-// the shared set alone. The shared set is the list `shared` in the kernel's pack file: type ids, grown only by the
-// owner's decision. Its views are those the kernel draws (a tree, a screen, a reason for attention, a lens): a read
-// a pack's code computes runs code, which is not a pack's on an island map. A pack there requires the kernel's pack and no other, uses none, adds no fields to another pack's
-// types, and its types, links and rules name only its own types, the shared set, a capability or anything (`*`).
-// The kernel's own pack is not judged here. Off is the default: with the setting off, nothing here is asked.
+// Packs on an island map (decisions e_pp5mu6xd, e_rf6q3q34 and e_ubd8satd). A workspace with the setting `islands` on
+// knows two kinds of pack, read off the file with no key of its own. An island pack speaks on an island: it declares a
+// type that lives on one (src/island-items.ts, livesOnIsland), a link type, or fields on another pack's type. It is
+// held to the island rules: its file holds vocabulary (types, links, the rules on its own items), views the kernel
+// draws and instructions, and it builds on the shared set alone, requiring the kernel's pack and no other. The shared
+// set is the list `shared` in the kernel's pack file: type ids, grown only by the owner's decision. A map pack owns no
+// type that lives on an island and brings looks, layouts, views, actions, handlers, uses and reach to the whole map,
+// each part judged by the gate it already has (a layout by the sandbox, code by code-runs, reach by core's pack reach
+// rule, adding a pack by the owner); it may require other packs. A pack that is both is refused: split it into an
+// island pack and a map pack. The kernel's own pack is not judged here. Off is the default: with the setting off,
+// nothing here is asked.
 
 import { capabilityOf } from './link-ends.ts';
 import { MANIFEST_KEYS, parts, type Manifest } from './manifest.ts';
@@ -21,29 +25,81 @@ export const ISLAND_KEYS: readonly string[] = MANIFEST_KEYS.filter((k) => !NOT_I
 /** The presets in `styles` that are instructions and views; any other (a look) is not a pack's on an island map. */
 const PRESETS_KEPT = ['instruction', 'lens'];
 
-/** What a pack on an island map may build on: the shared set's types, and the kernel's link types. */
+/** What a pack on an island map may build on: the shared set's types and the kernel's link types; and the types known to be actors, which live on no island. */
 export interface Shared {
   types: Set<string>;
   links: Set<string>;
+  actors?: Set<string>;
 }
+
+/** The two kinds of pack, and the kernel's own. */
+export type PackKind = 'kernel' | 'island' | 'map';
 
 /** The shared set as the kernel's packs declare it: types core itself declares (task and decision moved there from Work, the owner, 5 Nov 2026, e_rf6q3q34), so a pack on an island map always finds them. */
 export function sharedOf(kernel: Manifest[]): Shared {
-  return { types: new Set(kernel.flatMap((m) => m.shared ?? [])), links: new Set(kernel.flatMap((m) => parts(m).relations.map((r) => r.id))) };
+  return { types: new Set(kernel.flatMap((m) => m.shared ?? [])), links: new Set(kernel.flatMap((m) => parts(m).relations.map((r) => r.id))), actors: actorsOf(kernel) };
 }
 
-/** Why a pack may not be active on an island map, as sentences; none when it may. */
+/** The types of these packs that are actors: actor and every type whose line of `extends` reaches it. */
+export function actorsOf(packs: Manifest[], known: Set<string> = new Set(['actor'])): Set<string> {
+  const parent = new Map(packs.flatMap((m) => parts(m).types.map((t) => [t.id, t.extends] as const)));
+  const actors = new Set([...known, 'actor']);
+  for (const id of parent.keys()) {
+    const seen = new Set<string>();
+    for (let at: string | undefined = id; at && !seen.has(at); at = parent.get(at)) {
+      seen.add(at);
+      if (actors.has(at)) { for (const s of seen) actors.add(s); break; }
+    }
+  }
+  return actors;
+}
+
+/** The types of a pack that live on an island: its own, but actors. A pack's types never carry the kernel flag (src/packs.ts), so none is the kernel's own. */
+const islandTypes = (m: Manifest, shared: Shared) => {
+  const actors = actorsOf([m], shared.actors);
+  return parts(m).types.filter((t) => !actors.has(t.id)).map((t) => t.id);
+};
+
+/** What a pack speaks on an island, as phrases: types that live on one, link types, fields on another pack's types. */
+function vocabulary(m: Manifest, shared: Shared): string[] {
+  const p = parts(m);
+  const types = islandTypes(m, shared);
+  const added = Object.keys(p.adds);
+  return [
+    ...(types.length ? [`types ${types.join(', ')}`] : []),
+    ...(p.relations.length ? [`links ${p.relations.map((r) => r.id).join(', ')}`] : []),
+    ...(added.length ? [`fields on ${added.join(', ')}`] : []),
+  ];
+}
+
+/** Which kind a pack is: the kernel's own, an island pack (it speaks on an island) or a map pack (everything else). */
+export function packKind(m: Manifest, shared: Shared): PackKind {
+  if (KERNEL_PACKS.includes(m.id)) return 'kernel';
+  return vocabulary(m, shared).length ? 'island' : 'map';
+}
+
+/** What of a pack runs or reaches past an island, as phrases: tools, code, looks, computed views, uses, reach, another pack required. */
+function running(m: Manifest): string[] {
+  const keys = Object.keys(m).filter((k) => !ISLAND_KEYS.includes(k));
+  const looks = (m.styles ?? []).filter((s) => !PRESETS_KEPT.includes(s.type ?? 'style')).map((s) => s.id);
+  const computed = (m.views ?? []).filter((v) => v.form === undefined).map((v) => v.id);
+  const other = (m.requires ?? []).filter((p) => !KERNEL_PACKS.includes(p));
+  return [
+    ...keys,
+    ...(looks.length ? [`looks (${looks.join(', ')})`] : []),
+    ...(computed.length ? [`views its code computes (${computed.join(', ')})`] : []),
+    ...(other.length ? [`requires ${other.join(', ')}`] : []),
+  ];
+}
+
+/** Why a pack may not be active on an island map, as sentences; none when it may. A map pack always may; an island pack keeps the island rules, and one that is also a map pack is told to split. */
 export function islandProblems(m: Manifest, shared: Shared): string[] {
   if (KERNEL_PACKS.includes(m.id)) return [];
+  const words = vocabulary(m, shared);
+  if (!words.length) return []; // a map pack: each part is judged by the gate it already has
   const problems: string[] = [];
-  const keys = Object.keys(m).filter((k) => !ISLAND_KEYS.includes(k));
-  if (keys.length) problems.push(`its file holds ${keys.join(', ')}: a pack holds only vocabulary, views and instructions`);
-  const looks = (m.styles ?? []).filter((s) => !PRESETS_KEPT.includes(s.type ?? 'style')).map((s) => s.id);
-  if (looks.length) problems.push(`styles holds looks (${looks.join(', ')}): of styles, a pack keeps only instructions and views`);
-  const computed = (m.views ?? []).filter((v) => v.form === undefined).map((v) => v.id);
-  if (computed.length) problems.push(`views holds reads its code computes (${computed.join(', ')}): a pack's views are drawn (a tree, a screen, attention, a lens)`);
-  const other = (m.requires ?? []).filter((p) => !KERNEL_PACKS.includes(p));
-  if (other.length) problems.push(`it requires ${other.join(', ')}: a pack builds on the shared set alone, never on another pack`);
+  const runs = running(m);
+  if (runs.length) problems.push(`it is both an island pack (${words.join('; ')}) and a map pack (${runs.join(', ')}): split it into an island pack, words only, and a map pack that owns no type on an island`);
   const p = parts(m);
   const added = Object.keys(p.adds);
   if (added.length) problems.push(`it adds fields to ${added.join(', ')}: a pack adds no fields to another pack's types`);
@@ -63,7 +119,8 @@ export function islandProblems(m: Manifest, shared: Shared): string[] {
 /** The packs found that an island map does not take, each with why. */
 export function islandsOff(found: Iterable<Manifest>, local: string): Map<string, string> {
   const all = [...found];
-  const shared = sharedOf(all.filter((m) => KERNEL_PACKS.includes(m.id)));
+  const kernel = sharedOf(all.filter((m) => KERNEL_PACKS.includes(m.id)));
+  const shared = { ...kernel, actors: actorsOf(all, kernel.actors) };
   const off = new Map<string, string>();
   for (const m of all) {
     if (m.id === local) continue;
