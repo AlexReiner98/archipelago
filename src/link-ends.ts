@@ -8,6 +8,9 @@ import type { ResolvedType } from './packs.ts';
 
 const HAS = 'has:';
 
+/** What a style's on names for every type made for a reader (a type's deliverable), whatever pack declares it. */
+export const DELIVERABLE = 'has:deliverable';
+
 /** The capability an end names, if it names one. */
 export const capabilityOf = (end: string): keyof Capabilities | undefined => (end.startsWith(HAS) ? (end.slice(HAS.length) as keyof Capabilities) : undefined);
 

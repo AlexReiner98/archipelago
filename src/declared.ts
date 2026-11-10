@@ -3,6 +3,7 @@
 // verbs are declared by the core pack the same way. Checked when the pack loads.
 
 import { REASONS } from './attention.ts';
+import { capabilityOf, DELIVERABLE, unknownEnd } from './link-ends.ts';
 import { parts } from './manifest.ts';
 import type { PackFile, ResolvedType } from './packs.ts';
 
@@ -364,7 +365,8 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
     if (style.type === 'instruction' ? typeof style.body !== 'string' || !style.body.trim() : style.body !== undefined) problems.push(`${at}: an instruction says its words in body, and only an instruction has one`);
     if (!own(style.id)) problems.push(`${at} must be named "${pack.id}.<name>"`);
     if (!style.title || !style.props || typeof style.props !== 'object') problems.push(`${at} needs a title and its props`);
-    for (const t of style.on ?? []) if (!types.has(t)) problems.push(`${at} is on unknown type "${t}"`);
+    // A style may be on a type, on a capability (has:<capability>), or on whatever is made for a reader (has:deliverable).
+    for (const t of style.on ?? []) { const why = t === DELIVERABLE ? undefined : capabilityOf(t) ? unknownEnd(t, () => false) : types.has(t) ? undefined : `unknown type "${t}"`; if (why) problems.push(`${at} is on ${why}`); }
     for (const key of Object.keys(style.props ?? {})) if (!styleFields[key] || styleFields[key].system || ['code', 'on'].includes(key)) problems.push(`${at}: "${key}" is not a field a preset sets`);
   }
   for (const d of pack.layouts ?? []) {

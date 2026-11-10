@@ -100,7 +100,8 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
     const drawn = (title: string) => `document.body.innerText.includes(${JSON.stringify(title)}) || [...document.querySelectorAll('svg text, svg title')].some((t) => t.textContent.includes(${JSON.stringify(title)}))`;
     assert.ok(await page.until(drawn('Which hashing library?'), 20000), `Home draws the agent's open work: ${page.logs().join('\n').slice(0, 600)}`);
     assert.ok(await page.until(drawn('Login form')), 'every open step');
-    assert.ok(await page.until(drawn('Undecided')), 'with why it needs attention, as a mark');
+    // Why it needs attention is its mark, never a word on it: the question nobody has settled waits on the person.
+    assert.ok(await page.until(`[...document.querySelectorAll('.lf-step.you')].some((s) => s.textContent.includes('Which hashing library?'))`), 'with why it needs attention, as a mark');
     assert.ok(!(await page.evaluate<boolean>(drawn('Nothing to draw'))), 'not an empty Home');
   } finally {
     await page.close();

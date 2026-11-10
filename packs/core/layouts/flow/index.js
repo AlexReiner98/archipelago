@@ -34,7 +34,7 @@ import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
 import { css as sessionCss, hueRules, litStates, sessionItems, sessionMarks, sessionOf, stateMark, STATES, STATE_WORDS } from './session.js';
 import { cut, longest } from './lines.js';
-import { css as reasonCss, reasonFlag, reasonLines } from './reasons.js';
+import { reasonLines } from './reasons.js';
 
 /** The link type the order's wires are, for their colour. */
 const ORDER_TYPE = 'depends_on';
@@ -371,8 +371,6 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
         : m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, fit(i.title, room, n.stub ? STUB_TEXT : TEXT)),
       // In a story, the word a step flags on it then, over its top right corner.
       story && !n.stub && m('text', { key: `f:${n.id}`, x: X + n.w / 2, y: Y - n.h / 2 - z('flag_lift'), class: 'lf-flag' }, ''),
-      // Else why it needs attention now, where the answer says (./reasons.js), flagged in the same place.
-      !story && !n.stub && reasonFlag(i) && m('text', { x: X + n.w / 2, y: Y - n.h / 2 - z('flag_lift'), class: reasonFlag(i).cls }, reasonFlag(i).word),
     ];
     const key = `s:${n.id}`;
     keyed.set(key, i.id);
@@ -448,7 +446,7 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
     size.width = width;
   }
   return {
-    scene: { css: [css, ...(parts ? [islandCss, ...isles.rules] : []), sessionCss, reasonCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
+    scene: { css: [css, ...(parts ? [islandCss, ...isles.rules] : []), sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: player?.end,
     on(event) {
       const { name, key } = event;

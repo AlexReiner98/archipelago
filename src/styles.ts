@@ -22,6 +22,7 @@ import { layoutFor } from './layouts.ts';
 import { keptOf, type Kept } from './query-kept.ts';
 import { asOf } from './rebuild.ts';
 import type { Archipelago } from './pelago.ts';
+import { capabilityOf, DELIVERABLE, holds } from './link-ends.ts';
 
 export interface Preset extends StyleDef {
   pack: string;
@@ -84,7 +85,10 @@ export async function styleFor(l: Archipelago, kept: Kept[], ask: StyleAsk, give
     for (const [key, value] of Object.entries(top)) out[key] = key === 'theme' ? mergeTheme(out[key], value) : named(value) && named(out[key]) ? { ...out[key], ...value } : value;
     return out;
   };
-  const onIt = (on: string[]) => ask.hub !== undefined && on.some((t) => l.registry.isA(ask.hub!.type, t));
+  // A style is on a type and its flavours, or on what a type says of itself: has:<capability>, or has:deliverable for
+  // whatever is made for a reader, from any pack (core's reading look: the owner, 10 Nov 2026, e_nvhjsf3r).
+  const hubType = ask.hub && l.registry.type(ask.hub.type);
+  const onIt = (on: string[]) => ask.hub !== undefined && on.some((t) => (t === DELIVERABLE ? Boolean(hubType?.deliverable) : capabilityOf(t) ? holds(t, hubType) : l.registry.isA(ask.hub!.type, t)));
   const layers: { weight: number; id: string; title: string; preset?: string; props: Record<string, unknown> }[] = [];
   for (const p of presets) {
     const mine = versions.find((v) => v.props.preset === p.id);
