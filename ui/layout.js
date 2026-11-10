@@ -5,7 +5,8 @@
 // each drawing's code is sent once and kept by its hash. A drawing whose scene asks for a surface has the frames it
 // paints in its worker shown on a canvas laid over its picture (surface.js).
 
-import { frameSandbox, h } from './base.js';
+import { frameSandbox, h, state } from './base.js';
+import { drawingAsked } from './layout-asks.js';
 import { HELD } from './ghosts.js';
 import { tipOf } from './layout-tip.js';
 import { answered } from './tip.js';
@@ -163,10 +164,11 @@ export function drawWith(host, answer, style, keep) {
   const send = (event) => !ended && port.postMessage({ type: 'event', event });
   // Every event is told as it is. A click on a mark keyed for a held change (`held:<proposal>…`, ui/ghosts.js) also asks the page to put that change to
   // the person, where it is drawn (`drawing-held` on the host): the drawing only says where; the page says what it is.
-  const tell = (key, name, ev) => {
+  // A drop says which mark it came from (`from`, ui/marks-grab.js).
+  const tell = (key, name, ev, from) => {
     const held = name === 'click' && HELD.exec(key);
     if (held) host.dispatchEvent(new CustomEvent('drawing-held', { bubbles: true, detail: { proposal: held[1] } }));
-    send({ key, name });
+    send({ key, name, ...(from !== undefined && { from: String(from) }) });
   };
   const run = (now) => step(moving, now) && requestAnimationFrame(run);
   // What a drawing patches: its marks, and its tip (layout-tip.js), whose marks are checked as every mark is.
@@ -224,6 +226,9 @@ export function drawWith(host, answer, style, keep) {
       else if (said.type === 'surface?') surface ? surface.give() : port.postMessage({ type: 'surface', none: true });
       else if (said.type === 'surface-frame') surface?.paint(said.image);
       else if (said.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) location.hash = `#/e/${said.id}`;
+      // A change it asks for is put to the person, and sent as theirs (ui/layout-asks.js); what came of it goes back.
+      // What it made is not yet in the answer the canvas keeps, which follows only what it holds: the lens is read again.
+      else if (said.type === 'change') drawingAsked(said).then((came) => (Object.keys(came.created ?? {}).length && host.dispatchEvent(new CustomEvent('lens-read', { bubbles: true })), !ended && port.postMessage({ type: 'changed', asked: said.asked, ...came })));
       else if (said.type === 'error') failed(said.message);
     } catch (err) {
       end();
@@ -236,7 +241,8 @@ export function drawWith(host, answer, style, keep) {
   const types = Object.fromEntries([...new Set((shown.items ?? []).flatMap((i) => [i.type, i.root]).filter(Boolean))].map((t) => [t, typeTitle(t)]));
   // A picture that is panned is laid out for its pane with the sheet shut, so the sheet opening never changes its shape; one drawn to the page's width takes the room there is.
   const across = drawing?.flat ? host.clientWidth : host.clientWidth / (1 - sheetAside());
-  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: across, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches };
+  // What the session may do (ui/base.js may): a drawing that opts into gestures draws no handle where it may not write.
+  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: across, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches, may: [...(state.may ?? [])] };
   const seen = `${drawing.hash}
 ${JSON.stringify(input)}`;
   const kept = scenes.get(seen);

@@ -78,7 +78,7 @@ test('the setup shows what it will change and waits for a yes, keeps a copy of w
   const renewed = await setup();
   assert.equal(renewed.code, 0, renewed.out);
   assert.match(renewed.out, /not done {3}\.mcp\.json {2}\(it needs a yes\)[\s\S]*written {4}\.claude\/pelago\.md[\s\S]*Some of it was left/);
-  assert.match(file('.claude/pelago.md'), /query` with name `handoff`/);
+  assert.match(file('.claude/pelago.md'), /query` with name `brief`/);
   assert.equal(file('.mcp.json'), theirs['.mcp.json']);
   assert.equal((await setup(['--yes'])).code, 0);
   assert.ok(JSON.parse(file('.mcp.json')).mcpServers.pelago);
@@ -184,11 +184,13 @@ test('the hook script takes a Claude Code hook to whichever server the machine i
   assert.equal(lenient(z.number().optional()).parse(undefined), undefined);
   assert.throws(() => lenient(z.boolean()).parse('maybe'));
 
-  // Refused or unreachable, it says so and still lets the session go on.
-  const refused = await hook('prompt', { session_id: 'desk-1' }, {});
-  assert.deepEqual([refused.code, refused.out, /answered 401/.test(refused.err)], [0, '', true]);
-  const away = await hook('prompt', { session_id: 'desk-1' }, { PELAGO_URL: 'http://127.0.0.1:9' });
-  assert.deepEqual([away.code, away.out, /did not answer/.test(away.err)], [0, '', true]);
+  // Refused or unreachable, it says so in the session (once each) and still lets the session go on.
+  const once = `desk-said-${process.pid}-${Date.now()}`;
+  const refused = await hook('prompt', { session_id: once }, {});
+  assert.deepEqual([refused.code, /answered 401: this machine has no token/.test(JSON.parse(refused.out).systemMessage)], [0, true]);
+  assert.equal((await hook('prompt', { session_id: once }, {})).out, '', 'said once a session');
+  const away = await hook('prompt', { session_id: once }, { PELAGO_URL: 'http://127.0.0.1:9' });
+  assert.deepEqual([away.code, /did not answer/.test(JSON.parse(away.out).systemMessage)], [0, true]);
 });
 
 test('beyond this machine the server needs tokens, and answers only to the names it is given', async () => {

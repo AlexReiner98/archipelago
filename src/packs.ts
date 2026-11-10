@@ -409,9 +409,12 @@ export class Registry {
     if (!rel || (rel.dormant && taken)) return `unknown relation "${relId}"${taken}. Known relations: ${[...this.relations.keys()].join(', ')}`;
     if (rel.retired) return `"${relId}" is retired here: no new link is made of it`;
     const fits = (allowed: string[], type: string) => allowed.some((a) => a === '*' || this.isA(type, a));
-    if (!fits(rel.from, fromType)) return `"${relId}" must start from ${rel.from.join(' or ')}, not ${fromType}`;
-    if (!fits(rel.to, toType)) return `"${relId}" must point to ${rel.to.join(' or ')}, not ${toType}`;
-    return undefined;
+    if (fits(rel.from, fromType) && fits(rel.to, toType)) return undefined;
+    // What does join these two, so the refusal says what to use instead.
+    const instead = [...this.relations.values()].filter((r) => !r.dormant && !r.retired && fits(r.from, fromType) && fits(r.to, toType)).map((r) => r.id);
+    const use = instead.length ? `; from ${fromType} to ${toType}, use ${instead.slice(0, 6).join(', ')}` : '';
+    if (!fits(rel.from, fromType)) return `"${relId}" must start from ${rel.from.join(' or ')}, not ${fromType}${use}`;
+    return `"${relId}" must point to ${rel.to.join(' or ')}, not ${toType}${use}`;
   }
 
   /** Problems with a proposed new type. Empty means it can be defined. */

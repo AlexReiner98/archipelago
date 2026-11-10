@@ -31,6 +31,8 @@ export interface HookBody {
   title?: unknown;
   /** At the start: why Claude Code started it (startup, resume, clear, compact). */
   source?: unknown;
+  /** At a prompt: what was typed, as Claude Code passes it (src/frontier-prompt.ts narrows the session's start by the first). */
+  prompt?: unknown;
   /** At a turn's end: what the reply did since the owner's last message (src/reply-rules.ts), and that message's id. */
   reply?: unknown;
   turn?: unknown;
@@ -78,7 +80,7 @@ const actionsKey = (session: string | undefined) => `actions:${session ?? ''}`;
 const restarted = ({ started, commit }: HookCall['running'], added: string[] | undefined) =>
   `The Archipelago server has restarted since this session began (at ${started}${commit ? `, now running commit ${commit.slice(0, 7)}` : ''}). ${
     added?.length ? `Actions new since you were given the tools: ${added.join('; ')}. ` : added ? 'No action is new since you were given the tools. ' : ''
-  }A pelago tool's description you read before the restart may be the old one: call an action by name under its verb even if that description lacks it (query with name actions gives its inputs), or load the tool again (ToolSearch, select:mcp__pelago__<verb>) for the new one. If a pelago tool is missing altogether or answers that it is not connected, the client gave up reconnecting: ask the owner to reconnect it (in Claude Code: /mcp, pelago, Reconnect), and until then call it as plain JSON: POST /agent/<tool> on the same server with the same token. And if a pelago tool answers with a web page or "502" while the server is coming back, do not send it again through MCP (each such answer is a whole page in your context): wait until GET /health answers, then send it as plain JSON.`;
+  }A pelago tool's description you read before the restart may be the old one: call an action by name under its verb even if that description lacks it (query with name actions gives its inputs), or load the tool again (ToolSearch for the verb: mcp__pelago__<verb>, or mcp__plugin_archipelago_pelago__<verb> where the plugin connected it) for the new one. If a pelago tool is missing altogether or answers that it is not connected, the client gave up reconnecting: ask the owner to reconnect it (in Claude Code: /mcp, pelago, Reconnect), and until then call it as plain JSON: POST /agent/<tool> on the same server with the same token. And if a pelago tool answers with a web page or "502" while the server is coming back, do not send it again through MCP (each such answer is a whole page in your context): wait until GET /health answers, then send it as plain JSON.`;
 
 /** The answer to one hook, or undefined for an event there is none for. */
 export async function answerHook(event: string, call: HookCall): Promise<object | undefined> {
@@ -135,6 +137,16 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
     const looking = await seeingLine(pelago, whole, asking?.id).catch(() => undefined);
     if (looking) told.push(looking);
     if (changes.length) told.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${tally}${describeChanges(newest)}`);
+    // The first thing the owner asks a session narrows where it stands: what the map has settled on it (src/frontier-prompt.ts).
+    const asked = (await import('./frontier-prompt.ts')).askedBy(body.prompt);
+    const narrowKey = `narrowed:${body.session_id ?? ''}`;
+    if (asked && body.session_id && !(await kept(whole, narrowKey))) {
+      await keep(whole, narrowKey, true, HEARD_MS);
+      const { narrowed, narrowedText } = await import('./frontier-prompt.ts');
+      const found = await narrowed(pelago, asked).catch((err) => console.error(`hook narrow: ${(err as Error).message}`));
+      const on = found ? narrowedText(found) : undefined;
+      if (on) told.push(on);
+    }
     return told.length ? { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: told.join('\n\n') } } : {};
   }
   if (event === 'session-start') {

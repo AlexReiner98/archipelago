@@ -15,7 +15,7 @@ import type { Archipelago } from './pelago.ts';
 import { checkedAfter, holding, wordConditions, type Narrowing, type Word } from './query-only.ts';
 import { heldIds } from './query-held.ts';
 import { movedIds } from './moved.ts';
-import { endsOf, readTerm, sayTerm, setOf, type Term } from './query-terms.ts';
+import { endsOf, frontierOf, readTerm, sayTerm, setOf, workedBy, type Term } from './query-terms.ts';
 import { rankSql, searchIds, slipsOf } from './search.ts';
 import { markOf, sessionStates } from './session-state.ts';
 import { fileOnAxis } from './timelanes.ts';
@@ -176,16 +176,22 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   };
   const holds = async (found: string[]) => unless(checked ? await holding(l, words, found) : found, notChecked);
 
+  // Why each item the frontier finds needs attention (src/frontier.ts), read once, when a term asks for it.
+  let frontierRead: ReturnType<typeof frontierOf> | undefined;
+  const reasons = () => (frontierRead ??= frontierOf(l));
   // Not takes away what it says of an item named by id (e_ndcxf2bv); what nobody said, the default, hides nothing named.
   const saidNot = (input.filter as { not?: unknown } | undefined)?.not !== undefined;
   /** The items one term of Find finds, narrowed: every read bounded by the term's end, the type index or `most`. */
   const seedOf = async (term: Term, most: number): Promise<string[]> => {
     if (term.sort === 'id') return hidden ? [] : holds((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${[saidNot ? keep(2) : 'e.archived_at is null', ...numbered(terms, saidNot ? 2 + leftOut.length : 2)].join(' and ')}`, [[term.id], ...(saidNot ? leftOut : []), ...narrowing])).rows.map((r) => r.id));
     if (term.sort === 'type') return holds(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [l.registry.family(term.type), most]));
+    // The frontier in its own order, the strongest reason first; what a session worked on, the newest first.
+    if (term.sort === 'frontier') return holds(await seed((k) => `select e.id from entity e where e.id = any($1::text[]) and ${k} order by array_position($1::text[], e.id) limit $2`, [[...(await reasons()).keys()], most]));
     if (term.sort === 'held' || term.sort === 'moved') return holds(await seed((k) => `select e.id from entity e where e.id = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [term.sort === 'held' ? await heldIds(l) : await movedIds(l), most]));
-    if (term.sort !== 'link' && term.sort !== 'related' && term.sort !== 'in' && term.sort !== 'island') return [];
+    if (term.sort !== 'link' && term.sort !== 'related' && term.sort !== 'in' && term.sort !== 'island' && term.sort !== 'worked') return [];
     const at = await endsOf(l, term, me);
     if (!at.length) return [];
+    if (term.sort === 'worked') return holds(await seed((k) => `select e.id from entity e where e.id = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [await workedBy(l, at), most]));
     if (term.sort === 'island') return holds(await seed((k) => `select e.id from entity e where ${onIslands('$1')} and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
     if (term.sort === 'in') return holds(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
     if (term.sort === 'related') return holds(await seed((k) => `select e.id from relation r join entity e on e.id = case when r.from_id = any($1::text[]) then r.to_id else r.from_id end where (r.from_id = any($1::text[]) or r.to_id = any($1::text[])) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
@@ -220,7 +226,8 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   // The seeds, each narrowed: ids first, then what a link term finds, what is related, what is in an item, what the
   // text finds, the newest of each type named.
   for (const t of finds) if (t.sort === 'id') add(await seedOf(t, 1), 'id', [t]);
-  for (const t of finds) if (t.sort === 'held' || t.sort === 'moved') add(await seedOf(t, reach()), 'id', [t]);
+  for (const t of finds) if (t.sort === 'held' || t.sort === 'moved' || t.sort === 'frontier') add(await seedOf(t, reach()), 'id', [t]);
+  for (const t of finds) if (t.sort === 'worked' && room() > 0) add(await seedOf(t, reach()), 'link', [t]);
   for (const t of finds) if ((t.sort === 'link' || t.sort === 'related') && room() > 0) add(await seedOf(t, reach()), 'link', [t]);
   // What is in an item, at any depth, read from the part_of closure (decision e_tvsdqjeq), the newest first; in an item
   // the viewer cannot see, nothing is.
@@ -302,6 +309,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
   // What each island stands by: its published findings, a few, drawn on its shore (task e_p27ddjqt).
   const shore = new Map(await Promise.all(islandIds.map(async (id) => [id, (await islandFindings(l, id, SHORE_MOST, 0)).published] as const)));
   const named = new Map(isles.map((r) => [r.id, r.title])), packOf = new Map(isles.map((r) => [r.id, r.pack ? islandPack(l.registry, r.pack, usedOn(r.id)) : undefined]));
+  const why = frontierRead && (await frontierRead);
   // An end said by name goes back in the lens as its id.
   lens.find = finds.map(sayTerm);
   lens.only = onlys.map(sayTerm);
@@ -323,6 +331,8 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
         // Where it stands in its course (src/phases.ts), so every drawing reads one phase and keeps no registry.
         visibility: e.visibility, status: e.status, ...(type?.statuses.phases?.[e.status] && { phase: type.statuses.phases[e.status] }), open: e.is_open, owner: e.owner,
         ...(states.has(e.id) && { session: markOf(states.get(e.id)!) }),
+        // Found by the frontier: why it needs attention now, the strongest first, each a word and its few words.
+        ...(why?.has(e.id) && { reasons: why.get(e.id) }),
         created_at: e.created_at, updated_at: e.updated_at,
         ...(Object.keys(fields).length && { fields }),
         ...(islandOf(e) && { island: islandOf(e) }),

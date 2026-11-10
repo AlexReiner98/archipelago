@@ -4,7 +4,7 @@
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
 import { authorizePage } from './authorize.js';
-import { SignInNeeded, h, hooks, join, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
+import { SignInNeeded, api, h, hooks, join, link, loadMay, may, main, openLink, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { mayLeave, newItem, unsaved } from './draft.js';
 import { drawFind } from './find.js';
@@ -46,7 +46,14 @@ async function route(pulse = false) {
   if (name === 'graph') return void (location.hash = arg ? `#/v?from=${arg}` : `#/v?${query}`);
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/');
   try {
+    // A frozen link: its reader token first, and the view it shows when the address names nothing else.
+    if (link && !link.token) await openLink(), startOwn();
+    if (link && (name === '' || name === 'home')) return void location.replace(`#/v?canvas=${link.of}`);
     if (!state.schema) await loadSchema();
+    // What this session may do, before anything is drawn: each control is drawn only where it may (ui/base.js may).
+    await loadMay();
+    // A guest (signed in to read what was shared with them) has no map of their own either: shown the same way to one.
+    if (!link && !may('write')) startOwn();
   } catch (err) {
     document.body.dataset.sheet = 'open';
     if (err instanceof SignInNeeded) return signIn(store.token ? 'Your sign-in has run out. Sign in again.' : '');
@@ -108,3 +115,19 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 route();
+
+/**
+ * Someone reading what was shared with them is shown a way to start a map of their own, loud, in the bar: a link's
+ * reader beside the emblem, with Sign in for one who has a map already; a guest (signed in already) by the menu. The
+ * words the style gives (start, core's house style), to where this server says a person with no account begins.
+ */
+async function startOwn() {
+  if (document.querySelector('#nav .start-own')) return;
+  const words = (await api('view', { name: 'style' }).catch(() => null))?.style?.start;
+  if (typeof words !== 'string' || !words) return;
+  // The one thing the page asks of a stranger, loud; and for one who has a map already, a way back in to it.
+  const a = h('a', { class: 'start-own', href: '/', title: 'Make a map of your own, for your own work and agents' }, words);
+  if (link) document.querySelector('#nav .brand')?.after(h('a', { class: 'sign-in', href: '/', title: 'Open the map you have' }, 'Sign in'), a);
+  else document.getElementById('more')?.before(a);
+  fetch('/connect/start').then((r) => (r.ok ? r.json() : null)).then((r) => r?.url && a.setAttribute('href', r.url), () => null);
+}

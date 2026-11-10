@@ -4,6 +4,7 @@
 
 import { SignInNeeded, authHeaders, call, h } from './base.js';
 import { drawFrozen } from './doc-lens.js';
+import { openItem } from './doc-sheet.js';
 import { carried } from './doc-ref.js';
 import { warmLayouts } from './layout.js';
 import { sayLook } from './look.js';
@@ -28,6 +29,13 @@ const post = (at, input) =>
     throw err instanceof SignInNeeded ? new Error('Sign in to Archipelago in this browser first, then open this again.') : err;
   });
 const api = (tool, input) => post(`/api/${tool}`, input);
+/** One item a link shows, read through the link (src/share-view.ts, sharedItem). */
+const readItem = (id) =>
+  fetch(`${here}/data?item=${id}`).then(async (res) => {
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error ?? 'This item cannot be opened here.');
+    return body;
+  });
 /** A section's figure: from the link's own address, or fetched with the reader's sign-in. */
 const figureSrc = (id) => (own || preview ? '' : `${here}/picture/${id}`);
 
@@ -156,12 +164,22 @@ function invoiceHead(d) {
 }
 
 
+/** Whether a page ends with a way to start a map of one's own: read with no login, and the style gives it words. */
+const startsOwn = (d) => !own && !preview && !d.site?.host && typeof d.start === 'string' && Boolean(d.start);
+/** That way: where this server says a person with no account begins (src/connect.ts), else its front page. */
+function startLink(words) {
+  const link = h('a', { class: 'start-own', href: '/' }, words);
+  fetch('/connect/start').then((res) => (res.ok ? res.json() : null)).then((r) => r?.url && link.setAttribute('href', r.url), () => null);
+  return link;
+}
+
 /** The address word of a site's front page (src/site.ts). */
 const FRONT = 'home';
 // A link followed takes where the reader came from with it (?ref=), set as it is followed so every link drawn has it.
 const carry = (e) => {
+  // A page's own links only: a part of a drawing is an SVG link, whose address is not a string to rewrite.
   const link = e.target.closest?.('a[href]');
-  if (link) link.href = carried(link.href, location.href, document.referrer);
+  if (link instanceof HTMLAnchorElement) link.href = carried(link.href, location.href, document.referrer);
 };
 addEventListener('click', carry, true);
 addEventListener('auxclick', carry, true);
@@ -191,12 +209,14 @@ function draw(d) {
   // A page is one column (ui/doc-lens.css). Only a front page whose first section is a figure leaves it: that figure runs from edge to edge, with no title over it (its title is its words).
   const hero = d.parts.find((p) => p.section)?.section;
   const lead = d.path === FRONT && hero?.picture && !d.lenses?.[hero.id] ? hero.id : null;
+  // A page that is one item alone (a view or an item given as a link) has its title once, over the page.
+  const alone = d.parts.length === 1 && hero?.title === d.title ? hero.id : null;
   const part = (p) =>
     p.section
       ? h(
           'section',
           { id: p.section.id, ...(p.section.id === lead && { class: 'lead' }) },
-          p.section.id !== lead && h('h2', {}, p.section.title),
+          p.section.id !== lead && p.section.id !== alone && h('h2', {}, p.section.title),
           // A lens is its picture, drawn from what was frozen when it was published (or, for a draft read with a sign-in, now); otherwise a section shows its figure.
           d.lenses?.[p.section.id]
             ? h('div', { class: 'doc-lens', 'data-lens': p.section.id })
@@ -231,13 +251,16 @@ function draw(d) {
     parts(),
     // A site's pages each end with what its footer page says (src/site.ts).
     d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, titles, 3)),
-    // A published page is read on the web: only a link's or an invoice's has a way to print it.
-    !published && !d.site && h('footer', { class: 'muted' }, h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF')),
+    // A published page is read on the web: only a link's or an invoice's has a way to print it. One read with no login
+    // (a link's, a published one's, not one on its site's own domain) ends with a quiet way to start a map of one's own, in the style's words.
+    ((!published && !d.site) || startsOwn(d)) && h('footer', { class: 'muted' }, !published && !d.site && h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF'), startsOwn(d) && startLink(d.start)),
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
   document.body.classList.toggle('invoice', d.head === 'invoice');
   // Its pictures, with the text: a drawing's first frame is kept with the picture, and the drawing takes it over once started.
-  for (const el of main.querySelectorAll('[data-lens]')) drawFrozen(el, d.lenses[el.dataset.lens], d.types);
+  // On a link's page, a part of a view opens its page, read only, in a sheet (ui/doc-sheet.js), read through the link.
+  const onItem = here.startsWith('/s/') ? (id) => openItem(id, readItem, (text) => blocks(text, titles, 3)) : null;
+  for (const el of main.querySelectorAll('[data-lens]')) drawFrozen(el, d.lenses[el.dataset.lens], d.types, { onItem });
   // Read with the reader's sign-in, a figure is fetched the same way.
   if (own || preview) for (const img of main.querySelectorAll('img[data-figure]')) (img.dataset.via ? api('share_figure', { via: img.dataset.via, id: img.dataset.figure }) : api('picture', { result: img.dataset.figure })).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
 }

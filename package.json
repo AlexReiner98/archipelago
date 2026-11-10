@@ -20,6 +20,7 @@
     "demo": "node scripts/demo.ts",
     "demo:approvals": "node scripts/demo-approvals.ts",
     "pelago": "node src/cli.ts",
+    "plugin": "node scripts/plugin.ts",
     "test": "node scripts/test.ts",
     "test:full": "node scripts/test.ts full",
     "test:changed": "node scripts/test.ts changed",

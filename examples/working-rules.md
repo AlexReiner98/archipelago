@@ -14,14 +14,13 @@ actions; `query` with name `actions` gives their inputs whole.
 ## At the start
 
 1. Handed a task, `query` with name `brief` and params `task`: it holds what that
-   task needs. Otherwise, where the map has the software pack,
-   `query` with name `handoff` and params `repo` (the id the session hook gave):
-   one answer holds the last push, what has happened lately, what sessions left unpushed (`left`), what
-   nobody has seen working (`unseen`), the traps in the repository's files
-   (`traps`), and the open work. Without it, `query` with name `attention` for what
-   waits, and `story` for what has happened lately. If the handoff has `for_owner` with questions settled on an
-   agent's own judgment, show the owner those in your first reply and ask
-   them to confirm or correct; record their answer with `settle`, action `confirmed`.
+   task needs. Otherwise the session start says where things stand: `query`
+   with name `frontier` reads it again (the open items the sessions before you
+   here worked on, each with why it needs attention now); `query` with no name
+   lists the views this map has, and `search` with `open: true` finds the open work. If the session start puts
+   questions settled on an agent's own judgment to the owner, show them in your
+   first reply and ask the owner to confirm or correct; record their answer
+   with `settle`, action `confirmed`.
    If the session opened with no word from Archipelago, the
    hooks did not run here (the setup was run in another folder): call
    `capture` with action `session_start`, params `cwd` and the repository's `remote` yourself, and
@@ -41,13 +40,10 @@ actions; `query` with name `actions` gives their inputs whole.
 <!-- working_rules: the setup puts the instruction presets said here, one bullet each -->
 - **Give a hub its views.** An item that holds a lot is the hub of its
   problem, and the owner reads it through its views: each a `lens` item
-  linked `about` it, named for the question it answers (`place` for its
-  order; `kinds`, `far`, `over` for what is in it; `controls` for what the
-  owner may change on the page). A lens whose `from` is another item is a
-  shortcut to there. Give a project its views when you make it, if the owner
-  says what they want to see; the session start and `query` `hubs` name the
-  hubs that have none. While a project is still being shaped, set its
-  `hub_at` to 1: nearly everything in it is then a hub.
+  linked `about` it, named for the question it answers, holding its query
+  (`filter`, `walk`, `limit`) and how it is drawn (`style`). Give a hub
+  its views when you make it, if the owner says what they want to see; the
+  session start and `query` `hubs` name the hubs that have none.
 - **If a pelago tool answers with a web page or "502",** the server is
   restarting. Do not send the call again through MCP: each such answer is a
   whole page in your context. Wait until `GET /health` on the server answers,
@@ -59,11 +55,9 @@ actions; `query` with name `actions` gives their inputs whole.
 ## Before you finish
 
 1. What you built and nobody has seen working: say so on the item
-   (`seen_working` false, and in `to_see` what would show it). What bit you
-   and nothing can fix: an `instruction` linked `about` the repository, its
-   title the trap, its note the way round it, `for` the files it bites in
-   (`file:<glob>`); what can be fixed is an issue. Nothing else is written
-   down for the next session: what is left unpushed is read off the checkout.
+   (`seen_working` false, and in `to_see` what would show it). Nothing else is
+   written down for the next session: what is left unpushed is read off the
+   checkout.
 2. `report` with action `session_end` and a summary. It lists what is still open here that nobody
    changed: change each, name it in `still_true` if you checked it, or in
    `cannot_tell` if you had nothing to do with it (`cannot_tell_rest: true`

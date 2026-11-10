@@ -3,7 +3,29 @@
 
 import { applyTheme } from './theme.js';
 
-export const state = { workspace: undefined, schema: undefined, stamp: undefined, pos: undefined, seq: undefined, dirty: false, selfDrawn: false, trying: null };
+export const state = { workspace: undefined, schema: undefined, may: undefined, stamp: undefined, pos: undefined, seq: undefined, dirty: false, selfDrawn: false, trying: null };
+
+/**
+ * Whether this session may do something (/whoami `may`, held on `state.may` once a sign-in): 'write' changes the map,
+ * 'admin' the workspace. A control that does it is drawn only where it may; not yet known, nothing is allowed.
+ */
+export const may = (what) => state.may?.includes(what) === true;
+/** What this session may do, asked of the server once a sign-in (the page's route waits for it before drawing). */
+export const loadMay = async () => (state.may ??= link ? ['read'] : (await whoami())?.may ?? ['read']);
+
+/**
+ * A frozen link opened at /s/<workspace>/<secret> (decision e_qpaqnmrc, axis B): the page reads as a short reader token
+ * its secret is traded for, held in memory only and traded again when it runs out. Null on any other address.
+ */
+const linked = /^\/s\/([^/]+)\/([^/]+?)\/?$/.exec(location.pathname);
+export const link = linked ? { ws: linked[1], secret: linked[2], token: '', of: '', reads: null, views: null } : null;
+if (link) document.documentElement.dataset.reader = 'link';
+export async function openLink() {
+  const res = await postJson(`/s/${link.ws}/${link.secret}/token`, {});
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error);
+  return Object.assign(link, { token: body.token, of: body.of, reads: body.reads ?? null, views: body.views ?? null });
+}
 export const hooks = {};
 export const route = (pulse) => hooks.route(pulse);
 
@@ -113,12 +135,18 @@ export const store = {
     }
   },
 };
-export const authHeaders = () => (store.token ? { authorization: `Bearer ${store.token}` } : {});
+export const authHeaders = () => (link ? { authorization: `Bearer ${link.token}` } : store.token ? { authorization: `Bearer ${store.token}` } : {});
 
+// A dev server lets a page try a narrower session than its sign-in (?may=read in the page's address, before the #): the
+// server answers only that much, and the page draws as such a session would. Elsewhere the server ignores it.
+const trying = () => {
+  const narrow = new URLSearchParams(location.search).get('may');
+  return narrow ? `?may=${encodeURIComponent(narrow)}` : '';
+};
 /** Who this page is signed in as (/whoami), asked once a sign-in: its answer, or null where it is refused; a failure to reach the server rejects. */
 let asked;
 export const whoami = () =>
-  (asked ??= fetch('/whoami', { headers: authHeaders() }).then(
+  (asked ??= fetch(`/whoami${trying()}`, { headers: authHeaders() }).then(
     (r) => (r.ok ? r.json() : null),
     (err) => {
       asked = undefined;
@@ -173,7 +201,7 @@ export function waitingOnSignIn() {
 /** Become whoever a token says, starting from Home: nothing on the page belongs to the new workspace. */
 export function enter(token) {
   store.token = token;
-  state.schema = undefined;
+  state.schema = state.may = undefined;
   // Where the page stood in the log was the other workspace's.
   state.stamp = state.pos = state.seq = undefined;
   // A sign-in opens on Home, as the app does: a new workspace's first steps are there.
@@ -194,7 +222,17 @@ export async function call(path, input, headers) {
   if (!res.ok) throw new Error(body.error);
   return body.result;
 }
-export const api = (tool, input = {}) => call(`/api/${tool}`, input, authHeaders());
+/** What a link's reader may not ask, as its token said: refused here, quietly, rather than sent to be refused. */
+const notForLink = (tool, input) => Boolean(link?.reads) && (!link.reads.includes(tool) || (tool === 'view' && Boolean(link.views) && !link.views.includes(input?.name)));
+export const api = (tool, input = {}) =>
+  notForLink(tool, input)
+    ? Promise.reject(new Error(`A link only reads what it shows: not ${tool === 'view' ? `the view ${input?.name}` : tool}.`))
+    : call(`/api/${tool}`, input, authHeaders()).catch(async (err) => {
+    // A link's reader token has run out: trade the secret again, once.
+    if (!link || !(err instanceof SignInNeeded)) throw err;
+    await openLink();
+    return call(`/api/${tool}`, input, authHeaders());
+  });
 
 // Signed out, the style is not read with the rest: its colours are asked for on their own.
 const themeSignedOut = () => fetch('/connect/theme').then((r) => r.json()).then(applyTheme, () => undefined);
@@ -350,7 +388,7 @@ export async function showIdentity() {
     const signedOut = () => {
       known.forget(me.workspace.id);
       store.token = '';
-      state.schema = undefined;
+      state.schema = state.may = undefined;
       route();
     };
     const who = /@/.test(me.actor.name) ? me.actor.name : '';

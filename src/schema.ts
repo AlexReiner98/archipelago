@@ -464,5 +464,31 @@ create policy member_setting_read on setting for select to pelago_member
   using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish'));
 `;
 
+/**
+ * Step 35 (src/migrate.ts): whether an item the reader may not see is there at all, and nothing more about it: so a get
+ * of a private item says it is hidden, not that the id is wrong. Its title, type and who it is private to stay unread.
+ */
+export const ITEM_HIDDEN = `
+create or replace function pelago_item_hidden(item text) returns boolean
+language sql stable security definer set search_path = public as $fn$
+  select exists (select 1 from entity where id = item and archived_at is null)
+$fn$;
+grant execute on function pelago_item_hidden(text) to pelago_member;
+`;
+
 /** Step 16 (src/migrate.ts): a held change keeps the rule that held it (src/rules.ts, decide). */
 export const HELD_BY = `alter table proposal add column if not exists held_by jsonb;`;
+
+/**
+ * Step 36 (src/migrate.ts): a link keeps the view it shows, frozen when it was made (src/share-link.ts), and a reader
+ * token reads that and nothing else, while the token is good and the link stands.
+ */
+export const LINK_SNAPSHOT = `
+alter table share add column if not exists snapshot jsonb;
+create or replace function pelago_link_read(reader_hash text) returns jsonb
+language sql stable security definer set search_path = public as $fn$
+  select s.snapshot from transient t join share s on s.id = t.value ->> 'share'
+  where t.key = 'linkreader:' || reader_hash and t.until >= now() and s.revoked_at is null and s.snapshot is not null
+$fn$;
+grant execute on function pelago_link_read(text) to pelago_public;
+`;

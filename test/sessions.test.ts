@@ -222,14 +222,14 @@ test('the session-start hook registers the session and names its repository and 
 
   const other = await sessionStart(l, agent, { title: 'Lane holder' });
   await l.claim(agent, { resource: made.lane, holder: other.run, reason: 'busy' });
-  assert.match(await hookSessionStart(l, { session_id: 'def', cwd: 'C:\\elsewhere' }), /does not know a repository.*HELD by Lane holder: do not use it/s);
+  assert.match(await hookSessionStart(l, { session_id: 'def', cwd: 'C:\\elsewhere' }), /does not know a (?:repository|checkout).*HELD by Lane holder: do not use it/s);
 
   // On another machine the folder is somewhere else: the repository is known by the address it was cloned from, however that is written.
   await make(l, [{ op: 'update', id: repoId!, props: { remote: 'https://github.com/Acme/Apex' } }]);
   const far = await hookSessionStart(l, { session_id: 'far', cwd: '/home/someone/work/apex', remote: 'git@github.com:acme/apex.git' });
   assert.match(far, new RegExp(`Repository: Apex repo \\(${repoId}\\)`));
   assert.equal(((await VIEWS.sessions.run(l, {})) as any).open.find((r: any) => r.cwd === '/home/someone/work/apex').repo.id, repoId);
-  assert.match(await hookSessionStart(l, { session_id: 'stranger', cwd: '/tmp/x', remote: 'https://github.com/acme/other' }), /does not know a repository for this folder \(a checkout of https:\/\/github\.com\/acme\/other\)/);
+  assert.match(await hookSessionStart(l, { session_id: 'stranger', cwd: '/tmp/x', remote: 'https://github.com/acme/other' }), /does not know a (?:repository|checkout) for this folder \(a checkout of https:\/\/github\.com\/acme\/other\)/);
   for (const id of ['far', 'stranger']) await hookSessionEnd(l, { session_id: id });
 
   await hookSessionEnd(l, { session_id: 'abc', reason: 'logout' });

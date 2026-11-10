@@ -17,7 +17,18 @@ import { databaseFor, dropDatabaseFor } from './pg.ts';
 import { dueForDeletion, setEnded } from './ended.ts';
 import { Archipelago, type Policy } from './pelago.ts';
 import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
+import type { Q } from './db.ts';
 import { beginApplying } from './rules.ts';
+
+/**
+ * A new workspace makes things shared unless they say otherwise (the owner, 9 Nov 2026): with one person in it that
+ * hides nothing from anyone, a team sees one map, and a link shows what it is made for. The owner changes it in
+ * Settings; a workspace made before keeps what it has, private when it never chose.
+ */
+async function beginShared(q: Q): Promise<['+', string, string, unknown][]> {
+  const { rows } = await q.query(`insert into setting (key, value) values ('default_visibility', '"shared"'::jsonb) on conflict (key) do nothing returning key`);
+  return rows.length ? [['+', 'setting', 'default_visibility', 'shared']] : [];
+}
 import { followPacks, islandsOn, packsOff, syncPacks } from './packstate.ts';
 import { hostFor } from './packtools.ts';
 import { syncTypes } from './typetable.ts';
@@ -259,7 +270,7 @@ export class Workspaces {
       pelago.registry.turnOff(await packsOff(pelago), await islandsOn(pelago));
       await takeTypeItems(pelago);
       await syncTypes(pelago);
-      if (begins) await pelago.record('settings', 'system', await beginApplying(db));
+      if (begins) await pelago.record('settings', 'system', [...(await beginApplying(db)), ...(await beginShared(db))]);
       const ws = { id, name: isDefault ? 'Default' : (this.known.get(id) ?? id), pelago, automations: new Automations(pelago) };
       if (this.leading) this.clocks(ws, true);
       return ws;

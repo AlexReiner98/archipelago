@@ -335,7 +335,7 @@ export function weekCalendar(wk, today, act, full) {
     if (!act) return lane;
     let draw = null;
     lane.addEventListener('pointerdown', (ev) => {
-      if (ev.button !== 0 || ev.target !== lane) return;
+      if (!act || ev.button !== 0 || ev.target !== lane) return;
       ev.preventDefault();
       lane.setPointerCapture(ev.pointerId);
       state.dirty = true;

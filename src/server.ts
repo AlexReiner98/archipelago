@@ -34,12 +34,11 @@ import { join } from 'node:path';
 import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './auth.ts'; import { firstStart } from './first-start.ts';
 import { notify } from './notify.ts'; import { alertOnCrash } from './alert.ts';
 import { backupAll, parseBackup, parseVault } from './backup.ts'; import { adminEmails, admitMember, configureMembers, memberLimit, ownerEmail } from './members.ts'; import { configureEnded, readEnded } from './ended.ts'; import { askedAs, configurePlan, requestWait, slowTokensAt, storageBytes, tooManyRequests } from './plan.ts';
-import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
-import { env } from './env.ts';
+import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts'; import { env } from './env.ts';
 import { serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
 import { configureLauncher, stopAllLaunched } from './launcher.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
-import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts';
+import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts'; import { pageMay } from './may.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from './control-index.ts'; import { isPersonToken, personAt } from './person-tokens.ts';
 import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { setReach } from './pack-reach.ts';
@@ -49,12 +48,11 @@ import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
 import { servePublic } from './public-route.ts'; import { serveSite, siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
 import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
-import { sharedDocument, sharedPicture } from './documents.ts';
-import { configureSecrets } from './secrets.ts';
-import { serveBackupFile } from './backup-tools.ts';
+import { sharedPicture } from './documents.ts'; import { sharedAnswer } from './share-view.ts'; import { guestMap, ShareEnded } from './guests.ts'; import { serveLink } from './share-link-route.ts'; import { frozen } from './share-link.ts';
+import { configureSecrets } from './secrets.ts'; import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
-import { UI_FILES, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY } from './page-policies.ts';
+import { UI_FILES, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, unlisted, PAGE_POLICY, PREVIEW_POLICY, SHARED_POLICY } from './page-policies.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
@@ -188,7 +186,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       ws,
       // Everything this request reads or writes goes through the database as
       // this person sees it. A token tied to nobody sees only what is shared.
-      pelago: ws.pelago.as(identity.actor.person ?? '', Boolean(identity.actor.admin)),
+      pelago: identity.actor.reads ? await guestMap(ws.pelago, identity.actor.reads, identity.actor.person ?? '').catch((err) => { throw err instanceof ShareEnded ? new Refused(403, err.message) : err; }) : ws.pelago.as(identity.actor.person ?? '', Boolean(identity.actor.admin)),
       actor: (label) => (label && identity.actor.kind === 'agent' ? { ...identity.actor, name: `${identity.actor.name}/${label}` } : identity.actor),
     };
   }
@@ -228,6 +226,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture|drawing|live)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
       if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces, named, sites, from: addressOf(req) }));
+      // A frozen link's secret traded for a reader token, and that token's reads, from the link's snapshot alone (src/share-link-route.ts).
+      if (await serveLink(req, res, url.pathname, { workspaces, tooOften: () => tooOften(req, res, open), local: () => local(req), body: () => readJson(req) })) return;
 
       // A document given as a link: open to whoever holds it, with no login. The secret in the path is the only key, so
       // the page is never cached, never framed and never says where it was read from. What it shows is read through one
@@ -236,19 +236,19 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (shared) {
         if (tooOften(req, res, open)) return;
         const [, wsId, secret, data, figure] = shared;
-        const guard = UNLISTED;
+        const guard = UNLISTED, app = !data && (await workspaces.has(wsId)) && (await frozen((await workspaces.get(wsId)).pelago, secret)); // a frozen link opens the app, read only
         if (!data) {
-          res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
-          return res.end(await uiPage('doc.html'));
+          res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': app ? PAGE_POLICY : SHARED_POLICY });
+          return res.end(unlisted(app && options.unsandboxed ? markPage(await uiPage('index.html'), { open: false, unsandboxed: true }) : await uiPage(app ? 'index.html' : 'doc.html')));
         }
         if (data === 'picture') {
           const picture = figure && (await workspaces.has(wsId)) ? await sharedPicture((await workspaces.get(wsId)).pelago, secret, figure) : null;
           if (!picture) return send(res, 404, { error: 'Not found' }, guard);
           return res.writeHead(200, { ...guard, 'content-type': picture.content_type, 'content-security-policy': "default-src 'none'" }).end(picture.bytes);
         }
-        const doc = (await workspaces.has(wsId)) ? await sharedDocument((await workspaces.get(wsId)).pelago, secret) : null;
+        const doc = (await workspaces.has(wsId)) ? await sharedAnswer((await workspaces.get(wsId)).pelago, secret, url.searchParams.get('item')) : null;
         if (!doc) return send(res, 404, { error: 'This link does not open anything: it may have been revoked.' }, guard);
-        return send(res, 200, { ...doc, ...(await pageLook((await workspaces.get(wsId)).pelago, doc)) }, guard);
+        return send(res, 200, 'item' in doc ? doc : { ...doc, ...(await pageLook((await workspaces.get(wsId)).pelago, doc)) }, guard);
       }
 
       // A document read by someone signed in, to print or save as a PDF: the same page a link opens, which reads the
@@ -298,8 +298,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       if (req.method === 'GET' && url.pathname === '/whoami') {
         if (!local(req, false)) return send(res, 403, { error: 'Local requests only.' });
-        const { ws, actor } = await resolve(req, res, 'human');
-        return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name }, actor: actor() });
+        const { ws, actor, look } = await resolve(req, res, 'human'), me = actor(); // what it may do draws the page's controls (src/may.ts)
+        return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name }, actor: me, may: pageMay(me, Boolean(look), devMode() ? url.searchParams.get('may') : null) });
       }
 
       // A pack's webhook: /hook/<pack>/<id> in the default workspace, /hook/<workspace>/<pack>/<id> in another.

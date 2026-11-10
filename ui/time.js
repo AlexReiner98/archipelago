@@ -1,6 +1,6 @@
 // The Time screen.
 
-import { api, ask, h, part, state, tell } from './base.js';
+import { api, ask, h, may, part, state, tell } from './base.js';
 import { CAL_FULL, LAST_WORK, atHour, blockDialog, calHidden, choose, clockText, confirmEntryOps, confirmRoutineOps, dayName, happenedDialog, hoursText, localDay, mondayOf, moneyText, remember, shiftDay, timeState, weekCalendar, workPicker } from './week.js';
 import { clock, menu } from './words.js';
 
@@ -16,6 +16,8 @@ export async function time() {
     return main.replaceChildren(h('div', { class: 'error' }, err.message));
   }
   const again = () => ((state.dirty = false), time());
+  // Logging, confirming and invoicing write: a session that may only read sees the week as it is.
+  const writes = may('write');
   const week = (n) => () => ((timeState.from = n === 0 ? null : shiftDay(from, n * 7)), again());
   const write = async (ops, reason) => {
     try {
@@ -72,7 +74,7 @@ export async function time() {
         e.billable === false && h('span', { class: 'mark closed', title: 'Not invoiced' }, 'not billable'),
         e.status !== 'logged' && h('span', { class: 'mark closed', title: 'On an invoice' }, e.status),
         h('span', { class: 'tq-h' }, hoursText(e.hours)),
-        e.status === 'logged' &&
+        writes && e.status === 'logged' &&
           menu('\u22ef', [
             ['Edit', edit],
             [
@@ -179,15 +181,15 @@ export async function time() {
       h('a', { class: 'muted small tq-h', href: '#/time', title: 'Show its week', onclick: (ev) => (ev.preventDefault(), (timeState.from = mondayOf(b.date)), again()) }, dayName(b.date, { weekday: 'short', day: 'numeric' })),
       h('a', { class: 'gist grow', href: `#/e/${b.id}`, title: [b.what, b.work, b.start && `${clock(b.start)}\u2013${clock(b.end)}`].filter(Boolean).join('\n') }, b.what),
       h('span', { class: 'tq-h' }, hoursText(b.hours)),
-      h('button', { title: 'It happened as planned: count it', onclick: async () => {
+      writes && h('button', { title: 'It happened as planned: count it', onclick: async () => {
         const v = { work: { id: b.work_id }, what: b.what, date: b.date, start: b.start, end: b.end, hours: b.hours };
         write(b.routine ? await confirmRoutineOps(b, v, wk.types.entry) : [{ op: 'update', id: b.id, status: 'logged' }], 'Confirmed on the Time screen');
       } }, 'Confirm'),
-      h('button', { title: 'Say what actually happened, then count it', onclick: async () => {
+      writes && h('button', { title: 'Say what actually happened, then count it', onclick: async () => {
         const v = await happenedDialog(b);
         if (v) write(b.routine ? await confirmRoutineOps(b, v, wk.types.entry) : confirmEntryOps(b, v), 'Confirmed on the Time screen, as it happened');
       } }, 'Adjust'),
-      menu('\u22ef', [['Drop', async () => {
+      writes && menu('\u22ef', [['Drop', async () => {
         if (!b.routine) return write([{ op: 'archive', id: b.id }], 'Dropped on the Time screen: it did not happen');
         const p = (await api('get', { id: b.id })).entity.props;
         write([{ op: 'update', id: b.id, props: { skip: [...(Array.isArray(p.skip) ? p.skip : []), b.date] } }], `Skipped ${b.date} on the Time screen: it did not happen`);
@@ -201,7 +203,7 @@ export async function time() {
           'header',
           { class: 'tq-dayhead' },
           h('span', { class: 'grow' }, `To confirm ${due.length}`),
-          due.length > 1 && h('button', { title: 'Every one happened as planned', onclick: async () => {
+          writes && due.length > 1 && h('button', { title: 'Every one happened as planned', onclick: async () => {
             const ops = due.filter((b) => !b.routine).map((b) => ({ op: 'update', id: b.id, status: 'logged' }));
             // The days of one routine are marked done together, each with its own entry.
             const byRoutine = Map.groupBy(due.filter((b) => b.routine), (b) => b.id);
@@ -247,7 +249,7 @@ export async function time() {
     block(
       'Not invoiced',
       sheet.not_invoiced.map((c) =>
-        h('li', { class: 'row-top' }, h('span', { class: 'gist grow', title: c.client }, c.client), h('span', { class: 'tq-h' }, hoursText(c.hours)), c.id ? h('button', { title: `Draft an invoice to ${c.client} for this time`, onclick: () => draft(c) }, 'Draft invoice') : h('span', { class: 'muted small', title: 'This time is for work that involves no company' }, 'no client')),
+        h('li', { class: 'row-top' }, h('span', { class: 'gist grow', title: c.client }, c.client), h('span', { class: 'tq-h' }, hoursText(c.hours)), c.id ? writes && h('button', { title: `Draft an invoice to ${c.client} for this time`, onclick: () => draft(c) }, 'Draft invoice') : h('span', { class: 'muted small', title: 'This time is for work that involves no company' }, 'no client')),
       ),
       'All billed.',
     ),
@@ -260,7 +262,7 @@ export async function time() {
           h('a', { class: 'gist grow', href: `#/e/${i.id}`, title: `${i.number} to ${i.client}: ${moneyText(i.total, i.currency)}, ${moneyText(i.paid, i.currency)} paid` }, `${i.number} \u00b7 ${i.client}`),
           i.overdue_days ? h('span', { class: 'mark bad', title: `Due ${i.due}` }, `${i.overdue_days} d late`) : h('span', { class: 'muted small', title: 'Due' }, i.due ? dayName(i.due, { day: 'numeric', month: 'short' }) : ''),
           h('span', { class: 'tq-h' }, moneyText(i.owing, i.currency)),
-          h('button', { onclick: () => paid(i) }, 'Mark paid'),
+          writes && h('button', { onclick: () => paid(i) }, 'Mark paid'),
         ),
       ),
       'Nothing owed.',
@@ -274,7 +276,7 @@ export async function time() {
           h('a', { class: 'gist grow', href: `#/e/${i.id}`, title: `${i.number} to ${i.client}` }, `${i.number} \u00b7 ${i.client}`),
           h('span', { class: 'tq-h' }, moneyText(i.total, i.currency)),
           h('button', { title: 'Open it to print or save as a PDF', onclick: () => window.open(`/read/${i.id}`, '_blank') }, 'PDF'),
-          h('button', { title: 'Mark it sent to the client', onclick: () => write([{ op: 'update', id: i.id, status: 'sent' }], `Marked ${i.number} sent on the Time screen`) }, 'Sent'),
+          writes && h('button', { title: 'Mark it sent to the client', onclick: () => write([{ op: 'update', id: i.id, status: 'sent' }], `Marked ${i.number} sent on the Time screen`) }, 'Sent'),
         ),
       ),
       'No drafts.',
@@ -307,7 +309,7 @@ export async function time() {
       ),
       h('span', { class: 'fact', title: 'Hours this week' }, h('strong', {}, hoursText(sheet.total))),
     ),
-    weekCalendar(wk, today, calendarActs, full),
-    h('div', { class: 'tq-grid' }, h('div', { class: 'tq-main' }, add, days.length ? days : h('div', { class: 'empty card' }, 'Nothing logged this week.')), money),
+    weekCalendar(wk, today, writes && calendarActs, full),
+    h('div', { class: 'tq-grid' }, h('div', { class: 'tq-main' }, writes && add, days.length ? days : h('div', { class: 'empty card' }, 'Nothing logged this week.')), money),
   );
 }

@@ -172,9 +172,19 @@ export async function publishedDocument(l: Archipelago, id: string) {
  * published with.
  */
 function withDrawings(l: Archipelago, doc: Record<string, unknown> | null) {
-  const lenses = doc?.lenses as Record<string, { lens?: { time?: unknown }; style?: Record<string, unknown> }> | undefined;
+  const lenses = doc?.lenses as Record<string, Frozen> | undefined;
   if (!doc || !lenses) return doc;
-  const given = Object.fromEntries(
+  return { ...doc, lenses: drawingsGiven(l, lenses) };
+}
+
+type Frozen = { lens?: { time?: unknown }; style?: Record<string, unknown> };
+
+/**
+ * Each picture with a drawing: its own, or the pack's for its shape, or the flow's. A link's page reads them the same
+ * way (src/share-view.ts), so a view whose style names no drawing (a new map's) is drawn there too.
+ */
+export function drawingsGiven<T extends Frozen>(l: Archipelago, lenses: Record<string, T>): Record<string, T> {
+  return Object.fromEntries(
     Object.entries(lenses).map(([id, frozen]) => {
       const style = frozen.style ?? {};
       // One drawn by a layout's code is drawn by its shape's drawing here, as the page drew it by its shape before.
@@ -183,7 +193,6 @@ function withDrawings(l: Archipelago, doc: Record<string, unknown> | null) {
       return [id, drawing ? { ...frozen, style: { ...style, shape: drawing.shape, drawing } } : frozen];
     }),
   );
-  return { ...doc, lenses: given };
 }
 
 /** The figure of one section a published document holds, or null. */

@@ -286,6 +286,6 @@ export const sectionsOn = (data) =>
     })
     .filter(Boolean);
 /** The pieces the bare page draws as sections of its own. */
-const SECTIONS = ['turns', 'findings'];
+const SECTIONS = ['turns', 'findings', 'picture'];
 /** The count a screen on this item declares: it stands at the foot of its note while it is written (ui/note-count.js). */
 export const countOn = (data) => piecesOn(data).find((p) => p.piece === 'count');

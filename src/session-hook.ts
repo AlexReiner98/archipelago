@@ -29,6 +29,10 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   const lines = [`This session is registered in Archipelago, the owner's map of work and dependencies, as run ${started.run}, called "${(await l.entity(started.run))?.title}" after this chat, on the workspace "${started.workspace.name}" (${started.workspace.id}).`];
   const repo = 'repo' in started ? started.repo : undefined;
   if (repo) lines.push(`Repository: ${repo.title} (${repo.id}).`);
+  // Where this session stands, on any map: the open items the sessions before it here worked on, each with why it
+  // needs attention now (src/frontier.ts). Read off the map, never a note one session left for the next.
+  const { frontier, frontierText } = await import('./frontier.ts');
+  lines.push('', ...frontierText(await frontier(l, { run: started.run, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined })));
   // Where the work there stands is the place's pack's to say: a repository's, the software pack's views.
   if (repo && canAsk(l, 'repo_work') && canAsk(l, 'handoff')) {
     const work = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'repo_work', { repo: repo.id })) as { ready: { id: string; title: string; type: string; last_confirmed: string | Date }[]; blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[] };
@@ -55,7 +59,9 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
         ...owed.slice(0, 8).map((h) => `- ${h.title} (${h.id}), holding ${h.inside}`),
       );
   } else if (!repo) {
-    lines.push(`Archipelago does not know a repository for this folder${input.remote ? ` (a checkout of ${input.remote})` : ''}. If its work belongs in the map, give a repository there this address as its remote.`);
+    // Only a map with a type of place that knows an address (a repository, in the code pack) is told to make one.
+    const place = [...l.registry.types.values()].find((t) => t.capabilities.where?.address);
+    if (place) lines.push(`Archipelago does not know a ${place.title.toLowerCase()} for this folder${input.remote ? ` (a checkout of ${input.remote})` : ''}. If its work belongs in the map, give a ${place.title.toLowerCase()} there this address as its ${place.capabilities.where!.address}.`);
   }
   // The owner is here, in chat, and mostly nowhere else: what agents settled since they last answered is put to them now.
   const ask = await toConfirm(l, { limit: 15 });

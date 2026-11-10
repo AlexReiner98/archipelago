@@ -6,7 +6,7 @@
 // written there, by that map's `call`. Until then a copy of the words is kept in this browser alone (`kept`), so a
 // reload or a closed tab does not lose them: put back when the sheet opens again, still unsaved.
 
-import { api, ask, h, state, tell } from './base.js';
+import { api, ask, h, may, state, tell } from './base.js';
 import { renderBody } from './body.js';
 import { followLoose, refreshCanvas } from './canvas.js';
 import { countMark } from './note-count.js';
@@ -89,7 +89,7 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
   const save = h('button', { class: 'primary', type: 'button' }, isNew ? 'Create' : 'Save');
   const discard = h('button', { class: 'quiet-button', type: 'button' }, 'Discard');
   // How long the note is, in sight at the foot of the sheet while it is written.
-  const length = note && editable && countMark(count, base.props ?? {});
+  const length = (note && editable && countMark(count, base.props ?? {})) || null;
   const bar = h('div', { class: 'draft-bar', hidden: true }, said, h('span', { class: 'grow' }), length?.node, discard, save);
   const box = h('div', { class: 'draft' }, bar);
   // The line being written is scrolled into sight above the bar, not behind it: the sheet keeps the bar's height clear.
@@ -219,7 +219,8 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
     grow();
     update();
   };
-  return { title, note: note ? [read, area].filter(Boolean) : [], bar: box, field, open, save: () => save.click(), unsaved: () => changed() };
+  // Not to be written, the note is only read: no box to type in.
+  return { title, note: note ? (editable ? [read, area] : [read]).filter(Boolean) : [], bar: box, field, open, save: () => save.click(), unsaved: () => changed() };
 }
 
 /** A new item's kept words follow it to the type chosen for it. */
@@ -233,6 +234,8 @@ function moveKept(was, to) {
 /** A new item as a draft in the sheet: its type (a task unless chosen), a title to type and a note. Saved, it is a loose
  * item on the map, tied to nothing: how it relates is said in its note, and an agent proposes the links. */
 export function newItem(host, { type, title = '', style, types, choices }) {
+  // A session that may not write makes nothing: the sheet holds no draft.
+  if (!may('write')) return host.replaceChildren(h('div', { class: 'empty' }, 'Read only'));
   const draw = (chosen) => {
     const draft = draftOf({ base: { type: chosen, title }, style, saved: (id) => id && (location.hash = `#/e/${id}`) });
     host.replaceChildren(

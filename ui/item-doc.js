@@ -1,7 +1,7 @@
 // An item read whole, as its reader meets it (drawn by the reading page, ui/doc.js), and the links that let someone
 // read it with no login, and its shares with other workspaces.
 
-import { api, ask, call as callAt, h, known, tell } from './base.js';
+import { api, ask, call as callAt, h, known, may, tell } from './base.js';
 import { secretBox } from './workspace-cards.js';
 
 /** The item as a reader meets it, and the links to it that still work. */
@@ -30,17 +30,26 @@ export const figureOf = (s, cls = 'doc-figure') => {
   return img;
 };
 
-/** What the item's menu offers for reading it: print it, make a link to it, share it with a workspace (to publish, or not), stop sharing. */
-export function documentMenu(e, links, page, redraw, doc) {
-  const shareLink = async () => {
-    if (!(await ask({ title: `Make a link to "${e.title}"?`, message: 'Anyone with the link can read it and every item it brings in, with no login, until the link is revoked.', action: 'Make link' }))) return;
+/**
+ * Make a link that lets someone with no login read the item: a document as it is, a view drawn live, any other item
+ * as its page reads. One that is not a document is given as a document that brings it in alone (src/share-view.ts).
+ */
+export function shareLinkOf(e, page, isDoc = true) {
+  return async () => {
+    const message = isDoc ? 'Anyone with the link can read it and every item it brings in, with no login, until the link is revoked.' : 'Anyone with the link can see it, with no login, until the link is revoked: a view as it stands each time it is opened, with what the workspace may see in it.';
+    if (!(await ask({ title: `Make a link to "${e.title}"?`, message, action: 'Make link' }))) return;
     try {
       const made = await api('share_create', { id: e.id });
-      page.querySelector('.note').prepend(secretBox('Link to read this document. Send it to its reader.', `${location.origin}${made.path}`));
+      (page.querySelector('.note') ?? page).prepend(secretBox('Link to read this. Send it to its reader.', `${location.origin}${made.path}`));
     } catch (err) {
       tell('No link was made', err.message);
     }
   };
+}
+
+/** What the item's menu offers for reading it: print it, and where this session may write, make a link to it, share it with a workspace (to publish, or not), stop sharing. */
+export function documentMenu(e, links, page, redraw, doc, writes = may('write')) {
+  const shareLink = shareLinkOf(e, page);
   // To publish too: that workspace may publish it as this map gives it, until the share stops, which takes it down there.
   const shareWorkspace = async (publish) => {
     const message = publish
@@ -62,7 +71,7 @@ export function documentMenu(e, links, page, redraw, doc) {
   };
   const plain = links.filter((s) => !s.to_workspace);
   // Read here through another workspace's share: that workspace says who else may read it.
-  if (doc?.from) return [['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')]];
+  if (doc?.from || !writes) return [['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')]];
   return [
     ['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')],
     !e.archived_at && ['Make a link to read it', shareLink],

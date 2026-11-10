@@ -5,11 +5,12 @@
 // (the owner, 9 Nov 2026): the kept, newest first, then agents' working views folded; what a pack ships is found by
 // its name. One a document brings in is a part of that page, in neither list unless it is up.
 
-import { api, ask, h, hooks, idsOf, state, tell, wordsOf, withIds } from './base.js';
+import { api, ask, h, hooks, idsOf, may, state, tell, wordsOf, withIds } from './base.js';
 import { addressOf, flatView, stepsOf } from './query.js';
 import { filterSaid, fitBar } from './query-bar.js';
 import { canvasMenu } from './canvas-menu.js';
 import { lookSwitch, styleDelete } from './look-switch.js';
+import { newIslandEntry } from './island-new.js';
 import { thumbOf } from './thumbs.js';
 import { viewPicker } from './view-panel.js';
 import { ARROW, isA, typeTitle, wayOf } from './words.js';
@@ -138,6 +139,43 @@ async function save(lens, style, current, open, fresh = false) {
   const id = same?.id ?? made.created?.canvas;
   savedCanvases(true);
   if (id) open(`#/v?${addressOf(lens, { ...style, canvas: id })}`);
+  return id ? { id, title } : null;
+}
+
+/**
+ * Share the view that is up (decision e_qpaqnmrc, axis B): as a link anyone opens with no login, frozen as it is now
+ * (share_create), or with a guest by their address, who reads it as it changes (share_guest, an admin's). Saved first
+ * when it is not, since a share shows a view kept on the map.
+ */
+async function shareView(lens, style, current, open) {
+  const kept = current && !current.preset ? { id: current.id, title: current.title } : await save(lens, style, current, open, true);
+  if (!kept) return;
+  const how = may('admin')
+    ? await ask({ title: `Share “${kept.title}”`, choices: [['link', 'A link', 'Anyone with it sees the view as it is now, with no login'], ['guest', 'A guest', 'Someone you name signs in and sees it as it changes, and nothing else']] })
+    : (await ask({ title: `Make a link to “${kept.title}”?`, message: 'Anyone with the link sees this view as it is now, with no login, until the link is revoked.', action: 'Make link' })) && 'link';
+  if (!how) return;
+  try {
+    if (how === 'guest') return void (await shareGuest(kept));
+    // What is private is left out of a link, and a link is frozen when made: asked first, so what is shared is in it.
+    const hidden = await api('share_private', { id: kept.id });
+    const them = hidden.length === 1 ? 'it' : 'them';
+    if (hidden.length && (await ask({ title: `${hidden.length} ${hidden.length === 1 ? 'item' : 'items'} in it ${hidden.length === 1 ? 'is' : 'are'} private`, message: `The link leaves out what is private: ${hidden.slice(0, 5).map((i) => i.title).join(', ')}${hidden.length > 5 ? '…' : ''}. Make ${them} shared, so the link shows ${them}?`, action: 'Make shared', cancel: 'Leave private' })))
+      await api('change', { ops: hidden.map((i) => ({ op: 'update', id: i.id, visibility: 'shared' })), reason: 'Shared, to be seen through a link' });
+    const made = await api('share_create', { id: kept.id });
+    const url = `${location.origin}${made.path}`;
+    const copied = await navigator.clipboard?.writeText(url).then(() => true, () => false);
+    tell(copied ? 'Link copied' : 'Link made', `${url}\n\nShown once: it is not stored and cannot be shown again. Revoke it from the view's page.`);
+  } catch (err) {
+    tell('Not shared', err.message);
+  }
+}
+
+/** A guest invited by their address to read one view as it changes. */
+async function shareGuest(kept) {
+  const email = await ask({ title: `Share “${kept.title}” with a guest`, input: { placeholder: 'Their email address' }, action: 'Invite' });
+  if (!email) return;
+  const made = await api('share_guest', { id: kept.id, email });
+  tell(made.invited ? 'Invited' : 'Shared, not sent', made.invited ? `${made.email} can read this view as it changes.` : `${made.email} can read it once signed in. The invitation was not sent: ${made.error}`);
 }
 
 /** Delete a saved canvas, after asking: it is retired (a lens's closed status), so it leaves the bar and Home and can
@@ -193,7 +231,12 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const travel = own.filter((b) => b.classList.contains('q-travel'));
     // Each picker marked before it, its tooltip saying what it is.
     const named = (mark, title) => h('span', { class: 'q-label q-pick-label', title, 'aria-hidden': 'true' }, mark);
-    part.replaceChildren(...travel, named(canvasMark(), 'View: the saved view up'), pick, h('button', { type: 'button', class: 'q-save q-word', title: current ? (changed ? `Save the changes to “${current.title}”` : working(current) ? `Keep “${current.title}”: an agent’s view, retired with what it is about until you keep it` : `“${current.title}” is kept`) : 'Save this view', 'aria-label': 'Save this view', ...(current && !changed && !current.preset && !working(current) && { disabled: true }), onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, changed ? 'Save •' : working(current) ? 'Keep' : 'Save')), ...(current && !current.preset ? [h('button', { type: 'button', class: 'q-save q-delete', title: `Delete “${current.title}”`, 'aria-label': 'Delete this saved view', onclick: () => drop(lens, style, current, open) }, binMark())] : []), ...own.filter((b) => !travel.includes(b)), canvasMenu([{ element: h('label', { class: 'q-look-row', title: 'Layout: how this view is arranged' }, h('span', { class: 'muted' }, 'Layout'), lookSwitch(lens, style, open)) }, current && { text: 'Save as new view', title: 'Keep what is up as a view of its own', act: () => save(lens, style, current, open, true) }, styleDelete(lens, style, open)]));
+    // Saving, deleting and sharing a view write to the map: drawn only where this session may.
+    const writes = may('write');
+    // The menu's rows, read as it opens: making an island joins them once the map says it has islands.
+    const rows = [{ element: h('label', { class: 'q-look-row', title: 'Layout: how this view is arranged' }, h('span', { class: 'muted' }, 'Layout'), lookSwitch(lens, style, open)) }, writes && current && { text: 'Save as new view', title: 'Keep what is up as a view of its own', act: () => save(lens, style, current, open, true) }, writes && { text: 'Share it', title: 'A link anyone opens with no login, frozen as it is now, or a guest who reads it as it changes (saved first if it is not)', act: () => shareView(lens, style, current, open) }, styleDelete(lens, style, open)];
+    newIslandEntry(open).then((entry) => entry && rows.push(entry));
+    part.replaceChildren(...travel, named(canvasMark(), 'View: the saved view up'), pick, ...[writes && h('button', { type: 'button', class: 'q-save q-word', title: current ? (changed ? `Save the changes to “${current.title}”` : working(current) ? `Keep “${current.title}”: an agent’s view, retired with what it is about until you keep it` : `“${current.title}” is kept`) : 'Save this view', 'aria-label': 'Save this view', ...(current && !changed && !current.preset && !working(current) && { disabled: true }), onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, changed ? 'Save •' : working(current) ? 'Keep' : 'Save'))].filter(Boolean), ...(writes && current && !current.preset ? [h('button', { type: 'button', class: 'q-save q-delete', title: `Delete “${current.title}”`, 'aria-label': 'Delete this saved view', onclick: () => drop(lens, style, current, open) }, binMark())] : []), ...own.filter((b) => !travel.includes(b)), canvasMenu(rows));
     fitBar();
   });
   return part;

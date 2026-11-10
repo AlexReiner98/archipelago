@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "pelago": {
+      "type": "http",
+      "url": "${PELAGO_URL:-https://app.archipelago.tools}/mcp"
+    }
+  }
+}

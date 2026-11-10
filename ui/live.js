@@ -3,7 +3,7 @@ import { changeSet } from './changes.js';
 import { follow as keepCurrent, Store, View } from './replica.js';
 import { trace } from './traces.js';
 import { looked } from './catch-up.js';
-import { lookMode } from './look.js';
+import { still } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
 import { front, landsIn, poppedTab } from './tabs.js';
 import { relations, starterOf, types } from './words.js';
@@ -41,7 +41,7 @@ const pageId = Math.random().toString(36).slice(2, 14);
 // tab is in sight, so an agent knows what the owner is looking at and whether it is its own tab (src/seeing.ts). A
 // popped-out tab is the main page's too.
 const thisPage = () => {
-  if (lookMode) return undefined;
+  if (still) return undefined;
   const t = front();
   const chat = t?.chat ?? (/^e_[a-z0-9]{8}$/.test(t?.follows ?? '') ? t.follows : undefined);
   const lands = landsIn(t);
@@ -53,7 +53,7 @@ const waiting = new Map();
 
 export function follow(steps = []) {
   // A look's page, and a popped-out tab, leave what agents show to the main page.
-  if (lookMode || poppedTab) return;
+  if (still || poppedTab) return;
   // The first answer only says where things stand; an old step is not followed.
   const fresh = seenStep === undefined ? [] : steps.filter((s) => s.at > seenStep);
   seenStep = steps.at(-1)?.at ?? seenStep ?? 0;
@@ -108,7 +108,7 @@ export const store = new Store(kinds);
  */
 export async function replicate(read) {
   // A look draws once and is closed: it is kept current from nothing (and tail is the owner's page's, not an agent's).
-  const { pos, queue } = lookMode ? {} : await api('tail', {});
+  const { pos, queue } = still ? {} : await api('tail', {});
   const view = new View(store);
   const [answer, held] = await Promise.all([read(), heldNow()]);
   view.hold(answer, pos);
@@ -148,7 +148,7 @@ function touchedBy(beat, pos) {
 /** A redraw under way: another is not started on top of it. */
 export let redrawing = false;
 export async function checkTail() {
-  if (lookMode || document.hidden || redrawing) return;
+  if (still || document.hidden || redrawing) return;
   let now;
   let touched;
   let more = false;

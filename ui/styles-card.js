@@ -3,7 +3,7 @@
 // the map with the preset's id, which the owner edits like any item. Retired, the preset is not used. Themes are chosen
 // apart (ui/themes-card.js), not here.
 
-import { api, h, tell } from './base.js';
+import { api, h, may, tell } from './base.js';
 import { loadSchema, typeTitle } from './words.js';
 
 /** What a preset is for: the whole workspace, or the kinds and types it is on. */
@@ -29,7 +29,9 @@ export function styleRows(styles, then) {
       'li',
       { class: 'one' },
       h('span', { class: 'grow', title: `${s.title}, a style: ${where(s)}` }, s.item ? h('a', { href: `#/e/${s.item}` }, h('strong', {}, s.title)) : h('strong', {}, s.title), ' ', h('span', { class: 'muted small' }, s.retired ? 'not used' : where(s))),
-      s.retired
+      !may('write')
+        ? ''
+        : s.retired
         ? h('button', { onclick: () => useAgain(s) }, 'Use again')
         : s.item
           ? h('span', { class: 'mark', title: 'You changed this preset: open it to change it again' }, 'yours')

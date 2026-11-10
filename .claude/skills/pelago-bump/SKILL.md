@@ -1,6 +1,7 @@
 ---
 name: pelago-bump
-description: Record friction with Archipelago on the Archipelago map, the moment it happens. Use this whenever Archipelago itself gets in the way while you work, in any repository: a pelago tool errors or refuses something reasonable, you need a second call or a workaround to do one thing, a view lacks what you needed or answers with something stale or wrong, a tool description misled you, the web UI shows something badly, a hook or the GitHub workflow misbehaves, or the owner complains about how Archipelago behaves or looks. Also use it when the owner says "bump", "note that", "that was annoying" or "record that" about Archipelago. Do not wait to be asked: a bump nobody wrote down is hit again by the next session.
+description: >-
+  Record friction with Archipelago on the Archipelago map, the moment it happens. Use this whenever Archipelago itself gets in the way while you work, in any repository: a pelago tool errors or refuses something reasonable, you need a second call or a workaround to do one thing, a view lacks what you needed or answers with something stale or wrong, a tool description misled you, the web UI shows something badly, a hook or the GitHub workflow misbehaves, or the owner complains about how Archipelago behaves or looks. Also use it when the owner says "bump", "note that", "that was annoying" or "record that" about Archipelago. Do not wait to be asked: a bump nobody wrote down is hit again by the next session.
 ---
 
 # Archipelago bump
@@ -40,7 +41,9 @@ prevented it cheaply, it counts.
 1. **Find the home.** Bumps live as issues under the Archipelago project's feature
    for friction. `query` with name `search`, params type `feature` and q
    `friction`; `references/home.md` says the same for this workspace. If there
-   is none, create the issue as part of the Archipelago project instead.
+   is none, create the issue as part of the Archipelago project instead. A map
+   with no `issue` type (`query` `schema` says which it has) takes each bump as
+   a `finding` linked `about` the item it concerns, in the same shape below.
 
 2. **Look for it first.** `query` `search` with type `issue`, `open: true`, and
    one distinctive word of what happened in q (a search of several words can

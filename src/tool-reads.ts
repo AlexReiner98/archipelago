@@ -32,6 +32,8 @@ export interface HumanChange {
   reason?: string;
   /** For an edit, each field's value before and after. */
   changes?: unknown;
+  /** A held change this human approved or rejected: its id, and whose it was. */
+  decided?: { proposal: string; outcome: 'approved' | 'rejected'; proposer?: string };
 }
 
 export async function latestSeq(l: Archipelago): Promise<number> {
@@ -40,12 +42,15 @@ export async function latestSeq(l: Archipelago): Promise<number> {
 
 /** What humans have done since an event, oldest first: their edits, decisions, approvals and rejections. Reading a notification is not news. */
 export async function humanChanges(l: Archipelago, after: number): Promise<HumanChange[]> {
-  const read = await readEvents(l.db, { after, actorLike: 'human:%', news: true, oldest: true, limit: 50 });
+  const read = await readEvents(l.db, { after, actorLike: 'human:%', approvedToo: true, news: true, oldest: true, limit: 50 });
   const rows = read.filter((r) => r.target_type !== 'notification').map((r) => ({ ...r, ts: r.ts as string, type: r.target_type, title: r.target_title }));
+  // An approved change is the proposer's in the log and the approver's news: said as theirs, and as an approval.
   return rows.map((r) => ({
     seq: r.seq,
     ts: r.ts,
-    actor: r.actor,
+    actor: typeof r.detail?.approved_by === 'string' ? r.detail.approved_by : r.actor,
+    ...(typeof r.detail?.approved_by === 'string' && { decided: { proposal: String(r.detail.proposal ?? ''), outcome: 'approved' as const, proposer: r.actor } }),
+    ...(r.action === 'proposal.reject' && { decided: { proposal: String(r.detail?.proposal ?? ''), outcome: 'rejected' as const, proposer: r.detail?.proposer as string | undefined } }),
     action: r.action,
     target: r.target_id ? { id: r.target_id, type: r.type ?? '', title: r.title ?? '' } : undefined,
     reason: r.reason || undefined,
@@ -58,6 +63,7 @@ export function describeChanges(changes: HumanChange[]): string {
   const short = (v: unknown) => (v == null ? 'nothing' : JSON.stringify(v));
   return changes
     .map((c) => {
+      if (c.decided?.outcome === 'rejected') return `- rejected ${c.decided.proposer ?? 'a'}'s held change ${c.decided.proposal}${c.reason ? ` [${c.reason}]` : ''}`;
       const what = c.target ? `${c.target.type} "${c.target.title}" (${c.target.id})` : '';
       const fields =
         c.action === 'entity.update' && c.changes && typeof c.changes === 'object'
@@ -67,7 +73,8 @@ export function describeChanges(changes: HumanChange[]): string {
             : '';
       // An update that changed nothing is someone saying the item is still true.
       const checked = c.action === 'entity.update' && !fields;
-      return `- ${checked ? 'checked, still true as written:' : c.action} ${what}${fields ? `: ${fields}` : ''}${c.reason ? ` [${c.reason}]` : ''}`;
+      const decided = c.decided?.outcome === 'approved' ? `approved ${c.decided.proposer ?? 'a'}'s held change: ` : '';
+      return `- ${decided}${checked ? 'checked, still true as written:' : c.action} ${what}${fields ? `: ${fields}` : ''}${c.reason ? ` [${c.reason}]` : ''}`;
     })
     .join('\n');
 }

@@ -66,11 +66,13 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       const limits = await limitOf(l.workspace);
       // Whether anything has been put here yet beyond who is in it and how the app is set up.
       const started = (await l.db.query(`select 1 from entity where type <> all($1::text[]) and ${notKernel(l.registry)} and archived_at is null limit 1`, [l.registry.family('actor')])).rows.length > 0;
-      return { ...(await settings(l)), started, owner: rows[0] ?? null, member_limit: limits ?? null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
+      // Whether any agent session has ever been here: until one has, an empty page points at connecting one.
+      const agents = (await l.db.query(`select 1 from entity where type = 'run' limit 1 -- index entity_type`)).rows.length > 0;
+      return { ...(await settings(l)), started, agents, owner: rows[0] ?? null, member_limit: limits ?? null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
     },
   },
   workspace_set: {
-    description: 'Change workspace settings. default_visibility: whether new things are private to their author (the default) or shared unless they say otherwise. agent_changes: "apply" to have what agents change take effect as they make it, each change logged and undoable, or "hold" to have it wait for a human. With "apply" an agent can also settle a decision or a hypothesis: it must say what was chosen and why, and the human is notified. accepts_from: which other workspaces may send this one notifications. Admins only.',
+    description: 'Change workspace settings. default_visibility: whether new things are shared unless they say otherwise (how a new workspace starts) or private to their author. agent_changes: "apply" to have what agents change take effect as they make it, each change logged and undoable, or "hold" to have it wait for a human. With "apply" an agent can also settle a decision or a hypothesis: it must say what was chosen and why, and the human is notified. accepts_from: which other workspaces may send this one notifications. Admins only.',
     humanOnly: true,
     input: {
       default_visibility: z.enum(['private', 'shared']).optional(),
