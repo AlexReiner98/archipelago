@@ -407,7 +407,7 @@ create table if not exists member (
 alter table member enable row level security;
 `;
 
-/** Step 7 (src/migrate.ts): a share may be made out to another workspace on the server instead of to a secret (src/workspace-share.ts). */
+/** Step 7 (src/migrate.ts): a share may be made out to another workspace on the server instead of to a secret (dropped 10 Nov 2026; the columns stay). */
 export const WORKSPACE_SHARE = `
 alter table share add column if not exists to_workspace text;
 alter table share add column if not exists to_item text;

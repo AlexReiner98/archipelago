@@ -12,10 +12,8 @@ import { layoutFor } from './layouts.ts';
 import { headOf } from './log.ts';
 import { notify } from './notify.ts';
 import { actorId, type Actor, type Archipelago, type Authority } from './pelago.ts';
-import { SHARED } from './documents.ts';
 import { draftDocument, finishedStatuses, publicDocument, readable } from './public-document.ts';
 import { picturesOf } from './published-pictures.ts';
-import { freezeShared } from './published-share.ts';
 import { republished } from './published-live.ts';
 import { mayDo } from './rules.ts';
 import { pageLook } from './styles.ts';
@@ -30,9 +28,6 @@ export { gist, picturesOf } from './published-pictures.ts';
  * with nothing private in it.
  */
 async function freeze(l: Archipelago, id: string, draft = false) {
-  // One another workspace shares with this one is frozen as that workspace gives it.
-  const item = await l.entity(id);
-  if (item?.type === SHARED) return { ...(await freezeShared(l, item)), path: pathOf(item.props.path), menu: typeof item.props.menu === 'number' ? item.props.menu : null };
   // The other documents published here, which it may name by id and a reader then opens at their own pages.
   const { rows: others } = await l.db.query<{ id: string; title: string; path: string | null }>(
     `select e.id, e.title, p.path from published p join entity e on e.id = p.entity_id
@@ -54,14 +49,13 @@ async function freeze(l: Archipelago, id: string, draft = false) {
 
 /**
  * What publishing a document now would freeze, without publishing it: for its preview (src/published-preview.ts).
- * One not yet public is read as it will be once it is; one shared from another workspace, as that workspace gives it.
+ * One not yet public is read as it will be once it is.
  */
 export async function wouldPublish(l: Archipelago, id: string) {
   const doc = ID.test(id) ? await l.entity(id) : null;
   if (!doc || !readable(l).includes(doc.type)) throw new Error(`"${id}" is not a document that can be public.`);
   if (doc.private_to) throw new Error(`"${doc.title}" is private: share it, and its preview shows it as it would be published.`);
   const given = await freeze(l, id, doc.visibility !== 'public');
-  if (doc.type === SHARED) return given;
   // A draft at an address takes it from what is published there: it is what publishing would put there.
   const drafts = await draftPaths(l, given.parts), taken = new Set(Object.values(drafts));
   const published = ('paths' in given ? given.paths : {}) as Record<string, string>;
@@ -111,11 +105,9 @@ export async function publish(l: Archipelago, actor: Actor, id: string, said?: S
   if (!doc || !readable(l).includes(doc.type)) throw new Error(`"${id}" is not a document that can be public.`);
   if (doc.archived_at) throw new Error(`"${doc.title}" is archived.`);
   pathOf(doc.props.path);
-  // A shared one is frozen first: whether its sender lets it be published is known before it is made public.
-  const early = doc.type === SHARED ? await freeze(l, id) : null;
   if (doc.visibility !== 'public') await l.apply(actorId(actor), { ops: [{ op: 'update', id, visibility: 'public' }], reason: 'Published, for anyone to read' }, { authority });
   // Drawn as the map's styles stand now (src/styles.ts, pageLook), kept with it until it is published again.
-  const frozen = early ?? (await freeze(l, id));
+  const frozen = await freeze(l, id);
   const given = { ...frozen, style_at: (await headOf(l.db)).pos, look: await pageLook(l, { ...frozen, id }) };
   if (given.path) {
     const { rows } = await l.db.query<{ title: string }>(`select given ->> 'title' as title from published where path = $1 and entity_id <> $2`, [given.path, id]);

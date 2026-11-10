@@ -54,7 +54,10 @@ export function assemble(body: string, items: Map<string, Section>): Part[] {
   return parts;
 }
 
-/** The item a workspace holds a document another workspace shares with it as (src/workspace-share.ts). A kernel type. */
+/**
+ * A kernel type. Once what a workspace held a document another workspace shared with it as (dropped 10 Nov 2026); its
+ * starter is now the plain document a link wraps a view or an item in on a map with core alone (src/share-view.ts).
+ */
 export const SHARED = 'shared_document';
 
 /** Of an item's fields, those its type's pack marks as shown: what a page may lay out (an invoice's number, dates, total). */
@@ -107,8 +110,8 @@ export async function createShare(l: Archipelago, actor: Actor, id: string, snap
 
 /** The links made to a document, standing first. */
 export async function listShares(l: Archipelago, id: string) {
-  const { rows } = await l.db.query<{ id: string; hint: string; made_by: string; created_at: Date; revoked_at: Date | null; to_workspace: string | null; publishable: boolean }>(
-    `select id, hint, made_by, created_at, revoked_at, to_workspace, publishable from share where entity_id = $1 order by revoked_at is not null, created_at desc`,
+  const { rows } = await l.db.query<{ id: string; hint: string; made_by: string; created_at: Date; revoked_at: Date | null }>(
+    `select id, hint, made_by, created_at, revoked_at from share where entity_id = $1 order by revoked_at is not null, created_at desc`,
     [id],
   );
   return rows;
@@ -117,11 +120,11 @@ export async function listShares(l: Archipelago, id: string) {
 /** Stop a link from working. */
 export async function revokeShare(l: Archipelago, actor: Actor, share: string) {
   return l.db.transaction(async (tx: Q) => {
-    const { rows } = await tx.query<{ entity_id: string; to_workspace: string | null; to_item: string | null }>(`update share set revoked_at = now() where id = $1 and revoked_at is null returning entity_id, to_workspace, to_item`, [share]);
+    const { rows } = await tx.query<{ entity_id: string }>(`update share set revoked_at = now() where id = $1 and revoked_at is null returning entity_id`, [share]);
     if (!rows.length) throw new Error(`No standing link "${share}"`);
     const [r] = rows;
-    await l.log(tx, { actor: `${actor.kind}:${actor.name}`, action: 'share.revoke', target: r.entity_id, reason: r.to_workspace ? `It is no longer shared with the workspace "${r.to_workspace}"` : 'A link to read it was revoked', detail: { share } });
-    return { revoked: share, document: r.entity_id, to_workspace: r.to_workspace, to_item: r.to_item };
+    await l.log(tx, { actor: `${actor.kind}:${actor.name}`, action: 'share.revoke', target: r.entity_id, reason: 'A link to read it was revoked', detail: { share } });
+    return { revoked: share, document: r.entity_id };
   });
 }
 

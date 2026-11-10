@@ -215,19 +215,6 @@ export function islandsRow(info, redraw, fail) {
   return line(name, h('button', { title: 'Move this map onto islands; it stays on them', onclick: join }, 'Turn on'));
 }
 
-/** Which other workspaces on this server may notify this one: a row of the Connections card, changed in its menu. */
-export function notificationsRow(info, redraw, fail) {
-  const from = info.accepts_from.join(', ');
-  const accept = async () => {
-    const said = await ask({ title: 'Accept notifications from', message: `Other workspaces on this server, by id, separated by commas. Now: ${from || 'none'}. This one is "${info.id}".`, input: { placeholder: from || 'workspace ids' }, action: 'Save' });
-    if (said != null) api('workspace_set', { accepts_from: said.split(',').map((s) => s.trim()).filter(Boolean) }).then(redraw, fail);
-  };
-  return line(
-    h('span', { class: 'grow', title: `Other workspaces on this server that may send this one notifications. This workspace's id is "${info.id}".` }, h('strong', {}, 'Other workspaces'), ' ', h('span', { class: 'muted small' }, from ? `notify it: ${from}` : 'none may notify it')),
-    may('admin') ? menu('⋯', [['Change…', accept]]) : h('span', { class: 'menu-room' }),
-  );
-}
-
 /** The server's packs, for an admin of the default workspace: each a plate, with what it offers and may ask the server to do. Nothing when there are none. */
 export function serverPacksCard() {
   const box = card('Server packs', 'What this server does that no one workspace can, by packs kept on the machine it runs on');

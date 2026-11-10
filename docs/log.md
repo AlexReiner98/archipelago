@@ -1200,7 +1200,7 @@ section 4, Where this stands. Nothing else writes the map today
 | `document.publish`, `document.unpublish` | fact entries (`published` above) |
 | `types.sync` (`src/typetable.ts`) | the `pack` fact asserted again with the new manifest hash, only when a manifest changed |
 | `connection.made`, `connection.ended` | facts on the connection item (it is a thing on the map); its reachability in `observations` |
-| `workspace.notify` (`src/outbox.ts`) | `notifications` stream |
+| `workspace.notify` (retired 10 Nov 2026; older entries stay as written) | `notifications` stream |
 | `server.workspace.add`, `server.workspace.deliver` | the server's own log (`e_8g9feum7`) |
 | migrations (`src/schema.ts`: `update event`, `update token`) | gone: a format change is an upcaster |
 

@@ -1,5 +1,5 @@
 // A document's preview (src/published-preview.ts): what publishing it now would give, read before it is published,
-// on both sides of a share, with the site's header, for someone signed in. Nothing is published by reading it.
+// with the site's header, for someone signed in. Nothing is published by reading it.
 
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
@@ -14,7 +14,7 @@ import { serve } from './serve.ts';
 /** A pack with a document the kernel can publish: core keeps none of its own (test/fixtures/packs/pages). */
 const PAGES = [join(import.meta.dirname, 'fixtures', 'packs')];
 
-test('a document is previewed as publishing it would give it, before it is public, on both sides of a share', async () => {
+test('a document is previewed as publishing it would give it, before it is public', async () => {
   const { workspaces, call, base } = await serve('tokens', undefined, undefined, PAGES);
   const operator = (await workspaces.ensureOperator())!;
   const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
@@ -74,46 +74,6 @@ test('a document is previewed as publishing it would give it, before it is publi
   assert.match((await api(mine, 'share_create', { id: made.t })).path, /^\/s\/[^/]+\/[a-f0-9]{48}$/);
   // Its page may be framed by this server's own page alone, to read the draft on the canvas (ui/reader-frame.js).
   assert.match((await fetch(`${base}/preview/${made.d}`)).headers.get('content-security-policy') ?? '', /frame-ancestors 'self'/);
-
-  // The receiver's, shared to publish: as the sender gives it, its view drawn on the sender's map, in the receiver's site.
-  await api(theirs, 'workspace_set', { accepts_from: ['default'] });
-  await api(mine, 'share_workspace', { id: made.d, workspace: 'acme', publish: true });
-  const [offer] = await api(theirs, 'search', { type: 'shared_document' });
-  await api(theirs, 'change', { reason: 'test', ops: [{ op: 'update', id: offer.id, status: 'accepted' }] });
-  const there = (await preview(theirs, offer.id)).result;
-  assert.deepEqual([there.title, there.from, there.site.name], ['A page', 'default', 'Acme']);
-  assert.ok(there.lenses[made.l].items.some((i: any) => i.id === made.t));
-  assert.ok(there.sections.includes(made.s));
-  // The sheet reads its views as well, as publishing would draw them.
-  assert.ok((await api(theirs, 'document', { id: offer.id, drawn: true })).lenses[made.l]);
-});
-
-test('a document shared only to be read is previewed nowhere, and its views are not drawn through the share', async () => {
-  const { workspaces, call } = await serve('tokens', undefined, undefined, PAGES);
-  const operator = (await workspaces.ensureOperator())!;
-  const mine = (await createToken((await workspaces.get('default')).pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
-  const theirs = (await call('/operator/workspaces', operator, { id: 'acme', name: 'Acme', email: 'owner@acme.test' })).result.owner_token as string;
-  const api = async (token: string, tool: string, input: unknown = {}) => {
-    const answer = await call(`/api/${tool}`, token, input);
-    if (answer.error) throw new Error(answer.error);
-    return answer.result;
-  };
-  const made = (
-    await api(mine, 'change', {
-      reason: 'test',
-      ops: [
-        { op: 'create', ref: 'd', type: 'page', title: 'A page', visibility: 'shared', body: 'Words.\n\n{l}' },
-        { op: 'create', ref: 'l', type: 'lens', title: 'What it holds', visibility: 'shared', props: { filter: { find: ['type page'] } } },
-        { op: 'link', type: 'part_of', from: 'l', to: 'd' },
-      ],
-    })
-  ).created;
-  await api(theirs, 'workspace_set', { accepts_from: ['default'] });
-  await api(mine, 'share_workspace', { id: made.d, workspace: 'acme' });
-  const [offer] = await api(theirs, 'search', { type: 'shared_document' });
-  await api(theirs, 'change', { reason: 'test', ops: [{ op: 'update', id: offer.id, status: 'accepted' }] });
-  assert.match((await call(`/preview/${offer.id}/data`, theirs, {})).error, /to be read here, not published/);
-  assert.equal((await api(theirs, 'document', { id: offer.id, drawn: true })).lenses, undefined);
 });
 
 test('a draft keeps the sections it holds on a workspace other than default', async () => {
