@@ -30,5 +30,7 @@ main:has(.doc-band) > :is(section, .doc-band) + div.text { max-width: calc(var(-
 .band-pictures { flex: 6 1 var(--reader-band-least); min-width: 0; }
 .doc-lens { margin-block: var(--rhythm-6); }
 .doc-lens .lf-beside { display: block; }
-.doc-lens .lf-stage.still > svg { width: 100%; }
+/* A drawing reads at its own size, as in the app, centred; one wider than the column shrinks to it (ui/flow.css). Stretched
+   to the column, a view of a few steps read two or three times its size. */
+.doc-lens .lf-stage.still > svg { display: block; width: auto; max-width: 100%; height: auto; margin: 0 auto; }
 .doc-lens .sp-chat { margin-top: var(--space-8); }

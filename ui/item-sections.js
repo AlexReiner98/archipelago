@@ -7,6 +7,9 @@ import { fieldEditor, wordsEditor } from './field-edit.js';
 import { choicesOf, empty } from './fields.js';
 import { ago, changeRow, eventLine, label, link, statusesOf, typeTitle, types } from './words.js';
 
+/** Whether the page is a link's, read with no sign-in (ui/base.js marks it): its reader sees the item, not its keeping. */
+const reader = () => Boolean(document.documentElement.dataset.reader);
+
 /** One section: a heading, a count where it has one, and what it holds. */
 export const section = (key, title, n, ...content) => h('section', { class: 'page-section', 'data-section': key }, h('h2', {}, title, n ? h('span', { class: 'n' }, n) : ''), ...content);
 
@@ -14,7 +17,7 @@ export const section = (key, title, n, ...content) => h('section', { class: 'pag
 const rows = (list) => h('dl', { class: 'page-rows' }, list.map(([name, value, tip]) => [h('dt', { title: tip ?? '' }, name), h('dd', {}, value)]));
 const none = () => h('span', { class: 'muted' }, '—');
 
-/** Its head: what it is, where it stands, whose it is, who may see it, and when it was made and changed. */
+/** Its head: what it is, where it stands, whose it is, who may see it, and when it was made and changed. Without a setter, a value is said, not picked. */
 export function headSection(e, owner, setStatus, setVisibility) {
   const type = types.get(e.type);
   const seen = e.private_to ? 'private' : e.visibility;
@@ -24,11 +27,11 @@ export function headSection(e, owner, setStatus, setVisibility) {
     0,
     rows([
       ['Type', typeTitle(e.type), e.type],
-      ['Status', h('select', { class: 'mark-status', title: 'Status', disabled: Boolean(e.archived_at), onchange: (ev) => setStatus(ev.target.value) }, statusesOf(e.type).map((st) => h('option', { value: st, selected: st === e.status }, st)))],
+      ['Status', setStatus ? h('select', { class: 'mark-status', title: 'Status', disabled: Boolean(e.archived_at), onchange: (ev) => setStatus(ev.target.value) }, statusesOf(e.type).map((st) => h('option', { value: st, selected: st === e.status }, st))) : e.status],
       type?.columns?.owner && ['Owner', owner ? link(owner) : none()],
-      // Who may see it is a pick, made at once.
-      ['Visibility', e.archived_at || !['private', 'shared'].includes(seen) ? seen : h('select', { class: 'field-pick', title: 'Who can see it', onchange: (ev) => setVisibility(ev.target.value) }, ['private', 'shared'].map((v) => h('option', { value: v, selected: v === seen }, v)))],
-      type?.columns?.confidence && ['Confidence', String(e.confidence)],
+      // Who may see it is a pick, made at once; a link's reader is not told how the map is kept (ui/base.js, link).
+      !reader() && ['Visibility', !setVisibility || e.archived_at || !['private', 'shared'].includes(seen) ? seen : h('select', { class: 'field-pick', title: 'Who can see it', onchange: (ev) => setVisibility(ev.target.value) }, ['private', 'shared'].map((v) => h('option', { value: v, selected: v === seen }, v)))],
+      !reader() && type?.columns?.confidence && ['Confidence', String(e.confidence)],
       ['Created', ago(e.created_at)],
       ['Updated', ago(e.updated_at)],
       e.archived_at && ['Archived', ago(e.archived_at)],
@@ -79,7 +82,7 @@ export function choicesSection(e, pick, edit) {
   const c = choicesOf(e, types.get(e.type));
   if (!c) return null;
   const chosen = (x) => typeof c.picked === 'string' && (c.picked === x || c.picked.toLowerCase().startsWith(x.toLowerCase()));
-  const open = e.is_open && !e.archived_at;
+  const open = Boolean(pick) && e.is_open && !e.archived_at;
   return section(
     'choices',
     label(c.field),

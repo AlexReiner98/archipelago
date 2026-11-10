@@ -66,7 +66,7 @@ export interface Manifest {
 /** The keys of a manifest, and of its reach. */
 export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'styles', 'reach', 'shared'] as const;
 export const REACH_KEYS = ['hosts', 'secrets', 'webhooks', 'via', 'server'] as const;
-export const SERVER_KEYS = ['acts', 'entries', 'pages', 'connect', 'aliases', 'agreements'] as const;
+export const SERVER_KEYS = ['acts', 'entries', 'pages', 'connect', 'aliases', 'gates', 'mounts', 'streams', 'files', 'launchers', 'adapter'] as const;
 
 /** Every key pack files used before the manifest, and where it went (docs/packs.md has the table). */
 export const LEGACY: Record<string, string> = {
@@ -88,7 +88,7 @@ export const LEGACY: Record<string, string> = {
   pages: 'reach.server.pages',
   connect: 'reach.server.connect',
   aliases: 'reach.server.aliases',
-  agreements: 'reach.server.agreements',
+  agreements: 'reach.server.gates.signin (a handler the kernel calls, answering the documents and what an address owes)',
   contract: 'nothing: no part of the kernel reads it',
 };
 

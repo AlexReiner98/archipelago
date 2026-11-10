@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "tools.archipelago/archipelago",
+  "title": "Archipelago (archipelago.tools)",
+  "description": "Agent memory for human brains: your agent's plans and decisions as a map you read, correct, share.",
+  "version": "0.2.0",
+  "websiteUrl": "https://archipelago.tools",
+  "repository": {
+    "url": "https://github.com/AlexReiner98/archipelago",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://app.archipelago.tools/mcp"
+    }
+  ]
+}

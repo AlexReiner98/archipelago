@@ -199,7 +199,8 @@ export class View {
     this.store.take(answer, pos);
     this.ids = new Set((answer.items ?? []).map((i) => i.id));
     // Why each was in the answer (the terms that found it, or the walk's step): the answer's, not the log's, so kept apart.
-    this.why = new Map((answer.items ?? []).filter((i) => i.found || i.step).map((i) => [i.id, i.found ? { found: i.found, terms: i.terms } : { step: i.step }]));
+    // And why the frontier found it (`reasons`), worked out by the server as the lens was read.
+    this.why = new Map((answer.items ?? []).filter((i) => i.found || i.step).map((i) => [i.id, { ...(i.found ? { found: i.found, terms: i.terms } : { step: i.step }), ...(i.reasons && { reasons: i.reasons }) }]));
     // Where each falls on the lens's time axis, its lane and what it counts toward, worked out by the server: kept until the lens is read again.
     this.placed = new Map((answer.items ?? []).filter((i) => i.time).map((i) => [i.id, { time: i.time, ...(i.lane !== undefined && { lane: i.lane }), ...(i.stream !== undefined && { stream: i.stream }) }]));
     // The items whose notes the lens was asked to send whole (`notes`, for the pages): kept whole as they change.

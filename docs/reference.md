@@ -820,8 +820,9 @@ change that:
   admin is kept on the member (`member_set`), and removing one ends their
   sign-ins at once. The page says the same whether or not an address is a
   member anywhere. From then on:
-  - New things are **private to their author** unless created or edited as
-    shared. An admin can flip that default with `workspace_set`.
+  - In a new workspace, new things are **shared** with its members unless
+    created or edited as private; a workspace made before 9 Nov 2026 keeps
+    private as its default. An admin can flip it with `workspace_set`.
   - Private means hidden from other members everywhere: search, by id,
     links, the graph, the activity log and every view. The database
     enforces it (row level security), so no query has to remember to filter.

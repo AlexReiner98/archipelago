@@ -80,7 +80,7 @@ test('the kernel names no pack', () => {
 // verb's action): no new one may be added.
 const NAMES_PACK_TYPES: Record<string, number> = {
   'src/altitude.ts': 1, 'src/attention.ts': 1, 'src/capabilities.ts': 2, 'src/confirm.ts': 1, 'src/declared.ts': 3,
-  'src/diagram-types.ts': 1, 'src/documents.ts': 1, 'src/eventlog.ts': 1, 'src/launcher.ts': 1, 'src/query-saved.ts': 1, 'src/looks.ts': 1,
+  'src/eventlog.ts': 1, 'src/query-saved.ts': 1, 'src/looks.ts': 1,
   'src/manifest.ts': 1, 'src/outside.ts': 1, 'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2, 'src/pg.ts': 1,
   'src/public-document.ts': 1, 'src/public.ts': 2, 'src/replay.ts': 1, 'src/rules.ts': 1, 'src/saved-views.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2,
   'src/session-hook.ts': 1, 'src/surface.ts': 2, 'src/tail.ts': 1, 'src/tool-reads.ts': 1, 'src/ui-files.ts': 1, 'src/workspace-share.ts': 1,
@@ -388,7 +388,7 @@ const PAGE_CALLS = [
   'backup_download', 'change', 'connections', 'decide', 'document', 'events', 'get', 'import_backup', 'init',
   'launch', 'member_add', 'member_list', 'member_set', 'pack_set', 'packs', 'picture',
   'proposals', 'publish', 'publish_all', 'publish_plan', 'published', 'schema', 'search', 'server_packs',
-  'session_end', 'share_create', 'share_figure', 'share_list', 'share_revoke', 'share_workspace', 'tail',
+  'session_end', 'share_create', 'share_figure', 'share_guest', 'share_list', 'share_private', 'share_revoke', 'share_workspace', 'tail',
   'time_invoice_draft', 'time_invoice_paid', 'time_log', 'time_timesheet', 'time_week', 'token_create', 'token_list',
   'token_request_answer', 'token_requests', 'token_revoke', 'undo', 'unpublish', 'view', 'workspace_info', 'workspace_set',
 ];

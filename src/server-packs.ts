@@ -6,8 +6,8 @@
 // handler runs in the same sandbox as any pack's (src/packhost.ts), one process for the server.
 //
 // What it may declare: public pages and entries, and webhooks, all under /x/<pack>/ (src/server-routes.ts); the
-// server acts it may ask for, from the kernel's closed list (src/server-acts.ts); the documents a person agrees to
-// before they are signed in (src/agreements.ts); hosts it may call, with the secrets the kernel adds
+// server acts it may ask for, from the kernel's closed list (src/server-acts.ts); the gates the kernel asks it at
+// (src/server-gates.ts: what a person agrees to before signing in, what a workspace it made may do); hosts it may call, with the secrets the kernel adds
 // (src/server-requests.ts); what a workspace's admin may connect it to (src/server-connect.ts); and schedules. It gets
 // no database, no map, no token and no secret: the kernel holds each secret, sealed, and adds it where it is needed.
 
@@ -15,15 +15,22 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
 import { env } from './env.ts';
 import { isServerPack, parts, readManifest, type Manifest, type ReachDef } from './manifest.ts';
+import { checkMoreReach, runsMore, type MoreReach } from './server-reach.ts';
 
 /** The acts a server pack may ask the kernel for, each only if it declares it. */
 export const SERVER_ACTS = [
-  'workspace.create', 'workspace.admit', 'workspace.limit', 'workspace.end', 'signin.link', 'mail.send', 'agreement.record',
+  'workspace.create', 'workspace.admit', 'signin.link', 'mail.send',
+  // What a buyer agreed to as they paid, handed to the packs that keep what a person agreed to (gates.signin).
+  'agreement.record',
   // How many readers each source tag brought to a public site (PELAGO_SITES), per day, after a position (src/visits.ts).
   'site.visits',
   // On a workspace whose admin connected the pack (src/server-connect.ts).
   'begun.get', 'begun.take', 'connection.make', 'connection.get', 'connection.drop', 'workspace.add', 'workspace.deliver',
+  // What a person published, and nothing else: read through the security-definer reads, as anyone (src/server-published.ts).
+  'published.read', 'published.at', 'published.picture', 'published.drawing', 'site.pages',
 ] as const;
+/** The acts answered in src/server-published.ts. */
+export const PUBLISHED_ACTS: readonly ServerAct[] = ['published.read', 'published.at', 'published.picture', 'published.drawing', 'site.pages'];
 export type ServerAct = (typeof SERVER_ACTS)[number];
 
 const ID = /^[a-z][a-z0-9_]{0,39}$/;
@@ -54,7 +61,7 @@ export interface ServerHost {
 }
 
 /** Server reach, as a manifest asks for it (reach.server): a pack that asks for it is a server pack. */
-export interface ServerReach {
+export interface ServerReach extends MoreReach {
   /** The server acts it may ask for. */
   acts?: ServerAct[];
   /**
@@ -62,7 +69,7 @@ export interface ServerReach {
    * is where a person is sent back to from outside: called with the address's query, it answers where to send them on
    * ({ redirect }), and a refusal is shown them as a page.
    */
-  entries?: { id: string; description?: string; limit_ms?: number; method?: 'GET' | 'POST' }[];
+  entries?: { id: string; description?: string; limit_ms?: number; method?: 'GET' | 'POST'; answers?: 'json' | 'html' }[];
   /**
    * Pages anyone may open, as GET /x/<pack>/<id>: an HTML file in its public/ folder, under a strict policy. A page may
    * send a form to one of its hosts (form_action), as when a person is handed to another site with what it asks for.
@@ -78,11 +85,13 @@ export interface ServerReach {
   /** Addresses it answered at before it was a pack, each to one of its own routes ("hook/<id>", an entry or a page). */
   aliases?: Record<string, string>;
   /**
-   * One of its entries, answering the documents a person agrees to before they are signed in, each { id, title, url,
-   * version, also? } (src/agreements.ts), also naming the same document in other languages. A new version is agreed to
-   * again at the next sign-in.
+   * Functions of its handler the kernel calls, never anyone else (src/server-gates.ts). signin is given { email?,
+   * agree?, via? } and answers { documents, owes? }: the documents a person agrees to before they are signed in, each
+   * { id, title, url, version, also? }, and of those, by id, what the address has not agreed to at its version, with
+   * agree recorded first. standing is given { workspace }, one the pack made, and answers what it may do: { limits?,
+   * ended? } (src/standing.ts). With no gate, nothing is asked and nothing is limited.
    */
-  agreements?: string;
+  gates?: { signin?: string; standing?: string };
 }
 
 /**
@@ -108,7 +117,7 @@ export function checkServerPack(p: Partial<Manifest>, folder: string): string[] 
   const { server = {}, hosts, secrets: declared, webhooks, schedules } = parts(p as Manifest);
   for (const act of server.acts ?? []) if (!(SERVER_ACTS as readonly string[]).includes(act)) problems.push(`"${act}" is not a server act: one of ${SERVER_ACTS.join(', ')}`);
   const names = [...(server.entries ?? []), ...(server.pages ?? [])].map((e) => e.id);
-  for (const name of names) if (!NAME.test(name) || name === 'hook' || name === 'public') problems.push(`"${name}" cannot name an entry or a page`);
+  for (const name of names) if (!NAME.test(name) || name === 'hook' || name === 'public' || name === 'files') problems.push(`"${name}" cannot name an entry or a page`);
   if (new Set(names).size !== names.length) problems.push('an entry and a page share a name');
   for (const page of server.pages ?? []) if (!FILE.test(page.file) || !existsSync(join(folder, 'public', page.file))) problems.push(`page "${page.id}" names no file in its public/ folder`);
   for (const page of server.pages ?? []) if (page.form_action && !hosts.some((h) => h.id === page.form_action)) problems.push(`page "${page.id}" sends a form to no host of its own`);
@@ -132,8 +141,14 @@ export function checkServerPack(p: Partial<Manifest>, folder: string): string[] 
     if (!/^\/[a-z0-9][a-z0-9/_-]*$/.test(path) || KERNEL_PATHS.test(path)) problems.push(`"${path}" cannot be an address of its own`);
     if (hook ? !webhooks.some((w) => w.id === hook[1]) : !names.includes(to)) problems.push(`"${path}" leads to no route of its own: "${to}"`);
   }
-  if (server.agreements !== undefined && !server.entries?.some((e) => e.id === server.agreements)) problems.push(`its agreements name no entry of its own: "${server.agreements}"`);
-  if ((server.entries?.length || webhooks.length || server.connect || schedules.length) && !existsSync(join(folder, 'handler.js'))) problems.push('it has entries or webhooks and no handler.js');
+  for (const [gate, name] of Object.entries(server.gates ?? {})) {
+    if (!['signin', 'standing'].includes(gate)) problems.push(`"${gate}" is not a gate: signin or standing`);
+    else if (!NAME.test(String(name)) || names.includes(String(name))) problems.push(`its gate ${gate} names a function of its handler that is no entry or page: "${name}"`);
+  }
+  const html = (server.entries ?? []).filter((e) => e.answers === 'html').map((e) => e.id);
+  for (const e of server.entries ?? []) if (e.answers !== undefined && !['json', 'html'].includes(e.answers)) problems.push(`entry "${e.id}" answers json or html`);
+  problems.push(...checkMoreReach(server, folder, names, html, Object.values(server.gates ?? {}).map(String)));
+  if ((server.entries?.length || runsMore(server) || webhooks.length || server.connect || schedules.length || Object.keys(server.gates ?? {}).length) && !existsSync(join(folder, 'handler.js'))) problems.push('it has entries or webhooks and no handler.js');
   return problems;
 }
 
@@ -152,11 +167,14 @@ function markedServer(at: string): boolean {
   }
 }
 
-/** Every server pack in those folders. One that is not right is left out and said why, never half loaded. */
+/**
+ * Every server pack in those folders. One that is not right is left out and said why, never half loaded. The kernel's
+ * own (the reader) are read last: one the configuration names in their place (its id, a mount) replaces them.
+ */
 export function loadServerPacks(dirs = serverPackDirs()): { packs: ServerPack[]; refused: { folder: string; why: string[] }[] } {
   const packs: ServerPack[] = [];
   const refused: { folder: string; why: string[] }[] = [];
-  for (const dir of [...new Set(dirs)]) {
+  for (const dir of [...new Set(dirs)].sort((a, b) => Number(a === OWN_PACKS) - Number(b === OWN_PACKS))) {
     if (!existsSync(dir)) {
       refused.push({ folder: dir, why: ['there is no such folder'] });
       continue;
@@ -175,6 +193,10 @@ export function loadServerPacks(dirs = serverPackDirs()): { packs: ServerPack[];
       const why = checkServerPack(file, folder);
       if (!why.length && packs.some((p) => p.file.id === file.id)) why.push(`another server pack is "${file.id}" already`);
       for (const path of Object.keys(file.reach?.server?.aliases ?? {})) if (packs.some((p) => p.file.reach.server.aliases?.[path])) why.push(`another server pack answers at "${path}" already`);
+      for (const mount of Object.keys(file.reach?.server?.mounts ?? {})) if (packs.some((p) => p.file.reach.server.mounts?.[mount as never])) why.push(`another server pack takes the mount "${mount}" already`);
+      const surface = file.reach?.server?.adapter?.surface;
+      if (surface && packs.some((p) => p.file.reach.server.adapter?.surface === surface)) why.push(`another server pack translates the surface "${surface}" already`);
+      if (why.length && dir === OWN_PACKS && !checkServerPack(file, folder).length) continue; // replaced
       if (why.length) refused.push({ folder, why });
       else packs.push({ file: file as ServerPackFile, folder });
     }

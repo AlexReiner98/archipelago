@@ -2,7 +2,8 @@
 // they are sent an invitation, and from then on sign in by asking for a link at that address (POST /connect/sign-in).
 // The link (or the code beside it, typed: POST /connect/code) works once, for half an hour; opened, the page trades
 // its code (POST /connect/join) for a token that keeps
-// that browser signed in for a month. Whether a member is an admin is kept here, on the member, so every sign-in gets
+// that browser signed in for a month; a member who set a password may sign in with it instead (src/passwords.ts).
+// Whether a member is an admin is kept here, on the member, so every sign-in gets
 // it; removing a member ends their sign-ins at once. The table is read only through the whole database: no member's
 // role is granted it.
 
@@ -11,11 +12,9 @@ import { sha256Hex, workspaceSecret } from './hashes.ts';
 import { z } from 'zod';
 import { needAdmin } from './actor-checks.ts';
 import { createToken } from './auth.ts';
-import { controlValue, setControlValue, takeControlValue } from './control.ts';
-import { stillWritable } from './ended.ts';
 import type { Q } from './db.ts';
 import { mailConfigured, normalEmail, sendMail } from './mail.ts';
-import { configurePlan, limitOf, limitsChanged, type Limits } from './plan.ts';
+import { configureStanding, limitOf, stillWritable, type Limits, type Standing } from './standing.ts';
 import { indexMember } from './control-index.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
@@ -32,36 +31,27 @@ export interface Member {
   person_id: string;
   admin: boolean;
   added_at: string;
+  /** A guest's: the share whose view alone they read (src/guests.ts). */
+  reads?: string | null;
 }
 
-/** A workspace's limits (src/plan.ts), members among them: the name it had when members were all a plan limited. */
+/** A workspace's limits (src/standing.ts), members among them: the name it had when members were all a plan limited. */
 export type MemberLimit = Limits;
 
 let site = { origin: 'http://127.0.0.1:3100', nameOf: async (id: string) => id, rename: async (_id: string, _name: string): Promise<void> => {} };
-/** Where the links in the mail lead, a workspace's name to put in it, how to change it, and its limits: the server says, when it starts. */
-export function configureMembers(given: Partial<typeof site> & { limitOf?: (id: string) => Promise<Limits | undefined> }) {
-  const { limitOf: limits, ...rest } = given;
+/** Where the links in the mail lead, a workspace's name to put in it, how to change it, and its standing: the server says, when it starts. */
+export function configureMembers(given: Partial<typeof site> & { standingOf?: (id: string) => Promise<Standing | undefined> }) {
+  const { standingOf: read, ...rest } = given;
   site = { ...site, ...rest };
-  configurePlan({ ...(limits && { limitOf: limits }), ...(rest.nameOf && { nameOf: rest.nameOf }) });
+  configureStanding({ ...(read && { read }), ...(rest.nameOf && { nameOf: rest.nameOf }) });
 }
 /** Give a workspace another name, where the server keeps them. */
 export const renameWorkspace = (workspace: string, name: string) => site.rename(workspace, name);
 /** Which workspaces each address belongs to is kept beside the workspaces too, so a sign-in opens only those (src/control-index.ts). */
 const noted = indexMember;
 
-/**
- * A workspace's limits are the server's, not its map's: a server pack sets them on a workspace it made (a plan with
- * room for so many), in the control values of the default workspace's database, where no workspace admin can reach.
- * They are kept under the name they had when members were all a plan limited.
- */
-const limitKey = (workspace: string) => `member_limit:${workspace}`;
+// A workspace's limits are the server's, not its map's: the server pack that made it says them (src/standing.ts).
 export { limitOf };
-export const memberLimit = (control: Q, workspace: string) => controlValue<Limits>(control, limitKey(workspace));
-export async function setMemberLimit(control: Q, workspace: string, limit: Limits | null): Promise<void> {
-  if (limit) await setControlValue(control, limitKey(workspace), limit);
-  else await takeControlValue(control, limitKey(workspace));
-  limitsChanged(workspace);
-}
 
 /** Refuse one more member past the limit, saying how to make room. Those already in stay when a limit is lowered. */
 async function roomForOneMore(db: Q, workspace: string, added = 0): Promise<void> {
@@ -75,7 +65,7 @@ async function roomForOneMore(db: Q, workspace: string, added = 0): Promise<void
 }
 
 export async function memberOf(db: Q, email: string): Promise<Member | undefined> {
-  const { rows } = await db.query<Member>(`select email, person_id, admin, added_at from member where email = $1 and removed_at is null`, [email]);
+  const { rows } = await db.query<Member>(`select email, person_id, admin, added_at, reads from member where email = $1 and removed_at is null`, [email]);
   return rows[0];
 }
 
@@ -192,9 +182,12 @@ export async function typedWorks(workspaces: { id: string; db: () => Promise<Q> 
 async function redeemWith(db: Q, workspace: string, key: string): Promise<string | undefined> {
   const taken = await take<{ email: string }>(db, key);
   const member = taken && (await memberOf(db, taken.value.email));
-  if (!member) return undefined;
-  return (await createToken(db, workspace, { kind: 'human', name: member.email, entity: member.person_id, admin: member.admin, expires_days: SIGNED_IN_DAYS })).token;
+  return member && signedIn(db, workspace, member);
 }
+
+/** A member's sign-in in a browser: a month's token, an admin's if they are one. */
+export const signedIn = async (db: Q, workspace: string, member: Member) =>
+  (await createToken(db, workspace, { kind: 'human', name: member.email, entity: member.person_id, admin: member.admin, expires_days: SIGNED_IN_DAYS })).token;
 
 /**
  * Someone asks to sign in at an address: one mail, with a link and a code for each workspace it is a member of, or,

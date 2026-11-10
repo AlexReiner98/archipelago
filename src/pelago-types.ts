@@ -18,9 +18,11 @@ export interface Actor {
   within?: string[];
   /** What it may write: only reports (measurements), proposals that always wait, or changes. Absent: change. */
   may?: May;
+  /** A guest's: the share whose view alone it reads (src/guests.ts). With it, may is read. */
+  reads?: string;
 }
 
-export type May = 'report' | 'propose' | 'change';
+export type May = 'read' | 'report' | 'propose' | 'change';
 
 type Props = Record<string, unknown>;
 
@@ -152,6 +154,8 @@ export interface Proposal {
   decided_by: string | null;
   decided_at: Date | null;
   note: string | null;
+  /** Whom it was held for: the viewer of the map it was proposed on, or null. What it makes private is private to them. */
+  private_to: string | null;
   /** The rule that held it (src/rules.ts): null for one held before rules named themselves. */
   held_by: Ruled | null;
 }

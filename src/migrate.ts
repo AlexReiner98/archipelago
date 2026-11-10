@@ -9,7 +9,7 @@
 
 import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
-import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, HOLDS_OFF_READ, MEMBER, ORDERED, SCHEMA, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
+import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, HOLDS_OFF_READ, ITEM_HIDDEN, LINK_SNAPSHOT, MEMBER, ORDERED, SCHEMA, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
 import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';
 import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH, SHARE_PUBLISHABLE } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
@@ -17,7 +17,7 @@ import { ITEM_KIND } from './head.ts';
 import { ISLAND_INDEX } from './island-items.ts';
 import { SEARCH_ANY, SEARCH_INDEX } from './search.ts';
 import { LOG } from './log.ts';
-import { ACTIVITY, ACTIVITY_STREAM, EVENT_GONE, PRE_LOG_ACTIVITY } from './activity-steps.ts';
+import { ACTIVITY, ACTIVITY_STREAM, EVENT_GONE, OP_ABOUT, PRE_LOG_ACTIVITY } from './activity-steps.ts';
 import { carryEventTable } from './activity.ts';
 import { VAULT } from './vault.ts';
 import { FORGET, FORGET_STORES } from './forget.ts';
@@ -28,6 +28,7 @@ import { CLOSURE } from './closure.ts';
 import { MENTIONS } from './mentions.ts';
 import { ITEM_BYTES } from './bytes.ts';
 import { ACTIVE_HOLDS_BY_KEY, READ_INDEXES, ROW_POLICIES } from './read-indexes.ts';
+import { GUEST_READER } from './guest-schema.ts';
 
 interface Migration {
   version: number;
@@ -80,6 +81,10 @@ export const MIGRATIONS: Migration[] = [
   { version: 32, name: 'what lives on an island', sql: ISLAND_INDEX },
   { version: 33, name: 'what was done outside change sets, in the activity stream', sql: ACTIVITY_STREAM },
   { version: 34, name: 'the event table, carried into the activity stream and gone', sql: EVENT_GONE + FORGET_STORES, before: carryEventTable },
+  { version: 35, name: 'a get says hidden, not missing', sql: ITEM_HIDDEN },
+  { version: 36, name: 'a view shared with a guest, read live and nothing else', sql: GUEST_READER },
+  { version: 37, name: 'a link keeps its view frozen, read by a short token', sql: LINK_SNAPSHOT },
+  { version: 38, name: 'what the compacted streams say about an item, found by its index under the row policy', sql: OP_ABOUT },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

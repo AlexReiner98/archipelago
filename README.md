@@ -4,10 +4,10 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="brand/hero-dark.svg">
-  <img alt="A living map of all your work: islands drawn in stacked rows, parting round the title and its line, from a chat to a structured model that keeps you, your team, and your agents on the same page." src="brand/hero-light.svg">
+  <img alt="Agent memory for human brains: islands drawn in stacked rows, the water opening round the title and its line, your agent's plans and decisions as a map you read, correct, share." src="brand/hero-light.svg">
 </picture>
 
-**A living map of all your work. From a chat to a structured model that keeps you, your team, and your agents on the same page.**
+**Agent memory for human brains: your agent's plans and decisions as a map you read, correct, share.**
 
 *Early: built and used daily by its author; expect rough edges.*
 
@@ -69,24 +69,52 @@ Open `http://127.0.0.1:3100`, go to **Workspace** and type your name under
 Owner. To look around first, `npm run demo` opens a map of Archipelago itself
 on port 3200, its data kept apart.
 
-## Connect Claude Code
+## Connect your agent
 
-In the folder of a project you work on, with the server running:
+Ask it:
 
-```bash
-node -e "fetch('http://127.0.0.1:3100/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"
+> Install Archipelago from https://app.archipelago.tools/connect/install
+
+Or paste one line in a terminal. On Windows (PowerShell):
+
+```powershell
+irm https://app.archipelago.tools/connect/install.ps1 | iex
 ```
 
-It lists the files it will write (`.mcp.json`, a few hooks, working rules in
-`CLAUDE.md`) and asks first. Add ` -- --dry-run` to only see the list, or
-` -- --remove` to take it out. Then reopen Claude Code in that folder and say:
+On macOS or Linux:
+
+```bash
+curl -fsSL https://app.archipelago.tools/connect/install.sh | sh
+```
+
+It connects Claude Code, Codex and Cursor where it finds them, and opens your
+browser once to sign in to your workspace on archipelago.tools (the
+[Quickstart](https://archipelago.tools/quickstart?ref=github) makes one).
+ChatGPT and Grok Bot are connected in their own apps; the
+[install page](https://app.archipelago.tools/connect/install) says how. From
+then on each session starts on your map, handed the open work the sessions
+before it left there and why each piece needs attention. For a server of your
+own, the same page is at `/connect/install` on it.
+
+Then say:
 
 > Put this project in Archipelago, with the three things I am working on as
 > tasks, and tell me what you would do first.
 
 Your tasks appear on the map right away. To take anything back, open
 **Changes** and choose **Undo**. Any other MCP client works the map at
-`http://127.0.0.1:3100/mcp`.
+`/mcp` on the same server.
+
+To keep the hooks and working rules in the project's own files instead, run
+this in its folder with your server running:
+
+```bash
+node -e "fetch('http://127.0.0.1:3100/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"
+```
+
+It lists what it will write (`.mcp.json`, a few hooks, working rules in
+`CLAUDE.md`) and asks first. Add ` -- --dry-run` to only see the list, or
+` -- --remove` to take it out.
 
 ## Read on
 

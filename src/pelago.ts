@@ -2,8 +2,8 @@
 // by the rules (src/rules.ts), then either applied or stored as a proposal for a human, and always logged.
 
 import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, type Policy } from './rules.ts'; import { renamedQuery } from './query-names.ts';
-import { mayWrite } from './within.ts'; import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.ts'; import { authorityOf } from './authority.ts';
-import { anyone, newId, scoped, type Db, type Q } from './db.ts';
+import { mayWrite } from './within.ts'; import { roomToStore, stillWritable } from './standing.ts'; import { authorityOf } from './authority.ts';
+import { anyone, newId, reader, scoped, type Db, type Q } from './db.ts';
 import { once } from './merge.ts'; import { readEvents, type EventQuery } from './eventlog.ts'; import { doneFact, type Done } from './activity.ts';
 import type { Registry } from './packs.ts'; import { currentNames } from './type-items.ts'; import { noTwins } from './view-twins.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
@@ -41,6 +41,9 @@ export class Archipelago {
    */
   readonly props: string;
 
+  /** The share a guest reads under (src/guests.ts): set only on a guest's map, which reads and never writes. */
+  readonly reads?: string;
+
   constructor(db: Db, registry: Registry, policy: Partial<Policy> = {}, workspace = 'default', viewer?: string, props = 'props') {
     this.db = db;
     this.registry = registry;
@@ -58,6 +61,11 @@ export class Archipelago {
   /** This map as one person sees it. An empty viewer sees only what is shared; an admin also sees every token and setting. */
   as(viewer: string, admin = false): Archipelago {
     return new Archipelago(scoped(this.db, viewer, admin), this.registry, this.policy, this.workspace, viewer);
+  }
+
+  /** This map as a guest reads it: only the view of the share they were given, as it is now, and only reading. */
+  asReader(share: string, guest: string): Archipelago {
+    return Object.assign(new Archipelago(reader(this.db, share, guest), this.registry, this.policy, this.workspace, guest), { reads: share });
   }
 
   /** Whether new things are private to their author unless they say otherwise. */
@@ -323,21 +331,31 @@ export class Archipelago {
     return search(this.db, (type) => this.registry.family(type), input);
   }
 
+  /** Whether an item is there though the reader may not see it (pelago_item_hidden, src/schema.ts). */
+  async hidden(id: string): Promise<boolean> {
+    if (!/^e_[a-z0-9]{8}$/.test(id)) return false;
+    return Boolean((await this.db.query<{ h: boolean }>(`select pelago_item_hidden($1) as h`, [id])).rows[0]?.h);
+  }
+
   async get(id: string) {
     const entity = await this.entity(id);
-    if (!entity) throw new Error(`No item "${id}"`);
+    // One the reader may not see is said to be hidden, not missing: an agent can tell a private item from a wrong id.
+    if (!entity) throw new Error((await this.hidden(id)) ? `Item "${id}" is private to someone else: you cannot read it` : `No item "${id}"`);
     const rel = `r.id as relation, r.type, r.props, r.confidence, e.id, e.type as entity_type, e.title, e.status`;
-    const [out, inc, events, source] = await Promise.all([
+    // All at once: on a database over the network each read is a few round trips, and the trail is several reads.
+    const [out, inc, events, source, trail, mentioned_in] = await Promise.all([
       this.db.query(`select ${rel} from relation r join entity e on e.id = r.to_id where r.from_id = $1 and r.valid_to is null`, [id]),
       this.db.query(`select ${rel} from relation r join entity e on e.id = r.from_id where r.to_id = $1 and r.valid_to is null`, [id]),
       readEvents(this.db, { target: id, limit: 8 }),
       entity.source_id ? this.entity(entity.source_id) : undefined,
+      this.trail(id),
+      this.mentionedIn(id),
     ]);
     return {
       entity,
       source: source && { id: source.id, title: source.title, uri: source.props.uri },
-      trail: await this.trail(id),
-      mentioned_in: await this.mentionedIn(id),
+      trail,
+      mentioned_in,
       outgoing: out.rows,
       incoming: inc.rows,
       recent_events: events.map(({ seq, ts, actor, action, changeset, reason, detail }) => ({ seq, ts, actor, action, changeset, reason, detail })),

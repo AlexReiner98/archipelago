@@ -1,0 +1,17 @@
+{
+  "name": "archipelago",
+  "owner": {
+    "name": "Aperture Design Tools Inc."
+  },
+  "metadata": {
+    "description": "Archipelago for Claude Code."
+  },
+  "plugins": [
+    {
+      "name": "archipelago",
+      "source": "./plugins/archipelago",
+      "description": "Agent memory for human brains: your agent's plans and decisions as a map you read, correct, share.",
+      "category": "productivity"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "shop",
+  "version": "0.1.0",
+  "title": "Shop",
+  "description": "A server pack for the tests: makes a workspace to sign in to, and hands on what its buyer agreed to.",
+  "reach": {
+    "server": {
+      "acts": ["workspace.create", "workspace.admit", "signin.link", "agreement.record"],
+      "entries": [{ "id": "make" }, { "id": "link" }, { "id": "agreed" }]
+    }
+  }
+}

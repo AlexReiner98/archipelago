@@ -251,6 +251,9 @@ details.folded[open] > summary::before { content: "\25BE  "; }
 .ago { color: var(--muted); font-size: var(--text-2); min-width: var(--ago); text-align: right; }
 .effect { font-size: var(--text-2); }
 button.quiet-button { padding: var(--space-2) var(--space-6); font-size: var(--text-2); }
+/* Linking from an item's page (ui/link-pick.js): the canvas waits for the other end, and Link shows it is on. */
+body[data-linking] #canvas, body[data-linking] #canvas a { cursor: crosshair; }
+body[data-linking] .link-start { color: var(--accent); border-color: var(--accent); }
 
 @media (max-width: 720px) {
   .ops td.kind { width: auto; }

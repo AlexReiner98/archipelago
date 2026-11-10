@@ -6,6 +6,7 @@
 // window, so the two pages never write over each other; the main page reads it there, and takes it back when docked.
 
 import { known, store } from './base.js';
+import { still } from './look.js';
 
 /** In a window popped out of the main one, the tab it draws. */
 export const poppedTab = window.name.startsWith('pelago-tab:') ? window.name.slice('pelago-tab:'.length) : null;
@@ -57,6 +58,8 @@ const load = (key, from = localStorage) => {
   }
 };
 export const save = (key, value, to = localStorage) => {
+  // A frozen link's page, and a look's, keep nothing: what this browser holds is the person's own.
+  if (still) return;
   try {
     if (value === null) to.removeItem(key);
     else to.setItem(key, JSON.stringify(value));

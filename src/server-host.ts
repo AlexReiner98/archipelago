@@ -2,14 +2,16 @@
 // a call runs, the handler may ask for a server act it declared (ctx.act), for its keys (ctx.store), or for a request
 // to a host it declared (ctx.request), which the kernel makes with the secret it holds: nothing else. It reads no map.
 
-import { agreementsFrom, type Agreement } from './agreements.ts';
 import { storeGet, storeList, storePut, storeTake } from './control.ts';
 import type { Q } from './db.ts';
 import { Sandbox, type Answerer } from './packhost.ts';
 import { runAct, type ActPlaces } from './server-acts.ts';
+import { publishedAct } from './server-published.ts';
+import { signinGate } from './server-gates.ts';
+import { standingChanged } from './standing.ts';
 import { connectAct, connectionOf, type Connection } from './server-connect.ts';
 import { parts } from './manifest.ts';
-import { loadServerPacks, type ServerPack } from './server-packs.ts';
+import { loadServerPacks, PUBLISHED_ACTS, type ServerAct, type ServerPack } from './server-packs.ts';
 import { hostBase, hostRequest, type HostRequest } from './server-requests.ts';
 
 /** How long a call may take unless its pack says otherwise, and the most it may say. */
@@ -18,8 +20,6 @@ const MOST_MS = 30_000;
 const KEY = /^[A-Za-z0-9_.:-]{1,200}$/;
 /** The most keys one list of a pack's store answers. */
 const LIST_MOST = 1000;
-/** How long the documents in force are taken as they were last answered. */
-const AGREEMENTS_MS = 60_000;
 /** The acts done in src/server-connect.ts, on a workspace that connected the pack. */
 const CONNECT_ACTS = ['begun.get', 'begun.take', 'connection.make', 'connection.get', 'connection.drop', 'workspace.add', 'workspace.deliver'];
 
@@ -29,6 +29,8 @@ export class ServerPacks {
   /** The address this server is reached at from outside, which a pack is told (ctx.origin). */
   origin = '';
   private boxes = new Map<string, Sandbox>();
+  /** The calls each pack is in the middle of: a gate is not asked of a pack while it is (src/server-gates.ts). */
+  private inCall = new Map<string, number>();
   private readonly at: ActPlaces;
 
   constructor(at: ActPlaces, dirs?: string[]) {
@@ -82,40 +84,25 @@ export class ServerPacks {
     return this.find(id) ? connectionOf(await this.control(), id, workspace) : undefined;
   }
 
-  private agreed?: { at: number; documents: Promise<Agreement[]> };
-  /**
-   * The documents a person agrees to before they are signed in, from every pack that declares them, asked again after
-   * a minute so a new version is in force soon after it is put in place. A pack that fails to answer adds none, and
-   * is said in the server's log.
-   */
-  agreements(): Promise<Agreement[]> {
-    if (this.agreed && Date.now() - this.agreed.at < AGREEMENTS_MS) return this.agreed.documents;
-    const documents = Promise.all(
-      this.packs
-        .filter((p) => p.file.reach.server.agreements)
-        .map((p) =>
-          this.call(p.file.id, 'entry', p.file.reach.server.agreements!, {}).then(agreementsFrom, (err) => {
-            console.error(`server pack ${p.file.id}: its agreements did not answer: ${(err as Error).message}`);
-            return [];
-          }),
-        ),
-    ).then((each) => each.flat());
-    this.agreed = { at: Date.now(), documents };
-    return documents;
+  /** Whether a pack is in the middle of a call. */
+  busy(id: string): boolean {
+    return (this.inCall.get(id) ?? 0) > 0;
   }
 
-  /** Call one entry of a pack's handler (a public entry, a webhook, a schedule, or one the kernel calls) and give back its answer. */
-  async call(id: string, call: 'entry' | 'webhook' | 'schedule', name: string, input: unknown, ms = CALL_MS): Promise<unknown> {
+  /** Call one entry of a pack's handler (a public entry, a webhook, a schedule, or a gate the kernel asks at) and give back its answer. */
+  async call(id: string, call: 'entry' | 'webhook' | 'schedule', name: string, input: unknown, ms = CALL_MS, gate = false): Promise<unknown> {
     const pack = this.find(id);
     if (!pack) throw new Error(`No server pack "${id}".`);
     const box = this.boxes.get(id) ?? new Sandbox(pack.folder);
     this.boxes.set(id, box);
+    let wrote = false;
     const answer: Answerer = async (q) => {
       if (typeof q.act === 'string') {
         const input = (q.input ?? {}) as Record<string, unknown>;
         if (!(pack.file.reach.server.acts ?? []).includes(q.act as never)) throw new Error(`The pack "${id}" did not declare the act "${q.act}".`);
+        if (PUBLISHED_ACTS.includes(q.act as ServerAct)) return publishedAct(this.at, pack.file, q.act as ServerAct, input);
         if (CONNECT_ACTS.includes(q.act)) return connectAct(this.at, await this.control(), pack.file, q.act, input);
-        return runAct(this.at, pack.file, q.act, input, () => this.agreements());
+        return runAct(this.at, pack.file, q.act, input, (ask) => signinGate(this, ask, id));
       }
       if (q.request && typeof q.request === 'object') return this.request(id, q.request as HostRequest);
       if (q.store === 'list') {
@@ -127,12 +114,21 @@ export class ServerPacks {
         const key = String(q.key ?? '');
         if (!KEY.test(key)) throw new Error('A key is 1 to 200 letters, digits and _.:-');
         if (q.store === 'get') return (await storeGet(await this.control(), id, key)) ?? null;
+        // What a pack keeps may be what it says at its gates: asked afresh once it has written.
+        wrote = q.store === 'take' || q.store === 'put' || wrote;
+        if (wrote) standingChanged();
         if (q.store === 'take') return (await storeTake(await this.control(), id, key)) ?? null;
         if (q.store === 'put') return void (await storePut(await this.control(), id, key, q.value, typeof q.ms === 'number' && q.ms > 0 ? q.ms : undefined));
       }
       throw new Error('A server pack asks only for its acts, its hosts and its store: it reads no map.');
     };
-    const done = await box.call(answer, { call, name, input, actor: { name: `pack:${id}`, kind: 'agent' }, now: new Date().toISOString(), zone: 'UTC', origin: this.origin, hosts: Object.fromEntries((pack.file.reach.hosts ?? []).map((h) => [h.id, hostBase(id, h)])), present: [] }, Math.min(ms, MOST_MS));
+    // A gate is asked by the kernel and asks for nothing: it is no call the pack is in the middle of.
+    const counted = gate ? 0 : 1;
+    this.inCall.set(id, (this.inCall.get(id) ?? 0) + counted);
+    const done = await box.call(answer, { call, name, input, actor: { name: `pack:${id}`, kind: 'agent' }, now: new Date().toISOString(), zone: 'UTC', origin: this.origin, hosts: Object.fromEntries((pack.file.reach.hosts ?? []).map((h) => [h.id, hostBase(id, h)])), present: [] }, Math.min(ms, MOST_MS)).finally(() => {
+      this.inCall.set(id, this.inCall.get(id)! - counted);
+      if (wrote) standingChanged();
+    });
     return done.answer ?? null;
   }
 

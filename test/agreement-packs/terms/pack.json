@@ -2,13 +2,11 @@
   "id": "terms",
   "version": "0.1.0",
   "title": "Terms",
-  "description": "A server pack for the tests: two documents to agree to before signing in, a workspace to sign in to, and a page where a person with no account begins.",
+  "description": "A server pack for the tests: two documents to agree to before signing in, kept by its signin gate, and a page where a person with no account begins.",
   "reach": {
     "server": {
-      "acts": ["workspace.create", "workspace.admit", "signin.link", "agreement.record"],
-      "entries": [{ "id": "documents" }, { "id": "make" }, { "id": "link" }, { "id": "agreed" }],
       "pages": [{ "id": "begin_here", "file": "start.html", "start": true }],
-      "agreements": "documents"
+      "gates": { "signin": "signin" }
     }
   }
 }

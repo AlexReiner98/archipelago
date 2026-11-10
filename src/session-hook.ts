@@ -1,6 +1,6 @@
-// Claude Code's adapter onto the session contract (src/sessions.ts): its SessionStart hook registers the session and
-// answers what the model is told as it begins; its SessionEnd hook ends it, saying why. Any other client says the same
-// through capture session_start and report session_end.
+// What a session is told as it begins, on the session contract (src/sessions.ts): Claude Code's SessionStart hook
+// registers it here, and its SessionEnd hook ends it, saying why; the shape of their answers is src/claude-code.ts.
+// Any other client says the same through capture session_start and report session_end.
 
 import { placeFor } from './places.ts';
 import { askView, canAsk } from './askview.ts';
@@ -10,6 +10,7 @@ import { STALE_DAYS } from './attention.ts';
 import { instructionsFor } from './instructions.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { resolveRun, sessionEnd, sessionStart } from './sessions.ts';
+import { HOOK_ACTOR } from './chat-run.ts';
 
 /** What may be held, as a read names it: the types with a capacity, the fields those say it in (a place that says nothing of it is no resource), and whether one says it as a number, so every item of it may be. */
 const holdableBy = (l: Archipelago) => {
@@ -25,15 +26,19 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   // Claude Code says why it starts (startup, resume, clear, compact) and, from its record, what the chat is called; the
   // session that started it, if it knows one, is kept only when the map has it, so a hook never fails to register.
   const said = { source: typeof input.source === 'string' ? input.source : undefined, title: typeof input.title === 'string' ? input.title : undefined, parent: typeof input.parent === 'string' && input.parent && (await resolveRun(l, input.parent)) ? input.parent : undefined };
-  const started = await sessionStart(l, { kind: 'agent', name: 'claude-code' }, { session_id: input.session_id, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined, surface: 'claude-code', ...said });
+  const started = await sessionStart(l, HOOK_ACTOR, { session_id: input.session_id, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined, surface: 'claude-code', ...said });
   const lines = [`This session is registered in Archipelago, the owner's map of work and dependencies, as run ${started.run}, called "${(await l.entity(started.run))?.title}" after this chat, on the workspace "${started.workspace.name}" (${started.workspace.id}).`];
   const repo = 'repo' in started ? started.repo : undefined;
   if (repo) lines.push(`Repository: ${repo.title} (${repo.id}).`);
+  // Where this session stands, on any map: the open items the sessions before it here worked on, each with why it
+  // needs attention now (src/frontier.ts). Read off the map, never a note one session left for the next.
+  const { frontier, frontierText } = await import('./frontier.ts');
+  lines.push('', ...frontierText(await frontier(l, { run: started.run, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined })));
   // Where the work there stands is the place's pack's to say: a repository's, the software pack's views.
   if (repo && canAsk(l, 'repo_work') && canAsk(l, 'handoff')) {
-    const work = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'repo_work', { repo: repo.id })) as { ready: { id: string; title: string; type: string; last_confirmed: string | Date }[]; blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[] };
+    const work = (await askView(l, HOOK_ACTOR, 'repo_work', { repo: repo.id })) as { ready: { id: string; title: string; type: string; last_confirmed: string | Date }[]; blocked: { id: string; title: string; waiting_on: (string | undefined)[] }[] };
     // Where things stand is read off the map: how much has moved lately, and what sessions left, nobody has seen work, or bites here.
-    const stand = (await askView(l, { kind: 'agent', name: 'claude-code' }, 'handoff', { repo: repo.id })) as { from: string | { title: string; began: string }; left?: unknown[]; unseen?: unknown[]; traps?: unknown[]; since_then: Record<'pushes' | 'settled' | 'opened' | 'sessions', unknown[]> & { counts: Record<'pushes' | 'settled' | 'opened' | 'sessions', number> }; to_shape?: { hubs: { id: string; title: string; inside: number }[] } };
+    const stand = (await askView(l, HOOK_ACTOR, 'handoff', { repo: repo.id })) as { from: string | { title: string; began: string }; left?: unknown[]; unseen?: unknown[]; traps?: unknown[]; since_then: Record<'pushes' | 'settled' | 'opened' | 'sessions', unknown[]> & { counts: Record<'pushes' | 'settled' | 'opened' | 'sessions', number> }; to_shape?: { hubs: { id: string; title: string; inside: number }[] } };
     const n = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
     const then = stand.since_then;
     const marks = [stand.left?.length && `${n(stand.left.length, 'checkout')} left unpushed (left)`, stand.unseen?.length && `${n(stand.unseen.length, 'item')} nobody has seen working (unseen)`, stand.traps?.length && `${n(stand.traps.length, 'trap')} in its files (traps)`].filter(Boolean);
@@ -55,7 +60,9 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
         ...owed.slice(0, 8).map((h) => `- ${h.title} (${h.id}), holding ${h.inside}`),
       );
   } else if (!repo) {
-    lines.push(`Archipelago does not know a repository for this folder${input.remote ? ` (a checkout of ${input.remote})` : ''}. If its work belongs in the map, give a repository there this address as its remote.`);
+    // Only a map with a type of place that knows an address (a repository, in the code pack) is told to make one.
+    const place = [...l.registry.types.values()].find((t) => t.capabilities.where?.address);
+    if (place) lines.push(`Archipelago does not know a ${place.title.toLowerCase()} for this folder${input.remote ? ` (a checkout of ${input.remote})` : ''}. If its work belongs in the map, give a ${place.title.toLowerCase()} there this address as its ${place.capabilities.where!.address}.`);
   }
   // The owner is here, in chat, and mostly nowhere else: what agents settled since they last answered is put to them now.
   const ask = await toConfirm(l, { limit: 15 });
@@ -81,5 +88,5 @@ export async function hookSessionEnd(l: Archipelago, input: { session_id?: strin
   if (!input.session_id) return;
   const run = await resolveRun(l, input.session_id, true);
   // The chat itself has ended, whatever its reason (clear, logout, exit, other): its session ends, and its tab closes.
-  if (run) await sessionEnd(l, { kind: 'agent', name: 'claude-code' }, { run: run.id, outcome: 'finished', summary: input.reason ? `Session ended (${input.reason})` : undefined, reason: input.reason || 'other' });
+  if (run) await sessionEnd(l, HOOK_ACTOR, { run: run.id, outcome: 'finished', summary: input.reason ? `Session ended (${input.reason})` : undefined, reason: input.reason || 'other' });
 }

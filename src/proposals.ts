@@ -80,6 +80,8 @@ export async function decideProposal(l: Archipelago, actor: Actor, input: { prop
       // Held and then applied by a human: it rests on that human, whatever the agent thought it rested on.
       {
         except: input.except, approvedBy: me, revised, authority: { of: 'human', who: me },
+        // What it makes private is private to whom it was held for, as when it was held, not to whoever approves it.
+        privateTo: proposal.private_to ?? null,
         // The ids it would have made when it was held: with nothing moved since, the facts it appends are the ones it showed.
         ids: revised ? undefined : (record?.ids as Record<string, string> | undefined),
         rule: { outcome: 'approved', held_by: held ? { rule: held.rule, pack: held.pack } : null, proposal: proposal.id, proposal_hash: record?.hash ?? '', by: me, revised, except: input.except ?? [], ...(input.note && { note: input.note }) },
@@ -88,7 +90,12 @@ export async function decideProposal(l: Archipelago, actor: Actor, input: { prop
   }
   // The queue's row is the projection of what was appended: approved by the change set, declined by its own entry.
   const status = input.approve ? 'approved' : 'rejected';
-  if (!input.approve) await l.db.transaction((tx) => rejection(tx, l.workspace, proposal.id, { outcome: 'rejected', actor: me, by: me, reason: input.note ?? '' }));
+  // A rejection appends no facts, so the activity log (and with it watch and the prompt hook) hears of it by an entry of
+  // its own, the human's: what was held and by whom, never its words when it was private to someone.
+  if (!input.approve) await l.db.transaction(async (tx) => {
+    if (!(await rejection(tx, l.workspace, proposal.id, { outcome: 'rejected', actor: me, by: me, reason: input.note ?? '' }))) return;
+    await l.log(tx, { actor: me, action: 'proposal.reject', reason: input.note ?? '', detail: { proposal: proposal.id, proposer: proposal.actor, ...(!proposal.private_to && { asked: proposal.reason }) } });
+  });
   return { ...result, proposal: proposal.id, status };
 }
 

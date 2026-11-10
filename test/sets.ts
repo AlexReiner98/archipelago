@@ -13,6 +13,8 @@ export const ROOT = join(import.meta.dirname, '..');
 export const SLOW: Record<string, string> = {
   // A headless Chrome each, and the page loaded and driven in it: seconds per test, most of a core under load.
   'test/agents-beside.test.ts': 'browser',
+  // The core loop end to end: a server, the plugin's hook script run per event, and two Chrome pages.
+  'test/loop.test.ts': 'browser',
   'test/canvas-drag.test.ts': 'browser',
   'test/canvas-pan.test.ts': 'browser',
   'test/canvas-pinch.test.ts': 'browser',

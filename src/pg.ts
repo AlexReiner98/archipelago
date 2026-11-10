@@ -48,7 +48,7 @@ export async function openPg(url: string, prepare: (db: Database) => Promise<unk
     await prepare({ ...db, query: <T>(sql: string, params?: unknown[]) => rowsOf<T>(client, sql, params), exec: (sql: string) => client.query(sql) });
     // The login role switches to these per request (set local role): unless it is a superuser it must be a member.
     await client.query(`do $$ begin
-      if not (select rolsuper from pg_roles where rolname = current_user) then execute format('grant pelago_member, pelago_public to %I', current_user); end if;
+      if not (select rolsuper from pg_roles where rolname = current_user) then execute format('grant pelago_member, pelago_public, pelago_reader to %I', current_user); end if;
     end $$`);
   } catch (err) {
     await client.query(`select pg_advisory_unlock(hashtext('pelago.schema'))`).catch(() => {});

@@ -183,7 +183,8 @@ export async function iconOf(l: Archipelago): Promise<Buffer | null> {
  */
 export async function pageLook(l: Archipelago, doc?: Record<string, unknown>) {
   // One published since its look is kept with it (src/published.ts) is drawn in that, whatever the map holds now.
-  if (doc?.look && typeof doc.look === 'object') return doc.look as Look;
+  // One kept before a look held its way to start a map is given the workspace's words for it as they stand.
+  if (doc?.look && typeof doc.look === 'object') return 'start' in doc.look ? (doc.look as Look) : { ...(doc.look as Look), ...(await startWords(l)) };
   const hub = doc && typeof doc.type === 'string' ? { hub: { id: String(doc.id ?? ''), type: doc.type } } : {};
   const at = typeof doc?.style_at === 'number' ? doc.style_at : undefined;
   const key = at === undefined ? '' : `${l.workspace} ${at} ${String(doc?.id)}`;
@@ -191,13 +192,14 @@ export async function pageLook(l: Archipelago, doc?: Record<string, unknown>) {
   const now = async () => ({ kept: await keptOf(l, 'style', undefined), versions: undefined });
   // A page outlives its style: one that cannot be made again from the log is drawn in the style as it stands.
   const { kept, versions } = at === undefined ? await now() : await stylesAt(l, at).catch((err) => (console.error(`the style of ${String(doc?.id)} at ${at}:`, err), now()));
-  const style = (await styleFor(l, kept, hub, versions)).style as { theme: unknown; lengths: unknown; faces?: unknown; type?: unknown; page_css?: unknown; page?: { head?: unknown; share?: unknown } };
-  const { theme, lengths, faces, type, page_css, page } = style;
+  const style = (await styleFor(l, kept, hub, versions)).style as { theme: unknown; lengths: unknown; faces?: unknown; type?: unknown; page_css?: unknown; page?: { head?: unknown; share?: unknown }; start?: unknown };
+  const { theme, lengths, faces, type, page_css, page, start } = style;
   const look: Look = {
     theme, lengths, faces, type,
     ...(typeof page_css === 'string' && page_css.trim() && !cssProblem(page_css, true) && { page_css }),
     ...(typeof page?.head === 'string' && { head: page.head }),
     ...(typeof page?.share === 'string' && SECTION.test(page.share) && { share: page.share }),
+    ...(typeof start === 'string' && start.trim() && { start: start.trim() }),
   };
   if (key) {
     looks.set(key, look);
@@ -206,7 +208,13 @@ export async function pageLook(l: Archipelago, doc?: Record<string, unknown>) {
   return look;
 }
 
-interface Look { theme: unknown; lengths: unknown; faces?: unknown; type?: unknown; page_css?: string; head?: string; share?: string }
+/** The words of the way to start a map of one's own, as the workspace's style says them now. */
+async function startWords(l: Archipelago) {
+  const { start } = (await styleFor(l, await keptOf(l, 'style', undefined), {})).style as { start?: unknown };
+  return typeof start === 'string' && start.trim() ? { start: start.trim() } : {};
+}
+
+interface Look { theme: unknown; lengths: unknown; faces?: unknown; type?: unknown; page_css?: string; head?: string; share?: string; start?: string }
 
 /** An item's id, as a style names the section whose figure is a page's link picture (page.share). */
 const SECTION = /^e_[a-z0-9]{8}$/;

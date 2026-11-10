@@ -34,6 +34,7 @@ import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
 import { css as sessionCss, hueRules, litStates, sessionItems, sessionMarks, sessionOf, stateMark, STATES, STATE_WORDS } from './session.js';
 import { cut, longest } from './lines.js';
+import { css as reasonCss, reasonFlag, reasonLines } from './reasons.js';
 
 /** The link type the order's wires are, for their colour. */
 const ORDER_TYPE = 'depends_on';
@@ -194,6 +195,9 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
 
   // What can be dimmed, by the item it is of; each step's key, for hovering; the badge of each step a held change is on.
   const dims = new Map(), keyed = new Map(), tipped = new Set(), stepBadges = new Map();
+  // The gesture of the drawing tools (ui/draw-marks.js), where the session may write: a button in an island's legend
+  // that adds an item there (./islands.js), answered by the page. Not while a story plays.
+  const gestures = !story && tools.gestures ? tools.gestures({ island: (key) => (/^i:e_/.test(key) ? key.slice(2) : null) }) : { on: () => [] };
   // Ties under everything, then wires, each broken where it passes under, then the steps over all, then what each choice is.
   const drawIn = story ? { pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 } : {};
   const pend = (p) => (p ? ` held${p.mine ? ' mine' : ''}` : '');
@@ -294,7 +298,9 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
 Published: other islands may read it`, href: `#/e/${f.id}` }));
     return isle?.findings_more ? [...rows, { glyph: m('svg', { width: KW, height: KH }), label: `${isle.findings_more} more published`, href: `#/e/${id}` }] : rows;
   };
-  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, [...findingRows(p.id), ...(packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true }))]]));
+  // Its last row, where the session may add to it: a button that adds an item on it (./islands.js).
+  const addRow = (id) => (gestures.on(`i:${id}`).includes('add') ? [{ glyph: m('svg', { width: KW, height: KH, viewBox: `0 0 ${KW} ${KH}` }, m('path', { d: `M${KW / 2 - KH / 3} ${KH / 2}H${KW / 2 + KH / 3}M${KW / 2} ${KH / 6}V${KH * 5 / 6}`, class: 'lf-add-mark' })), label: 'Add', tip: 'Add an item on this island', add: id }] : []);
+  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, [...findingRows(p.id), ...(packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...addRow(p.id)]]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
   const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region');
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
@@ -365,6 +371,8 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
         : m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, fit(i.title, room, n.stub ? STUB_TEXT : TEXT)),
       // In a story, the word a step flags on it then, over its top right corner.
       story && !n.stub && m('text', { key: `f:${n.id}`, x: X + n.w / 2, y: Y - n.h / 2 - z('flag_lift'), class: 'lf-flag' }, ''),
+      // Else why it needs attention now, where the answer says (./reasons.js), flagged in the same place.
+      !story && !n.stub && reasonFlag(i) && m('text', { x: X + n.w / 2, y: Y - n.h / 2 - z('flag_lift'), class: reasonFlag(i).cls }, reasonFlag(i).word),
     ];
     const key = `s:${n.id}`;
     keyed.set(key, i.id);
@@ -413,7 +421,7 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
   /** A step's tip: its title, that it waits on you where it does (a colour no legend explains), and the start of its note. */
   const tipFor = (key) => {
     const i = g.nodes.get(key.slice(2)).item, note = held(i.pending) ? `Held for you${i.pending.reason ? `: ${i.pending.reason}` : ''}` : opening(i);
-    return m('div', { class: 'lf-tip' }, m('b', {}, i.said ?? i.title), yours(i) && m('span', { class: 'lf-tip-you' }, 'Waits on you'), (i.named ?? note) && m('span', {}, i.named ?? note));
+    return m('div', { class: 'lf-tip' }, m('b', {}, i.said ?? i.title), yours(i) && m('span', { class: 'lf-tip-you' }, 'Waits on you'), ...reasonLines(i).map((r) => m('span', {}, r)), (i.named ?? note) && m('span', {}, i.named ?? note));
   };
   /** The tip of a shared mark (a dot, a held badge, a gate), by its key; none for any other. */
   const markTips = [dotTips, heldTips, isles.tips];
@@ -440,7 +448,7 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
     size.width = width;
   }
   return {
-    scene: { css: [css, ...(parts ? [islandCss, ...isles.rules] : []), sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
+    scene: { css: [css, ...(parts ? [islandCss, ...isles.rules] : []), sessionCss, reasonCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: player?.end,
     on(event) {
       const { name, key } = event;

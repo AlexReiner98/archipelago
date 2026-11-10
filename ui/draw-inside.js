@@ -51,12 +51,28 @@ function inside(home, given) {
   const blob = (code) => URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
   const data = (code) => `data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(code)))}`;
 
+  /**
+   * The gesture a drawing opts into (decision e_qpaqnmrc, axis F): a button to add an item on an island. The drawing
+   * says which of its marks are islands, and draws the button where `on` gives it events; the page answers it itself
+   * (ui/marks-add.js), so nothing is heard here. A session that may not write is given no events, so no button.
+   */
+  const gesturesOf = (may) => ({ island = () => null } = {}) => {
+    const writes = Array.isArray(may) && may.includes('write');
+    return { on: (key) => (writes && island(key) ? ['add'] : []), hear: () => false };
+  };
+
   /** One picture, over its own channel. */
   function serve(port) {
-    let drawn, ended = false;
+    let drawn, ended = false, may = [];
     const waiting = [];
     const send = (message) => !ended && port.postMessage(message);
+    // A change asked of the page, answered by number: what came of it, or why not.
+    const asked = new Map();
+    let asks = 0;
+    const change = (ops, reason) => new Promise((resolve) => (asked.set(++asks, resolve), send({ type: 'change', asked: asks, ops, reason: String(reason ?? '') })));
     const tools = {
+      change,
+      gestures: (spec) => gesturesOf(may)(spec),
       measure,
       patch: (list) => send({ type: 'patch', list }),
       open: (id) => send({ type: 'open', id: String(id) }),
@@ -89,6 +105,13 @@ function inside(home, given) {
     let view = null;
     port.onmessage = (ev) => {
       const said = ev.data ?? {};
+      // What came of a change it asked for is answered at once: the drawing may be waiting on it inside an event.
+      if (said.type === 'changed') {
+        const { type: _t, asked: n, ...came } = said;
+        asked.get(n)?.(came);
+        return void asked.delete(n);
+      }
+      if (said.type === 'start') may = Array.isArray(said.input?.may) ? said.input.may : [];
       if (said.type === 'viewport') {
         const told = view;
         view = Object.fromEntries(['x', 'y', 'width', 'height', 'scale'].map((k) => [k, Number(said.view?.[k]) || 0]));

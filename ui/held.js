@@ -1,7 +1,7 @@
 // Held for you: the changes that wait for the owner's word before they apply. Home keeps one line that leads to the
 // canvas of them (the owner, 31 Oct 2026: the canvas finds them, the item's sheet decides them, ui/item-held.js).
 
-import { api, ask, h, tell } from './base.js';
+import { api, ask, h, may, tell } from './base.js';
 import { canvasAt, savedCanvases } from './canvases.js';
 import { gist, loadSchema, relations, typeTitle } from './words.js';
 
@@ -42,7 +42,8 @@ export async function decide(p, yes, { except, ops } = {}) {
 export async function heldPiece(host, title) {
   const [pending, kept] = await Promise.all([api('proposals').catch(() => []), savedCanvases().catch(() => [])]);
   if (!host.isConnected) return;
-  if (!pending.length) return host.remove();
+  // What waits for a word is for whoever may give it.
+  if (!pending.length || !may('write')) return host.remove();
   const canvas = kept.find((x) => x.id === HELD_CANVAS);
   const n = pending.length;
   host.replaceChildren(

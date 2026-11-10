@@ -1,7 +1,7 @@
 // One held change opened whole: each part of it can be left out or corrected before it is applied, or the whole
 // declined (the Look of a held change's band on an item's sheet, ui/item-held.js).
 
-import { api, ask, h } from './base.js';
+import { api, ask, h, may } from './base.js';
 import { ago, typeMark, gist, link, loadSchema, relations, statusesOf, typeTitle, who } from './words.js';
 
 /** The change `p`, drawn as a table of its parts; `names` says what its ids are (id to item), `done` is told once it is decided. */
@@ -50,7 +50,7 @@ export function proposalCard(p, names, done) {
       p.covers && h('div', { class: 'muted small', title: p.covers.join(', ') }, `Covers ${p.covers.length === 1 ? 'an older change' : `${p.covers.length} older changes`}`),
     ),
     h('table', { class: 'ops' }, h('thead', {}, h('tr', {}, h('th', {}), h('th', {}, 'Change'), h('th', {}, 'What'), h('th', {}, 'Status'))), body),
-    h(
+    may('write') && h(
       'div',
       { class: 'actions' },
       approve,
@@ -83,7 +83,7 @@ export function proposalCard(p, names, done) {
     const check = h('input', {
       type: 'checkbox',
       checked: !off,
-      disabled: dead(op),
+      disabled: dead(op) || !may('write'),
       onchange: (e) => {
         included[i] = e.target.checked;
         draw();
@@ -91,7 +91,7 @@ export function proposalCard(p, names, done) {
     });
     const mark = (cell) => (edited.has(i) ? ((cell.className += ' edited'), cell) : cell);
     const statusSelect = (typeId, current, fallback) =>
-      h(
+      !may('write') ? h('span', {}, current ?? fallback) : h(
         'select',
         {
           onchange: (e) => {
@@ -108,7 +108,7 @@ export function proposalCard(p, names, done) {
     if (op.op === 'create') {
       kind = typeMark(op.type);
       what = [
-        h('input', {
+        !may('write') ? h('span', {}, op.title) : h('input', {
           type: 'text',
           value: op.title,
           onchange: (e) => {

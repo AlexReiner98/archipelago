@@ -1,0 +1,92 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { pageLook } from '../src/styles.ts';
+import { sharedView } from '../src/share-view.ts';
+import { callTool } from '../src/tools.ts';
+import type { Actor } from '../src/pelago.ts';
+import { fresh, make } from './map.ts';
+
+const secretOf = (path: string) => path.split('/').at(-1)!;
+
+test('a view or an item is given as a link through a document that brings it in alone, the view drawn live', async () => {
+  const l = await fresh();
+  const people = await make(l, [{ op: 'create', ref: 'ann', type: 'person', title: 'Ann' }]);
+  const ann = l.as(people.ann);
+  const annActor: Actor = { kind: 'human', name: 'ann', person: people.ann };
+  const made = ((await ann.change(annActor, {
+    reason: 'test',
+    ops: [
+      { op: 'create', ref: 'open', type: 'question', title: 'SR&ED', body: 'Claimed after the work.', visibility: 'shared' },
+      { op: 'create', ref: 'hidden', type: 'question', title: 'IRAP', body: 'Call the advisor first.', visibility: 'private' },
+      { op: 'create', ref: 'lens', type: 'lens', title: 'Notes', visibility: 'shared', props: { filter: { find: ['type question'], not: [] }, walk: { over: [], steps: 0 }, style: { shape: 'list' } } },
+    ],
+  })) as { created: Record<string, string> }).created;
+
+  // An agent never makes a link, to a view any more than to a document.
+  await assert.rejects(callTool(ann, { kind: 'agent', name: 'a', person: people.ann }, 'share_create', { id: made.lens }), /humans only/);
+
+  // The view: a document is made about it, holding it alone, and the link draws its answer as the workspace may see it.
+  const link = (await callTool(ann, annActor, 'share_create', { id: made.lens })) as { path: string };
+  const shown = (await sharedView(l, secretOf(link.path)))!;
+  assert.equal(shown.title, 'Notes');
+  assert.deepEqual(shown.parts.map((p) => ('section' in p ? p.section.id : 'text')), [made.lens]);
+  const picture = (shown as { lenses?: Record<string, { items: { title: string }[] }> }).lenses?.[made.lens];
+  assert.ok(picture, 'the view is drawn');
+  assert.deepEqual(picture.items.map((i) => i.title), ['SR&ED'], 'what is private to someone is not in a view anyone with the link sees');
+  assert.equal((picture as { hidden?: number }).hidden, 1, 'and the page is told how many it leaves out');
+  assert.deepEqual((link as { private?: { title: string }[] }).private?.map((i) => i.title), ['IRAP'], 'the one making the link is told which, to share them or not');
+
+  // Live: what is added to the map later is in it the next time the link is opened.
+  await ann.change(annActor, { reason: 'test', ops: [{ op: 'create', type: 'question', title: 'SBIR', body: 'Later.', visibility: 'shared' }] });
+  const again = (await sharedView(l, secretOf(link.path))) as unknown as { lenses: Record<string, { items: { title: string }[] }> };
+  assert.deepEqual(again.lenses[made.lens].items.map((i) => i.title).sort(), ['SBIR', 'SR&ED']);
+
+  // A second link to the view uses the same document; a single item is given the same way, as its page reads it.
+  await callTool(ann, annActor, 'share_create', { id: made.lens });
+  const about = await l.db.query(`select from_id from relation where type = 'about' and valid_to is null and to_id = $1`, [made.lens]);
+  assert.equal(about.rows.length, 1, 'one document about the view, used again');
+  const item = (await callTool(ann, annActor, 'share_create', { id: made.open })) as { path: string };
+  const read = (await sharedView(l, secretOf(item.path)))!;
+  assert.deepEqual(read.parts.map((p) => ('section' in p ? p.section.title : 'text')), ['SR&ED']);
+  assert.equal('lenses' in read, false);
+
+  // A page read with no login carries the style's words for starting a map of one's own.
+  assert.equal((await pageLook(l, { id: 'e_aaaaaaaa', type: 'document' })).start, 'Start a map of your own');
+});
+
+test('a map with only core on gives a view as a link too, through a record that brings it in', async () => {
+  const { cpSync, mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { Registry } = await import('../src/packs.ts');
+  const { freshWith } = await import('./map.ts');
+  const packs = mkdtempSync(join(tmpdir(), 'pelago-core-share-'));
+  cpSync(join(import.meta.dirname, '..', 'packs', 'core'), join(packs, 'core'), { recursive: true });
+  const l = await freshWith(new Registry(packs));
+  assert.deepEqual(l.registry.packs.map((p) => p.id), ['core'], 'core alone');
+  const human: Actor = { kind: 'human', name: 'owner' };
+  const made = ((await l.change(human, {
+    reason: 'test',
+    ops: [
+      { op: 'create', ref: 'plan', type: 'task', title: 'Ship the login', visibility: 'shared' },
+      { op: 'create', ref: 'lens', type: 'lens', title: 'Open work', visibility: 'shared', props: { filter: { find: ['type task'], not: [] }, walk: { over: [], steps: 0 } } },
+    ],
+  })) as { created: Record<string, string> }).created;
+  const link = (await callTool(l, human, 'share_create', { id: made.lens })) as { path: string };
+  const shown = (await sharedView(l, secretOf(link.path)))!;
+  assert.deepEqual(shown.parts.map((p) => ('section' in p ? p.section.id : 'text')), [made.lens]);
+  assert.deepEqual((shown as { lenses?: Record<string, { items: { title: string }[] }> }).lenses?.[made.lens]?.items.map((i) => i.title), ['Ship the login']);
+
+  // The record that wraps the view is the link's own: a view of records, or a walk from the view, leaves it out.
+  const wrap = (await l.db.query<{ from_id: string; wraps: string }>(`select r.from_id, e.props->>'wraps' as wraps from relation r join entity e on e.id = r.from_id where r.type = 'about' and r.valid_to is null and r.to_id = $1`, [made.lens])).rows;
+  assert.deepEqual(wrap.map((w) => w.wraps), [made.lens], 'marked as the link to the view');
+  await l.change(human, { reason: 'test', ops: [{ op: 'create', type: 'record', title: 'Meeting notes', visibility: 'shared' }] });
+  const titles = async (params: Record<string, unknown>) => ((await callTool(l, human, 'view', { name: 'flat', params })) as { items: { title: string }[] }).items.map((i) => i.title);
+  assert.deepEqual(await titles({ filter: { find: ['type record'] } }), ['Meeting notes']);
+  assert.deepEqual(await titles({ filter: { find: [`id ${made.lens}`] }, walk: { over: ['about'], steps: 1 } }), ['Open work']);
+  assert.deepEqual(await titles({ filter: { find: [`id ${wrap[0].from_id}`] } }), ['Open work'], 'named by its id, it is still found');
+
+  // A second link to the view uses the same record.
+  await callTool(l, human, 'share_create', { id: made.lens });
+  assert.equal((await l.db.query(`select 1 from relation where type = 'about' and valid_to is null and to_id = $1`, [made.lens])).rows.length, 1);
+});

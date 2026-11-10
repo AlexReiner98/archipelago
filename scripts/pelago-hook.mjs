@@ -43,8 +43,11 @@
 // At the end of each turn and at the end it also says where the checkout stands (branch, commit, folder, commits no
 // remote has, files not committed), which the run keeps, so what a session left unpushed is known after it ends.
 //
-// It never fails the session: if the server is away it says so on stderr and
-// answers nothing.
+// It never fails the session: if the server is away or refuses it, it says so in the session once (a message the
+// person sees) and answers nothing more. With no token set, a server that asks for one is signed in to through the
+// browser (pelago-login.mjs, beside this in the plugin): the session that asked is registered at its first prompt
+// after. Run by the plugin (--plugin), the working rules beside it (../pelago.md) are said at the start, since a
+// plugin cannot add to CLAUDE.md.
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -56,7 +59,8 @@ const SETUP = '';
 
 const name = process.argv[2];
 const base = (process.env.PELAGO_URL || 'http://127.0.0.1:3100').replace(/\/$/, '');
-const token = process.env.PELAGO_AGENT_TOKEN;
+const login = await import('./pelago-login.mjs').catch(() => null);
+let token = process.env.PELAGO_AGENT_TOKEN || (await login?.accessToken(base).catch(() => undefined));
 
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
@@ -64,15 +68,16 @@ for await (const chunk of process.stdin) input += chunk;
 // The map's tools, as the setup names their server (pelago), and an item's id. A session may be
 // connected to other workspaces too, each its own server named after this one (pelago-site): what the reply read,
 // changed or told there counts for what it did, while the items it named there are not this map's to ask about.
-const MAP_TOOL = /^mcp__pelago__/;
-const ANY_MAP_TOOL = /^mcp__pelago([-_][\w-]*?)?__/;
+// Installed as a plugin, Claude Code names them mcp__plugin_<plugin>_pelago__<tool>.
+const MAP_TOOL = /^mcp__(plugin_[\w-]+?_)?pelago__/;
+const ANY_MAP_TOOL = /^mcp__(plugin_[\w-]+?_)?pelago([-_][\w-]*?)?__/;
 const ITEM = /\be_[a-z0-9]{8}\b/g;
 // A git command, past the options that come before its subcommand (git -C dir commit, git -c a=b push).
 const GIT = (sub) => new RegExp(String.raw`(^|[\s;&|(])git(\s+(-[Cc]\s+("[^"]*"|'[^']*'|\S+)|--?[\w-]+(=\S+)?))*\s+` + sub + String.raw`(?![\w-])`);
 const COMMIT = GIT('commit');
 const PUSH = GIT('push');
 // The reads that are not about several items: one item, what the tools take, where a session starts, how a page looks.
-const NOT_SURVEYS = new Set(['get', 'document', 'actions', 'schema', 'watch', 'picture', 'packs', 'style', 'story', 'published', 'publish_plan', 'backup_download', 'share_figure', 'brief', 'handoff']);
+const NOT_SURVEYS = new Set(['get', 'document', 'actions', 'schema', 'watch', 'picture', 'packs', 'style', 'story', 'published', 'publish_plan', 'backup_download', 'share_figure', 'brief', 'handoff', 'frontier']);
 // The tools that write a file.
 const EDITS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 // What git answers a commit with: [branch 1a2b3c4] Subject, or [main (root-commit) 1a2b3c4], or [detached HEAD 1a2b3c4].
@@ -328,7 +333,7 @@ if (name === 'session-start') {
     try {
       const said = JSON.parse(body);
       const git = gitState(said.cwd);
-      if (git) body = JSON.stringify({ ...said, git });
+      if (git) body = JSON.stringify({ ...said, stands: git });
     } catch {
       // Not JSON: it goes as it came.
     }
@@ -362,15 +367,62 @@ if (adapter) try {
 const telling = name === 'stop' ? null : sendEvents(said, events);
 let answered = '';
 
+const post = (event, payload) =>
+  fetch(`${base}/hooks/${event}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }, body: payload, signal: AbortSignal.timeout(10_000) });
+/** The run the server named for this session, kept for the commit-msg hook. */
+function keepRun(res, sent) {
+  const run = res.headers.get('x-pelago-run');
+  if (!run || !/^[\w-]+$/.test(run)) return;
+  try {
+    const file = runFile(JSON.parse(sent));
+    if (file) {
+      mkdirSync(resolve(file, '..'), { recursive: true });
+      writeFileSync(file, run);
+      if (/^\d+$/.test(process.env.CLAUDE_PID ?? '')) writeFileSync(`${file}.pid`, process.env.CLAUDE_PID);
+      return run;
+    }
+  } catch (err) {
+    console.error(`Archipelago ${name} hook: the run could not be kept for commits (${err.message})`);
+  }
+  // Outside a git checkout there are no commits to name it in.
+  return undefined;
+}
+
+/** What goes wrong is said to the person in the session, once a session for each thing, not at every turn. */
+function sayOnce(kind, words) {
+  console.error(words);
+  const file = typeof said.session_id === 'string' && /^[\w-]+$/.test(said.session_id) ? resolve(tmpdir(), 'pelago-said', `${said.session_id}-${kind}`) : null;
+  try {
+    if (file) mkdirSync(dirname(file), { recursive: true }), writeFileSync(file, '', { flag: 'wx' });
+    return words;
+  } catch {
+    return '';
+  }
+}
+// What this hook says beside the server's answer: context for the agent, and a line the person sees.
+const plugin = process.argv.includes('--plugin') ? login?.plugin(said, import.meta.url) : null;
+const context = [];
+let notice = '';
+let out = null;
+
 try {
-  const res = await fetch(`${base}/hooks/${name}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) },
-    body,
-    signal: AbortSignal.timeout(10_000),
-  });
+  // A session that started before its sign-in is registered at its first prompt after.
+  const late = name === 'prompt' && token ? plugin?.lateStart() : null;
+  if (late) {
+    const res = await post('session-start', late);
+    if (res.ok) context.push(plugin.fromServer(await res.text())?.hookSpecificOutput?.additionalContext, plugin.rules(), plugin.trailer(keepRun(res, late), said.cwd));
+  }
+  const res = await post(name, body);
   const answer = (answered = await res.text());
-  if (res.ok && name === 'file-used') {
+  if (res.status === 401 && plugin && !process.env.PELAGO_AGENT_TOKEN) {
+    // No sign-in, or one the server no longer takes: the person is asked to sign in, in the browser.
+    if (token) login.forget(base);
+    if (name === 'session-start' || name === 'prompt') {
+      const asked = await plugin.askSignIn(base, name === 'session-start' && body);
+      notice = asked.notice;
+      context.push(asked.context);
+    }
+  } else if (res.ok && name === 'file-used') {
     // What it said is kept, so the next file's answer leaves it out; the rest is Claude Code's.
     const { said: ids, ...rest } = JSON.parse(answer || '{}');
     const told = Array.isArray(ids) && ids.length ? runFile(JSON.parse(body)) : null;
@@ -378,25 +430,19 @@ try {
       mkdirSync(resolve(told, '..'), { recursive: true });
       appendFileSync(`${told}.said`, ids.map((id) => `${id}\n`).join(''));
     }
-    process.stdout.write(JSON.stringify(rest));
-  } else if (res.ok) process.stdout.write(answer);
-  else console.error(`Archipelago ${name} hook: ${base} answered ${res.status}`);
-  const run = res.ok && name === 'session-start' ? res.headers.get('x-pelago-run') : null;
-  if (run && /^[\w-]+$/.test(run)) {
-    try {
-      const file = runFile(JSON.parse(body));
-      if (file) {
-        mkdirSync(resolve(file, '..'), { recursive: true });
-        writeFileSync(file, run);
-        if (/^\d+$/.test(process.env.CLAUDE_PID ?? '')) writeFileSync(`${file}.pid`, process.env.CLAUDE_PID);
-      }
-    } catch (err) {
-      console.error(`Archipelago ${name} hook: the run could not be kept for commits (${err.message})`);
+    out = rest;
+  } else if (res.ok) {
+    out = answer;
+    if (name === 'session-start') {
+      const run = keepRun(res, body);
+      if (plugin) (out = plugin.fromServer(answer)), context.push(plugin.rules(), plugin.trailer(run, said.cwd));
     }
-  }
+  } else notice = sayOnce(`status-${res.status}`, `Archipelago ${name} hook: ${base} answered ${res.status}${res.status === 401 || res.status === 403 ? `: this machine ${token ? 'has a token the server refused' : 'has no token for it'}, so this session is not on the map` : ''}.`);
 } catch (err) {
-  console.error(`Archipelago ${name} hook: ${base} did not answer (${err.message})`);
+  notice = sayOnce('away', `Archipelago ${name} hook: ${base} did not answer (${err.message}), so this session’s work is not reaching the map.`);
 }
+const written = login && (context.length || notice) ? login.withSaid(out, name, context, notice) : notice ? { systemMessage: notice } : out;
+if (written) process.stdout.write(typeof written === 'string' ? written : JSON.stringify(written));
 // A reply the server sends on has not ended: its turn goes on.
 if (name === 'stop') {
   try {

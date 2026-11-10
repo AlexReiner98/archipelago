@@ -3,7 +3,7 @@
 
 import { newId, type Q } from './db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts'; import { ownerFollows } from './owner-link.ts';
-import { stillWritable } from './ended.ts'; import { roomToStore } from './plan.ts';
+import { roomToStore, stillWritable } from './standing.ts';
 import { typesAfter, typesApplied } from './type-items.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { append, type Decision, type Fact } from './log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
@@ -14,8 +14,8 @@ import type { Verdict } from './rules.ts';
 
 type Props = Record<string, unknown>;
 
-/** Who a new private thing is private to: the viewer, when there is one. */
-const privateTo = (map: Archipelago, visibility: string): string | null => (visibility === 'private' && map.viewer ? map.viewer : null);
+/** Who a new private thing is private to: the viewer, when there is one; for an approved change, whom it was held for (`to`). */
+const privateTo = (map: Archipelago, visibility: string, to?: string | null): string | null => (visibility !== 'private' ? null : to !== undefined ? to : map.viewer || null);
 
 /**
  * Apply a change without consulting policy. For human changes, approved proposals, and the system's own bookkeeping
@@ -23,7 +23,7 @@ const privateTo = (map: Archipelago, visibility: string): string | null => (visi
  * facts are appended to the fact stream as one change set in the same transaction. dry: the facts it would append and
  * the ids it would make, with nothing written; ids: those ids, to make the same ones again.
  */
-export async function applyChange(map: Archipelago, actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority; token?: string; rule?: Decision; dry?: boolean; ids?: Record<string, string> } = {}) {
+export async function applyChange(map: Archipelago, actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority; token?: string; rule?: Decision; dry?: boolean; ids?: Record<string, string>; privateTo?: string | null } = {}) {
   const ops = dropExcepted(input.ops, opts.except ?? []); await stillWritable(map.workspace); if (!opts.dry) await roomToStore(map.workspace);
   if (!ops.length) throw new Error('Nothing left to apply after exclusions.');
   // Validate again: the map may have changed since this was proposed.
@@ -44,7 +44,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
     const when = await stamp(tx);
     const said = async (some: Fact[]) => { facts.push(...some); await projectFacts(tx, reg, when, some); };
     const fallback = await map.defaultVisibility(tx);
-    const source = (spec: SourceSpec) => ensureSource(map, tx, spec, said, mint);
+    const source = (spec: SourceSpec) => ensureSource(map, tx, spec, said, mint, opts.privateTo);
     const defaultSource = input.source ? await source(input.source) : null;
     const sourceOf = async (op: { source?: SourceSpec }) => (op.source ? source(op.source) : defaultSource);
     const resolve = (key: string) => created[key] ?? key;
@@ -62,7 +62,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
           const visibility = op.visibility ?? fallback;
           await said(itemFacts({
             id, type: op.type, title: named(op.title.trim()), body: named(op.body) ?? '', status: op.status ?? type.statuses.open[0],
-            visibility, private_to: privateTo(map, visibility), owner: op.owner ? resolve(op.owner) : null, confidence: op.confidence ?? 1,
+            visibility, private_to: privateTo(map, visibility, opts.privateTo), owner: op.owner ? resolve(op.owner) : null, confidence: op.confidence ?? 1,
             source_id: type.columns && !type.columns.source ? null : await sourceOf(op), props: { ...reg.defaults(op.type), ...refsIn(op.props, named) },
           }));
           await kept(tx, id, op.props);
@@ -84,7 +84,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
             owner: op.owner === undefined ? before.owner : op.owner && resolve(op.owner),
             confidence: op.confidence ?? before.confidence,
             // Only an explicit change of visibility moves who it is private to.
-            private_to: op.visibility !== undefined && op.visibility !== before.visibility ? privateTo(map, visibility) : before.private_to,
+            private_to: op.visibility !== undefined && op.visibility !== before.visibility ? privateTo(map, visibility, opts.privateTo) : before.private_to,
           }));
           await kept(tx, op.id, op.props);
           break;
@@ -194,7 +194,7 @@ async function kept(tx: Q, id: string, props: Props = {}) {
   await tx.query(`update entity set props = (props || $2::jsonb) - $3::text[] where id = $1`, [id, JSON.stringify(set), ours.filter(([k]) => !(k in set)).map(([k]) => k)]);
 }
 
-async function ensureSource(map: Archipelago, q: Q, spec: SourceSpec, said: (facts: Fact[]) => Promise<void>, mint: (key: string, prefix: string) => string): Promise<string | null> {
+async function ensureSource(map: Archipelago, q: Q, spec: SourceSpec, said: (facts: Fact[]) => Promise<void>, mint: (key: string, prefix: string) => string, to?: string | null): Promise<string | null> {
   const type = map.registry.type('source');
   if (!type) return null;
   const found = await q.query<{ id: string }>(`select id from entity where type = 'source' and props->>'uri' = $1 and archived_at is null -- index entity_source_uri`, [spec.uri]);
@@ -206,6 +206,6 @@ async function ensureSource(map: Archipelago, q: Q, spec: SourceSpec, said: (fac
   if (problems.length) throw new Error(`Change rejected:\n- source: ${problems.join('\n- source: ')}`);
   const visibility = await map.defaultVisibility(q);
   // The source's own facts, before the facts that name it.
-  await said(itemFacts({ id, type: type.id, title: spec.title ?? spec.uri, body: spec.excerpt ?? '', status: 'recorded', visibility, private_to: privateTo(map, visibility), props }));
+  await said(itemFacts({ id, type: type.id, title: spec.title ?? spec.uri, body: spec.excerpt ?? '', status: 'recorded', visibility, private_to: privateTo(map, visibility, to), props }));
   return id;
 }

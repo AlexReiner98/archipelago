@@ -1,6 +1,6 @@
-// Connect the project in this folder to an Archipelago server, or take Archipelago out of it again. The server hands
-// this script out at GET /connect/setup.mjs with two lines in front of it: ORIGIN (its own address) and FILES
-// (what to write). It is run once in each project, from that project's folder (the first time on a machine with
+// Connect the project in this folder to an Archipelago server, or take Archipelago out of it again. The claude_code
+// server pack hands this script out at GET /connect/setup.mjs with ORIGIN (the server's address), TOKENS and FILES
+// (what to write) in front of it (packs/claude_code/sync.mjs). It is run once in each project, from that project's folder (the first time on a machine with
 // the token carried in, which it then keeps for the machine), and can be run again: it writes only what is
 // missing or has changed, and adds to .mcp.json, .claude/settings.json and CLAUDE.md without taking anything
 // out of them. It holds no secret: the token is in the machine's environment (PELAGO_AGENT_TOKEN).

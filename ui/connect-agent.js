@@ -13,10 +13,26 @@ const address = () => `${location.origin}/mcp${workspace === 'default' ? '' : `/
 const onThisMachine = () => /^(localhost|127\.|\[::1\])/.test(location.hostname);
 const FIRST_ASK = 'Put this project in Archipelago, with the three things I am working on as tasks, and tell me what you would do first.';
 
-const cursorInstall = () => `cursor://anysphere.cursor-deeplink/mcp/install?name=archipelago&config=${encodeURIComponent(btoa(JSON.stringify({ type: 'http', url: address() })))}`;
+// One name for the map's server in every client that asks for one, as the plugin and the setup name it.
+const SERVER = 'pelago';
+// The plugin (scripts/plugin.ts) connects to the hosted server unless PELAGO_URL names another.
+const HOSTED = 'https://app.archipelago.tools';
+const cursorInstall = () => `cursor://anysphere.cursor-deeplink/mcp/install?name=${SERVER}&config=${encodeURIComponent(btoa(JSON.stringify({ type: 'http', url: address() })))}`;
 
 // Each client's steps: its words, then what the row offers (copy, or open a place) and the rest of it in a tooltip.
 const CLIENTS = [
+  {
+    id: 'claude-code',
+    name: 'Claude Code',
+    label: 'Claude Code',
+    steps: () => [
+      location.origin !== HOSTED && ['Point Claude Code at this server', { copy: `PELAGO_URL=${location.origin}`, show: true }, 'Set it in your environment before opening Claude Code: setx on Windows, export in your shell profile elsewhere.'],
+      ['In Claude Code, add the marketplace', { copy: '/plugin marketplace add AlexReiner98/archipelago', show: true }],
+      ['Then install the plugin', { copy: '/plugin install archipelago@archipelago', show: true }, 'It brings the map’s tools, the hooks that put each session on the map, and the working rules.'],
+      ['Open a new session, then Allow here', null, 'The plugin opens this page in your browser to connect the computer.'],
+      ['Type /mcp, choose pelago, then Allow here', null, 'Connects the map’s tools as well.'],
+    ].filter(Boolean),
+  },
   {
     id: 'claude',
     name: 'Claude',
@@ -44,16 +60,6 @@ const CLIENTS = [
     ],
   },
   {
-    id: 'claude-code',
-    name: 'Claude Code',
-    label: 'Claude Code',
-    steps: () => [
-      ['Run this in a terminal', { copy: `claude mcp add --transport http --scope user archipelago ${address()}`, show: true }],
-      ['In Claude Code, type /mcp', null, 'Choose archipelago from the list.'],
-      ['Sign in here when asked, then Allow'],
-    ],
-  },
-  {
     id: 'cursor',
     name: 'Cursor',
     label: 'Cursor',
@@ -70,7 +76,7 @@ const CLIENTS = [
     steps: () => [
       ['Copy this address', { copy: address() }],
       ['In the Command Palette, run MCP: Add Server', { copy: 'MCP: Add Server', label: 'Copy name' }, 'Ctrl+Shift+P, or Cmd+Shift+P on a Mac'],
-      ['Choose HTTP and paste the address', null, 'Name it archipelago, and choose Global to have it in every project.'],
+      ['Choose HTTP and paste the address', null, `Name it ${SERVER}, and choose Global to have it in every project.`],
       ['Sign in here when asked, then Allow'],
     ],
   },
@@ -98,7 +104,7 @@ const CLIENTS = [
 ];
 
 /** What the card remembers while the page is drawn again: whether it is open, the client chosen, and the name of one that has just landed. */
-const chosen = { open: false, client: 'claude', landed: null };
+const chosen = { open: false, client: 'claude-code', landed: null };
 /** Open or shut the steps. */
 export const connecting = (open) => ((chosen.open = open), (chosen.landed = null));
 export const isConnecting = () => chosen.open;

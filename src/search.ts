@@ -67,6 +67,8 @@ export interface SearchInput {
   open?: boolean;
   include_archived?: boolean;
   limit?: number;
+  /** Types left out, each with the types that extend it. */
+  except?: string[];
 }
 
 /** How well an item (its columns unqualified, or as `e.`) matches the words in parameter `q`, the best highest: the
@@ -98,6 +100,7 @@ export async function search(db: Q, family: (type: string) => string[], input: S
       rank = `${rankSql(`$${params.length}`)} desc, `;
     }
     if (input.type) add(`type = any(?::text[])`, family(input.type));
+    if (input.except?.length) add(`not (type = any(?::text[]))`, input.except.flatMap(family));
     if (input.status) add(`status = ?`, input.status);
     if (input.owner) add(`owner = ?`, input.owner);
     if (input.open !== undefined) add(`is_open = ?`, input.open);

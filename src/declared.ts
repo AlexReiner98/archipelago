@@ -98,7 +98,7 @@ export interface ViewDef {
 }
 
 /** The reads a view the kernel answers may name, each kept to the form its view had (src/query-presets.ts). */
-export const LENS_ANSWERS = ['flat', 'graph', 'tree', 'hubs', 'attention', 'brief'] as const;
+export const LENS_ANSWERS = ['flat', 'graph', 'tree', 'hubs', 'attention', 'brief', 'frontier'] as const;
 
 /**
  * A tree a pack declares over "is part of": a roadmap, for one. The `tree`

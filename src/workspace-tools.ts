@@ -2,11 +2,11 @@
 // (apply their changes, download backups, publish documents) is the owner's to give and take back.
 
 import { z } from 'zod';
-import { endedOf } from './ended.ts';
+import { endedOf, useOf, type Limits } from './standing.ts';
 import { limitOf, renameWorkspace } from './members.ts';
 import { looksThisHour } from './looks.ts';
 import { sessionsAwake } from './sessions.ts';
-import { requestsThisMinute, storageOf, useOf, type Limits } from './plan.ts';
+import { requestsThisMinute, storageOf } from './workspace-use.ts';
 import { acceptedSenders, wholeMap } from './outbox.ts';
 import { actorId, type Archipelago } from './pelago.ts';
 import { askedLately } from './replies.ts';
@@ -49,7 +49,7 @@ async function replyRules(l: Archipelago, lifted: Record<string, boolean>, set: 
   });
 }
 
-/** How much of what its limits cap the workspace uses now (src/plan.ts), each said as the Limits card shows it. */
+/** How much of what its limits cap the workspace uses now (src/standing.ts), each said as the Limits card shows it. */
 async function planUse(l: Archipelago, limits: Limits) {
   const { db } = await wholeMap(l);
   const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from member where removed_at is null`);
@@ -66,11 +66,13 @@ export const WORKSPACE_TOOLS: Record<string, Tool> = {
       const limits = await limitOf(l.workspace);
       // Whether anything has been put here yet beyond who is in it and how the app is set up.
       const started = (await l.db.query(`select 1 from entity where type <> all($1::text[]) and ${notKernel(l.registry)} and archived_at is null limit 1`, [l.registry.family('actor')])).rows.length > 0;
-      return { ...(await settings(l)), started, owner: rows[0] ?? null, member_limit: limits ?? null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
+      // Whether any agent session has ever been here: until one has, an empty page points at connecting one.
+      const agents = (await l.db.query(`select 1 from entity where type = 'run' limit 1 -- index entity_type`)).rows.length > 0;
+      return { ...(await settings(l)), started, agents, owner: rows[0] ?? null, member_limit: limits ?? null, ...(limits && { use: await planUse(l, limits) }), ended: (await endedOf(l.workspace)) ?? null };
     },
   },
   workspace_set: {
-    description: 'Change workspace settings. default_visibility: whether new things are private to their author (the default) or shared unless they say otherwise. agent_changes: "apply" to have what agents change take effect as they make it, each change logged and undoable, or "hold" to have it wait for a human. With "apply" an agent can also settle a decision or a hypothesis: it must say what was chosen and why, and the human is notified. accepts_from: which other workspaces may send this one notifications. Admins only.',
+    description: 'Change workspace settings. default_visibility: whether new things are shared unless they say otherwise (how a new workspace starts) or private to their author. agent_changes: "apply" to have what agents change take effect as they make it, each change logged and undoable, or "hold" to have it wait for a human. With "apply" an agent can also settle a decision or a hypothesis: it must say what was chosen and why, and the human is notified. accepts_from: which other workspaces may send this one notifications. Admins only.',
     humanOnly: true,
     input: {
       default_visibility: z.enum(['private', 'shared']).optional(),

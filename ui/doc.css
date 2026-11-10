@@ -109,6 +109,18 @@ footer.site-foot {
 footer.site-foot p {
   margin: var(--rhythm-2) 0;
 }
+/* A page read with no login: its way to print, and at the far side its quiet way to start a map of one's own. */
+footer.muted {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-7);
+}
+a.start-own {
+  margin-left: auto;
+  color: var(--reader-muted);
+  font-size: var(--reader-small);
+}
 button.print {
   font: inherit;
   padding: var(--space-4) var(--space-7);
@@ -381,3 +393,12 @@ button.copy.copied::before {
   right: var(--space-5);
   margin: 0;
 }
+
+/* An item of a link's view, opened read only in a sheet over the page (ui/doc-sheet.js). */
+.doc-sheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(var(--reader-measure), 100%); overflow: auto; padding: var(--space-8) var(--reader-side); background: var(--reader-page, Canvas); color: var(--reader-ink, CanvasText); border-left: var(--border-1) solid var(--reader-line); }
+.doc-sheet-close { position: sticky; top: 0; float: right; border: 0; background: none; color: inherit; font: inherit; font-size: var(--reader-h1); line-height: 1; cursor: pointer; }
+.doc-sheet h2 { margin-top: 0; }
+.doc-sheet-fields { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2) var(--space-5); font-family: var(--face-text); font-size: var(--reader-small); }
+.doc-sheet-fields dt { color: var(--reader-muted); }
+.doc-sheet-fields dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media print { .doc-sheet { display: none; } }

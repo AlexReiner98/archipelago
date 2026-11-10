@@ -33,13 +33,12 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './auth.ts'; import { firstStart } from './first-start.ts';
 import { notify } from './notify.ts'; import { alertOnCrash } from './alert.ts';
-import { backupAll, parseBackup, parseVault } from './backup.ts'; import { adminEmails, admitMember, configureMembers, memberLimit, ownerEmail } from './members.ts'; import { configureEnded, readEnded } from './ended.ts'; import { askedAs, configurePlan, requestWait, slowTokensAt, storageBytes, tooManyRequests } from './plan.ts';
-import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts';
-import { env } from './env.ts';
-import { serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
-import { configureLauncher, stopAllLaunched } from './launcher.ts';
+import { backupAll, parseBackup, parseVault } from './backup.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from './members.ts'; import { requestWait } from './standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from './workspace-use.ts';
+import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts'; import { env } from './env.ts';
+import { SHORT, serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
+import { stopAllLaunched } from './launcher.ts'; import { configureLaunch } from './server-launch.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
-import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts';
+import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts'; import { pageMay } from './may.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { configureOutbox } from './outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from './control-index.ts'; import { isPersonToken, personAt } from './person-tokens.ts';
 import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './connection-tools.ts'; import { setReach } from './pack-reach.ts';
@@ -47,14 +46,13 @@ import { pgLeader, soleLeader, type Leader } from './leader.ts'; import { draine
 import { serverDuties } from './duties.ts'; import { keepVisits, onSitePage } from './visits.ts';
 import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
-import { servePublic } from './public-route.ts'; import { serveSite, siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
+import { servePublic } from './public-route.ts'; import { siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
 import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
-import { sharedDocument, sharedPicture } from './documents.ts';
-import { configureSecrets } from './secrets.ts';
-import { serveBackupFile } from './backup-tools.ts';
-import { answerHook } from './hook-answers.ts';
+import { sharedPicture } from './documents.ts'; import { sharedAnswer } from './share-view.ts'; import { guestMap, ShareEnded } from './guests.ts'; import { serveLink } from './share-link-route.ts'; import { frozen } from './share-link.ts';
+import { configureSecrets } from './secrets.ts'; import { serveBackupFile } from './backup-tools.ts';
+import { answerAt, hookAt } from './server-adapter.ts'; import { mountOf, serveMounted } from './server-mounts.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
-import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY } from './page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from './draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
+import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, unlisted, PAGE_POLICY, PREVIEW_POLICY, SHARED_POLICY } from './page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from './draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
@@ -105,7 +103,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   serverPacks.origin = named[0] ? `https://${named[0]}` : origins[0];
   configureConnections(serverPacks);
   setReach({ hold: (id) => workspaces.hold(id), connection: async (id, pack) => { const c = await serverPacks.connectionOf(pack, id); return c ? { id: c.id, account: c.account } : null; }, via: (id, pack, host, path) => serverPacks.lent(pack, host, id, path) });
-  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), limitOf: async (id) => (id === 'default' ? undefined : memberLimit((await workspaces.get('default')).pelago.db, id)) }); configureIndex(() => workspaces.control()); configureEnded(async (id) => (id === 'default' ? undefined : readEnded((await workspaces.get('default')).pelago.db, id))); configurePlan({ storageOf: async (id) => storageBytes((await workspaces.get(id)).pelago.db) }); slowTokensAt(options.limits?.token);
+  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => dueForDeletion(serverPacks, await workspaces.control(), now); slowTokensAt(options.limits?.token);
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
   const running = { commit: startedFrom(), started: new Date().toISOString() };
@@ -119,11 +117,11 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const trusted = trustedProxies(options.proxies);
   const addressOf = (req: IncomingMessage) => clientAddress(req.headers['x-forwarded-for'], req.socket.remoteAddress, trusted);
   /** True, and the request answered, when its address has asked too often. */
+  const counted = new WeakMap<IncomingMessage, Set<unknown>>(); // a request counts once against a limit, though a pack passes it back (src/server-mounts.ts)
   const tooOften = (req: IncomingMessage, res: ServerResponse, count: ReturnType<typeof limiter>) => {
-    const wait = count.take(addressOf(req));
-    if (wait) send(res, 429, { error: `Asked too often. Try again in ${wait} seconds.` }, { 'retry-after': String(wait) });
-    return wait > 0;
-  };
+    if (counted.get(req)?.has(count)) return false; counted.set(req, (counted.get(req) ?? new Set()).add(count));
+    const wait = count.take(addressOf(req)); if (wait) send(res, 429, { error: `Asked too often. Try again in ${wait} seconds.` }, { 'retry-after': String(wait) });
+    return wait > 0; };
 
   /** The workspace a request is for and who is making it. */
   async function resolve(req: IncomingMessage, res: ServerResponse, surface: 'human' | 'agent', asks?: () => Promise<string | undefined>): Promise<{ ws: Workspace; pelago: Archipelago; actor: (label?: string) => Actor; look?: true }> {
@@ -160,7 +158,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       const at = await personAt(token, asked, async (w) => ((await workspaces.has(w)) ? (await workspaces.get(w)).pelago.db : undefined));
       if (!at) throw deny(); // not a member there: the same answer as a token nobody made
       res.once('close', workspaces.hold(at.workspace)); const ws = await workspaces.get(at.workspace), as = at.actor;
-      const slow = await requestWait(ws.id, token, askedAs(as)); if (slow) throw new Refused(429, await tooManyRequests(ws.id, slow), slow);
+      const slow = await requestWait(ws.id, token, askedAs(as)); if (slow.wait) throw new Refused(429, slow.refusal!, slow.wait);
       return { ws, pelago: ws.pelago.as(as.person ?? '', false), actor: (label) => (label ? { ...as, name: `${as.name}/${label}` } : as) };
     }
     if (!token || !id || !(await workspaces.has(id))) throw deny();
@@ -176,7 +174,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       await unindexToken(control, hashSecret(token));
       throw deny();
     } else if (((await asked()) || id) !== id) throw deny(); // its own workspace alone, asked once it is known good
-    const slow = await requestWait(ws.id, token, askedAs(identity.actor)); if (slow) throw new Refused(429, await tooManyRequests(ws.id, slow), slow);
+    const slow = await requestWait(ws.id, token, askedAs(identity.actor)); if (slow.wait) throw new Refused(429, slow.refusal!, slow.wait);
     if (identity.newPlace)
       await notify(ws.pelago, { kind: 'agent', name: 'pelago' }, {
         title: `The token "${identity.actor.name}" was used from a new place`,
@@ -188,7 +186,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       ws,
       // Everything this request reads or writes goes through the database as
       // this person sees it. A token tied to nobody sees only what is shared.
-      pelago: ws.pelago.as(identity.actor.person ?? '', Boolean(identity.actor.admin)),
+      pelago: identity.actor.reads ? await guestMap(ws.pelago, identity.actor.reads, identity.actor.person ?? '').catch((err) => { throw err instanceof ShareEnded ? new Refused(403, err.message) : err; }) : ws.pelago.as(identity.actor.person ?? '', Boolean(identity.actor.admin)),
       actor: (label) => (label && identity.actor.kind === 'agent' ? { ...identity.actor, name: `${identity.actor.name}/${label}` } : identity.actor),
     };
   }
@@ -212,8 +210,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       const url = new URL(req.url ?? '/', 'http://localhost'), host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined;
       if (drawing.only(host) && !(req.method === 'GET' && drawHostServes(url.pathname))) return send(res, 404, { error: 'Not found' }); // the drawing host serves drawings only
       if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, data: devMode() ? (workspaces.config.dataDir ?? undefined) : undefined, leading: options.leading?.() ?? true });
-      // A domain that serves a workspace's public site: its pages by address word (src/site.ts), its icon; the rest as on any name.
-      if (site && (tooOften(req, res, open) || (await serveSite(res, url.pathname, { host, workspace: site, workspaces, onPage: () => onSitePage(site, host, url, req) })))) return;
+      // A domain that serves a workspace's public site: its pages by the reader pack (packs/reader), its icon; the rest as on any name.
+      const mount = req.method === 'GET' ? mountOf(url.pathname, site) : undefined; // an address a server pack took from the kernel's list (src/server-mounts.ts)
+      if (mount && (await serveMounted(req, res, mount, url.pathname, { packs: serverPacks, site, tokens, workspaces, named, sites, host, from: addressOf(req), onPage: () => site && onSitePage(site, host, url, req), tooOften: () => tooOften(req, res, open) }))) return;
       if (req.method === 'GET' && ICON.test(url.pathname)) return tooOften(req, res, open) || (await serveIcon(res, (await workspaces.get(site ?? DEFAULT_WORKSPACE)).pelago));
       if (req.method === 'GET' && url.pathname.startsWith('/backup-file/')) {
         if (tooOften(req, res, open)) return; // a guessed key would otherwise open the workspace it names, again and again
@@ -222,12 +221,14 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       }
       // What a project needs to work with this server, and a running system's request for its token: no token needed.
       // A server pack answers at the addresses it had before it was a pack, too (a GitHub App set up then still sends there).
-      const packPath = serverPacks.aliased(url.pathname) ?? url.pathname;
-      if (/^\/(connect|x|oauth|\.well-known)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : /^\/connect\/(sign-in|code|join)$/.test(packPath) ? signIn : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX), person: () => resolve(req, res, 'human') });
+      const packPath = (req.method === 'GET' && Object.hasOwn(SHORT, url.pathname) ? SHORT[url.pathname] : serverPacks.aliased(url.pathname)) ?? url.pathname;
+      if (/^\/(connect|x|oauth|\.well-known)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : /^\/connect\/(sign-in|code|join|password|password\/set)$/.test(packPath) ? signIn : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX), person: () => resolve(req, res, 'human'), from: addressOf(req) });
 
-      // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
+      // A product's public page, which the reader pack passed on: open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture|drawing|live)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
-      if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces, named, sites, from: addressOf(req) }));
+      if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces }));
+      // A frozen link's secret traded for a reader token, and that token's reads, from the link's snapshot alone (src/share-link-route.ts).
+      if (await serveLink(req, res, url.pathname, { workspaces, tooOften: () => tooOften(req, res, open), local: () => local(req), body: () => readJson(req) })) return;
 
       // A document given as a link: open to whoever holds it, with no login. The secret in the path is the only key, so
       // the page is never cached, never framed and never says where it was read from. What it shows is read through one
@@ -236,19 +237,19 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (shared) {
         if (tooOften(req, res, open)) return;
         const [, wsId, secret, data, figure] = shared;
-        const guard = UNLISTED;
+        const guard = UNLISTED, app = !data && (await workspaces.has(wsId)) && (await frozen((await workspaces.get(wsId)).pelago, secret)); // a frozen link opens the app, read only
         if (!data) {
-          res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
-          return res.end(await uiPage('doc.html'));
+          res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': app ? PAGE_POLICY : SHARED_POLICY });
+          return res.end(unlisted(app && options.unsandboxed ? markPage(await uiPage('index.html'), { open: false, unsandboxed: true }) : await uiPage(app ? 'index.html' : 'doc.html')));
         }
         if (data === 'picture') {
           const picture = figure && (await workspaces.has(wsId)) ? await sharedPicture((await workspaces.get(wsId)).pelago, secret, figure) : null;
           if (!picture) return send(res, 404, { error: 'Not found' }, guard);
           return res.writeHead(200, { ...guard, 'content-type': picture.content_type, 'content-security-policy': "default-src 'none'" }).end(picture.bytes);
         }
-        const doc = (await workspaces.has(wsId)) ? await sharedDocument((await workspaces.get(wsId)).pelago, secret) : null;
+        const doc = (await workspaces.has(wsId)) ? await sharedAnswer((await workspaces.get(wsId)).pelago, secret, url.searchParams.get('item')) : null;
         if (!doc) return send(res, 404, { error: 'This link does not open anything: it may have been revoked.' }, guard);
-        return send(res, 200, { ...doc, ...(await pageLook((await workspaces.get(wsId)).pelago, doc)) }, guard);
+        return send(res, 200, 'item' in doc ? doc : { ...doc, ...(await pageLook((await workspaces.get(wsId)).pelago, doc)) }, guard);
       }
 
       // A document read by someone signed in, to print or save as a PDF: the same page a link opens, which reads the
@@ -298,8 +299,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       if (req.method === 'GET' && url.pathname === '/whoami') {
         if (!local(req, false)) return send(res, 403, { error: 'Local requests only.' });
-        const { ws, actor } = await resolve(req, res, 'human');
-        return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name }, actor: actor() });
+        const { ws, actor, look } = await resolve(req, res, 'human'), me = actor(); // what it may do draws the page's controls (src/may.ts)
+        return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name }, actor: me, may: pageMay(me, Boolean(look), devMode() ? url.searchParams.get('may') : null) });
       }
 
       // A pack's webhook: /hook/<pack>/<id> in the default workspace, /hook/<workspace>/<pack>/<id> in another.
@@ -338,9 +339,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         if (req.headers.origin || !hosts.includes(req.headers.host ?? '')) return send(res, 403, { error: 'Hooks are called by Claude Code, not from a web page, and at an address this server is known by.' });
         const { ws, pelago, actor } = await resolve(req, res, 'agent');
         const body = ((await readJson(req)) ?? {}) as { session_id?: string; cwd?: string; remote?: string; reason?: string; tokens?: number; setup?: string };
-        const host = req.headers.host ?? '';
-        const answer = await answerHook(url.pathname.slice('/hooks/'.length), { whole: ws.pelago.db, pelago, within: actor().within ?? [], may: actor().may, body, running, origin: `${named.includes(host) ? 'https' : 'http'}://${host}`, ran: (run) => res.setHeader('x-pelago-run', run) });
-        if (answer) return send(res, 200, answer);
+        const host = req.headers.host ?? '', { surface, event } = hookAt(url.pathname.slice('/hooks/'.length)), answer = await answerAt(serverPacks, surface, event, { whole: ws.pelago.db, pelago, within: actor().within ?? [], may: actor().may, body, running, origin: `${named.includes(host) ? 'https' : 'http'}://${host}`, ran: (run) => res.setHeader('x-pelago-run', run) });
+        if (answer) return send(res, 200, answer); else if (surface) return send(res, 410, { error: `No server pack here translates the hooks of "${surface}".` });
       }
 
       // The operator runs the installation: they create workspaces and hand
@@ -416,7 +416,7 @@ if (import.meta.main) {
   // Before anything reads a secret: where the key they are sealed with is kept.
   configureSecrets(rootDir, !config.databaseUrl);
   const workspaces = new Workspaces({ dataDir: config.dataDir, databaseUrl: config.databaseUrl, rootDir, packsDir: config.packsDir, packDirs: config.packDirs, packs: config.packs, policy: config.policy, backupsDir: config.backup ? config.backup.dir : undefined });
-  if (config.launch) configureLauncher({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), command: ['claude'], auth: config.auth === 'tokens' });
+  if (config.launch) configureLaunch({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), auth: config.auth === 'tokens', packs: serverPacksOf(workspaces) });
 
   // One server per data folder, whatever port each is on: two of them writing
   // the same database files destroy it. The lock names the process that has it.

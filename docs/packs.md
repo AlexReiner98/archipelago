@@ -29,8 +29,29 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `shared` | Core's alone: the shared set, the type ids every pack on an island map may build on (below). |
 
 A **server pack** is a pack whose reach includes `server` (`acts`, `entries`,
-`pages`, `connect`, `aliases`, `agreements`). There is no other kind of
+`pages`, `connect`, `aliases`, `gates`). There is no other kind of
 pack: it is read by the server (`src/server-packs.ts`), never by a workspace.
+Its `gates` are where the kernel asks it before going ahead
+(`src/server-gates.ts`): `signin`, what a person agrees to before signing in,
+and `standing`, what a workspace it made may do (its limits, whether it has
+ended). It keeps what they answer from in its own store; with no gate, nothing
+is asked and nothing is limited.
+
+Since 10 Nov 2026 (e_nsruapq3) a server pack may also declare, each checked
+on load in `src/server-reach.ts` and acted on by the kernel alone:
+
+| Key | What the kernel does |
+|---|---|
+| `mounts` | Hands it an address from a closed list (decision e_wptrr6tf): `public` (`/p/`), `site` (a domain's whole space), `setup` (`/connect/setup.mjs`), each to at most one pack (`src/server-mounts.ts`). `/s/` stays the kernel's. Its entry answers a page, JSON, a picture, plain text or XML, a redirect on this server, the kernel's stream of a published document, or `pass` (the kernel answers). The open core's own reader (`packs/reader`) takes `public` and `site`; a pack the configuration names in its place replaces it. |
+| entries' `answers: "html"` | Sends what the entry answers as a page, with headers and policy the kernel sets (`src/server-routes.ts`). |
+| `streams` | Holds a stream at `/x/<pack>/<id>/<workspace>/<id>` and tells it when that document is `published` again (`src/server-streams.ts`). |
+| `files` | Serves a file of its `files/` folder at `/x/<pack>/files/<id>`, filled with `{origin}`, `{tokens}`, `{version}`, `{rules}`, and tells a session when its copy is behind (`src/server-files.ts`). |
+| `launchers` | Starts an agent with its argv (no shell; `{prompt}`, `{mcp_config}`, `{tools}`, `{model}`, `{mode}`, `{session_id}`), holding its token, when a person launches and the server's launch setting names the pack (PELAGO_LAUNCH_PACK; by default `claude_code`, which the open core ships in `packs/claude_code` with the Claude Code adapter and setup) (decision e_885ztqkv, `src/server-launch.ts`). |
+| `adapter` | Translates one surface's hooks, at `/hooks/<surface>/<event>`, with two functions of its handler, `in` and `out`; what a session is told stays the kernel's (decision e_6t8f46u6, `src/server-adapter.ts`). |
+
+Acts `published.read`, `published.at`, `published.picture`, `published.drawing`
+and `site.pages` read what a person published, through the security-definer
+reads alone (`src/server-published.ts`). A server pack still reads no map.
 
 ## The keys before
 
@@ -45,7 +66,8 @@ warning, until the release after 0.1.0, and then refused.
 | `verbs` | `actions`, with `kernel: true` |
 | `schedules`, `hears`, `events` | `handlers` |
 | `hosts`, `secrets`, `webhooks`, `via` | `reach.*` |
-| `acts`, `entries`, `pages`, `connect`, `aliases`, `agreements` | `reach.server.*` |
+| `acts`, `entries`, `pages`, `connect`, `aliases` | `reach.server.*` |
+| `agreements` | `reach.server.gates.signin` |
 | `tier` | goes: `reach.server` makes a server pack |
 | `contract` | goes: nothing read it |
 

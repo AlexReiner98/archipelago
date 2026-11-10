@@ -1,0 +1,18 @@
+{
+  "id": "page",
+  "version": "0.1.0",
+  "title": "Page",
+  "description": "A server pack for the tests: entries that make a page for each request, and some that answer what the kernel refuses.",
+  "reach": {
+    "server": {
+      "entries": [
+        { "id": "hello", "method": "GET", "answers": "html" },
+        { "id": "gone", "method": "GET", "answers": "html" },
+        { "id": "teapot", "method": "GET", "answers": "html" },
+        { "id": "huge", "method": "GET", "answers": "html" },
+        { "id": "nohtml", "method": "GET", "answers": "html" },
+        { "id": "throws", "method": "GET", "answers": "html" }
+      ]
+    }
+  }
+}
