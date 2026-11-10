@@ -55,8 +55,6 @@ actions; `query` with name `actions` gives their inputs whole.
   whole page in your context. Wait until `GET /health` on the server answers,
   then send it as plain JSON (`POST /agent/<tool>`, the same ten tools, with
   the agent token from the environment, never printed).
-- **When Archipelago gets in your way,** record it with the `pelago-bump` skill
-  when it happens. That is how it gets fixed.
 
 ## Before you finish
 

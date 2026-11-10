@@ -105,3 +105,9 @@ test('the plugin README opens with the listing, every slot filled from listing.j
   assert.ok(readme.startsWith(`# ${LISTING.title}\n\n${LISTING.summary}\n`), 'it opens with the listing title and summary');
   assert.doesNotMatch(readme, /\{\w+\}/);
 });
+
+test('the plugin ships no bump skill: that is for working on Archipelago itself', () => {
+  const files = pluginFiles();
+  assert.ok(!Object.keys(files).some((path) => path.includes('pelago-bump')));
+  assert.doesNotMatch(files[`${FOLDER}/pelago.md`], /pelago-bump/);
+});

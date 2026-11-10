@@ -1,5 +1,5 @@
-// The Claude Code plugin, made from this repository's own files: the hook and what it loads, the working rules, the
-// bump skill, and the map's tools at the hosted server, signed in to through the browser. `npm run plugin` writes it
+// The Claude Code plugin, made from this repository's own files: the hook and what it loads, the working rules and
+// the map's tools at the hosted server, signed in to through the browser. `npm run plugin` writes it
 // under plugins/archipelago/, beside the marketplace file (.claude-plugin/marketplace.json) that lets anyone install
 // it with one command (which the installer, scripts/pelago-install.mjs, runs for them). test/plugin.test.ts says when
 // what is written is behind its sources.
@@ -28,6 +28,8 @@ export const installCommand = `claude plugin install ${PLUGIN} --marketplace ${M
 
 const json = (value: unknown) => JSON.stringify(value, null, 2) + '\n';
 const DESCRIPTION = LISTING.summary;
+/** The working rules without the bump skill's line: that skill is for working on Archipelago itself, not shipped. */
+export const plainRules = () => workingRules().replace(/^- \*\*When Archipelago gets in your way,\*\*.*\n(?: {2}.*\n)*/m, '');
 
 /** The hooks, as the setup registers them in a project (scripts/pelago-setup.mjs), run from the plugin. */
 const HOOKS: [event: string, name: string, matcher?: string, timeout?: number, async?: boolean][] = [
@@ -96,9 +98,7 @@ export function pluginFiles(): Record<string, string> {
       const value = key in LISTING.urls ? LISTING.urls[key as keyof typeof LISTING.urls] : (LISTING as Record<string, unknown>)[key];
       return typeof value === 'string' ? value : all;
     }),
-    [at('pelago.md')]: workingRules(),
-    [at('skills/pelago-bump/SKILL.md')]: read('.claude/skills/pelago-bump/SKILL.md'),
-    [at('skills/pelago-bump/references/home.md')]: `# Where bumps live\n\nWorkspace: the one the map's tools are signed in to (${HOSTED} unless PELAGO_URL says another).\n\nFind the feature that gathers friction with Archipelago by search (type \`feature\`, q \`friction\`). If this workspace has none, make the bump an issue that is part of the project you are working in, and say in its first line that it is about Archipelago itself.\n`,
+    [at('pelago.md')]: plainRules(),
   };
 }
 
