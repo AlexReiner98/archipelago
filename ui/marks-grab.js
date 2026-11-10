@@ -2,7 +2,8 @@
 // in ui/draw-marks.js): a mark that asks for `grab` can be dragged onto another that does, and the drawing is told
 // `drop` on the one it lands on, with the one it came from; a mark that asks for `add` is told `add` on a double
 // click. While one is dragged it is marked `grabbing` and the mark under the pointer `drop-on`, for the drawing's
-// stylesheet to show. The plane does not pan from a mark that can be grabbed; a click that ends a drag opens nothing.
+// stylesheet to show. The plane does not pan from a mark that can be grabbed by a mouse or a pen; a finger pans from it,
+// since on a phone nearly the whole picture is marks. A click that ends a drag opens nothing.
 
 /** The mark that can be grabbed under a point, if any. */
 const grabAt = (x, y) => document.elementFromPoint(x, y)?.closest?.('[data-grab]') ?? null;
@@ -11,7 +12,7 @@ const grabAt = (x, y) => document.elementFromPoint(x, y)?.closest?.('[data-grab]
 export function grabbable(el, key, tell) {
   el.dataset.grab = key;
   el.addEventListener('pointerdown', (down) => {
-    if (down.button !== 0) return;
+    if (down.button !== 0 || down.pointerType === 'touch') return;
     // Neither the plane's pan nor the browser's own drag of a link starts from it.
     down.stopPropagation();
     down.preventDefault();

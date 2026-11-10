@@ -1,6 +1,7 @@
-// A step cannot be dragged, in a real browser (skipped where there is no Chrome): a press and move on it pans the
-// canvas, the step where its layout put it in the picture, and nothing is written. A view is drawn from its query alone
-// (the owner, 3 Nov 2026: Home wore down under places put by hand on other pictures).
+// A step cannot be moved, in a real browser (skipped where there is no Chrome): a press and move on it is the gesture
+// that links it to the step it is let go on (decision e_qpaqnmrc, axis F; ui/marks-grab.js), and let go on nothing it
+// leaves the step where its layout put it and writes nothing. A view is drawn from its query alone (the owner, 3 Nov
+// 2026: Home wore down under places put by hand on other pictures). A press and move on the plane pans it.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -9,7 +10,7 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-test('in a browser, a step cannot be dragged: a press and move on it pans the canvas', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, a step cannot be moved: dragged onto nothing it stays, and the plane pans', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {
     reason: 'test',
@@ -42,10 +43,19 @@ test('in a browser, a step cannot be dragged: a press and move on it pans the ca
     assert.ok(await page.still(middle), 'let go, the picture stands still');
     assert.deepEqual(await page.evaluate<number[]>(middle), before, 'where its layout put it in the picture');
     assert.deepEqual(await page.evaluate<string[]>(wires), laidOut, 'every wire as it was drawn');
-    const moved = await page.evaluate<number[]>(onScreen);
-    assert.ok(Math.abs(moved[0] - x - 160) < 3 && Math.abs(moved[1] - y - 90) < 3, `the canvas panned with the pointer: ${[x, y]} to ${moved}`);
+    assert.deepEqual(await page.evaluate<number[]>(onScreen), [x, y], 'and the plane did not pan under the step');
     assert.ok(!(await page.evaluate<boolean>(`location.hash.startsWith('#/e/')`)), 'a press that moves is not a click: no page opened');
     assert.equal(await events(), was, 'nothing written');
+    // From the plane, beside the step and on no mark, the same press and move pans the canvas.
+    const [px, py] = await page.evaluate<number[]>(`(() => { const r = ${step}.getBoundingClientRect(); for (let d = 40; d < 400; d += 20) { const [cx, cy] = [r.x + r.width / 2, r.bottom + d]; const el = document.elementFromPoint(cx, cy); if (el && el.closest('#canvas') && !el.closest('a, [data-grab]')) return [cx, cy]; } return [r.x + r.width / 2, r.bottom + 60]; })()`);
+    await mouse('mouseMoved', [px, py], 0);
+    await mouse('mousePressed', [px, py]);
+    for (let k = 1; k <= 10; k++) (await mouse('mouseMoved', [px + 16 * k, py + 9 * k]), await wait(30));
+    await mouse('mouseReleased', [px + 160, py + 90], 0);
+    assert.ok(await page.still(middle), 'let go, the picture stands still again');
+    const moved = await page.evaluate<number[]>(onScreen);
+    assert.ok(Math.abs(moved[0] - x - 160) < 3 && Math.abs(moved[1] - y - 90) < 3, `the canvas panned with the pointer: ${[x, y]} to ${moved}`);
+    assert.equal(await events(), was, 'and nothing written');
   } finally {
     await page.close();
   }
