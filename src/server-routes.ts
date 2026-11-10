@@ -124,7 +124,7 @@ export async function serveDrawingFile(res: ServerResponse, path: string, at: Dr
       'content-type': 'text/javascript; charset=utf-8',
       'cache-control': worker ? 'no-cache' : 'public, max-age=31536000, immutable',
       'x-content-type-options': 'nosniff',
-      // TODO(e_e7ahhyqb): the page's origin beside 'self', once the drawing host knows it: a surface drawing imports /three.js from there.
+      // 'self' is the drawing host, which serves /three.js too (src/draw-host.ts): nothing of the page's origin is needed.
       'content-security-policy': worker ? "default-src 'none'; script-src 'self'" : "default-src 'none'",
     })
     .end(text);

@@ -54,7 +54,7 @@ import { configureSecrets } from './secrets.ts';
 import { serveBackupFile } from './backup-tools.ts';
 import { answerHook } from './hook-answers.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
-import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { DRAW_SW_HEADERS, drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY } from './page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from './draw-host.ts';
+import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY } from './page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from './draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
@@ -276,6 +276,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         }
       }
 
+      if (req.method === 'GET' && url.pathname.startsWith('/drawing/')) return await serveDrawingFile(res, url.pathname, { tooOften: () => tooOften(req, res, open), reader: async () => ((ws) => (tokens ? ws.pelago.as('') : ws.pelago))(await workspaces.get(DEFAULT_WORKSPACE)) }); // a drawing's files by hash (src/drawing-files.ts), asked with no token: read as no one
       if (req.method === 'GET' && UI_FILES[url.pathname]) {
         const file = UI_FILES[url.pathname], framedBy = file === 'draw.html' ? drawing.framedBy(host, String(req.headers['sec-fetch-site'] ?? '')) : undefined;
         const page = file.endsWith('.html'), open = file === 'draw.html' && !framedBy && url.searchParams.get('open') === '1', frame = file === 'draw.html' ? await drawPage() : null;
@@ -287,13 +288,12 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           'cache-control': served?.keep ? 'public, max-age=31536000, immutable' : file === 'three.module.min.js' ? 'public, max-age=604800' : 'no-store',
           ...GUARD,
           ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
-          ...(file === 'draw.html' ? { 'content-security-policy': drawPolicy(open, Boolean(options.unsandboxed), frame!.hashes, framedBy) } : file === 'draw-sw.js' ? DRAW_SW_HEADERS : {}),
+          ...(file === 'draw.html' ? { 'content-security-policy': drawPolicy(open, Boolean(options.unsandboxed), frame!.hashes, framedBy) } : {}),
           // The frame has an origin of its own, so what it loads from here it loads as a stranger.
           ...((file === 'draw.js' || file === 'draw-marks.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
         });
         const html = page && (frame?.html ?? (await uiPage(file))), drawOrigin = file === 'index.html' && !options.unsandboxed ? drawing.originFor(host) : undefined;
-        if (html && (options.unsandboxed || open || drawOrigin)) return res.end(markPage(html, { open, unsandboxed: options.unsandboxed, drawOrigin }));
-        return res.end(file === 'layout.css' ? lengthsSheet((await workspaces.get(DEFAULT_WORKSPACE)).pelago.registry.packs) : html || served!.body);
+        return res.end(html && (options.unsandboxed || open || drawOrigin) ? markPage(html, { open, unsandboxed: options.unsandboxed, drawOrigin }) : file === 'layout.css' ? lengthsSheet((await workspaces.get(DEFAULT_WORKSPACE)).pelago.registry.packs) : html || served!.body);
       }
 
       if (req.method === 'GET' && url.pathname === '/whoami') {

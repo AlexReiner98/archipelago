@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { drawHosts, drawHostServes } from '../src/draw-host.ts';
-import { DRAW_SW_HEADERS, drawPolicy, markPage } from '../src/page-policies.ts';
+import { drawPolicy, markPage } from '../src/page-policies.ts';
 import { createHttpServer } from '../src/server.ts';
 import { Workspaces } from '../src/workspaces.ts';
 
@@ -44,9 +44,9 @@ test('in dev, each loopback name draws for the other, and only when framed from 
   assert.equal(none.framedBy('localhost:3100', 'cross-site'), undefined);
 });
 
-test('the drawing host serves the frame, its worker and drawings, and nothing else', () => {
-  for (const path of ['/draw.html', '/draw-sw.js', '/draw.js', '/draw-marks.js', '/three.js', '/drawing/abc/index.js']) assert.ok(drawHostServes(path), path);
-  for (const path of ['/', '/app.js', '/api/view', '/mcp', '/health', '/drawing', '/base.js']) assert.ok(!drawHostServes(path), path);
+test('the drawing host serves the frame and drawings with their service workers, and nothing else', () => {
+  for (const path of ['/draw.html', '/three.js', '/drawing/abc/index.js', '/drawing/abc/sw.js']) assert.ok(drawHostServes(path), path);
+  for (const path of ['/', '/app.js', '/api/view', '/mcp', '/health', '/drawing', '/base.js', '/draw.js', '/draw-sw.js']) assert.ok(!drawHostServes(path), path);
 });
 
 test('at the drawing host the frame keeps its origin, its workers start from it, and only the pages named frame it', () => {
@@ -60,8 +60,6 @@ test('at the drawing host the frame keeps its origin, its workers start from it,
   assert.match(drawPolicy(false, false), /^sandbox allow-scripts; .*worker-src blob: data:;/);
   assert.doesNotMatch(drawPolicy(false, false), /frame-ancestors/);
   assert.equal(drawPolicy(true, false), "frame-ancestors 'self'");
-  assert.match(DRAW_SW_HEADERS['content-security-policy'], /connect-src 'none'/);
-  assert.equal(DRAW_SW_HEADERS['service-worker-allowed'], '/drawing/');
 });
 
 test('the page is told where to frame its drawings, and its first frame is put there', () => {
@@ -114,4 +112,11 @@ test('the page frames its drawings at the drawing host, and its own host serves 
   const own = await get('/draw.html', 'app.example.com', { 'sec-fetch-site': 'cross-site' });
   assert.match(String(own.headers['content-security-policy']), /^sandbox allow-scripts; /);
   assert.doesNotMatch(String(own.headers['content-security-policy']), /frame-ancestors/);
+});
+
+test('a drawing by hash at the drawing host goes on to its own route', async () => {
+  // It by hash goes on to its own route (src/drawing-files.ts): it answers what it has not with an empty 404.
+  const none = await get('/drawing/not-a-hash/index.js', 'draw.example.com');
+  assert.equal(none.status, 404);
+  assert.equal(none.body, '', 'answered by the drawing route, not refused by the host');
 });

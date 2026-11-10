@@ -1,5 +1,5 @@
 // The drawing host: a second name the server answers to, for the frame a drawing runs in (ui/draw.html) alone. There
-// the frame has a real origin, never the page's, so it may keep a service worker (ui/draw-sw.js) across reloads and
+// the frame has a real origin, never the page's, so it may keep a service worker (/drawing/<hash>/sw.js, src/drawing-files.ts) across reloads and
 // draw in a warm worker, while the page's token and storage stay where it cannot reach them.
 //
 // Configured (PELAGO_DRAW_HOST), the name serves the frame and what it loads, and nothing else. In dev with none, the
@@ -16,8 +16,8 @@ export interface DrawHostOptions {
 }
 
 const LOOPBACK = ['127.0.0.1', 'localhost'];
-/** What the drawing host serves: the frame, its service worker, the files the frame loads, and drawings by hash (src/drawing-files.ts). */
-const SERVED = new Set(['/draw.html', '/draw-sw.js', '/draw.js', '/draw-marks.js', '/three.js']);
+/** What the drawing host serves: the frame (its scripts written in), three.js, which a drawing imports from the frame's origin, and drawings by hash with their service workers (src/drawing-files.ts). */
+const SERVED = new Set(['/draw.html', '/three.js']);
 export const drawHostServes = (path: string) => SERVED.has(path) || path.startsWith('/drawing/');
 
 /** A name a drawing host may have: a host name, and a port. */

@@ -30,8 +30,6 @@ export function drawPolicy(open: boolean, unsandboxed: boolean, hashes: string[]
 // the page's, which is why 'self' is never one of them (and the page refuses to frame its own origin so, ui/base.js).
 const hosted = (policy: string, framedBy: string[]) =>
   `${policy.replace('sandbox allow-scripts;', 'sandbox allow-scripts allow-same-origin;').replace('worker-src blob: data:', "worker-src 'self' blob: data:")}; frame-ancestors ${framedBy.join(' ')}`;
-/** The drawing frame's service worker (ui/draw-sw.js): its own policy, as shut as the frame's, answering only for drawings by hash. */
-export const DRAW_SW_HEADERS = { 'content-security-policy': "default-src 'none'; script-src 'self'; connect-src 'none'", 'service-worker-allowed': '/drawing/' };
 
 /** A page marked as it is served: with no sandbox for its drawing frames (ui/base.js frameSandbox), and draw.html as opened (ui/draw.js). */
 export const markPage = (html: string, { open = false, unsandboxed = false, drawOrigin }: { open?: boolean; unsandboxed?: boolean; drawOrigin?: string }) => {
