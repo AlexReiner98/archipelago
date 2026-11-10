@@ -1,10 +1,10 @@
 // The Claude Code plugin, made from this repository's own files: the hook and what it loads, the working rules, the
 // bump skill, and the map's tools at the hosted server, signed in to through the browser. `npm run plugin` writes it
 // under plugins/archipelago/, beside the marketplace file (.claude-plugin/marketplace.json) that lets anyone install
-// it with two commands in Claude Code. test/plugin.test.ts says when what is written is behind its sources.
+// it with one command (which the installer, scripts/pelago-install.mjs, runs for them). test/plugin.test.ts says when
+// what is written is behind its sources.
 //
-//   /plugin marketplace add AlexReiner98/archipelago
-//   /plugin install archipelago@archipelago
+//   claude plugin install archipelago --marketplace AlexReiner98/archipelago
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -19,7 +19,9 @@ export const HOSTED = 'https://app.archipelago.tools';
 export const PLUGIN = 'archipelago';
 export const SERVER = 'pelago';
 export const FOLDER = `plugins/${PLUGIN}`;
-export const installCommands = [`/plugin marketplace add AlexReiner98/archipelago`, `/plugin install ${PLUGIN}@${PLUGIN}`];
+/** Where the marketplace is, as Claude Code is told it. */
+export const MARKETPLACE = 'AlexReiner98/archipelago';
+export const installCommand = `claude plugin install ${PLUGIN} --marketplace ${MARKETPLACE}`;
 
 const json = (value: unknown) => JSON.stringify(value, null, 2) + '\n';
 const DESCRIPTION = 'A map of your work your agent keeps and you can read: sessions, plans, decisions and what waits on what, drawn in your browser.';
@@ -64,13 +66,14 @@ export function pluginFiles(): Record<string, string> {
       license: 'MIT',
       keywords: ['memory', 'map', 'tasks', 'decisions', 'mcp'],
     }),
-    // No token in it: Claude Code signs in through the browser, at /mcp.
-    [at('.mcp.json')]: json({ mcpServers: { [SERVER]: { type: 'http', url: `\${PELAGO_URL:-${HOSTED}}/mcp` } } }),
+    // No token in it: the tools take the machine's one sign-in (pelago-login.mjs headers), the one the installer and
+    // the hooks use; with none, the helper says nothing and Claude Code signs in itself, at /mcp.
+    [at('.mcp.json')]: json({ mcpServers: { [SERVER]: { type: 'http', url: `\${PELAGO_URL:-${HOSTED}}/mcp`, headersHelper: `node "\${CLAUDE_PLUGIN_ROOT}/scripts/pelago-login.mjs" headers` } } }),
     [at('hooks/hooks.json')]: json(hooks()),
     // Away from this repository the hook has no local server to fall back on: it calls the hosted one.
     [at('scripts/pelago-hook.mjs')]: read('scripts/pelago-hook.mjs').replace(`'http://127.0.0.1:3100'`, JSON.stringify(HOSTED)),
     [at('scripts/pelago-events.mjs')]: read('scripts/pelago-events.mjs'),
-    [at('scripts/pelago-login.mjs')]: read('scripts/pelago-login.mjs'),
+    [at('scripts/pelago-login.mjs')]: read('scripts/pelago-login.mjs').replace(`'http://127.0.0.1:3100'`, JSON.stringify(HOSTED)),
     [at('pelago.md')]: workingRules(),
     [at('skills/pelago-bump/SKILL.md')]: read('.claude/skills/pelago-bump/SKILL.md'),
     [at('skills/pelago-bump/references/home.md')]: `# Where bumps live\n\nWorkspace: the one the map's tools are signed in to (${HOSTED} unless PELAGO_URL says another).\n\nFind the feature that gathers friction with Archipelago by search (type \`feature\`, q \`friction\`). If this workspace has none, make the bump an issue that is part of the project you are working in, and say in its first line that it is about Archipelago itself.\n`,

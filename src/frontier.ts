@@ -30,7 +30,7 @@ export const folderKey = (path: string) =>
     .replace(/\/\.claude\/worktrees\/[^/]+$/, '');
 
 export interface FrontierInput {
-  /** The session asking: its place is read from it, and it is left out of the sessions before. With no run, cwd or remote, the place is the whole workspace: its recent sessions wherever they ran (Home). */
+  /** The session asking: its place is read from it, and it is left out of the sessions before. With no folder or remote, its own or given, the place is the whole workspace: its recent sessions wherever they ran (Home, a chat). */
   run?: string;
   cwd?: string;
   remote?: string;
@@ -53,8 +53,9 @@ async function placed(l: Archipelago, input: FrontierInput) {
   const here = cwd ? folderKey(cwd) : undefined;
   const { rows } = await l.db.query<Entity>(`select * from entity where type = 'run' and archived_at is null and updated_at > $1 order by updated_at desc limit 300 -- index entity_type`, [new Date(Date.now() - DAYS * 86_400_000)]);
   const inRepo = repo ? new Set((await l.db.query<{ id: string }>(`select from_id as id from relation where to_id = $1 and type = any($2::text[]) and valid_to is null`, [repo.id, livesIn(l)])).rows.map((r) => r.id)) : new Set<string>();
-  // Asked from nowhere in particular (a person's Home), every place is theirs: the workspace's recent sessions.
-  const anywhere = !input.run && !input.cwd && !input.remote;
+  // Asked from nowhere in particular (a person's Home, or a chat with no folder: ChatGPT, Grok Bot), every place is
+  // theirs: the workspace's recent sessions.
+  const anywhere = !cwd && !input.remote;
   const runs = rows.filter((r) => r.id !== self?.id && (anywhere || inRepo.has(r.id) || (here !== undefined && typeof r.props.cwd === 'string' && folderKey(r.props.cwd) === here))).slice(0, RUNS);
   return { repo, folder: here, runs };
 }

@@ -13,6 +13,7 @@ import { bearer } from './auth.ts';
 import { normalEmail } from './mail.ts';
 import { workspacesOf } from './control-index.ts';
 import { emailOfLink, LINK_MINUTES, redeem, redeemTyped, requestSignIn, triesSpent, typedWorks, workspaceOfCode } from './members.ts';
+import { installPage, installPs1, installScript, installSh } from './install.ts';
 import { serveOAuth } from './oauth.ts';
 import { json, PRIVATE } from './reply.ts';
 import type { Actor } from './pelago.ts';
@@ -97,6 +98,15 @@ const withRef = (address: string, ref: unknown) => {
 
 const reply = (res: ServerResponse, status: number, body: unknown) => json(res, status, body, PRIVATE);
 
+/** What /connect/install hands out, by path: its type and its text for this server's address. */
+const INSTALL: Record<string, [string, (origin: string) => string]> = {
+  '/connect/install': ['text/plain', installPage],
+  '/connect/install.md': ['text/markdown', installPage],
+  '/connect/install.mjs': ['text/javascript', installScript],
+  '/connect/install.ps1': ['text/plain', installPs1],
+  '/connect/install.sh': ['text/x-shellscript', installSh],
+};
+
 /**
  * Everything under /connect/ and /x/, none of it behind a token: the setup script, a system's request for a token (POST
  * /connect/request) and its poll (POST /connect/poll/<workspace>/<id>, the poll's secret as Authorization: Bearer).
@@ -114,6 +124,13 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     if (at.tooOften()) return;
     res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
     return res.end(setupScript(origin, at.tokens));
+  }
+  // Installing Archipelago, by a person or their agent (src/install.ts): the page, and what its one line fetches.
+  const install = INSTALL[path];
+  if (req.method === 'GET' && install) {
+    if (at.tooOften()) return;
+    res.writeHead(200, { 'content-type': `${install[0]}; charset=utf-8`, 'cache-control': 'no-store' });
+    return res.end(install[1](origin));
   }
   // The page's colours and lengths before anyone is signed in, so the sign-in page is drawn like every other.
   if (req.method === 'GET' && path === '/connect/theme') {
