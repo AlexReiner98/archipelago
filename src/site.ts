@@ -16,7 +16,10 @@ import type { Workspaces } from './workspaces.ts';
 export const HOME = 'home';
 /** The address word of the page every page of a site ends with: its legal and contact lines, say. */
 export const FOOTER = 'footer';
+/** The address word of the page whose words lead the site's /llms.txt (llmstxt.org), for an agent that lands here. */
+export const LLMS = 'llms';
 const PARAGRAPH = '\n\n';
+const textOf = (doc: { parts?: { text?: unknown }[] } | null) => (doc?.parts ?? []).flatMap((part) => (typeof part.text === 'string' ? [part.text] : [])).join(PARAGRAPH);
 
 /** Domains and the workspace each serves, from "archipelago.tools=archipelago,docs.example.com=acme". */
 export function readSites(text: string | undefined): Record<string, string> {
@@ -36,7 +39,7 @@ export async function siteNav(workspaces: Workspaces, workspace: string, href: (
   const pages = await sitePages(pelago);
   const home = pages.find((page) => page.path === HOME);
   const foot = pages.some((page) => page.path === FOOTER) ? ((await publishedAt(pelago, FOOTER)) as { parts?: { text?: string }[] } | null) : null;
-  const footer = (foot?.parts ?? []).flatMap((part) => (typeof part.text === 'string' ? [part.text] : [])).join(PARAGRAPH);
+  const footer = textOf(foot);
   return {
     ...(footer && { footer }),
     name: (await workspaces.list()).find((ws) => ws.id === workspace)?.name ?? workspace,
@@ -59,8 +62,16 @@ export async function serveSite(res: ServerResponse, pathname: string, at: { hos
   const pelago = (await at.workspaces.get(at.workspace)).pelago;
   if (pathname === '/robots.txt') return send(200, 'text/plain; charset=utf-8', `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`);
   if (pathname === '/sitemap.xml') {
-    const urls = (await sitePages(pelago)).filter((page) => page.path && page.path !== FOOTER).map((page) => `  <url><loc>${xml(origin + siteHref(page.path!))}</loc><lastmod>${new Date(page.published_at).toISOString().slice(0, 10)}</lastmod></url>`);
+    const urls = (await sitePages(pelago)).filter((page) => page.path && page.path !== FOOTER && page.path !== LLMS).map((page) => `  <url><loc>${xml(origin + siteHref(page.path!))}</loc><lastmod>${new Date(page.published_at).toISOString().slice(0, 10)}</lastmod></url>`);
     return send(200, 'application/xml; charset=utf-8', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`, { 'cache-control': 'public, max-age=300' });
+  }
+  // For an agent: the words of the page published at /llms, as published, then every page by its title and address.
+  if (pathname === '/llms.txt') {
+    const pages = (await sitePages(pelago)).filter((page) => page.path && page.path !== FOOTER && page.path !== LLMS);
+    const lead = textOf((await publishedAt(pelago, LLMS)) as { parts?: { text?: unknown }[] } | null);
+    const name = (await at.workspaces.list()).find((ws) => ws.id === at.workspace)?.name ?? at.workspace;
+    const list = pages.map((page) => `- [${page.title}](${origin + siteHref(page.path!)})`).join('\n');
+    return send(200, 'text/plain; charset=utf-8', `${lead.startsWith('# ') ? lead : `# ${name}${lead ? PARAGRAPH + lead : ''}`}${PARAGRAPH}## Pages${PARAGRAPH}${list}\n`, { 'cache-control': 'public, max-age=300' });
   }
   // The front page's data and figures are read at /data and /picture/<id>, as any page's are below its own address.
   const [path, what, extra] = parts.length === 0 || ['data', 'picture', 'drawing', 'live'].includes(parts[0]) ? [HOME, ...parts] : parts;

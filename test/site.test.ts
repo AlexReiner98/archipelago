@@ -150,6 +150,26 @@ test('a site’s pages each end with what its footer page says, and the sitemap 
   assert.equal((await call('/api/publish', undefined, { id: foot })).status, 200);
   assert.equal(JSON.parse((await visit(base, '/data', 'site.test')).body).site.footer, 'Made in Canada. Questions: hello@example.com.');
   assert.ok(!(await visit(base, '/sitemap.xml', 'site.test')).body.includes('/footer'));
+  const llms = (await visit(base, '/llms.txt', 'site.test')).body;
+  assert.ok(llms.startsWith('# ') && !llms.includes('/footer'), 'llms.txt opens on the site’s name and lists its pages, not the footer');
+});
+
+test('a site’s llms.txt leads with the words of its page at /llms, then lists its pages', async () => {
+  const { call, base } = await serve('off', undefined, { 'site.test': 'default' }, PAGES);
+  const { home, llms } = (
+    await call('/api/change', undefined, {
+      reason: 'test',
+      ops: [
+        { op: 'create', ref: 'home', type: 'page', title: 'Welcome', visibility: 'shared', props: { path: 'home' }, body: 'The front page.' },
+        { op: 'create', ref: 'llms', type: 'page', title: 'For agents', visibility: 'shared', props: { path: 'llms' }, body: '# Example\n\n> To install, read https://app.example/connect/install.' },
+      ],
+    })
+  ).result.created;
+  for (const id of [home, llms]) assert.equal((await call('/api/publish', undefined, { id })).status, 200);
+  const text = (await visit(base, '/llms.txt', 'site.test')).body;
+  assert.ok(text.startsWith('# Example\n\n> To install, read https://app.example/connect/install.'), text);
+  assert.ok(text.includes('- [Welcome](https://site.test/)') && !text.includes('/llms)'), 'its pages, not itself');
+  assert.ok(!(await visit(base, '/sitemap.xml', 'site.test')).body.includes('/llms'));
 });
 
 test('a link to a site’s page shows the figure its style names, and the page leaves that section out', async () => {
