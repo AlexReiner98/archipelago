@@ -170,6 +170,19 @@ test('a site’s llms.txt leads with the words of its page at /llms, then lists 
   assert.ok(text.startsWith('# Example\n\n> To install, read https://app.example/connect/install.'), text);
   assert.ok(text.includes('- [Welcome](https://site.test/)') && !text.includes('/llms)'), 'its pages, not itself');
   assert.ok(!(await visit(base, '/sitemap.xml', 'site.test')).body.includes('/llms'));
+  // An agent told the site's name guesses /install: the app's install page, and its one-line scripts.
+  for (const path of ['/install', '/install.ps1']) {
+    const guess = await visit(base, path, 'site.test');
+    assert.equal(guess.status, 302);
+    assert.equal(guess.headers.location, `${base}/connect${path}`);
+  }
+});
+
+test('without a page at /llms, a site’s llms.txt links the app’s install', async () => {
+  const { call, base } = await serve('off', undefined, { 'site.test': 'default' }, PAGES);
+  const { home } = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'home', type: 'page', title: 'Welcome', visibility: 'shared', props: { path: 'home' }, body: 'The front page.' }] })).result.created;
+  assert.equal((await call('/api/publish', undefined, { id: home })).status, 200);
+  assert.ok((await visit(base, '/llms.txt', 'site.test')).body.includes(`- [Install Archipelago for an agent](${base}/connect/install)`));
 });
 
 test('a link to a site’s page shows the figure its style names, and the page leaves that section out', async () => {
