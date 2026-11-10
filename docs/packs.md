@@ -96,10 +96,33 @@ screens and actions on them) is registered only while that pack is active.
 
 ## On an island map
 
-A workspace with the setting `islands` on (`workspace_set`; off unless set,
-and set only on a new workspace) holds its packs to the island rules
-(`src/islands.ts`; decisions e_pp5mu6xd and e_rf6q3q34). A pack that breaks
-one is off there, and its state says which.
+A workspace with the setting `islands` on (`workspace_set`; on for every new
+workspace) knows two kinds of pack, read off the file with no key of its own
+(`src/islands.ts`; decisions e_pp5mu6xd, e_rf6q3q34 and e_ubd8satd). The
+schema the page reads marks each pack's `kind`: `island`, `map`, or `kernel`
+for core. A pack that breaks its kind's rules is off there, and its state
+says why.
+
+- **An island pack** speaks on an island: it declares a type that lives on
+  one (any but an actor), a link type, or fields on another pack's type. An
+  island speaks one, and New island offers only these (core when there are
+  none). It is held to the island rules below.
+- **A map pack** owns no type that lives on an island. It brings looks,
+  layouts, views, actions, handlers, uses and reach to the whole map, and may
+  require other packs, island packs among them. The island rules do not judge
+  it: each part goes through the gate it already has (a layout runs in the
+  sandbox, code by the rule on code that runs, reach by core's pack reach
+  rule, and the owner adds the pack). What its action or handler makes of an
+  island pack's types goes on the island of what it is tied to in the same
+  change (what it is part of first, never a link that crosses), else on the
+  island the action is given as its input `island`, else on the lone island
+  it fits; else the change is refused, naming the islands it could go on
+  (`placeOnIslands`, `src/island-items.ts`).
+- **Both is refused.** A pack with island types and a part that runs (tools,
+  code, looks, computed views, uses, reach, or another pack required) is off,
+  told to split into an island pack and a map pack.
+
+The island rules, for an island pack:
 
 - **Vocabulary, views, instructions.** The file holds only `id`, `version`,
   `title`, `description`, `requires`, `types`, `links`, `rules`, `views` and
@@ -108,12 +131,49 @@ one is off there, and its state says which.
 - **The shared set alone.** `requires` names core and no other pack, `uses`
   is not there, no `types` entry has `of`, and its types, link ends and rules
   name only its own types, the shared set (core's `shared`: the eight starter
-  types, task and decision), a capability or `*`. Its links extend core's or
-  its own.
+  types, task, decision and finding), a capability or `*`. Its links extend
+  core's or its own.
 - A shared type no pack taken there declares (task and decision, while work
   is not taken) cannot be built on: a pack that does waits.
 
 Core, the kernel's pack, is never judged.
+
+## Kept as an item
+
+A pack can also be authored on the map, by a person or their agent, with no
+access to the server: an item of core's `pack` type (`src/pack-items.ts`). Its
+`name` is the pack's id, its title and note the pack's, its `version` the
+pack's (0.1.0 unless said), and its `manifest` what it declares, as a
+`pack.json` holds it:
+
+```json
+{ "op": "create", "type": "pack", "title": "Recipes", "body": "What we cook.",
+  "props": { "name": "recipes", "manifest": {
+    "types": [{ "id": "recipes.dish", "title": "Dish", "description": "A dish we cook.", "extends": "record" }] } } }
+```
+
+- **Data alone.** The manifest holds the keys of a pack on an island map
+  (`requires`, `types`, `links`, `rules`, `views`, `styles`), whatever the
+  workspace: no actions, handlers, layouts, reach or uses, so nothing of it
+  runs on the server. Of `views`, trees, screens and reasons for attention;
+  `styles` may hold looks as well as instructions and lenses, since a look
+  names no type and runs no code (on an island map the island rules judge
+  them, and today they take no looks: decision e_ubd8satd is open). A rule in it holds, refuses,
+  requires or asks: none keeps a stream (`stream`, `keep`), is lifted by a
+  setting (`lifted`) or by the server (`server`).
+- **Its own names.** Every type, link type and rule it declares is named
+  `<name>.<what>`, so none takes a kernel rule's name; its name is no pack's
+  on this server, and nothing it declares is declared by a pack the server
+  has, on or off here (a clash would stop the registry loading once both are
+  on).
+- **Checked when written.** A change that makes or changes one is checked as
+  the registry would be with the pack added, so a manifest that would not
+  load, or that the island rules would not take, is refused then, with why.
+- **Added by the owner.** It is off until the owner adds it (`pack_set`), as
+  any pack new to a workspace is; then its manifest's text is on the log, and
+  an edit to it is said there again. An agent's edit of one, or bringing one
+  back, waits for the owner (core's rule `agent_packs`). Retired or archived,
+  it leaves the registry and its items turn dormant.
 
 ## Where packs are found
 

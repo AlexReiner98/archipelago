@@ -6,8 +6,8 @@
 
 import { hooks } from './base.js';
 import { busy, windowOf } from './pane-busy.js';
-import { route, sessionOf } from './pane-route.js';
-import { activeId, flash, goPane, markPanes, only, openPane, paneAt, place } from './panes.js';
+import { route, sessionOf, SHOWN, WATCH } from './pane-route.js';
+import { activeId, drawn, flash, goPane, markPanes, only, openPane, paneAt, place } from './panes.js';
 import { arrived, drawStrip, openTab, toFront } from './tab-bar.js';
 import { chatTab, revive, takeOver } from './tab-life.js';
 import { BLANK, drawable, focusOf, keep, landed, named, outTabs, poppedTab, tabOf, tabs } from './tabs.js';
@@ -39,7 +39,7 @@ hooks.land = (step) => {
     draws: named(t.panes[id]?.at) === named(paneAt(at)),
     blank: t.panes[id]?.at === BLANK,
   });
-  const docked = tabs.list.map((t) => ({ id: t.id, follows: t.follows ?? 'none', front: t.id === tabs.front, panes: t.groups.map((g) => paneOf(t, g, t.id === tabs.front)) }));
+  const docked = tabs.list.map((t) => ({ id: t.id, follows: t.follows ?? 'none', chat: t.chat, watches: watched(t), front: t.id === tabs.front, panes: t.groups.map((g) => paneOf(t, g, t.id === tabs.front)) }));
   const out = outTabs()
     .filter((t) => !tabOf(t.id) && windowOf(t.id))
     .map((t) => ({ id: t.id, follows: t.follows ?? 'none', popped: true, panes: [{ ...paneOf(t, focusOf(t), false), busy: busy(t.id) }] }));
@@ -76,7 +76,7 @@ hooks.land = (step) => {
     // A blank pane taken for a name the show gave is that name's from now on.
     if (to.slot && t.panes[to.pane]) t.panes[to.pane].slot = to.slot;
     // A pane split for the session is its own, and closes as its chat ends (ui/tab-life.js).
-    const split = () => openPane(at, to.split.side, t.groups.at(-1), { by: session, ...(to.split.slot && { slot: to.split.slot }), ...(!to.split.slot && t.follows !== session && { held: session }) }, t);
+    const split = () => openPane(at, to.split.side, t.groups.at(-1), { ...(!to.split.shared && { by: session }), ...(to.split.slot && { slot: to.split.slot }), ...(!to.split.slot && t.follows !== session && { held: session }) }, t);
     // Not a canvas (a screen, the workspace): the page opens over the tab's pane in focus.
     if (!drawable(at)) {
       if (to.front) toFront(t.id);
@@ -109,9 +109,40 @@ hooks.land = (step) => {
     if (page && id === activeId()) location.hash = `#/e/${page}?${queryOf(t, id)}`;
     flash(id);
   } finally {
+    if (step.watch) watchFrom(session);
     markPanes();
     drawStrip();
   }
 };
+/**
+ * What tab `t` watches, when it watches: the items its panes draw, but for the one its sessions share. Read from the
+ * canvases drawn while it is in sight, and kept with it for while it is not.
+ */
+function watched(t) {
+  if (t.follows !== WATCH) return undefined;
+  if (t.id === tabs.front) {
+    const now = t.groups.filter((g) => t.panes[g]?.slot !== SHOWN).flatMap((g) => drawn.get(g)?.canvas?.ids?.() ?? []);
+    if (now.length) ((t.watch = [...new Set(now)]), keep());
+  }
+  return t.watch ?? [];
+}
+/** Make the tab session `run` last landed in watch what it draws: the owner approved the plan shown, so it is theirs now. */
+export function watchFrom(run) {
+  const t = tabs.list.filter((o) => o.groups.some((g) => landed.get(`${o.id}:${g}`)?.session === run)).sort((a, b) => latest(b, run) - latest(a, run))[0];
+  if (!t) return;
+  watchTab(t);
+}
+const latest = (t, run) => Math.max(0, ...t.groups.map((g) => landed.get(`${t.id}:${g}`)).filter((l) => l?.session === run).map((l) => l.at));
+/** Tab `t` watches what it draws from now on: the owner's, as a tab kept is (every pane theirs), following no one session. */
+export function watchTab(t) {
+  delete t.chat;
+  delete t.ended;
+  for (const g of t.groups) (delete t.panes[g].by, delete t.panes[g].held);
+  Object.assign(t, { follows: WATCH, named: undefined, word: undefined });
+  watched(t);
+  keep();
+}
+hooks.watchTab = watchTab;
+
 /** The lens query a pane of tab `t` stands at, for an item's page over it. */
 const queryOf = (t, id) => (t.panes[id]?.at ?? '').split('?')[1] ?? '';

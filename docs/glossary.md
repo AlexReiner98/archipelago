@@ -156,6 +156,16 @@ Which packs a workspace has is a fact in its log. In the code:
 `src/manifest.ts` reads a manifest, `src/packs.ts` loads them. Replaces
 *type pack*; a pack whose reach includes `server` is still a pack.
 
+**island pack.** A pack an island speaks: it declares a type that lives on
+an island, a link type, or fields on another pack's type, and holds only
+vocabulary, the views the kernel draws and instructions, on the shared set
+alone. In the code: `packKind` in `src/islands.ts`, kind `island`.
+
+**map pack.** A pack that owns no type living on an island and brings looks,
+layouts, views, actions, handlers, uses or reach to the whole map, each
+through the gate it already has. A pack that would be both is refused, told
+to split. In the code: `packKind` in `src/islands.ts`, kind `map`.
+
 **change.** A set of ops (create, update, link, unlink, archive, restore,
 merge, define_type, forget) sent with a reason and an authority, applied
 whole or held for a person as a proposal. The one way to write the map. In

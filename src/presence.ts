@@ -57,6 +57,10 @@ export interface Step {
   title?: string;
   /** What its surface calls it (its title in Claude Code), when that is known. */
   label?: string;
+  /** What the session works on and everything that holds it, all the way up: a tab watching any of them takes its shows (ui/pane-route.js). */
+  within?: string[];
+  /** For a show: the owner approved what it shows, and the tab it lands in watches it from now on (ui/pane-land.js). */
+  watch?: boolean;
 }
 
 /** How many steps are kept for a page to catch up on between two looks. */
@@ -94,7 +98,7 @@ export async function took(db: Q, w: Whose, step: Omit<Step, 'at'>, now = false)
   const named = `${key}|${step.actor}`;
   if (step.run) runs.set(named, step.run);
   const run = step.run ?? runs.get(named);
-  const called = run ? await namesOf(db, run) : {};
+  const called = run ? { ...(await namesOf(db, run)), ...(await withinOf(db, run)) } : {};
   const list = mine.get(key) ?? [];
   // Two steps in one millisecond are still two.
   list.push({ at: Math.max(Date.now(), (list.at(-1)?.at ?? 0) + 1), ...step, ...(run && { run }), ...called });
@@ -113,6 +117,21 @@ async function namesOf(db: Q, run: string): Promise<{ name?: string; title?: str
   const { rows } = await db.query<Row>(`select props->>'name' as name, title, props->>'label' as label from entity where id = $1`, [run]).catch(() => ({ rows: [] as Row[] }));
   const { name, title, label } = rows[0] ?? {};
   return { ...(name && { name }), ...(title && { title }), ...(label && { label }) };
+}
+
+/**
+ * What session `run` works on now and what holds each of those, read by its id through the part_of closure, so the
+ * owner's page can tell a session working inside a plan it watches.
+ */
+async function withinOf(db: Q, run: string): Promise<{ within?: string[] }> {
+  const { rows } = await db
+    .query<{ id: string }>(
+      `with task as (select to_id as id from relation where from_id = $1 and type = 'works_on' and valid_to is null)
+       select id from task union select c.ancestor from part_closure c join task on c.descendant = task.id`,
+      [run],
+    )
+    .catch(() => ({ rows: [] as { id: string }[] }));
+  return rows.length ? { within: rows.map((r) => r.id) } : {};
 }
 
 async function flush(key: string): Promise<void> {

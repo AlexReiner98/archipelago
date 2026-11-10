@@ -54,6 +54,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       // A show takes the owner to it (the owner, 4 Nov 2026: "the tab you open should automatically take focus").
       focus: z.boolean().optional().describe('false to leave the tab it lands in out of sight, marked (for a show they did not ask to watch). Left out, their page brings that tab into sight.'),
       note: z.string().max(200).optional().describe('One line, kept on your pane as its tooltip.'),
+      watch: z.boolean().optional().describe('true once the owner has approved the plan you show and its sessions are starting: the tab it lands in watches it, so each session working on anything in it is drawn there on its step and shows its work in that tab, not a tab of its own. Show a view that walks works_on< from the plan’s steps and leaves out no run (not: []), so its sessions are drawn on it.'),
       look: z.boolean().optional().describe('Also answer with a picture of it, drawn by the server (as query look draws it).'),
       width: z.number().int().min(320).max(1920).optional().describe('With look: the picture’s width in pixels (1200).'),
       height: z.number().int().min(240).max(1600).optional().describe('With look: its height (750).'),
@@ -76,7 +77,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       const hash = input.url ? webAddress(input.url) : await viewAddress(l, input);
       const { db } = await wholeMap(l);
       const focus = input.focus ?? true;
-      const at = await point(l, actor, 'show', hash, input.note, input.pane, input.run, focus);
+      const at = await point(l, actor, 'show', hash, input.note, input.pane, input.run, focus, input.watch);
       const pages = await watching(db, l);
       // Whether the owner sees it: the tab in sight is the one this session's shows go to. Brought there, it is once
       // their page has looked again (every two seconds), so it is asked until then.

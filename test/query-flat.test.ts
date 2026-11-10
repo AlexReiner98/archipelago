@@ -236,3 +236,19 @@ test('notes whole: each note sent whole and named in whole, for a drawing that r
   assert.deepEqual(whole.whole, [made.a]);
   await assert.rejects(flatRead(l, { filter: { find: [`id ${made.a}`] }, notes: 'all' }), /notes must be "whole"/);
 });
+
+test('a walk back along works_on keeps the sessions it reaches under the default Not, and nothing else of the kernel', async () => {
+  const { l, made } = await chain();
+  const got = await make(l, [
+    { op: 'create', ref: 'r', type: 'run', title: 'A session' },
+    { op: 'link', type: 'works_on', from: 'r', to: made.a },
+    { op: 'create', ref: 'v', type: 'lens', title: 'A view of it', props: { filter: { find: [`id ${made.p}`] } } },
+    { op: 'link', type: 'about', from: 'v', to: made.p },
+  ]);
+  const plan = (over: string[], not?: string[]) => flatRead(l, { filter: { find: [`id ${made.p}`], ...(not && { not }) }, walk: { over, steps: 2 } });
+  assert.deepEqual(titles(await plan(['part_of<', 'works_on<'])), ['A session', 'Flat lens', 'Rework', 'Tags'], 'the session at work on a step is drawn on the plan');
+  assert.deepEqual(titles(await plan(['part_of<', 'works_on<', 'about<'])), ['A session', 'Flat lens', 'Rework', 'Tags'], 'a view about it stays out');
+  assert.deepEqual(titles(await plan(['part_of<'])), ['Flat lens', 'Rework', 'Tags'], 'not walked along works_on, none');
+  assert.deepEqual(titles(await plan(['part_of<', 'works_on<'], ['kind system'])), ['Flat lens', 'Rework', 'Tags'], 'a Not said is kept to');
+  assert.ok(got.r);
+});

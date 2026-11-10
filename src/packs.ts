@@ -8,11 +8,11 @@ import { checkDeclared, KERNEL_VERBS, presetsOf, screensOf, stylesOf, toolName, 
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts';
 import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
-import { islandsOff } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
+import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 import { parts, withoutAbsent, type Manifest } from './manifest.ts';
-import { readPackFolders } from './pack-folders.ts';
+import { readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack } from './pack-items.ts';
 import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from './phases.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
@@ -138,6 +138,7 @@ export class Registry {
   /** Warnings said once: a pack file using the keys of the shape before the manifest. */
   /** Packs the owner turned off in this workspace. */
   private turnedOff: string[] = []; /** Whether this workspace holds its packs to the island rules (src/islands.ts). */ private islands = false; /** Whether this workspace has islands on: its items live on islands (src/island-items.ts). */ get onIslands() { return this.islands; }
+  /** The packs kept as items (src/pack-items.ts) by id, the pack items that are none with why, and those the owner added here. */ made = new Map<string, ItemPack>(); madeWrong = new Map<string, string>(); private madeOn = new Set<string>();
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
@@ -154,10 +155,13 @@ export class Registry {
     const { found, hashes, where } = readPackFolders<PackFile>(this.dirs, LOCAL_PACK);
     this.where = where;
     const own = ownPack(this.localPack(), this.items, LOCAL_PACK); if (own) found.set(LOCAL_PACK, own);
+    const made = madePacks(this.items, found, LOCAL_PACK); this.made = new Map(made.packs.map((p) => [p.manifest.id, p])); this.madeWrong = made.wrong;
+    for (const p of made.packs) found.set(p.manifest.id, p.manifest), hashes.set(p.manifest.id, p.hash);
 
     // Load in dependency order what is on and has what it requires; the rest waits or is off.
     const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK).map((id) => [id, 'not enabled on this server']));
     for (const id of this.turnedOff) off.set(id, 'turned off here');
+    for (const id of this.made.keys()) if (!this.madeOn.has(id)) off.set(id, 'kept as an item: the owner has not added it here');
     if (this.islands) for (const [id, why] of islandsOff([...found.values()].filter((p) => !off.has(p.id) || KERNEL_PACKS.includes(p.id)), LOCAL_PACK)) off.set(id, why);
     const { ordered: loaded, states } = orderPacks(found, off, LOCAL_PACK);
     // What a pack names of a pack it uses is registered only while that one is active (src/manifest.ts, uses).
@@ -273,7 +277,7 @@ export class Registry {
     const verbs = ordered.flatMap((pack) => parts(pack).verbs);
     const tools = new Map<string, { pack: string; call: 'action' | 'view'; def: ActionDef | ViewDef }>();
     for (const pack of ordered) {
-      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), pack.id !== LOCAL_PACK && existsSync(join(this.folderOf(pack.id), 'handler.js')));
+      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), pack.id !== LOCAL_PACK && !this.made.has(pack.id) && existsSync(join(this.folderOf(pack.id), 'handler.js')));
       if (declared.length) throw new Error(`Pack "${pack.id}": ${declared.join('; ')}`);
       for (const def of parts(pack).actions) tools.set(toolName(def.id), { pack: pack.id, call: 'action', def });
       // A lens preset is asked through the view tool, as any lens is: it is no tool of its own.
@@ -314,8 +318,10 @@ export class Registry {
   turnOff(packs: string[], islands = this.islands): string[] | undefined {
     const next = packs.filter((p) => !KERNEL_PACKS.includes(p));
     const newly = next.filter((p) => !this.turnedOff.includes(p));
-    if (!newly.length && next.length === this.turnedOff.length && islands === this.islands) return undefined;
-    this.turnedOff = next; this.islands = islands;
+    // a pack kept as an item is on once the owner adds it (it is not in the list), and off while it is new to this registry.
+    const madeOn = new Set([...this.made.keys()].filter((p) => !next.includes(p))); const sameMade = madeOn.size === this.madeOn.size && [...madeOn].every((p) => this.madeOn.has(p));
+    if (!newly.length && next.length === this.turnedOff.length && islands === this.islands && sameMade) return undefined;
+    this.turnedOff = next; this.islands = islands; this.madeOn = madeOn;
     this.reload();
     return newly;
   }
@@ -452,7 +458,7 @@ export class Registry {
   /** A registry like this one with these type items in place of its own: what a change that makes or changes one is checked against. */
   /** The folder a pack's files are in: where it was found, or the first folder for one not found. */
   folderOf(pack: string): string { return join(this.where.get(pack) ?? this.dir, pack); }
-  trial(items: TypeItem[]): Registry { const r = new Registry(this.dirs, this.only, this.local); r.turnedOff = this.turnedOff; r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
+  trial(items: TypeItem[], on: string[] = []): Registry { const r = new Registry(this.dirs, this.only, this.local); r.turnedOff = this.turnedOff.filter((p) => !on.includes(p)); r.madeOn = new Set([...this.madeOn, ...on]); r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
   /** Take up the types defined here by another server on the same database. Returns whether any were new. */
   followLocal(defs: TypeDef[]): boolean {
     const added = defs.filter((t) => !this.local.some((l) => l.id === t.id));
@@ -463,8 +469,9 @@ export class Registry {
   }
 
   describe() {
-    return {
-      packs: this.packs.map((p) => ({ id: p.id, version: p.version, title: p.title, description: p.description })),
+    const kernel = sharedOf(this.packs.filter((p) => KERNEL_PACKS.includes(p.id))), shared = { ...kernel, actors: actorsOf(this.packs, kernel.actors) };
+    return { // each pack with its kind (src/islands.ts): an island pack speaks on an island, a map pack brings the rest to the whole map
+      packs: this.packs.map((p) => ({ id: p.id, version: p.version, title: p.title, description: p.description, kind: packKind(p, shared) })),
       // The head every item has; status, owner, confidence and source are each type's columns, as its starter declares them.
       common_fields: { title: 'Required. A short name.', body: 'Free-form markdown detail.', visibility: 'private (default) or shared.' },
       types: [...this.types.values()].map((t) => ({

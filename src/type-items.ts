@@ -3,13 +3,18 @@
 
 import type { Registry, TypeDef } from './packs.ts';
 import type { Archipelago, Op } from './pelago.ts';
+import { PACK_ITEM } from './pack-items.ts';
 import { LINK_ITEM, TYPE_ITEM, type TypeItem } from './type-overlay.ts';
 
-const KINDS = [TYPE_ITEM, LINK_ITEM];
+/** What the registry reads from the map: types, link types, and packs made there (src/pack-items.ts). */
+const KINDS = [TYPE_ITEM, LINK_ITEM, PACK_ITEM];
 
 /** Told when the types kept on the map changed, so the type table follows (src/typetable.ts, set by src/workspaces.ts). */
 let typesChanged: (l: Archipelago) => Promise<unknown> = async () => {};
 export const onTypesChanged = (fn: (l: Archipelago) => Promise<unknown>) => (typesChanged = fn);
+/** Told when a pack kept as an item was made or changed, so the log and the packs on follow (src/packstate.ts, set by src/workspaces.ts). */
+let packsChanged: (l: Archipelago) => Promise<unknown> = async () => {};
+export const onPacksChanged = (fn: (l: Archipelago) => Promise<unknown>) => (packsChanged = fn);
 
 /**
  * An op naming a type or link type by a name it had before (work.task) names it as it is now (task), and a define_type
@@ -66,7 +71,24 @@ export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
     throw new Error(`Change rejected:\n- the types it makes or changes: ${(err as Error).message}`);
   }
   // The registry leaves a workspace's own type that does not resolve to the type table (its pack turned off); one this change makes must resolve.
-  const named = ops.flatMap((op, i) => (op.op === 'create' && KINDS.includes(op.type) ? [items.get(op.ref ?? `#${i + 1}`)!] : op.op === 'update' && items.has(op.id) ? [items.get(op.id)!] : []));
+  const written = ops.flatMap((op, i) => (op.op === 'create' && KINDS.includes(op.type) ? [items.get(op.ref ?? `#${i + 1}`)!] : op.op === 'update' && items.has(op.id) ? [items.get(op.id)!] : []));
+  const named = written.filter((i) => i.type !== PACK_ITEM);
+  const packs = written.filter((i) => i.type === PACK_ITEM);
+  const wrong = packs.flatMap((i) => (trial.madeWrong.has(i.id) ? [`the pack ${String(i.props.name ?? i.title)}: ${trial.madeWrong.get(i.id)}`] : []));
+  if (wrong.length) throw new Error(`Change rejected:\n- ${wrong.join('\n- ')}`);
+  // A pack made here is checked whole as if the owner had added it, so one that would not load is refused now, not when it is turned on.
+  const names = packs.filter((i) => i.is_open).map((i) => String(i.props.name));
+  if (names.length) {
+    let added: Registry;
+    try {
+      added = reg.trial([...items.values()], names);
+    } catch (err) {
+      throw new Error(`Change rejected:\n- the pack ${names.join(', ')}, as it would be once added: ${(err as Error).message}`);
+    }
+    // Off even once added: the island rules do not take it (one that waits for a pack still to come is let be).
+    const refused = names.flatMap((n) => (added.states.get(n)?.state === 'off' ? [`the pack ${n} is ${added.states.get(n)!.why}`] : []));
+    if (refused.length) throw new Error(`Change rejected:\n- ${refused.join('\n- ')}`);
+  }
   // A workspace's own is named local.<name>, so a pack added later never takes its name.
   const misnamed = named.filter((i) => typeof i.props.name === 'string' && !i.props.preset && !/^local\.[a-z][a-z0-9_]*$/.test(i.props.name));
   if (misnamed.length) throw new Error(`Change rejected:\n- the types it makes or changes: ${misnamed.map((i) => `"${String(i.props.name)}" must be named "local.<name>"`).join('; ')}`);
@@ -77,7 +99,10 @@ export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
 
 /** After a change is applied: when it made or changed a type item, the registry and the type table brought in line. */
 export async function typesApplied(l: Archipelago, ops: Op[], used: Registry): Promise<void> {
-  if (used !== l.registry) await typesTaken(l);
+  if (used === l.registry) return;
+  await typesTaken(l);
+  // a pack kept as an item may have come, changed or gone with it: the log and the packs on follow.
+  if (l.registry.made.size || used.made.size) await packsChanged(l);
 }
 
 /** The registry and the type table brought in line with the type items on the map, and these besides (a backup's, before it is merged). */

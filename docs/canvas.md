@@ -297,7 +297,17 @@ nobody.
 
 Each tab follows everyone (the default), one session, or nobody (its name
 in italics): the reader picks it in ⋯, which lists the sessions open now, and
-what the tab follows even once that session has ended. Where an agent's step lands is `pane-route.js`, worked
+what the tab follows even once that session has ended.
+
+A tab may instead watch what it draws (a plan, decision e_98z44prb: "Both,
+via the plan", the owner, 10 Nov 2026): Sessions in what it draws in ⋯, or
+an agent's show sent with `watch` once the owner has approved the plan it
+shows. Every session whose task is in it, or that it draws, lands there and
+opens no tab of its own: it is drawn on its step by the plan's view (one
+that walks `works_on<` and leaves out no run), its node's line its latest
+beat, read again as it tells one, and its shows share one pane beside the
+plan (`shown`), which never takes the plan's own pane. Which items a session
+is in comes with its every step (`within`: its tasks and all that hold them). Where an agent's step lands is `pane-route.js`, worked
 out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
 - only a show lands: a change or a beat of a session's story moves nothing
   and is said nowhere on the canvas (the owner, 29 and 30 Oct 2026,

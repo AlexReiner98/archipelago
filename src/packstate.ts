@@ -50,7 +50,8 @@ export async function packsOff(l: Archipelago): Promise<string[]> {
   const said = await packFacts(l);
   if (said.size) return l.registry.found.map((p) => p.id).filter((id) => id !== LOCAL_PACK && !KERNEL_PACKS.includes(id) && said.get(id)?.op !== '+');
   const { rows } = await l.db.query<{ value: unknown }>(`select value from setting where key = $1`, [PACKS_OFF]);
-  return Array.isArray(rows[0]?.value) ? (rows[0].value as string[]) : [];
+  // a pack kept as an item is new here until the owner adds it, whatever the old setting said.
+  return [...(Array.isArray(rows[0]?.value) ? (rows[0].value as string[]) : []), ...l.registry.made.keys()];
 }
 
 /** Whether this workspace holds its packs to the island rules (src/islands.ts): off unless the owner set it. */
@@ -111,8 +112,9 @@ async function keptManifests(l: Archipelago): Promise<Set<string>> {
 /** A pack's presence as a fact: its version and manifest hash, and the manifest's text the first time this log meets that hash. */
 function present(l: Archipelago, pack: { id: string; version: string }, kept: Set<string>): Fact {
   const manifest = l.registry.hashes.get(pack.id);
-  const file = join(l.registry.folderOf(pack.id), 'pack.json');
-  const text = manifest && !kept.has(manifest) && existsSync(file) ? readFileSync(file, 'utf8') : undefined;
+  // a pack kept as an item is its manifest's text, kept on the map; any other is its file.
+  const file = join(l.registry.folderOf(pack.id), 'pack.json'), made = l.registry.made.get(pack.id)?.text;
+  const text = !manifest || kept.has(manifest) ? undefined : made ?? (existsSync(file) ? readFileSync(file, 'utf8') : undefined);
   const same = text !== undefined && createHash('sha256').update(text).digest('hex') === manifest;
   if (same) kept.add(manifest!);
   return ['+', packFact(pack.id), 'pack', { version: pack.version, manifest, ...(same && { text }) }];
@@ -177,6 +179,7 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
   for (const p of l.registry.found) {
     if (p.id === LOCAL_PACK || (l.registry.only && !l.registry.only.includes(p.id))) continue;
     const was = said.get(p.id);
+    if (l.registry.made.has(p.id) && was?.op !== '+') continue; // kept as an item: the owner adds it, never the sync
     const kernel = KERNEL_PACKS.includes(p.id);
     const changed = !was || was.op === '-' || was.value?.version !== p.version || was.value?.manifest !== l.registry.hashes.get(p.id);
     if (renamed.has(p.id)) facts.push(present(l, p, kept), ['-', packFact(renamed.get(p.id)!), 'pack']);
@@ -239,7 +242,8 @@ export function packTouches(p: PackFile) {
 
 /** Every pack on this server, with its state in this workspace and why, what it needs, and what it touches. */
 export function packStates(l: Archipelago) {
-  return l.registry.found.map((p) => ({ id: p.id, title: p.title, version: p.version, description: p.description, requires: p.requires ?? [], touches: packTouches(p), ...l.registry.states.get(p.id)! }));
+  const made = (id: string) => l.registry.made.get(id)?.item;
+  return l.registry.found.map((p) => ({ id: p.id, title: p.title, version: p.version, description: p.description, requires: p.requires ?? [], touches: packTouches(p), ...(made(p.id) && { made: made(p.id) }), ...l.registry.states.get(p.id)! }));
 }
 
 /** Turn a pack off or on in this workspace. */
@@ -277,10 +281,16 @@ export async function followPacks(l: Archipelago): Promise<boolean> {
   return true;
 }
 
+/** After a pack kept as an item was made, changed or retired: the log says it as it is now, and the packs on follow. */
+export async function followMade(l: Archipelago): Promise<void> {
+  await syncPacks(l);
+  await followPacks(l);
+}
+
 /** The owner’s tools for packs: their states and switch, their secrets, and the acts they ask for. */
 export const PACK_STATE_TOOLS: Record<string, Tool> = {
   packs: {
-    description: 'The packs on this server and the state of each here: active, waiting (with what it needs) or off.',
+    description: 'The packs here and the state of each: active, waiting (with what it needs) or off. One kept as an item names it (made). To author a pack, make an item of type pack (query schema with type pack says its fields): the owner then adds it here.',
     input: {},
     run: async (l) => packStates(l),
   },
