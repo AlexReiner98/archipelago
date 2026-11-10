@@ -10,7 +10,7 @@
     {
       "name": "archipelago",
       "source": "./plugins/archipelago",
-      "description": "A map of your work your agent keeps and you can read: sessions, plans, decisions and what waits on what, drawn in your browser.",
+      "description": "Agent memory for human brains: your agent's plans and decisions as a map you read, correct, share.",
       "category": "productivity"
     }
   ]

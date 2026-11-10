@@ -1,0 +1,37 @@
+{
+  "name": "Archipelago",
+  "title": "Archipelago (archipelago.tools)",
+  "short": "Agent memory for human brains",
+  "registry_name": "tools.archipelago/archipelago",
+  "publisher": "Aperture Design Tools Inc.",
+  "tagline": "Agent memory for human brains",
+  "summary": "Agent memory for human brains: your agent's plans and decisions as a map you read, correct, share.",
+  "description": "Agent memory for human brains: your agent's plans and decisions as a map you read, correct, share.\n\nEach agent session is told where your projects stand when it opens, and leaves the map true when it ends: tasks, decisions and what waits on whom. You read it as a map in your browser, correct what is wrong, and share a view with a link. Every change is logged with whose word it rests on, and any of it can be undone. The core is unopinionated: its types, views and rules come in packs you shape to your work. Hosted in Canada; the server is MIT open source. Early, and used every day on its own development.",
+  "not": "Not the multiworld randomizer of the same name, at archipelago.gg.",
+  "category": "productivity",
+  "categories": [
+    "Productivity",
+    "Developer tools",
+    "Project management"
+  ],
+  "keywords": [
+    "memory",
+    "agent memory",
+    "knowledge graph",
+    "planning",
+    "decisions",
+    "mcp"
+  ],
+  "license": "MIT",
+  "urls": {
+    "site": "https://archipelago.tools",
+    "app": "https://app.archipelago.tools",
+    "install": "https://app.archipelago.tools/connect/install",
+    "mcp": "https://app.archipelago.tools/mcp",
+    "repository": "https://github.com/AlexReiner98/archipelago",
+    "privacy": "https://app.archipelago.tools/x/legal/privacy",
+    "terms": "https://app.archipelago.tools/x/legal/terms",
+    "support": null
+  },
+  "icon": "brand/emblem.png"
+}

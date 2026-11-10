@@ -7,7 +7,7 @@
   <img alt="A living map of all your work: islands drawn in stacked rows, parting round the title and its line, from a chat to a structured model that keeps you, your team, and your agents on the same page." src="brand/hero-light.svg">
 </picture>
 
-**A living map of all your work. From a chat to a structured model that keeps you, your team, and your agents on the same page.**
+**Agent memory for human brains: your agent's plans and decisions as a map you read, correct, share.**
 
 *Early: built and used daily by its author; expect rough edges.*
 

@@ -1,18 +1,22 @@
 {
   "name": "archipelago",
+  "displayName": "Archipelago (archipelago.tools)",
   "version": "0.2.0",
-  "description": "A map of your work your agent keeps and you can read: sessions, plans, decisions and what waits on what, drawn in your browser.",
+  "description": "Agent memory for human brains: your agent's plans and decisions as a map you read, correct, share.",
   "author": {
-    "name": "Aperture Design Tools Inc."
+    "name": "Aperture Design Tools Inc.",
+    "url": "https://archipelago.tools"
   },
   "homepage": "https://app.archipelago.tools",
   "repository": "https://github.com/AlexReiner98/archipelago",
   "license": "MIT",
   "keywords": [
     "memory",
-    "map",
-    "tasks",
+    "agent memory",
+    "knowledge graph",
+    "planning",
     "decisions",
     "mcp"
-  ]
+  ],
+  "privacyPolicyUrl": "https://app.archipelago.tools/x/legal/privacy"
 }
