@@ -273,7 +273,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
         if (steps) asking = { ...lens, filter: withIds(lens.filter, told) };
       }
       [store, look] = await Promise.all([
-        replicate(async () => (raw = await api('view', { name: 'flat', params: { ...asking, ...(whole.has(asked) && { notes: 'whole' }) } }))),
+        replicate(async () => (raw = await api('view', { name: 'flat', params: { ...asking, follow: true, ...(whole.has(asked) && { notes: 'whole' }) } }))),
         api('view', { name: 'style', params: { ...(of && { of }), ...(style.style && { style: style.style }), ...(style.canvas && { view: style.canvas }), ...(style.shape && { shape: style.shape }), have: [...layouts.keys()] } }),
       ]);
     } catch (err) {

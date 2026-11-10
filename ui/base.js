@@ -163,7 +163,7 @@ const trying = () => {
 /** Who this page is signed in as (/whoami), asked once a sign-in: its answer, or null where it is refused; a failure to reach the server rejects. */
 let asked;
 export const whoami = () =>
-  (asked ??= fetch(`/whoami${trying()}`, { headers: authHeaders() }).then(
+  (asked ??= (early('whoami') ?? fetch(`/whoami${trying()}`, { headers: authHeaders() })).then(
     (r) => (r.ok ? r.json() : null),
     (err) => {
       asked = undefined;
@@ -231,14 +231,29 @@ export class SignInNeeded extends Error {}
 
 /** A JSON body posted: the response, for the caller to read. */
 export const postJson = (path, body, headers = {}) => fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
-/** A tool called at this address with these headers: its result, or an error saying why not. */
-export async function call(path, input, headers) {
-  const res = await postJson(path, input, headers);
+/** A tool's response read: its result, or an error saying why not. */
+async function answerOf(res) {
   const body = await res.json();
   if (res.status === 401) throw new SignInNeeded(body.error);
   if (!res.ok) throw new Error(body.error);
   return body.result;
 }
+/** A tool called at this address with these headers: its result, or an error saying why not. */
+export const call = async (path, input, headers) => answerOf(await postJson(path, input, headers));
+
+/** A read ui/early.js asked for as the page started, taken once, while the page would still ask it so: its response. */
+function early(name) {
+  const asked = globalThis.pelagoEarly;
+  if (link || !asked?.[name] || asked.token !== store.token) return undefined;
+  const res = asked[name];
+  delete asked[name];
+  return res;
+}
+/** A tool's answer from the read ui/early.js asked for it (`name`), else from `ask`; one that failed is asked again. */
+export const apiFirst = (name, ask) => {
+  const res = early(name);
+  return res ? res.then(answerOf).catch(ask) : ask();
+};
 /** What a link's reader may not ask, as its token said: refused here, quietly, rather than sent to be refused. */
 const notForLink = (tool, input) => Boolean(link?.reads) && (!link.reads.includes(tool) || (tool === 'view' && Boolean(link.views) && !link.views.includes(input?.name)));
 export const api = (tool, input = {}) =>
