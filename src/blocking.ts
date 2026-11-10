@@ -74,16 +74,24 @@ export class BlockGraph {
 }
 
 /** Everything the given items wait on, step by step: all a block graph of them needs to read. */
-const REACH = (at: number) => `with recursive reach(id) as (select unnest($${at}::text[]) union select r.to_id from relation r join reach c on r.from_id = c.id where r.valid_to is null and r.type = any($${at + 1}::text[])) `;
+const REACH = `with recursive reach(id) as (select unnest($1::text[]) union select r.to_id from relation r join reach c on r.from_id = c.id where r.valid_to is null and r.type = any($2::text[])) select id from reach`;
 
-/** What blocks what: across the map, or for some items only, read as far as what they wait on reaches. */
+/**
+ * What blocks what: across the map, or for some items only, read as far as what they wait on reaches. For some items,
+ * how far is walked once and the edges are read of what it reached; who holds a resource is asked only where one of
+ * them needs one. Asked within each read, the walk was made twice and the holds read every time, a third of the cost.
+ */
 export async function blockGraph(l: Archipelago, of?: string[]): Promise<BlockGraph> {
   const families = ['depends_on', 'waits_on', 'needs'].map((root) => l.registry.relationFamily(root));
-  const scoped = (at: number, x: string) => (of ? [REACH(at), ` and ${x} in (select id from reach)`] : ['', '']);
-  const [edgesWith, edgesOnly] = scoped(4, 'r.from_id');
-  const { rows } = await l.db.query<Edge>(edgesWith + EDGES(edgesOnly), [...families, ...(of ? [of, families.flat()] : [])]);
-  const [heldWith, heldOnly] = scoped(2, 'n.from_id');
-  const { rows: held } = await l.db.query<Edge & { type: string; props: Record<string, unknown>; held: number }>(heldWith + HELD(heldOnly), [l.registry.relationFamily('needs'), ...(of ? [of, families.flat()] : [])]);
+  const needs = l.registry.relationFamily('needs');
+  const reached = of && (await l.db.query<{ id: string }>(REACH, [of, families.flat()])).rows.map((r) => r.id);
+  const only = (x: string, at: number) => (reached ? ` and ${x} = any($${at}::text[])` : '');
+  const within = reached ? [reached] : [];
+  const needing = async () => !reached || (await l.db.query(`select 1 from relation where type = any($1::text[]) and valid_to is null and from_id = any($2::text[]) limit 1`, [needs, reached])).rows.length > 0;
+  const [{ rows }, held] = await Promise.all([
+    l.db.query<Edge>(EDGES(only('r.from_id', 4)), [...families, ...within]),
+    needing().then(async (any) => (any ? (await l.db.query<Edge & { type: string; props: Record<string, unknown>; held: number }>(HELD(only('n.from_id', 2)), [needs, ...within])).rows : [])),
+  ]);
   const full = held.filter((h) => h.held >= (l.registry.capacity(h) ?? Infinity)).map(({ x, y, why }) => ({ x, y, why }));
   return new BlockGraph([...rows, ...full]);
 }
