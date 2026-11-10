@@ -52,6 +52,23 @@ curl -fsSL '${origin}/connect/install.mjs' -o "$dir/pelago-install.mjs"
 if [ -t 1 ] && (: </dev/tty) 2>/dev/null; then node "$dir/pelago-install.mjs" "$@" </dev/tty; else node "$dir/pelago-install.mjs" "$@"; fi
 `;
 
+/** /llms.txt (llmstxt.org): what this server is, for an agent that lands on it, pointing at the install. */
+export const llmsTxt = (origin: string) => `# Archipelago
+
+> A map of your work that your coding agent keeps and you can read: sessions, plans, decisions and what waits on what. Agents reach it as an MCP server at ${origin}/mcp; a person reads it at ${origin}.
+
+To install Archipelago for an agent (Claude Code, Codex, Cursor, Grok Bot, ChatGPT), fetch ${origin}/connect/install and follow the section for your client. The multiworld randomizer of the same name is another project, at archipelago.gg.
+
+## Install
+
+- [Install Archipelago](${origin}/connect/install): plain steps for each client, and the one line a person pastes
+- [Installer](${origin}/connect/install.mjs): the script those steps run, to read first
+
+## Connect
+
+- [MCP server](${origin}/mcp): streamable HTTP, signed in through the browser (OAuth)
+`;
+
 /** The page: what a person or their agent does, client by client. */
 export function installPage(origin: string): string {
   const line = installLines(origin);

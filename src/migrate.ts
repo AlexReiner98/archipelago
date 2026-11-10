@@ -17,7 +17,7 @@ import { ITEM_KIND } from './head.ts';
 import { ISLAND_INDEX } from './island-items.ts';
 import { SEARCH_ANY, SEARCH_INDEX } from './search.ts';
 import { LOG } from './log.ts';
-import { ACTIVITY, ACTIVITY_STREAM, EVENT_GONE, PRE_LOG_ACTIVITY } from './activity-steps.ts';
+import { ACTIVITY, ACTIVITY_STREAM, EVENT_GONE, OP_ABOUT, PRE_LOG_ACTIVITY } from './activity-steps.ts';
 import { carryEventTable } from './activity.ts';
 import { VAULT } from './vault.ts';
 import { FORGET, FORGET_STORES } from './forget.ts';
@@ -84,6 +84,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 35, name: 'a get says hidden, not missing', sql: ITEM_HIDDEN },
   { version: 36, name: 'a view shared with a guest, read live and nothing else', sql: GUEST_READER },
   { version: 37, name: 'a link keeps its view frozen, read by a short token', sql: LINK_SNAPSHOT },
+  { version: 38, name: 'what the compacted streams say about an item, found by its index under the row policy', sql: OP_ABOUT },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

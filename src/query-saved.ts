@@ -69,17 +69,17 @@ export async function keptPicture(l: Archipelago, id: string, have?: unknown) {
  * the documents that bring the view in. The way back from an item to the picture it was reached from.
  */
 export async function shownIn(l: Archipelago, id: string, trail: { id: string; title: string; views: { id: string; title: string }[] }[]) {
-  const shown: { id: string; title: string; of: { id: string; title: string }; documents: { id: string; type: string; title: string }[]; steps_wrong?: string }[] = [];
-  for (const step of trail)
-    for (const view of step.views) {
-      const item = await l.entity(view.id);
-      const answer = item && (await Promise.resolve(item.props).then((props) => flatRead(l, viewQuery(props))).catch(() => undefined));
-      if (!item || !answer?.items.some((one) => one.id === id)) continue;
-      const documents = (await l.mentionedIn(view.id)).filter((m) => bringersIn(l).includes(m.type)).map((m) => ({ id: m.id, type: m.type, title: m.title }));
-      const wrong = item.props.steps === undefined ? undefined : stepsWrong(item.props.steps);
-      shown.push({ id: view.id, title: view.title, of: { id: step.id, title: step.title }, documents, ...(wrong && { steps_wrong: wrong }) });
-    }
-  return shown;
+  type Shown = { id: string; title: string; of: { id: string; title: string }; documents: { id: string; type: string; title: string }[]; steps_wrong?: string };
+  // Each view asked at once, kept in the trail's order: one after another, a get waited for every view's query in turn.
+  const asked = trail.flatMap((step) => step.views.map(async (view): Promise<Shown | undefined> => {
+    const item = await l.entity(view.id);
+    const answer = item && (await Promise.resolve(item.props).then((props) => flatRead(l, viewQuery(props))).catch(() => undefined));
+    if (!item || !answer?.items.some((one) => one.id === id)) return undefined;
+    const documents = (await l.mentionedIn(view.id)).filter((m) => bringersIn(l).includes(m.type)).map((m) => ({ id: m.id, type: m.type, title: m.title }));
+    const wrong = item.props.steps === undefined ? undefined : stepsWrong(item.props.steps);
+    return { id: view.id, title: view.title, of: { id: step.id, title: step.title }, documents, ...(wrong && { steps_wrong: wrong }) };
+  }));
+  return (await Promise.all(asked)).filter((s): s is Shown => Boolean(s));
 }
 
 // ---- Views kept before the flat lens ------------------------------------------------------------------------------

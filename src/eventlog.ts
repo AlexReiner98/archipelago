@@ -72,8 +72,10 @@ async function groups(db: Q, input: EventQuery, limit: number): Promise<Group[]>
 )`;
   let ids = '';
   if (input.target) {
-    add(`e.pos in (select t.pos from log_fact t where t.stream = 'facts' and t.id in ${about} -- index log_fact_history
-)`, input.target);
+    // Its positions first, as an array, so the entries are found by (stream, pos): as a semi-join the planner walked
+    // every entry newest first and asked each for its facts (430 ms of a get on 1,769 entries; task e_h2ynbcva).
+    add(`e.pos = any(array(select t.pos from log_fact t where t.stream = 'facts' and t.id in ${about} -- index log_fact_history
+))`, input.target);
     ids = ` and f.id in ${about.replaceAll('?', `$${params.length}`)}`;
   }
   const having = [`true`];
