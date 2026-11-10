@@ -446,9 +446,9 @@
           "type": "string",
           "description": "Where it runs, e.g. claude-code."
         },
-        "git": {
+        "stands": {
           "type": "json",
-          "description": "Where its checkout stood when it was last heard from: branch, head (the commit), worktree (the folder), unpushed (commits no remote has) and dirty (files not committed). Said by the hook at each turn's end and at the end.",
+          "description": "Where its place stood when it was last heard from, as its hook said it at each turn's end and at the end: a small flat object whose keys are the pack's whose place it is (a repository's: branch, head, worktree, unpushed, dirty).",
           "system": true
         },
         "cwd": {

@@ -11,7 +11,7 @@ import { hookSessionEnd, hookSessionStart } from './session-hook.ts';
 import { sessionLabelled } from './session-name.ts';
 import { addTouched } from './touched.ts';
 import { fileSaid } from './file-said.ts';
-import { keepGit } from './git-state.ts';
+import { keepStands } from './stands.ts';
 import { sessionOpened } from './tool-change.ts';
 import { describeChanges, humanChanges, latestSeq, offeredActions } from './tools.ts';
 import { summed } from './summary.ts';
@@ -42,7 +42,9 @@ export interface HookBody {
   /** At the file-used event: the file read or changed, and the instructions the session has been told about files already. */
   path?: unknown;
   said?: unknown;
-  /** At a turn's end and at the end: where the checkout stands (src/git-state.ts). */
+  /** At a turn's end and at the end: where the session's place stands, a small flat object its pack reads (src/stands.ts). */
+  stands?: unknown;
+  /** What stands was called until 10 Nov 2026, still sent by hooks set up before then: read as stands. */
   git?: unknown;
   /** At the events route: the adapter's batch of raw events, in the vocabulary of docs/sessions.md (src/session-events.ts). */
   events?: unknown;
@@ -107,8 +109,8 @@ export async function answerHook(event: string, call: HookCall): Promise<object 
   const run = event !== 'session-start' && body.session_id && (Array.isArray(body.touched) || typeof body.title === 'string') ? await resolveRun(pelago, body.session_id, true) : undefined;
   if (run) await addTouched(whole, run.id, body.touched).catch((err) => console.error(`hook touched: ${(err as Error).message}`));
   if (run) await sessionLabelled(pelago, run, body.title).catch((err) => console.error(`hook title: ${(err as Error).message}`));
-  // Where its checkout stands, kept on the run while it is open: at the end, before the run is closed.
-  if (event === 'stop' || event === 'session-end') await keepGit(pelago, body.session_id, body.git).catch((err) => console.error(`hook git: ${(err as Error).message}`));
+  // Where its place stands, kept on the run while it is open: at the end, before the run is closed.
+  if (event === 'stop' || event === 'session-end') await keepStands(pelago, body.session_id, body.stands ?? body.git).catch((err) => console.error(`hook stands: ${(err as Error).message}`));
   if (event === 'prompt') {
     // Each time the owner sends a session a message, the session is told what the owner has done in the map since
     // it last heard: a decision made in the UI reaches the session with the next thing they say.

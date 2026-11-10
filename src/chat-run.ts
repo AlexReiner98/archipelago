@@ -48,7 +48,7 @@ export async function hookRunHere(l: Archipelago, input: { cwd?: string; branch?
     `select * from entity where type = any($1::text[]) and is_open and archived_at is null and props ? 'session_id' and created_at > $2 order by created_at desc limit 50 -- index entity_type`,
     [l.registry.family('run'), new Date(Date.now() - JOIN_MS).toISOString()],
   );
-  const branchOf = (run: Entity) => (run.props.branch ?? (run.props.git as { branch?: string } | undefined)?.branch) as string | undefined;
+  const branchOf = (run: Entity) => (run.props.branch ?? (run.props.stands as { branch?: string } | undefined)?.branch) as string | undefined;
   const here = rows.filter((run) => isChat(run) && typeof run.props.cwd === 'string' && folder(run.props.cwd) === folder(input.cwd!) && (!input.branch || !branchOf(run) || branchOf(run) === input.branch));
   const busy = here.filter((run) => run.props.busy === true);
   return here.length === 1 ? here[0] : busy.length === 1 ? busy[0] : undefined;
