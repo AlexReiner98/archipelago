@@ -4,11 +4,14 @@
 // (POST /x/<pack>/hook/<id>), each checked against a secret the kernel holds before the handler sees it. An entry marked
 // GET is where a person comes back to from another site: it answers where to send them on. Every request is counted
 // by address, as the other open routes are.
+// A drawing's modules by hash (GET /drawing/<hash>/<module>.js, src/drawing-files.ts) are served here too.
 
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { alertOwner } from './alert.ts';
+import { drawingFile, drawingPath } from './drawing-files.ts';
+import type { Archipelago } from './pelago.ts';
 import { signedWith } from './hashes.ts';
 import { json as reply, PRIVATE as GUARD } from './reply.ts';
 import { serverPacksOf } from './server-host.ts';
@@ -96,6 +99,32 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
   } catch (err) {
     return json(400, { error: (err as Error).message });
   }
+}
+
+/** What GET /drawing/<hash>/<module>.js is handed: the map it reads, as the person asking sees it. */
+export interface DrawingRoutes {
+  /** True, and the request answered, when its address has asked too often. */
+  tooOften: () => boolean;
+  reader: () => Promise<Archipelago>;
+}
+
+/**
+ * One module of a drawing, by its hash (src/drawing-files.ts): kept for good, since a hash is its content, and given
+ * nothing to run with. What is not there is a 404 with nothing in it.
+ */
+export async function serveDrawingFile(res: ServerResponse, path: string, at: DrawingRoutes): Promise<unknown> {
+  const asked = drawingPath(path);
+  if (at.tooOften()) return;
+  const text = asked ? await drawingFile(await at.reader(), asked.hash, asked.name) : null;
+  if (text === null) return res.writeHead(404, { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }).end();
+  return res
+    .writeHead(200, {
+      'content-type': 'text/javascript; charset=utf-8',
+      'cache-control': 'public, max-age=31536000, immutable',
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': "default-src 'none'",
+    })
+    .end(text);
 }
 
 /**

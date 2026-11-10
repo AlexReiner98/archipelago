@@ -58,10 +58,30 @@ export function layoutFor(
   if (!d) return undefined;
   const mine = versions.find((v) => v.props.preset === d.id);
   if (mine && !mine.is_open) return undefined;
-  const changed = mine?.props.modules && typeof mine.props.modules === 'object' ? Object.entries(mine.props.modules as Record<string, unknown>).filter(([name, text]) => NAME.test(name) && typeof text === 'string') : [];
-  const modules = { ...modulesOf(packs.folderOf(d.pack), d), ...Object.fromEntries(changed) } as Record<string, string>;
+  const modules = modulesWith(packs, d, mine);
   const hash = hashOf(modules);
   return { id: d.id, title: d.title, shape: d.shape, hash, ...(d.notes === 'whole' && { notes: d.notes }), ...(d.flat === true && { flat: true }), ...(!have.includes(hash) && { modules }) };
+}
+
+/** A shipped drawing's modules, under the owner's version of it when there is one: its `modules` stand in file by file. */
+function modulesWith(packs: { folderOf(pack: string): string }, d: LayoutDef & { pack: string }, mine?: { props: Record<string, unknown> }): Record<string, string> {
+  const changed = mine?.props.modules && typeof mine.props.modules === 'object' ? Object.entries(mine.props.modules as Record<string, unknown>).filter(([name, text]) => NAME.test(name) && typeof text === 'string') : [];
+  return { ...modulesOf(packs.folderOf(d.pack), d), ...Object.fromEntries(changed) } as Record<string, string>;
+}
+
+/**
+ * Every drawing a page may be sent, by its hash (the one `layoutFor` gives): each the packs ship as they ship it, and as
+ * each open version of it (`versions`) changes it. What src/drawing-files.ts serves a module of.
+ */
+export function drawingsBy(packs: { folderOf(pack: string): string; packs: { id: string; layouts?: LayoutDef[] }[] }, versions: { is_open: boolean; props: Record<string, unknown> }[] = []): Map<string, Record<string, string>> {
+  const out = new Map<string, Record<string, string>>();
+  for (const d of layoutsOf(packs.packs)) {
+    for (const mine of [undefined, ...versions.filter((v) => v.is_open && v.props.preset === d.id)]) {
+      const modules = modulesWith(packs, d, mine);
+      out.set(hashOf(modules), modules);
+    }
+  }
+  return out;
 }
 
 /**
