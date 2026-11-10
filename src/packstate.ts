@@ -14,6 +14,7 @@ import { newId } from './db.ts';
 import { env } from './env.ts';
 import { append, type Fact } from './log.ts';
 import { decideAct, listActs, setPackSecret } from './outside.ts';
+import { canSeal } from './secrets.ts';
 import { ISLANDS } from './islands.ts';
 import { islandBlockers, moveOntoIslands } from './island-start.ts';
 import { KERNEL_PACKS } from './packorder.ts';
@@ -192,7 +193,14 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
       facts.push(off.has(p.id) ? ['-', packFact(p.id), 'pack'] : present(l, p, kept));
     }
   }
-  if (facts.length) await appendPacks(l, 'system', 'pack.sync', 'The packs as this server has them', facts);
+  if (!facts.length) return facts;
+  // A server that cannot seal (no PELAGO_SECRETS_KEY on Postgres) opens the workspace with its packs as they are and
+  // leaves the log as it was: the open must not fail for want of a key, and nothing is written unsealed.
+  if (!canSeal()) {
+    console.warn(`${l.workspace}: the packs here differ from what its log says (${facts.map((f) => f[1]).join(', ')}), and with no sealing key the log is left as it was`);
+    return [];
+  }
+  await appendPacks(l, 'system', 'pack.sync', 'The packs as this server has them', facts);
   return facts;
 }
 
