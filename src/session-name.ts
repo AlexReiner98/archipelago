@@ -20,8 +20,28 @@ export function sessionNames(l: Archipelago): string[] {
 const TITLE_MOST = 60;
 /** A title cut to a name's length. */
 export const cutTitle = (title: string) => (title.length > TITLE_MOST ? `${title.slice(0, TITLE_MOST - 1).trimEnd()}…` : title);
+/** How a title named after where a session runs begins: until its chat is titled, its first prompt names it instead. */
+const PLACED = 'Session in ';
 /** What a session is called before its chat has a title: what it works on, else where it runs. */
-export const sessionTitle = (fallback: { task?: string; place?: string }) => cutTitle(fallback.task ?? `Session in ${fallback.place ?? 'an unknown folder'}`);
+export const sessionTitle = (fallback: { task?: string; place?: string }) => cutTitle(fallback.task ?? `${PLACED}${fallback.place ?? 'an unknown folder'}`);
+/** A first prompt's opening words, as a name: its first line, cut at a word to a name's length. */
+export const promptTitle = (prompt: unknown): string => {
+  const line = typeof prompt === 'string' ? (prompt.split('\n').find((l) => l.trim()) ?? '').trim().replace(/\s+/g, ' ') : '';
+  if (line.length <= TITLE_MOST) return line;
+  const cut = line.slice(0, TITLE_MOST - 1);
+  return `${cut.slice(0, cut.lastIndexOf(' ') > 20 ? cut.lastIndexOf(' ') : cut.length).trimEnd()}…`;
+};
+
+/**
+ * A session still named after its folder, prompted: named by what was asked, until its client gives it a title (which
+ * then replaces this, as its label). One named after its task, or titled, keeps its name.
+ */
+export async function sessionPromptNamed(l: Archipelago, run: Entity, prompt: unknown, actor = 'agent:claude-code'): Promise<void> {
+  const title = promptTitle(prompt);
+  if (!title || run.props.label || !run.title.startsWith(PLACED)) return;
+  await l.apply(actor, { ops: [{ op: 'update', id: run.id, title }], reason: 'Session named by its first prompt' });
+  await took((await wholeMap(l)).db, l, { kind: 'other', actor, did: 'titled', run: run.id }, true).catch(() => {});
+}
 /** A title as a client said it: its words, trimmed, or nothing. */
 export const saidTitle = (label: unknown) => (typeof label === 'string' ? label.trim().replace(/\s+/g, ' ').slice(0, 200) : '');
 

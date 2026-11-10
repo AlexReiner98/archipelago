@@ -69,22 +69,32 @@ Open `http://127.0.0.1:3100`, go to **Workspace** and type your name under
 Owner. To look around first, `npm run demo` opens a map of Archipelago itself
 on port 3200, its data kept apart.
 
-## Connect Claude Code
+## Connect your agent
 
-Install the plugin from Claude Code:
+Ask it:
 
+> Install Archipelago from https://app.archipelago.tools/connect/install
+
+Or paste one line in a terminal. On Windows (PowerShell):
+
+```powershell
+irm https://app.archipelago.tools/connect/install.ps1 | iex
 ```
-/plugin marketplace add AlexReiner98/archipelago
-/plugin install archipelago@archipelago
+
+On macOS or Linux:
+
+```bash
+curl -fsSL https://app.archipelago.tools/connect/install.sh | sh
 ```
 
-Start a new session. The first one opens your browser to sign in to your
-workspace on archipelago.tools (the [Quickstart](https://archipelago.tools/quickstart?ref=github)
-makes one), and type `/mcp`, then choose pelago, so the agent can use the
-map's tools. From then on each session, in any project, starts on your map,
-handed the open work the sessions before it left there and why each piece
-needs attention. To use a server of your own, set `PELAGO_URL` to it
-(`http://127.0.0.1:3100`) before you start Claude Code.
+It connects Claude Code, Codex and Cursor where it finds them, and opens your
+browser once to sign in to your workspace on archipelago.tools (the
+[Quickstart](https://archipelago.tools/quickstart?ref=github) makes one).
+ChatGPT and Grok Bot are connected in their own apps; the
+[install page](https://app.archipelago.tools/connect/install) says how. From
+then on each session starts on your map, handed the open work the sessions
+before it left there and why each piece needs attention. For a server of your
+own, the same page is at `/connect/install` on it.
 
 Then say:
 

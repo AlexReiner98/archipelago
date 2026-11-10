@@ -22,7 +22,8 @@ export function askedBy(prompt: unknown): string | undefined {
 
 /** What the map has settled and left open on what the session was asked. */
 export async function narrowed(l: Archipelago, text: string) {
-  const matches = (await l.search({ q: text, limit: MATCHES })) as { id: string }[];
+  // A session is named by its first prompt (src/session-name.ts), so sessions are left out: they would match it best.
+  const matches = (await l.search({ q: text, limit: MATCHES, except: ['run'] })) as { id: string }[];
   if (!matches.length) return { settled: [], open: [] };
   const ids = matches.map((m) => m.id);
   const families = l.registry.relationFamily(...STEP);

@@ -4,6 +4,9 @@
 // to come back, and the token it is given is kept in a file of this person's (the plugin's data folder, else
 // ~/.pelago), never printed, and refreshed before it runs out. PELAGO_AGENT_TOKEN, where it is set, still wins.
 //
+//   node pelago-login.mjs sign-in [<origin>]          sign in, waiting for the browser (the installer runs it)
+//   node pelago-login.mjs headers                     the sign-in as headers, for Claude Code's headersHelper
+//   node pelago-login.mjs call <tool> '<json>'        one call to the map, for a session whose tools have not loaded
 //   node pelago-login.mjs <origin> <folder> <port> <verifier> <state> <client id> [<address to open>]   (started by the hook, detached)
 
 import { execFile, execFileSync, spawn } from 'node:child_process';
@@ -19,8 +22,13 @@ const WAIT_MS = 10 * 60_000;
 const EARLY_MS = 2 * 60_000;
 const REDIRECT = '/callback';
 
-/** Where this person's sign-ins are kept: the plugin's own data folder when it runs as one, else ~/.pelago. */
-export const folderOf = (env = process.env) => env.CLAUDE_PLUGIN_DATA || join(homedir(), '.pelago');
+/**
+ * Where this person's sign-ins are kept: ~/.pelago (PELAGO_HOME for another), one place that the installer, the hooks
+ * and the map's tools (the plugin's headersHelper) all read, so one Allow in the browser serves them all.
+ */
+export const folderOf = (env = process.env) => env.PELAGO_HOME || join(homedir(), '.pelago');
+/** The server this file signs in to when nothing names one; the plugin and the installer write the hosted one in. */
+const DEFAULT = 'http://127.0.0.1:3100';
 const hostOf = (origin) => new URL(origin).host.replace(/[^\w.-]/g, '_');
 const fileOf = (folder, origin, what) => join(folder, `${what}-${hostOf(origin)}.json`);
 const readJson = (file) => {
@@ -181,8 +189,53 @@ async function waitForBrowser([origin, folder, port, verifier, state, client, op
   setTimeout(() => server.close(() => done(1)), WAIT_MS).unref();
 }
 
+/** The server named for this run: Claude Code's for the MCP server it asks headers for, else PELAGO_URL, else the default. */
+const originNamed = (env = process.env) => {
+  try {
+    if (env.CLAUDE_CODE_MCP_SERVER_URL) return new URL(env.CLAUDE_CODE_MCP_SERVER_URL).origin;
+  } catch { /* not an address: the next says */ }
+  return (env.PELAGO_URL || DEFAULT).replace(/\/$/, '');
+};
+const tokenFor = async (origin) => process.env.PELAGO_AGENT_TOKEN || (await accessToken(origin).catch(() => undefined));
+
+/** Call one of the map's tools as plain JSON with this machine's sign-in: what an agent uses before its tools load. */
+export async function call(origin, tool, input) {
+  const token = await tokenFor(origin);
+  const res = await fetch(`${origin}/agent/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }, body: JSON.stringify(input ?? {}), signal: AbortSignal.timeout(30_000) });
+  return { status: res.status, text: await res.text() };
+}
+
+/** Sign in, waiting here until the browser comes back: what the installer runs. True once signed in. */
+export async function signInHere(origin, say = console.log) {
+  if ((await tokenFor(origin)) && (await call(origin, 'query', {})).status === 200) return say(`Already signed in to ${origin}.`), true;
+  forget(origin);
+  const { url, waiting } = await signIn(origin, folderOf(), { open: true });
+  if (waiting) openBrowser(url);
+  say(`A browser window is open to sign in to ${origin}: say Allow there.\nIf no window opened, open this address:\n${url}`);
+  for (const until = Date.now() + WAIT_MS; Date.now() < until; await new Promise((r) => setTimeout(r, 1000))) {
+    if (readJson(fileOf(folderOf(), origin, 'signed-in'))?.access) return say('Signed in.'), true;
+    const pending = readJson(fileOf(folderOf(), origin, 'signing-in'));
+    if (!pending || !alive(pending.pid)) break;
+  }
+  say('Not signed in: the browser did not say Allow.');
+  return false;
+}
+
 const same = (a, b) => a.replace(/\\/g, '/').toLowerCase() === b.replace(/\\/g, '/').toLowerCase();
-if (process.argv[1] && existsSync(process.argv[1]) && same(fileURLToPath(import.meta.url), process.argv[1])) await waitForBrowser(process.argv.slice(2));
+if (process.argv[1] && existsSync(process.argv[1]) && same(fileURLToPath(import.meta.url), process.argv[1])) {
+  const [what, ...rest] = process.argv.slice(2);
+  // Claude Code's headersHelper: the sign-in as Authorization, or nothing, so Claude's own sign-in is the fallback.
+  if (what === 'headers') {
+    const token = await tokenFor(originNamed());
+    process.stdout.write(JSON.stringify(token ? { Authorization: `Bearer ${token}` } : {}));
+  } else if (what === 'sign-in') process.exit((await signInHere((rest[0] || originNamed()).replace(/\/$/, ''))) ? 0 : 1);
+  else if (what === 'call') {
+    // node pelago-login.mjs call <tool> '<json>': the answer, never the token.
+    const { status, text } = await call(originNamed(), rest[0], JSON.parse(rest[1] || '{}'));
+    process.stdout.write(text + '\n');
+    process.exit(status < 300 ? 0 : 1);
+  } else await waitForBrowser(process.argv.slice(2));
+}
 
 // What the hook says when it runs as the plugin's: Claude Code's names for its events, and what each answer carries.
 const EVENTS = { 'session-start': 'SessionStart', prompt: 'UserPromptSubmit', stop: 'Stop', 'file-used': 'PostToolUse' };
@@ -252,7 +305,7 @@ export function plugin(session, hookUrl, folder = folderOf()) {
         const { url, waiting } = await signIn(origin, folder);
         return {
           notice: `Archipelago: ${waiting ? 'sign in to connect this computer' : 'a browser window opened to connect this computer'}. Say Allow there, and this session goes on your map with your next message. If no window opened: ${url}`,
-          context: 'This session is not on the Archipelago map yet: the person is asked to sign in, in their browser, and it is registered with their next message. The map tools ask for the same sign-in through /mcp. Say so in one line in your first reply.',
+          context: 'This session is not on the Archipelago map yet: the person is asked to sign in, in their browser, and it is registered with their next message. The map’s tools use the same sign-in from the next session. Say so in one line in your first reply.',
         };
       } catch (err) {
         return { notice: `Archipelago: could not ask for a sign-in at ${origin} (${err.message}). This session is not on the map.`, context: '' };
