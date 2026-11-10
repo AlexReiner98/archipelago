@@ -37,7 +37,7 @@ page is where to find the one you need. Every `.ts` script is type-checked with 
 | `bench-views.ts` | the heavy reads and a typical write, end to end, against a running server |
 | `bench-log.ts` | the log at size, read and written as the server does (`docs/log.md`, section 9) |
 | `bench-rebuild.ts` | `npm run bench:rebuild`: the projections rebuilt from the log at scale |
-| `measure-plan.ts` | what the limits per plan (`src/plan.ts`) rest on, measured on a copy of a map |
+| `measure-plan.ts` | what the limits per plan (`src/standing.ts`) rest on, measured on a copy of a map |
 | `hero-bench.ts` | how soon the landing page's hero is on screen over a slowed network |
 
 ## Looking at drawings and pages

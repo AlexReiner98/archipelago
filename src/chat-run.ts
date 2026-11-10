@@ -2,9 +2,9 @@
 // One chat is one session under one name; its agent saying it is done does not end it, the chat ending does.
 
 import { actorId, type Actor, type Entity, type Archipelago } from './pelago.ts';
-import { awakeSessions, roomForSession } from './plan.ts'; import { wholeMap } from './outbox.ts';
+import { roomForSession } from './standing.ts'; import { awakeSessions } from './workspace-use.ts'; import { wholeMap } from './outbox.ts';
 
-/** How many sessions are at work in the workspace, whoever's they are (src/plan.ts). */
+/** How many sessions are at work in the workspace, whoever's they are (src/workspace-use.ts). */
 export const sessionsAwake = async (l: Archipelago) => awakeSessions((await wholeMap(l)).db, l.registry.family('run'));
 
 /** Find a run by its entity id or by the session id its surface gave it. */

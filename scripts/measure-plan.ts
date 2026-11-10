@@ -1,4 +1,4 @@
-// What the limits per plan (src/plan.ts) rest on, measured here and never on the live server: a workspace's storage
+// What the limits per plan (src/standing.ts) rest on, measured here and never on the live server: a workspace's storage
 // (its log and pictures, as the limit counts them, and the folder it takes on disk), the memory of a server process
 // with N workspaces open, the requests a minute it answers, and how many requests a minute real sessions make.
 //
@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { createToken } from '../src/auth.ts';
 import { parseBackup, readVault, type Dump } from '../src/backup.ts';
-import { storageBytes, bytes } from '../src/plan.ts';
+import { storageBytes, bytes } from '../src/workspace-use.ts';
 import { configureSecrets } from '../src/secrets.ts';
 import { createHttpServer } from '../src/server.ts';
 import { Workspaces } from '../src/workspaces.ts';
