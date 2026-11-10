@@ -4,6 +4,7 @@
 import { newId, type Q } from './db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts'; import { ownerFollows } from './owner-link.ts';
 import { roomToStore, stillWritable } from './standing.ts';
+import { placeOnLoneIsland } from './island-items.ts';
 import { typesAfter, typesApplied } from './type-items.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { append, type Decision, type Fact } from './log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
@@ -26,7 +27,8 @@ const privateTo = (map: Archipelago, visibility: string, to?: string | null): st
 export async function applyChange(map: Archipelago, actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority; token?: string; rule?: Decision; dry?: boolean; ids?: Record<string, string>; privateTo?: string | null } = {}) {
   const ops = dropExcepted(input.ops, opts.except ?? []); await stillWritable(map.workspace); if (!opts.dry) await roomToStore(map.workspace);
   if (!ops.length) throw new Error('Nothing left to apply after exclusions.');
-  // Validate again: the map may have changed since this was proposed.
+  // Validate again: the map may have changed since this was proposed. A new item naming no island takes the lone one.
+  await placeOnLoneIsland(map, map.registry, ops);
   const { warnings } = await map.plan(ops);
   const changeset = newId('c');
   const created: Record<string, string> = {};
