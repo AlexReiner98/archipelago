@@ -42,7 +42,7 @@ on load in `src/server-reach.ts` and acted on by the kernel alone:
 
 | Key | What the kernel does |
 |---|---|
-| `mounts` | Hands it an address from a closed list (decision e_wptrr6tf): `public` (`/p/`), `site` (a domain's whole space), `setup` (`/connect/setup.mjs`), each to at most one pack (`src/server-mounts.ts`). `/s/` stays the kernel's. |
+| `mounts` | Hands it an address from a closed list (decision e_wptrr6tf): `public` (`/p/`), `site` (a domain's whole space), `setup` (`/connect/setup.mjs`), each to at most one pack (`src/server-mounts.ts`). `/s/` stays the kernel's. Its entry answers a page, JSON, a picture, plain text or XML, a redirect on this server, the kernel's stream of a published document, or `pass` (the kernel answers). The open core's own reader (`packs/reader`) takes `public` and `site`; a pack the configuration names in its place replaces it. |
 | entries' `answers: "html"` | Sends what the entry answers as a page, with headers and policy the kernel sets (`src/server-routes.ts`). |
 | `streams` | Holds a stream at `/x/<pack>/<id>/<workspace>/<id>` and tells it when that document is `published` again (`src/server-streams.ts`). |
 | `files` | Serves a file of its `files/` folder at `/x/<pack>/files/<id>`, filled with `{origin}`, `{tokens}`, `{version}`, `{rules}`, and tells a session when its copy is behind (`src/server-files.ts`). |

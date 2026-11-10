@@ -65,8 +65,8 @@ test('a server pack is a pack that asks for server reach: never a workspace pack
   const reg = new Registry(dir);
   registries.push(reg);
   assert.ok(!reg.found.some((p) => p.id === 'hub'), "a workspace's registry leaves it out");
-  assert.deepEqual(loadServerPacks([dir]).packs.map((p) => [p.file.id, Boolean(p.file.reach.server)]), [['hub', true]]);
-  assert.deepEqual(loadServerPacks([OWN_PACKS]).packs, [], 'the kernel ships none of its own');
+  assert.deepEqual(loadServerPacks([dir]).packs.map((p) => [p.file.id, Boolean(p.file.reach.server)]), [['hub', true], ['reader', true]]);
+  assert.deepEqual(loadServerPacks([OWN_PACKS]).packs.map((p) => p.file.id), ['reader'], 'the kernel ships one of its own, the reader');
 });
 
 test('a pack waits while what it requires is missing, and what names a pack it uses registers only while that one is active', async () => {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { describe, publicDocument } from '../src/public-document.ts';
+import { publicDocument } from '../src/public-document.ts';
 import { gist } from '../src/published.ts';
 import { packsWith } from './map.ts';
 import { serve as served } from './serve.ts';
@@ -178,10 +178,3 @@ test('a part is told by its first sentence, with no ids', () => {
   assert.ok(gist('word '.repeat(80)).endsWith('…'));
 });
 
-test('a document is described by the first paragraph it opens on, cut short', () => {
-  assert.equal(describe([{ text: '# Title\n\nShort title\nThe first words, said **plainly**.\n\nThe second.' }]), 'The first words, said plainly.');
-  assert.equal(describe([{ section: { id: 'e_aaaaaaaa', type: 'record', title: 'A', status: 'current', body: '- one\n- two', updated_at: '' } }]), 'one two');
-  const long = describe([{ text: 'word '.repeat(100) }]);
-  assert.ok(long.length <= 160 && long.endsWith('…'));
-  assert.equal(describe([]), '');
-});

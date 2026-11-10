@@ -46,7 +46,7 @@ import { pgLeader, soleLeader, type Leader } from './leader.ts'; import { draine
 import { serverDuties } from './duties.ts'; import { keepVisits, onSitePage } from './visits.ts';
 import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
-import { servePublic } from './public-route.ts'; import { serveSite, siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
+import { servePublic } from './public-route.ts'; import { siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
 import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
 import { sharedPicture } from './documents.ts'; import { sharedAnswer } from './share-view.ts'; import { guestMap, ShareEnded } from './guests.ts'; import { serveLink } from './share-link-route.ts'; import { frozen } from './share-link.ts';
 import { configureSecrets } from './secrets.ts'; import { serveBackupFile } from './backup-tools.ts';
@@ -209,10 +209,10 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
       if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, data: devMode() ? (workspaces.config.dataDir ?? undefined) : undefined, leading: options.leading?.() ?? true });
-      // A domain that serves a workspace's public site: its pages by address word (src/site.ts), its icon; the rest as on any name.
+      // A domain that serves a workspace's public site: its pages by the reader pack (packs/reader), its icon; the rest as on any name.
       const host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined;
       const mount = req.method === 'GET' ? mountOf(url.pathname, site) : undefined; // an address a server pack took from the kernel's list (src/server-mounts.ts)
-      if ((mount && (await serveMounted(req, res, mount, url.pathname, { packs: serverPacks, site, tokens, tooOften: () => tooOften(req, res, open) }))) || (site && (tooOften(req, res, open) || (await serveSite(res, url.pathname, { host, workspace: site, workspaces, onPage: () => onSitePage(site, host, url, req) }))))) return;
+      if (mount && (await serveMounted(req, res, mount, url.pathname, { packs: serverPacks, site, tokens, workspaces, named, sites, host, from: addressOf(req), onPage: () => site && onSitePage(site, host, url, req), tooOften: () => tooOften(req, res, open) }))) return;
       if (req.method === 'GET' && ICON.test(url.pathname)) return tooOften(req, res, open) || (await serveIcon(res, (await workspaces.get(site ?? DEFAULT_WORKSPACE)).pelago));
       if (req.method === 'GET' && url.pathname.startsWith('/backup-file/')) {
         if (tooOften(req, res, open)) return; // a guessed key would otherwise open the workspace it names, again and again
@@ -224,9 +224,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       const packPath = serverPacks.aliased(url.pathname) ?? url.pathname;
       if (/^\/(connect|x|oauth|\.well-known)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : /^\/connect\/(sign-in|code|join)$/.test(packPath) ? signIn : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX), person: () => resolve(req, res, 'human'), from: addressOf(req) });
 
-      // A public page (a product's, or a document's): open to anyone, on any name this server has (src/public-route.ts).
+      // A product's public page, which the reader pack passed on: open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture|drawing|live)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
-      if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces, named, sites, from: addressOf(req) }));
+      if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces }));
       // A frozen link's secret traded for a reader token, and that token's reads, from the link's snapshot alone (src/share-link-route.ts).
       if (await serveLink(req, res, url.pathname, { workspaces, tooOften: () => tooOften(req, res, open), local: () => local(req), body: () => readJson(req) })) return;
 

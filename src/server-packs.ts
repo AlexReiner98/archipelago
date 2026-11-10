@@ -167,11 +167,14 @@ function markedServer(at: string): boolean {
   }
 }
 
-/** Every server pack in those folders. One that is not right is left out and said why, never half loaded. */
+/**
+ * Every server pack in those folders. One that is not right is left out and said why, never half loaded. The kernel's
+ * own (the reader) are read last: one the configuration names in their place (its id, a mount) replaces them.
+ */
 export function loadServerPacks(dirs = serverPackDirs()): { packs: ServerPack[]; refused: { folder: string; why: string[] }[] } {
   const packs: ServerPack[] = [];
   const refused: { folder: string; why: string[] }[] = [];
-  for (const dir of [...new Set(dirs)]) {
+  for (const dir of [...new Set(dirs)].sort((a, b) => Number(a === OWN_PACKS) - Number(b === OWN_PACKS))) {
     if (!existsSync(dir)) {
       refused.push({ folder: dir, why: ['there is no such folder'] });
       continue;
@@ -193,6 +196,7 @@ export function loadServerPacks(dirs = serverPackDirs()): { packs: ServerPack[];
       for (const mount of Object.keys(file.reach?.server?.mounts ?? {})) if (packs.some((p) => p.file.reach.server.mounts?.[mount as never])) why.push(`another server pack takes the mount "${mount}" already`);
       const surface = file.reach?.server?.adapter?.surface;
       if (surface && packs.some((p) => p.file.reach.server.adapter?.surface === surface)) why.push(`another server pack translates the surface "${surface}" already`);
+      if (why.length && dir === OWN_PACKS && !checkServerPack(file, folder).length) continue; // replaced
       if (why.length) refused.push({ folder, why });
       else packs.push({ file: file as ServerPackFile, folder });
     }

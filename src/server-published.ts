@@ -3,14 +3,13 @@
 // alone (src/public-schema.ts, by way of src/published.ts), as anyone: the pack is handed only what is public, never
 // the map. Publishing and taking down stay the kernel's (src/published.ts).
 //
-// Every answer is JSON: a document as its page's /data gives it (src/public-route.ts), its look beside it and each
+// Every answer is JSON: a document as its page's /data gives it (packs/reader), its look beside it and each
 // drawing's code left at its hash; a picture's bytes as base64 with their content type. What is not published, or not
 // there, is null, so a pack cannot tell a private item from one that never was.
 
 import type { Part } from './documents.ts';
-import { pageData, layoutCode } from './published-page.ts';
+import { layoutCode, pageData, publicPath } from './published-data.ts';
 import { PATH, publishedAt, publishedDocument, publishedPicture, sitePages } from './published.ts';
-import { publicPath } from './public-route.ts';
 import type { ActPlaces } from './server-acts.ts';
 import type { ServerAct, ServerPackFile } from './server-packs.ts';
 import { pageLook } from './styles.ts';
