@@ -2,25 +2,50 @@
 // and the cheapest flow that meets every node's need. Successive shortest paths, each found by Dijkstra over reduced
 // costs, so a cost must not be below zero. Nothing here knows a drawing. Layer: shape. Pure: numbers in, numbers out.
 
-/** A binary heap of [key, value], the least key first. */
-function heap() {
-  const a = [];
-  const up = (i) => { while (i > 0) { const p = (i - 1) >> 1; if (a[p][0] <= a[i][0]) break; [a[p], a[i]] = [a[i], a[p]]; i = p; } };
-  const down = (i) => {
-    for (;;) {
-      const l = i * 2 + 1, r = l + 1;
-      let m = i;
-      if (l < a.length && a[l][0] < a[m][0]) m = l;
-      if (r < a.length && a[r][0] < a[m][0]) m = r;
-      if (m === i) return;
-      [a[m], a[i]] = [a[i], a[m]];
-      i = m;
-    }
+/**
+ * A binary heap of keys and values, the least key first, in typed arrays that grow as it fills: nothing is made per
+ * push (bug e_a9w5jeme: the pairs it made were half a second of collecting garbage on 263 items).
+ */
+function heap(room) {
+  let keys = new Float64Array(Math.max(1, room)), vals = new Int32Array(Math.max(1, room)), size = 0;
+  const swap = (i, j) => {
+    const k = keys[i], v = vals[i];
+    ((keys[i] = keys[j]), (vals[i] = vals[j]), (keys[j] = k), (vals[j] = v));
   };
   return {
-    get size() { return a.length; },
-    push(k, v) { a.push([k, v]); up(a.length - 1); },
-    pop() { const top = a[0], last = a.pop(); if (a.length) { a[0] = last; down(0); } return top; },
+    get size() { return size; },
+    clear() { size = 0; },
+    push(k, v) {
+      if (size === keys.length) {
+        const k2 = new Float64Array(size * 2), v2 = new Int32Array(size * 2);
+        (k2.set(keys), v2.set(vals), (keys = k2), (vals = v2));
+      }
+      ((keys[size] = k), (vals[size] = v));
+      for (let i = size++; i > 0; ) {
+        const p = (i - 1) >> 1;
+        if (keys[p] <= keys[i]) break;
+        (swap(p, i), (i = p));
+      }
+    },
+    /** The least key's value; its key is left in `key`. */
+    pop() {
+      const v = vals[0];
+      this.key = keys[0];
+      size--;
+      if (size) {
+        ((keys[0] = keys[size]), (vals[0] = vals[size]));
+        for (let i = 0; ; ) {
+          const l = i * 2 + 1, r = l + 1;
+          let m = i;
+          if (l < size && keys[l] < keys[m]) m = l;
+          if (r < size && keys[r] < keys[m]) m = r;
+          if (m === i) break;
+          (swap(m, i), (i = m));
+        }
+      }
+      return v;
+    },
+    key: 0,
   };
 }
 
@@ -41,33 +66,43 @@ export function minCostFlow(n, supply, arcs, { batch = Infinity } = {}) {
   }
   for (const g of give) if (g > 0) total += g;
   if (give.reduce((s, g) => s + g, 0) !== 0) throw new Error('minCostFlow: what is given and taken do not balance');
-  // The residual graph: each arc and its reverse side by side, so arc k's reverse is k ^ 1.
-  const S = n, T = n + 1, size = n + 2, to = [], cap = [], cost = [], head = Array.from({ length: size }, () => []);
+  // The residual graph: each arc and its reverse side by side, so arc k's reverse is k ^ 1; each node's arcs in the
+  // order they were added (`first` and `out`, as one flat list), all in typed arrays.
+  const S = n, T = n + 1, size = n + 2, ends = arcs.length + give.filter(Boolean).length, M = ends * 2;
+  const to = new Int32Array(M), from = new Int32Array(M), cap = new Float64Array(M), cost = new Float64Array(M);
+  let made = 0;
   const add = (u, v, c, w) => {
-    head[u].push(to.length); to.push(v); cap.push(c); cost.push(w);
-    head[v].push(to.length); to.push(u); cap.push(0); cost.push(-w);
+    ((from[made] = u), (to[made] = v), (cap[made] = c), (cost[made] = w), made++);
+    ((from[made] = v), (to[made] = u), (cap[made] = 0), (cost[made] = -w), made++);
   };
-  const big = total + 1, slot = [];
-  for (const a of arcs) {
-    slot.push(to.length);
+  const big = total + 1, slot = new Int32Array(arcs.length);
+  arcs.forEach((a, i) => {
+    slot[i] = made;
     add(a.from, a.to, Math.min(big, (a.cap ?? Infinity) - (a.low ?? 0)), a.cost ?? 0);
-  }
+  });
   give.forEach((g, v) => { if (g > 0) add(S, v, g, 0); else if (g < 0) add(v, T, -g, 0); });
-  const pot = new Array(size).fill(0), dist = new Array(size), prev = new Array(size), level = new Array(size), next = new Array(size);
+  const first = new Int32Array(size + 1), out = new Int32Array(made);
+  for (let k = 0; k < made; k++) first[from[k] + 1]++;
+  for (let v = 0; v < size; v++) first[v + 1] += first[v];
+  const fill = first.slice(0, size);
+  for (let k = 0; k < made; k++) out[fill[from[k]]++] = k;
+  const pot = new Float64Array(size), dist = new Float64Array(size), prev = new Int32Array(size), level = new Int32Array(size), next = new Int32Array(size);
+  const queue = new Int32Array(size), path = new Int32Array(size), q = heap(made + 1);
   let sent = 0, spent = 0;
   while (sent < total) {
     dist.fill(Infinity);
     prev.fill(-1);
     dist[S] = 0;
-    const q = heap();
+    q.clear();
     q.push(0, S);
     while (q.size) {
-      const [d, u] = q.pop();
+      const u = q.pop(), d = q.key;
       if (d > dist[u]) continue;
       // Once the sink is reached its distance is known, and every node not yet out of the heap is at least as far: the
       // potentials below rise by no more than the sink's distance, so the rest of the search would change nothing.
       if (u === T) break;
-      for (const k of head[u]) {
+      for (let j = first[u], end = first[u + 1]; j < end; j++) {
+        const k = out[j];
         if (cap[k] <= 0) continue;
         const v = to[k], nd = d + cost[k] + pot[u] - pot[v];
         if (nd < dist[v]) { dist[v] = nd; prev[v] = k; q.push(nd, v); }
@@ -83,40 +118,43 @@ export function minCostFlow(n, supply, arcs, { batch = Infinity } = {}) {
     if (arcs.length >= batch) for (;;) {
       level.fill(-1);
       level[S] = 0;
-      const queue = [S];
-      for (let q = 0; q < queue.length && level[T] < 0; q++) {
-        const u = queue[q];
-        for (const k of head[u]) if (level[to[k]] < 0 && tight(k, u)) { level[to[k]] = level[u] + 1; queue.push(to[k]); }
+      queue[0] = S;
+      for (let h = 0, t = 1; h < t && level[T] < 0; h++) {
+        const u = queue[h];
+        for (let j = first[u], end = first[u + 1]; j < end; j++) {
+          const k = out[j];
+          if (level[to[k]] < 0 && tight(k, u)) ((level[to[k]] = level[u] + 1), (queue[t++] = to[k]));
+        }
       }
       if (level[T] < 0) break;
-      next.fill(0);
+      // Each node's arcs tried from where it last left off: `next` is a place in its stretch of `out`.
+      for (let v = 0; v < size; v++) next[v] = first[v];
       for (let pushed = true; pushed && sent < total;) {
         pushed = false;
-        // One path down the levels, each node's arcs tried from where it last left off.
-        const path = [];
-        let u = S;
+        // One path down the levels.
+        let u = S, steps = 0;
         while (u !== T) {
-          const arcs = head[u];
-          while (next[u] < arcs.length) {
-            const k = arcs[next[u]];
+          const end = first[u + 1];
+          while (next[u] < end) {
+            const k = out[next[u]];
             if (level[to[k]] === level[u] + 1 && tight(k, u)) break;
             next[u]++;
           }
-          if (next[u] === arcs.length) {
+          if (next[u] === end) {
             if (u === S) break;
             level[u] = -1;
-            u = to[path.pop() ^ 1];
+            u = to[path[--steps] ^ 1];
             next[u]++;
             continue;
           }
-          const k = arcs[next[u]];
-          path.push(k);
+          const k = out[next[u]];
+          path[steps++] = k;
           u = to[k];
         }
         if (u !== T) break;
         let push = total - sent;
-        for (const k of path) push = Math.min(push, cap[k]);
-        for (const k of path) { cap[k] -= push; cap[k ^ 1] += push; spent += push * cost[k]; }
+        for (let i = 0; i < steps; i++) push = Math.min(push, cap[path[i]]);
+        for (let i = 0; i < steps; i++) { const k = path[i]; cap[k] -= push; cap[k ^ 1] += push; spent += push * cost[k]; }
         sent += push;
         pushed = true;
       }

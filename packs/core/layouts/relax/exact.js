@@ -10,10 +10,12 @@ import { minCostFlow } from './flow.js';
  * by, q→p costing -by), each hard one an arc q→p with no limit costing -l; potentials from the hard arcs alone make
  * those costs non-negative, and a soft arc still below nothing is run full first. The places are the shortest paths
  * over what the flow leaves, in the costs as they were. A weight is counted in `grain` whole units a unit (the flow
- * carries whole units), a length within `near` of a whole one taken as it; `batch` is as ./flow.js takes it.
+ * carries whole units). A least distance is taken down to a whole pixel (within `near`), so no loop of them asks for
+ * more than it can hold (taken up, two of +0.3 and -0.3 made a loop of +1 and the flow ran on 52 million units); the
+ * last pass of ./solve.js keeps each exactly. `batch` is as ./flow.js takes it.
  */
 export function exactly(n, softIn, hardIn, grain, near, batch = 0) {
-  const soft = softIn.map(([p, q, by, w]) => [p, q, Math.round(by), w]), hard = hardIn.map(([p, q, l]) => [p, q, Math.ceil(l - near)]);
+  const soft = softIn.map(([p, q, by, w]) => [p, q, Math.round(by), w]), hard = hardIn.map(([p, q, l]) => [p, q, Math.floor(l + near)]);
   const pi = new Array(n).fill(0);
   for (let round = 0, changed = true; changed && round <= n; round++) {
     changed = false;
