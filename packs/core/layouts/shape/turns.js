@@ -4,13 +4,15 @@
 // turned round: turning node v by r adds r to the turns of every edge into v and takes r from every edge out of it, and
 // the faces still close. So the one solve is: each box turned to face the sides its wires asked for, every other node
 // turned however makes the fewest turns in all, no wire doubling back, borders kept as the network had them. Each cost
-// is w · max(0, |c + λ(to) - λ(from)| - s) over the integer turns λ: a minimum-cost tension, solved exactly as the dual
-// of a minimum-cost flow (./flow.js). Boxes may only turn by whole turns of four, which a flow cannot say, so two such
-// solves take turns until neither gains: the other nodes with the boxes held, then whole turns of four everywhere.
+// is w · max(0, |c + λ(to) - λ(from)| - s) over the integer turns λ: a minimum-cost tension, solved exactly by steepest
+// descent, a least cut a step (./descend.js; task e_77u56fwt). Boxes may only turn by whole turns of four, which one
+// such solve cannot say, so two take turns until neither gains: the other nodes with the boxes held, then whole turns of
+// four everywhere. Each starts from where the last left the turns, so the polish, which tries one node at a time, finds
+// its least again in a cut or two.
 // Layer: shape. Pure: the shape in, headings and turns out.
 
 import { ashore } from './angles.js';
-import { minCostFlow } from './flow.js';
+import { descent } from './descend.js';
 import { QUARTERS } from './sides.js';
 
 /** What a turn on a wire costs; one more inside an island, which it costs room there and none at sea; a bend in a
@@ -21,53 +23,6 @@ const BEND = 1e1, ASHORE = 1, BACK = 3e1, BAR = 1e2, BORDER = 1e4;
 /** Turns as a list, -1 left and 1 right: `n` of them, all one way. */
 const run = (n) => Array.from({ length: Math.abs(n) }, () => Math.sign(n));
 const mod = (a) => ((a % QUARTERS) + QUARTERS) % QUARTERS;
-
-/**
- * The integer λ at each of `n` nodes that minimises Σ w · max(0, |c + λ[to] - λ[from]| - s) over `terms`
- * { from, to, c, w, s }, node 0 held at 0. Solved as its dual, a circulation φ, |φ| ≤ w, each unit costing s less c
- * one way and s more c the other; λ are the shortest paths it leaves.
- */
-export function tension(n, terms, batch = Infinity, simplex = 0) {
-  const supply = new Array(n).fill(0), arcs = [], same = new Map();
-  // Arcs with the same ends and cost are one arc holding what both hold: the same flow, far fewer arcs to search.
-  const put = (from, to, cap, cost) => {
-    const key = `${from} ${to} ${cost}`, had = same.get(key);
-    if (had) had.cap += cap;
-    else { const a = { from, to, cap, cost }; same.set(key, a); arcs.push(a); }
-  };
-  const arc = (from, to, cap, cost) => {
-    // An arc that pays to run is run full from the start, and what is left of it runs back.
-    if (cost < 0) { supply[from] -= cap; supply[to] += cap; put(to, from, cap, -cost); } else put(from, to, cap, cost);
-  };
-  for (const { from, to, c, w, s = 0 } of terms) {
-    if (!w || from === to) continue;
-    arc(from, to, w, s - c);
-    arc(to, from, w, s + c);
-  }
-  const { flow } = minCostFlow(n, supply, arcs, { batch, simplex });
-  const left = [];
-  arcs.forEach((a, i) => {
-    if (flow[i] < a.cap) left.push([a.from, a.to, a.cost]);
-    if (flow[i] > 0) left.push([a.to, a.from, -a.cost]);
-  });
-  const dist = new Array(n).fill(0);
-  for (let round = 0, changed = true; changed && round <= n; round++) {
-    changed = false;
-    for (const [a, b, cost] of left) if (dist[a] + cost < dist[b]) { dist[b] = dist[a] + cost; changed = true; }
-  }
-  return dist.map((d) => d - dist[0]);
-}
-
-/** w · max(0, |x + 4d| - s) over whole d, as terms a |d - b| (each twice its weight, the same for every cost). */
-function wholeTurns(x, w, s) {
-  const f = (d) => w * Math.max(0, Math.abs(x + QUARTERS * d) - s), out = [];
-  const lo = Math.floor((-s - x) / QUARTERS), hi = Math.ceil((s - x) / QUARTERS);
-  for (let b = lo; b <= hi; b++) {
-    const a = f(b + 1) - 2 * f(b) + f(b - 1);
-    if (a) out.push({ c: -b, w: a });
-  }
-  return out;
-}
 
 /** The network's own frame: every dart's heading with each part turned from one node of it, each edge as bent. */
 function frame(F, S, nA) {
@@ -130,11 +85,11 @@ function costs(emb, F, S, nA, h0, span) {
 
 /**
  * The heading every dart leaves its tail with (`out`, N E S W as 0 to 3), the turns along every edge from its `from`
- * (`turns`), how many there are on wires (`bends`), and how many border edges turn otherwise than the network had them
- * (`bent`), which leaves an island no rectangle. The polish past the first solves asks `afford(work)` of the picture's
- * budget first, each try a solve over every term at every node: once it says no, the turns found stand.
+ * (`turns`), how many there are on wires (`bends`), how many border edges turn otherwise than the network had them
+ * (`bent`), which leaves an island no rectangle, and what the turns cost in all (`price`). The polish past the first
+ * solves asks `afford(work)` of the picture's budget first: once it says no, the turns found stand.
  */
-export function headings(emb, F, S, afford = () => true, { span = Infinity, batch = Infinity, simplex = 0 } = {}) {
+export function headings(emb, F, S, afford = () => true, { span = Infinity } = {}) {
   const { tail, leaving } = F, D = tail.length, N = emb.nodes.length;
   const nA = emb.edges.map((_, k) => S.rights[k] - S.lefts[k]), h0 = frame(F, S, nA);
   // Each box with sides asked is held turned so they face as asked.
@@ -149,17 +104,19 @@ export function headings(emb, F, S, afford = () => true, { span = Infinity, batc
   const index = new Map();
   emb.nodes.forEach((_, v) => { if (!held.has(v)) index.set(v, index.size + 1); });
   const at = (v) => index.get(v) ?? 0;
-  /** Whole turns of four at every node, boxes too, every node's turn kept up to four. */
-  const lift = () => {
-    const whole = tension(N, terms.flatMap((e) => wholeTurns(val(e), e.w, e.s).map((t) => ({ from: e.from, to: e.to, ...t }))), batch, simplex);
-    turn.forEach((t, v) => { turn[v] = t + QUARTERS * whole[v]; });
-  };
+  // The two solves, each made once over every term and run on the costs as the turns stand: whole turns of four at
+  // every node, boxes too (`whole`), and any turn at every other node with the boxes held as one (`free`).
+  const ws = Float64Array.from(terms, (e) => e.w), ss = Float64Array.from(terms, (e) => e.s), now = new Float64Array(terms.length);
+  const whole = descent(N, Int32Array.from(terms, (e) => e.from), Int32Array.from(terms, (e) => e.to), ws, ss, QUARTERS);
+  const free = descent(index.size + 1, Int32Array.from(terms, (e) => at(e.from)), Int32Array.from(terms, (e) => at(e.to)), ws, ss, 1);
+  const solve = (by) => { terms.forEach((e, i) => { now[i] = val(e); }); return by.run(now); };
+  const lift = () => { const { d } = solve(whole); turn.forEach((t, v) => { turn[v] = t + QUARTERS * d[v]; }); };
   /** The two solves in turn until neither gains: every other node's turn with the boxes held, then whole turns. Each
    *  round past the first spends from the picture's budget. */
   const settle = () => {
     for (let last = Infinity, now = price(), round = 0; now < last && (!round || afford(2 * terms.length * N)); last = now, now = price(), round++) {
-      const more = tension(index.size + 1, terms.map((e) => ({ from: at(e.from), to: at(e.to), c: val(e), w: e.w, s: e.s })), batch, simplex);
-      index.forEach((i, v) => { turn[v] += more[i]; });
+      const { d } = solve(free);
+      index.forEach((i, v) => { turn[v] += d[i]; });
       lift();
     }
   };
@@ -174,21 +131,22 @@ export function headings(emb, F, S, afford = () => true, { span = Infinity, batc
     for (const u of b) barOf[u] = a;
   });
   // Where a wire still doubles back, each node along it (with its bar) is tried turned each other way with the whole
-  // turns found again, for a gain neither solve finds alone (a junction turned and a box lifted with it).
+  // turns found again, for a gain neither solve finds alone (a junction turned and a box lifted with it). A try only
+  // asks what the whole turns would gain; the one that gains is then lifted and settled.
   for (let gained = true; gained;) {
     gained = false;
     const doubled = terms.filter((e) => e.w && Math.abs(val(e)) > e.s + 1);
     for (const v of new Set(doubled.flatMap((e) => e.nodes ?? [e.from, e.to]).filter((u) => !held.has(u)))) {
       const before = turn.slice(), was = price();
-      let better = false;
       if (!afford(terms.length * N)) { gained = false; break; }
-      for (let t = 1; t < QUARTERS && !better; t++) {
+      let won = 0;
+      for (let t = 1; t < QUARTERS && !won; t++) {
         turn.splice(0, N, ...before);
         for (const u of barOf[v]) turn[u] += t;
-        lift();
-        better = price() < was;
+        if (price() - solve(whole).gain < was) won = t;
       }
-      if (better) { settle(); gained = true; } else turn.splice(0, N, ...before);
+      turn.splice(0, N, ...before);
+      if (won) { for (const u of barOf[v]) turn[u] += won; lift(); settle(); gained = true; }
     }
   }
   const out = new Int8Array(D);
@@ -200,5 +158,5 @@ export function headings(emb, F, S, afford = () => true, { span = Infinity, batc
     turns.push(run(n));
     if (S.border.has(k)) { if (n !== nA[k]) bent++; } else if (!emb.unseen?.has(e.id)) bends += Math.abs(n);
   });
-  return { out, turns, bends, bent };
+  return { out, turns, bends, bent, price: price() };
 }
