@@ -129,7 +129,10 @@ export async function siteOf(parts, act, template) {
     const lead = textOf(await act('published.at', { workspace, path: LLMS }));
     const list = pages.map((page) => `- [${page.title}](${origin + siteHref(page.path)})`).join('\n');
     const head = lead.startsWith('# ') ? lead : `# ${name ?? workspace}${lead ? PARAGRAPH + lead : ''}`;
-    const installs = app && !lead.includes('/connect/install') ? `${PARAGRAPH}## Install${PARAGRAPH}- [Install Archipelago for an agent](${app}/connect/install)` : '';
+    // Said before the pages, since one of them may be how to host it: an agent asked to set it up connects to the app.
+    const installs = app && !lead.includes('/connect/install')
+      ? `${PARAGRAPH}## Install${PARAGRAPH}To set it up for a person, connect to the hosted service at ${app}: fetch ${app}/connect/install and follow the section for your client. There is nothing to host and nothing to ask; a person with no account makes one when the browser opens to sign in. Run a server of your own only if the person asks for that.${PARAGRAPH}- [Install Archipelago for an agent](${app}/connect/install)`
+      : '';
     return { text: `${head}${installs}${PARAGRAPH}## Pages${PARAGRAPH}${list}\n`, type: 'text/plain', cache: PICTURE_KEPT };
   }
   const steps = pathname.split('/').filter(Boolean);

@@ -1,6 +1,7 @@
 // A published page's head, for search engines and where a link to it is posted: its title, a description from the
 // first paragraph it opens on, the address to keep and the picture its style names. And its data in the page itself,
-// after its script, so the page draws its text and its pictures' first frames as soon as its scripts are here.
+// after its script, so the page draws its text and its pictures' first frames as soon as its scripts are here. Its words
+// are in the page as plain HTML too, never drawn: an agent's fetch runs no script, and read only a title.
 
 const escape = (s) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -50,9 +51,38 @@ export function publicHead(html, doc, canonical, site, image) {
 /** JSON as it may stand inside a page's script element: nothing in it can close the element or open a comment. */
 const inPage = (value) => JSON.stringify(value).replace(/</g, '\\u003c');
 
-/** The page sent for a published document: its head, and its data (what /data answers) after its script. */
+/** A line's code, strong words and links as HTML, everything else escaped: a link only to the web, this site or mail. */
+const inline = (line) =>
+  escape(line)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/\[([^\]]+)\]\(((?:https?:\/\/|\/|mailto:)[^)\s]*)\)/g, '<a href="$2">$1</a>');
+
+/** A note's words as plain HTML: its titles, paragraphs, lists and code, for a reader that runs no script. */
+export function wordsHtml(text) {
+  const out = [];
+  for (const block of String(text ?? '').split(/\n[ \t]*\n/)) {
+    const lines = block.split('\n').filter((line) => line.trim());
+    if (!lines.length) continue;
+    const fenced = /^```/.test(lines[0]);
+    if (fenced) out.push(`<pre>${escape(lines.slice(1, /^```/.test(lines.at(-1)) && lines.length > 1 ? -1 : undefined).join('\n'))}</pre>`);
+    else if (lines.length === 1 && /^#{1,4} /.test(lines[0])) out.push(`<h2>${inline(lines[0].replace(/^#+ /, ''))}</h2>`);
+    else if (lines.every((line) => /^\s*(-|\*|\d+\.)\s/.test(line))) out.push(`<ul>${lines.map((line) => `<li>${inline(line.replace(/^\s*(-|\*|\d+\.)\s+/, ''))}</li>`).join('')}</ul>`);
+    else out.push(`<p>${lines.map(inline).join('<br>')}</p>`);
+  }
+  return out.join('\n');
+}
+
+/**
+ * What the page says for a reader that runs no script and reads no style (an agent's fetch, a search engine): its
+ * title and words, beside the page, never drawn (doc.css hides .page-words), so a person sees only the page as drawn.
+ */
+const wordsOf = (doc) =>
+  `<article class="page-words">${[`<h1>${escape(doc.title ?? '')}</h1>`, ...(doc.parts ?? []).map((part) => wordsHtml(typeof part.text === 'string' ? part.text : part.section?.body ?? ''))].filter(Boolean).join('\n')}</article>`;
+
+/** The page sent for a published document: its head, its words, and its data (what /data answers) after its script. */
 export function publishedPage(template, doc, canonical, site, data, image) {
   return publicHead(template, doc, canonical, site, image)
     .replace(/<main id="main">[\s\S]*?<\/main>/, () => '<main id="main"></main>')
-    .replace('</body>', () => `<script type="application/json" id="page-data">${inPage(data)}</script></body>`);
+    .replace('</body>', () => `${wordsOf(doc)}<script type="application/json" id="page-data">${inPage(data)}</script></body>`);
 }
