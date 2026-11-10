@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
 import { createToken } from '../src/auth.ts';
 import { FOLDER, pluginFiles } from '../scripts/plugin.ts';
+import { LISTING } from '../src/listing.ts';
 import { serve } from './serve.ts';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -97,4 +98,10 @@ test('a machine with no token is connected through the browser, and the session 
     });
   assert.match(JSON.parse(await away('stop')).systemMessage, /did not answer/);
   assert.equal(await away('stop'), '', 'said once a session');
+});
+
+test('the plugin README opens with the listing, every slot filled from listing.json', () => {
+  const readme = pluginFiles()[`${FOLDER}/README.md`];
+  assert.ok(readme.startsWith(`# ${LISTING.title}\n\n${LISTING.summary}\n`), 'it opens with the listing title and summary');
+  assert.doesNotMatch(readme, /\{\w+\}/);
 });

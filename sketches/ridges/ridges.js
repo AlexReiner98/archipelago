@@ -92,6 +92,7 @@ export const DEFAULTS = {
   seed: 1,
   wrap: false,     // repeat seamlessly left to right
   swellReach: 0,   // how far the swell lines reach past the land, as a share of the height: 0 runs them frame to frame
+  swellClear: 0,   // how far the swell lines stop short of a name's clearing, as a share of the height: 0 runs them through it
   field: null,     // a field grown elsewhere, { nx, ny, v }, to stand in for the one these dials would grow
 };
 
@@ -480,6 +481,39 @@ export function ridges(dials) {
       if (lo === Infinity) return void (floor.gone = true);
       const wobble = (k) => (land(k, yc * 2.2) - 0.5) * reach * 0.9;
       floor.points = [[Math.max(xs[0], lo + wobble(31)), y], [Math.min(xs[last], hi + wobble(57)), y]];
+    });
+  }
+  // The swell keeps off the name as it keeps to the islands: in each row the line stops a reach short of the clearing,
+  // a disc rolled round the whole of it, wobbling with noise, so the water opens round the name as it ends at the land.
+  if (d.clear && d.swellClear > 0) {
+    const reach = d.swellClear * H, last = xs.length - 1;
+    const named = sky.map(({ y }) => {
+      let a = 0, b = last;
+      while (a <= last && gridAt(d.clear, xs[a], y) <= 0.3) a++;
+      if (a > last) return null;
+      while (gridAt(d.clear, xs[b], y) <= 0.3) b--;
+      return [xs[a], xs[b]];
+    });
+    sky.forEach(({ y, yc, floor }, r) => {
+      if (floor.gone) return;
+      let lo = Infinity, hi = -Infinity;
+      named.forEach((e, q) => {
+        const off = Math.abs(q - r) * gap;
+        if (!e || off >= reach) return;
+        const side = Math.sqrt(reach * reach - off * off);
+        (lo = Math.min(lo, e[0] - side)), (hi = Math.max(hi, e[1] + side));
+      });
+      if (lo === Infinity) return;
+      const wobble = (k) => (land(k, yc * 2.2) - 0.5) * reach * 0.9;
+      const [x0, x1] = [floor.points[0][0], floor.points[floor.points.length - 1][0]], a = lo + wobble(71), b = hi + wobble(93);
+      const parts = [[x0, Math.min(a, x1)], [Math.max(b, x0), x1]].filter(([p, q]) => q - p > gap);
+      if (!parts.length) return void (floor.gone = true);
+      floor.points = parts[0].map((x) => [x, y]);
+      if (parts[1]) {
+        // The second stretch is a line of its own, drawn with the first; what comes after it in the list moves on by one.
+        shapes.splice(sky[r].at, 0, { line: true, points: parts[1].map((x) => [x, y]) });
+        for (let q = r; q < sky.length; q++) sky[q].at++;
+      }
     });
   }
   // Clouds, from the mountains and spread on the wind (clouds.js): each row's go in just after its land, so nearer land passes
