@@ -1,5 +1,5 @@
 // A view's drawing as a published page keeps it: its answer frozen, with nothing private in it and nothing that names
-// a person or a session (src/published.ts, and src/published-share.ts for a document another workspace shares).
+// a person or a session (src/published.ts).
 
 import type { Archipelago } from './pelago.ts';
 import { isKept, keptPicture } from './query-saved.ts';

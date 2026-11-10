@@ -8,7 +8,8 @@ import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
 
 /** The layout switch, in the view band's menu (task e_xvz8g89r): the menu opened afresh, so the switch is the bar's now. */
-const look = `(() => { const m = [...document.querySelectorAll('.tab-menu')].find((x) => !x.classList.contains('view-panel')); if (m?.matches(':popover-open')) m.hidePopover(); document.querySelector('#query .q-band-menu')?.click(); return m?.querySelector('.q-look') ?? null; })()`;
+// The bar's own menu, by its name: the tab bar's menu is a .tab-menu too, and which comes first in the page varies.
+const look = `(() => { const m = document.querySelector('.tab-menu[aria-label="This view"]'); if (m?.matches(':popover-open')) m.hidePopover(); document.querySelector('#query .q-band-menu')?.click(); return m?.querySelector('.q-look') ?? null; })()`;
 
 const browser = chrome();
 
@@ -35,6 +36,8 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
   const shut = async () => {
     await page.evaluate(`document.body.dataset.sheet === 'open' && document.getElementById('sheet-close').click()`);
     await page.until(`document.body.dataset.sheet !== 'open' && Boolean(document.querySelector('#query .q-band-menu'))`);
+    // Once the bar is drawn again with its switch: it is redrawn as the page shuts.
+    await page.until(`Boolean(${look})`);
     await page.evaluate(`(() => { const s = ${look}; s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   };
   try {
@@ -59,9 +62,8 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
       assert.ok(await page.until(onPage(made.s)), `its page opens: ${await page.evaluate('location.hash')} ${page.logs().join('\n')}`);
       assert.equal(await page.evaluate(`${hash}.get('find')`), `id ${made.t}`, 'over the lens as it was');
       assert.ok(!(await page.evaluate(applied(made.s))), 'with nothing applied');
-      // The switch is drawn with the view's bar, which may come after the page: waited for, then read.
-      assert.ok(await page.until(`Boolean(${look})`), 'the switch is drawn');
-      assert.equal(await page.evaluate(`${look}.value`), '', 'the switch still says the house’s');
+      // Waited for: the bar is drawn again as the page opens.
+      assert.ok(await page.until(`${look}?.value === ''`), 'the switch still says the house’s');
 
       // Apply stands in the page's head, says what it does, and draws the canvas in the style as the switch does.
       assert.ok(await page.until(`${button}?.textContent === 'Use here'`), 'the style’s page offers Apply');
@@ -70,8 +72,8 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
       await page.evaluate(`${button}.click()`);
       assert.ok(await page.until(applied(made.s)), `Apply draws the canvas in it: ${await page.evaluate('location.hash')}`);
       assert.equal(await page.evaluate(`${hash}.get('find')`), `id ${made.t}`, 'the lens kept');
-      assert.ok(await page.until(`${look}.value === 'style:${made.s}'`), 'and the switch says so');
-      assert.equal(await page.evaluate(`${look}.selectedOptions[0].textContent`), 'Harbour blueprint');
+      assert.ok(await page.until(`${look}?.value === 'style:${made.s}'`), 'and the switch says so');
+      assert.ok(await page.until(`${look}?.selectedOptions[0]?.textContent === 'Harbour blueprint'`), 'by its name');
 
       await shut();
       assert.ok(await page.until(`!${applied(made.s)} && document.body.dataset.sheet !== 'open'`), 'back to the canvas');

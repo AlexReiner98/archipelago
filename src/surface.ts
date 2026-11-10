@@ -14,7 +14,7 @@ import { op, props } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 
 /** The kernel's tools an agent reaches through query, each by its own name. Every view, lens and pack view is a name of query too. */
-export const QUERY_READS = ['schema', 'search', 'get', 'events', 'proposals', 'picture', 'watch', 'packs', 'acts', 'document', 'publish_plan', 'published', 'share_figure', 'backup_download', 'look', 'seeing'];
+export const QUERY_READS = ['schema', 'search', 'get', 'events', 'proposals', 'picture', 'watch', 'packs', 'acts', 'document', 'publish_plan', 'published', 'backup_download', 'look', 'seeing'];
 
 /** What query lists when asked for nothing: the reads, then every view. */
 const LIST = 'actions';

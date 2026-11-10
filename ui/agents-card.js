@@ -66,28 +66,45 @@ export function tokensCard({ tokens, row, then, fail, say, workspace, connect })
   return box;
 }
 
-/** What the owner lets agents do: whether their changes wait, and the three things each asked for in turn. */
+/**
+ * How far an agent's change goes unasked, one choice of three: it waits for you, it takes effect (the kernel's rules
+ * still hold settling, code, what is public and forget), or nothing holds it (holds_off).
+ */
+const REACH = [
+  ['hold', 'Wait for you', { agent_changes: 'hold', holds_off: false }],
+  ['apply', 'Take effect', { agent_changes: 'apply', holds_off: false }],
+  ['all', 'Take effect, all of them', { agent_changes: 'apply', holds_off: true }],
+];
+const REACH_TIP = 'Wait for you: each change is a proposal you approve. Take effect: it applies as made, but settling a question, code that runs, what is public and forget still wait. All of them: nothing waits, a forget included, which cannot be undone. Every change is in the log with who made it and why.';
+
+/** What the owner lets agents do: how far their changes go unasked, and three things each allowed in turn. */
 export function agentsMayCard(info, then, fail) {
   // What agents may do is the workspace's setting: an admin's to change.
   if (!may('admin')) return null;
+  const now = info.holds_off ? 'all' : info.agent_changes;
+  const reach = h('select', { title: REACH_TIP }, REACH.map(([v, label]) => h('option', { value: v, selected: v === now }, label)));
+  reach.onchange = async () => {
+    const [v, , set] = REACH.find(([key]) => key === reach.value);
+    if (v === 'all' && !(await ask({ title: 'Let every change take effect?', message: 'No rule holds an agent’s change any more: settling, code, what is public and forget take effect at once, and a forget cannot be undone.', action: 'Allow', danger: true }))) return void (reach.value = now);
+    api('workspace_set', set).then(then, fail);
+  };
   return card(
     'What agents may do',
-    'Every change is in the log with who made it and why.',
+    null,
     h(
       'ul',
       { class: 'rows' },
-      line(
-        h('span', { class: 'grow', title: 'Held, the answer to a decision or a hypothesis waits for you too. Taking effect, an agent can settle one: it has to say what was chosen and why, and you are notified on Home.' }, 'Their changes'),
-        h('select', { onchange: (e) => api('workspace_set', { agent_changes: e.target.value }).then(then, fail) }, [['hold', 'Wait for you'], ['apply', 'Take effect']].map(([v, label]) => h('option', { value: v, selected: v === info.agent_changes }, label))),
-      ),
-      allowance(info, 'agent_publish', 'Publish documents', 'Lets an agent call publish and publish_all. Unpublishing stays a human’s.', { title: 'Let agents publish?', message: 'An agent could then make a document public, for anyone to read, without asking you. Each publish is logged; taking one down stays yours.' }),
-      allowance(info, 'agent_code', 'Change drawings', 'Lets an agent’s change to a style’s modules or code take effect without your approval.', { title: 'Let agents change drawings?', message: 'An agent could then change the code a view is drawn by, and it takes effect at once for whoever looks. It runs in the sandbox, reaching nothing of the page or the network, unless Drawings unsandboxed is on; each change is logged and can be undone.' }),
-      allowance(info, 'drawings_open', 'Drawings unsandboxed', 'A style’s own code runs in this page, as whoever looks: it may fetch from anywhere, load web fonts, open links, take and give files, and read and change the map as that person, its panel where an agent driving the browser can read it. Off, it runs walled in, reaching nothing.', { title: 'Run drawings without the sandbox?', message: 'A style’s code then runs as whoever looks at it, with their sign-in: it can reach the network and do anything they can do here. Agents’ changes to that code still wait for you unless Change drawings is on.' }),
-      allowance(info, 'holds_off', 'Holds off', 'Every change applies as it is made, whatever rule would hold it: settling a question, code that runs, what is public, and forget, which cannot be undone. A change that asks to wait, or a token that may only propose, still waits.', { title: 'Turn holds off?', message: 'No rule holds a change any more: what an agent does takes effect at once, a forget included, and a forget cannot be undone. Everything else is logged and can be undone.' }),
-      allowance(info, 'agent_backups', 'Download backups', 'Lets an agent call backup_download. A backup holds private items too.', { title: 'Let agents download backups?', message: 'A backup holds the whole map, private items included. An agent with your token could then read all of it.' }),
+      line(h('span', { class: 'grow', title: REACH_TIP }, 'Their changes'), reach),
+      allowance(info, 'agent_code', 'Change drawings', 'Their changes to a style’s or a layout’s code take effect without you. The code runs in the sandbox unless drawings run unsandboxed (Map).', { title: 'Let agents change drawings?', message: 'An agent’s change to the code a view is drawn by then takes effect at once for whoever looks. Each is logged and can be undone.' }),
+      allowance(info, 'agent_publish', 'Publish documents', 'They may make a document public. Taking one down stays yours.', { title: 'Let agents publish?', message: 'An agent could then make a document public, for anyone to read, without asking you. Each publish is logged.' }),
+      allowance(info, 'agent_backups', 'Download backups', 'They may download the whole map as a file, private items included.', { title: 'Let agents download backups?', message: 'A backup holds the whole map, private items included. An agent with your token could then read all of it.' }),
     ),
   );
 }
+
+/** Whether a drawing's code runs outside the sandbox, for whoever looks: a row of the Map section. */
+export const drawingsOpenRow = (info) =>
+  allowance(info, 'drawings_open', 'Drawings unsandboxed', 'A style’s own code runs in this page, as whoever looks: it may fetch from anywhere, load web fonts, open links, take and give files, and read and change the map as that person. Off, it runs walled in, reaching nothing.', { title: 'Run drawings without the sandbox?', message: 'A style’s code then runs as whoever looks at it, with their sign-in: it can reach the network and do anything they can do here. Agents’ changes to that code still wait for you unless Change drawings is on.' });
 
 /** A rule that asks an agent at its reply's end (on its pack's card): how often it asked this week, and its switch. */
 export function checkRow(r) {

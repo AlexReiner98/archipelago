@@ -1,7 +1,7 @@
 // An item read whole, as its reader meets it (drawn by the reading page, ui/doc.js), and the links that let someone
-// read it with no login, and its shares with other workspaces.
+// read it with no login.
 
-import { api, ask, call as callAt, h, known, may, tell } from './base.js';
+import { api, ask, h, may, tell } from './base.js';
 import { secretBox } from './workspace-cards.js';
 
 /** The item as a reader meets it, and the links to it that still work. */
@@ -11,22 +11,10 @@ export async function readDocument(id) {
   return { doc, links };
 }
 
-/**
- * The map a shared document's words live on, where this browser is signed in to it: that map's `call` and the item as
- * it stands there. Nothing crosses between maps: it is the person, with their own sign-in there, under that map's rules.
- */
-export async function homeOf(doc) {
-  const token = doc?.from && doc.source && known.all()[doc.from]?.token;
-  if (!token) return null;
-  const call = (tool, input) => callAt(`/api/${tool}`, input, { authorization: `Bearer ${token}` });
-  const item = await call('get', { id: doc.source }).then((got) => got.entity, () => null);
-  return item && { call, item };
-}
-
-/** A figure kept for an item, fetched with the page's token: an image address cannot carry it. One read through a share, through it. */
+/** A figure kept for an item, fetched with the page's token: an image address cannot carry it. */
 export const figureOf = (s, cls = 'doc-figure') => {
   const img = h('img', { class: cls, alt: s.title });
-  (s.via ? api('share_figure', { via: s.via, id: s.id }) : api('picture', { result: s.id })).then((p) => (p ? (img.src = `data:${p.content_type};base64,${p.data}`) : img.remove()), () => img.remove());
+  api('picture', { result: s.id }).then((p) => (p ? (img.src = `data:${p.content_type};base64,${p.data}`) : img.remove()), () => img.remove());
   return img;
 };
 
@@ -47,37 +35,18 @@ export function shareLinkOf(e, page, isDoc = true) {
   };
 }
 
-/** What the item's menu offers for reading it: print it, and where this session may write, make a link to it, share it with a workspace (to publish, or not), stop sharing. */
-export function documentMenu(e, links, page, redraw, doc, writes = may('write')) {
+/** What the item's menu offers for reading it: print it, and where this session may write, make a link to it, stop the links. */
+export function documentMenu(e, links, page, redraw, writes = may('write')) {
   const shareLink = shareLinkOf(e, page);
-  // To publish too: that workspace may publish it as this map gives it, until the share stops, which takes it down there.
-  const shareWorkspace = async (publish) => {
-    const message = publish
-      ? 'Those there can read it and every item it brings in once they accept it, and publish it as this map gives it, until you stop sharing: that takes it down there.'
-      : 'Those there can read it and every item it brings in once they accept it, until you stop sharing.';
-    const workspace = await ask({ title: `Share "${e.title}" with a workspace${publish ? ', to publish' : ''}?`, message, input: { placeholder: 'Workspace id' }, action: 'Share' });
-    if (!workspace) return;
-    try {
-      await api('share_workspace', { id: e.id, workspace, publish });
-      redraw();
-    } catch (err) {
-      tell('It was not shared', err.message);
-    }
-  };
   const stop = async (shares, what) => {
     if (!(await ask({ title: `Stop ${what}?`, message: 'It stops working at once.', action: 'Stop sharing', danger: true }))) return;
     for (const s of shares) await api('share_revoke', { id: s.id }).catch(() => null);
     redraw();
   };
-  const plain = links.filter((s) => !s.to_workspace);
-  // Read here through another workspace's share: that workspace says who else may read it.
-  if (doc?.from || !writes) return [['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')]];
+  if (!writes) return [['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')]];
   return [
     ['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')],
     !e.archived_at && ['Make a link to read it', shareLink],
-    !e.archived_at && ['Share with a workspace', () => shareWorkspace(false)],
-    !e.archived_at && ['Share with a workspace, to publish', () => shareWorkspace(true)],
-    plain.length > 0 && ['Stop the links', () => stop(plain, plain.length === 1 ? 'the link' : `the ${plain.length} links`), 'danger'],
-    ...links.filter((s) => s.to_workspace).map((s) => [`Stop sharing with ${s.to_workspace}`, () => stop([s], `sharing with ${s.to_workspace}`), 'danger']),
+    links.length > 0 && ['Stop the links', () => stop(links, links.length === 1 ? 'the link' : `the ${links.length} links`), 'danger'],
   ];
 }

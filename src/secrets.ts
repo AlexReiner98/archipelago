@@ -58,6 +58,12 @@ function fromFile(create: boolean): Buffer | undefined {
   return made;
 }
 
+/**
+ * Whether this server can seal: it has a key, or may make one. A server on Postgres without PELAGO_SECRETS_KEY (a
+ * staging copy of another's databases) cannot, and reads what it can open without writing what it would seal.
+ */
+export const canSeal = (): boolean => mayMake || !!(fromEnv() ?? fromFile(false));
+
 /** The key secrets and the key vault (src/vault.ts) are sealed with. `make` false: none is made where there is none. */
 export function sealingKey(make = true): Buffer {
   const key = fromEnv() ?? fromFile(make);

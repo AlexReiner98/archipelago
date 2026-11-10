@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { merge, parseBackup, parseVault, readable } from './backup.ts';
 import { launch } from './launcher.ts';
-import { notifyWorkspace, wholeMap } from './outbox.ts';
+import { wholeMap } from './outbox.ts';
 import type { TypeDef } from './packs.ts';
 import { actorId } from './pelago.ts';
 import { looked, presence } from './presence.ts';
@@ -127,17 +127,6 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       instructions: z.string().optional().describe('Anything to add to the brief.'),
     },
     run: async (l, actor, input) => launch(l, actor, input),
-  },
-  notify_workspace: {
-    description: 'Send a notification to another workspace on this server. It arrives only if that workspace\u2019s admin has chosen to accept notifications from this one.',
-    humanOnly: true,
-    input: {
-      workspace: z.string().describe('The other workspace\u2019s id.'),
-      title: z.string().min(1),
-      body: z.string().optional(),
-      level: z.enum(['info', 'warning', 'urgent']).optional(),
-    },
-    run: async (l, actor, input) => notifyWorkspace(l, actor, input),
   },
   seen: {
     description: 'Record that you have looked at what agents changed, up to an event. It permits nothing: it is the mark that a human saw.',
