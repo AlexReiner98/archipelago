@@ -14,6 +14,8 @@ import { sidesOf } from '../packs/core/layouts/shape/sides.js';
 import { shape } from '../packs/core/layouts/shape/index.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
 import { tension } from '../packs/core/layouts/shape/turns.js';
+// @ts-expect-error a drawing's modules are plain JavaScript
+import { paired, swept } from '../packs/core/layouts/shape/tighten.js';
 
 type P = [number, number];
 
@@ -63,6 +65,23 @@ test('flow: the network simplex meets every need at the cost shortest paths find
       ((net[a.from] -= tree.flow[i]), (net[a.to] += tree.flow[i]));
     });
     assert.deepEqual(net, new Array(n).fill(0), `problem ${k}: every need met`);
+  }
+});
+
+test('tighten: the lines swept in order stand where pairing every overlap put them', () => {
+  let seed = 11;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  for (let k = 0; k < 200; k++) {
+    const n = 2 + Math.floor(rnd() * 30), place = new Map<number, number>(), things: number[][] = [];
+    for (let l = 0; l < n; l++) place.set(l, Math.floor(rnd() * 8));
+    for (let l = 0; l < n; l++) for (let s = 1 + Math.floor(rnd() * 3); s > 0; s--) { const a = Math.floor(rnd() * 20), b = a + Math.floor(rnd() * 6); things.push([l, a, b]); }
+    const lines = [...place.keys()].sort((a, b) => place.get(a)! - place.get(b)! || a - b), pull = new Set(lines.filter(() => rnd() < 0.3));
+    // A few orders from stretches, either way along the lines.
+    const orders = Array.from({ length: Math.floor(rnd() * 4) }, () => [Math.floor(rnd() * n), Math.floor(rnd() * n)]).filter(([p, q]) => p !== q);
+    const made = () => { const after = new Map<number, Set<number>>(); for (const [p, q] of orders) (after.get(p) ?? after.set(p, new Set()).get(p)!).add(q); return after; };
+    const a1 = made(), add = (p: number, q: number) => { if (p !== q) (a1.get(p) ?? a1.set(p, new Set()).get(p)!).add(q); };
+    const want = paired(things.map((t) => [...t]), lines, a1, pull, place, add), got = swept(things, lines, made(), pull);
+    assert.deepEqual([...got].sort((p, q) => p[0] - q[0]), [...want].sort((p: number[], q: number[]) => p[0] - q[0]), `case ${k}`);
   }
 });
 
