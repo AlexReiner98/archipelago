@@ -112,7 +112,12 @@ says why.
   require other packs, island packs among them. The island rules do not judge
   it: each part goes through the gate it already has (a layout runs in the
   sandbox, code by the rule on code that runs, reach by core's pack reach
-  rule, and the owner adds the pack).
+  rule, and the owner adds the pack). What its action or handler makes of an
+  island pack's types goes on the island of what it is tied to in the same
+  change (what it is part of first, never a link that crosses), else on the
+  island the action is given as its input `island`, else on the lone island
+  it fits; else the change is refused, naming the islands it could go on
+  (`placeOnIslands`, `src/island-items.ts`).
 - **Both is refused.** A pack with island types and a part that runs (tools,
   code, looks, computed views, uses, reach, or another pack required) is off,
   told to split into an island pack and a map pack.
