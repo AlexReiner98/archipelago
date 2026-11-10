@@ -2,15 +2,17 @@
 // file from its public/ folder under a strict policy, and GET /x/<pack>/public/<file> for the script and stylesheet
 // such a page loads), its public entries (POST /x/<pack>/<entry>, JSON in and out), and its webhooks
 // (POST /x/<pack>/hook/<id>), each checked against a secret the kernel holds before the handler sees it. An entry marked
-// GET is where a person comes back to from another site: it answers where to send them on. Every request is counted
-// by address, as the other open routes are.
+// GET is where a person comes back to from another site: it answers where to send them on; one that answers html makes
+// a page per request, sent under the reader's policy with every header the kernel's. Every request is counted by
+// address, as the other open routes are.
 
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { alertOwner } from './alert.ts';
 import { signedWith } from './hashes.ts';
-import { json as reply, PRIVATE as GUARD } from './reply.ts';
+import { json as reply, PRIVATE as GUARD, GUARD as OPEN } from './reply.ts';
+import { READER_POLICY } from './public-document.ts';
 import { serverPacksOf } from './server-host.ts';
 import { hostBase, serverSecret } from './server-requests.ts';
 import { serveFile } from './server-files.ts';
@@ -33,6 +35,15 @@ export interface ServerRoutes {
   /** Whether this server asks for a token. */
   tokens?: boolean;
 }
+
+const queryOf = (req: IncomingMessage) => Object.fromEntries(new URL(req.url ?? '/', 'http://x').searchParams);
+
+/** The statuses a made page may answer with: found, not found, gone. */
+const PAGE_STATUSES = [200, 404, 410];
+/** The most a made page may be, in bytes. */
+export const PAGE_MOST = 2_000_000;
+/** The longest a made page may be kept by a browser or a cache, in seconds. */
+const CACHE_MOST = 86_400;
 
 /** Tell the owner of the server, on the default map and by mail, that a webhook refused a delivery or failed on it (src/alert.ts). */
 async function tellOwner(workspaces: ActPlaces, pack: string, hook: string, what: 'refused' | 'failed', detail: string): Promise<void> {
@@ -61,8 +72,10 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
       // The site it hands the person to may send them straight back here: a form's redirects are held to the policy too.
       return res.writeHead(200, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': pagePolicy(host && `'self' ${new URL(hostBase(file.id, host)).origin}`) }).end(await readFile(join(folder, 'public', page.file)));
     }
+    const made = !more && file.reach.server.entries?.find((e) => e.id === name && e.method === 'GET' && e.answers === 'html');
+    if (made) return madePage(res, () => packs.call(file.id, 'entry', made.id, queryOf(req), made.limit_ms));
     const back = !more && file.reach.server.entries?.find((e) => e.id === name && e.method === 'GET');
-    if (back) return comeBack(res, () => packs.call(file.id, 'entry', back.id, Object.fromEntries(new URL(req.url ?? '/', 'http://x').searchParams), back.limit_ms));
+    if (back) return comeBack(res, () => packs.call(file.id, 'entry', back.id, queryOf(req), back.limit_ms));
     if (name === 'public' && ASSET.test(more)) {
       const bytes = await readFile(join(folder, 'public', more)).catch(() => null);
       if (bytes) return res.writeHead(200, { ...GUARD, 'content-type': TYPES[more.split('.').pop()!], 'content-security-policy': "default-src 'none'" }).end(bytes);
@@ -115,6 +128,41 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
  */
 export const onThisServer = (to: string) => (/^\/(?![/\\])/.test(to) && !/[\u0000-\u001f\u007f]/.test(to) ? to : '/');
 
+/** What went wrong, as a page with the way back: what a person sees when an entry fails them. */
+function failed(res: ServerResponse, status: number, message: string): ServerResponse {
+  const said = message.replaceAll('&', '&amp;').replaceAll('<', '&lt;');
+  const page = `<!doctype html><meta charset="utf-8"><title>Archipelago</title><p>${said}</p><p><a href="/#/workspace">Back to Archipelago</a></p>`;
+  return res.writeHead(status, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'" }).end(page);
+}
+
+/**
+ * A page an entry makes for this request: { status?, html, cache? }, sent under the reader's policy with headers the
+ * kernel sets alone. A status other than found, not found or gone, html that is no string or too long, and a cache
+ * that is no whole number of seconds are refused: the person is shown that the page could not be made.
+ */
+async function madePage(res: ServerResponse, run: () => Promise<unknown>): Promise<unknown> {
+  let answer: { status?: unknown; html?: unknown; cache?: unknown };
+  try {
+    answer = ((await run()) ?? {}) as typeof answer;
+  } catch (err) {
+    return failed(res, 500, (err as Error).message);
+  }
+  const status = answer.status ?? 200;
+  const { html, cache } = answer;
+  const why =
+    typeof status !== 'number' || !PAGE_STATUSES.includes(status) ? `a page answers ${PAGE_STATUSES.join(', ')} or nothing, not ${String(status)}`
+    : typeof html !== 'string' ? 'a page answers its html as a string'
+    : Buffer.byteLength(html) > PAGE_MOST ? `a page is at most ${PAGE_MOST} bytes`
+    : cache !== undefined && !(Number.isInteger(cache) && (cache as number) >= 0) ? 'a page is kept for a whole number of seconds'
+    : '';
+  if (why) {
+    console.error(`server pack page: ${why}`);
+    return failed(res, 500, 'This page could not be made.');
+  }
+  const kept = typeof cache === 'number' && cache > 0 ? `public, max-age=${Math.min(cache, CACHE_MOST)}` : 'no-store';
+  return res.writeHead(status as number, { ...OPEN, 'cache-control': kept, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': READER_POLICY }).end(html);
+}
+
 /**
  * Send a person who came back from another site on to where the pack says: an address on this server only. What went
  * wrong is shown them as a page, with the way back.
@@ -124,8 +172,6 @@ async function comeBack(res: ServerResponse, run: () => Promise<unknown>): Promi
     const to = String((((await run()) ?? {}) as { redirect?: unknown }).redirect ?? '/');
     return res.writeHead(302, { ...GUARD, location: onThisServer(to) }).end();
   } catch (err) {
-    const said = (err as Error).message.replaceAll('&', '&amp;').replaceAll('<', '&lt;');
-    const page = `<!doctype html><meta charset="utf-8"><title>Archipelago</title><p>${said}</p><p><a href="/#/workspace">Back to Archipelago</a></p>`;
-    return res.writeHead(400, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'" }).end(page);
+    return failed(res, 400, (err as Error).message);
   }
 }
