@@ -49,27 +49,16 @@ function hooks() {
 }
 
 /**
- * The plugin directory's build, at plugins/archipelago-directory/: the directory takes no hook that runs a command, no
+ * The plugin directory's build, at plugins/archipelago-directory/: the directory takes no hook of any type, no
  * headersHelper and no credential read from the machine from an organization that isn't Verified. So its tools are at
- * the hosted server's fixed address, signed in to by Claude Code itself, and its hooks call those tools (report, action
- * hook: src/hook-tool.ts) with what Claude Code hands them. Claude Code runs none of them at launch, and the server is
- * gone by a session's end: the session starts at its first prompt, and ends as its agent reports it.
+ * the hosted server's fixed address, signed in to by Claude Code itself, and what the hooks do in the full plugin is a
+ * skill the agent follows: start the session on the map, say what it takes on, end it. It reports less than the full
+ * plugin, which stays in our own marketplace.
  */
 export const DIRECTORY = `plugins/${PLUGIN}-directory`;
 export const DIRECTORY_ICON = `${DIRECTORY}/.claude-plugin/icon.png`;
 /** Its MCP server's name: not pelago, which Claude Code drops as a duplicate where the installer set one up already. */
 export const DIRECTORY_SERVER = 'map';
-const DIRECTORY_HOOKS: [event: string, name: string, matcher: string | undefined, said: Record<string, string>][] = [
-  ['SessionStart', 'session-start', 'clear|compact', { source: '${source}' }],
-  ['UserPromptSubmit', 'prompt', undefined, { prompt: '${prompt}' }],
-  ['Stop', 'stop', undefined, { stop_hook_active: '${stop_hook_active}' }],
-];
-function directoryHooks() {
-  const all: Record<string, unknown[]> = {};
-  for (const [event, name, matcher, said] of DIRECTORY_HOOKS)
-    (all[event] ??= []).push({ ...(matcher && { matcher }), hooks: [{ type: 'mcp_tool', server: `plugin:${PLUGIN}:${DIRECTORY_SERVER}`, tool: 'report', input: { action: 'hook', params: { event: name, session_id: '${session_id}', cwd: '${cwd}', ...said } } }] });
-  return { description: 'Tells Archipelago a session was prompted and ended a turn, through its own tools.', hooks: all };
-}
 
 /** A README made from its template: {title}, {summary} and the listing's other words and addresses filled in. */
 const filled = (template: string) =>
@@ -131,7 +120,8 @@ export function pluginFiles(): Record<string, string> {
     // The directory's build: the same listing, no script, and the working rules handed over by the server at the start.
     [`${DIRECTORY}/.claude-plugin/plugin.json`]: manifest,
     [`${DIRECTORY}/.mcp.json`]: json({ mcpServers: { [DIRECTORY_SERVER]: { type: 'http', url: LISTING.urls.mcp } } }),
-    [`${DIRECTORY}/hooks/hooks.json`]: json(directoryHooks()),
+    // No hooks: the directory refuses them. The session's start, what it takes on and its end are the skill's.
+    [`${DIRECTORY}/skills/archipelago/SKILL.md`]: filled('scripts/plugin-skill-directory.md'),
     // The directory's listing text, and what this build sends, for the directory's review.
     [`${DIRECTORY}/README.md`]: filled('scripts/plugin-readme-directory.md'),
   };

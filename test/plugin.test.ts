@@ -112,15 +112,16 @@ test('the plugin ships no bump skill: that is for working on Archipelago itself'
   assert.doesNotMatch(files[`${FOLDER}/pelago.md`], /pelago-bump/);
 });
 
-test('the plugin directory’s build runs nothing on the machine: its hooks call the map’s own tools at a fixed address', () => {
+test('the plugin directory’s build runs nothing on the machine and has no hooks: a skill says when to call the map’s tools', () => {
   const files = pluginFiles();
   const mine = Object.keys(files).filter((path) => path.startsWith(`${DIRECTORY}/`));
-  assert.deepEqual(mine.map((path) => path.slice(DIRECTORY.length + 1)).sort(), ['.claude-plugin/plugin.json', '.mcp.json', 'README.md', 'hooks/hooks.json']);
+  assert.deepEqual(mine.map((path) => path.slice(DIRECTORY.length + 1)).sort(), ['.claude-plugin/plugin.json', '.mcp.json', 'README.md', 'skills/archipelago/SKILL.md']);
   assert.deepEqual(JSON.parse(files[`${DIRECTORY}/.mcp.json`]), { mcpServers: { map: { type: 'http', url: LISTING.urls.mcp } } }, 'no headersHelper, no PELAGO_URL');
   assert.equal(files[`${DIRECTORY}/.claude-plugin/plugin.json`], files[`${FOLDER}/.claude-plugin/plugin.json`], 'the same listing');
-  const hooks = Object.values(JSON.parse(files[`${DIRECTORY}/hooks/hooks.json`]).hooks as Record<string, { hooks: Record<string, any>[] }[]>).flatMap((g) => g.flatMap((h) => h.hooks));
-  assert.ok(hooks.length >= 3 && hooks.every((h) => h.type === 'mcp_tool' && h.server === 'plugin:archipelago:map' && h.tool === 'report' && h.input.action === 'hook'));
-  assert.ok(hooks.every((h) => h.input.params.session_id === '${session_id}'));
+  const skill = files[`${DIRECTORY}/skills/archipelago/SKILL.md`];
+  assert.match(skill, /^---\nname: archipelago\ndescription: /, 'a skill Claude Code loads');
+  for (const action of ['session_start', 'session_update', 'session_end']) assert.match(skill, new RegExp(action));
+  assert.match(files[`${DIRECTORY}/README.md`], /reports less than the full plugin/);
   assert.ok(files[`${DIRECTORY}/README.md`].startsWith(`# ${LISTING.title}\n\n${LISTING.summary}\n`));
   assert.doesNotMatch(files[`${DIRECTORY}/README.md`], /\{\w+\}/);
 });
