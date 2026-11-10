@@ -123,3 +123,37 @@ test('a database from before any-word search gets its function on opening', asyn
   assert.deepEqual((await db.query(`select * from pelago_search_any('nothing here')`)).rows, []);
   await db.close();
 });
+
+test('step 39 drops shares made out to a workspace, keeps the links, and a backup from before still restores', async () => {
+  const { WORKSPACE_SHARE } = await import('../src/schema.ts');
+  const { SHARE_PUBLISHABLE } = await import('../src/public-schema.ts');
+  const { dump, restore } = await import('../src/backup.ts');
+  const dir = folder();
+  const made = await openDb(dir);
+  // The map as it stood at step 38: a share may be made out to a workspace, and published there.
+  await made.exec(`${WORKSPACE_SHARE}\n${SHARE_PUBLISHABLE}\ndelete from schema_version where version >= 39;`);
+  await made.exec(`insert into entity (id, type, title, status, is_open) values ('e_doc00000', 'task', 'A page', 'todo', true)`);
+  await made.exec(`insert into share (id, hash, hint, entity_id, made_by) values ('s_link0000', 'h1', 'a link', 'e_doc00000', 'alex')`);
+  await made.exec(`insert into share (id, hint, entity_id, made_by, to_workspace, to_item, publishable) values ('s_ws000000', 'acme', 'e_doc00000', 'alex', 'acme', 'e_there000', true)`);
+  const { dumpVault } = await import('../src/vault.ts');
+  const before = { ...(await dump(made, { id: 'default', name: 'Default' })), vault: await dumpVault(made) };
+  await made.close();
+
+  // Opened by this release: the step runs once.
+  const db = await openDb(dir);
+  assert.equal(await versionOf(db), LATEST);
+  assert.deepEqual((await db.query<{ id: string }>(`select id from share order by id`)).rows.map((r) => r.id), ['s_link0000'], 'the link stays; the share made out to a workspace goes');
+  const columns = (await db.query<{ c: string }>(`select column_name as c from information_schema.columns where table_name = 'share'`)).rows.map((r) => r.c);
+  assert.ok(!columns.some((c) => ['to_workspace', 'to_item', 'publishable'].includes(c)), `its columns are gone: ${columns.join(', ')}`);
+  const fns = (await db.query<{ n: string }>(`select proname as n from pg_proc where proname like 'pelago_workspace_%'`)).rows;
+  assert.deepEqual(fns, [], 'and the functions only they read');
+  assert.equal((await db.query(`select 1 from entity where id = 'e_doc00000'`)).rows.length, 1, 'the item is untouched');
+  await db.close();
+
+  // A backup taken before the step restores into a database past it: the dropped columns are not read.
+  const into = await openDb(folder());
+  await restore(into, before);
+  assert.equal((await into.query(`select 1 from entity where id = 'e_doc00000'`)).rows.length, 1);
+  assert.ok((await into.query<{ id: string }>(`select id from share`)).rows.some((r) => r.id === 's_link0000'), 'its link restores');
+  await into.close();
+});

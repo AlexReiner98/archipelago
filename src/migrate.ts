@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
 import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, HOLDS_OFF_READ, ITEM_HIDDEN, LINK_SNAPSHOT, MEMBER, ORDERED, SCHEMA, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
 import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';
-import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH, SHARE_PUBLISHABLE } from './public-schema.ts';
+import { PUBLIC_DOCUMENT, PUBLISHED, PUBLISHED_PATH, SHARE_PUBLISHABLE, SHARE_WORKSPACE_GONE } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
 import { ITEM_KIND } from './head.ts';
 import { ISLAND_INDEX } from './island-items.ts';
@@ -85,6 +85,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 36, name: 'a view shared with a guest, read live and nothing else', sql: GUEST_READER },
   { version: 37, name: 'a link keeps its view frozen, read by a short token', sql: LINK_SNAPSHOT },
   { version: 38, name: 'what the compacted streams say about an item, found by its index under the row policy', sql: OP_ABOUT },
+  { version: 39, name: 'shares made out to another workspace, gone', sql: SHARE_WORKSPACE_GONE },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;
