@@ -10,7 +10,7 @@ import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { alertOwner } from './alert.ts';
-import { drawingFile, drawingPath } from './drawing-files.ts';
+import { drawingFile, drawingPath, drawingWorker } from './drawing-files.ts';
 import type { Archipelago } from './pelago.ts';
 import { signedWith } from './hashes.ts';
 import { json as reply, PRIVATE as GUARD } from './reply.ts';
@@ -110,19 +110,22 @@ export interface DrawingRoutes {
 
 /**
  * One module of a drawing, by its hash (src/drawing-files.ts): kept for good, since a hash is its content, and given
- * nothing to run with. What is not there is a 404 with nothing in it.
+ * nothing to run with. Its service worker (sw.js, a pack's drawing's alone) is asked again each time, since it holds a
+ * kernel file, and may import from this origin. What is not there is a 404 with nothing in it.
  */
 export async function serveDrawingFile(res: ServerResponse, path: string, at: DrawingRoutes): Promise<unknown> {
   const asked = drawingPath(path);
   if (at.tooOften()) return;
-  const text = asked ? await drawingFile(await at.reader(), asked.hash, asked.name) : null;
+  const worker = asked?.name === 'sw.js';
+  const text = !asked ? null : worker ? await drawingWorker(await at.reader(), asked.hash) : await drawingFile(await at.reader(), asked.hash, asked.name);
   if (text === null) return res.writeHead(404, { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }).end();
   return res
     .writeHead(200, {
       'content-type': 'text/javascript; charset=utf-8',
-      'cache-control': 'public, max-age=31536000, immutable',
+      'cache-control': worker ? 'no-cache' : 'public, max-age=31536000, immutable',
       'x-content-type-options': 'nosniff',
-      'content-security-policy': "default-src 'none'",
+      // TODO(e_e7ahhyqb): the page's origin beside 'self', once the drawing host knows it: a surface drawing imports /three.js from there.
+      'content-security-policy': worker ? "default-src 'none'; script-src 'self'" : "default-src 'none'",
     })
     .end(text);
 }

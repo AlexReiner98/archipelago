@@ -5,7 +5,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ServerResponse } from 'node:http';
-import { drawingFile, drawingPath } from '../src/drawing-files.ts';
+import { drawingFile, drawingPath, drawingWorker } from '../src/drawing-files.ts';
+import { drawInside } from '../src/ui-files.ts';
 import { layoutFor } from '../src/layouts.ts';
 import { serveDrawingFile } from '../src/server-routes.ts';
 import { fresh, make } from './map.ts';
@@ -78,4 +79,27 @@ test('the owner’s version is served by its own hash, to whoever may see it', a
   await make(owner, [{ op: 'update', id, visibility: 'shared' }]);
   assert.equal(await drawingFile(l.as('e_otherxx'), mine.hash, 'look.js'), look);
   assert.equal(await drawingFile(l.forAnyone(), mine.hash, 'look.js'), null);
+});
+
+test('a pack’s drawing has a service worker beside its modules; one kept on the map has none', async () => {
+  const l = await fresh();
+  const pack = layoutFor(l.registry, { shape: 'map' }, [])!;
+  const sw = (await drawingWorker(l, pack.hash))!;
+  assert.ok(sw.startsWith("import * as made from './index.js';\n" + (await drawInside())));
+  assert.ok(sw.endsWith('\ninside(null, made);\n'));
+  const { out, res } = written();
+  await serveDrawingFile(res, `/drawing/${pack.hash}/sw.js`, { tooOften: () => false, reader: async () => l });
+  assert.equal(out.status, 200);
+  assert.equal(out.body, sw);
+  assert.equal(out.headers['cache-control'], 'no-cache');
+  assert.equal(out.headers['content-security-policy'], "default-src 'none'; script-src 'self'");
+  // The owner's version is code from the map: the frame draws it in a worker it can stop.
+  await make(l, [{ op: 'create', type: 'layout', title: 'Map, mine', props: { preset: 'core.map', modules: { 'look.js': 'export const css = ``;\n' } } }]);
+  const { rows } = await l.db.query<{ is_open: boolean; props: Record<string, unknown> }>(`select is_open, props from entity where type = 'layout' limit 5`);
+  const mine = layoutFor(l.registry, { shape: 'map' }, rows)!;
+  assert.ok(await drawingFile(l, mine.hash, 'index.js'));
+  assert.equal(await drawingWorker(l, mine.hash), null);
+  const { out: none, res: r } = written();
+  await serveDrawingFile(r, `/drawing/${mine.hash}/sw.js`, { tooOften: () => false, reader: async () => l });
+  assert.deepEqual([none.status, none.body], [404, '']);
 });

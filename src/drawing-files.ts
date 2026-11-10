@@ -7,6 +7,7 @@
 
 import type { Archipelago } from './pelago.ts';
 import { drawingsBy, layoutsOf } from './layouts.ts';
+import { drawInside } from './ui-files.ts';
 
 const HASH = /^[0-9a-f]{64}$/;
 const NAME = /^[a-z][a-z0-9_-]*\.js$/;
@@ -22,12 +23,28 @@ export const drawingPath = (path: string): { hash: string; name: string } | unde
   return first === 'drawing' && extra === undefined && HASH.test(hash) && NAME.test(name) ? { hash, name } : undefined;
 };
 
+/** The drawings the packs ship, by hash: the same for every map with these packs. */
+function shippedBy(registry: Archipelago['registry']): Map<string, Record<string, string>> {
+  if (!shipped.has(registry)) shipped.set(registry, drawingsBy(registry));
+  return shipped.get(registry)!;
+}
+
+/**
+ * The service worker of the drawing with this hash (GET /drawing/<hash>/sw.js), in its scope beside its modules: what
+ * runs in a drawing's worker (ui/draw-inside.js) around its index.js, imported statically. Only for a drawing whose
+ * code is a pack's own: the frame cannot stop a service worker, so code kept on the map never runs in one
+ * (src/published-frames.ts keeps the same rule), and the frame draws such a drawing in a worker it can stop. Null else.
+ */
+export async function drawingWorker(l: Archipelago, hash: string): Promise<string | null> {
+  if (!HASH.test(hash) || !shippedBy(l.registry).get(hash)?.['index.js']) return null;
+  return `import * as made from './index.js';\n${await drawInside()}\ninside(null, made);\n`;
+}
+
 /** The text of one module of the drawing with this hash, as this map shows it to its reader; null if there is none. */
 export async function drawingFile(l: Archipelago, hash: string, name: string): Promise<string | null> {
   if (!HASH.test(hash) || !NAME.test(name)) return null;
   const registry = l.registry;
-  if (!shipped.has(registry)) shipped.set(registry, drawingsBy(registry));
-  const own = shipped.get(registry)!.get(hash);
+  const own = shippedBy(registry).get(hash);
   if (own) return Object.hasOwn(own, name) ? own[name] : null;
   // Else one the owner changed: their versions of the packs' drawings, as the reader may see them.
   const ids = layoutsOf(registry.packs).map((d) => d.id);
