@@ -292,7 +292,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           // The frame has an origin of its own, so what it loads from here it loads as a stranger.
           ...((file === 'draw.js' || file === 'draw-marks.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
         });
-        const html = page && (frame?.html ?? (await uiPage(file))), drawOrigin = file === 'index.html' && !options.unsandboxed ? drawing.originFor(host) : undefined;
+        const html = page && (frame?.html ?? (await uiPage(file))), drawOrigin = file === 'index.html' && !options.unsandboxed && !(process.env.PELAGO_LOOK_ORIGIN && host === lookAt.host) ? drawing.originFor(host) : undefined; // a Chrome beside the server may not reach the drawing host: it draws sandboxed
         return res.end(html && (options.unsandboxed || open || drawOrigin) ? markPage(html, { open, unsandboxed: options.unsandboxed, drawOrigin }) : file === 'layout.css' ? lengthsSheet((await workspaces.get(DEFAULT_WORKSPACE)).pelago.registry.packs) : html || served!.body);
       }
 

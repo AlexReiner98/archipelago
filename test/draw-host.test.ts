@@ -120,3 +120,20 @@ test('a drawing by hash at the drawing host goes on to its own route', async () 
   assert.equal(none.status, 404);
   assert.equal(none.body, '', 'answered by the drawing route, not refused by the host');
 });
+
+test('the server’s own Chrome, reached by a name of its own, is not sent to the drawing host', async () => {
+  const before = process.env.PELAGO_LOOK_ORIGIN;
+  process.env.PELAGO_LOOK_ORIGIN = 'http://app-beside:3100';
+  const beside = createHttpServer(workspaces, 0, { publicHosts: ['app.example.com'], draw: { host: 'draw.example.com' } });
+  await new Promise<void>((r) => beside.listen(0, '127.0.0.1', r));
+  const at2 = (beside.address() as AddressInfo).port;
+  try {
+    const at = (host: string) => new Promise<string>((resolve, reject) => request({ host: '127.0.0.1', port: at2, path: '/', headers: { host } }, (res) => { let b = ''; res.on('data', (d) => (b += d)).on('end', () => resolve(b)); }).on('error', reject).end());
+    assert.doesNotMatch(await at('app-beside:3100'), /data-draw-origin/);
+    assert.match(await at('app.example.com'), /data-draw-origin="https:\/\/draw\.example\.com"/);
+  } finally {
+    if (before === undefined) delete process.env.PELAGO_LOOK_ORIGIN;
+    else process.env.PELAGO_LOOK_ORIGIN = before;
+    await new Promise((r) => beside.close(r));
+  }
+});

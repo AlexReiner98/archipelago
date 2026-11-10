@@ -115,12 +115,13 @@ export interface DrawingRoutes {
  */
 export async function serveDrawingFile(res: ServerResponse, path: string, at: DrawingRoutes): Promise<unknown> {
   const asked = drawingPath(path);
+  if (!asked) return res.writeHead(404, { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }).end();
   const reader = await at.reader();
   // A pack's own drawing is served from what the packs ship, and a service worker installing it asks for every module at
   // once: only a read of the map (a drawing kept there, or a guess) is counted against the open limit.
-  if (!(asked && shippedDrawing(reader, asked.hash)) && at.tooOften()) return;
-  const worker = asked?.name === 'sw.js';
-  const text = !asked ? null : worker ? await drawingWorker(reader, asked.hash) : await drawingFile(reader, asked.hash, asked.name);
+  if (!shippedDrawing(reader, asked.hash) && at.tooOften()) return;
+  const worker = asked.name === 'sw.js';
+  const text = worker ? await drawingWorker(reader, asked.hash) : await drawingFile(reader, asked.hash, asked.name);
   if (text === null) return res.writeHead(404, { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }).end();
   return res
     .writeHead(200, {
