@@ -25,7 +25,7 @@
     "test:full": "node scripts/test.ts full",
     "test:changed": "node scripts/test.ts changed",
     "typecheck": "tsc --noEmit",
-    "diagrams": "node src/diagrams.ts",
+    "diagrams": "node scripts/diagrams.ts",
     "diagrams:publish": "node scripts/publish-diagrams.ts",
     "principles": "node scripts/principles.ts",
     "bench:scale": "node scripts/bench-scale.ts",

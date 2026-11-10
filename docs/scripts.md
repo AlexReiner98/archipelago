@@ -18,6 +18,7 @@ page is where to find the one you need. Every `.ts` script is type-checked with 
 | `demo-approvals.ts` | `npm run demo:approvals`: a second demo, a planning file with changes held for review |
 | `gen-map.ts` | a year-three map generated from a seed, for timing at scale |
 | `principles.ts` | `npm run principles`: the facts a principle's page draws that live in code, read onto the map |
+| `diagrams.ts` | `npm run diagrams`: the architecture and type diagrams as draw.io files, drawn by `diagram-modules.ts`, `diagram-types.ts` and `diagram-xml.ts` beside it |
 | `publish-diagrams.ts` | `npm run diagrams:publish`: this checkout's diagrams put on a map, after a push to main |
 
 ## Connecting a project

@@ -4,11 +4,11 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { readModules } from '../src/diagram-modules.ts';
-import { typeDiagram, type PackFile } from '../src/diagram-types.ts';
-import { layers, mxfile, pageData, pageXml } from '../src/diagram-xml.ts';
+import { readModules } from '../scripts/diagram-modules.ts';
+import { typeDiagram, type PackFile } from '../scripts/diagram-types.ts';
+import { layers, mxfile, pageData, pageXml } from '../scripts/diagram-xml.ts';
 import { diagramChange } from '../scripts/publish-diagrams.ts';
-import { diagrams } from '../src/diagrams.ts';
+import { diagrams } from '../scripts/diagrams.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const cells = (xml: string, attr: 'vertex' | 'edge') => (xml.match(new RegExp(`${attr}="1"`, 'g')) ?? []).length;
