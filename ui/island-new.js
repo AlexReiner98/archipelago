@@ -2,17 +2,17 @@
 // and names the first item on it, which go to the map as one change on their authority. The first item comes with it
 // because a picture draws an island round what lives on it: an empty one would stand nowhere to add to.
 
-import { api, ask, may, state, tell } from './base.js';
+import { api, ask, h, may, state, tell } from './base.js';
 import { askNew } from './layout-asks.js';
 
 /** Whether this map holds its packs to the island rules (workspace_info islands), read once a page. */
 let on;
 export const islandsOn = () => (on ??= api('workspace_info').then((info) => info?.islands === true, () => false));
 
-/** The band's menu entry for it, where this session may write on a map with islands. `open` goes to an address. */
-export async function newIslandEntry(open) {
+/** The band's button for it, where this session may write on a map with islands. `open` goes to an address. */
+export async function newIslandButton(open) {
   if (!may('write') || !(await islandsOn())) return null;
-  return { text: 'New island', title: 'An island of its own: its name, the pack it speaks and its first item', act: () => newIsland(open) };
+  return h('button', { type: 'button', class: 'q-save q-word q-island', title: 'A new island: its name, the pack it speaks and its first item', 'aria-label': 'New island', onclick: () => newIsland(open) }, h('span', { class: 'q-word-text' }, '+ Island'));
 }
 
 async function newIsland(open) {

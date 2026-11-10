@@ -5,13 +5,27 @@
 // an item once they have named it and, where its island speaks more than one, picked its type. A drawing may ask to
 // make one item and to link what is drawn, nothing more; a session that may not write is told so.
 
-import { api, ask, may } from './base.js';
+import { api, ask, may, tell } from './base.js';
+import { store } from './live.js';
 import { fits, isA, kept, relations, typeChoice, types, workType } from './words.js';
 
 const ITEM = /^e_[a-z0-9]{8}$/;
 
-/** The pack an island speaks, by its id. */
-const packOf = async (island) => (island ? (await api('get', { id: island }).catch(() => null))?.entity.props?.pack : null);
+/**
+ * The pack an island speaks, by its id: from a view's answer where one drew it (each island there with its pack), so
+ * the person is asked at once; read from the map only for one no view holds (a read can take seconds on a busy server).
+ */
+async function packOf(island) {
+  if (!island) return null;
+  for (const view of store.views) {
+    const isle = (view.islands ?? []).find((i) => i.id === island);
+    if (isle) return isle.pack ?? null;
+  }
+  return (await api('get', { id: island }).catch(() => null))?.entity.props?.pack ?? null;
+}
+
+/** An item by its id, as the page holds it where a view drew it, else as the map has it. */
+export const itemOf = async (id) => store.items.get(id) ?? (ITEM.test(String(id)) ? (await api('get', { id }).catch(() => null))?.entity : null);
 
 /** The types an item on an island of this pack may be: the pack's first, then the shared set's, the work type leading. */
 function typesOf(pack) {
@@ -33,15 +47,18 @@ export async function askNew(pack, type) {
   return title ? { type: chosen, title: title.slice(0, 60) } : null;
 }
 
-/** The ways one item can be linked to another, each as it reads: from a to b, or from b to a by its inverse. */
-const waysBetween = (a, b) =>
+/** The ways one item can be linked to another, each as it reads (`said`, and `verb` alone): from a to b, or from b to a by its inverse. */
+export const waysBetween = (a, b) =>
   [...relations.values()]
     .filter((r) => !kept(r.id) && !r.retired)
     .flatMap((r) => [
-      fits(r.from, a.type) && fits(r.to, b.type) && { type: r.id, from: a.id, to: b.id, said: `${a.title} ${r.title} ${b.title}` },
-      fits(r.from, b.type) && fits(r.to, a.type) && r.inverse && r.inverse !== r.title && { type: r.id, from: b.id, to: a.id, said: `${a.title} ${r.inverse} ${b.title}` },
+      fits(r.from, a.type) && fits(r.to, b.type) && { type: r.id, from: a.id, to: b.id, verb: r.title, said: `${a.title} ${r.title} ${b.title}` },
+      fits(r.from, b.type) && fits(r.to, a.type) && r.inverse && r.inverse !== r.title && { type: r.id, from: b.id, to: a.id, verb: r.inverse, said: `${a.title} ${r.inverse} ${b.title}` },
     ])
     .filter(Boolean);
+
+/** Which way a link between a and b reads, put to the person as the verb alone, the two names over it: its index, or null. */
+export const askWay = (a, b, ways) => ask({ title: `${a.title.slice(0, 40)} … ${b.title.slice(0, 40)}`, choices: ways.map((w, n) => [n, w.verb, w.said]) });
 
 /** A question put to the person for a drawing: one at a time, so no drawing stacks them. */
 let asking = false;
@@ -73,12 +90,11 @@ async function putToPerson(said) {
     sent.push({ op: 'create', ref, ...asked, ...(island && { props: { island } }) });
   }
   for (const o of links) {
-    const end = async (key) => made.get(key) ?? (ITEM.test(String(key)) ? (await api('get', { id: key }).catch(() => null))?.entity : null);
-    const [a, b] = [await end(o.from), await end(o.to)];
+    const [a, b] = await Promise.all([o.from, o.to].map((key) => made.get(key) ?? itemOf(key)));
     if (!a || !b || a.id === b.id) return { error: 'A link joins two items that are drawn.' };
     const ways = waysBetween(a, b).filter((w) => !o.type || w.type === o.type);
     if (!ways.length) return { error: `Nothing links ${a.title} and ${b.title}.` };
-    const way = await ask({ title: 'Link them', choices: ways.map((w, n) => [n, w.said, w.said]) });
+    const way = await askWay(a, b, ways);
     if (way === null) return { error: 'Not linked.' };
     sent.push({ op: 'link', type: ways[way].type, from: ways[way].from, to: ways[way].to });
   }
@@ -88,4 +104,15 @@ async function putToPerson(said) {
   } catch (err) {
     return { error: String(err.message).slice(0, 300) };
   }
+}
+
+/**
+ * Add an item on an island, from the page's own button by its legend: put to the person (its type, its name) and sent
+ * as theirs. Answers whether it was made or held; a refusal is told.
+ */
+export async function addOn(island) {
+  const came = await drawingAsked({ ops: [{ op: 'create', ref: 'new', props: { island } }], reason: 'Added on the canvas' });
+  if (came.error && !/^Not added/.test(came.error)) await tell('Nothing was added', came.error);
+  else if (came.proposal) await tell('Held for approval', came.held || 'A rule holds this change for a person to approve before it applies.');
+  return !came.error;
 }
