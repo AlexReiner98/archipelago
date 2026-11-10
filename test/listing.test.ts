@@ -47,6 +47,12 @@ test('an agent asked to set it up connects to this server: it does not ask, and 
     assert.match(text, /only if the person asks|unless the person asked/i, `${name}: a server of one's own only if asked`);
     assert.ok(text.lastIndexOf(LISTING.urls.repository) > text.indexOf(`${origin}/connect/install`), `${name}: hosting comes after connecting`);
   }
+  // One line an agent runs on Windows, in PowerShell, with no quotes inside it for the shell to drop; and what it changes.
+  const page = installPage(origin);
+  assert.ok(page.includes(`& ([scriptblock]::Create((irm ${origin}/connect/install.ps1))) --client claude --yes`), 'the Windows line');
+  assert.ok(!page.includes('node -e') && !page.includes('\\"'), 'no node one-liner, no escaped quotes');
+  assert.match(page, /--dry-run/);
+  assert.match(page, /### What it changes[\s\S]*\*\*Writes\*\*[\s\S]*~\/\.pelago[\s\S]*\*\*Sends\*\*[\s\S]*prompts/);
   const readme = readFileSync(join(ROOT, 'README.md'), 'utf8');
   assert.ok(readme.indexOf('## Connect your agent') < readme.indexOf('## Host it yourself'), 'README.md: connecting before hosting');
 });
