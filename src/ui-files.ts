@@ -60,7 +60,7 @@ const MADE = new Set(['/layout.css']);
 // moves when one is saved, under the dev server as on a deploy; an address with a version that is not the current
 // one is answered with what is current, and not kept.
 const named = (path: string) => !MADE.has(path) && UI_FILES[path] !== undefined && path !== '/';
-let held: { key: string; version: string; text: Map<string, string> } | undefined;
+let held: { key: string; version: string; text: Map<string, string>; draw?: { html: string; hashes: string[] } } | undefined;
 
 /** The UI as served now: its version, and each text file with the files it names versioned. */
 async function current() {
@@ -107,6 +107,25 @@ export async function uiPage(file: string): Promise<string> {
   const scripts = [...page.matchAll(/<script[^>]*\bsrc="(\/[\w.-]+\.js)\?v=/g)].map((m) => m[1]);
   const preload = reached(text, scripts).map((path) => `<link rel="modulepreload" href="${path}?v=${version}" />`);
   return preload.length ? page.replace('</head>', `    ${preload.join('\n    ')}\n  </head>`) : page;
+}
+
+/**
+ * The frame drawings run in (draw.html) as served now: its scripts written into it, each with the hash its policy
+ * allows it by (src/page-policies.ts). The frame has an origin of its own, for which no cache keeps a file, so a script
+ * it named would be fetched again on every page, behind whatever the page is reading; written in, it runs as the
+ * frame is parsed. The file keeps its scripts by name, as every page does.
+ */
+export async function drawPage(): Promise<{ html: string; hashes: string[] }> {
+  const now = await current();
+  if (now.draw) return now.draw;
+  const hashes: string[] = [];
+  const html = now.text.get('draw.html')!.replace(/<script src="\/([\w.-]+\.js)\?v=\w+"><\/script>/g, (all, file) => {
+    const code = now.text.get(file);
+    if (code === undefined || code.includes('</script')) return all;
+    hashes.push(createHash('sha256').update(code).digest('base64'));
+    return `<script>${code}</script>`;
+  });
+  return (now.draw = { html, hashes });
 }
 
 /** One file of the UI as served now, and whether the address asked for may be kept (it names the current version). */

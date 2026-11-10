@@ -63,20 +63,29 @@ export function warmLayouts() {
   // A frame taken off the page (a page that draws its body anew) is started again: its workers went with it.
   if (sandbox?.frame.isConnected) return sandbox;
   // Not hidden: a frame that is not drawn has its worker slowed many times over. It is drawn with no size instead (flow.css).
-  const frame = h('iframe', { class: 'drawing-sandbox', sandbox: frameSandbox(), src: '/draw.html', title: 'Where drawings run', tabindex: '-1', 'aria-hidden': 'true' });
+  // The page's own (ui/index.html) is taken first: started with the page, it is loading while the page's modules are.
+  const given = document.getElementById('drawing-sandbox');
+  given?.removeAttribute('id');
+  const frame = given && given.getAttribute('sandbox') === frameSandbox() ? given : h('iframe', { class: 'drawing-sandbox', sandbox: frameSandbox(), src: '/draw.html', title: 'Where drawings run', tabindex: '-1', 'aria-hidden': 'true' });
+  if (given && given !== frame) given.remove();
   const loads = new Map();
   sandbox = { frame, loads, ready: null, started: null };
   sandbox.ready = new Promise((resolve) => (sandbox.started = resolve));
   if (!hearing) ((hearing = true), addEventListener('message', hear));
   // Beside the body, not in it, so a page that draws its body anew does not take it away.
-  document.documentElement.append(frame);
+  if (frame !== given) document.documentElement.append(frame);
+  // Started before this listened, it may have said it was ready already: it is asked.
+  else frame.contentWindow?.postMessage({ type: 'ready?' }, '*');
   // What this browser drew last is loaded now, before an answer asks for it.
   for (const [hash, modules] of layouts) loaded(hash, modules).catch(() => {});
   return sandbox;
 }
 
-/** The drawing with this hash, loaded in the frame. */
-async function loaded(hash, modules) {
+/**
+ * The drawing with this hash, loaded in the frame. A picture's channel (`port`) goes with it at once: the frame keeps it
+ * until the drawing is loaded (ui/draw-marks.js), so the picture waits for no word back from the frame.
+ */
+async function loaded(hash, modules, port) {
   const box = warmLayouts();
   await box.ready;
   if (!box.loads.has(hash)) {
@@ -85,6 +94,7 @@ async function loaded(hash, modules) {
     box.loads.set(hash, load);
     box.frame.contentWindow.postMessage({ type: 'load', hash, modules }, '*');
   }
+  if (port) box.frame.contentWindow.postMessage({ type: 'picture', hash }, '*', [port]);
   return box.loads.get(hash).promise;
 }
 
@@ -257,11 +267,10 @@ ${JSON.stringify(input)}`;
   }
   code.then((modules) => {
     if (layouts.get(drawing.hash) !== modules || [...layouts.keys()].at(-1) !== drawing.hash) keepDrawing(drawing.hash, modules);
-    return loaded(drawing.hash, modules);
+    return loaded(drawing.hash, modules, ended ? undefined : channel.port2);
   }).then(
     () => {
       if (ended) return;
-      sandbox.frame.contentWindow.postMessage({ type: 'picture', hash: drawing.hash }, '*', [channel.port2]);
       const load = sandbox.loads.get(drawing.hash);
       if (load) load.stopped = () => !ended && (end(), failed('It did not answer for 12 seconds and was stopped.'));
     },

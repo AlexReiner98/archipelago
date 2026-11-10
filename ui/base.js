@@ -6,6 +6,15 @@ import { applyTheme } from './theme.js';
 export const state = { workspace: undefined, schema: undefined, stamp: undefined, pos: undefined, seq: undefined, dirty: false, selfDrawn: false, trying: null };
 export const hooks = {};
 export const route = (pulse) => hooks.route(pulse);
+/**
+ * The first view drawn on this page (drawn, empty or failed), or a page that draws none: reads no drawing needs (who
+ * is at work, the saved views, the names in the bar, what is around the answer) wait for it, so a server that answers
+ * one read at a time answers the drawing's own first.
+ */
+let drew;
+export const firstDrawn = new Promise((resolve) => (drew = resolve));
+export const drawnNone = () => drew();
+addEventListener('view-drawn', () => drew(), { once: true });
 
 export const main = document.getElementById('main');
 /**

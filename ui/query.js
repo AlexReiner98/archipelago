@@ -188,6 +188,9 @@ const phased = (steps, items = []) => {
   return steps.map((s) => (s.fields ? { ...s, fields: Object.fromEntries(Object.entries(s.fields).map(([id, f]) => [id, typeof f?.status === 'string' && kinds.phase(typeOf.get(id), f.status) ? { ...f, phase: kinds.phase(typeOf.get(id), f.status) } : f])) } : s));
 };
 
+/** A saved view just read to open it (ui/panes.js), handed to the canvas that plays its steps so it is not read twice: taken once. */
+export const opening = new Map();
+
 /** The styles asked for (by what was asked) whose drawing reads each note whole. */
 const whole = new Set();
 
@@ -260,7 +263,9 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     try {
       // A kept view's steps, read once: what they name is asked for beside the lens, not added to the query up.
       if (played && extra === undefined) {
-        const { steps, told } = stepsOf((await api('get', { id: played }).catch(() => null))?.entity);
+        const handed = opening.get(played);
+        opening.delete(played);
+        const { steps, told } = stepsOf(handed ?? (await api('get', { id: played }).catch(() => null))?.entity);
         extra = steps ? { steps } : null;
         if (steps) asking = { ...lens, filter: withIds(lens.filter, told) };
       }
