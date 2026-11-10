@@ -53,5 +53,5 @@ export function compose({ where, items, links, args }, { legends, names = new Ma
   });
   const done = finish({ nodes: a.nodes, x: a.x, y: a.y, chains: a.chains, ties: a.ties, potential: a.m.potential, margin: sizes.flow_margin, islands: shores });
   stage('finish', { chains: done.chains.map((w) => w.points), ties: done.ties.map((w) => w.points) });
-  return done;
+  return a.unwired ? Object.assign(done, { unwired: a.unwired }) : done;
 }

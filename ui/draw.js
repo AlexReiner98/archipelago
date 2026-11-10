@@ -271,6 +271,8 @@ addEventListener('message', (ev) => {
   // After the picture starts, the page says only these: a new answer, and what came of a change asked for.
   if (worker && worker !== true && ev.data?.type === 'answer') return void worker.postMessage({ type: 'event', name: 'answer', event: ev.data.answer });
   if (worker && worker !== true && ev.data?.type === 'changed') return void worker.postMessage({ type: 'event', name: 'changed', event: ev.data });
+  // A page that started this frame before it listened (the frame in ui/index.html) asks whether it is ready.
+  if (ev.data?.type === 'ready?') return void say({ type: 'ready' });
   if (ev.data?.type !== 'draw' || worker) return;
   worker = true;
   // A frame put up while its pane is hidden (a view opened from Home) has no size yet: its code starts once it has one,

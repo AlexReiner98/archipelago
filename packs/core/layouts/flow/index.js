@@ -5,7 +5,8 @@
 // stands: ./state.js), and colour only for what waits on you and what is in trouble (e_rnyqarfe), the order
 // (depends_on) read from the top down in wires at right angles from what is depended on to what depends on it, broken
 // where one passes under another, and every other link (part_of first) a quiet tie between the two it ties, with a
-// head where it points unless the style draws its type headless (core's house style: part_of).
+// head where it points: every wire has one. A type the style lists headless (core's house style: part_of) is laid out
+// from what it ties to, the whole over its part, so its head points up into the whole.
 // What follows an open question is dashed, as a scenario. Hovering a step lights its wires and ties and shows a tip:
 // its title and the start of its note. Every wire is drawn all the time: the layout places them all, so a wire left out of
 // the picture hides what placed it. Drawn from the
@@ -32,7 +33,7 @@ import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
 import { css as sessionCss, hueRules, litStates, sessionItems, sessionMarks, sessionOf, stateMark, STATES, STATE_WORDS } from './session.js';
-import { cut } from './lines.js';
+import { cut, longest } from './lines.js';
 import { css as reasonCss, reasonFlag, reasonLines } from './reasons.js';
 
 /** The link type the order's wires are, for their colour. */
@@ -106,9 +107,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const [TEXT, STUB_TEXT, CORNER] = ['text', 'stub_text', 'corner'].map(z);
   const fit = (text, width, px, role) => {
     if (measure(text, px, role) <= width) return text;
-    let t = text;
-    while (t.length > 1 && measure(`${t}…`, px, role) > width) t = t.slice(0, -1);
-    return `${t}…`;
+    return `${longest(text, (t) => measure(t, px, role) <= width)}…`;
   };
   // The link types the style draws no wire for (undrawn, as a style says) tie nothing here either.
   // The shape it is laid out toward: the pane's, as far as the style says to follow it (flow_aspect_follow, 0 not at
@@ -163,7 +162,19 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   };
   // A tie's head is on the end its link points to (`headAt`, the end or the start of its line), the way the line comes into it.
   const headless = new Set(Array.isArray(style.headless) ? style.headless : []);
-  const tieHead = (t) => head(t.headAt === 'start' ? [...t.points].reverse() : t.points);
+  // Which ends of a type's wire carry a head (the style's `ends`): where it points, where it leaves, or both.
+  const endsOf = (type) => (['start', 'end', 'both'].includes(style.ends?.[type]) ? style.ends[type] : 'end');
+  // A wire's heads, as one shape: at its end unless that end is on a trunk, at its start unless it starts at a junction.
+  const heads = (w, type) => {
+    const ends = endsOf(type), toEnd = w.headAt === 'start' ? [...w.points].reverse() : w.points;
+    const atEnd = ends !== 'start' && !w.toPort, atStart = ends !== 'end' && !w.stop && !w.fromPort;
+    return [atEnd && head(toEnd), atStart && head([...toEnd].reverse())].filter(Boolean).join('') || null;
+  };
+  // A tie in a legend, as it is drawn: its line and its heads. A headless type keeps its own line (part_of solid).
+  const tieKey = (type, cls) => {
+    const [stroke, d] = { end: ['M1 7H17', 'M21 7L13 3V11Z'], start: ['M5 7H21', 'M1 7L9 3V11Z'], both: ['M5 7H17', 'M1 7L9 3V11ZM21 7L13 3V11Z'] }[endsOf(type)];
+    return m('g', {}, m('path', { d: stroke, class: `lf-tie${type === 'part_of' ? ' near' : ''}${headless.has(type) ? '' : ' headed'}${cls}` }), m('path', { d, class: `lf-head${cls}` }));
+  };
   // A wire is broken where it passes under another; one that is drawn in as a story plays stays whole.
   const line = (w) => drawn(w.points, story ? [] : w.gaps, z('break_half'));
   // A held change's badge: where the person decides it, on the step's corner or a wire's middle. One per mark.
@@ -263,7 +274,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
       // A tie of each type in the colour it is drawn in: its own, or that of what waits on you; "you" said only where both are drawn.
       ((rows) => rows.map((row) => {
         const [type, you] = row.split('\n'), cls = `${kind(type)}${you}`, both = rows.includes(`${type}\n`) && rows.includes(`${type}\n you`);
-        return mark(headless.has(type) ? m('path', { d: 'M1 7H21', class: `lf-tie${type === 'part_of' ? ' near' : ''}${cls}` }) : m('g', {}, m('path', { d: 'M1 7H17', class: `lf-tie headed${cls}` }), m('path', { d: 'M21 7L13 3V11Z', class: `lf-head${cls}` })), you && both ? `${linkName(type)} you` : linkName(type));
+        return mark(tieKey(type, cls), you && both ? `${linkName(type)} you` : linkName(type));
       }))([...new Set(ties.map((t) => `${t.type}\n${local ? '' : onYou(t)}`))].sort()),
       !local && heldHere && mark(m('path', { d: 'M1 7H21', class: 'lf-wire held' }), 'Held for you'),
     ].flat().filter(Boolean);
@@ -274,7 +285,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   // use on it (the owner, 6 Nov 2026): the types of its items and the link types of its own links.
   const packRows = (pack, group) => [
     ...pack.types.filter((t) => group.items.some((i) => i.type === t.id)).map((t) => ((shape) => mark(m('g', { class: 'lf-step' }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), t.title))(shapes.type?.[shapedBy({ type: t.id, is: t.is }, shapes)] ?? 'box')),
-    ...pack.links.filter((r) => group.links.some((l) => (l.type ?? l.kind) === r.id)).map((r) => mark(r.id === ORDER_TYPE ? m('path', { d: 'M1 7H21', class: `lf-wire${kind(r.id)}` }) : headless.has(r.id) ? m('path', { d: 'M1 7H21', class: `lf-tie${r.id === 'part_of' ? ' near' : ''}${kind(r.id)}` }) : m('g', {}, m('path', { d: 'M1 7H17', class: `lf-tie headed${kind(r.id)}` }), m('path', { d: 'M21 7L13 3V11Z', class: `lf-head${kind(r.id)}` })), r.title)),
+    ...pack.links.filter((r) => group.links.some((l) => (l.type ?? l.kind) === r.id)).map((r) => mark(r.id === ORDER_TYPE ? m('path', { d: 'M1 7H21', class: `lf-wire${kind(r.id)}` }) : tieKey(r.id, kind(r.id)), r.title)),
   ];
   const packOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.pack;
   // What an island stands by first, under its name: each finding it publishes one line, cut to what the style lets it take (./islands.js).
@@ -298,16 +309,18 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
   if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
 
+  // A read that ends on a finding's name has no head there: the wire from the name to the finding carries it.
+  const tieHeads = g.ties.map((t) => heads(t, t.type)), chainHeads = g.chains.map((c) => heads(c, ORDER_TYPE));
+  const tieKeys = (n) => (tieHeads[n] ? [`n:${n}`, `nh:${n}`] : [`n:${n}`]);
   const tieLayer = g.ties.map((t, n) => {
     const cls = `${kind(t.type)}${onYou(t)}${pend(t.pending)}`;
     const path = m('path', { key: `n:${n}`, d: line(t), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${headless.has(t.type) ? '' : ' headed'}${t.dashed ? ' dashed' : ''}${cls}`, ...drawIn, ...hidden });
-    // A read that ends on a finding's name has no head of its own: the wire from the name to the finding carries it.
-    return headless.has(t.type) || t.toPort ? path : [path, m('path', { key: `nh:${n}`, d: tieHead(t), class: `lf-head${cls}`, ...hidden })];
+    return tieHeads[n] ? [path, m('path', { key: `nh:${n}`, d: tieHeads[n], class: `lf-head${cls}`, ...hidden })] : path;
   });
   const wireLayer = g.chains.map((c, n) => {
     // A wire that ends on a trunk (a bundle's, ./bundle.js) has no head of its own: the trunk's wire carries it.
     const wire = m('path', { key: `w:${n}`, d: line(c), class: `lf-wire${kind(ORDER_TYPE)}${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden });
-    return c.toPort ? [wire] : [wire, m('path', { key: `h:${n}`, d: head(c.points), class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}`, ...hidden })];
+    return chainHeads[n] ? [wire, m('path', { key: `h:${n}`, d: chainHeads[n], class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}`, ...hidden })] : [wire];
   });
   // The badges of held links, with the wire or tie each sits on, so a step moved takes them with its wires. A link of a
   // new item held in the same change is decided with it: the item's badge is the one.
@@ -387,7 +400,11 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
   });
   const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, isles.layer, tieLayer, wireLayer, stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark));
   // The picture's key; on an archipelago none, each island carrying its own.
-  const key = parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 });
+  const key = [
+    // A picture too large to wire says so, and how many links it leaves out (bug e_a9w5jeme).
+    ...(g.unwired ? [{ label: `${g.unwired} link${g.unwired === 1 ? '' : 's'} not drawn: too many to wire` }] : []),
+    ...(parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 })),
+  ];
 
   // What stays lit, as the style says: the rest dimmed. Where the lens's words found some of what is drawn and not all,
   // what they found is lit.
@@ -399,7 +416,7 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
   const light = (id) => [
     { key: 'flow', toggle: { lighting: Boolean(id) } },
     ...g.chains.flatMap((c, n) => [`w:${n}`, `h:${n}`].map((key) => ({ key, toggle: { lit: Boolean(id) && (c.a === id || c.b === id) } }))),
-    ...g.ties.flatMap((t, n) => (headless.has(t.type) ? [`n:${n}`] : [`n:${n}`, `nh:${n}`]).map((key) => ({ key, toggle: { lit: Boolean(id) && (t.a === id || t.b === id) } }))),
+    ...g.ties.flatMap((t, n) => tieKeys(n).map((key) => ({ key, toggle: { lit: Boolean(id) && (t.a === id || t.b === id) } }))),
   ];
   /** A step's tip: its title, that it waits on you where it does (a colour no legend explains), and the start of its note. */
   const tipFor = (key) => {
@@ -416,7 +433,7 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
   if (story) {
     const marks = {
       steps: new Map(steps.map((n) => [`s:${n.id}`, [n.item.id]])),
-      wires: [...g.chains.map((c, n) => ({ keys: [`w:${n}`, `h:${n}`], from: [c.a], to: [g.nodes.get(c.b)?.item.id ?? c.b], pair: [c.a, c.b].sort().join(' ') })), ...g.ties.map((t, n) => ({ keys: headless.has(t.type) ? [`n:${n}`] : [`n:${n}`, `nh:${n}`], from: [t.a], to: [t.b], pair: [t.a, t.b].sort().join(' ') }))],
+      wires: [...g.chains.map((c, n) => ({ keys: [`w:${n}`, `h:${n}`], from: [c.a], to: [g.nodes.get(c.b)?.item.id ?? c.b], pair: [c.a, c.b].sort().join(' ') })), ...g.ties.map((t, n) => ({ keys: tieKeys(n), from: [t.a], to: [t.b], pair: [t.a, t.b].sort().join(' ') }))],
       says: new Map([...said.values()].map((c) => [g.chains.indexOf(c), `t:${g.chains.indexOf(c)}`])),
       flags: new Map(steps.filter((n) => !n.stub).map((n) => [n.item.id, `f:${n.id}`])),
       dots: new Map(steps.filter((n) => !n.stub).map((n) => [n.item.id, `d:${n.id}`])),
