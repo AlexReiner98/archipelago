@@ -86,7 +86,7 @@ test('what a server pack may declare, and the acts on a workspace only once it c
   assert.match(checkServerPack(with_({}, { pages: [{ id: 'p', file: 'new.html', form_action: 'web' }] }), OWN_PACKS).join(), /sends a form to no host/);
   // The kernel's own packs folder holds workspace packs too: only those marked for the server are read as server packs.
   const own = loadServerPacks([OWN_PACKS]);
-  assert.deepEqual([own.packs.map((p) => p.file.id), own.refused], [[], []]);
+  assert.deepEqual([own.packs.map((p) => p.file.id), own.refused], [['claude_code', 'reader'], []]);
 
   const control = await openDb();
   const at = { has: async () => true, get: async () => { throw new Error('reached a workspace'); }, hold: () => () => {} } as never;

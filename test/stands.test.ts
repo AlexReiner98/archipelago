@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { answerHook } from '../src/hook-answers.ts';
+import { answerHook } from './claude-hook.ts';
 import type { Archipelago } from '../src/pelago.ts';
 import { sessionStart } from '../src/sessions.ts';
 import { standsOf } from '../src/stands.ts';

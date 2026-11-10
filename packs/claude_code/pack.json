@@ -1,0 +1,20 @@
+{
+  "id": "claude_code",
+  "version": "0.1.0",
+  "title": "Claude Code",
+  "description": "A server pack: Claude Code's hooks translated (/hooks/<event> and /hooks/claude_code/<event>), the setup a project is handed at /connect/setup.mjs, and a headless `claude -p` launched on a task.",
+  "reach": {
+    "server": {
+      "mounts": { "setup": "setup" },
+      "files": [{ "id": "setup", "file": "setup.mjs", "type": "text/javascript", "fill": ["origin", "tokens", "version", "rules"] }],
+      "launchers": [
+        {
+          "id": "headless",
+          "argv": ["claude", "-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "{mode}", "--session-id", "{session_id}", "--mcp-config", "{mcp_config}", "--allowedTools", "{tools}", "--model", "{model}"],
+          "read": "read"
+        }
+      ],
+      "adapter": { "surface": "claude_code", "in": "hook_in", "out": "hook_out" }
+    }
+  }
+}

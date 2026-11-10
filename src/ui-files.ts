@@ -103,7 +103,19 @@ function reached(text: Map<string, string>, from: string[]): string[] {
 /** A page of the UI as served now: what it names versioned, and what its scripts will import asked for at once. */
 export async function uiPage(file: string): Promise<string> {
   const { version, text } = await current();
-  const page = text.get(file)!;
+  return preloaded(text.get(file)!, version, text);
+}
+
+/**
+ * A page made elsewhere (a server pack's reader) that loads the UI's files: each it names versioned, and what its
+ * scripts import asked for at once, as a page of the UI's own is. What it names that is no UI file is left as it is.
+ */
+export async function uiVersioned(html: string): Promise<string> {
+  const { version, text } = await current();
+  return preloaded(html.replace(/(<(?:script|link)\b[^>]*\b(?:href|src)=")(\/[\w.-]+)"/g, (all, before, path) => (named(path) ? `${before}${path}?v=${version}"` : all)), version, text);
+}
+
+function preloaded(page: string, version: string, text: Map<string, string>): string {
   const scripts = [...page.matchAll(/<script[^>]*\bsrc="(\/[\w.-]+\.js)\?v=/g)].map((m) => m[1]);
   const preload = reached(text, scripts).map((path) => `<link rel="modulepreload" href="${path}?v=${version}" />`);
   return preload.length ? page.replace('</head>', `    ${preload.join('\n    ')}\n  </head>`) : page;

@@ -3,7 +3,6 @@
 
 import { actorId, type Actor, type Entity, type Archipelago } from './pelago.ts';
 import { roomForSession } from './standing.ts'; import { awakeSessions } from './workspace-use.ts'; import { wholeMap } from './outbox.ts';
-import { CLAUDE_CODE } from './claude-code.ts';
 
 /** How many sessions are at work in the workspace, whoever's they are (src/workspace-use.ts). */
 export const sessionsAwake = async (l: Archipelago) => awakeSessions((await wholeMap(l)).db, l.registry.family('run'));
@@ -21,7 +20,10 @@ export async function resolveRun(l: Archipelago, key: string, openOnly = false):
 }
 
 /** A run that is a chat's: a surface named it and keeps it, where a run this server launched (src/launcher.ts) is the server's to end. */
-export const isChat = (run: Entity) => Boolean(run.props.session_id && run.props.surface) && run.props.surface !== 'claude-headless';
+export const isChat = (run: Entity) => Boolean(run.props.session_id && run.props.surface) && run.props.surface !== 'claude-headless' && !String(run.props.surface).startsWith('pack:');
+
+/** The actor a session's hooks act as, whatever surface it is in: named claude-code since before there were surfaces, as the log keeps it. */
+export const HOOK_ACTOR: Actor = { kind: 'agent', name: 'claude-code' };
 
 export async function takeUp(l: Archipelago, actor: Actor, run: Entity): Promise<void> {
   if (!run.is_open) await roomForSession(l.workspace, () => sessionsAwake(l));
@@ -31,7 +33,7 @@ export async function takeUp(l: Archipelago, actor: Actor, run: Entity): Promise
 /** The chat goes on: a prompt to a session that was ended, or that had said where its work stands, takes it up under its name. */
 export async function sessionPrompted(l: Archipelago, sessionId: string | undefined): Promise<void> {
   const run = sessionId ? await resolveRun(l, sessionId) : undefined;
-  if (run && isChat(run) && (!run.is_open || run.status === 'waiting')) await takeUp(l, CLAUDE_CODE, run);
+  if (run && isChat(run) && (!run.is_open || run.status === 'waiting')) await takeUp(l, HOOK_ACTOR, run);
 }
 
 /** How long after its hook registered a chat a call to register it again is taken to be the same chat. */

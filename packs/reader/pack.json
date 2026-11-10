@@ -1,0 +1,16 @@
+{
+  "id": "reader",
+  "version": "0.1.0",
+  "title": "Reader",
+  "description": "What anyone reads with no login: a published document at /p/<workspace>/<id>, and a workspace's site at a domain of its own, drawn from what was published alone.",
+  "reach": {
+    "server": {
+      "acts": ["published.read", "published.at", "published.picture", "published.drawing", "site.pages"],
+      "entries": [
+        { "id": "page", "description": "A published document's page, data, pictures, drawings and stream, at /p/.", "answers": "html" },
+        { "id": "site", "description": "A site's pages, robots.txt and sitemap, on its own domain.", "answers": "html" }
+      ],
+      "mounts": { "public": "page", "site": "site" }
+    }
+  }
+}
