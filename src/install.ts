@@ -34,6 +34,16 @@ export function installScript(origin: string): string {
   return `const ORIGIN = ${JSON.stringify(origin)};\nconst FILES = ${JSON.stringify(files)};\n${read('scripts/pelago-install.mjs')}`;
 }
 
+/**
+ * The installer as an agent runs it, for one client and asking nothing: PowerShell's script as a block, so the
+ * arguments reach it (a pipe into iex passes none), and sh's from stdin, with them after -s --. No quotes inside an
+ * argument: PowerShell drops those when it hands one to a program.
+ */
+export const agentLines = (origin: string) => ({
+  windows: (client: string) => `& ([scriptblock]::Create((irm ${origin}/connect/install.ps1))) --client ${client} --yes`,
+  unix: (client: string) => `curl -fsSL ${origin}/connect/install.sh | sh -s -- --client ${client} --yes`,
+});
+
 /** For PowerShell: fetch the installer to a file, so it can be read, and run it with node. */
 export const installPs1 = (origin: string) => `# Archipelago's installer for Windows: ${origin}/connect/install says what it does.
 $ErrorActionPreference = 'Stop'
@@ -77,7 +87,7 @@ To set up ${LISTING.name} for a person (Claude Code, Codex, Cursor, Grok Bot, Ch
 /** The page: what a person or their agent does, client by client. */
 export function installPage(origin: string): string {
   const line = installLines(origin);
-  const node = `node -e "fetch('${origin}/connect/install.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))" --`;
+  const run = agentLines(origin);
   return `# Install Archipelago
 
 ${LISTING.summary} It is at ${origin}. Connecting an agent takes one step and one sign-in in the browser; there is nothing to host.
@@ -100,31 +110,34 @@ Or ask your agent: "Install Archipelago from ${origin}/connect/install".
 
 Connect to this server: find your section below and follow it. Do not ask whether to host it, and do not set up a server of your own unless the person asked for one. Tell the person, in one line, what you are about to run and that a browser window will ask them to sign in, where someone with no account chooses Start a workspace; then run it. Every command here is safe to read first: the installer is at ${origin}/connect/install.mjs.
 
+For Claude Code, Codex or Cursor, run the installer with your shell tool, naming your client (\`claude\`, \`codex\` or \`cursor\`). On Windows, in PowerShell:
+
+    ${run.windows('claude')}
+
+On macOS or Linux:
+
+    ${run.unix('claude')}
+
+Add \`--dry-run\` to see what it would do, changing nothing.
+
+### What it changes
+
+- **Writes** your client's connection (Claude Code's plugin; Codex's and Cursor's server entry and session hooks), and ~/.pelago: the sign-in, a token in a file only this user can read, and the hook scripts.
+- **Sends**, from the hooks to this server, as the session's record on the person's map: each session's start and end, its prompts, the tokens it used, the files it touched, and its folder's repository, branch and recent commits.
+
 ### Claude Code
-
-Run, with your shell tool:
-
-    ${node} --client claude --yes
 
 It installs the Archipelago plugin (\`claude plugin install archipelago --marketplace AlexReiner98/archipelago\`) and waits while the person says Allow in the browser. The plugin's tools load with the next session. Until then, reach the map from this one with:
 
-    node ~/.pelago/bin/pelago-login.mjs call query "{\\"name\\":\\"frontier\\"}"
+    node ~/.pelago/bin/pelago-login.mjs call query name=frontier
 
-(any tool and its input: \`call <tool> '<json>'\`). If it reports an older \`pelago\` server in ~/.mcp.json, ask the person whether to remove it, and if yes run the same command with \`--remove-old\`.
+(any tool and its input: \`call <tool> name=value\`, or the input as JSON). If it reports an older \`pelago\` server in ~/.mcp.json, ask the person whether to remove it, and if yes run the same command with \`--remove-old\`.
 
 ### Codex
-
-Run:
-
-    ${node} --client codex --yes
 
 It runs \`codex mcp add pelago --url ${origin}/mcp\` and then \`codex mcp login pelago\`, which opens the browser, and writes the session hooks in ~/.codex/hooks.json. Tell the person to type \`/hooks\` in Codex once and allow the four Archipelago hooks. The tools load with the next session.
 
 ### Cursor
-
-Run:
-
-    ${node} --client cursor --yes
 
 It adds \`"pelago": { "url": "${origin}/mcp" }\` to ~/.cursor/mcp.json and the session hooks to ~/.cursor/hooks.json, and opens the browser once for the hooks' sign-in. Tell the person to open Settings, MCP, and press Connect beside pelago to sign in.
 
