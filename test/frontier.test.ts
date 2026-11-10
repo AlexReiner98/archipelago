@@ -77,6 +77,11 @@ test('a second session is placed where the first worked: the owner’s correctio
   assert.equal(none.before.sessions, 0);
   assert.match(frontierText(none)[0], /No session has worked here before/);
 
+  // A chat with no folder (ChatGPT, Grok Bot) is the person's, wherever they worked: it is handed the open work too.
+  const chat = await sessionStart(l, agent, { session_id: 'four', title: 'A chat', surface: 'chatgpt' });
+  const theirs = await frontier(l, { run: chat.run });
+  assert.ok(theirs.before.sessions >= 1 && theirs.items.some((i) => i.id === made.hash), 'the undecided question reaches a chat');
+
   // And the same answer is a view anyone may ask, the agent's start and the person's alike.
   const asked = (await callTool(l, human, 'view', { name: 'frontier', params: { cwd: 'C:/work/todo' } })) as { items: { id: string }[] };
   assert.ok(asked.items.some((i) => i.id === made.hash));

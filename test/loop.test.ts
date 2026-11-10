@@ -1,4 +1,4 @@
-// The core loop, end to end, as a stranger meets it (the gate, e_2wz3kdks): a server with core alone, a Claude Code
+﻿// The core loop, end to end, as a stranger meets it (the gate, e_2wz3kdks): a server with core alone, a Claude Code
 // session played by the plugin's own hook script with what Claude Code hands it, the map's tools over HTTP, and the
 // page in a real browser (skipped where there is no Chrome). Each of the six steps is a check: install, write, read,
 // correct, remember, share. No model is in it, so it says the same each run; a run with a real agent is e_aj5bh4yj.
@@ -20,7 +20,7 @@ const PLUGIN = join(ROOT, 'plugins', 'archipelago');
 function hookOf(base: string, data: string) {
   return (event: string, body: Record<string, unknown>) =>
     new Promise<{ context: string; raw: string }>((resolve, reject) => {
-      const env: NodeJS.ProcessEnv = { ...process.env, PELAGO_URL: base, CLAUDE_PLUGIN_DATA: data, CLAUDE_PLUGIN_ROOT: PLUGIN };
+      const env: NodeJS.ProcessEnv = { ...process.env, PELAGO_URL: base, PELAGO_HOME: data, CLAUDE_PLUGIN_ROOT: PLUGIN };
       delete env.PELAGO_AGENT_TOKEN;
       const child = spawn(process.execPath, [join(PLUGIN, 'scripts', 'pelago-hook.mjs'), event, '--plugin'], { env, cwd: String(body.cwd ?? ROOT), stdio: ['pipe', 'pipe', 'pipe'] });
       let out = '';

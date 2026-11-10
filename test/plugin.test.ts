@@ -1,8 +1,8 @@
-// The Claude Code plugin (scripts/plugin.ts): its files are what its sources make, and a stranger's machine is
+﻿// The Claude Code plugin (scripts/plugin.ts): its files are what its sources make, and a stranger's machine is
 // connected by a sign-in in the browser, with no token copied: the hook asks for it when the server refuses it, keeps
 // what the browser comes back with, and registers the session that asked at its next prompt.
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,7 +18,9 @@ test('the plugin in the repository is what its sources make (npm run plugin writ
   for (const [path, text] of Object.entries(pluginFiles())) assert.equal(existsSync(join(ROOT, path)) && readFileSync(join(ROOT, path), 'utf8'), text, `${path} is behind: run npm run plugin`);
   const hooks = JSON.parse(pluginFiles()[`${FOLDER}/hooks/hooks.json`]).hooks;
   assert.deepEqual(Object.keys(hooks).sort(), ['Notification', 'PostToolUse', 'SessionEnd', 'SessionStart', 'Stop', 'StopFailure', 'UserPromptSubmit']);
-  assert.match(pluginFiles()[`${FOLDER}/.mcp.json`], /"pelago": \{\s*"type": "http",\s*"url": "\$\{PELAGO_URL:-https:\/\/app\.archipelago\.tools\}\/mcp"\s*\}/, 'no token in it: Claude Code signs in at /mcp');
+  const server = JSON.parse(pluginFiles()[`${FOLDER}/.mcp.json`]).mcpServers.pelago;
+  assert.deepEqual(server, { type: 'http', url: '${PELAGO_URL:-https://app.archipelago.tools}/mcp', headersHelper: 'node "${CLAUDE_PLUGIN_ROOT}/scripts/pelago-login.mjs" headers' }, 'no token in it: the tools take the machine’s one sign-in');
+  assert.match(pluginFiles()[`${FOLDER}/scripts/pelago-login.mjs`], /const DEFAULT = "https:\/\/app\.archipelago\.tools";/, 'away from this repository it signs in to the hosted server');
 });
 
 test('a plugin tool is counted as a map tool, and the items it names as touched', async () => {
@@ -37,7 +39,7 @@ test('a machine with no token is connected through the browser, and the session 
   const data = mkdtempSync(join(tmpdir(), 'pelago-plugin-'));
   const hook = (name: string, input: unknown) =>
     new Promise<{ out: any; err: string }>((done) => {
-      const child = spawn(process.execPath, [join(ROOT, FOLDER, 'scripts', 'pelago-hook.mjs'), name, '--plugin'], { env: { ...process.env, PELAGO_URL: base, PELAGO_AGENT_TOKEN: '', CLAUDE_PLUGIN_DATA: data, PELAGO_LOGIN_QUIET: '1' } });
+      const child = spawn(process.execPath, [join(ROOT, FOLDER, 'scripts', 'pelago-hook.mjs'), name, '--plugin'], { env: { ...process.env, PELAGO_URL: base, PELAGO_AGENT_TOKEN: '', PELAGO_HOME: data, PELAGO_LOGIN_QUIET: '1' } });
       let out = '';
       let err = '';
       child.stdout.on('data', (d) => (out += d));
@@ -59,7 +61,21 @@ test('a machine with no token is connected through the browser, and the session 
   assert.match(back, /Connected/);
   const kept = join(data, `signed-in-${new URL(base).host.replace(/[^\w.-]/g, '_')}.json`);
   for (let i = 0; i < 50 && !existsSync(kept); i++) await new Promise((r) => setTimeout(r, 100));
-  assert.ok(readFileSync(kept, 'utf8').includes('"access"'), 'the token is kept in the plugin\u2019s data folder');
+  assert.ok(readFileSync(kept, 'utf8').includes('"access"'), 'the token is kept in the machine\u2019s one place for it');
+  // The plugin's tools ask the same file for their headers: one Allow serves the hooks and the tools.
+  const headers = spawnSync(process.execPath, [join(ROOT, FOLDER, 'scripts', 'pelago-login.mjs'), 'headers'], { env: { ...process.env, PELAGO_HOME: data, PELAGO_AGENT_TOKEN: '', CLAUDE_CODE_MCP_SERVER_URL: `${base}/mcp` }, encoding: 'utf8' });
+  assert.match(JSON.parse(headers.stdout).Authorization, /^Bearer \S+/);
+  const none = spawnSync(process.execPath, [join(ROOT, FOLDER, 'scripts', 'pelago-login.mjs'), 'headers'], { env: { ...process.env, PELAGO_HOME: mkdtempSync(join(tmpdir(), 'pelago-none-')), PELAGO_AGENT_TOKEN: '', CLAUDE_CODE_MCP_SERVER_URL: `${base}/mcp` }, encoding: 'utf8' });
+  assert.equal(none.stdout, '{}', 'with no sign-in it says nothing, and Claude Code signs in itself');
+  // Run apart from this process, which is the server it calls.
+  const called = await new Promise<{ status: number | null; stdout: string }>((done) => {
+    const child = spawn(process.execPath, [join(ROOT, FOLDER, 'scripts', 'pelago-login.mjs'), 'call', 'query', '{}'], { env: { ...process.env, PELAGO_HOME: data, PELAGO_AGENT_TOKEN: '', PELAGO_URL: base } });
+    let stdout = '';
+    child.stdout.on('data', (d) => (stdout += d));
+    child.on('close', (status) => done({ status, stdout }));
+  });
+  assert.equal(called.status, 0, `a session whose tools have not loaded reaches the map: ${called.stdout}`);
+  assert.doesNotMatch(called.stdout, /Bearer/, 'and the token is never printed');
 
   const prompted = await hook('prompt', { session_id: 'stranger-1', cwd: data, prompt: 'hello' });
   assert.equal(prompted.out.systemMessage, undefined, 'nothing more to sign in to');
@@ -67,6 +83,7 @@ test('a machine with no token is connected through the browser, and the session 
   assert.doesNotMatch(prompted.out.hookSpecificOutput.additionalContext, /older than the server/, 'a plugin is not told to run the setup');
   const open = (await call('/agent/view', owner, { name: 'sessions' })).result.open;
   assert.equal(open.length, 1, 'the session that asked is on the map');
+  assert.equal(open[0].title, 'hello', 'named by what was asked, not by its folder, until its chat has a title');
 
   // A server that is away is said in the session, once, not only to stderr.
   const gone = `away-${process.pid}-${Date.now()}`;
