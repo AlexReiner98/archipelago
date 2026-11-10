@@ -115,6 +115,38 @@ one is off there, and its state says which.
 
 Core, the kernel's pack, is never judged.
 
+## Made on the map
+
+A pack can also be authored on the map, by a person or their agent, with no
+access to the server: an item of core's `pack` type (`src/map-packs.ts`). Its
+`name` is the pack's id, its title and note the pack's, its `version` the
+pack's (0.1.0 unless said), and its `manifest` what it declares, as a
+`pack.json` holds it:
+
+```json
+{ "op": "create", "type": "pack", "title": "Recipes", "body": "What we cook.",
+  "props": { "name": "recipes", "manifest": {
+    "types": [{ "id": "recipes.dish", "title": "Dish", "description": "A dish we cook.", "extends": "record" }] } } }
+```
+
+- **Data alone.** The manifest holds the keys of a pack on an island map
+  (`requires`, `types`, `links`, `rules`, `views`, `styles`), whatever the
+  workspace: no actions, handlers, layouts, reach or uses, so nothing of it
+  runs on the server. Of `views`, trees, screens and reasons for attention;
+  of `styles`, instructions and lenses. A rule in it holds, refuses,
+  requires or asks: none keeps a stream (`stream`, `keep`), is lifted by a
+  setting (`lifted`) or by the server (`server`).
+- **Its own names.** Every type and link type it declares is named
+  `<name>.<what>`, and its name is no pack's on this server.
+- **Checked when written.** A change that makes or changes one is checked as
+  the registry would be with the pack added, so a manifest that would not
+  load, or that the island rules would not take, is refused then, with why.
+- **Added by the owner.** It is off until the owner adds it (`pack_set`), as
+  any pack new to a workspace is; then its manifest's text is on the log, and
+  an edit to it is said there again. An agent's edit of one, or bringing one
+  back, waits for the owner (core's rule `agent_packs`). Retired or archived,
+  it leaves the registry and its items turn dormant.
+
 ## Where packs are found
 
 A server reads its packs from `packs/`, then from each folder `PELAGO_PACKS`
