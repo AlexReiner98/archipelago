@@ -48,7 +48,8 @@ export function withoutShell(argv: string[], platform = process.platform, path =
     // npm's shims end by running "%dp0%\<the program>" %*: that program, found beside the shim.
     const named = [...readFileSync(shim, 'utf8').matchAll(/"%dp0%\\([^"%]+\.(exe|js|cjs|mjs))"/gi)].at(-1);
     if (!named) return argv;
-    const target = resolve(dirname(shim), named[1]);
+    // The shim says its path with backslashes: split there, so it is the same file wherever it is read.
+    const target = resolve(dirname(shim), ...named[1].split('\\'));
     return named[2].toLowerCase() === 'exe' ? [target, ...rest] : [process.execPath, target, ...rest];
   }
   return argv;

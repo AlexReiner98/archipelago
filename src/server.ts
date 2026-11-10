@@ -117,11 +117,11 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const trusted = trustedProxies(options.proxies);
   const addressOf = (req: IncomingMessage) => clientAddress(req.headers['x-forwarded-for'], req.socket.remoteAddress, trusted);
   /** True, and the request answered, when its address has asked too often. */
+  const counted = new WeakMap<IncomingMessage, Set<unknown>>(); // a request counts once against a limit, though a pack passes it back (src/server-mounts.ts)
   const tooOften = (req: IncomingMessage, res: ServerResponse, count: ReturnType<typeof limiter>) => {
-    const wait = count.take(addressOf(req));
-    if (wait) send(res, 429, { error: `Asked too often. Try again in ${wait} seconds.` }, { 'retry-after': String(wait) });
-    return wait > 0;
-  };
+    if (counted.get(req)?.has(count)) return false; counted.set(req, (counted.get(req) ?? new Set()).add(count));
+    const wait = count.take(addressOf(req)); if (wait) send(res, 429, { error: `Asked too often. Try again in ${wait} seconds.` }, { 'retry-after': String(wait) });
+    return wait > 0; };
 
   /** The workspace a request is for and who is making it. */
   async function resolve(req: IncomingMessage, res: ServerResponse, surface: 'human' | 'agent', asks?: () => Promise<string | undefined>): Promise<{ ws: Workspace; pelago: Archipelago; actor: (label?: string) => Actor; look?: true }> {

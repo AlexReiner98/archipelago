@@ -71,13 +71,14 @@ const drawing = (code) => (code ? { json: code, cache: FOR_GOOD } : null);
 export async function pageOf(parts, act, template) {
   const { workspace, id, what, extra, name, named, domain } = parts;
   if (!WORKSPACE.test(workspace ?? '') || !ID.test(id ?? '') || (what && !WHATS.includes(what))) return PASS;
+  // Its stream is the kernel's, which checks itself that the document is published: no read first, so it opens at once.
+  if (what === 'live') return { stream: true };
   // A document is read as it was last published, never as the map has it now.
   const read = await act('published.read', { workspace, id });
   if (!read) return PASS;
   // Its id is its address: the page is not given it twice.
   const { id: _id, ...doc } = read;
   const path = publicPath(workspace, id);
-  if (what === 'live') return { stream: true };
   if (what === 'drawing') return (extra && HASH.test(extra) && drawing(await act('published.drawing', { workspace, id, hash: extra }))) || NONE;
   // A section of the document shows its figure; anything public in its own right is the kernel's.
   if (what === 'picture') return (extra && ID.test(extra) && picture(await act('published.picture', { workspace, id, section: extra }))) || PASS;
