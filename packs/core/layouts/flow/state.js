@@ -7,6 +7,7 @@
 // answer in, each item's state out.
 
 import { isOf } from './graph.js';
+import { reasonState } from './reasons.js';
 
 /** Whether a link is of a type, or a flavour of it: an older answer names its type as its kind. */
 const isA = (l, type) => isOf({ type: l.type ?? l.kind, is: l.is }, type);
@@ -15,10 +16,11 @@ const isA = (l, type) => isOf({ type: l.type ?? l.kind, is: l.is }, type);
 export function statesOf({ items, links = [], viewer, lit = new Set() }) {
   const byId = new Map(items.map((i) => [i.id, i]));
   const open = (id) => byId.get(id)?.open !== false;
-  const out = new Map(items.map((i) => [i.id, {
+  // What the answer's reasons say (./reasons.js) is read into the same state: a reason is never a word of its own.
+  const out = new Map(items.map((i) => [i.id, ((r) => ({
     phase: i.phase ?? (i.open === false ? 'finished' : 'not_started'),
-    you: Boolean(i.state?.needs_you), blocked: Boolean(i.state?.blocked), working: Number(i.state?.sessions) > 0,
-  }]));
+    you: Boolean(i.state?.needs_you) || r.you, blocked: Boolean(i.state?.blocked) || r.blocked, working: Number(i.state?.sessions) > 0 || r.working,
+  }))(reasonState(i))]));
   for (const i of items) {
     const state = i.session?.state, s = out.get(i.id);
     if (typeof state !== 'string') continue;
