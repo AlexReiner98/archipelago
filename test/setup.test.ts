@@ -312,6 +312,7 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
   const operator = (await workspaces.ensureOperator())!;
   // Where the file comes from: another map, with a type of its own and things its owner did.
   const there = await bareMap(workspaces, 'laptop', 'Laptop'); // a map to take a file of, with no owner yet
+  await call('/api/workspace_set', there, { islands: false }); // a plain map, as one made before islands
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'define_type', type: { id: 'local.site_visit', title: 'Site visit', description: 'A visit.', extends: 'event' } }] });
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }, { op: 'create', type: 'task', title: 'Order the stone' }] });
   const laptop = await workspaces.get('laptop');
@@ -330,11 +331,11 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
 
   const { latest } = (await call('/agent/watch', robot)).result;
   const preview = (await call('/api/import_backup', admin, { backup, vault })).result;
-  assert.deepEqual([preview.applied, preview.entities.added, preview.types_added], [false, 3, ['local.site_visit']], 'its two items and the type item one of them needs');
+  assert.deepEqual([preview.applied, preview.entities.added, preview.types_added], [false, 4, ['local.site_visit']], 'its two items, the island it was made with and the type item one of them needs');
   const titles = async () => ((await call('/api/search', admin)).result as any[]).map((e) => e.title).sort();
   assert.ok(!(await titles()).includes('Order the stone'), 'looking changes nothing');
   const done = (await call('/api/import_backup', admin, { backup, vault, apply: true })).result;
-  assert.deepEqual([done.applied, done.entities.added], [true, 3]);
+  assert.deepEqual([done.applied, done.entities.added], [true, 4]);
   assert.deepEqual((await titles()).filter((t) => ['Already here', 'Order the stone', 'Visit the quarry'].includes(t)), ['Already here', 'Order the stone', 'Visit the quarry']);
   assert.equal(((await call('/api/search', admin, { type: 'local.site_visit' })).result as any[]).length, 1, 'with the type it needed');
 
@@ -347,6 +348,7 @@ test('an import can make the owner in the file and the owner here one person, an
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
   const there = await bareMap(workspaces, 'laptop', 'Laptop'); // a map to take a file of, with no owner yet
+  await call('/api/workspace_set', there, { islands: false }); // a plain map, as one made before islands
   const theirs = (await call('/api/init', there, { name: 'Alex Reiner' })).result.me as string;
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'From the laptop', owner: theirs }] });
   const backup = gzipSync(JSON.stringify(await dump((await workspaces.get('laptop')).pelago.db, { id: 'laptop', name: 'Laptop' }))).toString('base64');
