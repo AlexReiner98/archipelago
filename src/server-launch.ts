@@ -1,12 +1,15 @@
 // Launching an agent a server pack declares (task e_ukp2mqys, decision e_885ztqkv): the pack names its command
-// (reach.server.launchers, argv with {prompt}, {mcp_config}, {tools}, {model}) and reads each line it prints (read); the
-// server's launch setting names the pack that may launch. The kernel registers the run, mints the token the process
-// is given (the pack never sees it), spawns with no shell and an environment of the token and the system's own, records what read answers, and
-// on exit ends the run and revokes the token (src/launcher.ts). Only a person launches.
+// (reach.server.launchers, argv with {prompt}, {mcp_config}, {tools}, {model}, {mode}, {session_id}) and reads each
+// line it prints (read); the server's launch setting names the pack that may launch. The kernel registers the run,
+// mints the token the process is given (the pack never sees it), spawns with no shell and an environment of the token
+// and the system's own, records what read answers, and on exit ends the run and revokes the token (src/launcher.ts).
+// Only a person launches.
 //
-// The setting is PELAGO_LAUNCH_PACK (or pack, given): "<pack>" or "<pack>:<launcher>". With none named, the kernel's
-// own Claude Code launcher runs, as before, until the claude_code pack ships (the adapter cut); then none named is off.
+// The setting is PELAGO_LAUNCH_PACK (or pack, given): "<pack>" or "<pack>:<launcher>". With none named it is the
+// launcher the open core ships, the claude_code pack's; a pack named that is not here turns launching off.
 
+import { existsSync, readFileSync } from 'node:fs';
+import { delimiter, dirname, extname, isAbsolute, join, resolve } from 'node:path';
 import { env } from './env.ts';
 import { configureLauncher, stopLaunchedOf, type Launcher, type LauncherConfig, type Read } from './launcher.ts';
 import type { ServerPacks } from './server-host.ts';
@@ -23,9 +26,33 @@ const SYSTEM_ENV = ['PATH', 'Path', 'PATHEXT', 'SystemRoot', 'SYSTEMROOT', 'wind
 export type LaunchConfig = Omit<LauncherConfig, 'via'> & {
   /** The server's packs, the launch setting's pack read from them. Optional until src/server.ts passes them. */
   packs?: Pick<ServerPacks, 'find' | 'call'>;
-  /** Which pack may launch, and which of its launchers ("<pack>:<launcher>"); left out, PELAGO_LAUNCH_PACK. */
+  /** Which pack may launch, and which of its launchers ("<pack>:<launcher>"); left out, PELAGO_LAUNCH_PACK, else DEFAULT_LAUNCH. */
   pack?: string;
 };
+
+/** The launch setting when none is given: the launcher of the server pack the open core ships for it (packs/). */
+export const DEFAULT_LAUNCH = 'claude_code';
+
+/**
+ * A command named by its bare name, as a Windows machine finds it without a shell. An npm-installed CLI is there a
+ * .cmd shim, which only a shell can start; the program it starts is run instead: its .exe, or its script under this
+ * node. Anywhere else, or for anything else, the argv as it was.
+ */
+export function withoutShell(argv: string[], platform = process.platform, path = process.env.PATH ?? process.env.Path ?? ''): string[] {
+  const [bin, ...rest] = argv;
+  if (platform !== 'win32' || !bin || isAbsolute(bin) || extname(bin) || /[\\/]/.test(bin)) return argv;
+  for (const dir of path.split(delimiter).filter(Boolean)) {
+    if (existsSync(join(dir, `${bin}.exe`))) return argv;
+    const shim = join(dir, `${bin}.cmd`);
+    if (!existsSync(shim)) continue;
+    // npm's shims end by running "%dp0%\<the program>" %*: that program, found beside the shim.
+    const named = [...readFileSync(shim, 'utf8').matchAll(/"%dp0%\\([^"%]+\.(exe|js|cjs|mjs))"/gi)].at(-1);
+    if (!named) return argv;
+    const target = resolve(dirname(shim), named[1]);
+    return named[2].toLowerCase() === 'exe' ? [target, ...rest] : [process.execPath, target, ...rest];
+  }
+  return argv;
+}
 
 type Fill = Partial<Record<(typeof LAUNCH_FILLS)[number], string>>;
 
@@ -71,7 +98,7 @@ export function packLauncher(packs: Pick<ServerPacks, 'find' | 'call'>, setting:
       const named = l.argv.some((a) => a.includes('{prompt}'));
       const system = Object.fromEntries(SYSTEM_ENV.filter((k) => process.env[k] !== undefined).map((k) => [k, process.env[k]]));
       return {
-        argv: fillArgv(l.argv, fill),
+        argv: withoutShell(fillArgv(l.argv, fill)),
         env: { ...system, ...(token && { [TOKEN_ENV]: token }) },
         stdin: !named,
         tells: true,
@@ -81,14 +108,13 @@ export function packLauncher(packs: Pick<ServerPacks, 'find' | 'call'>, setting:
   };
 }
 
-/** Set up launching for this server: the setting's pack, when one is named; the kernel's own launcher until then. */
+/** Set up launching for this server: the launcher of the pack the setting names, or of the one the open core ships. */
 export function configureLaunch(config: LaunchConfig): void {
   const { packs, pack, ...rest } = config;
-  const setting = pack ?? env('LAUNCH_PACK');
-  if (!setting) return configureLauncher(rest);
+  const setting = pack ?? env('LAUNCH_PACK') ?? DEFAULT_LAUNCH;
   const via = packs ? packLauncher(packs, setting) : 'the server passed no server packs to launch with';
   if (typeof via === 'string') {
-    // Named wrong, nothing launches: never the kernel's own in its place.
+    // Named wrong, nothing launches.
     console.error(`Launching is off: ${via}.`);
     return configureLauncher(undefined);
   }

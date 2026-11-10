@@ -19,8 +19,8 @@ export const STREAM_ON = ['published'] as const;
 export const FILLS = ['origin', 'tokens', 'version', 'rules'] as const;
 /** The types a served file may be. */
 export const FILE_TYPES = ['text/javascript', 'text/markdown', 'text/plain', 'text/x-shellscript'] as const;
-/** What a launcher's command may name, filled by the kernel (decision e_885ztqkv): never a shell. */
-export const LAUNCH_FILLS = ['prompt', 'mcp_config', 'tools', 'model'] as const;
+/** What a launcher's command may name, filled by the kernel (decision e_885ztqkv): never a shell. mode is how the launch was asked to run (plan, acceptEdits), session_id the id its run is registered under. */
+export const LAUNCH_FILLS = ['prompt', 'mcp_config', 'tools', 'model', 'mode', 'session_id'] as const;
 
 export interface MoreReach {
   /** The addresses it takes: public (/p/), site (a domain's whole space), setup (/connect/setup.mjs). */

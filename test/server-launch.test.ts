@@ -53,7 +53,7 @@ test('a person launches the pack’s agent: its run registered, its tokens and w
   ]);
   // A secret of the server's own, which the process must not be given.
   process.env.PELAGO_SECRET_SOMETHING = 'not for the agent';
-  configureLaunch({ mcpUrl: 'http://127.0.0.1:1/mcp', dir: join(dir, 'runs'), command: ['never-run'], auth: true, packs, pack: 'agent' });
+  configureLaunch({ mcpUrl: 'http://127.0.0.1:1/mcp', dir: join(dir, 'runs'), auth: true, packs, pack: 'agent' });
 
   await assert.rejects(launch(l, agent, { task: made.task }), /Only a human/);
 
@@ -85,6 +85,24 @@ test('a person launches the pack’s agent: its run registered, its tokens and w
   assert.equal((await ended(l, hung.run)).status, 'failed');
 
   // Named wrong, the setting turns launching off rather than falling back to the kernel's own.
-  configureLaunch({ mcpUrl: 'http://127.0.0.1:1/mcp', dir: join(dir, 'runs'), command: ['never-run'], packs, pack: 'nobody' });
+  configureLaunch({ mcpUrl: 'http://127.0.0.1:1/mcp', dir: join(dir, 'runs'), packs, pack: 'nobody' });
   await assert.rejects(launch(l, human, { task: made.task }), /Launching is off/);
+});
+
+test('on Windows, an npm .cmd shim is run without a shell: the program it starts', async () => {
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const { withoutShell } = await import('../src/server-launch.ts');
+  const bin = join(dir, 'bin');
+  mkdirSync(join(bin, 'node_modules', 'tool'), { recursive: true });
+  writeFileSync(join(bin, 'tool.cmd'), String.raw`@ECHO off
+CALL :find_dp0
+"%dp0%\node_modules\tool\bin\tool.exe"   %*
+`);
+  writeFileSync(join(bin, 'script.cmd'), String.raw`"%_prog%"  "%dp0%\node_modules\script\cli.js" %*
+`);
+  assert.deepEqual(withoutShell(['tool', '-p'], 'win32', bin), [join(bin, 'node_modules', 'tool', 'bin', 'tool.exe'), '-p']);
+  assert.deepEqual(withoutShell(['script', '-p'], 'win32', bin), [process.execPath, join(bin, 'node_modules', 'script', 'cli.js'), '-p']);
+  assert.deepEqual(withoutShell(['tool', '-p'], 'linux', bin), ['tool', '-p'], 'elsewhere as it was');
+  assert.deepEqual(withoutShell(['nothing'], 'win32', bin), ['nothing']);
+  assert.deepEqual(withoutShell([process.execPath, 'x.js'], 'win32', bin), [process.execPath, 'x.js']);
 });

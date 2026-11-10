@@ -1,9 +1,8 @@
 // A surface's hooks translated by the server pack that declares it (task e_chb65gx7): the kernel says what a session is
-// told, neutrally, and the pack puts it in the surface's shape. /hooks/<event> stays Claude Code's.
+// told, neutrally, and the pack puts it in the surface's shape. /hooks/<event> is Claude Code's, the claude_code pack's.
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { claudeCodeAnswer } from '../src/claude-code.ts';
 import { hookAt } from '../src/server-adapter.ts';
 import { loadServerPacks } from '../src/server-packs.ts';
 import { serve } from './serve.ts';
@@ -15,13 +14,6 @@ after(() => void delete process.env.PELAGO_SERVER_PACKS);
 test('an address under /hooks/ names an event, or a surface and its event', () => {
   assert.deepEqual(hookAt('session-start'), { event: 'session-start' });
   assert.deepEqual(hookAt('rover/begin'), { surface: 'rover', event: 'begin' });
-});
-
-test('a neutral answer in Claude Code’s shape: told as additional context, go_on as a block, the rest beside', () => {
-  assert.deepEqual(claudeCodeAnswer('prompt', { told: 'x', said: ['e_1'] }), { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: 'x' }, said: ['e_1'] });
-  assert.deepEqual(claudeCodeAnswer('stop', { go_on: 'why' }), { decision: 'block', reason: 'why' });
-  assert.deepEqual(claudeCodeAnswer('events', { run: 'e_r', kept: 2 }), { run: 'e_r', kept: 2 });
-  assert.deepEqual(claudeCodeAnswer('session-end', {}), {});
 });
 
 test('two packs cannot translate one surface', () => {

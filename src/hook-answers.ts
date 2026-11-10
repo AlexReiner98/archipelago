@@ -21,7 +21,7 @@ import { seeingLine } from './seeing.ts';
 import { keep, kept } from './transient.ts';
 import { takeEvents } from './session-events.ts';
 import { instructionsFor } from './instructions.ts';
-import { CLAUDE_CODE, claudeCodeAnswer } from './claude-code.ts';
+import { HOOK_ACTOR } from './chat-run.ts';
 
 export interface HookBody {
   session_id?: string;
@@ -104,12 +104,6 @@ export interface Neutral {
 
 const told = (text: string, extra: object = {}): Neutral => ({ told: text, ...extra });
 
-/** The answer to one hook in Claude Code's shape, as before there were surfaces: goes with the adapter cut. */
-export async function answerHook(event: string, call: HookCall): Promise<object | undefined> {
-  const neutral = await sessionAnswer(event, call);
-  return neutral && claudeCodeAnswer(event, neutral);
-}
-
 /** What a session is told at one hook, or undefined for an event there is none for. */
 export async function sessionAnswer(event: string, call: HookCall): Promise<Neutral | undefined> {
   const { whole, pelago, within, body, running } = call;
@@ -188,7 +182,7 @@ export async function sessionAnswer(event: string, call: HookCall): Promise<Neut
     if (run) call.ran?.(run.id);
     // A new one gets a tab of its own on the owner's page, or the tab of the one a clear ended in its chat; one taken up
     // again after it ended gets its tab back; one still open has its own already.
-    if (run && (!known || !known.is_open)) await sessionOpened(pelago, CLAUDE_CODE, run.id, undefined, typeof run.props.took_over === 'string' ? run.props.took_over : undefined).catch((err) => console.error(`hook tab: ${(err as Error).message}`));
+    if (run && (!known || !known.is_open)) await sessionOpened(pelago, HOOK_ACTOR, run.id, undefined, typeof run.props.took_over === 'string' ? run.props.took_over : undefined).catch((err) => console.error(`hook tab: ${(err as Error).message}`));
     // A project keeps the files it was given when it was set up; the server moves on. A session is told when its
     // project is behind, since nothing else would: an old hook counts less, and old rules name tools as they were.
     if (setupBehind(body.setup)) {

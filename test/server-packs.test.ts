@@ -116,8 +116,8 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
   const notes = (await call('/api/search', owner, { type: 'notification' })).result as any[];
   assert.deepEqual(notes.map((n) => n.title), [`The demo pack's webhook "paid" refused a delivery`]);
   const listed = (await call('/api/server_packs', owner)).result;
-  // Those the configuration names are listed (the kernel ships none of its own).
-  assert.deepEqual(listed.packs.map((p: any) => p.id), ['demo']);
+  // Those the kernel ships (packs/claude_code) and those the configuration names are listed.
+  assert.deepEqual(listed.packs.map((p: any) => p.id), ['claude_code', 'demo']);
   assert.deepEqual(listed.packs.find((p: any) => p.id === 'demo').acts, ['workspace.create', 'workspace.admit', 'signin.link']);
   assert.equal(listed.refused.length, 1);
   assert.match((await call('/api/server_packs', me.actor && token)).error, /default workspace/);
