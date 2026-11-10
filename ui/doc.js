@@ -222,7 +222,7 @@ function draw(d) {
           // A lens is its picture, drawn from what was frozen when it was published (or, for a draft read with a sign-in, now); otherwise a section shows its figure.
           d.lenses?.[p.section.id]
             ? h('div', { class: 'doc-lens', 'data-lens': p.section.id })
-            : p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id, 'data-via': p.section.via })),
+            : p.section.picture && h('figure', {}, h('img', { src: figureSrc(p.section.id), alt: p.section.title, 'data-figure': p.section.id })),
           blocks(p.section.body, titles, 3),
         )
       : h('div', { class: 'text' }, blocks(p.text, titles, 2));
@@ -264,7 +264,7 @@ function draw(d) {
   const onItem = here.startsWith('/s/') ? (id) => openItem(id, readItem, (text) => blocks(text, titles, 3)) : null;
   for (const el of main.querySelectorAll('[data-lens]')) drawFrozen(el, d.lenses[el.dataset.lens], d.types, { onItem });
   // Read with the reader's sign-in, a figure is fetched the same way.
-  if (own || preview) for (const img of main.querySelectorAll('img[data-figure]')) (img.dataset.via ? api('share_figure', { via: img.dataset.via, id: img.dataset.figure }) : api('picture', { result: img.dataset.figure })).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
+  if (own || preview) for (const img of main.querySelectorAll('img[data-figure]')) api('picture', { result: img.dataset.figure }).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
 }
 
 // A published page carries its data (src/published-page.ts); a link's and a signed-in reader's page fetch it, and

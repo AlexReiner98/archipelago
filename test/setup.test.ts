@@ -17,6 +17,7 @@ import { loadConfig } from '../src/config.ts';
 import { linkFor } from '../src/members.ts';
 import { createHttpServer, lenient } from '../src/server.ts';
 import { Workspaces } from '../src/workspaces.ts';
+import { setIslands } from '../src/packstate.ts';
 import { serve, closers } from './serve.ts';
 
 test('the setup shows what it will change and waits for a yes, keeps a copy of what it changes, and can be taken out again', async () => {
@@ -312,7 +313,7 @@ test('a workspace admin merges a backup into their map; nobody else can, and lis
   const operator = (await workspaces.ensureOperator())!;
   // Where the file comes from: another map, with a type of its own and things its owner did.
   const there = await bareMap(workspaces, 'laptop', 'Laptop'); // a map to take a file of, with no owner yet
-  await call('/api/workspace_set', there, { islands: false }); // a plain map, as one made before islands
+  await setIslands((await workspaces.get('laptop')).pelago, 'system', false); // a plain map, as one made before islands
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'define_type', type: { id: 'local.site_visit', title: 'Site visit', description: 'A visit.', extends: 'event' } }] });
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'local.site_visit', title: 'Visit the quarry' }, { op: 'create', type: 'task', title: 'Order the stone' }] });
   const laptop = await workspaces.get('laptop');
@@ -348,7 +349,7 @@ test('an import can make the owner in the file and the owner here one person, an
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
   const there = await bareMap(workspaces, 'laptop', 'Laptop'); // a map to take a file of, with no owner yet
-  await call('/api/workspace_set', there, { islands: false }); // a plain map, as one made before islands
+  await setIslands((await workspaces.get('laptop')).pelago, 'system', false); // a plain map, as one made before islands
   const theirs = (await call('/api/init', there, { name: 'Alex Reiner' })).result.me as string;
   await call('/api/change', there, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'From the laptop', owner: theirs }] });
   const backup = gzipSync(JSON.stringify(await dump((await workspaces.get('laptop')).pelago.db, { id: 'laptop', name: 'Laptop' }))).toString('base64');

@@ -16,8 +16,7 @@ import type { Archipelago } from './pelago.ts';
 const ID = /^e_[a-z0-9]{8}$/;
 
 /**
- * The types a document is read whole as and can be public: a flavour that cannot be (an invoice) is left out. A
- * shared one is published only as its sender gives it (src/published-share.ts), never read here as its own.
+ * The types a document is read whole as and can be public: a flavour that cannot be (an invoice) is left out.
  */
 export const readable = (l: Archipelago) => l.registry.drawnWith('document').filter((t) => l.registry.type(t)?.public);
 

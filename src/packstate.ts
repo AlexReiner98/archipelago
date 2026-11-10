@@ -68,6 +68,8 @@ export async function islandsOn(l: Archipelago): Promise<boolean> {
  */
 export async function setIslands(l: Archipelago, actor: Actor | 'system', on: boolean) {
   if (actor !== 'system') needHuman(actor, 'Holding the packs to the island rules is the owner’s.');
+  // One way (the owner, 10 Nov 2026): a map on islands stays on them. Only the system makes a plain map, for a test.
+  if (!on && actor !== 'system' && (await islandsOn(l))) throw new Error('Islands cannot be turned off: a map on islands stays on them.');
   const turning = on && !(await islandsOn(l));
   if (turning) {
     const blocked = await islandBlockers(l);

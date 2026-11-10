@@ -88,6 +88,11 @@ interface WorkspacesConfig {
   runAutomations?: boolean;
   /** Where the scheduled backups are written, one folder a workspace: a deleted workspace's go with it. */
   backupsDir?: string;
+  /**
+   * A fresh default map starts on islands with one to start on, as every map added after it does (the owner, 10 Nov
+   * 2026). The server sets it; left out (the tests), a fresh default map is plain, as maps were before islands.
+   */
+  defaultOnIslands?: boolean;
 }
 
 export class Workspaces {
@@ -277,6 +282,11 @@ export class Workspaces {
       await syncTypes(pelago);
       if (begins) await pelago.record('settings', 'system', [...(await beginApplying(db)), ...(await beginShared(db))]);
       const ws = { id, name: isDefault ? 'Default' : (this.known.get(id) ?? id), pelago, automations: new Automations(pelago) };
+      // A fresh default map on islands, as create puts every other new map (e_44rbfwxp).
+      if (begins && isDefault && this.config.defaultOnIslands) {
+        await setIslands(pelago, 'system', true);
+        await firstIsland(pelago, ws.name);
+      }
       if (this.leading) this.clocks(ws, true);
       return ws;
     } catch (err) {

@@ -58,8 +58,9 @@ canvas as a flat graph", with its decisions.
 - **A view is a query and a layout** kept on the map (an item of core's
   type `lens`; a canvas opens on one). The bar names the one up and switches
   to the others; ☆ saves the canvas as it is, under a name.
-- **Home's sheet, For you, lists the canvases first,** then Start here,
-  what is held for your word and Your move (at most five). The mark in the
+- **Home's sheet, For you, is what waits on you:** Start here, what is
+  held for your word and Your move (at most five). The canvases are in the
+  bar, not here. The mark in the
   top bar counts what waits for you and opens it.
 
 ### Writing on it

@@ -1,5 +1,6 @@
 // What the browser tests of saved canvases share (test/saved-canvases*.test.ts): a map with a task, a step of it, a
 // view kept about it and another task, with a type of page that can bring a view in; a page on it; and one pass of saving a canvas from the bar at a width.
+// The views kept are listed in the bar's switcher, not on Home (the owner, 10 Nov 2026).
 
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
@@ -28,7 +29,10 @@ export async function savedCanvasPage() {
   /** A canvas of the task and its parts, kept as the bar keeps one saved at `at` px: what a pass before this one left. */
   const keptBefore = (at: number) => call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: `Saved at ${at}`, props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } } }] });
 
-  /** At `w` px: a canvas saved from the bar and listed on Home one line each. */
+  /** The rows of the switcher's panel, opened from the bar if it is not open; none while the bar is still being drawn. */
+  const panelRows = `(() => { const p = document.querySelector('.view-panel'); const b = document.querySelector('#query .q-pick'); if (!p || (!p.matches(':popover-open') && !b)) return []; if (!p.matches(':popover-open')) b.click(); return [...p.querySelectorAll('.view-row')]; })()`;
+
+  /** At `w` px: a canvas saved from the bar and listed in its switcher, one line each. */
   async function savePass(w: number) {
     await width(w);
     const name = `Saved at ${w}`;
@@ -46,16 +50,16 @@ export async function savedCanvasPage() {
     assert.deepEqual([saved.props.filter.find, saved.props.walk], [[`id ${made.p}`], { over: ['part_of'], steps: 1 }], 'its lens: the filter, the walk');
     assert.equal(await canvasUp(), saved.id, 'its id in the address');
 
-    // Home: one line each, opening in one click.
-    await page.evaluate(`location.hash = '#/you'`);
+    // The switcher: one line each, opening in one click.
     // Waited for by its name: a canvas saved before is listed already.
-    assert.ok(await page.until(`[...document.querySelectorAll('.canvases > .rows > li a')].some((a) => a.textContent === ${JSON.stringify(name)})`), 'listed on Home');
+    assert.ok(await page.until(`${panelRows}.some((r) => r.dataset.title === ${JSON.stringify(name)})`), 'listed in the switcher');
     const rows = await page.evaluate<{ title: string; tall: number; line: number; wide: boolean }[]>(
-      `[...document.querySelectorAll('.canvases > .rows > li')].map((li) => ({ title: li.querySelector('a').textContent, tall: li.getBoundingClientRect().height, line: parseFloat(getComputedStyle(li).lineHeight) || 20, wide: li.scrollWidth > li.clientWidth + 1 }))`,
+      `${panelRows}.map((r) => ({ title: r.dataset.title, tall: r.getBoundingClientRect().height, line: parseFloat(getComputedStyle(r).lineHeight) || 20, wide: r.scrollWidth > r.clientWidth + 1 }))`,
     );
+    await page.evaluate(`document.querySelector('.view-panel').hidePopover()`);
     for (const r of rows) assert.ok(r.tall < 3 * r.line && !r.wide, `one line at ${w}: ${JSON.stringify(r)}`);
     assert.ok(rows.some((r) => r.title === name));
   }
 
-  return { base, call, made, page, drawn, canvasUp, picked, width, keptBefore, savePass };
+  return { base, call, made, page, drawn, canvasUp, picked, width, keptBefore, savePass, panelRows };
 }

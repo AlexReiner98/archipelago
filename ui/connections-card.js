@@ -5,17 +5,18 @@
 import { api, ask, h } from './base.js';
 import { menu } from './words.js';
 
-/** more: rows the Workspace page puts under them (GitHub's pushes, the other workspaces that may notify this one). */
-export function connectionsCard(...more) {
-  const card = h('section', { class: 'card wide' }, h('header', {}, h('h2', { class: 'hinted', title: 'What this server can connect to this map, each chosen outside and heard from here.' }, 'Connections')));
+/** A card of the Packs section, above the packs; hidden while this server offers nothing to connect. */
+export function connectionsCard() {
+  const card = h('section', { class: 'card wide', hidden: true }, h('header', {}, h('h2', { class: 'hinted', title: 'What this server can connect to this map, each chosen outside and heard from here.' }, 'Connections')));
   const body = h('ul', { class: 'rows' });
-  const fail = (err) => body.replaceChildren(h('li', { class: 'error' }, err.message));
+  const fail = (err) => ((card.hidden = false), body.replaceChildren(h('li', { class: 'error' }, err.message)));
   const go = (pack, what) => () =>
     api('connections', { pack, [what]: true })
       .then((to) => (location.href = to.url))
       .catch(fail);
   const draw = async (answer) => {
     const { packs } = answer ?? (await api('connections'));
+    card.hidden = !packs.length;
     if (!packs.length) return body.replaceChildren();
     const end = (p) => async () => {
       if (!(await ask({ title: `Disconnect ${p.title}?`, message: `What ${p.title} hears no longer reaches this map. It stays where it was chosen outside until it is removed there.`, action: 'Disconnect', danger: true }))) return;
@@ -40,6 +41,6 @@ export function connectionsCard(...more) {
     );
   };
   draw().catch(fail);
-  card.append(body, h('ul', { class: 'rows' }, more));
+  card.append(body);
   return card;
 }

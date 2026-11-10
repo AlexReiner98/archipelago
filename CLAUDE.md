@@ -200,9 +200,10 @@ The canvas keeps to these (the flat canvas, 25 Oct 2026: document
   growing a canvas is editing its query. A person and an agent read the same
   query (`query` name `flat`), and the page calls no tool an agent lacks for
   it; `npm test` freezes the names the page calls through `/api`.
-- **Home is the saved views.** A view kept on the map is a query and a layout
-  with its settings (core's `lens` type); Home lists them, and the bar switches between
-  them. There is no other list of views.
+- **The bar holds the saved views.** A view kept on the map is a query and a layout
+  with its settings (core's `lens` type); the bar's switcher lists them and switches
+  between them. There is no other list of views: Home's For you is what waits on
+  you, not the views (the owner, 10 Nov 2026).
 - **A view is its query and its layout, nothing more.** It is drawn from its
   answer alone, the same each time it is asked, and no node is dragged or
   put by hand (the owner, 3 Nov 2026). A grouping that matters is made as a

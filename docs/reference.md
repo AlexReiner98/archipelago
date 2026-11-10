@@ -70,8 +70,7 @@ The web UI has five places, and one page for each thing.
   links, views, styles, instructions, rules, actions, runs and reach, each
   counted; a click opens a group in the card, each thing in it one line by name
   and what it is, with its controls where it is changed here: styles, screens,
-  checks), and **Connections** (the server packs it may connect, and the
-  other workspaces that may notify this one). Each setting is one row; what is done rarely is in its ⋯ menu.
+  checks; above them, Connections: the server packs it may connect). Each setting is one row; what is done rarely is in its ⋯ menu.
 
 Every item has a single page, and every way to it leads there: its head,
 its note folded to the first paragraph, each field drawn by its kind, where
@@ -859,12 +858,11 @@ change that:
   or `smtps://…:465`); a password is never sent without TLS. A host that may not
   send on mail ports can hand mail to a relay it reaches over a private
   network.
-- **Notifications between workspaces.** A human can send another workspace a
-  notification with `notify_workspace`. It arrives only if that workspace's
-  admin has added the sender to the workspaces it accepts, and accepting is
-  one-way.
-- **The Workspace screen** manages all of this: your agent tokens, members,
-  the default visibility and which workspaces to accept notifications from.
+- **Nothing passes between workspaces.** A document reaches someone outside
+  by a link or as a guest; notifications and shares by workspace were dropped
+  (10 Nov 2026).
+- **The Workspace screen** manages all of this: your agent tokens, members
+  and the default visibility.
 
 Limits, stated plainly: unless told otherwise the server listens on this
 machine only, and it never speaks TLS itself: hosted, that ends at the

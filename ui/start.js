@@ -21,7 +21,7 @@ export async function startPiece(host, title) {
   const room = info.member_limit?.members;
   const steps = [
     // What the server offers to connect (the GitHub App, say), once it is set up for the server.
-    ...offered.packs.filter((p) => p.ready).map((p) => ({ id: p.pack, title: `Connect ${p.title}`, done: Boolean(p.connected), href: '#/workspace?at=connections', tip: `Choose outside what ${p.title} is given; what it hears reaches this map. The Connections card, in Settings.` })),
+    ...offered.packs.filter((p) => p.ready).map((p) => ({ id: p.pack, title: `Connect ${p.title}`, done: Boolean(p.connected), href: '#/workspace?at=connections', tip: `Choose outside what ${p.title} is given; what it hears reaches this map. The Connections card, under Packs in Settings.` })),
     { id: 'agent', title: 'Connect an agent', done: tokens.some((t) => t.kind === 'agent' && !t.revoked_at && t.last_used), href: '#/workspace?at=agent', tip: 'Pick your client and follow its steps' },
     room !== 1 && { id: 'team', title: 'Invite your team', done: members.length > 1, href: '#/workspace?at=team', tip: 'Add people by their email address; each is sent an invitation. In Settings.' },
   ].filter(Boolean);

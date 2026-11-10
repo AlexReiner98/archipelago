@@ -1,7 +1,7 @@
 // The Workspace screen: setting the workspace up, in five sections shown one at a time. People: who is in it. Agents:
 // what is connected, how to connect another, and what they may do. Map: its theme, whether new things start private,
-// its backup. Packs: what it is made of, each pack's card holding everything that pack offers. Connections: what is tied
-// to it from outside. Which is open is kept in the address (#/workspace?at=map); a step of Start here (ui/start.js)
+// its backup. Packs: what it is made of, each pack's card holding everything that pack offers, and above them what this
+// server can connect it to (the GitHub App, say). Which is open is kept in the address (#/workspace?at=map); a step of Start here (ui/start.js)
 // names a card, and lands on its section with that card in view.
 
 import { api, ask, h, may, part, state, whoami } from './base.js';
@@ -11,22 +11,21 @@ import { packsCard } from './packs.js';
 import { membersCard } from './members-card.js';
 import { limitsCard } from './limits-card.js';
 import { connectionsCard } from './connections-card.js';
-import { agentsMayCard, tokenRow, tokensCard } from './agents-card.js';
+import { agentsMayCard, drawingsOpenRow, tokenRow, tokensCard } from './agents-card.js';
 import { connectCard, connecting, isConnecting } from './connect-agent.js';
 import { workspacesCard } from './workspaces-card.js';
-import { backupCard, card, islandsRow, notificationsRow, ownerRow, serverPacksCard, visibilityRow } from './workspace-cards.js';
+import { backupCard, card, islandsRow, ownerRow, serverPacksCard, visibilityRow } from './workspace-cards.js';
 
 const SECTIONS = [
   ['people', 'People', 'Who is in this workspace'],
   ['agents', 'Agents', 'The agents connected, how to connect one, and what they may do'],
   ['map', 'Map', 'Its theme, whether new things start private, and its backup'],
-  ['packs', 'Packs', 'The ways of working it is made of, and what each offers'],
-  ['connections', 'Connections', 'What is tied to it from outside'],
+  ['packs', 'Packs', 'The ways of working it is made of, what each offers, and what this server can connect'],
 ];
 /** The section each card a step of Start here names is in. */
-const CARD_IN = { team: 'people', agent: 'agents', backup: 'map', connections: 'connections', github: 'connections' };
-/** Sections by the names they had before (27 Oct 2026), for an address kept from then. */
-const WAS = { look: 'map', outside: 'connections' };
+const CARD_IN = { team: 'people', agent: 'agents', backup: 'map', connections: 'packs', github: 'packs' };
+/** Sections by the names they had before (27 Oct 2026), for an address kept from then; Connections went into Packs on 10 Nov 2026. */
+const WAS = { look: 'map', outside: 'packs' };
 
 /** The section open, and the card asked for, if any. */
 let open = 'people';
@@ -97,9 +96,8 @@ export async function workspace() {
       tokensOn && isConnecting() && at('agent', connectCard({ tokens: agents, then: workspace, workspace: me.workspace.id })),
       admin && agentsMayCard(info, workspace, fail),
     ],
-    map: () => [themesCard(workspace), at('backup', backupCard(workspace, visibilityRow(info, workspace, fail), islandsRow(info, workspace, fail)))],
-    packs: () => [packsCard({ info, then: workspace, goTo: go }), own.length > 0 && card('Your screens', 'Screens you made, which no pack offers', h('ul', { class: 'rows' }, screenRows(own, workspace))), me.workspace.id === 'default' && serverPacksCard(), me.workspace.id === 'default' && tokensOn && admin && workspacesCard(me.workspace.id)],
-    connections: () => [at('connections', connectionsCard(notificationsRow(info, workspace, fail)))],
+    map: () => [themesCard(workspace), at('backup', backupCard(workspace, visibilityRow(info, workspace, fail), islandsRow(info, workspace, fail), admin && drawingsOpenRow(info)))],
+    packs: () => [at('connections', connectionsCard()), packsCard({ info, then: workspace, goTo: go }), own.length > 0 && card('Your screens', 'Screens you made, which no pack offers', h('ul', { class: 'rows' }, screenRows(own, workspace))), me.workspace.id === 'default' && serverPacksCard(), me.workspace.id === 'default' && tokensOn && admin && workspacesCard(me.workspace.id)],
   };
   // What a person who is not an admin may change is only their own agent tokens.
   const shown = SECTIONS.filter(([key]) => admin || (key === 'agents' && tokensOn) || (key === 'people' && !tokensOn && !info.owner));

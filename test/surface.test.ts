@@ -16,7 +16,7 @@ import { closers, serve } from './serve.ts';
 /** Every kernel tool an agent was offered before the surface was made small (main at 391a4be), and Kuma's old name. */
 const OLD = `schema search get view events proposals backup watch show claim release session_start session_update
   tell run_report picture_put picture session_end notify check_connections rechecked import_audit packs acts
-  document publish publish_all publish_plan publish_ask published share_figure backup_download confirmed restart health_report`.split(/\s+/);
+  document publish publish_all publish_plan publish_ask published backup_download confirmed restart health_report`.split(/\s+/);
 /** A pack's actions and views were tools of their own too, named <pack>_<name>: a pack of one of each stands in for them. */
 const OLD_PACK = ['olden_log', 'olden_week'];
 const olden = {
