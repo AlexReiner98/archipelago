@@ -13,6 +13,7 @@ import { readAgain } from './reader-frame.js';
 import { choicesOf } from './fields.js';
 import { choicesSection, fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
 import { linkAdder } from './item-links.js';
+import { startLink } from './link-pick.js';
 import { added } from './query-bar.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
 import { actionForm, actionsFor, buttonsOn, countOn, drawnBy, keepsFigure, readWhole, sectionsOn, toolOf } from './screens.js';
@@ -30,6 +31,10 @@ export async function entity(id, here) {
   page.dataset.item = id;
   let data;
   let past;
+  // What does not wait on the item is asked with it: each read can take a second or more on a busy server, so the
+  // page asks them side by side, not one after another. How its page looks, and what is held on it:
+  const lookOf = api('view', { name: 'style', params: { of: id } }), heldHere = heldOn(id);
+  lookOf.catch(() => null);
   try {
     // A frozen link keeps no history: what it shows is as it was when shared.
     [data, past] = await Promise.all([api('get', { id }), link ? [] : api('events', { target: id, limit: 40 })]);
@@ -48,22 +53,24 @@ export async function entity(id, here) {
       tell('That change was not made', err.message);
     }
   };
-  const owner = e.owner ? await api('get', { id: e.owner }).then((r) => r.entity, () => null) : null;
   // The kernel's own record of a session at work.
   const run = isA(e.type, 'run');
   const session = run && e.is_open && !e.archived_at;
-  // An item a screen reads whole can be printed and shared: its text with the items it brings in, in their places.
-  const { doc, links } = readWhole(e.type) ? await readDocument(id) : { doc: null, links: [] };
+  // Its owner; an item a screen reads whole, its text with the items it brings in, in their places (it can be printed
+  // and shared); and what it holds that can be published (a site's project publishes all of it with one click).
+  const [owner, { doc, links }, plan] = await Promise.all([
+    e.owner ? api('get', { id: e.owner }).then((r) => r.entity, () => null) : null,
+    readWhole(e.type) ? readDocument(id) : { doc: null, links: [] },
+    !e.archived_at && data.incoming.some((r) => rootOf(r.type) === 'part_of' && readWhole(r.entity_type)) ? api('publish_plan', { within: id }).catch(() => null) : null,
+  ]);
   // A document is read in public as it was last published: whether it is, and whether its draft says something else now.
   // One shared from another workspace too, which publishes only where that workspace allows it (src/published-share.ts).
   const shown = doc && type?.public ? await api('published', { id }).catch(() => null) : null;
-  // What it holds that can be published: a site's project publishes all of it with one click.
-  const plan = !e.archived_at && data.incoming.some((r) => rootOf(r.type) === 'part_of' && readWhole(r.entity_type)) ? await api('publish_plan', { within: id }).catch(() => null) : null;
   // How its page looks is its style: the house style's, its kind's (a document reads through), its own.
-  const looks = (await api('view', { name: 'style', params: { of: id } })).style;
+  const looks = (await lookOf).style;
 
   // What waits for the person's word on it: each held change that touches it, as a band under its title.
-  const bands = await Promise.all((await heldOn(id)).map((p) => heldBand(p, again)));
+  const bands = await Promise.all((await heldHere).map((p) => heldBand(p, again)));
 
   const live = writes && !e.archived_at && e.is_open && !e.type.startsWith('sys.');
   // What can be shown to anyone is what its pack says can be; public work (a product) has a page of its own.
@@ -179,10 +186,11 @@ export async function entity(id, here) {
         h('span', { class: 'grow' }),
         writes && session && h('button', { class: 'quiet-button', title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
         buttons[0] && h('button', { class: 'quiet-button item-button', title: buttons[0].tip, onclick: () => press(buttons[0]) }, buttons[0].label),
+        writes && !e.archived_at && ties.any && h('button', { class: 'quiet-button link-start', title: 'Link it to another: click that one on the canvas (Esc lets it go)', onclick: () => startLink(e, (made) => made && again()) }, 'Link'),
         !link && !e.archived_at && along.length > 0 && h('button', { class: 'quiet-button walk-from', title: `Draw it and what it links to, along ${walkSaid}, in place of the canvas's lens`, onclick: () => walkFrom(false) }, 'Walk from it'),
       menu('⋯', [
         ...buttons.slice(1).map((b) => [b.label, () => press(b)]),
-        writes && !e.archived_at && ties.any && ['Link to…', ties.open],
+        writes && !e.archived_at && ties.any && ['Link to one by name…', ties.open],
         !link && !e.archived_at && along.length > 0 && ['Walk from it, added to the lens', () => walkFrom(true)],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
         // What packs offer to do with this kind of item.

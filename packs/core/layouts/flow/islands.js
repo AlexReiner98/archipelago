@@ -31,9 +31,9 @@ export function saidOf(to) {
 /**
  * The islands' marks: `layer` (drawn first, under the wires), `gates` (drawn over them), the colour `rules` they read,
  * and `found`: the class each finding read across takes, by its id, for its outline in its island's colour.
- * `legends` holds each island's rows ({ glyph, label }); `isHex` says what is a colour.
+ * `legends` holds each island's rows ({ glyph, label }, and `add` on the row that adds to it); `isHex` says what is a colour.
  */
-export function islandMarks({ g, legends, islands = [], style, z, m, titled, isHex, on = () => [] }) {
+export function islandMarks({ g, legends, islands = [], style, z, m, titled, isHex }) {
   if (!g.islands?.length) return { layer: [], gates: [], rules: [], tips: new Map(), found: new Map() };
   const given = Array.isArray(style.island_hues) && style.island_hues.length ? style.island_hues : Array.isArray(style.hues) ? style.hues : [];
   const hues = given.filter(isHex);
@@ -59,11 +59,11 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
     const legend = (legends.get(isle.id) ?? []).map((row, n) => {
       const [ex, ey] = isle.entries[n], [tag, attrs, ...inner] = row.glyph;
       const key = m('g', { class: row.href ? 'lf-island-key lf-island-finding' : 'lf-island-key' }, m(tag, { ...attrs, x: ex, y: ey + (ROW - KEY_H) / 2 }, ...inner), m('text', { x: ex + KEY_W + MARK_GAP, y: ey + ROW / 2 }, row.label));
+      // The add row is a button the page answers (ui/marks-add.js): it stands for the island by its id.
+      if (row.add) return titled(m('g', { key: `add:${row.add}`, item: row.add, on: ['add'], class: 'lf-island-key lf-island-add' }, ...key.slice(2)), row.tip);
       return row.href ? titled(m('a', { href: row.href }, key), row.tip ?? row.label) : key;
     });
-    // Its land takes a double click where the session may add to it (the gestures, ./index.js).
-    const adds = on(`i:${isle.id}`);
-    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region${adds.length ? ' addable' : ''}`, ...(adds.length && { on: adds }) }, land, shore, name, legend);
+    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, land, shore, name, legend);
   });
   // A gate on each shore a link between islands crosses: a bar across the wire in its island's colour, as long as the
   // port it marks. A finding
@@ -97,7 +97,11 @@ export const css = `
 .lf-island { --lf-land: color-mix(in srgb, var(--lf-island, var(--ln-line)) var(--ln-flow-island-tint), var(--ln-sea)); }
 .lf-region { pointer-events: none; }
 .lf-land rect { fill: var(--lf-land); stroke: none; }
-.lf-region.addable .lf-land rect { pointer-events: auto; cursor: copy; }
+/* The add row: a button the page answers (ui/marks-add.js), lit as the pointer comes to it. */
+.lf-island-add { pointer-events: auto; cursor: pointer; color: var(--ln-muted); outline: none; }
+.lf-island-add:is(:hover, :focus-visible) { color: var(--accent, var(--ln-text)); }
+.lf-island-add text { fill: currentColor; }
+.lf-add-mark { stroke: currentColor; stroke-width: var(--ln-flow-stroke-hover); fill: none; }
 .lf-shore rect { fill: none; stroke: var(--lf-island, var(--ln-line)); stroke-width: var(--ln-flow-island-stroke); }
 .lf-island-name { pointer-events: auto; cursor: pointer; }
 .lf-island-name text { fill: color-mix(in srgb, var(--lf-island, var(--ln-muted)), var(--ln-text) var(--ln-flow-lit-mix)); font-size: var(--ln-flow-island-text); font-family: var(--type-region-family, var(--ln-font)); font-weight: var(--type-region-weight, 400); font-style: var(--type-region-style, normal); text-transform: var(--type-region-case, none); letter-spacing: var(--type-region-track, 0); dominant-baseline: central; }

@@ -164,7 +164,7 @@ export function drawWith(host, answer, style, keep) {
   const send = (event) => !ended && port.postMessage({ type: 'event', event });
   // Every event is told as it is. A click on a mark keyed for a held change (`held:<proposal>…`, ui/ghosts.js) also asks the page to put that change to
   // the person, where it is drawn (`drawing-held` on the host): the drawing only says where; the page says what it is.
-  // A drop says which mark it came from (`from`, ui/marks-grab.js).
+  // A drop says which mark it came from (`from`).
   const tell = (key, name, ev, from) => {
     const held = name === 'click' && HELD.exec(key);
     if (held) host.dispatchEvent(new CustomEvent('drawing-held', { bubbles: true, detail: { proposal: held[1] } }));
