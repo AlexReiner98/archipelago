@@ -141,3 +141,24 @@ test('a blank pane (a new tab, a split: no query) is taken before one is split b
   assert.deepEqual(route(step(run, 'story'), [chat(run, { blank: true, busy: true })], at), { later: true }, 'nor one the reader is busy in');
   assert.deepEqual(route(step(run, 'story'), [chat(run, { blank: true, held: 'e_bbbbbbbb' })], at), { tab: 't0', split: { slot: 'story', side: 'right' }, front: true }, 'nor one held for another');
 });
+
+// A tab watching a plan the owner approved (e_j7hdfq9m): every session working inside it lands there, beside the plan.
+test('a session working inside a watched plan lands beside it, never in a tab of its own', () => {
+  const plan = (beside: Pane[] = [], also = {}) => tab('t1', 'watch', {}, beside, { watches: ['e_hubhubhu', 'e_taskaaaa'], ...also });
+  const inPlan = { ...step('e_aaaaaaaa'), within: ['e_taskbbbb', 'e_hubhubhu'] };
+  assert.deepEqual(route(inPlan, [first(), plan()], at), { tab: 't1', split: { slot: 'shown', side: 'right', shared: true }, front: false }, 'the plan pane is never taken');
+  assert.deepEqual(route(inPlan, [first(), plan([{ id: 'p1', slot: 'shown' }])], at), { tab: 't1', pane: 'p1', front: false }, 'its sessions share one pane');
+  assert.deepEqual(route(inPlan, [first(), plan([{ id: 'p1', blank: true }])], at), { tab: 't1', pane: 'p1', slot: 'shown', front: false }, 'a blank pane is taken first');
+  assert.deepEqual(route({ ...inPlan, focus: true }, [first(), plan([{ id: 'p1', slot: 'shown' }])], at), { tab: 't1', pane: 'p1', front: true });
+  // Drawn on the plan itself, by its run, it is the plan's too; what the server says of it moves nothing.
+  assert.deepEqual(route(step('e_taskaaaa'), [first(), plan([{ id: 'p1', slot: 'shown' }])], at), { tab: 't1', pane: 'p1', front: false });
+  assert.deepEqual(route({ ...inPlan, canvas: true, opens: true }, [first(), plan()], at), { nowhere: true });
+  // Its chat's tab gives way to the plan; a tab the owner set to follow it does not.
+  assert.deepEqual(route(inPlan, [first(), plan([{ id: 'p1', slot: 'shown' }]), tab('t2', 'e_aaaaaaaa', {}, [], { chat: 'e_aaaaaaaa' })], at), { tab: 't1', pane: 'p1', front: false });
+  assert.deepEqual(route(inPlan, [first(), plan(), tab('t2', 'e_aaaaaaaa')], at), { tab: 't2', pane: 'p0', front: false });
+  // Outside the plan, as before: a tab of its own.
+  assert.deepEqual(route({ ...step('e_cccccccc'), within: ['e_elsewher'] }, [first(), plan()], at), { open: { follows: 'e_cccccccc' }, front: false });
+  // The shared pane in use waits; a page that is no canvas goes to a tab of its own.
+  assert.deepEqual(route(inPlan, [first(), plan([{ id: 'p1', slot: 'shown', busy: true }])], at), { later: true });
+  assert.deepEqual(route(inPlan, [first(), plan()], { drawable: false }), { open: { follows: 'e_aaaaaaaa' }, front: false });
+});

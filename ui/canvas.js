@@ -72,6 +72,11 @@ export const mark = (here) => current?.mark(here);
  * the facts (ui/replica.js), and is not read again.
  */
 export const refreshCanvas = (tail = false) => all.forEach((c) => c.refresh(tail));
+/**
+ * Read again each canvas that draws one of these sessions: what the server says of a session on its node (its state and
+ * the line of its latest beat) is worked out as the lens is read, not kept current by the facts, so a beat asks again.
+ */
+export const refreshSessions = (runs) => all.forEach((c) => runs.some((run) => c.has(run)) && c.refresh());
 
 /**
  * A canvas drawn in `host`, for a pane: `pane.go(lens)` draws another lens there (null for Home), `pane.open(href)`
@@ -143,6 +148,8 @@ export function canvasIn(host, pane) {
       at.view.mark?.(here);
     },
     has: (id) => Boolean(at?.view?.answer?.items.some((i) => i.id === id)),
+    /** The ids of what it draws now. */
+    ids: () => (at?.view?.answer?.items ?? []).map((i) => i.id),
     refresh: (tail = false) => (tail && at?.view?.store ? undefined : at?.view?.refresh?.()),
     /** The frame the drawing moves in now, and what moves it (ui/pan-zoom.js). */
     moves: () => at?.view?.querySelector('.lens-view')?.moves,
@@ -212,6 +219,7 @@ const keepLoose = () => {
 /** Follow an item just started, loose: when a change ties it (its own, or an agent's once approved), it is the focus. */
 export const followLoose = (id) => id && (loose.add(id), keepLoose());
 // The pulse says which items changes touched (ui/live.js): one of these, now tied, becomes the focus of the pane in focus.
+hooks.sessionsTold = refreshSessions;
 hooks.touched = async (touched) => {
   const ids = touched?.ids === null ? [...loose] : (touched?.ids ?? []).filter((id) => loose.has(id));
   for (const id of ids) {

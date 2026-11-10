@@ -15,7 +15,7 @@ import { readAddress } from './query.js';
 import { still } from './look.js';
 import { placeBy } from './menu-place.js';
 import { windowOf, windows } from './pane-busy.js';
-import { followable, heard, hearOpen, nameOf } from './pane-route.js';
+import { followable, heard, hearOpen, nameOf, WATCH } from './pane-route.js';
 import { activeIs, close, draw, paneAt, paneButtons, startPanes } from './panes.js';
 import { filterSaid } from './query-bar.js';
 import { countGoes, countTip, onYou, stateSaid } from './tab-count.js';
@@ -78,7 +78,7 @@ hooks.paneToTab = (id, into) => {
   toFront(t.id);
 };
 /** The session a tab follows, if it follows one. */
-const sessionOfTab = (t) => (t.follows && !['all', 'none'].includes(t.follows) ? t.follows : null);
+const sessionOfTab = (t) => (t.follows && !['all', 'none', WATCH].includes(t.follows) ? t.follows : null);
 /**
  * The way back: move panes of tab `from`, all of them unless named, into tab `to`, beside its own, in sight, the pane in
  * focus there staying so (the one in focus is the reader's: an agent's show never takes it). A tab left with no pane
@@ -289,12 +289,13 @@ function drawMenu(t) {
   const now = t.follows ?? 'none';
   const sessions = followable({ now: Date.now(), recent: 600_000 });
   // What the tab follows stays in sight, ended or not, so the reader can see it and change it.
-  if (!['none', ...sessions].includes(now)) sessions.unshift(now);
+  if (!['none', WATCH, ...sessions].includes(now)) sessions.unshift(now);
   const pick = (key, said, title) => h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(key === now), title, onclick: () => (menuEl.hidePopover(), setFollows(key, t)) }, said);
   menuEl.replaceChildren(
     ...[
       h('div', { class: 'tab-menu-head', title: 'Whose shows and changes come into this tab' }, 'Follows'),
       pick('none', 'Nobody', 'No agent moves this tab'),
+      h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': String(now === WATCH), title: 'Every session working on what this tab draws: each is drawn on its step, and its shows share one pane beside it', onclick: () => (menuEl.hidePopover(), hooks.watchTab?.(t), drawStrip()) }, 'Sessions in what it draws'),
       ...sessions.map((key) => pick(key, key === now && !heard.has(key) ? (t.named ?? nameOf(key)) : nameOf(key), key)),
       t.chat && h('hr'),
       t.chat && h('button', { type: 'button', role: 'menuitem', title: 'Make this tab yours: it stays when its chat ends', onclick: () => (menuEl.hidePopover(), keepTab(t)) }, 'Keep'),

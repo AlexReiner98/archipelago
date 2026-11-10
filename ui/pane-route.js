@@ -6,6 +6,9 @@
 // set one to follow a chat (e_jk6bnuh9):
 // - Only a show lands (ui/live.js sends no other). A change or a beat of a session's story moves nothing (the owner,
 //   29 Oct 2026, e_e7yfp2yg): with several sessions at work, the reader's canvas stays where they left it.
+// - A session working inside what a tab watches (a plan the owner approved: its tasks or what holds them, `within`) is
+//   drawn on that plan and its shows go to the one pane beside it that the plan's sessions share (`shown`), never to a
+//   tab of its own; only a tab the owner set to follow the session alone comes first (e_98z44prb, 10 Nov 2026).
 // - A show goes to a tab that follows its session, else to a tab holding a pane of its own (one the owner merged
 //   elsewhere), else to a tab of its own, opened out of sight and marked: a chat's tab the owner closed comes back with
 //   its next show (e_qvdrv6h3). What the server says of a session (`canvas`: it began, took up a task) moves a tab it
@@ -22,6 +25,11 @@
 //   goes to a tab of its own in the background instead. A session has one tab: when the reader is busy in the tab that
 //   follows it, the show waits there until they are not (the owner, 2 Nov 2026).
 // - A tab popped out into a window of its own is drawn in its canvas when it follows the session.
+
+/** Whom a tab follows when it watches what it draws (a plan the owner approved): every session working inside it. */
+export const WATCH = 'watch';
+/** The one pane beside a watched plan that its sessions' shows share. */
+export const SHOWN = 'shown';
 
 /** The words a show's `pane` places by, rather than names. */
 export const SIDE_WORDS = new Set(['left', 'right', 'above', 'below', 'main', 'alone']);
@@ -67,8 +75,8 @@ export function nameOf(key) {
 }
 
 /**
- * Where this step goes. `tabs` are the tabs there are, each { id, follows: 'none' | <session>, front?, popped?,
- * panes }, `front` for the one in sight and `popped` for one in a window of its own; `panes` are its panes in order,
+ * Where this step goes. `tabs` are the tabs there are, each { id, follows: 'none' | 'watch' | <session>, chat?, watches?,
+ * front?, popped?, panes }, `watches` the ids a tab that watches draws and `chat` the session a chat's tab was opened for; `front` for the one in sight and `popped` for one in a window of its own; `panes` are its panes in order,
  * each { id, slot?, held?, by?, focus?, draws?, blank?, busy?, landed?: { session, at } }, with `held` the session it is kept for, `by` the one it was made for,
  * `focus` on the one the reader last touched, `draws` true where it draws what the step names, `blank` where it has no
  * query and `busy` where the reader is at work in it. Answers { tab, pane, slot?, side?, front } to draw it in a pane
@@ -115,8 +123,27 @@ export function route(step, tabs, { drawable = true } = {}) {
     if (taken) return t.follows === session ? { later: true } : ownTab();
     return { tab: t.id, ...at, front: Boolean(t.front || (focus && !t.popped)) };
   }
+  /**
+   * Into tab `t`, which watches what the session works inside: the plan's own pane is never taken, since it draws the
+   * session on its step; a show goes to the one pane beside it the plan's sessions share, taken from a blank one or split.
+   */
+  function intoWatched(t) {
+    if (!drawable) return ownTab();
+    if (t.popped) return { nowhere: true };
+    const shared = t.panes.find((p) => p.slot === SHOWN);
+    const blank = t.panes.find((p) => p.blank && !p.busy && !p.slot);
+    const at = shared ? { pane: shared.id } : blank ? { pane: blank.id, slot: SHOWN } : { split: { slot: SHOWN, side: 'right', shared: true } };
+    const taken = at.split ? t.front && working(t) : t.panes.find((p) => p.id === at.pane)?.busy;
+    if (taken) return { later: true };
+    return { tab: t.id, ...at, front: Boolean(t.front || focus) };
+  }
+  // A session working on anything a tab watches, or drawn there itself, is the watched plan's: no tab of its own.
+  const inside = [session, ...(step.within ?? [])];
+  const watching = tabs.find((t) => t.follows === WATCH && t.watches?.some((id) => inside.includes(id)));
   const own = tabs.filter((t) => t.follows === session).sort((a, b) => (last(b)?.at ?? 0) - (last(a)?.at ?? 0))[0];
-  if (own) return into(own);
+  // A tab the owner set to follow the session comes first; one opened for its chat gives way to the plan it works in.
+  if (own && !(watching && own.chat === session)) return into(own);
+  if (watching) return step.canvas ? { nowhere: true } : intoWatched(watching);
   // A pane of its own the owner merged into another tab: its shows find it there, and no tab of its own is opened.
   const holding = !step.opens && tabs.find((t) => !t.popped && t.panes.some((p) => p.held === session || p.by === session));
   if (holding) return into(holding);

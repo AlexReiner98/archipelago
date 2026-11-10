@@ -55,7 +55,11 @@ export class Store {
 
   /** Take a lens answer read at `pos` (read before the answer, so nothing between is missed): a row held already and as new is kept. */
   take(answer, pos) {
-    for (const i of answer.items ?? []) if (!(this.at.get(i.id) >= pos)) (this.items.set(i.id, itemRow(i)), this.at.set(i.id, pos));
+    for (const i of answer.items ?? []) {
+      if (!(this.at.get(i.id) >= pos)) (this.items.set(i.id, itemRow(i)), this.at.set(i.id, pos));
+      // A session's state and line are no facts' (itemRow): the latest answer's are the ones, whatever the row's position.
+      else if (i.session && this.items.has(i.id)) this.items.get(i.id).session = i.session;
+    }
     for (const r of answer.links ?? []) if (!(this.at.get(r.id) >= pos)) (this.links.set(r.id, linkRow(r)), this.at.set(r.id, pos));
     this.head = Math.max(this.head ?? pos, pos);
   }
