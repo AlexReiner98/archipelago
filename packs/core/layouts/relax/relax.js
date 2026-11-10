@@ -19,7 +19,7 @@ export function lengthsOf(sizes, heads = new Map()) {
   return {
     apart: sizes.flow_node_gap, wire: Math.max(sizes.flow_node_gap / 3, sizes.flow_wire_gap), room: sizes.flow_wire_room, run: sizes.flow_port_run, corner: sizes.flow_port_corner,
     pad: sizes.flow_island_pad, sea: sizes.flow_island_sea, shore: sizes.flow_island_sea / 2, head: (id) => heads.get(id) ?? sizes.flow_island_name_room,
-    unit: z('unit'), pull: z('pull'), even: z('even'), hold: z('hold'), center: z('center'), rigid: z('rigid'), step: z('step'), rounds: z('rounds'), sweeps: z('sweeps'), still: z('still'), every: z('every'), near: z('near'), unstack: z('unstack'),
+    unit: z('unit'), pull: z('pull'), even: z('even'), hold: z('hold'), center: z('center'), rigid: z('rigid'), step: z('step'), exact: sizes.relax_exact ?? 0, rounds: z('rounds'), sweeps: z('sweeps'), still: z('still'), every: z('every'), near: z('near'), unstack: z('unstack'),
   };
 }
 

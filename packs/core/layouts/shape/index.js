@@ -52,7 +52,7 @@ export function shape(given, { afford, span, batch } = {}) {
   for (let round = 0; ; round++) {
     ({ g, chain, cage } = shaped(emb, F, S, H));
     refine(g, chain);
-    const first = compact(g);
+    const first = compact(g, batch);
     ({ x, y } = tighten(g, first.x, first.y));
     if (round === ROUNDS || !necks(emb, F, H, g, x, y)) break;
   }

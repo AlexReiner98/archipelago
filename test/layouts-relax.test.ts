@@ -12,16 +12,16 @@ import { setOut } from './wired.ts';
 const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs/core/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const sizes = house.sizes;
 /** The relaxation's modules, as a layout would list them. */
-export const RELAX = { pack: 'core', id: 'relax', modules: { 'relax.js': 'layouts/relax/relax.js', 'atoms.js': 'layouts/relax/atoms.js', 'order.js': 'layouts/relax/order.js', 'solve.js': 'layouts/relax/solve.js', 'stage.js': 'layouts/kit/stage.js' } };
+export const RELAX = { pack: 'core', id: 'relax', modules: { 'relax.js': 'layouts/relax/relax.js', 'atoms.js': 'layouts/relax/atoms.js', 'order.js': 'layouts/relax/order.js', 'solve.js': 'layouts/relax/solve.js', 'exact.js': 'layouts/relax/exact.js', 'flow.js': 'layouts/shape/flow.js', 'stage.js': 'layouts/kit/stage.js' } };
 /** A step's drawn size: as wide as the shape gives it, a point nothing. */
 const size = (n: any) => (n.w ? [n.w * 30, 34] : [0, 0]);
 
-async function relaxed(shape: Shape, sized = size) {
+async function relaxed(shape: Shape, sized = size, more: Record<string, number> = {}) {
   return setOut(RELAX, async (url) => {
     const { relax } = await import(url('relax.js')), { stages } = await import(url('stage.js'));
     const rounds: any[] = [];
     stages((name: string, s: any) => name === 'relax' && rounds.push(s));
-    try { return { out: relax(shape, { size: sized, sizes }), rounds }; } finally { stages(null); }
+    try { return { out: relax(shape, { size: sized, sizes: { ...sizes, ...more } }), rounds }; } finally { stages(null); }
   });
 }
 
@@ -75,6 +75,11 @@ for (const [name, make] of Object.entries({ cycle, trunk, dense, islands, map })
     checked(shape, out);
     assert.ok(rounds.length > 2, 'its rounds are told, to be watched');
     assert.ok(rounds.every((r) => r.nodes.length === shape.nodes.length), 'each round tells every place');
+  });
+  test(`solved exactly, the relaxation keeps the shape of ${name}`, async () => {
+    const shape = make(), { out } = await relaxed(shape, size, { relax_exact: 100 });
+    checked(shape, out);
+    assert.equal(out.told.rounds, 1, 'one solve, no rounds');
   });
 }
 
