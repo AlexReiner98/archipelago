@@ -1,5 +1,5 @@
 // The first start's operator secret reaches a person at a terminal, and with nobody at one a file, never the log; the
-// owner is named by their address and mailed a link to sign in, never handed a token to paste.
+// owner is named by their address and mailed a code to sign in, never handed a token to paste.
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

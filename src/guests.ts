@@ -12,7 +12,7 @@ import { stillWritable } from './standing.ts';
 import type { Fact } from './log.ts';
 import { normalEmail, sendMail } from './mail.ts';
 import { LOOK_READS } from './looks.ts';
-import { INVITE_DAYS, linkFor, memberOf } from './members.ts';
+import { INVITE_DAYS, memberOf, signInBy } from './members.ts';
 import { wholeMap } from './outbox.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { isKept, keptPicture } from './query-saved.ts';
@@ -62,8 +62,7 @@ export async function shareAsGuest(l: Archipelago, actor: Actor, input: { id: st
       text: [
         'Hello,',
         `${actor.name} has shared the view "${view.title}" with you on Archipelago. You can read it as it changes; nothing else of the map is shown to you.`,
-        `To open it, follow this link. It signs you in on this device and works once, for ${INVITE_DAYS} days:`,
-        await linkFor(whole.db, l.workspace, email, INVITE_DAYS * 86_400_000),
+        `To open it, ${signInBy(email)}`,
         '- Archipelago',
       ].join('\n\n'),
     });

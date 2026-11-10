@@ -115,7 +115,13 @@ export async function humanTokenAllowed(l: Archipelago, person: string | undefin
 const KEY = 'signin:';
 const hash = sha256Hex;
 
-/** A one-time link that signs this member in. The code names its workspace, so the server knows where to trade it. */
+/**
+ * How an invitation says to come in: sign in at this server with the address, which is mailed a code. Never a sign-in
+ * link in a mail: from a young domain one reads to spam filters as phishing (the owner, 10 Nov 2026).
+ */
+export const signInBy = (email: string) => `go to ${new URL(site.origin).host} and sign in with this email address (${email}). You will be sent a code to type there.`;
+
+/** A one-time link that signs this member in, handed over in a browser, never mailed. The code names its workspace, so the server knows where to trade it. */
 export async function linkFor(db: Q, workspace: string, email: string, ms: number, origin = site.origin): Promise<string> {
   const code = workspaceSecret('inv', workspace);
   await keep(db, KEY + hash(code), { email }, ms);
@@ -279,7 +285,7 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
             'Hello,',
             `${by} has invited you to ${name} on Archipelago, where its people and their AI agents keep track of their work together.`,
             // No sign-in link (see requestSignIn): they ask for a code at the sign-in page, which is mailed to them.
-            `To accept, go to ${new URL(site.origin).host} and sign in with this email address (${email}). You will be sent a code to type there.`,
+            `To accept, ${signInBy(email)}`,
             `You are getting this because ${by} added ${email} to ${name}. If you were not expecting it, you can ignore this email.${replyTo ? ` Reply to it to reach ${by}.` : ''}`,
             '- Archipelago',
           ].join('\n\n'),

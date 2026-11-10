@@ -2,7 +2,7 @@
 // The operator secret is given once: to a person at a terminal it is printed; otherwise it would stay in a log that
 // others read and keep (a container's, a host's), so it is written to a file only the server's own user can read, and
 // the log says where (the sweep of 29 Oct 2026). The default workspace's owner is named by their address
-// (PELAGO_OWNER_EMAIL), made its first admin and mailed a sign-in link: a person signs in by email, never by pasting a
+// (PELAGO_OWNER_EMAIL), made its first admin and mailed a sign-in code: a person signs in by email, never by pasting a
 // token, and a server is not set up without mail (the owner, 8 Nov 2026).
 
 import { writeFileSync } from 'node:fs';

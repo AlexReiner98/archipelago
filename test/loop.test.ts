@@ -187,7 +187,7 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
 
 test('a guest, signed in to read what was shared with them, is shown the way to a map of their own too', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { createToken } = await import('../src/auth.ts');
-  const { codeSentTo } = await import('./serve.ts');
+  const { linkFor } = await import('../src/members.ts');
   const { workspaces, call, base } = await serve('tokens');
   const db = (await workspaces.get('default')).pelago.db;
   const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
@@ -199,7 +199,8 @@ test('a guest, signed in to read what was shared with them, is shown the way to 
     ],
   })).result.created;
   await call('/api/share_guest', alex, { id: made.lens, email: 'guest@example.com' });
-  const page = await open(`${base}/#/join/${codeSentTo('guest@example.com')}`);
+  // The invitation carries no link; the sign-in it leads to is made here and opened as a browser hands one over.
+  const page = await open(`${base}/#/join/${(await linkFor(db, 'default', 'guest@example.com', 60_000)).split('/join/')[1]}`);
   try {
     assert.ok(await page.until(`document.querySelector('#nav .start-own')?.textContent.includes('Start a map of your own')`, 20000), `the guest is shown it: ${page.logs().join(' ').slice(0, 600)}`);
     assert.ok(await page.evaluate<boolean>(`!document.querySelector('#nav .sign-in')`), 'with no Sign in: they are signed in');
