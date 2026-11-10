@@ -33,7 +33,7 @@ import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
 import { css as sessionCss, hueRules, litStates, sessionItems, sessionMarks, sessionOf, stateMark, STATES, STATE_WORDS } from './session.js';
-import { cut } from './lines.js';
+import { cut, longest } from './lines.js';
 
 /** The link type the order's wires are, for their colour. */
 const ORDER_TYPE = 'depends_on';
@@ -106,9 +106,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   const [TEXT, STUB_TEXT, CORNER] = ['text', 'stub_text', 'corner'].map(z);
   const fit = (text, width, px, role) => {
     if (measure(text, px, role) <= width) return text;
-    let t = text;
-    while (t.length > 1 && measure(`${t}…`, px, role) > width) t = t.slice(0, -1);
-    return `${t}…`;
+    return `${longest(text, (t) => measure(t, px, role) <= width)}…`;
   };
   // The link types the style draws no wire for (undrawn, as a style says) tie nothing here either.
   // The shape it is laid out toward: the pane's, as far as the style says to follow it (flow_aspect_follow, 0 not at
