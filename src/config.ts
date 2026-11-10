@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DRAW_HOST_NAME } from './draw-host.ts';
 import { env } from './env.ts';
 import { DEFAULT_AGENT_POLICY, type Policy } from './pelago.ts';
 
@@ -34,6 +35,12 @@ export interface Config {
    * refused. TLS is expected to end in front of the server.
    */
   publicHosts: string[];
+  /**
+   * The name that serves the frame drawings run in, and nothing else (PELAGO_DRAW_HOST, e.g. "draw.example.com"),
+   * so the frame has an origin of its own and keeps a service worker (src/draw-host.ts). Unset, a dev server frames
+   * drawings at the other loopback name, and any other at the page's own origin, sandboxed with none.
+   */
+  drawHost?: string;
   /**
    * Domains that each serve one workspace's public site (PELAGO_SITES,
    * "archipelago.tools=archipelago", comma separated): there a published
@@ -115,6 +122,8 @@ export function loadConfig(): Config {
   if (!local && auth !== 'tokens') throw new Error(`Listening on ${host} makes the server reachable from outside, which needs auth "tokens": without it anyone who can reach it is the owner.`);
   if (!local && dev) throw new Error('Dev mode does not listen beyond this machine.');
   const named = env('PUBLIC_HOST')?.split(',') ?? fromFile.publicHosts ?? [];
+  const drawHost = (env('DRAW_HOST') ?? fromFile.drawHost)?.trim().toLowerCase() || undefined;
+  if (drawHost && (!DRAW_HOST_NAME.test(drawHost) || named.some((n) => n.trim().toLowerCase() === drawHost))) throw new Error(`PELAGO_DRAW_HOST is a name of its own (and a port), never one the page is reached at: not ${drawHost}.`);
   const dataDir = resolve(ROOT, env('DATA') ?? fromFile.dataDir ?? 'data');
   // A Postgres server for the databases, in place of folders: it carries a password, so from the environment only.
   const databaseUrl = env('DATABASE_URL');
@@ -137,6 +146,7 @@ export function loadConfig(): Config {
     idleMinutes: Number(env('IDLE_MINUTES') ?? fromFile.idleMinutes ?? 30),
     // A hosted server has neither its customers' repositories nor their Claude CLI: it launches nothing.
     launch,
+    drawHost,
     publicHosts: named.map((name) => name.trim().toLowerCase()).filter(Boolean),
     sites: Object.fromEntries((env('SITES') ?? '').split(',').map((pair) => pair.split('=').map((part) => part.trim().toLowerCase())).filter(([host, ws]) => host && ws)),
     trustedProxies: env('TRUSTED_PROXIES') ?? fromFile.trustedProxies,

@@ -5,7 +5,7 @@
 // each drawing's code is sent once and kept by its hash. A drawing whose scene asks for a surface has the frames it
 // paints in its worker shown on a canvas laid over its picture (surface.js).
 
-import { frameSandbox, h } from './base.js';
+import { drawFrame, h } from './base.js';
 import { HELD } from './ghosts.js';
 import { tipOf } from './layout-tip.js';
 import { answered } from './tip.js';
@@ -66,7 +66,8 @@ export function warmLayouts() {
   // The page's own (ui/index.html) is taken first: started with the page, it is loading while the page's modules are.
   const given = document.getElementById('drawing-sandbox');
   given?.removeAttribute('id');
-  const frame = given && given.getAttribute('sandbox') === frameSandbox() ? given : h('iframe', { class: 'drawing-sandbox', sandbox: frameSandbox(), src: '/draw.html', title: 'Where drawings run', tabindex: '-1', 'aria-hidden': 'true' });
+  const want = drawFrame();
+  const frame = given && given.getAttribute('sandbox') === want.sandbox && new URL(given.src).origin === new URL(want.src, location.href).origin ? given : h('iframe', { class: 'drawing-sandbox', sandbox: want.sandbox, src: want.src, title: 'Where drawings run', tabindex: '-1', 'aria-hidden': 'true' });
   if (given && given !== frame) given.remove();
   const loads = new Map();
   sandbox = { frame, loads, ready: null, started: null };

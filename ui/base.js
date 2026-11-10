@@ -55,6 +55,14 @@ export const notOf = (filter) => filter?.not ?? ['kind system'];
 // The sandbox of a frame drawing code runs in. Only a dev server started with PELAGO_UNSANDBOXED=1 marks the page to
 // drop it, for a browser that loads no sandboxed frame (the desktop app's pane); the worker inside is still a wall.
 export const frameSandbox = () => (document.documentElement.dataset.drawSandbox === 'off' ? null : 'allow-scripts');
+// At the drawing host the page was marked with (src/draw-host.ts), the frame keeps that host's origin, so it may keep a service
+// worker; never at the page's own, where an origin would be the page's: then it has none, as anywhere else.
+export const drawOrigin = () => { const at = document.documentElement.dataset.drawOrigin; return at && at !== location.origin ? at : null; };
+/** The frame every drawing runs in (ui/layout.js): at the drawing host with that host's origin, else at the page's with none. */
+export const drawFrame = () => {
+  const at = drawOrigin(), walled = frameSandbox();
+  return { src: `${at ?? ''}/draw.html`, sandbox: at && walled ? `${walled} allow-same-origin` : walled };
+};
 
 // Whether the owner turned the sandbox off for a layout's code here (workspace_info drawings_open): read once a page, and
 // again once the setting is changed. Anything but a yes keeps the sandbox.

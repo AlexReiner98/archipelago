@@ -40,7 +40,8 @@ export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; del
   await new Promise<void>((r) => probe.listen(0, '127.0.0.1', r));
   const port = (probe.address() as AddressInfo).port;
   await new Promise((r) => probe.close(r));
-  const server = createHttpServer(workspaces, port, { auth, limits, sites });
+  // Drawn as on a dev server: a page on 127.0.0.1 frames its drawings at localhost (src/draw-host.ts).
+  const server = createHttpServer(workspaces, port, { auth, limits, sites, draw: { loopback: auth === 'off' } });
   await new Promise<void>((r) => server.listen(port, '127.0.0.1', r));
   closers.push(async () => {
     server.close();
