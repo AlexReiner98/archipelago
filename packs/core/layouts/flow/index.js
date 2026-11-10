@@ -28,6 +28,7 @@ import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, HEX, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
 import { drawn } from './polyline.js';
+import { carried } from './carried.js';
 import { shapedBy } from './steps.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
@@ -322,6 +323,14 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
     const wire = m('path', { key: `w:${n}`, d: line(c), class: `lf-wire${kind(ORDER_TYPE)}${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden });
     return chainHeads[n] ? [wire, m('path', { key: `h:${n}`, d: chainHeads[n], class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}`, ...hidden })] : [wire];
   });
+  // A wire cut onto a trunk goes on along it (./carried.js): that stretch drawn over the trunk, seen only while lit, so a
+  // step hovered lights its way all the way to what it shares and not the other branches of the trunk.
+  const C = g.chains.length, wired = [...g.chains, ...g.ties], carry = story ? wired.map(() => []) : carried(wired);
+  const keysOf = (j) => (j < C ? { line: `w:${j}`, head: `h:${j}`, on: `wx:${j}` } : { line: `n:${j - C}`, head: `nh:${j - C}`, on: `nx:${j - C}` });
+  const trunkLayer = wired.flatMap((w, j) => (carry[j].length ? [m('path', {
+    key: keysOf(j).on, d: carry[j].map((c) => drawn(c.points, wired[c.k].gaps, z('break_half'))).join(''),
+    class: j < C ? `lf-wire trunk${kind(ORDER_TYPE)}${w.dashed ? ' dashed' : ''}` : `lf-tie trunk${w.type === 'part_of' ? ' near' : ''}${headless.has(w.type) ? '' : ' headed'}${kind(w.type)}${onYou(w)}`,
+  })] : []));
   // The badges of held links, with the wire or tie each sits on, so a step moved takes them with its wires. A link of a
   // new item held in the same change is decided with it: the item's badge is the one.
   const madeBy = (id, p) => g.nodes.get(id)?.item?.pending?.op === 'create' && g.nodes.get(id).item.pending.proposal === p.proposal;
@@ -396,7 +405,7 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
     const text = saysText(c), w = saysWide(c), [lx, ly] = saysAt(g, c), sh = z('says_height');
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
-  const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, isles.layer, tieLayer, wireLayer, stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark));
+  const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, isles.layer, tieLayer, wireLayer, trunkLayer, stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark));
   // The picture's key; on an archipelago none, each island carrying its own.
   const key = [
     // A picture too large to wire says so, and how many links it leaves out (bug e_a9w5jeme).
@@ -410,12 +419,12 @@ Published: other islands may read it`, href: `#/e/${f.id}` }));
   const found = hits > 0 && hits < answer.items.length;
   const dimmed = (now) => [...dims.keys()].filter((id) => !lit(g.nodes.get(id).item, now, found, stateOf(g.nodes.get(id).item)));
   for (const id of dimmed(style)) addClass(dims.get(id), 'dim');
-  /** Light the wires and ties of a step, or of none: while one is lit, the rest fade. */
-  const light = (id) => [
-    { key: 'flow', toggle: { lighting: Boolean(id) } },
-    ...g.chains.flatMap((c, n) => [`w:${n}`, `h:${n}`].map((key) => ({ key, toggle: { lit: Boolean(id) && (c.a === id || c.b === id) } }))),
-    ...g.ties.flatMap((t, n) => tieKeys(n).map((key) => ({ key, toggle: { lit: Boolean(id) && (t.a === id || t.b === id) } }))),
-  ];
+  /** Light the wires and ties of a step, or of none: while one is lit, the rest fade. One on a trunk is lit along it, to its head. */
+  const wireKeys = wired.map((w, j) => [...(j < C ? [`w:${j}`, `h:${j}`] : tieKeys(j - C)), ...(carry[j].length ? [keysOf(j).on] : [])]);
+  const light = (id) => {
+    const on = new Set(id ? wired.flatMap((w, j) => (w.a === id || w.b === id ? [...wireKeys[j], ...carry[j].filter((c) => c.end).map((c) => keysOf(c.k).head)] : [])) : []);
+    return [{ key: 'flow', toggle: { lighting: Boolean(id) } }, ...wireKeys.flat().map((key) => ({ key, toggle: { lit: on.has(key) } }))];
+  };
   /** A step's tip: its title, that it waits on you where it does (a colour no legend explains), and the start of its note. */
   const tipFor = (key) => {
     const i = g.nodes.get(key.slice(2)).item, note = held(i.pending) ? `Held for you${i.pending.reason ? `: ${i.pending.reason}` : ''}` : opening(i);

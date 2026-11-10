@@ -38,6 +38,8 @@ export const css = `
 .lf-tie.lit { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-hover); stroke-dasharray: none; }
 /* While a step is hovered, what is not tied to it fades, so its own wires and ties stand out. */
 .lighting :is(.lf-wire, .lf-tie, .lf-head):not(.lit) { opacity: var(--ln-flow-unlit); }
+/* The way a wire cut onto a trunk goes on along it: drawn only while its wire is lit. */
+.lf-wire.trunk:not(.lit), .lf-tie.trunk:not(.lit) { display: none; }
 /* Each link type in its own colour (the style's link_colours, else one of its hues), lit or not; a held change keeps
    the colour of what waits on you, below. */
 .lf-wire[class*=lf-k-], .lf-tie[class*=lf-k-] { stroke: var(--lf-link); }
