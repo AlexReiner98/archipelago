@@ -11,7 +11,7 @@ import { attention } from './attention.ts';
 import { isKernel } from './head.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { livesIn, placeFor } from './places.ts';
-import { touchedBy } from './touched.ts';
+import { touchedByAll } from './touched.ts';
 
 /** The strongest first: a reason's place in this list is its rank. Attention's reasons this view does not weigh are left out. */
 export const FRONTIER_REASONS = ['corrected', 'waits_on', 'to_confirm', 'unsettled', 'left', 'under_way', 'holding_up', 'blocked', 'moved', 'due', 'unseen', 'open'] as const;
@@ -63,13 +63,16 @@ async function placed(l: Archipelago, input: FrontierInput) {
 /** What sessions worked on: what they changed (the log keeps each change's run), touched, or were set to work on. */
 export async function workedOn(l: Archipelago, ids: string[]): Promise<string[]> {
   if (!ids.length) return [];
-  const { rows: changed } = await l.db.query<{ id: string }>(
-    `select distinct f.id from log_entry e join log_fact f on f.stream = e.stream and f.pos = e.pos and f.at = e.at
-     where e.stream = 'facts' and e.at > $2 and e.head->>'run' = any($1::text[]) and f.id like 'e\\_%' -- index log_entry_at`,
-    [ids, new Date(Date.now() - DAYS * 86_400_000)],
-  );
-  const { rows: on } = await l.db.query<{ id: string }>(`select to_id as id from relation where type = 'works_on' and from_id = any($1::text[])`, [ids]);
-  const touched = (await Promise.all(ids.map((id) => touchedBy(l, id)))).flat();
+  // Three reads that wait on nothing of each other, asked together.
+  const [{ rows: changed }, { rows: on }, touched] = await Promise.all([
+    l.db.query<{ id: string }>(
+      `select distinct f.id from log_entry e join log_fact f on f.stream = e.stream and f.pos = e.pos and f.at = e.at
+       where e.stream = 'facts' and e.at > $2 and e.head->>'run' = any($1::text[]) and f.id like 'e\\_%' -- index log_entry_at`,
+      [ids, new Date(Date.now() - DAYS * 86_400_000)],
+    ),
+    l.db.query<{ id: string }>(`select to_id as id from relation where type = 'works_on' and from_id = any($1::text[])`, [ids]),
+    touchedByAll(l, ids),
+  ]);
   return [...new Set([...changed.map((r) => r.id), ...on.map((r) => r.id), ...touched])];
 }
 
@@ -82,19 +85,24 @@ async function around(l: Archipelago, ids: string[]): Promise<string[]> {
 
 /** What a person changed after an agent last did, item by item: who, when, and which fields. An item a person made inside an agent's work counts too. */
 async function corrections(l: Archipelago, ids: string[]) {
-  const { rows } = await l.db.query<{ id: string; seq: string; field: string; actor: string; at: Date }>(
-    `select f.id, f.seq, f.field, e.head->'actor'->>'id' as actor, e.at from log_fact f join log_entry e on e.stream = f.stream and e.pos = f.pos and e.at = f.at
-     where f.stream = 'facts' and f.id = any($1::text[]) order by f.id, f.seq limit 20000 -- index log_fact_history`,
+  // Only the facts a person said after the last an agent (or anyone not a person) said of the item are sent: the
+  // rest of each item's history is weighed where it lies, not read back whole (a busy map's thousand items are
+  // some ten thousand facts).
+  const { rows } = await l.db.query<{ id: string; field: string; actor: string; at: Date; added: boolean }>(
+    `with said as (
+       select f.id, f.seq, f.field, e.head->'actor'->>'id' as actor, e.at from log_fact f join log_entry e on e.stream = f.stream and e.pos = f.pos and e.at = f.at
+        where f.stream = 'facts' and f.id = any($1::text[]) -- index log_fact_history
+     ), agent as (
+       select id, max(seq) filter (where actor is null or actor not like 'human:%') as seq from said group by id
+     )
+     select s.id, s.field, s.actor, s.at, a.seq is null as added from said s join agent a on a.id = s.id
+      where s.actor like 'human:%' and (a.seq is null or s.seq > a.seq) order by s.id, s.seq limit 20000`,
     [ids],
   );
   const out = new Map<string, { by: string; at: Date; fields: string[]; added: boolean }>();
-  for (const [id, facts] of Map.groupBy(rows, (r) => r.id)) {
-    const human = (f: { actor: string }) => Boolean(f.actor?.startsWith('human:'));
-    const lastAgent = facts.findLastIndex((f) => !human(f));
-    const after = facts.slice(lastAgent + 1).filter(human);
-    if (!after.length) continue;
+  for (const [id, after] of Map.groupBy(rows, (r) => r.id)) {
     const last = after.at(-1)!;
-    out.set(id, { by: last.actor, at: last.at, fields: [...new Set(after.map((f) => f.field))].filter((f) => f !== 'created_at'), added: lastAgent < 0 });
+    out.set(id, { by: last.actor, at: last.at, fields: [...new Set(after.map((f) => f.field))].filter((f) => f !== 'created_at'), added: last.added });
   }
   return out;
 }

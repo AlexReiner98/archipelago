@@ -26,20 +26,22 @@ export async function toConfirm(l: Archipelago, input: { limit?: number } = {}) 
      order by e.id, f.seq desc`,
     [since, l.registry.having('settles')],
   );
-  // The basis is the change set's words, sealed in the log with its key (src/seal.ts).
-  const bases = await openSaid(l.db, rows.map((r, i) => ({ id: r.changeset, field: 'basis', value: r.authority?.basis, i })));
-  for (const b of bases) if (b.value !== undefined) rows[b.i].authority = { ...rows[b.i].authority, basis: b.value };
   // What an agent settled on its own judgment is what the owner has not seen; what it settled on their word they
   // chose themselves, in chat. The first are listed first, and counted apart.
   const own = (q: { authority: { of?: string } | null }) => q.authority?.of !== 'human';
   const newest = rows.sort((a, b) => Number(own(b)) - Number(own(a)) || b.seq - a.seq);
+  // The basis is the change set's words, sealed in the log with its key (src/seal.ts): opened only for those listed,
+  // since each takes its key from the vault (a map with hundreds settled spent most of the read on the rest).
+  const listed = newest.slice(0, input.limit ?? 40);
+  const bases = await openSaid(l.db, listed.map((r, i) => ({ id: r.changeset, field: 'basis', value: r.authority?.basis, i })));
+  for (const b of bases) if (b.value !== undefined) listed[b.i].authority = { ...listed[b.i].authority, basis: b.value };
   const short = (s: string | undefined) => (s && s.length > 240 ? `${s.slice(0, 240)}…` : s);
   return {
     count: newest.length,
     on_agents_judgment: newest.filter(own).length,
     on_owners_word: newest.filter((q) => !own(q)).length,
     upto: newest.reduce((max, q) => Math.max(max, q.seq), since),
-    questions: newest.slice(0, input.limit ?? 40).map((q) => ({
+    questions: listed.map((q) => ({
       id: q.id,
       title: q.title,
       answer: q.outcome ?? q.status,
