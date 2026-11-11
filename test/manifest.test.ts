@@ -111,7 +111,10 @@ test("adding and taking out a pack is a fact on the log; its registrations follo
   const l = await mapOf(packsWith(CLOCK, LEANS, 'reacher'));
   const first = await syncPacks(l);
   assert.deepEqual(first.map((f) => f[1]).sort(), l.registry.found.map((p) => `pack:${p.id}`).sort(), 'every pack the server starts a workspace with is asserted when it opens');
-  const reacher = first.find((f) => f[1] === 'pack:reacher')![3] as { version: string; manifest: string; text: string };
+  const reacher = first.find((f) => f[1] === 'pack:reacher')![3] as { version: string; manifest: string; text: string; code: string; files: Record<string, string>; texts: Record<string, string> };
+  // Its code is named by its files' hashes beside it, their texts kept the first time too (src/pack-code.ts).
+  const code = { code: reacher.code, files: reacher.files };
+  assert.deepEqual(Object.keys(reacher.texts).sort(), [...new Set(Object.values(reacher.files))].sort(), 'and its code, file by file');
   assert.deepEqual([reacher.version, reacher.manifest, createHash('sha256').update(reacher.text).digest('hex')], ['0.1.0', l.registry.hashes.get('reacher'), l.registry.hashes.get('reacher')], 'the log keeps the manifest itself, the first time it meets it');
   assert.deepEqual(await syncPacks(l), [], 'and only once');
   const note = await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'e', type: 'reacher.note', title: 'Drafting' }] }) as { created: Record<string, string> };
@@ -128,10 +131,10 @@ test("adding and taking out a pack is a fact on the log; its registrations follo
   await assert.rejects(setPack(l, human, { pack: 'core', on: false }), /the kernel's own/);
   await setPack(l, human, { pack: 'reacher', on: true });
   assert.ok(!l.registry.type('reacher.note')!.dormant && l.registry.tools.has('reacher_keep'), 'and adding it back brings it all back');
-  assert.deepEqual((await entries(l.db)).at(-1)!.facts, [['+', 'pack:reacher', 'pack', { version: '0.1.0', manifest: l.registry.hashes.get('reacher') }]], 'a manifest the log keeps already is named, not kept again');
+  assert.deepEqual((await entries(l.db)).at(-1)!.facts, [['+', 'pack:reacher', 'pack', { version: '0.1.0', manifest: l.registry.hashes.get('reacher'), ...code }]], 'a manifest and code the log keeps already are named, not kept again');
 
   l.registry.hashes.set('reacher', 'f'.repeat(64));
-  assert.deepEqual(await syncPacks(l), [['+', 'pack:reacher', 'pack', { version: '0.1.0', manifest: 'f'.repeat(64) }]], 'a manifest that changed on the server is asserted again');
+  assert.deepEqual(await syncPacks(l), [['+', 'pack:reacher', 'pack', { version: '0.1.0', manifest: 'f'.repeat(64), ...code }]], 'a manifest that changed on the server is asserted again');
 });
 
 test('a pack renamed takes the place of the one the owner added: inquiry is grove now', async () => {

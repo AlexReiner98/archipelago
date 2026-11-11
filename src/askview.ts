@@ -5,7 +5,7 @@
 
 import type { ViewDef } from './declared.ts';
 import { parts } from './manifest.ts';
-import { hostFor } from './packtools.ts';
+import { hostIn } from './packtools.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import type { Registry } from './packs.ts';
 import { REPLACED } from './attention.ts';
@@ -74,5 +74,5 @@ export async function askView(map: Archipelago, actor: Actor, name: string, para
   if (!found) throw new Error(`No view "${name}". Views: ${Object.keys(viewList(l)).join(', ')}`);
   used(l.workspace, 'view', found.def.id);
   if (found.def.lens) return answerPreset(l, found.def, params);
-  return (await hostFor(l.registry).call(l, actor, found.pack, 'view', found.def.id, params, found.def.limit_ms)).answer ?? null;
+  return (await (await hostIn(map, found.pack, params.island)).call(l, actor, found.pack, 'view', found.def.id, params, found.def.limit_ms)).answer ?? null;
 }

@@ -1,7 +1,7 @@
 // Packs in time (Rule 8 of the target model, docs/log.md section 8): a pack's presence in a workspace is a fact on its
-// log, kept forever: ["+", "pack:<id>", "pack", { version, manifest, text? }] when it is added (the manifest is the SHA-256
+// log, kept forever: ["+", "pack:<id>", "pack", { version, manifest, text?, code?, files?, texts? }] when it is added (the manifest is the SHA-256
 // of its pack.json as read, and its text the first time the log meets that hash; one said before texts were kept is
-// said again with it), and only the owner adds one; ["-", "pack:<id>", "pack"] when it is taken out. Which packs are off is read from those facts,
+// said again with it; its code, src/pack-code.ts, the same way by file), and only the owner adds one; ["-", "pack:<id>", "pack"] when it is taken out. Which packs are off is read from those facts,
 // and everything a pack registers is derived from the set (src/packs.ts), so taking one out unwinds it at once: its
 // types turn dormant in the type table, its tools leave the tool list, its process stops, and connected agents are
 // told the list changed. What it made stays, as dormant items a person can still edit. Adding it back brings it all
@@ -28,6 +28,7 @@ import type { Tool } from './tools.ts';
 import { syncTypes } from './typetable.ts';
 import { packTouches } from './pack-touches.ts';
 import { withUse } from './pack-use.ts';
+import { folderCode, keptHashes } from './pack-code.ts';
 
 /** The setting that held the packs turned off in a workspace before they were facts: read until the first pack fact. */
 export const PACKS_OFF = 'packs_off';
@@ -35,11 +36,11 @@ export const PACKS_OFF = 'packs_off';
 /** The id a pack's presence is kept under on the log. */
 export const packFact = (pack: string) => `pack:${pack}`;
 
-type Said = { id: string; op: '+' | '-'; value: { version?: string; manifest?: string; text?: string } | null };
+type Said = { id: string; op: '+' | '-'; value: { version?: string; manifest?: string; code?: string } | null };
 
 /** The last fact said of each pack here. */
 async function packFacts(l: Archipelago): Promise<Map<string, Said>> {
-  const { rows } = await l.db.query<Said>(`select distinct on (id) id, op, value from log_fact where stream = 'facts' and field = 'pack' and id like 'pack:%' order by id, pos desc, n desc -- index log_fact_kept`);
+  const { rows } = await l.db.query<Said>(`select distinct on (id) id, op, value - 'text' - 'texts' - 'files' as value from log_fact where stream = 'facts' and field = 'pack' and id like 'pack:%' order by id, pos desc, n desc -- index log_fact_kept`);
   return new Map(rows.map((r) => [r.id.slice('pack:'.length), r]));
 }
 
@@ -116,15 +117,29 @@ async function keptManifests(l: Archipelago): Promise<Set<string>> {
   return new Set(rows.map((r) => r.manifest));
 }
 
-/** A pack's presence as a fact: its version and manifest hash, and the manifest's text the first time this log meets that hash. */
-function present(l: Archipelago, pack: { id: string; version: string }, kept: Set<string>): Fact {
+/** What is kept on this log already: the manifests whose text it keeps, and the files of packs' code (src/pack-code.ts), by hash. */
+type Kept = { manifests: Set<string>; files: Set<string> };
+const keptHere = async (l: Archipelago): Promise<Kept> => ({ manifests: await keptManifests(l), files: await keptHashes(l.db) });
+
+/** A pack's code as its folder holds it now: none for one kept as an item, or one with no folder. */
+const codeNow = (l: Archipelago, id: string) => (l.registry.made.has(id) ? undefined : folderCode(l.registry.folderOf(id)));
+
+/**
+ * A pack's presence as a fact: its version and manifest hash, and the manifest's text the first time this log meets
+ * that hash; its code's hash and its files' (src/pack-code.ts), with the text of each file this log has not met yet.
+ */
+function present(l: Archipelago, pack: { id: string; version: string }, k: Kept): Fact {
+  const kept = k.manifests;
   const manifest = l.registry.hashes.get(pack.id);
   // a pack kept as an item is its manifest's text, kept on the map; any other is its file as this process read it.
   const file = join(l.registry.folderOf(pack.id), 'pack.json'), made = l.registry.made.get(pack.id)?.text;
   const text = !manifest || kept.has(manifest) ? undefined : made ?? manifestRead(manifest) ?? (existsSync(file) ? readFileSync(file, 'utf8') : undefined);
   const same = text !== undefined && createHash('sha256').update(text).digest('hex') === manifest;
   if (same) kept.add(manifest!);
-  return ['+', packFact(pack.id), 'pack', { version: pack.version, manifest, ...(same && { text }) }];
+  const code = codeNow(l, pack.id);
+  const texts = code ? Object.fromEntries([...code.texts].filter(([h]) => !k.files.has(h))) : {};
+  for (const h of Object.keys(texts)) k.files.add(h);
+  return ['+', packFact(pack.id), 'pack', { version: pack.version, manifest, ...(same && { text }), ...(code && { code: code.code, files: code.files }), ...(Object.keys(texts).length && { texts }) }];
 }
 
 /**
@@ -177,7 +192,7 @@ async function takenOver(l: Archipelago, said: Map<string, Said>): Promise<Set<s
 export async function syncPacks(l: Archipelago): Promise<Fact[]> {
   const said = await packFacts(l);
   const off = new Set(await packsOff(l));
-  const kept = await keptManifests(l);
+  const kept = await keptHere(l);
   const start = startPacks();
   const first = !said.size && !(await l.db.query(`select 1 from entity limit 1`)).rows.length;
   const renamed = await renamedPacks(l, said);
@@ -188,7 +203,7 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
     const was = said.get(p.id);
     if (l.registry.made.has(p.id) && was?.op !== '+') continue; // kept as an item: the owner adds it, never the sync
     const kernel = KERNEL_PACKS.includes(p.id);
-    const changed = !was || was.op === '-' || was.value?.version !== p.version || was.value?.manifest !== l.registry.hashes.get(p.id);
+    const changed = !was || was.op === '-' || was.value?.version !== p.version || was.value?.manifest !== l.registry.hashes.get(p.id) || was.value?.code !== codeNow(l, p.id)?.code;
     if (renamed.has(p.id)) facts.push(present(l, p, kept), ['-', packFact(renamed.get(p.id)!), 'pack']);
     else if (kernel || was?.op === '+') {
       if (changed) facts.push(present(l, p, kept));
@@ -241,7 +256,7 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   else off.add(input.pack);
   const list = [...off].sort();
   const pack = l.registry.found.find((p) => p.id === input.pack)!;
-  const fact: Fact = input.on ? present(l, pack, await keptManifests(l)) : ['-', packFact(input.pack), 'pack'];
+  const fact: Fact = input.on ? present(l, pack, await keptHere(l)) : ['-', packFact(input.pack), 'pack'];
   await appendPacks(l, actorId(actor), input.on ? 'pack.on' : 'pack.off', `${input.on ? 'Added' : 'Took out'} the ${input.pack} pack`, [fact]);
   l.registry.turnOff(list, await islandsOn(l));
   if (!input.on) hostFor(l.registry).stop();

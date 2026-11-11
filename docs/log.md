@@ -995,7 +995,15 @@ at a position and each one's manifest blob, with the workspace's own
   the same, else today's file stands in (`stand_in`); a type the packs at P did not define is kept dormant from
   today's registry. Before any pack fact there is no past registry. The islands setting is today's.
 - Manifests that no longer load under this server's code leave the read under today's registry, and `asOf` says
-  why (`past_refused`). A pack's code (handlers, layouts) is not on the log: nothing runs old code yet.
+  why (`past_refused`).
+- A pack's code is on the log beside its manifest (11 Nov 2026, `src/pack-code.ts`): the files of its folder that
+  run or are served (not `pack.json`, words or tests), each by the SHA-256 of its text. A pack fact names `code`,
+  the hash of the whole, and `files`, each path's hash, and `texts` holds a file's text the first time the log
+  meets its hash, so a deploy adds the files it changed alone; a change of code alone asserts the pack again. The
+  registry at P runs the code named then: today's folder where the code is the same, else the files read back from
+  the log and laid out in a folder kept by the code's hash (`code: 'log'`); a fact from before code was kept, or
+  one whose texts the log lacks, runs today's (`stand_in`, with why). No table changed: a fact without `code` is
+  one from before.
 
 ### In space: what a pack requires and uses
 
