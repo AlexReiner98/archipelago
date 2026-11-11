@@ -301,6 +301,20 @@ The Packs screen names them before the owner confirms. Everything a pack registe
 derived from the set of packs, so taking one out unwinds it: its tools,
 screens, rules and handlers go, and its items stay, their types dormant.
 
+## Bundles
+
+A bundle names packs that go on and off together (decision e_f9ybsuce): on
+an island map one way of working is often an island pack of words and the
+map pack that acts on them, as `replays` and `refine` are. It is a manifest
+of its own, `bundle.json` in a folder beside the packs (`packs/refinement/`):
+`{ id, title, description, packs }`, its id no pack's, and a pack in one
+bundle at most (`src/bundles.ts`). `pack_set` with a bundle's id, or any of
+its packs' ids, turns them all, in one change set; the Packs screen draws it
+as one plate with one switch, each pack a band in it. It is offered only
+where the server's list offers every pack in it; where one is left out, the
+others stand alone. A distribution names bundles: `PELAGO_START_PACKS=refinement`
+starts a new map with refine and replays.
+
 ## Not yet
 
 - The log keeps each manifest, but the registry as of an old position still

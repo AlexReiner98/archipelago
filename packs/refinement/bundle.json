@@ -1,0 +1,6 @@
+{
+  "id": "refinement",
+  "title": "Refinement",
+  "description": "How the harness refines itself: the refine pack's views and actions on the map, and the replays pack's words on the islands, on and off together.",
+  "packs": ["refine", "replays"]
+}
