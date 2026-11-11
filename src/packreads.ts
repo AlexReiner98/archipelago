@@ -6,6 +6,7 @@
 import { livesIn, livesInFor, SCOPE } from './places.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { blockGraph } from './blocking.ts';
+import { packVersions } from './pack-versions.ts';
 import { readEvents } from './eventlog.ts';
 import { askPackView, VIEWS } from './views.ts';
 import { scanAround } from './region.ts';
@@ -59,6 +60,8 @@ export type Read = {
   proposed?: Record<string, unknown>;
   /** Only these of each item's props, and no note. */
   fields?: string[];
+  /** The packs in force here, each with its version and its manifest's hash (src/pack-versions.ts). */
+  packs?: boolean;
 };
 
 export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
@@ -175,6 +178,7 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     const run = new Map(runs.map((r) => [r.id, r]));
     return rows.filter((r) => run.has(r.run)).map((r) => ({ item: r.item, run: r.run, title: run.get(r.run)!.title, ...(run.get(r.run)!.packs != null && { packs: run.get(r.run)!.packs }) }));
   }
+  if (q.packs) return packVersions(l.registry);
   if (q.view !== undefined) {
     // A kernel view, a lens preset (attention, hubs) or a pack's view, each by its short name (repo_work).
     const view = VIEWS[q.view];
@@ -190,5 +194,5 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, view, type_info, me, proposed.');
+  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, packs, view, type_info, me, proposed.');
 }

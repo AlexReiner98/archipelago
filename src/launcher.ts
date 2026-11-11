@@ -17,6 +17,7 @@ import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
 import { briefFor, promptFor, type LaunchInput, type LaunchMode, type StartedBy } from './launch-brief.ts';
 import { setPackLaunch } from './pack-launch.ts';
+import { setActionLaunch } from './pack-action-launch.ts';
 
 export type { LaunchMode, StartedBy } from './launch-brief.ts';
 
@@ -105,7 +106,8 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
   const sessionId = randomUUID();
   const surface = `pack:${via.pack}`;
   const agent: Actor = { kind: 'agent', name: `launched:${via.pack}` };
-  const begun = await sessionStart(l, agent, { task: input.task, cwd, session_id: sessionId, surface, title: `Headless (${mode}): ${brief.task.title}` });
+  // A frozen brief is run again, not worked on: its run is tied to no task (its started_by names the task).
+  const begun = await sessionStart(l, agent, { task: input.brief ? undefined : input.task, cwd, session_id: sessionId, surface, title: `Headless (${mode}): ${brief.task.title}` });
   const run = begun.run;
   if (begun.status === 'waiting') {
     const why = (('blocked' in begun ? begun.blocked : undefined) ?? []).map((b) => b.why).join(' ');
@@ -194,6 +196,7 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
 
 // A pack's answer launches through this (src/pack-launch.ts).
 setPackLaunch(launch);
+setActionLaunch(launch);
 
 /** Kill a launched session's process, if this server started one for the run. */
 export function stopLaunched(run: string): boolean {

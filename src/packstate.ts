@@ -245,7 +245,7 @@ export function packTouches(p: PackFile) {
     ['rules', all(p.rules).map((r) => ({ name: title(r.id), about: r.on === 'reply_ended' ? 'asks an agent as its reply ends' : r.then === 'refuse' ? 'refuses a change' : r.then === 'hold' ? 'holds a change for a person' : 'decides a change', sort: r.on === 'reply_ended' ? 'check' : 'decides' }))],
     ['actions', all(p.actions).filter((a) => !a.kernel).map((a) => ({ name: named(a), about: [a.verb && `under ${a.verb}`, gist(a.description)].filter(Boolean).join(': ') }))],
     ['runs', all(p.handlers).map((r) => ({ name: title(r.event ?? r.schedule ?? r.webhook), about: r.event ? 'on an event' : r.webhook ? 'on a webhook' : r.every_minutes ? `every ${r.every_minutes} minutes` : 'on a schedule' }))],
-    ['reach', [...all(reach.hosts).map((x) => ({ name: String(x.host ?? x.id ?? x.name ?? 'a host'), about: 'a host it calls' })), ...all(reach.secrets).map((x) => ({ name: title(x.name), about: 'a secret it holds' })), ...all(reach.webhooks).map((x) => ({ name: title(x.id ?? x.name), about: 'a webhook it hears' })), ...(reach.server ? [{ name: 'the server', about: 'what no one workspace can do' }] : [])]],
+    ['reach', [...all(reach.hosts).map((x) => ({ name: String(x.host ?? x.id ?? x.name ?? 'a host'), about: 'a host it calls' })), ...all(reach.secrets).map((x) => ({ name: title(x.name), about: 'a secret it holds' })), ...all(reach.webhooks).map((x) => ({ name: title(x.id ?? x.name), about: 'a webhook it hears' })), ...(reach.server ? [{ name: 'the server', about: 'what no one workspace can do' }] : []), ...(reach.launch ? [{ name: 'sessions', about: 'starts agent sessions when a person calls its action' }] : [])]],
   ];
   return groups.map(([key, items]) => ({ key, n: items.length, items }));
 }

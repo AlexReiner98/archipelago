@@ -32,6 +32,8 @@ export interface ActionDef {
   acts?: ActDef[];
   /** Only a workspace's admin may call it: what it starts is paid for by the workspace. */
   admin?: boolean;
+  /** Only a person may call it, as the kernel's own humanOnly tools: left out of what agents are offered, and refused whole when an agent calls it. */
+  humanOnly?: boolean;
 }
 
 /** A service outside the map a pack may reach, and the name of the secret the kernel adds (the pack never sees it). */

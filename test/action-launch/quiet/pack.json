@@ -1,0 +1,21 @@
+{
+  "id": "quiet",
+  "version": "0.1.0",
+  "title": "Quiet",
+  "description": "A pack for testing launches answered from an action (test/pack-action-launch.test.ts): it does not ask for reach.launch.",
+  "requires": ["core"],
+  "actions": [
+    {
+      "id": "quiet.go",
+      "title": "Start sessions",
+      "description": "Start n sessions on a task, each from a brief it is given.",
+      "verb": "assign",
+      "input": {
+        "type": "object",
+        "properties": { "task": { "type": "string" }, "n": { "type": "number" } },
+        "required": ["task", "n"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

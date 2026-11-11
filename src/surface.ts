@@ -52,7 +52,7 @@ export function actionsOf(reg: Registry, tools: Record<string, Tool>): Action[] 
     .map(([name, verb]): Action => ({ name, verb, tool: name, description: tools[name].description, params: schemaOf(tools[name].input), humanOnly: tools[name].humanOnly, devOnly: tools[name].devOnly }));
   const packs = [...reg.tools]
     .filter(([, t]) => t.call === 'action')
-    .map(([tool, t]): Action => ({ name: t.def.id, verb: (t.def as ActionDef).verb, tool, description: `${t.def.description} (from the ${t.pack} pack)`, params: t.def.input }));
+    .map(([tool, t]): Action => ({ name: t.def.id, verb: (t.def as ActionDef).verb, tool, description: `${t.def.description} (from the ${t.pack} pack)`, params: t.def.input, humanOnly: (t.def as ActionDef).humanOnly }));
   return [...kernel, ...packs];
 }
 
