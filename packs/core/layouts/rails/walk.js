@@ -1,5 +1,5 @@
-// The walk's order: every item of the answer a stop, read in the view's order, and which link rides the rail between
-// two stops that follow one another. Layer: graph. Pure: items and links in, the order and the links' roles out.
+// The walk's order: every item of the answer a stop, read in the view's order. Layer: graph. Pure: items and links in,
+// the order out.
 //
 // The order is the answer's own, put right by the order of the work: what an item depends on (depends_on) is read
 // before it, so a walk never reaches a step before what it rests on. A field `order` an item carries (a number) comes
@@ -33,20 +33,4 @@ export function readingOrder(items, links) {
   };
   for (const i of sorted) visit(i);
   return out;
-}
-
-/**
- * Each link's part in the walk: one between two stops that follow one another rides the rail between them (the first
- * such, a second is a wire of its own); every other is a wire from the stop read first (`early`) to the one read later.
- * A link to itself or to what the answer does not hold is not drawn.
- */
-export function roles(order, links) {
-  const at = new Map(order.map((i, k) => [i.id, k])), riding = new Map(), wires = [];
-  for (const l of links) {
-    if (!at.has(l.from) || !at.has(l.to) || l.from === l.to) continue;
-    const [p, q] = [at.get(l.from), at.get(l.to)], early = Math.min(p, q), late = Math.max(p, q);
-    if (late === early + 1 && !riding.has(early)) riding.set(early, l);
-    else wires.push({ link: l, early, late });
-  }
-  return { riding, wires };
 }
