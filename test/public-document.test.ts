@@ -85,14 +85,8 @@ test('a document a human makes public is read by anyone at its own address, with
   const { pelago } = await workspaces.get('default');
   assert.equal(await publicDocument(pelago, q), null);
 
-  // A link to it is still kept out of search engines.
-  const link = (await call('/api/share_create', undefined, { id: d })).result;
-  const linked = await fetch(base + link.path);
-  assert.equal(linked.headers.get('x-robots-tag'), 'noindex');
-  assert.match(await linked.text(), /<meta name="robots" content="noindex" \/>/);
-
-  // Once it is not public, its address is gone again.
-  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: d, visibility: 'shared' }] });
+  // Taken down, its address is gone again.
+  await call('/api/unpublish', undefined, { id: d });
   assert.equal((await fetch(`${base}/p/default/${d}`)).status, 404);
   assert.equal((await fetch(`${base}/p/default/${d}/data`)).status, 404);
   assert.equal((await fetch(`${base}/p/default/${d}/picture/${s}`)).status, 404);

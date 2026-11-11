@@ -7,8 +7,8 @@
 // preview (ui/doc.js) says so itself, once it has drawn the page.
 
 export const lookMode = new URLSearchParams(location.search).has('look');
-/** A page that draws once and follows nothing: a look, or a frozen link opened at /s/ (ui/base.js `link`), which never changes. */
-export const still = lookMode || /^\/s\//.test(location.pathname);
+/** A page that draws once and follows nothing: a look. */
+export const still = lookMode;
 
 /** Say that the view in `el` has drawn: drawn, empty or error, and why. */
 export const saidDrawn = (el, state, why) => el.dispatchEvent(new CustomEvent('view-drawn', { bubbles: true, detail: { state, why } }));

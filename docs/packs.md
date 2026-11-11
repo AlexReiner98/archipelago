@@ -42,7 +42,7 @@ on load in `src/server-reach.ts` and acted on by the kernel alone:
 
 | Key | What the kernel does |
 |---|---|
-| `mounts` | Hands it an address from a closed list (decision e_wptrr6tf): `public` (`/p/`), `site` (a domain's whole space), `setup` (`/connect/setup.mjs`), each to at most one pack (`src/server-mounts.ts`). `/s/` stays the kernel's. Its entry answers a page, JSON, a picture, plain text or XML, a redirect on this server, the kernel's stream of a published document, or `pass` (the kernel answers). The open core's own reader (`packs/reader`) takes `public` and `site`; a pack the configuration names in its place replaces it. |
+| `mounts` | Hands it an address from a closed list (decision e_wptrr6tf): `public` (`/p/`), `site` (a domain's whole space), `setup` (`/connect/setup.mjs`), each to at most one pack (`src/server-mounts.ts`). Its entry answers a page, JSON, a picture, plain text or XML, a redirect on this server, the kernel's stream of a published document, or `pass` (the kernel answers). The open core's own reader (`packs/reader`) takes `public` and `site`; a pack the configuration names in its place replaces it. |
 | entries' `answers: "html"` | Sends what the entry answers as a page, with headers and policy the kernel sets (`src/server-routes.ts`). |
 | `counts` | Names the stream on a public site's map its counts are kept in (a plain word no kernel stream has, one pack's alone): it adds to a key's day with the act `count.add`, and a pack reads them back after a position with `count.read` (`src/pack-counts.ts`). How many, never of whom. The reader counts its visits so, in `visits`, kept by core's rule `counts:visits`. The entry of a `public` or `site` mount is handed what the request said too (`request`: query, host, referrer, agent, purpose), to read and forget. |
 | `streams` | Holds a stream at `/x/<pack>/<id>/<workspace>/<id>` and tells it when that document is `published` again (`src/server-streams.ts`). |
@@ -50,9 +50,10 @@ on load in `src/server-reach.ts` and acted on by the kernel alone:
 | `launchers` | Starts an agent with its argv (no shell; `{prompt}`, `{mcp_config}`, `{tools}`, `{model}`, `{mode}`, `{session_id}`), holding its token, when a person launches and the server's launch setting names the pack (PELAGO_LAUNCH_PACK; by default `claude_code`, which the open core ships in `packs/claude_code` with the Claude Code adapter and setup) (decision e_885ztqkv, `src/server-launch.ts`). |
 | `adapter` | Translates one surface's hooks, at `/hooks/<surface>/<event>`, with two functions of its handler, `in` and `out`; what a session is told stays the kernel's (decision e_6t8f46u6, `src/server-adapter.ts`). |
 
-Acts `published.read`, `published.at`, `published.picture`, `published.drawing`
-and `site.pages` read what a person published, through the security-definer
-reads alone (`src/server-published.ts`). A server pack still reads no map.
+Acts `public.read`, `public.at`, `public.picture`, `public.drawing` and
+`public.list` read the public views a person made (`src/public-view.ts`), each
+as it was frozen, through the security-definer reads alone
+(`src/server-published.ts`). A server pack still reads no map.
 
 ## The keys before
 

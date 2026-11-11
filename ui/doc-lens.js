@@ -25,7 +25,7 @@ function keepAddress(host, byId) {
   });
 }
 
-/** Draw one frozen answer into host. `typeTitles` names each type the picture holds. `inApp`: drawn in the app's sheet, whose addresses are its own. `onItem`: a part opens there (a link's page opens it in its sheet, ui/doc-sheet.js). */
+/** Draw one frozen answer into host. `typeTitles` names each type the picture holds. `inApp`: drawn in the app's sheet, whose addresses are its own. `onItem`: a part opens there (a public view opens it in its sheet, ui/doc-sheet.js). */
 export function drawFrozen(host, answer, typeTitles = {}, { inApp = false, onItem = null } = {}) {
   for (const [id, title] of Object.entries(typeTitles)) if (!types.has(id)) types.set(id, { id, title });
   // Read here, a picture holds still and asks nothing: no lighting to switch, no zoom, its key always open.

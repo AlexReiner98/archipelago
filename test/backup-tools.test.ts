@@ -10,7 +10,7 @@ import { dumpVault, rewrap } from '../src/vault.ts';
 import { takeBackup } from '../src/backup-tools.ts';
 import { openDb } from '../src/db.ts';
 import { databaseFor, dropDatabaseFor } from '../src/pg.ts';
-import { createShare } from '../src/documents.ts';
+import { share } from '../src/public-view.ts';
 import { configureOutbox } from '../src/outbox.ts';
 import { hostFor } from '../src/packtools.ts';
 import { Archipelago, type Actor } from '../src/pelago.ts';
@@ -85,15 +85,15 @@ test("an agent's own view of the map reads whether the owner allows it a backup"
   const made = (await callTool(whole.as('e_agentx'), agent, 'backup_download', {})) as Made;
   assert.ok(await fetched(whole, made), 'a member reads the setting, as an agent token does');
 });
-test('a link given to a writing is in the backup, and works again where the backup is restored', async () => {
+test('a public view is in the backup, and is public again where the backup is restored', async () => {
   const l = await map();
-  const made = await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'writing', title: 'Shared plan' }] });
+  const made = await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'writing', title: 'Shared plan', visibility: 'shared' }] });
   const doc = Object.values((made as { created: Record<string, string> }).created)[0];
-  await createShare(l, owner, doc);
+  await share(l, owner, doc);
   const file = (await fetched(l, (await callTool(l, owner, 'backup_download', {})) as Made))!;
   const there = await openDb();
-  assert.equal((await restore(there, { ...parseBackup(file.file), vault: await dumpVault(l.db) })).share, 1);
-  assert.deepEqual((await there.query<{ entity_id: string }>(`select entity_id from share`)).rows, [{ entity_id: doc }]);
+  assert.equal((await restore(there, { ...parseBackup(file.file), vault: await dumpVault(l.db) })).public_view, 1);
+  assert.deepEqual((await there.query<{ entity_id: string }>(`select entity_id from public_view`)).rows, [{ entity_id: doc }]);
 });
 
 test('a backup is restored from the command line into a new folder, and never over one', async () => {

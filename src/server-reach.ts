@@ -8,7 +8,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { isCountStream } from './retention.ts';
 
-/** The addresses a server pack may take, each by at most one pack (decision e_wptrr6tf). /s/ stays the kernel's. */
+/** The addresses a server pack may take, each by at most one pack (decision e_wptrr6tf). */
 export const MOUNTS = ['public', 'site', 'setup'] as const;
 export type Mount = (typeof MOUNTS)[number];
 /** What answers at a mount: public and site an entry of its own that answers a page, setup a file it serves. */

@@ -1,15 +1,16 @@
-// What a server pack may read of what a person published (task e_uc8m8jwa): a document as it was last published, the
-// one at a site's path, its pictures and drawings, a site's pages. Each act goes through the security-definer reads
-// alone (src/public-schema.ts, by way of src/published.ts), as anyone: the pack is handed only what is public, never
-// the map. Publishing and taking down stay the kernel's (src/published.ts).
+// What a server pack may read of what a person made public (task e_uc8m8jwa, public views since e_79erzrcx): a public
+// view as it was frozen, the one at a site's path, its pictures and drawings, every public view. Each act goes through
+// the security-definer reads alone (src/public-schema.ts, by way of src/public-view-store.ts), as anyone: the pack is
+// handed only what is public, never the map. Sharing, publishing and taking down stay the kernel's.
 //
 // Every answer is JSON: a document as its page's /data gives it (packs/reader), its look beside it and each
-// drawing's code left at its hash; a picture's bytes as base64 with their content type. What is not published, or not
+// drawing's code left at its hash; a picture's bytes as base64 with their content type. What is not public, or not
 // there, is null, so a pack cannot tell a private item from one that never was.
 
 import type { Part } from './documents.ts';
 import { layoutCode, pageData, publicPath } from './published-data.ts';
-import { PATH, publishedAt, publishedDocument, publishedPicture, sitePages } from './published.ts';
+import { PATH } from './published.ts';
+import { publicView, publicViewAt, publicViewPicture, publicViews } from './public-view-store.ts';
 import type { ActPlaces } from './server-acts.ts';
 import type { ServerAct, ServerPackFile } from './server-packs.ts';
 import { pageLook } from './styles.ts';
@@ -37,29 +38,29 @@ export async function publishedAct(at: ActPlaces, pack: ServerPackFile, act: Ser
   const l = await mapOf(at, input);
   const workspace = input.workspace as string;
   switch (act) {
-    case 'published.read':
-    case 'published.at': {
-      const key = act === 'published.read' ? word(input.id, ID, 'An id') : word(input.path, PATH, 'A path');
-      const doc = l && ((act === 'published.read' ? await publishedDocument(l, key) : await publishedAt(l, key)) as Doc | null);
+    case 'public.read':
+    case 'public.at': {
+      const key = act === 'public.read' ? word(input.id, ID, 'An id') : word(input.path, PATH, 'A path');
+      const doc = l && ((act === 'public.read' ? await publicView(l, key) : await publicViewAt(l, key)) as Doc | null);
       if (!l || !doc) return null;
-      const id = act === 'published.read' ? (input.id as string) : String(doc.id);
+      const id = String(doc.id);
       return pageData({ ...doc, id, ...(await pageLook(l, { ...doc, id })) }, publicPath(workspace, id));
     }
-    case 'published.picture': {
+    case 'public.picture': {
       const id = word(input.id, ID, 'An id');
       const section = word(input.section, ID, 'A section');
-      const picture = l && (await publishedPicture(l, id, section));
+      const picture = l && (await publicViewPicture(l, id, section));
       return picture ? { content_type: picture.content_type, base64: picture.bytes.toString('base64') } : null;
     }
-    case 'published.drawing': {
+    case 'public.drawing': {
       const id = word(input.id, ID, 'An id');
       const hash = word(input.hash, HASH, 'A hash');
-      const doc = l && ((await publishedDocument(l, id)) as Doc | null);
+      const doc = l && ((await publicView(l, id)) as Doc | null);
       return (doc && layoutCode(doc, hash)) ?? null;
     }
-    case 'site.pages':
-      return l ? sitePages(l) : [];
+    case 'public.list':
+      return l ? publicViews(l) : [];
     default:
-      throw new Error(`The act "${act}" is not one of the published acts.`);
+      throw new Error(`The act "${act}" is not one of the public acts.`);
   }
 }
