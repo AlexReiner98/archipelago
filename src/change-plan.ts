@@ -4,7 +4,7 @@
 import { checkUpdated, checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts'; import { typedProblems } from './fields.ts';
 import { bodyAfter } from './ops.ts'; import { mergeRefusals } from './merge.ts';
 import { currentNames, typesAfter } from './type-items.ts'; import { privateDependencies } from './private-deps.ts';
-import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts'; import { islandRefusals } from './island-items.ts'; import { subjectRefusals } from './subject.ts';
+import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts'; import { islandRefusals } from './island-items.ts'; import { subjectRefusals } from './subject.ts'; import { islandRegistry, pinRefusals } from './island-pin.ts';
 import type { Archipelago } from './pelago.ts';
 
 /** Validate ops against the schema and the current map. Throws listing every problem. */
@@ -49,12 +49,13 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
     switch (op.op) {
       case 'create': {
         if (!op.title?.trim()) errors.push(`${where}: title is required`);
-        errors.push(...reg.check(op.type, op.status, op.props ?? {}).map((p) => `${where}: ${p}`));
+        const here = await islandRegistry(map, op.props?.island, reg); // an item is checked against the version of its pack its island runs
+        errors.push(...here.check(op.type, op.status, op.props ?? {}).map((p) => `${where}: ${p}`));
         if (op.owner) await checkOwner(reg.type(op.type) && op.type, op.owner, where);
-        const type = reg.type(op.type);
+        const type = here.type(op.type);
         if (!type) break; if (type.retired) errors.push(`${where}: ${op.type} is retired here: no new item is made of it`);
         if (op.visibility === 'public' && !type.public) errors.push(`${where}: a ${op.type} cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
-        errors.push(...[...checkWritten(reg, op.type, op.props ?? {}), ...typedProblems(op.type, type.fields, op.props ?? {}), ...undeclaredColumns(type, op)].map((p) => `${where}: ${p}`));
+        errors.push(...[...checkWritten(here, op.type, op.props ?? {}), ...typedProblems(op.type, type.fields, op.props ?? {}), ...undeclaredColumns(type, op)].map((p) => `${where}: ${p}`));
         if (op.ref) {
           if (refs.has(op.ref)) errors.push(`${where}: ref "${op.ref}" is used twice`);
           refs.set(op.ref, op.type);
@@ -74,7 +75,8 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
       case 'update': {
         const target = await existing(op.id, where);
         if (!target) break;
-        errors.push(...[...reg.check(target.type, op.status, op.props ?? {}), ...checkUpdated(reg, target.type, op.props ?? {}), ...typedProblems(target.type, reg.type(target.type)?.fields ?? {}, op.props ?? {}, target.props), ...undeclaredColumns(reg.type(target.type), op)].map((p) => `${where}: ${p}`));
+        const here = await islandRegistry(map, op.props?.island ?? target.props.island, reg);
+        errors.push(...[...here.check(target.type, op.status, op.props ?? {}), ...checkUpdated(here, target.type, op.props ?? {}), ...typedProblems(target.type, here.type(target.type)?.fields ?? {}, op.props ?? {}, target.props), ...undeclaredColumns(here.type(target.type), op)].map((p) => `${where}: ${p}`));
         if (op.visibility === 'public' && !reg.type(target.type)?.public) errors.push(`${where}: "${target.title}" is a ${target.type}, which cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
         if (op.title !== undefined && !op.title.trim()) errors.push(`${where}: title cannot be empty`);
         try {
@@ -122,7 +124,7 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
         break;
     }
   }
-  errors.push(...(await islandRefusals(map, reg, ops)), ...(await subjectRefusals(map, reg, ops)));
+  errors.push(...(await islandRefusals(map, reg, ops)), ...(await subjectRefusals(map, reg, ops)), ...(await pinRefusals(map, reg, ops)));
   if (!errors.length) errors.push(...(await privateDependencies(map, ops)));
   if (errors.length) throw new Error(`Change rejected:\n- ${errors.join('\n- ')}`);
   return { warnings };

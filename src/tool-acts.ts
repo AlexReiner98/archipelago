@@ -137,7 +137,9 @@ export const ACT_TOOLS: Record<string, Tool> = {
       // What every session is told (instructions for session_start) is said in the answer too, so a session its hook
       // registered and that joins that run hears it as a new one does (issue e_sm2sa75h). A resume was told at first.
       if (started.resumed) return { ...started, link: itemLink(l.workspace) };
-      const told = await instructionsFor(l, 'session_start', { about: started.repo?.id, fill: { run: started.run } });
+      // A session on a task is told what its task's island says: the version of its pack the island runs (src/island-pin.ts).
+      const island = input.task ? (await l.entity(input.task))?.props.island : undefined;
+      const told = await instructionsFor(l, 'session_start', { about: started.repo?.id, ...(typeof island === 'string' && { island }), fill: { run: started.run } });
       // And where it stands: what the sessions before it here worked on that needs attention now (src/frontier.ts).
       const here = await (await import('./frontier.ts')).frontier(l, { run: started.run, cwd: input.cwd, remote: input.remote });
       return { ...started, link: itemLink(l.workspace), frontier: here, ...(told.length && { instructions: told.map((one) => one.text) }) };
