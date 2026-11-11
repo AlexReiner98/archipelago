@@ -135,16 +135,16 @@ export class Registry {
   /** The fields a pack adds to another pack's type, by type and field: the pack that added each (src/reach.ts). */
   added = new Map<string, Map<string, string>>();
   /** A name a type or link type had before (its moved_from), by the one it is now: what an old name still reads as. */ renamed = new Map<string, string>();
-  /** Warnings said once: a pack file using the keys of the shape before the manifest. */
   /** Packs the owner turned off in this workspace. */
   private turnedOff: string[] = []; /** Whether this workspace holds its packs to the island rules (src/islands.ts). */ private islands = false; /** Whether this workspace has islands on: its items live on islands (src/island-items.ts). */ get onIslands() { return this.islands; }
   /** The packs kept as items (src/pack-items.ts) by id, the pack items that are none with why, and those the owner added here. */ made = new Map<string, ItemPack>(); madeWrong = new Map<string, string>(); private madeOn = new Set<string>(); /** The versions of packs kept as items, by item (src/island-pin.ts), and the one this registry runs in its pack's place. */ versions = new Map<string, PackVersion>(); private swap?: PackVersion;
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
-  constructor(dirs: string | string[], only?: string[], local: TypeDef[] = []) {
-    this.dirs = [dirs].flat();
-    this.dir = this.dirs[0];
+  /** The manifests this registry was given in place of folders: the packs as the log said them at a past position (src/registry-at.ts). No code is read for them: a handler they declare is taken as it was said. */ private given?: { found: Map<string, PackFile>; hashes: Map<string, string> };
+  constructor(dirs: string | string[] | { found: Map<string, PackFile>; hashes: Map<string, string> }, only?: string[], local: TypeDef[] = []) {
+    if (typeof dirs === 'object' && !Array.isArray(dirs)) (this.given = dirs), (dirs = []);
+    this.dirs = [dirs].flat(); this.dir = this.dirs[0] ?? '';
     this.only = only;
     this.local = [...local];
     this.reload();
@@ -152,7 +152,7 @@ export class Registry {
 
   reload(): void {
     // A workspace's own types are in its database, never in a folder another server started from here would read.
-    const { found, hashes, where } = readPackFolders<PackFile>(this.dirs, LOCAL_PACK);
+    const { found, hashes, where } = this.given ? { found: new Map(this.given.found), hashes: new Map(this.given.hashes), where: new Map<string, string>() } : readPackFolders<PackFile>(this.dirs, LOCAL_PACK);
     this.where = where;
     const own = ownPack(this.localPack(), this.items, LOCAL_PACK); if (own) found.set(LOCAL_PACK, own);
     const made = madePacks(this.items, found, LOCAL_PACK); this.made = new Map(made.packs.map((p) => [p.manifest.id, p])); this.madeWrong = made.wrong;
@@ -277,7 +277,7 @@ export class Registry {
     const verbs = ordered.flatMap((pack) => parts(pack).verbs);
     const tools = new Map<string, { pack: string; call: 'action' | 'view'; def: ActionDef | ViewDef }>();
     for (const pack of ordered) {
-      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), pack.id !== LOCAL_PACK && !this.made.has(pack.id) && existsSync(join(this.folderOf(pack.id), 'handler.js')));
+      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), !!this.given || (pack.id !== LOCAL_PACK && !this.made.has(pack.id) && existsSync(join(this.folderOf(pack.id), 'handler.js'))));
       if (declared.length) throw new Error(`Pack "${pack.id}": ${declared.join('; ')}`);
       for (const def of parts(pack).actions) tools.set(toolName(def.id), { pack: pack.id, call: 'action', def });
       // A lens preset is asked through the view tool, as any lens is: it is no tool of its own.
@@ -455,10 +455,10 @@ export class Registry {
 
   /** Take in the types and link types kept on the map; one that does not load leaves the registry as it was, and says why. */
   takeItems(items: TypeItem[]): void { const was = this.items; this.items = items; try { this.reload(); } catch (err) { this.items = was; this.reload(); throw err; } }
-  /** A registry like this one with these type items in place of its own: what a change that makes or changes one is checked against. */
   /** The folder a pack's files are in: where it was found, or the first folder for one not found. */
   folderOf(pack: string): string { return join(this.where.get(pack) ?? this.dir, pack); }
-  trial(items: TypeItem[], on: string[] = [], swap?: PackVersion): Registry { const r = new Registry(this.dirs, this.only, this.local); r.swap = swap; r.turnedOff = this.turnedOff.filter((p) => !on.includes(p)); r.madeOn = new Set([...this.madeOn, ...on]); r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
+  /** A registry like this one with these type items in place of its own: what a change that makes or changes one is checked against. */
+  trial(items: TypeItem[], on: string[] = [], swap?: PackVersion): Registry { const r = new Registry(this.given ?? this.dirs, this.only, this.local); r.swap = swap; r.turnedOff = this.turnedOff.filter((p) => !on.includes(p)); r.madeOn = new Set([...this.madeOn, ...on]); r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
   /** Take up the types defined here by another server on the same database. Returns whether any were new. */
   followLocal(defs: TypeDef[]): boolean {
     const added = defs.filter((t) => !this.local.some((l) => l.id === t.id));

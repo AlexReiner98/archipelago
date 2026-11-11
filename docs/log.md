@@ -985,6 +985,18 @@ at a position and each one's manifest blob, with the workspace's own
   to how manifests are read rebuilds it, and the manifests themselves never
   change.
 
+### As built: the registry as of P (11 Nov 2026, `src/registry-at.ts`)
+
+- `registryAt` reads the last pack fact of each pack up to fact position P and the manifest texts the log keeps by
+  hash, and builds a `Registry` from those manifests (given to it in place of folders). `asOf` projects under it
+  and gives it back, with the type items as they stood at P taken in after the walk (the owner's versions of
+  types, an island's pinned versions); the walk itself runs under the pack facts' registry alone.
+- What the log lacks is today's, and said: a manifest whose text was never kept is today's file when its hash is
+  the same, else today's file stands in (`stand_in`); a type the packs at P did not define is kept dormant from
+  today's registry. Before any pack fact there is no past registry. The islands setting is today's.
+- Manifests that no longer load under this server's code leave the read under today's registry, and `asOf` says
+  why (`past_refused`). A pack's code (handlers, layouts) is not on the log: nothing runs old code yet.
+
 ### In space: what a pack requires and uses
 
 A manifest declares, beside its types, links and the rest:
