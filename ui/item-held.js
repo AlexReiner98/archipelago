@@ -49,6 +49,12 @@ export async function heldBand(p, again) {
     whole.hidden = !whole.hidden;
     if (!whole.hidden && !whole.childElementCount) whole.append(proposalCard(p, names, again));
   };
+  // The reason and who asked share what the buttons leave, each cut in proportion to its length: a session's name can be
+  // as long as the reason, and the buttons stay in sight.
+  const by = who(p.actor, p.run_name);
+  by.classList.add('muted', 'small', 'cut');
+  by.style.flex = '0 1 auto';
+  if (p.run_name && !by.title.includes(p.run_name)) by.title = [p.run_name, by.title].filter(Boolean).join(' · ');
   return h(
     'section',
     { class: 'held-band needs', 'data-held': p.id },
@@ -56,8 +62,8 @@ export async function heldBand(p, again) {
       'div',
       { class: 'row-top' },
       h('span', { class: 'muted small', style: 'flex: none' }, 'Held for you'),
-      h('span', { class: 'grow', title: p.reason }, gist(p.reason)),
-      h('span', { class: 'muted small', style: 'flex: none' }, who(p.actor, p.run_name)),
+      h('span', { class: 'grow', style: 'flex: 1 1 auto', title: p.reason }, gist(p.reason)),
+      by,
       h('span', { class: 'muted small nowrap', style: 'flex: none' }, ago(p.ts)),
       p.ops.length > 1 && h('button', { class: 'quiet-button', style: 'flex: none', title: 'See each part of it, and leave out or correct any before applying', onclick: look }, `Look (${p.ops.length})`),
       ...buttons,
