@@ -343,13 +343,14 @@
       "id": "pack",
       "extends": "system",
       "title": "Pack",
-      "description": "A pack authored on the map: a way of working made of data alone, read beside the packs the server has. Its title is the pack's, its note what it is for, its name its id, and its manifest what it declares: types, links, rules, views (trees, screens, reasons for attention) and styles (looks, instructions, lenses), as a pack.json holds them (docs/packs.md). Every type, link type and rule it declares is named <name>.<what>. It runs no code: actions, handlers, layouts and reach are a server's packs' alone, and a rule in it only tightens, never keeps a stream or is lifted. It is checked whole when it is written, and it is off until the owner adds it (pack_set); the island rules judge it as any pack. Retired, it is taken out of the registry and its items turn dormant. An agent's edit of one waits for the owner.",
+      "description": "A pack authored on the map: a way of working made of data alone, read beside the packs the server has. Its title is the pack's, its note what it is for, its name its id, and its manifest what it declares: types, links, rules, views (trees, screens, reasons for attention) and styles (looks, instructions, lenses), as a pack.json holds them (docs/packs.md). Every type, link type and rule it declares is named <name>.<what>. It runs no code: actions, handlers, layouts and reach are a server's packs' alone (a version of a server's pack may carry code of its own, code, run on its islands alone), and a rule in it only tightens, never keeps a stream or is lifted. It is checked whole when it is written, and it is off until the owner adds it (pack_set); the island rules judge it as any pack. Retired, it is taken out of the registry and its items turn dormant. An agent's edit of one waits for the owner.",
       "statuses": { "open": ["draft", "current"], "closed": ["retired"], "phases": { "draft": "under_way", "current": "standing", "retired": "ended" } },
       "fields": {
         "name": { "type": "string", "description": "The pack's id: lower case letters, digits and _, starting with a letter, and no pack's on this server (e.g. recipes)." },
         "version": { "type": "string", "description": "Its version, e.g. 0.1.0: 0.1.0 unless said." },
         "version_of": { "type": "string", "description": "The pack this is a version of, by id, to try on an island (its field pack_version) while the rest of the map keeps that pack as it is: never added as a pack of its own. It declares the same types and link types as that pack, by the same ids, and may change their fields, its rules and its instructions." },
-        "manifest": { "type": "json", "large": true, "description": "What it declares, as an object with the keys of a pack.json a pack on the map may hold: requires, types, links, rules, views and styles, e.g. {\"types\": [{\"id\": \"recipes.dish\", \"title\": \"Dish\", \"description\": \"A dish we cook.\", \"extends\": \"record\"}]}. query schema shows the types there are to extend." }
+        "manifest": { "type": "json", "large": true, "description": "What it declares, as an object with the keys of a pack.json a pack on the map may hold: requires, types, links, rules, views and styles, e.g. {\"types\": [{\"id\": \"recipes.dish\", \"title\": \"Dish\", \"description\": \"A dish we cook.\", \"extends\": \"record\"}]}. query schema shows the types there are to extend." },
+        "code": { "type": "json", "large": true, "code": true, "description": "A version's own code: files by path (handler.js, layouts/x.js...), each a text, standing in for its pack's files of those paths. Only a version of a server's pack may carry it, and it runs on the islands that run the version alone, under the same walls as the pack's own. An agent's word for it always waits for the owner." }
       }
     },
     {
@@ -900,6 +901,12 @@
     {"id": "finding_option", "when": {"actor": "agent", "op": ["create", "update"], "type": "finding", "matches": {"title": "^(?:[Oo]ption|[Aa]lternative)\\b"}}, "then": "refuse", "say": "\"{title}\": an option is weighed, not found. Make it a question part_of the decision it answers (on a design island, a concept alternative_for it)."},
     {"id": "finding_bug", "when": {"actor": "agent", "op": ["create", "update"], "type": "finding", "matches": {"title": "^(?:[Bb]ug|BUG|[Ii]ssue)\\b"}}, "then": "refuse", "say": "\"{title}\": a fault is not a finding. Make it the work that fixes it (a bug, where the map has one; else a task), part_of what it is in."},
     {"id": "finding_claim", "when": {"actor": "agent", "op": ["create", "update"], "type": "finding", "matches": {"title": ", as .+ reads it$"}}, "then": "refuse", "say": "\"{title}\": a finding's title is the claim itself, as a sentence (\"Peak load is 42 kW\"), not who reads it."},
+    {
+      "id": "pack_code",
+      "when": { "actor": "agent", "op": ["create", "update"], "type": "pack", "fields": ["code"] },
+      "then": "hold",
+      "say": "Code a version of a pack runs on its island is code that runs on the server: the owner allows it."
+    },
     {
       "id": "code_runs",
       "when": { "actor": "agent", "op": ["create", "update"], "fields": ["code", "modules", "page_css", "writes"] },

@@ -183,9 +183,8 @@ the pack as it is (task e_j4bzhegb, `src/island-pin.ts`).
 
 - **A version is a pack item** whose `version_of` names the pack (one the
   server has or one kept as an item; never core). It holds what a pack item
-  may, and over its pack's manifest takes the place of those keys alone, so a
-  map pack's code stays as it is: never code, layouts, handlers, actions or
-  reach. It may change its types' fields, the rules, the views the kernel
+  may, and over its pack's manifest takes the place of those keys alone:
+  never layouts, handlers, actions or reach in its manifest. It may change its types' fields, the rules, the views the kernel
   draws (trees, screens, reasons for attention) and the styles (instructions,
   lenses, looks). It keeps every type and link type its pack declares, by the
   same ids, since items may be of them, and may add its own, named
@@ -198,8 +197,18 @@ the pack as it is (task e_j4bzhegb, `src/island-pin.ts`).
   runs the version. A link is judged by the version its from item's island
   runs. Rolled back, the island's items of an added type stay, as a pack's do
   when it is turned off, and no more are made.
+- **A version of a server's pack may carry code** (task e_7vezatrt,
+  `src/pack-code.ts`): its field `code`, files by path (`handler.js`,
+  `layouts/x.js`), each standing in for its pack's file of that path. It is
+  laid out in a folder of its own, kept by the hash of the whole, and runs
+  from there under the same walls as the pack's own, on the islands that run
+  the version alone: an action or a view called with `island` runs it, any
+  other call the map's. An agent's word for it always waits for the owner
+  (core's rule `pack_code`, which no setting lifts). A pack kept as an item,
+  and a version of one, carries none.
 - **An island runs it** by naming the item in its field `pack_version`; the
-  version must be of the pack the island speaks. Setting it is a change, and
+  version must be of the pack the island speaks, or of a map pack (one that
+  owns no type living on an island): one version per island. Setting it is a change, and
   unsetting it is the rollback: nothing is unwound.
 - **A registry per version.** The map's registry keeps each version and
   builds, on first ask, a registry with the version in its pack's place,

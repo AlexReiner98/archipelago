@@ -12,7 +12,7 @@ import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import 
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 import { parts, withoutAbsent, type Manifest } from './manifest.ts';
-import { readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts';
+import { readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts';
 import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from './phases.ts'; import { keepVersionTypes } from './version-types.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
@@ -141,8 +141,8 @@ export class Registry {
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
-  /** The manifests this registry was given in place of folders: the packs as the log said them at a past position (src/registry-at.ts). No code is read for them: a handler they declare is taken as it was said. */ private given?: { found: Map<string, PackFile>; hashes: Map<string, string> };
-  constructor(dirs: string | string[] | { found: Map<string, PackFile>; hashes: Map<string, string> }, only?: string[], local: TypeDef[] = []) {
+  /** The manifests this registry was given in place of folders: the packs as the log said them at a past position (src/registry-at.ts). Their code is read from `where` (src/pack-code.ts), as the log kept it, and a handler they declare is taken as it was said. */ private given?: { found: Map<string, PackFile>; hashes: Map<string, string>; where?: Map<string, string> };
+  constructor(dirs: string | string[] | { found: Map<string, PackFile>; hashes: Map<string, string>; where?: Map<string, string> }, only?: string[], local: TypeDef[] = []) {
     if (typeof dirs === 'object' && !Array.isArray(dirs)) (this.given = dirs), (dirs = []);
     this.dirs = [dirs].flat(); this.dir = this.dirs[0] ?? '';
     this.only = only;
@@ -152,11 +152,11 @@ export class Registry {
 
   reload(): void {
     // A workspace's own types are in its database, never in a folder another server started from here would read.
-    const { found, hashes, where } = this.given ? { found: new Map(this.given.found), hashes: new Map(this.given.hashes), where: new Map<string, string>() } : readPackFolders<PackFile>(this.dirs, LOCAL_PACK);
+    const { found, hashes, where } = this.given ? { found: new Map(this.given.found), hashes: new Map(this.given.hashes), where: new Map(this.given.where) } : readPackFolders<PackFile>(this.dirs, LOCAL_PACK);
     this.where = where;
     const own = ownPack(this.localPack(), this.items, LOCAL_PACK); if (own) found.set(LOCAL_PACK, own);
     const made = madePacks(this.items, found, LOCAL_PACK); this.made = new Map(made.packs.map((p) => [p.manifest.id, p])); this.madeWrong = made.wrong;
-    for (const p of [...made.packs, ...(this.swap ? [{ manifest: this.swap.manifest, hash: this.swap.hash }] : [])]) found.set(p.manifest.id, p.manifest), hashes.set(p.manifest.id, p.hash); this.versions = new Map(made.versions.map((v) => [v.item, v]));
+    for (const p of [...made.packs, ...(this.swap ? [{ manifest: this.swap.manifest, hash: this.swap.hash }] : [])]) found.set(p.manifest.id, p.manifest), hashes.set(p.manifest.id, p.hash); this.versions = new Map(made.versions.map((v) => [v.item, v])); if (this.swap?.code) where.set(this.swap.of, versionWhere(this.swap.of, join(where.get(this.swap.of) ?? this.dir, this.swap.of), this.swap.code)); // a version's own code runs from its own folder
 
     // Load in dependency order what is on and has what it requires; the rest waits or is off.
     const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK && !this.made.has(id)).map((id) => [id, 'not enabled on this server']));
