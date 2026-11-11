@@ -7,8 +7,14 @@
 // or link type (`type:event`) or a kind of event (`event:item.due`). Whichever active pack declares it provides it, so
 // a provider can be swapped without its consumers knowing. What a pack provides is read off what it declares, never
 // claimed. A bare pack id is the old form, kept for a bundle's two halves.
+//
+// What a pack reads of a type it does not own is named too (task e_f9x7ddeh): a field (`field:due@task`), a status
+// (`status:done@task`) or a phase some status stands in (`phase:finished@task`). It is checked by shape, as a record
+// type's width is: the type as its provider declares it (its lineage, and fields other packs add to it) may have more,
+// never less. A version in its provider's place is checked the same way (src/island-pin.ts).
 
-import type { PackFile } from './packs.ts';
+import { phasesOf } from './phases.ts';
+import type { PackFile, TypeDef } from './packs.ts';
 
 export type PackState = { state: 'active' | 'waiting' | 'off'; why?: string };
 
@@ -19,22 +25,69 @@ export const KERNEL_PACKS = ['core'];
 export const KERNEL_EVENTS = ['item.due', 'notification.made'];
 
 /** A name a pack requires or uses, read: what it asks for, and of what. A bare id is a pack: the old form. */
-export type Need = { by: 'has' | 'type' | 'event' | 'pack'; name: string };
-const FORMS = ['has', 'type', 'event'] as const;
+export type Need = { by: 'has' | 'type' | 'event' | 'field' | 'status' | 'phase' | 'pack'; name: string; of?: string };
+/** The forms that name what is read of a type: <what>@<type>. */
+const SHAPED = ['field', 'status', 'phase'] as const;
+const FORMS = ['has', 'type', 'event', ...SHAPED] as const;
+const shaped = (by: string) => (SHAPED as readonly string[]).includes(by);
 /** Whether a manifest's entry of requires or uses is a name in one of these forms; what they are, for its refusal. */
-export const isName = (n: unknown): n is string => typeof n === 'string' && /^([a-z]+:)?[\w.-]+$/.test(n) && (!n.includes(':') || (FORMS as readonly string[]).includes(n.split(':')[0]));
-export const NAME_FORMS = `a name is ${FORMS.map((f) => `${f}:<${f === 'has' ? 'capability' : f === 'type' ? 'id' : 'kind'}>`).join(', ')}, or a pack's id (the old form)`;
+export const isName = (n: unknown): n is string => {
+  const m = typeof n === 'string' ? /^(?:([a-z]+):)?([\w.-]+(@[\w.-]+)?)$/.exec(n) : null;
+  return !!m && (m[1] === undefined ? !m[3] : (FORMS as readonly string[]).includes(m[1]) && shaped(m[1]) === !!m[3]);
+};
+const SAYS: Record<string, string> = { has: 'capability', type: 'id', event: 'kind' };
+export const NAME_FORMS = `a name is ${FORMS.map((f) => `${f}:<${SAYS[f] ?? `${f}>@<type`}>`).join(', ')}, or a pack's id (the old form)`;
 export function needOf(name: string): Need {
   const at = name.indexOf(':');
   const by = name.slice(0, at) as Need['by'];
-  return at > 0 && (FORMS as readonly string[]).includes(by) ? { by, name: name.slice(at + 1) } : { by: 'pack', name };
+  if (at <= 0 || !(FORMS as readonly string[]).includes(by)) return { by: 'pack', name };
+  const rest = name.slice(at + 1);
+  if (!shaped(by)) return { by, name: rest };
+  const [what, of] = rest.split('@');
+  return { by, name: what, of };
+}
+
+type Decl = { pack: string; def: TypeDef };
+/** Each pack's own declaration of a type, among `all`. */
+const declsOf = (id: string, all: PackFile[]): Decl[] => all.flatMap((p) => (p.types ?? []).filter((t): t is TypeDef => !('of' in t) && t.id === id).map((def) => ({ pack: p.id, def })));
+/** A declaration and its ancestors', nearest first: a parent is read as the first pack that declares it. */
+function lineageOf(d: Decl, all: PackFile[]): Decl[] {
+  const chain = [d];
+  const parent = (c: Decl): Decl | undefined => (c.def.extends ? declsOf(c.def.extends, all)[0] : undefined);
+  for (let up = parent(d); up && !chain.some((c) => c.def.id === up!.def.id); up = parent(up)) chain.push(up);
+  return chain;
+}
+/** The head every type has (src/head.ts, ownHead): a need of one is met wherever the type is. */
+const HEAD = ['status', 'confidence', 'source', 'owner'];
+
+/** The packs that give a type, as each declares it, what a shaped need names: its declarer, or the pack adding the field. */
+function shapedProviders(need: Need, all: PackFile[]): string[] {
+  const out = new Set<string>();
+  for (const d of declsOf(need.of!, all)) {
+    const chain = lineageOf(d, all);
+    if (need.by === 'field') {
+      if (HEAD.includes(need.name) || chain.some((c) => c.def.fields?.[need.name])) out.add(d.pack);
+      for (const p of all) for (const t of p.types ?? []) if ('of' in t && chain.some((c) => c.def.id === t.of) && t.fields[need.name]) out.add(p.id);
+      continue;
+    }
+    const statuses = chain.find((c) => c.def.statuses)?.def.statuses;
+    if (!statuses) continue;
+    const has = need.by === 'status' ? [...statuses.open, ...statuses.closed].includes(need.name) : Object.values(phasesOf(statuses, chain.map((c) => c.def.statuses?.phases))).includes(need.name as never);
+    if (has) out.add(d.pack);
+  }
+  return [...out];
+}
+
+/** Why nobody provides a shaped need, as a phrase: no pack declares the type, or the type as each declares it lacks it. */
+function shapeMissing(need: Need, all: PackFile[]): string {
+  const by = [...new Set(declsOf(need.of!, all).map((d) => d.pack))];
+  return by.length ? `${need.of} as ${by.join(', ')} declare${by.length === 1 ? 's' : ''} it has no ${need.by} ${need.name}` : `no pack here declares ${need.of}`;
 }
 
 /**
  * The packs among `packs` that provide a name, by id: those declaring a type with that capability, the one declaring
- * that type or link type, the one whose handlers record that event (core for the kernel's), or the pack itself.
- * Where a provider must also fit what is asked of it (its type's fields and statuses, checked by shape), that check
- * belongs here (task e_f9x7ddeh: what a pack needs of a type, checked by shape).
+ * that type or link type, the one whose handlers record that event (core for the kernel's), the one whose type has
+ * the field, status or phase asked of it (by shape: more is fine, less is none), or the pack itself.
  */
 export function providersOf(name: string, packs: Iterable<PackFile>): string[] {
   const need = needOf(name);
@@ -46,6 +99,7 @@ export function providersOf(name: string, packs: Iterable<PackFile>): string[] {
     case 'type': return of((p) => own(p).some((t) => t.id === need.name) || (p.links ?? []).some((r) => r.id === need.name));
     case 'event': return KERNEL_EVENTS.includes(need.name) ? of((p) => KERNEL_PACKS.includes(p.id)) : of((p) => (p.handlers ?? []).some((h) => !('schedule' in h) && (h.records ?? []).includes(need.name)));
     case 'pack': return of((p) => p.id === need.name);
+    default: return shapedProviders(need, all);
   }
 }
 
@@ -78,7 +132,7 @@ export function orderPacks(found: Map<string, PackFile>, off: Map<string, string
         if (states.some((s) => s.state === 'active')) continue;
         const need = needOf(name);
         const why = need.by === 'pack' ? `needs ${name}, which is ${states[0]?.state ?? 'not on this server'}`
-          : !providers.length ? `needs ${name}: no pack here provides it`
+          : !providers.length ? `needs ${name}: ${need.of ? shapeMissing(need, [...found.values()]) : 'no pack here provides it'}`
           : `needs ${name}, which ${states.map((s) => `${s.id} is ${s.state}`).join(', ')}`;
         return set(pack, { state: 'waiting', why });
       }

@@ -96,6 +96,15 @@ consumers stay active (`src/packorder.ts`). A name is one of:
 | `has:<capability>` | any pack declaring a type with that capability (`has:when`) |
 | `type:<id>` | the one pack declaring that type or link type (`type:event`) |
 | `event:<kind>` | core for the kernel's (`item.due`, `notification.made`), else the pack whose handlers record it |
+| `field:<field>@<type>` | the pack declaring that type, when it or an ancestor has the field; or the pack adding it (`of`) |
+| `status:<status>@<type>`, `phase:<phase>@<type>` | the pack declaring that type, when its statuses (its own or inherited) have it, or one in that phase |
+
+The last three are what a pack reads of a type it does not own, checked by
+shape (task e_f9x7ddeh): the type as its provider declares it may have more,
+never less. A pack whose need the map's provider does not meet waits, saying
+what the type lacks, and an island may not run a version of a pack that drops
+what an active pack needs: the pin is refused, naming that pack and the name
+(`src/island-pin.ts`).
 
 What a pack provides is read off what it declares: there is no key to claim
 it. A bare pack id is the old form, kept for a bundle's two halves.

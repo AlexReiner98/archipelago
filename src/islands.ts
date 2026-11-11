@@ -110,7 +110,7 @@ export function islandProblems(m: Manifest, shared: Shared): string[] {
   for (const t of p.types) if (t.extends && !fine(t.extends)) named.add(t.extends);
   for (const r of p.relations) for (const end of [...r.from, ...r.to]) if (!fine(end)) named.add(end);
   for (const r of m.rules ?? []) for (const t of [r.when?.type, r.type].flat()) if (typeof t === 'string' && !fine(t)) named.add(t);
-  for (const r of m.requires ?? []) { const n = needOf(r); if (n.by === 'type' && !fine(n.name) && !links.has(n.name) && !shared.links.has(n.name)) named.add(n.name); }
+  for (const r of m.requires ?? []) { const n = needOf(r); if (n.by === 'type' && !fine(n.name) && !links.has(n.name) && !shared.links.has(n.name)) named.add(n.name); if (n.of && !fine(n.of)) named.add(n.of); }
   if (named.size) problems.push(`it names ${[...named].join(', ')}, not its own nor in the shared set (${[...shared.types].join(', ')})`);
   const built = p.relations.filter((r) => r.extends && !links.has(r.extends) && !shared.links.has(r.extends)).map((r) => `${r.id} extends ${r.extends}`);
   if (built.length) problems.push(`its links extend another pack's (${built.join('; ')}): only the kernel's or its own`);

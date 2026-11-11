@@ -86,7 +86,10 @@ export async function pinRefusals(map: Archipelago, reg: Registry, ops: Op[]): P
     if (!version) { errors.push(`${where}: ${reg.madeWrong.has(item) ? `the pack item ${item} is no version: ${reg.madeWrong.get(item)}` : `"${item}" is no version of a pack here: a pack item whose version_of names the pack`}`); continue; }
     if (!mayRun(reg, version.of, island)) { errors.push(`${where}: ${item} is a version of ${version.of}, and this island speaks ${String(island.props.pack ?? 'none')}`); continue; }
     const run = versionRegistry(reg, item);
-    if (run instanceof Error) errors.push(`${where}: the version ${item} of ${version.of} does not load: ${run.message}`);
+    if (run instanceof Error) { errors.push(`${where}: the version ${item} of ${version.of} does not load: ${run.message}`); continue; }
+    // A pack active on the map that would wait under the version: it drops what that one reads (by shape, src/packorder.ts).
+    const left = run ? [...reg.states].filter(([id, s]) => s.state === 'active' && run.states.get(id)?.state === 'waiting').map(([id]) => `${id} ${run.states.get(id)!.why}`) : [];
+    if (left.length) errors.push(`${where}: the version ${item} of ${version.of} drops what a pack here needs: ${left.join('; ')}`);
   }
   return errors;
 }
