@@ -195,13 +195,17 @@ const clockHours = (t: unknown) => {
   return n >= 0 && n <= 24 ? n : undefined;
 };
 
+const DAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+/** A day of the week as 1 (Monday) to 7: a number, or a name or its first three letters ("mon"). */
+const dayNumber = (d: unknown) => (typeof d === 'string' && d.trim().length >= 3 && !/^\d+$/.test(d.trim()) ? DAY_NAMES.findIndex((n) => n.startsWith(d.trim().toLowerCase())) + 1 : Number(d));
+
 /**
  * The hours a repeating thing holds on a day, if it falls on it: not before it starts or after it ends, not on a
  * day skipped or done. `made` is the day it was made, the start when it names none.
  */
 export function occurs(repeat: Repeat, p: Record<string, unknown>, day: string, made?: string): [number, number] | undefined {
   const list = (key: string | undefined) => (key && Array.isArray(p[key]) ? (p[key] as unknown[]) : undefined);
-  const days = list(repeat.days)?.length ? list(repeat.days)!.map(Number) : [1, 2, 3, 4, 5, 6, 7];
+  const days = list(repeat.days)?.length ? list(repeat.days)!.map(dayNumber) : [1, 2, 3, 4, 5, 6, 7];
   if (!days.includes(new Date(`${day}T12:00:00Z`).getUTCDay() || 7)) return undefined;
   const text = (key: string | undefined) => (key && typeof p[key] === 'string' ? (p[key] as string) : undefined);
   const starts = text(repeat.starts) ?? made;

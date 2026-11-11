@@ -28,7 +28,8 @@ const dayIn = (at: number, zone: string) => new Intl.DateTimeFormat('en-CA', { t
 /** The occurrences of these items that begin after `from` and at or before `to`, in a zone, earliest first. */
 export function dueBetween(l: Archipelago, items: Pick<Entity, 'id' | 'type' | 'title' | 'props' | 'created_at' | 'status' | 'is_open'>[], from: number, to: number, zone: string): Due[] {
   // From the start of the day `from` falls on: a repeat is laid out a whole day at a time.
-  const axis = { from: dayIn(from, zone), to: new Date(to).toISOString(), by: ['when' as const] };
+  // To a moment past `to`: the axis keeps what begins before its end, and what begins at `to` itself is due.
+  const axis = { from: dayIn(from, zone), to: new Date(to + 1).toISOString(), by: ['when' as const] };
   const out: Due[] = [];
   for (const e of items)
     for (const span of spansOf(l, e, axis, zone)) {

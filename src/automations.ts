@@ -4,7 +4,9 @@
 // agent proposes does nothing until a human approves it. Every firing is
 // logged with its result.
 
-import { AUTOMATION_TOOLS, checkAutomation, weekdays } from './automation-rules.ts';
+import { AUTOMATION_TOOLS, checkAutomation } from './automation-rules.ts';
+import { dueBetween } from './due.ts';
+import { dayStart, zoneOf } from './timeaxis.ts';
 import { lastSeq, readEvents } from './eventlog.ts';
 import { launch } from './launcher.ts';
 import type { Entity, Archipelago } from './pelago.ts';
@@ -80,7 +82,7 @@ export class Automations {
           const hits = events.filter((ev) => matches(p.on_action as string, ev.action));
           // One launch per pass however many events matched; a notification for each.
           for (const ev of p.action === 'launch' ? hits.slice(0, 1) : hits) fired.push(await this.fire(auto, now, ev));
-        } else if (this.due(auto, now)) {
+        } else if (await this.due(auto, now)) {
           fired.push(await this.fire(auto, now));
         }
       }
@@ -96,15 +98,17 @@ export class Automations {
     return Boolean(last && (await this.l.entity(last))?.is_open);
   }
 
-  private due(auto: Entity, now: Date): boolean {
+  private async due(auto: Entity, now: Date): Promise<boolean> {
     const last = auto.props.last_fired ? new Date(auto.props.last_fired as string) : undefined;
     if (auto.props.trigger === 'every') return !last || now.getTime() - last.getTime() >= (auto.props.every_minutes as number) * 60_000;
     if (auto.props.trigger === 'daily' || auto.props.trigger === 'weekly') {
-      // A weekly one is a daily one on its days alone (getDay counts Sunday as 0).
-      if (auto.props.trigger === 'weekly' && !weekdays(auto.props.days)?.includes(now.getDay() || 7)) return false;
-      const [h, m] = (auto.props.at as string).split(':').map(Number);
-      const slot = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
-      return now >= slot && (!last || last < slot);
+      // Its when (at, on its days; a daily one every day), as the clock counts it (src/due.ts): in the workspace's zone.
+      // Since it last fired, else since the start of today; a day at most.
+      const zone = await zoneOf(this.l);
+      const day = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+      const from = Math.max(last?.getTime() ?? dayStart(day, zone), now.getTime() - 86_400_000);
+      const timed = auto.props.trigger === 'daily' ? { ...auto, props: { ...auto.props, days: undefined } } : auto;
+      return dueBetween(this.l, [timed], from, now.getTime(), zone).length > 0;
     }
     return false;
   }
