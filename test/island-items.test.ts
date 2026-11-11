@@ -38,23 +38,23 @@ test('an item names its island, and its type is the island’s pack’s or of th
   const { a, b, c } = await make(l, [
     { op: 'create', ref: 'a', type: 'island', title: 'Billing', props: { pack: 'plain' } },
     { op: 'create', ref: 'b', type: 'island', title: 'Hiring', props: { pack: 'other' } },
-    { op: 'create', ref: 'c', type: 'island', title: 'Plans', props: { pack: 'core' } },
+    { op: 'create', ref: 'c', type: 'island', title: 'Plans', props: { pack: 'calendar' } },
   ]);
   assert.equal((await l.entity(a))!.props.pack, 'plain', 'an island is the kernel’s own: it lives on none');
   const { n } = await make(l, [{ op: 'create', ref: 'n', type: 'plain_thing', title: 'Named none' }]);
   assert.equal((await l.entity(n))!.props.island, a, 'naming none, it goes on the one island it fits');
   await refused(l, [{ op: 'create', type: 'plain_thing', title: 'Abroad', props: { island: b } }], /plain_thing is plain’s, and the island .* speaks other/);
-  await refused(l, [{ op: 'create', type: 'event', title: 'Not shared', props: { island: a } }], /event is core’s/);
+  await refused(l, [{ op: 'create', type: 'event', title: 'Not shared', props: { island: a } }], /event is calendar’s/);
   await refused(l, [{ op: 'create', type: 'plain_thing', title: 'On a task', props: { island: 'e_nothere' } }], /"e_nothere" is no island/);
   await refused(l, [{ op: 'create', type: 'island', title: 'Of nothing', props: { pack: 'nope' } }], /an island speaks a pack active here/);
   const { t, s, g, p } = await make(l, [
     { op: 'create', ref: 't', type: 'plain_thing', title: 'Invoice run', props: { island: a } },
     { op: 'create', ref: 's', type: 'task', title: 'Shared task', props: { island: b } },
-    { op: 'create', ref: 'g', type: 'event', title: 'Core event', props: { island: c } },
+    { op: 'create', ref: 'g', type: 'event', title: 'Calendar event', props: { island: c } },
     { op: 'create', ref: 'p', type: 'person', title: 'Ann' },
   ]);
   assert.equal((await l.entity(t))!.props.island, a);
-  assert.ok(s && g, 'a shared type lives on any island; a core island speaks core');
+  assert.ok(s && g, 'a shared type lives on any island; a calendar island speaks calendar');
   await make(l, [{ op: 'update', id: t, owner: p }]); // an actor is linked from any island
   await refused(l, [{ op: 'update', id: a, props: { pack: 'other' } }], /an island’s pack is fixed once it is made/);
   await refused(l, [{ op: 'update', id: t, props: { island: null } }], /lives on an island here/);
@@ -169,10 +169,10 @@ test('a flat answer names, after its pack, every other type and link type in use
   assert.ok(links.includes('depends_on'), `the link in use within it: ${links.join(', ')}`);
 });
 
-test("core's legend on an island is task, decision, finding and event, and the links an island's work is drawn with", () => {
+test("core's legend on an island is task, decision and finding (event is calendar's), and the links an island's work is drawn with", () => {
   const reg = new Registry(join(import.meta.dirname, '..', 'packs'));
   const types = [...reg.types.values()].filter((t) => t.pack === 'core' && typeOnLegend(t)).map((t) => t.id).sort();
   const links = [...reg.relations.values()].filter((r) => r.pack === 'core' && linkOnLegend(r)).map((r) => r.id).sort();
-  assert.deepEqual(types, ['decision', 'event', 'finding', 'task']);
+  assert.deepEqual(types, ['decision', 'finding', 'task']);
   assert.deepEqual(links, ['about', 'bears_on', 'depends_on', 'involves', 'link', 'lives_in', 'needs', 'owned_by', 'part_of', 'produced', 'reads', 'serves', 'uses', 'waits_on']);
 });

@@ -26,7 +26,7 @@ const bench = {
   reach: { webhooks: [{ id: 'bench.count', secret: 'count' }] },
 };
 const PACKS_DIR = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
-cpSync(join(PACKS, 'core'), join(PACKS_DIR, 'core'), { recursive: true });
+for (const name of ['core', 'practice']) cpSync(join(PACKS, name), join(PACKS_DIR, name), { recursive: true }); // practice: settle_why moved there
 for (const name of ['checkout', 'reacher']) cpSync(join(PACKS, '..', 'test', 'packs', name), join(PACKS_DIR, name), { recursive: true });
 mkdirSync(join(PACKS_DIR, 'bench'));
 writeFileSync(join(PACKS_DIR, 'bench', 'pack.json'), JSON.stringify(bench));

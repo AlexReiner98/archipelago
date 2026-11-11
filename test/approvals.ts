@@ -140,7 +140,7 @@ export function checkPolicy(policyName: string, part: number) {
     const table: Record<string, string> = {};
     for (const settingName of settings) {
       const setting = SETTINGS[settingName];
-      const base = await freshWith(new Registry([PACKS, join(import.meta.dirname, 'packs'), join(import.meta.dirname, 'fixtures', 'packs')], ['core', 'claims', 'pages']));
+      const base = await freshWith(new Registry([PACKS, join(import.meta.dirname, 'packs'), join(import.meta.dirname, 'fixtures', 'packs')], ['core', 'practice', 'claims', 'pages'])); // practice: settle_why moved there
       const l = new Archipelago(base.db, base.registry, policy);
       for (const [key, value] of Object.entries(setting)) await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb)`, [key, JSON.stringify(value)]);
       for (const [actorName, who] of Object.entries(ACTORS))
