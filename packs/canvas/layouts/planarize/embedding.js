@@ -99,7 +99,7 @@ function measured({ g, number }) {
  * style's, which say how much work threading and mending may count.
  */
 export function embedding(m, { headless = [], islandOf = () => null, trunks: joinTrunks = true, oneWay = true, down = 'all', sizes } = {}) {
-  for (const name of ['planarize_repair_rounds', 'planarize_repair_step', 'planarize_repair_work', 'planarize_starts_work', 'planarize_starts_most', 'planarize_order_rounds']) if (typeof sizes?.[name] !== 'number') throw new Error(`The style names no size "${name}": the house style (packs/core/pack.json) names every one planarize uses`);
+  for (const name of ['planarize_repair_rounds', 'planarize_repair_step', 'planarize_repair_work', 'planarize_starts_work', 'planarize_starts_most', 'planarize_order_rounds']) if (typeof sizes?.[name] !== 'number') throw new Error(`The style names no size "${name}": the house style (packs/canvas/pack.json) names every one planarize uses`);
   const made = (id) => m.nodes.get(id)?.made ?? Infinity, steps = [...m.nodes.keys()];
   const { wires: ways } = directed(joined(m, headless), steps, made);
   const joinedUp = joinTrunks ? withTrunks(ways, made, islandOf) : { wires: ways, junctions: [], trunks: 0 }, { junctions, trunks } = joinedUp;

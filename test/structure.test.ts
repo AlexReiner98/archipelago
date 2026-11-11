@@ -266,7 +266,7 @@ const SHAPES = /(?:LENS_SHAPES|SHAPES) = \{([^}]*)\}/;
 
 test('the kernel draws no shape of its own: each is a drawing a pack ships', () => {
   const counted = Object.fromEntries(['ui/query.js', 'ui/doc-lens.js'].map((f) => [f, (SHAPES.exec(read(f))?.[1] ?? '').split(',').filter((s) => s.trim()).length]));
-  assert.deepEqual(ratchet(counted, KERNEL_SHAPES), [], "Make the shape a drawing in a pack (pack.json drawings: its modules, entered at index.js, answering with marks), as packs/core/layouts/architecture is.");
+  assert.deepEqual(ratchet(counted, KERNEL_SHAPES), [], "Make the shape a drawing in a pack (pack.json drawings: its modules, entered at index.js, answering with marks), as packs/canvas/layouts/architecture is.");
 });
 
 // 12. One name for each idea (docs/glossary.md; Rule 9 of the rework's target model, the owner, 23 Oct 2026). The
@@ -446,7 +446,7 @@ function lengthsIn(text: string) {
 test('a length in a drawing is named on the style', () => {
   const files = packIds.flatMap((p) => walk(`packs/${p}/layouts`)).filter((f) => f.endsWith('.js'));
   const counted = Object.fromEntries(files.map((f) => [short(f), lengthsIn(read(f))]).filter(([, n]) => (n as number) > 0));
-  assert.deepEqual(ratchet(counted, LENGTHS_IN_DRAWINGS), [], 'Name it: a size in the style (packs/core/pack.json), read from there, as the flow reads flow_wire_gap.');
+  assert.deepEqual(ratchet(counted, LENGTHS_IN_DRAWINGS), [], 'Name it: a size in the style (packs/canvas/pack.json), read from there, as the flow reads flow_wire_gap.');
 });
 
 // 20. A wired drawing is layers, each reading those before it (docs/layouts.md; design e_49yk2trw, 30 Oct 2026). A module

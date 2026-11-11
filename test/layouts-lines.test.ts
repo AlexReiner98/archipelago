@@ -1,9 +1,9 @@
-// A step's name cut to fit (packs/core/layouts/flow/lines.js), without a database: the start a cut keeps is found by
+// A step's name cut to fit (packs/canvas/layouts/flow/lines.js), without a database: the start a cut keeps is found by
 // halving (task e_e2qv3dsh), and is the one a cut a character at a time from the end found, in far fewer measures.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error A drawing's module is plain JavaScript, typed by nothing.
-import { cut, lines, longest } from '../packs/core/layouts/flow/lines.js';
+import { cut, lines, longest } from '../packs/canvas/layouts/flow/lines.js';
 
 /** How wide a text is, near enough to a face: each character its own width, by what it is. */
 const widthOf = (text: string) => [...text].reduce((w, c) => w + (/[il.,' ]/.test(c) ? 3 : /[mwMW…]/.test(c) ? 11 : /[A-Z]/.test(c) ? 8 : 6.5), 0);

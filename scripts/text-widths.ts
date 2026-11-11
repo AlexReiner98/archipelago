@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { open } from '../test/browser.ts';
 
-const pack = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'core', 'pack.json'), 'utf8'));
+const pack = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'canvas', 'pack.json'), 'utf8'));
 const font: string = pack.styles.find((s: { id: string }) => s.id === 'core.house').props.font;
 const chars = [...Array.from({ length: 95 }, (_, n) => String.fromCharCode(32 + n)), ...Array.from({ length: 96 }, (_, n) => String.fromCharCode(160 + n)), ...'‘’“”–—…·•→←×€'].join('');
 const page = await open('about:blank');

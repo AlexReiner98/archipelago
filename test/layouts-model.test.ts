@@ -1,4 +1,4 @@
-// The kit's model of the map (packs/core/layouts/kit/model.js), run as the page loads it, with no database: the order
+// The kit's model of the map (packs/canvas/layouts/kit/model.js), run as the page loads it, with no database: the order
 // sorted by the links' ways. The kit's lanes, bundles and bands went with the strips layout (tag archive/layouts-2026-11-09).
 
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { drawings, setOut } from './wired.ts';
 
 const map = drawings.find((d) => d.id === 'core.map')!;
-const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs/core/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
+const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs/canvas/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const measure = (text: string, px: number) => text.length * px * 0.55;
 const item = (id: string, more: Record<string, unknown> = {}) => ({ id, type: 'task', title: `Step ${id}`, open: true, created_at: `2026-11-0${id.length}T00:00:${id.padStart(2, '0').slice(-2)}Z`, ...more });
 const dep = (from: string, to: string) => ({ type: 'depends_on', from, to });

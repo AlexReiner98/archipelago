@@ -89,3 +89,25 @@ test('a declaration is held again by its id, or by the kernel’s name under the
   assert.ok(!holdsMoved(pack('b', 'core.kept'), gone));
   assert.deepEqual([...declaredIds({ rules: [{ id: 'r' }], views: [{ id: 'v' }], types: [{ id: 't' }] })], ['r', 'v']);
 });
+
+/** The packs as they were before canvas took the look (decision e_fgsgw8ja): its declarations back in core, no canvas folder. */
+function beforeCanvas(): string {
+  const dir = packsWith();
+  const core = read('core'), canvas = read('canvas');
+  for (const key of ['views', 'layouts', 'styles'] as const) core[key] = [...(core[key] ?? []), ...(canvas[key] ?? []).filter((d) => (d as { id: string }).id.startsWith('core.'))];
+  writeFileSync(join(dir, 'core', 'pack.json'), JSON.stringify(core));
+  rmSync(join(dir, 'canvas'), { recursive: true });
+  return dir;
+}
+
+test('a map that had core before canvas took the look is given canvas, once, and draws in the house style', async () => {
+  const old = await mapOn(beforeCanvas());
+  await old.change(human, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Made before the move' }] });
+  await syncPacks(old);
+  const now = await mapOn(packsWith(), old.db);
+  assert.ok((await syncPacks(now)).some((f) => f[0] === '+' && /pack:canvas$/.test(f[1])), 'given canvas');
+  assert.ok(!(await packsOff(now)).includes('canvas'), 'on, as core’s look was');
+  assert.deepEqual((await syncPacks(now)).filter((f) => /pack:canvas$/.test(f[1])), [], 'once');
+  await syncTypes(now);
+  assert.ok(now.registry.packs.some((p) => (p.layouts ?? []).some((d) => d.id === 'core.map')), 'the map drawing is there under its id');
+});

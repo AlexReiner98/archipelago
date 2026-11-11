@@ -290,8 +290,9 @@ Adding or taking out a pack is a fact on the workspace's log, kept forever:
 SHA-256 of its `pack.json`, its `text` kept with it the first time the log
 meets that hash, and `["-", "pack:<id>", "pack"]` (docs/log.md, section 8).
 Adding a pack is the owner's: a new workspace starts with the kernel's
-(core) alone, or those the server names (`PELAGO_START_PACKS`, a list or
-`all`), and a pack new to the server is off in a workspace until its owner
+(core), the packs that keep core's ids (`core.x`: canvas, sessions; what
+core shipped stays shipped, `keepsKernel` in `src/pack-moved.ts`), and those
+the server names (`PELAGO_START_PACKS`, a list or `all`), and a pack new to the server is off in a workspace until its owner
 adds it. A workspace that opens asserts again a pack it has whose manifest
 changed. A pack that holds now what a pack it names in `moved_from` declared once (a
 rule, view, style, action or layout, by its id or with `<that pack>.`

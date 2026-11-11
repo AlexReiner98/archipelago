@@ -95,11 +95,11 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   // Every length is the style's (sizes, flow_*), named by the house style; so is the typeface.
   const z = (name) => {
     const v = style.sizes?.[`flow_${name}`];
-    if (typeof v !== 'number') throw new Error(`The style names no size "flow_${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
+    if (typeof v !== 'number') throw new Error(`The style names no size "flow_${name}": the house style (packs/canvas/pack.json) names every one a drawing uses`);
     return v;
   };
   const NOTE = style.numbers?.note_opening_cut;
-  if (typeof NOTE !== 'number') throw new Error('The style names no number "note_opening_cut": the house style (packs/core/pack.json) names every one a drawing uses');
+  if (typeof NOTE !== 'number') throw new Error('The style names no number "note_opening_cut": the house style (packs/canvas/pack.json) names every one a drawing uses');
   // A text is measured as it is drawn: in the plain face, or as one of the style's text roles (type), such as water.
   const measure = (text, px, role) => {
     const as = role && style.type?.[role];
@@ -115,7 +115,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
   // all, 1 wholly, more to lean further), from the shape it takes when the pane's is not known (flow_aspect).
   const [ASPECT, FOLLOW] = ['flow_aspect', 'flow_aspect_follow'].map((name) => {
     const v = style.numbers?.[name];
-    if (typeof v !== 'number') throw new Error(`The style names no number "${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
+    if (typeof v !== 'number') throw new Error(`The style names no number "${name}": the house style (packs/canvas/pack.json) names every one a drawing uses`);
     return v;
   });
   const pane = width > 0 && height > 0 ? width / height : ASPECT;

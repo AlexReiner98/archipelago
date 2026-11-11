@@ -70,9 +70,9 @@ export const SLOW: Record<string, string> = {
   'test/approvals-mixed-1.test.ts': 'table',
   'test/approvals-mixed-2.test.ts': 'table',
   // The map of a few hundred items drawn whole through its budget, timed: about 22 seconds.
-  'packs/core/map-time.test.ts': 'timed',
+  'packs/canvas/map-time.test.ts': 'timed',
   // Dense pictures drawn six times over, each checked: about 22 seconds.
-  'packs/core/map-routing.test.ts': 'long',
+  'packs/canvas/map-routing.test.ts': 'long',
   // Many tests in one file, past LONG seconds of one process in CI (test/weights.json, 8 Nov 2026).
   'test/sessions.test.ts': 'long',
   'test/oauth.test.ts': 'long',

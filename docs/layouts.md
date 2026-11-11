@@ -2,7 +2,7 @@
 
 Every picture is drawn by a drawing: code a pack ships for one shape, which the owner changes on the map, run in the browser's sandbox and answering with marks the page checks. The kernel keeps only the frame every picture has (the stage that pans and zooms, the key, the bar, a published page's still frame) and draws no shape of its own.
 
-Core ships one drawing, **Map** (`core.map`, shape `map`; the owner, 9 Nov 2026): the whole graph made plane at once, islands and their ports with it, given right angles with the fewest bends, then its distances relaxed keeping that shape. Its entry and marks are the flow's (`layouts/flow/index.js`), its layout `layouts/map/layout.js`, built on `planarize/`, `shape/` and `relax/`. Core's house style draws every view with it; a hosted pack's preset (the canvas pack's) that still names an old shape draws it too. A style or saved view that names a shape no pack draws (one retired below) is drawn by the first drawing the packs ship, so nothing kept stops drawing (`src/layouts.ts`). A view is always fitted into sight until the reader moves it; there is no Fit setting.
+The canvas pack (`packs/canvas`, moved out of core with its ids on 11 Nov 2026, decision e_fgsgw8ja) ships one drawing, **Map** (`core.map`, shape `map`; the owner, 9 Nov 2026): the whole graph made plane at once, islands and their ports with it, given right angles with the fewest bends, then its distances relaxed keeping that shape. Its entry and marks are the flow's (`layouts/flow/index.js`), its layout `layouts/map/layout.js`, built on `planarize/`, `shape/` and `relax/`. The house style (`core.house`, canvas's) draws every view with it; canvas's own preset, which still names an old shape, draws it too. Every map starts with canvas: the page reads its numbers off the house style, so a map without it draws nothing. A style or saved view that names a shape no pack draws (one retired below) is drawn by the first drawing the packs ship, so nothing kept stops drawing (`src/layouts.ts`). A view is always fitted into sight until the reader moves it; there is no Fit setting.
 
 **Rails** (`core.rails`, shape `rails`; decision e_btxq2nzq) is the shipped map with a walk through it: its picture is core.map's, mark for mark (`layouts/rails/index.js` runs `layouts/flow/index.js` as `map.js`), so a page baked from a view looks as the product does. Every item drawn is a stop, read in the view's order (`walk.js`: an `order` field first, then what an item depends on before it, then the answer's order), and each item's mark says its `item`. Beside the marks its scene carries `stops` (each item's id, title, first paragraph, and the camera on it: `x`, `y`, the `span` of picture it frames, `zoom` against the whole, read off where the map put it, `places`) and `whole`. A page baked from it is walked by scrolling with `packs/reader/public/rails.js` and `rails.css` (the markup they read is in rails.js's head): wide, the map fills a screen held still and scroll only moves its camera: the stop at rest is lit, the rest dimmed, and its words stand in one callout beside its box, a dot row at the foot the walk (question e_m7tssx3y); at `rails_narrow_at` or less, a column of cards with a wire between; asked for less motion, or with no script, a plain page of titles and notes. The camera's lengths are `rails_stop_span` and `rails_stop_room`; the page's the other `rails_*` sizes.
 
@@ -13,16 +13,16 @@ On 9 Nov 2026 the owner kept Map alone, to bring the others back one by one as t
 | Layout | Shape | Where it was |
 | --- | --- | --- |
 | List | `list` | the kernel's own (`ui/list.js`, `ui/list.css`) |
-| Flow | `flow` | `packs/core/layouts/flow/` (`layout.js`, `solve.js`, `combs.js`, `ports.js`...) |
-| Strips | `strips` | `packs/core/layouts/strips/`, on the kit's `lanes.js`, `bundle.js`, `bands.js` |
-| Rows | `rows` | `packs/core/layouts/rows/` |
-| Cola | `cola` | `packs/core/layouts/cola/` |
-| Grid | `grid` | `packs/core/layouts/grid/` |
-| Time | `time` | `packs/core/layouts/time/` |
-| Architecture | `architecture` | `packs/core/layouts/architecture/` (Map keeps its `marks.js`, `play.js`, `story-look.js`) |
-| Pages | `pages` | `packs/core/layouts/pages/`: a document written beside its live draft went with it (`test/docs-beside.test.ts`) |
+| Flow | `flow` | `packs/canvas/layouts/flow/` (`layout.js`, `solve.js`, `combs.js`, `ports.js`...) |
+| Strips | `strips` | `packs/canvas/layouts/strips/`, on the kit's `lanes.js`, `bundle.js`, `bands.js` |
+| Rows | `rows` | `packs/canvas/layouts/rows/` |
+| Cola | `cola` | `packs/canvas/layouts/cola/` |
+| Grid | `grid` | `packs/canvas/layouts/grid/` |
+| Time | `time` | `packs/canvas/layouts/time/` |
+| Architecture | `architecture` | `packs/canvas/layouts/architecture/` (Map keeps its `marks.js`, `play.js`, `story-look.js`) |
+| Pages | `pages` | `packs/canvas/layouts/pages/`: a document written beside its live draft went with it (`test/docs-beside.test.ts`) |
 
-To read one: `git show archive/layouts-2026-11-09:packs/core/layouts/<folder>/<file>`. To bring one back: `git checkout archive/layouts-2026-11-09 -- packs/core/layouts/<folder>`, its entry in `layouts` and its shape in the style's `shape` enum in `packs/core/pack.json`, and its tests (`git show --stat archive/layouts-2026-11-09` lists them; `git diff archive/layouts-2026-11-09 -- test packs/core` shows what went). Much of what follows (Wired drawings, Levels and ports) was written of the flow and holds of Map where it reuses the flow's modules.
+To read one: `git show archive/layouts-2026-11-09:packs/canvas/layouts/<folder>/<file>`. To bring one back: `git checkout archive/layouts-2026-11-09 -- packs/canvas/layouts/<folder>`, its entry in `layouts` and its shape in the style's `shape` enum in `packs/core/pack.json`, and its tests (`git show --stat archive/layouts-2026-11-09` lists them; `git diff archive/layouts-2026-11-09 -- test packs/core` shows what went). Much of what follows (Wired drawings, Levels and ports) was written of the flow and holds of Map where it reuses the flow's modules.
 
 ## Where a drawing comes from
 
@@ -125,7 +125,7 @@ Every picture is drawn the same way, whatever its size: a planar drawing of each
 
 ### One budget
 
-A picture of any size draws well inside the page's twelve seconds: what makes it look better than it must spends from one budget per picture, `flow_picture_work` (`flow/effort.js`). That is each trial of a part past the first (`flow_part_work` for each item times link), the second drawing of a level (it costs what the first did), the wires' shaping (each two stretches of wires held against one another) and each split of a bundle at sea. Once it is spent, each takes its plain way: one trial, combs alone, the first wires, the bundle as it is. Work is counted, never timed, so a picture is the same on every machine and each time it is asked. A layout kept from another picture is used again only where it would come out the same from what is left, and spends what it spent then; one this picture has already had is free. Measured in headless Chrome (`node scripts/flow-bench.ts <answer>`), 7 Nov 2026: the view that stopped, 67 items and 147 links on three islands, is drawn as before in 3.6 seconds (4.2 before); three times its size in 5 (10 or more before), and six times in 5. `packs/core/flow-time.test.ts` keeps it so.
+A picture of any size draws well inside the page's twelve seconds: what makes it look better than it must spends from one budget per picture, `flow_picture_work` (`flow/effort.js`). That is each trial of a part past the first (`flow_part_work` for each item times link), the second drawing of a level (it costs what the first did), the wires' shaping (each two stretches of wires held against one another) and each split of a bundle at sea. Once it is spent, each takes its plain way: one trial, combs alone, the first wires, the bundle as it is. Work is counted, never timed, so a picture is the same on every machine and each time it is asked. A layout kept from another picture is used again only where it would come out the same from what is left, and spends what it spent then; one this picture has already had is free. Measured in headless Chrome (`node scripts/flow-bench.ts <answer>`), 7 Nov 2026: the view that stopped, 67 items and 147 links on three islands, is drawn as before in 3.6 seconds (4.2 before); three times its size in 5 (10 or more before), and six times in 5. `packs/canvas/flow-time.test.ts` keeps it so.
 
 Where two wires cross, one passes under: the line drawn has a gap there (`flow_break_half`), a tie under a wire of the order, else what runs up or down under what runs across. A picture that plays keeps its wires whole, for they are drawn in.
 

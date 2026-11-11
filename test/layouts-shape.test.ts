@@ -7,15 +7,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { CASES } from './shape-cases.ts';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { minCostFlow } from '../packs/core/layouts/shape/flow.js';
+import { minCostFlow } from '../packs/canvas/layouts/shape/flow.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { sidesOf } from '../packs/core/layouts/shape/sides.js';
+import { sidesOf } from '../packs/canvas/layouts/shape/sides.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { shape } from '../packs/core/layouts/shape/index.js';
+import { shape } from '../packs/canvas/layouts/shape/index.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { descend, descent } from '../packs/core/layouts/shape/descend.js';
+import { descend, descent } from '../packs/canvas/layouts/shape/descend.js';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { paired, swept } from '../packs/core/layouts/shape/tighten.js';
+import { paired, swept } from '../packs/canvas/layouts/shape/tighten.js';
 
 type P = [number, number];
 

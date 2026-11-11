@@ -5,6 +5,7 @@
 
 import type { ViewDef } from './declared.ts';
 import { parts } from './manifest.ts';
+import { KERNEL_PACKS } from './packorder.ts';
 import { hostIn } from './packtools.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import type { Registry } from './packs.ts';
@@ -15,6 +16,9 @@ import { setPackAsker, VIEWS } from './views.ts';
 import { used } from './uses.ts';
 
 const short = (id: string) => id.slice(id.indexOf('.') + 1);
+
+/** Whether a view is the kernel's: its pack's, or by its id (`core.x`) wherever it lives now: a pack that took it from core keeps the id (src/pack-moved.ts). */
+const kernels = (pack: string, id: string) => KERNEL_PACKS.includes(pack) || KERNEL_PACKS.some((k) => id.startsWith(`${k}.`));
 
 /** The pack view a short name stands for, if a loaded pack declares one. */
 function packView(l: Archipelago, name: string): { pack: string; def: ViewDef } | undefined {
@@ -28,7 +32,7 @@ function packView(l: Archipelago, name: string): { pack: string; def: ViewDef } 
 /** Every question that can be asked here, with what each answers. */
 export function viewList(l: Archipelago): Record<string, string> {
   const out = Object.fromEntries(Object.entries(VIEWS).map(([name, v]) => [name, v.description]));
-  for (const pack of l.registry.packs) for (const v of parts(pack).views) out[short(v.id)] ??= pack.id === 'core' ? v.description : `${v.description} (from the ${pack.id} pack)`;
+  for (const pack of l.registry.packs) for (const v of parts(pack).views) out[short(v.id)] ??= kernels(pack.id, v.id) ? v.description : `${v.description} (from the ${pack.id} pack)`;
   return out;
 }
 
@@ -41,13 +45,13 @@ export function viewNames(reg: Registry): string[] {
 
 /** The views the other packs on here add, by name, or nothing when only core is on. */
 function packsSaid(reg?: Registry): string {
-  const added = (reg?.packs ?? []).filter((p) => p.id !== 'core').flatMap((p) => parts(p).views.map((v) => short(v.id)));
+  const added = (reg?.packs ?? []).flatMap((p) => parts(p).views.filter((v) => !kernels(p.id, v.id)).map((v) => short(v.id)));
   return added.length ? ` The other packs on here add their own (${[...new Set(added)].join(', ')}): call with no name for what each answers.` : '';
 }
 
-/** What the view tool says it answers: the views the core pack declares (none without a registry), the flat lens first, then the kernel's own views, then the packs'. */
+/** What the view tool says it answers: the kernel's views by their ids, wherever they live (none without a registry), the flat lens first, then the kernel's own views, then the packs'. */
 export function viewsSaid(reg?: Registry): string {
-  const core = reg ? parts(reg.packs.find((p) => p.id === 'core')!).views : [];
+  const core = (reg?.packs ?? []).flatMap((p) => parts(p).views.filter((v) => kernels(p.id, v.id)));
   const queries = core.map((v): [string, string] => [short(v.id), v.description]).sort(([a], [b]) => Number(b === 'flat') - Number(a === 'flat'));
   const views = [...queries, ...Object.entries(VIEWS).map(([name, v]): [string, string] => [name, v.description])];
   return (

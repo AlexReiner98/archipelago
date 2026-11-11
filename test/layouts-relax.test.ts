@@ -1,4 +1,4 @@
-// Step 3 of the one layout (packs/core/layouts/relax/, task e_7et8f4uv), run on hand-made shapes in step 2's format
+// Step 3 of the one layout (packs/canvas/layouts/relax/, task e_7et8f4uv), run on hand-made shapes in step 2's format
 // (./relax-sketches.ts) with no database: every stretch keeps its way, nothing new crosses, no two boxes come nearer than
 // their gap, what is on an island stays on it, a port stays on its side, every distance is kept, and the rounds are told.
 
@@ -9,10 +9,10 @@ import { test } from 'node:test';
 import { cycle, dense, islands, map, trunk, type Shape } from './relax-sketches.ts';
 import { setOut } from './wired.ts';
 
-const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs/core/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
+const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs/canvas/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const sizes = house.sizes;
 /** The relaxation's modules, as a layout would list them. */
-export const RELAX = { pack: 'core', id: 'relax', modules: { 'relax.js': 'layouts/relax/relax.js', 'atoms.js': 'layouts/relax/atoms.js', 'order.js': 'layouts/relax/order.js', 'solve.js': 'layouts/relax/solve.js', 'exact.js': 'layouts/relax/exact.js', 'flow.js': 'layouts/shape/flow.js', 'simplex.js': 'layouts/shape/simplex.js', 'stage.js': 'layouts/kit/stage.js' } };
+export const RELAX = { pack: 'canvas', id: 'relax', modules: { 'relax.js': 'layouts/relax/relax.js', 'atoms.js': 'layouts/relax/atoms.js', 'order.js': 'layouts/relax/order.js', 'solve.js': 'layouts/relax/solve.js', 'exact.js': 'layouts/relax/exact.js', 'flow.js': 'layouts/shape/flow.js', 'simplex.js': 'layouts/shape/simplex.js', 'stage.js': 'layouts/kit/stage.js' } };
 /** A step's drawn size: as wide as the shape gives it, a point nothing. */
 const size = (n: any) => (n.w ? [n.w * 30, 34] : [0, 0]);
 

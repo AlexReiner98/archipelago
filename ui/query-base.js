@@ -49,13 +49,13 @@ export const layered = (...styles) => {
 /** A size a drawing's code lays out by, in pixels: the style's, named by the house style. */
 export const sizeOf = (style, name) => {
   const v = style.sizes?.[name];
-  if (typeof v !== 'number') throw new Error(`The style names no size "${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
+  if (typeof v !== 'number') throw new Error(`The style names no size "${name}": the house style (core.house, packs/canvas/pack.json) names every one a drawing uses`);
   return v;
 };
 /** A number a drawing's code is drawn by: the style's, named by the house style. */
 export const numberOf = (style, name) => {
   const v = style.numbers?.[name];
-  if (typeof v !== 'number') throw new Error(`The style names no number "${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
+  if (typeof v !== 'number') throw new Error(`The style names no number "${name}": the house style (core.house, packs/canvas/pack.json) names every one a drawing uses`);
   return v;
 };
 

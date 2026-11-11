@@ -1,8 +1,8 @@
-// How wires stand beside one another: the flow's measure (packs/core/layouts/flow/faults.js until 9 Nov 2026, now at
+// How wires stand beside one another: the flow's measure (packs/canvas/layouts/flow/faults.js until 9 Nov 2026, now at
 // git tag archive/layouts-2026-11-09), kept for the checks every wired drawing is held to (test/structure.test.ts).
 
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { tidy } from '../packs/core/layouts/flow/polyline.js';
+import { tidy } from '../packs/canvas/layouts/flow/polyline.js';
 
 /**
  * How wires stand beside one another, for wires running `down` and those running `across`. `lines` are { ends, points }.
