@@ -12,6 +12,7 @@ import { drawFind } from './find.js';
 import { home } from './home.js';
 import { entity } from './item.js';
 import { heldPage } from './item-held.js';
+import { linkFirst } from './item-link.js';
 import { stale } from './live.js';
 import { drawNav, screenOfPage, screenPage } from './nav.js';
 import { loadSchema, typeChoice, types, workType } from './words.js';
@@ -26,6 +27,8 @@ import { workspace } from './workspace.js';
 const GHOST = /^p_[a-z0-9]+:/;
 const SHEET = { e: 'item', held: 'item', new: 'item', s: 'screen', workspace: 'workspace', you: 'you' };
 const sheet = document.getElementById('sheet');
+// An item named outside the app (?link=): a tab open on its workspace takes it, else this page opens on it there.
+const linked = await linkFirst();
 startTips();
 // The frame drawings run in, and the drawing this browser drew last loaded in it, started before anything is read: the
 // worker is ready when the first answer comes.
@@ -120,7 +123,7 @@ window.addEventListener('beforeunload', (e) => {
   if (unsaved()) (e.preventDefault(), (e.returnValue = ''));
 });
 
-route();
+if (linked !== 'gate') route();
 
 /**
  * Someone reading what was shared with them is shown a way to start a map of their own, loud, in the bar: a link's

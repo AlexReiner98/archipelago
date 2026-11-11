@@ -215,6 +215,27 @@ export function waitingOnSignIn() {
   }
 }
 
+/** The workspace a sign-in's token is of (pel_<workspace>_…), or undefined. */
+export const workspaceOf = (token) => /^pel_([a-z0-9][a-z0-9-]{0,39})_/.exec(token ?? '')?.[1];
+/** Where a link from outside the app (ui/item-link.js) was going when it asked for a sign-in to its workspace: for half an hour. */
+const LANDING = 'pelago-link';
+export function keepLanding(ws, hash) {
+  try {
+    if (ws) localStorage.setItem(LANDING, JSON.stringify({ ws, hash, at: Date.now() }));
+    else localStorage.removeItem(LANDING);
+  } catch {}
+}
+/** The address a sign-in to workspace `ws` lands on, kept by such a link, taken once. */
+function landingIn(ws) {
+  try {
+    const kept = JSON.parse(localStorage.getItem(LANDING) ?? 'null');
+    keepLanding(null);
+    return kept && kept.ws === ws && Date.now() - kept.at < 30 * 60_000 ? kept.hash : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Become whoever a token says, starting from Home: nothing on the page belongs to the new workspace. The page is loaded
  * again, so every part of it that holds what it read (the saved views, the replica, a drawing) starts empty: one kept
@@ -222,8 +243,8 @@ export function waitingOnSignIn() {
  */
 export function enter(token) {
   store.token = token;
-  // A sign-in opens on Home, as the app does: a new workspace's first steps are there.
-  history.replaceState(null, '', waitingOnSignIn() ? '#/authorize' : '#/home');
+  // A sign-in opens on Home, as the app does: a new workspace's first steps are there; one a link asked for, on its item.
+  history.replaceState(null, '', waitingOnSignIn() ? '#/authorize' : landingIn(workspaceOf(token)) ?? '#/home');
   location.reload();
 }
 

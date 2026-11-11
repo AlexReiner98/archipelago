@@ -35,7 +35,7 @@ import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './aut
 import { notify } from './notify.ts'; import { alertOnCrash } from './alert.ts';
 import { backupAll, parseBackup, parseVault } from './backup.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from './members.ts'; import { requestWait } from './standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from './workspace-use.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts'; import { env } from './env.ts';
-import { SHORT, serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
+import { SHORT, serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts'; import { itemAddress } from './item-address.ts';
 import { stopAllLaunched } from './launcher.ts'; import { configureLaunch } from './server-launch.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
 import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts'; import { pageMay } from './may.ts';
@@ -207,7 +207,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
   return createServer(async (req, res) => {
     try {
-      const url = new URL(req.url ?? '/', 'http://localhost'), host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined;
+      const url = new URL(req.url ?? '/', 'http://localhost'), host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined; const toItem = req.method === 'GET' && !site ? itemAddress(url.pathname) : undefined; if (toItem !== undefined) return toItem ? void res.writeHead(302, { location: toItem, 'cache-control': 'no-store' }).end() : send(res, 404, { error: 'Not found' }); // an item named outside the app (src/item-address.ts)
       if (drawing.only(host) && !(req.method === 'GET' && drawHostServes(url.pathname))) return send(res, 404, { error: 'Not found' }); // the drawing host serves drawings only
       if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, data: devMode() ? (workspaces.config.dataDir ?? undefined) : undefined, leading: options.leading?.() ?? true });
       // A domain that serves a workspace's public site: its pages by the reader pack (packs/reader), its icon; the rest as on any name.
