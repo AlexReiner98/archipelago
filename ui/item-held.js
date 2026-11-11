@@ -49,23 +49,24 @@ export async function heldBand(p, again) {
     whole.hidden = !whole.hidden;
     if (!whole.hidden && !whole.childElementCount) whole.append(proposalCard(p, names, again));
   };
-  // The reason and who asked share what the buttons leave, each cut in proportion to its length: a session's name can be
-  // as long as the reason, and the buttons stay in sight.
+  // The line is who asked, as their mark (the name and when in its tooltip), the reason, and the two buttons (Alex, 11 Nov
+  // 2026: the row was too full). A change of several parts unfolds them from the reason itself, its count beside it.
   const by = who(p.actor, p.run_name);
-  by.classList.add('muted', 'small', 'cut');
-  by.style.flex = '0 1 auto';
-  if (p.run_name && !by.title.includes(p.run_name)) by.title = [p.run_name, by.title].filter(Boolean).join(' · ');
+  by.replaceChildren();
+  by.style.minWidth = 'auto';
+  by.title = [p.run_name, who(p.actor).textContent, ago(p.ts)].filter(Boolean).join(' · ');
+  const parts = p.ops.length > 1;
+  const unfold = parts && { role: 'button', tabindex: 0, style: 'cursor: pointer', onclick: look, onkeydown: (e) => e.key === 'Enter' && look() };
+  const tip = parts ? `${p.reason}\n\nClick to see its ${p.ops.length} parts, and leave out or correct any before applying` : p.reason;
   return h(
     'section',
     { class: 'held-band needs', 'data-held': p.id },
     h(
       'div',
       { class: 'row-top' },
-      h('span', { class: 'muted small', style: 'flex: none' }, 'Held for you'),
-      h('span', { class: 'grow', style: 'flex: 1 1 auto', title: p.reason }, gist(p.reason)),
       by,
-      h('span', { class: 'muted small nowrap', style: 'flex: none' }, ago(p.ts)),
-      p.ops.length > 1 && h('button', { class: 'quiet-button', style: 'flex: none', title: 'See each part of it, and leave out or correct any before applying', onclick: look }, `Look (${p.ops.length})`),
+      h('span', { class: 'grow', title: tip, ...unfold }, gist(p.reason)),
+      parts && h('span', { class: 'muted small', title: tip, ...unfold }, `${p.ops.length} parts ▾`),
       ...buttons,
     ),
     whole,
