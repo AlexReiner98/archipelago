@@ -29,6 +29,7 @@ import { syncTypes } from './typetable.ts';
 import { packTouches } from './pack-touches.ts';
 import { withUse } from './pack-use.ts';
 import { folderCode, keptHashes } from './pack-code.ts';
+import { bundlesOffered, expandBundles, packsNamed, readBundles, type Bundle } from './bundles.ts';
 
 /** The setting that held the packs turned off in a workspace before they were facts: read until the first pack fact. */
 export const PACKS_OFF = 'packs_off';
@@ -105,11 +106,24 @@ export async function setIslands(l: Archipelago, actor: Actor | 'system', on: bo
 const appendPacks = (l: Archipelago, by: string, action: string, reason: string, facts: Fact[]) =>
   l.db.transaction((tx) => append(tx, l.workspace, 'facts', { id: newId('c'), actor: { id: by }, authority: by === 'system' ? null : { of: 'human', who: by }, rule: { outcome: 'apply', spared: [] }, reason, source: null, action, undoes: null, keys: [] }, facts));
 
-/** The packs a new workspace starts with beside the kernel's: none, unless the server says (PELAGO_START_PACKS, a list or "all"). */
-const startPacks = (): string[] | 'all' => {
+/**
+ * The packs a new workspace starts with beside the kernel's: none, unless the server says (PELAGO_START_PACKS, a list or
+ * "all"). A name in the list may be a bundle's (src/bundles.ts): it stands for its packs.
+ */
+const startPacks = (bundles: Bundle[]): string[] | 'all' => {
   const said = env('START_PACKS')?.trim();
-  return said === 'all' ? 'all' : (said?.split(',').map((p) => p.trim()).filter(Boolean) ?? []);
+  return said === 'all' ? 'all' : expandBundles(said?.split(',').map((p) => p.trim()).filter(Boolean) ?? [], bundles);
 };
+
+/** Whether the server's list offers a pack to this workspace (src/pack-allow.ts). */
+const offeredHere = (l: Archipelago) => (id: string) => !l.registry.only || l.registry.only.includes(id) || id === LOCAL_PACK || l.registry.made.has(id);
+
+/** The bundles this workspace is offered: each found beside the packs whose every pack the server's list offers here. */
+export function bundlesHere(l: Archipelago): Bundle[] {
+  const found = new Set(l.registry.found.map((p) => p.id));
+  const offered = offeredHere(l);
+  return bundlesOffered(readBundles(l.registry.dirs, found), (id) => found.has(id) && offered(id));
+}
 
 /** The manifests whose text this log keeps, by hash. */
 async function keptManifests(l: Archipelago): Promise<Set<string>> {
@@ -193,7 +207,7 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
   const said = await packFacts(l);
   const off = new Set(await packsOff(l));
   const kept = await keptHere(l);
-  const start = startPacks();
+  const start = startPacks(bundlesHere(l));
   const first = !said.size && !(await l.db.query(`select 1 from entity limit 1`)).rows.length;
   const renamed = await renamedPacks(l, said);
   const taken = await takenOver(l, said);
@@ -236,32 +250,41 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
  */
 export function packStates(l: Archipelago) {
   const made = (id: string) => l.registry.made.get(id)?.item;
-  const only = l.registry.only;
-  const offered = (id: string) => !only || only.includes(id) || id === LOCAL_PACK || l.registry.made.has(id);
-  return l.registry.found.filter((p) => offered(p.id)).map((p) => ({ id: p.id, title: p.title, version: p.version, manifest: l.registry.hashes.get(p.id), description: p.description, requires: p.requires ?? [], touches: packTouches(p), ...(made(p.id) && { made: made(p.id) }), ...l.registry.states.get(p.id)! }));
+  const offered = offeredHere(l);
+  const bundles = bundlesHere(l);
+  // A bundled pack names its bundle, so the page draws the bundle as one plate with its packs inside.
+  const bundleOf = (id: string) => bundles.find((b) => b.packs.includes(id));
+  const said = (b: Bundle) => ({ id: b.id, title: b.title, ...(b.description && { description: b.description }), packs: b.packs });
+  return l.registry.found.filter((p) => offered(p.id)).map((p) => ({ id: p.id, title: p.title, version: p.version, manifest: l.registry.hashes.get(p.id), description: p.description, requires: p.requires ?? [], touches: packTouches(p), ...(made(p.id) && { made: made(p.id) }), ...(bundleOf(p.id) && { bundle: said(bundleOf(p.id)!) }), ...l.registry.states.get(p.id)! }));
 }
 
-/** Turn a pack off or on in this workspace. */
+/**
+ * Turn a pack off or on in this workspace, or a bundle (src/bundles.ts): a bundle's id, or any of its packs' ids,
+ * turns all its packs together, in one change set.
+ */
 export async function setPack(l: Archipelago, actor: Actor, input: { pack: string; on: boolean }) {
   needHuman(actor, 'Turning a pack on or off is the owner’s.');
-  if (!l.registry.states.has(input.pack)) throw new Error(`No pack "${input.pack}" on this server. Packs: ${[...l.registry.states.keys()].join(', ')}`);
+  const { packs: named, bundle } = packsNamed(bundlesHere(l), input.pack);
+  if (!bundle && !l.registry.states.has(input.pack)) throw new Error(`No pack "${input.pack}" on this server. Packs: ${[...l.registry.states.keys()].join(', ')}`);
   // A pack the server's list leaves out here (src/pack-allow.ts) is not the owner's to add: the server's configuration lets it in.
-  if (input.on && l.registry.only && !l.registry.only.includes(input.pack) && !l.registry.made.has(input.pack)) throw new Error(`The ${input.pack} pack is not offered to this workspace on this server.`);
-  if (!input.on && KERNEL_PACKS.includes(input.pack)) throw new Error(`The ${input.pack} pack is the kernel's own: it is never taken out.`);
-  const needing = input.on ? [] : l.registry.packs.filter((p) => (p.requires ?? []).includes(input.pack)).map((p) => p.id);
+  if (input.on && !named.every(offeredHere(l))) throw new Error(`The ${input.pack} pack is not offered to this workspace on this server.`);
+  const kernel = named.find((id) => KERNEL_PACKS.includes(id));
+  if (!input.on && kernel) throw new Error(`The ${kernel} pack is the kernel's own: it is never taken out.`);
+  // What still needs a pack taken out, beside the packs that go with it.
+  const needing = input.on ? [] : l.registry.packs.filter((p) => !named.includes(p.id) && (p.requires ?? []).some((r) => named.includes(r))).map((p) => p.id);
   if (needing.length) throw new Error(`${needing.join(', ')} require${needing.length === 1 ? 's' : ''} the ${input.pack} pack: take ${needing.length === 1 ? 'it' : 'them'} out first.`);
   await syncPacks(l); // the log says what is present before it says what changed
   const off = new Set(await packsOff(l));
-  if (input.on) off.delete(input.pack);
-  else off.add(input.pack);
+  for (const id of named) input.on ? off.delete(id) : off.add(id);
   const list = [...off].sort();
-  const pack = l.registry.found.find((p) => p.id === input.pack)!;
-  const fact: Fact = input.on ? present(l, pack, await keptHere(l)) : ['-', packFact(input.pack), 'pack'];
-  await appendPacks(l, actorId(actor), input.on ? 'pack.on' : 'pack.off', `${input.on ? 'Added' : 'Took out'} the ${input.pack} pack`, [fact]);
+  const kept = await keptHere(l);
+  const facts: Fact[] = named.map((id) => (input.on ? present(l, l.registry.found.find((p) => p.id === id)!, kept) : ['-', packFact(id), 'pack']));
+  const what = bundle ? `the ${bundle.title} bundle (${named.join(', ')})` : `the ${input.pack} pack`;
+  await appendPacks(l, actorId(actor), input.on ? 'pack.on' : 'pack.off', `${input.on ? 'Added' : 'Took out'} ${what}`, facts);
   l.registry.turnOff(list, await islandsOn(l));
   if (!input.on) hostFor(l.registry).stop();
   const synced = await syncTypes(l);
-  await l.log(l.db, { actor: actorId(actor), action: input.on ? 'pack.on' : 'pack.off', reason: `${input.on ? 'Turned on' : 'Turned off'} the ${input.pack} pack`, detail: { pack: input.pack, ...synced } });
+  await l.log(l.db, { actor: actorId(actor), action: input.on ? 'pack.on' : 'pack.off', reason: `${input.on ? 'Turned on' : 'Turned off'} ${what}`, detail: { pack: input.pack, ...(bundle && { bundle: bundle.id, packs: named }), ...synced } });
   toolsChanged(l.workspace);
   return { packs: packStates(l), dormant: synced.dormant, activated: synced.activated };
 }
@@ -292,7 +315,7 @@ export const PACK_STATE_TOOLS: Record<string, Tool> = {
     run: async (l) => withUse(l, packStates(l)),
   },
   pack_set: {
-    description: 'Turn a pack off or on in this workspace. Its items stay; while it is off they are dormant and its tools are gone.',
+    description: 'Turn a pack off or on in this workspace. Its items stay; while it is off they are dormant and its tools are gone. A bundle (packs that go together) is turned by its id or any of its packs’ ids, all its packs at once.',
     input: { pack: z.string(), on: z.boolean() },
     humanOnly: true,
     run: async (l, actor, input) => setPack(l, actor, input),
