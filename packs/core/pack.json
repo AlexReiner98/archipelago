@@ -574,6 +574,21 @@
       }
     },
     {
+      "id": "replay_set",
+      "extends": "system",
+      "title": "Replay set",
+      "description": "Five to ten real finished tasks, each with its brief frozen as it was when the set took it (capture, action replay_freeze), run again under a named pack version (replay), so two versions are compared on the same work. Each replay's runs name the set and the version in started_by.",
+      "statuses": { "open": ["current"], "closed": ["retired"], "phases": { "current": "standing", "retired": "ended" } },
+      "fields": {
+        "tasks": {
+          "type": "json",
+          "large": true,
+          "description": "The tasks, in order: each { task, title, brief, frozen_at }, its brief as the task's brief answered then (task, repo, text). A frozen brief is never changed.",
+          "system": true
+        }
+      }
+    },
+    {
       "id": "automation",
       "moved_from": [
         "sys.automation"

@@ -29,6 +29,7 @@ import { WRITE_TOOLS } from './tool-change.ts';
 import { devMode } from './tool-config.ts';
 import { HUMAN_TOOLS } from './tool-human.ts';
 import { READ_TOOLS } from './tool-reads.ts';
+import { REPLAY_TOOLS } from './replay-set.ts';
 
 export { configureBackup, configureRestart, devMode } from './tool-config.ts';
 export { describeChanges, humanChanges, latestSeq, type HumanChange } from './tool-reads.ts';
@@ -74,7 +75,7 @@ async function step(l: Archipelago, actor: Actor, name: string, input: Record<st
 export const TOOLS: Record<string, Tool> = {
   ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...HOOK_TOOLS, ...HUMAN_TOOLS,
   ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
-  ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS, ...WORKSPACE_TOOLS, ...CONNECTION_TOOLS,
+  ...REPLAY_TOOLS, ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS, ...WORKSPACE_TOOLS, ...CONNECTION_TOOLS,
 };
 
 /** The view tool as a registry offers it: described with the lenses its core pack declares, then the kernel's own views. */

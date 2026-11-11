@@ -104,7 +104,8 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
   const sessionId = randomUUID();
   const surface = `pack:${via.pack}`;
   const agent: Actor = { kind: 'agent', name: `launched:${via.pack}` };
-  const begun = await sessionStart(l, agent, { task: input.task, cwd, session_id: sessionId, surface, title: `Headless (${mode}): ${brief.task.title}` });
+  // A frozen brief is run again, not worked on: its run is tied to no task (its started_by names the task).
+  const begun = await sessionStart(l, agent, { task: input.brief ? undefined : input.task, cwd, session_id: sessionId, surface, title: `Headless (${mode}): ${brief.task.title}` });
   const run = begun.run;
   if (begun.status === 'waiting') {
     const why = (('blocked' in begun ? begun.blocked : undefined) ?? []).map((b) => b.why).join(' ');
