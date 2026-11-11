@@ -12,10 +12,20 @@ export function noticeOf(item, subject) {
   return { title, level, about: subject ?? item.id };
 }
 
-/** The answer to an automation's occurrence: a notification for notify; nothing, yet, for any other action. */
-export function answerDue(item, subject) {
+/** The session an automation that launches starts: its own input's task, mode and instructions, which the kernel checks it says. */
+export function launchOf(item) {
+  const input = item.props?.input ?? {};
+  return { task: input.task, mode: input.mode ?? 'plan', ...(typeof input.instructions === 'string' && input.instructions && { instructions: input.instructions }) };
+}
+
+/**
+ * The answer to an automation's occurrence: a notification for notify; for launch, the session it starts, unless the
+ * one it last started is still open (`running`); nothing for any other action.
+ */
+export function answerDue(item, subject, running = false) {
   if (!fires(item)) return {};
   const action = item.props?.action ?? 'notify';
-  if (action !== 'notify') return {};
-  return { notify: [noticeOf(item, subject)], reason: `${item.title}: notified` };
+  if (action === 'notify') return { notify: [noticeOf(item, subject)], reason: `${item.title}: notified` };
+  if (action === 'launch' && !running) return { launch: launchOf(item), reason: `${item.title}: launched` };
+  return {};
 }

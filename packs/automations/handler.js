@@ -1,5 +1,5 @@
 // Automations: told by the kernel's clock that an item came due (src/due.ts), it reads the item and, when it is an
-// enabled automation, what it is about, and answers what it does. The kernel only keeps time; this pack acts.
+// enabled automation, what it is about, and answers what it does: a notification, or a launch the kernel starts (src/pack-launch.ts). The kernel only keeps time; this pack acts.
 
 import { answerDue } from './fire.js';
 
@@ -10,6 +10,8 @@ export default {
     const item = await ctx.read({ get: id });
     if (!item || !(item.is ?? []).includes('automation')) return {};
     const about = await ctx.read({ related: id, relation: 'about', direction: 'out' });
-    return answerDue(item, Array.isArray(about) ? about[0]?.id : undefined);
+    // One that launches starts nothing while the session it last started is open.
+    const last = item.props?.action === 'launch' && typeof item.props.last_run === 'string' ? await ctx.read({ get: item.props.last_run }) : null;
+    return answerDue(item, Array.isArray(about) ? about[0]?.id : undefined, Boolean(last?.is_open));
   },
 };
