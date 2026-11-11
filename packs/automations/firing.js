@@ -21,6 +21,7 @@ const occurrence = (event) => ({
   at: event?.detail?.at ?? null,
   due_seq: Number.isInteger(event?.seq) ? event.seq : null,
   version: Number.isInteger(event?.detail?.version) ? event.detail.version : null,
+  packs: Array.isArray(event?.detail?.packs) ? event.detail.packs : null,
 });
 
 /**

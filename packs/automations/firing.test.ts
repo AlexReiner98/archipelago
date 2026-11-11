@@ -8,9 +8,11 @@ import { failedFiring, FIRED, withFiring } from './firing.js';
 import handler from './handler.js';
 
 const A = 'e_auto0001', S = 'e_subject1';
+/** The packs the clock says it came due under (src/pack-versions.ts), copied into the fact. */
+const PACKS = [{ id: 'automations', version: '0.1.0', manifest: 'abc123' }];
 const auto = (props: Record<string, unknown> = {}, status = 'enabled') => ({ id: A, type: 'automation', is: ['automation', 'system'], title: 'Morning', status, props: { action: 'notify', ...props } });
-const due = { action: 'item.due', pack: 'kernel', target: A, seq: 41, detail: { type: 'automation', at: '2030-01-07T13:00:00.000Z', version: 7 } };
-const at = { at: '2030-01-07T13:00:00.000Z', due_seq: 41, version: 7 };
+const due = { action: 'item.due', pack: 'kernel', target: A, seq: 41, detail: { type: 'automation', at: '2030-01-07T13:00:00.000Z', version: 7, packs: PACKS } };
+const at = { at: '2030-01-07T13:00:00.000Z', due_seq: 41, version: 7, packs: PACKS };
 
 test('a firing that launches records the fact, naming the session by its run', () => {
   const done = withFiring(auto({ action: 'launch' }), due, { launch: { task: 'e_task0001', mode: 'plan' }, reason: 'Morning: launched' });

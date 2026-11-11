@@ -9,7 +9,7 @@ import { actorId, type Actor, type Entity, type Archipelago, type Op } from './p
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
 import { cutTitle, mintName, saidTitle, sessionLabelled, sessionTitle } from './session-name.ts';
 import { roomForSession, workspaceName } from './standing.ts'; import { wholeMap } from './outbox.ts'; import { took } from './presence.ts';
-import { VIEWS } from './views.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts';
+import { packVersions } from './pack-versions.ts'; import { VIEWS } from './views.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts';
 import { hookRunHere, isChat, resolveRun, sessionsAwake, takeUp } from './chat-run.ts'; import { parentOps, parentRun } from './session-parent.ts';
 export { resolveRun, sessionPrompted, sessionsAwake } from './chat-run.ts';
 export { recordRun } from './run-record.ts';
@@ -117,7 +117,7 @@ async function newRun(l: Archipelago, actor: Actor, input: SessionSaid, task: En
   const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };
   for (const k of ['surface', 'cwd', 'session_id', 'branch'] as const) if (input[k]) props[k] = input[k];
   // The packs it ran under, each by version and the hash of its manifest, so a measure can tell the harness's versions apart.
-  props.packs = l.registry.packs.map((p) => ({ id: p.id, version: p.version, manifest: l.registry.hashes.get(p.id) ?? null }));
+  props.packs = packVersions(l.registry);
   // Its word is its hue's key, never shown (src/session-name.ts).
   const name = await mintName(l);
   if (name) props.name = name;
