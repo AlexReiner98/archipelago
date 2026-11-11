@@ -53,9 +53,9 @@ test('a pack mounted at site answers any address on a domain the server names', 
     assert.equal(r.status, 200, path);
     assert.match(r.body, new RegExp(`site workspace=acme;path=${path};host=reader.example;app=http://127\\.0\\.0\\.1:\\d+<`));
   }
-  // What the request said is handed on too, for the pack to read and forget: its query, host, referrer, agent, purpose.
+  // What the request said is handed on too, for the pack to read and forget: its query, host, referrer, agent, purpose, accept.
   const asked = await getAs(base, 'reader.example', '/about?ref=x&utm_source=y');
-  assert.deepEqual(JSON.parse(/<pre>(.*)<\/pre>/.exec(asked.body)![1]), { query: 'ref=x&utm_source=y', host: 'reader.example', referrer: '', agent: '', purpose: '' });
+  assert.deepEqual(JSON.parse(/<pre>(.*)<\/pre>/.exec(asked.body)![1]), { query: 'ref=x&utm_source=y', host: 'reader.example', referrer: '', agent: '', purpose: '', accept: '' });
   assert.match(asked.body, /path=\/about;/, 'the path is the path alone');
 });
 
