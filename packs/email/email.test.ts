@@ -24,6 +24,28 @@ test('a channel that is on is mailed the notification, its level in the subject'
   assert.ok(mailFor(made(), [{ props: { on: false } }, { props: { on: true } }], NOON, 'UTC'), 'any channel that is on');
 });
 
+test('a notification with no note carries the note of what it is about; its own note comes first', () => {
+  const on = [{ props: { on: true } }];
+  const post = { title: 'Post for 12 Nov', body: '## Facts\n- the mail landed' };
+  assert.equal(mailFor(made('info', "Today's post", ''), on, NOON, 'UTC', post)?.text, "Today's post\n\nPost for 12 Nov\n\n## Facts\n- the mail landed");
+  assert.equal(mailFor(made(), on, NOON, 'UTC', post)?.text, 'main is red', 'its own note wins');
+  assert.equal(mailFor(made('info', 'Late', ''), on, NOON, 'UTC', { title: 'X', body: '' })?.text, 'Late', 'a subject with no note adds nothing');
+});
+
+test('the handler reads what a notification is about only when it has no note and mail is on', async () => {
+  const asked: { get?: string }[] = [];
+  const event = { ...made('info', "Today's post", ''), detail: { ...made().detail, title: "Today's post", body: '', about: 'e_post0001' } };
+  const ctx = (on: boolean) => ({ now: NOON, zone: 'UTC', read: async (q: { get?: string }) => (asked.push(q), q.get ? { title: 'Post for 12 Nov', body: '- a fact' } : [{ props: { on } }]) });
+  const got = await handler['notification.made']({ event }, ctx(true));
+  assert.equal(got.mail[0].text, "Today's post\n\nPost for 12 Nov\n\n- a fact");
+  assert.deepEqual(asked.at(-1), { get: 'e_post0001' });
+  asked.length = 0;
+  await handler['notification.made']({ event }, ctx(false));
+  assert.equal(asked.some((q) => q.get), false, 'mail off: nothing more is read');
+  await handler['notification.made']({ event: made() }, ctx(true));
+  assert.equal(asked.some((q) => q.get), false, 'a note of its own: nothing more is read');
+});
+
 test('below the least level, nothing', () => {
   const ch = [{ props: { on: true, least: 'warning' } }];
   assert.equal(mailFor(made('info'), ch, NOON, 'UTC'), undefined);

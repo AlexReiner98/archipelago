@@ -45,6 +45,15 @@ export async function personFor(whole: Archipelago, notification: string): Promi
   return rows[0].private_to || (await ownerOf(whole));
 }
 
+/** What a notification is about (its about link), if it is about something still on the map. */
+export async function subjectOf(whole: Archipelago, notification: string): Promise<string | undefined> {
+  const { rows } = await whole.db.query<{ to_id: string }>(
+    `select r.to_id from relation r join entity e on e.id = r.to_id where r.from_id = $1 and r.type = any($2::text[]) and r.valid_to is null and e.archived_at is null order by r.id limit 1`,
+    [notification, whole.registry.relationFamily('about')],
+  );
+  return rows[0]?.to_id;
+}
+
 /** The address a notification's person signs in with, if they are a member who does. */
 export async function addressFor(l: Archipelago, notification: string): Promise<string | undefined> {
   const whole = await wholeMap(l);
@@ -67,7 +76,8 @@ export async function mailHeard(l: Archipelago, pack: string, input: unknown, as
   if (!subject) throw new Error(`The ${pack} pack's mail has no subject.`);
   const to = await addressFor(l, heard.target);
   if (!to) return { sent: false, why: 'the person it is for signs in with no address' };
-  const link = itemLink(l.workspace).replace('{id}', heard.target);
+  // The link is to what the notification is about, where there is something to do, else to the notification.
+  const link = itemLink(l.workspace).replace('{id}', (await subjectOf(await wholeMap(l), heard.target)) ?? heard.target);
   await sendMail({ to, subject, text: `${text.replace(/\n+$/, '')}\n\n${link}\n` });
   console.log(`${pack}: mailed notification ${heard.target}`);
   return { sent: true };

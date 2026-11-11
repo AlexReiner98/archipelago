@@ -11,7 +11,11 @@ export default {
     const person = event?.detail?.for;
     if (typeof person !== 'string' || !person) return {};
     const channels = await ctx.read({ related: person, relation: 'part_of', direction: 'in', types: ['email.channel'], fields: FIELDS });
-    const mail = mailFor(event, channels, ctx.now, ctx.zone);
+    // What it is about, read only when the notification has no note of its own and a channel is on to mail it.
+    const about = event?.detail?.about;
+    const wants = typeof about === 'string' && about && !String(event?.detail?.body ?? '').trim() && channels.some((c) => (c.props ?? c).on === true);
+    const subject = wants ? await ctx.read({ get: about }) : undefined;
+    const mail = mailFor(event, channels, ctx.now, ctx.zone, subject);
     return mail ? { mail: [mail], reason: 'Mailed a notification' } : {};
   },
 };

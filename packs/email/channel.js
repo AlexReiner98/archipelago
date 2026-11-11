@@ -38,8 +38,10 @@ export const channelOn = (channels) => (channels ?? []).map((c) => c.props ?? c)
 /**
  * The mail for a notification made, by the person's channels, or undefined when none is sent: mail is off (or there
  * is no channel), the notification is below the least level, or it is quiet hours and the notification not urgent.
+ * A notification with no note of its own (an automation's reminder) carries the note of what it is about, `subject`,
+ * so the mail holds what is to be done and not only that something is.
  */
-export function mailFor(event, channels, now, zone) {
+export function mailFor(event, channels, now, zone, subject) {
   const channel = channelOn(channels);
   if (!channel || typeof event?.target !== 'string') return undefined;
   const d = event.detail ?? {};
@@ -48,9 +50,11 @@ export function mailFor(event, channels, now, zone) {
   if (level !== 'urgent' && isQuiet(channel, now, zone)) return undefined;
   const title = String(d.title ?? '').trim() || 'A notification';
   const body = String(d.body ?? '').trim();
+  const note = String(subject?.body ?? '').trim();
+  const about = note ? `${title}\n\n${String(subject.title ?? '').trim()}\n\n${note}` : '';
   return {
     notification: event.target,
     subject: level === 'info' ? title : `${level === 'urgent' ? 'Urgent' : 'Warning'}: ${title}`,
-    text: body || title,
+    text: body || about || title,
   };
 }
