@@ -18,6 +18,8 @@ const map = () => freshWith(new Registry(packsWith(SIGNUPS as never)));
 const NOW = Date.parse('2030-01-07T13:00:00Z');
 const signups = { query: { filter: { find: ['type signup'] } } };
 const pass = async (l: Archipelago, i: number) => (await duePass(l, NOW + i * 60_000)).filter((d) => d.edge);
+// An automation lives with what it is about (src/subject.ts): each is made about a task.
+const ABOUT = [{ op: 'create', ref: 'subject', type: 'task', title: 'Regulated regions' }, { op: 'link', type: 'about', from: 'auto', to: 'subject' }] as never[];
 const automation = (on: unknown) => ({ op: 'create', ref: 'auto', type: 'automation', title: 'Watch', status: 'enabled', props: { on, action: 'notify', message: 'Started to match' } });
 
 test('a bad on is refused on write, and a good one taken', async () => {
@@ -31,15 +33,15 @@ test('a bad on is refused on write, and a good one taken', async () => {
   assert.match(checkOn({ query: { ...signups.query, limit: 100000 }, edge: 'each' }).join(), /limit/);
 
   const l = await map();
-  await assert.rejects(l.change(human, { reason: 'test', ops: [automation({ ...signups, edge: 'never' }) as never] }), /on.edge must be/);
-  const ids = await make(l, [automation({ ...signups, edge: 'each' }) as never]);
+  await assert.rejects(l.change(human, { reason: 'test', ops: [automation({ ...signups, edge: 'never' }) as never, ...ABOUT] }), /on.edge must be/);
+  const ids = await make(l, [automation({ ...signups, edge: 'each' }) as never, ...ABOUT]);
   await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: ids.auto, props: { on: { edge: 'each' } } }] }), /filter.find/, 'an on changed is checked whole, as on a create');
 });
 
 test('each: each item that starts to match fires once, and what matched before it was set does not', async () => {
   const l = await map();
   await make(l, [{ op: 'create', type: 'signup', title: 'Ada', props: { region: 'EU' } }]);
-  const ids = await make(l, [automation({ ...signups, edge: 'each' }) as never]);
+  const ids = await make(l, [automation({ ...signups, edge: 'each' }) as never, ...ABOUT]);
   assert.deepEqual(await pass(l, 0), [], 'the first pass only learns what already matches');
   const b = await make(l, [{ op: 'create', ref: 'b', type: 'signup', title: 'Ben', props: { region: 'UK' } }]);
   const met = await pass(l, 1);
@@ -63,7 +65,7 @@ test('each: each item that starts to match fires once, and what matched before i
 
 test('first: fires the first time the query matches, never again', async () => {
   const l = await map();
-  await make(l, [automation({ ...signups, edge: 'first' }) as never]);
+  await make(l, [automation({ ...signups, edge: 'first' }) as never, ...ABOUT]);
   assert.deepEqual(await pass(l, 0), []);
   const a = await make(l, [{ op: 'create', ref: 'a', type: 'signup', title: 'Ada' }]);
   assert.deepEqual((await pass(l, 1)).map((m) => [m.edge, m.matched]), [['first', [a.a]]]);
@@ -71,7 +73,7 @@ test('first: fires the first time the query matches, never again', async () => {
   assert.deepEqual(await pass(l, 2), [], 'only the first');
 
   const late = await map();
-  await make(late, [{ op: 'create', type: 'signup', title: 'Ada' }, automation({ ...signups, edge: 'first' }) as never]);
+  await make(late, [{ op: 'create', type: 'signup', title: 'Ada' }, automation({ ...signups, edge: 'first' }) as never, ...ABOUT]);
   await pass(late, 0);
   await make(late, [{ op: 'create', type: 'signup', title: 'Ben' }]);
   assert.deepEqual(await pass(late, 1), [], 'already matching when it was set: it never starts to');
@@ -79,7 +81,7 @@ test('first: fires the first time the query matches, never again', async () => {
 
 test('first_per: once for each value of a field, ever', async () => {
   const l = await map();
-  await make(l, [{ op: 'create', type: 'signup', title: 'Old', props: { region: 'CA' } }, automation({ ...signups, edge: 'first_per:region' }) as never]);
+  await make(l, [{ op: 'create', type: 'signup', title: 'Old', props: { region: 'CA' } }, automation({ ...signups, edge: 'first_per:region' }) as never, ...ABOUT]);
   await pass(l, 0);
   const eu = await make(l, [{ op: 'create', ref: 'a', type: 'signup', title: 'Ada', props: { region: 'EU' } }, { op: 'create', type: 'signup', title: 'Ann', props: { region: 'CA' } }]);
   assert.deepEqual((await pass(l, 1)).map((m) => [m.edge, m.value, m.matched]), [['first_per:region', 'EU', [eu.a]]], 'CA was met before');
@@ -95,7 +97,7 @@ test('first_per: once for each value of a field, ever', async () => {
 test('crosses: an item reaching n from under it fires, and again only after it falls back under', async () => {
   const l = await map();
   const on = { query: { filter: { find: ['type finding'] } }, edge: 'crosses:10000', field: 'value' };
-  const f = await make(l, [{ op: 'create', ref: 'f', type: 'finding', title: 'Monthly profit', props: { value: 8000, value_type: 'number', unit: 'EUR' } }, automation(on) as never]);
+  const f = await make(l, [{ op: 'create', ref: 'f', type: 'finding', title: 'Monthly profit', props: { value: 8000, value_type: 'number', unit: 'EUR' } }, automation(on) as never, ...ABOUT]);
   await pass(l, 0);
   const set = (value: number) => l.change(human, { reason: 'test', ops: [{ op: 'update', id: f.f, props: { value } }] });
   await set(9000);
@@ -112,7 +114,7 @@ test('crosses: an item reaching n from under it fires, and again only after it f
 
 test('what an edge met is remembered across a restart, and a changed on starts again', async () => {
   const l = await map();
-  const ids = await make(l, [automation({ ...signups, edge: 'each' }) as never]);
+  const ids = await make(l, [automation({ ...signups, edge: 'each' }) as never, ...ABOUT]);
   await pass(l, 0);
   await make(l, [{ op: 'create', type: 'signup', title: 'Ada' }]);
   assert.equal((await pass(l, 1)).length, 1);
