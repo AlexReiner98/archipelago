@@ -319,6 +319,7 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
       'Check your email',
       gateRow(h('span', { class: 'muted grow gist', title: `A sign-in code is on its way to ${sentTo}, if it has a workspace here` }, sentTo), change, again),
       gateRow(code, go),
+      gateRow(h('span', { class: 'muted grow' }, 'Not there? Check spam or junk.')),
       error,
       startAt && gateRow(h('span', { class: 'muted grow' }, 'No code?'), h('a', { href: startAt, title: 'An address with no workspace here is sent nothing: make one of your own' }, 'Start a workspace')),
     );

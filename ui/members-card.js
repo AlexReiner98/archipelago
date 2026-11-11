@@ -14,7 +14,7 @@ export function membersCard({ me, owner, members, others, tokenRow, then, fail, 
     try {
       const made = await api('member_add', { email: email.value.trim(), name: name.value.trim() || undefined, admin: admin.checked });
       await then();
-      made.invited ? say('muted', `Invitation sent to ${made.email}.`) : say('error', `${made.email} is a member, but the invitation was not sent: ${made.error}`);
+      made.invited ? say('muted', `Invitation sent to ${made.email}. Not there? It may be in spam or junk.`) : say('error', `${made.email} is a member, but the invitation was not sent: ${made.error}`);
     } catch (err) {
       fail(err);
     }
