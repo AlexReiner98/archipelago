@@ -488,6 +488,16 @@
           "description": "The id the surface gave the session.",
           "system": true
         },
+        "packs": {
+          "type": "json",
+          "description": "The packs active when the run started, as [{ id, version, manifest }], manifest the hash of its pack file: what lets a measure tell one version of the harness from another.",
+          "system": true
+        },
+        "model": {
+          "type": "string",
+          "description": "The model a launched run was started with, as its launcher was told it.",
+          "system": true
+        },
         "last_seen": {
           "type": "datetime",
           "description": "Last time the session reported in.",
