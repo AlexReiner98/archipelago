@@ -11,6 +11,7 @@ import type { Registry } from './packs.ts';
 import { REPLACED } from './attention.ts';
 import { answerPreset } from './query-presets.ts';
 import { setPackAsker, VIEWS } from './views.ts';
+import { used } from './uses.ts';
 
 const short = (id: string) => id.slice(id.indexOf('.') + 1);
 
@@ -68,6 +69,7 @@ export async function askView(l: Archipelago, actor: Actor, name: string, params
   const found = packView(l, name);
   if (!found && REPLACED[name]) throw new Error(`No view "${name}": attention answers it now. Ask query attention with params ${REPLACED[name]}.`);
   if (!found) throw new Error(`No view "${name}". Views: ${Object.keys(viewList(l)).join(', ')}`);
+  used(l.workspace, 'view', found.def.id);
   if (found.def.lens) return answerPreset(l, found.def, params);
   return (await hostFor(l.registry).call(l, actor, found.pack, 'view', found.def.id, params, found.def.limit_ms)).answer ?? null;
 }

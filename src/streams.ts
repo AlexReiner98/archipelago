@@ -15,7 +15,7 @@ import { kept, ruleFor, type OpEntry, type Retention } from './retention.ts';
 import { makePartitions, partitionMade } from './partitions.ts';
 import { hashed, openOps, sealOp } from './opseal.ts';
 
-export type OpStream = 'sessions' | 'claims' | 'notifications' | 'automations' | 'settings' | 'access' | 'observations' | 'places' | 'activity' | `pack:${string}` | CountStream;
+export type OpStream = 'sessions' | 'claims' | 'notifications' | 'automations' | 'settings' | 'access' | 'observations' | 'places' | 'activity' | 'uses' | `pack:${string}` | CountStream;
 /** A stream a server pack keeps its counts in, by the word its manifest names (src/pack-counts.ts). */
 export type CountStream = string & { readonly counts: true };
 export type OpFact = ['+', string, string, unknown] | ['-', string, string];

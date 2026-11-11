@@ -1195,6 +1195,14 @@
       "say": "What was done that is no change to the map and is kept nowhere else: a push heard, a share made, a pack turned on, an act made outside. Every entry kept."
     },
     {
+      "id": "uses",
+      "stream": "uses",
+      "keep": {
+        "history": "P35D"
+      },
+      "say": "How often each thing a pack declares was used, per day: a view asked, an instruction said, a rule that held, refused or asked. Counts only, kept five weeks."
+    },
+    {
       "id": "pack",
       "stream": "pack:*",
       "keep": {
