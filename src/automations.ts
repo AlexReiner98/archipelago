@@ -5,8 +5,6 @@
 // logged with its result.
 
 import { AUTOMATION_TOOLS, checkAutomation } from './automation-rules.ts';
-import { dueBetween } from './due.ts';
-import { dayStart, zoneOf } from './timeaxis.ts';
 import { lastSeq, readEvents } from './eventlog.ts';
 import { launch } from './launcher.ts';
 import type { Entity, Archipelago } from './pelago.ts';
@@ -98,18 +96,10 @@ export class Automations {
     return Boolean(last && (await this.l.entity(last))?.is_open);
   }
 
+  /** Only an interval is the runner's: a time of day (daily, weekly) comes due by the clock (src/due.ts) and the packs that hear item.due act on it. */
   private async due(auto: Entity, now: Date): Promise<boolean> {
     const last = auto.props.last_fired ? new Date(auto.props.last_fired as string) : undefined;
     if (auto.props.trigger === 'every') return !last || now.getTime() - last.getTime() >= (auto.props.every_minutes as number) * 60_000;
-    if (auto.props.trigger === 'daily' || auto.props.trigger === 'weekly') {
-      // Its when (at, on its days; a daily one every day), as the clock counts it (src/due.ts): in the workspace's zone.
-      // Since it last fired, else since the start of today; a day at most.
-      const zone = await zoneOf(this.l);
-      const day = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-      const from = Math.max(last?.getTime() ?? dayStart(day, zone), now.getTime() - 86_400_000);
-      const timed = auto.props.trigger === 'daily' ? { ...auto, props: { ...auto.props, days: undefined } } : auto;
-      return dueBetween(this.l, [timed], from, now.getTime(), zone).length > 0;
-    }
     return false;
   }
 

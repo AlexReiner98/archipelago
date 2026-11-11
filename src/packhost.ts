@@ -12,6 +12,7 @@ import { createInterface } from 'node:readline';
 import { notify } from './notify.ts';
 import { mailHeard, type NotificationMail } from './notify-mail.ts';
 import { handleRequests, type OutsideRequest } from './outside.ts';
+import { launchHeard, type LaunchAsked } from './pack-launch.ts';
 import { answerBeyond, holdWorkspace, NOT_BEYOND } from './pack-reach.ts';
 import type { PackFile } from './packs.ts';
 import { answerRead, type Read } from './packreads.ts';
@@ -41,6 +42,8 @@ export interface Done {
   notify?: { title: string; body?: string; level?: 'info' | 'warning' | 'urgent'; about?: string }[];
   /** On hearing a notification made: one mail about it, to its person (src/notify-mail.ts). */
   mail?: NotificationMail[];
+  /** On hearing an automation come due: the session it says to start, started by the kernel (src/pack-launch.ts). */
+  launch?: LaunchAsked;
 }
 
 /** What is asked of an action's ops before they are applied: a token limited to some work is held to it. */
@@ -228,6 +231,7 @@ export class PackHost {
     // Refused whole, before anything is written: an event of a kind its pack does not declare.
     for (const e of done.log ?? []) if (!parts(file).events.includes(e.action)) throw new Error(`The ${pack} pack declares no event "${e.action}"`);
     const mailed = done.mail?.length ? await mailHeard(l, pack, call === 'event' ? input : undefined, done.mail) : undefined;
+    const launched = done.launch ? await launchHeard(l, pack, call === 'event' ? input : undefined, done.launch) : undefined;
     const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name, pack, ...islandIn(input) }) : undefined;
     const action = call === 'action' ? parts(file).actions.find((a) => a.id === name) : undefined;
     const outside = done.requests?.length ? await handleRequests(this, l, actor, file, action, done.requests, (changed as { changeset?: string } | undefined)?.changeset) : undefined;
@@ -236,7 +240,7 @@ export class PackHost {
     const dropped = changed?.status === 'applied' && done.drop_pictures?.length ? await dropPictures(l, actor, done.drop_pictures, done.reason?.trim() || name) : undefined;
     const others = await further(l, actor, file, name, done, input);
     for (const e of done.log ?? []) this.tell(l, file.id, e);
-    return { answer, ...changed, ...(mailed && { mailed }), ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }) };
+    return { answer, ...changed, ...(mailed && { mailed }), ...(launched && { launched }), ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }) };
   }
 
   /**
