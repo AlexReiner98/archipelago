@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { alertOwner, resetAlerts } from '../src/alert.ts';
-import { Automations } from '../src/automations.ts';
 import { setMailer, type Mail } from '../src/mail.ts';
 import { VIEWS } from '../src/views.ts';
 import { fresh, make } from './map.ts';
@@ -10,17 +9,18 @@ import { fresh, make } from './map.ts';
 const mailbox: Mail[] = [];
 setMailer(async (mail) => void mailbox.push(mail));
 
-test('a failing automation tells the owner on the map and by mail, once an hour', async (t) => {
+test('a failure tells the owner on the map and by mail, once an hour', async (t) => {
   t.after(() => delete process.env.PELAGO_ALERT_TO);
   process.env.PELAGO_ALERT_TO = 'Owner@Example.com';
   resetAlerts();
   mailbox.length = 0;
   const l = await fresh();
   assert.equal(l.workspace, 'default');
-  await make(l, [{ op: 'create', ref: 'broken', type: 'automation', title: 'Nightly tidy', status: 'enabled', props: { trigger: 'every', every_minutes: 1, action: 'tool', tool: 'import_audit', input: { connection: 'e_nowhere' } } }, { op: 'create', ref: 'map', type: 'task', title: 'Keep the map tidy' }, { op: 'link', type: 'about', from: 'broken', to: 'map' }]);
-  const autos = new Automations(l);
-  await autos.tick();
-  await autos.tick(new Date(Date.now() + 120_000));
+  const { tidy } = await make(l, [{ op: 'create', ref: 'tidy', type: 'task', title: 'Nightly tidy' }]);
+  // As the clock tells the owner its pass failed: the same key twice in an hour is said once.
+  const failed = { key: 'clock', title: 'The automation "Nightly tidy" failed', body: 'No connection e_nowhere', level: 'warning' as const, from: 'pelago', about: tidy };
+  await alertOwner(l, failed);
+  await alertOwner(l, failed);
   const told = ((await VIEWS.notifications.run(l, {})) as any[]).filter((n) => n.title.includes('Nightly tidy'));
   assert.equal(told.length, 1, 'said once, not on every pass');
   assert.deepEqual([told[0].title, told[0].level, told[0].about_title], ['The automation "Nightly tidy" failed', 'warning', 'Nightly tidy']);

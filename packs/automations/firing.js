@@ -53,11 +53,12 @@ export function withFiring(item, event, answer) {
   return { ...answer, notify, log: [...(answer.log ?? []), fact] };
 }
 
-/** The fact of a firing that failed before it answered: nothing made, and why. */
+/** The fact of a firing that failed before it answered: nothing made, and why; and the person warned, about the automation. */
 export function failedFiring(item, event, err) {
   const why = short(err?.message ?? err) || 'failed';
   return {
     reason: `${item.title}: failed`,
+    notify: [{ title: `The automation "${item.title}" failed`, body: why, level: 'warning', about: item.id }],
     log: [{ action: FIRED, target: item.id, reason: `${item.title}: failed`, detail: { ...occurrence(event), ok: false, result: why, made: [] } }],
   };
 }

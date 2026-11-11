@@ -7,7 +7,7 @@
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { hashSecret, newSecret, OPERATOR_RESET_FILE, sameSecret, validWorkspaceId } from './auth.ts';
-import { Automations } from './automations.ts';
+import { QuietSessions } from './session-quiet.ts';
 import { restore, type Dump } from './backup.ts';
 import { indexWorkspace } from './control-index.ts';
 import { addLocalType, addWorkspace, claimControlValue, controlValue, importControlFiles, importLocalPack, listWorkspaces, localTypes, nameWorkspace, OPERATOR, OPERATOR_RESET, removeWorkspace, setControlValue, takeControlValue } from './control.ts';
@@ -69,7 +69,7 @@ export interface Workspace {
   id: string;
   name: string;
   pelago: Archipelago;
-  automations: Automations;
+  quiet: QuietSessions;
 }
 
 interface WorkspacesConfig {
@@ -286,7 +286,7 @@ export class Workspaces {
       if (pelago.registry.made.size) await followMade(pelago);
       await syncTypes(pelago);
       if (begins) await pelago.record('settings', 'system', [...(await beginApplying(db)), ...(await beginShared(db))]);
-      const ws = { id, name: isDefault ? 'Default' : (this.known.get(id) ?? id), pelago, automations: new Automations(pelago) };
+      const ws = { id, name: isDefault ? 'Default' : (this.known.get(id) ?? id), pelago, quiet: new QuietSessions(pelago) };
       // A fresh default map on islands, as create puts every other new map (e_44rbfwxp).
       if (begins && isDefault && this.config.defaultOnIslands) {
         await setIslands(pelago, 'system', true);
@@ -300,14 +300,14 @@ export class Workspaces {
     }
   }
 
-  /** Start or stop what runs on a clock in one workspace: its automations and its packs' schedules. */
+  /** Start or stop what runs on a clock in one workspace: the clock, its packs' schedules and the look for quiet sessions. */
   private clocks(ws: Workspace, on: boolean): void {
-    ws.automations.stop();
+    ws.quiet.stop();
     stopSchedules(ws.pelago.registry);
     stopClock(ws.pelago);
     if (!on) return;
     startSchedules(ws.pelago);
-    ws.automations.start();
+    ws.quiet.start();
     startClock(ws.pelago, (err) => void alertOwner(ws.pelago, { key: 'clock', title: 'The clock failed', body: `A pass over what came due failed: ${err.message}`, from: 'pelago' }));
   }
 

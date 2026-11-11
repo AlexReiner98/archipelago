@@ -1,10 +1,8 @@
-// What makes an automation's definition complete. Kept free of runtime imports so the
+// What makes an automation's definition complete: when it comes due (a time of day, daily or on its days, or a
+// query starting to match) and what it does (notify or launch); the automations pack does it. Kept free of runtime imports so the
 // write path can check a definition before it is stored.
 
 import type { Registry } from './packs.ts';
-
-/** Tools an automation may call. Anything that decides or approves is left out on purpose. */
-export const AUTOMATION_TOOLS = ['check_connections', 'import_audit'];
 
 /** The days of the week, 1 for Monday to 7 for Sunday, as the time pack counts them. */
 const DAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -78,41 +76,29 @@ export function checkOn(on: unknown): string[] {
 export function checkAutomation(props: Record<string, unknown>): string[] {
   const problems: string[] = [];
   if (props.on !== undefined) problems.push(...checkOn(props.on));
-  // An automation that watches a query fires on its edge: it needs no time or trigger beside it.
-  if (props.on !== undefined && props.trigger === undefined) {
-    if (props.action !== 'notify' && props.action !== 'launch' && props.action !== 'tool') problems.push('an automation needs action: notify, tool or launch');
-    return problems;
-  }
-  switch (props.trigger) {
-    case 'every':
-      if (typeof props.every_minutes !== 'number' || props.every_minutes < 1) problems.push('trigger "every" needs every_minutes of 1 or more');
-      break;
-    case 'daily':
-      if (typeof props.at !== 'string' || !TIME.test(props.at)) problems.push('trigger "daily" needs at as "HH:MM" (24-hour, in the workspace time zone)');
-      break;
-    case 'weekly':
-      if (!weekdays(props.days)) problems.push('trigger "weekly" needs days: the days of the week, as names ("monday") or numbers (1 for Monday to 7)');
-      if (typeof props.at !== 'string' || !TIME.test(props.at)) problems.push('trigger "weekly" needs at as "HH:MM" (24-hour, in the workspace time zone)');
-      break;
-    case 'event':
-      if (typeof props.on_action !== 'string' || !props.on_action) problems.push('trigger "event" needs on_action, e.g. "entity.create" or "resource.*"');
-      break;
-    default:
-      problems.push('an automation needs trigger: every, daily, weekly or event');
-  }
+  // One that watches a query comes due on its edge: it needs no time beside it.
+  if (props.on === undefined || props.trigger !== undefined)
+    switch (props.trigger) {
+      case 'daily':
+        if (typeof props.at !== 'string' || !TIME.test(props.at)) problems.push('trigger "daily" needs at as "HH:MM" (24-hour, in the workspace time zone)');
+        break;
+      case 'weekly':
+        if (!weekdays(props.days)) problems.push('trigger "weekly" needs days: the days of the week, as names ("monday") or numbers (1 for Monday to 7)');
+        if (typeof props.at !== 'string' || !TIME.test(props.at)) problems.push('trigger "weekly" needs at as "HH:MM" (24-hour, in the workspace time zone)');
+        break;
+      default:
+        problems.push('an automation needs trigger daily or weekly, or on: a query and the edge it fires on');
+    }
   const input = (props.input ?? {}) as Record<string, unknown>;
   switch (props.action) {
     case 'notify':
-      break;
-    case 'tool':
-      if (!AUTOMATION_TOOLS.includes(props.tool as string)) problems.push(`action "tool" needs tool to be one of: ${AUTOMATION_TOOLS.join(', ')}`);
       break;
     case 'launch':
       if (typeof input.task !== 'string') problems.push('action "launch" needs input.task: the id of the entity to work on');
       if (input.mode !== undefined && input.mode !== 'plan' && input.mode !== 'acceptEdits') problems.push('input.mode must be plan or acceptEdits');
       break;
     default:
-      problems.push('an automation needs action: notify, tool or launch');
+      problems.push('an automation needs action: notify or launch');
   }
   return problems;
 }
