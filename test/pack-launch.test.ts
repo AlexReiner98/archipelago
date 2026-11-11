@@ -38,6 +38,8 @@ test('an automation come due launches what it says, on its approver\'s authority
     { op: 'link', type: 'part_of', from: 'other', to: 'proj' },
     { op: 'create', ref: 'auto', type: 'automation', title: 'Nightly refiner', status: 'enabled', props: { trigger: 'daily', at: '03:00', action: 'launch', input: { task: '{task}', mode: 'plan', instructions: 'Refine.' } } },
     { op: 'create', ref: 'paused', type: 'automation', title: 'Paused', status: 'paused', props: { trigger: 'daily', at: '03:00', action: 'launch', input: { task: '{task}' } } },
+    { op: 'link', type: 'about', from: 'auto', to: 'proj' },
+    { op: 'link', type: 'about', from: 'paused', to: 'proj' },
   ]);
   // A {ref} in props is not filled: set the task's id now.
   await make(l, [{ op: 'update', id: m.auto, props: { input: { task: m.task, mode: 'plan', instructions: 'Refine.' } } }, { op: 'update', id: m.paused, props: { input: { task: m.task } } }]);
