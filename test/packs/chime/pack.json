@@ -1,0 +1,19 @@
+{
+  "id": "chime",
+  "version": "0.1.0",
+  "title": "Chime",
+  "description": "A pack for testing the clock: a chime rings at an hour on days of the week, and the pack tells the owner when it hears one come due.",
+  "requires": ["core"],
+  "types": [
+    {
+      "id": "chime",
+      "title": "Chime",
+      "description": "Something that rings at an hour on days of the week.",
+      "extends": "occurrence",
+      "statuses": { "open": ["on"], "closed": ["off"] },
+      "capabilities": { "when": { "repeat": { "from": "hour", "days": "days" } } },
+      "fields": { "hour": { "type": "string" }, "days": { "type": "json" } }
+    }
+  ],
+  "handlers": [{ "event": "item.due" }]
+}

@@ -1,0 +1,73 @@
+// The clock: the kernel's one duty in time (decision e_esqevwkf, the owner, 11 Nov 2026). Once a minute it finds what
+// came due since its last pass: each occurrence of an item whose type says when it happens (the when capability: a
+// moment, a span's start, or a repeat's hour on each day it falls on, in the workspace's zone). For each it records an
+// item.due event and tells the packs that hear item.due, which do whatever is to be done: the kernel decides nothing
+// and names no pack. Its cursor is kept in the workspace's settings, so a pass after a restart catches up on what came
+// due while it was down, a day at most; the first pass ever starts from now.
+
+import { hostFor } from './packtools.ts';
+import type { Archipelago, Entity } from './pelago.ts';
+import { spansOf, zoneOf } from './timeaxis.ts';
+
+const CURSOR = 'due_cursor';
+/** The furthest back a pass looks: what came due while the server was down longer than this is let go. */
+const CATCH_UP_MS = 24 * 3_600_000;
+const EVERY_MS = 60_000;
+
+export interface Due {
+  item: string;
+  type: string;
+  title: string;
+  /** The instant the occurrence begins. */
+  at: string;
+}
+
+/** The day an instant falls on in a zone, as a date. */
+const dayIn = (at: number, zone: string) => new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+
+/** The occurrences of these items that begin after `from` and at or before `to`, in a zone, earliest first. */
+export function dueBetween(l: Archipelago, items: Pick<Entity, 'id' | 'type' | 'title' | 'props' | 'created_at' | 'status' | 'is_open'>[], from: number, to: number, zone: string): Due[] {
+  // From the start of the day `from` falls on: a repeat is laid out a whole day at a time.
+  // To a moment past `to`: the axis keeps what begins before its end, and what begins at `to` itself is due.
+  const axis = { from: dayIn(from, zone), to: new Date(to + 1).toISOString(), by: ['when' as const] };
+  const out: Due[] = [];
+  for (const e of items)
+    for (const span of spansOf(l, e, axis, zone)) {
+      const at = Date.parse(span.start);
+      if (at > from && at <= to) out.push({ item: e.id, type: e.type, title: e.title, at: span.start });
+    }
+  return out.sort((a, b) => a.at.localeCompare(b.at));
+}
+
+/** The types whose items happen at a time. */
+const timedTypes = (l: Archipelago) => [...l.registry.types.values()].filter((t) => t.capabilities.when).map((t) => t.id);
+
+/** One pass: what came due since the last, each recorded and told to the packs that hear it. Answers what came due. */
+export async function duePass(l: Archipelago, now = Date.now()): Promise<Due[]> {
+  const last = await l.setting<number>(CURSOR);
+  await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [CURSOR, JSON.stringify(now)]);
+  const types = timedTypes(l);
+  if (last === undefined || !types.length || now <= last) return [];
+  const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null`, [types]);
+  const due = dueBetween(l, rows, Math.max(last, now - CATCH_UP_MS), now, await zoneOf(l));
+  const host = hostFor(l.registry);
+  for (const d of due) {
+    const event = { action: 'item.due', target: d.item, reason: `"${d.title}" is due`, detail: { type: d.type, at: d.at } };
+    await l.log(l.db, { actor: 'agent:pelago', ...event });
+    host.tell(l, 'kernel', event);
+  }
+  return due;
+}
+
+const clocks = new WeakMap<Archipelago, ReturnType<typeof setInterval>>();
+
+/** Start the workspace's clock; the leader alone runs it (src/leader.ts). */
+export function startClock(l: Archipelago, onError: (err: Error) => void): void {
+  stopClock(l);
+  clocks.set(l, setInterval(() => void duePass(l).catch(onError), EVERY_MS).unref());
+}
+
+export function stopClock(l: Archipelago): void {
+  clearInterval(clocks.get(l));
+  clocks.delete(l);
+}
