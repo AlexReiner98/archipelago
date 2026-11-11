@@ -17,7 +17,7 @@ test('a failing automation tells the owner on the map and by mail, once an hour'
   mailbox.length = 0;
   const l = await fresh();
   assert.equal(l.workspace, 'default');
-  await make(l, [{ op: 'create', ref: 'broken', type: 'automation', title: 'Nightly tidy', status: 'enabled', props: { trigger: 'every', every_minutes: 1, action: 'tool', tool: 'import_audit', input: { connection: 'e_nowhere' } } }]);
+  await make(l, [{ op: 'create', ref: 'broken', type: 'automation', title: 'Nightly tidy', status: 'enabled', props: { trigger: 'every', every_minutes: 1, action: 'tool', tool: 'import_audit', input: { connection: 'e_nowhere' } } }, { op: 'create', ref: 'map', type: 'task', title: 'Keep the map tidy' }, { op: 'link', type: 'about', from: 'broken', to: 'map' }]);
   const autos = new Automations(l);
   await autos.tick();
   await autos.tick(new Date(Date.now() + 120_000));

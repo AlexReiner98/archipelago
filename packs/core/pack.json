@@ -580,8 +580,8 @@
       ],
       "extends": "system",
       "title": "Automation",
-      "description": "A trigger that fires an action. Only fires while its status is enabled.",
-      "capabilities": { "when": { "repeat": { "from": "at", "days": "days" } } },
+      "description": "A trigger that fires an action, about the item it serves: it lives on that item's island and is as visible as it. Only fires while its status is enabled.",
+      "capabilities": { "when": { "repeat": { "from": "at", "days": "days" } }, "subject": { "link": "about" } },
       "statuses": {
         "open": [
           "enabled",

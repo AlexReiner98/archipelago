@@ -59,12 +59,15 @@ test('an agent can notify the human; a stale session raises one notification', a
 
 test('automations fire on a schedule and on events, are logged, and cannot trigger each other', async () => {
   const l = await fresh();
+  // Each lives with what it is about (src/subject.ts).
+  const { subject } = await make(l, [{ op: 'create', ref: 'subject', type: 'task', title: 'The map' }]);
+  const about = (...refs: string[]): Op[] => refs.map((from) => ({ op: 'link', type: 'about', from, to: subject }));
   await assert.rejects(
-    make(l, [{ op: 'create', type: 'automation', title: 'Half-made', status: 'enabled', props: { trigger: 'every', action: 'tool', tool: 'decide' } }]),
+    make(l, [{ op: 'create', ref: 'h', type: 'automation', title: 'Half-made', status: 'enabled', props: { trigger: 'every', action: 'tool', tool: 'decide' } }, ...about('h')]),
     /needs every_minutes[\s\S]*tool to be one of: check_connections, import_audit/,
   );
   // An agent can only propose one.
-  const proposed = await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'automation', title: 'Sneaky', status: 'enabled', props: { trigger: 'every', every_minutes: 1, action: 'notify' } }] });
+  const proposed = await l.change(agent, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'automation', title: 'Sneaky', status: 'enabled', props: { trigger: 'every', every_minutes: 1, action: 'notify' } }, ...about('s')] });
   assert.equal(proposed.status, 'proposed');
 
   const made = await make(l, [
@@ -72,13 +75,14 @@ test('automations fire on a schedule and on events, are logged, and cannot trigg
     { op: 'create', ref: 'morning', type: 'automation', title: 'Morning nudge', status: 'enabled', props: { trigger: 'daily', at: '09:00', action: 'notify', message: 'Review the map' } },
     { op: 'create', ref: 'review', type: 'automation', title: 'New item', status: 'enabled', props: { trigger: 'event', on_action: 'entity.create', action: 'notify', message: 'Made by {actor}: {reason}', level: 'warning' } },
     { op: 'create', ref: 'any', type: 'automation', title: 'Everything', status: 'paused', props: { trigger: 'event', on_action: 'entity.*', action: 'notify' } },
+    ...about('hourly', 'morning', 'review', 'any'),
   ]);
   // Nor where agents' other changes are applied as made: an automation acts later with a human's authority, so
   // making one, changing one or bringing one back waits for the human.
   const loose = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', archive: 'auto', restore: 'auto', link: 'auto' });
   const launches = { trigger: 'every', every_minutes: 1, action: 'launch', input: { task: made.hourly, mode: 'acceptEdits', instructions: 'anything' } };
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'An ordinary thing' }] })).status, 'applied');
-  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'automation', title: 'Launches', status: 'enabled', props: launches }] })).status, 'proposed');
+  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', ref: 'l', type: 'automation', title: 'Launches', status: 'enabled', props: launches }, ...about('l')] })).status, 'proposed');
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.morning, props: launches }] })).status, 'proposed');
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.any, status: 'enabled' }] })).status, 'proposed');
   const autos = new Automations(l);

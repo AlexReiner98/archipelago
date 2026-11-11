@@ -16,7 +16,7 @@ test('a weekly trigger names its days and fires once on each, at its time', asyn
   assert.match(checkAutomation({ trigger: 'weekly', at: '9:00', action: 'notify' }).join('; '), /needs days[\s\S]*needs at as "HH:MM"/);
 
   const l = await fresh();
-  const made = await make(l, [{ op: 'create', ref: 'w', type: 'automation', title: 'Weekly posting', status: 'enabled', props: { trigger: 'weekly', days: ['monday'], at: '09:00', action: 'notify' } }]);
+  const made = await make(l, [{ op: 'create', ref: 'w', type: 'automation', title: 'Weekly posting', status: 'enabled', props: { trigger: 'weekly', days: ['monday'], at: '09:00', action: 'notify' } }, { op: 'create', ref: 't', type: 'task', title: 'Post' }, { op: 'link', type: 'about', from: 'w', to: 't' }]);
   const autos = new Automations(l);
   const fired = async (when: Date) => (await autos.tick(when)).map((f) => f.automation);
   // 7 Jan 2030 is a Monday, after anything the test makes; times are in Toronto, the workspace zone.

@@ -69,6 +69,8 @@ const style = (ref = 's'): Op => ({ op: 'create', ref, type: 'style', title: `St
 const layout = (ref = 's'): Op => ({ op: 'create', ref, type: 'layout', title: `Layout ${ref}` });
 const doc: Op = { op: 'create', ref: 'doc', type: 'page', title: 'Guide' };
 const automation: Op = { op: 'create', ref: 'a', type: 'automation', title: 'Nightly', status: 'paused', props: { trigger: 'daily', at: '03:00', action: 'notify', message: 'hi' } };
+/** An automation lives with what it is about (src/subject.ts): given with a task, linked by ref. */
+const about: Op = { op: 'link', type: 'about', from: 'a', to: 't' };
 
 const CASES: Record<string, Case> = {
   'create task': { ops: () => [task()] },
@@ -82,7 +84,7 @@ const CASES: Record<string, Case> = {
   'create style': { ops: () => [style()] },
   'create layout with code': { ops: () => [{ ...layout(), props: { code: 'export default () => []' } }] },
   'create screen': { ops: () => [{ op: 'create', type: 'screen', title: 'Board' }] },
-  'create automation': { ops: () => [automation] },
+  'create automation': { given: [task()], ops: (i) => [automation, { op: 'link', type: 'about', from: 'a', to: i.t }] },
   'update task title': { given: [task()], ops: (i) => [{ op: 'update', id: i.t, title: 'Renamed' }] },
   'update task done': { given: [task()], ops: (i) => [{ op: 'update', id: i.t, status: 'done' }] },
   'update task shared': { given: [task('t', { visibility: 'private' })], ops: (i) => [{ op: 'update', id: i.t, visibility: 'shared' }] },
@@ -99,8 +101,8 @@ const CASES: Record<string, Case> = {
   'update style title': { given: [style()], ops: (i) => [{ op: 'update', id: i.s, title: 'Calmer' }] },
   'update layout code': { given: [layout()], ops: (i) => [{ op: 'update', id: i.s, props: { code: 'export default () => []' } }] },
   'update style page_css': { given: [style()], ops: (i) => [{ op: 'update', id: i.s, props: { page_css: 'h2 { color: red }' } }] },
-  'update automation': { given: [automation], ops: (i) => [{ op: 'update', id: i.a, title: 'Weekly' }] },
-  'archive automation': { given: [automation], ops: (i) => [{ op: 'archive', id: i.a }] },
+  'update automation': { given: [task(), automation, about], ops: (i) => [{ op: 'update', id: i.a, title: 'Weekly' }] },
+  'archive automation': { given: [task(), automation, about], ops: (i) => [{ op: 'archive', id: i.a }] },
   'link task': { given: [task(), task('u')], ops: (i) => [{ op: 'link', type: 'depends_on', from: i.t, to: i.u }] },
   'unlink task': { given: [task(), task('u'), { op: 'link', type: 'depends_on', from: 't', to: 'u' }], ops: (i) => [{ op: 'unlink', relation: i.link }] },
   'archive task': { given: [task()], ops: (i) => [{ op: 'archive', id: i.t }] },
@@ -117,7 +119,7 @@ async function outcome(l: Archipelago, who: (typeof ACTORS)[string], c: Case): P
   if (c.given) {
     const made = (await l.change(human, { ops: c.given, reason: 'given' })) as { created: Ids };
     Object.assign(ids, made.created);
-    const linked = c.given.find((op) => op.op === 'link');
+    const linked = c.given.find((op) => op.op === 'link' && op.type === 'depends_on');
     if (linked) ids.link = (await l.db.query<{ id: string }>(`select id from relation where from_id = $1 and valid_to is null and type = 'depends_on'`, [ids.t])).rows[0].id;
     if (c.ops(ids).some((op) => op.op === 'restore')) await l.change(human, { ops: [{ op: 'archive', id: ids.t }], reason: 'given' });
   }
