@@ -9,7 +9,7 @@ import { actorId, type Actor, type Entity, type Archipelago, type Op } from './p
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
 import { cutTitle, mintName, saidTitle, sessionLabelled, sessionTitle } from './session-name.ts';
 import { roomForSession, workspaceName } from './standing.ts'; import { wholeMap } from './outbox.ts'; import { took } from './presence.ts';
-import { packVersions } from './pack-versions.ts'; import { VIEWS } from './views.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts';
+import { packVersionsFor } from './pack-versions.ts'; import { VIEWS } from './views.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts';
 import { hookRunHere, isChat, resolveRun, sessionsAwake, takeUp } from './chat-run.ts'; import { parentOps, parentRun } from './session-parent.ts';
 export { resolveRun, sessionPrompted, sessionsAwake } from './chat-run.ts';
 export { recordRun } from './run-record.ts';
@@ -67,6 +67,9 @@ export async function sessionStart(
     await sessionLabelled(l, hooked, input.title, actorId(actor));
     const ops: Op[] = [];
     if (task) ops.push({ op: 'link', type: 'works_on', from: hooked.id, to: task.id });
+    // Its hook recorded the map's packs; now it says its task, it runs under what the task's island runs.
+    const packs = task && (await packVersionsFor(l, task));
+    if (packs && JSON.stringify(packs) !== JSON.stringify(hooked.props.packs)) ops.push({ op: 'update', id: hooked.id, props: { packs } });
     if (input.branch && input.branch !== hooked.props.branch) ops.push({ op: 'update', id: hooked.id, props: { branch: input.branch } });
     if (parent) ops.push(...(await parentOps(l, hooked.id, parent)));
     if (ops.length) await l.apply(actorId(actor), { ops, reason: 'Session registered again: its hook had registered it' });
@@ -116,8 +119,9 @@ export async function sessionStart(
 async function newRun(l: Archipelago, actor: Actor, input: SessionSaid, task: Entity | undefined, repo: Entity | null | undefined, parent?: Entity) {
   const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };
   for (const k of ['surface', 'cwd', 'session_id', 'branch'] as const) if (input[k]) props[k] = input[k];
-  // The packs it ran under, each by version and the hash of its manifest, so a measure can tell the harness's versions apart.
-  props.packs = packVersions(l.registry);
+  // The packs it ran under, each by version and the hash of its manifest, so a measure can tell the harness's versions
+  // apart: on a task, those its task's island runs, so a trial of a version on one island is told from the rest.
+  props.packs = await packVersionsFor(l, task);
   // Its word is its hue's key, never shown (src/session-name.ts).
   const name = await mintName(l);
   if (name) props.name = name;
