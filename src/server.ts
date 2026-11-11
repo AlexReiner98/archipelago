@@ -48,7 +48,7 @@ import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
 import { servePublic } from './public-route.ts'; import { siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
 import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
-import { sharedPicture } from './documents.ts'; import { sharedAnswer } from './share-view.ts'; import { guestMap, ShareEnded } from './guests.ts'; import { serveLink } from './share-link-route.ts'; import { frozen } from './share-link.ts';
+import { sharedPicture } from './documents.ts'; import { sharedAnswer } from './share-view.ts'; import { serveLink } from './share-link-route.ts'; import { frozen } from './share-link.ts';
 import { configureSecrets } from './secrets.ts'; import { serveBackupFile } from './backup-tools.ts';
 import { answerAt, hookAt } from './server-adapter.ts'; import { mountOf, serveMounted } from './server-mounts.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
@@ -186,7 +186,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       ws,
       // Everything this request reads or writes goes through the database as
       // this person sees it. A token tied to nobody sees only what is shared.
-      pelago: identity.actor.reads ? await guestMap(ws.pelago, identity.actor.reads, identity.actor.person ?? '').catch((err) => { throw err instanceof ShareEnded ? new Refused(403, err.message) : err; }) : ws.pelago.as(identity.actor.person ?? '', Boolean(identity.actor.admin), identity.actor.may === 'read'),
+      pelago: ws.pelago.as(identity.actor.person ?? '', Boolean(identity.actor.admin), identity.actor.may === 'read'),
       actor: (label) => (label && identity.actor.kind === 'agent' ? { ...identity.actor, name: `${identity.actor.name}/${label}` } : identity.actor),
     };
   }

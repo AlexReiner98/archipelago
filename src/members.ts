@@ -33,8 +33,6 @@ export interface Member {
   added_at: string;
   /** One who only reads: they see what any member sees, and the database refuses their writes (src/db.ts scoped). Never an admin. */
   read_only: boolean;
-  /** A guest's: the share whose view alone they read (src/guests.ts). */
-  reads?: string | null;
 }
 
 /** A workspace's limits (src/standing.ts), members among them: the name it had when members were all a plan limited. */
@@ -67,7 +65,7 @@ async function roomForOneMore(db: Q, workspace: string, added = 0): Promise<void
 }
 
 export async function memberOf(db: Q, email: string): Promise<Member | undefined> {
-  const { rows } = await db.query<Member>(`select email, person_id, admin, added_at, read_only, reads from member where email = $1 and removed_at is null`, [email]);
+  const { rows } = await db.query<Member>(`select email, person_id, admin, added_at, read_only from member where email = $1 and removed_at is null`, [email]);
   return rows[0];
 }
 

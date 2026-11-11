@@ -124,7 +124,7 @@ route();
 
 /**
  * Someone reading what was shared with them is shown a way to start a map of their own, loud, in the bar: a link's
- * reader beside the emblem, with Sign in for one who has a map already; a guest (signed in already) by the menu. The
+ * reader beside the emblem, with Sign in for one who has a map already; a member who only reads (signed in already) by the menu. The
  * words the style gives (start, core's house style), to where this server says a person with no account begins.
  */
 async function startOwn() {
