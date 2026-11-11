@@ -44,9 +44,25 @@ async function siteOf(at: ActPlaces, input: Record<string, unknown>) {
   return { site, workspace };
 }
 
-/** Read the counts kept in a stream on a site's map after a position, logged there. */
+const WORKSPACE = /^[a-z0-9][a-z0-9-]{0,62}$/;
+
+/**
+ * The map a pack's counts are kept on: a site this server serves, by its domain, or by its id a workspace that has a
+ * public view, which anyone may open at /p/ whether or not it has a domain of its own (the owner, 11 Nov 2026,
+ * e_hx5x4xhj). A workspace with nothing public takes no counts: there is nothing on it for anyone to visit.
+ */
+async function countedOn(at: ActPlaces, input: Record<string, unknown>) {
+  if (input.site != null || input.workspace == null) return siteOf(at, input);
+  const workspace = String(input.workspace);
+  if (!WORKSPACE.test(workspace) || !(await at.has(workspace))) throw new Error(`"${workspace}" is not a workspace this server holds.`);
+  const { rows } = await (await at.get(workspace)).pelago.db.query(`select 1 from public_view limit 1`);
+  if (!rows.length) throw new Error(`"${workspace}" has no public view: counts are kept on a public site, or a workspace with something public.`);
+  return { site: workspace, workspace };
+}
+
+/** Read the counts kept in a stream on a site's or a public workspace's map after a position, logged there. */
 async function readCounts(at: ActPlaces, pack: ServerPackFile, act: string, input: Record<string, unknown>, stream: string | undefined) {
-  const { site, workspace } = await siteOf(at, input);
+  const { site, workspace } = await countedOn(at, input);
   const after = input.after == null ? 0 : Number(input.after);
   if (!(Number.isInteger(after) && after >= 0)) throw new Error('after: a position of the counts stream, a whole number.');
   const { pelago } = await at.get(workspace);
@@ -109,7 +125,7 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       if (!COUNT_KEY.test(key)) throw new Error('key: 1 to 40 letters, digits, _ and -.');
       const n = input.n == null ? 1 : Number(input.n);
       if (!(Number.isInteger(n) && n >= 1 && n <= 1000)) throw new Error('n: a whole number from 1 to 1000.');
-      addCount((await siteOf(at, input)).workspace, stream, key, undefined, n);
+      addCount((await countedOn(at, input)).workspace, stream, key, undefined, n);
       return { counted: true };
     }
     case 'count.read': {

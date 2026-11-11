@@ -9,15 +9,16 @@ import { pageOf, siteOf, visitOf } from './reader.js';
 
 const TEMPLATE = readFileSync(new URL('./public/page.html', import.meta.url), 'utf8');
 
-/** Count a reader's visit under the tag they came by, on the site's map: a count that fails never fails the page. */
-async function counted(parts, answer, site, ctx) {
+/** Count a reader's visit under the tag they came by, on the map `on` names: a count that fails never fails the page. */
+async function counted(parts, answer, on, ctx) {
   const tag = visitOf(parts, answer);
-  if (tag && site) await ctx.act('count.add', { site, key: tag }).catch(() => null);
+  if (tag) await ctx.act('count.add', { ...on, key: tag }).catch(() => null);
   return { answer };
 }
 
 export default {
-  // A public view at /p/ is counted on the map of its workspace's site (parts.domain), as a page of that site is.
-  page: async (parts, ctx) => counted(parts, await pageOf(parts, (act, input) => ctx.act(act, input), TEMPLATE), parts.domain, ctx),
-  site: async (parts, ctx) => counted(parts, await siteOf(parts, (act, input) => ctx.act(act, input), TEMPLATE), parts.host, ctx),
+  // A public view at /p/ is counted on the map of its workspace's site (parts.domain), as a page of that site is; on a
+  // workspace with no site, on its own map.
+  page: async (parts, ctx) => counted(parts, await pageOf(parts, (act, input) => ctx.act(act, input), TEMPLATE), parts.domain ? { site: parts.domain } : { workspace: parts.workspace }, ctx),
+  site: async (parts, ctx) => counted(parts, await siteOf(parts, (act, input) => ctx.act(act, input), TEMPLATE), { site: parts.host }, ctx),
 };

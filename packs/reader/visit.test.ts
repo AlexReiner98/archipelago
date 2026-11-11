@@ -53,15 +53,16 @@ test("a site's page read by a reader with a tag is a visit, counted under it; no
   assert.equal(visitOf(parts('/'), { status: 404, html: '<p>no</p>' }), null, 'a page not found');
 });
 
-test('a public view at /p/ read by a reader with a tag is a visit too, counted on its site', async () => {
+test('a public view at /p/ read by a reader with a tag is a visit too, counted on its site, or its own map with none', async () => {
   const { default: handler } = await import('./handler.js');
   const counted: Record<string, unknown>[] = [];
   const ctx = { act: async (name: string, input: Record<string, unknown>) => (name === 'count.add' ? void counted.push(input) : act(name, input)) };
   await handler.page({ workspace: 'acme', id: D, domain: 'site.example', request: ask('ref=launch', { host: 'app.example' }) }, ctx);
   assert.deepEqual(counted, [{ site: 'site.example', key: 'launch' }]);
   await handler.page({ workspace: 'acme', id: D, domain: 'site.example', request: ask('', { host: 'app.example' }) }, ctx);
+  assert.equal(counted.length, 1, 'no tag, nothing counted');
   await handler.page({ workspace: 'acme', id: D, request: ask('ref=launch', { host: 'app.example' }) }, ctx);
-  assert.equal(counted.length, 1, 'no tag, or a workspace with no site to count on: nothing counted');
+  assert.deepEqual(counted.at(-1), { workspace: 'acme', key: 'launch' }, 'a workspace with no site is counted on its own map');
   await handler.site({ workspace: 'acme', path: '/', host: 'site.example', request: ask('ref=post') }, ctx);
   assert.deepEqual(counted.at(-1), { site: 'site.example', key: 'post' }, 'and its site, as before');
 });
