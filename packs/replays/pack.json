@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "title": "Replays",
   "description": "A fixed set of real finished tasks, each with its brief held as it was, so two pack versions are run on the same work and compared like with like. Words only: the refine pack's actions hold the briefs and replay them.",
-  "requires": ["core"],
   "types": [
     {
       "id": "replays.set",

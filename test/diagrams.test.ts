@@ -1,7 +1,7 @@
 // The diagrams made from the code: files and pack files in, draw.io XML out, with no database.
 
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { readModules } from '../scripts/diagram-modules.ts';
@@ -77,7 +77,7 @@ test('every type is drawn under what it extends, down to the kinds, and an unkno
 test('the diagrams of this repository are made whole, and the same each time', () => {
   const walk = (dir: string): string[] => readdirSync(join(ROOT, dir)).flatMap((n) => (statSync(join(ROOT, dir, n)).isDirectory() ? walk(`${dir}/${n}`) : [`${dir}/${n}`]));
   const files = ['src', 'ui', 'packs'].flatMap(walk).map((path) => ({ path, text: readFileSync(join(ROOT, path), 'utf8') }));
-  const packs = readdirSync(join(ROOT, 'packs')).map((p) => JSON.parse(readFileSync(join(ROOT, 'packs', p, 'pack.json'), 'utf8')) as PackFile);
+  const packs = readdirSync(join(ROOT, 'packs')).filter((p) => existsSync(join(ROOT, 'packs', p, 'pack.json'))).map((p) => JSON.parse(readFileSync(join(ROOT, 'packs', p, 'pack.json'), 'utf8')) as PackFile);
   const made = diagrams(files, packs);
   assert.deepEqual(Object.keys(made), ['modules.drawio', 'types.drawio']);
   assert.deepEqual(diagrams(files, packs), made);

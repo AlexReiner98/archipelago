@@ -127,7 +127,9 @@ test("adding and taking out a pack is a fact on the log; its registrations follo
   assert.equal((await l.entity(note.created.e))!.title, 'Drafting', 'its items stay');
   assert.deepEqual(await syncPacks(l), [], 'a pack taken out stays out');
 
-  await assert.rejects(setPack(l, human, { pack: 'clock', on: false }), /leans requires the clock pack: take it out first/);
+  const out = await setPack(l, human, { pack: 'clock', on: false });
+  assert.deepEqual(out.waiting, [{ id: 'leans', why: 'needs clock, which is off' }], 'what requires it waits instead of refusing');
+  assert.deepEqual((await setPack(l, human, { pack: 'clock', on: true })).woken, ['leans']);
   await assert.rejects(setPack(l, human, { pack: 'core', on: false }), /the kernel's own/);
   await setPack(l, human, { pack: 'reacher', on: true });
   assert.ok(!l.registry.type('reacher.note')!.dormant && l.registry.tools.has('reacher_keep'), 'and adding it back brings it all back');

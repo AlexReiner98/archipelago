@@ -4,7 +4,8 @@
 // click, so the owner sees exactly what the pack brings: each thing one line, by name and what it is, with how much it
 // was used on this map in the last 30 days (src/pack-use.ts), a mark where it was not used at all; a click opens its
 // whole definition as the manifest has it. Where the owner changes a thing here (its styles, the screens among its
-// views, the checks among its rules), its controls come first.
+// views, the checks among its rules), its controls come first. Packs that go together (a bundle, src/bundles.ts) are
+// one plate with one switch: each pack a band in it, its name on a line and what it touches under it.
 
 import { api, ask, h, state, tell } from './base.js';
 import { screenRows } from './nav.js';
@@ -43,9 +44,13 @@ export function packsCard({ info, then, goTo }) {
   const schema = state.schema ?? {};
   const body = h('div', { class: 'plates' });
   const turn = async (p, on, box) => {
+    // What relies on it waits while it is out: named before it happens.
+    const named = (ids) => ids.map((id) => packs.find((q) => q.id === id)?.title ?? id).join(', ');
+    const waits = !on && p.dependents?.length ? ` ${named(p.dependents)} will wait until it is back.` : '';
+    const all = p.packs ? ` All ${p.packs.length} of its packs go ${on ? 'on' : 'off'} together.` : '';
     const sure = await ask({
       title: `${on ? 'Turn on' : 'Turn off'} ${p.title}?`,
-      message: on ? 'Its tools come back and its items are active again.' : 'Its items stay, dormant: a person can still edit them. Its tools are gone until it is on again.',
+      message: (on ? 'Its tools come back and its items are active again.' : `Its items stay, dormant: a person can still edit them. Its tools are gone until it is on again.${waits}`) + all,
       action: on ? 'Turn on' : 'Turn off',
       danger: !on,
     });
@@ -85,7 +90,8 @@ export function packsCard({ info, then, goTo }) {
     );
     return open ? [row, h('li', { class: 'decl-def' }, h('pre', { class: 'page-json' }, JSON.stringify(x.def, null, 1)))] : [row];
   };
-  const packPlate = (p) => {
+  // What a pack touches, a cell a group, and the group open under it.
+  const touchRows = (p) => {
     const on = p.state !== 'off';
     const touched = (p.touches ?? []).filter((t) => t.n > 0);
     const open = touched.find((t) => t.key === opened.get(p.id));
@@ -99,21 +105,55 @@ export function packsCard({ info, then, goTo }) {
         t.unused > 0 && h('span', { class: 'mark warn' }, `${t.unused} unused`),
       );
     };
+    return { open, rows: [h('li', { class: 'touches' }, touched.map(cell)), open ? group(p, open) : []] };
+  };
+  const toggle = (p, on) => {
     const box = h('input', { type: 'checkbox', role: 'switch', class: 'switch-toggle', checked: on, title: on ? 'On here: turn it off' : 'Off here: turn it on' });
     box.onchange = () => turn(p, box.checked, box);
+    return box;
+  };
+  const marksOf = (p) => [p.version && h('span', { class: 'mark', title: p.manifest ? `Manifest ${p.manifest}` : 'Version' }, String(p.version)), p.made && h('a', { class: 'mark', href: `#/e/${p.made}`, title: 'Kept as an item on this map: open it' }, 'item'), p.state === 'waiting' && h('span', { class: 'mark warn', title: p.why ?? '' }, 'waiting'), p.state === 'off' && p.bundle && h('span', { class: 'mark', title: p.why ?? '' }, 'off')].filter(Boolean);
+  const packPlate = (p) => {
+    const on = p.state !== 'off';
+    const { open, rows } = touchRows(p);
     return plate({
       wide: Boolean(open),
       name: p.title,
       title: `${p.title} ${p.version}${p.why ? `: ${p.why}` : ''}${p.description ? `\n${p.description}` : ''}${p.requires?.length ? `\nNeeds: ${p.requires.join(', ')}` : ''}`,
       off: !on,
-      marks: [p.version && h('span', { class: 'mark', title: p.manifest ? `Manifest ${p.manifest}` : 'Version' }, String(p.version)), p.made && h('a', { class: 'mark', href: `#/e/${p.made}`, title: 'Kept as an item on this map: open it' }, 'item'), p.state === 'waiting' && h('span', { class: 'mark warn', title: p.why ?? '' }, 'waiting')].filter(Boolean),
+      marks: marksOf(p),
       // The switch is on the plate's face; the kernel's pack has none, since it is never off.
-      action: KERNEL.includes(p.id) ? h('span', { class: 'muted small', title: 'The kernel’s own: never off' }, 'always on') : box,
-      rows: [h('li', { class: 'touches' }, touched.map(cell)), open ? group(p, open) : []],
+      action: KERNEL.includes(p.id) ? h('span', { class: 'muted small', title: 'The kernel’s own: never off' }, 'always on') : toggle(p, on),
+      rows,
     });
   };
+  // A bundle: one plate, one switch for all its packs, on when every one is; each pack a band of its own under it.
+  const bundlePlate = (b, parts) => {
+    const on = parts.every((p) => p.state !== 'off');
+    const bands = parts.map((p) => {
+      const { open, rows } = touchRows(p);
+      return { open, rows: [h('li', { class: 'one part', title: `${p.title} ${p.version}${p.why ? `: ${p.why}` : ''}${p.description ? `
+${p.description}` : ''}` }, h('span', { class: 'grow' }, h('strong', {}, p.title), ' ', h('span', { class: 'muted small' }, p.description ?? '')), ...marksOf(p)), ...rows] };
+    });
+    return plate({
+      wide: bands.some((x) => x.open),
+      name: b.title,
+      title: `${b.title}: ${parts.map((p) => p.title).join(' and ')}, on and off together${b.description ? `
+${b.description}` : ''}`,
+      off: !on,
+      marks: [h('span', { class: 'mark', title: `A bundle of ${parts.length} packs` }, `${parts.length} packs`), parts.some((p) => p.state === 'waiting') && h('span', { class: 'mark warn' }, 'waiting')].filter(Boolean),
+      action: toggle({ id: b.id, title: b.title, packs: b.packs, dependents: [...new Set(parts.flatMap((p) => p.dependents ?? []))] }, on),
+      rows: bands.map((x) => x.rows),
+    });
+  };
+  // Each pack its plate, except a bundle's, drawn once where its first pack stands.
+  const plates = () => packs.flatMap((p) => {
+    if (!p.bundle) return [packPlate(p)];
+    if (p.bundle.packs.find((id) => packs.some((q) => q.id === id)) !== p.id) return [];
+    return [bundlePlate(p.bundle, p.bundle.packs.map((id) => packs.find((q) => q.id === id)).filter(Boolean))];
+  });
   let packs = [];
-  const draw = () => body.replaceChildren(...packs.map(packPlate));
+  const draw = () => body.replaceChildren(...plates());
   api('packs').then(
     (all) => ((packs = all), draw()),
     (err) => body.replaceChildren(h('div', { class: 'error' }, err.message)),

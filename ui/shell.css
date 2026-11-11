@@ -329,6 +329,8 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 /* A plate with a group open takes the grid's whole width; each thing in the group is a row that opens its definition. */
 .plate.wide { grid-column: 1 / -1; }
 .plate > .rows > li.decl { cursor: pointer; }
+/* A bundle's plate: each pack a band, its name on a line set apart above what it touches. */
+.plate > .rows > li.part { padding-top: var(--space-5); }
 .plate > .rows > li.decl:hover, .plate > .rows > li.decl.on { background: var(--accent-soft); }
 .plate > .rows > li.decl-def > pre { margin: 0; max-height: var(--scroll-most); overflow: auto; }
 /* A switch: a checkbox drawn as a sliding knob. */
