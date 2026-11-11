@@ -3,7 +3,7 @@
 // rows from a pack's view, a pack action's form, a short note. An action a pack offers on a kind or type is offered on
 // the page of each such item too. What a pack shows of one item (a roadmap, a gate) is a view of it: ui/canvases.js.
 
-import { api, h, state } from './base.js';
+import { api, h } from './base.js';
 import { renderBody } from './body.js';
 import { section } from './item-sections.js';
 import { attentionCard } from './attention.js';
@@ -18,10 +18,11 @@ import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
 import { turnsPiece } from './turns.js';
 import { findingsPiece } from './findings.js';
-import { ago, isA, label, link, statusMark, typeMark, unfolded } from './words.js';
+import { pageIsA, pageSchema } from './page-schema.js';
+import { ago, label, link, statusMark, typeMark, unfolded } from './words.js';
 
 /** The screens shown on an item of this type, in the order the packs load. */
-export const screensFor = (typeId) => (state.schema?.screens ?? []).filter((s) => s.on?.some((t) => isA(typeId, t)));
+export const screensFor = (typeId) => (pageSchema()?.screens ?? []).filter((s) => s.on?.some((t) => pageIsA(typeId, t)));
 /** The pieces of those screens, each with the screen it is part of. */
 const piecesFor = (typeId) => screensFor(typeId).flatMap((s) => s.pieces.map((p) => ({ ...p, screen: s })));
 /** Whether an item of this type is read whole, its text with what it brings in, in place of its note. */
@@ -29,10 +30,10 @@ export const readWhole = (typeId) => piecesFor(typeId).some((p) => p.piece === '
 /** Whether an item of this type keeps a figure, shown with its note. */
 export const keepsFigure = (typeId) => piecesFor(typeId).some((p) => p.piece === 'figure');
 /** The actions packs offer on an item of this type, as the schema lists them. */
-export const actionsFor = (typeId) => (state.schema?.pack_tools ?? []).filter((t) => t.action && t.on?.some((on) => isA(typeId, on)));
+export const actionsFor = (typeId) => (pageSchema()?.pack_tools ?? []).filter((t) => t.action && t.on?.some((on) => pageIsA(typeId, on)));
 
 /** The tool a button opens the form of. */
-export const toolOf = (action) => (state.schema?.pack_tools ?? []).find((t) => t.action === action);
+export const toolOf = (action) => (pageSchema()?.pack_tools ?? []).find((t) => t.action === action);
 /** How a button draws the canvas on this item's page: what it says, "{here}" being the item. */
 export const drawnBy = (draw, id) => Object.fromEntries(Object.entries(draw).map(([key, value]) => [key, value === '{here}' ? id : value]));
 
@@ -116,7 +117,7 @@ const viewRow = (row) => {
 
 /** Rows from a pack's view of this item. */
 async function rows(host, id, p) {
-  const tool = (state.schema?.pack_tools ?? []).find((t) => t.view === p.view);
+  const tool = (pageSchema()?.pack_tools ?? []).find((t) => t.view === p.view);
   if (!tool) return host.remove();
   try {
     const answer = await api(tool.tool, p.item ? { [p.item]: id } : {});
@@ -141,7 +142,7 @@ const PIECES = {
     return { node, later: () => rows(node, ctx.id, p) };
   },
   action: (ctx, p) => {
-    const tool = (state.schema?.pack_tools ?? []).find((t) => t.action === p.action);
+    const tool = (pageSchema()?.pack_tools ?? []).find((t) => t.action === p.action);
     return tool && !ctx.e?.archived_at && { node: actionForm(tool, ctx.id, ctx.redraw) };
   },
   // What needs attention: for you, and on an item's page only what is that item's.
@@ -270,8 +271,8 @@ const settle = (drawn) => ({
 
 /** The packs an item uses: those of its type and what it is a flavour of, and of what it is linked to and by what. */
 function packsUsed(data) {
-  const types = new Map((state.schema?.types ?? []).map((t) => [t.id, t]));
-  const relations = new Map((state.schema?.relations ?? []).map((r) => [r.id, r]));
+  const types = new Map((pageSchema()?.types ?? []).map((t) => [t.id, t]));
+  const relations = new Map((pageSchema()?.relations ?? []).map((r) => [r.id, r]));
   const used = new Set();
   const take = (typeId) => {
     for (let t = types.get(typeId); t; t = types.get(t.flavour_of)) used.add(t.pack);
@@ -285,7 +286,7 @@ function packsUsed(data) {
 }
 
 /** Whether a pack owns no type and no link: a map pack, whose pieces are the whole map's (src/islands.ts). */
-const mapPack = (pack) => !(state.schema?.types ?? []).some((t) => t.pack === pack) && !(state.schema?.relations ?? []).some((r) => r.pack === pack);
+const mapPack = (pack) => !(pageSchema()?.types ?? []).some((t) => t.pack === pack) && !(pageSchema()?.relations ?? []).some((r) => r.pack === pack);
 
 /** A pack's pieces show on an item only once the item uses that pack; the core's, a map pack's and the owner's own always do. */
 const piecesOn = (data) => {

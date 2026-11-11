@@ -13,6 +13,7 @@ import type { Archipelago } from './pelago.ts';
 import { lookAt, takeLook } from './looks.ts';
 import { getPicture } from './pictures.ts';
 import { withScreens } from './screens.ts';
+import { islandVersion } from './island-pin.ts';
 import { schemaBrief, schemaOf } from './schema-brief.ts';
 import { NOW_MS, seeing, seenNow } from './seeing.ts';
 import { withStyles } from './styles.ts';
@@ -207,9 +208,18 @@ const FULL = z.boolean().optional().describe('true to be given the history whole
 
 export const READ_TOOLS: Record<string, Tool> = {
   schema: {
-    description: 'Describe the map\'s model: every type of item with its statuses and the fields you set, and every link type with its ends. Read this before writing. With type (a type, a link type or a pack): those whole, each field explained; full: true for everything, screens and verbs too.',
-    input: { type: z.string().optional().describe('A type, a link type or a pack, by its id as the brief lists it.'), full: z.boolean().optional() },
-    run: async (l, actor, input) => input.type ? schemaOf(l.registry.describe(), input.type) : actor.kind === 'human' || input.full ? withStyles(l, await withScreens(l, l.registry.describe())) : schemaBrief(l.registry),
+    description: 'Describe the map\'s model: every type of item with its statuses and the fields you set, and every link type with its ends. Read this before writing. With type (a type, a link type or a pack): those whole, each field explained; full: true for everything, screens and verbs too. With island: as that island runs it, where it runs a version of its pack (version names it); one that runs the map\'s answers only that.',
+    input: { type: z.string().optional().describe('A type, a link type or a pack, by its id as the brief lists it.'), full: z.boolean().optional(), island: z.string().optional().describe('An island, by its id: the model as it runs there.') },
+    run: async (map, actor, input) => {
+      // An island that runs a version of its pack is described through that version's registry (src/island-pin.ts).
+      const pinned = input.island ? await islandVersion(map, input.island) : undefined;
+      if (input.island && !pinned) return { island: input.island, runs: 'map' };
+      const l = pinned ? map.readIn(pinned.registry) : map;
+      const said = input.type ? schemaOf(l.registry.describe(), input.type) : actor.kind === 'human' || input.full ? await withStyles(l, await withScreens(l, l.registry.describe())) : schemaBrief(l.registry);
+      if (!pinned) return said;
+      const title = (await map.entity(pinned.version.item))?.title ?? pinned.version.item;
+      return { ...(said as object), island: input.island, version: { id: pinned.version.item, of: pinned.version.of, title } };
+    },
   },
   search: {
     description: 'Find items by text, type (flavours included), status or owner. Text matches words in any form in titles and notes, and titles that are nearly what you typed; the best match comes first. The query (query flat) takes the same search as its filter’s text, so what is found can be read with what it is tied to. Always search before creating, to avoid duplicates.',

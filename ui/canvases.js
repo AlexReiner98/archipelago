@@ -14,7 +14,8 @@ import { lookSwitch, styleDelete } from './look-switch.js';
 import { newIslandButton } from './island-new.js';
 import { thumbOf } from './thumbs.js';
 import { viewPicker } from './view-panel.js';
-import { ARROW, isA, typeTitle, wayOf } from './words.js';
+import { ARROW, typeTitle, wayOf } from './words.js';
+import { pageIsA, pageSchema, versionCanvases } from './page-schema.js';
 
 const TYPE = 'lens';
 /**
@@ -59,7 +60,7 @@ export const presetSettings = (lens) => {
   const at = addressOf(lens);
   // A view of one item is its address with that item where it says {here}.
   const fits = (p) => new RegExp(`^${addressOf(viewParts({ ...p, preset: true, props: p.props }).lens).replace(/[.*+?^$()|[\]\\]/g, '\\$&').replaceAll(encodeURIComponent('{here}'), 'e_[a-z0-9]+')}$`).test(at);
-  const preset = (state.schema?.canvases ?? []).find(fits);
+  const preset = [...(state.schema?.canvases ?? []), ...versionCanvases()].find(fits);
   return preset ? settingsOf({ props: preset.props }) : {};
 };
 
@@ -68,8 +69,8 @@ export const presetSettings = (lens) => {
  * item where its query says {here}. Its page offers them, so a project's roadmap is a view, not a screen.
  */
 export const viewsOn = (typeId, id) =>
-  (state.schema?.canvases ?? [])
-    .filter((p) => p.on?.some((t) => isA(typeId, t)))
+  (pageSchema()?.canvases ?? [])
+    .filter((p) => p.on?.some((t) => pageIsA(typeId, t)))
     .map((p) => {
       const props = JSON.parse(JSON.stringify(p.props).replaceAll('{here}', id));
       const { lens, style } = viewParts({ preset: true, props });
