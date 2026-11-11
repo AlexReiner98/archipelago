@@ -11,7 +11,7 @@ import type { Archipelago } from './pelago.ts';
 export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warnings: string[] }> {
   if (!ops.length) throw new Error('A change needs at least one op.'); currentNames(map.registry, ops);
   const errors: string[] = [], warnings: string[] = [];
-  const refs = new Map<string, string>(); // ref -> type
+  const refs = new Map<string, string>(), refIslands = new Map<string, unknown>(); // ref -> type, and the island it is made on
   const seen = new Set<string>(), dropped = new Set<string>(); // dropped: what this change has merged away so far
   const reg = await typesAfter(map, ops); // a type made in this change can be used in it (src/type-items.ts)
 
@@ -58,7 +58,7 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
         errors.push(...[...checkWritten(here, op.type, op.props ?? {}), ...typedProblems(op.type, type.fields, op.props ?? {}), ...undeclaredColumns(type, op)].map((p) => `${where}: ${p}`));
         if (op.ref) {
           if (refs.has(op.ref)) errors.push(`${where}: ref "${op.ref}" is used twice`);
-          refs.set(op.ref, op.type);
+          refs.set(op.ref, op.type); refIslands.set(op.ref, op.props?.island);
         }
         const root = type.base;
         const key = `${root}\n${op.title.trim().toLowerCase()}`;
@@ -93,7 +93,9 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
         const to = await typeOf(op.to, where);
         if (op.from === op.to) errors.push(`${where}: cannot link an entity to itself`);
         if (from && to) {
-          const problem = reg.checkRelation(op.type, from, to);
+          // A link is judged by the version its from item's island runs, as that item is.
+          const island = refIslands.has(op.from) ? refIslands.get(op.from) : (await map.entity(op.from))?.props.island;
+          const problem = (await islandRegistry(map, island, reg)).checkRelation(op.type, from, to);
           if (problem) errors.push(`${where}: ${problem}`);
         }
         break;

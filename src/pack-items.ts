@@ -90,8 +90,9 @@ const declaredIds = (m: Manifest) => [...parts(m).types, ...parts(m).relations].
 
 /**
  * Why a pack item is not a version of the pack it names; none when it is. A version holds what a pack item may, and
- * over its pack's manifest it takes the place of those keys alone, so a map pack's code stays as it is. It declares the
- * same types and link types by the same ids: it may change their fields, the rules and the instructions, never rename one.
+ * over its pack's manifest it takes the place of those keys alone, so a map pack's code stays as it is. It keeps every
+ * type and link type its pack declares, by the same ids, and may add its own (named <pack>.<what>): it may change their
+ * fields, the rules, the views and the styles (data: instructions, lenses, looks), never rename or leave one out.
  */
 export function versionProblems(item: Said, of: string, base: Manifest | undefined, local: string): string[] {
   if (!base || of === local) return [`it is a version of "${of}", which is no pack here`];
@@ -107,8 +108,9 @@ export function versionProblems(item: Said, of: string, base: Manifest | undefin
   let manifest: Manifest;
   try { manifest = readManifest(versionText(item, base), `the version ${item.title} of ${of}`); } catch (err) { return [(err as Error).message]; }
   const [was, now] = [declaredIds(base), declaredIds(manifest)];
-  const gone = was.filter((id) => !now.includes(id)), added = now.filter((id) => !was.includes(id));
-  if (gone.length || added.length) problems.push(`a version declares the types and link types its pack does, by the same ids${gone.length ? `; it leaves out ${gone.join(', ')}` : ''}${added.length ? `; it adds ${added.join(', ')}` : ''}`);
+  const gone = was.filter((id) => !now.includes(id)), misnamed = now.filter((id) => !was.includes(id) && !id.startsWith(`${of}.`));
+  if (gone.length) problems.push(`a version keeps every type and link type its pack declares, by the same ids, since items may be of them: it leaves out ${gone.join(', ')}`);
+  if (misnamed.length) problems.push(`what a version adds is named ${of}.<what>: ${misnamed.join(', ')}`);
   return problems;
 }
 
