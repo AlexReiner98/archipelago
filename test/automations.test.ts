@@ -7,6 +7,7 @@ import { sessionStart, sessionUpdate } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { VIEWS } from '../src/views.ts';
 import { askView } from '../src/askview.ts';
+import { dayStart } from '../src/timeaxis.ts';
 import { human, agent, fresh, make } from './map.ts';
 
 /** A view asked by its name, as the view tool asks it. */
@@ -81,25 +82,27 @@ test('automations fire on a schedule and on events, are logged, and cannot trigg
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.morning, props: launches }] })).status, 'proposed');
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.any, status: 'enabled' }] })).status, 'proposed');
   const autos = new Automations(l);
-  const at = (h: number, m = 0) => new Date(2026, 9, 7, h, m);
+  // A Monday and Tuesday in Toronto, the workspace zone, after anything the test makes.
+  const on = (day: string, h: number, m = 0) => new Date(dayStart(day, "America/Toronto") + (h * 60 + m) * 60_000);
+  const at = (h: number, m = 0) => on("2030-01-07", h, m);
   const fired = async (when: Date) => (await autos.tick(when)).map((f) => f.automation).sort();
 
   assert.deepEqual(await fired(at(8)), [made.hourly], 'interval fires at once; daily waits for its time; events start from now');
   assert.deepEqual(await fired(at(8, 30)), []);
   assert.deepEqual(await fired(at(9, 1)), [made.hourly, made.morning].sort());
   assert.deepEqual(await fired(at(9, 30)), [], 'daily fires once a day');
-  assert.deepEqual(await fired(new Date(2026, 9, 8, 9, 0)), [made.hourly, made.morning].sort());
+  assert.deepEqual(await fired(on("2030-01-08", 9)), [made.hourly, made.morning].sort());
 
   await l.change(human, { reason: 'Found a bug', ops: [{ op: 'create', type: 'task', title: 'Crash' }] });
-  assert.deepEqual(await fired(new Date(2026, 9, 8, 9, 5)), [made.review]);
+  assert.deepEqual(await fired(on("2030-01-08", 9, 5)), [made.review]);
   const unread = (await VIEWS.notifications.run(l, {})) as any[];
   assert.ok(unread.some((n) => n.title === 'Made by human:test: Found a bug' && n.level === 'warning'));
 
   // Unpause the catch-all: the notifications automations create must not set it off.
   await make(l, [{ op: 'update', id: made.any, status: 'enabled' }]);
-  await autos.tick(new Date(2026, 9, 8, 9, 6));
+  await autos.tick(on("2030-01-08", 9, 6));
   const before = ((await VIEWS.notifications.run(l, {})) as any[]).length;
-  assert.deepEqual(await fired(new Date(2026, 9, 8, 9, 7)), []);
+  assert.deepEqual(await fired(on("2030-01-08", 9, 7)), []);
   assert.equal(((await VIEWS.notifications.run(l, {})) as any[]).length, before);
 
   const hourly = (await l.entity(made.hourly))!;

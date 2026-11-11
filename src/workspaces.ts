@@ -12,6 +12,8 @@ import { restore, type Dump } from './backup.ts';
 import { indexWorkspace } from './control-index.ts';
 import { addLocalType, addWorkspace, claimControlValue, controlValue, importControlFiles, importLocalPack, listWorkspaces, localTypes, nameWorkspace, OPERATOR, OPERATOR_RESET, removeWorkspace, setControlValue, takeControlValue } from './control.ts';
 import { startSchedules, stopSchedules } from './hooks.ts';
+import { startClock, stopClock } from './due.ts';
+import { alertOwner } from './alert.ts';
 import { openDb, type Database } from './db.ts';
 import { databaseFor, dropDatabaseFor } from './pg.ts';
 import { Archipelago, type Policy } from './pelago.ts';
@@ -302,9 +304,11 @@ export class Workspaces {
   private clocks(ws: Workspace, on: boolean): void {
     ws.automations.stop();
     stopSchedules(ws.pelago.registry);
+    stopClock(ws.pelago);
     if (!on) return;
     startSchedules(ws.pelago);
     ws.automations.start();
+    startClock(ws.pelago, (err) => void alertOwner(ws.pelago, { key: 'clock', title: 'The clock failed', body: `A pass over what came due failed: ${err.message}`, from: 'pelago' }));
   }
 
   /**

@@ -14,7 +14,8 @@ export interface Bound {
 /** The days a thing repeats on, and the hours it holds on each: the fields that say so. */
 export interface Repeat {
   from: string;
-  to: string;
+  /** When it ends on each day; without it, each occurrence is a moment (a reminder at 08:00). */
+  to?: string;
   days?: string;
   starts?: string;
   until?: string;
@@ -132,7 +133,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     has('when.end', when.end, DATES);
     if (when.repeat) {
       const r = when.repeat;
-      for (const key of ['from', 'to'] as const) if (!r[key]) problems.push(`when.repeat needs ${key}`);
+      if (!r.from) problems.push('when.repeat needs from');
       for (const key of ['from', 'to'] as const) has(`when.repeat.${key}`, r[key], ['string']);
       for (const key of ['starts', 'until'] as const) has(`when.repeat.${key}`, r[key], ['date']);
       for (const key of ['days', 'skip', 'moved', 'done'] as const) has(`when.repeat.${key}`, r[key], ['json']);
@@ -194,13 +195,17 @@ const clockHours = (t: unknown) => {
   return n >= 0 && n <= 24 ? n : undefined;
 };
 
+const DAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+/** A day of the week as 1 (Monday) to 7: a number, or a name or its first three letters ("mon"). */
+const dayNumber = (d: unknown) => (typeof d === 'string' && d.trim().length >= 3 && !/^\d+$/.test(d.trim()) ? DAY_NAMES.findIndex((n) => n.startsWith(d.trim().toLowerCase())) + 1 : Number(d));
+
 /**
  * The hours a repeating thing holds on a day, if it falls on it: not before it starts or after it ends, not on a
  * day skipped or done. `made` is the day it was made, the start when it names none.
  */
 export function occurs(repeat: Repeat, p: Record<string, unknown>, day: string, made?: string): [number, number] | undefined {
   const list = (key: string | undefined) => (key && Array.isArray(p[key]) ? (p[key] as unknown[]) : undefined);
-  const days = list(repeat.days)?.length ? list(repeat.days)!.map(Number) : [1, 2, 3, 4, 5, 6, 7];
+  const days = list(repeat.days)?.length ? list(repeat.days)!.map(dayNumber) : [1, 2, 3, 4, 5, 6, 7];
   if (!days.includes(new Date(`${day}T12:00:00Z`).getUTCDay() || 7)) return undefined;
   const text = (key: string | undefined) => (key && typeof p[key] === 'string' ? (p[key] as string) : undefined);
   const starts = text(repeat.starts) ?? made;
@@ -209,6 +214,7 @@ export function occurs(repeat: Repeat, p: Record<string, unknown>, day: string, 
   if (list(repeat.skip)?.includes(day) || list(repeat.done)?.includes(day)) return undefined;
   const all = repeat.moved ? p[repeat.moved] : undefined;
   const moved = all && typeof all === 'object' ? (all as Record<string, unknown>)[day] : undefined;
-  const [a, b] = Array.isArray(moved) ? moved.map(clockHours) : [clockHours(p[repeat.from]), clockHours(p[repeat.to])];
-  return a !== undefined && b !== undefined && b > a ? [a, b] : undefined;
+  const [a, b] = Array.isArray(moved) ? moved.map(clockHours) : [clockHours(p[repeat.from]), repeat.to === undefined ? clockHours(p[repeat.from]) : clockHours(p[repeat.to])];
+  // A repeat with no end is a moment each day it falls on; one with an end holds from one hour to a later one.
+  return a !== undefined && b !== undefined && (b > a || (repeat.to === undefined && b === a)) ? [a, b] : undefined;
 }

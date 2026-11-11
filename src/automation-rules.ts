@@ -30,11 +30,11 @@ export function checkAutomation(props: Record<string, unknown>): string[] {
       if (typeof props.every_minutes !== 'number' || props.every_minutes < 1) problems.push('trigger "every" needs every_minutes of 1 or more');
       break;
     case 'daily':
-      if (typeof props.at !== 'string' || !TIME.test(props.at)) problems.push('trigger "daily" needs at as "HH:MM" (24-hour, local time)');
+      if (typeof props.at !== 'string' || !TIME.test(props.at)) problems.push('trigger "daily" needs at as "HH:MM" (24-hour, in the workspace time zone)');
       break;
     case 'weekly':
       if (!weekdays(props.days)) problems.push('trigger "weekly" needs days: the days of the week, as names ("monday") or numbers (1 for Monday to 7)');
-      if (typeof props.at !== 'string' || !TIME.test(props.at)) problems.push('trigger "weekly" needs at as "HH:MM" (24-hour, local time)');
+      if (typeof props.at !== 'string' || !TIME.test(props.at)) problems.push('trigger "weekly" needs at as "HH:MM" (24-hour, in the workspace time zone)');
       break;
     case 'event':
       if (typeof props.on_action !== 'string' || !props.on_action) problems.push('trigger "event" needs on_action, e.g. "entity.create" or "resource.*"');
