@@ -20,6 +20,7 @@ import { props } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 import { previewAddress, VIEW_INPUT, viewAddress } from './view-address.ts';
 import { withCovers } from './withdraw.ts';
+import { itemLink } from './members.ts';
 import './session-turns.ts'; // adds the turns view
 
 /** One thing the human did to the map, small enough to put in front of a model. */
@@ -198,6 +199,9 @@ function forAgent(name: string, answer: unknown): unknown {
   return out;
 }
 
+/** The views a session starts from, each answering with the pattern of an item's link (`link`) once. */
+const LINKED = new Set(['handoff', 'brief', 'frontier']);
+
 const FULL = z.boolean().optional().describe('true to be given the history whole: long notes, and the reason and authority on every event of a change set. Left out, an agent is given the start of each note and its length, and a change set’s reason and authority on the first of its events only.');
 
 export const READ_TOOLS: Record<string, Tool> = {
@@ -250,7 +254,9 @@ export const READ_TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => {
       if (!input.name) return viewList(l);
-      const answer = await askView(l, actor, input.name, input.params ?? {});
+      const asked = await askView(l, actor, input.name, input.params ?? {});
+      // A view a session starts from says once how an item is linked to, so its agent names items to a person by link.
+      const answer = LINKED.has(input.name) && asked && typeof asked === 'object' && !Array.isArray(asked) ? { ...(asked as object), link: itemLink(l.workspace) } : asked;
       if (actor.kind !== 'agent' || input.params?.full) return answer;
       // A view that answers with events (changed_since) is history, and is cut for an agent as history is: its counts,
       // and the newest few unless it asked for more.

@@ -37,6 +37,8 @@ actions; `query` with name `actions` gives their inputs whole.
   about, and the ties between them you want seen. The owner reads the beats
   on your session's page beside a drawing of those items. Tell what matters,
   not every step; take a beat back with `replaces` when you change your mind.
+- **Name an item to a person as [its name](link),** never a bare id; ids stay
+  in tool calls. `link` is the pattern the session start answers with.
 - **Keep the map true.** When what you do or find settles something still open (a task done, a decision made in practice, a question answered), change its status in the same breath, with the outcome and the evidence, rather than leaving it open with a note. Settle only what the work or the owner has in fact settled: closing a decision waits for the owner unless this workspace applies agents’ changes as made, so propose it with what was chosen (props.outcome) and why (props.rationale). A choice that is still the owner’s stays open.
 - **Say on whose authority.** Every change takes authority: of "human" with what the owner said and where, when they told you to or decided it; of "agent" for your own reading of the work. Never claim the owner’s word for your own judgment.
 - **A name is a few words.** A title names the thing in 60 characters at most; the rest goes in the first line of its note. Lead a note with the point in two or three sentences, and give each further part a short title on a line of its own, so it folds. Write it in the map's one dialect, which every page reads alike: ## titles, - points, - [ ] and - [x] checklists, > [!NOTE] or > [!WARNING] callouts, | tables |, `code`, **strong**, and an item named by its id (e_...) or as [its name](e_...).
