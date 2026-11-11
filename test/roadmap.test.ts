@@ -22,8 +22,13 @@ const SHAPING = {
   id: 'shaping', version: '1', title: 'Shaping', requires: ['core'],
   types: [{ id: 'effort', title: 'Effort', description: 'A body of work with an end.', extends: 'task', fields: { hub_at: { type: 'number' } } }],
 } as PackFile;
-/** A map with core's packs alone and the test's (and sessions, split out of core): the styles it draws in are theirs, and no other pack's. */
-const coreOnly = () => freshWith(new Registry(packsWith(SHAPING), ['core', 'sessions', 'shaping']));
+/** A map with core's packs alone and the test's (and sessions and canvas, split out of core): the styles it draws in are theirs, and no other pack's. */
+const coreOnly = async () => {
+  const l = await freshWith(new Registry(packsWith(SHAPING), ['core', 'sessions', 'canvas', 'shaping']));
+  // The canvas preset that lies over the workspace's style is taken back by the owner, so the layers below show.
+  await make(l, [{ op: 'create', type: 'style', title: 'Canvas', status: 'retired', props: { preset: 'canvas.house' } }]);
+  return l;
+};
 
 test('a picture is drawn in the styles kept for it, nearest last; hubs, code and where a kept view is seen', async () => {
   const l = await coreOnly();
@@ -42,7 +47,7 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
     { op: 'link', type: 'part_of', from: 'c', to: 'p' },
   ]);
   const run = async (params: Record<string, unknown> = {}) => (await ask(l, 'style', params)) as any;
-  // The packs' presets first: with nothing kept on the map, a view is drawn in the core pack's house style, with the
+  // The packs' presets first: with nothing kept on the map, a view is drawn in the house style (canvas's, moved from core with its id), with the
   // marks of a session's state over it.
   const house = { id: 'core.house', title: 'House style', preset: 'core.house' };
   const added = [{ id: 'core.sessions_look', title: "A session's state", preset: 'core.sessions_look' }];

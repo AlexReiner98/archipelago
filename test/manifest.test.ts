@@ -184,13 +184,15 @@ test('a pack that took over words a pack the owner added held is added with them
   assert.deepEqual((await syncPacks(now)).filter((x) => /pack:(stem|leaf)$/.test(x[1])), [], 'once');
 });
 
-test('a new workspace starts with the kernel alone, and a pack the log never added waits for the owner', async () => {
+test('a new workspace starts with the kernel and what keeps its ids, and a pack the log never added waits for the owner', async () => {
   const was = process.env.PELAGO_START_PACKS;
   delete process.env.PELAGO_START_PACKS;
   try {
     const l = await mapOf(packsWith(CLOCK, 'reacher'));
-    assert.deepEqual((await syncPacks(l)).map((f) => f[1]), ['pack:core'], 'only the kernel is asserted');
-    assert.deepEqual((await packsOff(l)).sort(), l.registry.found.map((p) => p.id).filter((p) => p !== 'core').sort(), 'every other pack is off');
+    // The kernel, and the packs that keep what core shipped under core's ids (the house style and drawings, a session's marks).
+    const kernel = ['pack:canvas', 'pack:core', 'pack:sessions'];
+    assert.deepEqual((await syncPacks(l)).map((f) => f[1]).sort(), kernel, 'only the kernel and what keeps its ids are asserted');
+    assert.deepEqual((await packsOff(l)).sort(), l.registry.found.map((p) => p.id).filter((p) => !kernel.includes(`pack:${p}`)).sort(), 'every other pack is off');
     assert.deepEqual(await syncPacks(l), [], 'and opening it again adds none');
     await setPack(l, human, { pack: 'clock', on: true });
     assert.ok(!(await packsOff(l)).includes('clock') && (await packsOff(l)).includes('reacher'), 'the owner adds one');

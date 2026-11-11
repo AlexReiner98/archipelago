@@ -1,7 +1,7 @@
 // The whole-map embedding (task e_snvzsxj4) drawn plainly for the owner to judge, beside what the flow draws today.
 //   node scripts/planarize-judge.ts [replay names...] [--from <folder of flow replays>] [--png]
 // Each replay (scripts/flow-replay.ts, kept under runs/flow-replay/<name>.json) is the exact answer a page drew. Its
-// graph is made with the layouts' kit, planarized whole (packs/core/layouts/planarize/), and drawn as a
+// graph is made with the layouts' kit, planarized whole (packs/canvas/layouts/planarize/), and drawn as a
 // visibility drawing: each island's border a loop, crossings as dots, ports as squares on the border, turned wires red.
 // Writes runs/planarize/<name>.svg, <name>.embedding.json (step 2's input), an index.html with the counts beside the
 // flow's, and with --png a picture of each.
@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execSync } from 'node:child_process';
 
-const ROOT = join(import.meta.dirname, '..'), LAYOUTS = join(ROOT, 'packs', 'core', 'layouts');
+const ROOT = join(import.meta.dirname, '..'), LAYOUTS = join(ROOT, 'packs', 'canvas', 'layouts');
 const argv = process.argv.slice(2), png = argv.includes('--png');
 const fromAt = argv.indexOf('--from');
 const common = () => join(execSync('git rev-parse --path-format=absolute --git-common-dir', { cwd: ROOT }).toString().trim(), '..');
@@ -21,7 +21,7 @@ const names = argv.filter((a, k) => !a.startsWith('--') && argv[k - 1] !== '--fr
 const wanted = names.length ? names : ['built', 'principles', 'ias', 'study'];
 const out = join(ROOT, 'runs', 'planarize');
 /** The house style's sizes: a replay kept before planarize's were named lacks them. */
-const house = JSON.parse(readFileSync(join(ROOT, 'packs', 'core', 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
+const house = JSON.parse(readFileSync(join(ROOT, 'packs', 'canvas', 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 mkdirSync(out, { recursive: true });
 
 /** The flow's, the kit's and the planarize modules side by side, under the names they import each other by. */

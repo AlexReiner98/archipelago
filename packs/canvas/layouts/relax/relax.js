@@ -14,7 +14,7 @@ const NAMES = ['relax_unit', 'relax_pull', 'relax_even', 'relax_hold', 'relax_ce
 
 /** The distances and weights, from the style; `heads` gives an island's name and legend height over what it holds. */
 export function lengthsOf(sizes, heads = new Map()) {
-  for (const name of NAMES) if (typeof sizes?.[name] !== 'number') throw new Error(`The style names no size "${name}": the house style (packs/core/pack.json) names every one the relaxation uses`);
+  for (const name of NAMES) if (typeof sizes?.[name] !== 'number') throw new Error(`The style names no size "${name}": the house style (packs/canvas/pack.json) names every one the relaxation uses`);
   const z = (k) => sizes[`relax_${k}`];
   return {
     apart: sizes.flow_node_gap, wire: Math.max(sizes.flow_node_gap / 3, sizes.flow_wire_gap), room: sizes.flow_wire_room, run: sizes.flow_port_run, corner: sizes.flow_port_corner,

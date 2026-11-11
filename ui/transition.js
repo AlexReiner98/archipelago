@@ -30,7 +30,7 @@ const SVG = 'http://www.w3.org/2000/svg';
 export function stagesOf(before, after, numbers, reduced = false, framed = true) {
   const n = (name) => {
     const v = numbers?.[name];
-    if (typeof v !== 'number') throw new Error(`The style names no number "${name}": the house style (packs/core/pack.json) names every one the page moves by`);
+    if (typeof v !== 'number') throw new Error(`The style names no number "${name}": the house style (core.house, packs/canvas/pack.json) names every one the page moves by`);
     return v;
   };
   const none = (cut, pulse = []) => ({ cut, frame: null, leave: [], move: [], arrive: [], draw: [], pulse, times: pulse.length ? { pulse: [0, n('motion_pulse')] } : null });

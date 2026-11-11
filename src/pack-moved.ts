@@ -25,6 +25,14 @@ export function declaredIds(manifest: unknown): Set<string> {
   return out;
 }
 
+/**
+ * Whether a pack keeps what a kernel pack shipped under the kernel's ids (`core.x`): such a pack is what the kernel's
+ * pack was, so a new map starts with it as it starts with the kernel's (src/packstate.ts), and moving a declaration out
+ * of core changes nothing a new map has either (the house style and the drawings every page reads, decision e_fgsgw8ja).
+ */
+export const keepsKernel = (pack: { id: string }): boolean =>
+  !KERNEL_PACKS.includes(pack.id) && [...declaredIds(pack)].some((id) => KERNEL_PACKS.some((k) => id.startsWith(`${k}.`)));
+
 /** What a manifest declared, by its hash: a manifest's text never changes under its hash, so it is read once. */
 const byHash = new Map<string, Set<string>>();
 

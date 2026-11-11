@@ -6,4 +6,4 @@ import { join } from 'node:path';
 
 const here = (...p: string[]) => join(import.meta.dirname, ...p);
 /** The house style, as the packs ship it, with the shape asked for. */
-export const house = (shape: string) => ({ ...JSON.parse(readFileSync(here('..', 'packs', 'core', 'pack.json'), 'utf8')).styles.find((s: { id: string }) => s.id === 'core.house').props, shape });
+export const house = (shape: string) => ({ ...JSON.parse(readFileSync(here('..', 'packs', 'canvas', 'pack.json'), 'utf8')).styles.find((s: { id: string }) => s.id === 'core.house').props, shape });

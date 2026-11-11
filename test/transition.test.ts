@@ -8,7 +8,7 @@ import { test } from 'node:test';
 // @ts-ignore: a module of the page, plain JavaScript
 import { stagesOf } from '../ui/transition.js';
 
-const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'core', 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house');
+const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'canvas', 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house');
 const numbers = house.props?.numbers ?? house.numbers;
 
 type Row = { box: number[]; wire?: boolean; path?: string | null; holds?: boolean; within?: string | null; pulse?: string };

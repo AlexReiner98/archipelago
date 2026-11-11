@@ -12,7 +12,7 @@ import { packLayout } from './layouts.ts';
 import type { Archipelago } from './pelago.ts';
 import { sceneOf } from './published-frames.ts';
 
-/** The shape whose drawing walks a picture by its stops (packs/core/layouts/rails). */
+/** The shape whose drawing walks a picture by its stops (packs/canvas/layouts/rails). */
 export const RAILS = 'rails';
 
 type Lens = { style?: Record<string, unknown>; items?: unknown[]; links?: unknown[] } & Record<string, unknown>;

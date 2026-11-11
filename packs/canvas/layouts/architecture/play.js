@@ -41,7 +41,7 @@ export function play({ answer, style, reduced, tools, shape }) {
   const { frames, keyLooks = [], dotsOf = () => null } = shape;
   const t = (name) => {
     const v = style.numbers?.[`arch_story_${name}`];
-    if (typeof v !== 'number') throw new Error(`The style names no number "arch_story_${name}": the house style (packs/core/pack.json) names every one a drawing uses`);
+    if (typeof v !== 'number') throw new Error(`The style names no number "arch_story_${name}": the house style (packs/canvas/pack.json) names every one a drawing uses`);
     return v;
   };
   const steps = answer.steps, last = frames.length - 1;

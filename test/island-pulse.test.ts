@@ -6,9 +6,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 // @ts-ignore: a pack's drawing code, plain JavaScript
-import { islandMarks } from '../packs/core/layouts/flow/islands.js';
+import { islandMarks } from '../packs/canvas/layouts/flow/islands.js';
 
-const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'core', 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house');
+const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'canvas', 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house');
 const sizes = (house.props ?? house).sizes;
 const m = (tag: string, attrs: Record<string, unknown>, ...kids: unknown[]) => [tag, attrs, ...kids.flat()];
 type Mark = [string, Record<string, unknown>, ...unknown[]];

@@ -10,15 +10,15 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-// The house style is core's; the marks of a session's state, the sessions pack's (split out of core with its id).
+// The house style is canvas's (moved from core with its id); the marks of a session's state, the sessions pack's (split out of core with its id).
 const read = (folder: string) => JSON.parse(readFileSync(join(import.meta.dirname, '..', folder, 'pack.json'), 'utf8'));
-const core = read('core');
-const styles = [...core.styles, ...read('sessions').styles];
+const canvas = read('canvas');
+const styles = [...canvas.styles, ...read('sessions').styles];
 const preset = (id: string) => styles.find((s: any) => s.id === id);
 const house = { ...preset('core.house').props, ...preset('core.sessions_look').props, shape: 'flow' };
 // The drawing's modules laid out by name in one folder, as the sandbox has them.
 const laid = mkdtempSync(join(tmpdir(), 'pelago-flow-session-'));
-for (const [name, file] of Object.entries(core.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
+for (const [name, file] of Object.entries(canvas.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
 const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
 const { sessionItems, sessionMarks } = await import(pathToFileURL(join(laid, 'session.js')).href);
 const measure = (t: string, px: number) => t.length * px * 0.55;

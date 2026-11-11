@@ -18,7 +18,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
 
 /** The process map's style as the one module a style keeps: the flow layout (retired 9 Nov 2026, read from its tag) joined in before its drawing. */
 function processCode(): string {
-  const layout = execSync('git show archive/layouts-2026-11-09:packs/core/layouts/flow/layout.js', { cwd: ROOT, encoding: 'utf8' }).replace(/^export function layout/m, 'function layout');
+  const layout = execSync('git show archive/layouts-2026-11-09:packs/canvas/layouts/flow/layout.js', { cwd: ROOT, encoding: 'utf8' }).replace(/^export function layout/m, 'function layout');
   const drawing = readFileSync(join(ROOT, 'examples', 'approvals', 'process.js'), 'utf8');
   return `${layout}\n${drawing.replace(/^import \{ layout \} from .*\n/m, '')}`;
 }

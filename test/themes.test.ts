@@ -32,6 +32,6 @@ test('a nearer layer\'s name is its own, whether it gives a colour or says how t
 });
 
 test('the house style carries its emblem, a PNG', () => {
-  const house = JSON.parse(readFileSync('packs/core/pack.json', 'utf8')).styles.find((s: { id: string }) => s.id === 'core.house').props;
+  const house = JSON.parse(readFileSync('packs/canvas/pack.json', 'utf8')).styles.find((s: { id: string }) => s.id === 'core.house').props;
   assert.match(house.emblem, /^data:image\/png;base64,[A-Za-z0-9+/=]+$/);
 });

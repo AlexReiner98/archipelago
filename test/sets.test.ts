@@ -8,7 +8,7 @@ import { affected, allTests, ENGINES, fastTests, FIRST_STEPS, LONG, PER_FILE, pr
 
 test('the fast set is every test file but the slow ones, the structure test always among them', () => {
   const all = allTests();
-  assert.ok(all.length > 100 && all.includes('packs/core/map-story.test.ts'), 'the full run finds the packs’ tests too');
+  assert.ok(all.length > 100 && all.includes('packs/canvas/map-story.test.ts'), 'the full run finds the packs’ tests too');
   assert.deepEqual(Object.keys(SLOW).filter((f) => !existsSync(join(ROOT, f))), [], 'every slow file is there');
   assert.deepEqual([...fastTests(), ...Object.keys(SLOW)].sort(), all);
   for (const f of ['test/structure.test.ts', 'test/sets.test.ts']) assert.ok(fastTests().includes(f), f);
@@ -33,10 +33,10 @@ test('a change runs the tests that import it or name it, the structure test, and
   assert.ok(page.includes('test/layouts.test.ts') && page.includes('test/page-css.test.ts'), 'a page: the browser tests, and the tests that read the pages as text');
   assert.ok(!page.includes('test/rules.test.ts'), 'but not a test that never reads a page');
 
-  const flow = affected(['packs/core/layouts/flow/islands.js']).files;
-  for (const f of ['packs/core/map-story.test.ts', 'test/layouts.test.ts']) assert.ok(flow.includes(f), `a layout's code: ${f}, which imports it or draws that layout`);
+  const flow = affected(['packs/canvas/layouts/flow/islands.js']).files;
+  for (const f of ['packs/canvas/map-story.test.ts', 'test/layouts.test.ts']) assert.ok(flow.includes(f), `a layout's code: ${f}, which imports it or draws that layout`);
   assert.ok(!flow.includes('test/rules.test.ts') && !flow.includes('test/canvas-pan.test.ts'), 'but not the kernel’s tests, nor a browser test that names no such layout');
-  assert.ok(reads('test/canvas-pan.test.ts', 'packs/core/layouts/flow/islands.js', true), 'a reused pass counts every pack’s code a browser test could draw');
+  assert.ok(reads('test/canvas-pan.test.ts', 'packs/canvas/layouts/flow/islands.js', true), 'a reused pass counts every pack’s code a browser test could draw');
 
   const manifest = affected(['packs/core/pack.json']).files;
   assert.ok(fastTests().every((f) => manifest.includes(f)), 'a pack’s manifest is read by every map: the fast set');

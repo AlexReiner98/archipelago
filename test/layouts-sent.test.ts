@@ -29,7 +29,7 @@ async function system(call: (path: string, token?: string, body?: unknown) => Pr
   return { ...made, ...kept.result.created } as Record<string, string>;
 }
 
-const shipped = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'core', 'pack.json'), 'utf8')).layouts.find((d: { id: string }) => d.id === 'core.map');
+const shipped = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'canvas', 'pack.json'), 'utf8')).layouts.find((d: { id: string }) => d.id === 'core.map');
 
 test('a picture is sent the drawing its shape is drawn by, once, and the owner’s version stands in module by module', async () => {
   const { call } = await serve('off');

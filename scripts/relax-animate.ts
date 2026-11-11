@@ -12,9 +12,9 @@ import * as sketches from '../test/relax-sketches.ts';
 import { drawings, setOut } from '../test/wired.ts';
 
 const strips = drawings.find((d) => d.id === 'core.strips')!;
-const RELAX = { pack: 'core', id: 'relax', modules: { ...strips.modules, 'relax.js': 'layouts/relax/relax.js', 'atoms.js': 'layouts/relax/atoms.js', 'order.js': 'layouts/relax/order.js', 'solve.js': 'layouts/relax/solve.js' } };
+const RELAX = { pack: 'canvas', id: 'relax', modules: { ...strips.modules, 'relax.js': 'layouts/relax/relax.js', 'atoms.js': 'layouts/relax/atoms.js', 'order.js': 'layouts/relax/order.js', 'solve.js': 'layouts/relax/solve.js' } };
 const ROOT = join(import.meta.dirname, '..');
-const house = JSON.parse(readFileSync(join(ROOT, 'packs/core/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props, sizes = house.sizes;
+const house = JSON.parse(readFileSync(join(ROOT, 'packs/canvas/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props, sizes = house.sizes;
 // RELAX="unit=20,hold=0.2" tries other sizes of the relaxation than the house style's.
 for (const kv of (process.env.RELAX ?? '').split(',').filter(Boolean)) { const [k, v] = kv.split('='); sizes[`relax_${k}`] = Number(v); }
 const [what = 'map', out = join(ROOT, 'runs', 'relax.html')] = process.argv.slice(2);
