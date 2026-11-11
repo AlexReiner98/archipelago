@@ -447,7 +447,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     size.width = width;
   }
   return {
-    scene: { css: [css, ...(parts ? [islandCss, ...isles.rules] : []), sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
+    scene: { css: [css, ...(parts ? [islandCss, ...isles.rules] : []), sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: player?.end,
     on(event) {
       const { name, key } = event;
