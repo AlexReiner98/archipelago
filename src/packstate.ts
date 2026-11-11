@@ -250,10 +250,15 @@ export function packTouches(p: PackFile) {
   return groups.map(([key, items]) => ({ key, n: items.length, items }));
 }
 
-/** Every pack on this server, with its state in this workspace and why, what it needs, and what it touches. */
+/**
+ * Every pack this workspace may have, with its state here and why, what it needs, and what it touches. A pack the
+ * server's list does not offer it (src/pack-allow.ts) is left out: it cannot be added here, so it is not shown.
+ */
 export function packStates(l: Archipelago) {
   const made = (id: string) => l.registry.made.get(id)?.item;
-  return l.registry.found.map((p) => ({ id: p.id, title: p.title, version: p.version, description: p.description, requires: p.requires ?? [], touches: packTouches(p), ...(made(p.id) && { made: made(p.id) }), ...l.registry.states.get(p.id)! }));
+  const only = l.registry.only;
+  const offered = (id: string) => !only || only.includes(id) || id === LOCAL_PACK || l.registry.made.has(id);
+  return l.registry.found.filter((p) => offered(p.id)).map((p) => ({ id: p.id, title: p.title, version: p.version, manifest: l.registry.hashes.get(p.id), description: p.description, requires: p.requires ?? [], touches: packTouches(p), ...(made(p.id) && { made: made(p.id) }), ...l.registry.states.get(p.id)! }));
 }
 
 /** Turn a pack off or on in this workspace. */
