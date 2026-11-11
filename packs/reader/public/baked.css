@@ -18,17 +18,20 @@ body.baked { margin: 0; background: var(--ln-sea); color: var(--ln-text); font-f
 .lead-words { max-width: var(--ln-rails-card-width); margin: 0; }
 .lead-words > :first-child { margin-top: 0; }
 .lead h1 { font-size: var(--ln-rails-card-title); }
+.lead h1.said { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .lead p { color: var(--ln-muted); font-size: var(--ln-rails-card-text); }
-.hero { margin: 0; }
-.hero img { display: block; width: 100%; max-height: var(--ln-rails-hero-most); object-fit: cover; border-radius: var(--ln-rails-corner); }
+.hero { margin: 0 calc(0px - var(--ln-rails-card-inset)); }
+.hero img { display: block; width: 100%; height: auto; max-height: var(--ln-rails-hero-most); object-fit: contain; }
 .hero figcaption { margin-top: calc(var(--ln-rails-card-pad) / 2); color: var(--ln-muted); font-size: var(--ln-rails-count-text); }
 .baked .rails { padding: 0 var(--ln-rails-card-inset); }
 .baked .rails[data-rails="walk"] { padding: 0; }
 .site-foot { padding: var(--ln-rails-card-inset); color: var(--ln-muted); font-size: var(--ln-rails-count-text); max-width: var(--ln-rails-card-width); }
 
-/* The map's colours read from the page's, as a picture in a published document reads them (ui/doc-lens.css). */
+/* The map's colours read from the page's, as a picture in a published document reads them (ui/doc-lens.css), on the
+   ground a published page stands on (--reader-page), which a hero's own ground is drawn to match (the ridges kit). */
 body.baked {
-  --ln-sea: var(--bg); --ln-land: var(--panel); --ln-inner: var(--bg); --ln-line: var(--edge); --ln-text: var(--text); --ln-muted: var(--muted);
+  --ln-sea: var(--reader-page, var(--bg)); --ln-land: var(--panel); --ln-inner: var(--reader-page, var(--bg)); --ln-line: var(--reader-line, var(--edge));
+  --ln-text: var(--reader-ink, var(--text)); --ln-muted: var(--reader-muted, var(--muted));
   --ln-blocked: var(--g-blocked); --ln-you: var(--g-question); --ln-session: var(--accent); --ln-done: var(--ok); --ln-warn: var(--warn); --ln-accent: var(--accent);
   --ln-font: var(--face-text);
 }

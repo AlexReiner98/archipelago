@@ -93,14 +93,17 @@ const block = (selector, vars) => `${selector} {\n${vars.map(([n, v]) => `  ${n}
 
 /**
  * The page's own stylesheet: the page's look (`look`, the public view's theme, lengths, faces and type) in the reader's
- * scheme, the style's values, and the drawing's sheet (checked by the kernel) kept to the rails.
+ * scheme, the style's values, the drawing's sheet (checked by the kernel) kept to the rails, and the style's sheet for
+ * published pages (page_css, checked by the kernel) kept to the band above them: there it picks which of a hero's
+ * pictures a reader sees (its scheme's, its width's) by each picture's section id, as it does on the published page.
  */
 export function lookCss(baked, look = {}) {
   return `${[
     block(':root', [...themeOf(look, 'light'), ...varsOf(baked.style)]),
     `@media (prefers-color-scheme: dark) {\n${block(':root', themeOf(look, 'dark'))}\n}`,
     `.rails {\n${baked.scene.css ?? ''}\n}`,
-  ].join('\n')}\n`;
+    typeof look.page_css === 'string' && look.page_css.trim() ? `.lead {\n${look.page_css}\n}` : '',
+  ].filter(Boolean).join('\n')}\n`;
 }
 
 /** The stops as an agent is handed them: in order, each with its words and its own address. */
@@ -126,12 +129,15 @@ export function aboveHtml(doc, section) {
     if (typeof p.text === 'string') return `<div class="lead-words">${wordsHtml(p.text)}</div>`;
     const s = p.section ?? {};
     if (!ID.test(String(s.id))) return '';
-    if (s.picture) return `<figure class="hero"><img src="/picture/${s.id}" alt="${escape(s.title)}" />${s.body ? `<figcaption>${wordsHtml(s.body)}</figcaption>` : ''}</figure>`;
+    // Lazy, so a variant the style hides (another scheme's, another width's) is never fetched.
+    if (s.picture) return `<figure class="hero" id="${s.id}"><img src="/picture/${s.id}" alt="${escape(s.title)}" loading="lazy" decoding="async" />${s.body ? `<figcaption>${wordsHtml(s.body)}</figcaption>` : ''}</figure>`;
     return `<div class="lead-words"><h2>${escape(s.title)}</h2>${wordsHtml(s.body ?? '')}</div>`;
   });
   const leading = shown.findIndex((p) => !p.section?.picture);
   const k = leading < 0 ? html.length : leading;
-  return [...html.slice(0, k), `<h1 class="lead-words">${escape(doc.title)}</h1>`, ...html.slice(k)].filter(Boolean).join('\n');
+  // A band that opens on a picture has its title set in the land (the ridges kit): kept for readers and search engines, off the screen.
+  const title = `<h1 class="lead-words${k > 0 ? ' said' : ''}">${escape(doc.title)}</h1>`;
+  return [...html.slice(0, k), title, ...html.slice(k)].filter(Boolean).join('\n');
 }
 
 /**

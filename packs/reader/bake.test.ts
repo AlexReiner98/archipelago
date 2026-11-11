@@ -6,6 +6,25 @@ import test from 'node:test';
 import { aboveHtml, bakedPage, lookCss, svgOf } from './bake.js';
 // @ts-expect-error the pack's code is plain JavaScript
 import { bakedSite, keyOf } from './baked-site.js';
+// @ts-expect-error a page's script is plain JavaScript
+import { settled } from './public/baked.js';
+
+test('the walk waits for the band’s shown pictures, measured again as each arrives, never for a hidden one', () => {
+  const img = (complete: boolean, display: string) => {
+    const on: Record<string, () => void> = {};
+    return { complete, display, on, closest: () => null, addEventListener: (name: string, fn: () => void) => void (on[name] = fn) };
+  };
+  const win = { getComputedStyle: (el: { display: string }) => ({ display: el.display }) };
+  const shown = img(false, 'block'), hidden = img(false, 'none'), loaded = img(true, 'block');
+  const said: string[] = [];
+  settled({ querySelectorAll: () => [shown, hidden, loaded] }, win, () => said.push('moved'), () => said.push('done'));
+  assert.deepEqual(said, []);
+  shown.on.load();
+  assert.deepEqual(said, ['moved', 'done']);
+  const none: string[] = [];
+  settled(null, win, () => none.push('moved'), () => none.push('done'));
+  assert.deepEqual(none, ['done']);
+});
 
 const A = 'e_aaaaaaaa', B = 'e_bbbbbbbb';
 const baked = {
@@ -57,6 +76,13 @@ test('the look is the page’s theme for each scheme and the style’s values, h
   assert.match(css, /--ln-accent: #abc;/);
   for (const bad of ['url(x)', 'red;}', '--x;']) assert.ok(!css.includes(bad), bad);
   assert.match(css, /\.rails \{\n\.lf-step/);
+  assert.ok(!css.includes('.lead {'), 'no page sheet, none written');
+});
+
+test('the style’s page sheet is kept to the band, where it picks which hero a reader sees', () => {
+  const sheet = '#e_dark0000 { display: none; }\n@media (prefers-color-scheme: dark) { #e_dark0000 { display: block; } }';
+  const css = lookCss(baked, { ...doc, page_css: sheet });
+  assert.ok(css.endsWith(`.lead {\n${sheet}\n}\n`));
 });
 
 /** The kernel as the pack sees it: the acts it answers, and the counts it is asked to add. */
@@ -103,8 +129,9 @@ test('the band above the walk is what the document holds before its rails pictur
     ],
   };
   const html = aboveHtml(page, L);
-  assert.ok(html.startsWith(`<figure class="hero"><img src="/picture/${H}" alt="A map &#60;of&#62; work" /></figure>`), 'the hero first');
+  assert.ok(html.startsWith(`<figure class="hero" id="${H}"><img src="/picture/${H}" alt="A map &#60;of&#62; work" loading="lazy" decoding="async" /></figure>`), 'the hero first');
   assert.ok(html.indexOf('<h1') > html.indexOf('hero') && html.indexOf('<h1') < html.indexOf('mapped'), 'the title after the pictures it opens with');
+  assert.ok(html.includes('<h1 class="lead-words said">Archipelago</h1>'), 'set in the land: kept, off the screen');
   assert.ok(html.includes('<b>mapped</b>'));
   assert.ok(!html.includes(C), 'the link card is the card’s alone');
   assert.ok(!html.includes('After'), 'only what comes before the walk');

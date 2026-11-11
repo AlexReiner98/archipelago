@@ -60,7 +60,7 @@ test('a home view drawn by the rails is baked at /: its stops in order, each at 
   assert.match(front.body, /<a class="start" href="\/go\/start">/);
 
   // The hero above the walk, its picture the one kept with the view.
-  const hero = front.body.indexOf(`<img src="/picture/${made.hero}" alt="A map of the work" />`);
+  const hero = front.body.indexOf(`<figure class="hero" id="${made.hero}"><img src="/picture/${made.hero}" alt="A map of the work"`);
   assert.ok(hero > 0 && hero < front.body.indexOf('<section class="rails"'));
   assert.equal((await visit(base, `/picture/${made.hero}`, 'site.test')).status, 200);
 
