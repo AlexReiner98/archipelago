@@ -184,6 +184,17 @@ service keeps the packs it sells, is a folder there. A pack is its id wherever
 it is found, so one moved between folders is the same pack to every
 workspace. The same id in two folders stops the server from starting.
 
+Which of them a workspace may have is the server's to say
+(`src/pack-allow.ts`). `PELAGO_ONLY_PACKS` (comma separated; `packs` in
+`pelago.config.json`) names the packs every workspace may have, core always
+among them; unset, every pack found. `PELAGO_WORKSPACE_PACKS`
+(`islands=canvas,code;site=work`; `workspacePacks`) names the packs one
+workspace alone may have beside them, so a pack is offered to one map before
+every map. A pack a workspace may not have is off there ("not enabled on this
+server"), and its owner cannot add it: its items stay, dormant, and its fact
+on the log is kept, so letting it in again brings it back as it was. A pack
+let in that the workspace never added is still off until its owner adds it.
+
 ## In time
 
 Adding or taking out a pack is a fact on the workspace's log, kept forever:
