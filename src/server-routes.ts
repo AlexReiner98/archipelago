@@ -119,7 +119,13 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
   const entry = !more && file.reach.server.entries?.find((e) => e.id === name && e.method !== 'GET');
   if (!entry) return json(404, { error: 'Not found' });
   try {
-    return json(200, { result: await packs.call(file.id, 'entry', entry.id, (await at.body()) ?? {}, entry.limit_ms) });
+    // The input is the address's query and the body over it: JSON from a page, or a form, as a mail program's one-click
+    // unsubscribe POSTs (RFC 8058: List-Unsubscribe=One-Click, its address naming what to stop).
+    const query = Object.fromEntries(new URL(req.url ?? '/', 'http://x').searchParams);
+    const form = /^application\/x-www-form-urlencoded\b/i.test(req.headers['content-type'] ?? '');
+    const body = form ? Object.fromEntries(new URLSearchParams((await at.raw()).toString('utf8'))) : ((await at.body()) ?? {});
+    const input = body && typeof body === 'object' && !Array.isArray(body) ? { ...query, ...body } : body;
+    return json(200, { result: await packs.call(file.id, 'entry', entry.id, input, entry.limit_ms) });
   } catch (err) {
     return json(400, { error: (err as Error).message });
   }

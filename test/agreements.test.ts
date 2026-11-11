@@ -62,23 +62,15 @@ test('a sign-in waits until the documents in force are agreed to, without spendi
   assert.match((await post('/x/shop/agreed', { workspace: 'default', email: 'kim@acme.example', agreed: both })).error, /not a workspace this pack made/);
 });
 
-test('an address in no workspace is mailed where to begin, tagged with where it came from; a member is mailed their code', async () => {
+test('an address in no workspace is sent nothing, answered as a member is; where to begin is the page’s to offer', async () => {
   const { base } = await serve('tokens');
   const post = (path: string, body: unknown) => fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, ...(await r.json()) }));
-  const mailTo = async (to: string) => {
-    for (let tries = 0; tries < 100 && !mailbox.some((m) => m.to === to); tries++) await new Promise((r) => setTimeout(r, 50));
-    return mailbox.findLast((m) => m.to === to);
-  };
   assert.deepEqual(await fetch(`${base}/connect/start`).then((r) => r.json()), { url: '/x/terms/begin_here' }, 'the page a pack marks start');
   assert.equal((await fetch(`${base}/x/terms/begin_here`)).status, 200);
 
-  // Answered as for a member: only the mail differs, and only its owner reads it.
+  // Anyone can type a stranger's address: mail its owner never asked for is marked as spam, so none goes.
+  const before = mailbox.length;
   assert.deepEqual(await post('/connect/sign-in', { email: 'newcomer@example.com', ref: 'mcp' }), { status: 200, sent_to: 'newcomer@example.com' });
-  const mail = (await mailTo('newcomer@example.com'))!;
-  assert.match(mail.text, /no workspace here yet/);
-  assert.match(mail.text, /http:\/\/[^\s]+\/x\/terms\/begin_here\?ref=mcp\s/);
-  assert.doesNotMatch(mail.text, /#\/join\//, 'and no way in to anything');
-
-  await post('/connect/sign-in', { email: 'other@example.com', ref: 'a b"<script>' });
-  assert.match((await mailTo('other@example.com'))!.text, /\/x\/terms\/begin_here\s/, 'a ref that is not a tag is left off');
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(mailbox.slice(before).filter((m) => m.to === 'newcomer@example.com').length, 0);
 });

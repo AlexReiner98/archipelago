@@ -295,6 +295,9 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
   const email = h('input', { type: 'email', placeholder: 'Email', autocomplete: 'email', spellcheck: false, value: given });
   const send = h('button', { class: 'primary' }, 'Email me a code');
 
+  // Where a person with no account begins (/connect/start), once known: offered again after asking, since an address
+  // with no workspace is sent no mail, and the page says the same to everyone.
+  let startAt;
   // Step two: a code is in the mail, typed here, in whichever browser asked.
   const codeStep = (sentTo) => {
     const code = h('input', { type: 'text', placeholder: 'Code from the email', autocomplete: 'one-time-code', autocapitalize: 'characters', spellcheck: false });
@@ -316,9 +319,10 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
     change.onclick = (e) => (e.preventDefault(), first());
     gate(
       'Check your email',
-      gateRow(h('span', { class: 'muted grow gist', title: `A sign-in code is on its way to ${sentTo}, or where to start, if it has no workspace here` }, sentTo), change, again),
+      gateRow(h('span', { class: 'muted grow gist', title: `A sign-in code is on its way to ${sentTo}, if it has a workspace here` }, sentTo), change, again),
       gateRow(code, go),
       error,
+      startAt && gateRow(h('span', { class: 'muted grow' }, 'No code?'), h('a', { href: startAt, title: 'An address with no workspace here is sent nothing: make one of your own' }, 'Start a workspace')),
     );
     code.focus();
   };
@@ -360,6 +364,7 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
     if (!url) return;
     const to = new URL(url, location.origin);
     if (ref) to.searchParams.set('ref', ref);
+    startAt = to.href;
     const tip = 'Make a workspace of your own; a client waiting to connect is asked again once you are in';
     // Sent here by a client, in a browser that has never signed in: most likely they have no account, so it leads.
     const start = newcomer ? h('button', { class: 'primary', title: tip, onclick: () => location.assign(to.href) }, 'Start a workspace') : h('a', { href: to.href, title: tip }, 'Start a workspace');

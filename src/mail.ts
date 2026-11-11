@@ -20,6 +20,11 @@ export interface Mail {
   text: string;
   /** Where a reply goes, when not to the sender (an invitation: to whoever sent it). */
   replyTo?: string;
+  /**
+   * For mail that sells (a trial's reminder), never for a sign-in: an https address that stops such mail when POSTed
+   * to, sent as List-Unsubscribe with List-Unsubscribe-Post (RFC 8058), which Gmail and Yahoo ask of it.
+   */
+  unsubscribe?: string;
 }
 
 type Mailer = (mail: Mail) => Promise<void>;
@@ -83,6 +88,12 @@ export function compose(from: string, mail: Mail, now = new Date()): { headers: 
       ['From', name ? `${word(name)} <${addressOf(from)}>` : addressOf(from)],
       ['To', mail.to],
       ...(mail.replyTo ? [['Reply-To', mail.replyTo] as [string, string]] : []),
+      ...(mail.unsubscribe
+        ? ([
+            ['List-Unsubscribe', `<${mail.unsubscribe}>`],
+            ['List-Unsubscribe-Post', 'List-Unsubscribe=One-Click'],
+          ] as [string, string][])
+        : []),
       ['Subject', word(mail.subject)],
       ['Date', now.toUTCString().replace('GMT', '+0000')],
       ['Message-ID', `<${randomBytes(12).toString('hex')}@${domain}>`],
@@ -107,7 +118,7 @@ export function relaxedBody(body: string): string {
 /** The DKIM-Signature header for a message, signed with the key for `domain` under `selector`. */
 export function dkimSign(headers: [string, string][], body: string, domain: string, selector: string, key: string, now = new Date()): [string, string] {
   const bh = createHash('sha256').update(relaxedBody(body)).digest('base64');
-  const signed = headers.filter(([n]) => ['from', 'to', 'reply-to', 'subject', 'date', 'message-id', 'mime-version', 'content-type', 'content-transfer-encoding'].includes(n.toLowerCase()));
+  const signed = headers.filter(([n]) => ['from', 'to', 'reply-to', 'subject', 'date', 'message-id', 'mime-version', 'content-type', 'content-transfer-encoding', 'list-unsubscribe', 'list-unsubscribe-post'].includes(n.toLowerCase()));
   const value = `v=1; a=rsa-sha256; c=relaxed/relaxed; d=${domain}; s=${selector}; t=${Math.floor(now.getTime() / 1000)}; h=${signed.map(([n]) => n.toLowerCase()).join(':')}; bh=${bh}; b=`;
   const input = [...signed.map(([n, v]) => relaxedHeader(n, v)), relaxedHeader('DKIM-Signature', value)].join('\r\n');
   return ['DKIM-Signature', value + createSign('RSA-SHA256').update(input).sign(key, 'base64')];

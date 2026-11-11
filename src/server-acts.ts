@@ -126,7 +126,13 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       const to = normalEmail(input.to);
       if (!to) throw new Error('That is not an email address.');
       const subject = text(input.subject, 200, 'A subject');
-      await sendMail({ to, subject, text: text(input.text, 20_000, 'The text') });
+      // A way out of mail that sells: one of the pack's own entries, on https, which a mail program POSTs to.
+      const unsubscribe = input.unsubscribe == null ? undefined : String(input.unsubscribe);
+      if (unsubscribe !== undefined) {
+        const u = URL.canParse(unsubscribe) ? new URL(unsubscribe) : undefined;
+        if (u?.protocol !== 'https:' || !u.pathname.startsWith(`/x/${pack.id}/`)) throw new Error(`unsubscribe: an https address of one of this pack's own entries (/x/${pack.id}/...).`);
+      }
+      await sendMail({ to, subject, text: text(input.text, 20_000, 'The text'), ...(unsubscribe && { unsubscribe }) });
       await log(`Sent "${subject}" to ${to}`, { to });
       return { sent: true };
     }
