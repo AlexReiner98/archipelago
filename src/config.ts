@@ -3,6 +3,7 @@ import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DRAW_HOST_NAME } from './draw-host.ts';
 import { env } from './env.ts';
+import { readOnlyPacks, readWorkspacePacks } from './pack-allow.ts';
 import { DEFAULT_AGENT_POLICY, type Policy } from './pelago.ts';
 
 export interface Config {
@@ -14,8 +15,10 @@ export interface Config {
   /** Every folder workspace packs are read from: packsDir, then those PELAGO_PACKS names (separated as PATH is), so a
    * private pack is a folder on the machine the server runs on, never a file of this repository. */
   packDirs: string[];
-  /** Pack ids to enable. Omit to enable every pack in packsDir. */
+  /** Pack ids to enable (PELAGO_ONLY_PACKS, comma separated). Omit to enable every pack found (src/pack-allow.ts). */
   packs?: string[];
+  /** Packs one workspace may have beyond `packs`, by workspace id (PELAGO_WORKSPACE_PACKS, "islands=a,b;other=c"). */
+  workspacePacks?: Record<string, string[]>;
   /** What agents may do without asking. Humans are never restricted. */
   policy?: Partial<Policy>;
   /**
@@ -138,7 +141,8 @@ export function loadConfig(): Config {
   const launch = wantLaunch === 'off' ? false : ('local' as const);
   const unreviewed = Object.fromEntries(Object.keys(DEFAULT_AGENT_POLICY).map((op) => [op, 'auto'])) as Policy;
   return {
-    packs: fromFile.packs,
+    packs: readOnlyPacks(env('ONLY_PACKS')) ?? fromFile.packs,
+    workspacePacks: env('WORKSPACE_PACKS') !== undefined ? readWorkspacePacks(env('WORKSPACE_PACKS')) : fromFile.workspacePacks,
     policy: dev ? { ...unreviewed, ...fromFile.policy } : fromFile.policy,
     auth,
     dev,
