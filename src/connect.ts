@@ -5,6 +5,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { bearer } from './auth.ts';
+import { BOUNCED_DAYS, failedFor, fromRelay, noteBounced } from './bounces.ts';
 import { normalEmail } from './mail.ts';
 import { workspacesOf } from './control-index.ts';
 import type { Q } from './db.ts';
@@ -140,6 +141,14 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     if (problem) return reply(res, 400, { error: problem });
     await setPassword(control, email, body.password as string);
     return reply(res, 200, { email, set: await passwordSet(control, email) });
+  }
+  // A failure notice the relay hands over (src/bounces.ts): the addresses that failed for good are sent nothing for a while.
+  if (req.method === 'POST' && path === '/connect/bounce') {
+    if (!fromRelay(req.headers.authorization)) return reply(res, 403, { error: 'Only the relay hands over bounces.' });
+    const failed = failedFor((await at.raw()).toString('utf8'));
+    await noteBounced((await at.workspaces.get(at.fallback)).pelago.db, failed);
+    if (failed.length) console.log(`bounced for good, not mailed for ${BOUNCED_DAYS} days: ${failed.length} address${failed.length === 1 ? '' : 'es'}`);
+    return reply(res, 200, { kept: failed.length });
   }
   if (req.method === 'POST' && (path === '/connect/sign-in' || path === '/connect/join' || path === '/connect/code' || path === '/connect/password')) {
     if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in.' });

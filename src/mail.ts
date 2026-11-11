@@ -34,6 +34,12 @@ export function setMailer(m: Mailer | undefined) {
   mailer = m;
 }
 
+/** Whether an address bounced lately (src/bounces.ts), told by the server at its start: such an address is sent nothing. */
+let bounced: ((email: string) => Promise<boolean>) | undefined;
+export function setBounced(check: ((email: string) => Promise<boolean>) | undefined) {
+  bounced = check;
+}
+
 /** An address on its own, from "Name <address>" or a bare address. */
 export const addressOf = (from: string) => /<([^>]+)>/.exec(from)?.[1] ?? from.trim();
 
@@ -132,6 +138,11 @@ const dkimKey = () => {
 
 /** Send one message as configured. Throws when no server took it. */
 export async function sendMail(mail: Mail): Promise<void> {
+  // Mail to an address that bounced for good is not sent again for a while: receivers hold it against the sender.
+  if (await bounced?.(mail.to).catch(() => false)) {
+    console.log(`mail not sent (${mail.to} bounced lately): "${mail.subject}"`);
+    return;
+  }
   if (mailer) return mailer(mail);
   const from = env('MAIL_FROM');
   // Unsent, the log says only that it was not: its text holds sign-in codes, which a log must not keep.

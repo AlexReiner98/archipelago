@@ -850,7 +850,11 @@ change that:
   subject: never its text, which holds sign-in codes. No mail carries a
   sign-in link: from a young domain, one reads to spam filters as phishing,
   so a sign-in mail holds a code, and an invitation says to sign in with the
-  address.
+  address. An address with no workspace is sent nothing when it asks to sign
+  in. An address that bounced for good is sent nothing for 90 days: the relay
+  hands each failure notice to `POST /connect/bounce` with
+  `PELAGO_BOUNCE_SECRET` as its bearer token (without that setting none is
+  taken).
   For it to arrive, and not as spam, the sending domain needs: an SPF record
   naming the server's address (`v=spf1 ip4:<address> -all`), a DKIM key
   (`openssl genrsa -out dkim.pem 2048`; the private key in `PELAGO_DKIM_KEY`,
