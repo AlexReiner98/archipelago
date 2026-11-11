@@ -46,7 +46,7 @@ const PUBLIC = /^\/p\/([^/]+)\/([^/]+)(?:\/([^/]+)(?:\/([^/]+))?)?\/?$/;
 /** The longest anything a mounted entry answers may be kept, in seconds: a year, and then it never changes. */
 const YEAR = 31_536_000;
 /** The text a mounted entry may answer, by the type it names. */
-const TEXTS: Record<string, string> = { 'text/plain': 'text/plain; charset=utf-8', 'application/xml': 'application/xml; charset=utf-8' };
+const TEXTS: Record<string, string> = { 'text/plain': 'text/plain; charset=utf-8', 'application/xml': 'application/xml; charset=utf-8', 'text/css': 'text/css; charset=utf-8', 'text/javascript': 'text/javascript; charset=utf-8' };
 const PICTURE = /^image\/(png|jpeg|gif|webp|svg\+xml)$/;
 
 /** Which mount an address is, if any: the site of a domain the server names first, then /p/, then the setup. */
@@ -78,8 +78,9 @@ function partsOf(mount: Mount, pathname: string, site: string | undefined): Reco
 /** What the server says of where the address is, beside its parts: the workspace's name, the name to keep, its domain. */
 async function placeOf(mount: Mount, parts: Record<string, string>, at: MountCall): Promise<Record<string, string>> {
   const name = (await at.workspaces?.list?.().catch(() => []))?.find((ws) => ws.id === parts.workspace)?.name;
-  // A site is told the app's own address too, where its /install leads (it is this server under its first name).
-  if (mount === 'site') return { ...(name && { name }), ...(at.host && { host: at.host }), ...(at.packs.origin && { app: at.packs.origin }) };
+  // A site is told the app's own address too, where its /install leads (it is this server under its first name), and
+  // the page a person with no account begins at there (start), where its main button leads.
+  if (mount === 'site') return { ...(name && { name }), ...(at.host && { host: at.host }), ...(at.packs.origin && { app: at.packs.origin }), ...(at.packs.start() && { start: at.packs.start()! }) };
   const domain = Object.entries(at.sites ?? {}).find(([, ws]) => ws === parts.workspace)?.[0];
   return { ...(name && { name }), ...(at.named?.[0] && { named: at.named[0] }), ...(domain && { domain }) };
 }
@@ -88,12 +89,12 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) 
 /**
  * What the request said that a page may answer by, handed to a public or site entry and kept by the kernel nowhere: its
  * query, the name it was sent to (host), the page before (referrer), the browser's name for itself (agent), and whether
- * it was fetched ahead (purpose).
+ * it was fetched ahead (purpose), and what it asks to be answered in (accept).
  */
 export function requestOf(req: Pick<IncomingMessage, 'url' | 'headers'>) {
   const at = (req.url ?? '').indexOf('?');
   const h = req.headers;
-  return { query: at < 0 ? '' : (req.url ?? '').slice(at + 1), host: one(h.host).toLowerCase(), referrer: one(h.referer), agent: one(h['user-agent']), purpose: one(h['sec-purpose']) || one(h.purpose) };
+  return { query: at < 0 ? '' : (req.url ?? '').slice(at + 1), host: one(h.host).toLowerCase(), referrer: one(h.referer), agent: one(h['user-agent']), purpose: one(h['sec-purpose']) || one(h.purpose), accept: one(h.accept) };
 }
 
 /** How long what was answered may be kept: whole seconds said, up to a year (then for good), else as otherwise. */

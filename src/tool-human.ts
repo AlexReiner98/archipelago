@@ -14,7 +14,6 @@ import { seen as standsAt } from './seeing.ts';
 import { backupNow, needAdmin } from './tool-config.ts';
 import { op } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
-import { guestFacts } from './guests.ts';
 import { eventsAfter, factsAfter, factsUpTo, HELD_MOST, headPos, ISLANDS_MOST } from './tail.ts';
 import { typeItemsIn, typesTaken } from './type-items.ts';
 import { movesAgain, syncTypes } from './typetable.ts';
@@ -41,7 +40,6 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
         .describe('The page asking, whether a show can land in it, and where it stands (its address after "#/"): an agent’s show says how many pages can take it, and an agent is told what the owner is looking at, and whether its show lands in the tab in sight (lands: the sessions whose shows go there).'),
     },
     run: async (l, _actor, { after, seq, ids = [], islands = [], page, was }) => {
-      if (l.reads) return guestFacts(l, { after, ids }); // a guest's page follows only the view shared with them (src/guests.ts)
       if (page) await looked((await wholeMap(l)).db, l, { page: page.page, on: page.on });
       if (page?.where !== undefined) await standsAt((await wholeMap(l)).db, l, page.page, page.where, page.tab, page.lands);
       const [queue, { told, ...seen }, pos] = await Promise.all([l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending' -- index proposal_status`), presence((await wholeMap(l)).db, l), headPos(l.db)]);

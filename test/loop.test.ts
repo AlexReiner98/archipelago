@@ -145,7 +145,7 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
     await sharer.evaluate(`document.querySelector('.q-band-menu').click()`);
     assert.ok(await sharer.until(`[...document.querySelectorAll('.tab-menu button')].some((b) => b.textContent === 'Share it')`), 'the menu offers to share it');
     await sharer.evaluate(`[...document.querySelectorAll('.tab-menu button')].find((b) => b.textContent === 'Share it').click()`);
-    // Named first, since a public view is of a view kept on the map; then public, not a guest.
+    // Named first, since a public view is of a view kept on the map; then asked to share it.
     assert.ok(await sharer.until(`Boolean(document.querySelector('dialog.ask textarea'))`), 'asked for a name');
     await sharer.evaluate(`(() => { const d = document.querySelector('dialog.ask'); d.querySelector('textarea').value = 'The login plan'; d.querySelector('button[value="ok"]').click(); })()`);
     const choose = `document.querySelector('dialog.ask button[value="choice:0"]')`;
@@ -180,24 +180,17 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
   }
 });
 
-test('a guest, signed in to read what was shared with them, is shown the way to a map of their own too', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('a member who only reads, signed in, is shown the way to a map of their own too', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { createToken } = await import('../src/auth.ts');
   const { linkFor } = await import('../src/members.ts');
   const { workspaces, call, base } = await serve('tokens');
   const db = (await workspaces.get('default')).pelago.db;
   const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
-  const made = (await call('/api/change', alex, {
-    reason: 'test',
-    ops: [
-      { op: 'create', ref: 'a', type: 'task', title: 'Login form', visibility: 'shared' },
-      { op: 'create', ref: 'lens', type: 'lens', title: 'The plan', visibility: 'shared', props: { filter: { find: ['type task'], not: [] }, walk: { over: [], steps: 0 } } },
-    ],
-  })).result.created;
-  await call('/api/share_guest', alex, { id: made.lens, email: 'guest@example.com' });
+  await call('/api/member_add', alex, { email: 'reader@example.com', read_only: true });
   // The invitation carries no link; the sign-in it leads to is made here and opened as a browser hands one over.
-  const page = await open(`${base}/#/join/${(await linkFor(db, 'default', 'guest@example.com', 60_000)).split('/join/')[1]}`);
+  const page = await open(`${base}/#/join/${(await linkFor(db, 'default', 'reader@example.com', 60_000)).split('/join/')[1]}`);
   try {
-    assert.ok(await page.until(`document.querySelector('#nav .start-own')?.textContent.includes('Start a map of your own')`, 20000), `the guest is shown it: ${page.logs().join(' ').slice(0, 600)}`);
+    assert.ok(await page.until(`document.querySelector('#nav .start-own')?.textContent.includes('Start a map of your own')`, 20000), `they are shown it: ${page.logs().join(' ').slice(0, 600)}`);
     assert.ok(await page.evaluate<boolean>(`!document.querySelector('#nav .sign-in')`), 'with no Sign in: they are signed in');
   } finally {
     await page.close();

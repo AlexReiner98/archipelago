@@ -388,7 +388,7 @@ const PAGE_CALLS = [
   'backup_download', 'change', 'connections', 'decide', 'document', 'events', 'get', 'import_backup', 'init',
   'launch', 'member_add', 'member_list', 'member_set', 'pack_set', 'packs', 'picture',
   'proposals', 'publish', 'publish_all', 'publish_plan', 'published', 'schema', 'search', 'server_packs',
-  'session_end', 'share_create', 'share_guest', 'share_list', 'share_plan', 'share_revoke', 'tail',
+  'session_end', 'share_create', 'share_list', 'share_plan', 'share_revoke', 'tail',
   'time_invoice_draft', 'time_invoice_paid', 'time_log', 'time_timesheet', 'time_week', 'token_create', 'token_list',
   'token_request_answer', 'token_requests', 'token_revoke', 'undo', 'unpublish', 'view', 'workspace_info', 'workspace_set',
 ];

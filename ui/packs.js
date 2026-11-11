@@ -84,7 +84,7 @@ export function packsCard({ info, then, goTo }) {
       name: p.title,
       title: `${p.title} ${p.version}${p.why ? `: ${p.why}` : ''}${p.description ? `\n${p.description}` : ''}${p.requires?.length ? `\nNeeds: ${p.requires.join(', ')}` : ''}`,
       off: !on,
-      marks: [p.made && h('a', { class: 'mark', href: `#/e/${p.made}`, title: 'Kept as an item on this map: open it' }, 'item'), p.state === 'waiting' && h('span', { class: 'mark warn', title: p.why ?? '' }, 'waiting')].filter(Boolean),
+      marks: [p.version && h('span', { class: 'mark', title: p.manifest ? `Manifest ${p.manifest}` : 'Version' }, String(p.version)), p.made && h('a', { class: 'mark', href: `#/e/${p.made}`, title: 'Kept as an item on this map: open it' }, 'item'), p.state === 'waiting' && h('span', { class: 'mark warn', title: p.why ?? '' }, 'waiting')].filter(Boolean),
       // The switch is on the plate's face; the kernel's pack has none, since it is never off.
       action: KERNEL.includes(p.id) ? h('span', { class: 'muted small', title: 'The kernel’s own: never off' }, 'always on') : box,
       rows: [h('li', { class: 'touches' }, touched.map(cell)), open ? group(p, open) : []],

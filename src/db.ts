@@ -123,12 +123,14 @@ function pgliteVersion() {
  * The same database as one person sees it. Every statement runs inside a
  * transaction that first drops to the member role and names the viewer (and
  * whether they are an admin of the workspace), so neither can leak between
- * requests sharing the connection.
+ * requests sharing the connection. A member who only reads (src/members.ts) runs in a read-only transaction besides:
+ * the database refuses every write in it, and once it has read, refuses to be made to write again.
  */
-export function scoped(db: Db, viewer: string, admin = false): Db {
+export function scoped(db: Db, viewer: string, admin = false, readOnly = false): Db {
   const enter = async (tx: Q) => {
-    await tx.query(`select set_config('pelago.viewer', $1, true), set_config('pelago.admin', $2, true)`, [viewer, admin ? '1' : '']);
+    await tx.query(`select set_config('pelago.viewer', $1, true), set_config('pelago.admin', $2, true)`, [viewer, admin && !readOnly ? '1' : '']);
     await tx.query(`set local role pelago_member`);
+    if (readOnly) await tx.query(`set transaction read only`);
   };
   return {
     query: <T>(sql: string, params?: unknown[]) =>
@@ -143,30 +145,6 @@ export function scoped(db: Db, viewer: string, admin = false): Db {
       }),
     close: () => db.close(),
     whole: db.whole ?? db,
-  };
-}
-
-/**
- * The same database as a guest sees it: the reader role, under the one share they were given (src/guest-schema.ts),
- * which may only select, and only what that share's view holds now. The guest is named as viewer, never as admin.
- */
-export function reader(db: Db, share: string, guest: string): Db {
-  const enter = async (tx: Q) => {
-    await tx.query(`select set_config('pelago.share', $1, true), set_config('pelago.viewer', $2, true), set_config('pelago.admin', '', true)`, [share, guest]);
-    await tx.query(`set local role pelago_reader`);
-  };
-  return {
-    query: <T>(sql: string, params?: unknown[]) =>
-      db.transaction(async (tx) => {
-        await enter(tx);
-        return tx.query<T>(sql, params);
-      }),
-    transaction: <T>(fn: (tx: Q) => Promise<T>) =>
-      db.transaction(async (tx) => {
-        await enter(tx);
-        return fn(tx);
-      }),
-    close: () => db.close(),
   };
 }
 

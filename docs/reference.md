@@ -870,8 +870,8 @@ change that:
   send on mail ports can hand mail to a relay it reaches over a private
   network.
 - **Nothing passes between workspaces.** A document reaches someone outside
-  by a link or as a guest; notifications and shares by workspace were dropped
-  (10 Nov 2026).
+  by a link; guests, notifications and shares by workspace were dropped
+  (10 Nov 2026). A known person is added as a member, read-only where wanted.
 - **The Workspace screen** manages all of this: your agent tokens, members
   and the default visibility.
 
