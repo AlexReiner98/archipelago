@@ -13,6 +13,7 @@ import { notify } from './notify.ts';
 import { mailHeard, type NotificationMail } from './notify-mail.ts';
 import { handleRequests, type OutsideRequest } from './outside.ts';
 import { launchHeard, type LaunchAsked } from './pack-launch.ts';
+import { launchesAsked, launchesRefused, type LaunchesAsked } from './pack-action-launch.ts';
 import { answerBeyond, holdWorkspace, NOT_BEYOND } from './pack-reach.ts';
 import type { PackFile } from './packs.ts';
 import { answerRead, type Read } from './packreads.ts';
@@ -48,6 +49,8 @@ export interface Done {
   mail?: NotificationMail[];
   /** On hearing an automation come due: the session it says to start, started by the kernel (src/pack-launch.ts). */
   launch?: LaunchAsked;
+  /** On a person calling its action, where its manifest asks for reach.launch: the sessions to start, ten at most (src/pack-action-launch.ts). */
+  launches?: LaunchesAsked[];
 }
 
 export interface LogEntry {
@@ -242,10 +245,13 @@ export class PackHost {
     const file = l.registry.packs.find((p) => p.id === pack)!;
     // Refused whole, before anything is written: an event of a kind its pack does not declare.
     for (const e of done.log ?? []) if (!parts(file).events.includes(e.action)) throw new Error(`The ${pack} pack declares no event "${e.action}"`);
+    const action = call === 'action' ? parts(file).actions.find((a) => a.id === name) : undefined;
+    const refused = done.launches !== undefined ? launchesRefused(file, actor, action, done.launches) : undefined;
+    if (refused) throw new Error(refused);
     const mailed = done.mail?.length ? await mailHeard(l, pack, call === 'event' ? input : undefined, done.mail) : undefined;
     const launched = done.launch ? await launchHeard(l, pack, call === 'event' ? input : undefined, done.launch) : undefined;
+    const launches = done.launches !== undefined ? await launchesAsked(l, file, actor, action, done.launches) : undefined;
     const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name, pack, ...islandIn(input) }) : undefined;
-    const action = call === 'action' ? parts(file).actions.find((a) => a.id === name) : undefined;
     const outside = done.requests?.length ? await handleRequests(this, l, actor, file, action, done.requests, (changed as { changeset?: string } | undefined)?.changeset) : undefined;
     const made = (changed as { created?: Record<string, string> } | undefined)?.created ?? {};
     const answer = done.answer === undefined ? null : JSON.parse(JSON.stringify(done.answer).replace(/\{([^{}\s"]+)\}/g, (whole, ref: string) => made[ref] ?? whole));
@@ -254,7 +260,7 @@ export class PackHost {
     const ran = launched ? (launched.run ? { made: { run: launched.run } } : { failed: { run: launched.why ?? 'not started' } }) : {};
     const { logged, others } = await further(l, actor, file, name, done, input, ran);
     for (const e of logged) this.tell(l, file.id, e);
-    return { answer, ...changed, ...(mailed && { mailed }), ...(launched && { launched }), ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }) };
+    return { answer, ...changed, ...(mailed && { mailed }), ...(launched && { launched }), ...(launches && { launches }), ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }) };
   }
 
   /**

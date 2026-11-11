@@ -8,6 +8,7 @@ import { atSetting, countsTo, holds, isAt, onReply, replyFacts } from './reply-r
 import type { Rule } from './rules.ts';
 import { tell } from './sessions.ts';
 import { keep, kept } from './transient.ts';
+import { used } from './uses.ts';
 
 /** How long a turn's asking is remembered: past it, the turn is long over. */
 const ASKED_MS = 86_400_000;
@@ -57,6 +58,7 @@ export async function askOnReply(whole: Q, l: Archipelago, run: Entity | undefin
   }
   if (!asking.length) return undefined;
   for (const rule of asking) {
+    used(l.workspace, 'asked', `${rule.pack}.${rule.id ?? ''}`);
     await tell(l, { kind: 'agent', name: rule.pack }, { run: run.id, said: rule.say!, asked: `${rule.pack}.${rule.id ?? ''}` }).catch((err) =>
       console.error(`reply rule ${rule.id}: not kept in the story (${(err as Error).message})`),
     );

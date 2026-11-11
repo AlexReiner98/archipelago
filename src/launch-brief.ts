@@ -9,9 +9,12 @@ import type { Actor, Archipelago } from './pelago.ts';
  * Such a run only proposes, whatever agents may do here: what it changes waits for the owner.
  */
 export interface StartedBy {
-  kind: 'person' | 'automation' | 'webhook';
+  kind: 'person' | 'automation' | 'webhook' | 'pack';
   id?: string;
   name: string;
+  /** A pack's action that started it (src/pack-action-launch.ts): the pack, and what else the pack says of the run. */
+  pack?: string;
+  [field: string]: unknown;
 }
 
 /** What the launched session may do without anyone there to approve it. */
@@ -21,6 +24,8 @@ export interface LaunchInput {
   task: string;
   mode?: LaunchMode;
   instructions?: string;
+  /** A brief held earlier (a replay set's): run as it was then, the task not worked on again. */
+  brief?: Brief;
 }
 
 const MODE_NOTE: Record<LaunchMode, string> = {
@@ -41,7 +46,7 @@ export async function briefFor(l: Archipelago, actor: Actor, input: LaunchInput,
   // Started by anyone but the owner (another member, or an automation), the session only proposes.
   const owner = await l.setting<string>('me');
   const started = by ?? (owner && actor.person && actor.person !== owner ? { kind: 'person' as const, id: actor.person, name: actor.name } : undefined);
-  const brief = (await askView(l, actor, 'brief', { task: input.task })) as Brief;
+  const brief = input.brief ?? ((await askView(l, actor, 'brief', { task: input.task })) as Brief);
   return { brief, started };
 }
 

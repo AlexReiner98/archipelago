@@ -1,0 +1,29 @@
+{
+  "id": "replays",
+  "version": "0.1.0",
+  "title": "Replays",
+  "description": "A fixed set of real finished tasks, each with its brief held as it was, so two pack versions are run on the same work and compared like with like. Words only: the refine pack's actions hold the briefs and replay them.",
+  "requires": ["core"],
+  "types": [
+    {
+      "id": "replays.set",
+      "title": "Replay set",
+      "description": "Five to ten finished tasks, each a held brief part of it, run again under a named pack version. Each replay's runs name the set and the version they ran under.",
+      "extends": "record",
+      "statuses": { "open": ["current"], "closed": ["retired"] }
+    },
+    {
+      "id": "replays.brief",
+      "title": "Held brief",
+      "description": "A task's brief as it was when its set took it: its note the brief, run again as it is, never changed.",
+      "extends": "record",
+      "fields": {
+        "task": { "type": "string", "description": "The task it is the brief of, by id." },
+        "repo": { "type": "string", "description": "The repository it ran in." },
+        "path": { "type": "string", "description": "The repository's local path, where a replay runs it." },
+        "frozen_at": { "type": "datetime", "description": "When its set took it." },
+        "order": { "type": "number", "description": "Its place in its set, from 0." }
+      }
+    }
+  ]
+}

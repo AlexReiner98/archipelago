@@ -292,7 +292,8 @@
       "description": "A cluster of work that speaks one pack's vocabulary and the shared set, below a project or across projects. On a map with islands on, every item but the kernel's own and actors lives on exactly one island (its field island), its type the island's pack's or of the shared set, and no link joins items on two islands: findings are how islands meet. The query term island <island> is what lives on it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
-        "pack": { "type": "string", "description": "The pack it speaks, by id (core for the shared set alone), fixed once the island is made." }
+        "pack": { "type": "string", "description": "The pack it speaks, by id (core for the shared set alone), fixed once the island is made." },
+        "pack_version": { "type": "string", "description": "A version of its pack to try here, by the id of a pack item that is one (version_of): its types, rules and instructions are this island's while the rest of the map keeps the pack as it is. Unset, it runs the map's: unsetting it rolls the trial back." }
       }
     },
     {
@@ -347,6 +348,7 @@
       "fields": {
         "name": { "type": "string", "description": "The pack's id: lower case letters, digits and _, starting with a letter, and no pack's on this server (e.g. recipes)." },
         "version": { "type": "string", "description": "Its version, e.g. 0.1.0: 0.1.0 unless said." },
+        "version_of": { "type": "string", "description": "The pack this is a version of, by id, to try on an island (its field pack_version) while the rest of the map keeps that pack as it is: never added as a pack of its own. It declares the same types and link types as that pack, by the same ids, and may change their fields, its rules and its instructions." },
         "manifest": { "type": "json", "large": true, "description": "What it declares, as an object with the keys of a pack.json a pack on the map may hold: requires, types, links, rules, views and styles, e.g. {\"types\": [{\"id\": \"recipes.dish\", \"title\": \"Dish\", \"description\": \"A dish we cook.\", \"extends\": \"record\"}]}. query schema shows the types there are to extend." }
       }
     },
@@ -1182,6 +1184,14 @@
         "forever": true
       },
       "say": "What was done that is no change to the map and is kept nowhere else: a push heard, a share made, a pack turned on, an act made outside. Every entry kept."
+    },
+    {
+      "id": "uses",
+      "stream": "uses",
+      "keep": {
+        "history": "P35D"
+      },
+      "say": "How often each thing a pack declares was used, per day: a view asked, an instruction said, a rule that held, refused or asked. Counts only, kept five weeks."
     },
     {
       "id": "pack",

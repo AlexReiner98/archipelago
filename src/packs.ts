@@ -12,7 +12,7 @@ import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import 
 import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 import { parts, withoutAbsent, type Manifest } from './manifest.ts';
-import { readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack } from './pack-items.ts';
+import { readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts';
 import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from './phases.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
@@ -116,7 +116,7 @@ export class Registry {
   private where = new Map<string, string>();
   readonly only: string[] | undefined;
   /** The types this workspace defined for itself (define_type), in order: its database keeps them (src/control.ts). */
-  private local: TypeDef[]; /** The types and link types kept on the map (src/type-items.ts). */ private items: TypeItem[] = [];
+  private local: TypeDef[]; /** The types and link types kept on the map (src/type-items.ts). */ items: TypeItem[] = [];
   /** Where a type defined here is kept once the registry has taken it: the workspace's database. None keeps it in memory. */
   keepLocal: (def: TypeDef) => Promise<void> = async () => {};
   packs: PackFile[] = [];
@@ -138,7 +138,7 @@ export class Registry {
   /** Warnings said once: a pack file using the keys of the shape before the manifest. */
   /** Packs the owner turned off in this workspace. */
   private turnedOff: string[] = []; /** Whether this workspace holds its packs to the island rules (src/islands.ts). */ private islands = false; /** Whether this workspace has islands on: its items live on islands (src/island-items.ts). */ get onIslands() { return this.islands; }
-  /** The packs kept as items (src/pack-items.ts) by id, the pack items that are none with why, and those the owner added here. */ made = new Map<string, ItemPack>(); madeWrong = new Map<string, string>(); private madeOn = new Set<string>();
+  /** The packs kept as items (src/pack-items.ts) by id, the pack items that are none with why, and those the owner added here. */ made = new Map<string, ItemPack>(); madeWrong = new Map<string, string>(); private madeOn = new Set<string>(); /** The versions of packs kept as items, by item (src/island-pin.ts), and the one this registry runs in its pack's place. */ versions = new Map<string, PackVersion>(); private swap?: PackVersion;
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
@@ -156,7 +156,7 @@ export class Registry {
     this.where = where;
     const own = ownPack(this.localPack(), this.items, LOCAL_PACK); if (own) found.set(LOCAL_PACK, own);
     const made = madePacks(this.items, found, LOCAL_PACK); this.made = new Map(made.packs.map((p) => [p.manifest.id, p])); this.madeWrong = made.wrong;
-    for (const p of made.packs) found.set(p.manifest.id, p.manifest), hashes.set(p.manifest.id, p.hash);
+    for (const p of [...made.packs, ...(this.swap ? [{ manifest: this.swap.manifest, hash: this.swap.hash }] : [])]) found.set(p.manifest.id, p.manifest), hashes.set(p.manifest.id, p.hash); this.versions = new Map(made.versions.map((v) => [v.item, v]));
 
     // Load in dependency order what is on and has what it requires; the rest waits or is off.
     const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK && !this.made.has(id)).map((id) => [id, 'not enabled on this server']));
@@ -458,7 +458,7 @@ export class Registry {
   /** A registry like this one with these type items in place of its own: what a change that makes or changes one is checked against. */
   /** The folder a pack's files are in: where it was found, or the first folder for one not found. */
   folderOf(pack: string): string { return join(this.where.get(pack) ?? this.dir, pack); }
-  trial(items: TypeItem[], on: string[] = []): Registry { const r = new Registry(this.dirs, this.only, this.local); r.turnedOff = this.turnedOff.filter((p) => !on.includes(p)); r.madeOn = new Set([...this.madeOn, ...on]); r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
+  trial(items: TypeItem[], on: string[] = [], swap?: PackVersion): Registry { const r = new Registry(this.dirs, this.only, this.local); r.swap = swap; r.turnedOff = this.turnedOff.filter((p) => !on.includes(p)); r.madeOn = new Set([...this.madeOn, ...on]); r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
   /** Take up the types defined here by another server on the same database. Returns whether any were new. */
   followLocal(defs: TypeDef[]): boolean {
     const added = defs.filter((t) => !this.local.some((l) => l.id === t.id));

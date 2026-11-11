@@ -3,7 +3,7 @@
 
 import type { Registry, TypeDef } from './packs.ts';
 import type { Archipelago, Op } from './pelago.ts';
-import { PACK_ITEM } from './pack-items.ts';
+import { PACK_ITEM } from './pack-items.ts'; import { versionRegistry } from './island-pin.ts';
 import { LINK_ITEM, TYPE_ITEM, type TypeItem } from './type-overlay.ts';
 
 /** What the registry reads from the map: types, link types, and packs made there (src/pack-items.ts). */
@@ -77,7 +77,7 @@ export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
   const wrong = packs.flatMap((i) => (trial.madeWrong.has(i.id) ? [`the pack ${String(i.props.name ?? i.title)}: ${trial.madeWrong.get(i.id)}`] : []));
   if (wrong.length) throw new Error(`Change rejected:\n- ${wrong.join('\n- ')}`);
   // A pack made here is checked whole as if the owner had added it, so one that would not load is refused now, not when it is turned on.
-  const names = packs.filter((i) => i.is_open).map((i) => String(i.props.name));
+  const names = packs.filter((i) => i.is_open && !i.props.version_of).map((i) => String(i.props.name));
   if (names.length) {
     let added: Registry;
     try {
@@ -89,6 +89,9 @@ export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
     const refused = names.flatMap((n) => (added.states.get(n)?.state === 'off' ? [`the pack ${n} is ${added.states.get(n)!.why}`] : []));
     if (refused.length) throw new Error(`Change rejected:\n- ${refused.join('\n- ')}`);
   }
+  // A version of a pack is checked as an island would run it, so one that would not load is refused now, not when an island names it.
+  const broken = packs.filter((i) => i.is_open && i.props.version_of).flatMap((i) => { const run = versionRegistry(trial, i.id); return run instanceof Error ? [`the version ${i.title} of ${String(i.props.version_of)}: ${run.message}`] : []; });
+  if (broken.length) throw new Error(`Change rejected:\n- ${broken.join('\n- ')}`);
   // A workspace's own is named local.<name>, so a pack added later never takes its name.
   const misnamed = named.filter((i) => typeof i.props.name === 'string' && !i.props.preset && !/^local\.[a-z][a-z0-9_]*$/.test(i.props.name));
   if (misnamed.length) throw new Error(`Change rejected:\n- the types it makes or changes: ${misnamed.map((i) => `"${String(i.props.name)}" must be named "local.<name>"`).join('; ')}`);

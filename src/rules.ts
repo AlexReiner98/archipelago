@@ -288,6 +288,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   const held: Ruled[] = [];
   const spared: Ruled[] = [];
   const refused: string[] = [];
+  const refusers: Ruled[] = [];
   const title = targets[0]?.title ?? String((w as { title?: string }).title ?? '');
   const said = (rule: Rule, fallback: string) =>
     (rule.say ?? fallback).replaceAll('{title}', title).replaceAll('{pack}', who.pack ?? '').replaceAll('{type}', () => (who.pack && outsideReach(reg, who.pack, w, targets)) || (who.drawing && outsideLayout(reg, who.drawing.writes, w, targets)) || w.type || targets[0]?.type || '');
@@ -304,16 +305,16 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
     if (rule.then === 'hold') {
       // A person's own change waits for nobody; one a drawing asked for waits for that person.
       if (!who.human || (who.drawing && rule.when?.drawing)) held.push(ruled(rule));
-    } else if (rule.then === 'refuse') refused.push(said(rule, `"${title}": refused by ${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`));
+    } else if (rule.then === 'refuse') refusers.push(ruled(rule)), refused.push(said(rule, `"${title}": refused by ${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`));
     else if (typeof rule.then === 'object') {
       // A field the item's head holds (its body) is read from the op too.
       const props = { ...targets[0]?.props, ...w.props };
       const value = (f: string) => props[f] ?? (w as unknown as Record<string, unknown>)[f];
       const missing = rule.then.require.filter((f) => value(f) == null || String(value(f)).trim() === '');
-      if (missing.length) refused.push(said(rule, `"${title}": needs ${missing.join(', ')}`));
+      if (missing.length) refusers.push(ruled(rule)), refused.push(said(rule, `"${title}": needs ${missing.join(', ')}`));
     }
   }
-  return { held, spared, refused };
+  return { held, spared, refused, refusers };
 }
 
 /** What a unique rule refuses: another item of the type with the same values. `self` is the item being changed. */
@@ -392,6 +393,8 @@ export interface Verdict {
   /** Every rule that holds it. */
   held: Ruled[];
   refused: string[];
+  /** The rules that refused it, where a rule did (a clash with a unique rule names none). */
+  refusers: Ruled[];
   /** For each op, the rules it would be under but for a setting or the server that lifted them, or holds being off. */
   spared: Ruled[][];
   /** Holds are off here, and they spared it at least one rule. */
@@ -415,13 +418,13 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
     const targets = on(op).flatMap((id) => found.get(id) ?? []);
     const one = judge(rules, reg, who, op, targets, lifted);
     const passed = off ? one.held.filter((r) => !askedFor(r)) : [];
-    return { held: one.held.filter((r) => !passed.includes(r)), spared: [...one.spared, ...passed.map((r) => ({ ...r, lifted_by: HOLDS_OFF }))], passed: passed.length, refused: [...one.refused, ...(await clashes(q, reg, op, targets[0]))] };
+    return { held: one.held.filter((r) => !passed.includes(r)), spared: [...one.spared, ...passed.map((r) => ({ ...r, lifted_by: HOLDS_OFF }))], passed: passed.length, refusers: one.refusers, refused: [...one.refused, ...(await clashes(q, reg, op, targets[0]))] };
   }));
   const refused = judged.flatMap((j) => j.refused);
   const held = judged.flatMap((j) => j.held);
   const by = [...held].sort((a, b) => particular(b, rules) - particular(a, rules))[0];
   const passed = judged.some((j) => j.passed);
-  return { outcome: refused.length ? 'refuse' : held.length ? 'hold' : 'apply', by, held, refused, spared: judged.map((j) => j.spared), ...(passed && { holds_off: true as const }) };
+  return { outcome: refused.length ? 'refuse' : held.length ? 'hold' : 'apply', by, held, refused, refusers: judged.flatMap((j) => j.refusers), spared: judged.map((j) => j.spared), ...(passed && { holds_off: true as const }) };
 }
 
 /** Whether this actor may do an act that is not a change: refused, with the rule's reason, when a rule refuses it. */

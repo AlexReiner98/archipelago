@@ -5,10 +5,10 @@
 import { h } from './base.js';
 
 /** A plate: its head (a name, marks, one action), a line it says, rows of controls, and counts at its foot. */
-export function plate({ name, title, marks, action, says, rows, foot, off }) {
+export function plate({ name, title, marks, action, says, rows, foot, off, wide }) {
   return h(
     'section',
-    { class: `plate${off ? ' off' : ''}` },
+    { class: `plate${off ? ' off' : ''}${wide ? ' wide' : ''}` },
     h('div', { class: 'plate-head' }, h('span', { class: 'grow', title: title ?? '' }, h('span', { class: 'plate-name' }, name)), marks, action),
     says && h('div', { class: 'plate-says', title: says }, says),
     rows?.flat(Infinity).filter(Boolean).length > 0 && h('ul', { class: 'rows' }, rows),
