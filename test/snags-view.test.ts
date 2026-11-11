@@ -5,6 +5,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { answerRead } from '../src/packreads.ts';
 import { Registry } from '../src/packs.ts';
 import { setPack } from '../src/packstate.ts';
 import { sessionStart } from '../src/sessions.ts';
@@ -85,4 +86,24 @@ test('a touches value the snags view cannot read is refused; with refine out, no
   await setPack(l, human, { pack: 'refine', on: false });
   assert.equal((await filing('the change tool')).status, 'applied', 'the form is refine’s rule');
   await assert.rejects(callTool(l, agent, 'query', { name: 'snags' }), /No view "snags"/);
+});
+
+test('left to itself, query snags reads every type that declares touches, a bug as well as an issue', async () => {
+  const BUGS = { id: 'bugs', version: '0.1.0', title: 'Bugs', description: 'Bugs, for the snags test.', requires: ['core'], types: [{ id: 'bug', extends: 'work', title: 'Bug', description: 'A defect.', statuses: { open: ['open'], closed: ['fixed'] }, fields: { touches: { type: 'string' } } }] };
+  const l = await freshWith(new Registry(packsWith(TRACKER as never, BUGS as never)));
+  await callTool(l, human, 'init', { name: 'Alex' });
+  for (const pack of ['tracker', 'bugs', 'refine']) await setPack(l, human, { pack, on: true });
+  const { friction, bug, issue } = await make(l, [
+    { op: 'create', ref: 'friction', type: 'task', title: 'Friction' },
+    { op: 'create', ref: 'bug', type: 'bug', title: 'The packs read is huge', props: { touches: 'view:packs' } },
+    { op: 'create', ref: 'issue', type: 'issue', title: 'A note is refused', props: { touches: 'tool:change' } },
+    { op: 'link', type: 'part_of', from: 'bug', to: 'friction' },
+    { op: 'link', type: 'part_of', from: 'issue', to: 'friction' },
+  ]);
+  assert.deepEqual(await answerRead(l, { with_field: 'touches' }), ['bug', 'issue']);
+  const inside = (await callTool(l, agent, 'query', { name: 'snags', params: { within: friction } })) as Answer;
+  assert.equal(inside.open, 2, 'the task it is all part of is no snag');
+  assert.deepEqual(inside.groups.flatMap((g) => g.snags.map((s) => s.id)).sort(), [bug, issue].sort());
+  const all = (await callTool(l, agent, 'query', { name: 'snags' })) as Answer;
+  assert.deepEqual(all.groups.map((g) => g.touches).sort(), ['tool:change', 'view:packs']);
 });

@@ -8,9 +8,12 @@ import { snagsOf, touchesOf } from './snags.js';
 /** The fields of a snag the view reads. */
 const FIELDS = ['touches', 'severity'];
 
-/** The open snags: inside `within` at any depth, or else those of the types that name what they touched. */
+/** The open snags: inside `within` at any depth, or else those of the types that name what they touched. Left to
+ * itself, a snag is an open item of any type that declares touches: an issue where the map speaks work, a bug where it
+ * speaks code. */
 async function openSnags(input, ctx) {
-  const types = Array.isArray(input.types) && input.types.length ? input.types : ['issue'];
+  const types = Array.isArray(input.types) && input.types.length ? input.types : await ctx.read({ with_field: 'touches' });
+  if (!types.length) return [];
   if (input.within) return ctx.read({ scope: input.within, parts: true, open: true, types, fields: FIELDS });
   const found = [];
   for (const type of types) {

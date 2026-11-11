@@ -54,6 +54,8 @@ export type Read = {
   params?: Record<string, unknown>;
   /** What a type is: its statuses, whether a person settles it (a question) and how, and whether it is estimated, so a handler need not know it. */
   type_info?: string;
+  /** The live types that declare this field, by id, so a handler can find what carries a field without naming types. */
+  with_field?: string;
   /** Who the answer is for: the person asking, else the workspace's owner. */
   me?: boolean;
   /** Whether a change with this op is waiting for a person already. */
@@ -187,12 +189,16 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
   if (q.type_info !== undefined) {
     const t = l.registry.type(q.type_info);
     // lives_in: the link that puts an item in a place of this type.
-    return t ? { id: t.id, is: t.lineage, statuses: t.statuses, settles: l.registry.having('settles').includes(t.id), settled_by: t.capabilities.settles?.by ?? null, estimated: Boolean(t.fields.tokens_estimated), lives_in: livesInFor(l, t.id) } : null;
+    return t ? { id: t.id, is: t.lineage, statuses: t.statuses, settles: l.registry.having('settles').includes(t.id), settled_by: t.capabilities.settles?.by ?? null, estimated: Boolean(t.fields.tokens_estimated), lives_in: livesInFor(l, t.id), fields: Object.keys(t.fields) } : null;
+  }
+  if (q.with_field !== undefined) {
+    if (typeof q.with_field !== 'string' || !q.with_field) throw new Error('with_field is a field name');
+    return [...l.registry.types.values()].filter((t) => !t.dormant && q.with_field! in t.fields).map((t) => t.id).sort();
   }
   if (q.me) return l.viewer || (await l.setting<string>('me')) || null;
   if (q.proposed !== undefined) {
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, packs, view, type_info, me, proposed.');
+  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, packs, view, type_info, with_field, me, proposed.');
 }
