@@ -1,0 +1,37 @@
+/* A baked home view's page (packs/reader/bake.js): the site's name and its one button over the walk, the view's title
+   above it (the band a part above the rails goes in), the footer below. Every length and colour is the style's. */
+
+body.baked { margin: 0; background: var(--ln-sea); color: var(--ln-text); font-family: var(--ln-font, system-ui, sans-serif); }
+.baked a { color: inherit; }
+.site-head {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between;
+  padding: var(--ln-rails-card-inset); pointer-events: none;
+}
+.site-head a { pointer-events: auto; }
+.site-name { font-weight: 600; text-decoration: none; }
+.start {
+  padding: calc(var(--ln-rails-card-pad) / 2) var(--ln-rails-card-pad); border-radius: var(--ln-rails-corner);
+  background: var(--ln-accent); color: var(--ln-sea) !important; font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+/* The band above the walk: a hero picture across it, then the view's title and any words, a card wide. */
+.lead { padding: calc(var(--ln-rails-card-inset) * 4) var(--ln-rails-card-inset) var(--ln-rails-card-inset); display: grid; gap: var(--ln-rails-card-pad); }
+.lead-words { max-width: var(--ln-rails-card-width); margin: 0; }
+.lead-words > :first-child { margin-top: 0; }
+.lead h1 { font-size: var(--ln-rails-card-title); }
+.lead h1.said { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.lead p { color: var(--ln-muted); font-size: var(--ln-rails-card-text); }
+.hero { margin: 0 calc(0px - var(--ln-rails-card-inset)); }
+.hero img { display: block; width: 100%; height: auto; max-height: var(--ln-rails-hero-most); object-fit: contain; }
+.hero figcaption { margin-top: calc(var(--ln-rails-card-pad) / 2); color: var(--ln-muted); font-size: var(--ln-rails-count-text); }
+.baked .rails { padding: 0 var(--ln-rails-card-inset); }
+.baked .rails[data-rails="walk"] { padding: 0; }
+.site-foot { padding: var(--ln-rails-card-inset); color: var(--ln-muted); font-size: var(--ln-rails-count-text); max-width: var(--ln-rails-card-width); }
+
+/* The map's colours read from the page's, as a picture in a published document reads them (ui/doc-lens.css), on the
+   ground a published page stands on (--reader-page), which a hero's own ground is drawn to match (the ridges kit). */
+body.baked {
+  --ln-sea: var(--reader-page, var(--bg)); --ln-land: var(--panel); --ln-inner: var(--reader-page, var(--bg)); --ln-line: var(--reader-line, var(--edge));
+  --ln-text: var(--reader-ink, var(--text)); --ln-muted: var(--reader-muted, var(--muted));
+  --ln-blocked: var(--g-blocked); --ln-you: var(--g-question); --ln-session: var(--accent); --ln-done: var(--ok); --ln-warn: var(--warn); --ln-accent: var(--accent);
+  --ln-font: var(--face-text);
+}

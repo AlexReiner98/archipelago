@@ -5,7 +5,7 @@
   "description": "What anyone reads with no login: a public view at /p/<workspace>/<id>, and a workspace's site at a domain of its own, drawn from its public views alone.",
   "reach": {
     "server": {
-      "acts": ["public.read", "public.at", "public.picture", "public.drawing", "public.list", "count.add"],
+      "acts": ["public.read", "public.at", "public.picture", "public.drawing", "public.list", "public.baked", "count.add"],
       "counts": "visits",
       "entries": [
         { "id": "page", "description": "A public view's page, data, pictures, drawings and stream, at /p/.", "answers": "html" },
