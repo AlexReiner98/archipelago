@@ -3,11 +3,11 @@
 // on "published" is told when that document is published again, and nothing more. Pack code never holds a connection:
 // the kernel answers the route itself, and closes the pack's streams when the pack goes (closeStreams).
 //
-// Only a published document is listened to, read as anyone reads it (publishedDocument): what is private, or not
+// Only a public view is listened to, read as anyone reads it (publicView): what is private, or not
 // published, has no stream, the same 404 as nothing at all.
 
 import type { ServerResponse } from 'node:http';
-import { publishedDocument } from './published.ts';
+import { publicView } from './public-view-store.ts';
 import { closePackListeners, listenForPack } from './published-live.ts';
 import { json, PRIVATE } from './reply.ts';
 import type { ActPlaces } from './server-acts.ts';
@@ -27,7 +27,7 @@ export async function serveStream(res: ServerResponse, pack: ServerPackFile, str
   const declared = pack.reach.server.streams?.find((s) => s.id === stream);
   if (declared?.on !== 'published' || !at.workspaces || !(await at.workspaces.has(at.workspace).catch(() => false))) return none();
   const { pelago } = await at.workspaces.get(at.workspace);
-  if (!(await publishedDocument(pelago, at.id))) return none();
+  if (!(await publicView(pelago, at.id))) return none();
   return listenForPack(res, pack.id, at.workspace, at.id, PRIVATE, at.from);
 }
 

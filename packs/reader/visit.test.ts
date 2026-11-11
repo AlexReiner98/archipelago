@@ -11,7 +11,7 @@ const TEMPLATE = '<html><head><title>Document</title></head><body><main id="main
 const D = 'e_doc00001';
 const home = { id: D, title: 'Home', path: 'home', parts: [{ text: 'Words.' }] };
 const act = async (name: string, input: Record<string, unknown>) =>
-  name === 'site.pages' ? [] : name === 'published.at' ? (input.path === 'home' ? home : null) : name === 'published.read' ? (input.id === D ? home : null) : null;
+  name === 'public.list' ? [] : name === 'public.at' ? (input.path === 'home' ? home : null) : name === 'public.read' ? (input.id === D ? home : null) : null;
 const ask = (query = '', more: Record<string, string> = {}) => ({ query, host: 'site.example', referrer: '', agent: BROWSER, purpose: '', ...more });
 
 test('a reader is a browser, not a bot or a page fetched ahead', () => {
@@ -51,6 +51,19 @@ test("a site's page read by a reader with a tag is a visit, counted under it; no
   assert.equal(await visit('/', ask()), null, 'no tag, no count');
   assert.equal(await visit('/', ask('', { referrer: 'https://news.ycombinator.com/item?id=1' })), 'ycombinator');
   assert.equal(visitOf(parts('/'), { status: 404, html: '<p>no</p>' }), null, 'a page not found');
+});
+
+test('a public view at /p/ read by a reader with a tag is a visit too, counted on its site', async () => {
+  const { default: handler } = await import('./handler.js');
+  const counted: Record<string, unknown>[] = [];
+  const ctx = { act: async (name: string, input: Record<string, unknown>) => (name === 'count.add' ? void counted.push(input) : act(name, input)) };
+  await handler.page({ workspace: 'acme', id: D, domain: 'site.example', request: ask('ref=launch', { host: 'app.example' }) }, ctx);
+  assert.deepEqual(counted, [{ site: 'site.example', key: 'launch' }]);
+  await handler.page({ workspace: 'acme', id: D, domain: 'site.example', request: ask('', { host: 'app.example' }) }, ctx);
+  await handler.page({ workspace: 'acme', id: D, request: ask('ref=launch', { host: 'app.example' }) }, ctx);
+  assert.equal(counted.length, 1, 'no tag, or a workspace with no site to count on: nothing counted');
+  await handler.site({ workspace: 'acme', path: '/', host: 'site.example', request: ask('ref=post') }, ctx);
+  assert.deepEqual(counted.at(-1), { site: 'site.example', key: 'post' }, 'and its site, as before');
 });
 
 test("a page's data carries the tag its reader came by, for its links to the site; with none, nothing", async () => {

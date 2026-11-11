@@ -50,9 +50,10 @@ on load in `src/server-reach.ts` and acted on by the kernel alone:
 | `launchers` | Starts an agent with its argv (no shell; `{prompt}`, `{mcp_config}`, `{tools}`, `{model}`, `{mode}`, `{session_id}`), holding its token, when a person launches and the server's launch setting names the pack (PELAGO_LAUNCH_PACK; by default `claude_code`, which the open core ships in `packs/claude_code` with the Claude Code adapter and setup) (decision e_885ztqkv, `src/server-launch.ts`). |
 | `adapter` | Translates one surface's hooks, at `/hooks/<surface>/<event>`, with two functions of its handler, `in` and `out`; what a session is told stays the kernel's (decision e_6t8f46u6, `src/server-adapter.ts`). |
 
-Acts `published.read`, `published.at`, `published.picture`, `published.drawing`
-and `site.pages` read what a person published, through the security-definer
-reads alone (`src/server-published.ts`). A server pack still reads no map.
+Acts `public.read`, `public.at`, `public.picture`, `public.drawing` and
+`public.list` read the public views a person made (`src/public-view.ts`), each
+as it was frozen, through the security-definer reads alone
+(`src/server-published.ts`). A server pack still reads no map.
 
 ## The keys before
 

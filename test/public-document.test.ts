@@ -85,8 +85,8 @@ test('a document a human makes public is read by anyone at its own address, with
   const { pelago } = await workspaces.get('default');
   assert.equal(await publicDocument(pelago, q), null);
 
-  // Once it is not public, its address is gone again.
-  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: d, visibility: 'shared' }] });
+  // Taken down, its address is gone again.
+  await call('/api/unpublish', undefined, { id: d });
   assert.equal((await fetch(`${base}/p/default/${d}`)).status, 404);
   assert.equal((await fetch(`${base}/p/default/${d}/data`)).status, 404);
   assert.equal((await fetch(`${base}/p/default/${d}/picture/${s}`)).status, 404);

@@ -1,4 +1,4 @@
-// The reader, run without a database: the parts of an address and what the published acts give go in, what the
+// The reader, run without a database: the parts of an address and what the public acts give go in, what the
 // kernel is to send comes out. The acts are a table here.
 
 import assert from 'node:assert/strict';
@@ -8,7 +8,8 @@ import { pageOf, siteOf } from './reader.js';
 
 const TEMPLATE = '<html><head><meta name="robots" content="noindex" />\n<title>Document</title></head><body><main id="main"><p>Loading…</p></main><script type="module" src="/doc.js"></script></body></html>';
 const HASH = 'a'.repeat(64);
-const D = 'e_doc00001', HOMEID = 'e_home0001', SEC = 'e_sec00001';
+const D = 'e_doc00001', HOMEID = 'e_home0001', SEC = 'e_sec00001', VIEW = 'e_view0001';
+const view = { id: VIEW, title: 'The roadmap', path: null, parts: [{ section: { id: VIEW, title: 'The roadmap', body: '' } }], lenses: { [VIEW]: { items: [] } } };
 
 const lens = (at: string) => ({ [SEC]: { style: { drawing: { id: 'flow', title: 'Flow', hash: HASH, src: `${at}/drawing/${HASH}` } } } });
 const doc = { id: D, title: 'About <us>', path: 'about', share: SEC, parts: [{ text: 'The first words.' }, { section: { id: SEC, title: 'A figure', picture: true, body: '' } }], lenses: lens(`/p/acme/${D}`) };
@@ -18,6 +19,7 @@ const pages = [
   { id: HOMEID, title: 'Home', path: 'home', menu: 0, published_at: '2026-11-01T00:00:00Z' },
   { id: D, title: 'About', path: 'about', menu: 1, published_at: '2026-11-02T00:00:00Z' },
   { id: 'e_foot0001', title: 'Footer', path: 'footer', menu: null, published_at: '2026-11-03T00:00:00Z' },
+  { id: VIEW, title: 'The roadmap', path: null, menu: null, published_at: '2026-11-04T00:00:00Z' },
 ];
 
 /** The acts as the kernel answers them for the workspace acme, each asked of it kept in asked. */
@@ -25,12 +27,12 @@ function acts() {
   const asked: [string, Record<string, unknown>][] = [];
   const act = async (name: string, input: Record<string, unknown>) => {
     asked.push([name, input]);
-    if (input.workspace !== 'acme') return name === 'site.pages' ? [] : null;
-    if (name === 'published.read') return input.id === D ? doc : null;
-    if (name === 'published.at') return ({ about: doc, home, footer } as Record<string, unknown>)[input.path as string] ?? null;
-    if (name === 'site.pages') return pages;
-    if (name === 'published.picture') return input.section === SEC ? { content_type: 'image/png', base64: 'AAAA' } : null;
-    if (name === 'published.drawing') return input.hash === HASH ? { 'entry.js': 'export const picture = () => null;' } : null;
+    if (input.workspace !== 'acme') return name === 'public.list' ? [] : null;
+    if (name === 'public.read') return ({ [D]: doc, [VIEW]: view } as Record<string, unknown>)[input.id as string] ?? null;
+    if (name === 'public.at') return ({ about: doc, home, footer } as Record<string, unknown>)[input.path as string] ?? null;
+    if (name === 'public.list') return pages;
+    if (name === 'public.picture') return input.section === SEC ? { content_type: 'image/png', base64: 'AAAA' } : null;
+    if (name === 'public.drawing') return input.hash === HASH ? { 'entry.js': 'export const picture = () => null;' } : null;
     throw new Error(`no act ${name}`);
   };
   return { act, asked };
@@ -95,6 +97,12 @@ test('a site: its front page at /, each page at its word, its figures, drawings,
   assert.equal(map.type, 'application/xml');
   assert.match(map.text, /<loc>https:\/\/acme.example\/<\/loc><lastmod>2026-11-01<\/lastmod>/);
   assert.doesNotMatch(map.text, /footer/);
+  // Every public view is in it: one with no address word at its own address on the site's domain, read there too.
+  assert.match(map.text, /<loc>https:\/\/acme.example\/p\/acme\/e_view0001<\/loc><lastmod>2026-11-04<\/lastmod>/);
+  const roadmap = (await at(`/p/acme/${VIEW}`)) as { html: string };
+  assert.match(roadmap.html, /canonical" href="https:\/\/acme.example\/p\/acme\/e_view0001"/);
+  assert.equal(((await at(`/p/acme/${VIEW}/data`)) as { json: { title: string } }).json.title, 'The roadmap');
+  assert.deepEqual(await at(`/p/other/${VIEW}`), { pass: true }, "another workspace's view is not this site's");
   // An address no published page has is not the site's.
   for (const path of ['/nothing', '/doc.js', '/a/b/c/d', '/about/else/x', '/about/data/x']) assert.deepEqual(await at(path), { pass: true }, path);
 });
@@ -102,9 +110,9 @@ test('a site: its front page at /, each page at its word, its figures, drawings,
 test('a page with no share of its own on a site shows its front page figure; with no front page, / says so', async () => {
   const { act } = acts();
   const plain = { ...doc, parts: [{ text: 'Words.' }] };
-  const only = async (name: string, input: Record<string, unknown>) => (name === 'published.at' && input.path === 'about' ? plain : act(name, input));
+  const only = async (name: string, input: Record<string, unknown>) => (name === 'public.at' && input.path === 'about' ? plain : act(name, input));
   assert.match(((await siteOf({ workspace: 'acme', path: '/about', host: 'acme.example' }, only, TEMPLATE)) as { html: string }).html, /og:image" content="https:\/\/acme.example\/picture\/e_sec00001"/);
-  const empty = async (name: string) => (name === 'site.pages' ? [] : null);
+  const empty = async (name: string) => (name === 'public.list' ? [] : null);
   assert.deepEqual(await siteOf({ workspace: 'acme', path: '/', host: 'acme.example' }, empty, TEMPLATE), { status: 404, text: 'This site has no front page yet.', type: 'text/plain' });
 });
 
