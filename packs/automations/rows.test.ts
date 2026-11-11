@@ -45,10 +45,10 @@ test('each row is its head and three marks: next, last, what it does; soonest fi
   const rows = rowsOf(items, { spans, fired: new Map(), now: NOW, zone: ZONE });
   assert.deepEqual(rows.map((r) => r.id), ['e_soon', 'e_late', 'e_pause']);
   const [soon, late, paused] = rows;
-  assert.deepEqual(soon.marks.map((m) => m.text), ['Thu 08:00', '✓', '✉ notify']);
+  assert.deepEqual(soon.marks.map((m) => m.text), ['Thu 08:00', '✓', '✉']);
   assert.equal(soon.marks[1].ago, '2026-11-11T13:00:00Z');
   assert.equal(soon.marks[1].tone, 'ok');
-  assert.deepEqual(late.marks.map((m) => m.text), ['Mon 09:30', '·', '▶ launch']);
+  assert.deepEqual(late.marks.map((m) => m.text), ['Mon 09:30', '·', '▶']);
   assert.equal(paused.marks[0].text, '—', 'a paused one has no next run');
   assert.equal(paused.status, 'paused');
 });

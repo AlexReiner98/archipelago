@@ -44,8 +44,8 @@ export function lastOf(item, fired) {
   return { at: p.last_fired, ok: !/^fail/i.test(result), said: result.replace(/^(ok|failed):\s*/i, '') };
 }
 
-/** What an automation does, as a mark: notify or launch, the field's own word. */
-const doesMark = (action) => ({ text: action === 'launch' ? '▶ launch' : action === 'tool' ? '⚙ tool' : '✉ notify', tip: action === 'launch' ? 'Starts a session on a task' : action === 'tool' ? 'Calls a tool' : 'Tells a person' });
+/** What an automation does, as a mark: a glyph alone, so the name keeps the row's width; the word is in its tooltip. */
+const doesMark = (action) => (action === 'launch' ? { text: '▶', tip: 'Launch: starts a session on a task' } : { text: '✉', tip: 'Notify: tells a person' });
 
 /** One automation's row: its head, and its marks for next run, last firing and what it does. */
 export function rowOf(item, { spans, fired, now, zone }) {
