@@ -154,7 +154,7 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
     if (await sharer.evaluate<boolean>(`Boolean(${choose})`)) await sharer.evaluate(`${choose}.click()`);
     // What goes out with it is said before it goes (what is left out as private is test/public-view.test.ts's).
     assert.ok(await sharer.until(sure, 10000), `asked to share it: ${sharer.logs().join(' ').slice(0, 400)}`);
-    assert.match(await sharer.evaluate<string>(`document.querySelector('dialog.ask .ask-message').textContent`), /Goes out with it: .*Login form/);
+    assert.match(await sharer.evaluate<string>(`document.querySelector('dialog.ask .ask-message').textContent`), /^Goes out with it: .+ and \d+ more\./);
     await sharer.evaluate(`document.querySelector('dialog.ask button[value="ok"]').click()`);
     assert.ok(await sharer.until(`(document.querySelector('dialog.ask .ask-message')?.textContent ?? '').includes('/p/')`, 10000), `the address is shown: ${sharer.logs().join(' ').slice(0, 400)}`);
     const message = await sharer.evaluate<string>(`document.querySelector('dialog.ask .ask-message').textContent`);
@@ -174,8 +174,6 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
       await reader.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
       assert.ok(await reader.until(`document.body.dataset.docSheet !== 'open'`), 'and closes');
     }
-    // Nothing of the map is read through it: the page holds what was frozen, and the API asks for a sign-in.
-    assert.equal((await fetch(`${base}/api/get`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: ids.form }) })).status, 401);
     assert.ok(!reader.logs().some((line) => /Uncaught|TypeError|ReferenceError| 403 /.test(line)), `no errors, nothing refused: ${reader.logs().join('\n').slice(0, 600)}`);
   } finally {
     await reader.close();

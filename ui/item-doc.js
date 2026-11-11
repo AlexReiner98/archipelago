@@ -18,7 +18,7 @@ export const figureOf = (s, cls = 'doc-figure') => {
   return img;
 };
 
-const names = (list) => `${list.slice(0, 6).map((i) => i.title).join(', ')}${list.length > 6 ? ` and ${list.length - 6} more` : ''}`;
+const names = (list) => `${list.slice(0, 3).map((i) => i.title).join(', ')}${list.length > 3 ? ` and ${list.length - 3} more` : ''}`;
 
 /**
  * Share an item: its public view, frozen now. What goes out with it and what stays out as private are said first, so
