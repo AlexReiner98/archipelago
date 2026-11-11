@@ -4,6 +4,7 @@
   "title": "Refine",
   "description": "How the harness refines itself: snags read by what they touched, so a refiner can propose a pack change for what keeps getting in the way. A snag names what it touched in touches, a field each snag's type declares in its own pack (an issue's, in the work pack).",
   "requires": ["core"],
+  "uses": ["replays"],
   "rules": [
     {"id": "touches_form", "when": {"op": ["create", "update"], "matches": {"touches": "^(?!\\s*(?:pack|instruction|tool|rule|view|hook|page):[^\\s,]+(?:[\\s,]+(?:pack|instruction|tool|rule|view|hook|page):[^\\s,]+)*\\s*$)"}}, "then": "refuse", "say": "\"{title}\": touches names what a snag touched as kind:ref, separated by spaces: pack:<id>, instruction:<id>, tool:<name>, rule:<id>, view:<name>, hook:<event> or page:<name>."}
   ],
@@ -23,6 +24,42 @@
       }
     }
   ],
+  "actions": [
+    {
+      "id": "refine.replay_freeze",
+      "title": "Hold briefs for a replay",
+      "description": "Hold the briefs of 5 to 10 finished tasks on a replay set (the replays pack's), so they run again under another pack version and are compared like with like. Names a set to add to, or a title for a new one; a task the set holds keeps its brief.",
+      "verb": "capture",
+      "input": {
+        "type": "object",
+        "properties": {
+          "set": { "type": "string", "description": "The replay set to add to. Left out, a new one is made." },
+          "title": { "type": "string", "maxLength": 60, "description": "A new set's title." },
+          "tasks": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 10, "description": "Finished tasks, by id, each in a repository with a local path." }
+        },
+        "required": ["tasks"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "refine.replay",
+      "title": "Replay a set",
+      "description": "Run every held brief of a replay set again, each a session on this machine, under the pack version named (<pack>@<version>, the one this map runs). Each run names the set and the version, so two versions' runs are told apart. A person's action: it starts sessions.",
+      "verb": "assign",
+      "input": {
+        "type": "object",
+        "properties": {
+          "set": { "type": "string", "description": "The replay set." },
+          "version": { "type": "string", "description": "The pack version it runs under, as <pack>@<version>: refused where this map runs another." },
+          "mode": { "type": "string", "enum": ["plan", "acceptEdits"], "description": "plan (the default): read and investigate only. acceptEdits: may edit files in the repository." },
+          "instructions": { "type": "string", "description": "Anything to add to every brief." }
+        },
+        "required": ["set", "version"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "reach": { "launch": 10 },
   "styles": [
     { "id": "refine.touches", "type": "instruction", "title": "Say what a bump touched", "body": "A bump is recorded as an issue part_of the friction feature (search type feature, q friction). Put what it touched in its touches: one or more of pack:<id>, instruction:<id>, tool:<name>, rule:<id>, view:<name>, hook:<event> or page:<name>, separated by spaces. A refusal names its rule, so rule:<that id>. The snags view groups bumps by it.", "props": { "for": ["session_start"], "order": 31 } }
   ]
