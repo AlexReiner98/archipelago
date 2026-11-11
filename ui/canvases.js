@@ -168,7 +168,7 @@ async function shareGuest(kept) {
   const email = await ask({ title: `Share “${kept.title}” with a guest`, input: { placeholder: 'Their email address' }, action: 'Invite' });
   if (!email) return;
   const made = await api('share_guest', { id: kept.id, email });
-  tell(made.invited ? 'Invited' : 'Shared, not sent', made.invited ? `${made.email} can read this view as it changes.` : `${made.email} can read it once signed in. The invitation was not sent: ${made.error}`);
+  tell(made.invited ? 'Invited' : 'Shared, not sent', made.invited ? `${made.email} can read this view as it changes. Not there? The invitation may be in spam or junk.` : `${made.email} can read it once signed in. The invitation was not sent: ${made.error}`);
 }
 
 /** Delete a saved canvas, after asking: it is retired (a lens's closed status), so it leaves the bar and Home and can
