@@ -56,7 +56,7 @@ async function route(pulse = false) {
     if (!state.schema) await loadSchema();
     // What this session may do, before anything is drawn: each control is drawn only where it may (ui/base.js may).
     await loadMay();
-    // A guest (signed in to read what was shared with them) has no map of their own either: shown the same way to one.
+    // One signed in who only reads has no map of their own to change either: shown the same way to one.
     if (!may('write')) startOwn();
   } catch (err) {
     document.body.dataset.sheet = 'open';
@@ -123,8 +123,8 @@ window.addEventListener('beforeunload', (e) => {
 if (linked !== 'gate') route();
 
 /**
- * Someone reading what was shared with them is shown a way to start a map of their own, loud, in the bar: a guest
- * (signed in already) by the menu. The
+ * Someone reading what was shared with them is shown a way to start a map of their own, loud, in the bar: a member
+ * who only reads (signed in already) by the menu. The
  * words the style gives (start, core's house style), to where this server says a person with no account begins.
  */
 async function startOwn() {

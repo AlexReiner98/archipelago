@@ -15,8 +15,8 @@ import { FORMER_NAMES, REPORT_TOOLS } from './report.ts';
 import { TOKEN_TOOLS } from './token-tools.ts';
 import { ASK_TOOLS } from './token-ask.ts';
 import { CONNECTION_TOOLS } from './connection-tools.ts';
-import { GUEST_READS, GUEST_TOOLS } from './guests.ts';
 import { wholeMap } from './outbox.ts';
+import { LOOK_READS } from './looks.ts';
 import type { Registry } from './packs.ts';
 import { packActionByShort, packTool, packTools } from './packtools.ts';
 import { took } from './presence.ts';
@@ -50,6 +50,8 @@ export interface Tool {
 /** Tools that are no step of their own: those that point the screen themselves, and the one that only waits. */
 const UNWATCHED = new Set(['show', 'change', 'tell', 'watch', 'hook']);
 const READS = new Set(['get', 'events', 'proposals', 'picture', 'schema']);
+/** What a member who only reads may call (src/members.ts): the reads a canvas makes, the page's feed of the log, query, and the workspace's settings. Their database writes nothing besides (src/db.ts). */
+const MEMBER_READS = new Set([...LOOK_READS, 'tail', 'query', 'workspace_info']);
 async function step(l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>): Promise<void> {
   const params = (input.params ?? {}) as Record<string, unknown>;
   // A session saying only that it is alive has done nothing to see.
@@ -72,7 +74,7 @@ async function step(l: Archipelago, actor: Actor, name: string, input: Record<st
 export const TOOLS: Record<string, Tool> = {
   ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...HOOK_TOOLS, ...HUMAN_TOOLS,
   ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
-  ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS, ...WORKSPACE_TOOLS, ...CONNECTION_TOOLS, ...GUEST_TOOLS,
+  ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS, ...WORKSPACE_TOOLS, ...CONNECTION_TOOLS,
 };
 
 /** The view tool as a registry offers it: described with the lenses its core pack declares, then the kernel's own views. */
@@ -122,7 +124,7 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
   if (!tool) throw new Error(`No tool "${name}". Tools: ${(actor.kind === 'human' ? toolsFor(l.registry) : surfaceFor(l.registry)).map(([t]) => t).join(', ')}`);
   if (tool.devOnly && !devMode()) throw new Error(`"${name}" is available only in dev mode (npm run dev).`);
   if (tool.humanOnly && actor.kind !== 'human') throw new Error(`"${name}" is for humans only.`);
-  if (actor.may === 'read' && !GUEST_READS.has(name)) throw new Error(`A guest reads the view shared with them: they cannot call ${name}.`);
+  if (actor.may === 'read' && !MEMBER_READS.has(name)) throw new Error(`This sign-in only reads the map: it cannot call ${name}.`);
   if (actor.may === 'report' && !tool.report) throw new Error(`This token may only report: it cannot call ${name}. Send what was measured with report.`);
   const parsed = z.strictObject(tool.input).safeParse(routed ? routed.input : (input ?? {}));
   if (!parsed.success) throw new Error(`Invalid input for ${name}:\n${z.prettifyError(parsed.error)}`);

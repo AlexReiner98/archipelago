@@ -12,8 +12,8 @@ export type PageMay = 'read' | 'write' | 'admin';
  * (?may=read), honoured only there, and only ever narrower than the session.
  */
 export function pageMay(actor: Actor, look: boolean, narrow?: string | null): PageMay[] {
-  // A guest (actor.reads) only reads, whatever its token says. A token that only reports, or a kind of `may` this module does not know, writes nothing from the page.
-  const writes = !look && !actor.reads && (actor.may === undefined || actor.may === 'change' || actor.may === 'propose');
+  // A member who only reads (may 'read', src/members.ts) reads, whatever their token says. A token that only reports, or a kind of `may` this module does not know, writes nothing from the page.
+  const writes = !look && (actor.may === undefined || actor.may === 'change' || actor.may === 'propose');
   const all: PageMay[] = ['read', ...(writes ? (['write'] as const) : []), ...(writes && actor.admin ? (['admin'] as const) : [])];
   if (!narrow) return all;
   const asked = new Set(narrow.split(',').map((s) => s.trim()));

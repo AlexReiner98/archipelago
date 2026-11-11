@@ -87,17 +87,6 @@ export async function readDocument(l: Archipelago, id: string) {
   return { id: doc.id, type: doc.type, title: doc.title, status: doc.status, for: doc.props.for ?? null, fields: shownOf(l, doc.type, doc.props), updated_at: doc.updated_at, parts: assemble(doc.body, items), ...(notInside.length && { not_inside: notInside }) };
 }
 
-/** Stop a share from working: a guest's (src/guests.ts), by its id. */
-export async function revokeShare(l: Archipelago, actor: Actor, share: string) {
-  return l.db.transaction(async (tx: Q) => {
-    const { rows } = await tx.query<{ entity_id: string }>(`update share set revoked_at = now() where id = $1 and revoked_at is null returning entity_id`, [share]);
-    if (!rows.length) throw new Error(`No standing share "${share}"`);
-    const [r] = rows;
-    await l.log(tx, { actor: `${actor.kind}:${actor.name}`, action: 'share.revoke', target: r.entity_id, reason: 'A share to read it was revoked', detail: { share } });
-    return { revoked: share, document: r.entity_id };
-  });
-}
-
 /** A document read from outside the map, as the database gave it: the document and the items it brings in. */
 export interface Given {
   id: string;

@@ -2,7 +2,7 @@
 // a person, and publishing a document. Links with a secret went with public views (the owner, 11 Nov 2026).
 
 import { z } from 'zod';
-import { readDocument, revokeShare } from './documents.ts';
+import { readDocument } from './documents.ts';
 import { share, shareAsk, sharedViews, sharePlan, unshare } from './public-view.ts';
 import { picturesOf, publish, publishAll, publishAsk, publishedState, publishPlan, unpublish } from './published.ts';
 import type { Tool } from './tools.ts';
@@ -48,10 +48,10 @@ export const SHARE_TOOLS: Record<string, Tool> = {
     run: async (l, _actor, input) => sharedViews(l, input.id),
   },
   share_revoke: {
-    description: 'Take a public view down, at once: its address answers nothing, and the item itself is left as it is. Given a guest’s share (from share_guest), it ends that instead.',
+    description: 'Take a public view down, at once: its address answers nothing, and the item itself is left as it is.',
     humanOnly: true,
-    input: { id: z.string().describe('The item whose public view to take down, or a guest’s share.') },
-    run: async (l, actor, input) => (input.id.startsWith('e_') ? unshare(l, actor, input.id) : revokeShare(l, actor, input.id)),
+    input: { id: z.string().describe('The item whose public view to take down.') },
+    run: async (l, actor, input) => unshare(l, actor, input.id),
   },
   share_ask: {
     description: 'Ask the person to make a view, document or item public: they are notified about it, and share it from its page. Sharing is theirs; this never shares.',

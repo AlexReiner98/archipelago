@@ -148,13 +148,13 @@ export async function rotateGrant(db: Q, workspace: string, refresh: string, cli
  * The first place a token is used is not news.
  */
 export async function verifyToken(db: Db, token: string, from?: string, ws = 'default'): Promise<Identity | undefined> {
-  const { rows } = await db.query<{ id: string; hash: string; kind: 'human' | 'agent'; name: string; entity_id: string | null; admin: boolean; within: string[] | null; may: May; seen: string[] | null; last_used: Date | null; hosted: boolean; reads: string | null }>(
+  const { rows } = await db.query<{ id: string; hash: string; kind: 'human' | 'agent'; name: string; entity_id: string | null; admin: boolean; within: string[] | null; may: May; seen: string[] | null; last_used: Date | null; hosted: boolean; read_only: boolean }>(
     // A person merged into another acts as that other: their sign-ins and tokens follow the merge.
     `select id, hash, kind, name, coalesce((select f.value #>> '{}' from log_fact f join entity e on e.id = f.id and e.archived_at is not null
        where f.stream = 'facts' and f.id = t.entity_id and f.field = 'merged_into' order by f.pos desc limit 1 -- index log_fact_history
      ), entity_id) as entity_id, admin, within, coalesce(may, 'change') as may, seen, last_used, granted is not null as hosted,
-       -- A guest's token, whatever made it, reads only the view shared with them (src/guests.ts).
-       (select m.reads from member m where m.person_id = t.entity_id and m.removed_at is null and m.reads is not null limit 1) as reads
+       -- A member who only reads: every token tied to them reads, their agents' too (src/members.ts).
+       exists (select 1 from member m where m.person_id = t.entity_id and m.removed_at is null and m.read_only) as read_only
      from token t where hash = $1 and revoked_at is null and (expires_at is null or expires_at > now())`,
     [hash(token)],
   );
@@ -168,7 +168,7 @@ export async function verifyToken(db: Db, token: string, from?: string, ws = 'de
   // Its use is in the access stream at most once an hour: how recently, not every request.
   if (!row.last_used || Date.now() - new Date(row.last_used).getTime() >= 3600_000) await db.transaction((tx) => record(tx, ws, 'access', row.id, [['+', row.id, 'last_used', new Date().toISOString()]]));
   return {
-    actor: { kind: row.kind, name: row.name, person: row.entity_id ?? undefined, admin: row.admin && !row.reads, token: row.id, ...(row.within?.length && { within: row.within }), ...(row.may !== 'change' && { may: row.may }), ...(row.reads && { reads: row.reads, may: 'read' as const }) },
+    actor: { kind: row.kind, name: row.name, person: row.entity_id ?? undefined, admin: row.admin && !row.read_only, token: row.id, ...(row.within?.length && { within: row.within }), ...(row.may !== 'change' && { may: row.may }), ...(row.read_only && { may: 'read' as const }) },
     // A client a person allowed may call from many addresses of its host's: a new one says nothing.
     ...(fresh && seen.length > 0 && !row.hosted && { newPlace: place }),
   };

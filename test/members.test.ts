@@ -128,6 +128,43 @@ test('an admin changes a member’s standing or removes them, and their sign-ins
   assert.deepEqual((await call('/api/member_list', alex)).result, []);
 });
 
+test('a member who only reads sees what any member sees, the database refuses their writes, and an admin switches them', async () => {
+  const { workspaces, call, member } = await serve('tokens');
+  const ws = await workspaces.get('default');
+  const alex = (await createToken(ws.pelago.db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
+  const shown = (await call('/api/change', alex, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: 'Shared work', visibility: 'shared' }] })).result.created.t as string;
+  assert.match((await call('/api/member_add', alex, { email: 'no@example.com', admin: true, read_only: true })).error, /cannot be an admin/);
+  const rosa = await member(alex, { email: 'rosa@example.com', name: 'Rosa', read_only: true });
+  const person = ((await call('/api/member_list', alex)).result as any[]).find((m) => m.email === 'rosa@example.com');
+  assert.equal(person.read_only, true, 'listed as one who only reads');
+
+  const who = await call('/whoami', rosa, undefined, 'GET');
+  assert.deepEqual([who.may, who.actor.may, who.actor.admin], [['read'], 'read', false], 'the page draws no control that writes');
+  assert.equal((await call('/api/get', rosa, { id: shown })).result.entity.title, 'Shared work', 'they read what any member reads, with no reach of their own');
+  assert.equal((await call('/api/tail', rosa, {})).status, 200, 'and follow the log as the page does');
+  assert.match((await call('/api/change', rosa, { reason: 'test', ops: [{ op: 'update', id: shown, title: 'Mine now' }] })).error, /only reads/);
+  const robot = (await createToken(ws.pelago.db, 'default', { kind: 'agent', name: 'rosa’s robot', entity: person.person_id })).token;
+  assert.equal((await call('/agent/query', robot, { name: 'schema' })).status, 200, 'their agents read');
+  assert.match((await call('/agent/change', robot, { reason: 'test', ops: [{ op: 'update', id: shown, title: 'Mine now' }] })).error, /only reads/, 'and do not write');
+
+  // The database itself refuses, whatever the server's tools would let through.
+  const theirs = ws.pelago.as(person.person_id, false, true);
+  await assert.rejects(theirs.apply(`human:rosa`, { ops: [{ op: 'update', id: shown, title: 'Mine now' }], reason: 'test' }), /read-only transaction/);
+  await assert.rejects(theirs.db.query(`update entity set title = 'Mine now' where id = $1`, [shown]), /read-only transaction/);
+  await assert.rejects(theirs.db.transaction(async (tx) => { await tx.query(`set transaction read write`); await tx.query(`update entity set title = 'x' where id = $1`, [shown]); }), /read-only|read-write/, 'nor can a read-only transaction be made to write again');
+  assert.equal((await ws.pelago.entity(shown))!.title, 'Shared work');
+
+  // An admin switches them, and their sign-in follows at once; an admin never only reads.
+  assert.equal((await call('/api/member_set', alex, { email: 'rosa@example.com', read_only: false })).result.read_only, false);
+  assert.deepEqual((await call('/whoami', rosa, undefined, 'GET')).may, ['read', 'write']);
+  assert.equal((await call('/api/change', rosa, { reason: 'test', ops: [{ op: 'update', id: shown, title: 'Rosa’s work' }] })).status, 200);
+  assert.equal((await call('/api/member_set', alex, { email: 'rosa@example.com', admin: true })).result.admin, true);
+  const back = (await call('/api/member_set', alex, { email: 'rosa@example.com', read_only: true })).result;
+  assert.deepEqual([back.admin, back.read_only], [false, true], 'made to only read, an admin is one no more');
+  assert.deepEqual([(await call('/whoami', rosa, undefined, 'GET')).actor.admin, (await call('/whoami', rosa, undefined, 'GET')).may], [false, ['read']]);
+  assert.match((await call('/api/member_set', alex, { email: 'rosa@example.com', admin: true, read_only: true })).error, /cannot be an admin/);
+});
+
 test('a sign-in opens only the workspaces its address belongs to, as the index says, after a restore too', async () => {
   const { workspaces, call } = await serve('tokens');
   const operator = (await workspaces.ensureOperator())!;
