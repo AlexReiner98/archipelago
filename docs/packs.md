@@ -300,7 +300,7 @@ renamed to its own prefix) is added, once, to a map that had that pack on and
 whose log keeps a manifest of it that declared it, so moving something between
 packs changes nothing a map does (`src/pack-moved.ts`; task e_qhtt4phv). The
 kernel's packs are in every pack's `moved_from` without being named (the core
-audit, e_sjhbyf52: the `findings` pack first, then `sessions`). A
+audit, e_sjhbyf52: the `findings` pack first, then `sessions` and `practice`). A
 declaration may keep its old id in the pack it moved to, so what names it (an
 owner's kept version) still does (`ownsId`, `src/packorder.ts`); a type or
 link type keeps its id, or names its old one in its own `moved_from`, and

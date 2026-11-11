@@ -946,18 +946,6 @@
       "say": "Settling \"{title}\" is the owner's: the agent proposes the answer, and they confirm it."
     },
     {
-      "id": "settle_why",
-      "when": {
-        "actor": "agent",
-        "op": "update",
-        "capability": { "settles": { "by": "word" } },
-        "status": { "from": "open", "to": "closed" },
-        "held": false
-      },
-      "then": { "require": ["outcome", "rationale"] },
-      "say": "\"{title}\": to settle a decision, say what was chosen (props.outcome) and why (props.rationale)."
-    },
-    {
       "id": "settle_said",
       "when": {
         "actor": "agent",
@@ -986,7 +974,6 @@
       "say": "The agent asked for a look before it takes effect."
     },
     { "id": "propose_only", "when": { "actor": "agent", "may": "propose" }, "then": "hold", "say": "This agent's token may only propose." },
-    { "id": "views_said", "when": { "actor": "agent", "op": "create", "type": "lens" }, "then": { "require": ["body"] }, "say": "\"{title}\": a view is named for the question it answers, and its note's first line says what it shows: send body." },
     { "id": "kept_by_word", "when": { "actor": "agent", "type": ["lens", "layout"], "status": { "to": "kept" }, "owner_said": false }, "then": "refuse", "say": "\"{title}\": a view or layout is kept only on the owner's word. Leave it working, or say where they said so (authority of human)." },
     { "id": "kept_retired_by_word", "when": { "actor": "agent", "op": "update", "type": ["lens", "layout"], "status": { "from": "kept", "to": "closed" }, "owner_said": false }, "then": "refuse", "say": "\"{title}\" is kept by the owner: an agent retires it only on their word (authority of human)." },
     {
@@ -1010,22 +997,6 @@
       "then": "refuse",
       "lifted": "agent_backups",
       "say": "Agents may not download this workspace’s backups: the owner allows it in Settings, under Agents."
-    },
-    {
-      "id": "draw_answers",
-      "on": "reply_ended",
-      "when": { "reply": { "surveyed": true, "changed": false, "edited": false, "committed": false, "showed": false } },
-      "then": "ask",
-      "lifted": "reply_draw_answers",
-      "say": "You answered from the map and drew nothing: if the answer is about several items or how they relate, order or stand, open it with report, action show, and say it in a line."
-    },
-    {
-      "id": "record_findings",
-      "on": "reply_ended",
-      "when": { "reply": { "worked": 6, "told": false, "changed": false } },
-      "then": "ask",
-      "lifted": "reply_record_findings",
-      "say": "This reply worked and put nothing on the map. Before you answer: tell each thing you found or decided (report, action tell, with its items), or change the items it settles."
     },
     {
       "id": "sessions",
@@ -1296,15 +1267,9 @@
   "styles": [
     { "id": "core.server_restarted", "type": "instruction", "title": "Tools after a restart", "body": "A pelago tool's description you read before the restart may be the old one: call an action by name under its verb even if that description lacks it (query with name actions gives its inputs), or load the tool again (ToolSearch for the verb: mcp__pelago__<verb>, or mcp__plugin_archipelago_pelago__<verb> where the plugin connected it) for the new one. If a pelago tool is missing altogether or answers that it is not connected, the client gave up reconnecting: ask the owner to reconnect it (in Claude Code: /mcp, pelago, Reconnect), and until then call it as plain JSON: POST /agent/<tool> on the same server with the same token. And if a pelago tool answers with a web page or \"502\" while the server is coming back, do not send it again through MCP (each such answer is a whole page in your context): wait until GET /health answers, then send it as plain JSON.", "props": {"for": ["server_restarted"], "order": 10} },
     { "id": "core.setup_behind", "type": "instruction", "title": "Bring the folder up to date", "body": "This folder's Archipelago files (hooks, working rules, the bump skill) are older than the server's. Tell the owner in your first reply, and with their yes bring them up to date by running this in the folder (it holds no secret, and with nobody at a terminal it renews only what Archipelago wrote there before):{command} . What it changes takes effect in the next session.", "props": {"for": ["setup_behind"], "order": 10} },
-    { "id": "core.draw_answers", "type": "instruction", "title": "Answer the owner with a view", "body": "When the owner asks to see something on the map, or you explain how something works, and the answer is about several items or how they relate, order or stand, answer with a query: open a kept view, or a query and layout of your own, with report, action show, and say in chat in one line what it shows. An explanation is a diagram, not paragraphs; what it explains is made items and links first if the map lacks them. A yes, a number or one item is a line in chat. The chat is a screen too: no wall of text there.", "props": { "for": ["session_start"], "order": 25 } },
     { "id": "core.bumps", "type": "instruction", "title": "Record what gets in the way", "body": "When Archipelago itself gets in your way (a tool that fails or misleads, a workaround, an answer that is stale or too big, something the owner finds bad in its screens), record it on the map when it happens, after searching for it: a finding about the item it concerns, saying what you were doing, what happened, and what would have made it smooth. That is how it gets fixed.", "props": { "for": ["session_start"], "order": 30 } },
-    { "id": "core.map_true", "type": "instruction", "title": "Keep the map true", "body": "When what you do or find settles something still open (a task done, a decision made in practice, a question answered), change its status in the same breath, with the outcome and the evidence, rather than leaving it open with a note. Settle only what the work or the owner has in fact settled: closing a decision waits for the owner unless this workspace applies agents’ changes as made, so propose it with what was chosen (props.outcome) and why (props.rationale). A choice that is still the owner’s stays open.", "props": { "for": ["working_rules"], "order": 40 } },
     { "id": "core.authority", "type": "instruction", "title": "Say on whose authority", "body": "Every change takes authority: of \"human\" with what the owner said and where, when they told you to or decided it; of \"agent\" for your own reading of the work. Never claim the owner’s word for your own judgment.", "props": { "for": ["working_rules"], "order": 50 } },
-    { "id": "core.names", "type": "instruction", "title": "A name is a few words", "body": "A title names the thing in 60 characters at most; the rest goes in the first line of its note. Lead a note with the point in two or three sentences, and give each further part a short title on a line of its own, so it folds. Write it in the map's one dialect, which every page reads alike: ## titles, - points, - [ ] and - [x] checklists, > [!NOTE] or > [!WARNING] callouts, | tables |, `code`, **strong**, and an item named by its id (e_...) or as [its name](e_...).", "props": { "for": ["working_rules"], "order": 60 } },
-    { "id": "core.search_first", "type": "instruction", "title": "Search before you create", "body": "Query with name search first, so nothing is made twice.", "props": { "for": ["working_rules"], "order": 70 } },
     { "id": "core.held", "type": "lens", "title": "Held for you", "props": { "filter": { "find": ["held"], "not": ["type run"] }, "walk": { "over": "all", "steps": 1 } } },
-    { "id": "core.reading", "title": "Reading what is made for a reader", "on": ["has:deliverable"], "props": { "page": { "picture": false, "notes": "whole" }, "notes": { "measure": "reader_measure" } } },
-    { "id": "core.plan_flow", "type": "instruction", "title": "A result is items and a view", "body": "Anything with parts goes on the map as items first, never as one long note: a plan, research, an evaluation, a comparison. A plan: each step a task, part_of its hub, its order as depends_on, who must act as waits_on. Research: each finding and each option an item that bears_on the question it answers (anything else it informs, it is about), what it rests on as depends_on, its facts as fields or a short note. Then a view about the hub (a lens linked about it: shape flow for steps, a drawing of how the parts connect for an explanation), and show it. A plan's flow walks works_on< too, so each session at work on a step is drawn on it; once the owner approves the plan, show that view with watch: true, so every session started for its steps shows its work there rather than in a tab of its own. The hub's note holds only the point: why, what done is, what was found or chosen. This holds whatever a brief says about notes.", "props": { "for": ["working_rules"], "order": 75 } },
-    { "id": "core.waits_on", "type": "instruction", "title": "Say who is waited on with a link", "body": "A person who has to answer or act is waits_on (what for in props.for), removed once they have; other work is depends_on; a resource is needs, and an exclusive one is taken with assign, action claim, and given back with revise, action release.", "props": { "for": ["working_rules"], "order": 80 } }
+    { "id": "core.reading", "title": "Reading what is made for a reader", "on": ["has:deliverable"], "props": { "page": { "picture": false, "notes": "whole" }, "notes": { "measure": "reader_measure" } } }
   ]
 }
