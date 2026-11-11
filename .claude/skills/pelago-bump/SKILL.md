@@ -41,11 +41,13 @@ prevented it cheaply, it counts.
 1. **Find the home.** Bumps live as issues under the Archipelago project's feature
    for friction. `query` with name `search`, params type `feature` and q
    `friction`; `references/home.md` says the same for this workspace. If there
-   is none, create the issue as part of the Archipelago project instead. A map
+   is none, create the issue as part of the Archipelago project instead. On a
+   map with islands, a bump is of the type the home's island takes: `bug` where
+   it speaks code, `issue` where it speaks work (a refusal names which). A map
    with no `issue` type (`query` `schema` says which it has) takes each bump as
    a `finding` linked `about` the item it concerns, in the same shape below.
 
-2. **Look for it first.** `query` `search` with type `issue`, `open: true`, and
+2. **Look for it first.** `query` `search` with that type, `open: true`, and
    one distinctive word of what happened in q (a search of several words can
    miss what one finds). The same bump is usually already there.
 
@@ -78,8 +80,8 @@ prevented it cheaply, it counts.
    - **props**: `kind: "problem"`, and `severity`: `high` if it stopped the
      work or lost something, `medium` if it cost real time or would mislead,
      `low` if it is only awkward.
-   - **touches**, in props, where the issue type has the field (`query`
-     `schema` type `issue`): what it touched, so the snags view (the refine
+   - **touches**, in props, where its type has the field (`query`
+     `schema` with that type): what it touched, so the snags view (the refine
      pack's) can group it with the others that did. One or more of `pack:<id>`, `instruction:<id>`,
      `tool:<name>`, `rule:<id>`, `view:<name>`, `hook:<event>` or
      `page:<name>`, separated by spaces: `"tool:change rule:finding_note"`.
