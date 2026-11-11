@@ -81,7 +81,7 @@ settled, the ones holding up the most first. A decision is made where it
 stands: pick one of its options and say why. The whole log of
 changes is at `#/activity`.
 
-The roadmap is the `tree` view, which agents can call too. The tree is
+The roadmap is the `tree` view (work_views, a hosted pack, declares the read), which agents can call too. The tree is
 declared by a pack (the software pack's, a hosted pack, as a view of
 `form: "tree"`): which types are roots,
 branches and work, which field orders them, and which statuses mean "now". A
@@ -330,7 +330,7 @@ The questions the map exists to answer. `npm run pelago -- view` lists them.
 | `home` | Each project's open questions and next release |
 | `questions` | What is still to be decided in a project? |
 | `gate` | What does a release wait for, and what can follow it? (software pack) |
-| `tree` | A project's roadmap |
+| `tree` | A project's roadmap (work_views) |
 | `flat` | What is in a view: the flat query |
 | `to_confirm` | What did agents settle that I have not confirmed? |
 | `oldest` | What has gone longest without being checked? |
@@ -346,8 +346,8 @@ sets it. A pack declares its views
 in its pack file (`views`): one with `lens` is answered by a read of the
 kernel's that its `answer` names (`src/query-presets.ts`), in the form that view
 has always had; any other is answered by the pack's own code. The core pack's
-are `flat`, `attention`, `brief`, `graph` (`src/view-graph.ts`), `tree`
-(`src/view-tree.ts`) and `hubs`, each read on its own. A view kept on the map
+are `flat`, `attention`, `brief`, `graph` (`src/view-graph.ts`) and `hubs`, each read on its
+own; `tree` (`src/view-tree.ts`) is declared by a practice pack (work_views). A view kept on the map
 (an item of type `lens`, a view on Home) is a flat query and a
 style (`src/query-saved.ts`): a document draws it where a line names it, and
 publishing freezes its picture. `gate` is the software pack's, and reads around its event (the pack

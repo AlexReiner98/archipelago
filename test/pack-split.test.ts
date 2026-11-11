@@ -118,3 +118,11 @@ test('a pack may name only its own ids, the kernel’s, and those of the packs i
   const dir = packsWith(vocabulary, { ...stranger, id: 'loose', moved_from: undefined } as unknown as PackFile);
   assert.throws(() => registries.push(new Registry(dir)), /garden\.other.*must be named "loose\.<name>"/);
 });
+
+test('a bare name is the kernel’s: kept only by a pack whose moved_from names core outright', () => {
+  const screen = { form: 'screen', id: 'needs_here', title: 'Needs', on: ['plant'], pieces: [{ piece: 'turns' }] };
+  const taken = { ...practice, id: 'took_core', moved_from: ['garden', 'core'], views: [screen] } as unknown as PackFile;
+  registries.push(new Registry(packsWith(vocabulary, taken)));
+  const loose = { ...practice, id: 'bare', views: [screen] } as unknown as PackFile;
+  assert.throws(() => registries.push(new Registry(packsWith(vocabulary, loose))), /needs_here.*must be named "bare\.<name>"/);
+});
