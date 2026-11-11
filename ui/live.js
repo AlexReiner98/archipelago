@@ -141,18 +141,20 @@ export async function replicate(read) {
   // A look draws once and is closed: it is kept current from nothing.
   if (!still && !Number.isInteger(answer.pos)) throw new Error('A lens kept current is read with follow: true, so its answer says where the log stood');
   view.hold(answer, still ? undefined : answer.pos);
-  store.holdChanges(held);
+  holdNow(held);
   return keepCurrent(view);
 }
 /** The changes held for the owner, as this viewer may see them; none where they may not. */
 const heldNow = () => api('proposals').catch(() => []);
+/** The store holds what is held now, and the page is told (the call over the canvas, ui/item-held.js). */
+const holdNow = (held) => (store.holdChanges(held), hooks.heldMoved?.(store.held));
 /** Where the queue of held changes stood when the stores last read it. */
 const heard = { queue: undefined };
 /** The queue moved (a change held, applied or declined): the store reads what is held again. */
 async function queueMoved(queue) {
   if (queue === heard.queue || !store.views.size) return;
   heard.queue = queue;
-  store.holdChanges(await heldNow());
+  holdNow(await heldNow());
 }
 
 /** Whether what changed (the items facts and events touched, and whether the held changes or a story moved) bears on the page in view. */
