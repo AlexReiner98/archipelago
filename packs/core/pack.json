@@ -1322,20 +1322,6 @@
     },
     {
       "form": "screen",
-      "id": "core.automations_here",
-      "title": "Automations",
-      "on": ["work", "aim", "place"],
-      "pieces": [{ "piece": "picture", "lens": { "filter": { "find": ["about {here}"], "only": ["type automation"], "not": ["status retired"] }, "limit": 20 }, "style": { "shape": "map" } }]
-    },
-    {
-      "form": "screen",
-      "id": "core.automations",
-      "title": "Automations",
-      "nav": true,
-      "pieces": [{ "piece": "picture", "lens": { "filter": { "find": ["type automation"], "not": ["status retired"] }, "limit": 200 }, "style": { "shape": "map" } }]
-    },
-    {
-      "form": "screen",
       "id": "core.island_findings",
       "title": "Findings",
       "on": ["island"],

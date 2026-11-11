@@ -18,7 +18,7 @@ import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
 import { turnsPiece } from './turns.js';
 import { findingsPiece } from './findings.js';
-import { isA, label, link, statusMark, typeMark, unfolded } from './words.js';
+import { ago, isA, label, link, statusMark, typeMark, unfolded } from './words.js';
 
 /** The screens shown on an item of this type, in the order the packs load. */
 export const screensFor = (typeId) => (state.schema?.screens ?? []).filter((s) => s.on?.some((t) => isA(typeId, t)));
@@ -96,9 +96,23 @@ export function actionForm(tool, id, done) {
   return form;
 }
 
-/** One row a pack's view answered: an item by its name, or a line of text. */
-const viewRow = (row) =>
-  h('li', { class: 'row-top' }, row && typeof row === 'object' && row.id ? [row.type && typeMark(row.type), h('span', { class: 'grow', title: row.title ?? '' }, link(row)), row.status && row.type && statusMark(row.type, row.status)] : h('span', { class: 'grow', title: String(row) }, String(row)));
+/** The tones a pack's mark may take: each a class the style colours. */
+const TONES = ['ok', 'warn', 'bad', 'open', 'closed'];
+/** A mark a pack's row carries: a few words, an age (ago), or both; the whole of it in the tooltip, a tone the style colours. */
+const rowMark = (m) =>
+  m && typeof m === 'object' && h('span', { class: `mark${TONES.includes(m.tone) ? ` ${m.tone}` : ''}`, title: m.tip ?? '' }, m.text !== undefined && String(m.text), m.text !== undefined && m.ago && ' ', m.ago && ago(m.ago));
+
+/**
+ * One row a pack's view answered: an item by its name, or a line of text. A row that carries marks reads as its state
+ * first, then its name, then those marks in the order given: one line, the name cut where it does not fit.
+ */
+const viewRow = (row) => {
+  if (!row || typeof row !== 'object' || !row.id) return h('li', { class: 'row-top' }, h('span', { class: 'grow', title: String(row) }, String(row)));
+  const name = h('span', { class: 'grow', title: row.title ?? '' }, link(row));
+  const state = row.status && row.type && statusMark(row.type, row.status);
+  if (Array.isArray(row.marks)) return h('li', { class: 'row-top' }, state, name, row.marks.map(rowMark));
+  return h('li', { class: 'row-top' }, row.type && typeMark(row.type), name, state);
+};
 
 /** Rows from a pack's view of this item. */
 async function rows(host, id, p) {
@@ -107,8 +121,8 @@ async function rows(host, id, p) {
   try {
     const answer = await api(tool.tool, p.item ? { [p.item]: id } : {});
     const list = Array.isArray(answer) ? answer : [];
-    // On a screen of its own (Home), a list with nothing in it is not drawn.
-    if (!list.length && !id) return host.remove();
+    // A list with nothing in it is not drawn (on Home, on an item's page), but on a nav page of its own it says so.
+    if (!list.length && !p.screen.nav) return host.remove();
     host.replaceWith(fold(id, p.screen.id, p.screen.title, list.length, true, list.length ? h('ul', { class: 'rows' }, list.map(viewRow)) : h('div', { class: 'empty' }, 'Nothing here.')));
   } catch (err) {
     host.replaceChildren(h('div', { class: 'error' }, err.message));

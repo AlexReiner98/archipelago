@@ -1,0 +1,29 @@
+{
+  "id": "automations",
+  "version": "0.1.0",
+  "title": "Automations",
+  "description": "Automations drawn as rows of marks: on the page of what each is about, and on a page of their own for the nav. Each row says whether it runs, its name, when it runs next (worked out by the kernel's clock from its when), how it last fired and what it does. It owns no type: core's automation type is what it reads.",
+  "views": [
+    {
+      "id": "automations.rows",
+      "shape": "rows",
+      "description": "Automations as rows: those about an item (about), else every one in the workspace; retired ones left out. Each row is the automation's head and its marks: next run (\"Thu 08:00\", in the workspace's zone), last firing (a tick or cross and when) and what it does.",
+      "input": { "type": "object", "properties": { "about": { "type": "string", "description": "The item the automations are about; every automation when left out." } } },
+      "limit_ms": 5000
+    },
+    {
+      "form": "screen",
+      "id": "automations.here",
+      "title": "Automations",
+      "on": ["work", "aim", "place"],
+      "pieces": [{ "piece": "view", "view": "automations.rows", "item": "about" }]
+    },
+    {
+      "form": "screen",
+      "id": "automations.all",
+      "title": "Automations",
+      "nav": true,
+      "pieces": [{ "piece": "view", "view": "automations.rows" }]
+    }
+  ]
+}
