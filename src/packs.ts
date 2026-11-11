@@ -13,7 +13,7 @@ import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 import { parts, withoutAbsent, type Manifest } from './manifest.ts';
 import { readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts';
-import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from './phases.ts';
+import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from './phases.ts'; import { keepVersionTypes } from './version-types.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
 
@@ -296,7 +296,7 @@ export class Registry {
     this.relations = relations; this.renamed = new Map([...[...types.values()].flatMap((t) => (t.movedFrom ?? []).map((o) => [o, t.id] as const)), ...[...relations.values()].flatMap((r) => (r.moved_from ?? []).map((o) => [o, r.id] as const))]);
     this.trees = trees; this.verbs = verbs;
     this.tools = tools;
-    this.keep(this.kept);
+    this.keep(this.kept); if (!this.swap) keepVersionTypes(this); // what versions add, dormant and retired here (src/version-types.ts)
   }
 
   /**

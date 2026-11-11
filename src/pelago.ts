@@ -60,6 +60,11 @@ export class Archipelago {
     return new Archipelago(scoped(this.db, viewer, admin, readOnly), this.registry, this.policy, this.workspace, viewer);
   }
 
+  /** This map read through another registry: the one an island runs, when a read names it (src/island-pin.ts). For reads alone; a change is judged per island where it is planned. */
+  readIn(registry: Registry): Archipelago {
+    return registry === this.registry ? this : new Archipelago(this.db, registry, this.policy, this.workspace, this.viewer, this.props);
+  }
+
   /** Whether new things are private to their author unless they say otherwise. */
   async defaultVisibility(q: Q = this.db): Promise<'private' | 'shared'> {
     const { rows } = await q.query<{ value: string }>(`select value from setting where key = 'default_visibility'`);
