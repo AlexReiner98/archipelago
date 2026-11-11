@@ -16,7 +16,8 @@ import { startLink } from './link-pick.js';
 import { added } from './query-bar.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
 import { actionForm, actionsFor, buttonsOn, countOn, drawnBy, keepsFigure, readWhole, sectionsOn, toolOf } from './screens.js';
-import { idsIn, isA, label, menu, relations, titles, types } from './words.js';
+import { idsIn, isA, label, menu, relations, titles } from './words.js';
+import { pageType, readPageModel } from './page-schema.js';
 
 /** The root relation a relation extends: what the page reads, whichever pack's flavour of it was used. */
 const rootOf = (type) => relations.get(type)?.root ?? type;
@@ -40,7 +41,9 @@ export async function entity(id, here) {
     return page.replaceChildren(h('div', { class: 'error' }, err.message));
   }
   const e = data.entity;
-  const type = types.get(e.type);
+  // On an island that runs a version of its pack, the page is drawn by that version: its screens, views and fields.
+  const version = await readPageModel(e);
+  const type = pageType(e.type);
   // Whether this session may change the map: every control that writes is drawn only then (ui/base.js may).
   const writes = may('write');
   const change = async (ops, reason) => {
@@ -179,6 +182,7 @@ export async function entity(id, here) {
         'div',
         { class: 'sheet-marks' },
         h('span', { class: 'grow' }),
+        version && h('span', { class: 'muted small gist version-mark', title: `Its island runs ${version.title}, a version of the ${version.of} pack: this page is drawn by it` }, version.title),
         // The public views that show it, and a share again when one is behind it (ui/item-doc.js).
         publicMark(data.public_views, again, writes && !e.archived_at),
         writes && session && h('button', { class: 'quiet-button', title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
