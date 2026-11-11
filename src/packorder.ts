@@ -1,7 +1,12 @@
-// Which packs run, and in what order. A pack is active when it is on and every pack it requires is active; waiting
-// when it is on but a pack it requires is not (it says which, and why); off when the owner turned it off here or the
-// server does not enable it. A waiting or off pack registers nothing, and its items behave as dormant. The kernel's
-// own packs are always on, and the server starts whatever state the others are in.
+// Which packs run, and in what order. A pack is active when it is on and every name it requires has an active
+// provider; waiting when it is on but one has none (it says which, and why); off when the owner turned it off here or
+// the server does not enable it. A waiting or off pack registers nothing, and its items behave as dormant. The
+// kernel's own packs are always on, and the server starts whatever state the others are in.
+//
+// A pack requires names, never packs (decision e_f9ybsuce, after the Cordis paper): a capability (`has:when`), a type
+// or link type (`type:event`) or a kind of event (`event:item.due`). Whichever active pack declares it provides it, so
+// a provider can be swapped without its consumers knowing. What a pack provides is read off what it declares, never
+// claimed. A bare pack id is the old form, kept for a bundle's two halves.
 
 import type { PackFile } from './packs.ts';
 
@@ -9,6 +14,46 @@ export type PackState = { state: 'active' | 'waiting' | 'off'; why?: string };
 
 /** The kernel's packs: the kinds and root relations, and the system tier. Never off. */
 export const KERNEL_PACKS = ['core'];
+
+/** The kernel's own kinds of event (src/due.ts, src/notify.ts): always provided, by core. */
+export const KERNEL_EVENTS = ['item.due', 'notification.made'];
+
+/** A name a pack requires or uses, read: what it asks for, and of what. A bare id is a pack: the old form. */
+export type Need = { by: 'has' | 'type' | 'event' | 'pack'; name: string };
+const FORMS = ['has', 'type', 'event'] as const;
+/** Whether a manifest's entry of requires or uses is a name in one of these forms; what they are, for its refusal. */
+export const isName = (n: unknown): n is string => typeof n === 'string' && /^([a-z]+:)?[\w.-]+$/.test(n) && (!n.includes(':') || (FORMS as readonly string[]).includes(n.split(':')[0]));
+export const NAME_FORMS = `a name is ${FORMS.map((f) => `${f}:<${f === 'has' ? 'capability' : f === 'type' ? 'id' : 'kind'}>`).join(', ')}, or a pack's id (the old form)`;
+export function needOf(name: string): Need {
+  const at = name.indexOf(':');
+  const by = name.slice(0, at) as Need['by'];
+  return at > 0 && (FORMS as readonly string[]).includes(by) ? { by, name: name.slice(at + 1) } : { by: 'pack', name };
+}
+
+/**
+ * The packs among `packs` that provide a name, by id: those declaring a type with that capability, the one declaring
+ * that type or link type, the one whose handlers record that event (core for the kernel's), or the pack itself.
+ * Where a provider must also fit what is asked of it (its type's fields and statuses, checked by shape), that check
+ * belongs here (task e_f9x7ddeh: what a pack needs of a type, checked by shape).
+ */
+export function providersOf(name: string, packs: Iterable<PackFile>): string[] {
+  const need = needOf(name);
+  const all = [...packs];
+  const own = (p: PackFile) => (p.types ?? []).filter((t) => !('of' in t)) as { id: string; capabilities?: Record<string, unknown> }[];
+  const of = (keep: (p: PackFile) => boolean) => all.filter(keep).map((p) => p.id);
+  switch (need.by) {
+    case 'has': return of((p) => own(p).some((t) => t.capabilities?.[need.name] !== undefined));
+    case 'type': return of((p) => own(p).some((t) => t.id === need.name) || (p.links ?? []).some((r) => r.id === need.name));
+    case 'event': return KERNEL_EVENTS.includes(need.name) ? of((p) => KERNEL_PACKS.includes(p.id)) : of((p) => (p.handlers ?? []).some((h) => !('schedule' in h) && (h.records ?? []).includes(need.name)));
+    case 'pack': return of((p) => p.id === need.name);
+  }
+}
+
+/** The active packs left without a provider were `provider` gone: what taking it out would leave waiting (task e_5h5kprqm sends them there). */
+export function dependentsOf(active: PackFile[], provider: string): string[] {
+  const rest = active.filter((p) => p.id !== provider);
+  return rest.filter((p) => (p.requires ?? []).some((r) => providersOf(r, active).includes(provider) && !providersOf(r, rest).length)).map((p) => p.id);
+}
 
 /**
  * Put the packs found in load order and say the state of each. `off` is what is off, each with why. The workspace's own
@@ -18,18 +63,30 @@ export const KERNEL_PACKS = ['core'];
 export function orderPacks(found: Map<string, PackFile>, off: Map<string, string>, local: string): { ordered: PackFile[]; states: Map<string, PackState> } {
   const states = new Map<string, PackState>();
   const ordered: PackFile[] = [];
+  const owners = new Map<string, string>();
+  const namesOf = (p: PackFile) => [...(p.types ?? []).flatMap((t) => ('of' in t ? [] : [t.id])), ...(p.links ?? []).map((r) => r.id)];
   const visit = (pack: PackFile, trail: string[]): PackState => {
     const known = states.get(pack.id);
     if (known) return known;
     if (off.has(pack.id) && !KERNEL_PACKS.includes(pack.id)) return set(pack, { state: 'off', why: off.get(pack.id) });
     if (trail.includes(pack.id)) return set(pack, { state: 'waiting', why: `in a cycle: ${[...trail, pack.id].join(' -> ')}` });
     if (pack.id !== local) {
-      for (const dep of pack.requires ?? []) {
-        const required = found.get(dep);
-        const theirs = required ? visit(required, [...trail, pack.id]) : { state: 'missing' as const };
-        if (theirs.state !== 'active') return set(pack, { state: 'waiting', why: `needs ${dep}, which is ${theirs.state === 'missing' ? 'not on this server' : theirs.state}` });
+      for (const name of pack.requires ?? []) {
+        const providers = providersOf(name, found.values());
+        if (providers.includes(pack.id)) continue; // it provides what it requires itself
+        const states = providers.map((id) => ({ id, ...visit(found.get(id)!, [...trail, pack.id]) }));
+        if (states.some((s) => s.state === 'active')) continue;
+        const need = needOf(name);
+        const why = need.by === 'pack' ? `needs ${name}, which is ${states[0]?.state ?? 'not on this server'}`
+          : !providers.length ? `needs ${name}: no pack here provides it`
+          : `needs ${name}, which ${states.map((s) => `${s.id} is ${s.state}`).join(', ')}`;
+        return set(pack, { state: 'waiting', why });
       }
+      // One owner per name: a pack declaring a type or link type another active pack owns waits until that one goes.
+      const taken = namesOf(pack).filter((n) => owners.has(n));
+      if (taken.length) return set(pack, { state: 'waiting', why: `${taken.map((n) => `${n} is ${owners.get(n)}'s`).join(', ')}: one pack owns a name` });
     }
+    for (const n of namesOf(pack)) owners.set(n, pack.id);
     ordered.push(pack);
     return set(pack, { state: 'active' });
   };

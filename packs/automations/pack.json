@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "title": "Automations",
   "description": "Does what an automation says when it comes due, and draws each automation as a row of marks. The kernel's clock tells it an automation's time has come, and it makes the notification, about what the automation is about, or asks the kernel to start the session it says; on the page of what each is about, and on a page of its own for the nav, a row says whether it runs, its name, when it runs next, how it last fired and what it does. It owns no type: core's automation type is what it acts on.",
+  "requires": ["event:item.due", "type:automation", "type:notification"],
   "handlers": [
     {
       "event": "item.due",

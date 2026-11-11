@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "title": "Email",
   "description": "Mails a notification to the person it is for, at the address they sign in with, once they turn it on: an email channel of theirs, part of their person item, says whether mail is on, their quiet hours and the least level worth a mail. Nobody is mailed who has not turned it on.",
+  "requires": ["event:notification.made"],
   "types": [
     {
       "id": "email.channel",

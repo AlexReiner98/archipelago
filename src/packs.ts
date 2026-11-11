@@ -9,7 +9,7 @@ import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts';
 import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
 import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
-import { orderPacks, KERNEL_PACKS, type PackState } from './packorder.ts';
+import { orderPacks, KERNEL_PACKS, providersOf, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 import { parts, withoutAbsent, type Manifest } from './manifest.ts';
 import { readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts';
@@ -164,9 +164,9 @@ export class Registry {
     for (const id of this.made.keys()) if (!this.madeOn.has(id)) off.set(id, 'kept as an item: the owner has not added it here');
     if (this.islands) for (const [id, why] of islandsOff([...found.values()].filter((p) => !off.has(p.id) || KERNEL_PACKS.includes(p.id)), LOCAL_PACK)) off.set(id, why);
     const { ordered: loaded, states } = orderPacks(found, off, LOCAL_PACK);
-    // What a pack names of a pack it uses is registered only while that one is active (src/manifest.ts, uses).
+    // What a pack names of a pack it uses is registered only while that one is active (src/manifest.ts, uses); a name it uses is read as the pack that provides it.
     const declaredBy = new Map([...found.values()].flatMap((p) => [...parts(p).types, ...parts(p).relations].map((t) => [t.id, p.id] as const)));
-    const ordered = withVersions(loaded.map((pack) => withoutAbsent(pack, (id) => states.get(id)?.state === 'active', (name) => declaredBy.get(name))), this.items);
+    const usesPacks = (pack: PackFile) => (pack.uses?.length ? { ...pack, uses: pack.uses.flatMap((u) => { const by = providersOf(u, found.values()); return by.length ? by : [u]; }) } : pack); const ordered = withVersions(loaded.map((pack) => { const read = usesPacks(pack), kept = withoutAbsent(read, (id) => states.get(id)?.state === 'active', (name) => declaredBy.get(name)); return kept === read ? pack : kept; }), this.items);
 
     const raw = new Map<string, TypeDef & { pack: string }>();
     const relations = new Map<string, ResolvedRelation>();

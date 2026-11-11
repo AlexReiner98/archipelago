@@ -12,7 +12,7 @@
 
 import { capabilityOf } from './link-ends.ts';
 import { MANIFEST_KEYS, parts, type Manifest } from './manifest.ts';
-import { KERNEL_PACKS } from './packorder.ts';
+import { KERNEL_PACKS, needOf } from './packorder.ts';
 
 /** The workspace setting that holds packs to the island rules. Off unless set, and set only on a new workspace. */
 export const ISLANDS = 'islands';
@@ -83,7 +83,7 @@ function running(m: Manifest): string[] {
   const keys = Object.keys(m).filter((k) => !ISLAND_KEYS.includes(k));
   const looks = (m.styles ?? []).filter((s) => !PRESETS_KEPT.includes(s.type ?? 'style')).map((s) => s.id);
   const computed = (m.views ?? []).filter((v) => v.form === undefined).map((v) => v.id);
-  const other = (m.requires ?? []).filter((p) => !KERNEL_PACKS.includes(p));
+  const other = (m.requires ?? []).filter((r) => { const n = needOf(r); return n.by === 'event' || (n.by === 'pack' && !KERNEL_PACKS.includes(n.name)); }); // a capability or a type is vocabulary; an event is heard by code
   return [
     ...keys,
     ...(looks.length ? [`looks (${looks.join(', ')})`] : []),
@@ -110,6 +110,7 @@ export function islandProblems(m: Manifest, shared: Shared): string[] {
   for (const t of p.types) if (t.extends && !fine(t.extends)) named.add(t.extends);
   for (const r of p.relations) for (const end of [...r.from, ...r.to]) if (!fine(end)) named.add(end);
   for (const r of m.rules ?? []) for (const t of [r.when?.type, r.type].flat()) if (typeof t === 'string' && !fine(t)) named.add(t);
+  for (const r of m.requires ?? []) { const n = needOf(r); if (n.by === 'type' && !fine(n.name) && !links.has(n.name) && !shared.links.has(n.name)) named.add(n.name); }
   if (named.size) problems.push(`it names ${[...named].join(', ')}, not its own nor in the shared set (${[...shared.types].join(', ')})`);
   const built = p.relations.filter((r) => r.extends && !links.has(r.extends) && !shared.links.has(r.extends)).map((r) => `${r.id} extends ${r.extends}`);
   if (built.length) problems.push(`its links extend another pack's (${built.join('; ')}): only the kernel's or its own`);

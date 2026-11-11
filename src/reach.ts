@@ -1,7 +1,9 @@
 // What a pack's code may write (Rule 8 of the target model, packs in space): the types, link types and fields of
-// the pack itself, of the packs it requires and what they require, of those it uses while they are active, and
-// core's. Core's rule pack_reach refuses a change a pack's action or handler makes outside it (src/rules.ts).
+// the pack itself, of the packs that provide a type it requires (type:<id>, or a pack by the old form) and what they
+// require, of those it uses while they are active, and core's. Requiring a capability or an event lets it read and
+// hear, not write another pack's types. Core's rule pack_reach refuses a change a pack's action or handler makes outside it (src/rules.ts).
 
+import { needOf, providersOf } from './packorder.ts';
 import type { Registry } from './packs.ts';
 
 const reaches = new WeakMap<Registry['packs'], Map<string, Set<string>>>();
@@ -16,10 +18,11 @@ export function reachOf(reg: Pick<Registry, 'packs'>, pack: string): Set<string>
   const visit = (id: string) => {
     if (out.has(id) && id !== 'core') return;
     out.add(id);
-    for (const r of active.get(id)?.requires ?? []) visit(r);
+    for (const r of active.get(id)?.requires ?? []) for (const p of writes(r)) visit(p);
   };
+  const writes = (name: string) => (['type', 'pack'].includes(needOf(name).by) ? providersOf(name, reg.packs) : []);
   visit(pack);
-  for (const u of active.get(pack)?.uses ?? []) if (active.has(u)) visit(u);
+  for (const u of active.get(pack)?.uses ?? []) for (const p of writes(u)) visit(p);
   cache.set(pack, out);
   return out;
 }

@@ -3,8 +3,7 @@
   "version": "0.1.0",
   "title": "Refine",
   "description": "How the harness refines itself: snags read by what they touched, so a refiner can propose a pack change for what keeps getting in the way. A snag names what it touched in touches, a field each snag's type declares in its own pack (an issue's, in the work pack).",
-  "requires": ["core"],
-  "uses": ["replays"],
+  "uses": ["type:replays.set"],
   "rules": [
     {"id": "touches_form", "when": {"op": ["create", "update"], "matches": {"touches": "^(?!\\s*(?:pack|instruction|tool|rule|view|hook|page):[^\\s,]+(?:[\\s,]+(?:pack|instruction|tool|rule|view|hook|page):[^\\s,]+)*\\s*$)"}}, "then": "refuse", "say": "\"{title}\": touches names what a snag touched as kind:ref, separated by spaces: pack:<id>, instruction:<id>, tool:<name>, rule:<id>, view:<name>, hook:<event> or page:<name>."}
   ],

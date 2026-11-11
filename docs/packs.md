@@ -16,8 +16,8 @@ reads it, `test/structure.test.ts` refuses any other key).
 | Key | What it holds |
 |---|---|
 | `id`, `version`, `title`, `description` | What the pack is. |
-| `requires` | Packs it cannot work without. While one is not active, it waits. |
-| `uses` | Packs it works with when they are active. |
+| `requires` | Names it cannot work without, never packs (below). While one has no active provider, it waits, saying which. |
+| `uses` | Names it works with while they are provided, as `requires` names them. |
 | `types` | Its types. An entry with `of` and `fields` adds fields to another pack's type. A type's `statuses` may say where each stands in its course (`phases`: not_started, under_way, finished, ended, trouble or standing), which every drawing reads; unsaid, it is read from its place in the lists (`src/phases.ts`). |
 | `links` | Its link types: each extends a root, or extends nothing and is its own. An end is `*`, a type (with its flavours) or `has:<capability>`, any type that declares it. |
 | `rules` | What decides a write (`src/rules.ts`), and what asks an agent to go on when its reply ends (`on: "reply_ended"`, `src/reply-rules.ts`). |
@@ -85,11 +85,27 @@ over the manifests before it reads them (`src/type-overlay.ts`), and a
 change that makes or changes one is checked against the registry as it
 will be, so a type made in a change can be used in it (`src/type-items.ts`).
 
+## What a pack requires
+
+A pack requires names, never packs (decision e_f9ybsuce): whichever active
+pack declares a name provides it, so a provider can be swapped and its
+consumers stay active (`src/packorder.ts`). A name is one of:
+
+| Name | Provided by |
+|---|---|
+| `has:<capability>` | any pack declaring a type with that capability (`has:when`) |
+| `type:<id>` | the one pack declaring that type or link type (`type:event`) |
+| `event:<kind>` | core for the kernel's (`item.due`, `notification.made`), else the pack whose handlers record it |
+
+What a pack provides is read off what it declares: there is no key to claim
+it. A bare pack id is the old form, kept for a bundle's two halves.
+
 ## In space
 
 A pack's **reach** is the types, link types and fields of the pack itself,
-of the packs it requires (and theirs), of the packs it uses while they are
-active, and core's. A change a pack's action or handler makes carries the
+of the packs that provide a type it requires or uses (`type:`, or a pack by
+the old form, and theirs), and core's. Requiring a capability or an event
+lets it read and hear, not write another pack's types. A change a pack's action or handler makes carries the
 pack (`pack` in the entry's header, with its manifest and the action), and
 core's rule `pack_reach` refuses one that writes outside its reach. What a
 pack names of a pack it uses (fields added to its types, links to them,
@@ -129,7 +145,8 @@ The island rules, for an island pack:
   `title`, `description`, `requires`, `types`, `links`, `rules`, `views` and
   `styles`. Of `views`, only what the kernel draws (trees, screens,
   attention); of `styles`, only instructions and lenses, no looks.
-- **The shared set alone.** `requires` names core and no other pack, `uses`
+- **The shared set alone.** `requires` names capabilities and shared types
+  (`has:`, `type:`), and no pack but core and no event, `uses`
   is not there, no `types` entry has `of`, and its types, link ends and rules
   name only its own types, the shared set (core's `shared`: the eight starter
   types, task, decision and finding), a capability or `*`. Its links extend
@@ -268,7 +285,7 @@ Adding a pack is the owner's: a new workspace starts with the kernel's
 adds it. A workspace that opens asserts again a pack it has whose manifest
 changed. Taking a
 pack out is the owner's, and is refused while another active pack requires
-it; the kernel's packs are never taken out. Everything a pack registers is
+a name only it provides; the kernel's packs are never taken out. Everything a pack registers is
 derived from the set of packs, so taking one out unwinds it: its tools,
 screens, rules and handlers go, and its items stay, their types dormant.
 

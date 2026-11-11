@@ -18,7 +18,7 @@ import { decideAct, listActs, setPackSecret } from './outside.ts';
 import { canSeal } from './secrets.ts';
 import { ISLANDS } from './islands.ts';
 import { islandBlockers, moveOntoIslands } from './island-start.ts';
-import { KERNEL_PACKS } from './packorder.ts';
+import { dependentsOf, KERNEL_PACKS } from './packorder.ts';
 import { manifestRead } from './pack-folders.ts';
 import { LOCAL_PACK, type PackFile } from './packs.ts';
 import { hostFor } from './packtools.ts';
@@ -248,7 +248,7 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   // A pack the server's list leaves out here (src/pack-allow.ts) is not the owner's to add: the server's configuration lets it in.
   if (input.on && l.registry.only && !l.registry.only.includes(input.pack) && !l.registry.made.has(input.pack)) throw new Error(`The ${input.pack} pack is not offered to this workspace on this server.`);
   if (!input.on && KERNEL_PACKS.includes(input.pack)) throw new Error(`The ${input.pack} pack is the kernel's own: it is never taken out.`);
-  const needing = input.on ? [] : l.registry.packs.filter((p) => (p.requires ?? []).includes(input.pack)).map((p) => p.id);
+  const needing = input.on ? [] : dependentsOf(l.registry.packs, input.pack);
   if (needing.length) throw new Error(`${needing.join(', ')} require${needing.length === 1 ? 's' : ''} the ${input.pack} pack: take ${needing.length === 1 ? 'it' : 'them'} out first.`);
   await syncPacks(l); // the log says what is present before it says what changed
   const off = new Set(await packsOff(l));

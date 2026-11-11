@@ -7,7 +7,7 @@
 // The keys pack files used before this shape are refused, each named with where it went (LEGACY). `parts` is how the kernel reads a pack: each thing it declares as one list, whichever shape it came in.
 
 import type { ActionDef, LayoutDef, HearDef, HostDef, ReasonDef, ScheduleDef, ScreenDef, StyleDef, TreeDef, VerbDef, ViaDef, ViewDef, WebhookDef } from './declared.ts';
-import { KERNEL_PACKS } from './packorder.ts';
+import { isName, KERNEL_PACKS, NAME_FORMS } from './packorder.ts';
 import type { FieldDef, RelationDef, TypeDef } from './packs.ts';
 import type { RuleDef } from './rules.ts';
 import type { ServerHost, ServerReach } from './server-packs.ts';
@@ -48,9 +48,9 @@ export interface Manifest {
   version: string;
   title: string;
   description?: string;
-  /** Packs it cannot work without: while one is not active, it waits. */
+  /** Names it cannot work without, each has:<capability>, type:<id> or event:<kind> (src/packorder.ts): while one has no active provider, it waits. A bare pack id is the old form, kept for a bundle's two halves. */
   requires?: string[];
-  /** Packs it works with when they are active: what of it names their types is registered only while they are. */
+  /** Names it works with while they are provided, as requires names them: what of it names their provider's types is registered only while that one is active. */
   uses?: string[];
   types?: (TypeDef | TypeAdd)[];
   links?: RelationDef[];
@@ -116,6 +116,7 @@ function keyProblems(m: Raw): string[] {
   for (const v of arr<Raw>(m.views)) if (v.form !== undefined && v.form !== 'tree' && v.form !== 'screen' && v.form !== 'attention') problems.push(`view "${String(v.id)}": form is tree, screen or attention, or left out for a read`);
   if (m.shared !== undefined && (!KERNEL_PACKS.includes(String(m.id)) || !Array.isArray(m.shared) || m.shared.some((t) => typeof t !== 'string'))) problems.push('shared is a list of type ids, and only the kernel\'s pack declares it');
   else if (Array.isArray(m.shared)) { const own = new Set(arr<Raw>(m.types).map((t) => t.id)); const not = m.shared.filter((t) => !own.has(t)); if (not.length) problems.push(`shared names ${not.join(', ')}: the shared set is of the types this pack declares`); }
+  for (const [key, names] of Object.entries({ requires: m.requires, uses: m.uses })) for (const n of arr<unknown>(names)) if (!isName(n)) problems.push(`${key} names ${JSON.stringify(n)}: ${NAME_FORMS}`);
   for (const t of arr<Raw>(m.types)) if (t.of !== undefined && (t.id !== undefined || typeof t.fields !== 'object')) problems.push(`type entry of "${String(t.of)}" adds fields to another pack's type: of and fields only`);
   return problems;
 }
