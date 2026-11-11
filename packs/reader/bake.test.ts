@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 // @ts-expect-error the pack's code is plain JavaScript
-import { bakedPage, lookCss, svgOf } from './bake.js';
+import { aboveHtml, bakedPage, lookCss, svgOf } from './bake.js';
 // @ts-expect-error the pack's code is plain JavaScript
 import { bakedSite, keyOf } from './baked-site.js';
 
@@ -44,7 +44,7 @@ test('the page holds each stop’s title and note in order, the walk’s markup,
   assert.ok(html.indexOf(`id="s-${A}"`) < html.indexOf(`id="s-${B}"`));
   assert.ok(html.includes(`<li class="rails-stop" id="s-${A}" data-item="${A}" data-at="10 10 50"><div class="rails-card"><h2>One</h2><p>First &#60;b&#62;note&#60;/b&#62;.</p></div></li>`));
   assert.ok(html.includes(`<section class="rails" data-whole="50 50 100" data-start="${B}" data-ref="hn">`));
-  assert.ok(html.includes('<h1>Home</h1>'), 'the band above the walk');
+  assert.ok(html.includes('<header class="lead"><h1 class="lead-words">Home</h1></header>'), 'the band above the walk');
   assert.ok(html.includes('Made &#60;here&#62;.'));
   assert.ok(!/<style|<script(?![^>]*\bsrc=)/.test(html));
 });
@@ -87,6 +87,28 @@ test('an agent asking for JSON at / is given the stops and the install line; a p
   const at = (await bakedSite(parts(`/${B}`), k.act, k.count)).html;
   assert.match(at, /<title>Two · Site<\/title>/);
   assert.equal(await bakedSite(parts('/e_zzzzzzzz'), k.act, k.count), null, 'no such stop: the site answers it');
+});
+
+test('the band above the walk is what the document holds before its rails picture: the hero first, then the title and words', () => {
+  const H = 'e_hhhhhhh1', C = 'e_cccccccc', L = 'e_llllllll', N = 'e_nnnnnnnn';
+  const page = {
+    title: 'Archipelago',
+    share: C,
+    parts: [
+      { section: { id: H, title: 'A map <of> work', body: '', picture: true } },
+      { section: { id: C, title: 'Card', body: '', picture: true } },
+      { text: 'Work, **mapped**.' },
+      { section: { id: L, title: 'The walk', body: '' } },
+      { section: { id: N, title: 'After', body: 'Not above.' } },
+    ],
+  };
+  const html = aboveHtml(page, L);
+  assert.ok(html.startsWith(`<figure class="hero"><img src="/picture/${H}" alt="A map &#60;of&#62; work" /></figure>`), 'the hero first');
+  assert.ok(html.indexOf('<h1') > html.indexOf('hero') && html.indexOf('<h1') < html.indexOf('mapped'), 'the title after the pictures it opens with');
+  assert.ok(html.includes('<b>mapped</b>'));
+  assert.ok(!html.includes(C), 'the link card is the card’s alone');
+  assert.ok(!html.includes('After'), 'only what comes before the walk');
+  assert.equal(aboveHtml({ title: 'T', parts: [{ section: { id: L } }] }, L), '<h1 class="lead-words">T</h1>');
 });
 
 test('a site whose home is not baked is answered as it was', async () => {

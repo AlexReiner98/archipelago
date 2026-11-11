@@ -13,8 +13,15 @@ body.baked { margin: 0; background: var(--ln-sea); color: var(--ln-text); font-f
   padding: calc(var(--ln-rails-card-pad) / 2) var(--ln-rails-card-pad); border-radius: var(--ln-rails-corner);
   background: var(--ln-accent); color: var(--ln-sea) !important; font-weight: 600; text-decoration: none; white-space: nowrap;
 }
-.lead { padding: calc(var(--ln-rails-card-inset) * 4) var(--ln-rails-card-inset) var(--ln-rails-card-inset); max-width: var(--ln-rails-card-width); }
-.lead h1 { margin: 0; font-size: var(--ln-rails-card-title); }
+/* The band above the walk: a hero picture across it, then the view's title and any words, a card wide. */
+.lead { padding: calc(var(--ln-rails-card-inset) * 4) var(--ln-rails-card-inset) var(--ln-rails-card-inset); display: grid; gap: var(--ln-rails-card-pad); }
+.lead-words { max-width: var(--ln-rails-card-width); margin: 0; }
+.lead-words > :first-child { margin-top: 0; }
+.lead h1 { font-size: var(--ln-rails-card-title); }
+.lead p { color: var(--ln-muted); font-size: var(--ln-rails-card-text); }
+.hero { margin: 0; }
+.hero img { display: block; width: 100%; max-height: var(--ln-rails-hero-most); object-fit: cover; border-radius: var(--ln-rails-corner); }
+.hero figcaption { margin-top: calc(var(--ln-rails-card-pad) / 2); color: var(--ln-muted); font-size: var(--ln-rails-count-text); }
 .baked .rails { padding: 0 var(--ln-rails-card-inset); }
 .baked .rails[data-rails="walk"] { padding: 0; }
 .site-foot { padding: var(--ln-rails-card-inset); color: var(--ln-muted); font-size: var(--ln-rails-count-text); max-width: var(--ln-rails-card-width); }

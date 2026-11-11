@@ -3,7 +3,10 @@
 // script reads whole: each stop's title and note as text in order, the map as SVG, its stops as a list. Pure: what the
 // kernel answered in, the page out. Nothing is read here but that answer, so what was not frozen is not on the page.
 //
-// The page has a band above the walk (header.lead): the place for what is put above the rails (task e_4m657w2v).
+// The page has a band above the walk (header.lead): what the view's document holds before its rails picture, a hero
+// picture first (aboveHtml). Placing things freely on the map the camera walks is a later pack's (task e_4m657w2v).
+
+import { wordsHtml } from './head.js';
 
 /** The tags and attributes a mark may have, as the page holds a drawing to them (ui/marks.js); anything else is refused. */
 const SVG_TAGS = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'title', 'a', 'defs', 'clipPath', 'linearGradient', 'radialGradient', 'stop']);
@@ -110,6 +113,28 @@ export const stopOf = (baked, id) => baked.scene.stops.find((s) => s.id === id);
 const at = (c) => `${c.x} ${c.y} ${c.span}`;
 
 /**
+ * The band above the walk: what the view's document holds before its rails picture, in its order. A section with a
+ * figure is a picture across the band (the first, the hero), any other its title and words, and words between them as
+ * written; the section the style names for a link's card (`share`) is that card's alone, as on any published page.
+ * The view's title stands after the pictures it opens with.
+ */
+export function aboveHtml(doc, section) {
+  const parts = doc.parts ?? [];
+  const end = parts.findIndex((p) => p.section?.id === section);
+  const shown = (end < 0 ? [] : parts.slice(0, end)).filter((p) => !(p.section && p.section.id === doc.share));
+  const html = shown.map((p) => {
+    if (typeof p.text === 'string') return `<div class="lead-words">${wordsHtml(p.text)}</div>`;
+    const s = p.section ?? {};
+    if (!ID.test(String(s.id))) return '';
+    if (s.picture) return `<figure class="hero"><img src="/picture/${s.id}" alt="${escape(s.title)}" />${s.body ? `<figcaption>${wordsHtml(s.body)}</figcaption>` : ''}</figure>`;
+    return `<div class="lead-words"><h2>${escape(s.title)}</h2>${wordsHtml(s.body ?? '')}</div>`;
+  });
+  const leading = shown.findIndex((p) => !p.section?.picture);
+  const k = leading < 0 ? html.length : leading;
+  return [...html.slice(0, k), `<h1 class="lead-words">${escape(doc.title)}</h1>`, ...html.slice(k)].filter(Boolean).join('\n');
+}
+
+/**
  * The page. `head` is what goes in its head beyond the title (description, canonical, the preview card), `title` its
  * title, `site` the header and footer (name, footer, home), `start` the main button's address, `look` the stylesheet's
  * address, `stop` the stop it opens at, `ref` the tag the reader came by, which its counts carry.
@@ -137,7 +162,7 @@ export function bakedPage(baked, doc, { title, head = '', site = {}, start, look
   <body class="baked">
     <nav class="site-head"><a class="site-name" href="/">${escape(site.name ?? '')}</a>${start ? `<a class="start" href="${escape(start)}">Start hosted</a>` : ''}</nav>
     <main id="main">
-      <header class="lead"><h1>${escape(doc.title)}</h1></header>
+      <header class="lead">${aboveHtml(doc, baked.section)}</header>
       <section class="rails" data-whole="${at(scene.whole)}"${stop ? ` data-start="${stop.id}"` : ''}${ref ? ` data-ref="${escape(ref)}"` : ''}>
         <div class="rails-stage">${svgOf(scene.svg)}</div>
         <ol class="rails-stops">

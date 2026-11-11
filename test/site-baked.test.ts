@@ -33,11 +33,15 @@ test('a home view drawn by the rails is baked at /: its stops in order, each at 
         { op: 'link', type: 'depends_on', from: 'b', to: 'a' },
         { op: 'link', type: 'depends_on', from: 'p', to: 'b' },
         { op: 'create', ref: 'l', type: 'lens', title: 'The walk', visibility: 'shared', props: { filter: { find: ['type task'] }, style: { shape: 'rails' } } },
-        { op: 'create', ref: 'home', type: 'page', title: 'Archipelago', visibility: 'shared', props: { path: 'home' }, body: '{l}' },
+        { op: 'create', ref: 'home', type: 'page', title: 'Archipelago', visibility: 'shared', props: { path: 'home' }, body: '{hero}\n\n{l}' },
+        { op: 'create', ref: 'hero', type: 'plate', title: 'A map of the work', visibility: 'shared', body: '' },
+        { op: 'link', type: 'part_of', from: 'hero', to: 'home' },
         { op: 'link', type: 'part_of', from: 'l', to: 'home' },
       ],
     })
   ).result.created as Record<string, string>;
+  const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex').toString('base64');
+  assert.equal((await call('/api/picture_put', undefined, { result: made.hero, data: png, content_type: 'image/png' })).status, 200);
   assert.equal((await call('/api/publish', undefined, { id: made.home })).status, 200);
 
   const front = await visit(base, '/', 'site.test');
@@ -54,6 +58,11 @@ test('a home view drawn by the rails is baked at /: its stops in order, each at 
   assert.match(String(front.headers['content-security-policy']), /script-src 'self'/);
   assert.ok(!/<script(?![^>]*\bsrc=)/.test(front.body) && !/<style/.test(front.body) && !/ style="/.test(front.body));
   assert.match(front.body, /<a class="start" href="\/go\/start">/);
+
+  // The hero above the walk, its picture the one kept with the view.
+  const hero = front.body.indexOf(`<img src="/picture/${made.hero}" alt="A map of the work" />`);
+  assert.ok(hero > 0 && hero < front.body.indexOf('<section class="rails"'));
+  assert.equal((await visit(base, `/picture/${made.hero}`, 'site.test')).status, 200);
 
   // A stop at its own address: the same page, its head the stop's.
   const stop = await visit(base, `/${made.b}`, 'site.test');
