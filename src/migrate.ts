@@ -29,6 +29,7 @@ import { MENTIONS } from './mentions.ts';
 import { ITEM_BYTES } from './bytes.ts';
 import { ACTIVE_HOLDS_BY_KEY, READ_INDEXES, ROW_POLICIES } from './read-indexes.ts';
 import { GUEST_READER } from './guest-schema.ts';
+import { MEMBER_READ_ONLY } from './member-schema.ts';
 
 interface Migration {
   version: number;
@@ -86,6 +87,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 37, name: 'a link keeps its view frozen, read by a short token', sql: LINK_SNAPSHOT },
   { version: 38, name: 'what the compacted streams say about an item, found by its index under the row policy', sql: OP_ABOUT },
   { version: 39, name: 'shares made out to another workspace, gone', sql: SHARE_WORKSPACE_GONE },
+  { version: 40, name: 'a member who only reads', sql: MEMBER_READ_ONLY },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

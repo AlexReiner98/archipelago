@@ -159,7 +159,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (!at) throw deny(); // not a member there: the same answer as a token nobody made
       res.once('close', workspaces.hold(at.workspace)); const ws = await workspaces.get(at.workspace), as = at.actor;
       const slow = await requestWait(ws.id, token, askedAs(as)); if (slow.wait) throw new Refused(429, slow.refusal!, slow.wait);
-      return { ws, pelago: ws.pelago.as(as.person ?? '', false), actor: (label) => (label ? { ...as, name: `${as.name}/${label}` } : as) };
+      return { ws, pelago: ws.pelago.as(as.person ?? '', false, as.may === 'read'), actor: (label) => (label ? { ...as, name: `${as.name}/${label}` } : as) };
     }
     if (!token || !id || !(await workspaces.has(id))) throw deny();
     // A token nobody made for that workspace is refused before its database is opened (src/control-index.ts).
@@ -186,7 +186,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       ws,
       // Everything this request reads or writes goes through the database as
       // this person sees it. A token tied to nobody sees only what is shared.
-      pelago: identity.actor.reads ? await guestMap(ws.pelago, identity.actor.reads, identity.actor.person ?? '').catch((err) => { throw err instanceof ShareEnded ? new Refused(403, err.message) : err; }) : ws.pelago.as(identity.actor.person ?? '', Boolean(identity.actor.admin)),
+      pelago: identity.actor.reads ? await guestMap(ws.pelago, identity.actor.reads, identity.actor.person ?? '').catch((err) => { throw err instanceof ShareEnded ? new Refused(403, err.message) : err; }) : ws.pelago.as(identity.actor.person ?? '', Boolean(identity.actor.admin), identity.actor.may === 'read'),
       actor: (label) => (label && identity.actor.kind === 'agent' ? { ...identity.actor, name: `${identity.actor.name}/${label}` } : identity.actor),
     };
   }

@@ -72,7 +72,7 @@ export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; del
    * Add a member as an admin does, and sign them in: their token. The mail carries only a code, and asking for one is
    * limited to once a minute an address, so the sign-in is made here the way the server makes one, and traded at the door.
    */
-  const member = async (admin: string, body: { email: string; name?: string; admin?: boolean }) => {
+  const member = async (admin: string, body: { email: string; name?: string; admin?: boolean; read_only?: boolean }) => {
     const added = await call('/api/member_add', admin, body);
     if (added.status !== 200) throw new Error(added.error);
     const workspace = (await call('/whoami', admin, undefined, 'GET')).workspace.id as string;

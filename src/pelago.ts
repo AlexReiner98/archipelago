@@ -58,9 +58,9 @@ export class Archipelago {
     return new Archipelago(anyone(this.db), this.registry, this.policy, this.workspace, '', 'pelago_public_props(id) as props');
   }
 
-  /** This map as one person sees it. An empty viewer sees only what is shared; an admin also sees every token and setting. */
-  as(viewer: string, admin = false): Archipelago {
-    return new Archipelago(scoped(this.db, viewer, admin), this.registry, this.policy, this.workspace, viewer);
+  /** This map as one person sees it. An empty viewer sees only what is shared; an admin also sees every token and setting; one who only reads writes nothing (src/db.ts). */
+  as(viewer: string, admin = false, readOnly = false): Archipelago {
+    return new Archipelago(scoped(this.db, viewer, admin, readOnly), this.registry, this.policy, this.workspace, viewer);
   }
 
   /** This map as a guest reads it: only the view of the share they were given, as it is now, and only reading. */

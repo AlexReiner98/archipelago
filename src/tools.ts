@@ -50,6 +50,8 @@ export interface Tool {
 /** Tools that are no step of their own: those that point the screen themselves, and the one that only waits. */
 const UNWATCHED = new Set(['show', 'change', 'tell', 'watch', 'hook']);
 const READS = new Set(['get', 'events', 'proposals', 'picture', 'schema']);
+/** What a member who only reads may call (src/members.ts): the reads a canvas makes, the page's feed of the log, query, and the workspace's settings. Their database writes nothing besides (src/db.ts). */
+const MEMBER_READS = new Set([...GUEST_READS, 'query', 'workspace_info']);
 async function step(l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>): Promise<void> {
   const params = (input.params ?? {}) as Record<string, unknown>;
   // A session saying only that it is alive has done nothing to see.
@@ -122,7 +124,7 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
   if (!tool) throw new Error(`No tool "${name}". Tools: ${(actor.kind === 'human' ? toolsFor(l.registry) : surfaceFor(l.registry)).map(([t]) => t).join(', ')}`);
   if (tool.devOnly && !devMode()) throw new Error(`"${name}" is available only in dev mode (npm run dev).`);
   if (tool.humanOnly && actor.kind !== 'human') throw new Error(`"${name}" is for humans only.`);
-  if (actor.may === 'read' && !GUEST_READS.has(name)) throw new Error(`A guest reads the view shared with them: they cannot call ${name}.`);
+  if (actor.may === 'read' && !(actor.reads ? GUEST_READS : MEMBER_READS).has(name)) throw new Error(`This sign-in only reads the map: it cannot call ${name}.`);
   if (actor.may === 'report' && !tool.report) throw new Error(`This token may only report: it cannot call ${name}. Send what was measured with report.`);
   const parsed = z.strictObject(tool.input).safeParse(routed ? routed.input : (input ?? {}));
   if (!parsed.success) throw new Error(`Invalid input for ${name}:\n${z.prettifyError(parsed.error)}`);

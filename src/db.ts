@@ -123,12 +123,14 @@ function pgliteVersion() {
  * The same database as one person sees it. Every statement runs inside a
  * transaction that first drops to the member role and names the viewer (and
  * whether they are an admin of the workspace), so neither can leak between
- * requests sharing the connection.
+ * requests sharing the connection. A member who only reads (src/members.ts) runs in a read-only transaction besides:
+ * the database refuses every write in it, and once it has read, refuses to be made to write again.
  */
-export function scoped(db: Db, viewer: string, admin = false): Db {
+export function scoped(db: Db, viewer: string, admin = false, readOnly = false): Db {
   const enter = async (tx: Q) => {
-    await tx.query(`select set_config('pelago.viewer', $1, true), set_config('pelago.admin', $2, true)`, [viewer, admin ? '1' : '']);
+    await tx.query(`select set_config('pelago.viewer', $1, true), set_config('pelago.admin', $2, true)`, [viewer, admin && !readOnly ? '1' : '']);
     await tx.query(`set local role pelago_member`);
+    if (readOnly) await tx.query(`set transaction read only`);
   };
   return {
     query: <T>(sql: string, params?: unknown[]) =>

@@ -31,6 +31,8 @@ export interface Member {
   person_id: string;
   admin: boolean;
   added_at: string;
+  /** One who only reads: they see what any member sees, and the database refuses their writes (src/db.ts scoped). Never an admin. */
+  read_only: boolean;
   /** A guest's: the share whose view alone they read (src/guests.ts). */
   reads?: string | null;
 }
@@ -65,7 +67,7 @@ async function roomForOneMore(db: Q, workspace: string, added = 0): Promise<void
 }
 
 export async function memberOf(db: Q, email: string): Promise<Member | undefined> {
-  const { rows } = await db.query<Member>(`select email, person_id, admin, added_at, reads from member where email = $1 and removed_at is null`, [email]);
+  const { rows } = await db.query<Member>(`select email, person_id, admin, added_at, read_only, reads from member where email = $1 and removed_at is null`, [email]);
   return rows[0];
 }
 
@@ -233,9 +235,11 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
       email: z.string().min(3),
       name: z.string().optional().describe('Their name, for a new person entity; the address is used when it is left out.'),
       admin: z.boolean().optional().describe('May manage members, tokens and workspace settings.'),
+      read_only: z.boolean().optional().describe('Only reads: sees what any member sees and changes nothing. Never an admin.'),
     },
     run: async (l, actor, input) => {
       needAdmin(actor, 'add members');
+      if (input.admin && input.read_only) throw new Error('A member who only reads cannot be an admin.');
       const email = normalEmail(input.email);
       if (!email) throw new Error(`"${input.email}" is not an email address.`);
       const whole = await wholeMap(l);
@@ -247,9 +251,9 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
         rows[0]?.id ??
         (await l.apply(actorId(actor), { ops: [{ op: 'create', ref: 'p', type: 'person', title: input.name?.trim() || email, visibility: 'shared', props: { email } }], reason: 'Added to the workspace' })).created.p;
       await whole.db.query(
-        `insert into member (email, person_id, admin, added_by) values ($1, $2, $3, $4)
-         on conflict (email) do update set person_id = excluded.person_id, admin = excluded.admin, added_by = excluded.added_by, added_at = now(), removed_at = null`,
-        [email, person, Boolean(input.admin), actor.name],
+        `insert into member (email, person_id, admin, added_by, read_only) values ($1, $2, $3, $4, $5)
+         on conflict (email) do update set person_id = excluded.person_id, admin = excluded.admin, added_by = excluded.added_by, added_at = now(), removed_at = null, read_only = excluded.read_only`,
+        [email, person, Boolean(input.admin), actor.name, Boolean(input.read_only)],
       );
       await noted(email, l.workspace, true);
       // Two added at once may both have found room: counted again, the one past the limit is taken out.
@@ -285,13 +289,13 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
     },
   },
   member_list: {
-    description: 'The members of this workspace: each email address, the person it is, whether they are an admin, and when they last used a sign-in. Admins only.',
+    description: 'The members of this workspace: each email address, the person it is, whether they are an admin or only read, and when they last used a sign-in. Admins only.',
     humanOnly: true,
     input: {},
     run: async (l, actor) => {
       needAdmin(actor, 'list members');
       const { rows } = await (await wholeMap(l)).db.query<Member & { name: string | null; last_used: string | null }>(
-        `select m.email, m.person_id, m.admin, m.added_at, e.title as name,
+        `select m.email, m.person_id, m.admin, m.read_only, m.added_at, e.title as name,
                 (select max(t.last_used) from token t where t.entity_id = m.person_id and t.kind = 'human') as last_used
          from member m left join entity e on e.id = m.person_id where m.removed_at is null order by m.added_at`,
       );
@@ -299,9 +303,9 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
     },
   },
   member_set: {
-    description: 'Make a member an admin or not (their sign-ins change at once), or remove them (their sign-ins end at once). Admins only; nobody removes themselves.',
+    description: 'Make a member an admin or not, or one who only reads or not (their sign-ins change at once), or remove them (their sign-ins end at once). An admin never only reads. Admins only; nobody removes themselves.',
     humanOnly: true,
-    input: { email: z.string(), admin: z.boolean().optional(), remove: z.boolean().optional() },
+    input: { email: z.string(), admin: z.boolean().optional(), read_only: z.boolean().optional(), remove: z.boolean().optional() },
     run: async (l, actor, input) => {
       needAdmin(actor, 'change members');
       const whole = await wholeMap(l);
@@ -316,11 +320,16 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
         await noted(member.email, l.workspace, false);
         return { removed: member.email };
       }
-      if (input.admin === undefined) return member;
-      if (!input.admin && member.person_id === actor.person) throw new Error('You cannot take away your own admin.');
-      await whole.db.query(`update member set admin = $2 where email = $1`, [member.email, input.admin]);
-      await whole.db.query(`update token set admin = $2 where ${live}`, [member.person_id, input.admin]);
-      return { ...member, admin: input.admin };
+      if (input.admin === undefined && input.read_only === undefined) return member;
+      if (input.admin && input.read_only) throw new Error('A member who only reads cannot be an admin.');
+      // Each takes the other away: an admin who is made to only read is an admin no more, and the other way round.
+      const admin = input.admin ?? (input.read_only ? false : member.admin);
+      const readOnly = input.read_only ?? (input.admin ? false : member.read_only);
+      if ((!admin || readOnly) && member.person_id === actor.person) throw new Error('You cannot take away your own admin.');
+      // Their tokens' admin follows at once; whether they only read is read from here with each request (src/auth.ts).
+      await whole.db.query(`update member set admin = $2, read_only = $3 where email = $1`, [member.email, admin, readOnly]);
+      await whole.db.query(`update token set admin = $2 where ${live}`, [member.person_id, admin]);
+      return { ...member, admin, read_only: readOnly };
     },
   },
 };
