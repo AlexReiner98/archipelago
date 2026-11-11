@@ -1,0 +1,27 @@
+/* A baked home view's page (packs/reader/bake.js): the site's name and its one button over the walk, the view's title
+   above it (the band a part above the rails goes in), the footer below. Every length and colour is the style's. */
+
+body.baked { margin: 0; background: var(--ln-sea); color: var(--ln-text); font-family: var(--ln-font, system-ui, sans-serif); }
+.baked a { color: inherit; }
+.site-head {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between;
+  padding: var(--ln-rails-card-inset); pointer-events: none;
+}
+.site-head a { pointer-events: auto; }
+.site-name { font-weight: 600; text-decoration: none; }
+.start {
+  padding: calc(var(--ln-rails-card-pad) / 2) var(--ln-rails-card-pad); border-radius: var(--ln-rails-corner);
+  background: var(--ln-accent); color: var(--ln-sea) !important; font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.lead { padding: calc(var(--ln-rails-card-inset) * 4) var(--ln-rails-card-inset) var(--ln-rails-card-inset); max-width: var(--ln-rails-card-width); }
+.lead h1 { margin: 0; font-size: var(--ln-rails-card-title); }
+.baked .rails { padding: 0 var(--ln-rails-card-inset); }
+.baked .rails[data-rails="walk"] { padding: 0; }
+.site-foot { padding: var(--ln-rails-card-inset); color: var(--ln-muted); font-size: var(--ln-rails-count-text); max-width: var(--ln-rails-card-width); }
+
+/* The map's colours read from the page's, as a picture in a published document reads them (ui/doc-lens.css). */
+body.baked {
+  --ln-sea: var(--bg); --ln-land: var(--panel); --ln-inner: var(--bg); --ln-line: var(--edge); --ln-text: var(--text); --ln-muted: var(--muted);
+  --ln-blocked: var(--g-blocked); --ln-you: var(--g-question); --ln-session: var(--accent); --ln-done: var(--ok); --ln-warn: var(--warn); --ln-accent: var(--accent);
+  --ln-font: var(--face-text);
+}

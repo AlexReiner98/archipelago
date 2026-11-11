@@ -31,26 +31,32 @@ export async function openingScene(entry: string, frozen: Frozen, types: Record<
   return drawn?.scene ? plain(drawn.scene) : null;
 }
 
+/** The scene the pack's drawing at `entry` opens `frozen` on, given the words the page would give it; null when it cannot be had. */
+export async function sceneOf(l: Pick<Archipelago, 'registry'>, frozen: Frozen, entry: string) {
+  // The titles of the types it holds, as the page would give them.
+  const items = (frozen.items as { type?: string; root?: string }[] | undefined) ?? [];
+  const held = new Set(items.flatMap((i) => [i.type, i.root]).filter((t): t is string => Boolean(t)));
+  const types = Object.fromEntries([...held].map((t) => [t, l.registry.type(t)?.title ?? t]));
+  // The values each type's fields may take, and each link's title, as the page would give them (ui/layout.js).
+  const fields = Object.fromEntries(
+    [...new Set(items.map((i) => i.type).filter((t): t is string => Boolean(t)))]
+      .map((t) => [t, Object.fromEntries(Object.entries(l.registry.type(t)?.fields ?? {}).flatMap(([name, f]) => (Array.isArray((f as { values?: unknown }).values) ? [[name, (f as { values: string[] }).values]] : [])))])
+      .filter(([, f]) => Object.keys(f as object).length),
+  );
+  const kinds = new Set(((frozen.links as { kind?: string }[] | undefined) ?? []).map((k) => k.kind).filter((k): k is string => Boolean(k)));
+  const relations = Object.fromEntries([...kinds].map((k) => [k, l.registry.relations.get(k)?.title ?? k]));
+  const scene = await openingScene(entry, frozen, types, { fields, relations }).catch(() => null);
+  return scene && !scene.message ? scene : null;
+}
+
 /** Keep each picture's first frame with it (`first`), where its drawing is the pack's own. */
 export async function framesFor(l: Pick<Archipelago, 'registry'>, lenses: Record<string, Frozen>) {
   for (const frozen of Object.values(lenses)) {
     const sent = frozen.style?.drawing as { id?: string; hash?: string } | undefined;
     const own = sent?.id ? packLayout(l.registry, sent.id) : undefined;
     if (!own?.entry || own.hash !== sent?.hash) continue;
-    // The titles of the types it holds, as the page would give them.
-    const held = new Set(((frozen.items as { type?: string; root?: string }[] | undefined) ?? []).flatMap((i) => [i.type, i.root]).filter((t): t is string => Boolean(t)));
-    const types = Object.fromEntries([...held].map((t) => [t, l.registry.type(t)?.title ?? t]));
-    // The values each type's fields may take, and each link's title, as the page would give them (ui/layout.js).
-    const items = (frozen.items as { type?: string }[] | undefined) ?? [];
-    const fields = Object.fromEntries(
-      [...new Set(items.map((i) => i.type).filter((t): t is string => Boolean(t)))]
-        .map((t) => [t, Object.fromEntries(Object.entries(l.registry.type(t)?.fields ?? {}).flatMap(([name, f]) => (Array.isArray((f as { values?: unknown }).values) ? [[name, (f as { values: string[] }).values]] : [])))])
-        .filter(([, f]) => Object.keys(f as object).length),
-    );
-    const kinds = new Set(((frozen.links as { kind?: string }[] | undefined) ?? []).map((k) => k.kind).filter((k): k is string => Boolean(k)));
-    const relations = Object.fromEntries([...kinds].map((k) => [k, l.registry.relations.get(k)?.title ?? k]));
-    const scene = await openingScene(own.entry, frozen, types, { fields, relations }).catch(() => null);
-    if (scene && !scene.message) frozen.first = scene;
+    const scene = await sceneOf(l, frozen, own.entry);
+    if (scene) frozen.first = scene;
   }
   return lenses;
 }

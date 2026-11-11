@@ -10,6 +10,7 @@
 import type { Part } from './documents.ts';
 import { layoutCode, pageData, publicPath } from './published-data.ts';
 import { PATH } from './published.ts';
+import { bake } from './public-bake.ts';
 import { publicView, publicViewAt, publicViewPicture, publicViews } from './public-view-store.ts';
 import type { ActPlaces } from './server-acts.ts';
 import type { ServerAct, ServerPackFile } from './server-packs.ts';
@@ -60,6 +61,11 @@ export async function publishedAct(at: ActPlaces, pack: ServerPackFile, act: Ser
     }
     case 'public.list':
       return l ? publicViews(l) : [];
+    case 'public.baked': {
+      // The public view at a path, its rails picture run with this server's code (src/public-bake.ts); null when it has none.
+      const doc = l && ((await publicViewAt(l, word(input.path, PATH, 'A path'))) as Doc | null);
+      return l && doc ? bake(l, doc) : null;
+    }
     default:
       throw new Error(`The act "${act}" is not one of the public acts.`);
   }
