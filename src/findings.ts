@@ -19,8 +19,6 @@ export interface FindingRow {
 /** How many published findings a brief lists of one island, and how many working ones; what is past each is counted. */
 export const FINDINGS_LIMIT = 40;
 export const WORKING_LIMIT = 8;
-/** How many published findings an island's shore lists on a canvas. */
-export const SHORE_MOST = 6;
 
 /** Some rows of a longer list: those listed, and how many more there are. */
 export interface Listed { rows: FindingRow[]; more: number }
