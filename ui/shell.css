@@ -261,6 +261,9 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .mark-type { color: var(--muted); }
 #sheet .sheet-marks select { padding: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; }
 #sheet .sheet-marks details.menu > summary { border: 0; padding: var(--space-2) var(--space-5); font-size: var(--text-7); line-height: 1; color: var(--muted); }
+/* An item a public view shows: a mark, and one behind it (changed since shared) offers to share it again. */
+#sheet .sheet-marks .public-mark { white-space: nowrap; }
+#sheet .sheet-marks .public-mark.behind, #sheet .sheet-marks details.public-mark > summary { color: var(--accent); font-size: inherit; }
 #sheet .note { margin-bottom: var(--space-10); }
 #sheet .note > .fields { padding: 0; margin: 0 0 var(--space-8); }
 #sheet .draft-read { cursor: text; }

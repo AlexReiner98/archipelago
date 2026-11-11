@@ -7,6 +7,7 @@ import { lastSeq, readEvents } from './eventlog.ts';
 import { listening } from './presence.ts';
 import { askView, viewList, viewsSaid } from './askview.ts';
 import { shownIn } from './query-saved.ts';
+import { showingIn } from './public-view-store.ts';
 import { wholeMap } from './outbox.ts';
 import type { Archipelago } from './pelago.ts';
 import { lookAt, takeLook } from './looks.ts';
@@ -228,11 +229,15 @@ export const READ_TOOLS: Record<string, Tool> = {
     },
   },
   get: {
-    description: 'One item in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the views it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in, and steps_wrong where the steps of a view no longer pass) and its links in both directions. Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
+    description: 'One item in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the views it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in, and steps_wrong where the steps of a view no longer pass), the public views that show it (public_views, frozen when shared: one marked behind has changed since, so tell the person, whose act sharing it again is) and its links in both directions. Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
     input: { id: z.string(), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe(`true for all of it whole. Past ${GET_LISTED} links in a direction, an agent is given those and a count by type (links_cut); of what names it the first ${GET_MENTIONS}; of what holds it the number of views about each; and of a large field (a layout's code) its first lines and size. The whole record is in events, with full: true.`) },
     run: async (l, actor, input) => {
       const found = { ...(await l.get(input.id)), shown_in: [] as Awaited<ReturnType<typeof shownIn>> };
       found.shown_in = await shownIn(l, input.id, found.trail);
+      // The public views that show it, frozen when shared: one marked behind has changed since, and sharing that view again
+      // is the person's (an agent editing it tells them).
+      const shared = await showingIn(l, input.id, found.entity.updated_at);
+      if (shared.length) Object.assign(found, { public_views: shared });
       // Only the last few changes, long values cut, for anyone; an agent mostly wants the item, so has them when it asks.
       const { recent_events, ...item } = found;
       const recent = shortHistory(recent_events, actor.kind !== 'human', 'query events, with full: true, has all of it');
