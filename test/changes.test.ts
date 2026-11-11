@@ -67,7 +67,7 @@ test('invalid changes are rejected whole, with every problem listed', async () =
     { op: 'create', ref: 'a', type: 'task', title: 'A' },
     { op: 'create', ref: 'c', type: 'company', title: 'C' },
     { op: 'link', type: 'works_at', from: 'a', to: 'c' },
-  ]), /must start from person, not task/);
+  ]), /must start from actor, not task/);
   await assert.rejects(l.change(human, { ops: [{ op: 'create', type: 'task', title: 'A' }], reason: ' ' }), /needs a reason/);
 });
 

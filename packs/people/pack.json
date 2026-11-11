@@ -19,7 +19,7 @@
       "extends": "part_of",
       "title": "works at",
       "inverse": "employs",
-      "from": ["person"],
+      "from": ["actor"],
       "to": ["company"],
       "description": "Put the job title in the relation's props.role."
     }
