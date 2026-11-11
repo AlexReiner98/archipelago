@@ -28,9 +28,15 @@ export const KERNEL_PACKS = ['core'];
  */
 export const movedFrom = (pack: { id: string; moved_from?: string[] }): string[] => [...KERNEL_PACKS, ...(pack.moved_from ?? [])].filter((p) => p !== pack.id);
 
-/** Whether a pack may declare an id: its own `<pack>.<name>`, or a name a pack it took declarations from gave (movedFrom). The kernel's pack names anything. */
+/**
+ * Whether a pack may declare an id: its own `<pack>.<name>`, or a name a pack it took declarations from gave
+ * (movedFrom). The kernel's pack names anything, so a bare name (no pack in it) is the kernel's: kept by a pack whose
+ * `moved_from` names the kernel's pack outright (task e_2a94ypah: core's "needs" screen, moved to work_views).
+ */
 export const ownsId = (pack: { id: string; moved_from?: string[] }, id: string): boolean =>
-  KERNEL_PACKS.includes(pack.id) || [pack.id, ...movedFrom(pack)].some((p) => id.startsWith(`${p}.`));
+  KERNEL_PACKS.includes(pack.id) ||
+  [pack.id, ...movedFrom(pack)].some((p) => id.startsWith(`${p}.`)) ||
+  (!id.includes('.') && (pack.moved_from ?? []).some((p) => KERNEL_PACKS.includes(p)));
 
 /** The kernel's own kinds of event (src/due.ts, src/notify.ts): always provided, by core. */
 export const KERNEL_EVENTS = ['item.due', 'notification.made'];

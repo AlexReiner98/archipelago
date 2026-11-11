@@ -1212,13 +1212,6 @@
       "description": "What deserves attention, and why: each item with its reasons, the strongest first. Reasons: waits_on (someone must answer or act), to_confirm (an agent settled it and the owner has not confirmed), holding_up (others are blocked by it), due (its bound is near or past), moved (a finding it reads has changed since it was last changed or said still true: which, from what to what, when; an update of only its id clears it), unsettled (a question not yet settled, and how it settles), blocked (and what has to move first), stale (nobody has changed or confirmed it for stale_days), under_way (a session is on it), ready (work nothing blocks). Each item says what it sits in at the top (top). Params: person (\"me\", or an id: only what is theirs), within (an item or place: only what is its): one of the two, since weighing every open item would read the whole map (for everyone, only to_confirm), reasons (some of the above), days (due within, 7), stale_days (14), order (latest: what changed most recently first), limit (100). With to_confirm, the answer has to_confirm.upto for the confirmed tool."
     },
     {
-      "id": "core.tree",
-      "shape": "data",
-      "lens": {},
-      "answer": "tree",
-      "description": "A tree a pack declares over \"is part of\", such as software.roadmap: one root and its branches in order, the work under each, progress rolled up, and what is being worked on now. Params: root (an item id; without it, the roots to choose from), tree (needed only when packs declare more than one)."
-    },
-    {
       "id": "core.hubs",
       "shape": "data",
       "lens": {},
@@ -1250,13 +1243,6 @@
         { "piece": "held", "title": "Held for you" },
         { "piece": "attention", "title": "Your move", "person": "me", "reasons": ["waits_on", "to_confirm", "due", "moved", "unsettled"], "limit": 5 }
       ]
-    },
-    {
-      "form": "screen",
-      "id": "needs",
-      "title": "Needs you",
-      "on": ["work", "aim"],
-      "pieces": [{ "piece": "attention", "person": "me", "reasons": ["waits_on", "to_confirm", "holding_up", "due", "moved", "unsettled"] }]
     },
     {
       "form": "screen",
@@ -1318,7 +1304,6 @@
     { "id": "core.search_first", "type": "instruction", "title": "Search before you create", "body": "Query with name search first, so nothing is made twice.", "props": { "for": ["working_rules"], "order": 70 } },
     { "id": "core.held", "type": "lens", "title": "Held for you", "props": { "filter": { "find": ["held"], "not": ["type run"] }, "walk": { "over": "all", "steps": 1 } } },
     { "id": "core.reading", "title": "Reading what is made for a reader", "on": ["has:deliverable"], "props": { "page": { "picture": false, "notes": "whole" }, "notes": { "measure": "reader_measure" } } },
-    { "id": "core.waiting", "type": "lens", "title": "Waiting on you", "props": { "filter": { "find": ["waits_on me"] }, "walk": { "over": [], "steps": 0 } } },
     { "id": "core.plan_flow", "type": "instruction", "title": "A result is items and a view", "body": "Anything with parts goes on the map as items first, never as one long note: a plan, research, an evaluation, a comparison. A plan: each step a task, part_of its hub, its order as depends_on, who must act as waits_on. Research: each finding and each option an item that bears_on the question it answers (anything else it informs, it is about), what it rests on as depends_on, its facts as fields or a short note. Then a view about the hub (a lens linked about it: shape flow for steps, a drawing of how the parts connect for an explanation), and show it. A plan's flow walks works_on< too, so each session at work on a step is drawn on it; once the owner approves the plan, show that view with watch: true, so every session started for its steps shows its work there rather than in a tab of its own. The hub's note holds only the point: why, what done is, what was found or chosen. This holds whatever a brief says about notes.", "props": { "for": ["working_rules"], "order": 75 } },
     { "id": "core.waits_on", "type": "instruction", "title": "Say who is waited on with a link", "body": "A person who has to answer or act is waits_on (what for in props.for), removed once they have; other work is depends_on; a resource is needs, and an exclusive one is taken with assign, action claim, and given back with revise, action release.", "props": { "for": ["working_rules"], "order": 80 } }
   ]
