@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { hashSecret, newSecret, OPERATOR_RESET_FILE } from './auth.ts';
 import { loadConfig } from './config.ts';
 import { env } from './env.ts';
+import { packsFor } from './pack-allow.ts';
 
 const USAGE = `pelago <command>
 
@@ -200,7 +201,9 @@ The old one no longer works.`);
       const [{ isServer, openDb }, { dropDatabase, makeDatabase }, { move }, { Registry }, { localTypes }, { configureSecrets }] = await Promise.all([
         import('./db.ts'), import('./pg.ts'), import('./move.ts'), import('./packs.ts'), import('./control.ts'), import('./secrets.ts'),
       ]);
-      const { packDirs, packs, dataDir } = loadConfig();
+      const { packDirs, packs, workspacePacks, dataDir } = loadConfig();
+      // A move carries a map whole: every pack any workspace here may have.
+      const allowed = packsFor(packs, { all: Object.values(workspacePacks ?? {}).flat() }, 'all');
       // What is sealed is opened with the key the server has (PELAGO_SECRETS_KEY, else the one kept beside its data),
       // and stays sealed with it: a server on the target needs that same key. None is made here.
       configureSecrets(join(dataDir, '..', 'workspaces'), false);
@@ -212,7 +215,7 @@ The old one no longer works.`);
       let target: Awaited<ReturnType<typeof openDb>> | undefined;
       try {
         target = await openDb(to);
-        const report = await move(source, target, new Registry(packDirs, packs, await localTypes(source)));
+        const report = await move(source, target, new Registry(packDirs, allowed, await localTypes(source)));
         console.log(`Moved: ${report.entries.facts} change sets and ${report.entries.pending} held changes, the same chain on both sides (head ${report.head.facts.slice(0, 12)}…).`);
         console.log(`Projected again: ${Object.entries(report.projected).map(([t, n]) => `${n} ${t}`).join(', ')}, as the source has them.`);
         console.log(`Carried beside the log: ${Object.entries(report.rows).filter(([, n]) => n).map(([t, n]) => `${n} ${t}`).join(', ') || 'nothing'}.`);
