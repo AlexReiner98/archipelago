@@ -1,0 +1,22 @@
+{
+  "id": "starter",
+  "version": "0.1.0",
+  "title": "Starter",
+  "description": "A pack for testing launches answered from an action (test/pack-action-launch.test.ts): it asks for reach.launch.",
+  "requires": ["core"],
+  "actions": [
+    {
+      "id": "starter.go",
+      "title": "Start sessions",
+      "description": "Start n sessions on a task, each from a brief it is given.",
+      "verb": "assign",
+      "input": {
+        "type": "object",
+        "properties": { "task": { "type": "string" }, "n": { "type": "number" } },
+        "required": ["task", "n"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "reach": { "launch": true }
+}

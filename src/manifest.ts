@@ -39,6 +39,8 @@ export interface ReachDef {
   via?: ViaDef[];
   /** Server reach: a pack that asks for it is the server's, never a workspace's. */
   server?: ServerReach;
+  /** It may answer an action a person calls with sessions to start: true for up to ten in one answer, or a number fewer (src/pack-action-launch.ts). */
+  launch?: boolean | number;
 }
 
 export interface Manifest {
@@ -65,7 +67,7 @@ export interface Manifest {
 
 /** The keys of a manifest, and of its reach. */
 export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'styles', 'reach', 'shared'] as const;
-export const REACH_KEYS = ['hosts', 'secrets', 'webhooks', 'via', 'server'] as const;
+export const REACH_KEYS = ['hosts', 'secrets', 'webhooks', 'via', 'server', 'launch'] as const;
 export const SERVER_KEYS = ['acts', 'entries', 'pages', 'connect', 'aliases', 'gates', 'mounts', 'streams', 'files', 'launchers', 'adapter', 'counts'] as const;
 
 /** Every key pack files used before the manifest, and where it went (docs/packs.md has the table). */

@@ -9,12 +9,12 @@ import type { Actor, Archipelago } from './pelago.ts';
  * Such a run only proposes, whatever agents may do here: what it changes waits for the owner.
  */
 export interface StartedBy {
-  kind: 'person' | 'automation' | 'webhook' | 'replay';
+  kind: 'person' | 'automation' | 'webhook' | 'pack';
   id?: string;
   name: string;
-  /** A replay's: the pack version it was run under, as <pack>@<version>, and the task whose frozen brief it ran. */
-  version?: string;
-  task?: string;
+  /** A pack's action that started it (src/pack-action-launch.ts): the pack, and what else the pack says of the run. */
+  pack?: string;
+  [field: string]: unknown;
 }
 
 /** What the launched session may do without anyone there to approve it. */
@@ -24,7 +24,7 @@ export interface LaunchInput {
   task: string;
   mode?: LaunchMode;
   instructions?: string;
-  /** A brief frozen earlier (a replay set's): run as it was then, the task not worked on again. */
+  /** A brief held earlier (a replay set's): run as it was then, the task not worked on again. */
   brief?: Brief;
 }
 

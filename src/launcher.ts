@@ -17,6 +17,7 @@ import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
 import { briefFor, promptFor, type LaunchInput, type LaunchMode, type StartedBy } from './launch-brief.ts';
 import { setPackLaunch } from './pack-launch.ts';
+import { setActionLaunch } from './pack-action-launch.ts';
 
 export type { LaunchMode, StartedBy } from './launch-brief.ts';
 
@@ -195,6 +196,7 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
 
 // A pack's answer launches through this (src/pack-launch.ts).
 setPackLaunch(launch);
+setActionLaunch(launch);
 
 /** Kill a launched session's process, if this server started one for the run. */
 export function stopLaunched(run: string): boolean {
