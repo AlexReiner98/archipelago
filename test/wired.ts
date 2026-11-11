@@ -83,6 +83,14 @@ export const WIRED: Record<string, { gap: (sizes: Record<string, number>) => num
       return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
     },
   },
+  'core.rails': {
+    gap: (sizes) => sizes.rails_wire_gap,
+    draw(layout, { items, links }) {
+      const { sizes, numbers } = house(), g = layout({ items, links, measure, sizes, numbers });
+      const boxes = [...g.boxes.values()].map((b: any) => ({ id: b.id, l: b.x - b.w / 2, r: b.x + b.w / 2, t: b.y - b.h / 2, u: b.y + b.h / 2 }));
+      return { boxes, lines: [...g.wires, ...g.rails].map((w: any) => ({ ends: [w.a, w.b], points: w.points })) };
+    },
+  },
 };
 
 /** How each sketch fails a drawing, counted: `spacing` (test/spacing.ts) run on its lines at `gap`. */

@@ -1,0 +1,37 @@
+/* The rails, walked by scrolling (rails.js). Three ways to read one baked picture:
+   plain (no script, or less motion asked for): the picture as a still figure, then the stops as titles and notes;
+   walk (data-rails="walk"): the stage stands still behind the cards and the picture moves under it;
+   column (data-rails="column", narrower than rails_narrow_at): the cards in a column, a wire between each two.
+   Every length is the style's (sizes rails_*, set on the page as --ln-rails-*), every colour the lens's. */
+
+.rails { position: relative; }
+.rails-stage svg { display: block; max-width: 100%; height: auto; }
+.rails-stops { list-style: none; margin: 0; padding: 0; }
+.rails-card { max-width: var(--ln-rails-card-width); padding: var(--ln-rails-card-pad) 0; }
+.rails-card h2 { margin: 0; font-size: var(--ln-rails-card-title); color: var(--ln-text); }
+.rails-card p { margin: var(--ln-rails-card-gap) 0 0; font-size: var(--ln-rails-card-text); color: var(--ln-muted); }
+.rails-card h2 + p { margin-top: calc(var(--ln-rails-card-pad) / 2); }
+
+/* Walk: the stage a screen tall, held in sight while the section scrolls by; the picture moved by rails.js alone. */
+.rails[data-rails="walk"] .rails-stage { position: sticky; top: 0; height: 100vh; overflow: hidden; }
+.rails[data-rails="walk"] .rails-stage svg { max-width: none; width: auto; height: auto; transform-origin: 0 0; will-change: transform; }
+.rails[data-rails="walk"] .rails-stops { position: relative; margin-top: -100vh; padding: calc(var(--ln-rails-stop-scroll) / 2) 0; pointer-events: none; }
+.rails[data-rails="walk"] .rails-stop { min-height: var(--ln-rails-stop-scroll); display: flex; align-items: center; }
+.rails[data-rails="walk"] .rails-card {
+  pointer-events: auto; margin-left: var(--ln-rails-card-inset); width: var(--ln-rails-card-width);
+  padding: var(--ln-rails-card-pad); background: var(--ln-land); border: var(--ln-rule) solid var(--ln-line); border-radius: var(--ln-rails-corner);
+}
+
+/* Column: no stage; each card a stop on a line down the page, a dot where it stands, a wire on to the next. */
+.rails[data-rails="column"] .rails-stage { display: none; }
+.rails[data-rails="column"] .rails-stop { position: relative; padding-left: var(--ln-rails-column-room); }
+.rails[data-rails="column"] .rails-stop::before {
+  content: ""; position: absolute; left: 0; top: calc(var(--ln-rails-card-pad) + var(--ln-rails-card-title) / 2 - var(--ln-rails-column-dot) / 2);
+  width: var(--ln-rails-column-dot); height: var(--ln-rails-column-dot); border-radius: 50%; background: var(--ln-accent, var(--ln-text));
+}
+.rails[data-rails="column"] .rails-stop:not(:last-child)::after {
+  content: ""; position: absolute; left: calc(var(--ln-rails-column-dot) / 2 - var(--ln-rails-column-line) / 2);
+  top: calc(var(--ln-rails-card-pad) + var(--ln-rails-card-title) / 2 + var(--ln-rails-column-dot) / 2); bottom: calc(0px - var(--ln-rails-card-pad) - var(--ln-rails-card-title) / 2 + var(--ln-rails-column-dot) / 2);
+  width: var(--ln-rails-column-line); background: var(--ln-accent, var(--ln-text));
+}
+.rails[data-rails="column"] .rails-card { padding-bottom: var(--ln-rails-card-gap); }
