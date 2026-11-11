@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { packsFor, readOnlyPacks, readWorkspacePacks } from '../src/pack-allow.ts';
-import { setPack } from '../src/packstate.ts';
+import { packStates, setPack } from '../src/packstate.ts';
 import { Workspaces } from '../src/workspaces.ts';
 import { human, packsWith } from './map.ts';
 
@@ -48,6 +48,9 @@ test('a pack off the list is off in a workspace, its items kept, and back when t
   assert.equal((await w2.pelago.get(entry))?.entity.title, 'Drafting', 'its item is still there');
   assert.equal(w2.pelago.registry.states.get('core')?.state, 'active', "the kernel's pack is never off the list");
   await assert.rejects(setPack(w2.pelago, human, { pack: 'tally', on: true }), /not offered to this workspace/);
+  const listed = (w: Awaited<ReturnType<Workspaces['get']>>) => packStates(w.pelago).map((p) => p.id);
+  assert.ok(!listed(w2).includes('tally'), 'a pack not offered here is not on its Packs screen');
+  assert.ok(listed(w2).includes('core'), 'the packs it is offered are');
   await two.closeAll();
 
   // Let this workspace alone have it: it is on again as the log left it, with no one adding it again.
@@ -55,5 +58,6 @@ test('a pack off the list is off in a workspace, its items kept, and back when t
   const w3 = await three.get('default');
   assert.equal(state(w3)?.state, 'active');
   assert.equal(w3.pelago.registry.types.get('tally_entry')?.dormant, undefined, 'its type is live again');
+  assert.ok(packStates(w3.pelago).some((p) => p.id === 'tally'), 'and on its Packs screen again');
   await three.closeAll();
 });
