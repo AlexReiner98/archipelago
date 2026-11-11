@@ -207,7 +207,7 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
     if (renamed.has(p.id)) facts.push(present(l, p, kept), ['-', packFact(renamed.get(p.id)!), 'pack']);
     else if (kernel || was?.op === '+') {
       if (changed) facts.push(present(l, p, kept));
-      else if (!kept.has(l.registry.hashes.get(p.id) ?? '')) {
+      else if (!kept.manifests.has(l.registry.hashes.get(p.id) ?? '')) {
         // said before the log kept texts: said again with its text, so the hash never reads as today's stand-in
         const fact = present(l, p, kept);
         if ((fact[3] as { text?: string }).text !== undefined) facts.push(fact);
