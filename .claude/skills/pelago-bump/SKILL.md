@@ -78,8 +78,9 @@ prevented it cheaply, it counts.
    - **props**: `kind: "problem"`, and `severity`: `high` if it stopped the
      work or lost something, `medium` if it cost real time or would mislead,
      `low` if it is only awkward.
-   - **touches**, in props: what it touched, so the snags view can group it
-     with the others that did. One or more of `pack:<id>`, `instruction:<id>`,
+   - **touches**, in props, where the issue type has the field (`query`
+     `schema` type `issue`): what it touched, so the snags view (the refine
+     pack's) can group it with the others that did. One or more of `pack:<id>`, `instruction:<id>`,
      `tool:<name>`, `rule:<id>`, `view:<name>`, `hook:<event>` or
      `page:<name>`, separated by spaces: `"tool:change rule:finding_note"`.
      A refusal names its rule (`held_by`, or the id in its text): put

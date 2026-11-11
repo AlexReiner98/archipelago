@@ -1,0 +1,29 @@
+{
+  "id": "refine",
+  "version": "0.1.0",
+  "title": "Refine",
+  "description": "How the harness refines itself: snags read by what they touched, so a refiner can propose a pack change for what keeps getting in the way. A snag names what it touched in touches, a field each snag's type declares in its own pack (an issue's, in the work pack).",
+  "requires": ["core"],
+  "rules": [
+    {"id": "touches_form", "when": {"op": ["create", "update"], "matches": {"touches": "^(?!\\s*(?:pack|instruction|tool|rule|view|hook|page):[^\\s,]+(?:[\\s,]+(?:pack|instruction|tool|rule|view|hook|page):[^\\s,]+)*\\s*$)"}}, "then": "refuse", "say": "\"{title}\": touches names what a snag touched as kind:ref, separated by spaces: pack:<id>, instruction:<id>, tool:<name>, rule:<id>, view:<name>, hook:<event> or page:<name>."}
+  ],
+  "views": [
+    {
+      "id": "refine.snags",
+      "shape": "data",
+      "limit_ms": 30000,
+      "description": "Open snags grouped by what they touched (touches: pack:, instruction:, tool:, rule:, view:, hook:, page:), the most first: each group with its count, its highest severity, its snags and the runs that wrote them, with the packs they ran under. Params: within (an item id, such as the friction feature: every open snag inside it, those that name nothing counted under untouched); without it, the open snags that name what they touched; types (the types read as snags; issue unless said).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "within": { "type": "string", "description": "An item id: the open snags inside it, at any depth." },
+          "types": { "type": "array", "items": { "type": "string" }, "description": "The types read as snags: issue unless said." }
+        },
+        "additionalProperties": false
+      }
+    }
+  ],
+  "styles": [
+    { "id": "refine.touches", "type": "instruction", "title": "Say what a bump touched", "body": "A bump is recorded as an issue part_of the friction feature (search type feature, q friction). Put what it touched in its touches: one or more of pack:<id>, instruction:<id>, tool:<name>, rule:<id>, view:<name>, hook:<event> or page:<name>, separated by spaces. A refusal names its rule, so rule:<that id>. The snags view groups bumps by it.", "props": { "for": ["session_start"], "order": 31 } }
+  ]
+}

@@ -41,7 +41,6 @@ const READINGS: Record<(typeof LENS_ANSWERS)[number], Reading> = {
   attention: attend,
   brief: briefOf,
   frontier: frontierOf,
-  snags: async (l, _def, params) => (await import('./snags.ts')).snags(l, params),
 };
 
 /** Answer a standing view a pack declares as data: read as its answer says. */
