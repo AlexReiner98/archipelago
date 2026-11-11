@@ -216,7 +216,7 @@ export class Registry {
         system: kernel,
         statuses: { ...statuses, phases: phasesOf(statuses, [def.statuses?.phases, parent?.statuses.phases]) },
         // A type that extends nothing keeps in its row the columns it declares, or the common ones (src/head.ts, ownHead).
-        ...headOf({ ...ownHead(Boolean(parent?.columns.status ?? def.fields?.status?.column), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id), ...(this.islands && livesOnIsland({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])] }) && { [ISLAND]: ISLAND_FIELD }) }, statuses),
+        ...headOf({ ...ownHead(Boolean(parent?.columns.status ?? def.fields?.status?.column), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id), ...(this.islands && (livesOnIsland({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])] }) || (def.capabilities?.subject ?? parent?.capabilities.subject)) && { [ISLAND]: ISLAND_FIELD }) }, statuses),
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
         public: def.public ?? parent?.public ?? false,
         ...((def.altitude ?? parent?.altitude) && { altitude: altitudeOf(id, def.altitude ?? parent?.altitude) }),
