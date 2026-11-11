@@ -12,6 +12,7 @@
 import { presetsOf, type StyleDef } from './declared.ts';
 import { islandRegistry } from './island-pin.ts';
 import type { Archipelago } from './pelago.ts';
+import { used } from './uses.ts';
 
 /** An instruction the map keeps, with what it is about. */
 export interface KeptInstruction {
@@ -90,5 +91,6 @@ async function keptInstructions(l: Archipelago): Promise<KeptInstruction[]> {
 /** What agents are told where (`for`), to a session about `about`, with the names in braces filled in; on an island, the presets of the version of its pack it runs (src/island-pin.ts). */
 export async function instructionsFor(l: Archipelago, where: string, input: { about?: string; island?: string; fill?: Record<string, string> } = {}): Promise<Said[]> {
   const told = said(presetsOf((await islandRegistry(l, input.island)).packs, 'instruction'), await keptInstructions(l), where, input.about);
+  for (const one of told) used(l.workspace, 'told', one.preset ?? one.id);
   return told.map((one) => ({ ...one, text: filled(one.text, input.fill ?? {}) }));
 }

@@ -29,7 +29,7 @@ export interface Retention {
 }
 
 /** The streams the kernel appends to, besides the fact stream; a pack's own is `pack:<id>`. */
-export const STREAMS = ['sessions', 'claims', 'notifications', 'automations', 'settings', 'access', 'observations', 'places', 'activity'] as const;
+export const STREAMS = ['sessions', 'claims', 'notifications', 'automations', 'settings', 'access', 'observations', 'places', 'activity', 'uses'] as const;
 const PACK_STREAM = /^pack:([a-z][a-z0-9_]*|\*)$/;
 /**
  * A stream a server pack keeps its counts in (reach.server.counts, src/pack-counts.ts): a plain word no kernel stream
