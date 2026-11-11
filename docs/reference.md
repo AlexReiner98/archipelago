@@ -295,16 +295,20 @@ rules that govern them, as text to start a session with.
 - **Notifications:** an agent (`notify`), an automation or the system can leave
   you a message. Unread ones are on the Changes screen. A session that stops
   reporting raises one, saying what it still holds.
-- **Automations:** a trigger and an action, stored as an item.
-  - Triggers: `every` N minutes, `daily` at a local time, or an `event` in the
-    activity log (`entity.create`, `repo.push`, or a prefix such as `resource.*`).
-  - Actions: `notify`, call `check_connections` or `import_audit`, or `launch`
-    a headless session on a task.
-  - An automation an agent proposes does nothing until you approve it. Every
-    firing is logged with its result. Events caused by automations cannot
-    trigger automations, and a launching automation waits for its last session
+- **Automations:** when something comes due, what to do, about the item it
+  serves. It lives with that item: its island and who may see it.
+  - When: `daily` or `weekly` at a time in the workspace's zone, or `on` a
+    query starting to match (the first match, each new one, the first for each
+    value of a field, or a value crossing a number).
+  - What: `notify` (about the item it is about), or `launch` a headless
+    session on a task.
+  - The kernel's clock says when one is due; the automations pack does it.
+    An automation an agent proposes does nothing until you approve it. Every
+    firing is kept, with what it answered, as which version, and what it made;
+    a failed one warns you. A launching automation waits for its last session
     to end before starting another.
-  - Create and pause them from Search, as things of the type Automation.
+  - Each shows as a row (whether it runs, next, last, what it does) on the page
+    of what it is about, and on the Automations page.
 
 ## Views
 

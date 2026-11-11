@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Automations } from '../src/automations.ts';
+import { QuietSessions } from '../src/session-quiet.ts';
 import { heldResources } from '../src/blocking.ts';
 import { Archipelago, type Op } from '../src/pelago.ts';
 import { sessionStart, sessionUpdate } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { VIEWS } from '../src/views.ts';
 import { askView } from '../src/askview.ts';
-import { dayStart } from '../src/timeaxis.ts';
 import { human, agent, fresh, make } from './map.ts';
 
 /** A view asked by its name, as the view tool asks it. */
@@ -29,7 +28,7 @@ test('an agent can notify the human; a stale session raises one notification', a
   // One that holds nothing is not worth a notice: it ends by itself.
   const idle = (await sessionStart(l, agent, { title: 'Idle one' })).run;
   await silent(idle, 1);
-  const autos = new Automations(l);
+  const autos = new QuietSessions(l);
   await autos.tick();
   await autos.tick();
   unread = (await VIEWS.notifications.run(l, {})) as any[];
@@ -57,59 +56,34 @@ test('an agent can notify the human; a stale session raises one notification', a
   assert.equal(((await VIEWS.notifications.run(l, {})) as any[]).length, 1, 'other notifications are left alone');
 });
 
-test('automations fire on a schedule and on events, are logged, and cannot trigger each other', async () => {
+test('an automation is checked on write, and what an agent makes or changes of one waits for the human', async () => {
   const l = await fresh();
+  // Each lives with what it is about (src/subject.ts).
+  const { subject } = await make(l, [{ op: 'create', ref: 'subject', type: 'task', title: 'The map' }]);
+  const about = (...refs: string[]): Op[] => refs.map((from) => ({ op: 'link', type: 'about', from, to: subject }));
+  // What the old runner did and nothing does now (an interval, a logged event, a tool) is refused.
   await assert.rejects(
-    make(l, [{ op: 'create', type: 'automation', title: 'Half-made', status: 'enabled', props: { trigger: 'every', action: 'tool', tool: 'decide' } }]),
-    /needs every_minutes[\s\S]*tool to be one of: check_connections, import_audit/,
+    make(l, [{ op: 'create', ref: 'h', type: 'automation', title: 'Half-made', status: 'enabled', props: { trigger: 'every', action: 'tool' } }, ...about('h')]),
+    /trigger[\s\S]*action/,
   );
+  await assert.rejects(make(l, [{ op: 'create', ref: 'w', type: 'automation', title: 'No when', status: 'enabled', props: { action: 'notify' } }, ...about('w')]), /needs trigger daily or weekly, or on/);
   // An agent can only propose one.
-  const proposed = await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'automation', title: 'Sneaky', status: 'enabled', props: { trigger: 'every', every_minutes: 1, action: 'notify' } }] });
+  const proposed = await l.change(agent, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'automation', title: 'Sneaky', status: 'enabled', props: { trigger: 'daily', at: '09:00', action: 'notify' } }, ...about('s')] });
   assert.equal(proposed.status, 'proposed');
 
   const made = await make(l, [
-    { op: 'create', ref: 'hourly', type: 'automation', title: 'Check connections', status: 'enabled', props: { trigger: 'every', every_minutes: 60, action: 'tool', tool: 'check_connections' } },
     { op: 'create', ref: 'morning', type: 'automation', title: 'Morning nudge', status: 'enabled', props: { trigger: 'daily', at: '09:00', action: 'notify', message: 'Review the map' } },
-    { op: 'create', ref: 'review', type: 'automation', title: 'New item', status: 'enabled', props: { trigger: 'event', on_action: 'entity.create', action: 'notify', message: 'Made by {actor}: {reason}', level: 'warning' } },
-    { op: 'create', ref: 'any', type: 'automation', title: 'Everything', status: 'paused', props: { trigger: 'event', on_action: 'entity.*', action: 'notify' } },
+    { op: 'create', ref: 'any', type: 'automation', title: 'Paused one', status: 'paused', props: { trigger: 'weekly', days: ['monday'], at: '09:00', action: 'notify' } },
+    ...about('morning', 'any'),
   ]);
   // Nor where agents' other changes are applied as made: an automation acts later with a human's authority, so
   // making one, changing one or bringing one back waits for the human.
   const loose = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', archive: 'auto', restore: 'auto', link: 'auto' });
-  const launches = { trigger: 'every', every_minutes: 1, action: 'launch', input: { task: made.hourly, mode: 'acceptEdits', instructions: 'anything' } };
+  const launches = { trigger: 'daily', at: '03:00', action: 'launch', input: { task: subject, mode: 'acceptEdits', instructions: 'anything' } };
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'task', title: 'An ordinary thing' }] })).status, 'applied');
-  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', type: 'automation', title: 'Launches', status: 'enabled', props: launches }] })).status, 'proposed');
+  assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'create', ref: 'l', type: 'automation', title: 'Launches', status: 'enabled', props: launches }, ...about('l')] })).status, 'proposed');
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.morning, props: launches }] })).status, 'proposed');
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.any, status: 'enabled' }] })).status, 'proposed');
-  const autos = new Automations(l);
-  // A Monday and Tuesday in Toronto, the workspace zone, after anything the test makes.
-  const on = (day: string, h: number, m = 0) => new Date(dayStart(day, "America/Toronto") + (h * 60 + m) * 60_000);
-  const at = (h: number, m = 0) => on("2030-01-07", h, m);
-  const fired = async (when: Date) => (await autos.tick(when)).map((f) => f.automation).sort();
-
-  assert.deepEqual(await fired(at(8)), [made.hourly], 'interval fires at once; events start from now');
-  assert.deepEqual(await fired(at(8, 30)), []);
-  assert.deepEqual(await fired(at(9, 1)), [made.hourly], 'a time of day comes due by the clock now (test/weekly-trigger.test.ts)');
-  assert.deepEqual(await fired(at(9, 30)), []);
-  assert.deepEqual(await fired(on("2030-01-08", 9)), [made.hourly]);
-
-  await l.change(human, { reason: 'Found a bug', ops: [{ op: 'create', type: 'task', title: 'Crash' }] });
-  assert.deepEqual(await fired(on("2030-01-08", 9, 5)), [made.review]);
-  const unread = (await VIEWS.notifications.run(l, {})) as any[];
-  assert.ok(unread.some((n) => n.title === 'Made by human:test: Found a bug' && n.level === 'warning'));
-
-  // Unpause the catch-all: the notifications automations create must not set it off.
-  await make(l, [{ op: 'update', id: made.any, status: 'enabled' }]);
-  await autos.tick(on("2030-01-08", 9, 6));
-  const before = ((await VIEWS.notifications.run(l, {})) as any[]).length;
-  assert.deepEqual(await fired(on("2030-01-08", 9, 7)), []);
-  assert.equal(((await VIEWS.notifications.run(l, {})) as any[]).length, before);
-
-  const hourly = (await l.entity(made.hourly))!;
-  assert.match(hourly.props.last_result as string, /^ok: \[\]/);
-  const log = (await l.events({ target: made.hourly })) as any[];
-  assert.equal(log.filter((e) => e.action === 'automation.fire').length, 3);
-  assert.equal(log[0].actor, `agent:automation:${made.hourly}`);
 });
 
 test('a note is added to, or one passage of it replaced, without sending it again', async () => {

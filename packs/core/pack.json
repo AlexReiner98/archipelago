@@ -590,8 +590,8 @@
       ],
       "extends": "system",
       "title": "Automation",
-      "description": "A trigger that fires an action. Only fires while its status is enabled.",
-      "capabilities": { "when": { "repeat": { "from": "at", "days": "days" } } },
+      "description": "Something done when a time comes or a query starts to match, about the item it serves: it lives on that item's island and is as visible as it. The kernel's clock says when it is due; the automations pack does it. Only fires while its status is enabled.",
+      "capabilities": { "when": { "repeat": { "from": "at", "days": "days" } }, "subject": { "link": "about" } },
       "statuses": {
         "open": [
           "enabled",
@@ -606,16 +606,10 @@
         "trigger": {
           "type": "enum",
           "values": [
-            "every",
             "daily",
-            "weekly",
-            "event"
+            "weekly"
           ],
-          "description": "every: an interval. daily: a time of day. weekly: a time of day on the days named. event: something logged in the activity feed."
-        },
-        "every_minutes": {
-          "type": "number",
-          "description": "For trigger every."
+          "description": "daily: a time of day. weekly: a time of day on the days named. Left out for one that fires on a query (on)."
         },
         "at": {
           "type": "string",
@@ -625,22 +619,21 @@
           "type": "json",
           "description": "For trigger weekly: the days of the week it fires on, as names (\"monday\") or numbers, 1 for Monday to 7 for Sunday."
         },
-        "on_action": {
-          "type": "string",
-          "description": "For trigger event: an event action such as entity.create or repo.push, or a prefix such as resource.*"
+        "on": {
+          "type": "json",
+          "description": "Fires when a query starts to match, not at a time: { query: a flat filter as query name flat takes it ({ filter: { find, only, not }, walk, limit }), edge: first (it matches at all, once), each (each item that starts to match), first_per:<field> (once for each value of a field), or crosses:<n> with field (an item's value reaching n from under it) }. What already matches when it is set does not fire."
         },
         "action": {
           "type": "enum",
           "values": [
             "notify",
-            "tool",
             "launch"
           ],
-          "description": "notify: tell the human. tool: call check_connections or import_audit. launch: start a headless session on a task."
+          "description": "notify: tell the human, about what it is about. launch: start a headless session on a task."
         },
         "message": {
           "type": "string",
-          "description": "For action notify. May use {target}, {action}, {actor} and {reason} from the triggering event."
+          "description": "For action notify: what the human is told; its name when left out."
         },
         "level": {
           "type": "enum",
@@ -650,13 +643,9 @@
             "urgent"
           ]
         },
-        "tool": {
-          "type": "string",
-          "description": "For action tool."
-        },
         "input": {
           "type": "json",
-          "description": "For action tool: the tool's input. For action launch: {task, mode, instructions}."
+          "description": "For action launch: {task, mode, instructions}."
         },
         "last_fired": {
           "type": "datetime",
@@ -1329,20 +1318,6 @@
       "title": "Worked on",
       "on": ["run"],
       "pieces": [{ "piece": "picture", "lens": { "filter": { "find": ["worked {here}"] }, "limit": 50 }, "style": { "shape": "map" } }]
-    },
-    {
-      "form": "screen",
-      "id": "core.automations_here",
-      "title": "Automations",
-      "on": ["work", "aim", "place"],
-      "pieces": [{ "piece": "picture", "lens": { "filter": { "find": ["about {here}"], "only": ["type automation"], "not": ["status retired"] }, "limit": 20 }, "style": { "shape": "map" } }]
-    },
-    {
-      "form": "screen",
-      "id": "core.automations",
-      "title": "Automations",
-      "nav": true,
-      "pieces": [{ "piece": "picture", "lens": { "filter": { "find": ["type automation"], "not": ["status retired"] }, "limit": 200 }, "style": { "shape": "map" } }]
     },
     {
       "form": "screen",

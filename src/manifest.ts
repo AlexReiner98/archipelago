@@ -26,7 +26,7 @@ export type ActionEntry = ActionDef | (VerbDef & { kernel: true });
 
 /** Code a pack's handler runs by itself: on an event another pack records, on a schedule, or on a webhook's delivery. */
 export type HandlerDef =
-  | { event: string; limit_ms?: number }
+  | { event: string; records?: string[]; limit_ms?: number }
   | { schedule: string; every_minutes?: number; at_start?: boolean; limit_ms?: number }
   | { webhook: string; records?: string[]; limit_ms?: number };
 
@@ -77,7 +77,7 @@ export const LEGACY: Record<string, string> = {
   verbs: 'actions (kernel: true)',
   schedules: 'handlers ({ schedule })',
   hears: 'handlers ({ event })',
-  events: 'handlers ({ webhook, records })',
+  events: 'handlers ({ webhook, records } or { event, records })',
   hosts: 'reach.hosts',
   secrets: 'reach.secrets',
   webhooks: 'reach.webhooks',
@@ -109,7 +109,7 @@ function keyProblems(m: Raw): string[] {
   for (const h of arr<Raw>(m.handlers)) {
     const on = ['event', 'schedule', 'webhook'].filter((k) => typeof h[k] === 'string' && h[k]);
     if (on.length !== 1) problems.push(`a handler runs on one of an event, a schedule or a webhook, named: ${JSON.stringify(h)}`);
-    if (h.records !== undefined && !h.webhook) problems.push('only a webhook\'s handler says what it records');
+    if (h.records !== undefined && h.schedule) problems.push('a schedule\'s handler records nothing: a webhook\'s or an event\'s says what it records');
   }
   for (const v of arr<Raw>(m.views)) if (v.form !== undefined && v.form !== 'tree' && v.form !== 'screen' && v.form !== 'attention') problems.push(`view "${String(v.id)}": form is tree, screen or attention, or left out for a read`);
   if (m.shared !== undefined && (!KERNEL_PACKS.includes(String(m.id)) || !Array.isArray(m.shared) || m.shared.some((t) => typeof t !== 'string'))) problems.push('shared is a list of type ids, and only the kernel\'s pack declares it');
@@ -175,7 +175,7 @@ export function parts(m: Manifest): Parts {
     actions: actions.filter((a): a is ActionDef => !('kernel' in a && a.kernel)),
     schedules: handlers.flatMap((h) => ('schedule' in h ? [{ id: h.schedule, every_minutes: h.every_minutes, at_start: h.at_start, limit_ms: h.limit_ms }] : [])),
     hears: handlers.flatMap((h) => ('event' in h ? [{ event: h.event, limit_ms: h.limit_ms }] : [])),
-    events: handlers.flatMap((h) => ('webhook' in h ? (h.records ?? []) : [])),
+    events: handlers.flatMap((h) => ('webhook' in h || 'event' in h ? (h.records ?? []) : [])),
     hosts: m.reach?.hosts ?? [],
     secrets: m.reach?.secrets ?? [],
     webhooks: m.reach?.webhooks ?? [],

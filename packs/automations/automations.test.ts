@@ -45,7 +45,8 @@ test('the handler reads the item and what it is about', async () => {
   const asked: unknown[] = [];
   const ctx = (item: unknown, about: unknown[]) => ({ read: async (q: { get?: string }) => (asked.push(q), q.get ? item : about) });
   const done = await handler['item.due']({ event: due }, ctx(auto({ message: 'Hi' }), [{ id: S, type: 'feature' }]));
-  assert.deepEqual(done.notify, [{ title: 'Hi', level: 'info', about: S }]);
+  assert.deepEqual(done.notify, [{ title: 'Hi', level: 'info', about: S, ref: 'notice' }]);
+  assert.equal(done.log[0].action, 'automation.fired', 'with the fact of its firing (firing.test.ts)');
   assert.deepEqual(asked, [{ get: A }, { related: A, relation: 'about', direction: 'out' }]);
   assert.deepEqual(await handler['item.due']({ event: { ...due, target: 'e_task0001' } }, ctx({ id: 'e_task0001', type: 'task', is: ['task'] }, [])), {}, 'another item come due is not this pack\'s');
   assert.deepEqual(await handler['item.due']({ event: { ...due, target: undefined } }, ctx(null, [])), {});

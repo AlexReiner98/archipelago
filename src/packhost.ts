@@ -36,14 +36,26 @@ export interface Done {
   drop_pictures?: string[];
   /** Further changes, each a change set of its own with its reason, authority and source: each is held or applied on its own. */
   changes?: { ops: Op[]; reason: string; authority?: { of: 'human' | 'agent'; basis: string }; source?: SourceSpec }[];
-  /** What it records in the log beside its changes: only the kinds of event its pack declares. */
-  log?: { action: string; target?: string; reason?: string; detail?: Record<string, unknown> }[];
-  /** What the owner is told. */
-  notify?: { title: string; body?: string; level?: 'info' | 'warning' | 'urgent'; about?: string }[];
+  /**
+   * What it records in the log beside its changes: only the kinds of event its pack declares. A {ref} in its detail is
+   * the id of the notification of that ref; when that notification could not be made, `otherwise` is recorded in its
+   * place (its reason and detail over the entry's, {error} in either the reason it failed).
+   */
+  log?: LogEntry[];
+  /** What the owner is told; a notification with a ref is named by it in what is logged. */
+  notify?: { title: string; body?: string; level?: 'info' | 'warning' | 'urgent'; about?: string; ref?: string }[];
   /** On hearing a notification made: one mail about it, to its person (src/notify-mail.ts). */
   mail?: NotificationMail[];
   /** On hearing an automation come due: the session it says to start, started by the kernel (src/pack-launch.ts). */
   launch?: LaunchAsked;
+}
+
+export interface LogEntry {
+  action: string;
+  target?: string;
+  reason?: string;
+  detail?: Record<string, unknown>;
+  otherwise?: { reason?: string; detail?: Record<string, unknown> };
 }
 
 /** What is asked of an action's ops before they are applied: a token limited to some work is held to it. */
@@ -238,8 +250,10 @@ export class PackHost {
     const made = (changed as { created?: Record<string, string> } | undefined)?.created ?? {};
     const answer = done.answer === undefined ? null : JSON.parse(JSON.stringify(done.answer).replace(/\{([^{}\s"]+)\}/g, (whole, ref: string) => made[ref] ?? whole));
     const dropped = changed?.status === 'applied' && done.drop_pictures?.length ? await dropPictures(l, actor, done.drop_pictures, done.reason?.trim() || name) : undefined;
-    const others = await further(l, actor, file, name, done, input);
-    for (const e of done.log ?? []) this.tell(l, file.id, e);
+    // What it logged may name the run it launched as {run}; one not started is the failure of what names it.
+    const ran = launched ? (launched.run ? { made: { run: launched.run } } : { failed: { run: launched.why ?? 'not started' } }) : {};
+    const { logged, others } = await further(l, actor, file, name, done, input, ran);
+    for (const e of logged) this.tell(l, file.id, e);
     return { answer, ...changed, ...(mailed && { mailed }), ...(launched && { launched }), ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }) };
   }
 
@@ -249,7 +263,7 @@ export class PackHost {
    * itself. Not waited for: what records it (a webhook) answers its sender now. What each answers is applied like
    * any of its calls; it may only read beyond the map.
    */
-  tell(l: Archipelago, from: string, e: NonNullable<Done['log']>[number]): void {
+  tell(l: Archipelago, from: string, e: Omit<LogEntry, 'otherwise'> & { seq?: number }): void {
     for (const pack of l.registry.packs) {
       const hears = pack.id !== from && parts(pack).hears.find((h) => h.event === e.action);
       if (!hears) continue;
@@ -270,17 +284,41 @@ export class PackHost {
  * What a call answered beyond its own ops: the events it records (of the kinds its pack declares, checked first), what the owner is
  * told, and further change sets, each with its own reason, so a person approves or declines each on its own.
  */
-async function further(l: Archipelago, actor: Actor, file: PackFile, name: string, done: Done, input: unknown) {
-  for (const e of done.log ?? []) {
+async function further(l: Archipelago, actor: Actor, file: PackFile, name: string, done: Done, input: unknown, ran: { made?: Record<string, string>; failed?: Record<string, string> } = {}) {
+  // Made first, so what is logged can name them: one with a ref that fails is the failure of what names it, not the call's.
+  const made: Record<string, string> = { ...ran.made };
+  const failed: Record<string, string> = { ...ran.failed };
+  for (const { ref, ...n } of done.notify ?? []) {
+    if (!ref) await notify(l, actor, n);
+    else await notify(l, actor, n).then((r) => (made[ref] = r.notification), (err: Error) => (failed[ref] = err.message));
+  }
+  const logged = (done.log ?? []).map((e) => resolved(e, made, failed));
+  for (const e of logged) {
     await l.log(l.db, { actor: actorId(actor), action: e.action, target: e.target, reason: e.reason, detail: { ...e.detail, pack: file.id } });
   }
-  for (const n of done.notify ?? []) await notify(l, actor, n);
-  const results = [];
+  const others = [];
   for (const c of done.changes ?? []) {
     const result = await l.change(actor, { ops: c.ops, reason: c.reason?.trim() || name, action: name, pack: file.id, ...islandIn(input), ...(c.authority && { authority: c.authority }), ...(c.source && { source: c.source }) });
-    results.push({ status: result.status, ...('changeset' in result && { changeset: result.changeset }), ...('proposal' in result && { proposal: result.proposal }) });
+    others.push({ status: result.status, ...('changeset' in result && { changeset: result.changeset }), ...('proposal' in result && { proposal: result.proposal }) });
   }
-  return results;
+  return { logged, others };
+}
+
+const REF = /\{([^{}\s"]+)\}/g;
+
+/**
+ * A logged event as recorded: each {ref} in it the id of what was made of that ref, or, when a ref it names failed,
+ * its `otherwise` in place, {error} the reason, and what failed named in no list. Exported for its test.
+ */
+export function resolved(e: LogEntry, made: Record<string, string>, failed: Record<string, string>): Omit<LogEntry, 'otherwise'> {
+  const { otherwise, ...entry } = e;
+  const text = JSON.stringify(entry);
+  const error = [...text.matchAll(REF)].map((m) => failed[m[1]]).find((x) => x !== undefined);
+  const fill = <T>(v: T): T => JSON.parse(JSON.stringify(v).replace(REF, (whole, ref: string) => made[ref] ?? (ref === 'error' && error !== undefined ? JSON.stringify(error).slice(1, -1) : whole)));
+  if (error === undefined) return fill(entry);
+  const drop = (v: unknown): unknown => (Array.isArray(v) ? v.filter((x) => !(typeof x === 'string' && [...x.matchAll(REF)].some((m) => m[1] in failed))).map(drop) : v);
+  const detail = Object.fromEntries(Object.entries({ ...entry.detail, ...otherwise?.detail }).map(([k, v]) => [k, drop(v)]));
+  return fill({ ...entry, reason: otherwise?.reason ?? entry.reason, detail });
 }
 
 /** The island an action was given, as its input `island`: where what it makes goes, on a map of islands, when nothing it is tied to says. */

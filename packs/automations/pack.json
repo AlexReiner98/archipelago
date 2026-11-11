@@ -2,6 +2,75 @@
   "id": "automations",
   "version": "0.1.0",
   "title": "Automations",
-  "description": "Does what an automation says when it comes due: the kernel's clock tells it an automation's time has come, and it makes the notification, about what the automation is about, or asks the kernel to start the session it says. It owns no type: core's automation type is what it acts on.",
-  "handlers": [{ "event": "item.due", "limit_ms": 5000 }]
+  "description": "Does what an automation says when it comes due, and draws each automation as a row of marks. The kernel's clock tells it an automation's time has come, and it makes the notification, about what the automation is about, or asks the kernel to start the session it says; on the page of what each is about, and on a page of its own for the nav, a row says whether it runs, its name, when it runs next, how it last fired and what it does. It owns no type: core's automation type is what it acts on.",
+  "handlers": [
+    {
+      "event": "item.due",
+      "records": [
+        "automation.fired"
+      ],
+      "limit_ms": 5000
+    }
+  ],
+  "rules": [
+    {
+      "id": "automation_fired",
+      "stream": "activity",
+      "when": {
+        "fields": [
+          "automation.fired"
+        ]
+      },
+      "keep": {
+        "forever": true
+      },
+      "say": "Each firing of an automation: what occurrence it answered, as which version, and what it made. Every one kept, so a firing can be measured and replayed by version."
+    }
+  ],
+  "views": [
+    {
+      "id": "automations.rows",
+      "shape": "rows",
+      "description": "Automations as rows: those about an item (about), else every one in the workspace; retired ones left out. Each row is the automation's head and its marks: next run (\"Thu 08:00\", in the workspace's zone), last firing (a tick or cross and when) and what it does.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "about": {
+            "type": "string",
+            "description": "The item the automations are about; every automation when left out."
+          }
+        }
+      },
+      "limit_ms": 5000
+    },
+    {
+      "form": "screen",
+      "id": "automations.here",
+      "title": "Automations",
+      "on": [
+        "work",
+        "aim",
+        "place"
+      ],
+      "pieces": [
+        {
+          "piece": "view",
+          "view": "automations.rows",
+          "item": "about"
+        }
+      ]
+    },
+    {
+      "form": "screen",
+      "id": "automations.all",
+      "title": "Automations",
+      "nav": true,
+      "pieces": [
+        {
+          "piece": "view",
+          "view": "automations.rows"
+        }
+      ]
+    }
+  ]
 }

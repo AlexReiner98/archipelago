@@ -24,8 +24,8 @@ test('only a leading server runs the clocks, and stops them when it loses the le
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(import.meta.dirname, '..', 'packs') });
   const ws = await workspaces.get('default');
   const calls: string[] = [];
-  ws.automations.start = () => void calls.push('start');
-  ws.automations.stop = () => void calls.push('stop');
+  ws.quiet.start = () => void calls.push('start');
+  ws.quiet.stop = () => void calls.push('stop');
   await workspaces.lead(true);
   assert.deepEqual(calls.filter((c) => c === 'start'), ['start'], 'the leader starts what runs on a clock');
   calls.length = 0;

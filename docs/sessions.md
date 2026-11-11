@@ -200,7 +200,7 @@ makes them true.
 | task | files it owns |
 |---|---|
 | Wiring (part of e_ees7hr6q) | `src/session-state.ts`, `src/views.ts` (the `sessions` view only), `src/query-flat.ts`, the two numbers in the house style |
-| 7. Ended leave; quiet dim, then end (e_9jduzn9c) | the stale sweep in `src/automations.ts`, `src/sessions.ts` if ending needs it |
+| 7. Ended leave; quiet dim, then end (e_9jduzn9c) | the stale sweep in `src/session-quiet.ts`, `src/sessions.ts` if ending needs it |
 | 8. A Sessions view (e_htwjh45d) | a lens preset and style preset in `packs/core/pack.json` (`views`, `styles`), `packs/core/layouts/flow/state.js` and the flow's marks for a session |
 | 9. The tab bar's count (e_82rggead) | `ui/tab-bar.js`, `ui/tab-life.js` |
 | 10. A session's page shows its turns (e_ezyzr7ms) | `src/session-turns.ts` (the `turns` read), a screen piece in `src/declared.ts` and its `ui/` module |

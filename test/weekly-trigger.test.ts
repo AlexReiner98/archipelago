@@ -26,7 +26,7 @@ test('it comes due once on each of its days, at its time, and the person is told
     { op: 'create', ref: 'loop', type: 'task', title: 'The refinement loop' },
     { op: 'create', ref: 'w', type: 'automation', title: 'Weekly posting', status: 'enabled', props: { trigger: 'weekly', days: [1], at: '09:00', action: 'notify', message: 'Post today' } },
     { op: 'create', ref: 'off', type: 'automation', title: 'Paused one', status: 'paused', props: { trigger: 'weekly', days: [1], at: '09:00', action: 'notify' } },
-    { op: 'link', type: 'about', from: 'w', to: 'loop' },
+    { op: 'link', type: 'about', from: 'w', to: 'loop' }, { op: 'link', type: 'about', from: 'off', to: 'loop' },
   ]);
   const due = async (when: number) => (await duePass(l, when)).map((d) => d.item);
   assert.deepEqual(await due(at('2030-01-07', 8)), [], 'the first pass only sets where the clock starts');
