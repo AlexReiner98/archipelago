@@ -6,6 +6,15 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { isServerPack, readManifest, type Manifest } from './manifest.ts';
 
+/**
+ * Each pack.json text this process has read, by its SHA-256: the text the log keeps for a pack fact naming that hash
+ * (src/packstate.ts) is the one that was hashed, never the file as it is by the time the fact is written.
+ */
+const read = new Map<string, string>();
+
+/** The pack.json this process read with that hash, if it has read one. */
+export const manifestRead = (hash: string | undefined): string | undefined => (hash ? read.get(hash) : undefined);
+
 export interface PackFolders<P> {
   /** Each workspace pack found, by id. */
   found: Map<string, P>;
@@ -31,7 +40,9 @@ export function readPackFolders<P extends Manifest>(dirs: string[], skip: string
       if (where.has(pack.id)) throw new Error(`Pack "${pack.id}" is in two pack folders: ${where.get(pack.id)} and ${dir}`);
       where.set(pack.id, dir);
       found.set(pack.id, pack);
-      hashes.set(pack.id, createHash('sha256').update(text).digest('hex'));
+      const hash = createHash('sha256').update(text).digest('hex');
+      hashes.set(pack.id, hash);
+      read.set(hash, text);
     }
   }
   if (!found.has('core')) throw new Error(`No core pack in ${dirs.join(', ')}`);

@@ -6,12 +6,14 @@
 // What it cannot read from the log it takes from today, and says so: a manifest whose text the log never kept (the
 // pack was said before texts were kept) is today's when its hash is the same, else today's file stands in for it
 // (`stand_in`); a type the packs at P do not define but today's registry knows (a pack added later, a type of the
-// workspace's own) is kept dormant, as a pack taken out is. Before any pack fact, there is no past registry: today's
-// stands. The islands setting is today's.
+// workspace's own defined later) is kept dormant, as a pack taken out is. Before any pack fact, there is no past
+// registry: today's stands. The islands setting and the workspace's own types are as the logs said them by P
+// (src/registry-then.ts).
 
 import type { Q } from './db.ts';
 import { readManifest } from './manifest.ts';
-import { Registry, type PackFile } from './packs.ts';
+import { LOCAL_PACK, Registry, type PackFile } from './packs.ts';
+import { islandsAt, localAt } from './registry-then.ts';
 import { typeItemsIn } from './type-items.ts';
 
 /** The last fact said of each pack up to fact position `pos`. */
@@ -69,8 +71,9 @@ export async function registryAt(q: Q, today: Registry, pos: number): Promise<Re
     packs.push({ id, version: s.version, manifest: s.manifest, from });
   }
   if (!found.has('core')) return undefined;
-  const registry = new Registry({ found, hashes });
-  registry.turnOff([], today.onIslands);
+  const local = await localAt(q, [...today.types.values()].filter((t) => t.pack === LOCAL_PACK).map((t) => t.id), pos);
+  const registry = new Registry({ found, hashes }, undefined, local);
+  registry.turnOff([], await islandsAt(q, today.onIslands, pos));
   // What the packs then did not define and today's registry knows is dormant, as a pack taken out leaves its types.
   registry.keep({ types: [...today.types.values()].filter((t) => !registry.types.has(t.id)), relations: [...today.relations.values()].filter((r) => !registry.relations.has(r.id)) });
   return { registry, pos, packs, missing };

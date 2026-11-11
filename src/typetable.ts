@@ -12,6 +12,7 @@ import { moveLayouts } from './layout-move.ts';
 import { moveLives, movePins } from './view-life.ts';
 import { linkOwners } from './owner-link.ts';
 import { newId } from './db.ts';
+import { versionAdded } from './version-types.ts';
 
 interface Row {
   id: string;
@@ -81,6 +82,12 @@ export async function syncTypes(given: Archipelago): Promise<{ activated: string
     ...[...reg.types.values()].filter((t) => !t.dormant).map((def) => ({ id: def.id, what: 'type' as const, pack: def.pack, state: 'active' as const, def: { ...def, kind: def.starter } })),
     ...[...reg.relations.values()].filter((r) => !r.dormant).map((def) => ({ id: def.id, what: 'relation' as const, pack: def.pack, state: 'active' as const, def })),
   ];
+  // What a version of a pack adds is kept dormant, so its items keep their type once the version is archived.
+  const added = versionAdded(reg);
+  const asleepNow: Row[] = [
+    ...[...added.types].map((id) => reg.types.get(id)!).map((def) => ({ id: def.id, what: 'type' as const, pack: def.pack, state: 'dormant' as const, def: { ...def, kind: def.starter } })),
+    ...[...added.relations].map((id) => reg.relations.get(id)!).map((def) => ({ id: def.id, what: 'relation' as const, pack: def.pack, state: 'dormant' as const, def })),
+  ].filter((r) => { const was = kept.get(r.id); return !was || (was.state === 'dormant' && canonical(was.def) !== canonical(r.def)); });
   const now = new Set(live.map((r) => r.id));
   const dormant = rows.filter((r) => r.state === 'active' && !now.has(r.id)).map((r) => r.id);
   const activated: string[] = [];
@@ -100,6 +107,12 @@ export async function syncTypes(given: Archipelago): Promise<{ activated: string
         [row.id, row.what, row.pack, JSON.stringify(row.def)],
       );
     }
+    for (const row of asleepNow)
+      await tx.query(
+        `insert into type_def (id, what, pack, state, def) values ($1, $2, $3, 'dormant', $4::jsonb)
+         on conflict (id) do update set what = $2, pack = $3, def = $4::jsonb, changed = now() where type_def.state = 'dormant'`,
+        [row.id, row.what, row.pack, JSON.stringify(row.def)],
+      );
     if (dormant.length) await tx.query(`update type_def set state = 'dormant', changed = now() where id = any($1::text[])`, [dormant]);
   });
   const stamp: Moves = (await l.setting<Moves>(MOVES)) ?? { done: [] };
@@ -134,7 +147,7 @@ export async function syncTypes(given: Archipelago): Promise<{ activated: string
   await once('pins', has('lens'), () => movePins(l)); // the ids a view held by hand, id terms of its filter (after lives, which reads pinned)
   await once('owners', true, () => linkOwners(l, () => newId('r'))); // each owner said as a link
   if (JSON.stringify(stamp) !== was) await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [MOVES, JSON.stringify(stamp)]);
-  const asleep = rows.filter((r) => !now.has(r.id));
+  const asleep = [...rows.filter((r) => !now.has(r.id) && !asleepNow.some((a) => a.id === r.id)), ...asleepNow];
   reg.keep({
     types: asleep.filter((r) => r.what === 'type').map((r) => r.def as ResolvedType),
     relations: asleep.filter((r) => r.what === 'relation').map((r) => r.def as ResolvedRelation),

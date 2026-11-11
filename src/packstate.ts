@@ -1,6 +1,7 @@
 // Packs in time (Rule 8 of the target model, docs/log.md section 8): a pack's presence in a workspace is a fact on its
 // log, kept forever: ["+", "pack:<id>", "pack", { version, manifest, text? }] when it is added (the manifest is the SHA-256
-// of its pack.json as read, and its text the first time the log meets that hash), and only the owner adds one; ["-", "pack:<id>", "pack"] when it is taken out. Which packs are off is read from those facts,
+// of its pack.json as read, and its text the first time the log meets that hash; one said before texts were kept is
+// said again with it), and only the owner adds one; ["-", "pack:<id>", "pack"] when it is taken out. Which packs are off is read from those facts,
 // and everything a pack registers is derived from the set (src/packs.ts), so taking one out unwinds it at once: its
 // types turn dormant in the type table, its tools leave the tool list, its process stops, and connected agents are
 // told the list changed. What it made stays, as dormant items a person can still edit. Adding it back brings it all
@@ -18,6 +19,7 @@ import { canSeal } from './secrets.ts';
 import { ISLANDS } from './islands.ts';
 import { islandBlockers, moveOntoIslands } from './island-start.ts';
 import { KERNEL_PACKS } from './packorder.ts';
+import { manifestRead } from './pack-folders.ts';
 import { LOCAL_PACK, type PackFile } from './packs.ts';
 import { hostFor } from './packtools.ts';
 import { needHuman } from './actor-checks.ts';
@@ -117,9 +119,9 @@ async function keptManifests(l: Archipelago): Promise<Set<string>> {
 /** A pack's presence as a fact: its version and manifest hash, and the manifest's text the first time this log meets that hash. */
 function present(l: Archipelago, pack: { id: string; version: string }, kept: Set<string>): Fact {
   const manifest = l.registry.hashes.get(pack.id);
-  // a pack kept as an item is its manifest's text, kept on the map; any other is its file.
+  // a pack kept as an item is its manifest's text, kept on the map; any other is its file as this process read it.
   const file = join(l.registry.folderOf(pack.id), 'pack.json'), made = l.registry.made.get(pack.id)?.text;
-  const text = !manifest || kept.has(manifest) ? undefined : made ?? (existsSync(file) ? readFileSync(file, 'utf8') : undefined);
+  const text = !manifest || kept.has(manifest) ? undefined : made ?? manifestRead(manifest) ?? (existsSync(file) ? readFileSync(file, 'utf8') : undefined);
   const same = text !== undefined && createHash('sha256').update(text).digest('hex') === manifest;
   if (same) kept.add(manifest!);
   return ['+', packFact(pack.id), 'pack', { version: pack.version, manifest, ...(same && { text }) }];
@@ -190,6 +192,11 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
     if (renamed.has(p.id)) facts.push(present(l, p, kept), ['-', packFact(renamed.get(p.id)!), 'pack']);
     else if (kernel || was?.op === '+') {
       if (changed) facts.push(present(l, p, kept));
+      else if (!kept.has(l.registry.hashes.get(p.id) ?? '')) {
+        // said before the log kept texts: said again with its text, so the hash never reads as today's stand-in
+        const fact = present(l, p, kept);
+        if ((fact[3] as { text?: string }).text !== undefined) facts.push(fact);
+      }
     } else if (taken.has(p.id)) facts.push(present(l, p, kept));
     else if (!said.size && first) {
       if (start === 'all' || start.includes(p.id)) facts.push(present(l, p, kept));
