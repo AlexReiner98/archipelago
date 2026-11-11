@@ -1,10 +1,10 @@
 // The reads every page of a workspace waits on before it can ask for what it shows (who is signed in, the schema and
 // the workspace's style), asked as the page starts: this runs as soon as it is fetched, while the page's styles and
 // its modules are still loading. ui/base.js takes each answer once (`early`); a page that finds none asks as before.
-// It imports nothing, so nothing holds it up. A frozen link's page (/s/...) and a narrower session tried on a dev
-// server (?may=) read otherwise, and are left to ask for themselves.
+// It imports nothing, so nothing holds it up. A narrower session tried on a dev server (?may=) reads otherwise, and
+// is left to ask for itself.
 
-if (!/^\/s\//.test(location.pathname) && !new URLSearchParams(location.search).has('may')) {
+if (!new URLSearchParams(location.search).has('may')) {
   let token = '';
   try {
     token = localStorage.getItem('pelago-token') ?? '';

@@ -3,7 +3,7 @@
 // keeps of it: which domain serves which workspace, where a page of it is read, and the header and footer a preview
 // of a page is drawn with (/preview/<id>), read through the narrow functions that give what was published.
 
-import { publishedAt, sitePages } from './published.ts';
+import { publicViewAt, publicViews } from './public-view-store.ts';
 import type { Workspaces } from './workspaces.ts';
 
 /** The address word of a site's front page, read at /. */
@@ -27,9 +27,9 @@ export const siteHref = (path: string) => (path === HOME ? '/' : `/${path}`);
  */
 export async function siteNav(workspaces: Workspaces, workspace: string, href: (page: { id: string; path: string | null }) => string | null) {
   const pelago = (await workspaces.get(workspace)).pelago;
-  const pages = await sitePages(pelago);
+  const pages = await publicViews(pelago);
   const home = pages.find((page) => page.path === HOME);
-  const foot = pages.some((page) => page.path === FOOTER) ? ((await publishedAt(pelago, FOOTER)) as { parts?: { text?: string }[] } | null) : null;
+  const foot = pages.some((page) => page.path === FOOTER) ? ((await publicViewAt(pelago, FOOTER)) as { parts?: { text?: string }[] } | null) : null;
   const footer = (foot?.parts ?? []).flatMap((part) => (typeof part.text === 'string' ? [part.text] : [])).join(PARAGRAPH);
   return {
     ...(footer && { footer }),

@@ -442,3 +442,17 @@ dialog.cal-ask .cal-when { display: flex; align-items: center; gap: var(--space-
 .cal-routine .cal-what::before { content: "\21bb  "; }
 dialog.cal-ask .cal-days { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-6); }
 dialog.cal-ask [hidden] { display: none; }
+
+/* A held change on the sheet it touches: a thing to act on, set apart by its tone and room (Alex, 11 Nov 2026; ui/item-held.js). */
+.held-band { margin: var(--space-6) 0 var(--space-9); padding: var(--space-7) var(--space-8); background: var(--warn-soft); border-left: var(--border-4) solid var(--warn); border-radius: var(--radius-2); }
+.held-band .held-head { color: var(--warn); font-weight: 600; font-size: var(--text-3); }
+.held-band .held-why { margin: var(--space-4) 0 var(--space-7); font-size: var(--text-6); }
+.held-band .held-acts { display: flex; align-items: center; gap: var(--space-5); min-width: 0; }
+.held-band .held-acts > * { flex: none; }
+.held-band .held-acts > .grow { flex: 1 1 0; }
+.held-band .held-acts > .who { flex: 0 1 auto; min-width: 0; color: var(--muted); font-size: var(--text-3); }
+/* The same, called out over the canvas while no sheet is open: one press from the band. */
+#find .held-call { display: flex; align-items: center; gap: var(--space-6); margin: 0 0 var(--space-5); padding: var(--space-4) var(--space-4) var(--space-4) var(--space-7); background: var(--panel); border: var(--border-1) solid var(--warn); border-left-width: var(--border-4); border-radius: var(--radius-2); }
+#find .held-call[hidden], body[data-sheet="open"] #find .held-call, #find.open .held-call { display: none; }
+#find .held-call > .held-call-n { flex: none; color: var(--warn); font-weight: 600; }
+#find .held-call > button { flex: none; }

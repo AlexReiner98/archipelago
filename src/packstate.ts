@@ -180,7 +180,7 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
   const taken = await takenOver(l, said);
   const facts: Fact[] = [];
   for (const p of l.registry.found) {
-    if (p.id === LOCAL_PACK || (l.registry.only && !l.registry.only.includes(p.id))) continue;
+    if (p.id === LOCAL_PACK || (l.registry.only && !l.registry.only.includes(p.id) && !l.registry.made.has(p.id))) continue;
     const was = said.get(p.id);
     if (l.registry.made.has(p.id) && was?.op !== '+') continue; // kept as an item: the owner adds it, never the sync
     const kernel = KERNEL_PACKS.includes(p.id);
@@ -260,6 +260,8 @@ export function packStates(l: Archipelago) {
 export async function setPack(l: Archipelago, actor: Actor, input: { pack: string; on: boolean }) {
   needHuman(actor, 'Turning a pack on or off is the owner’s.');
   if (!l.registry.states.has(input.pack)) throw new Error(`No pack "${input.pack}" on this server. Packs: ${[...l.registry.states.keys()].join(', ')}`);
+  // A pack the server's list leaves out here (src/pack-allow.ts) is not the owner's to add: the server's configuration lets it in.
+  if (input.on && l.registry.only && !l.registry.only.includes(input.pack) && !l.registry.made.has(input.pack)) throw new Error(`The ${input.pack} pack is not offered to this workspace on this server.`);
   if (!input.on && KERNEL_PACKS.includes(input.pack)) throw new Error(`The ${input.pack} pack is the kernel's own: it is never taken out.`);
   const needing = input.on ? [] : l.registry.packs.filter((p) => (p.requires ?? []).includes(input.pack)).map((p) => p.id);
   if (needing.length) throw new Error(`${needing.join(', ')} require${needing.length === 1 ? 's' : ''} the ${input.pack} pack: take ${needing.length === 1 ? 'it' : 'them'} out first.`);

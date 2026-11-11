@@ -12,6 +12,7 @@ import { toConfirm } from './confirm.ts';
 import { stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
 import { wholeMap } from './outbox.ts';
+import { itemLink } from './members.ts';
 import { actorId } from './pelago.ts';
 import { PICTURE_TYPES, putPicture } from './pictures.ts';
 import { runNamed, tellStamp, took, watching } from './presence.ts';
@@ -135,11 +136,11 @@ export const ACT_TOOLS: Record<string, Tool> = {
       if (!started.resumed || started.reopened) await sessionOpened(l, actor, started.run, input.task, started.took_over);
       // What every session is told (instructions for session_start) is said in the answer too, so a session its hook
       // registered and that joins that run hears it as a new one does (issue e_sm2sa75h). A resume was told at first.
-      if (started.resumed) return started;
+      if (started.resumed) return { ...started, link: itemLink(l.workspace) };
       const told = await instructionsFor(l, 'session_start', { about: started.repo?.id, fill: { run: started.run } });
       // And where it stands: what the sessions before it here worked on that needs attention now (src/frontier.ts).
       const here = await (await import('./frontier.ts')).frontier(l, { run: started.run, cwd: input.cwd, remote: input.remote });
-      return { ...started, frontier: here, ...(told.length && { instructions: told.map((one) => one.text) }) };
+      return { ...started, link: itemLink(l.workspace), frontier: here, ...(told.length && { instructions: told.map((one) => one.text) }) };
     },
   },
   session_update: {

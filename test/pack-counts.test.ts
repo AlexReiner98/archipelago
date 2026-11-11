@@ -138,3 +138,30 @@ test('the reader counts a reader’s tagged page load on its site once; its data
     assert.deepEqual(heldCounts('default', VISITS).map((r) => r.key).sort(), ['x', 'ycombinator'], 'no tag, no count');
   });
 });
+
+test('with no site, counts are kept on a workspace that has a public view, and a /p/ visit there is counted on it', async () => {
+  const { workspaces, call, base } = await serve('off', undefined, undefined, PAGES);
+  const reader = packOf('reader', ['count.add'], { counts: 'visits', mounts: { public: 'page' } });
+  const billing = packOf('billing', ['count.read']);
+  const act = (pack: ServerPackFile, name: string, input: Record<string, unknown>) => runAct(workspaces, pack, name, input, undefined, [reader, billing]) as Promise<{ counts: Record<string, unknown>[]; pos: number }>;
+  // Nothing public on it: nothing to visit, so no counts.
+  await assert.rejects(act(reader, 'count.add', { workspace: 'default', key: 'x' }), /has no public view/);
+  await assert.rejects(act(reader, 'count.add', { workspace: 'nowhere', key: 'x' }), /not a workspace this server holds/);
+  await assert.rejects(act(billing, 'count.read', { workspace: 'default', of: 'reader' }), /has no public view/);
+
+  const { page } = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'page', type: 'page', title: 'A map of mine', visibility: 'shared', body: 'Shared for anyone.' }] })).result.created;
+  assert.equal((await call('/api/share_create', undefined, { id: page })).status, 200);
+  const count = (tag: string) => heldCounts('default', VISITS).find((r) => r.key === tag && r.day === dayOf())?.n ?? 0;
+  // The reader's own page load at /p/, on a server that names no site for the workspace.
+  const { hostname, port } = new URL(base);
+  const status = await new Promise<number>((resolve, reject) => {
+    request({ hostname, port, path: `/p/default/${page}?ref=post1`, headers: { 'user-agent': BROWSER } }, (res) => res.resume().on('end', () => resolve(res.statusCode ?? 0))).on('error', reject).end();
+  });
+  assert.equal(status, 200);
+  assert.equal(count('post1'), 1, 'the visit is counted on its own map');
+  await act(reader, 'count.add', { workspace: 'default', key: 'post2', n: 2 });
+  await flushCounts((id) => workspaces.get(id));
+  // Read back by its workspace (what earlier tests left in memory for a workspace of this name is there too).
+  const read = await act(billing, 'count.read', { workspace: 'default', of: 'reader' });
+  assert.deepEqual(read.counts.filter((r) => String(r.key).startsWith('post')).map((r) => [r.key, r.n]).sort(), [['post1', 1], ['post2', 2]]);
+});

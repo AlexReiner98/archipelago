@@ -11,21 +11,8 @@ export const state = { workspace: undefined, schema: undefined, may: undefined, 
  */
 export const may = (what) => state.may?.includes(what) === true;
 /** What this session may do, asked of the server once a sign-in (the page's route waits for it before drawing). */
-export const loadMay = async () => (state.may ??= link ? ['read'] : (await whoami())?.may ?? ['read']);
+export const loadMay = async () => (state.may ??= (await whoami())?.may ?? ['read']);
 
-/**
- * A frozen link opened at /s/<workspace>/<secret> (decision e_qpaqnmrc, axis B): the page reads as a short reader token
- * its secret is traded for, held in memory only and traded again when it runs out. Null on any other address.
- */
-const linked = /^\/s\/([^/]+)\/([^/]+?)\/?$/.exec(location.pathname);
-export const link = linked ? { ws: linked[1], secret: linked[2], token: '', of: '', reads: null, views: null } : null;
-if (link) document.documentElement.dataset.reader = 'link';
-export async function openLink() {
-  const res = await postJson(`/s/${link.ws}/${link.secret}/token`, {});
-  const body = await res.json();
-  if (!res.ok) throw new Error(body.error);
-  return Object.assign(link, { token: body.token, of: body.of, reads: body.reads ?? null, views: body.views ?? null });
-}
 export const hooks = {};
 export const route = (pulse) => hooks.route(pulse);
 /**
@@ -152,7 +139,7 @@ export const store = {
     }
   },
 };
-export const authHeaders = () => (link ? { authorization: `Bearer ${link.token}` } : store.token ? { authorization: `Bearer ${store.token}` } : {});
+export const authHeaders = () => (store.token ? { authorization: `Bearer ${store.token}` } : {});
 
 // A dev server lets a page try a narrower session than its sign-in (?may=read in the page's address, before the #): the
 // server answers only that much, and the page draws as such a session would. Elsewhere the server ignores it.
@@ -215,6 +202,27 @@ export function waitingOnSignIn() {
   }
 }
 
+/** The workspace a sign-in's token is of (pel_<workspace>_…), or undefined. */
+export const workspaceOf = (token) => /^pel_([a-z0-9][a-z0-9-]{0,39})_/.exec(token ?? '')?.[1];
+/** Where a link from outside the app (ui/item-link.js) was going when it asked for a sign-in to its workspace: for half an hour. */
+const LANDING = 'pelago-link';
+export function keepLanding(ws, hash) {
+  try {
+    if (ws) localStorage.setItem(LANDING, JSON.stringify({ ws, hash, at: Date.now() }));
+    else localStorage.removeItem(LANDING);
+  } catch {}
+}
+/** The address a sign-in to workspace `ws` lands on, kept by such a link, taken once. */
+function landingIn(ws) {
+  try {
+    const kept = JSON.parse(localStorage.getItem(LANDING) ?? 'null');
+    keepLanding(null);
+    return kept && kept.ws === ws && Date.now() - kept.at < 30 * 60_000 ? kept.hash : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Become whoever a token says, starting from Home: nothing on the page belongs to the new workspace. The page is loaded
  * again, so every part of it that holds what it read (the saved views, the replica, a drawing) starts empty: one kept
@@ -222,8 +230,8 @@ export function waitingOnSignIn() {
  */
 export function enter(token) {
   store.token = token;
-  // A sign-in opens on Home, as the app does: a new workspace's first steps are there.
-  history.replaceState(null, '', waitingOnSignIn() ? '#/authorize' : '#/home');
+  // A sign-in opens on Home, as the app does: a new workspace's first steps are there; one a link asked for, on its item.
+  history.replaceState(null, '', waitingOnSignIn() ? '#/authorize' : landingIn(workspaceOf(token)) ?? '#/home');
   location.reload();
 }
 
@@ -244,7 +252,7 @@ export const call = async (path, input, headers) => answerOf(await postJson(path
 /** A read ui/early.js asked for as the page started, taken once, while the page would still ask it so: its response. */
 function early(name) {
   const asked = globalThis.pelagoEarly;
-  if (link || !asked?.[name] || asked.token !== store.token) return undefined;
+  if (!asked?.[name] || asked.token !== store.token) return undefined;
   const res = asked[name];
   delete asked[name];
   return res;
@@ -254,17 +262,7 @@ export const apiFirst = (name, ask) => {
   const res = early(name);
   return res ? res.then(answerOf).catch(ask) : ask();
 };
-/** What a link's reader may not ask, as its token said: refused here, quietly, rather than sent to be refused. */
-const notForLink = (tool, input) => Boolean(link?.reads) && (!link.reads.includes(tool) || (tool === 'view' && Boolean(link.views) && !link.views.includes(input?.name)));
-export const api = (tool, input = {}) =>
-  notForLink(tool, input)
-    ? Promise.reject(new Error(`A link only reads what it shows: not ${tool === 'view' ? `the view ${input?.name}` : tool}.`))
-    : call(`/api/${tool}`, input, authHeaders()).catch(async (err) => {
-    // A link's reader token has run out: trade the secret again, once.
-    if (!link || !(err instanceof SignInNeeded)) throw err;
-    await openLink();
-    return call(`/api/${tool}`, input, authHeaders());
-  });
+export const api = (tool, input = {}) => call(`/api/${tool}`, input, authHeaders());
 
 // Signed out, the style is not read with the rest: its colours are asked for on their own.
 const themeSignedOut = () => fetch('/connect/theme').then((r) => r.json()).then(applyTheme, () => undefined);
@@ -321,6 +319,7 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
       'Check your email',
       gateRow(h('span', { class: 'muted grow gist', title: `A sign-in code is on its way to ${sentTo}, if it has a workspace here` }, sentTo), change, again),
       gateRow(code, go),
+      gateRow(h('span', { class: 'muted grow' }, 'Not there? Check spam or junk.')),
       error,
       startAt && gateRow(h('span', { class: 'muted grow' }, 'No code?'), h('a', { href: startAt, title: 'An address with no workspace here is sent nothing: make one of your own' }, 'Start a workspace')),
     );

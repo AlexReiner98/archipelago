@@ -159,7 +159,7 @@ export class Registry {
     for (const p of made.packs) found.set(p.manifest.id, p.manifest), hashes.set(p.manifest.id, p.hash);
 
     // Load in dependency order what is on and has what it requires; the rest waits or is off.
-    const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK).map((id) => [id, 'not enabled on this server']));
+    const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK && !this.made.has(id)).map((id) => [id, 'not enabled on this server']));
     for (const id of this.turnedOff) off.set(id, 'turned off here');
     for (const id of this.made.keys()) if (!this.madeOn.has(id)) off.set(id, 'kept as an item: the owner has not added it here');
     if (this.islands) for (const [id, why] of islandsOff([...found.values()].filter((p) => !off.has(p.id) || KERNEL_PACKS.includes(p.id)), LOCAL_PACK)) off.set(id, why);

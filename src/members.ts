@@ -45,6 +45,8 @@ export function configureMembers(given: Partial<typeof site> & { standingOf?: (i
   site = { ...site, ...rest };
   configureStanding({ ...(read && { read }), ...(rest.nameOf && { nameOf: rest.nameOf }) });
 }
+/** Where an item of a workspace is read by a person, `{id}` for the item: an agent names an item to its owner as a link to it, not by its id. */
+export const itemLink = (workspace: string) => `${site.origin}/i/${workspace}/{id}`;
 /** Give a workspace another name, where the server keeps them. */
 export const renameWorkspace = (workspace: string, name: string) => site.rename(workspace, name);
 /** Which workspaces each address belongs to is kept beside the workspaces too, so a sign-in opens only those (src/control-index.ts). */

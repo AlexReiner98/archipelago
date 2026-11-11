@@ -31,6 +31,7 @@ export const STORES: Record<string, string> = {
   proposal: 'The review queue, a projection of the log: a held change’s record in the pending stream makes its row, the entry that decides it in the fact stream says what became of it (src/replay.ts).',
   reach: "What a view shared with a guest holds now, by share: worked out by the server as the person who shared it whenever the log has moved (src/guests.ts), and read by the reader role's policies; never a fact, never backed up.",
   published: 'A document as it was published, frozen: written only when a human publishes.',
+  public_view: 'A view or an item made public, frozen as the person who shared it saw it: written only when a human shares it or publishes a document, and when it is taken down.',
   picture: 'The picture a test drew, kept for a public result: one per result, replaced when the test runs again; its hash appended to the observations stream.',
   act: 'A request a pack made outside the map: one that cannot be taken back waits for a person; once made it is logged, never undone.',
   type_def: "Every type and relation the packs declare, dormant ones included: written when a workspace opens, never by a change.",

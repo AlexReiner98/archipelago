@@ -581,6 +581,7 @@
       "extends": "system",
       "title": "Automation",
       "description": "A trigger that fires an action. Only fires while its status is enabled.",
+      "capabilities": { "when": { "repeat": { "from": "at", "days": "days" } } },
       "statuses": {
         "open": [
           "enabled",
@@ -608,7 +609,7 @@
         },
         "at": {
           "type": "string",
-          "description": "For trigger daily or weekly: local time as HH:MM."
+          "description": "For trigger daily or weekly: the time as HH:MM, in the workspace's time zone."
         },
         "days": {
           "type": "json",

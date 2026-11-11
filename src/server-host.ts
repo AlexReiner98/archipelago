@@ -11,7 +11,7 @@ import { signinGate } from './server-gates.ts';
 import { standingChanged } from './standing.ts';
 import { connectAct, connectionOf, type Connection } from './server-connect.ts';
 import { parts } from './manifest.ts';
-import { loadServerPacks, PUBLISHED_ACTS, type ServerAct, type ServerPack } from './server-packs.ts';
+import { loadServerPacks, PUBLIC_ACTS, type ServerAct, type ServerPack } from './server-packs.ts';
 import { hostBase, hostRequest, type HostRequest } from './server-requests.ts';
 
 /** How long a call may take unless its pack says otherwise, and the most it may say. */
@@ -100,7 +100,7 @@ export class ServerPacks {
       if (typeof q.act === 'string') {
         const input = (q.input ?? {}) as Record<string, unknown>;
         if (!(pack.file.reach.server.acts ?? []).includes(q.act as never)) throw new Error(`The pack "${id}" did not declare the act "${q.act}".`);
-        if (PUBLISHED_ACTS.includes(q.act as ServerAct)) return publishedAct(this.at, pack.file, q.act as ServerAct, input);
+        if (PUBLIC_ACTS.includes(q.act as ServerAct)) return publishedAct(this.at, pack.file, q.act as ServerAct, input);
         if (CONNECT_ACTS.includes(q.act)) return connectAct(this.at, await this.control(), pack.file, q.act, input);
         return runAct(this.at, pack.file, q.act, input, (ask) => signinGate(this, ask, id), this.packs.map((p) => p.file));
       }

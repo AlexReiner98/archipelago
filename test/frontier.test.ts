@@ -85,6 +85,8 @@ test('a second session is placed where the first worked: the owner’s correctio
   // And the same answer is a view anyone may ask, the agent's start and the person's alike.
   const asked = (await callTool(l, human, 'view', { name: 'frontier', params: { cwd: 'C:/work/todo' } })) as { items: { id: string }[] };
   assert.ok(asked.items.some((i) => i.id === made.hash));
+  // It says once how an item is linked to, so an agent names an item to a person by a link, not by its id.
+  assert.equal((asked as unknown as { link: string }).link, `http://127.0.0.1:3100/i/${l.workspace}/{id}`);
 });
 
 test('capture session_start answers with where the session stands', async () => {
@@ -92,8 +94,9 @@ test('capture session_start answers with where the session stands', async () => 
   cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
   const l = await freshWith(new Registry(packs));
   await l.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"') on conflict (key) do update set value = excluded.value`);
-  const first = (await callTool(l, agent, 'session_start', { session_id: 'a', cwd: '/srv/app' })) as { run: string; frontier: { before: { sessions: number } } };
+  const first = (await callTool(l, agent, 'session_start', { session_id: 'a', cwd: '/srv/app' })) as { run: string; link: string; frontier: { before: { sessions: number } } };
   assert.equal(first.frontier.before.sessions, 0);
+  assert.equal(first.link, `http://127.0.0.1:3100/i/${l.workspace}/{id}`, 'the answer carries the pattern of an item’s link once');
   await l.change(agent, { run: first.run, reason: 'Plan', ops: [{ op: 'create', type: 'task', title: 'Ship it' }] });
   const second = (await callTool(l, agent, 'session_start', { session_id: 'b', cwd: '/srv/app' })) as { frontier: { items: { title: string; reasons: { why: string }[] }[] } };
   assert.deepEqual(second.frontier.items.map((i) => [i.title, i.reasons[0].why]), [['Ship it', 'open']]);

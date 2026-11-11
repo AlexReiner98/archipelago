@@ -35,7 +35,7 @@ import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './aut
 import { notify } from './notify.ts'; import { alertOnCrash } from './alert.ts';
 import { backupAll, parseBackup, parseVault } from './backup.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from './members.ts'; import { requestWait } from './standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from './workspace-use.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts'; import { env } from './env.ts';
-import { SHORT, serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts';
+import { SHORT, serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts'; import { itemAddress } from './item-address.ts';
 import { stopAllLaunched } from './launcher.ts'; import { configureLaunch } from './server-launch.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
 import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from './looks.ts'; import { pageMay } from './may.ts';
@@ -48,11 +48,11 @@ import { clientAddress, trustedProxies } from './address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
 import { servePublic } from './public-route.ts'; import { siteNav } from './site.ts'; import { ICON, serveIcon } from './icon.ts';
 import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageLook } from './styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
-import { sharedPicture } from './documents.ts'; import { sharedAnswer } from './share-view.ts'; import { guestMap, ShareEnded } from './guests.ts'; import { serveLink } from './share-link-route.ts'; import { frozen } from './share-link.ts';
+import { guestMap, ShareEnded } from './guests.ts';
 import { configureSecrets } from './secrets.ts'; import { serveBackupFile } from './backup-tools.ts';
 import { answerAt, hookAt } from './server-adapter.ts'; import { mountOf, serveMounted } from './server-mounts.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
-import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, unlisted, PAGE_POLICY, PREVIEW_POLICY, SHARED_POLICY } from './page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from './draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
+import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY } from './page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from './draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts'; import { hasBounced } from './bounces.ts'; import { setBounced } from './mail.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
@@ -207,7 +207,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
   return createServer(async (req, res) => {
     try {
-      const url = new URL(req.url ?? '/', 'http://localhost'), host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined;
+      const url = new URL(req.url ?? '/', 'http://localhost'), host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined; const toItem = req.method === 'GET' && !site ? itemAddress(url.pathname) : undefined; if (toItem !== undefined) return toItem ? void res.writeHead(302, { location: toItem, 'cache-control': 'no-store' }).end() : send(res, 404, { error: 'Not found' }); // an item named outside the app (src/item-address.ts)
       if (drawing.only(host) && !(req.method === 'GET' && drawHostServes(url.pathname))) return send(res, 404, { error: 'Not found' }); // the drawing host serves drawings only
       if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, data: devMode() ? (workspaces.config.dataDir ?? undefined) : undefined, leading: options.leading?.() ?? true });
       // A domain that serves a workspace's public site: its pages by the reader pack (packs/reader), its icon; the rest as on any name.
@@ -227,31 +227,6 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // A product's public page, which the reader pack passed on: open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture|drawing|live)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
       if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces }));
-      // A frozen link's secret traded for a reader token, and that token's reads, from the link's snapshot alone (src/share-link-route.ts).
-      if (await serveLink(req, res, url.pathname, { workspaces, tooOften: () => tooOften(req, res, open), local: () => local(req), body: () => readJson(req) })) return;
-
-      // A document given as a link: open to whoever holds it, with no login. The secret in the path is the only key, so
-      // the page is never cached, never framed and never says where it was read from. What it shows is read through one
-      // function that gives that document and what it brings in, and nothing else (src/db.ts).
-      const shared = req.method === 'GET' ? /^\/s\/([^/]+)\/([^/]+?)(?:\/(data|picture)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
-      if (shared) {
-        if (tooOften(req, res, open)) return;
-        const [, wsId, secret, data, figure] = shared;
-        const guard = UNLISTED, app = !data && (await workspaces.has(wsId)) && (await frozen((await workspaces.get(wsId)).pelago, secret)); // a frozen link opens the app, read only
-        if (!data) {
-          res.writeHead(200, { ...guard, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': app ? PAGE_POLICY : SHARED_POLICY });
-          return res.end(unlisted(app && options.unsandboxed ? markPage(await uiPage('index.html'), { open: false, unsandboxed: true }) : await uiPage(app ? 'index.html' : 'doc.html')));
-        }
-        if (data === 'picture') {
-          const picture = figure && (await workspaces.has(wsId)) ? await sharedPicture((await workspaces.get(wsId)).pelago, secret, figure) : null;
-          if (!picture) return send(res, 404, { error: 'Not found' }, guard);
-          return res.writeHead(200, { ...guard, 'content-type': picture.content_type, 'content-security-policy': "default-src 'none'" }).end(picture.bytes);
-        }
-        const doc = (await workspaces.has(wsId)) ? await sharedAnswer((await workspaces.get(wsId)).pelago, secret, url.searchParams.get('item')) : null;
-        if (!doc) return send(res, 404, { error: 'This link does not open anything: it may have been revoked.' }, guard);
-        return send(res, 200, 'item' in doc ? doc : { ...doc, ...(await pageLook((await workspaces.get(wsId)).pelago, doc)) }, guard);
-      }
-
       // A document read by someone signed in, to print or save as a PDF: the same page a link opens, which reads the
       // document with the reader's own token. The page holds nothing; what it shows is what that token may see.
       if (req.method === 'GET' && /^\/read\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
@@ -415,7 +390,7 @@ if (import.meta.main) {
   const rootDir = join(config.dataDir, '..', 'workspaces');
   // Before anything reads a secret: where the key they are sealed with is kept.
   configureSecrets(rootDir, !config.databaseUrl);
-  const workspaces = new Workspaces({ dataDir: config.dataDir, databaseUrl: config.databaseUrl, rootDir, packsDir: config.packsDir, packDirs: config.packDirs, packs: config.packs, policy: config.policy, backupsDir: config.backup ? config.backup.dir : undefined, defaultOnIslands: true });
+  const workspaces = new Workspaces({ dataDir: config.dataDir, databaseUrl: config.databaseUrl, rootDir, packsDir: config.packsDir, packDirs: config.packDirs, packs: config.packs, workspacePacks: config.workspacePacks, policy: config.policy, backupsDir: config.backup ? config.backup.dir : undefined, defaultOnIslands: true });
   if (config.launch) configureLaunch({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), auth: config.auth === 'tokens', packs: serverPacksOf(workspaces) });
 
   // One server per data folder, whatever port each is on: two of them writing

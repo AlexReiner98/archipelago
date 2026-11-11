@@ -281,6 +281,7 @@ export const KERNEL_VERBS: Record<string, string> = {
   hook: 'report',
   notify: 'ask',
   publish_ask: 'ask',
+  share_ask: 'ask',
   confirmed: 'settle',
   decide: 'settle',
   release: 'revise',

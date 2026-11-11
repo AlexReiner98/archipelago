@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { notify } from './notify.ts';
+import { mailHeard, type NotificationMail } from './notify-mail.ts';
 import { handleRequests, type OutsideRequest } from './outside.ts';
 import { answerBeyond, holdWorkspace, NOT_BEYOND } from './pack-reach.ts';
 import type { PackFile } from './packs.ts';
@@ -38,6 +39,8 @@ export interface Done {
   log?: { action: string; target?: string; reason?: string; detail?: Record<string, unknown> }[];
   /** What the owner is told. */
   notify?: { title: string; body?: string; level?: 'info' | 'warning' | 'urgent'; about?: string }[];
+  /** On hearing a notification made: one mail about it, to its person (src/notify-mail.ts). */
+  mail?: NotificationMail[];
 }
 
 /** What is asked of an action's ops before they are applied: a token limited to some work is held to it. */
@@ -224,6 +227,7 @@ export class PackHost {
     const file = l.registry.packs.find((p) => p.id === pack)!;
     // Refused whole, before anything is written: an event of a kind its pack does not declare.
     for (const e of done.log ?? []) if (!parts(file).events.includes(e.action)) throw new Error(`The ${pack} pack declares no event "${e.action}"`);
+    const mailed = done.mail?.length ? await mailHeard(l, pack, call === 'event' ? input : undefined, done.mail) : undefined;
     const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name, pack, ...islandIn(input) }) : undefined;
     const action = call === 'action' ? parts(file).actions.find((a) => a.id === name) : undefined;
     const outside = done.requests?.length ? await handleRequests(this, l, actor, file, action, done.requests, (changed as { changeset?: string } | undefined)?.changeset) : undefined;
@@ -232,15 +236,16 @@ export class PackHost {
     const dropped = changed?.status === 'applied' && done.drop_pictures?.length ? await dropPictures(l, actor, done.drop_pictures, done.reason?.trim() || name) : undefined;
     const others = await further(l, actor, file, name, done, input);
     for (const e of done.log ?? []) this.tell(l, file.id, e);
-    return { answer, ...changed, ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }) };
+    return { answer, ...changed, ...(mailed && { mailed }), ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }) };
   }
 
   /**
-   * Tell the packs that hear a kind of event that another pack recorded one, each at its entry of that name, as
+   * Tell the packs that hear a kind of event that another pack recorded one (or the kernel, from "kernel": an item.due
+   * from its clock, src/due.ts, or a notification.made, src/notify.ts), each at its entry of that name, as
    * itself. Not waited for: what records it (a webhook) answers its sender now. What each answers is applied like
    * any of its calls; it may only read beyond the map.
    */
-  private tell(l: Archipelago, from: string, e: NonNullable<Done['log']>[number]): void {
+  tell(l: Archipelago, from: string, e: NonNullable<Done['log']>[number]): void {
     for (const pack of l.registry.packs) {
       const hears = pack.id !== from && parts(pack).hears.find((h) => h.event === e.action);
       if (!hears) continue;

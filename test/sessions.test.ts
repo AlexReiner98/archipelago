@@ -215,6 +215,7 @@ test('the session-start hook registers the session and names its repository and 
   const made = await laneSetup(l);
   const text = await hookSessionStart(l, { session_id: 'abc', cwd: 'C:\\code\\Apex' });
   assert.match(text, /registered in Archipelago/);
+  assert.ok(text.includes(`Name an item to a person as [its name](http://127.0.0.1:3100/i/${l.workspace}/{id}), never a bare id`), 'it is told how to link to an item');
   const repoId = /Repository: Apex repo \((e_\w+)\)/.exec(text)?.[1];
   assert.ok(repoId, 'the repository comes with its id');
   assert.match(await hookSessionStart(l, { session_id: 'abc', cwd: 'C:\\code\\Apex' }), new RegExp(`Repository: Apex repo \\(${repoId}\\)`), 'a session that is resumed is told its repository again');

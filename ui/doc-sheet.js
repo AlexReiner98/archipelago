@@ -1,6 +1,6 @@
-// An item a link's view shows, opened where the reader is: the item's page, read only, in a sheet over the page, as the
-// app opens an item over the canvas (one thing, one page). Only what the link shows can be opened (src/share-view.ts,
-// sharedItem): its title, what it is and where it stands, its fields and its note. Nothing in it changes anything.
+// An item a public view shows, opened where the reader is: what was frozen of it, read only, in a sheet over the page,
+// as the app opens an item over the canvas (one thing, one page): its title, what it is and where it stands, its
+// fields and its first line. Nothing in it changes anything.
 
 import { h } from './base.js';
 import { day } from './words.js';
@@ -17,7 +17,7 @@ function close() {
 addEventListener('keydown', (e) => e.key === 'Escape' && sheet && close());
 
 /**
- * Open the item `id` in the sheet: read through the link (`read`, which answers { item } or fails), its note drawn by
+ * Open the item `id` in the sheet: read by `read`, which answers { item } or fails, its note drawn by
  * the page's own reading of the one dialect (ui/doc.js), so it reads as the page does.
  */
 export async function openItem(id, read, note) {
