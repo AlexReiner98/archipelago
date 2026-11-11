@@ -25,7 +25,7 @@ after(() => registries.forEach((r) => hostFor(r).stop()));
 
 /** A pack that keeps hours and adds an hourly rate to a company, and one that requires it. */
 const CLOCK: PackFile = {
-  id: 'clock', version: '0.1.0', title: 'Clock', requires: ['core'],
+  id: 'clock', version: '0.1.0', title: 'Clock', requires: ['core', 'type:company'],
   types: [{ id: 'clock.entry', title: 'Entry', description: 'Hours kept.', extends: 'record', fields: { hours: { type: 'number' } } }, { of: 'company', fields: { hourly: { type: 'number' } } }],
 };
 const LEANS: PackFile = { id: 'leans', version: '0.1.0', title: 'Leans', requires: ['core', 'clock'] };
@@ -100,10 +100,10 @@ test("a change a pack's action makes may touch only what the pack declares or re
   await assert.rejects(callTool(l, human, 'reacher_rename', { id: task.created.t, title: 'Renamed' }), /The reacher pack touched "Survey", a clock.entry it neither declares nor requires/);
   assert.equal((await l.entity(task.created.t))!.title, 'Survey', 'refused whole');
 
-  // A field another pack adds is that pack's: reacher requires core only, so clock's hourly on a company is outside it.
+  // A company is the people pack's, and clock adds hourly to it: reacher requires core only, so a company is outside it whole.
   const company = { op: 'create' as const, type: 'company', title: 'Acme', props: { hourly: 120 } };
   assert.equal((await decide(l.db, l.registry, { human: true, pack: 'clock' }, [company])).outcome, 'apply');
-  assert.match((await decide(l.db, l.registry, { human: true, pack: 'reacher' }, [company])).refused.join(), /a company \(its field hourly\)/);
+  assert.match((await decide(l.db, l.registry, { human: true, pack: 'reacher' }, [company])).refused.join(), /a company it neither declares nor requires/);
   assert.equal((await decide(l.db, l.registry, { human: true }, [company])).outcome, 'apply', 'a change no pack makes is not under it');
 });
 
