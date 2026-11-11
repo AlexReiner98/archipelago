@@ -1,0 +1,23 @@
+{
+  "id": "email",
+  "version": "0.1.0",
+  "title": "Email",
+  "description": "Mails a notification to the person it is for, at the address they sign in with, once they turn it on: an email channel of theirs, part of their person item, says whether mail is on, their quiet hours and the least level worth a mail. Nobody is mailed who has not turned it on.",
+  "types": [
+    {
+      "id": "email.channel",
+      "extends": "actor",
+      "title": "Email channel",
+      "description": "How a person is reached by mail: part of their person item. Mail goes to the address they sign in with, never another. Off unless turned on.",
+      "statuses": { "open": ["active"], "closed": ["inactive"] },
+      "fields": {
+        "on": { "type": "boolean", "default": false, "description": "Whether notifications are mailed. Off unless turned on." },
+        "least": { "type": "enum", "values": ["info", "warning", "urgent"], "default": "info", "description": "The least level of notification mailed." },
+        "quiet_from": { "type": "string", "description": "When quiet hours begin, as HH:MM: nothing but an urgent notification is mailed until they end." },
+        "quiet_to": { "type": "string", "description": "When quiet hours end, as HH:MM." },
+        "zone": { "type": "string", "description": "The time zone quiet hours are in (e.g. Europe/London); the workspace's unless said." }
+      }
+    }
+  ],
+  "handlers": [{ "event": "notification.made", "limit_ms": 5000 }]
+}
