@@ -107,7 +107,7 @@ grant execute on function pelago_published_at(text, text[]), pelago_site_pages(t
 
 /**
  * Step 26 (src/migrate.ts): a document shared with another workspace may be published there, when the admin who
- * shares it says so (dropped 10 Nov 2026; the function stays for the schema). The receiving workspace is given what it may publish through one
+ * shares it says so (dropped 10 Nov 2026, with its column and function, by step 39). The receiving workspace was given what it may publish through one
  * function, and only while the share stands: the document and what it brings in, as the share shows them.
  */
 export const SHARE_PUBLISHABLE = `
@@ -117,4 +117,25 @@ language sql stable security definer set search_path = public as $fn$
   select coalesce((select s.publishable from share s where s.id = share_id and s.to_workspace = reader and s.revoked_at is null), false)
 $fn$;
 grant execute on function pelago_workspace_publishable(text, text) to pelago_public;
+`;
+
+/**
+ * Step 39 (src/migrate.ts): shares made out to another workspace are gone (the owner, 10 Nov 2026; #323 stopped
+ * reading them, and was live before this step). Their rows go first, so none is left looking like a link with no
+ * secret; then the columns and the functions only they read. A backup kept from before restores all the same: rows
+ * are filled by name, and a column no longer here is not read.
+ */
+export const SHARE_WORKSPACE_GONE = `
+do $step$ begin
+  -- Safe to run again: on a database past it, the column is gone already.
+  if exists (select 1 from information_schema.columns where table_name = 'share' and column_name = 'to_workspace') then
+    delete from share where to_workspace is not null;
+  end if;
+end $step$;
+drop function if exists pelago_workspace_picture(text, text, text);
+drop function if exists pelago_workspace_document(text, text);
+drop function if exists pelago_workspace_publishable(text, text);
+alter table share drop column if exists to_workspace;
+alter table share drop column if exists to_item;
+alter table share drop column if exists publishable;
 `;
