@@ -1,6 +1,6 @@
 // A document anyone may read, with no login, at an address of its own that search engines may keep:
 // /p/<workspace>/<id>, beside a product's public page. Only a human makes it public: the core pack holds an agent's
-// change to public, as for anything public. Unlike a link (/s/...), the address holds no secret and is not withdrawn
+// change to public, as for anything public. The address holds no secret and is not withdrawn
 // by revoking anything: it reads while the document is public, and is a 404 once it is not.
 //
 // It is read through one function that sees everything and gives as little as it can (below): the document, and of

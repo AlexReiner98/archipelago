@@ -1,0 +1,134 @@
+// A public view (decision e_nwdn7ce6): a view or an item made public by a person, frozen as they saw it when they
+// shared it, at /p/<workspace>/<id> for anyone and search engines, and at its address word on its site's domain. It
+// replaces links with a secret, guests' frozen links and, in time, publishing: a document is frozen as publishing
+// freezes it (src/published.ts), a view or any other item as a page of one section, itself, drawn as a document's
+// view is (its picture's answer kept with nothing private in it, src/published-pictures.ts). What is private is left
+// out, and the person is told what goes out before it does (`sharePlan`). Only a person shares; an agent asks
+// (`shareAsk`). Kept and read by src/public-view-store.ts.
+
+import { sectionIds, shownOf } from './documents.ts';
+import { headOf } from './log.ts';
+import { notify } from './notify.ts';
+import { actorId, type Actor, type Archipelago } from './pelago.ts';
+import { readable } from './public-document.ts';
+import { publicPath } from './published-data.ts';
+import { republished } from './published-live.ts';
+import { picturesOf } from './published-pictures.ts';
+import { freezeDocument, pathOf } from './published.ts';
+import { keepPublicView } from './public-view-store.ts';
+import { isKept, keptPicture } from './query-saved.ts';
+import { pageLook } from './styles.ts';
+
+const ID = /^e_[a-z0-9]{8}$/;
+const IDS = /[ \t]*\(?\b(e_[a-z0-9]{8})\b\)?/g;
+
+async function itemOf(l: Archipelago, id: string) {
+  const item = ID.test(id) ? await l.entity(id) : null;
+  if (!item) throw new Error(`"${id}" is not an item of this workspace you can read.`);
+  if (item.archived_at) throw new Error(`"${item.title}" is archived.`);
+  return item;
+}
+
+const isDocument = (l: Archipelago, type: string) => readable(l).includes(type);
+
+/**
+ * What a public view of `id` keeps, read as the one sharing it sees the map, with nothing private: a document as
+ * publishing freezes it, anything else as a page of one section. The item shared is kept whatever its visibility, since
+ * sharing it is choosing that; what it shows only when it is shared with the workspace or public.
+ */
+export async function freeze(l: Archipelago, id: string) {
+  const item = await itemOf(l, id);
+  const props = item.props ?? {};
+  if (isDocument(l, item.type)) {
+    if (item.private_to) throw new Error(`"${item.title}" is private: share it with the workspace first, and what it brings in goes out with it.`);
+    return freezeDocument(l, id, true);
+  }
+  const kept = isKept(l, item.type);
+  const { rows } = await l.db.query<{ picture: boolean }>(`select exists (select 1 from picture where entity_id = $1) as picture`, [id]);
+  // Its note names nothing it does not show: an id in it is cut, as a document's is of what it does not bring in.
+  const section = { id, type: item.type, title: item.title, status: item.status, body: kept ? '' : (item.body ?? '').replace(IDS, (found, ref) => (ref === id ? found : '')), updated_at: String(item.updated_at), ...(rows[0]?.picture && { picture: true }) };
+  const { lenses, types } = await picturesOf(l, [section], true);
+  return { type: item.type, title: item.title, status: item.status, fields: shownOf(l, item.type, props), updated_at: String(item.updated_at), parts: [{ section }], sections: [id], lenses, types, path: pathOf(props.path), menu: typeof props.menu === 'number' ? props.menu : null };
+}
+
+type Frozen = Awaited<ReturnType<typeof freeze>>;
+
+/** The items a frozen view shows: its sections and what each picture in it draws. */
+const shownIn = (given: Frozen) => {
+  const sections = given.parts.flatMap((p) => ('section' in p ? [{ id: p.section.id, title: p.section.title }] : []));
+  const drawn = Object.values(given.lenses ?? {}).flatMap((lens) => (lens.items ?? []).map((i) => ({ id: i.id, title: i.title })));
+  return [...new Map([...sections, ...drawn].map((i) => [i.id, i])).values()];
+};
+
+/**
+ * What sharing `id` now would take out, and what it leaves out as private: told to the person before they share, so
+ * nothing goes out without their seeing it, and a view whose items are all private (a new map's) is not given as an
+ * empty page without their knowing.
+ */
+export async function sharePlan(l: Archipelago, id: string) {
+  const item = await itemOf(l, id);
+  const goes = shownIn(await freeze(l, id));
+  const asked = isKept(l, item.type) ? ((await keptPicture(l, id).catch(() => null))?.items ?? []).map((i) => i.id) : sectionIds(item.body ?? '');
+  const out = new Set(goes.map((i) => i.id));
+  const { rows } = await l.db.query<{ id: string; title: string }>(
+    `select id, title from entity where id = any($1::text[]) and (visibility = 'private' or private_to is not null) and archived_at is null`,
+    [asked.filter((x) => !out.has(x))],
+  );
+  return { id, title: item.title, goes, private: rows, ...(await sharedState(l, id)) };
+}
+
+/** Whether an item has a public view, where, when and by whom. */
+export async function sharedState(l: Archipelago, id: string) {
+  const { rows } = await l.db.query<{ shared_by: string; shared_at: Date; path: string | null }>(`select shared_by, shared_at, path from public_view where entity_id = $1`, [id]);
+  const r = rows[0];
+  return r ? { shared: true, at: r.shared_at, by: r.shared_by, address: publicPath(l.workspace, id), ...(r.path && { path: r.path }) } : { shared: false };
+}
+
+/** Every public view of this workspace, newest first, or the one of an item. */
+export async function sharedViews(l: Archipelago, id?: string) {
+  const { rows } = await l.db.query<{ id: string; title: string; path: string | null; shared_by: string; shared_at: Date }>(
+    `select entity_id as id, given ->> 'title' as title, path, shared_by, shared_at from public_view where $1::text is null or entity_id = $1 order by shared_at desc limit 500`,
+    [id ?? null],
+  );
+  return rows.map((r) => ({ ...r, address: publicPath(l.workspace, r.id) }));
+}
+
+/**
+ * Make `id` public as it stands, in place of any public view of it before: frozen now, kept at its address. A person's
+ * alone (the tool is human only): an agent asks with shareAsk.
+ */
+export async function share(l: Archipelago, actor: Actor, id: string) {
+  if (actor.kind !== 'human') throw new Error('Only a person makes a view public: ask them (ask, action share_ask).');
+  const frozen = await freeze(l, id);
+  const given = { ...frozen, style_at: (await headOf(l.db)).pos, look: await pageLook(l, { ...frozen, id }) };
+  if (given.path) {
+    const { rows } = await l.db.query<{ title: string }>(`select given ->> 'title' as title from public_view where path = $1 and entity_id <> $2`, [given.path, id]);
+    if (rows[0]) throw new Error(`"${rows[0].title}" is already public at /${given.path}: give this one another path.`);
+  }
+  const by = actor.person ?? actorId(actor);
+  await l.db.transaction(async (tx) => {
+    await keepPublicView(tx, l.workspace, id, given, by);
+    await l.log(tx, { actor: actorId(actor), action: 'view.share', target: id, reason: 'Made public as it stands', detail: { shows: shownIn(frozen).length } });
+  });
+  republished(l.workspace, id);
+  return { shared: id, address: publicPath(l.workspace, id), shows: shownIn(frozen).length, ...(given.path && { path: given.path }) };
+}
+
+/** Take a public view down: its address answers nothing. The item itself is left as it is. */
+export async function unshare(l: Archipelago, actor: Actor, id: string) {
+  const gone = await l.db.transaction(async (tx) => {
+    const { rows } = await tx.query(`delete from public_view where entity_id = $1 returning entity_id`, [id]);
+    if (rows.length) await l.log(tx, { actor: actorId(actor), action: 'view.unshare', target: id, reason: 'No longer public' });
+    return rows.length > 0;
+  });
+  if (!gone) throw new Error(`"${id}" has no public view.`);
+  republished(l.workspace, id);
+  return { unshared: id };
+}
+
+/** An agent asks the person to make a view or an item public: a notification about it, which they share from its page. */
+export async function shareAsk(l: Archipelago, actor: Actor, id: string, reason?: string) {
+  const item = await itemOf(l, id);
+  await notify(l, actor, { title: `Make "${item.title}" public`.slice(0, 200), body: reason ?? '', about: id });
+  return { asked: true, note: 'The person is notified; making it public is theirs.' };
+}

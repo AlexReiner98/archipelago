@@ -1,15 +1,15 @@
-// An item read whole, as its reader meets it (drawn by the reading page, ui/doc.js), and the links that let someone
-// read it with no login.
+// An item read whole, as its reader meets it (drawn by the reading page, ui/doc.js), and its public view: the item
+// made public by a person, frozen as they saw it, at an address anyone may open (src/public-view.ts).
 
 import { api, ask, h, may, tell } from './base.js';
-import { secretBox } from './workspace-cards.js';
 
-/** The item as a reader meets it, and the links to it that still work. */
+/** The item as a reader meets it. */
 export async function readDocument(id) {
-  const doc = await api('document', { id, drawn: true }).catch(() => null);
-  const links = doc ? (await api('share_list', { id }).catch(() => [])).filter((s) => !s.revoked_at) : [];
-  return { doc, links };
+  return { doc: await api('document', { id, drawn: true }).catch(() => null) };
 }
+
+/** The item's public view, when it has one: its address, who shared it and when. */
+export const publicOf = async (id) => (await api('share_list', { id }).catch(() => []))[0] ?? null;
 
 /** A figure kept for an item, fetched with the page's token: an image address cannot carry it. */
 export const figureOf = (s, cls = 'doc-figure') => {
@@ -18,35 +18,54 @@ export const figureOf = (s, cls = 'doc-figure') => {
   return img;
 };
 
+const names = (list) => `${list.slice(0, 6).map((i) => i.title).join(', ')}${list.length > 6 ? ` and ${list.length - 6} more` : ''}`;
+
 /**
- * Make a link that lets someone with no login read the item: a document as it is, a view drawn live, any other item
- * as its page reads. One that is not a document is given as a document that brings it in alone (src/share-view.ts).
+ * Share an item: its public view, frozen now. What goes out with it and what stays out as private are said first, so
+ * nothing leaves without the person seeing it. The address is copied once it is public.
  */
-export function shareLinkOf(e, page, isDoc = true) {
-  return async () => {
-    const message = isDoc ? 'Anyone with the link can read it and every item it brings in, with no login, until the link is revoked.' : 'Anyone with the link can see it, with no login, until the link is revoked: a view as it stands each time it is opened, with what the workspace may see in it.';
-    if (!(await ask({ title: `Make a link to "${e.title}"?`, message, action: 'Make link' }))) return;
-    try {
-      const made = await api('share_create', { id: e.id });
-      (page.querySelector('.note') ?? page).prepend(secretBox('Link to read this. Send it to its reader.', `${location.origin}${made.path}`));
-    } catch (err) {
-      tell('No link was made', err.message);
-    }
-  };
+export async function sharePublicly(id, title) {
+  let plan;
+  try {
+    plan = await api('share_plan', { id });
+  } catch (err) {
+    return void tell('Not shared', err.message);
+  }
+  const goes = plan.goes.filter((i) => i.id !== id);
+  const message = [
+    goes.length ? `Goes out with it: ${names(goes)}.` : 'It goes out alone.',
+    plan.private.length && `Left out as private: ${names(plan.private)}.`,
+    'Anyone may open it and search engines list it, as it is now.',
+  ].filter(Boolean).join('\n');
+  const again = plan.shared;
+  if (!(await ask({ title: `${again ? 'Share again' : 'Share'} “${title}”?`, message, action: again ? 'Share again' : 'Share' }))) return null;
+  try {
+    const made = await api('share_create', { id });
+    const url = `${location.origin}${made.address}`;
+    const copied = await navigator.clipboard?.writeText(url).then(() => true, () => false);
+    tell(copied ? 'Shared, address copied' : 'Shared', url);
+    return made;
+  } catch (err) {
+    tell('Not shared', err.message);
+    return null;
+  }
 }
 
-/** What the item's menu offers for reading it: print it, and where this session may write, make a link to it, stop the links. */
-export function documentMenu(e, links, page, redraw, writes = may('write')) {
-  const shareLink = shareLinkOf(e, page);
-  const stop = async (shares, what) => {
-    if (!(await ask({ title: `Stop ${what}?`, message: 'It stops working at once.', action: 'Stop sharing', danger: true }))) return;
-    for (const s of shares) await api('share_revoke', { id: s.id }).catch(() => null);
+/** What the item's menu offers for its public view: share it (again), open it, stop sharing it. */
+export function shareMenu(e, shared, redraw, writes = may('write')) {
+  const stop = async () => {
+    if (!(await ask({ title: `Stop sharing “${e.title}”?`, message: 'Its public address stops answering at once.', action: 'Stop sharing', danger: true }))) return;
+    await api('share_revoke', { id: e.id }).catch((err) => tell('Still shared', err.message));
     redraw();
   };
-  if (!writes) return [['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')]];
   return [
-    ['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')],
-    !e.archived_at && ['Make a link to read it', shareLink],
-    links.length > 0 && ['Stop the links', () => stop(links, links.length === 1 ? 'the link' : `the ${links.length} links`), 'danger'],
+    writes && !e.archived_at && [shared ? 'Share again' : 'Share', async () => (await sharePublicly(e.id, e.title)) && redraw()],
+    shared && ['Open its public view', () => window.open(shared.address, '_blank', 'noopener')],
+    writes && shared && ['Stop sharing', stop, 'danger'],
   ];
+}
+
+/** What a document's menu offers: print it, and its public view. */
+export function documentMenu(e, shared, redraw, writes = may('write')) {
+  return [['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')], ...shareMenu(e, shared, redraw, writes)];
 }

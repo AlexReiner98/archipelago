@@ -39,7 +39,7 @@ import type { Workspaces } from './workspaces.ts';
 import { makePartitions } from './partitions.ts';
 
 /** Every table, parents before the rows that point at them. */
-const TABLES = ['entity', 'relation', 'proposal', 'token', 'share', 'setting', 'picture', 'type_def', 'act', 'member', 'published', 'log_entry', 'log_fact', 'log_op'] as const;
+const TABLES = ['entity', 'relation', 'proposal', 'token', 'share', 'setting', 'picture', 'type_def', 'act', 'member', 'published', 'public_view', 'log_entry', 'log_fact', 'log_op'] as const;
 /** What the log makes, and a backup since format 3 does not carry but makes again. */
 const PROJECTIONS: readonly string[] = ['entity', 'relation', 'proposal'];
 
@@ -94,7 +94,7 @@ async function opened(tx: Q, backup: Dump, keep: boolean): Promise<Dump> {
     if (made.left_out && !made.rows.entity.length) throw new Error('This backup is sealed: give the backup of the key vault taken with it, on a server with the same sealing key.');
     const ids = new Set(made.rows.entity.map((r) => r.id));
     Object.assign(tables, made.rows);
-    for (const t of ['picture', 'share', 'published']) tables[t] = (tables[t] ?? []).filter((r) => ids.has(r.entity_id));
+    for (const t of ['picture', 'share', 'published', 'public_view']) tables[t] = (tables[t] ?? []).filter((r) => ids.has(r.entity_id));
     return { ...backup, format: 1, tables };
   }
   if (left_out && left_out === backup.tables.entity?.length) throw new Error('This backup is sealed: give the backup of the key vault taken with it, on a server with the same sealing key.');
@@ -148,7 +148,7 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
     // The types it defined for itself go in its database, where the server looks for them.
     for (const def of (given.local_pack as { types?: { id: string }[] } | null)?.types ?? []) await addLocalType(tx, def);
     if (as !== undefined && as !== given.workspace?.id) {
-      for (const table of ['entity', 'relation', 'proposal', 'share', 'picture', 'act', 'published']) await tx.query(`update ${table} set workspace = $1`, [as]);
+      for (const table of ['entity', 'relation', 'proposal', 'share', 'picture', 'act', 'published', 'public_view']) await tx.query(`update ${table} set workspace = $1`, [as]);
       await tx.query(`update token set revoked_at = now() where revoked_at is null`);
     }
   });

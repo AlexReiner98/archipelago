@@ -139,3 +139,71 @@ alter table share drop column if exists to_workspace;
 alter table share drop column if exists to_item;
 alter table share drop column if exists publishable;
 `;
+
+/**
+ * Step 40 (src/migrate.ts): a public view (decision e_nwdn7ce6). A view or an item, frozen as the person who shared it
+ * saw it, with nothing private in it (src/public-view.ts), kept at /p/<workspace>/<id> for anyone and for search
+ * engines, and at its address word on its site's domain when it has one. Read through these functions alone, as
+ * anyone: what a reader is given is the frozen copy, never the map as it is now, and only while the item it is of
+ * stands (archiving or forgetting it takes the view down).
+ */
+export const PUBLIC_VIEW = `
+create table if not exists public_view (
+  entity_id  text primary key references entity(id),
+  workspace  text not null default 'default',
+  given      jsonb not null,
+  shared_by  text not null,
+  shared_at  timestamptz not null default now(),
+  path       text,
+  menu       double precision
+);
+create unique index if not exists public_view_path on public_view (path) where path is not null;
+grant select, insert, update, delete on public_view to pelago_member;
+alter table public_view enable row level security;
+drop policy if exists member_public_view on public_view;
+create policy member_public_view on public_view for all to pelago_member
+  using (entity_id in (select id from entity))
+  with check (entity_id in (select id from entity));
+
+-- A public view as anyone reads it, by the item it is of or by its address word.
+create or replace function pelago_public_view(target text) returns jsonb
+language sql stable security definer set search_path = public as $fn$
+  select v.given || jsonb_build_object('id', v.entity_id, 'path', v.path, 'menu', v.menu, 'published_at', v.shared_at)
+  from public_view v join entity e on e.id = v.entity_id
+  where v.entity_id = target and e.archived_at is null
+$fn$;
+create or replace function pelago_public_view_at(at_path text) returns jsonb
+language sql stable security definer set search_path = public as $fn$
+  select v.given || jsonb_build_object('id', v.entity_id, 'path', v.path, 'menu', v.menu, 'published_at', v.shared_at)
+  from public_view v join entity e on e.id = v.entity_id
+  where v.path = at_path and e.archived_at is null
+$fn$;
+-- Every public view, for a site's header and its sitemap: its id, title as shared, path, place and when.
+create or replace function pelago_public_views() returns jsonb
+language sql stable security definer set search_path = public as $fn$
+  select coalesce(jsonb_agg(jsonb_build_object('id', v.entity_id, 'title', v.given ->> 'title', 'path', v.path, 'menu', v.menu, 'published_at', v.shared_at)
+    order by v.menu nulls last, v.given ->> 'title'), '[]'::jsonb)
+  from public_view v join entity e on e.id = v.entity_id
+  where e.archived_at is null
+$fn$;
+-- The figure of one section a public view holds, and of nothing else.
+create or replace function pelago_public_view_picture(target text, section text)
+returns table (content_type text, bytes bytea)
+language sql stable security definer set search_path = public as $fn$
+  select p.content_type, p.bytes from picture p
+  where p.entity_id = section and pelago_public_view(target) -> 'sections' ? section
+$fn$;
+grant execute on function pelago_public_view(text), pelago_public_view_at(text), pelago_public_views(), pelago_public_view_picture(text, text) to pelago_public;
+
+-- A forget clears its public view too.
+create or replace function pelago_forget_stores(item text, reasons text[], held text[]) returns void language plpgsql security definer set search_path = public as $fn$
+begin
+  delete from picture where entity_id = item;
+  delete from share where entity_id = item;
+  delete from published where entity_id = item;
+  delete from public_view where entity_id = item;
+  update proposal set ops = '[]', warnings = '[]', source = null, note = 'Forgotten with what it touched',
+    status = case when status = 'pending' then 'superseded' else status end where id = any(held);
+  update proposal set reason = '' where id = any(reasons);
+end $fn$;
+`;

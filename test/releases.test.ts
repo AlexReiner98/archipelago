@@ -157,8 +157,8 @@ test('a member sees their own tokens and the few settings every request needs; t
   assert.equal(await bo.agentChanges(), 'apply');
 });
 
-test('a document brings items in by id, and a link shows it and them to anyone holding it, and nothing more', async () => {
-  const { sharedDocument, sectionIds } = await import('../src/documents.ts');
+test('a document brings items in by id, read whole by its author with what she may not see said as missing', async () => {
+  const { sectionIds } = await import('../src/documents.ts');
   const l = await shelf();
   const people = await make(l, [
     { op: 'create', ref: 'ann', type: 'person', title: 'Ann' },
@@ -185,36 +185,8 @@ test('a document brings items in by id, and a link shows it and them to anyone h
     read.parts.map((p) => p.section?.title ?? p.missing ?? p.text.split('\n')[0]),
     ['# Funding', 'IRAP', 'Between them, ' + hers.mine + ' comes first.', 'SR&ED', his.n, 'e_nothing1'],
   );
-  // An agent may read it, but only a person makes a link, and only to what they can see.
+  // An agent may read it, but only a person makes it public (test/public-view.test.ts says what goes out).
   await assert.rejects(callTool(ann, { kind: 'agent', name: 'a', person: people.ann }, 'share_create', { id: doc }), /humans only/);
-  await assert.rejects(callTool(bo, boActor, 'share_create', { id: doc }), /not a document/);
-
-  const made = (await callTool(ann, annActor, 'share_create', { id: doc })) as { share: string; path: string };
-  const secret = made.path.split('/').at(-1)!;
-  assert.match(made.path, /^\/s\/default\/[a-f0-9]{48}$/);
-  const shown = (await sharedDocument(l, secret))!;
-  assert.equal(shown.title, 'Funding for Northwind');
-  assert.deepEqual(
-    shown.parts.map((p: Record<string, any>) => p.section?.title ?? p.text),
-    ['# Funding\n\nTwo programs, and a third the reader does not see.', 'IRAP', `Between them, ${hers.mine} comes first.`, 'SR&ED'],
-    'Bo’s private note is left out, and so is its id in the text; an id that is nothing is not said',
-  );
-  assert.equal(JSON.stringify(shown).includes('secret plan'), false);
-  assert.equal(await sharedDocument(l, 'f'.repeat(48)), null, 'a link never made opens nothing');
-  assert.equal(await sharedDocument(l, '../x'), null);
-
-  // Bo cannot see her links; she can, and revoking one closes it at once. An archived document is not shown either.
-  assert.deepEqual(await callTool(bo, boActor, 'share_list', { id: doc }), []);
-  assert.equal(((await callTool(ann, annActor, 'share_list', { id: doc })) as unknown[]).length, 1);
-  await assert.rejects(callTool(bo, boActor, 'share_revoke', { id: made.share }), /No standing link/);
-  await callTool(ann, annActor, 'share_revoke', { id: made.share });
-  assert.equal(await sharedDocument(l, secret), null);
-  const again = (await callTool(ann, annActor, 'share_create', { id: doc })) as { path: string };
-  await theirs(ann, annActor, [{ op: 'archive', id: doc }]);
-  assert.equal(await sharedDocument(l, again.path.split('/').at(-1)!), null);
-  // What was done is in the history.
-  const actions = (await doneEvents(l.db, { target: doc, oldest: true }, 50)).map((r) => r.action).filter((a) => a.startsWith('share.'));
-  assert.deepEqual(actions, ['share.create', 'share.revoke', 'share.create']);
 });
 
 test('what is made for a reader is marked deliverable by its type, and a document names the sections kept outside it', async () => {

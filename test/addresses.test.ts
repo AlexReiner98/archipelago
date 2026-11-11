@@ -130,50 +130,44 @@ test('refused tokens are counted by address, a backup unpacks only so far, and t
   assert.doesNotMatch(frameText, /<script src=/, 'the frame names no script to fetch: an origin of its own keeps none');
 });
 
-test('a link to a writing opens its page and its text with no login, until it is revoked', async () => {
-  // A test pack's writing is what can be given as a link (test/packs/reader).
+test('a writing shared is public at its address with no login, until it is taken down', async () => {
+  // A test pack's writing is what can be read whole (test/packs/reader).
   const { call, base } = await serve('off', undefined, undefined, packsWith('reader'));
   const made = await call('/api/change', undefined, {
     reason: 'test',
     ops: [
-      { op: 'create', ref: 'n', type: 'clipping', title: 'IRAP', body: 'Call first.' },
-      { op: 'create', ref: 'd', type: 'writing', title: 'Funding', body: 'Intro.\n\n{n}' },
+      { op: 'create', ref: 'n', type: 'clipping', title: 'IRAP', body: 'Call first.', visibility: 'shared' },
+      { op: 'create', ref: 'd', type: 'writing', title: 'Funding', body: 'Intro.\n\n{n}', visibility: 'shared' },
+      { op: 'link', type: 'part_of', from: 'n', to: 'd' },
     ],
   });
-  const { d } = made.result.created;
+  const { d, n } = made.result.created;
   assert.match((await call('/agent/share_create', undefined, { id: d })).error, /humans only/);
-  const link = (await call('/api/share_create', undefined, { id: d })).result;
-  const page = await fetch(base + link.path);
+  // A section's figure is kept with it when it is shared; a figure of anything it does not bring in is not.
+  const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex').toString('base64');
+  const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'clipping', title: 'Not in it' }] })).result.created.o;
+  for (const id of [n, other]) assert.equal((await call('/api/picture_put', undefined, { result: id, data: png, content_type: 'image/png' })).status, 200);
+  const shared = (await call('/api/share_create', undefined, { id: d })).result;
+  assert.equal(shared.address, `/p/default/${d}`);
+  const page = await fetch(base + shared.address);
   assert.equal(page.status, 200);
-  assert.match(page.headers.get('content-security-policy') ?? '', /frame-ancestors 'none'/);
-  assert.equal(page.headers.get('referrer-policy'), 'no-referrer');
-  assert.equal(page.headers.get('cache-control'), 'no-store');
-  assert.match(await page.text(), /doc\.js/);
-  const data = await fetch(`${base}${link.path}/data`);
+  assert.doesNotMatch(await page.text(), /noindex/, 'a public view is for search engines too');
+  const data = await fetch(`${base}${shared.address}/data`);
   assert.equal(data.status, 200);
-  const doc = (await data.json()) as { title: string; parts: { text?: string; section?: { title: string } }[] };
+  const doc = (await data.json()) as { title: string; parts: { text?: string; section?: { title: string; picture?: boolean } }[] };
   assert.deepEqual([doc.title, doc.parts.map((p) => p.section?.title ?? p.text)], ['Funding', ['Intro.', 'IRAP']]);
-  assert.equal((await fetch(`${base}/doc.js`)).status, 200);
+  assert.equal(doc.parts[1].section?.picture, true);
+  const figure = await fetch(`${base}${shared.address}/picture/${n}`);
+  assert.deepEqual([figure.status, figure.headers.get('content-type')], [200, 'image/png']);
+  assert.equal((await fetch(`${base}${shared.address}/picture/${other}`)).status, 404);
   // The same page reads a document with the reader's own sign-in, to print it; the page itself holds nothing.
   const read = await fetch(`${base}/read/${d}`);
   assert.equal(read.status, 200);
   assert.match(read.headers.get('content-security-policy') ?? '', /img-src 'self' data:/);
   assert.equal((await fetch(`${base}/read/not-an-id`)).status === 200, false);
-  // A section's figure is shown through the link; a figure of anything the document does not bring in is not.
-  const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex').toString('base64');
-  const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'clipping', title: 'Not in it' }] })).result.created.o;
-  for (const id of [made.result.created.n, other]) assert.equal((await call('/api/picture_put', undefined, { result: id, data: png, content_type: 'image/png' })).status, 200);
-  assert.match((await call('/api/picture_put', undefined, { result: d, data: png, content_type: 'image/png' })).error, /is of type writing, and a picture is kept only on a type whose page shows one/);
-  const pictured = (await (await fetch(`${base}${link.path}/data`)).json()) as { parts: { section?: { picture: boolean } }[] };
-  assert.equal(pictured.parts[1].section?.picture, true);
-  const figure = await fetch(`${base}${link.path}/picture/${made.result.created.n}`);
-  assert.deepEqual([figure.status, figure.headers.get('content-type'), figure.headers.get('content-security-policy')], [200, 'image/png', "default-src 'none'"]);
-  assert.equal(Buffer.from(await figure.arrayBuffer()).toString('base64'), png);
-  assert.equal((await fetch(`${base}${link.path}/picture/${other}`)).status, 404);
-  assert.match((await page.headers.get('content-security-policy')) ?? '', /img-src 'self'/);
-  assert.equal((await fetch(`${base}/s/default/${'0'.repeat(48)}/data`)).status, 404);
-  assert.equal((await fetch(`${base}/s/elsewhere/${link.path.split('/').at(-1)}/data`)).status, 404);
-  await call('/api/share_revoke', undefined, { id: link.share });
-  assert.equal((await fetch(`${base}${link.path}/picture/${made.result.created.n}`)).status, 404);
-  assert.equal((await fetch(`${base}${link.path}/data`)).status, 404);
+  // The secret links that went before are gone.
+  assert.notEqual((await fetch(`${base}/s/default/${'0'.repeat(48)}/data`)).status, 200);
+  await call('/api/share_revoke', undefined, { id: d });
+  assert.equal((await fetch(`${base}${shared.address}/data`)).status, 404);
+  assert.equal((await fetch(`${base}${shared.address}/picture/${n}`)).status, 404);
 });

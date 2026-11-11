@@ -65,13 +65,13 @@ test('a document is previewed as publishing it would give it, before it is publi
   // A private one is read as its reader sees it (ui/reader-frame.js), its page framed by this server's own alone.
   assert.match((await fetch(`${base}/read/${made.p}`)).headers.get('content-security-policy') ?? '', /frame-ancestors 'self'/);
   // Any item is read whole by its note, as a document is, for a Pages view of what is not one; it has no draft to
-  // preview, and it is given as a link as a document that brings it in alone (src/share-view.ts).
+  // preview, and it is shared as a page of one section, itself (src/public-view.ts).
   const task = await api(mine, 'document', { id: made.t });
   assert.equal(task.title, 'Write it');
   assert.deepEqual(await api(mine, 'published', { id: made.t }), { published: false, publishable: false });
   assert.equal((await api(mine, 'published', { id: made.d })).publishable, undefined);
   assert.equal((await fetch(`${base}/read/${made.t}`)).status, 200);
-  assert.match((await api(mine, 'share_create', { id: made.t })).path, /^\/s\/[^/]+\/[a-f0-9]{48}$/);
+  assert.match((await api(mine, 'share_create', { id: made.t })).address, /^\/p\/[^/]+\/e_[a-z0-9]{8}$/);
   // Its page may be framed by this server's own page alone, to read the draft on the canvas (ui/reader-frame.js).
   assert.match((await fetch(`${base}/preview/${made.d}`)).headers.get('content-security-policy') ?? '', /frame-ancestors 'self'/);
 });

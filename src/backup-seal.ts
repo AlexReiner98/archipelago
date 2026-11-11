@@ -88,7 +88,7 @@ export async function openTables(q: Q, tables: Record<string, Row[]>, vault?: Va
   const kept = (id: unknown) => !gone.has(id as string);
   for (const r of out.entity) for (const c of ['owner', 'source_id']) if (!kept(r[c])) r[c] = null;
   out.relation = (tables.relation ?? []).filter((r) => kept(r.from_id) && kept(r.to_id)).map((r) => ({ ...r, source_id: kept(r.source_id) ? r.source_id : null, props: read(ring.get(r.id as string), 'relation.props', r.props) ?? {} }));
-  for (const t of ['picture', 'share', 'published']) out[t] = (tables[t] ?? []).filter((r) => kept(r.entity_id));
+  for (const t of ['picture', 'share', 'published', 'public_view']) out[t] = (tables[t] ?? []).filter((r) => kept(r.entity_id));
   out.picture = out.picture.map((r) => ({ ...r, bytes: read(ring.get(r.entity_id as string), 'picture.bytes', r.bytes) }));
   out.event = (tables.event ?? []).filter((r) => kept(r.target_id)).map((r) => {
     const [detail, reason] = SEALED.event.map((p) => p.key(r));

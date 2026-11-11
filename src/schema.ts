@@ -480,7 +480,7 @@ grant execute on function pelago_item_hidden(text) to pelago_member;
 export const HELD_BY = `alter table proposal add column if not exists held_by jsonb;`;
 
 /**
- * Step 36 (src/migrate.ts): a link keeps the view it shows, frozen when it was made (src/share-link.ts), and a reader
+ * Step 36 (src/migrate.ts): a link keeps the view it shows,  frozen when it was made (src/share-link.ts, gone since public views), and a reader
  * token reads that and nothing else, while the token is good and the link stands.
  */
 export const LINK_SNAPSHOT = `

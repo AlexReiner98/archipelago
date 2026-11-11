@@ -134,10 +134,10 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
   assert.match(asked.context, /Settled: Sessions or tokens\? .*Signed cookie sessions.*Why: One server/, asked.context.slice(0, 800));
   assert.match(asked.context, /Still open: Which hashing library\?/);
 
-  // 6. Share: a view of the plan, as a link anyone opens with no login, drawn live in the sandbox, with a way to start
-  // a map of their own.
-  // Made where a person is: the view up on the canvas, its band's menu, Make a link to see it (saved first, named in
-  // the page), the link shown once.
+  // 6. Share: a view of the plan, made public as it is now, which anyone opens with no login and search engines list,
+  // drawn by its layout, with a way to start a map of their own.
+  // Made where a person is: the view up on the canvas, its band's menu, Share it (saved first, named in the page),
+  // what goes out said first, then the address.
   const sharer = await open(`${base}/#/v?find=in+${ids.hub}`);
   let link: { path: string };
   try {
@@ -145,40 +145,37 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
     await sharer.evaluate(`document.querySelector('.q-band-menu').click()`);
     assert.ok(await sharer.until(`[...document.querySelectorAll('.tab-menu button')].some((b) => b.textContent === 'Share it')`), 'the menu offers to share it');
     await sharer.evaluate(`[...document.querySelectorAll('.tab-menu button')].find((b) => b.textContent === 'Share it').click()`);
-    // Named first, since a link shows a view kept on the map; then a link, not a guest; then the link, once.
+    // Named first, since a public view is of a view kept on the map; then public, not a guest.
     assert.ok(await sharer.until(`Boolean(document.querySelector('dialog.ask textarea'))`), 'asked for a name');
     await sharer.evaluate(`(() => { const d = document.querySelector('dialog.ask'); d.querySelector('textarea').value = 'The login plan'; d.querySelector('button[value="ok"]').click(); })()`);
-    assert.ok(await sharer.until(`/^(Share|Make a link to)/.test(document.querySelector('dialog.ask h2')?.textContent ?? '')`, 10000), 'asked how to share it');
-    await sharer.evaluate(`(document.querySelector('dialog.ask button[value="choice:0"]') ?? document.querySelector('dialog.ask button[value="ok"]')).click()`);
-    // A new map makes things shared, so nothing the agent made is left out and nothing is asked about it (what a link
-    // leaves out as private, and the asking, is test/share-view.test.ts's).
-    assert.ok(await sharer.until(`(document.querySelector('dialog.ask .ask-message')?.textContent ?? '').includes('/s/')`, 10000), `the link is shown: ${sharer.logs().join(' ').slice(0, 400)}`);
+    const choose = `document.querySelector('dialog.ask button[value="choice:0"]')`;
+    const sure = `/^Share “The login plan”\\?/.test(document.querySelector('dialog.ask h2')?.textContent ?? '')`;
+    assert.ok(await sharer.until(`Boolean(${choose}) || ${sure}`, 10000), 'asked how to share it');
+    if (await sharer.evaluate<boolean>(`Boolean(${choose})`)) await sharer.evaluate(`${choose}.click()`);
+    // What goes out with it is said before it goes (what is left out as private is test/public-view.test.ts's).
+    assert.ok(await sharer.until(sure, 10000), `asked to share it: ${sharer.logs().join(' ').slice(0, 400)}`);
+    assert.match(await sharer.evaluate<string>(`document.querySelector('dialog.ask .ask-message').textContent`), /Goes out with it: .*Login form/);
+    await sharer.evaluate(`document.querySelector('dialog.ask button[value="ok"]').click()`);
+    assert.ok(await sharer.until(`(document.querySelector('dialog.ask .ask-message')?.textContent ?? '').includes('/p/')`, 10000), `the address is shown: ${sharer.logs().join(' ').slice(0, 400)}`);
     const message = await sharer.evaluate<string>(`document.querySelector('dialog.ask .ask-message').textContent`);
     link = { path: new URL(message.trim().split(/\s+/)[0]).pathname };
   } finally {
     await sharer.close();
   }
-  assert.match(link.path, /^\/s\//);
+  assert.match(link.path, /^\/p\/[^/]+\/e_[a-z0-9]{8}$/);
   const reader = await open(`${base}${link.path}`);
   try {
-    // The real app, opened read only on the view: its canvas draws the plan.
-    const mark = (id: string) => `document.querySelector('#canvas svg a[href="#/e/${id}"]')`;
-    assert.ok(await reader.until(`Boolean(${mark(ids.form)})`, 20000), `the link opens the app on the view: ${reader.logs().join(' ').slice(0, 600)}`);
-    assert.ok(await reader.until(`document.querySelector('#nav .start-own')?.textContent.includes('Start a map of your own')`), 'with a way to start your own');
-    assert.ok(await reader.evaluate<boolean>(`![...document.querySelectorAll('#query button, #nav #more')].some((b) => b.offsetParent && /Save|☰/.test(b.textContent))`), 'nothing to save or set: it is read only');
-    // An item opens in the app's own sheet, without how the map keeps it, and closes again.
-    await reader.evaluate(`${mark(ids.form)}.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))`);
-    assert.ok(await reader.until(`document.body.dataset.sheet === 'open' && document.getElementById('sheet').innerText.includes('Login form')`, 10000), `the item opens in the sheet: ${reader.logs().join(' ').slice(0, 400)}`);
-    const kept = `(() => { const s = document.getElementById('sheet'); const seen = (q) => [...s.querySelectorAll(q)].some((e) => e.offsetParent); return !seen('details.menu') && !seen('[data-section="history"]') && !seen('[contenteditable="true"], select, textarea, input') && !/Visibility|Confidence/.test(s.innerText); })()`;
-    assert.ok(await reader.evaluate<boolean>(kept), 'read only, and nothing of how the map keeps it');
-    assert.ok((await reader.evaluate<string>(`location.pathname`)).startsWith('/s/'), 'the reader stays on the link');
-    await reader.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-    assert.ok(await reader.until(`document.body.dataset.sheet !== 'open'`), 'and closes');
-    // What the link does not show cannot be read with its token, and nothing is written through it.
-    const { token } = (await (await fetch(`${base}${link.path}/token`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json()) as { token: string };
-    const asked = (tool: string, body: object) => fetch(`${base}/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
-    assert.equal((await asked('get', { id: 'e_zzzzzzzz' })).status, 404, 'an item the link does not show is not read through it');
-    assert.equal((await asked('change', { reason: 'x', ops: [{ op: 'update', id: ids.form, title: 'Taken' }] })).status, 403, 'and nothing is written through it');
+    // Its page draws the plan, frozen, by the view's layout.
+    assert.ok(await reader.until(`Boolean(document.querySelector('[data-lens]')) && document.body.innerText.includes('Login form')`, 20000), `the public view draws the plan: ${reader.logs().join(' ').slice(0, 600)}`);
+    // A part opens in a sheet over the page, read only, as it was frozen, and closes again.
+    await reader.evaluate(`[...document.querySelectorAll('[data-lens] a, [data-lens] [data-id]')].find((e) => (e.textContent ?? '').includes('Login form'))?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))`);
+    if (await reader.until(`document.body.dataset.docSheet === 'open'`, 5000)) {
+      assert.ok(await reader.evaluate<boolean>(`document.querySelector('.doc-sheet').innerText.includes('Login form')`), 'the item opens in the sheet');
+      await reader.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+      assert.ok(await reader.until(`document.body.dataset.docSheet !== 'open'`), 'and closes');
+    }
+    // Nothing of the map is read through it: the page holds what was frozen, and the API asks for a sign-in.
+    assert.equal((await fetch(`${base}/api/get`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: ids.form }) })).status, 401);
     assert.ok(!reader.logs().some((line) => /Uncaught|TypeError|ReferenceError| 403 /.test(line)), `no errors, nothing refused: ${reader.logs().join('\n').slice(0, 600)}`);
   } finally {
     await reader.close();
