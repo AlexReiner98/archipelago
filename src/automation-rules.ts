@@ -23,8 +23,66 @@ export function checkWritten(reg: Registry, type: string, props: Record<string, 
   return reg.isA(type, 'automation') ? checkAutomation(props) : [];
 }
 
+/** Problems with a change to an automation: the `on` it is given, checked whole, as on a create. */
+export function checkUpdated(reg: Registry, type: string, props: Record<string, unknown>): string[] {
+  return reg.isA(type, 'automation') && props.on !== undefined && props.on !== null ? checkOn(props.on) : [];
+}
+
+/** What an automation that watches a query fires on: a flat filter (as `query` name `flat` takes it) and its edge. */
+export interface On {
+  query: { filter: { find: string[]; only?: string[]; not?: string[] }; walk?: unknown; limit?: number };
+  edge: string;
+  /** For crosses: the field whose value crosses n. */
+  field?: string;
+}
+
+/** An edge read: first (the query matches at all), each (each item that starts to match), first_per (each value of a field met), crosses (an item's field reaching n from under it). */
+export type Edge = { kind: 'first' } | { kind: 'each' } | { kind: 'first_per'; field: string } | { kind: 'crosses'; n: number; field: string };
+
+/** The most items a watched query may read at once. */
+export const ON_LIMIT = 500;
+
+const FIELD = /^[a-z_][a-z0-9_]*$/;
+
+/** The edge of a checked `on`. */
+export function edgeOf(on: On): Edge {
+  if (on.edge === 'first' || on.edge === 'each') return { kind: on.edge };
+  if (on.edge.startsWith('first_per:')) return { kind: 'first_per', field: on.edge.slice('first_per:'.length) };
+  return { kind: 'crosses', n: Number(on.edge.slice('crosses:'.length)), field: on.field! };
+}
+
+/** Problems with what an automation watches: a query that finds something, bounded, and an edge it can meet. */
+export function checkOn(on: unknown): string[] {
+  const problems: string[] = [];
+  if (!on || typeof on !== 'object' || Array.isArray(on)) return ['on must be { query, edge }: a flat filter and when it fires'];
+  const o = on as Record<string, unknown>;
+  const q = o.query as Record<string, unknown> | undefined;
+  const filter = q && typeof q === 'object' ? (q.filter as Record<string, unknown> | undefined) : undefined;
+  const terms = (v: unknown) => Array.isArray(v) && v.every((t) => typeof t === 'string' && t.trim());
+  if (!filter || typeof filter !== 'object' || !terms(filter.find) || !(filter.find as string[]).length) problems.push('on.query needs filter.find: a list of terms that finds something, as query name flat takes it');
+  else for (const part of ['only', 'not'] as const) if (filter[part] !== undefined && !terms(filter[part])) problems.push(`on.query.filter.${part} must be a list of terms`);
+  if (q && q.limit !== undefined && (!Number.isInteger(q.limit) || (q.limit as number) < 1 || (q.limit as number) > ON_LIMIT)) problems.push(`on.query.limit must be a whole number from 1 to ${ON_LIMIT}`);
+  if (q && q.time !== undefined) problems.push('on.query cannot name a window of time: when is the edge, not the query');
+  const edge = o.edge;
+  if (typeof edge !== 'string') problems.push('on.edge must be first, each, first_per:<field> or crosses:<n>');
+  else if (edge.startsWith('first_per:')) {
+    if (!FIELD.test(edge.slice('first_per:'.length))) problems.push('on.edge first_per needs a field name after the colon, e.g. first_per:region');
+  } else if (edge.startsWith('crosses:')) {
+    const n = edge.slice('crosses:'.length);
+    if (!n.trim() || !Number.isFinite(Number(n))) problems.push('on.edge crosses needs a number after the colon, e.g. crosses:10000');
+    if (typeof o.field !== 'string' || !FIELD.test(o.field)) problems.push('on.edge crosses needs on.field: the field whose value crosses n');
+  } else if (edge !== 'first' && edge !== 'each') problems.push('on.edge must be first, each, first_per:<field> or crosses:<n>');
+  return problems;
+}
+
 export function checkAutomation(props: Record<string, unknown>): string[] {
   const problems: string[] = [];
+  if (props.on !== undefined) problems.push(...checkOn(props.on));
+  // An automation that watches a query fires on its edge: it needs no time or trigger beside it.
+  if (props.on !== undefined && props.trigger === undefined) {
+    if (props.action !== 'notify' && props.action !== 'launch' && props.action !== 'tool') problems.push('an automation needs action: notify, tool or launch');
+    return problems;
+  }
   switch (props.trigger) {
     case 'every':
       if (typeof props.every_minutes !== 'number' || props.every_minutes < 1) problems.push('trigger "every" needs every_minutes of 1 or more');
