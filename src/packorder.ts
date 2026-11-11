@@ -22,15 +22,11 @@ export type PackState = { state: 'active' | 'waiting' | 'off'; why?: string };
 export const KERNEL_PACKS = ['core'];
 
 /**
- * A name a kernel pack gave, kept by a pack split out of it (the core audit, e_sjhbyf52): a view or preset moves with
- * its id, so what names it (an owner's kept version, a test, a doc) still does. A pack that keeps one was the kernel's,
- * so every map has it until its owner takes it out (src/packstate.ts, syncPacks).
+ * A name a kernel pack gave, kept by a pack it moved to (the core audit, e_sjhbyf52): a view or preset moves with its
+ * id, so what names it (an owner's kept version, a test, a doc) still does. Which maps are given that pack is
+ * src/pack-moved.ts's.
  */
 export const keptFromKernel = (id: string) => KERNEL_PACKS.some((k) => id.startsWith(`${k}.`));
-
-/** Whether a pack was split out of a kernel pack: it is none of them, and keeps a view or preset by a kernel name. */
-export const splitFromKernel = (p: Pick<PackFile, 'id' | 'views' | 'styles'>) =>
-  !KERNEL_PACKS.includes(p.id) && [...(p.views ?? []), ...(p.styles ?? [])].some((d) => keptFromKernel(d.id));
 
 /** The kernel's own kinds of event (src/due.ts, src/notify.ts): always provided, by core. */
 export const KERNEL_EVENTS = ['item.due', 'notification.made'];

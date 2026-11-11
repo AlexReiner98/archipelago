@@ -36,14 +36,17 @@ test('beside each, its use here: items, links, a view’s reads, a rule’s refu
   const held = await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Held' }], hold: true });
   assert.equal(held.status, 'proposed');
 
-  const core = (await withUse(l, packStates(l))).find((p) => p.id === 'core')!;
-  const item = (key: string, pred: (t: { def: unknown }) => boolean) => core.touches.find((g) => g.key === key)!.items.find(pred)!;
+  const states = await withUse(l, packStates(l));
+  const core = states.find((p) => p.id === 'core')!;
+  const of = (pack: typeof core) => (key: string, pred: (t: { def: unknown }) => boolean) => pack.touches.find((g) => g.key === key)!.items.find(pred)!;
+  const item = of(core);
   const id = (want: string) => (t: { def: unknown }) => (t.def as { id?: string }).id === want;
   assert.equal(item('types', id('task')).used, 2);
   assert.equal(item('links', id('depends_on')).used, 1);
   assert.equal(item('views', id('core.frontier')).used, 1);
-  assert.equal(item('rules', id('finding_value')).used, 1);
-  assert.match(item('rules', id('finding_value')).said!, /refused 1 change/);
+  const findings = of(states.find((p) => p.id === 'findings')!);
+  assert.equal(findings('rules', id('finding_value')).used, 1, 'a rule moved out of core is counted in its own pack');
+  assert.match(findings('rules', id('finding_value')).said!, /refused 1 change/);
   assert.equal(item('rules', id('asked')).used, 1);
   assert.match(item('rules', id('asked')).said!, /held 1 change/);
   assert.equal(item('views', id('core.hubs')).used, 0, 'a view never read is unused');

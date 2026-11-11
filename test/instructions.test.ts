@@ -106,7 +106,7 @@ test('each working rule is said once: in the rules file a project is handed, fro
   const { WRITE_TOOLS } = await import('../src/tool-change.ts');
   const presets = presetsOf(checkoutPacks(), 'instruction');
   const rules = presets.filter((p) => (p.props.for as string[]).includes('working_rules'));
-  assert.deepEqual(rules.map((p) => p.id), ['core.map_true', 'core.authority', 'core.names', 'core.search_first', 'core.plan_flow', 'core.finding_line', 'core.waits_on']);
+  assert.deepEqual(rules.map((p) => p.id), ['core.map_true', 'core.authority', 'core.names', 'core.search_first', 'core.plan_flow', 'core.waits_on']);
   assert.deepEqual(presets.filter((p) => (p.props.for as string[]).length !== 1).map((p) => p.id), [], 'an instruction is said in one place');
   const file = workingRules();
   for (const p of rules) assert.equal(file.split(p.body!).length, 2, `${p.id} is said once in the rules file`);

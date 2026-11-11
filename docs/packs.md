@@ -289,10 +289,18 @@ Adding or taking out a pack is a fact on the workspace's log, kept forever:
 SHA-256 of its `pack.json`, its `text` kept with it the first time the log
 meets that hash, and `["-", "pack:<id>", "pack"]` (docs/log.md, section 8).
 Adding a pack is the owner's: a new workspace starts with the kernel's
-(core) and the packs split out of it (below), or those the server names
-(`PELAGO_START_PACKS`, a list or `all`), and a pack new to the server is off
-in a workspace until its owner adds it. A workspace that opens asserts again a pack it has whose manifest
-changed. Taking a
+(core) alone, or those the server names (`PELAGO_START_PACKS`, a list or
+`all`), and a pack new to the server is off in a workspace until its owner
+adds it. A workspace that opens asserts again a pack it has whose manifest
+changed. A pack that holds now what the kernel declared once (a rule, view,
+style, action or layout, by its id or with `core.` renamed to its own prefix)
+is added, once, to a map whose log keeps a manifest of core that declared it,
+so moving something out of core changes nothing a map does
+(`src/pack-moved.ts`; the core audit, e_sjhbyf52: the `findings` pack first,
+then `sessions`). A view or preset may keep its `core.` id in the pack it
+moved to, so what names it (an owner's kept version) still does
+(`keptFromKernel`, `src/packorder.ts`).
+A map made after the move starts with it only when the server names it. Taking a
 pack out is the owner's; the kernel's packs are never taken out. The packs
 relying on a name only it provides go to waiting first, saying why, their
 items kept, and adding it back wakes them (`dependentsOf`, task e_5h5kprqm,
@@ -300,19 +308,6 @@ after the Cordis paper: consumers deactivate before their provider goes).
 The Packs screen names them before the owner confirms. Everything a pack registers is
 derived from the set of packs, so taking one out unwinds it: its tools,
 screens, rules and handlers go, and its items stay, their types dormant.
-
-## Split out of the kernel
-
-What moves out of core into a pack of its own (the core audit, e_sjhbyf52)
-keeps its id: a view or preset of the new pack may be named `core.<name>`, so
-what names it (an owner's kept version, a test, a doc) still does
-(`keptFromKernel`, `src/packorder.ts`). A pack that keeps one was the
-kernel's, so every map has it: the sync adds it once to a map whose log never
-named it, new or old, and never again once the owner has taken it out
-(`splitFromKernel`, `src/packstate.ts`). A server's list (`PELAGO_ONLY_PACKS`)
-must still name it. The `sessions` pack is one: what a session is shown and
-told (its turns and what it worked on, the Sessions view and its marks, report
-in and estimate), while the run type stays in core, which the kernel reads.
 
 ## Bundles
 
