@@ -30,7 +30,9 @@ const levels: PackFile = {
     { id: 'x.feature', title: 'Feature', description: 'A stream of work in a project.', extends: 'work', altitude: 'stream', fields: { order: { type: 'number', description: 'Its place among its siblings.' }, ...tokens } },
     { id: 'x.issue', title: 'Issue', description: 'Something wrong to look into.', extends: 'work', fields: tokens },
   ],
-  views: [{ form: 'tree', id: 'x.roadmap', title: 'Roadmap', description: 'A project, its features in order and the work under each.', roots: ['x.project'], branches: ['x.feature'], work: ['task', 'x.issue'], order: 'order', active: ['doing'] }],
+  views: [{ form: 'tree', id: 'x.roadmap', title: 'Roadmap', description: 'A project, its features in order and the work under each.', roots: ['x.project'], branches: ['x.feature'], work: ['task', 'x.issue'], order: 'order', active: ['doing'] },
+    // The tree read is a practice pack's (work_views on the hosted map, task e_2a94ypah), so a pack that wants it declares it.
+    { id: 'x.tree', shape: 'data', lens: {}, answer: 'tree', description: 'A tree this pack declares.' }],
 } as PackFile;
 
 async function fixture() {

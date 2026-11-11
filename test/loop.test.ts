@@ -43,9 +43,9 @@ function hookOf(base: string, data: string) {
 }
 
 test('the core loop, as a stranger meets it: install, write, read, correct, remember, share', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
-  // A map with core alone, as a new workspace starts.
+  // A map with the kernel and what keeps its ids (the default look, a session's pages), as a new workspace starts.
   const packs = mkdtempSync(join(tmpdir(), 'pelago-loop-packs-'));
-  cpSync(join(ROOT, 'packs', 'core'), join(packs, 'core'), { recursive: true });
+  for (const name of ['core', 'canvas', 'sessions']) cpSync(join(ROOT, 'packs', name), join(packs, name), { recursive: true });
   const { base, call } = await serve('off', undefined, undefined, packs);
   const work = mkdtempSync(join(tmpdir(), 'pelago-loop-'));
   const project = join(work, 'todo');

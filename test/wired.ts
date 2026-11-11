@@ -16,7 +16,7 @@ export const drawings: Layout[] = readdirSync(join(ROOT, 'packs')).filter((p) =>
 /** What a module imports of its drawing, by name. */
 export const imported = (text: string) => [...text.matchAll(/(?:from\s+|import\s*\(\s*)['"]\.\/([^'"]+)['"]/g)].map((m) => m[1]);
 export const pathOf = (d: Layout, name: string) => `packs/${d.pack}/${d.modules[name]}`;
-export const short = (file: string) => file.replace('packs/core/layouts/', '');
+export const short = (file: string) => file.replace('packs/canvas/layouts/', '');
 
 export type Sketch = { items: any[]; links: { type: string; from: string; to: string }[] };
 type Line = { ends: string[]; points: number[][] };
@@ -64,8 +64,8 @@ function apart() {
 
 export const SKETCHES: Record<string, Sketch> = { knot: knot(), fan: fan(), crossed: crossed(), comb: comb(), apart: apart() };
 
-/** The core pack's house style. */
-const house = () => JSON.parse(readFileSync(join(ROOT, 'packs/core/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
+/** The house style (canvas's, kept under core's id). */
+const house = () => JSON.parse(readFileSync(join(ROOT, 'packs/canvas/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 
 const boxesOf = (g: any): Box[] => g.all.filter((n: any) => !n.dummy).map((n: any) => {
   const [x, y] = [g.x.get(n.id), g.y.get(n.id)];

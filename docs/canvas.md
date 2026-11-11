@@ -208,7 +208,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `src/layouts.ts` | which drawing a style names, and the owner's version of it (a layout with its `preset`) |
 | `src/tail.ts`, `src/project.ts` | facts after a position; the pure projector (served as `/project.js`) |
 | `src/pelago.ts`, `src/rules.ts` | the one write path, and what decides it |
-| `packs/core/layouts/flow/` | the flow drawing: `graph.js` flattens, `layout.js` orders, `free.js` keeps places, `index.js` answers marks |
+| `packs/canvas/layouts/flow/` | the flow drawing: `graph.js` flattens, `layout.js` orders, `free.js` keeps places, `index.js` answers marks |
 
 ## How a canvas is read
 1. The address holds the query (`#/v?…` or `#/e/<id>?…`); `panes.js` reads

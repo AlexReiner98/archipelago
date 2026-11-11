@@ -29,7 +29,7 @@ import { syncTypes } from './typetable.ts';
 import { packTouches } from './pack-touches.ts';
 import { withUse } from './pack-use.ts';
 import { folderCode, keptHashes } from './pack-code.ts';
-import { movedFromKernel } from './pack-moved.ts';
+import { keepsKernel, movedPacks } from './pack-moved.ts';
 import { bundlesOffered, expandBundles, packsNamed, readBundles, type Bundle } from './bundles.ts';
 
 /** The setting that held the packs turned off in a workspace before they were facts: read until the first pack fact. */
@@ -200,7 +200,7 @@ async function takenOver(l: Archipelago, said: Map<string, Said>): Promise<Set<s
  * Bring the log in line with the packs this server has, when a workspace opens. The kernel's packs are asserted, and a
  * pack the log has added is asserted again when its version or manifest changed. A pack the log never added is not
  * added: that is the owner's, unless it is one the owner added under its old name (renamedPacks), which takes its
- * place once, or one that took over words a pack the owner added held (takenOver), or what the kernel declared once (movedFromKernel, src/pack-moved.ts). A new workspace starts with the kernel's packs (and those the server starts with); one
+ * place once, or one that took over words a pack the owner added held (takenOver), or what a pack on it declared once (movedPacks, src/pack-moved.ts). A new workspace starts with the kernel's packs, those that keep the kernel's ids (keepsKernel), and those the server starts with; one
  * made before packs were facts is said to have what it had (and one the old setting turned off is retracted once). A
  * pack the server does not enable is not said either way. One system change set.
  */
@@ -212,7 +212,7 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
   const first = !said.size && !(await l.db.query(`select 1 from entity limit 1`)).rows.length;
   const renamed = await renamedPacks(l, said);
   const taken = await takenOver(l, said);
-  if (said.size) for (const id of await movedFromKernel(l, (id) => said.has(id))) taken.add(id);
+  if (said.size) for (const id of await movedPacks(l, (id) => said.has(id), (id) => said.get(id)?.op === '+')) taken.add(id);
   const facts: Fact[] = [];
   for (const p of l.registry.found) {
     if (p.id === LOCAL_PACK || (l.registry.only && !l.registry.only.includes(p.id) && !l.registry.made.has(p.id))) continue;
@@ -230,7 +230,7 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
       }
     } else if (taken.has(p.id)) facts.push(present(l, p, kept));
     else if (!said.size && first) {
-      if (start === 'all' || start.includes(p.id)) facts.push(present(l, p, kept));
+      if (start === 'all' || start.includes(p.id) || keepsKernel(p)) facts.push(present(l, p, kept));
     } else if (!said.size) {
       facts.push(off.has(p.id) ? ['-', packFact(p.id), 'pack'] : present(l, p, kept));
     }

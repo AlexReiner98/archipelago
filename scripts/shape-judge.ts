@@ -1,5 +1,5 @@
 // Step 2's sketch (task e_7vp7udzk) drawn plainly on its grid for the owner to judge: each embedding step 1 wrote
-// (runs/planarize/<name>.embedding.json) shaped at right angles (packs/core/layouts/shape/) and drawn cell for cell,
+// (runs/planarize/<name>.embedding.json) shaped at right angles (packs/canvas/layouts/shape/) and drawn cell for cell,
 // boxes as their grid rectangles, islands as theirs, crossings as dots, ports as squares, junctions as small dots,
 // turned wires red. The grid keeps order, not distance: step 3 sets the sizes.
 //   node scripts/shape-judge.ts [names...] [--from <folder of embeddings>] [--png]
@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execSync } from 'node:child_process';
 // @ts-expect-error a drawing's modules are plain JavaScript
-import { shape } from '../packs/core/layouts/shape/index.js';
+import { shape } from '../packs/canvas/layouts/shape/index.js';
 
 const ROOT = join(import.meta.dirname, '..'), argv = process.argv.slice(2), png = argv.includes('--png');
 const common = () => join(execSync('git rev-parse --path-format=absolute --git-common-dir', { cwd: ROOT }).toString().trim(), '..');

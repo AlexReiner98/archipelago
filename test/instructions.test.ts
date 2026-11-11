@@ -69,7 +69,7 @@ test('an instruction preset is checked as a style preset is: its words in body, 
 });
 
 test('the session-start text is read from the instructions on the map', async () => {
-  const l = await freshWith(new Registry(packsWith(CHECKOUT), ['core', 'sessions', 'checkouts'])); // sessions: what a session is told at its start
+  const l = await freshWith(new Registry(packsWith(CHECKOUT), ['core', 'sessions', 'practice', 'checkouts'])); // sessions and practice: what a session is told at its start
   await make(l, [{ op: 'create', type: 'checkout', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } }]);
   const text = await hookSessionStart(l, { session_id: 'i1', cwd: 'C:\\code\\Apex' });
   const run = /as run (e_\w+)/.exec(text)?.[1];
@@ -89,7 +89,7 @@ test('the session-start text is read from the instructions on the map', async ()
   const far = await hookSessionStart(l, { session_id: 'i2', cwd: 'C:\\elsewhere' });
   assert.match(far, /how many tokens/, 'elsewhere the preset is said');
   const view = (await VIEWS.instructions.run(l, { about: repo })) as { said: { id: string; preset?: string }[] };
-  assert.deepEqual(view.said.map((s) => s.preset), ['core.estimate', 'core.report_in', 'core.draw_answers']);
+  assert.deepEqual(view.said.map((s) => s.preset), ['core.estimate', 'core.report_in', 'practice.draw_answers']);
   assert.equal(view.said[0].id, made.v);
   // A guide is said only when asked for.
   const guide = (await VIEWS.instructions.run(l, { for: 'guide:checkout_code' })) as { said: { preset?: string; text: string }[] };
@@ -106,7 +106,7 @@ test('each working rule is said once: in the rules file a project is handed, fro
   const { WRITE_TOOLS } = await import('../src/tool-change.ts');
   const presets = presetsOf(checkoutPacks(), 'instruction');
   const rules = presets.filter((p) => (p.props.for as string[]).includes('working_rules'));
-  assert.deepEqual(rules.map((p) => p.id), ['core.map_true', 'core.authority', 'core.names', 'core.search_first', 'core.plan_flow', 'core.waits_on']);
+  assert.deepEqual(rules.map((p) => p.id), ['core.authority', 'findings.finding_line', 'practice.map_true', 'practice.names', 'practice.search_first', 'practice.plan_flow', 'practice.waits_on']);
   assert.deepEqual(presets.filter((p) => (p.props.for as string[]).length !== 1).map((p) => p.id), [], 'an instruction is said in one place');
   const file = workingRules();
   for (const p of rules) assert.equal(file.split(p.body!).length, 2, `${p.id} is said once in the rules file`);

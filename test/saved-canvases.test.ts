@@ -6,7 +6,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome } from './browser.ts';
-import { agent, fresh, human, make } from './map.ts';
+import { agent, fresh, freshWith, human, make, packsWith } from './map.ts';
+import { Registry } from '../src/packs.ts';
 import { savedCanvasPage } from './saved-canvas-page.ts';
 import { callTool } from '../src/tools.ts';
 
@@ -31,10 +32,12 @@ test('an agent makes and changes a saved canvas through change, and report show 
 });
 
 test("a pack ships canvases as presets: the schema offers each, its lens answers, and the owner keeps their version under its id", async () => {
-  const l = await fresh();
+  // Core ships no waiting lens since it went to work_views (task e_2a94ypah): a pack of the test's own ships one.
+  const shelf = { id: 'shelf', version: '1.0.0', title: 'Shelf', description: 'A canvas.', requires: ['core'], styles: [{ id: 'shelf.waiting', type: 'lens', title: 'Waiting on you', props: { filter: { find: ['waits_on me'] }, walk: { over: [], steps: 0 } } }] };
+  const l = await freshWith(new Registry(packsWith(shelf)));
   const { canvases, shapes } = (await callTool(l, human, 'schema', {})) as { canvases: { id: string; pack: string; title: string; props: { filter: Record<string, unknown>; walk: unknown } }[]; shapes: { shape: string }[] };
-  const waiting = canvases.find((c) => c.id === 'core.waiting');
-  assert.ok(waiting && waiting.pack === 'core' && waiting.title, 'core ships what waits on you');
+  const waiting = canvases.find((c) => c.id === 'shelf.waiting');
+  assert.ok(waiting && waiting.pack === 'shelf' && waiting.title, 'the pack ships what waits on you');
   assert.deepEqual(shapes.filter((s) => s.shape === 'map').length, 1, 'the shapes the drawings draw, for the style switch');
   // What waits on the person looking: the lens answers as a saved one does.
   const { me } = await l.init(human, { name: 'Me' });
@@ -44,7 +47,7 @@ test("a pack ships canvases as presets: the schema offers each, its lens answers
   assert.ok(drawn.items.some((i) => i.id === t), 'what waits on you is drawn');
   const kept = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: waiting.title, props: { ...waiting.props, preset: waiting.id } }] })) as { created: Record<string, string> };
   const got = (await callTool(l, human, 'query', { name: 'get', params: { id: kept.created.c } })) as { entity: { props: Record<string, unknown> } };
-  assert.equal(got.entity.props.preset, 'core.waiting', 'the owner’s version names the preset it stands for');
+  assert.equal(got.entity.props.preset, 'shelf.waiting', 'the owner’s version names the preset it stands for');
 });
 
 test('in a browser, a canvas is saved from the bar at 1280 px and listed on Home', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {

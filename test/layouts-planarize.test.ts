@@ -1,4 +1,4 @@
-// The whole map planarized at once (packs/core/layouts/planarize/, task e_snvzsxj4), run with no database: wires
+// The whole map planarized at once (packs/canvas/layouts/planarize/, task e_snvzsxj4), run with no database: wires
 // joined by pair, rings broken by turning the fewest, trunks of one type and way, islands as closed runs of the line
 // crossed once by each wire that leaves them, and the plain drawing of it.
 
@@ -9,13 +9,13 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
 
-const LAYOUTS = join(import.meta.dirname, '..', 'packs', 'core', 'layouts');
+const LAYOUTS = join(import.meta.dirname, '..', 'packs', 'canvas', 'layouts');
 /** The flow's, the kit's and these modules side by side, under the names they import each other by. */
 const dir = mkdtempSync(join(tmpdir(), 'pelago-planarize-test-'));
 for (const folder of ['flow', 'kit', 'planarize']) for (const f of readdirSync(join(LAYOUTS, folder))) if (f.endsWith('.js')) cpSync(join(LAYOUTS, folder, f), join(dir, f));
 const mod = (name: string) => import(pathToFileURL(join(dir, name)).href);
 
-const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs/core/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
+const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs/canvas/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
 const measure = (text: string, px: number) => text.length * px * 0.55;
 const item = (id: string, island?: string) => ({ id, type: 'task', title: `Step ${id}`, open: true, ...(island && { island }) });
 const link = (type: string, from: string, to: string) => ({ type, from, to });

@@ -81,7 +81,7 @@ settled, the ones holding up the most first. A decision is made where it
 stands: pick one of its options and say why. The whole log of
 changes is at `#/activity`.
 
-The roadmap is the `tree` view, which agents can call too. The tree is
+The roadmap is the `tree` view (work_views, a hosted pack, declares the read), which agents can call too. The tree is
 declared by a pack (the software pack's, a hosted pack, as a view of
 `form: "tree"`): which types are roots,
 branches and work, which field orders them, and which statuses mean "now". A
@@ -330,7 +330,7 @@ The questions the map exists to answer. `npm run pelago -- view` lists them.
 | `home` | Each project's open questions and next release |
 | `questions` | What is still to be decided in a project? |
 | `gate` | What does a release wait for, and what can follow it? (software pack) |
-| `tree` | A project's roadmap |
+| `tree` | A project's roadmap (work_views) |
 | `flat` | What is in a view: the flat query |
 | `to_confirm` | What did agents settle that I have not confirmed? |
 | `oldest` | What has gone longest without being checked? |
@@ -346,8 +346,8 @@ sets it. A pack declares its views
 in its pack file (`views`): one with `lens` is answered by a read of the
 kernel's that its `answer` names (`src/query-presets.ts`), in the form that view
 has always had; any other is answered by the pack's own code. The core pack's
-are `flat`, `attention`, `brief`, `graph` (`src/view-graph.ts`), `tree`
-(`src/view-tree.ts`) and `hubs`, each read on its own. A view kept on the map
+are `flat`, `attention`, `brief`, `graph` (`src/view-graph.ts`) and `hubs`, each read on its
+own; `tree` (`src/view-tree.ts`) is declared by a practice pack (work_views). A view kept on the map
 (an item of type `lens`, a view on Home) is a flat query and a
 style (`src/query-saved.ts`): a document draws it where a line names it, and
 publishing freezes its picture. `gate` is the software pack's, and reads around its event (the pack
@@ -394,13 +394,16 @@ Types live in packs, one folder each. The open core ships `core` under
 (docs/packs.md):
 
 - `core`: the starter types (the kinds of the work and the system kind), the
-  four every island speaks (task, decision, finding, event), actors (person,
-  company, agent), the system's own (lens, style, screen, type, link type, and
+  three every island speaks (task, decision, finding), actors (person and
+  agent), the system's own (lens, style, screen, type, link type, and
   the primitives source, connection, run, notification and automation) and the
   root links, which name kinds or capabilities at their ends (`owned_by` goes
   from `has:owned`, whatever declares owned). A place that says `exclusive` is
-  a resource. It is the one pack always on, and the only one in this
-  repository.
+  a resource. It is the one pack always on.
+- `people` and `calendar`: vocabulary that left core on 11 Nov 2026, ids kept
+  (`company` and `works_at`; `event`). Calendar also holds `meeting` and
+  `routine`, from time. A pack that uses them requires `type:company` or
+  `type:event`.
 
 The hosted service's:
 
@@ -418,14 +421,14 @@ The hosted service's:
 - `design`: studies, concepts, tenets, research, elements and write-ups.
 - `outreach`: posts, channels, conversations and each channel's month;
   `social` counts visits and trials onto them.
-- `time`: meetings, time entries, routines, invoices and what
-  is paid regularly (`cost`).
+- `time`: time entries, invoices and what is paid regularly (`cost`),
+  with bills; `time_views` logs, sums and bills them (the Time screen).
 - `funding`: funding programs, tied to the work they could pay for.
 - `local`: a workspace's own types, `local.<name>`.
 
 A new workspace starts with `core` alone; the owner adds the rest.
 
-Each pack is described by its `pack.json`, a manifest of sixteen keys
+Each pack is described by its `pack.json`, a manifest of seventeen keys
 ([docs/packs.md](packs.md)): what it declares, which packs it requires or
 uses, and what it may reach beyond the map. Adding or taking out a pack is a
 fact in the workspace's log, and everything it registers (its types, tools,

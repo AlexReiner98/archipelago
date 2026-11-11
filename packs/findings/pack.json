@@ -22,6 +22,6 @@
   ],
   "styles": [
     { "id": "findings.moved", "type": "lens", "title": "Findings moved", "props": { "filter": { "find": ["moved"] }, "walk": { "over": ["reads>"], "steps": 1 }, "style": {  } } },
-    { "id": "findings.finding_line", "type": "instruction", "title": "A finding is what an island stands by, in one line", "body": "Its title is the claim as a sentence, value the fact (a number takes its unit), with its confidence and as_of; its note says how it was found, three lines at most. Mark it published (props.published: true) only when the island stands by it, a few per island: only those are read from other islands. An option is an alternative, a bug is a bug, and working research stays research.", "props": { "for": ["session_start"], "order": 75 } }
+    { "id": "findings.finding_line", "type": "instruction", "title": "A finding is what an island stands by, in one line", "body": "Its title is the claim as a sentence, value the fact (a number takes its unit), with its confidence and as_of; its note says how it was found, three lines at most. Mark it published (props.published: true) only when the island stands by it, a few per island: only those are read from other islands. An option is an alternative, a bug is a bug, and working research stays research.", "props": { "for": ["working_rules"], "order": 78 } }
   ]
 }

@@ -1,5 +1,5 @@
 // Scrolling moves along the rails (task e_u2sxep5g; decision e_btxq2nzq). A page baked from a view drawn by core's
-// rails (packs/core/layouts/rails) holds the picture's marks as an SVG and its stops as a list; this lets the page's
+// rails (packs/canvas/layouts/rails) holds the picture's marks as an SVG and its stops as a list; this lets the page's
 // own scroll carry the camera from stop to stop. It never hears the wheel: the page scrolls as any page does, so keys,
 // links to a stop (#s-<id>) and the browser's find all work, and the camera only follows where the page stands.
 //

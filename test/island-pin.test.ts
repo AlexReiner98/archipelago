@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { instructionsFor } from '../src/instructions.ts';
-import { Registry } from '../src/packs.ts';
+import { Registry, type PackFile } from '../src/packs.ts';
 import { setIslands } from '../src/packstate.ts';
 import type { Archipelago, Op } from '../src/pelago.ts';
 import { callTool } from '../src/tools.ts';
@@ -19,8 +19,11 @@ const plain = {
   styles: [{ id: 'plain.tending', type: 'instruction', title: 'Tending', body: OLD, props: { for: ['session_start'] } }],
 };
 
+/** A map pack that asks for trees: core declares no tree read (it went to work_views, task e_2a94ypah). */
+const reads = { id: 'reads', version: '1.0.0', title: 'Reads', description: 'The tree read.', requires: ['core'], views: [{ id: 'reads.tree', shape: 'data', lens: {}, answer: 'tree', description: 'A tree a pack declares.' }] } as unknown as PackFile;
+
 async function map() {
-  const l = await freshWith(new Registry(packsWith(plain)));
+  const l = await freshWith(new Registry(packsWith(plain, reads)));
   await setIslands(l, human, true);
   const made = await make(l, [
     { op: 'create', ref: 'trial', type: 'island', title: 'Trial', props: { pack: 'plain' } },

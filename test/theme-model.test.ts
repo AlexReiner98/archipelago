@@ -10,7 +10,7 @@ import { Registry } from '../src/packs.ts';
 import { freshWith, human, make, PACKS } from './map.ts';
 
 /** A map with two themes to choose from (test/packs/tints, as the hosted themes pack ships them) and a page to publish. */
-const fresh = () => freshWith(new Registry([PACKS, join(import.meta.dirname, 'packs'), join(import.meta.dirname, 'fixtures', 'packs')], ['core', 'tints', 'pages']));
+const fresh = () => freshWith(new Registry([PACKS, join(import.meta.dirname, 'packs'), join(import.meta.dirname, 'fixtures', 'packs')], ['core', 'canvas', 'tints', 'pages'])); // canvas: the house style moved there
 
 const OPEN_WATER = { light: '#216bc0', dark: '#70a4e6' };
 const BAY = { light: '#077783', dark: '#28b1c3' };
