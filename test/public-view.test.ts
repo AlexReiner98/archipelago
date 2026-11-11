@@ -92,3 +92,23 @@ test('a forget takes its public view with it', async () => {
   await l.change(owner, { reason: 'test', ops: [{ op: 'forget', id: t }] });
   assert.equal((await l.db.query(`select 1 from public_view where entity_id = $1`, [t])).rows.length, 0);
 });
+
+test('step 41 makes each published revision its public view, as published, and nothing published that is not read', async () => {
+  const { PUBLISHED_TO_PUBLIC_VIEW } = await import('../src/public-schema.ts');
+  const { l, mine, owner, made } = await shelf();
+  const { o } = await make(l, [{ op: 'create', ref: 'o', type: 'writing', title: 'Old page', body: 'Gone private.', visibility: 'shared', props: { path: 'old' } }]);
+  for (const id of [made.d, o]) await callTool(mine, owner, 'publish', { id });
+  // What was there before public views: the revisions alone, one of them since made private.
+  await l.db.query(`delete from public_view`);
+  await mine.change(owner, { reason: 'test', ops: [{ op: 'update', id: made.d, title: 'Funding, a new draft' }, { op: 'update', id: o, visibility: 'private' }] });
+  await l.db.query(PUBLISHED_TO_PUBLIC_VIEW);
+  const { rows } = await l.db.query<{ entity_id: string; given: unknown; path: string; menu: number; shared_at: Date }>(`select entity_id, given, path, menu, shared_at from public_view`);
+  const [was] = (await l.db.query<{ given: unknown; published_at: Date }>(`select given, published_at from published where entity_id = $1`, [made.d])).rows;
+  assert.deepEqual(rows.map((r) => [r.entity_id, r.path, r.menu]), [[made.d, 'funding', 2]], 'the private one is not made public');
+  assert.deepEqual(rows[0].given, was.given, 'its frozen copy, not its draft');
+  assert.equal(new Date(rows[0].shared_at).toISOString(), new Date(was.published_at).toISOString());
+  assert.equal(((await publicViewAt(l, 'funding')) as { title: string }).title, 'Funding');
+  // Run again, it changes nothing.
+  await l.db.query(PUBLISHED_TO_PUBLIC_VIEW);
+  assert.equal((await l.db.query(`select 1 from public_view`)).rows.length, 1);
+});

@@ -207,3 +207,18 @@ begin
   update proposal set reason = '' where id = any(reasons);
 end $fn$;
 `;
+
+/**
+ * Step 41 (src/migrate.ts): what is published becomes its public view, exactly as published (its frozen copy, never its
+ * draft), keeping its address word, its place and when (decision e_nwdn7ce6, task e_3zm5mexm): a site's pages answer
+ * the same words from public views. Only what a reader can read now: a revision of a document made private or
+ * archived since stays unread. A public view made already is kept (publishing since step 40 writes one too), as is an
+ * address word another public view holds.
+ */
+export const PUBLISHED_TO_PUBLIC_VIEW = `
+insert into public_view (entity_id, workspace, given, shared_by, shared_at, path, menu)
+select p.entity_id, p.workspace, p.given, p.published_by, p.published_at, p.path, p.menu
+from published p join entity e on e.id = p.entity_id
+where e.visibility = 'public' and e.archived_at is null and e.private_to is null
+on conflict do nothing;
+`;
