@@ -49,10 +49,21 @@ export function providersOf(name: string, packs: Iterable<PackFile>): string[] {
   }
 }
 
-/** The active packs left without a provider were `provider` gone: what taking it out would leave waiting (task e_5h5kprqm sends them there). */
-export function dependentsOf(active: PackFile[], provider: string): string[] {
-  const rest = active.filter((p) => p.id !== provider);
-  return rest.filter((p) => (p.requires ?? []).some((r) => providersOf(r, active).includes(provider) && !providersOf(r, rest).length)).map((p) => p.id);
+/**
+ * The active packs left without a provider were the packs `gone` all taken out at once (one, or a bundle's): what
+ * taking them out sends to waiting (task e_5h5kprqm), and so on down, since a pack that waits provides nothing. A
+ * dependent inside `gone` is not counted: it goes out with them. As in the Cordis paper, the consumers deactivate
+ * first and the provider is withdrawn after.
+ */
+export function dependentsOf(active: PackFile[], gone: string[]): string[] {
+  const out = new Set(gone);
+  for (let more = true; more; ) {
+    const rest = active.filter((p) => !out.has(p.id));
+    const lost = rest.filter((p) => (p.requires ?? []).some((r) => !providersOf(r, rest).length && providersOf(r, active).some((id) => out.has(id))));
+    for (const p of lost) out.add(p.id);
+    more = lost.length > 0;
+  }
+  return [...out].filter((id) => !gone.includes(id));
 }
 
 /**

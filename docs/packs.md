@@ -284,8 +284,11 @@ Adding a pack is the owner's: a new workspace starts with the kernel's
 `all`), and a pack new to the server is off in a workspace until its owner
 adds it. A workspace that opens asserts again a pack it has whose manifest
 changed. Taking a
-pack out is the owner's, and is refused while another active pack requires
-a name only it provides; the kernel's packs are never taken out. Everything a pack registers is
+pack out is the owner's; the kernel's packs are never taken out. The packs
+relying on a name only it provides go to waiting first, saying why, their
+items kept, and adding it back wakes them (`dependentsOf`, task e_5h5kprqm,
+after the Cordis paper: consumers deactivate before their provider goes).
+The Packs screen names them before the owner confirms. Everything a pack registers is
 derived from the set of packs, so taking one out unwinds it: its tools,
 screens, rules and handlers go, and its items stay, their types dormant.
 
@@ -295,5 +298,6 @@ screens, rules and handlers go, and its items stay, their types dormant.
   reads the pack files the server has now.
 - A pack the log says is present but whose code the server lacks is not yet
   listed as waiting.
-- Taking out a pack together with the packs that require it, in one change,
-  is not offered yet.
+- What the Packs screen says will wait is read from the active packs alone:
+  a waiting pack that would stand in as provider is not counted, so it may
+  name more than will wait.
