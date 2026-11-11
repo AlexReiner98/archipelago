@@ -6,7 +6,7 @@
 /**
  * Step 36, as a new database makes it now: the vault's keys under a row policy, a member reading and adding every
  * one. The step also made guests (a reader role, its policies, `reach`, and a function for their feed of the log);
- * step 41 takes those away where it ran whole.
+ * step 43 takes those away where it ran whole.
  */
 export const VAULT_KEY_POLICY = `
 alter table vault_key enable row level security;
@@ -14,10 +14,10 @@ drop policy if exists member_vault_key on vault_key;
 create policy member_vault_key on vault_key for all to pelago_member using (true) with check (true);
 `;
 
-/** Step 40: a member may be one who only reads. */
+/** Step 42: a member may be one who only reads. */
 export const MEMBER_READ_ONLY = `alter table member add column if not exists read_only boolean not null default false;`;
 
-/** Step 41: guests gone. Their shares and memberships first, then what let them read. Safe to run again. */
+/** Step 43: guests gone. Their shares and memberships first, then what let them read. Safe to run again. */
 export const GUESTS_GONE = `
 do $step$ begin
   if exists (select 1 from information_schema.columns where table_name = 'share' and column_name = 'guest') then
