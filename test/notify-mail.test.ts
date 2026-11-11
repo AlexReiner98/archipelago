@@ -44,6 +44,17 @@ test('a notification for a person who turned mail on is mailed to their address;
   assert.equal(sent[0].subject, 'Urgent: The build broke');
   assert.match(sent[0].text, /^main is red\n\n.*\/i\/default\/e_\w+\n$/, 'the note, then where it is on the map');
   assert.ok(sent[0].text.includes(notification));
+
+  // A reminder with no note, about an item: the mail carries that item's note and links to it, not to the notification.
+  const { post } = await make(l, [{ op: 'create', ref: 'post', type: 'task', title: 'Post for 12 Nov', body: '## Facts\n- the mail landed' }]);
+  const second = nextMail();
+  const reminder = await notify(l, agent, { title: "Today's post", about: post });
+  await second;
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].subject, "Today's post");
+  assert.ok(sent[1].text.startsWith("Today's post\n\nPost for 12 Nov\n\n## Facts\n- the mail landed\n\n"), 'the reminder, then what it is about, whole');
+  assert.ok(sent[1].text.trimEnd().endsWith(`/i/default/${post}`), 'the link is to what it is about');
+  assert.ok(!sent[1].text.includes(reminder.notification));
 });
 
 test('a pack mails only about the notification it heard made, and only on hearing it', async () => {
