@@ -67,6 +67,7 @@ test('the view reads open snags of its types, keeps those that name what they to
   const asked: unknown[] = [];
   const read = async (q: Record<string, any>) => {
     asked.push(q);
+    if (q.with_field) return q.with_field === 'touches' ? ['issue'] : [];
     if (q.type_info) return q.type_info === 'issue' ? { statuses: { open: ['open', 'investigating'], closed: ['resolved'] } } : null;
     if (q.items) return [
       { id: 'a', title: 'A', type: 'issue', status: 'open', props: { touches: 'tool:change', severity: 'high' } },
