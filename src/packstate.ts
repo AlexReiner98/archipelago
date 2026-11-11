@@ -180,7 +180,7 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
   const taken = await takenOver(l, said);
   const facts: Fact[] = [];
   for (const p of l.registry.found) {
-    if (p.id === LOCAL_PACK || (l.registry.only && !l.registry.only.includes(p.id))) continue;
+    if (p.id === LOCAL_PACK || (l.registry.only && !l.registry.only.includes(p.id) && !l.registry.made.has(p.id))) continue;
     const was = said.get(p.id);
     if (l.registry.made.has(p.id) && was?.op !== '+') continue; // kept as an item: the owner adds it, never the sync
     const kernel = KERNEL_PACKS.includes(p.id);
