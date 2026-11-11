@@ -53,7 +53,7 @@ import { configureSecrets } from './secrets.ts'; import { serveBackupFile } from
 import { answerAt, hookAt } from './server-adapter.ts'; import { mountOf, serveMounted } from './server-mounts.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
 import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, unlisted, PAGE_POLICY, PREVIEW_POLICY, SHARED_POLICY } from './page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from './draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
-import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts';
+import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts'; import { hasBounced } from './bounces.ts'; import { setBounced } from './mail.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
 const BODY_MAX = 32_000_000; /** What a route open to anyone takes: a form's worth, or a webhook's delivery. */ const OPEN_BODY_MAX = 64_000, HOOK_BODY_MAX = 1_000_000;
@@ -103,7 +103,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   serverPacks.origin = named[0] ? `https://${named[0]}` : origins[0];
   configureConnections(serverPacks);
   setReach({ hold: (id) => workspaces.hold(id), connection: async (id, pack) => { const c = await serverPacks.connectionOf(pack, id); return c ? { id: c.id, account: c.account } : null; }, via: (id, pack, host, path) => serverPacks.lent(pack, host, id, path) });
-  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => dueForDeletion(serverPacks, await workspaces.control(), now); slowTokensAt(options.limits?.token);
+  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => dueForDeletion(serverPacks, await workspaces.control(), now); slowTokensAt(options.limits?.token); setBounced(async (email) => hasBounced((await workspaces.get(DEFAULT_WORKSPACE)).pelago.db, email)); // a bounced address is sent nothing (src/bounces.ts)
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
   const running = { commit: startedFrom(), started: new Date().toISOString() }; configureHookTool(serverPacks, running);

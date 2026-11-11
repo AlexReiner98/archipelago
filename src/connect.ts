@@ -5,6 +5,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { bearer } from './auth.ts';
+import { BOUNCED_DAYS, failedFor, fromRelay, noteBounced } from './bounces.ts';
 import { normalEmail } from './mail.ts';
 import { workspacesOf } from './control-index.ts';
 import type { Q } from './db.ts';
@@ -56,14 +57,6 @@ function askedLately(email: string): boolean {
 
 /** Where a person with no account begins on this server, if anywhere: a server pack's start page. */
 const startOf = (at: ConnectRoutes) => serverPacksOf(at.workspaces).start();
-const REF = /^[A-Za-z0-9_-]{1,40}$/;
-/** An address with where its reader came from (?ref=), when that is a tag and not anything else. */
-const withRef = (address: string, ref: unknown) => {
-  if (typeof ref !== 'string' || !REF.test(ref)) return address;
-  const url = new URL(address);
-  url.searchParams.set('ref', ref);
-  return url.href;
-};
 
 const reply = (res: ServerResponse, status: number, body: unknown) => json(res, status, body, PRIVATE);
 
@@ -149,6 +142,14 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     await setPassword(control, email, body.password as string);
     return reply(res, 200, { email, set: await passwordSet(control, email) });
   }
+  // A failure notice the relay hands over (src/bounces.ts): the addresses that failed for good are sent nothing for a while.
+  if (req.method === 'POST' && path === '/connect/bounce') {
+    if (!fromRelay(req.headers.authorization)) return reply(res, 403, { error: 'Only the relay hands over bounces.' });
+    const failed = failedFor((await at.raw()).toString('utf8'));
+    await noteBounced((await at.workspaces.get(at.fallback)).pelago.db, failed);
+    if (failed.length) console.log(`bounced for good, not mailed for ${BOUNCED_DAYS} days: ${failed.length} address${failed.length === 1 ? '' : 'es'}`);
+    return reply(res, 200, { kept: failed.length });
+  }
   if (req.method === 'POST' && (path === '/connect/sign-in' || path === '/connect/join' || path === '/connect/code' || path === '/connect/password')) {
     if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in.' });
     if (at.tooOften()) return;
@@ -167,10 +168,8 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
       const email = normalEmail(body.email);
       if (!email) return reply(res, 400, { error: 'That is not an email address.' });
       // Answered at once and the same either way: whether the address is a member anywhere is not told. An address in
-      // no workspace is mailed where to begin, which only its owner reads.
-      const start = startOf(at);
-      const begin = start && withRef(`${origin}${start}`, body.ref);
-      if (!askedLately(email)) void requestSignIn(await theirs(email), email, origin, begin).catch((err) => console.error(`sign-in mail to ${email} failed:`, (err as Error).message));
+      // no workspace is sent nothing; the page offers where to begin to everyone who asks.
+      if (!askedLately(email)) void requestSignIn(await theirs(email), email).catch((err) => console.error(`sign-in mail to ${email} failed:`, (err as Error).message));
       return reply(res, 200, { sent_to: email });
     }
     // An address and its password. Its workspace is the one named, or the only one; for several, the answer lists them.

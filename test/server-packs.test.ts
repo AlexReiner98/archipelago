@@ -79,6 +79,12 @@ test('a server pack sells a workspace: its page, its entries, a signed webhook, 
   assert.deepEqual((await post('/x/demo/listed', { prefix: 'request:r', most: 1 })).result, [{ key: 'request:r1', value: { email: 'Rosa@Acme.example', name: 'Acme' } }]);
   assert.deepEqual(((await post('/x/demo/listed', { prefix: 'request:' })).result as any[]).map((e) => e.key), ['request:r1', 'request:r2']);
   assert.match((await post('/x/demo/listed', { prefix: '' })).error, /A prefix is/);
+  // An entry's input is its address's query with the body over it: JSON from a page, or a mail program's one-click
+  // unsubscribe, a form (RFC 8058) whose address names what to stop.
+  assert.deepEqual((await post('/x/demo/echo?t=t1&n=1', { n: 2 })).result, { t: 't1', n: 2 });
+  const oneClick = await fetch(`${base}/x/demo/echo?t=t1`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'List-Unsubscribe=One-Click' });
+  assert.equal(oneClick.status, 200);
+  assert.deepEqual((await oneClick.json()).result, { t: 't1', 'List-Unsubscribe': 'One-Click' });
 
   // A new workspace says nothing has been put in it; its admin can rename it, its id staying as it is; the default keeps its name.
   assert.equal((await call('/api/workspace_info', token)).result.started, false);

@@ -21,6 +21,7 @@ export default {
   sneak: (_input, ctx) => ctx.act('mail.send', { to: 'someone@example.com', subject: 'x', text: 'x' }),
   peek: (_input, ctx) => ctx.read({ items: { type: 'person' } }),
   listed: async (input, ctx) => ({ answer: await ctx.store.list(input.prefix, input.most) }),
+  echo: (input) => ({ answer: input }),
   async limit({ workspace, ...limits }, ctx) {
     await ctx.store.put(`limits:${workspace}`, limits);
     return { answer: { workspace } };

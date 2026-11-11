@@ -26,6 +26,18 @@ test('a message is signed with DKIM so that the public key verifies it', () => {
   assert.ok(createVerify('RSA-SHA256').update(input).verify(publicKey, tags.b, 'base64'));
 });
 
+test('mail that sells carries a one-click way out, signed with the rest; a sign-in carries none', () => {
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
+  const stop = 'https://app.example/x/billing/trial_stop?t=t123';
+  const { headers, body } = compose('Archipelago <signin@example.com>', { to: 'rosa@acme.ca', subject: '7 days left', text: 'Hello', unsubscribe: stop });
+  assert.equal(headers.find(([n]) => n === 'List-Unsubscribe')?.[1], `<${stop}>`);
+  assert.equal(headers.find(([n]) => n === 'List-Unsubscribe-Post')?.[1], 'List-Unsubscribe=One-Click');
+  const h = /h=([^;]+)/.exec(dkimSign(headers, body, 'example.com', 'mail', privateKey)[1])![1].split(':');
+  assert.ok(h.includes('list-unsubscribe') && h.includes('list-unsubscribe-post'), 'both are signed, as Gmail asks');
+  const signin = compose('Archipelago <signin@example.com>', { to: 'rosa@acme.ca', subject: 'Your code', text: 'Hello' });
+  assert.ok(!signin.headers.some(([n]) => n.startsWith('List-')), 'a sign-in is not something to unsubscribe from');
+});
+
 test('relaxed body: spaces collapsed, trailing ones and empty last lines gone', () => {
   assert.equal(relaxedBody('a  b \r\nc\t\r\n\r\n\r\n'), 'a b\r\nc\r\n');
   assert.equal(relaxedBody('\r\n\r\n'), '');

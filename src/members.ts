@@ -196,11 +196,10 @@ export const signedIn = async (db: Q, workspace: string, member: Member) =>
   (await createToken(db, workspace, { kind: 'human', name: member.email, entity: member.person_id, admin: member.admin, expires_days: SIGNED_IN_DAYS })).token;
 
 /**
- * Someone asks to sign in at an address: one mail, with a link and a code for each workspace it is a member of, or,
- * to an address in none, where to begin one (start) if this server offers that. Nothing is said back either way, so
- * the page cannot be used to learn who is a member where.
+ * Someone asks to sign in at an address: one mail, with a code for each workspace it is a member of, and to an address
+ * in none, nothing. Nothing is said back either way, so the page cannot be used to learn who is a member where.
  */
-export async function requestSignIn(workspaces: { id: string; name: string; db: () => Promise<Q> }[], email: string, origin: string = site.origin, start?: string): Promise<void> {
+export async function requestSignIn(workspaces: { id: string; name: string; db: () => Promise<Q> }[], email: string): Promise<void> {
   const links: string[] = [];
   for (const ws of workspaces) {
     const db = await ws.db();
@@ -209,20 +208,9 @@ export async function requestSignIn(workspaces: { id: string; name: string; db: 
     // A code, never a link: a mail from a young domain that carries a sign-in link reads to spam filters as phishing.
     links.push(`${ws.name}: ${await codeFor(db, email, ms)}`);
   }
-  if (!links.length) {
-    if (!start) return;
-    return sendMail({
-      to: email,
-      subject: 'Signing in to Archipelago',
-      text: [
-        'Hello,',
-        'Someone asked to sign in to Archipelago at this address, and it has no workspace here yet.',
-        `To start one, open this link: ${start}`,
-        'If you meant another address, ask again with that one. If you did not ask, you can ignore this email.',
-        '- Archipelago',
-      ].join('\n\n'),
-    });
-  }
+  // An address in no workspace is sent nothing: anyone can type one, and mail its owner never asked for is marked as
+  // spam, which costs every mail after it. The page offers Start a workspace after asking, the same for everyone.
+  if (!links.length) return;
   await sendMail({
     to: email,
     subject: 'Your Archipelago sign-in code',
