@@ -116,6 +116,8 @@ export async function sessionStart(
 async function newRun(l: Archipelago, actor: Actor, input: SessionSaid, task: Entity | undefined, repo: Entity | null | undefined, parent?: Entity) {
   const props: Record<string, unknown> = { last_seen: now(), active: stretch([], now(), 'at') };
   for (const k of ['surface', 'cwd', 'session_id', 'branch'] as const) if (input[k]) props[k] = input[k];
+  // The packs it ran under, each by version and the hash of its manifest, so a measure can tell the harness's versions apart.
+  props.packs = l.registry.packs.map((p) => ({ id: p.id, version: p.version, manifest: l.registry.hashes.get(p.id) ?? null }));
   // Its word is its hue's key, never shown (src/session-name.ts).
   const name = await mintName(l);
   if (name) props.name = name;

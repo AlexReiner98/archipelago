@@ -117,6 +117,7 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
   // else started may only propose. The run says who. (With tokens off there is no identity to hold: everyone is the owner.)
   const key = at.auth ? await createToken(l.db, l.workspace, { kind: 'agent', name: `launched:${run}`, expires_days: 1, entity: l.viewer || undefined, ...(started && { may: 'propose' as const }) }) : undefined;
   if (started) await l.apply(actorId(agent), { ops: [{ op: 'update', id: run, props: { started_by: started } }], reason: `Started by ${started.name}` });
+  if (at.model) await l.apply(actorId(agent), { ops: [{ op: 'update', id: run, props: { model: at.model } }], reason: `Runs on ${at.model}` });
   const mcpFile = join(at.dir, `${run}.mcp.json`);
   writeFileSync(mcpFile, JSON.stringify({ mcpServers: { pelago: { type: 'http', url: at.mcpUrl, ...(key && { headers: { Authorization: `Bearer ${key.token}` } }) } } }));
   const transcript = join(at.dir, `${run}.jsonl`);
