@@ -56,7 +56,7 @@ test("a run's state and line move as its events arrive", async () => {
   s = await sessionState(l, run, at(4));
   assert.deepEqual([s?.state, s?.line], ['working', 'The lane waits on its owner now.']);
   // A rule's ask at the reply's end is kept in the story too, and is never the line.
-  await tell(l, { kind: 'agent', name: 'core' }, { run, said: 'This reply worked and put nothing on the map.', asked: 'core.record_findings' });
+  await tell(l, { kind: 'agent', name: 'core' }, { run, said: 'This reply worked and put nothing on the map.', asked: 'practice.record_findings' });
   assert.equal((await sessionState(l, run, at(4)))?.line, 'The lane waits on its owner now.');
 
   // It ends on a question: your move, its line the question.

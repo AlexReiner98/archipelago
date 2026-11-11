@@ -297,7 +297,7 @@ style, action or layout, by its id or with `core.` renamed to its own prefix)
 is added, once, to a map whose log keeps a manifest of core that declared it,
 so moving something out of core changes nothing a map does
 (`src/pack-moved.ts`; the core audit, e_sjhbyf52: the `findings` pack first,
-then `sessions`). A view or preset may keep its `core.` id in the pack it
+then `sessions` and `practice`). A view or preset may keep its `core.` id in the pack it
 moved to, so what names it (an owner's kept version) still does
 (`keptFromKernel`, `src/packorder.ts`).
 A map made after the move starts with it only when the server names it. Taking a

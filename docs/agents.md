@@ -49,11 +49,11 @@ change: `judge` skips it, and what applies or waits stays the other rules'
 An answer about several items, or how they relate, order or stand, is a
 view opened with `report` action `show`, with one line in chat; a yes, a
 number or one item is a line in chat. It is said at session start
-(`core.draw_answers`, an instruction) and checked by core's reply rule
+(`practice.draw_answers`, an instruction of the practice pack) and checked by its reply rule
 `draw_answers`, lifted by `reply_draw_answers`: a reply that surveyed the
 map and changed, edited, committed and showed nothing is asked once to draw
 it.
-- `test/replies.test.ts`: "core asks a reply that answered from the map and
+- `test/replies.test.ts`: "practice asks a reply that answered from the map and
   drew nothing to draw it, and the owner can turn that off"; "the
   session-start text tells an agent to answer the owner with a drawing".
 
@@ -62,7 +62,7 @@ The map, not the chat, is the record of a session's work: each thing an
 agent concludes (a cause, a finding, a choice and why) is a beat told with
 `report` action `tell`, and each item it settles is changed. The session
 start leads with it (`core.report_in`, in the sessions pack, split out of
-core with its id), and core's reply rule
+core with its id), and the practice pack's reply rule
 `record_findings`, lifted by `reply_record_findings`, asks a reply that
 called other tools at least six times (`worked`) and neither told nor
 changed anything (a note updated is as much a record as a new one: the
@@ -147,7 +147,8 @@ SessionStart's `source` and SessionEnd's `reason`.
 ### In `packs/`
 | Pack | What it adds |
 | --- | --- |
-| `core` | the `instruction` type and its presets; the reply rules `draw_answers` and `record_findings` |
+| `core` | the `instruction` type and its presets |
+| `practice` | the working-rules instructions (`practice.map_true`, `names`, `search_first`, `plan_flow`, `waits_on`) and `practice.draw_answers`; the rules `settle_why` and `views_said`; the reply rules `draw_answers` and `record_findings` |
 | `software` | the instructions `build_first` (lay a build out as items and have the owner agree it before the first edit) and `drawing_on_map` (a drawing is a style on the map), and the guide `guide:style_code` |
 | `github` | `account.js`: the check on main, answered from the map |
 | `github_app` | `checks.js`: posts the check, keeps it while red, asks again each minute |
@@ -159,7 +160,8 @@ SessionStart's `source` and SessionEnd's `reason`.
    waits, answers to confirm, then `instructionsFor('session_start')` with `{run}` filled in.
 3. The rules file (`.claude/pelago.md`) is the frame in
    `examples/working-rules.md` with each `working_rules` preset as one
-   bullet, handed out by `src/connect.ts`.
+   bullet, of every pack the server turns on (`serverPacks`; a plugin ships
+   every pack's), handed out by `src/connect.ts`.
 
 ## How a reply is checked
 1. At each turn's end the stop hook reads the transcript since the owner's
