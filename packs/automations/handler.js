@@ -1,0 +1,15 @@
+// Automations: told by the kernel's clock that an item came due (src/due.ts), it reads the item and, when it is an
+// enabled automation, what it is about, and answers what it does. The kernel only keeps time; this pack acts.
+
+import { answerDue } from './fire.js';
+
+export default {
+  'item.due': async ({ event }, ctx) => {
+    const id = event?.target;
+    if (typeof id !== 'string' || !id) return {};
+    const item = await ctx.read({ get: id });
+    if (!item || !(item.is ?? []).includes('automation')) return {};
+    const about = await ctx.read({ related: id, relation: 'about', direction: 'out' });
+    return answerDue(item, Array.isArray(about) ? about[0]?.id : undefined);
+  },
+};

@@ -87,11 +87,11 @@ test('automations fire on a schedule and on events, are logged, and cannot trigg
   const at = (h: number, m = 0) => on("2030-01-07", h, m);
   const fired = async (when: Date) => (await autos.tick(when)).map((f) => f.automation).sort();
 
-  assert.deepEqual(await fired(at(8)), [made.hourly], 'interval fires at once; daily waits for its time; events start from now');
+  assert.deepEqual(await fired(at(8)), [made.hourly], 'interval fires at once; events start from now');
   assert.deepEqual(await fired(at(8, 30)), []);
-  assert.deepEqual(await fired(at(9, 1)), [made.hourly, made.morning].sort());
-  assert.deepEqual(await fired(at(9, 30)), [], 'daily fires once a day');
-  assert.deepEqual(await fired(on("2030-01-08", 9)), [made.hourly, made.morning].sort());
+  assert.deepEqual(await fired(at(9, 1)), [made.hourly], 'a time of day comes due by the clock now (test/weekly-trigger.test.ts)');
+  assert.deepEqual(await fired(at(9, 30)), []);
+  assert.deepEqual(await fired(on("2030-01-08", 9)), [made.hourly]);
 
   await l.change(human, { reason: 'Found a bug', ops: [{ op: 'create', type: 'task', title: 'Crash' }] });
   assert.deepEqual(await fired(on("2030-01-08", 9, 5)), [made.review]);
