@@ -14,7 +14,8 @@ export interface Bound {
 /** The days a thing repeats on, and the hours it holds on each: the fields that say so. */
 export interface Repeat {
   from: string;
-  to: string;
+  /** When it ends on each day; without it, each occurrence is a moment (a reminder at 08:00). */
+  to?: string;
   days?: string;
   starts?: string;
   until?: string;
@@ -132,7 +133,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     has('when.end', when.end, DATES);
     if (when.repeat) {
       const r = when.repeat;
-      for (const key of ['from', 'to'] as const) if (!r[key]) problems.push(`when.repeat needs ${key}`);
+      if (!r.from) problems.push('when.repeat needs from');
       for (const key of ['from', 'to'] as const) has(`when.repeat.${key}`, r[key], ['string']);
       for (const key of ['starts', 'until'] as const) has(`when.repeat.${key}`, r[key], ['date']);
       for (const key of ['days', 'skip', 'moved', 'done'] as const) has(`when.repeat.${key}`, r[key], ['json']);
@@ -209,6 +210,7 @@ export function occurs(repeat: Repeat, p: Record<string, unknown>, day: string, 
   if (list(repeat.skip)?.includes(day) || list(repeat.done)?.includes(day)) return undefined;
   const all = repeat.moved ? p[repeat.moved] : undefined;
   const moved = all && typeof all === 'object' ? (all as Record<string, unknown>)[day] : undefined;
-  const [a, b] = Array.isArray(moved) ? moved.map(clockHours) : [clockHours(p[repeat.from]), clockHours(p[repeat.to])];
-  return a !== undefined && b !== undefined && b > a ? [a, b] : undefined;
+  const [a, b] = Array.isArray(moved) ? moved.map(clockHours) : [clockHours(p[repeat.from]), repeat.to === undefined ? clockHours(p[repeat.from]) : clockHours(p[repeat.to])];
+  // A repeat with no end is a moment each day it falls on; one with an end holds from one hour to a later one.
+  return a !== undefined && b !== undefined && (b > a || (repeat.to === undefined && b === a)) ? [a, b] : undefined;
 }

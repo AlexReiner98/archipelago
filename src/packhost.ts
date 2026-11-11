@@ -236,11 +236,12 @@ export class PackHost {
   }
 
   /**
-   * Tell the packs that hear a kind of event that another pack recorded one, each at its entry of that name, as
+   * Tell the packs that hear a kind of event that another pack recorded one (or the kernel's clock, from "kernel": an
+   * item.due, src/due.ts), each at its entry of that name, as
    * itself. Not waited for: what records it (a webhook) answers its sender now. What each answers is applied like
    * any of its calls; it may only read beyond the map.
    */
-  private tell(l: Archipelago, from: string, e: NonNullable<Done['log']>[number]): void {
+  tell(l: Archipelago, from: string, e: NonNullable<Done['log']>[number]): void {
     for (const pack of l.registry.packs) {
       const hears = pack.id !== from && parts(pack).hears.find((h) => h.event === e.action);
       if (!hears) continue;
