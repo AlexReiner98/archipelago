@@ -8,13 +8,14 @@
 // in, the picture's data (src/query-saved.ts) with nothing private in it and nothing that names a person or a session.
 
 import { authorityOf } from './authority.ts';
-import { layoutFor } from './layouts.ts';
 import { headOf } from './log.ts';
 import { notify } from './notify.ts';
 import { actorId, type Actor, type Archipelago, type Authority } from './pelago.ts';
 import { draftDocument, finishedStatuses, publicDocument, readable } from './public-document.ts';
 import { picturesOf } from './published-pictures.ts';
 import { republished } from './published-live.ts';
+import { drawingsGiven, keepPublicView } from './public-view-store.ts';
+
 import { mayDo } from './rules.ts';
 import { pageLook } from './styles.ts';
 import { logged } from './logged.ts';
@@ -27,7 +28,7 @@ export { gist, picturesOf } from './published-pictures.ts';
  * sections it holds that are shared, the rest only by name and state), and for each lens among them its picture,
  * with nothing private in it.
  */
-async function freeze(l: Archipelago, id: string, draft = false) {
+export async function freezeDocument(l: Archipelago, id: string, draft = false) {
   // The other documents published here, which it may name by id and a reader then opens at their own pages.
   const { rows: others } = await l.db.query<{ id: string; title: string; path: string | null }>(
     `select e.id, e.title, p.path from published p join entity e on e.id = p.entity_id
@@ -55,7 +56,7 @@ export async function wouldPublish(l: Archipelago, id: string) {
   const doc = ID.test(id) ? await l.entity(id) : null;
   if (!doc || !readable(l).includes(doc.type)) throw new Error(`"${id}" is not a document that can be public.`);
   if (doc.private_to) throw new Error(`"${doc.title}" is private: share it, and its preview shows it as it would be published.`);
-  const given = await freeze(l, id, doc.visibility !== 'public');
+  const given = await freezeDocument(l, id, doc.visibility !== 'public');
   // A draft at an address takes it from what is published there: it is what publishing would put there.
   const drafts = await draftPaths(l, given.parts), taken = new Set(Object.values(drafts));
   const published = ('paths' in given ? given.paths : {}) as Record<string, string>;
@@ -75,7 +76,7 @@ async function draftPaths(l: Archipelago, parts: unknown) {
 
 /** An address word: lowercase letters and digits, words joined by single dashes. */
 export const PATH = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-const pathOf = (value: unknown) => {
+export const pathOf = (value: unknown) => {
   if (value == null || value === '') return null;
   if (typeof value !== 'string' || !PATH.test(value) || value.length > 60) throw new Error(`"${value}" cannot be an address: use lowercase letters, digits and single dashes, such as how-it-works.`);
   return value;
@@ -107,10 +108,13 @@ export async function publish(l: Archipelago, actor: Actor, id: string, said?: S
   pathOf(doc.props.path);
   if (doc.visibility !== 'public') await l.apply(actorId(actor), { ops: [{ op: 'update', id, visibility: 'public' }], reason: 'Published, for anyone to read' }, { authority });
   // Drawn as the map's styles stand now (src/styles.ts, pageLook), kept with it until it is published again.
-  const frozen = await freeze(l, id);
+  const frozen = await freezeDocument(l, id);
   const given = { ...frozen, style_at: (await headOf(l.db)).pos, look: await pageLook(l, { ...frozen, id }) };
   if (given.path) {
-    const { rows } = await l.db.query<{ title: string }>(`select given ->> 'title' as title from published where path = $1 and entity_id <> $2`, [given.path, id]);
+    const { rows } = await l.db.query<{ title: string }>(
+      `select given ->> 'title' as title from published where path = $1 and entity_id <> $2 union all select given ->> 'title' from public_view where path = $1 and entity_id <> $2`,
+      [given.path, id],
+    );
     if (rows[0]) throw new Error(`"${rows[0].title}" is already published at /${given.path}: give this one another path.`);
   }
   const by = actor.person ?? actorId(actor);
@@ -120,6 +124,8 @@ export async function publish(l: Archipelago, actor: Actor, id: string, said?: S
        on conflict (entity_id) do update set given = excluded.given, published_by = excluded.published_by, path = excluded.path, menu = excluded.menu, published_at = now()`,
       [id, l.workspace, JSON.stringify(given), by, given.path, given.menu],
     );
+    // What a reader is given is its public view (src/public-view.ts): publishing a document shares it as it stands.
+    await keepPublicView(tx, l.workspace, id, given, by);
     await l.log(tx, { actor: actorId(actor), action: 'document.publish', target: id, reason: 'Published as it stands', detail: { sections: given.sections.length, lenses: Object.keys(given.lenses).length, authority } });
   });
   // A page open on it with ?live draws it anew.
@@ -133,6 +139,7 @@ export async function unpublish(l: Archipelago, actor: Actor, id: string) {
   if (!doc) throw new Error(`No item "${id}".`);
   await l.db.transaction(async (tx) => {
     await tx.query(`delete from published where entity_id = $1`, [id]);
+    await tx.query(`delete from public_view where entity_id = $1`, [id]);
     await l.log(tx, { actor: actorId(actor), action: 'document.unpublish', target: id, reason: 'No longer published' });
   });
   if (doc.visibility === 'public') await l.apply(actorId(actor), { ops: [{ op: 'update', id, visibility: 'shared' }], reason: 'No longer published' });
@@ -146,7 +153,7 @@ export async function publishedState(l: Archipelago, id: string) {
   if (item && (!readable(l).includes(item.type) || item.private_to || item.visibility === 'private')) return { published: false, publishable: false };
   const { rows } = await l.db.query<{ given: Record<string, unknown>; published_by: string; published_at: Date }>(`select given, published_by, published_at from published where entity_id = $1`, [id]);
   if (!rows[0]) return { published: false };
-  const now = await freeze(l, id).catch(logged(`published ${id}: its draft could not be frozen to compare, so it reads as changed`, null));
+  const now = await freezeDocument(l, id).catch(logged(`published ${id}: its draft could not be frozen to compare, so it reads as changed`, null));
   const { style_at: _, look: _look, ...given } = rows[0].given;
   return { published: true, at: rows[0].published_at, by: rows[0].published_by, changed: !now || !same(now, given) };
 }
@@ -164,27 +171,9 @@ export async function publishedDocument(l: Archipelago, id: string) {
  * published with.
  */
 function withDrawings(l: Archipelago, doc: Record<string, unknown> | null) {
-  const lenses = doc?.lenses as Record<string, Frozen> | undefined;
+  const lenses = doc?.lenses as Record<string, { style?: Record<string, unknown> }> | undefined;
   if (!doc || !lenses) return doc;
   return { ...doc, lenses: drawingsGiven(l, lenses) };
-}
-
-type Frozen = { lens?: { time?: unknown }; style?: Record<string, unknown> };
-
-/**
- * Each picture with a drawing: its own, or the pack's for its shape, or the flow's. A link's page reads them the same
- * way (src/share-view.ts), so a view whose style names no drawing (a new map's) is drawn there too.
- */
-export function drawingsGiven<T extends Frozen>(l: Archipelago, lenses: Record<string, T>): Record<string, T> {
-  return Object.fromEntries(
-    Object.entries(lenses).map(([id, frozen]) => {
-      const style = frozen.style ?? {};
-      // One drawn by a layout's code is drawn by its shape's drawing here, as the page drew it by its shape before.
-      if (style.drawing) return [id, frozen];
-      const drawing = layoutFor(l.registry, { shape: style.shape }, []);
-      return [id, drawing ? { ...frozen, style: { ...style, shape: drawing.shape, drawing } } : frozen];
-    }),
-  );
 }
 
 /** The figure of one section a published document holds, or null. */

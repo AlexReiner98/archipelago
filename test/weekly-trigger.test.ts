@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { checkAutomation, weekdays } from '../src/automation-rules.ts';
 import { Automations } from '../src/automations.ts';
+import { dayStart } from '../src/timeaxis.ts';
 import { fresh, make } from './map.ts';
 
 test('a weekly trigger names its days and fires once on each, at its time', async () => {
@@ -18,10 +19,11 @@ test('a weekly trigger names its days and fires once on each, at its time', asyn
   const made = await make(l, [{ op: 'create', ref: 'w', type: 'automation', title: 'Weekly posting', status: 'enabled', props: { trigger: 'weekly', days: ['monday'], at: '09:00', action: 'notify' } }]);
   const autos = new Automations(l);
   const fired = async (when: Date) => (await autos.tick(when)).map((f) => f.automation);
-  // 2 Nov 2026 is a Monday.
-  assert.deepEqual(await fired(new Date(2026, 10, 2, 8, 59)), [], 'not before its time');
-  assert.deepEqual(await fired(new Date(2026, 10, 2, 9, 0)), [made.w]);
-  assert.deepEqual(await fired(new Date(2026, 10, 2, 15, 0)), [], 'once on its day');
-  assert.deepEqual(await fired(new Date(2026, 10, 3, 9, 0)), [], 'not on a Tuesday');
-  assert.deepEqual(await fired(new Date(2026, 10, 9, 9, 30)), [made.w], 'and again the next Monday');
+  // 7 Jan 2030 is a Monday, after anything the test makes; times are in Toronto, the workspace zone.
+  const at = (day: string, h: number, m = 0) => new Date(dayStart(day, 'America/Toronto') + (h * 60 + m) * 60_000);
+  assert.deepEqual(await fired(at('2030-01-07', 8, 59)), [], 'not before its time');
+  assert.deepEqual(await fired(at('2030-01-07', 9)), [made.w]);
+  assert.deepEqual(await fired(at('2030-01-07', 15)), [], 'once on its day');
+  assert.deepEqual(await fired(at('2030-01-08', 9)), [], 'not on a Tuesday');
+  assert.deepEqual(await fired(at('2030-01-14', 9, 30)), [made.w], 'and again the next Monday');
 });

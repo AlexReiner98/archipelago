@@ -11,6 +11,7 @@ import { instructionsFor } from './instructions.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { resolveRun, sessionEnd, sessionStart } from './sessions.ts';
 import { HOOK_ACTOR } from './chat-run.ts';
+import { itemLink } from './members.ts';
 
 /** What may be held, as a read names it: the types with a capacity, the fields those say it in (a place that says nothing of it is no resource), and whether one says it as a number, so every item of it may be. */
 const holdableBy = (l: Archipelago) => {
@@ -28,6 +29,7 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   const said = { source: typeof input.source === 'string' ? input.source : undefined, title: typeof input.title === 'string' ? input.title : undefined, parent: typeof input.parent === 'string' && input.parent && (await resolveRun(l, input.parent)) ? input.parent : undefined };
   const started = await sessionStart(l, HOOK_ACTOR, { session_id: input.session_id, cwd: input.cwd, remote: typeof input.remote === 'string' ? input.remote : undefined, surface: 'claude-code', ...said });
   const lines = [`This session is registered in Archipelago, the owner's map of work and dependencies, as run ${started.run}, called "${(await l.entity(started.run))?.title}" after this chat, on the workspace "${started.workspace.name}" (${started.workspace.id}).`];
+  lines.push(`Name an item to a person as [its name](${itemLink(started.workspace.id)}), never a bare id; ids stay in tool calls.`);
   const repo = 'repo' in started ? started.repo : undefined;
   if (repo) lines.push(`Repository: ${repo.title} (${repo.id}).`);
   // Where this session stands, on any map: the open items the sessions before it here worked on, each with why it

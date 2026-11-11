@@ -29,11 +29,11 @@ export const SERVER_ACTS = [
   'site.visits',
   // On a workspace whose admin connected the pack (src/server-connect.ts).
   'begun.get', 'begun.take', 'connection.make', 'connection.get', 'connection.drop', 'workspace.add', 'workspace.deliver',
-  // What a person published, and nothing else: read through the security-definer reads, as anyone (src/server-published.ts).
-  'published.read', 'published.at', 'published.picture', 'published.drawing', 'site.pages',
+  // What a person made public, and nothing else: read through the security-definer reads, as anyone (src/server-published.ts).
+  'public.read', 'public.at', 'public.picture', 'public.drawing', 'public.list',
 ] as const;
 /** The acts answered in src/server-published.ts. */
-export const PUBLISHED_ACTS: readonly ServerAct[] = ['published.read', 'published.at', 'published.picture', 'published.drawing', 'site.pages'];
+export const PUBLIC_ACTS: readonly ServerAct[] = ['public.read', 'public.at', 'public.picture', 'public.drawing', 'public.list'];
 export type ServerAct = (typeof SERVER_ACTS)[number];
 
 const ID = /^[a-z][a-z0-9_]{0,39}$/;

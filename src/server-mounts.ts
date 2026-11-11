@@ -12,7 +12,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ICON } from './icon.ts';
 import { GUARD, POLICY, READER_POLICY } from './public-document.ts';
-import { publishedDocument } from './published.ts';
+import { publicView } from './public-view-store.ts';
 import { listenForPack } from './published-live.ts';
 import { json } from './reply.ts';
 import type { ActPlaces } from './server-acts.ts';
@@ -134,7 +134,7 @@ export async function sendPage(res: ServerResponse, answer: unknown, at: Sent = 
     // The kernel's own stream of a document published on this workspace, read as anyone reads it: nothing the pack holds.
     const id = typeof a.id === 'string' ? a.id : at.id;
     const ws = at.workspace;
-    const found = Boolean(id && ws && at.pack && at.workspaces && (await at.workspaces.has(ws).catch(() => false)) && (await publishedDocument((await at.workspaces.get(ws)).pelago, id)));
+    const found = Boolean(id && ws && at.pack && at.workspaces && (await at.workspaces.has(ws).catch(() => false)) && (await publicView((await at.workspaces.get(ws)).pelago, id)));
     if (!found) return (json(res, 404, { error: 'Not found' }, GUARD), true);
     listenForPack(res, at.pack!, ws!, id!, GUARD, at.from);
     return true;

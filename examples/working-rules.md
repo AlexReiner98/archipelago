@@ -37,6 +37,8 @@ actions; `query` with name `actions` gives their inputs whole.
   about, and the ties between them you want seen. The owner reads the beats
   on your session's page beside a drawing of those items. Tell what matters,
   not every step; take a beat back with `replaces` when you change your mind.
+- **Name an item to a person as [its name](link),** never a bare id; ids stay
+  in tool calls. `link` is the pattern the session start answers with.
 <!-- working_rules: the setup puts the instruction presets said here, one bullet each -->
 - **Give a hub its views.** An item that holds a lot is the hub of its
   problem, and the owner reads it through its views: each a `lens` item

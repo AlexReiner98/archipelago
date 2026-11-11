@@ -5,6 +5,7 @@
 import { join } from 'node:path';
 import { z } from 'zod';
 import type { ActionDef } from './declared.ts';
+import { onNotificationMade } from './notify.ts';
 import { PackHost, type Check } from './packhost.ts';
 import type { Registry } from './packs.ts';
 import type { Actor, Archipelago } from './pelago.ts';
@@ -17,6 +18,9 @@ export function hostFor(reg: Registry): PackHost {
   if (!host) hosts.set(reg, (host = new PackHost((pack) => reg.folderOf(pack))));
   return host;
 }
+
+// A notification made is told to the packs that hear it, as the kernel's event: a channel pack carries it to its person.
+onNotificationMade((l, e) => hostFor(l.registry).tell(l, 'kernel', e));
 
 /** A tool as the MCP server and callTool need it. */
 export interface PackTool {

@@ -23,7 +23,7 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `rules` | What decides a write (`src/rules.ts`), and what asks an agent to go on when its reply ends (`on: "reply_ended"`, `src/reply-rules.ts`). |
 | `views` | Reads (a `shape` or a `lens`), trees (`form: "tree"`), screens on an item's page (`form: "screen"`; what a pack shows of one item is a lens preset `on` its type instead, under `styles`; a piece `button` stands in the page's head beside Walk from it, its `label` and `tip` with what it does: the pack's `action`, or `draw`, how the canvas up is drawn, "{here}" being the item), and reasons attention gives (`form: "attention"`: items `of` a type whose fields hold `where`'s values, weighed with the kernel's reason it `joins`). |
 | `actions` | What people and agents can do through it, each under a verb. Core's six verbs are its actions marked `kernel`. |
-| `handlers` | Code run by itself: `{ event }`, `{ schedule, every_minutes, at_start }` or `{ webhook, records }`. |
+| `handlers` | Code run by itself: `{ event }`, `{ schedule, every_minutes, at_start }` or `{ webhook, records }`. An event is one another pack records, or the kernel's: `notification.made`, whose hearer may answer one `mail` about that notification, sent by the kernel to the person it is for at the address they sign in with, never one the pack names (`src/notify-mail.ts`; the `email` pack). `{ event: "item.due" }` hears the kernel's clock: each occurrence of an item whose type has `when` (a moment, or a repeat's hour on its days, in the workspace's zone), with the item as `target` and its `type` and `at` in `detail` (`src/due.ts`). |
 | `layouts`, `styles` | The code views are drawn by, and the presets of the map's own configuration: how things look, and (an entry with `type: "instruction"`, its words in `body`) what agents are told (`src/instructions.ts`), and (an entry with `type: "lens"`, its props a flat query and a style: `filter`, `walk`, `limit`, `style`) a view the pack ships, listed in the bar's picker and on Home until the owner saves their own version of it (`props.preset`); one `on` types, its query naming the item as `{here}`, is a view of each such item (a project's roadmap, an event's gate), offered on that item's page and drawn on the canvas (decision e_2mndpgdj: what a pack shows of an item is a view, not a screen). A style preset on nothing is used on every page; with `over: "workspace"` it lies over the workspace's own style; with `over: "chosen"` (a theme) only once the owner keeps a version of it. |
 | `reach` | What it may reach beyond the map: `hosts`, `secrets`, `webhooks`, `via`, and `server`. |
 | `shared` | Core's alone: the shared set, the type ids every pack on an island map may build on (below). |
@@ -42,7 +42,7 @@ on load in `src/server-reach.ts` and acted on by the kernel alone:
 
 | Key | What the kernel does |
 |---|---|
-| `mounts` | Hands it an address from a closed list (decision e_wptrr6tf): `public` (`/p/`), `site` (a domain's whole space), `setup` (`/connect/setup.mjs`), each to at most one pack (`src/server-mounts.ts`). `/s/` stays the kernel's. Its entry answers a page, JSON, a picture, plain text or XML, a redirect on this server, the kernel's stream of a published document, or `pass` (the kernel answers). The open core's own reader (`packs/reader`) takes `public` and `site`; a pack the configuration names in its place replaces it. |
+| `mounts` | Hands it an address from a closed list (decision e_wptrr6tf): `public` (`/p/`), `site` (a domain's whole space), `setup` (`/connect/setup.mjs`), each to at most one pack (`src/server-mounts.ts`). Its entry answers a page, JSON, a picture, plain text or XML, a redirect on this server, the kernel's stream of a published document, or `pass` (the kernel answers). The open core's own reader (`packs/reader`) takes `public` and `site`; a pack the configuration names in its place replaces it. |
 | entries' `answers: "html"` | Sends what the entry answers as a page, with headers and policy the kernel sets (`src/server-routes.ts`). |
 | `counts` | Names the stream on a public site's map its counts are kept in (a plain word no kernel stream has, one pack's alone): it adds to a key's day with the act `count.add`, and a pack reads them back after a position with `count.read` (`src/pack-counts.ts`). How many, never of whom. The reader counts its visits so, in `visits`, kept by core's rule `counts:visits`. The entry of a `public` or `site` mount is handed what the request said too (`request`: query, host, referrer, agent, purpose), to read and forget. |
 | `streams` | Holds a stream at `/x/<pack>/<id>/<workspace>/<id>` and tells it when that document is `published` again (`src/server-streams.ts`). |
@@ -50,9 +50,10 @@ on load in `src/server-reach.ts` and acted on by the kernel alone:
 | `launchers` | Starts an agent with its argv (no shell; `{prompt}`, `{mcp_config}`, `{tools}`, `{model}`, `{mode}`, `{session_id}`), holding its token, when a person launches and the server's launch setting names the pack (PELAGO_LAUNCH_PACK; by default `claude_code`, which the open core ships in `packs/claude_code` with the Claude Code adapter and setup) (decision e_885ztqkv, `src/server-launch.ts`). |
 | `adapter` | Translates one surface's hooks, at `/hooks/<surface>/<event>`, with two functions of its handler, `in` and `out`; what a session is told stays the kernel's (decision e_6t8f46u6, `src/server-adapter.ts`). |
 
-Acts `published.read`, `published.at`, `published.picture`, `published.drawing`
-and `site.pages` read what a person published, through the security-definer
-reads alone (`src/server-published.ts`). A server pack still reads no map.
+Acts `public.read`, `public.at`, `public.picture`, `public.drawing` and
+`public.list` read the public views a person made (`src/public-view.ts`), each
+as it was frozen, through the security-definer reads alone
+(`src/server-published.ts`). A server pack still reads no map.
 
 ## The keys before
 
@@ -182,6 +183,17 @@ names (separated as `PATH` is): a pack kept off this repository, as the hosted
 service keeps the packs it sells, is a folder there. A pack is its id wherever
 it is found, so one moved between folders is the same pack to every
 workspace. The same id in two folders stops the server from starting.
+
+Which of them a workspace may have is the server's to say
+(`src/pack-allow.ts`). `PELAGO_ONLY_PACKS` (comma separated; `packs` in
+`pelago.config.json`) names the packs every workspace may have, core always
+among them; unset, every pack found. `PELAGO_WORKSPACE_PACKS`
+(`islands=canvas,code;site=work`; `workspacePacks`) names the packs one
+workspace alone may have beside them, so a pack is offered to one map before
+every map. A pack a workspace may not have is off there ("not enabled on this
+server"), and its owner cannot add it: its items stay, dormant, and its fact
+on the log is kept, so letting it in again brings it back as it was. A pack
+let in that the workspace never added is still off until its owner adds it.
 
 ## In time
 

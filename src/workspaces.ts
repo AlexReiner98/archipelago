@@ -12,6 +12,8 @@ import { restore, type Dump } from './backup.ts';
 import { indexWorkspace } from './control-index.ts';
 import { addLocalType, addWorkspace, claimControlValue, controlValue, importControlFiles, importLocalPack, listWorkspaces, localTypes, nameWorkspace, OPERATOR, OPERATOR_RESET, removeWorkspace, setControlValue, takeControlValue } from './control.ts';
 import { startSchedules, stopSchedules } from './hooks.ts';
+import { startClock, stopClock } from './due.ts';
+import { alertOwner } from './alert.ts';
 import { openDb, type Database } from './db.ts';
 import { databaseFor, dropDatabaseFor } from './pg.ts';
 import { Archipelago, type Policy } from './pelago.ts';
@@ -32,6 +34,7 @@ import { followMade, followPacks, islandsOn, packsOff, setIslands, syncPacks } f
 import { firstIsland } from './island-start.ts';
 import { hostFor } from './packtools.ts';
 import { syncTypes } from './typetable.ts';
+import { packsFor } from './pack-allow.ts';
 import { onPacksChanged, onTypesChanged, typeItems } from './type-items.ts';
 
 // The type table follows the types kept on the map as it follows the packs.
@@ -83,6 +86,8 @@ interface WorkspacesConfig {
   /** The folders packs are read from, packsDir first (src/config.ts); packsDir alone when left out. */
   packDirs?: string[];
   packs?: string[];
+  /** Packs one workspace may have beyond packs, by its id (src/pack-allow.ts). */
+  workspacePacks?: Record<string, string[]>;
   policy?: Partial<Policy>;
   /** Start each workspace's automation runner and schedules when it opens: while this process leads (lead). */
   runAutomations?: boolean;
@@ -254,7 +259,7 @@ export class Workspaces {
   }
 
   private async load(id: string, backup?: Dump): Promise<Workspace> {
-    const { dataDir, databaseUrl, rootDir, packsDir, packDirs, packs, policy } = this.config;
+    const { dataDir, databaseUrl, rootDir, packsDir, packDirs, packs, workspacePacks, policy } = this.config;
     const isDefault = id === DEFAULT_WORKSPACE;
     let db: Database;
     if (isDefault) db = await this.control();
@@ -268,7 +273,7 @@ export class Workspaces {
       if (backup) await indexWorkspace(await this.control(), id, db);
       // Types a workspace defines for itself are in its own database. Those kept in a folder before are taken in once.
       if (dataDir !== null) await importLocalPack(db, isDefault ? join(packsDir, LOCAL_PACK, 'pack.json') : join(rootDir, id, 'local-pack', 'pack.json'));
-      const registry = new Registry(packDirs ?? packsDir, packs, await localTypes<TypeDef>(db));
+      const registry = new Registry(packDirs ?? packsDir, packsFor(packs, workspacePacks, id), await localTypes<TypeDef>(db));
       registry.keepLocal = (def) => addLocalType(db, def);
       const pelago = new Archipelago(db, registry, policy, id);
       // Nothing on its log and nothing brought in: a new workspace, opened for the first time. Any other keeps what it has.
@@ -299,9 +304,11 @@ export class Workspaces {
   private clocks(ws: Workspace, on: boolean): void {
     ws.automations.stop();
     stopSchedules(ws.pelago.registry);
+    stopClock(ws.pelago);
     if (!on) return;
     startSchedules(ws.pelago);
     ws.automations.start();
+    startClock(ws.pelago, (err) => void alertOwner(ws.pelago, { key: 'clock', title: 'The clock failed', body: `A pass over what came due failed: ${err.message}`, from: 'pelago' }));
   }
 
   /**

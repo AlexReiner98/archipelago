@@ -122,3 +122,11 @@ test('a pack kept as an item may bring a look; on an island map a pack of looks 
   await setPack(isl, human, { pack: 'recipes', on: true });
   assert.equal(isl.registry.states.get('recipes')?.state, 'active', 'a pack of looks alone is a map pack');
 });
+
+test('a pack kept as an item is the owner’s to add on a server that lists its packs (src/pack-allow.ts)', async () => {
+  const l = await freshWith(new Registry(packsWith(), ['core', 'themes']));
+  await make(l, [recipes()]);
+  assert.equal(l.registry.states.get('recipes')?.state, 'off', 'off until the owner adds it, as on any server');
+  await setPack(l, human, { pack: 'recipes', on: true });
+  assert.equal(l.registry.states.get('recipes')?.state, 'active', 'the server’s list judges its own packs, never the map’s');
+});

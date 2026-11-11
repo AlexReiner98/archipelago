@@ -18,7 +18,7 @@ startTips();
 
 const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');
-// Opened from the app (/read/<id>), the page reads the document with the reader's own sign-in; from a link (/s/...), with the link;
+// Opened from the app (/read/<id>), the page reads the document with the reader's own sign-in;
 // made public (/p/<workspace>/<id>), as anyone. A preview (/preview/<id>) is drawn as the published page would be, from
 // what publishing it would give now (src/published-preview.ts), read with the reader's sign-in.
 const own = /^\/read\/(e_[a-z0-9]{8})$/.exec(here)?.[1];
@@ -29,14 +29,12 @@ const post = (at, input) =>
     throw err instanceof SignInNeeded ? new Error('Sign in to Archipelago in this browser first, then open this again.') : err;
   });
 const api = (tool, input) => post(`/api/${tool}`, input);
-/** One item a link shows, read through the link (src/share-view.ts, sharedItem). */
-const readItem = (id) =>
-  fetch(`${here}/data?item=${id}`).then(async (res) => {
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error ?? 'This item cannot be opened here.');
-    return body;
-  });
-/** A section's figure: from the link's own address, or fetched with the reader's sign-in. */
+/** One part of a public view's picture, as it was frozen: its name, kind, state and first line, and nothing more. */
+const frozenItem = (d) => (id) => {
+  const item = Object.values(d.lenses ?? {}).flatMap((lens) => lens.items ?? []).find((i) => i.id === id);
+  return item ? Promise.resolve({ item: { title: item.title, type: d.types?.[item.type] ?? item.type, status: item.status, body: item.gist ?? '' } }) : Promise.reject(new Error('This item cannot be opened here.'));
+};
+/** A section's figure: from the page's own address, or fetched with the reader's sign-in. */
 const figureSrc = (id) => (own || preview ? '' : `${here}/picture/${id}`);
 
 /** A control that copies code, in line with it, saying so until the pointer or the focus leaves. Where the browser refuses, the code is selected instead, to copy by hand. */
@@ -206,7 +204,7 @@ function draw(d) {
   away = new Map(Object.entries(d.links ?? {}));
   paths = d.paths ?? {};
   onSite = Boolean(d.site?.host);
-  // The section the style names for a link's picture (page.share) is shown where a link is posted, not on the page.
+  // The section the style names for a page's picture (page.share) is shown where its address is posted, not on the page.
   const sections = d.parts.filter((p) => p.section && p.section.id !== d.share);
   // A page is one column (ui/doc-lens.css). Only a front page whose first section is a figure leaves it: that figure runs from edge to edge, with no title over it (its title is its words).
   const hero = d.parts.find((p) => p.section)?.section;
@@ -253,21 +251,21 @@ function draw(d) {
     parts(),
     // A site's pages each end with what its footer page says (src/site.ts).
     d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, titles, 3)),
-    // A published page is read on the web: only a link's or an invoice's has a way to print it. One read with no login
-    // (a link's, a published one's, not one on its site's own domain) ends with a quiet way to start a map of one's own, in the style's words.
+    // A public page is read on the web: only an invoice's has a way to print it. One read with no login, not on its
+    // site's own domain, ends with a quiet way to start a map of one's own, in the style's words.
     ((!published && !d.site) || startsOwn(d)) && h('footer', { class: 'muted' }, !published && !d.site && h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF'), startsOwn(d) && startLink(d.start)),
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
   document.body.classList.toggle('invoice', d.head === 'invoice');
   // Its pictures, with the text: a drawing's first frame is kept with the picture, and the drawing takes it over once started.
-  // On a link's page, a part of a view opens its page, read only, in a sheet (ui/doc-sheet.js), read through the link.
-  const onItem = here.startsWith('/s/') ? (id) => openItem(id, readItem, (text) => blocks(text, titles, 3)) : null;
+  // On a public view, a part of a picture opens in a sheet, read only (ui/doc-sheet.js), as it was frozen.
+  const onItem = published || d.site ? (id) => openItem(id, frozenItem(d), (text) => blocks(text, titles, 3)) : null;
   for (const el of main.querySelectorAll('[data-lens]')) drawFrozen(el, d.lenses[el.dataset.lens], d.types, { onItem });
   // Read with the reader's sign-in, a figure is fetched the same way.
   if (own || preview) for (const img of main.querySelectorAll('img[data-figure]')) api('picture', { result: img.dataset.figure }).then((p) => p && (img.src = `data:${p.content_type};base64,${p.data}`), () => null);
 }
 
-// A published page carries its data (src/published-page.ts); a link's and a signed-in reader's page fetch it, and
+// A public page carries its data (src/published-page.ts); a signed-in reader's page fetches it, and
 // start the frame drawings run in while it is on its way (ui/layout.js).
 const given = document.getElementById('page-data');
 if (!given) warmLayouts();
@@ -279,7 +277,7 @@ if (!given) warmLayouts();
   ? Promise.all([api('document', { id: own, drawn: true }), api('view', { name: 'style', params: { of: own } })]).then(([d, { style: s }]) => ({ ...d, theme: s.theme, lengths: s.lengths, faces: s.faces, type: s.type, head: s.page?.head, share: s.page?.share }))
   : fetch(`${here}/data`).then(async (res) => {
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? 'This link does not open anything.');
+      if (!res.ok) throw new Error(body.error ?? 'This page does not open anything.');
       return body;
     })
 )

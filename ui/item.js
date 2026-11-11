@@ -2,11 +2,11 @@
 // holds, a section for each (ui/item-sections.js), under its title. What it is tied to is not on it: the canvas
 // behind draws that, with this item lit. Rare actions are in one menu; the page names no pack's type.
 
-import { api, ask, h, link, may, part, state, tell } from './base.js';
+import { api, ask, h, may, part, state, tell } from './base.js';
 import { drawIn, goQuery, openHere, queryNow } from './canvas.js';
 import { viewsOn } from './canvases.js';
 import { draftOf } from './draft.js';
-import { documentMenu, figureOf, readDocument, shareLinkOf } from './item-doc.js';
+import { documentMenu, figureOf, publicOf, readDocument, shareMenu } from './item-doc.js';
 import { heldBand, heldOn } from './item-held.js';
 import { readingOf } from './item-read.js';
 import { choicesOf } from './fields.js';
@@ -35,8 +35,7 @@ export async function entity(id, here) {
   const lookOf = api('view', { name: 'style', params: { of: id } }), heldHere = heldOn(id);
   lookOf.catch(() => null);
   try {
-    // A frozen link keeps no history: what it shows is as it was when shared.
-    [data, past] = await Promise.all([api('get', { id }), link ? [] : api('events', { target: id, limit: 40 })]);
+    [data, past] = await Promise.all([api('get', { id }), api('events', { target: id, limit: 40 })]);
   } catch (err) {
     return page.replaceChildren(h('div', { class: 'error' }, err.message));
   }
@@ -57,10 +56,12 @@ export async function entity(id, here) {
   const session = run && e.is_open && !e.archived_at;
   // Its owner; an item a screen reads whole, its text with the items it brings in, in their places (it can be printed
   // and shared); and what it holds that can be published (a site's project publishes all of it with one click).
-  const [owner, { doc, links }, plan] = await Promise.all([
+  const [owner, { doc }, plan, shared] = await Promise.all([
     e.owner ? api('get', { id: e.owner }).then((r) => r.entity, () => null) : null,
-    readWhole(e.type) ? readDocument(id) : { doc: null, links: [] },
+    readWhole(e.type) ? readDocument(id) : { doc: null },
     !e.archived_at && data.incoming.some((r) => rootOf(r.type) === 'part_of' && readWhole(r.entity_type)) ? api('publish_plan', { within: id }).catch(() => null) : null,
+    // Its public view, when a person shared it (src/public-view.ts).
+    publicOf(id),
   ]);
   // A document is read in public as it was last published: whether it is, and whether its draft says something else now.
   const shown = doc && type?.public ? await api('published', { id }).catch(() => null) : null;
@@ -181,11 +182,11 @@ export async function entity(id, here) {
         writes && session && h('button', { class: 'quiet-button', title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
         buttons[0] && h('button', { class: 'quiet-button item-button', title: buttons[0].tip, onclick: () => press(buttons[0]) }, buttons[0].label),
         writes && !e.archived_at && ties.any && h('button', { class: 'quiet-button link-start', title: 'Link it to another: click that one on the canvas (Esc lets it go)', onclick: () => startLink(e, (made) => made && again()) }, 'Link'),
-        !link && !e.archived_at && along.length > 0 && h('button', { class: 'quiet-button walk-from', title: `Draw it and what it links to, along ${walkSaid}, in place of the canvas's lens`, onclick: () => walkFrom(false) }, 'Walk from it'),
+        !e.archived_at && along.length > 0 && h('button', { class: 'quiet-button walk-from', title: `Draw it and what it links to, along ${walkSaid}, in place of the canvas's lens`, onclick: () => walkFrom(false) }, 'Walk from it'),
       menu('⋯', [
         ...buttons.slice(1).map((b) => [b.label, () => press(b)]),
         writes && !e.archived_at && ties.any && ['Link to one by name…', ties.open],
-        !link && !e.archived_at && along.length > 0 && ['Walk from it, added to the lens', () => walkFrom(true)],
+        !e.archived_at && along.length > 0 && ['Walk from it, added to the lens', () => walkFrom(true)],
         live && ['Still true as written', () => change([{ op: 'update', id }], 'Checked in the UI: still true as written')],
         // What packs offer to do with this kind of item.
         ...(e.archived_at || !writes ? [] : actionsFor(e.type).filter((tool) => !buttons.some((b) => b.action === tool.action)).map((tool) => [tool.title ?? tool.tool, () => act(tool)])),
@@ -219,8 +220,7 @@ export async function entity(id, here) {
           ],
         publishable && !shown && e.visibility === 'public' && ['Stop being public', () => change([{ op: 'update', id, visibility: 'private' }], 'No longer public, set in the UI')],
         e.visibility === 'public' && type?.public && (Boolean(type?.capabilities?.plannable) || shown?.published) && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
-        ...(doc ? documentMenu(e, links, page, again, writes) : []),
-        writes && !doc && !e.archived_at && ['Make a link to see it', shareLinkOf(e, page, false)],
+        ...(doc ? documentMenu(e, shared, again, writes) : shareMenu(e, shared, again, writes)),
         ['Copy id', () => navigator.clipboard.writeText(e.id)],
         writes && !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],
       ]),

@@ -1,10 +1,9 @@
-// Ways to read one document from outside: a link that lets someone with no login read it, made, listed and revoked by
-// the owner. Sharing with another workspace by its id was dropped (the owner, 10 Nov 2026): links and guests only.
+// Ways to read from outside the map: a public view anyone may open (src/public-view.ts), made, listed and taken down by
+// a person, and publishing a document. Links with a secret went with public views (the owner, 11 Nov 2026).
 
 import { z } from 'zod';
-import { createShare, listShares, readDocument, revokeShare } from './documents.ts';
-import { privateIn, shareable } from './share-view.ts';
-import { freeze } from './share-link.ts';
+import { readDocument } from './documents.ts';
+import { share, shareAsk, sharedViews, sharePlan, unshare } from './public-view.ts';
 import { picturesOf, publish, publishAll, publishAsk, publishedState, publishPlan, unpublish } from './published.ts';
 import type { Tool } from './tools.ts';
 
@@ -33,29 +32,31 @@ export const SHARE_TOOLS: Record<string, Tool> = {
     },
   },
   share_create: {
-    description: 'Make a link that lets someone with no login read one document and the items it brings in, or one view (a lens, drawn live as the workspace may see it) or one item: either is given as a document that brings it in alone, made about it the first time. What it shows is frozen as it is now, for the app opened from the link to read. The link is shown once.',
+    description: 'Make a view, a document or any item public as it stands now, frozen, at /p/<workspace>/<id> for anyone and for search engines (and at its path on its site, when it has one). What is private is left out; share_plan says what goes out first. Sharing it again replaces what is public. Only a person shares: an agent asks with the ask verb, action share_ask.',
     humanOnly: true,
-    input: { id: z.string().describe('The document, view or item.') },
-    // With the items it leaves out as private, so the page can ask whether to share them.
-    run: async (l, actor, input) => ({ ...(await createShare(l, actor, await shareable(l, actor, input.id), await freeze(l, input.id))), private: await privateIn(l, input.id) }),
+    input: { id: z.string().describe('The view, document or item.') },
+    run: async (l, actor, input) => share(l, actor, input.id),
   },
-  share_private: {
-    description: 'What a link to a view, document or item would leave out because it is private, asked before the link is made: a link freezes what it shows.',
-    humanOnly: true,
-    input: { id: z.string().describe('The document, view or item.') },
-    run: (l, _actor, input) => privateIn(l, input.id),
+  share_plan: {
+    description: 'What making a view, document or item public would take out with it (goes), what it leaves out because it is private, and whether it is public already: asked before it is shared, since it is frozen when shared.',
+    input: { id: z.string().describe('The view, document or item.') },
+    run: (l, _actor, input) => sharePlan(l, input.id),
   },
   share_list: {
-    description: 'The links made to a document, standing ones first. Secrets are never shown.',
-    humanOnly: true,
-    input: { id: z.string().describe('The document.') },
-    run: async (l, _actor, input) => listShares(l, input.id),
+    description: 'Every public view of this workspace, newest first, or with id the one of that item: what it is of, its address, who shared it and when.',
+    input: { id: z.string().optional().describe('Only the public view of this item.') },
+    run: async (l, _actor, input) => sharedViews(l, input.id),
   },
   share_revoke: {
-    description: 'Stop a link to a document from working, at once.',
+    description: 'Take a public view down, at once: its address answers nothing, and the item itself is left as it is.',
     humanOnly: true,
-    input: { id: z.string().describe('The link, from share_list.') },
-    run: async (l, actor, input) => revokeShare(l, actor, input.id),
+    input: { id: z.string().describe('The item whose public view to take down.') },
+    run: async (l, actor, input) => unshare(l, actor, input.id),
+  },
+  share_ask: {
+    description: 'Ask the person to make a view, document or item public: they are notified about it, and share it from its page. Sharing is theirs; this never shares.',
+    input: { id: z.string().describe('The view, document or item.'), reason: z.string().optional().describe('Why, in a sentence.') },
+    run: async (l, actor, input) => shareAsk(l, actor, input.id, input.reason),
   },
   publish: {
     description: 'Publish a document as it stands: it becomes public, and what anyone reads at its address (/p/<workspace>/<id>) is this, frozen, until it is published again. Its lenses are kept as views a reader can explore. An agent may publish only where the owner allows it (agent_publish); elsewhere ask with the ask verb, action publish_ask.',
