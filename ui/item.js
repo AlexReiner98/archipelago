@@ -6,7 +6,7 @@ import { api, ask, h, may, part, state, tell } from './base.js';
 import { drawIn, goQuery, openHere, queryNow } from './canvas.js';
 import { viewsOn } from './canvases.js';
 import { draftOf } from './draft.js';
-import { documentMenu, figureOf, publicOf, readDocument, shareMenu } from './item-doc.js';
+import { documentMenu, figureOf, publicMark, publicOf, readDocument, shareMenu } from './item-doc.js';
 import { heldBand, heldOn } from './item-held.js';
 import { readingOf } from './item-read.js';
 import { choicesOf } from './fields.js';
@@ -179,6 +179,8 @@ export async function entity(id, here) {
         'div',
         { class: 'sheet-marks' },
         h('span', { class: 'grow' }),
+        // The public views that show it, and a share again when one is behind it (ui/item-doc.js).
+        publicMark(data.public_views, again, writes && !e.archived_at),
         writes && session && h('button', { class: 'quiet-button', title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
         buttons[0] && h('button', { class: 'quiet-button item-button', title: buttons[0].tip, onclick: () => press(buttons[0]) }, buttons[0].label),
         writes && !e.archived_at && ties.any && h('button', { class: 'quiet-button link-start', title: 'Link it to another: click that one on the canvas (Esc lets it go)', onclick: () => startLink(e, (made) => made && again()) }, 'Link'),

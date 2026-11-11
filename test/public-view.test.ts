@@ -112,3 +112,24 @@ test('step 41 makes each published revision its public view, as published, and n
   await l.db.query(PUBLISHED_TO_PUBLIC_VIEW);
   assert.equal((await l.db.query(`select 1 from public_view`)).rows.length, 1);
 });
+
+test('an item a public view shows says so in get, and is behind once it changes after', async () => {
+  const { mine, owner, made } = await shelf();
+  const agent: Actor = { kind: 'agent', name: 'a', person: owner.person };
+  type Got = { public_views?: { id: string; title: string; shared_at: string; address: string; behind?: boolean }[] };
+  const views = async (id: string) => ((await callTool(mine, agent, 'get', { id })) as Got).public_views;
+  assert.equal(await views(made.a), undefined, 'nothing public shows it yet');
+
+  await callTool(mine, owner, 'share_create', { id: made.lens });
+  await callTool(mine, owner, 'share_create', { id: made.d });
+  assert.deepEqual(await views(made.a), [{ id: made.lens, title: 'Questions', shared_at: (await views(made.a))![0].shared_at, address: `/p/default/${made.lens}` }], 'a question the view draws');
+  assert.deepEqual((await views(made.s))!.map((v) => v.id), [made.d], 'a section of the document');
+  assert.deepEqual((await views(made.lens))!.map((v) => v.id), [made.lens], 'the view itself');
+  assert.equal(await views(made.p), undefined, 'a private item left out is not shown by it');
+
+  await mine.change(owner, { reason: 'test', ops: [{ op: 'update', id: made.a, title: 'SR&ED, renamed' }] });
+  assert.equal((await views(made.a))![0].behind, true, 'changed since it was shared');
+  assert.equal((await views(made.b))![0].behind, undefined, 'one unchanged is not');
+  await callTool(mine, owner, 'share_create', { id: made.lens });
+  assert.equal((await views(made.a))![0].behind, undefined, 'shared again, it is current');
+});

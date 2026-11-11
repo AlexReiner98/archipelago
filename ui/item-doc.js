@@ -2,6 +2,7 @@
 // made public by a person, frozen as they saw it, at an address anyone may open (src/public-view.ts).
 
 import { api, ask, h, may, tell } from './base.js';
+import { menu, when } from './words.js';
 
 /** The item as a reader meets it. */
 export async function readDocument(id) {
@@ -68,4 +69,22 @@ export function shareMenu(e, shared, redraw, writes = may('write')) {
 /** What a document's menu offers: print it, and its public view. */
 export function documentMenu(e, shared, redraw, writes = may('write')) {
   return [['Print or save as PDF', () => window.open(`/read/${e.id}`, '_blank')], ...shareMenu(e, shared, redraw, writes)];
+}
+
+/**
+ * The mark of an item a public view shows (task e_r9e87vgz): which views, in its tooltip. One frozen before the item
+ * last changed is behind, and the mark offers to share it again, the person's act through the same share as ever.
+ */
+export function publicMark(views, redraw, writes = may('write')) {
+  if (!views?.length) return null;
+  const behind = views.filter((v) => v.behind);
+  // A line for each view: its title, when it was shared, and whether this has changed since.
+  const tip = ['Public in', ...views.map((v) => `${v.title}, shared ${when(v.shared_at)}${v.behind ? ': changed since' : ''}`)].join('\n');
+  if (!behind.length || !writes) return h('span', { class: 'public-mark', title: tip }, behind.length ? '◉ Public, behind' : '◉ Public');
+  const again = async (v) => (await sharePublicly(v.id, v.title)) && redraw();
+  if (behind.length === 1) return h('button', { class: 'quiet-button public-mark behind', title: `${tip}\nShare it again with this version`, onclick: () => again(behind[0]) }, '◉ Share again');
+  const box = menu('◉ Share again', behind.map((v) => [v.title, () => again(v)]));
+  box.title = tip;
+  box.classList.add('public-mark', 'behind');
+  return box;
 }

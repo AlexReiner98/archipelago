@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
 import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, HOLDS_OFF_READ, ITEM_HIDDEN, LINK_SNAPSHOT, MEMBER, ORDERED, SCHEMA, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
 import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';
-import { PUBLIC_DOCUMENT, PUBLIC_VIEW, PUBLISHED, PUBLISHED_PATH, PUBLISHED_TO_PUBLIC_VIEW, SHARE_PUBLISHABLE, SHARE_WORKSPACE_GONE } from './public-schema.ts';
+import { PUBLIC_DOCUMENT, PUBLIC_VIEW, PUBLISHED, PUBLISHED_PATH, PUBLISHED_TO_PUBLIC_VIEW, PUBLIC_VIEW_SHOWS, SHARE_PUBLISHABLE, SHARE_WORKSPACE_GONE } from './public-schema.ts';
 import { TRANSIENT } from './transient.ts';
 import { ITEM_KIND } from './head.ts';
 import { ISLAND_INDEX } from './island-items.ts';
@@ -90,6 +90,7 @@ export const MIGRATIONS: Migration[] = [
   { version: 41, name: 'what is published, made its public view', sql: PUBLISHED_TO_PUBLIC_VIEW },
   { version: 42, name: 'a member who only reads', sql: MEMBER_READ_ONLY },
   { version: 43, name: 'guests, gone', sql: GUESTS_GONE },
+  { version: 44, name: 'what a public view shows, indexed', sql: PUBLIC_VIEW_SHOWS },
 ];
 
 export const LATEST = MIGRATIONS.at(-1)!.version;

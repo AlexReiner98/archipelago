@@ -222,3 +222,17 @@ from published p join entity e on e.id = p.entity_id
 where e.visibility = 'public' and e.archived_at is null and e.private_to is null
 on conflict do nothing;
 `;
+
+/**
+ * Step 44 (src/migrate.ts): what a public view shows, indexed (task e_r9e87vgz), so an item's page can say which public
+ * views show it without reading every one. What it shows is read from the frozen copy itself: its sections and the
+ * items each picture in it draws (src/public-view.ts, shownIn). An expression, not a column: every writer of a public
+ * view, a restore among them, keeps it true without knowing of it.
+ */
+export const PUBLIC_VIEW_SHOWS = `
+create or replace function pelago_public_view_shows(given jsonb) returns jsonb
+language sql immutable parallel safe as $fn$
+  select jsonb_path_query_array(given, '$.parts[*].section.id') || jsonb_path_query_array(given, '$.lenses.*.items[*].id')
+$fn$;
+create index if not exists public_view_shows on public_view using gin (pelago_public_view_shows(given));
+`;

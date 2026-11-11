@@ -5,6 +5,7 @@
 import type { Q } from './db.ts';
 import { layoutFor } from './layouts.ts';
 import type { Archipelago } from './pelago.ts';
+import { publicPath } from './published-data.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
 /** An address word: lowercase letters and digits, words joined by single dashes. */
@@ -65,4 +66,21 @@ export async function publicViewPicture(l: Archipelago, id: string, section: str
   if (!ID.test(id) || !ID.test(section)) return null;
   const { rows } = await l.forAnyone().db.query<{ content_type: string; data: string }>(`select content_type, encode(bytes, 'base64') as data from pelago_public_view_picture($1, $2)`, [id, section]);
   return rows[0] ? { content_type: rows[0].content_type, bytes: Buffer.from(rows[0].data, 'base64') } : null;
+}
+
+/**
+ * The public views that show an item, itself or within (task e_r9e87vgz): each by title, when it was shared, and
+ * whether the item has changed since (behind), so its page can offer to share that view again and an agent editing it
+ * can tell the person. Read by the index on what a public view shows, never by reading every public view.
+ */
+export async function showingIn(l: Archipelago, id: string, updated: Date | string) {
+  if (!ID.test(id)) return [];
+  const { rows } = await l.db.query<{ id: string; title: string; shared_at: Date }>(
+    `select v.entity_id as id, v.given ->> 'title' as title, v.shared_at from public_view v join entity e on e.id = v.entity_id
+     where (v.entity_id = $1 or pelago_public_view_shows(v.given) @> jsonb_build_array($1::text)) and e.archived_at is null
+     order by v.shared_at desc limit 50 -- index public_view_shows`,
+    [id],
+  );
+  const changed = new Date(updated).getTime();
+  return rows.map((r) => ({ ...r, address: publicPath(l.workspace, r.id), ...(changed > new Date(r.shared_at).getTime() && { behind: true }) }));
 }
