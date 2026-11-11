@@ -8,7 +8,7 @@ design, the canvas's look and the rest) is the hosted service's, kept in
 `archipelago-hosted` and read from a folder `PELAGO_PACKS` names (decision
 e_8jd82drh, 9 Nov 2026). A pack's tests live beside it and reach the kernel
 only through `#pelago/test`. The manifest says what the pack declares, in
-sixteen keys and no others (Rule 8 of the target model; `src/manifest.ts`
+seventeen keys and no others (Rule 8 of the target model; `src/manifest.ts`
 reads it, `test/structure.test.ts` refuses any other key).
 
 ## The keys
@@ -27,6 +27,7 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `layouts`, `styles` | The code views are drawn by, and the presets of the map's own configuration: how things look, and (an entry with `type: "instruction"`, its words in `body`) what agents are told (`src/instructions.ts`), and (an entry with `type: "lens"`, its props a flat query and a style: `filter`, `walk`, `limit`, `style`) a view the pack ships, listed in the bar's picker and on Home until the owner saves their own version of it (`props.preset`); one `on` types, its query naming the item as `{here}`, is a view of each such item (a project's roadmap, an event's gate), offered on that item's page and drawn on the canvas (decision e_2mndpgdj: what a pack shows of an item is a view, not a screen). A style preset on nothing is used on every page; with `over: "workspace"` it lies over the workspace's own style; with `over: "chosen"` (a theme) only once the owner keeps a version of it. |
 | `reach` | What it may reach beyond the map: `hosts`, `secrets`, `webhooks`, `via`, and `server`. |
 | `shared` | Core's alone: the shared set, the type ids every pack on an island map may build on (below). |
+| `moved_from` | The packs it took declarations from, keeping their ids (below, In time): it may name a rule, view, style, action or layout `<pack>.<name>` for each, as well as its own. The kernel's packs it never needs to name. |
 
 A **server pack** is a pack whose reach includes `server` (`acts`, `entries`,
 `pages`, `connect`, `aliases`, `gates`). There is no other kind of
@@ -292,14 +293,20 @@ Adding a pack is the owner's: a new workspace starts with the kernel's
 (core) alone, or those the server names (`PELAGO_START_PACKS`, a list or
 `all`), and a pack new to the server is off in a workspace until its owner
 adds it. A workspace that opens asserts again a pack it has whose manifest
-changed. A pack that holds now what the kernel declared once (a rule, view,
-style, action or layout, by its id or with `core.` renamed to its own prefix)
-is added, once, to a map whose log keeps a manifest of core that declared it,
-so moving something out of core changes nothing a map does
-(`src/pack-moved.ts`; the core audit, e_sjhbyf52: the `findings` pack first,
-then `sessions`). A view or preset may keep its `core.` id in the pack it
-moved to, so what names it (an owner's kept version) still does
-(`keptFromKernel`, `src/packorder.ts`).
+changed. A pack that holds now what a pack it names in `moved_from` declared once (a
+rule, view, style, action or layout, by its id or with `<that pack>.`
+renamed to its own prefix) is added, once, to a map that had that pack on and
+whose log keeps a manifest of it that declared it, so moving something between
+packs changes nothing a map does (`src/pack-moved.ts`; task e_qhtt4phv). The
+kernel's packs are in every pack's `moved_from` without being named (the core
+audit, e_sjhbyf52: the `findings` pack first, then `sessions`). A
+declaration may keep its old id in the pack it moved to, so what names it (an
+owner's kept version) still does (`ownsId`, `src/packorder.ts`); a type or
+link type keeps its id, or names its old one in its own `moved_from`, and
+moves by `takenOver`. Splitting a pack in two: its vocabulary half keeps
+the pack's id (an island speaks a pack by its id), and its practice half is a
+new pack naming it in `moved_from` and requiring its types by name
+(`test/pack-split.test.ts`).
 A map made after the move starts with it only when the server names it. Taking a
 pack out is the owner's; the kernel's packs are never taken out. The packs
 relying on a name only it provides go to waiting first, saying why, their

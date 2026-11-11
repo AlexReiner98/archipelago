@@ -9,7 +9,7 @@ import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts';
 import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
 import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
-import { orderPacks, KERNEL_PACKS, keptFromKernel, providersOf, type PackState } from './packorder.ts';
+import { orderPacks, KERNEL_PACKS, ownsId, providersOf, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
 import { parts, withoutAbsent, type Manifest } from './manifest.ts';
 import { readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts';
@@ -171,7 +171,7 @@ export class Registry {
     const raw = new Map<string, TypeDef & { pack: string }>();
     const relations = new Map<string, ResolvedRelation>();
     const declared = new Map<string, RelationDef>();
-    const owned = (pack: PackFile, id: string) => pack.id === 'core' || id.startsWith(pack.id + '.') || keptFromKernel(id); // a tree's name; a type is named by what it is
+    const owned = (pack: PackFile, id: string) => ownsId(pack, id); // a tree's name; a type is named by what it is
     for (const pack of ordered) {
       for (const type of parts(pack).types) {
         if (raw.has(type.id)) throw new Error(`Type "${type.id}" is defined twice`);

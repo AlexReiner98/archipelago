@@ -425,7 +425,7 @@ The hosted service's:
 
 A new workspace starts with `core` alone; the owner adds the rest.
 
-Each pack is described by its `pack.json`, a manifest of sixteen keys
+Each pack is described by its `pack.json`, a manifest of seventeen keys
 ([docs/packs.md](packs.md)): what it declares, which packs it requires or
 uses, and what it may reach beyond the map. Adding or taking out a pack is a
 fact in the workspace's log, and everything it registers (its types, tools,

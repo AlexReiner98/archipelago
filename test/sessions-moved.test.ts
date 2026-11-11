@@ -1,13 +1,13 @@
 // The sessions pack, moved out of core with its ids (decision e_3v6x2u2m; src/pack-moved.ts): a map that had core
 // while core declared a session's screens, view and instructions is given the pack, once, and a session there is
-// still told to report in; a view or preset keeps its core id (keptFromKernel), so what names it still finds it.
+// still told to report in; a view or preset keeps its core id (ownsId), so what names it still finds it.
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { openDb } from '../src/db.ts';
 import { instructionsFor } from '../src/instructions.ts';
-import { keptFromKernel } from '../src/packorder.ts';
+import { ownsId } from '../src/packorder.ts';
 import { hostFor } from '../src/packtools.ts';
 import { Registry } from '../src/packs.ts';
 import { packsOff, syncPacks } from '../src/packstate.ts';
@@ -38,8 +38,10 @@ async function mapOn(dir: string, db?: Archipelago['db']) {
 }
 
 test('a kernel id is kept by the pack it moved to, and no other prefix is', () => {
-  assert.ok(keptFromKernel('core.report_in'));
-  assert.ok(!keptFromKernel('corey.x') && !keptFromKernel('work.x'));
+  const sessions = { id: 'sessions' };
+  assert.ok(ownsId(sessions, 'core.report_in') && ownsId(sessions, 'sessions.x'));
+  assert.ok(!ownsId(sessions, 'corey.x') && !ownsId(sessions, 'work.x'));
+  assert.ok(ownsId({ id: 'work_ways', moved_from: ['work'] }, 'work.x'), 'a pack named in moved_from gives its ids too');
 });
 
 test('a map that had core before the move is given sessions, and a session there is still told to report in', async () => {

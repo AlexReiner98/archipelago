@@ -63,10 +63,12 @@ export interface Manifest {
   reach?: ReachDef;
   /** The shared set every pack on an island map may build on, by type id: the kernel's pack alone declares it (src/islands.ts). */
   shared?: string[];
+  /** The packs it took declarations from, keeping their ids (src/pack-moved.ts): it may name a view, a style, a rule, an action or a layout `<pack>.<name>` for each, and is turned on, once, wherever one of them was. The kernel's packs are always among them. */
+  moved_from?: string[];
 }
 
 /** The keys of a manifest, and of its reach. */
-export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'styles', 'reach', 'shared'] as const;
+export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'styles', 'reach', 'shared', 'moved_from'] as const;
 export const REACH_KEYS = ['hosts', 'secrets', 'webhooks', 'via', 'server', 'launch'] as const;
 export const SERVER_KEYS = ['acts', 'entries', 'pages', 'connect', 'aliases', 'gates', 'mounts', 'streams', 'files', 'launchers', 'adapter', 'counts'] as const;
 
@@ -116,6 +118,7 @@ function keyProblems(m: Raw): string[] {
   for (const v of arr<Raw>(m.views)) if (v.form !== undefined && v.form !== 'tree' && v.form !== 'screen' && v.form !== 'attention') problems.push(`view "${String(v.id)}": form is tree, screen or attention, or left out for a read`);
   if (m.shared !== undefined && (!KERNEL_PACKS.includes(String(m.id)) || !Array.isArray(m.shared) || m.shared.some((t) => typeof t !== 'string'))) problems.push('shared is a list of type ids, and only the kernel\'s pack declares it');
   else if (Array.isArray(m.shared)) { const own = new Set(arr<Raw>(m.types).map((t) => t.id)); const not = m.shared.filter((t) => !own.has(t)); if (not.length) problems.push(`shared names ${not.join(', ')}: the shared set is of the types this pack declares`); }
+  if (m.moved_from !== undefined && (!Array.isArray(m.moved_from) || m.moved_from.some((p) => typeof p !== 'string' || !/^[a-z][\w-]*$/.test(p) || p === m.id))) problems.push('moved_from is a list of the ids of the packs it took declarations from, not its own');
   for (const [key, names] of Object.entries({ requires: m.requires, uses: m.uses })) for (const n of arr<unknown>(names)) if (!isName(n)) problems.push(`${key} names ${JSON.stringify(n)}: ${NAME_FORMS}`);
   for (const t of arr<Raw>(m.types)) if (t.of !== undefined && (t.id !== undefined || typeof t.fields !== 'object')) problems.push(`type entry of "${String(t.of)}" adds fields to another pack's type: of and fields only`);
   return problems;

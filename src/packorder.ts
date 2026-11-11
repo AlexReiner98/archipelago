@@ -22,11 +22,15 @@ export type PackState = { state: 'active' | 'waiting' | 'off'; why?: string };
 export const KERNEL_PACKS = ['core'];
 
 /**
- * A name a kernel pack gave, kept by a pack it moved to (the core audit, e_sjhbyf52): a view or preset moves with its
- * id, so what names it (an owner's kept version, a test, a doc) still does. Which maps are given that pack is
- * src/pack-moved.ts's.
+ * The packs a pack took declarations from, keeping their ids (task e_qhtt4phv): those its manifest names in
+ * `moved_from`, and the kernel's, from which every pack may take (the core audit, e_sjhbyf52). Which maps are given the
+ * pack that took them is src/pack-moved.ts's.
  */
-export const keptFromKernel = (id: string) => KERNEL_PACKS.some((k) => id.startsWith(`${k}.`));
+export const movedFrom = (pack: { id: string; moved_from?: string[] }): string[] => [...KERNEL_PACKS, ...(pack.moved_from ?? [])].filter((p) => p !== pack.id);
+
+/** Whether a pack may declare an id: its own `<pack>.<name>`, or a name a pack it took declarations from gave (movedFrom). The kernel's pack names anything. */
+export const ownsId = (pack: { id: string; moved_from?: string[] }, id: string): boolean =>
+  KERNEL_PACKS.includes(pack.id) || [pack.id, ...movedFrom(pack)].some((p) => id.startsWith(`${p}.`));
 
 /** The kernel's own kinds of event (src/due.ts, src/notify.ts): always provided, by core. */
 export const KERNEL_EVENTS = ['item.due', 'notification.made'];
