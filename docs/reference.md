@@ -401,8 +401,9 @@ Types live in packs, one folder each. The open core ships `core` under
   from `has:owned`, whatever declares owned). A place that says `exclusive` is
   a resource. It is the one pack always on.
 - `people` and `calendar`: vocabulary that left core on 11 Nov 2026, ids kept
-  (`company` and `works_at`; `event`). A pack that uses them requires
-  `type:company` or `type:event`.
+  (`company` and `works_at`; `event`). Calendar also holds `meeting` and
+  `routine`, from time. A pack that uses them requires `type:company` or
+  `type:event`.
 
 The hosted service's:
 
@@ -420,8 +421,8 @@ The hosted service's:
 - `design`: studies, concepts, tenets, research, elements and write-ups.
 - `outreach`: posts, channels, conversations and each channel's month;
   `social` counts visits and trials onto them.
-- `time`: meetings, time entries, routines, invoices and what
-  is paid regularly (`cost`).
+- `time`: time entries, invoices and what is paid regularly (`cost`),
+  with bills; `time_views` logs, sums and bills them (the Time screen).
 - `funding`: funding programs, tied to the work they could pay for.
 - `local`: a workspace's own types, `local.<name>`.
 

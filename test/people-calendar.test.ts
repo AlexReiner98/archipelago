@@ -32,7 +32,8 @@ function packsBefore() {
   const dir = packsWith();
   const read = (p: string) => JSON.parse(readFileSync(join(dir, p, 'pack.json'), 'utf8')) as { types?: object[]; links?: object[] };
   const core = read('core'), people = read('people'), calendar = read('calendar');
-  core.types = [...(core.types ?? []), ...(people.types ?? []), ...(calendar.types ?? [])];
+  // only event was core's: meeting and routine came to calendar from the hosted time pack
+  core.types = [...(core.types ?? []), ...(people.types ?? []), ...((calendar.types ?? []) as { id?: string }[]).filter((t) => t.id === 'event')];
   core.links = [...(core.links ?? []), ...(people.links ?? []).map((l) => ({ ...l, kernel: true }))];
   writeFileSync(join(dir, 'core', 'pack.json'), JSON.stringify(core));
   for (const p of ['people', 'calendar']) rmSync(join(dir, p), { recursive: true, force: true });
