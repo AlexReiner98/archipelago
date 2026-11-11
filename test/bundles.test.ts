@@ -11,6 +11,7 @@ import { expandBundles, packsNamed, readBundle, readBundles } from '../src/bundl
 import { bundlesHere, packStates, packsOff, setPack, syncPacks } from '../src/packstate.ts';
 import { syncTypes } from '../src/typetable.ts';
 import { openDb } from '../src/db.ts';
+import { splitFromKernel } from '../src/packorder.ts';
 import { human, packsWith, PACKS } from './map.ts';
 
 async function mapOf(dir: string, only?: string[]) {
@@ -97,5 +98,6 @@ test("a bundle is offered only where the server's list offers all its packs; els
 
 test('a distribution names a bundle: a new map starts with its packs', async () => {
   const l = await mapOf(packsWith());
-  assert.deepEqual((await starting('refinement', () => syncPacks(l))).map((f) => f[1]).sort(), ['pack:core', 'pack:refine', 'pack:replays']);
+  const split = l.registry.found.filter(splitFromKernel).map((p) => `pack:${p.id}`);
+  assert.deepEqual((await starting('refinement', () => syncPacks(l))).map((f) => f[1]).sort(), ['pack:core', 'pack:refine', 'pack:replays', ...split].sort());
 });

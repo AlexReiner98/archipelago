@@ -1,0 +1,16 @@
+{
+  "id": "sessions",
+  "version": "0.1.0",
+  "title": "Sessions",
+  "description": "What a session is shown and told: its turns and what it worked on, on its page; the Sessions view and how a session's state is marked; and what every session is told at its start. Split out of core with its ids kept: the run type stays in core, which the kernel reads.",
+  "views": [
+    { "form": "screen", "id": "core.run_turns", "title": "Turns", "on": ["run"], "pieces": [{ "piece": "turns" }] },
+    { "form": "screen", "id": "core.run_worked", "title": "Worked on", "on": ["run"], "pieces": [{ "piece": "picture", "lens": { "filter": { "find": ["worked {here}"] }, "limit": 50 }, "style": { "shape": "map" } }] }
+  ],
+  "styles": [
+    { "id": "core.estimate", "type": "instruction", "title": "Estimate what you take on", "body": "When you take on a task that has no estimate, give it one: how many tokens you expect it to take, one number for input and output together (props.tokens_estimated, with change). What is actually used is measured from this session and shown beside it.", "props": { "for": ["session_start"], "order": 10 }},
+    { "id": "core.report_in", "type": "instruction", "title": "Report in and tell the story", "body": "The map is the record of this work, not the chat: what is only said in chat is lost to the owner and the next session. Each time you conclude something (a cause, a finding, a choice and why), tell it with report, action tell (run {run}): one sentence and the items it is about, before you say it in chat; and change each item it settles. Do it unasked: a reply that worked and told nothing is asked to. With the pelago tools (query reads, change writes, every other action under its verb): on taking on one of these, report session_update with its id as task; propose changes with change, run {run}. Before you finish, report session_end with a summary: it asks about what is still open here that nobody changed since you began. A session that ends without it is recorded as not reconciled.", "props": { "for": ["session_start"], "order": 20 }},
+    { "id": "core.sessions", "type": "lens", "title": "Sessions", "props": { "filter": { "find": ["type run"], "not": ["done"] }, "walk": { "over": ["works_on>", "started_from>"], "steps": 1 }, "style": {} }},
+    { "id": "core.sessions_look", "title": "A session's state", "props": { "session_marks": { "waiting": { "shape": "disc", "hue": "you", "lit": true }, "your_move": { "shape": "diamond", "hue": "you", "lit": true }, "blocked": { "shape": "square", "hue": "blocked" }, "working": { "shape": "half", "hue": "session" }, "quiet": { "shape": "ring", "hue": "warn" }, "idle": { "shape": "ring", "hue": "muted" }, "done": { "shape": "disc", "hue": "done" } }} }
+  ]
+}

@@ -22,8 +22,8 @@ const SHAPING = {
   id: 'shaping', version: '1', title: 'Shaping', requires: ['core'],
   types: [{ id: 'effort', title: 'Effort', description: 'A body of work with an end.', extends: 'task', fields: { hub_at: { type: 'number' } } }],
 } as PackFile;
-/** A map with core's packs alone and the test's: the styles it draws in are core's, and no other pack's. */
-const coreOnly = () => freshWith(new Registry(packsWith(SHAPING), ['core', 'shaping']));
+/** A map with core's packs alone and the test's (and sessions, split out of core): the styles it draws in are theirs, and no other pack's. */
+const coreOnly = () => freshWith(new Registry(packsWith(SHAPING), ['core', 'sessions', 'shaping']));
 
 test('a picture is drawn in the styles kept for it, nearest last; hubs, code and where a kept view is seen', async () => {
   const l = await coreOnly();

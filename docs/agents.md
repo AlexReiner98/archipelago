@@ -61,7 +61,8 @@ it.
 The map, not the chat, is the record of a session's work: each thing an
 agent concludes (a cause, a finding, a choice and why) is a beat told with
 `report` action `tell`, and each item it settles is changed. The session
-start leads with it (`core.report_in`), and core's reply rule
+start leads with it (`core.report_in`, in the sessions pack, split out of
+core with its id), and core's reply rule
 `record_findings`, lifted by `reply_record_findings`, asks a reply that
 called other tools at least six times (`worked`) and neither told nor
 changed anything (a note updated is as much a record as a new one: the

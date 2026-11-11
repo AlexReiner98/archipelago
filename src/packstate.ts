@@ -18,7 +18,7 @@ import { decideAct, listActs, setPackSecret } from './outside.ts';
 import { canSeal } from './secrets.ts';
 import { ISLANDS } from './islands.ts';
 import { islandBlockers, moveOntoIslands } from './island-start.ts';
-import { dependentsOf, KERNEL_PACKS } from './packorder.ts';
+import { dependentsOf, KERNEL_PACKS, splitFromKernel } from './packorder.ts';
 import { manifestRead } from './pack-folders.ts';
 import { LOCAL_PACK, type PackFile } from './packs.ts';
 import { hostFor } from './packtools.ts';
@@ -226,7 +226,7 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
         const fact = present(l, p, kept);
         if ((fact[3] as { text?: string }).text !== undefined) facts.push(fact);
       }
-    } else if (taken.has(p.id)) facts.push(present(l, p, kept));
+    } else if (taken.has(p.id) || (!was && splitFromKernel(p))) facts.push(present(l, p, kept)); // split out of the kernel: every map had it
     else if (!said.size && first) {
       if (start === 'all' || start.includes(p.id)) facts.push(present(l, p, kept));
     } else if (!said.size) {

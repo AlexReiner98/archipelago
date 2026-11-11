@@ -69,7 +69,7 @@ test('an instruction preset is checked as a style preset is: its words in body, 
 });
 
 test('the session-start text is read from the instructions on the map', async () => {
-  const l = await freshWith(new Registry(packsWith(CHECKOUT), ['core', 'checkouts']));
+  const l = await freshWith(new Registry(packsWith(CHECKOUT), ['core', 'sessions', 'checkouts'])); // sessions: what a session is told at its start
   await make(l, [{ op: 'create', type: 'checkout', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } }]);
   const text = await hookSessionStart(l, { session_id: 'i1', cwd: 'C:\\code\\Apex' });
   const run = /as run (e_\w+)/.exec(text)?.[1];
