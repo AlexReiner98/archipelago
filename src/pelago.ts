@@ -12,7 +12,7 @@ import { search, type SearchInput } from './search.ts'; import { layoutOf } from
 import { append, headOf, type Fact } from './log.ts'; import { projectDecision, projectFacts, stamp } from './replay.ts'; import { linkFacts } from './facts.ts';
 import { decideProposal } from './proposals.ts'; import { guardedFetch } from './outbound.ts'; import { needHuman } from './actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
-import { planChange } from './change-plan.ts'; import { placeOnIslands } from './island-items.ts'; import { applyChange, letThrough } from './change-apply.ts';
+import { planChange } from './change-plan.ts'; import { placeOnIslands } from './island-items.ts'; import { placeWithSubject } from './subject.ts'; import { applyChange, letThrough } from './change-apply.ts';
 
 export * from './pelago-types.ts';
 export type { Level, OpKind, Policy } from './rules.ts';
@@ -82,7 +82,7 @@ export class Archipelago {
   /** measured: a report's reading (a part up or down), applied at once as a measurement, not anyone's judgment. */
   async change(actor: Actor, input: ChangeInput, measured = false) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
-    currentNames(this.registry, input.ops); await placeOnIslands(this, this.registry, input.ops, input.island); await stillWritable(this.workspace); await roomToStore(this.workspace); await mayWrite(this, actor, input.ops, measured);
+    currentNames(this.registry, input.ops); await placeWithSubject(this, this.registry, input.ops); await placeOnIslands(this, this.registry, input.ops, input.island); await stillWritable(this.workspace); await roomToStore(this.workspace); await mayWrite(this, actor, input.ops, measured);
     if (actor.kind !== 'human' && !input.pack) await noTwins(this, input.ops);
     const { warnings } = await this.plan(input.ops);
     const me = actorId(actor);
@@ -173,8 +173,9 @@ export class Archipelago {
    * Something done that is no change to the map and is kept in no other stream (a push heard, a pack turned on), in
    * the activity stream (src/activity.ts), in the transaction given. An entry about an item is as visible as the item.
    */
-  async log(q: Q, e: Done): Promise<void> {
-    await this.record('activity', e.actor, [doneFact(e)], e.reason || undefined, q === this.db ? undefined : q);
+  /** Record what was done; answers its seq, the number readers of events know it by. */
+  async log(q: Q, e: Done): Promise<number | undefined> {
+    return (await this.record('activity', e.actor, [doneFact(e)], e.reason || undefined, q === this.db ? undefined : q))[0]?.seq;
   }
 
   // ---- operational state (src/operational.ts) ------------------------------

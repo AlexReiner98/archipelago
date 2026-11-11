@@ -86,7 +86,13 @@ export interface Promised {
   published?: string;
 }
 
+/** It lives with what it is about (src/subject.ts): made with a link of this type to its subject, on its island and as visible as it. */
+export interface Subject {
+  link: string;
+}
+
 export interface Capabilities {
+  subject?: Subject;
   bound?: Bound;
   when?: When;
   where?: Where;
@@ -104,7 +110,7 @@ export interface Capabilities {
   kernel?: true;
 }
 
-export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch', 'promised', 'owned', 'actionable', 'plannable', 'kernel'] as const;
+export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch', 'promised', 'owned', 'actionable', 'plannable', 'kernel', 'subject'] as const;
 
 const DATES = ['date', 'datetime'];
 
@@ -170,6 +176,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     has('watch.commit', watch.commit, ['string']);
   }
   for (const flag of ['owned', 'actionable', 'plannable', 'kernel'] as const) if (caps[flag] !== undefined && caps[flag] !== true) problems.push(`${flag} is true, or left out`);
+  if (caps.subject && !relations.has(caps.subject.link)) problems.push(`subject is linked by "${caps.subject.link}", which is no relation`);
   if (promised) {
     if (!Array.isArray(promised.fields) || !promised.fields.length) problems.push('promised names the fields its readers rely on');
     else for (const f of promised.fields) if (!fields[f]) problems.push(`promised reads "${f}", which it has no field of`);

@@ -3,8 +3,12 @@
 // moment, a span's start, or a repeat's hour on each day it falls on, in the workspace's zone). For each it records an
 // item.due event and tells the packs that hear item.due, which do whatever is to be done: the kernel decides nothing
 // and names no pack. Its cursor is kept in the workspace's settings, so a pass after a restart catches up on what came
-// due while it was down, a day at most; the first pass ever starts from now.
+// due while it was down, a day at most; the first pass ever starts from now. An automation that watches a query
+// comes due when it starts to match instead (src/due-on.ts), by the same fact. A hearer is told the event's seq, and in
+// its detail the item's version (its last position in the fact stream), and the packs it came due under (src/pack-versions.ts), so what it does can name what it answered.
 
+import { onPass } from './due-on.ts';
+import { packVersions } from './pack-versions.ts';
 import { hostFor } from './packtools.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { spansOf, zoneOf } from './timeaxis.ts';
@@ -20,6 +24,10 @@ export interface Due {
   title: string;
   /** The instant the occurrence begins. */
   at: string;
+  /** Come due by a query starting to match (src/due-on.ts): the edge met, the items that met it, and the value. */
+  edge?: string;
+  matched?: string[];
+  value?: unknown;
 }
 
 /** The day an instant falls on in a zone, as a date. */
@@ -46,17 +54,29 @@ const timedTypes = (l: Archipelago) => [...l.registry.types.values()].filter((t)
 export async function duePass(l: Archipelago, now = Date.now()): Promise<Due[]> {
   const last = await l.setting<number>(CURSOR);
   await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [CURSOR, JSON.stringify(now)]);
-  const types = timedTypes(l);
-  if (last === undefined || !types.length || now <= last) return [];
-  const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null`, [types]);
-  const due = dueBetween(l, rows, Math.max(last, now - CATCH_UP_MS), now, await zoneOf(l));
   const host = hostFor(l.registry);
-  for (const d of due) {
-    const event = { action: 'item.due', target: d.item, reason: `"${d.title}" is due`, detail: { type: d.type, at: d.at } };
-    await l.log(l.db, { actor: 'agent:pelago', ...event });
-    host.tell(l, 'kernel', event);
+  const tell = async (event: { action: string; target: string; reason: string; detail: Record<string, unknown> }) => {
+    const version = (await versionsOf(l, [event.target])).get(event.target) ?? null;
+    const told = { ...event, detail: { ...event.detail, version, packs: packVersions(l.registry) } };
+    const seq = await l.log(l.db, { actor: 'agent:pelago', ...told });
+    host.tell(l, 'kernel', { ...told, seq });
+  };
+  const types = timedTypes(l);
+  const due: Due[] = [];
+  if (last !== undefined && types.length && now > last) {
+    const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null`, [types]);
+    due.push(...dueBetween(l, rows, Math.max(last, now - CATCH_UP_MS), now, await zoneOf(l)));
+    for (const d of due) await tell({ action: 'item.due', target: d.item, reason: `"${d.title}" is due`, detail: { type: d.type, at: d.at } });
   }
-  return due;
+  // What watches a query comes due when it starts to match (src/due-on.ts): asked on every pass, the first included.
+  return [...due, ...(await onPass(l, now, tell))];
+}
+
+/** Each item's version: the position of its last fact in the fact stream, what a hearer acted on. */
+async function versionsOf(l: Archipelago, ids: string[]): Promise<Map<string, number>> {
+  if (!ids.length) return new Map();
+  const { rows } = await l.db.query<{ id: string; pos: number }>(`select id, max(pos)::int as pos from log_fact where stream = 'facts' and id = any($1::text[]) group by id -- index log_fact_history`, [ids]);
+  return new Map(rows.map((r) => [r.id, r.pos]));
 }
 
 const clocks = new WeakMap<Archipelago, ReturnType<typeof setInterval>>();

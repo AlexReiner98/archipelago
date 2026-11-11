@@ -21,12 +21,13 @@ test('each operational write lands in its stream, at once, with the light header
   const l = await fresh();
   const { run, auto, res, task, n, conn, drawn } = await make(l, [
     { op: 'create', ref: 'run', type: 'run', title: 'A run' },
-    { op: 'create', ref: 'auto', type: 'automation', title: 'Nightly', props: { trigger: 'every', every_minutes: 60, action: 'notify' } },
+    { op: 'create', ref: 'auto', type: 'automation', title: 'Nightly', props: { trigger: 'daily', at: '03:00', action: 'notify' } },
     { op: 'create', ref: 'res', type: 'place', props: { exclusive: true }, title: 'The lane' },
     { op: 'create', ref: 'task', type: 'task', title: 'Hold it' },
     { op: 'create', ref: 'n', type: 'notification', title: 'Look' },
     { op: 'create', ref: 'conn', type: 'connection', title: 'Nowhere', props: { url: 'http://127.0.0.1:1/' } },
     { op: 'create', ref: 'drawn', type: 'lens', title: 'Drawn' },
+    { op: 'link', type: 'about', from: 'auto', to: 'task' },
   ]);
   await l.operational(run, { add: { tokens_used: 40 }, props: { story: [{ n: 1, said: 'began' }], last_seen: 'now' } });
   await l.operational(run, { add: { tokens_used: 2 } });

@@ -4,7 +4,7 @@
 import { newId, type Q } from './db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts'; import { ownerFollows } from './owner-link.ts';
 import { roomToStore, stillWritable } from './standing.ts';
-import { placeOnIslands } from './island-items.ts';
+import { placeOnIslands } from './island-items.ts'; import { placeWithSubject } from './subject.ts';
 import { typesAfter, typesApplied } from './type-items.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { append, type Decision, type Fact } from './log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
@@ -28,7 +28,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
   const ops = dropExcepted(input.ops, opts.except ?? []); await stillWritable(map.workspace); if (!opts.dry) await roomToStore(map.workspace);
   if (!ops.length) throw new Error('Nothing left to apply after exclusions.');
   // Validate again: the map may have changed since this was proposed. A new item naming no island is placed again (src/island-items.ts).
-  await placeOnIslands(map, map.registry, ops);
+  await placeWithSubject(map, map.registry, ops); await placeOnIslands(map, map.registry, ops);
   const { warnings } = await map.plan(ops);
   const changeset = newId('c');
   const created: Record<string, string> = {};

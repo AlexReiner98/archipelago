@@ -30,6 +30,8 @@ export interface Light {
   rule: string;
   facts: OpFact[];
   reason?: string;
+  /** Its number in the sequence the fact stream's facts share, as appended. */
+  seq?: number;
 }
 
 /** The rule an entry's facts are kept by, as its header names it: the stream's own when no rules are given. */
@@ -63,8 +65,11 @@ export async function record(tx: Q, ws: string, stream: OpStream, actor: string,
   for (const [rule, of] of groups) {
     const e: Light = { v: 1, ws, stream, pos: ++pos, at, actor: { id: actor }, rule, facts: of, ...(opts.reason && { reason: opts.reason }) };
     const stored = await sealOp(tx, ws, stream, { v: 1, ws, actor: e.actor, rule, ...(opts.reason && { reason: opts.reason }) }, of);
-    await tx.query(`insert into log_op (stream, pos, at, head, facts, seq) values ($1, $2, $3, $4::jsonb, $5::jsonb, coalesce($6, nextval('event_seq_seq')))`, [stream, e.pos, at, JSON.stringify(stored.head), JSON.stringify(stored.facts), opts.seq ?? null]);
-    out.push(e);
+    const { rows: put } = await tx.query<{ seq: string }>(
+      `insert into log_op (stream, pos, at, head, facts, seq) values ($1, $2, $3, $4::jsonb, $5::jsonb, coalesce($6, nextval('event_seq_seq'))) returning seq`,
+      [stream, e.pos, at, JSON.stringify(stored.head), JSON.stringify(stored.facts), opts.seq ?? null],
+    );
+    out.push({ ...e, seq: Number(put[0].seq) });
   }
   return out;
 }

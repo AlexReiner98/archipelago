@@ -1,10 +1,10 @@
 // Planning a change: its ops checked against the schema and the map as it is now, before anything is written. The
 // write path (src/pelago.ts) asks it before a change is judged and again before it is applied.
 
-import { checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts'; import { typedProblems } from './fields.ts';
+import { checkUpdated, checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts'; import { typedProblems } from './fields.ts';
 import { bodyAfter } from './ops.ts'; import { mergeRefusals } from './merge.ts';
 import { currentNames, typesAfter } from './type-items.ts'; import { privateDependencies } from './private-deps.ts';
-import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts'; import { islandRefusals } from './island-items.ts';
+import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts'; import { islandRefusals } from './island-items.ts'; import { subjectRefusals } from './subject.ts';
 import type { Archipelago } from './pelago.ts';
 
 /** Validate ops against the schema and the current map. Throws listing every problem. */
@@ -74,7 +74,7 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
       case 'update': {
         const target = await existing(op.id, where);
         if (!target) break;
-        errors.push(...[...reg.check(target.type, op.status, op.props ?? {}), ...typedProblems(target.type, reg.type(target.type)?.fields ?? {}, op.props ?? {}, target.props), ...undeclaredColumns(reg.type(target.type), op)].map((p) => `${where}: ${p}`));
+        errors.push(...[...reg.check(target.type, op.status, op.props ?? {}), ...checkUpdated(reg, target.type, op.props ?? {}), ...typedProblems(target.type, reg.type(target.type)?.fields ?? {}, op.props ?? {}, target.props), ...undeclaredColumns(reg.type(target.type), op)].map((p) => `${where}: ${p}`));
         if (op.visibility === 'public' && !reg.type(target.type)?.public) errors.push(`${where}: "${target.title}" is a ${target.type}, which cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
         if (op.title !== undefined && !op.title.trim()) errors.push(`${where}: title cannot be empty`);
         try {
@@ -122,7 +122,7 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
         break;
     }
   }
-  errors.push(...(await islandRefusals(map, reg, ops)));
+  errors.push(...(await islandRefusals(map, reg, ops)), ...(await subjectRefusals(map, reg, ops)));
   if (!errors.length) errors.push(...(await privateDependencies(map, ops)));
   if (errors.length) throw new Error(`Change rejected:\n- ${errors.join('\n- ')}`);
   return { warnings };

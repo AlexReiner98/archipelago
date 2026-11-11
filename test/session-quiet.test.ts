@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Automations } from '../src/automations.ts';
+import { QuietSessions } from '../src/session-quiet.ts';
 import { flatRead } from '../src/query-flat.ts';
 import { takeEvents } from '../src/session-events.ts';
 import { sessionStart } from '../src/sessions.ts';
@@ -27,7 +27,7 @@ test('a run quiet past quiet_end_after is ended, says why, and leaves its task\'
   const l = await fresh();
   const { task, run } = await quietFor(l, 25 * 60);
   assert.ok((await beside(l, task)).includes(run), 'drawn beside its task while open');
-  await new Automations(l).tick();
+  await new QuietSessions(l).tick();
   const ended = (await l.entity(run))!;
   assert.equal(ended.is_open, false);
   assert.equal(ended.props.ended_by, 'quiet');
@@ -40,7 +40,7 @@ test('a run quiet past quiet_end_after is ended, says why, and leaves its task\'
 test('a run quiet for less is flagged, not ended', async () => {
   const l = await fresh();
   const { run } = await quietFor(l, 60);
-  await new Automations(l).tick();
+  await new QuietSessions(l).tick();
   const still = (await l.entity(run))!;
   assert.equal(still.is_open, true);
   assert.equal(still.props.stale_flagged, true);
@@ -50,7 +50,7 @@ test('a run heard from again by a raw event is not ended', async () => {
   const l = await fresh();
   const { run } = await quietFor(l, 25 * 60);
   assert.equal((await takeEvents(l, { session_id: 'q1', source: 'claude-code', events: [{ at: ago(1), kind: 'turn.start', turn: 't1', by: 'person' }] })).kept, 1);
-  await new Automations(l).tick();
+  await new QuietSessions(l).tick();
   const still = (await l.entity(run))!;
   assert.equal(still.is_open, true);
   assert.notEqual(still.props.stale_flagged, true, 'nor flagged: it is not quiet');
@@ -60,6 +60,6 @@ test('the owner\'s style sets how long', async () => {
   const l = await fresh();
   await make(l, [{ op: 'create', ref: 's', type: 'style', title: 'Quicker', props: { numbers: { quiet_end_after: 90 } } }]);
   const { run } = await quietFor(l, 120);
-  await new Automations(l).tick();
+  await new QuietSessions(l).tick();
   assert.equal((await l.entity(run))!.props.ended_by, 'quiet');
 });
