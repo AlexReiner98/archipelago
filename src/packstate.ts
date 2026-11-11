@@ -238,7 +238,12 @@ export function packStates(l: Archipelago) {
   const made = (id: string) => l.registry.made.get(id)?.item;
   const only = l.registry.only;
   const offered = (id: string) => !only || only.includes(id) || id === LOCAL_PACK || l.registry.made.has(id);
-  return l.registry.found.filter((p) => offered(p.id)).map((p) => ({ id: p.id, title: p.title, version: p.version, manifest: l.registry.hashes.get(p.id), description: p.description, requires: p.requires ?? [], touches: packTouches(p), ...(made(p.id) && { made: made(p.id) }), ...l.registry.states.get(p.id)! }));
+  // An active pack says what taking it out would send to waiting, so the owner is told before it happens.
+  const relying = (p: PackFile) => (l.registry.states.get(p.id)?.state === 'active' && !KERNEL_PACKS.includes(p.id) ? dependentsOf(l.registry.packs, [p.id]) : []);
+  return l.registry.found.filter((p) => offered(p.id)).map((p) => {
+    const waits = relying(p);
+    return { id: p.id, title: p.title, version: p.version, manifest: l.registry.hashes.get(p.id), description: p.description, requires: p.requires ?? [], touches: packTouches(p), ...(made(p.id) && { made: made(p.id) }), ...(waits.length && { dependents: waits }), ...l.registry.states.get(p.id)! };
+  });
 }
 
 /** Turn a pack off or on in this workspace. */
@@ -248,8 +253,8 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   // A pack the server's list leaves out here (src/pack-allow.ts) is not the owner's to add: the server's configuration lets it in.
   if (input.on && l.registry.only && !l.registry.only.includes(input.pack) && !l.registry.made.has(input.pack)) throw new Error(`The ${input.pack} pack is not offered to this workspace on this server.`);
   if (!input.on && KERNEL_PACKS.includes(input.pack)) throw new Error(`The ${input.pack} pack is the kernel's own: it is never taken out.`);
-  const needing = input.on ? [] : dependentsOf(l.registry.packs, input.pack);
-  if (needing.length) throw new Error(`${needing.join(', ')} require${needing.length === 1 ? 's' : ''} the ${input.pack} pack: take ${needing.length === 1 ? 'it' : 'them'} out first.`);
+  // Taking out a provider sends the packs that rely on it to waiting, their items kept; adding it back wakes them (decision e_f9ybsuce).
+  const waitingBefore = new Set([...l.registry.states].filter(([, s]) => s.state === 'waiting').map(([id]) => id));
   await syncPacks(l); // the log says what is present before it says what changed
   const off = new Set(await packsOff(l));
   if (input.on) off.delete(input.pack);
@@ -261,9 +266,13 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   l.registry.turnOff(list, await islandsOn(l));
   if (!input.on) hostFor(l.registry).stop();
   const synced = await syncTypes(l);
-  await l.log(l.db, { actor: actorId(actor), action: input.on ? 'pack.on' : 'pack.off', reason: `${input.on ? 'Turned on' : 'Turned off'} the ${input.pack} pack`, detail: { pack: input.pack, ...synced } });
+  const now = (id: string) => l.registry.states.get(id);
+  // What this sent to waiting, each with why; what it woke.
+  const waiting = [...l.registry.states].filter(([id, s]) => id !== input.pack && s.state === 'waiting' && !waitingBefore.has(id)).map(([id, s]) => ({ id, why: s.why }));
+  const woken = [...waitingBefore].filter((id) => now(id)?.state === 'active');
+  await l.log(l.db, { actor: actorId(actor), action: input.on ? 'pack.on' : 'pack.off', reason: `${input.on ? 'Turned on' : 'Turned off'} the ${input.pack} pack`, detail: { pack: input.pack, ...synced, ...(waiting.length && { waiting: waiting.map((w) => w.id) }), ...(woken.length && { woken }) } });
   toolsChanged(l.workspace);
-  return { packs: packStates(l), dormant: synced.dormant, activated: synced.activated };
+  return { packs: packStates(l), dormant: synced.dormant, activated: synced.activated, waiting, woken };
 }
 
 /**
@@ -292,7 +301,7 @@ export const PACK_STATE_TOOLS: Record<string, Tool> = {
     run: async (l) => withUse(l, packStates(l)),
   },
   pack_set: {
-    description: 'Turn a pack off or on in this workspace. Its items stay; while it is off they are dormant and its tools are gone.',
+    description: 'Turn a pack off or on in this workspace. Its items stay; while it is off they are dormant and its tools are gone. The packs relying on it (dependents in packs) wait meanwhile, and wake when it is on again.',
     input: { pack: z.string(), on: z.boolean() },
     humanOnly: true,
     run: async (l, actor, input) => setPack(l, actor, input),

@@ -43,9 +43,12 @@ export function packsCard({ info, then, goTo }) {
   const schema = state.schema ?? {};
   const body = h('div', { class: 'plates' });
   const turn = async (p, on, box) => {
+    // What relies on it waits while it is out: named before it happens.
+    const named = (ids) => ids.map((id) => packs.find((q) => q.id === id)?.title ?? id).join(', ');
+    const waits = !on && p.dependents?.length ? ` ${named(p.dependents)} will wait until it is back.` : '';
     const sure = await ask({
       title: `${on ? 'Turn on' : 'Turn off'} ${p.title}?`,
-      message: on ? 'Its tools come back and its items are active again.' : 'Its items stay, dormant: a person can still edit them. Its tools are gone until it is on again.',
+      message: on ? 'Its tools come back and its items are active again.' : `Its items stay, dormant: a person can still edit them. Its tools are gone until it is on again.${waits}`,
       action: on ? 'Turn on' : 'Turn off',
       danger: !on,
     });
