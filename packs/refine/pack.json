@@ -30,6 +30,7 @@
       "title": "Hold briefs for a replay",
       "description": "Hold the briefs of 5 to 10 finished tasks on a replay set (the replays pack's), so they run again under another pack version and are compared like with like. Names a set to add to, or a title for a new one; a task the set holds keeps its brief.",
       "verb": "capture",
+      "humanOnly": true,
       "input": {
         "type": "object",
         "properties": {
@@ -46,6 +47,7 @@
       "title": "Replay a set",
       "description": "Run every held brief of a replay set again, each a session on this machine, under the pack version named (<pack>@<version>, the one this map runs). Each run names the set and the version, so two versions' runs are told apart. A person's action: it starts sessions.",
       "verb": "assign",
+      "humanOnly": true,
       "input": {
         "type": "object",
         "properties": {
