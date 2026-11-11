@@ -137,7 +137,7 @@ export const VIEWS: Record<string, View> = {
     run: (l, input) => pageStyle(l, input),
   },
   instructions: {
-    description: 'What agents are told where: the instructions the packs ship (presets), under the workspace’s kept on the map, under those kept about a repository, nearest last, in order, each with the item (and preset) that says it. A session is told those for session_start when it begins. Params: for (where: session_start, working_rules, tool:<name>, guide:<name> (a guide, as guide:style_code for how a style’s code is written), or file:<path>, what is said about that file by the instructions whose file:<glob> names it; session_start unless said), about (a repository: what is said to a session there).',
-    run: async (l, input) => ({ said: await instructionsFor(l, typeof input.for === 'string' ? input.for : 'session_start', { ...(typeof input.about === 'string' && { about: input.about }) }) }),
+    description: 'What agents are told where: the instructions the packs ship (presets), under the workspace’s kept on the map, under those kept about a repository, nearest last, in order, each with the item (and preset) that says it. A session is told those for session_start when it begins. Params: for (where: session_start, working_rules, tool:<name>, guide:<name> (a guide, as guide:style_code for how a style’s code is written), or file:<path>, what is said about that file by the instructions whose file:<glob> names it; session_start unless said), about (a repository: what is said to a session there), island (an island: what is said there, by the version of its pack it runs).',
+    run: async (l, input) => ({ said: await instructionsFor(l, typeof input.for === 'string' ? input.for : 'session_start', { ...(typeof input.about === 'string' && { about: input.about }), ...(typeof input.island === 'string' && { island: input.island }) }) }),
   },
 };

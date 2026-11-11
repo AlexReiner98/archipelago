@@ -176,6 +176,31 @@ pack's (0.1.0 unless said), and its `manifest` what it declares, as a
   back, waits for the owner (core's rule `agent_packs`). Retired or archived,
   it leaves the registry and its items turn dormant.
 
+## A version on one island
+
+A change to a pack can be tried on one island while the rest of the map keeps
+the pack as it is (task e_j4bzhegb, `src/pack-versions.ts`).
+
+- **A version is a pack item** whose `version_of` names the pack (one the
+  server has or one kept as an item; never core). It holds what a pack item
+  may, and over its pack's manifest takes the place of those keys alone, so a
+  map pack's code stays as it is. It declares the same types and link types by
+  the same ids: it may change their fields, the rules and the instructions,
+  never rename one. It is checked when written, as an island would run it,
+  and is never added as a pack of its own.
+- **An island runs it** by naming the item in its field `pack_version`; the
+  version must be of the pack the island speaks. Setting it is a change, and
+  unsetting it is the rollback: nothing is unwound.
+- **A registry per version.** The map's registry keeps each version and
+  builds, on first ask, a registry with the version in its pack's place,
+  kept until the map's loads again. What an item on the island is checked
+  against when written (`planChange`) and what is said there
+  (`instructionsFor` with `island`, the `instructions` view's param `island`)
+  are read from the registry the island runs, and so is what a session started on a task there is told (session_start with `task`); every other read is the map's.
+
+Not yet: the rules that decide a change, and what a session's hook tells it
+at its start (it knows no task), are still the map's on a trial island.
+
 ## Where packs are found
 
 A server reads its packs from `packs/`, then from each folder `PELAGO_PACKS`
