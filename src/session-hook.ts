@@ -20,6 +20,21 @@ const holdableBy = (l: Archipelago) => {
 };
 
 /**
+ * The island a session works on, whose pack version it is told (src/island-pin.ts): its task's, once it has said one,
+ * else its repository's (the place it lives in). None where neither is on an island: it is told the map's.
+ */
+export async function sessionIsland(l: Archipelago, run: string | undefined): Promise<string | undefined> {
+  if (!run) return undefined;
+  const { rows } = await l.db.query<{ island: unknown; works: boolean }>(
+    `select e.props->>'island' as island, r.type = any($2::text[]) as works from relation r join entity e on e.id = r.to_id
+     where r.from_id = $1 and r.valid_to is null and e.archived_at is null and r.type = any($2::text[] || $3::text[]) and e.props ? 'island'
+     order by works desc, r.valid_from desc limit 1`,
+    [run, l.registry.relationFamily('works_on'), l.registry.relationFamily('lives_in')],
+  );
+  return typeof rows[0]?.island === 'string' ? rows[0].island : undefined;
+}
+
+/**
  * A Claude Code SessionStart hook: register the session and return the text
  * to put in front of the model, so it starts knowing what the map knows.
  */
@@ -81,8 +96,9 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
     const held = heldNow.find((h) => h.resource === res.id);
     lines.push('', `Exclusive resource "${res.title}" (${res.id}) is ${held ? `HELD by ${held.held_by_title}: do not use it` : 'free'}. Claim it with the pelago assign tool, action claim (holder ${started.run}), before using it, and give it back with revise, action release, after.`);
   }
-  // What every session is told is kept on the map as instructions (src/instructions.ts): the core pack's, under the owner's.
-  lines.push('', ...(await instructionsFor(l, 'session_start', { about: repo?.id, fill: { run: started.run } })).map((one) => one.text));
+  // What every session is told is kept on the map as instructions (src/instructions.ts): the core pack's, under the owner's;
+  // on an island that tries a version of its pack, the version's (its task's island, else its repository's).
+  lines.push('', ...(await instructionsFor(l, 'session_start', { about: repo?.id, island: await sessionIsland(l, started.run), fill: { run: started.run } })).map((one) => one.text));
   return lines.join('\n');
 }
 

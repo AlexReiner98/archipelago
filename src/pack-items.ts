@@ -4,13 +4,16 @@
 // so a person or their agent on a hosted map can author a way of working, or a look, without the server running
 // anything of theirs. On an island map the island rules judge it as any pack, looks included. A rule only
 // tightens, a view is drawn by the kernel, and what runs code (actions, handlers, layouts, reach) stays a server's
-// pack's. The registry lays these beside the folder packs (src/packs.ts), off until the owner adds one, and judges
+// pack's. A version of a server's pack alone may carry code of its own (its field code: files by path over its
+// pack's), run only on the islands that run the version (src/pack-code.ts), and an agent's word for it always waits
+// for the owner (core's rule pack_code). The registry lays these beside the folder packs (src/packs.ts), off until the owner adds one, and judges
 // them as it judges any pack; a change that makes or changes one is checked here first (src/type-items.ts).
 
 import { createHash } from 'node:crypto';
 import { ISLAND_KEYS } from './islands.ts';
 import { parts, readManifest, type Manifest } from './manifest.ts';
 import { KERNEL_PACKS } from './packorder.ts';
+import { versionCodeProblems } from './pack-code.ts';
 import type { TypeItem } from './type-overlay.ts';
 
 export const PACK_ITEM = 'pack';
@@ -57,6 +60,7 @@ export function madeProblems(item: Said, taken: Set<string>, declared: Set<strin
   if (clash.length) problems.push(`a pack this server has declares ${clash.join(', ')} already`);
   const misnamedRules = all(manifest.rules).map((r) => String(r.id ?? '')).filter((id) => !id.startsWith(`${name}.`));
   if (misnamedRules.length) problems.push(`its rules are named ${name}.<what>, so none is taken for a kernel rule: ${misnamedRules.map((id) => id || 'one with no id').join(', ')}`);
+  if (item.props.code !== undefined && item.props.code !== null) problems.push('a pack kept as an item runs no code: only a version of a server’s pack may carry code (version_of)');
   if (!problems.length) {
     try {
       readManifest(manifestText(item, name), `the pack item ${name}`);
@@ -83,15 +87,20 @@ function heldProblems(manifest: Entry): string[] {
 }
 
 /** A version of a pack kept as an item (its field version_of): what an island may run in that pack's place, never a pack of its own. */
-export interface PackVersion extends ItemPack { of: string }
+export interface PackVersion extends ItemPack {
+  of: string;
+  /** Its own code, files by path over its pack's (src/pack-code.ts): run on its islands alone. */
+  code?: Record<string, string>;
+}
 
 /** The ids a manifest declares as its own types and link types, sorted. */
 const declaredIds = (m: Manifest) => [...parts(m).types, ...parts(m).relations].map((d) => d.id).sort();
 
 /**
  * Why a pack item is not a version of the pack it names; none when it is. A version holds what a pack item may, and
- * over its pack's manifest it takes the place of those keys alone, so a map pack's code stays as it is. It declares the
- * same types and link types by the same ids: it may change their fields, the rules and the instructions, never rename one.
+ * over its pack's manifest it takes the place of those keys alone, so a map pack's code stays as it is. It keeps every
+ * type and link type its pack declares, by the same ids, and may add its own (named <pack>.<what>): it may change their
+ * fields, the rules, the views and the styles (data: instructions, lenses, looks), never rename or leave one out.
  */
 export function versionProblems(item: Said, of: string, base: Manifest | undefined, local: string): string[] {
   if (!base || of === local) return [`it is a version of "${of}", which is no pack here`];
@@ -107,8 +116,9 @@ export function versionProblems(item: Said, of: string, base: Manifest | undefin
   let manifest: Manifest;
   try { manifest = readManifest(versionText(item, base), `the version ${item.title} of ${of}`); } catch (err) { return [(err as Error).message]; }
   const [was, now] = [declaredIds(base), declaredIds(manifest)];
-  const gone = was.filter((id) => !now.includes(id)), added = now.filter((id) => !was.includes(id));
-  if (gone.length || added.length) problems.push(`a version declares the types and link types its pack does, by the same ids${gone.length ? `; it leaves out ${gone.join(', ')}` : ''}${added.length ? `; it adds ${added.join(', ')}` : ''}`);
+  const gone = was.filter((id) => !now.includes(id)), misnamed = now.filter((id) => !was.includes(id) && !id.startsWith(`${of}.`));
+  if (gone.length) problems.push(`a version keeps every type and link type its pack declares, by the same ids, since items may be of them: it leaves out ${gone.join(', ')}`);
+  if (misnamed.length) problems.push(`what a version adds is named ${of}.<what>: ${misnamed.join(', ')}`);
   return problems;
 }
 
@@ -146,10 +156,12 @@ export function madePacks(items: TypeItem[], found: Map<string, Manifest>, local
   const bases = new Map([...found, ...packs.map((p) => [p.manifest.id, p.manifest] as const)]);
   for (const item of items.filter((i) => i.type === PACK_ITEM && i.is_open && text(i.props.version_of))) {
     const of = text(item.props.version_of)!;
-    const problems = versionProblems(item, of, bases.get(of), local);
+    const problems = [...versionProblems(item, of, bases.get(of), local), ...versionCodeProblems(item.props.code, of, found.has(of))];
     if (problems.length) { wrong.set(item.id, problems.join('; ')); continue; }
     const t = versionText(item, bases.get(of)!);
-    versions.push({ item: item.id, of, manifest: JSON.parse(t) as Manifest, text: t, hash: hash(t) });
+    const code = item.props.code ? (item.props.code as Record<string, string>) : undefined;
+    // Its hash is its manifest's, and its code's with it: a version whose code changed is another version.
+    versions.push({ item: item.id, of, manifest: JSON.parse(t) as Manifest, text: t, hash: hash(code ? `${t} ${JSON.stringify(Object.entries(code).sort(([a], [b]) => (a < b ? -1 : 1)))}` : t), ...(code && { code }) });
   }
   return { packs, versions, wrong };
 }

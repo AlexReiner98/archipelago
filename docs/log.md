@@ -985,6 +985,26 @@ at a position and each one's manifest blob, with the workspace's own
   to how manifests are read rebuilds it, and the manifests themselves never
   change.
 
+### As built: the registry as of P (11 Nov 2026, `src/registry-at.ts`)
+
+- `registryAt` reads the last pack fact of each pack up to fact position P and the manifest texts the log keeps by
+  hash, and builds a `Registry` from those manifests (given to it in place of folders). `asOf` projects under it
+  and gives it back, with the type items as they stood at P taken in after the walk (the owner's versions of
+  types, an island's pinned versions); the walk itself runs under the pack facts' registry alone.
+- What the log lacks is today's, and said: a manifest whose text was never kept is today's file when its hash is
+  the same, else today's file stands in (`stand_in`); a type the packs at P did not define is kept dormant from
+  today's registry. Before any pack fact there is no past registry. The islands setting is today's.
+- Manifests that no longer load under this server's code leave the read under today's registry, and `asOf` says
+  why (`past_refused`).
+- A pack's code is on the log beside its manifest (11 Nov 2026, `src/pack-code.ts`): the files of its folder that
+  run or are served (not `pack.json`, words or tests), each by the SHA-256 of its text. A pack fact names `code`,
+  the hash of the whole, and `files`, each path's hash, and `texts` holds a file's text the first time the log
+  meets its hash, so a deploy adds the files it changed alone; a change of code alone asserts the pack again. The
+  registry at P runs the code named then: today's folder where the code is the same, else the files read back from
+  the log and laid out in a folder kept by the code's hash (`code: 'log'`); a fact from before code was kept, or
+  one whose texts the log lacks, runs today's (`stand_in`, with why). No table changed: a fact without `code` is
+  one from before.
+
 ### In space: what a pack requires and uses
 
 A manifest declares, beside its types, links and the rest:

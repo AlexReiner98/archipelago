@@ -5,7 +5,8 @@
 import { api, ask, h, state, tell } from './base.js';
 import { fieldEditor, wordsEditor } from './field-edit.js';
 import { choicesOf, empty } from './fields.js';
-import { ago, changeRow, eventLine, label, link, statusesOf, typeTitle, types } from './words.js';
+import { ago, changeRow, eventLine, label, link, statusesOf, typeTitle } from './words.js';
+import { pageType } from './page-schema.js';
 
 /** Whether the page is a link's, read with no sign-in (ui/base.js marks it): its reader sees the item, not its keeping. */
 const reader = () => Boolean(document.documentElement.dataset.reader);
@@ -19,7 +20,7 @@ const none = () => h('span', { class: 'muted' }, '—');
 
 /** Its head: what it is, where it stands, whose it is, who may see it, and when it was made and changed. Without a setter, a value is said, not picked. */
 export function headSection(e, owner, setStatus, setVisibility) {
-  const type = types.get(e.type);
+  const type = pageType(e.type);
   const seen = e.private_to ? 'private' : e.visibility;
   return section(
     'head',
@@ -46,7 +47,7 @@ export function headSection(e, owner, setStatus, setVisibility) {
  * The choices it settles by have their own section.
  */
 export function fieldsSection(e, style, edit) {
-  const type = types.get(e.type);
+  const type = pageType(e.type);
   const declared = type?.fields ?? {};
   const settles = type?.capabilities?.settles;
   const choices = choicesOf(e, type) ? settles.choices : undefined;
@@ -79,7 +80,7 @@ export function fieldsSection(e, style, edit) {
  * (`pick(choice)`): a change like any other, which the rules apply or hold.
  */
 export function choicesSection(e, pick, edit) {
-  const c = choicesOf(e, types.get(e.type));
+  const c = choicesOf(e, pageType(e.type));
   if (!c) return null;
   const chosen = (x) => typeof c.picked === 'string' && (c.picked === x || c.picked.toLowerCase().startsWith(x.toLowerCase()));
   const open = Boolean(pick) && e.is_open && !e.archived_at;

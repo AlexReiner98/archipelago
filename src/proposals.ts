@@ -49,8 +49,8 @@ export async function rejection(tx: Q, ws: string, proposal: string, d: { outcom
   await stamp(tx); // the fact stream's lock: one decision at a time
   if ((await tx.query(`select 1 from proposal where id = $1 and status = 'pending'`, [proposal])).rows.length === 0) return false;
   const record = await entry(tx, proposal);
-  const held = record?.held_by as { rule: string; pack: string } | null | undefined;
-  const rule: Decision = { outcome: d.outcome, held_by: held ? { rule: held.rule, pack: held.pack } : null, proposal, proposal_hash: record?.hash ?? '', by: d.by, ...(d.note && { note: d.note }) };
+  const held = record?.held_by as { rule: string; pack: string; version?: string } | null | undefined;
+  const rule: Decision = { outcome: d.outcome, held_by: held ? { rule: held.rule, pack: held.pack, ...(held.version && { version: held.version }) } : null, proposal, proposal_hash: record?.hash ?? '', by: d.by, ...(d.note && { note: d.note }) };
   await projectDecision(tx, await append(tx, ws, 'facts', { id: newId('c'), actor: { id: d.actor }, authority: null, rule, reason: d.reason, source: null, action: null, undoes: null, keys: [] }, []));
   return true;
 }
@@ -73,7 +73,7 @@ export async function decideProposal(l: Archipelago, actor: Actor, input: { prop
       const problems = await overtakenFields(l, record.base as number, dropExcepted(ops, input.except ?? []));
       if (problems.length) throw overtaken(proposal.id, new Error(`Change rejected:\n- ${problems.join('\n- ')}`));
     }
-    const held = record?.held_by as { rule: string; pack: string } | null | undefined;
+    const held = record?.held_by as { rule: string; pack: string; version?: string } | null | undefined;
     result = await l.apply(
       proposal.actor,
       { ops, reason: proposal.reason, source: proposal.source ?? undefined, action: (record?.action as string | null) ?? undefined, undoes: (record?.undoes as string | null) ?? undefined, run: (record?.run as string | undefined) ?? undefined },
@@ -84,7 +84,7 @@ export async function decideProposal(l: Archipelago, actor: Actor, input: { prop
         privateTo: proposal.private_to ?? null,
         // The ids it would have made when it was held: with nothing moved since, the facts it appends are the ones it showed.
         ids: revised ? undefined : (record?.ids as Record<string, string> | undefined),
-        rule: { outcome: 'approved', held_by: held ? { rule: held.rule, pack: held.pack } : null, proposal: proposal.id, proposal_hash: record?.hash ?? '', by: me, revised, except: input.except ?? [], ...(input.note && { note: input.note }) },
+        rule: { outcome: 'approved', held_by: held ? { rule: held.rule, pack: held.pack, ...(held.version && { version: held.version }) } : null, proposal: proposal.id, proposal_hash: record?.hash ?? '', by: me, revised, except: input.except ?? [], ...(input.note && { note: input.note }) },
       },
     ).catch((err: Error) => { throw err.message.startsWith('Change rejected') ? overtaken(proposal.id, err) : err; });
   }

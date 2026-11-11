@@ -9,7 +9,7 @@ import type { Q } from './db.ts';
 import type { Archipelago, May } from './pelago.ts';
 import { askOnReply } from './replies.ts';
 import { hookWithin, recordUsage, resolveRun, sessionBegan, sessionHeard, sessionPrompted } from './sessions.ts';
-import { hookSessionEnd, hookSessionStart } from './session-hook.ts';
+import { hookSessionEnd, hookSessionStart, sessionIsland } from './session-hook.ts';
 import { sessionLabelled, sessionPromptNamed } from './session-name.ts';
 import { addTouched } from './touched.ts';
 import { fileSaid } from './file-said.ts';
@@ -82,13 +82,14 @@ const LIMITED =
 const actionsKey = (session: string | undefined) => `actions:${session ?? ''}`;
 
 /** What is said at `where` (an instruction's `for`), one after another: what to do about it is the instructions'. */
-const sayAt = async (l: Archipelago, where: string, fill: Record<string, string>) => (await instructionsFor(l, where, { fill })).map((one) => one.text).join(' ');
+const sayAt = async (l: Archipelago, where: string, fill: Record<string, string>, session?: string) =>
+  (await instructionsFor(l, where, { fill, island: await sessionIsland(l, session && (await resolveRun(l, session, true))?.id) })).map((one) => one.text).join(' ');
 
 // A client keeps the tools as they were when it connected; what to do about it is core's instruction for server_restarted.
-const restarted = async (l: Archipelago, { started, commit }: HookCall['running'], added: string[] | undefined) =>
+const restarted = async (l: Archipelago, { started, commit }: HookCall['running'], added: string[] | undefined, session?: string) =>
   `The Archipelago server has restarted since this session began (at ${started}${commit ? `, now running commit ${commit.slice(0, 7)}` : ''}). ${
     added?.length ? `Actions new since you were given the tools: ${added.join('; ')}. ` : added ? 'No action is new since you were given the tools. ' : ''
-  }${await sayAt(l, 'server_restarted', {})}`.trimEnd();
+  }${await sayAt(l, 'server_restarted', {}, session)}`.trimEnd();
 
 /**
  * What a session is told at a hook, the same for any surface: told, words added to what it reads next; go_on, why it
@@ -149,7 +150,7 @@ export async function sessionAnswer(event: string, call: HookCall): Promise<Neut
       // Which actions are new is told against what the session was given, or was last told of.
       const now = offeredActions(pelago.registry);
       const had = await kept<string[]>(whole, actionsKey(body.session_id));
-      lines.push(await restarted(pelago, running, had && now.filter((a) => !had.includes(a))));
+      lines.push(await restarted(pelago, running, had && now.filter((a) => !had.includes(a)), body.session_id));
       await keep(whole, actionsKey(body.session_id), now, HEARD_MS);
     }
     // How many of each, and the newest few: the rest is one query away.
@@ -186,7 +187,7 @@ export async function sessionAnswer(event: string, call: HookCall): Promise<Neut
     // A project keeps the files it was given when it was set up; the server moves on. A session is told when its
     // project is behind, since nothing else would: an old hook counts less, and old rules name tools as they were.
     if (setupBehind(body.setup)) {
-      const behind = await sayAt(pelago, 'setup_behind', { command: setupCommand(call.origin) });
+      const behind = await sayAt(pelago, 'setup_behind', { command: setupCommand(call.origin) }, body.session_id);
       if (behind) additionalContext += `\n\n${behind}`;
     }
     return told(additionalContext);

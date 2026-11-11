@@ -68,8 +68,48 @@ test('a version keeps its pack’s types, and an island names only a version of 
   const { l, trial, core, v2 } = await map();
   await refused(l, [{ op: 'update', id: core, props: { pack_version: v2 } }], /is a version of plain, and this island speaks core/);
   await refused(l, [{ op: 'update', id: trial, props: { pack_version: trial } }], /is no version of a pack here/);
-  await refused(l, [{ op: 'create', type: 'pack', title: 'Renamed', props: { version_of: 'plain', manifest: { types: [{ id: 'plain.other', title: 'Other', description: 'Renamed.', extends: 'work' }] } } }], /leaves out plain\.thing; it adds plain\.other/);
   await refused(l, [{ op: 'create', type: 'pack', title: 'Of nothing', props: { version_of: 'nope', manifest: {} } }], /a version of "nope", which is no pack here/);
   await refused(l, [{ op: 'create', type: 'pack', title: 'Of the kernel', props: { version_of: 'core', manifest: {} } }], /the kernel's own/);
   await refused(l, [{ op: 'create', type: 'pack', title: 'With code', props: { version_of: 'plain', manifest: { actions: [] } } }], /holds actions/);
+});
+
+/** A version that adds a type and a link type, and a tree over them in its views. */
+const growing = { op: 'create', ref: 'v3', type: 'pack', title: 'Plain, with parts', props: { version_of: 'plain', version: '1.2.0', manifest: {
+  types: [...plain.types, { id: 'plain.part', title: 'Part', description: 'A part of a thing.', extends: 'work' }],
+  links: [{ id: 'plain.feeds', title: 'feeds', description: 'One thing feeds another.', from: ['plain.thing'], to: ['plain.thing'] }],
+  views: [{ form: 'tree', id: 'plain.parts', title: 'Parts', description: 'Each thing and its parts.', roots: ['plain.thing'], branches: ['plain.part'], work: [], order: 'order', active: ['doing'] }],
+} } } as Op;
+
+test('a version may add types, link types and views: they are the pinned island’s alone', async () => {
+  const { l, trial, rest } = await map();
+  const { v3 } = await make(l, [growing]);
+  await make(l, [{ op: 'update', id: trial, props: { pack_version: v3 } }]);
+  const { a, b, p } = await make(l, [
+    { op: 'create', ref: 'a', type: 'plain.thing', title: 'Engine', props: { island: trial } },
+    { op: 'create', ref: 'b', type: 'plain.thing', title: 'Wheel', props: { island: trial } },
+    { op: 'create', ref: 'p', type: 'plain.part', title: 'Piston', props: { island: trial } },
+  ]);
+  await make(l, [{ op: 'link', type: 'part_of', from: p, to: a }, { op: 'link', type: 'plain.feeds', from: a, to: b }]);
+  await refused(l, [{ op: 'create', type: 'plain.part', title: 'Elsewhere', props: { island: rest } }], /plain\.part/);
+  const { c } = await make(l, [{ op: 'create', ref: 'c', type: 'plain.thing', title: 'Rest thing', props: { island: rest } }]);
+  await refused(l, [{ op: 'link', type: 'plain.feeds', from: c, to: a }], /plain\.feeds/);
+
+  // The version's tree answers a read on its island, and is no view of the map's.
+  const parts = (await callTool(l, human, 'query', { name: 'tree', params: { tree: 'plain.parts', root: a, island: trial } })) as { tree: { id: string }; root: { id: string }; branches: { id: string }[] };
+  assert.equal(parts.tree.id, 'plain.parts');
+  assert.deepEqual([parts.root.id, parts.branches.map((x) => x.id)], [a, [p]], 'the thing and its part');
+  await assert.rejects(callTool(l, human, 'query', { name: 'tree', params: { tree: 'plain.parts', root: a } }), /tree must be one of/);
+  await assert.rejects(callTool(l, human, 'query', { name: 'tree', params: { tree: 'plain.parts', root: a, island: rest } }), /tree must be one of/);
+
+  // The map keeps what the version adds, dormant, so its items are projected as their type says; rolled back, none is made.
+  assert.ok(l.registry.type('plain.part')?.dormant && l.registry.type('plain.part')?.retired, 'the map has the added type, and makes none of it');
+  assert.equal((await l.entity(p))?.status, 'todo', 'the part was made with its type’s first status');
+  await make(l, [{ op: 'update', id: trial, props: { pack_version: null } }]);
+  await refused(l, [{ op: 'create', type: 'plain.part', title: 'After', props: { island: trial } }], /retired here/);
+});
+
+test('a version never leaves out a type, and names what it adds as its pack’s', async () => {
+  const { l } = await map();
+  await refused(l, [{ op: 'create', type: 'pack', title: 'Dropping', props: { version_of: 'plain', manifest: { types: [{ id: 'plain.other', title: 'Other', description: 'Renamed.', extends: 'work' }] } } }], /leaves out plain\.thing/);
+  await refused(l, [{ op: 'create', type: 'pack', title: 'Misnamed', props: { version_of: 'plain', manifest: { types: [...plain.types, { id: 'other.part', title: 'Part', description: 'A part.', extends: 'work' }] } } }], /named plain\.<what>: other\.part/);
 });

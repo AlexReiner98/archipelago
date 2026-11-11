@@ -183,23 +183,59 @@ the pack as it is (task e_j4bzhegb, `src/island-pin.ts`).
 
 - **A version is a pack item** whose `version_of` names the pack (one the
   server has or one kept as an item; never core). It holds what a pack item
-  may, and over its pack's manifest takes the place of those keys alone, so a
-  map pack's code stays as it is. It declares the same types and link types by
-  the same ids: it may change their fields, the rules and the instructions,
-  never rename one. It is checked when written, as an island would run it,
-  and is never added as a pack of its own.
+  may, and over its pack's manifest takes the place of those keys alone:
+  never layouts, handlers, actions or reach in its manifest. It may change its types' fields, the rules, the views the kernel
+  draws (trees, screens, reasons for attention) and the styles (instructions,
+  lenses, looks). It keeps every type and link type its pack declares, by the
+  same ids, since items may be of them, and may add its own, named
+  `<pack>.<what>`: it never leaves one out or renames it. It is checked when
+  written, as an island would run it, and is never added as a pack of its own.
+- **What a version adds is the island's.** The map's registry keeps each type
+  and link type a version adds, dormant and retired (`src/version-types.ts`):
+  an item made of one is projected as its type says, on the write path and in
+  a rebuild from the log, and nothing new is made of it but on an island that
+  runs the version. A link is judged by the version its from item's island
+  runs. Rolled back, the island's items of an added type stay, as a pack's do
+  when it is turned off, and no more are made.
+- **A version of a server's pack may carry code** (task e_7vezatrt,
+  `src/pack-code.ts`): its field `code`, files by path (`handler.js`,
+  `layouts/x.js`), each standing in for its pack's file of that path. It is
+  laid out in a folder of its own, kept by the hash of the whole, and runs
+  from there under the same walls as the pack's own, on the islands that run
+  the version alone: an action or a view called with `island` runs it, any
+  other call the map's. An agent's word for it always waits for the owner
+  (core's rule `pack_code`, which no setting lifts). A pack kept as an item,
+  and a version of one, carries none.
 - **An island runs it** by naming the item in its field `pack_version`; the
-  version must be of the pack the island speaks. Setting it is a change, and
+  version must be of the pack the island speaks, or of a map pack (one that
+  owns no type living on an island): one version per island. Setting it is a change, and
   unsetting it is the rollback: nothing is unwound.
 - **A registry per version.** The map's registry keeps each version and
   builds, on first ask, a registry with the version in its pack's place,
   kept until the map's loads again. What an item on the island is checked
   against when written (`planChange`) and what is said there
   (`instructionsFor` with `island`, the `instructions` view's param `island`)
-  are read from the registry the island runs, and so is what a session started on a task there is told (session_start with `task`); every other read is the map's.
+  are read from the registry the island runs, and so is what a session started on a task there is told (session_start with `task`).
+- **A read that names an island is the island's.** A view asked with
+  `island` in its params (`askView`) is answered through the registry that
+  island runs: a version's changed tree or reasons answer there and nowhere
+  else. A read that names no island is the map's, though it may cross
+  islands: an item is not read through its own island's version one by one.
 
-Not yet: the rules that decide a change, and what a session's hook tells it
-at its start (it knows no task), are still the map's on a trial island.
+- **Its rules decide there** (task e_tykp9yfc, `src/island-rules.ts`). Each
+  op is judged by the rules of the version its island runs, for the pack the
+  version is of; every other pack's rules, core's among them, stay the map's.
+  A create is on the island it is made on, an update or archive on its item's,
+  a link or merge on both ends'; an op on no island, or on one that runs the
+  map's pack, is judged by the map's rules. A change is held or refused if
+  any op is, and a held change names the rule and the version (`held_by`
+  `version`, the pack item) that held it.
+
+Not yet: what a session's hook tells it at its start (it knows no task) is
+still the map's on a trial island. So are what the page draws from the map's
+configuration (the bar's lens presets, the screens on an item's page), which
+asks with no island. And a version archived takes its added types with it:
+its items' types are then unknown, as no type table keeps them.
 
 ## Where packs are found
 

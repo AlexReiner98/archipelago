@@ -8,7 +8,7 @@
 // its detail the item's version (its last position in the fact stream), and the packs it came due under (src/pack-versions.ts), so what it does can name what it answered.
 
 import { onPass } from './due-on.ts';
-import { packVersions } from './pack-versions.ts';
+import { packVersionsFor } from './pack-versions.ts';
 import { hostFor } from './packtools.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { spansOf, zoneOf } from './timeaxis.ts';
@@ -57,7 +57,8 @@ export async function duePass(l: Archipelago, now = Date.now()): Promise<Due[]> 
   const host = hostFor(l.registry);
   const tell = async (event: { action: string; target: string; reason: string; detail: Record<string, unknown> }) => {
     const version = (await versionsOf(l, [event.target])).get(event.target) ?? null;
-    const told = { ...event, detail: { ...event.detail, version, packs: packVersions(l.registry) } };
+    // The packs it came due under: those its item's island runs (src/island-pin.ts), the map's elsewhere.
+    const told = { ...event, detail: { ...event.detail, version, packs: await packVersionsFor(l, await l.entity(event.target)) } };
     const seq = await l.log(l.db, { actor: 'agent:pelago', ...told });
     host.tell(l, 'kernel', { ...told, seq });
   };

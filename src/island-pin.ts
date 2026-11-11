@@ -2,7 +2,8 @@
 // plan "The harness refines itself through packs", e_e9526ead). A version is a pack item that names the pack in its
 // field version_of (src/pack-items.ts): it declares the same types and link types by the same ids, and may change
 // their fields, the rules and the instructions. An island runs one by naming it in its field pack_version; unset, it
-// runs the map's. Setting it is a change like any other, and unsetting it is the rollback: nothing is unwound.
+// runs the map's. It names a version of the pack it speaks, or of a map pack (one that brings code and looks to the
+// whole map, src/islands.ts): a map pack's version may carry code of its own, run there alone (src/pack-code.ts). Setting it is a change like any other, and unsetting it is the rollback: nothing is unwound.
 //
 // Each version runs in a registry of its own, built from the map's with the version in its pack's place and kept until
 // the map's loads again: so every read of a type stays one consistent map, and nothing that reads a registry has to
@@ -10,6 +11,8 @@
 // from the registry the island runs (islandRegistry).
 
 import { ISLAND } from './island-items.ts';
+import { actorsOf, packKind, sharedOf } from './islands.ts';
+import { KERNEL_PACKS } from './packorder.ts';
 import type { PackVersion } from './pack-items.ts';
 import type { Registry } from './packs.ts';
 import type { Archipelago } from './pelago.ts';
@@ -38,19 +41,36 @@ export function versionRegistry(reg: Registry, item: string): Registry | Error |
   return mine.get(item);
 }
 
-/** The version an island names, if the island is one and the version is of the pack it speaks. */
+/** Whether a pack here is a map pack: it owns no type that lives on an island, so a version of it may be tried on any island. */
+function mapPack(reg: Registry, id: string): boolean {
+  const m = reg.found.find((p) => p.id === id);
+  if (!m) return false;
+  const kernel = sharedOf(reg.found.filter((p) => KERNEL_PACKS.includes(p.id)));
+  return packKind(m, { ...kernel, actors: actorsOf(reg.found, kernel.actors) }) === 'map';
+}
+
+/** Whether an island may run this version: one of the pack it speaks, or of a map pack. */
+const mayRun = (reg: Registry, of: string, island: { props: Record<string, unknown> }) => of === island.props.pack || mapPack(reg, of);
+
+/** The version an island names, if the island is one and it may run that version. */
 const pinOf = (reg: Registry, island: { type: string; props: Record<string, unknown>; archived_at?: unknown }) => {
   const pinned = island.props[PACK_VERSION];
-  return !island.archived_at && reg.isA(island.type, ISLAND) && typeof pinned === 'string' && reg.versions.get(pinned)?.of === island.props.pack ? pinned : undefined;
+  const version = typeof pinned === 'string' ? reg.versions.get(pinned) : undefined;
+  return !island.archived_at && reg.isA(island.type, ISLAND) && version && mayRun(reg, version.of, island) ? (pinned as string) : undefined;
 };
 
-/** The registry an island runs: the one of the version it names, else the map's (`reg`). No island, or one that names none, is the map's. */
-export async function islandRegistry(map: Archipelago, island: unknown, reg: Registry = map.registry): Promise<Registry> {
-  if (typeof island !== 'string' || !island) return reg;
+/** The version an island runs and its registry; undefined where it runs the map's (no island, none named, or one that does not load). */
+export async function islandVersion(map: Archipelago, island: unknown, reg: Registry = map.registry): Promise<{ registry: Registry; version: PackVersion } | undefined> {
+  if (typeof island !== 'string' || !island) return undefined;
   const found = await map.entity(island);
   const pinned = found && pinOf(reg, found);
   const run = pinned ? versionRegistry(reg, pinned) : undefined;
-  return run instanceof Error || !run ? reg : run;
+  return run instanceof Error || !run ? undefined : { registry: run, version: reg.versions.get(pinned as string)! };
+}
+
+/** The registry an island runs: the one of the version it names, else the map's (`reg`). No island, or one that names none, is the map's. */
+export async function islandRegistry(map: Archipelago, island: unknown, reg: Registry = map.registry): Promise<Registry> {
+  return (await islandVersion(map, island, reg))?.registry ?? reg;
 }
 
 /** Why ops that set an island's version cannot be kept, as sentences: it names no version, one of another pack, or one that does not load. */
@@ -64,7 +84,7 @@ export async function pinRefusals(map: Archipelago, reg: Registry, ops: Op[]): P
     const where = `op ${i + 1} (${op.op})`;
     const item = String(set), version = reg.versions.get(item);
     if (!version) { errors.push(`${where}: ${reg.madeWrong.has(item) ? `the pack item ${item} is no version: ${reg.madeWrong.get(item)}` : `"${item}" is no version of a pack here: a pack item whose version_of names the pack`}`); continue; }
-    if (version.of !== island.props.pack) { errors.push(`${where}: ${item} is a version of ${version.of}, and this island speaks ${String(island.props.pack ?? 'none')}`); continue; }
+    if (!mayRun(reg, version.of, island)) { errors.push(`${where}: ${item} is a version of ${version.of}, and this island speaks ${String(island.props.pack ?? 'none')}`); continue; }
     const run = versionRegistry(reg, item);
     if (run instanceof Error) errors.push(`${where}: the version ${item} of ${version.of} does not load: ${run.message}`);
   }

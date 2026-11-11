@@ -5,11 +5,12 @@
 
 import type { ViewDef } from './declared.ts';
 import { parts } from './manifest.ts';
-import { hostFor } from './packtools.ts';
+import { hostIn } from './packtools.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import type { Registry } from './packs.ts';
 import { REPLACED } from './attention.ts';
 import { answerPreset } from './query-presets.ts';
+import { islandRegistry } from './island-pin.ts';
 import { setPackAsker, VIEWS } from './views.ts';
 import { used } from './uses.ts';
 
@@ -63,7 +64,9 @@ export const canAsk = (l: Archipelago, name: string) => Boolean(VIEWS[name] ?? p
 setPackAsker((l, name, params) => askView(l, { kind: 'agent', name: 'kernel' }, name, params));
 
 /** Answer a question by its name. */
-export async function askView(l: Archipelago, actor: Actor, name: string, params: Record<string, unknown> = {}): Promise<unknown> {
+export async function askView(map: Archipelago, actor: Actor, name: string, params: Record<string, unknown> = {}): Promise<unknown> {
+  // A read that names an island is read as that island runs: through the version of its pack it names, if any.
+  const l = typeof params.island === 'string' ? map.readIn(await islandRegistry(map, params.island)) : map;
   const view = VIEWS[name];
   if (view) return view.run(l, params, actor);
   const found = packView(l, name);
@@ -71,5 +74,5 @@ export async function askView(l: Archipelago, actor: Actor, name: string, params
   if (!found) throw new Error(`No view "${name}". Views: ${Object.keys(viewList(l)).join(', ')}`);
   used(l.workspace, 'view', found.def.id);
   if (found.def.lens) return answerPreset(l, found.def, params);
-  return (await hostFor(l.registry).call(l, actor, found.pack, 'view', found.def.id, params, found.def.limit_ms)).answer ?? null;
+  return (await (await hostIn(map, found.pack, params.island)).call(l, actor, found.pack, 'view', found.def.id, params, found.def.limit_ms)).answer ?? null;
 }
