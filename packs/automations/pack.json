@@ -2,7 +2,7 @@
   "id": "automations",
   "version": "0.1.0",
   "title": "Automations",
-  "description": "Does what an automation says when it comes due: the kernel's clock tells it an automation's time has come, and it makes the notification, about what the automation is about. It owns no type: core's automation type is what it acts on.",
+  "description": "Does what an automation says when it comes due: the kernel's clock tells it an automation's time has come, and it makes the notification, about what the automation is about, or asks the kernel to start the session it says. It owns no type: core's automation type is what it acts on.",
   "handlers": [{ "event": "item.due", "records": ["automation.fired"], "limit_ms": 5000 }],
   "rules": [
     {

@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { answerDue, fires, noticeOf } from './fire.js';
+import { answerDue, fires, launchOf, noticeOf } from './fire.js';
 import handler from './handler.js';
 
 const A = 'e_auto0001', S = 'e_subject1';
@@ -24,10 +24,21 @@ test('a notification is about the automation\'s subject, its message its title',
   assert.deepEqual(noticeOf(auto({ level: 'loud' }), undefined), { title: 'Morning', level: 'info', about: A }, 'about nothing: about itself');
 });
 
-test('notify answers one notification; any other action nothing yet', () => {
+test('notify answers one notification; launch the session its input says, not while its last is open', () => {
   assert.deepEqual(answerDue(auto({ message: 'Hi' }), S), { notify: [{ title: 'Hi', level: 'info', about: S }], reason: 'Morning: notified' });
-  assert.deepEqual(answerDue(auto({ action: 'launch' }), S), {});
+  const launching = auto({ action: 'launch', input: { task: 'e_task0001', instructions: 'Refine.' } });
+  assert.deepEqual(answerDue(launching, S), { launch: { task: 'e_task0001', mode: 'plan', instructions: 'Refine.' }, reason: 'Morning: launched' });
+  assert.deepEqual(answerDue(launching, S, true), {}, 'its last session still open');
+  assert.deepEqual(launchOf(auto({ action: 'launch', input: { task: 'e_task0001', mode: 'acceptEdits', instructions: '' } })), { task: 'e_task0001', mode: 'acceptEdits' });
+  assert.deepEqual(answerDue(auto({ action: 'tool' }), S), {});
   assert.deepEqual(answerDue(auto({}, 'paused'), S), {});
+});
+
+test('the handler reads the last session an automation that launches started', async () => {
+  const launching = auto({ action: 'launch', input: { task: 'e_task0001' }, last_run: 'e_run00001' });
+  const ctx = (open: boolean) => ({ read: async (q: { get?: string }) => (q.get === A ? launching : q.get === 'e_run00001' ? { id: 'e_run00001', is_open: open } : []) });
+  assert.deepEqual((await handler['item.due']({ event: due }, ctx(false))).launch, { task: 'e_task0001', mode: 'plan' });
+  assert.deepEqual(await handler['item.due']({ event: due }, ctx(true)), {});
 });
 
 test('the handler reads the item and what it is about', async () => {

@@ -7,6 +7,8 @@
 export const FIRED = 'automation.fired';
 /** The ref a firing's notification is named by in its fact. */
 export const NOTICE = 'notice';
+/** The ref the session a firing launched is named by in its fact: the kernel fills in its run (src/packhost.ts). */
+export const RUN = 'run';
 const LONGEST = 200;
 
 const short = (text) => {
@@ -27,6 +29,17 @@ const occurrence = (event) => ({
  * does nothing (a paused automation, an action not done here) fired nothing and records nothing.
  */
 export function withFiring(item, event, answer) {
+  if (answer?.launch) {
+    // The kernel starts the session after the handler answers, so the fact names its run as {run}.
+    const fact = {
+      action: FIRED,
+      target: item.id,
+      reason: `${item.title}: launched`,
+      detail: { ...occurrence(event), ok: true, result: 'launched', made: [`{${RUN}}`] },
+      otherwise: { reason: `${item.title}: failed`, detail: { ok: false, result: 'session not started: {error}' } },
+    };
+    return { ...answer, log: [...(answer.log ?? []), fact] };
+  }
   const notices = answer?.notify ?? [];
   if (!notices.length) return answer;
   const notify = notices.map((n, i) => ({ ...n, ref: i ? `${NOTICE}${i}` : NOTICE }));

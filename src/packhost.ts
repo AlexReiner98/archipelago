@@ -12,6 +12,7 @@ import { createInterface } from 'node:readline';
 import { notify } from './notify.ts';
 import { mailHeard, type NotificationMail } from './notify-mail.ts';
 import { handleRequests, type OutsideRequest } from './outside.ts';
+import { launchHeard, type LaunchAsked } from './pack-launch.ts';
 import { answerBeyond, holdWorkspace, NOT_BEYOND } from './pack-reach.ts';
 import type { PackFile } from './packs.ts';
 import { answerRead, type Read } from './packreads.ts';
@@ -45,6 +46,8 @@ export interface Done {
   notify?: { title: string; body?: string; level?: 'info' | 'warning' | 'urgent'; about?: string; ref?: string }[];
   /** On hearing a notification made: one mail about it, to its person (src/notify-mail.ts). */
   mail?: NotificationMail[];
+  /** On hearing an automation come due: the session it says to start, started by the kernel (src/pack-launch.ts). */
+  launch?: LaunchAsked;
 }
 
 export interface LogEntry {
@@ -240,15 +243,18 @@ export class PackHost {
     // Refused whole, before anything is written: an event of a kind its pack does not declare.
     for (const e of done.log ?? []) if (!parts(file).events.includes(e.action)) throw new Error(`The ${pack} pack declares no event "${e.action}"`);
     const mailed = done.mail?.length ? await mailHeard(l, pack, call === 'event' ? input : undefined, done.mail) : undefined;
+    const launched = done.launch ? await launchHeard(l, pack, call === 'event' ? input : undefined, done.launch) : undefined;
     const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name, pack, ...islandIn(input) }) : undefined;
     const action = call === 'action' ? parts(file).actions.find((a) => a.id === name) : undefined;
     const outside = done.requests?.length ? await handleRequests(this, l, actor, file, action, done.requests, (changed as { changeset?: string } | undefined)?.changeset) : undefined;
     const made = (changed as { created?: Record<string, string> } | undefined)?.created ?? {};
     const answer = done.answer === undefined ? null : JSON.parse(JSON.stringify(done.answer).replace(/\{([^{}\s"]+)\}/g, (whole, ref: string) => made[ref] ?? whole));
     const dropped = changed?.status === 'applied' && done.drop_pictures?.length ? await dropPictures(l, actor, done.drop_pictures, done.reason?.trim() || name) : undefined;
-    const { logged, others } = await further(l, actor, file, name, done, input);
+    // What it logged may name the run it launched as {run}; one not started is the failure of what names it.
+    const ran = launched ? (launched.run ? { made: { run: launched.run } } : { failed: { run: launched.why ?? 'not started' } }) : {};
+    const { logged, others } = await further(l, actor, file, name, done, input, ran);
     for (const e of logged) this.tell(l, file.id, e);
-    return { answer, ...changed, ...(mailed && { mailed }), ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }) };
+    return { answer, ...changed, ...(mailed && { mailed }), ...(launched && { launched }), ...(outside && { requests: outside }), ...(dropped !== undefined && { pictures_removed: dropped }), ...(others.length && { changes: others }) };
   }
 
   /**
@@ -278,10 +284,10 @@ export class PackHost {
  * What a call answered beyond its own ops: the events it records (of the kinds its pack declares, checked first), what the owner is
  * told, and further change sets, each with its own reason, so a person approves or declines each on its own.
  */
-async function further(l: Archipelago, actor: Actor, file: PackFile, name: string, done: Done, input: unknown) {
+async function further(l: Archipelago, actor: Actor, file: PackFile, name: string, done: Done, input: unknown, ran: { made?: Record<string, string>; failed?: Record<string, string> } = {}) {
   // Made first, so what is logged can name them: one with a ref that fails is the failure of what names it, not the call's.
-  const made: Record<string, string> = {};
-  const failed: Record<string, string> = {};
+  const made: Record<string, string> = { ...ran.made };
+  const failed: Record<string, string> = { ...ran.failed };
   for (const { ref, ...n } of done.notify ?? []) {
     if (!ref) await notify(l, actor, n);
     else await notify(l, actor, n).then((r) => (made[ref] = r.notification), (err: Error) => (failed[ref] = err.message));
