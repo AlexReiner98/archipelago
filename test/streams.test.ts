@@ -215,7 +215,9 @@ test('what is not sealed is not compacted', async () => {
 test('the packs declare a rule for every stream', async () => {
   const l = await fresh();
   const retention = l.registry.rules.filter((r) => r.stream);
-  for (const s of ['sessions', 'claims', 'notifications', 'automations', 'settings', 'access', 'observations', 'places', 'counts:visits', 'pack:*']) assert.ok(retention.some((r) => r.stream === s), s);
+  // places is retired and has no rule (e_yt84zyvj): nothing appends to it, and an entry no rule names is kept.
+  assert.ok(!retention.some((r) => r.stream === 'places'), 'places has no rule');
+  for (const s of ['sessions', 'claims', 'notifications', 'automations', 'settings', 'access', 'observations', 'counts:visits', 'pack:*']) assert.ok(retention.some((r) => r.stream === s), s);
   const [e] = await record(l.db, 'default', 'observations', 'system', [['+', 'c', 'status', 'up']], { rules: l.registry.rules });
   assert.equal(e.rule, 'observations');
 });
