@@ -11,6 +11,7 @@ import type { Registry } from './packs.ts';
 import { checkRetention, type Keep } from './retention.ts';
 import { fieldInReach, inReach } from './reach.ts';
 import { checkReplyRule, onReply } from './reply-rules.ts';
+import { KERNEL_PACKS } from './packorder.ts';
 
 type OneOrMany = string | string[];
 
@@ -94,7 +95,8 @@ export interface RuleDef {
   keep?: Keep;
 }
 
-export type Rule = RuleDef & { pack: string };
+/** A rule as loaded: the pack it is of, and the version of that pack where an island runs one. */
+export type Rule = RuleDef & { pack: string; version?: string };
 
 /** The rule that decided something, as a change's answer and a held proposal name it. */
 export interface Ruled {
@@ -103,6 +105,14 @@ export interface Ruled {
   say: string;
   /** Of a rule that did not hold it: what let it through, a setting (agent_code), the server's policy (server) or holds being off (holds_off). */
   lifted_by?: string;
+  /** The version of its pack the rule is of (its pack item), where an island runs one (src/island-pin.ts). */
+  version?: string;
+}
+
+/** A version of a pack an island runs, as decide reads it: its registry, its pack item and the pack it is of. */
+export interface IslandRun {
+  registry: Registry;
+  version: { item: string; of: string };
 }
 
 /** An item a change is written to, as it is before the change. */
@@ -401,28 +411,53 @@ export interface Verdict {
   holds_off?: true;
 }
 
-/** How particular a rule is: the more it asks of a change, the more it says about why one waits. */
-const particular = (r: Ruled, rules: Rule[]) => Object.keys(rules.find((x) => x.id === r.rule && x.pack === r.pack)?.when ?? {}).length;
+/** A rule's key, the version it is of included: the same rule of a pack and of its version are two. */
+const keyOf = (r: { rule?: string; id?: string; pack: string; version?: string }) => `${r.pack}.${r.rule ?? r.id ?? ''}.${r.version ?? ''}`;
 
-/** What the rules make of a change: whether it applies, waits or is refused, and the rule that decided it. */
-export async function decide(q: Q, reg: Registry, who: Who, given: { op: string }[], policy: Partial<Policy> = {}): Promise<Verdict> {
+/**
+ * The rules an op on an island that runs a version is under: the version's for the pack it is of, the map's for every
+ * other. Core's own (agent_changes, settle, forget...) are always the map's: a version is never of the kernel's packs.
+ */
+function rulesUnder(base: Rule[], run: IslandRun): Rule[] {
+  const of = run.version.of;
+  if (KERNEL_PACKS.includes(of)) return base;
+  return [...base.filter((r) => r.pack !== of), ...run.registry.rules.filter((r) => r.pack === of).map((r) => ({ ...r, version: run.version.item }))];
+}
+
+/**
+ * What the rules make of a change: whether it applies, waits or is refused, and the rule that decided it. `runs` says,
+ * for each op, the versions of packs its islands run (src/island-rules.ts), undefined for an island on the map's: the
+ * op is judged under each, and held or refused if it is under any. Left out, every op is judged by the map's rules.
+ */
+export async function decide(q: Q, reg: Registry, who: Who, given: { op: string }[], policy: Partial<Policy> = {}, runs: (IslandRun | undefined)[][] = []): Promise<Verdict> {
   const rules = [...serverRules(policy), ...reg.rules];
-  const lifted: Lifted = who.human && !who.drawing ? () => false : await liftsOf(q, rules, policy);
+  const under = (run: IslandRun | undefined): { rules: Rule[]; registry: Registry } => (run ? { rules: rulesUnder(rules, run), registry: run.registry } : { rules, registry: reg });
+  const every = new Map([...rules, ...runs.flat().flatMap((run) => (run ? under(run).rules : []))].filter((r) => r.id).reverse().map((r) => [keyOf(r), r])); // the first of a name wins, as a find would
+  const lifted: Lifted = who.human && !who.drawing ? () => false : await liftsOf(q, [...rules, ...runs.flat().flatMap((run) => (run ? under(run).rules : []))], policy);
   const ops = given as (Written & { id?: string; keep?: string; drop?: string })[];
   const on = (op: (typeof ops)[number]) => (op.op === 'merge' ? [op.keep!, op.drop!] : op.id ? [op.id] : []);
   const found = new Map((await q.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ops.flatMap(on)])).rows.map((e) => [e.id, e]));
   // With holds off, what a rule holds applies as made; a wait the change or its token asked for (asked, may) still holds.
   const off = who.human && !who.drawing ? false : await holdsOff(q);
-  const askedFor = (r: Ruled) => { const when = rules.find((x) => x.id === r.rule && x.pack === r.pack)?.when; return when?.asked !== undefined || when?.may !== undefined; };
-  const judged = await Promise.all(ops.map(async (op) => {
+  const askedFor = (r: Ruled) => { const when = every.get(keyOf(r))?.when; return when?.asked !== undefined || when?.may !== undefined; };
+  const once = <T>(xs: T[], key: (x: T) => string) => [...new Map(xs.map((x) => [key(x), x])).values()];
+  const judged = await Promise.all(ops.map(async (op, i) => {
     const targets = on(op).flatMap((id) => found.get(id) ?? []);
-    const one = judge(rules, reg, who, op, targets, lifted);
-    const passed = off ? one.held.filter((r) => !askedFor(r)) : [];
-    return { held: one.held.filter((r) => !passed.includes(r)), spared: [...one.spared, ...passed.map((r) => ({ ...r, lifted_by: HOLDS_OFF }))], passed: passed.length, refusers: one.refusers, refused: [...one.refused, ...(await clashes(q, reg, op, targets[0]))] };
+    const each = await Promise.all((runs[i]?.length ? runs[i] : [undefined]).map(async (run) => {
+      const { rules: these, registry } = under(run);
+      // A rule of a version names it: the held change says which version of the pack held it.
+      const mark = (r: Ruled) => (run && r.pack === run.version.of && !KERNEL_PACKS.includes(r.pack) ? { ...r, version: run.version.item } : r);
+      const one = judge(these, registry, who, op, targets, lifted);
+      return { held: one.held.map(mark), spared: one.spared.map(mark), refusers: one.refusers.map(mark), refused: [...one.refused, ...(await clashes(q, registry, op, targets[0]))] };
+    }));
+    const held = once(each.flatMap((e) => e.held), keyOf);
+    const passed = off ? held.filter((r) => !askedFor(r)) : [];
+    return { held: held.filter((r) => !passed.includes(r)), spared: [...once(each.flatMap((e) => e.spared), keyOf), ...passed.map((r) => ({ ...r, lifted_by: HOLDS_OFF }))], passed: passed.length, refusers: once(each.flatMap((e) => e.refusers), keyOf), refused: [...new Set(each.flatMap((e) => e.refused))] };
   }));
   const refused = judged.flatMap((j) => j.refused);
   const held = judged.flatMap((j) => j.held);
-  const by = [...held].sort((a, b) => particular(b, rules) - particular(a, rules))[0];
+  const particular = (r: Ruled) => Object.keys(every.get(keyOf(r))?.when ?? {}).length;
+  const by = [...held].sort((a, b) => particular(b) - particular(a))[0];
   const passed = judged.some((j) => j.passed);
   return { outcome: refused.length ? 'refuse' : held.length ? 'hold' : 'apply', by, held, refused, refusers: judged.flatMap((j) => j.refusers), spared: judged.map((j) => j.spared), ...(passed && { holds_off: true as const }) };
 }

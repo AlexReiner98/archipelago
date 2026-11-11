@@ -44,13 +44,18 @@ const pinOf = (reg: Registry, island: { type: string; props: Record<string, unkn
   return !island.archived_at && reg.isA(island.type, ISLAND) && typeof pinned === 'string' && reg.versions.get(pinned)?.of === island.props.pack ? pinned : undefined;
 };
 
-/** The registry an island runs: the one of the version it names, else the map's (`reg`). No island, or one that names none, is the map's. */
-export async function islandRegistry(map: Archipelago, island: unknown, reg: Registry = map.registry): Promise<Registry> {
-  if (typeof island !== 'string' || !island) return reg;
+/** The version an island runs and its registry; undefined where it runs the map's (no island, none named, or one that does not load). */
+export async function islandVersion(map: Archipelago, island: unknown, reg: Registry = map.registry): Promise<{ registry: Registry; version: PackVersion } | undefined> {
+  if (typeof island !== 'string' || !island) return undefined;
   const found = await map.entity(island);
   const pinned = found && pinOf(reg, found);
   const run = pinned ? versionRegistry(reg, pinned) : undefined;
-  return run instanceof Error || !run ? reg : run;
+  return run instanceof Error || !run ? undefined : { registry: run, version: reg.versions.get(pinned as string)! };
+}
+
+/** The registry an island runs: the one of the version it names, else the map's (`reg`). No island, or one that names none, is the map's. */
+export async function islandRegistry(map: Archipelago, island: unknown, reg: Registry = map.registry): Promise<Registry> {
+  return (await islandVersion(map, island, reg))?.registry ?? reg;
 }
 
 /** Why ops that set an island's version cannot be kept, as sentences: it names no version, one of another pack, or one that does not load. */

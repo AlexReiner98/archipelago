@@ -198,8 +198,17 @@ the pack as it is (task e_j4bzhegb, `src/island-pin.ts`).
   (`instructionsFor` with `island`, the `instructions` view's param `island`)
   are read from the registry the island runs, and so is what a session started on a task there is told (session_start with `task`); every other read is the map's.
 
-Not yet: the rules that decide a change, and what a session's hook tells it
-at its start (it knows no task), are still the map's on a trial island.
+- **Its rules decide there** (task e_tykp9yfc, `src/island-rules.ts`). Each
+  op is judged by the rules of the version its island runs, for the pack the
+  version is of; every other pack's rules, core's among them, stay the map's.
+  A create is on the island it is made on, an update or archive on its item's,
+  a link or merge on both ends'; an op on no island, or on one that runs the
+  map's pack, is judged by the map's rules. A change is held or refused if
+  any op is, and a held change names the rule and the version (`held_by`
+  `version`, the pack item) that held it.
+
+Not yet: what a session's hook tells it at its start (it knows no task) is
+still the map's on a trial island.
 
 ## Where packs are found
 

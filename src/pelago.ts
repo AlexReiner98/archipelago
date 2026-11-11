@@ -12,7 +12,7 @@ import { search, type SearchInput } from './search.ts'; import { layoutOf } from
 import { append, headOf, type Fact } from './log.ts'; import { projectDecision, projectFacts, stamp } from './replay.ts'; import { linkFacts } from './facts.ts';
 import { decideProposal } from './proposals.ts'; import { guardedFetch } from './outbound.ts'; import { needHuman } from './actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
-import { planChange } from './change-plan.ts'; import { used } from './uses.ts'; import { placeOnIslands } from './island-items.ts'; import { placeWithSubject } from './subject.ts'; import { applyChange, letThrough } from './change-apply.ts';
+import { planChange } from './change-plan.ts'; import { used } from './uses.ts'; import { placeOnIslands } from './island-items.ts'; import { placeWithSubject } from './subject.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from './island-rules.ts';
 
 export * from './pelago-types.ts';
 export type { Level, OpKind, Policy } from './rules.ts';
@@ -90,7 +90,8 @@ export class Archipelago {
     const authority = authorityOf(actor.kind === 'human', me, claimed);
     // Whether it applies, waits or is refused is the rules' to say (src/rules.ts), and the answer names the rule.
     const who = { human: actor.kind === 'human', reading: measured, may: actor.may, asked: input.hold, said: Boolean(claimed), ownerSaid: claimed?.of === 'human' && Boolean(claimed.basis?.trim()), pack: input.pack, ...(await layoutOf(this, actor, input)) };
-    const verdict = await decide(this.db, this.registry, who, input.ops, this.policy);
+    // Each op is judged by the rules of the version of its pack its island runs, if one does (src/island-rules.ts).
+    const verdict = await decide(this.db, this.registry, who, input.ops, this.policy, await opRuns(this, input.ops));
     // Each rule that refused or held it is counted once a change, for the Packs screen (src/uses.ts).
     for (const r of new Set(verdict.refusers.map((x) => `${x.pack}.${x.rule}`))) used(this.workspace, 'refused', r);
     if (verdict.outcome === 'hold') for (const r of new Set(verdict.held.map((x) => `${x.pack}.${x.rule}`))) used(this.workspace, 'held', r);
@@ -112,7 +113,7 @@ export class Archipelago {
       const id = newId('p');
       // What it would do on the map as it is now, with the ids it would make: approved with nothing moved, it appends these facts.
       const { facts = [], ids = {}, created: would = {} } = await this.apply(me, input, { authority, dry: true });
-      const base = (await headOf(this.db)).pos, rule = verdict.by && { rule: verdict.by.rule, pack: verdict.by.pack, say: verdict.by.say };
+      const base = (await headOf(this.db)).pos, rule = verdict.by && { rule: verdict.by.rule, pack: verdict.by.pack, say: verdict.by.say, ...(verdict.by.version && { version: verdict.by.version }) };
       // The queue is a projection of the pending stream: the record makes its row (src/replay.ts).
       await this.db.transaction(async (tx) =>
         projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, ...(input.run && { run: input.run }), base, ops: input.ops, warnings, ids, private_to: this.viewer || null }, facts)),

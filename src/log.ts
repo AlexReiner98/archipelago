@@ -18,7 +18,7 @@ export type Fact = ['+', string, string, unknown] | ['+', string, string, unknow
 /** What decided a change set (section 3). */
 export type Decision =
   | { outcome: 'apply'; spared: { rule: string; pack: string }[] }
-  | { outcome: 'approved' | 'rejected' | 'superseded' | 'withdrawn'; held_by: { rule: string; pack: string } | null; proposal: string; proposal_hash: string; by: string; revised?: boolean; except?: string[]; note?: string };
+  | { outcome: 'approved' | 'rejected' | 'superseded' | 'withdrawn'; held_by: { rule: string; pack: string; version?: string } | null; proposal: string; proposal_hash: string; by: string; revised?: boolean; except?: string[]; note?: string };
 
 export interface Entry {
   v: 1;
