@@ -1164,14 +1164,6 @@
       "say": "The latest reading, one an hour after a day, one a day after a month."
     },
     {
-      "id": "places",
-      "stream": "places",
-      "keep": {
-        "history": "P1D"
-      },
-      "say": "Retired: where things were put by hand on a canvas, which nothing keeps now. What is left goes a day after it was put."
-    },
-    {
       "id": "visits",
       "stream": "counts:visits",
       "keep": {
