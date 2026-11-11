@@ -394,13 +394,15 @@ Types live in packs, one folder each. The open core ships `core` under
 (docs/packs.md):
 
 - `core`: the starter types (the kinds of the work and the system kind), the
-  four every island speaks (task, decision, finding, event), actors (person,
-  company, agent), the system's own (lens, style, screen, type, link type, and
+  three every island speaks (task, decision, finding), actors (person and
+  agent), the system's own (lens, style, screen, type, link type, and
   the primitives source, connection, run, notification and automation) and the
   root links, which name kinds or capabilities at their ends (`owned_by` goes
   from `has:owned`, whatever declares owned). A place that says `exclusive` is
-  a resource. It is the one pack always on, and the only one in this
-  repository.
+  a resource. It is the one pack always on.
+- `people` and `calendar`: vocabulary that left core on 11 Nov 2026, ids kept
+  (`company` and `works_at`; `event`). A pack that uses them requires
+  `type:company` or `type:event`.
 
 The hosted service's:
 

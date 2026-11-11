@@ -123,14 +123,6 @@
       "fields": { "email": { "type": "string" }, "role": { "type": "string", "description": "What they do, in a few words." } }
     },
     {
-      "id": "company",
-      "extends": "actor",
-      "title": "Company",
-      "description": "An organisation: a business, client, vendor or institution.",
-      "statuses": { "open": ["active"], "closed": ["inactive"] },
-      "fields": { "url": { "type": "url" } }
-    },
-    {
       "id": "agent",
       "extends": "actor",
       "title": "Agent",
@@ -184,15 +176,6 @@
         "unit": { "type": "string", "shown": true, "description": "What a number counts, read after it: s, kW, EUR, requests a minute." },
         "as_of": { "type": "date", "shown": true, "description": "When the value was true: the day it was found or measured." }
       }
-    },
-    {
-      "id": "event",
-      "capabilities": { "when": { "start": "at", "end": "ends" }, "where": { "field": "location" } },
-      "extends": "occurrence",
-      "title": "Event",
-      "description": "Something that happens at a time: a deadline, a launch, an appointment.",
-      "statuses": { "open": ["upcoming", "in_progress"], "closed": ["happened", "cancelled"] },
-      "fields": { "at": { "type": "datetime" }, "ends": { "type": "datetime" }, "location": { "type": "string" }, "recurrence": { "type": "string" } }
     },
     {
       "id": "lens",
@@ -766,16 +749,6 @@
       "from": ["*"],
       "to": ["actor"],
       "description": "Participants and stakeholders."
-    },
-    {
-      "id": "works_at",
-      "kernel": true,
-      "extends": "part_of",
-      "title": "works at",
-      "inverse": "employs",
-      "from": ["person"],
-      "to": ["company"],
-      "description": "Put the job title in the relation's props.role."
     },
     {
       "id": "about",

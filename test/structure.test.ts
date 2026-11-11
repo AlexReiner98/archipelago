@@ -87,10 +87,13 @@ const NAMES_PACK_TYPES: Record<string, number> = {
   'ui/canvas.js': 1, 'ui/doc.js': 5, 'ui/draft.js': 2, 'ui/item-doc.js': 1, 'ui/item.js': 2, 'ui/screens.js': 1, 'ui/workspace-cards.js': 1,
 };
 
+// Core's words until 11 Nov 2026 (people and calendar packs, e_wrdg6udh); `event` is also the kernel's for a log event.
+const LEFT_CORE = ['company', 'works_at', 'event'];
+
 test("the kernel names no pack's type by its bare name", () => {
   const ids = packIds.filter((p) => !KERNEL_PACKS.includes(p) && existsSync(join(ROOT, 'packs', p, 'pack.json'))).flatMap((p) => {
     const m = JSON.parse(read(`packs/${p}/pack.json`)) as { types?: { id?: string }[]; links?: { id: string }[] };
-    return [...(m.types ?? []), ...(m.links ?? [])].flatMap((t) => (t.id ? [t.id] : []));
+    return [...(m.types ?? []), ...(m.links ?? [])].flatMap((t) => (t.id && !LEFT_CORE.includes(t.id) ? [t.id] : []));
   }).concat(Object.values(LEFT).flat());
   const named = count(kernelFiles, new RegExp(`['"\`](?:${ids.join('|')})['"\`]`, 'g'));
   assert.deepEqual(ratchet(named, NAMES_PACK_TYPES), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');

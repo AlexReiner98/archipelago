@@ -1,0 +1,27 @@
+{
+  "id": "people",
+  "version": "0.1.0",
+  "title": "People",
+  "description": "Who the work is with beyond the map's people: a company, and who works at it. Words only: the views of them are other packs'.",
+  "types": [
+    {
+      "id": "company",
+      "extends": "actor",
+      "title": "Company",
+      "description": "An organisation: a business, client, vendor or institution.",
+      "statuses": { "open": ["active"], "closed": ["inactive"] },
+      "fields": { "url": { "type": "url" } }
+    }
+  ],
+  "links": [
+    {
+      "id": "works_at",
+      "extends": "part_of",
+      "title": "works at",
+      "inverse": "employs",
+      "from": ["person"],
+      "to": ["company"],
+      "description": "Put the job title in the relation's props.role."
+    }
+  ]
+}

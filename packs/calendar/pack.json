@@ -1,0 +1,17 @@
+{
+  "id": "calendar",
+  "version": "0.1.0",
+  "title": "Calendar",
+  "description": "What happens at a time: an event, with when and where. Words only: the views of them are other packs'.",
+  "types": [
+    {
+      "id": "event",
+      "capabilities": { "when": { "start": "at", "end": "ends" }, "where": { "field": "location" } },
+      "extends": "occurrence",
+      "title": "Event",
+      "description": "Something that happens at a time: a deadline, a launch, an appointment.",
+      "statuses": { "open": ["upcoming", "in_progress"], "closed": ["happened", "cancelled"] },
+      "fields": { "at": { "type": "datetime" }, "ends": { "type": "datetime" }, "location": { "type": "string" }, "recurrence": { "type": "string" } }
+    }
+  ]
+}
