@@ -619,6 +619,10 @@
           "type": "string",
           "description": "For trigger event: an event action such as entity.create or repo.push, or a prefix such as resource.*"
         },
+        "on": {
+          "type": "json",
+          "description": "Fires when a query starts to match, not at a time: { query: a flat filter as query name flat takes it ({ filter: { find, only, not }, walk, limit }), edge: first (it matches at all, once), each (each item that starts to match), first_per:<field> (once for each value of a field), or crosses:<n> with field (an item's value reaching n from under it) }. What already matches when it is set does not fire."
+        },
         "action": {
           "type": "enum",
           "values": [

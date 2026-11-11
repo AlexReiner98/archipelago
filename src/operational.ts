@@ -21,7 +21,7 @@ export const KEPT_FIELDS = ['last_seen', 'active', 'busy', 'stands', 'git', 'tok
 export const STORES: Record<string, string> = {
   token: "Who may act: stored as a hash; made, moved and revoked by a human, an admin or the server's setup, never by a change.",
   share: 'A link that lets someone with no login, or another workspace, read one document: made and revoked by a human only.',
-  setting: "The workspace's settings and sealed secrets: set by the human or by the server, never by an agent's change; each set appended to the settings stream (a secret by its name only).",
+  setting: "The workspace's settings and sealed secrets: set by the human or by the server, never by an agent's change; each set appended to the settings stream (a secret by its name only). Among them the clock's own (src/due.ts, src/due-on.ts): its cursor, and for each automation that watches a query what its edge has met, so a restart does not fire it again; written only by the clock's pass.",
   member: 'Who belongs to the workspace, by email: written by an admin or a server pack, read only by the whole database.',
   part_closure: 'What is inside what, all the way down: a projection of the open part_of links, kept by the projector in the append (src/closure.ts), made again whole after a restore.',
   bytes_added: "What each append adds to the log, in bytes, by the item or link its facts are about: rows only inserted by the append (src/bytes.ts), so writers at once never wait on each other, and folded into item_bytes and type_bytes before those are read.",
