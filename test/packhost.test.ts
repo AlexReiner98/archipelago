@@ -5,7 +5,7 @@ import { cpSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { PackHost, Sandbox, type Answerer } from '../src/packhost.ts';
+import { PackHost, resolved, Sandbox, type Answerer } from '../src/packhost.ts';
 import { Registry } from '../src/packs.ts';
 import { readEvents } from '../src/eventlog.ts';
 import { freshWith, human } from './map.ts';
@@ -62,4 +62,11 @@ test('a handler cannot read outside its own folder', async () => {
   const l = await freshWith(new Registry(dir));
   await assert.rejects(host.call(l, human, 'demo', 'action', 'demo.peek', {}), /ERR_ACCESS_DENIED|Access to this API has been restricted/);
   await assert.rejects(host.call(l, human, 'demo', 'action', 'demo.nothing', {}), /The handler has no "demo.nothing"/);
+});
+
+test('a logged event names what was made by its ref, or records otherwise when it could not be made', () => {
+  const e = { action: 'x.done', target: 'e_a', reason: 'done', detail: { ok: true, made: ['{n}', 'e_kept'] }, otherwise: { reason: 'failed', detail: { ok: false, why: 'not made: {error}' } } };
+  assert.deepEqual(resolved(e, { n: 'e_note0001' }, {}), { action: 'x.done', target: 'e_a', reason: 'done', detail: { ok: true, made: ['e_note0001', 'e_kept'] } });
+  assert.deepEqual(resolved(e, {}, { n: 'No item "e_gone"' }), { action: 'x.done', target: 'e_a', reason: 'failed', detail: { ok: false, made: ['e_kept'], why: 'not made: No item "e_gone"' } });
+  assert.deepEqual(resolved({ action: 'x.done', detail: { made: ['{n}'] } }, {}, { n: 'gone' }), { action: 'x.done', detail: { made: [] } }, 'with no otherwise: the same entry, naming nothing it did not make');
 });

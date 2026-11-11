@@ -181,8 +181,9 @@ export class Archipelago {
    * Something done that is no change to the map and is kept in no other stream (a push heard, a pack turned on), in
    * the activity stream (src/activity.ts), in the transaction given. An entry about an item is as visible as the item.
    */
-  async log(q: Q, e: Done): Promise<void> {
-    await this.record('activity', e.actor, [doneFact(e)], e.reason || undefined, q === this.db ? undefined : q);
+  /** Record what was done; answers its seq, the number readers of events know it by. */
+  async log(q: Q, e: Done): Promise<number | undefined> {
+    return (await this.record('activity', e.actor, [doneFact(e)], e.reason || undefined, q === this.db ? undefined : q))[0]?.seq;
   }
 
   // ---- operational state (src/operational.ts) ------------------------------

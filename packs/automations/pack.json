@@ -3,5 +3,14 @@
   "version": "0.1.0",
   "title": "Automations",
   "description": "Does what an automation says when it comes due: the kernel's clock tells it an automation's time has come, and it makes the notification, about what the automation is about. It owns no type: core's automation type is what it acts on.",
-  "handlers": [{ "event": "item.due", "limit_ms": 5000 }]
+  "handlers": [{ "event": "item.due", "records": ["automation.fired"], "limit_ms": 5000 }],
+  "rules": [
+    {
+      "id": "automation_fired",
+      "stream": "activity",
+      "when": { "fields": ["automation.fired"] },
+      "keep": { "forever": true },
+      "say": "Each firing of an automation: what occurrence it answered, as which version, and what it made. Every one kept, so a firing can be measured and replayed by version."
+    }
+  ]
 }

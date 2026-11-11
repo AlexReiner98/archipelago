@@ -3,7 +3,8 @@
 // moment, a span's start, or a repeat's hour on each day it falls on, in the workspace's zone). For each it records an
 // item.due event and tells the packs that hear item.due, which do whatever is to be done: the kernel decides nothing
 // and names no pack. Its cursor is kept in the workspace's settings, so a pass after a restart catches up on what came
-// due while it was down, a day at most; the first pass ever starts from now.
+// due while it was down, a day at most; the first pass ever starts from now. A hearer is told the event's seq, and in
+// its detail the item's version (its last position in the fact stream), so what it does can name what it answered.
 
 import { hostFor } from './packtools.ts';
 import type { Archipelago, Entity } from './pelago.ts';
@@ -51,12 +52,20 @@ export async function duePass(l: Archipelago, now = Date.now()): Promise<Due[]> 
   const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null`, [types]);
   const due = dueBetween(l, rows, Math.max(last, now - CATCH_UP_MS), now, await zoneOf(l));
   const host = hostFor(l.registry);
+  const versions = await versionsOf(l, [...new Set(due.map((d) => d.item))]);
   for (const d of due) {
-    const event = { action: 'item.due', target: d.item, reason: `"${d.title}" is due`, detail: { type: d.type, at: d.at } };
-    await l.log(l.db, { actor: 'agent:pelago', ...event });
-    host.tell(l, 'kernel', event);
+    const event = { action: 'item.due', target: d.item, reason: `"${d.title}" is due`, detail: { type: d.type, at: d.at, version: versions.get(d.item) ?? null } };
+    const seq = await l.log(l.db, { actor: 'agent:pelago', ...event });
+    host.tell(l, 'kernel', { ...event, seq });
   }
   return due;
+}
+
+/** Each item's version: the position of its last fact in the fact stream, what a hearer acted on. */
+async function versionsOf(l: Archipelago, ids: string[]): Promise<Map<string, number>> {
+  if (!ids.length) return new Map();
+  const { rows } = await l.db.query<{ id: string; pos: number }>(`select id, max(pos)::int as pos from log_fact where stream = 'facts' and id = any($1::text[]) group by id -- index log_fact_history`, [ids]);
+  return new Map(rows.map((r) => [r.id, r.pos]));
 }
 
 const clocks = new WeakMap<Archipelago, ReturnType<typeof setInterval>>();
