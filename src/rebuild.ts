@@ -13,6 +13,8 @@ import { mentionedAll } from './mentions.ts';
 import { openAll } from './seal.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { newestValid, prune, takeSnapshot, type Positions, type Snapshot } from './snapshot.ts';
+import { Registry } from './packs.ts';
+import { registryAt, takeItemsAt, type RegistryAt } from './registry-at.ts';
 
 export interface RebuildOptions {
   /** Entries projected per transaction. */
@@ -145,9 +147,16 @@ export const snapshotNow = (db: Db, reg: TypesRead, ws: string, o?: RebuildOptio
  * The projections as they stood at a fact position: the nearest snapshot at or before it, and the entries of both
  * streams up to that moment, projected into tables that live for one transaction and are thrown away. `reader` says
  * who asks: only the items and links their database shows them now are given back, as the log's facts are read.
+ * Given today's registry, it projects under the registry of that position (src/registry-at.ts): the packs active
+ * then, with the manifests named then, and the type items as they stood; that registry is given back (`registry`,
+ * with `items` saying why the type items did not load). Where the manifests then do not load under this server's
+ * code, it projects under today's and says why (`past_refused`).
  */
-export async function asOf(db: Db, reg: TypesRead, ws: string, pos: number, reader: Q = db): Promise<{ at: Positions; rows: Rows }> {
+export async function asOf(db: Db, reg: TypesRead, ws: string, pos: number, reader: Q = db): Promise<{ at: Positions; rows: Rows; registry?: RegistryAt & { items?: string }; past_refused?: string }> {
   const start = await newestValid(db, ws, pos);
+  let refused: string | undefined;
+  const past = reg instanceof Registry ? await registryAt(db, reg, pos).catch((err: Error) => ((refused = err.message), undefined)) : undefined;
+  const types = past?.registry ?? reg;
   const out = await db.transaction(async (tx) => {
     for (const t of PROJECTED) await tx.query(`create temp table ${t} (like public.${t} including defaults including indexes) on commit drop`);
     await loadRows(tx, start?.rows ?? (await beforeTheLog(tx, KEPT_FIELDS)));
@@ -158,7 +167,7 @@ export async function asOf(db: Db, reg: TypesRead, ws: string, pos: number, read
     const by = (e: Entry) => (e.stream === 'facts' ? e.pos <= pos : !!until && Date.parse(e.at) <= new Date(until).getTime());
     for (let entries = await next(tx, at, 2000); entries.length; entries = await next(tx, at, 2000)) {
       const upto = entries.filter(by);
-      await project(tx, reg, upto, at);
+      await project(tx, types, upto, at);
       if (upto.length < entries.length) break;
     }
     return { rows: await projectedRows(tx), at };
@@ -167,8 +176,10 @@ export async function asOf(db: Db, reg: TypesRead, ws: string, pos: number, read
   const { rows } = await reader.query<{ id: string }>(`select id from entity where id = any($1::text[])`, [out.rows.entity.map((r) => r.id)]);
   const seen = new Set(rows.map((r) => r.id));
   const { entity, relation, proposal } = out.rows;
+  const items = past && takeItemsAt(past, entity);
   return {
     at: out.at,
+    ...(past && { registry: { ...past, ...(items && { items }) } }), ...(refused && { past_refused: refused }),
     rows: {
       entity: entity.filter((r) => seen.has(r.id as string)),
       relation: relation.filter((r) => seen.has(r.from_id as string) && seen.has(r.to_id as string)),
