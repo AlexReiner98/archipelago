@@ -60,10 +60,10 @@ test('the view reads what the automations are about, and answers nothing for an 
     zone: ZONE,
     read: async (q) => (asked.push(q), q.related || q.items ? found : q.placed ? [{ id: 'e_soon', time: [span('2026-11-12T13:00:00Z')] }] : []),
   });
-  assert.deepEqual((await handler.rows({ about: 'e_task' }, ctx([]))).answer, []);
+  assert.deepEqual((await handler['automations.rows']({ about: 'e_task' }, ctx([]))).answer, []);
   assert.equal(asked[0].related, 'e_task');
   assert.equal(asked.length, 1, 'nothing more is read');
-  const { answer } = await handler.rows({}, ctx([auto('e_soon', 'Morning')]));
+  const { answer } = await handler['automations.rows']({}, ctx([auto('e_soon', 'Morning')]));
   assert.deepEqual(answer.map((r) => [r.id, r.marks[0].text]), [['e_soon', 'Thu 08:00']]);
   assert.ok(asked.some((q) => q.events?.action === 'automation.fired' && q.events.target === 'e_soon'));
 });

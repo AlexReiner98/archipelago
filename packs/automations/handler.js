@@ -8,7 +8,7 @@ const FIELDS = ['action', 'at', 'days', 'last_fired', 'last_result'];
 const MOST = 200;
 
 export default {
-  rows: async (input, ctx) => {
+  'automations.rows': async (input, ctx) => {
     const about = typeof input?.about === 'string' && input.about ? input.about : undefined;
     const found = about
       ? await ctx.read({ related: about, relation: 'about', direction: 'in', types: ['automation'], fields: FIELDS })

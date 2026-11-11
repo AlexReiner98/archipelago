@@ -123,7 +123,9 @@ async function rows(host, id, p) {
     const list = Array.isArray(answer) ? answer : [];
     // A list with nothing in it is not drawn (on Home, on an item's page), but on a nav page of its own it says so.
     if (!list.length && !p.screen.nav) return host.remove();
-    host.replaceWith(fold(id, p.screen.id, p.screen.title, list.length, true, list.length ? h('ul', { class: 'rows' }, list.map(viewRow)) : h('div', { class: 'empty' }, 'Nothing here.')));
+    const content = list.length ? h('ul', { class: 'rows' }, list.map(viewRow)) : h('div', { class: 'empty' }, 'Nothing here.');
+    // On an item's page, a section of it as its turns are; on a screen of its own, a fold.
+    host.replaceWith(id ? section(p.screen.id, p.title ?? p.screen.title, list.length, content) : fold(id, p.screen.id, p.screen.title, list.length, true, content));
   } catch (err) {
     host.replaceChildren(h('div', { class: 'error' }, err.message));
   }
@@ -282,10 +284,13 @@ function packsUsed(data) {
   return used;
 }
 
-/** A pack's pieces show on an item only once the item uses that pack; the core's and the owner's own always do. */
+/** Whether a pack owns no type and no link: a map pack, whose pieces are the whole map's (src/islands.ts). */
+const mapPack = (pack) => !(state.schema?.types ?? []).some((t) => t.pack === pack) && !(state.schema?.relations ?? []).some((r) => r.pack === pack);
+
+/** A pack's pieces show on an item only once the item uses that pack; the core's, a map pack's and the owner's own always do. */
 const piecesOn = (data) => {
   const used = packsUsed(data);
-  return piecesFor(data.entity.type).filter((p) => !p.screen.pack || p.screen.pack === 'core' || used.has(p.screen.pack));
+  return piecesFor(data.entity.type).filter((p) => !p.screen.pack || p.screen.pack === 'core' || used.has(p.screen.pack) || mapPack(p.screen.pack));
 };
 /** The buttons the screens on this item declare: they stand in its page's head (ui/item.js), not in the column. */
 export const buttonsOn = (data) => piecesOn(data).filter((p) => p.piece === 'button');
@@ -300,6 +305,6 @@ export const sectionsOn = (data) =>
     })
     .filter(Boolean);
 /** The pieces the bare page draws as sections of its own. */
-const SECTIONS = ['turns', 'findings', 'picture'];
+const SECTIONS = ['turns', 'findings', 'picture', 'view'];
 /** The count a screen on this item declares: it stands at the foot of its note while it is written (ui/note-count.js). */
 export const countOn = (data) => piecesOn(data).find((p) => p.piece === 'count');
