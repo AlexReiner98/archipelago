@@ -3,7 +3,7 @@
 // parts can be left out or corrected. A change that only makes a new item has no item yet: its own sheet shows the item
 // proposed, read-only, under the same band (`heldPage`).
 
-import { api, h, may, part } from './base.js';
+import { api, h, hooks, may, part } from './base.js';
 import { proposalCard } from './held-card.js';
 import { decide } from './held.js';
 import { renderBody } from './body.js';
@@ -37,8 +37,8 @@ export async function heldBand(p, again) {
   const whole = h('div', { hidden: true });
   // Deciding is writing: a session that may only read sees the change, not the way to decide it.
   const buttons = !may('write') ? [] : [
-    h('button', { class: 'primary', style: 'flex: none', title: p.held_by?.say ?? 'Apply the change as it was asked', onclick: () => go(true) }, 'Apply'),
-    h('button', { class: 'danger', style: 'flex: none', title: 'Decline it, with a word for whoever asked', onclick: () => go(false) }, 'Decline'),
+    h('button', { class: 'primary', title: p.held_by?.say ?? 'Apply the change as it was asked', onclick: () => go(true) }, 'Apply'),
+    h('button', { class: 'danger', title: 'Decline it, with a word for whoever asked', onclick: () => go(false) }, 'Decline'),
   ];
   const go = async (yes) => {
     for (const b of buttons) b.disabled = true;
@@ -49,29 +49,46 @@ export async function heldBand(p, again) {
     whole.hidden = !whole.hidden;
     if (!whole.hidden && !whole.childElementCount) whole.append(proposalCard(p, names, again));
   };
-  // The line is who asked, as their mark (the name and when in its tooltip), the reason, and the two buttons (Alex, 11 Nov
-  // 2026: the row was too full). A change of several parts unfolds them from the reason itself, its count beside it.
+  // A thing to act on, with room around it (Alex, 11 Nov 2026): what it is, why it was asked, and the two buttons, with
+  // its parts and who asked after them. Each is one line, cut where it does not fit.
   const by = who(p.actor, p.run_name);
-  by.replaceChildren();
-  by.style.minWidth = 'auto';
+  by.classList.add('cut');
   by.title = [p.run_name, who(p.actor).textContent, ago(p.ts)].filter(Boolean).join(' · ');
   const parts = p.ops.length > 1;
-  const unfold = parts && { role: 'button', tabindex: 0, style: 'cursor: pointer', onclick: look, onkeydown: (e) => e.key === 'Enter' && look() };
-  const tip = parts ? `${p.reason}\n\nClick to see its ${p.ops.length} parts, and leave out or correct any before applying` : p.reason;
   return h(
     'section',
-    { class: 'held-band needs', 'data-held': p.id },
+    { class: 'held-band', 'data-held': p.id },
+    h('div', { class: 'held-head' }, 'Waits for your word'),
+    h('div', { class: 'held-why cut', title: p.reason }, gist(p.reason)),
     h(
       'div',
-      { class: 'row-top' },
-      by,
-      h('span', { class: 'grow', title: tip, ...unfold }, gist(p.reason)),
-      parts && h('span', { class: 'muted small', title: tip, ...unfold }, `${p.ops.length} parts ▾`),
+      { class: 'held-acts' },
       ...buttons,
+      parts && h('button', { type: 'button', class: 'quiet-button', title: 'See each part, and leave out or correct any before applying', onclick: look }, `${p.ops.length} parts ▾`),
+      h('span', { class: 'grow' }),
+      by,
     ),
     whole,
   );
 }
+
+// ---- The call over the canvas: while no sheet is open, what waits for the person's word is said above find, one press
+// from the band that decides it (Alex, 11 Nov 2026). What is held is told by the store (ui/live.js).
+
+const call = h('div', { class: 'held-call', hidden: true });
+document.getElementById('find')?.prepend(call);
+hooks.heldMoved = (held) => {
+  const waiting = may('write') ? held : [];
+  call.hidden = !waiting.length;
+  if (call.hidden) return call.replaceChildren();
+  const [first] = waiting;
+  const n = waiting.length;
+  call.replaceChildren(
+    h('span', { class: 'held-call-n' }, n === 1 ? 'Waits for your word' : `${n} wait for your word`),
+    h('span', { class: 'grow cut', title: first.reason }, gist(first.reason)),
+    h('button', { type: 'button', class: 'primary', title: n === 1 ? 'Open it where it is decided' : 'Open the oldest where it is decided', onclick: () => (location.hash = heldAt(first)) }, 'Review'),
+  );
+};
 
 /** The sheet of a change that makes new items: what is proposed, read-only, under its band. */
 export async function heldPage(proposal) {
