@@ -47,6 +47,8 @@ export type Read = {
   events?: { action: string; target?: string; since?: string; limit?: number };
   /** For each item: whether it is blocked, whether it waits on someone's answer, and what has to move first. */
   blocked?: string[];
+  /** The runs whose changes wrote these items (made them or changed them), as the log keeps each change's run: one row per item and run, with the run's title and the packs it ran under. */
+  writers?: string[];
   view?: string;
   params?: Record<string, unknown>;
   /** What a type is: its statuses, whether a person settles it (a question) and how, and whether it is estimated, so a handler need not know it. */
@@ -159,6 +161,20 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     const root = (r: string) => ({ id: r, title: found.get(r)?.title, type: found.get(r)?.type, status: found.get(r)?.status });
     return Object.fromEntries(q.blocked.map((id) => [id, { blocked: graph.isBlocked(id), waits_on_someone: graph.waitsOnSomeone(id), roots: graph.roots(id).map(root) }]));
   }
+  if (q.writers !== undefined) {
+    if (!Array.isArray(q.writers) || q.writers.some((id) => typeof id !== 'string')) throw new Error('writers is a list of item ids');
+    if (!open || !q.writers.length) return [];
+    const { rows } = await l.db.query<{ item: string; run: string }>(
+      `select distinct f.id as item, e.head->>'run' as run from log_fact f join log_entry e on e.stream = f.stream and e.pos = f.pos and e.at = f.at
+       where f.id = any($1::text[]) and f.stream = 'facts' and e.head ? 'run'`,
+      [q.writers],
+    );
+    const ids = [...new Set(rows.map((r) => r.run))];
+    // The runs as the asker may see them: one hidden from them is left out with its rows.
+    const { rows: runs } = ids.length ? await l.db.query<{ id: string; title: string; packs: unknown }>(`select id, title, props->'packs' as packs from entity where id = any($1::text[])`, [ids]) : { rows: [] };
+    const run = new Map(runs.map((r) => [r.id, r]));
+    return rows.filter((r) => run.has(r.run)).map((r) => ({ item: r.item, run: r.run, title: run.get(r.run)!.title, ...(run.get(r.run)!.packs != null && { packs: run.get(r.run)!.packs }) }));
+  }
   if (q.view !== undefined) {
     // A kernel view, a lens preset (attention, hubs) or a pack's view, each by its short name (repo_work).
     const view = VIEWS[q.view];
@@ -174,5 +190,5 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, view, type_info, me, proposed.');
+  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, view, type_info, me, proposed.');
 }
