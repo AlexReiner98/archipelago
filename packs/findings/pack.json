@@ -1,0 +1,27 @@
+{
+  "id": "findings",
+  "version": "0.1.0",
+  "title": "Findings",
+  "description": "How a finding is kept: what an agent's finding must carry and may not be, what agents are told of it, an island's findings on its page, and the findings that moved. The finding type itself is core's, in the shared set.",
+  "requires": ["type:finding", "type:island"],
+  "rules": [
+    {"id": "finding_value", "when": {"actor": "agent", "op": "create", "type": "finding"}, "then": {"require": ["value"]}, "say": "\"{title}\": a finding carries its value (props.value: a number with its unit, true or false, a date, or a few words). With nothing found yet, it is research or a question, not a finding."},
+    {"id": "finding_note", "when": {"actor": "agent", "op": ["create", "update"], "type": "finding", "matches": {"body": "^(?:[\\s\\S]{401}|(?:[^\n]*\\S[^\n]*\n+){3}[^\n]*\\S)"}}, "then": "refuse", "say": "\"{title}\": a finding's note says how it was found, in three lines and 400 characters at most. Put the rest in research or a record the finding rests on (based_on)."},
+    {"id": "finding_option", "when": {"actor": "agent", "op": ["create", "update"], "type": "finding", "matches": {"title": "^(?:[Oo]ption|[Aa]lternative)\\b"}}, "then": "refuse", "say": "\"{title}\": an option is weighed, not found. Make it a question part_of the decision it answers (on a design island, a concept alternative_for it)."},
+    {"id": "finding_bug", "when": {"actor": "agent", "op": ["create", "update"], "type": "finding", "matches": {"title": "^(?:[Bb]ug|BUG|[Ii]ssue)\\b"}}, "then": "refuse", "say": "\"{title}\": a fault is not a finding. Make it the work that fixes it (a bug, where the map has one; else a task), part_of what it is in."},
+    {"id": "finding_claim", "when": {"actor": "agent", "op": ["create", "update"], "type": "finding", "matches": {"title": ", as .+ reads it$"}}, "then": "refuse", "say": "\"{title}\": a finding's title is the claim itself, as a sentence (\"Peak load is 42 kW\"), not who reads it."}
+  ],
+  "views": [
+    {
+      "form": "screen",
+      "id": "findings.island_findings",
+      "title": "Findings",
+      "on": ["island"],
+      "pieces": [{ "piece": "findings" }]
+    }
+  ],
+  "styles": [
+    { "id": "findings.moved", "type": "lens", "title": "Findings moved", "props": { "filter": { "find": ["moved"] }, "walk": { "over": ["reads>"], "steps": 1 }, "style": {  } } },
+    { "id": "findings.finding_line", "type": "instruction", "title": "A finding is what an island stands by, in one line", "body": "Its title is the claim as a sentence, value the fact (a number takes its unit), with its confidence and as_of; its note says how it was found, three lines at most. Mark it published (props.published: true) only when the island stands by it, a few per island: only those are read from other islands. An option is an alternative, a bug is a bug, and working research stays research.", "props": { "for": ["session_start"], "order": 75 } }
+  ]
+}

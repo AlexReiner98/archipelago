@@ -69,7 +69,7 @@ test('an instruction preset is checked as a style preset is: its words in body, 
 });
 
 test('the session-start text is read from the instructions on the map', async () => {
-  const l = await freshWith(new Registry(packsWith(CHECKOUT), ['core', 'checkouts']));
+  const l = await freshWith(new Registry(packsWith(CHECKOUT), ['core', 'sessions', 'checkouts'])); // sessions: what a session is told at its start
   await make(l, [{ op: 'create', type: 'checkout', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } }]);
   const text = await hookSessionStart(l, { session_id: 'i1', cwd: 'C:\\code\\Apex' });
   const run = /as run (e_\w+)/.exec(text)?.[1];
@@ -106,7 +106,7 @@ test('each working rule is said once: in the rules file a project is handed, fro
   const { WRITE_TOOLS } = await import('../src/tool-change.ts');
   const presets = presetsOf(checkoutPacks(), 'instruction');
   const rules = presets.filter((p) => (p.props.for as string[]).includes('working_rules'));
-  assert.deepEqual(rules.map((p) => p.id), ['core.map_true', 'core.authority', 'core.names', 'core.search_first', 'core.plan_flow', 'core.finding_line', 'core.waits_on']);
+  assert.deepEqual(rules.map((p) => p.id), ['core.map_true', 'core.authority', 'core.names', 'core.search_first', 'core.plan_flow', 'core.waits_on']);
   assert.deepEqual(presets.filter((p) => (p.props.for as string[]).length !== 1).map((p) => p.id), [], 'an instruction is said in one place');
   const file = workingRules();
   for (const p of rules) assert.equal(file.split(p.body!).length, 2, `${p.id} is said once in the rules file`);

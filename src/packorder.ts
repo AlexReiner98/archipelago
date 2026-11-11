@@ -21,6 +21,13 @@ export type PackState = { state: 'active' | 'waiting' | 'off'; why?: string };
 /** The kernel's packs: the kinds and root relations, and the system tier. Never off. */
 export const KERNEL_PACKS = ['core'];
 
+/**
+ * A name a kernel pack gave, kept by a pack it moved to (the core audit, e_sjhbyf52): a view or preset moves with its
+ * id, so what names it (an owner's kept version, a test, a doc) still does. Which maps are given that pack is
+ * src/pack-moved.ts's.
+ */
+export const keptFromKernel = (id: string) => KERNEL_PACKS.some((k) => id.startsWith(`${k}.`));
+
 /** The kernel's own kinds of event (src/due.ts, src/notify.ts): always provided, by core. */
 export const KERNEL_EVENTS = ['item.due', 'notification.made'];
 

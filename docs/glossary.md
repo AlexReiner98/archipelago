@@ -143,8 +143,8 @@ bug or working research is not a finding. A reader ties itself to one with a
 
 **place.** Where a drawing's layout puts an item: never set by hand (the
 owner, 3 Nov 2026), never meaning anything. The `places` stream that once
-kept hand places is retired: nothing appends to it, and what is left of it
-goes in a day.
+kept hand places is retired: nothing appends to it, and since 11 Nov 2026
+(e_yt84zyvj) no rule keeps it, so compaction leaves what little is left.
 
 **ghost.** A held change drawn where it would land on the canvas: a faint
 node, a dashed wire, a badge. In the code: `ui/ghosts.js`.

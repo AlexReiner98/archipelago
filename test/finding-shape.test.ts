@@ -1,4 +1,4 @@
-// A published finding reads in one line (task e_cg5y8qdy): core's rules refuse, from an agent, a finding with no
+// A published finding reads in one line (task e_cg5y8qdy): the findings pack's rules refuse, from an agent, a finding with no
 // value, a note past three lines, an option, a bug or a placeholder title, and each refusal says what to send instead.
 import assert from 'node:assert/strict';
 import { join } from 'node:path';

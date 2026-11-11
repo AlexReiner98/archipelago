@@ -5,6 +5,7 @@
 import { REASONS } from './attention.ts';
 import { capabilityOf, DELIVERABLE, unknownEnd } from './link-ends.ts';
 import { parts } from './manifest.ts';
+import { keptFromKernel } from './packorder.ts';
 import type { PackFile, ResolvedType } from './packs.ts';
 
 export interface VerbDef {
@@ -302,7 +303,7 @@ const isObjectSchema = (s: unknown) => Boolean(s) && typeof s === 'object' && (s
 /** Problems with what a pack declares, given the types loaded and whether it has a handler. Empty means it loads. */
 export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, verbs: string[], handler: boolean): string[] {
   const problems: string[] = [];
-  const own = (id: string) => pack.id === 'core' || id.startsWith(pack.id + '.');
+  const own = (id: string) => pack.id === 'core' || id.startsWith(pack.id + '.') || keptFromKernel(id); // or a kernel name kept by a pack split out of it
   const seen = new Set<string>();
   for (const [what, list] of [['action', parts(pack).actions], ['view', parts(pack).views]] as const) {
     for (const def of list) {
