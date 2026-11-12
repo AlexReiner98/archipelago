@@ -7,6 +7,7 @@
 import type { Archipelago } from '../../../src/pelago.ts';
 import { headPos } from '../../log/kernel/tail.ts';
 import { opEntries, type OpStream } from '../../log/kernel/streams.ts';
+import { isCountStream } from '../../log/kernel/retention.ts';
 import { publicViewAt, publicViews } from '../../database/kernel/public-view-store.ts';
 import { draftDocument, publicDocument } from '../../walls/kernel/public-document.ts';
 import { islandsOff } from './islands.ts';
@@ -46,8 +47,6 @@ export const COUNT_ENTRIES = 1000;
 /** A key of a pack's memory: a short word of letters, digits, _, -, : and . */
 const KEY = /^[A-Za-z0-9_.:-]{1,120}$/;
 const ID = /^e_[a-z0-9]{8}$/;
-/** The streams the kernel keeps, which no count read may open. */
-const KERNEL_STREAMS = new Set(['facts', 'sessions', 'claims', 'notifications', 'automations', 'settings', 'access', 'observations', 'places', 'activity', 'uses']);
 
 const list = (v: unknown, what: string): string[] => {
   if (!Array.isArray(v) || v.some((id) => typeof id !== 'string')) throw new Error(`${what} is a list of ids`);
@@ -114,7 +113,7 @@ export async function serviceRead(l: Archipelago, q: ServiceRead, pack?: string)
   }
   if (q.counts !== undefined) {
     const stream = String(q.counts.stream);
-    if (!stream || KERNEL_STREAMS.has(stream) || stream.startsWith('pack:')) throw new Error(`counts reads a count stream, not "${stream}"`);
+    if (!isCountStream(stream)) throw new Error(`counts reads a count stream, not "${stream}"`);
     const after = Number(q.counts.after ?? 0);
     if (!(Number.isInteger(after) && after >= 0)) throw new Error('counts.after is a position, a whole number');
     const entries = await opEntries(l.db, stream as OpStream, { from: after + 1, limit: COUNT_ENTRIES });
