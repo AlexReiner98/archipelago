@@ -13,7 +13,8 @@
   const say = (message) => parent.postMessage(message, '*');
 
   // A page with no origin may not start a worker every way a page can, and browsers differ in which: each is tried until one answers.
-  const source = `(${inside})(${JSON.stringify(home)})`;
+  // The same worker serves a pack version's parts (partInside, in ui/draw-inside.js).
+  const source = `(${inside})(${JSON.stringify(home)});(${partInside})()`;
   // A classic worker first: it starts at once where a module worker from a blob is refused, and imports the drawing all the same.
   const WAYS = [
     () => new Worker(URL.createObjectURL(new Blob([source], { type: 'text/javascript' }))),
@@ -51,6 +52,8 @@
     return one;
   };
   spareOne();
+  // A pack version's parts take the warm worker too (at the foot of this file).
+  self.takeWorker = take;
 
   // A drawing a pack ships is drawn, where this frame has an origin of its own (the drawing host's, never the page's),
   // by a service worker the host serves for it (/drawing/<hash>/sw.js, around ui/draw-inside.js): the browser keeps
@@ -148,6 +151,71 @@
       w.worker.terminate();
       workers.delete(hash);
       say({ type: 'stopped', hash, message: 'It did not answer for 12 seconds and was stopped.' });
+    }
+  }, 2000);
+})();
+
+// Where the app's parts run: one worker for each pack version on screen, not one for each part, its parts' code given
+// as text (partInside in ui/draw-inside.js runs around it), started from the warm worker above.
+//
+// The frame starts a version's worker and hands the page one end of a channel to it (part-port, the version named);
+// nothing goes through the frame after that, so the page knows which pack version speaks by the port alone (decision
+// e_xeqhcums), and two versions of one pack on one screen are two workers that cannot see each other. The walls are
+// the drawings'.
+//
+// The page says: part-load { version, parts } (each part's modules by its id) and part-end { version }. The frame says: part-port { version } with
+// the port, part-failed { version, message } and part-stopped { version, message }.
+(() => {
+  const say = (message, transfer) => parent.postMessage(message, '*', transfer);
+  /** Each pack version's worker, by its name. */
+  const versions = new Map();
+  const end = (version) => (versions.get(version)?.worker?.terminate(), versions.delete(version));
+  const failed = (version, message) => (end(version), say({ type: 'part-failed', version, message: String(message).slice(0, 300) }));
+
+  const load = (version, parts) => {
+    if (versions.has(version)) return;
+    const v = { worker: null, unanswered: 0 };
+    versions.set(version, v);
+    self.takeWorker().then(
+      (worker) => {
+        if (versions.get(version) !== v) return void worker.terminate();
+        v.worker = worker;
+        const { port1, port2 } = new MessageChannel();
+        worker.onmessage = ({ data: said }) => {
+          v.unanswered = 0;
+          if (said?.type === 'loaded') say({ type: 'part-port', version, took: Number(said.took) || 0 }, [port2]);
+          else if (said?.type === 'error') failed(version, said.message);
+        };
+        worker.onerror = (err) => failed(version, err.message || 'The pack stopped.');
+        worker.postMessage({ type: 'parts', parts }, [port1]);
+      },
+      (err) => failed(version, err.message),
+    );
+  };
+
+  addEventListener('message', (ev) => {
+    if (ev.source !== parent) return;
+    const said = ev.data ?? {};
+    if (typeof said.version !== 'string' || !/^[\w.:@/-]{1,160}$/.test(said.version)) return;
+    if (said.type === 'part-load' && said.parts && typeof said.parts === 'object') load(said.version, said.parts);
+    else if (said.type === 'part-end') end(said.version);
+  });
+
+  // A version that stops answering is ended, as a drawing is (ui/draw-marks.js): six pings unanswered, counted, not
+  // timed, and none asked while the page is hidden.
+  setInterval(() => {
+    for (const [version, v] of versions) {
+      if (!v.worker) continue;
+      if (document.hidden) {
+        v.unanswered = 0;
+        continue;
+      }
+      if (v.unanswered++ < 6) {
+        v.worker.postMessage({ type: 'ping' });
+        continue;
+      }
+      end(version);
+      say({ type: 'part-stopped', version, message: 'It did not answer for 12 seconds and was stopped.' });
     }
   }, 2000);
 })();

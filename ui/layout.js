@@ -370,3 +370,49 @@ ${JSON.stringify(input)}`;
     host.prepend(h('div', { class: 'toolbar fold-bar' }, bar, h('span', { class: 'grow' }), lit, zoom));
   }
 }
+
+// How the page reaches a pack version's parts: this frame (warmLayouts) also starts a worker for the version and hands
+// back a port to it (the foot of ui/draw-marks.js; the words on it are partInside's, in ui/draw-inside.js). What checks
+// and renders the marks that come back is the host's. Here, not a module of its own, while the page's files are pinned
+// with the surface root pack (packs/roots.json).
+
+/** Each version asked for, by its name: its port once the frame gives it, and the box it was asked of. */
+const askedParts = new Map();
+let hearingParts = false;
+
+function hearParts(ev) {
+  const said = ev.data ?? {};
+  if (typeof said.version !== 'string' || !String(said.type).startsWith('part-')) return;
+  const one = askedParts.get(said.version);
+  // Only the frame the version was asked of speaks for it.
+  if (!one || ev.source !== one.box.frame.contentWindow) return;
+  if (said.type === 'part-port' && ev.ports[0]) one.resolve(ev.ports[0]);
+  else if (said.type === 'part-failed' || said.type === 'part-stopped') (askedParts.delete(said.version), one.reject(new Error(String(said.message ?? 'The pack stopped.').slice(0, 300))), one.stopped?.(said));
+}
+
+/**
+ * The port of a pack version's worker, its parts loaded from `parts`: each part's modules by its id, as its manifest
+ * declares them (packs/loader/kernel/ui-parts.ts), index.js exporting the part by default. Asked again, the
+ * same port; once it failed or was stopped, a new worker. `stopped` hears a version stopped after it answered.
+ */
+export async function partPort(version, parts, stopped) {
+  if (!askedParts.has(version) || !askedParts.get(version).box.frame.isConnected) {
+    const box = warmLayouts();
+    if (!hearingParts) ((hearingParts = true), addEventListener('message', hearParts));
+    const one = { box, stopped };
+    one.port = new Promise((resolve, reject) => Object.assign(one, { resolve, reject }));
+    askedParts.set(version, one);
+    await box.ready;
+    box.frame.contentWindow.postMessage({ type: 'part-load', version, parts }, '*');
+  }
+  return askedParts.get(version).port;
+}
+
+/** The version's worker ended, its parts with it: none of them is on screen any more. */
+export function endPart(version) {
+  const one = askedParts.get(version);
+  if (!one) return;
+  askedParts.delete(version);
+  one.port.then((port) => port.close(), () => {});
+  one.box.frame.contentWindow?.postMessage({ type: 'part-end', version }, '*');
+}
