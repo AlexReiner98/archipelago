@@ -40,6 +40,29 @@
         "in": "any",
         "out": "any",
         "run": "root-bookkeep.ts#bookkeep"
+      },
+      "root.merge": {
+        "in": {
+          "dump": "any",
+          "session_types?": [
+            "string"
+          ],
+          "apply?": "boolean"
+        },
+        "out": {
+          "from": "any",
+          "taken": "string",
+          "plan": "any",
+          "relations": "any",
+          "proposals": "any",
+          "events": [
+            "number"
+          ],
+          "owner_set": "boolean",
+          "open_sessions": "number",
+          "holds": "number"
+        },
+        "run": "backup-merge.ts#mergeOf"
       }
     }
   }

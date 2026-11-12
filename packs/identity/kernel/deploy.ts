@@ -4,11 +4,11 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { loadConfig } from './config.ts';
-import { listWorkspaces } from '../../../src/control.ts';
-import { openDb } from './db.ts';
-import { LATEST, versionOf } from './migrate.ts';
-import { databaseFor } from './pg.ts';
+import { loadConfig } from '../../database/kernel/config.ts';
+import { listWorkspaces } from './control.ts';
+import { openDb } from '../../database/kernel/db.ts';
+import { latest, versionOf } from '../../database/kernel/migrate.ts';
+import { databaseFor } from '../../database/kernel/pg.ts';
 
 async function deploy() {
   const { dataDir, databaseUrl } = loadConfig();
@@ -19,6 +19,7 @@ async function deploy() {
   // The default database first: it lists the others. A server not yet started on it since the list moved there has
   // it still in the file beside its data.
   const main = await openDb(databaseUrl);
+  const LATEST = await latest();
   const listed = (await listWorkspaces(main)).map((w) => w.id);
   console.log(`default: at step ${await versionOf(main)} of ${LATEST}`);
   await main.close();

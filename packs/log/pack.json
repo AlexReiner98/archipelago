@@ -19,29 +19,6 @@
           "vault_error?": "string"
         },
         "run": "backup.ts#dumpOf"
-      },
-      "root.merge": {
-        "in": {
-          "dump": "any",
-          "session_types?": [
-            "string"
-          ],
-          "apply?": "boolean"
-        },
-        "out": {
-          "from": "any",
-          "taken": "string",
-          "plan": "any",
-          "relations": "any",
-          "proposals": "any",
-          "events": [
-            "number"
-          ],
-          "owner_set": "boolean",
-          "open_sessions": "number",
-          "holds": "number"
-        },
-        "run": "backup.ts#mergeOf"
       }
     }
   }

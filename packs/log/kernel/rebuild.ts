@@ -13,8 +13,17 @@ import { projectAgain } from './log-project.ts';
 import { openAll } from '../../../src/seal.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { newestValid, prune, takeSnapshot, type Positions, type Snapshot } from './snapshot.ts';
-import { Registry } from '../../../src/packs.ts';
-import { registryAt, takeItemsAt, type RegistryAt } from '../../../src/registry-at.ts';
+import type { RegistryAt } from '../../../src/registry-at.ts';
+import { rootFills } from '../../database/kernel/root-fills.ts';
+
+/**
+ * The slot log.past: the registry as it stood at a fact position, given today's (a map's whole registry; undefined for
+ * one that is not), and why the type items then did not load. Filled by the loader (its kernel/fills.ts, PAST).
+ */
+export interface RootPast {
+  at(q: Q, today: TypesRead, pos: number): Promise<RegistryAt | undefined>;
+  items(at: RegistryAt, rows: Record<string, unknown>[]): string | undefined;
+}
 
 export interface RebuildOptions {
   /** Entries projected per transaction. */
@@ -155,7 +164,8 @@ export const snapshotNow = (db: Db, reg: TypesRead, ws: string, o?: RebuildOptio
 export async function asOf(db: Db, reg: TypesRead, ws: string, pos: number, reader: Q = db): Promise<{ at: Positions; rows: Rows; registry?: RegistryAt & { items?: string }; past_refused?: string }> {
   const start = await newestValid(db, ws, pos);
   let refused: string | undefined;
-  const past = reg instanceof Registry ? await registryAt(db, reg, pos).catch((err: Error) => ((refused = err.message), undefined)) : undefined;
+  const [filled] = await rootFills<RootPast>('fills.ts', 'PAST');
+  const past = filled ? await filled.value.at(db, reg, pos).catch((err: Error) => ((refused = err.message), undefined)) : undefined;
   const types = past?.registry ?? reg;
   const out = await db.transaction(async (tx) => {
     for (const t of PROJECTED) await tx.query(`create temp table ${t} (like public.${t} including defaults including indexes) on commit drop`);
@@ -176,7 +186,7 @@ export async function asOf(db: Db, reg: TypesRead, ws: string, pos: number, read
   const { rows } = await reader.query<{ id: string }>(`select id from entity where id = any($1::text[])`, [out.rows.entity.map((r) => r.id)]);
   const seen = new Set(rows.map((r) => r.id));
   const { entity, relation, proposal } = out.rows;
-  const items = past && takeItemsAt(past, entity);
+  const items = past && filled?.value.items(past, entity);
   return {
     at: out.at,
     ...(past && { registry: { ...past, ...(items && { items }) } }), ...(refused && { past_refused: refused }),

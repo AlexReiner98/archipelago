@@ -6,8 +6,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { migrate, schemaKey } from './migrate.ts';
-import { makePartitions } from '../../../src/partitions.ts';
+import { prepare, schemaKey } from './migrate.ts';
 import { openPg, scratchPg } from './pg.ts';
 import { keepStatistics } from './stats.ts';
 
@@ -47,12 +46,11 @@ export async function openDb(where?: string): Promise<Database> {
  */
 const WAL_KEPT = ['-c', 'min_wal_size=32MB', '-c', 'max_wal_size=64MB'];
 
-// The steps of the schema this database lacks (src/migrate.ts). pg_trgm, which search uses for near-misses and typos,
-// is in the first; a Postgres server has it too.
+// The steps of the schema this database lacks (src/migrate.ts), then what each root does to it at every open (the
+// log's partitions, made ahead of need). pg_trgm, which search uses for near-misses and typos, is in the first step; a
+// Postgres server has it too.
 async function prepared<D extends Database>(db: D, server = false) {
-  await migrate(db, server)
-    .then(() => makePartitions(db)) // the log's partitions, made ahead of need (src/partitions.ts)
-    .catch(async (err) => {
+  await prepare(db, server).catch(async (err) => {
       if (!server) await db.close(); // a server's pool is closed by its opener
       throw err;
     });
@@ -71,7 +69,7 @@ let blank: Promise<File | Blob> | undefined;
 
 async function inMemory() {
   const server = process.env.PELAGO_TEST_DATABASE_URL;
-  const db: Database = await keepStatistics(server ? await scratchPg(server, schemaKey(true), (db) => prepared(db, true)) : await PGlite.create({ loadDataDir: await (blank ??= blankImage()), extensions: { pg_trgm } }), Boolean(server));
+  const db: Database = await keepStatistics(server ? await scratchPg(server, await schemaKey(true), (db) => prepared(db, true)) : await PGlite.create({ loadDataDir: await (blank ??= blankImage()), extensions: { pg_trgm } }), Boolean(server));
   openInMemory.add(db);
   const close = db.close.bind(db);
   db.close = async () => {
@@ -100,7 +98,7 @@ async function makeImage() {
 
 /** The blank image kept in the temp folder, named for the schema, PGlite and how it is made: made when it is not there yet. */
 export async function blankImageFile() {
-  const made = createHash('sha256').update(`${schemaKey(false)} ${pgliteVersion()} ${makeImage}`).digest('hex').slice(0, 12);
+  const made = createHash('sha256').update(`${await schemaKey(false)} ${pgliteVersion()} ${makeImage}`).digest('hex').slice(0, 12);
   const file = join(tmpdir(), `pelago-blank-${made}.tar`);
   if (existsSync(file)) return file;
   const image = await makeImage();
