@@ -1,0 +1,11 @@
+{
+  "id": "publish",
+  "version": "0.1.0",
+  "title": "Publishing",
+  "description": "What goes out of the map and how it is drawn there: what publishing a document or sharing a view would freeze, its plan and state, a page's preview, the bake of a public view, live pages, a site's header and footer, a product's public page, the counts a server pack keeps, drawings' code as files, kept pictures, and the tools that share and publish. Publishing itself, taking down and the public reads stay the kernel's, behind the rules and the walls.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}

@@ -1,6 +1,8 @@
 {
  "files": {
   "packs/attention/kernel/attention.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/mcp_apps/kernel/mcp-view.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/publish/kernel/publish.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/canvas/flow-lines.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/canvas/flow-topology.test.ts": { "pglite": 6.1, "postgres": 3.4 },
   "packs/canvas/map-found.test.ts": { "pglite": 0.1, "postgres": 0.1 },
