@@ -1,10 +1,10 @@
 // What a session has left unsaid when it ends (report, action session_end): the open work it has to change, vouch
 // for, or say it cannot tell about. Kept beside what asks it (src/sessions.ts).
 
-import { blockGraph } from '../../../src/blocking.ts';
-import type { Archipelago, Entity, Op } from '../../../src/pelago.ts';
-import { livesIn, scopeOf } from '../../../src/places.ts';
+import type { KernelContext } from '#pelago/kernel';
+import { placesOf } from './places.ts';
 import { touchedBy } from './touched.ts';
+import type { Item as Run } from './types.ts';
 
 export type Item = { id: string; type: string; title: string; status: string; touched?: true };
 
@@ -18,16 +18,16 @@ export type Item = { id: string; type: string; title: string; status: string; to
  * repository settles it. Nor is what has a change waiting for the human: what
  * was found has been said, and is theirs to confirm.
  */
-export async function unreconciled(l: Archipelago, run: Entity): Promise<Item[]> {
-  const [{ rows: repos }, mine] = await Promise.all([l.db.query<{ to_id: string }>(`select to_id from relation where type = any($2::text[]) and from_id = $1 and valid_to is null`, [run.id, livesIn(l)]), touchedBy(l, run.id)]);
+export async function unreconciled(ctx: KernelContext, run: Pick<Run, 'id' | 'created_at'>): Promise<Item[]> {
+  const [repos, mine] = await Promise.all([placesOf(ctx, run.id), touchedBy(ctx, run.id)]);
   if (!repos.length && !mine.length) return [];
-  const scope = [...(repos.length ? await scopeOf(l, repos[0].to_id, true) : []), ...mine];
-  const { rows: work } = await l.db.query<Item>(`select id, type, title, status from entity where id = any($1::text[]) and is_open and archived_at is null and type = any($2::text[]) order by props->>'due' nulls last, updated_at desc`, [scope, [...l.registry.types.values()].filter((t) => t.fields.tokens_estimated || t.capabilities.settles).map((t) => t.id)]);
-  const graph = await blockGraph(l, work.map((i) => i.id));
-  const { rows: held } = await l.db.query<{ ops: Op[] }>(`select ops from proposal where status = 'pending' -- index proposal_status`);
-  const proposed = new Set(held.flatMap((p) => p.ops.flatMap((o) => ('id' in o && o.id ? [o.id] : []))));
-  const open = work.filter((i) => !graph.waitsOnSomeone(i.id) && !proposed.has(i.id));
-  const { rows: untouched } = await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and updated_at <= $2`, [open.map((i) => i.id), run.created_at]);
-  const left = open.filter((i) => untouched.some((u) => u.id === i.id)).map(({ id, type, title, status }): Item => ({ id, type, title, status, ...(mine.includes(id) && { touched: true as const }) }));
+  const scope = [...(repos.length ? ((await ctx.reads({ within: { id: repos[0], open: true } })) as string[]) : []), ...mine];
+  const types = [...ctx.registry.types.values()].filter((t) => t.fields.tokens_estimated || t.capabilities.settles).map((t) => t.id);
+  const work = (await ctx.reads({ open_work: { ids: scope, types } })) as Item[];
+  const blocked = work.length ? ((await ctx.reads({ blocked: work.map((i) => i.id) })) as Record<string, { waits_on_someone: boolean }>) : {};
+  const proposed = new Set((await ctx.reads({ pending_ids: true })) as string[]);
+  const open = work.filter((i) => !blocked[i.id]?.waits_on_someone && !proposed.has(i.id));
+  const untouched = new Set((await ctx.reads({ untouched: { ids: open.map((i) => i.id), at: new Date(run.created_at).toISOString() } })) as string[]);
+  const left = open.filter((i) => untouched.has(i.id)).map(({ id, type, title, status }): Item => ({ id, type, title, status, ...(mine.includes(id) && { touched: true as const }) }));
   return [...left.filter((i) => i.touched), ...left.filter((i) => !i.touched)];
 }

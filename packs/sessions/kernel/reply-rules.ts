@@ -7,7 +7,16 @@
 // keeps each time it asked as a step. Every such rule names the setting the owner turns it off by (lifted).
 // What such a rule is and when it holds is read here, with nothing of the map; src/replies.ts asks.
 
-import type { RuleDef } from '../../../src/rules.ts';
+/** A rule as a pack declares it (src/rules.ts): the fields a rule on a reply's end is read by. */
+export interface RuleDef {
+  id?: string;
+  on?: string;
+  then?: unknown;
+  when?: { reply?: Record<string, unknown>; [key: string]: unknown };
+  say?: string;
+  lifted?: string;
+  pack?: string;
+}
 
 /** The event a reply rule is on. */
 export const REPLY_ENDED = 'reply_ended';

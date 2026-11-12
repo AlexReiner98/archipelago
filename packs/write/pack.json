@@ -35,6 +35,11 @@
           "notification": "id"
         },
         "run": "root-notify.ts#notifyOf"
+      },
+      "root.bookkeep": {
+        "in": "any",
+        "out": "any",
+        "run": "root-bookkeep.ts#bookkeep"
       }
     }
   }

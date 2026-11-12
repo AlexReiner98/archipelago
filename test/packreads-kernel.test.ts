@@ -61,7 +61,7 @@ test('runs are read by repository or folder, with what each touched that the ask
   const a = await sessionStart(l, agent, { cwd: 'C:\\code\\Apex\\.claude\\worktrees\\one', session_id: 'r1' });
   const b = await sessionStart(l, agent, { cwd: 'C:\\code\\Other', session_id: 'r2' });
   await make(l, [{ op: 'link', type: 'lives_in', from: b.run, to: repo }]);
-  await addTouched(l.db, a.run, [task, 'e_notthere']);
+  await addTouched(l, a.run, [task, 'e_notthere']);
 
   const inFolder = (await answerRead(l, { runs: { folder: 'C:\\code\\Apex\\', touched: true } })) as Paged<{ id: string; touched: string[] }>;
   assert.deepEqual(inFolder.rows.map((r) => r.id), [a.run], 'a folder holds the runs started in it and under it');

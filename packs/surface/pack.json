@@ -82,6 +82,11 @@
         "in": "any",
         "out": "any",
         "run": "root-connections.ts#connectionsOf"
+      },
+      "root.sessions": {
+        "in": "any",
+        "out": "any",
+        "run": "root-sessions.ts#sessionRoom"
       }
     }
   }

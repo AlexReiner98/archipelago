@@ -15,7 +15,7 @@ import { resolveRun } from '../../../src/sessions.ts';
 import { covering } from '../../../src/withdraw.ts'; import { proposals } from './map-reads.ts';
 import { holdsOff } from '../../../src/rules.ts';
 import { type Noted, PLAN_SECTIONS, sections, structureAsText, tiedInChange, type TieTypes } from '../../../src/plan-note.ts';
-import { closeOffers } from '../../../src/close-offer.ts';
+import { closeOffers } from '../../../src/sessions.ts';
 import { logged } from '../../../src/logged.ts';
 
 // Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
@@ -173,7 +173,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         await point(l, actor, 'change', result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason, undefined, input.run).catch(logged("change: the owner's page could not be pointed at it"));
       }
       // What it closes was meant to fix what is still open: the answer names each, with the op that closes it.
-      const offers = await closeOffers(l.db, l.registry, input.ops as { op: string; id?: string; status?: string }[]);
+      const offers = await closeOffers(l, input.ops as { op: string; id?: string; status?: string }[]);
       if (offers) result = { ...result, still_open: offers };
       // With holds off (src/rules.ts, HOLDS_OFF), the answer says so: no rule held it, and none will until the owner turns them on.
       // A structure put in as one long note (a plan, findings, options) is said back, so its pieces are laid out as items (src/plan-note.ts).

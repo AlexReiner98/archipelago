@@ -17,10 +17,11 @@ import { viewsRead, type ViewsRead } from './packreads-views.ts';
 import { presenceRead, type PresenceRead } from './packreads-presence.ts';
 import { publishRead, type PublishRead } from './packreads-publish.ts';
 import { runsRead, type RunsRead } from './packreads-runs.ts';
+import { sessionsRead, type SessionsRead } from './packreads-sessions.ts';
 import { queryRead, type QueryRead } from './packreads-query.ts';
 import { fillReads } from '../../loader/kernel/packhost.ts'; import { trail } from './map-reads.ts';
 
-export type Read = KernelRead & ServiceRead & ViewsRead & ClocksRead & PublishRead & PresenceRead & RunsRead & QueryRead & {
+export type Read = KernelRead & ServiceRead & ViewsRead & ClocksRead & PublishRead & PresenceRead & RunsRead & QueryRead & SessionsRead & {
   get?: string;
   /** Items of a type (flavours included): with a status or one of several, fields equal to where's, and a field between two values. */
   items?: { type: string; status?: string | string[]; where?: Record<string, unknown>; between?: { field: string; from?: string; to?: string } };
@@ -104,6 +105,8 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
   if (runs !== undefined) return runs;
   const query = await queryRead(l, q);
   if (query !== undefined) return query;
+  const sessions = await sessionsRead(l, q);
+  if (sessions !== undefined) return sessions;
   if (q.fields && (!Array.isArray(q.fields) || q.fields.some((f) => !NAME.test(f)))) throw new Error('fields is a list of field names');
   // An item's columns as the asker may read them: anyone with no login reads no note, no owner, no link's id, and of the
   // props only the few public ones, and may not filter by props at all.
