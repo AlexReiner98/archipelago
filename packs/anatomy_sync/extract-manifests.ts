@@ -1,30 +1,25 @@
-// The pack architecture as the anatomy pack models it, read from manifests alone: what items and links the Pack
-// anatomy island should hold. Pure: manifests in, items and links out, each keyed so a refresh finds what it made
-// before (scripts/anatomy.ts reads the map, compares and sends the difference).
+// The manifests' extractor: every pack.json and bundle.json, and packs/roots.json, as the anatomy pack models them.
+// A pack, what it declares (types, link types, parts, stores), the names it asks for and offers and who provides each,
+// its services' shapes, its place among the roots, and its bundle. The modules it names (a service's or a hook's code)
+// are the code extractor's: this one only ties to them.
+
+import { gist, title, type Extractor, type Model, type Source, type Want, type WantLink } from './model.ts';
 
 type Json = Record<string, any>;
-export interface PackFile { m: Json; home: 'open_core' | 'hosted'; path: string; root: boolean }
-export interface Bundle { id: string; title?: string; description?: string; packs?: string[] }
-export interface Want { key: string; type: string; title: string; body: string; props: Record<string, unknown> }
-export interface WantLink { type: string; from: string; to: string; props?: Record<string, unknown> }
-export interface Model { items: Want[]; links: WantLink[] }
-
-/** The link types this model makes: a refresh may take back one of these that it no longer wants, and no other. */
-export const MADE_LINKS = ['part_of', 'anatomy.requires', 'anatomy.uses', 'anatomy.provides', 'anatomy.calls', 'anatomy.grants', 'anatomy.extends', 'anatomy.joins', 'anatomy.hears', 'anatomy.records', 'anatomy.moved_from', 'anatomy.kept_in'];
+interface PackFile { m: Json; home: Source['repo']; path: string; blob: string; rootOrder?: number }
 
 const RUNS = ['actions', 'handlers', 'layouts', 'uses', 'reach'];
 const KERNEL_DRAWN = new Set(['tree', 'screen', 'attention']);
 const size = (v: unknown) => (Array.isArray(v) ? v.length : v && typeof v === 'object' ? Object.keys(v).length : 0);
-const cut = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s);
-const gist = (s: unknown) => cut(String(s ?? '').split(/(?<=\.)\s/).slice(0, 2).join(' '), 400);
 const list = (v: unknown): string[] => [].concat((v ?? []) as never);
 export const formOf = (n: string) => (n.includes(':') ? n.split(':')[0] : 'pack');
 const svc = (n: string) => (n.startsWith('service:') ? n : `service:${n}`);
+const MANIFEST = /^(packs|workspace-packs)\/[^/]+\/(pack|bundle)\.json$/;
 
 /** Its kind on an island map, as packs/loader/kernel/islands.ts reads a file: core, a root, a server's, words or habits. */
-export function kindOf({ m, root }: PackFile): string {
+export function kindOf({ m, rootOrder }: Pick<PackFile, 'm' | 'rootOrder'>): string {
   if (m.id === 'core') return 'kernel';
-  if (root) return 'root';
+  if (rootOrder !== undefined) return 'root';
   if (m.reach?.server) return 'server';
   const runs = RUNS.some((k) => size(m[k])) || list(m.requires).some((r) => !/^(has|type):/.test(r) && r !== 'core');
   return (size(m.types) || size(m.links)) && !runs ? 'island' : 'map';
@@ -59,28 +54,15 @@ export function partsOf(m: Json): Part[] {
   return out;
 }
 
-/** The keys an item of the model has, read back off the map: its type, its fields and the pack it is part of. */
-export function keyOf(type: string, props: Json, pack?: string): string | undefined {
-  switch (type) {
-    case 'anatomy.pack': return props.pack_id && `pack:${props.pack_id}`;
-    case 'anatomy.bundle': return props.bundle_id && `bundle:${props.bundle_id}`;
-    case 'anatomy.name': return props.name && `name:${props.name}`;
-    case 'anatomy.module': return props.path && `module:${props.path}`;
-    case 'anatomy.type': return props.type_id && `type:${props.adds_fields ? `${props.type_id}+${pack}` : props.type_id}`;
-    case 'anatomy.link_type': return props.link_id && `link:${props.link_id}`;
-    case 'anatomy.part': return pack && props.part_id && `part:${pack}:${props.part}:${props.part_id}:${props.side}`;
-    default: return undefined;
-  }
-}
-
-export function model(packs: PackFile[], bundles: Bundle[], calls: Record<string, string[]>): Model {
+/** The model of a set of manifests: what the island holds of packs, apart from their code. */
+export function modelOf(packs: PackFile[], bundles: { b: Json }[], calls: Record<string, string[]>): Model {
   const items: Want[] = [], links: WantLink[] = [];
-  const want = (key: string, type: string, title: string, body: unknown, props: Record<string, unknown>) => items.push({ key, type, title: cut(title, 60), body: gist(body), props });
+  const want = (key: string, type: string, name: string, body: unknown, props: Record<string, unknown>) => items.push({ key, type, title: title(name), body: gist(body), props });
   const tie = (type: string, from: string, to: string, props?: Record<string, unknown>) => links.push({ type, from, to, ...(props && { props }) });
   const packIds = new Set(packs.map((p) => p.m.id));
   const typeOwner = new Map<string, string>(), linkOwner = new Map<string, string>(), caps = new Map<string, Set<string>>();
-  const names = new Set<string>(), modules = new Map<string, string>(); // path -> pack id
-  const modOf = (p: PackFile, run: string) => { const file = String(run).split('#')[0]; if (!file) return undefined; const path = `${p.path}/${p.m.kernel?.modules ?? ''}${file}`; modules.set(path, p.m.id); return `module:${path}`; };
+  const names = new Set<string>(), shapes = new Map<string, { takes?: unknown; gives?: unknown }>();
+  const moduleOf = (p: PackFile, run: string) => { const file = String(run).split('#')[0]; return file ? `module:${p.path}/${p.m.kernel?.modules ?? ''}${file}` : undefined; };
 
   for (const p of packs) {
     const m = p.m, k = m.kernel ?? {};
@@ -92,14 +74,15 @@ export function model(packs: PackFile[], bundles: Bundle[], calls: Record<string
     }
     for (const l of m.links ?? []) { linkOwner.set(l.id, m.id); for (const e of [...list(l.from), ...list(l.to)]) if (e.startsWith('has:')) names.add(e); }
     for (const h of m.handlers ?? []) { if (h.event) names.add(`event:${h.event}`); for (const r of list(h.records)) names.add(`event:${r}`); }
-    for (const n of [...Object.keys(k.provides ?? {}), ...Object.keys(k.calls ?? {})]) names.add(svc(n));
+    for (const [n, sig] of Object.entries<any>(k.provides ?? {})) { names.add(svc(n)); shapes.set(svc(n), { takes: sig?.in, gives: sig?.out }); }
+    for (const n of Object.keys(k.calls ?? {})) names.add(svc(n));
   }
   for (const act of Object.keys(calls)) names.add(svc(act));
 
-  for (const b of bundles) { want(`bundle:${b.id}`, 'anatomy.bundle', b.title || b.id, b.description, { bundle_id: b.id }); for (const pid of b.packs ?? []) tie('part_of', `pack:${pid}`, `bundle:${b.id}`); }
+  for (const { b } of bundles) { want(`bundle:${b.id}`, 'anatomy.bundle', b.title || b.id, b.description, { bundle_id: b.id }); for (const pid of b.packs ?? []) tie('part_of', `pack:${pid}`, `bundle:${b.id}`); }
   for (const p of packs) {
     const m = p.m, k = m.kernel ?? {}, me = `pack:${m.id}`;
-    want(me, 'anatomy.pack', m.title || m.id, m.description, { pack_id: m.id, kind: kindOf(p), home: p.home, version: m.version ?? '', path: p.path, ...(k.trust && { trust: k.trust }) });
+    want(me, 'anatomy.pack', m.title || m.id, m.description, { pack_id: m.id, kind: kindOf(p), home: p.home, version: m.version ?? '', path: p.path, blob: p.blob, ...(k.trust && { trust: k.trust }), ...(p.rootOrder !== undefined && { root_order: p.rootOrder }) });
     for (const r of list(m.requires)) tie('anatomy.requires', me, `name:${r}`);
     for (const r of list(m.uses)) tie('anatomy.uses', me, `name:${r}`);
     for (const n of Object.keys(k.calls ?? {})) tie('anatomy.calls', me, `name:${svc(n)}`);
@@ -125,11 +108,12 @@ export function model(packs: PackFile[], bundles: Bundle[], calls: Record<string
       tie('part_of', key, me);
       if (x.part === 'handler' && x.rec.event) tie('anatomy.hears', key, `name:event:${x.rec.event}`);
       for (const r of list(x.rec.records)) tie('anatomy.records', key, `name:event:${r}`);
-      for (const r of x.runs ?? []) { const mod = modOf(p, r); if (mod) tie('anatomy.kept_in', key, mod); }
+      for (const r of x.runs ?? []) { const mod = moduleOf(p, r); if (mod) tie('anatomy.kept_in', key, mod); }
     }
-    for (const [n, sig] of Object.entries<any>(k.provides ?? {})) { const mod = sig?.run && modOf(p, sig.run); if (mod) tie('anatomy.kept_in', `name:${svc(n)}`, mod); }
+    for (const [n, sig] of Object.entries<any>(k.provides ?? {})) { const mod = sig?.run && moduleOf(p, sig.run); if (mod) tie('anatomy.kept_in', `name:${svc(n)}`, mod); }
+    const stores: [string, string][] = [...Object.keys(k.tables ?? {}).map((t) => [t, 'table'] as [string, string]), ...(k.memory ? [[String(k.memory), 'memory'] as [string, string]] : [])];
+    for (const [id, store] of stores) { const key = `store:${m.id}:${id}`; want(key, 'anatomy.store', `${store} ${id}`, '', { store_id: id, store }); tie('part_of', key, me); }
   }
-  for (const [path, pid] of modules) { want(`module:${path}`, 'anatomy.module', path.split('/').pop()!, '', { path }); tie('part_of', `module:${path}`, `pack:${pid}`); }
 
   const provider = (n: string): string[] => {
     const f = formOf(n), rest = n.slice(n.indexOf(':') + 1), of = rest.split('@')[1];
@@ -140,12 +124,30 @@ export function model(packs: PackFile[], bundles: Bundle[], calls: Record<string
     if (f === 'event') return ['item.due', 'notification.made'].includes(rest) ? ['core'] : packs.filter((p) => (p.m.handlers ?? []).some((h: Json) => list(h.records).includes(rest))).map((p) => p.m.id);
     return of && typeOwner.has(of) ? [typeOwner.get(of)!] : [];
   };
+  const json = (v: unknown) => (v === undefined ? undefined : JSON.stringify(v));
   for (const n of [...names].sort()) {
-    want(`name:${n}`, 'anatomy.name', n, '', { name: n, form: formOf(n) });
+    const shape = shapes.get(n);
+    want(`name:${n}`, 'anatomy.name', n, '', { name: n, form: formOf(n), ...(shape?.takes !== undefined && { takes: json(shape.takes) }), ...(shape?.gives !== undefined && { gives: json(shape.gives) }) });
     for (const pid of provider(n)) tie('anatomy.provides', `pack:${pid}`, `name:${n}`);
   }
   for (const [act, callers] of Object.entries(calls)) for (const c of callers) tie('anatomy.calls', `pack:${c}`, `name:${svc(act)}`);
-
-  const keys = new Set(items.map((i) => i.key)), seen = new Set<string>();
-  return { items, links: links.filter((l) => { const k = `${l.type}|${l.from}|${l.to}`; if (seen.has(k) || l.from === l.to || !keys.has(l.from) || !keys.has(l.to)) return false; seen.add(k); return true; }) };
+  return { items, links };
 }
+
+export const manifests: Extractor = {
+  id: 'manifests',
+  owns: (path) => MANIFEST.test(path) || path === 'packs/roots.json',
+  extract(files) {
+    const roots = files.find((f) => f.path === 'packs/roots.json' && f.repo === 'open_core');
+    const parsed = roots ? JSON.parse(roots.text) : { roots: [], calls: {} };
+    const order = new Map<string, number>(parsed.roots.map((r: { id: string }, i: number) => [r.id, i + 1]));
+    const packs: PackFile[] = [], bundles: { b: Json }[] = [];
+    for (const f of files) {
+      if (!MANIFEST.test(f.path)) continue;
+      const m = JSON.parse(f.text);
+      if (f.path.endsWith('bundle.json')) bundles.push({ b: m });
+      else packs.push({ m, home: f.repo, path: f.path.replace(/\/pack\.json$/, ''), blob: f.blob, rootOrder: order.get(m.id) });
+    }
+    return modelOf(packs, bundles, parsed.calls ?? {});
+  },
+};

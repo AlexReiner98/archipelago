@@ -2,5 +2,5 @@
   "id": "anatomy_sync",
   "version": "0.1.0",
   "title": "Anatomy sync",
-  "description": "Keeps the Pack anatomy island true to the code. For now its reader alone (reader.ts): each file's imports, its pack and its header comment, read the way the structure test checks the architecture, so the check and the map read code alike. The handler that syncs the island on each push comes later."
+  "description": "Keeps the Pack anatomy island true to the code. Its reader (reader.ts) reads each file's imports, pack and header comment the way the structure test checks the architecture, and its extractors (extract.ts), one per kind of source, turn the manifests, the modules, the tests and the structure checks into the island's keyed items and links. The handler that syncs the island on each push comes later; scripts/anatomy.ts is the full check."
 }
