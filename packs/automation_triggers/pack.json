@@ -1,0 +1,11 @@
+{
+  "id": "automation_triggers",
+  "version": "0.1.0",
+  "title": "Automation triggers",
+  "description": "What an automation's definition must say and when it comes due: a trigger daily or weekly at a time, or a watched query and the edge it fires on (first, each, first_per, crosses), and what a watched query's edge meets from one pass to the next. The automations pack does what one says once it is due.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}
