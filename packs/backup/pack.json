@@ -2,7 +2,12 @@
   "id": "backup",
   "version": "0.1.0",
   "title": "Backup",
-  "description": "Backups kept off the map: every workspace written to a file each day and a copy sent off the server, the key vault's backups beside them, a backup given to an admin by a link, and a backup merged into a map that already holds one. Dump and restore are the log's.",
+  "description": "Backups kept off the map: every workspace written to a file each day and a copy sent off the server, the key vault's backups beside them, and a backup merged into a map that already holds one. Dump and restore are the log's, reached through root services; the download link is the surface's.",
+  "uses": [
+    "service:root.workspaces",
+    "service:root.dump",
+    "service:root.merge"
+  ],
   "kernel": {
     "trust": "service",
     "internal": true,

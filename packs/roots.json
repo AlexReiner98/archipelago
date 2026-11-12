@@ -14,11 +14,11 @@
     },
     {
       "id": "log",
-      "hash": "9650f3050e79ca4c4e8c7a9fe304ecfffd88ad81462791b101c3344a951e0b22"
+      "hash": "46a67b97e1a3476ed8c33533ef5e2550843c45210b60cddffa4c22136b4073d0"
     },
     {
       "id": "identity",
-      "hash": "ebfa21c314605e7b252325e6c1158334e0a7fd6435c2af2734127058726ff6c3"
+      "hash": "399eaaaace09a18e6745ee92db8ddfdd844c15b8512223e193bdcd948c157125"
     },
     {
       "id": "walls",
@@ -26,7 +26,7 @@
     },
     {
       "id": "loader",
-      "hash": "1dedee57c84fd77b138659fd739e4c8a7377b9fc90cabe8ef2bb85f9e2db35af"
+      "hash": "66c24c9e6d1768a835c2a076e8b7556418dde09f984092d722b207b7608cc874"
     },
     {
       "id": "rules",
@@ -38,7 +38,7 @@
     },
     {
       "id": "surface",
-      "hash": "37a787eea3de48253f19b6629c95b73d7caef97f9db1a63c854965b8368d0478"
+      "hash": "fec9a912aabe0feb667ed60afb2c4c313e1ac87d549e23a0b713f3c90e223335"
     }
   ]
 }

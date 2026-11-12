@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url';
 import { isInternal, type Manifest, type ModuleRef } from './manifest.ts';
 import { answerRead, type Read } from './packreads.ts';
 import { guardedFetch } from './outbound.ts';
-import { callService, fillServices } from './services.ts'; import { fillWritePoints, type WriteSlot } from './write-hooks.ts';
+import { callService, fillServices } from './services.ts'; import { callRoot, declares, isRootName, ownManifest, type RootCall } from './root-calls.ts'; import { fillWritePoints, type WriteSlot } from './write-hooks.ts';
 import type { Archipelago } from './pelago.ts';
 import type { ChangeInput } from './pelago-types.ts';
 import type { Fact } from './log.ts';
@@ -105,13 +105,15 @@ export class KernelHost {
 
   /** Each service name the active internal packs provide, bound to its provider's context: what the loader hands fillServices (src/services.ts). */
   services(l: Archipelago): Map<string, (input: unknown) => Promise<unknown>> {
-    return new Map(this.packs(l).flatMap((pack) => Object.entries(pack.kernel?.provides ?? {}).map(([name, p]) => [name, async (input: unknown) => (await this.fn(pack, p.run))(contextFor(l, pack, this), input)] as const)));
+    return new Map(this.packs(l).flatMap((pack) => Object.entries(pack.kernel?.provides ?? {}).filter(([name]) => !isRootName(name)).map(([name, p]) => [name, async (input: unknown) => (await this.fn(pack, p.run))(contextFor(l, pack, this), input)] as const)));
   }
 
   /** A service name called by a pack: only one it requires or uses, answered by its one active provider. */
   async call<O>(l: Archipelago, from: Manifest, name: string, input: unknown): Promise<O> {
     const want = `service:${name}`;
     if (![...(from.requires ?? []), ...(from.uses ?? [])].includes(want)) throw new Error(`The ${from.id} pack calls ${want}, which it neither requires nor uses`);
+    // A root service: only a pack packs/roots.json names for it, answered by its root (src/root-calls.ts).
+    if (isRootName(name)) return callRoot<O>(from.id, name, input, { map: l });
     return this.answer<O>(l, name, input);
   }
 
@@ -121,6 +123,7 @@ export class KernelHost {
    * Only an internal pack's name is answered here; any other is what fillServices was handed.
    */
   async answer<O>(l: Archipelago, name: string, input: unknown): Promise<O> {
+    if (isRootName(name)) throw new Error(`${name} is a root service: only a pack packs/roots.json names for it calls it, through its context`);
     const pack = this.packs(l).find((p) => p.kernel?.provides?.[name]);
     if (!pack) return callService<O>(l.registry, name, input);
     return (await (await this.fn(pack, pack.kernel!.provides![name].run))(contextFor(l, pack, this), input)) as O;
@@ -218,5 +221,33 @@ export function contextFor(l: Archipelago, pack: Manifest, host: KernelHost): Ke
     },
     now: () => new Date(),
     said: (message) => console.error(`${id}: ${message}`),
+  };
+}
+
+/**
+ * The context of an internal pack's server duty, which no map asks (backupAll walks every workspace): it calls only the
+ * root services roots.json lets it, handed the server's workspaces; anything that needs a map is refused.
+ */
+export function serverContext(pack: string, workspaces: NonNullable<RootCall['workspaces']>): KernelContext {
+  const manifest = ownManifest(pack);
+  if (!manifest || manifest.kernel?.internal !== true) throw new Error(`No internal pack "${pack}" is on this server`);
+  const none = (what: string) => (): never => { throw new Error(`The ${pack} pack's server duty has no map to ${what}`); };
+  return {
+    pack: { id: pack, version: (manifest as { version?: string }).version ?? '', hash: '' },
+    workspace: '',
+    reads: none('read'),
+    registry: new Proxy({}, { get: none('read the types of') }) as RegistryRead,
+    call: async <I, O>(name: string, input: I) => {
+      if (!isRootName(name)) throw new Error(`The ${pack} pack's server duty calls only root services, not service:${name}`);
+      if (!declares(manifest, name)) throw new Error(`The ${pack} pack calls service:${name}, which it neither requires nor uses`);
+      return callRoot<O>(pack, name, input, { workspaces });
+    },
+    change: none('change'),
+    move: none('move'),
+    record: none('record on'),
+    secret: none('read a secret of'),
+    fetch: none('fetch for'),
+    now: () => new Date(),
+    said: (message) => console.error(`${pack}: ${message}`),
   };
 }

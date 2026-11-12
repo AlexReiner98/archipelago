@@ -3,7 +3,8 @@
 //
 //   1. reads packs/roots.json, the root packs in order, each with its hash;
 //   2. hashes each root pack's folder (pack.json as canonical JSON, and kernel/**) and refuses to start on a
-//      difference, naming the pack and both hashes;
+//      difference, naming the pack and both hashes, and refuses a list of root service callers (roots.json calls)
+//      that names a pack not here or a name no root provides (src/root-calls.ts);
 //   3. starts the roots in order, each handed the roots before it by id: a root that asks for one after it stops
 //      the start;
 //   4. hands each root the fillings of the hook points and slots it opens, as the root that has them (the loader)
@@ -24,6 +25,7 @@ import { controlValue, setControlValue } from './control.ts';
 import type { Q } from './db.ts';
 import { sha256Hex } from './hashes.ts';
 import { jcs } from './jcs.ts';
+import { readRootTable } from './root-calls.ts';
 
 /** The repository: packs/ and roots.json are read from here unless told otherwise. */
 export const HOME = join(import.meta.dirname, '..');
@@ -169,6 +171,8 @@ export function checkRoots(home = HOME): string[] {
   }
   const listed = new Set(roots.map((r) => r.id));
   for (const id of declaredRoots(packsDir)) if (!listed.has(id)) wrong.push(`${id}: its manifest says it is a root pack, but ${ROOTS_FILE} does not list it.`);
+  // The root services, and the packs roots.json lets call each (src/root-calls.ts): every name provided, every caller here.
+  wrong.push(...readRootTable(home).problems);
   return wrong;
 }
 

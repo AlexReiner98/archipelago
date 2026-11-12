@@ -1,6 +1,7 @@
 {
  "files": {
   "packs/agents/kernel/agents.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/backup/kernel/backup-run.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/attention/kernel/attention.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/automation_triggers/kernel/automation-rules.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/canvas/flow-lines.test.ts": { "pglite": 0, "postgres": 0 },
@@ -154,6 +155,7 @@
   "test/replies.test.ts": { "pglite": 9.5, "postgres": 3.3 },
   "test/report.test.ts": { "pglite": 1.7, "postgres": 0.8 },
   "test/roadmap.test.ts": { "pglite": 11.8, "postgres": 5.2 },
+  "test/root-calls.test.ts": { "pglite": 0, "postgres": 0 },
   "test/rules.test.ts": { "pglite": 8.8, "postgres": 2.8 },
   "test/saved-canvases-narrow.test.ts": { "pglite": 6.2, "postgres": 4.5 },
   "test/saved-canvases-switch.test.ts": { "pglite": 8.3, "postgres": 4.4 },

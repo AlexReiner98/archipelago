@@ -33,8 +33,7 @@ const CALLERS: Record<string, number> = {
   'src/tools.ts': 1,
   'src/touched.ts': 3,
   'src/typetable.ts': 2,
-  'src/usage.ts': 1,
-  'src/workspace-tools.ts': 3,
+  'src/workspace-tools.ts': 4, // root.counters, the usage view's whole count (was src/usage.ts's)
 };
 
 /** Reads of a Db's `whole`: src/db.ts carries it through, and the type table's own bypassingRls takes it. */

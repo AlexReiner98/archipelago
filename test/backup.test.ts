@@ -45,10 +45,10 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   const count = async (l: Archipelago, table: string) => (await l.db.query<{ n: number }>(`select count(*)::int as n from ${table}`)).rows[0].n;
   const before = [await count(b, 'entity'), await count(b, 'log_op')];
 
-  const options = { workspace: 'default', sessionTypes: b.registry.family('run') };
-  const preview = await merge(b.db, from, options);
+  const options = { sessionTypes: b.registry.family('run') };
+  const preview = await merge(b, from, options);
   assert.deepEqual([preview.applied, await count(b, 'entity'), await count(b, 'log_op')], [false, ...before], 'looking changes nothing');
-  const done = await merge(b.db, from, { ...options, apply: true });
+  const done = await merge(b, from, { ...options, apply: true });
   assert.deepEqual({ ...done, applied: false, events: { ...done.events, first_seq: 0, last_seq: 0 } }, { ...preview, events: { ...preview.events, first_seq: 0, last_seq: 0 } }, 'and it does what it said it would');
   assert.deepEqual([done.entities.added, done.entities.updated, done.entities.kept_newer_here], [1, 2, 1], 'the new task; the renamed and the archived one; and the aim b renamed stays');
   assert.deepEqual([done.relations, done.proposals, done.left_out.open_sessions], [{ added: 1, ended: 1 }, { added: 0, decided: 1 }, 1]);
@@ -63,16 +63,16 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   assert.equal((await b.proposals()).length, 0);
   assert.ok(((await b.get(made.t)) as any).recent_events.some((e: any) => e.action === 'entity.update'), 'with the history of what changed');
 
-  const again = await merge(b.db, from, { ...options, apply: true });
+  const again = await merge(b, from, { ...options, apply: true });
   assert.deepEqual([again.entities.added, again.entities.updated, again.relations, again.events.added, again.proposals], [0, 0, { added: 0, ended: 0 }, 0, { added: 0, decided: 0 }], 'a second time adds nothing');
 
   // And back the other way: a hears of what b did, and keeps its own.
-  const back = await merge(a.db, await snapshot(b), { ...options, apply: true });
+  const back = await merge(a, await snapshot(b), { ...options, apply: true });
   assert.deepEqual([back.entities.added, back.entities.updated, back.entities.kept_newer_here], [1, 1, 0]);
   assert.deepEqual([await title(a, made.p), await title(a, made.t)], ['Proj, renamed in b', 'Task, renamed in a']);
   assert.ok(await a.entity(session.run), 'its own session is untouched');
   // An older file never undoes a newer map.
-  const stale = await merge(b.db, from, { ...options, apply: true });
+  const stale = await merge(b, from, { ...options, apply: true });
   assert.equal(stale.entities.updated, 0);
 });
 

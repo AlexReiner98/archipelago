@@ -9,12 +9,32 @@
 // is read row by row: storage is the database's count of each table's size and the counts kept beside the log
 // (src/bytes.ts), sessions the open runs heard from in the hour, requests and looks the server's own counts.
 
-import { bytesByType, largestItems } from './bytes.ts';
-import { looksBy, looksThisHour } from '../../../src/looks.ts';
-import { limitOf } from '../../../src/members.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
-import { LIMITS, NEAR, useOf, type LimitName } from '../../../src/standing.ts'; import { awakeSessions, bytes, requestsBy, requestsThisMinute, SESSION_AWAKE_MS, storageOf, storageParts } from './workspace-use.ts';
+import type { KernelContext } from '#pelago/kernel';
+
+/** A limit the server sets a workspace (src/standing.ts). */
+type LimitName = 'members' | 'storage' | 'requests' | 'sessions' | 'looks';
+/** What one limit allows and how near it is, as the server says it (useOf, src/standing.ts). */
+interface Allowed { name: LimitName; of: string; near: boolean; over: boolean }
+/** What the server counts of a workspace (root.counters, packs/surface/kernel/workspace-tools.ts). */
+interface Counters {
+  limits: (Partial<Record<LimitName, number>> & { note?: string }) | null;
+  near: number;
+  order: LimitName[];
+  used: Record<LimitName, number>;
+  allowed: Allowed[];
+  storage_parts: Record<string, number>;
+  bytes_by_type: { type: string; bytes: number }[];
+  largest: { id: string; type: string; bytes: number }[];
+  requests_by: [string, number][];
+  looks_by: [string, number][];
+  /** The sessions at work, newest heard from first. */
+  awake: string[];
+  /** The members' people, for an admin. */
+  members?: string[];
+}
+
+/** A number of bytes as a person reads it (as src/workspace-use.ts says it). */
+const bytes = (n: number) => (n >= 1e9 ? `${+(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${+(n / 1e6).toFixed(1)} MB` : n >= 1e3 ? `${Math.round(n / 1e3)} kB` : `${n} bytes`);
 
 /** How many of the largest items are named, and how many types. */
 const LARGEST = 12;
@@ -57,10 +77,11 @@ interface Item {
 const ratio = (n: number, of: number) => (of > 0 ? Math.min(n / of, 1) : 0);
 
 /** The usage view: every limit the server sets the workspace (all of them where it sets none), with what each is made of. */
-export async function usage(l: Archipelago, _input: Record<string, unknown>, actor?: Actor) {
-  const limits = await limitOf(l.workspace);
+export async function usage(ctx: KernelContext, _input: Record<string, unknown>, actor?: { admin?: boolean }) {
   const admin = Boolean(actor?.admin);
-  const whole = await bypassingRls(l);
+  // What the server counts, whole (root.counters): each item it names is read below as the reader, under their row-level security.
+  const counted = await ctx.call<unknown, Counters>('root.counters', { admin, runs: ctx.registry.family('run'), largest: LARGEST });
+  const limits = counted.limits ?? undefined;
   const items: Item[] = [];
   const links: { id: string; type: string; from: string; to: string; props: Record<string, unknown> }[] = [];
   let n = 0;
@@ -69,20 +90,15 @@ export async function usage(l: Archipelago, _input: Record<string, unknown>, act
 
   // Titles of the items named, as the reader may see them: one they cannot read is not named.
   const titlesOf = async (ids: string[]) => {
-    const { rows } = ids.length ? await l.db.query<{ id: string; title: string; type: string }>(`select id, title, type from entity where id = any($1::text[])`, [ids]) : { rows: [] };
+    const rows = ids.length ? ((await ctx.reads({ ids })) as { id: string; title: string; type: string }[]) : [];
     return new Map(rows.map((r) => [r.id, r]));
   };
-  const typeName = (t: string) => (t === 'links' ? 'Links' : t === 'packs' ? 'Packs' : t === 'other' ? 'Other' : (l.registry.type(t)?.title ?? t));
+  const typeName = (t: string) => (t === 'links' ? 'Links' : t === 'packs' ? 'Packs' : t === 'other' ? 'Other' : (ctx.registry.type(t)?.title ?? t));
 
-  const used = {} as Record<LimitName, number>;
-  used.storage = await storageOf(l.workspace);
-  used.sessions = await awakeSessions(whole.db, l.registry.family('run'));
-  used.requests = requestsThisMinute(l.workspace);
-  used.looks = looksThisHour(l.workspace);
-  if (admin) used.members = Number((await whole.db.query<{ n: number }>(`select count(*)::int as n from member where removed_at is null`)).rows[0].n);
-  const allowed = limits ? Object.fromEntries(useOf(limits, used).map((u) => [u.name, u])) : {};
+  const used = counted.used;
+  const allowed: Partial<Record<LimitName, Allowed>> = Object.fromEntries(counted.allowed.map((u) => [u.name, u]));
 
-  for (const name of LIMITS) {
+  for (const name of counted.order) {
     if (name === 'members' && !admin) continue;
     const at = allowed[name];
     const id = `use:${name}`;
@@ -110,17 +126,17 @@ export async function usage(l: Archipelago, _input: Record<string, unknown>, act
     });
 
     if (name === 'storage') {
-      const parts = await storageParts(whole.db);
+      const parts = counted.storage_parts;
       for (const [table, n] of Object.entries(parts)) if (n) part(id, piece(`use:storage:${table}`, STORED[table], n));
       // What the facts are about: by type, and the largest items the reader may see. Counted as stored, so these
       // are shares of the facts, not of the table's size on disk (its indexes and pages).
-      const types = await bytesByType(whole.db);
+      const types = counted.bytes_by_type;
       const said = types.reduce((a, t) => a + t.bytes, 0);
       const row = (pid: string, title: string, n: number, list: string, item?: string) => part(id, { ...piece(pid, title, n), use: { as: 'row', list, used: n, shown: bytes(n), share: ratio(n, said), ...(item && { item }) } });
       for (const t of types.slice(0, TYPES)) row(`use:storage:type:${t.type}`, typeName(t.type), t.bytes, 'By type');
       const rest = types.slice(TYPES).reduce((a, t) => a + t.bytes, 0);
       if (rest) row('use:storage:type:rest', 'Every other type', rest, 'By type');
-      const largest = await largestItems(whole.db, LARGEST);
+      const largest = counted.largest;
       const seen = await titlesOf(largest.map((x) => x.id));
       // What the reader cannot see is one row, among the rest by its size.
       const named: [string, string, number, string?][] = [];
@@ -135,17 +151,15 @@ export async function usage(l: Archipelago, _input: Record<string, unknown>, act
     }
 
     if (name === 'sessions') {
-      const since = new Date(Date.now() - SESSION_AWAKE_MS).toISOString();
-      const { rows } = await l.db.query<{ id: string; title: string; type: string }>(
-        `select id, title, type from entity where type = any($2::text[]) and is_open and archived_at is null and props->>'last_seen' >= $1 order by props->>'last_seen' desc`,
-        [since, l.registry.family('run')],
-      );
+      // The sessions at work the reader may see, newest heard from first.
+      const seen = await titlesOf(counted.awake);
+      const rows = counted.awake.flatMap((s) => (seen.has(s) ? [seen.get(s)!] : []));
       for (const r of rows) part(id, piece(`use:sessions:${r.id}`, r.title, 1, r.id, 'At work'));
       if (used.sessions > rows.length) part(id, piece('use:sessions:hidden', 'Sessions you cannot see', used.sessions - rows.length, undefined, 'At work'));
     }
 
     if (name === 'requests' || name === 'looks') {
-      const by = name === 'requests' ? requestsBy(l.workspace) : looksBy(l.workspace);
+      const by = name === 'requests' ? counted.requests_by : counted.looks_by;
       const who = new Map<string, number>();
       // An agent's are counted as its person's agents; a person's by the person.
       for (const [key, count] of by) who.set(key, (who.get(key) ?? 0) + count);
@@ -158,7 +172,7 @@ export async function usage(l: Archipelago, _input: Record<string, unknown>, act
     }
 
     if (name === 'members') {
-      const { rows } = await whole.db.query<{ person_id: string }>(`select person_id from member where removed_at is null and person_id is not null`);
+      const rows = (counted.members ?? []).map((person_id) => ({ person_id }));
       const people = await titlesOf(rows.map((r) => r.person_id));
       for (const r of rows) part(id, piece(`use:members:${r.person_id}`, people.get(r.person_id)?.title ?? 'A member', 1, people.has(r.person_id) ? r.person_id : undefined, 'By person'));
     }
@@ -166,7 +180,7 @@ export async function usage(l: Archipelago, _input: Record<string, unknown>, act
 
   return {
     as_of: new Date().toISOString(),
-    near_at: NEAR,
+    near_at: counted.near,
     ...(limits?.note && { note: limits.note }),
     lens: { view: 'usage' },
     items,

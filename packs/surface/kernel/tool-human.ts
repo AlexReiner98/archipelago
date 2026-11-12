@@ -90,7 +90,7 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       const their = theirs && mine && theirs !== mine ? file.tables.entity?.find((e) => e.id === theirs) : undefined;
       const my = their ? await whole.entity(mine!) : undefined;
       const owners = their && my && !my.archived_at ? { here: { id: my.id, title: my.title }, file: { id: theirs!, title: their.title as string }, made_one: false } : undefined;
-      const report = await merge(whole.db, file, { workspace: l.workspace, sessionTypes: whole.registry.family('run'), apply: input.apply });
+      const report = await merge(whole, file, { sessionTypes: whole.registry.family('run'), apply: input.apply });
       // What the file brought may be in the shapes from before the migrations a workspace runs once: they run again.
       if (input.apply) (await movesAgain(whole), await syncTypes(whole));
       if (input.apply && named.length) await typesTaken(whole);
