@@ -8,56 +8,24 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { hashSecret, newSecret, OPERATOR_RESET_FILE, sameSecret, validWorkspaceId } from './auth.ts';
 import { QuietSessions } from './session-quiet.ts';
-import { restore, type Dump } from './backup.ts';
-import { indexWorkspace } from './control-index.ts';
-import { addLocalType, addWorkspace, claimControlValue, controlValue, importControlFiles, importLocalPack, listWorkspaces, localTypes, nameWorkspace, OPERATOR, OPERATOR_RESET, removeWorkspace, setControlValue, takeControlValue } from './control.ts';
-import { startSchedules, stopSchedules } from './hooks.ts';
-import { startClock, stopClock } from './due.ts';
-import { alertOwner } from './alert.ts';
+import type { Dump } from './backup.ts';
+import type { Booted } from './boot.ts';
+import { addWorkspace, claimControlValue, controlValue, importControlFiles, listWorkspaces, localTypes, nameWorkspace, OPERATOR, OPERATOR_RESET, removeWorkspace, setControlValue, takeControlValue } from './control.ts';
 import { openDb, type Database } from './db.ts';
+import { openPhases, startDuties } from './lifecycle.ts';
+import { takeTypeItems } from './open-steps.ts'; // the kernel's steps of a workspace's open, and the clock
 import { databaseFor, dropDatabaseFor } from './pg.ts';
-import { Archipelago, type Policy } from './pelago.ts';
-import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
-import type { Q } from './db.ts';
-import { beginApplying } from './rules.ts';
-
-/**
- * A new workspace makes things shared unless they say otherwise (the owner, 9 Nov 2026): with one person in it that
- * hides nothing from anyone, a team sees one map, and a link shows what it is made for. The owner changes it in
- * Settings; a workspace made before keeps what it has, private when it never chose.
- */
-async function beginShared(q: Q): Promise<['+', string, string, unknown][]> {
-  const { rows } = await q.query(`insert into setting (key, value) values ('default_visibility', '"shared"'::jsonb) on conflict (key) do nothing returning key`);
-  return rows.length ? [['+', 'setting', 'default_visibility', 'shared']] : [];
-}
-import { followMade, followPacks, islandsOn, packsOff, setIslands, syncPacks } from './packstate.ts';
+import type { Archipelago, Policy } from './pelago.ts';
+import type { TypeDef } from './packs.ts';
+import { followMade, followPacks, setIslands } from './packstate.ts';
 import { firstIsland } from './island-start.ts';
 import { hostFor } from './packtools.ts';
-import { syncTypes } from './typetable.ts'; import { openKernel } from './kernel-context.ts';
-import { packsFor } from './pack-allow.ts';
-import { onPacksChanged, onTypesChanged, typeItems } from './type-items.ts';
+import { syncTypes } from './typetable.ts';
+import { onPacksChanged, onTypesChanged } from './type-items.ts';
 
 // The type table follows the types kept on the map as it follows the packs.
 onTypesChanged(syncTypes);
 onPacksChanged(followMade);
-
-/** The type items each open workspace's registry last took, to follow another server's change to them. */
-const taken = new WeakMap<Archipelago, string>();
-
-/** Take in the types and link types kept on the map, when they changed: ones that no longer load (a pack gone) are said, and left out. */
-async function takeTypeItems(pelago: Archipelago): Promise<boolean> {
-  const items = await typeItems(pelago);
-  const now = JSON.stringify(items);
-  if (taken.get(pelago) === now) return false;
-  taken.set(pelago, now);
-  try {
-    pelago.registry.takeItems(items);
-  } catch (err) {
-    console.error(`the types kept on the map in ${pelago.workspace} do not load: ${(err as Error).message}`);
-    return false;
-  }
-  return true;
-}
 
 export const DEFAULT_WORKSPACE = 'default';
 /** How soon a pack switched on another server is followed here. */
@@ -72,7 +40,7 @@ export interface Workspace {
   quiet: QuietSessions;
 }
 
-interface WorkspacesConfig {
+export interface WorkspacesConfig {
   /** The default workspace's database folder. Null keeps every database in memory (tests). */
   dataDir: string | null;
   /**
@@ -98,6 +66,11 @@ interface WorkspacesConfig {
    * 2026). The server sets it; left out (the tests), a fresh default map is plain, as maps were before islands.
    */
   defaultOnIslands?: boolean;
+  /**
+   * The started root packs (src/boot.ts): each workspace is opened on them root by root before its own phases, and
+   * closed on them when it closes. Left out (the tests, the scripts), there are none.
+   */
+  boot?: Pick<Booted, 'open' | 'close'>;
 }
 
 export class Workspaces {
@@ -241,9 +214,7 @@ export class Workspaces {
     // Asked again after waiting: a request may have arrived meanwhile.
     if (rows[0].busy || this.held.get(id) || this.open.get(id) !== opening) return false;
     this.open.delete(id);
-    this.clocks(ws, false);
-    hostFor(ws.pelago.registry).stop();
-    const closing = ws.pelago.db.close().finally(() => this.closing.delete(id));
+    const closing = this.shut(ws).then(() => ws.pelago.db.close()).finally(() => this.closing.delete(id));
     this.closing.set(id, closing);
     await closing;
     return true;
@@ -258,8 +229,12 @@ export class Workspaces {
     return closed;
   }
 
+  /**
+   * Open a workspace (src/lifecycle.ts): its database, then each root pack's open (src/boot.ts), then the phases
+   * restore, packs, types, begin, islands and ready as the packs fill them, then, while this server leads, its duties.
+   */
   private async load(id: string, backup?: Dump): Promise<Workspace> {
-    const { dataDir, databaseUrl, rootDir, packsDir, packDirs, packs, workspacePacks, policy } = this.config;
+    const { dataDir, databaseUrl, rootDir, boot } = this.config;
     const isDefault = id === DEFAULT_WORKSPACE;
     let db: Database;
     if (isDefault) db = await this.control();
@@ -267,48 +242,40 @@ export class Workspaces {
       const onServer = databaseUrl && (await databaseFor(databaseUrl, id));
       db = await openDb(dataDir === null ? undefined : onServer || join(rootDir, id, 'db'));
     }
+    let rooted = false;
     try {
-      if (backup) await restore(db, backup, id);
-      // The members and tokens a backup brings can sign in here: the indexes beside the workspaces hear of them (src/control-index.ts).
-      if (backup) await indexWorkspace(await this.control(), id, db);
-      // Types a workspace defines for itself are in its own database. Those kept in a folder before are taken in once.
-      if (dataDir !== null) await importLocalPack(db, isDefault ? join(packsDir, LOCAL_PACK, 'pack.json') : join(rootDir, id, 'local-pack', 'pack.json'));
-      const registry = new Registry(packDirs ?? packsDir, packsFor(packs, workspacePacks, id), await localTypes<TypeDef>(db));
-      registry.keepLocal = (def) => addLocalType(db, def);
-      const pelago = new Archipelago(db, registry, policy, id);
+      // The roots' timers follow the lead with the workspace's own duties (clocks), not from here: hence not leading.
+      if (boot) await boot.open(id, false);
+      rooted = Boolean(boot);
       // Nothing on its log and nothing brought in: a new workspace, opened for the first time. Any other keeps what it has.
       const begins = !backup && !(await db.query(`select 1 from log_entry limit 1`)).rows.length;
-      // The packs the owner turned off here stay off; what they made is dormant.
-      await syncPacks(pelago); // which packs are present, and as which manifests, is a fact on the log
-      pelago.registry.turnOff(await packsOff(pelago), await islandsOn(pelago));
-      await takeTypeItems(pelago);
-      // The packs kept as items are read with the type items: the log and the packs on take them in now.
-      if (pelago.registry.made.size) await followMade(pelago);
-      await syncTypes(pelago); openKernel(pelago); // the internal packs' service names, filled (src/kernel-context.ts)
-      if (begins) await pelago.record('settings', 'system', [...(await beginApplying(db)), ...(await beginShared(db))]);
-      const ws = { id, name: isDefault ? 'Default' : (this.known.get(id) ?? id), pelago, quiet: new QuietSessions(pelago) };
-      // A fresh default map on islands, as create puts every other new map (e_44rbfwxp).
-      if (begins && isDefault && this.config.defaultOnIslands) {
-        await setIslands(pelago, 'system', true);
-        await firstIsland(pelago, ws.name);
-      }
+      const name = isDefault ? 'Default' : (this.known.get(id) ?? id);
+      const pelago = await openPhases({ id, name, isDefault, db, backup, begins, config: this.config, control: () => this.control() });
+      const ws = { id, name, pelago, quiet: new QuietSessions(pelago) };
       if (this.leading) this.clocks(ws, true);
       return ws;
     } catch (err) {
+      if (rooted) await boot!.close(id).catch(() => {});
       if (!isDefault) await db.close();
       throw err;
     }
   }
 
-  /** Start or stop what runs on a clock in one workspace: the clock, its packs' schedules and the look for quiet sessions. */
+  /** What runs in each open workspace while this server leads, by what stops it. */
+  private readonly duties = new WeakMap<Workspace, () => void>();
+
+  /** Start or stop what runs while this server leads in one workspace: the duties its packs declare (src/lifecycle.ts), the clock among them. */
   private clocks(ws: Workspace, on: boolean): void {
-    ws.quiet.stop();
-    stopSchedules(ws.pelago.registry);
-    stopClock(ws.pelago);
-    if (!on) return;
-    startSchedules(ws.pelago);
-    ws.quiet.start();
-    startClock(ws.pelago, (err) => void alertOwner(ws.pelago, { key: 'clock', title: 'The clock failed', body: `A pass over what came due failed: ${err.message}`, from: 'pelago' }));
+    this.duties.get(ws)?.();
+    this.duties.delete(ws);
+    if (on) this.duties.set(ws, startDuties(ws));
+  }
+
+  /** Stop what runs in a workspace, and close it on the root packs: before its database is closed. */
+  private async shut(ws: Workspace): Promise<void> {
+    this.clocks(ws, false);
+    hostFor(ws.pelago.registry).stop();
+    await this.config.boot?.close(ws.id).catch((err) => console.error(`closing ${ws.id} on the root packs failed: ${(err as Error).message}`));
   }
 
   /**
@@ -414,8 +381,7 @@ export class Workspaces {
     this.open.delete(id);
     const ws = await opening?.catch(() => undefined);
     if (ws) {
-      this.clocks(ws, false);
-      hostFor(ws.pelago.registry).stop();
+      await this.shut(ws);
       await ws.pelago.db.close().catch(() => {});
     }
     await this.closing.get(id)?.catch(() => {});
@@ -444,10 +410,7 @@ export class Workspaces {
     this.deleting = undefined;
     for (const opening of this.open.values()) {
       const ws = await opening.catch(() => undefined);
-      if (ws) {
-        this.clocks(ws, false);
-        hostFor(ws.pelago.registry).stop();
-      }
+      if (ws) await this.shut(ws);
       if (ws?.id !== DEFAULT_WORKSPACE) await ws?.pelago.db.close();
     }
     this.open.clear();
