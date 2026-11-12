@@ -9,7 +9,7 @@ import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { type Focus, point as setFocus, took } from '../../../src/presence.ts';
 import { op, source, TITLE_MAX } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
-import { keep, kept as keptFor, take } from './transient.ts';
+import { keep, kept as keptFor, take } from '../../database/kernel/transient.ts';
 import { undo } from '../../../src/undo.ts';
 import { resolveRun } from '../../../src/sessions.ts';
 import { covering } from '../../../src/withdraw.ts'; import { proposals } from './map-reads.ts';

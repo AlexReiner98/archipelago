@@ -22,3 +22,6 @@ export const useKey = (kind: UseKind, id: string) => `${kind}:${id}`;
 export async function used(ctx: KernelContext, kind: UseKind, id: string, n = 1, workspace = ctx.workspace): Promise<void> {
   if (id) await ctx.call('root.uses', { workspace, add: [{ key: useKey(kind, id.replace(/\s/g, '_')), n }] });
 }
+
+/** act.report.used: one use counted on the asking map, for a kernel caller that holds a map (the write path's rules). */
+export const usedAct = async (ctx: KernelContext, input: { kind: UseKind; id: string; n?: number }) => { await used(ctx, input.kind, String(input.id ?? ''), input.n ?? 1); return {}; };

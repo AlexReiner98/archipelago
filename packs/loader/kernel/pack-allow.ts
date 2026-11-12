@@ -7,28 +7,8 @@
 
 import { KERNEL_PACKS } from './packorder.ts';
 
-const list = (text: string) => text.split(',').map((p) => p.trim()).filter(Boolean);
-
-/** The server's list of packs, read from PELAGO_ONLY_PACKS: unset or empty, every pack. */
-export function readOnlyPacks(said: string | undefined): string[] | undefined {
-  return said?.trim() ? list(said) : undefined;
-}
-
-/** The packs each workspace may have beyond the server's list, read from "ws=a,b;other=c". */
-export function readWorkspacePacks(said: string | undefined): Record<string, string[]> {
-  const out: Record<string, string[]> = {};
-  for (const part of (said ?? '').split(';')) {
-    const at = part.indexOf('=');
-    if (at < 0) {
-      if (part.trim()) throw new Error(`PELAGO_WORKSPACE_PACKS: "${part.trim()}" names no workspace (workspace=pack,pack).`);
-      continue;
-    }
-    const ws = part.slice(0, at).trim();
-    if (!ws) throw new Error(`PELAGO_WORKSPACE_PACKS: "${part.trim()}" names no workspace (workspace=pack,pack).`);
-    out[ws] = [...new Set([...(out[ws] ?? []), ...list(part.slice(at + 1))])];
-  }
-  return out;
-}
+// The server's lists, read from its words, are the database root's, where its configuration is read.
+export { readOnlyPacks, readWorkspacePacks } from '../../database/kernel/config-words.ts';
 
 /** The packs one workspace may have: undefined for every pack; else the server's list, its own, and the kernel's. */
 export function packsFor(only: string[] | undefined, perWorkspace: Record<string, string[]> | undefined, workspace: string): string[] | undefined {

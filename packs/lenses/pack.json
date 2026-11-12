@@ -13,7 +13,8 @@
     "internal": true,
     "modules": "kernel/",
     "hooks": {
-      "write.validate": "view-twins.ts#validate"
+      "write.validate": "view-twins.ts#validate",
+      "loader.moves": "moves.ts#moves"
     },
     "provides": {
       "answer.kept_picture": {
@@ -29,6 +30,18 @@
           "links": "any"
         },
         "run": "kept-picture.ts#keptPictureOf"
+      },
+      "answer.renamed_query": {
+        "in": {
+          "props": "any",
+          "from": "string",
+          "to": "string",
+          "what": "string"
+        },
+        "out": {
+          "props": "any"
+        },
+        "run": "query-names.ts#renamed"
       }
     }
   }

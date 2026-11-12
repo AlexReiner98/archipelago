@@ -6,7 +6,7 @@
 
 import type { RootCall } from '../../loader/kernel/root-calls.ts';
 import { ownerOf } from '../../walls/kernel/notify-mail.ts';
-import { bypassingRls } from '../../walls/kernel/outbox.ts';
+import { bypassingRls } from '../../identity/kernel/outbox.ts';
 import { actorId, type Actor } from './pelago-types.ts';
 
 /** What a notification says, and who sends it. */

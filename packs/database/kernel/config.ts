@@ -2,9 +2,8 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from '../../../src/env.ts';
-import { readOnlyPacks, readWorkspacePacks } from '../../../src/pack-allow.ts';
+import { readOnlyPacks, readWorkspacePacks, serverPolicy } from './config-words.ts';
 import type { Policy } from '../../../src/pelago.ts';
-import { serverPolicy } from '../../identity/kernel/policy.ts';
 
 export interface Config {
   port: number;

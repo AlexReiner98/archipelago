@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { KernelContext } from '#pelago/kernel';
 import { appended } from './appended.ts';
-import { gist, packTouches } from './pack-touches.ts';
 import { withUse } from './pack-use.ts';
 import { told } from './reads.ts';
 import { used } from './uses.ts';
@@ -25,16 +24,6 @@ test('an append with no facts counts nothing', async () => {
   const calls: unknown[] = [];
   await appended(ctx, { facts: [] }, { definer: async (...a) => void calls.push(a) });
   assert.deepEqual(calls, []);
-});
-
-test('what a pack touches is read from its manifest alone, each counted thing saying how', () => {
-  const groups = packTouches({ id: 'p', version: '1', types: [{ id: 'task', title: 'Task', fields: { due: {} } }], views: [{ id: 'p.v', lens: {} }], rules: [{ id: 'r', then: 'hold', when: { actor: 'agent' } }] } as never);
-  const of = (key: string) => groups.find((g) => g.key === key)!;
-  assert.deepEqual(of('types').items[0].counts, { by: 'items', type: 'task' });
-  assert.deepEqual(of('views').items[0].counts, { by: 'view', id: 'p.v' });
-  assert.deepEqual(of('rules').items[0].counts, { by: 'ruling', id: 'p.r' });
-  assert.equal(of('rules').items[0].sort, 'holds');
-  assert.equal(gist('Holds a change. And more.'), 'Holds a change');
 });
 
 test('a use is counted through root.uses, on the context’s workspace or the one named', async () => {
@@ -58,6 +47,13 @@ test('told counts each instruction said once, on the asking map, and answers tru
   await assert.rejects(told(at, { told: 'e_counted' }), /told is a list of ids/);
 });
 
+// What the loader reads a pack touching from its manifest (packs/loader/kernel/pack-touches.ts) for a type, a view and a rule.
+const TOUCHES = [
+  { key: 'types', n: 1, items: [{ name: 'Task', about: '0 fields', hint: '', def: { id: 'task', fields: {} }, counts: { by: 'items' as const, type: 'task' } }] },
+  { key: 'views', n: 1, items: [{ name: 'V', about: 'a lens', sort: 'read', hint: '', def: { id: 'p.v', lens: {} }, counts: { by: 'view' as const, id: 'p.v' } }] },
+  { key: 'rules', n: 1, items: [{ name: 'R', about: '', sort: 'holds', hint: '', def: { id: 'r', then: 'hold' }, counts: { by: 'ruling' as const, id: 'p.r' } }] },
+];
+
 test('beside each counted thing, its use: the items standing, and the uses written down and held summed', async () => {
   const asked: string[] = [];
   const at = {
@@ -68,7 +64,7 @@ test('beside each counted thing, its use: the items standing, and the uses writt
     },
     call: async () => [{ key: 'view:p.v', day: DAY, n: 1 }],
   } as unknown as KernelContext;
-  const [state] = await withUse(at, [{ id: 'p', touches: packTouches({ id: 'p', types: [{ id: 'task', fields: {} }], views: [{ id: 'p.v', lens: {} }], rules: [{ id: 'r', then: 'hold' }] }) }]);
+  const [state] = await withUse(at, [{ id: 'p', touches: TOUCHES }]);
   const of = (key: string) => state.touches.find((g) => g.key === key)!;
   assert.equal(of('types').items[0].said, '3 items here, 1 made in 30 days');
   assert.equal(of('views').items[0].used, 3);

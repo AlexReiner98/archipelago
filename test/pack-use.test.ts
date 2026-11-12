@@ -3,7 +3,7 @@
 // type, a view's reads, a rule's refusals and holds, counted as they happen (src/uses.ts).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { packTouches, whenWords } from '../src/pack-touches.ts';
+import { gist, packTouches, whenWords } from '../src/pack-touches.ts';
 import { packStates } from '../src/packstate.ts';
 import { withUse } from '../src/pack-use.ts';
 import { askView } from '../src/askview.ts';
@@ -85,4 +85,14 @@ test('the Packs screen’s use, pinned: written-down and held uses summed, items
   const used = states.flatMap((p) => p.touches.flatMap((g) => g.items.filter((t) => t.used).map((t) => `${p.id}/${g.key}/${t.name}: ${t.used} (${t.said})`))).sort();
   assert.deepEqual(used, PINNED);
   assert.ok(states.every((p) => p.use_days === 30));
+});
+
+test('what a pack touches is read from its manifest alone, each counted thing saying how', () => {
+  const groups = packTouches({ id: 'p', version: '1', types: [{ id: 'task', title: 'Task', fields: { due: {} } }], views: [{ id: 'p.v', lens: {} }], rules: [{ id: 'r', then: 'hold', when: { actor: 'agent' } }] } as never);
+  const of = (key: string) => groups.find((g) => g.key === key)!;
+  assert.deepEqual(of('types').items[0].counts, { by: 'items', type: 'task' });
+  assert.deepEqual(of('views').items[0].counts, { by: 'view', id: 'p.v' });
+  assert.deepEqual(of('rules').items[0].counts, { by: 'ruling', id: 'p.r' });
+  assert.equal(of('rules').items[0].sort, 'holds');
+  assert.equal(gist('Holds a change. And more.'), 'Holds a change');
 });

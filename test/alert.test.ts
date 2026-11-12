@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { alertOwner, resetAlerts } from '../src/alert.ts';
 import { setMailer, type Mail } from '../src/mail.ts';
+import '../packs/loader/kernel/server-slots.ts'; // the mailer fills the walls' slot walls.mail, as when the server starts
 import { VIEWS } from '../src/views.ts';
 import { fresh, make } from './map.ts';
 

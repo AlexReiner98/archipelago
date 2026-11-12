@@ -8,9 +8,11 @@
 
 import type { Q } from '../../../src/db.ts';
 import type { Registry } from '../../../src/packs.ts';
-import { checkRetention, type Keep } from '../../../src/retention.ts';
+import type { Keep } from '../../../src/retention.ts';
 import { fieldInReach, inReach } from '../../../src/reach.ts';
-import { checkOnEvent } from './rule-events.ts';
+// What checks a pack's rules as it loads is the loader's; the words it checks by are read here too.
+import { COMPARE, fillLifts, regex } from '../../loader/kernel/rule-check.ts';
+export { checkRules } from '../../loader/kernel/rule-check.ts';
 import { KERNEL_PACKS } from '../../../src/packorder.ts';
 
 type OneOrMany = string | string[];
@@ -154,9 +156,11 @@ export interface Who {
   drawing?: { style: string; writes: string[] };
 }
 
-const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.isArray(x) ? x : [x]);
 /** The settings an owner lifts a rule by: each one an agent's token may read (src/schema.ts, AGENT_CODE_READ). On is true, or "apply". */
 export const LIFTS = ['agent_changes', 'agent_code', 'agent_publish', 'agent_backups'];
+// The loader's slot loader.lifts: a pack's rule is checked against these as it loads (packs/loader/kernel/rule-check.ts).
+fillLifts(LIFTS);
+const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.isArray(x) ? x : [x]);
 /** The lift by which agents' changes apply as they are made; a new workspace begins with it (beginApplying). */
 export const AGENT_CHANGES = 'agent_changes';
 /**
@@ -165,40 +169,6 @@ export const AGENT_CHANGES = 'agent_changes';
  * Off unless set. An agent's token reads it (src/schema.ts, HOLDS_OFF_READ).
  */
 export const HOLDS_OFF = 'holds_off';
-const COMPARE = /^\s*([a-z_][a-z0-9_]*)\s*(>=|<=|!=|>|<|=)\s*(-?\d+(?:\.\d+)?|[a-z_][a-z0-9_]*)\s*$/;
-
-/** Problems with a pack's rules, given the registry it loads into. Empty means they can be enforced. */
-export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): string[] {
-  const problems: string[] = [];
-  const known = (t: string) => reg.types.has(t);
-  for (const [i, rule] of rules.entries()) {
-    const at = `rule ${rule.id ?? i + 1}`;
-    if (rule.on !== undefined) {
-      problems.push(...checkOnEvent(rule, at, known));
-      continue;
-    }
-    if (rule.stream !== undefined || rule.keep !== undefined) {
-      problems.push(...checkRetention(rule, at));
-      continue;
-    }
-    if (rule.unique) {
-      if (!rule.type || !known(rule.type)) problems.push(`${at}: unique needs a type it holds within`);
-      else for (const f of rule.unique) if (!reg.types.get(rule.type)!.fields[f]) problems.push(`${at}: ${rule.type} has no field "${f}"`);
-      continue;
-    }
-    const then = rule.then;
-    if (then !== 'hold' && then !== 'refuse' && !(typeof then === 'object' && Array.isArray(then.require))) problems.push(`${at}: then is hold, refuse or { require: [fields] }`);
-    if (rule.when && 'kind' in rule.when) problems.push(`${at}: when names a type or a capability, not a kind`);
-    for (const t of list(rule.when?.type) ?? []) if (!known(t)) problems.push(`${at}: no type "${t}"`);
-    if (rule.when?.compare !== undefined && !COMPARE.test(rule.when.compare)) problems.push(`${at}: compare reads like "total > 500"`);
-    for (const [f, pattern] of Object.entries(rule.when?.matches ?? {})) if (!pattern || !regex(pattern)) problems.push(`${at}: matches.${f} is no pattern`);
-    if (rule.when?.reach !== undefined && rule.when.reach !== 'outside') problems.push(`${at}: reach is "outside", for what a pack writes outside its reach`);
-    if (rule.when?.root !== undefined && (!Array.isArray(rule.when.root) || !rule.when.root.length || rule.when.root.some((f) => typeof f !== 'string'))) problems.push(`${at}: root is a list of the fields that may name a root pack`);
-    if (rule.lifted !== undefined && !LIFTS.includes(rule.lifted)) problems.push(`${at}: lifted is one of ${LIFTS.join(', ')}`);
-    if (rule.server && !rule.lifted) problems.push(`${at}: server says what lifts it where the workspace has not set lifted, so it needs lifted`);
-  }
-  return problems;
-}
 
 /** Whether a type has a capability, or has it as the rule asks. */
 function capable(reg: Registry, type: string, wanted: string | Record<string, Record<string, unknown>>): boolean {
@@ -267,17 +237,6 @@ const rootPacks = (reg: Registry): Set<string> =>
   new Set([...KERNEL_PACKS, ...(reg.found ?? []).filter((p) => reg.internal?.has(p.id) && (p as { kernel?: { trust?: string } }).kernel?.trust === 'root').map((p) => p.id)]);
 /** Whether any of these fields names a root pack. */
 const namesRoot = (reg: Registry, fields: string[], props: Record<string, unknown>) => { const roots = rootPacks(reg); return fields.some((f) => typeof props[f] === 'string' && roots.has(props[f] as string)); };
-
-/** A rule's pattern, compiled once; undefined when it is none. */
-const patterns = new Map<string, RegExp | undefined>();
-function regex(pattern: string): RegExp | undefined {
-  if (!patterns.has(pattern)) {
-    let re: RegExp | undefined;
-    try { re = new RegExp(pattern, 'u'); } catch { re = undefined; }
-    patterns.set(pattern, re);
-  }
-  return patterns.get(pattern);
-}
 
 /**
  * What an op writes outside a pack's reach, if anything: a type or link type it neither declares nor requires (nor

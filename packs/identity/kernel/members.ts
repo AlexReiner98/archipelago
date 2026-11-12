@@ -10,16 +10,16 @@
 import { randomInt } from 'node:crypto';
 import { sha256Hex, workspaceSecret } from '../../../src/hashes.ts';
 import { z } from 'zod';
-import { needAdmin } from '../../../src/actor-checks.ts';
+import { actorId, needAdmin } from './actor-checks.ts';
 import { createToken } from './auth.ts';
 import type { Q } from '../../../src/db.ts';
-import { normalEmail } from '../../../src/email-address.ts';
-import { configureStanding, limitOf, stillWritable, type Limits, type Standing } from '../../../src/standing.ts';
+import { normalEmail } from './email-address.ts';
+import { configureStanding, limitOf, stillWritable, type Limits, type Standing } from './standing.ts';
 import { indexMember } from './control-index.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
-import { actorId, type Actor, type Archipelago } from '../../../src/pelago.ts';
+import { bypassingRls } from './outbox.ts';
+import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import type { Tool } from '../../../src/tools.ts';
-import { keep, kept, take } from '../../../src/transient.ts';
+import { keep, kept, take } from '../../database/kernel/transient.ts';
 
 /** How long a sign-in lasts in a browser, how long a sign-in link works, and how long an invitation does. */
 export const SIGNED_IN_DAYS = 30;

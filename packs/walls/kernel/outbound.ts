@@ -9,6 +9,7 @@ import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { BlockList, isIP, type LookupFunction } from 'node:net';
 import { env } from '../../../src/env.ts';
+import { fillGuardedFetch } from '../../identity/kernel/oauth-clients.ts';
 
 /** What no call to an address someone gave may reach: private, shared, link-local, reserved and multicast ranges. */
 const PRIVATE = new BlockList();
@@ -89,3 +90,6 @@ export const guardedFetch: typeof fetch = async (input, init = {}) => {
     req.end(typeof init.body === 'string' ? init.body : undefined);
   });
 };
+
+// The identity slot identity.fetch: an OAuth client's document is read through this fetch (packs/identity/kernel/oauth-clients.ts).
+fillGuardedFetch(guardedFetch);

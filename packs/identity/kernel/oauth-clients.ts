@@ -3,7 +3,14 @@
 // (Client ID Metadata) gives the address of that document as its client_id, read through src/outbound.ts. Neither proves
 // who the client is, which is why a person is shown where it returns to and says yes each time.
 
-import { guardedFetch } from '../../../src/outbound.ts';
+/**
+ * The slot identity.fetch (docs/kernel-packs.md, "Slots"): a client's document is read through the walls' guarded fetch
+ * (src/outbound.ts), which fills this when it loads, so identity reads one without importing above itself. Unfilled,
+ * no document is read.
+ */
+let guarded: typeof fetch = async () => { throw new Error('No guarded fetch is loaded: the walls fill identity.fetch (src/outbound.ts).'); };
+export const fillGuardedFetch = (filled: typeof fetch): void => void (guarded = filled);
+const guardedFetch: typeof fetch = (input, init) => guarded(input, init);
 
 export interface Client {
   id: string;

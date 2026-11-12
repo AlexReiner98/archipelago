@@ -4,14 +4,9 @@
 // capabilities. A definition that changed (a pack upgraded, or added back after a while) is logged with what changed.
 // A type that took another over (moved_from) takes its items once the old one is defined by no pack; a relation, its links.
 
-import { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../../src/pelago.ts';
 import type { ResolvedRelation, ResolvedType } from './packs.ts';
-import { moveQueries, termQueries } from '../../../src/query-saved.ts';
-import { moveStyles } from '../../../src/style-move.ts';
-import { moveLayouts } from '../../../src/layout-move.ts';
-import { moveLives, movePins } from '../../../src/view-life.ts';
-import { linkOwners } from '../../../src/owner-link.ts';
-import { newId } from '../../../src/db.ts';
+import { hostAt } from './kernel-context.ts';
 import { versionAdded } from './version-types.ts';
 
 interface Row {
@@ -58,6 +53,22 @@ export function differences(was: Record<string, unknown>, now: Record<string, un
  * a merge takes it off (movesAgain), since what it brings may be from before them.
  */
 const MOVES = 'moves_done';
+/**
+ * The slot loader.moves: a migration of what a pack keeps, run once as a workspace opens, when the map has every type it
+ * names. An internal pack fills it from its manifest (`kernel.hooks["loader.moves"]`, answering its moves with its
+ * context: lenses, styles). The write root's own (each owner said as a link) is the map's: linkOwners.
+ */
+export interface Move { name: string; types: string[]; run: () => Promise<unknown> }
+/** The order the moves run in, by name: terms before the takeovers, the rest once each item's kind is in its row. A move not named here runs last, in pack order. */
+const ORDER = ['terms', 'kinds', 'queries', 'styles', 'layouts', 'lives', 'pins'];
+
+/** Every move the packs here make, by name, in pack order. */
+async function movesOf(l: Archipelago): Promise<Map<string, Move>> {
+  const out = new Map<string, Move>();
+  for (const f of await hostAt(l).fillings(l, 'loader.moves')) for (const m of ((await f.run()) as Move[]) ?? []) out.set(m.name, m);
+  return out;
+}
+
 interface Moves {
   done: string[];
   taken?: string;
@@ -69,7 +80,7 @@ export async function movesAgain(l: Archipelago): Promise<void> {
 }
 
 /** The map whole, row-level security bypassed (listed in test/bypassing-rls.test.ts): the type table is the system's own, kept as the server keeps it whoever's act changed the types. */
-const bypassingRls = (l: Archipelago) => (l.db.whole ? new Archipelago(l.db.whole, l.registry, l.policy, l.workspace) : l);
+const bypassingRls = (l: Archipelago) => (l.db.whole ? l.on(l.db.whole) : l);
 
 /** Bring the table in line with the packs, and the registry in line with the table. Returns what it changed. */
 export async function syncTypes(given: Archipelago): Promise<{ activated: string[]; dormant: string[]; changed: Record<string, string[]>; moved: Record<string, number> }> {
@@ -123,7 +134,9 @@ export async function syncTypes(given: Archipelago): Promise<{ activated: string
     stamp.done.push(name);
   };
   const has = (...types: string[]) => types.every((t) => reg.types.has(t));
-  await once('terms', has('lens'), () => termQueries(l)); // views kept in the filter's old words, said in its terms
+  const moves = await movesOf(l);
+  const run = (name: string) => { const m = moves.get(name); return m ? once(name, has(...m.types), m.run) : undefined; };
+  await run('terms');
   // A type a pack took over brings its items with it, once no pack defines the old one: asked again only when which
   // types are taken over and gone changes, or when the type table did.
   const typesChanged = !rows.length || dormant.length > 0 || activated.length > 0 || Object.keys(changed).length > 0;
@@ -140,12 +153,10 @@ export async function syncTypes(given: Archipelago): Promise<{ activated: string
   // Each item's kind in its row, now the type table is whole: again whenever the types changed or items moved.
   if (typesChanged || Object.keys(moved).length) stamp.done = stamp.done.filter((d) => d !== 'kinds');
   await once('kinds', true, () => l.fillKinds());
-  await once('queries', has('lens'), () => moveQueries(l)); // views kept before the flat lens, translated into flat lenses
-  await once('styles', has('style', 'lens'), () => moveStyles(l)); // styles made for one view, moved into it
-  await once('layouts', has('style', 'layout'), () => moveLayouts(l)); // styles with code, layouts now (after styles, which reads code on a style)
-  await once('lives', has('lens', 'layout'), () => moveLives(l)); // views and layouts sorted into working, kept and retired (after layouts)
-  await once('pins', has('lens'), () => movePins(l)); // the ids a view held by hand, id terms of its filter (after lives, which reads pinned)
-  await once('owners', true, () => linkOwners(l, () => newId('r'))); // each owner said as a link
+  // In ORDER: layouts after styles (which reads code on a style), lives after layouts, pins after lives (which reads pinned).
+  for (const name of ORDER.slice(ORDER.indexOf('kinds') + 1)) await run(name);
+  await once('owners', true, () => l.linkOwners()); // each owner said as a link
+  for (const name of [...moves.keys()].filter((n) => !ORDER.includes(n))) await run(name);
   if (JSON.stringify(stamp) !== was) await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [MOVES, JSON.stringify(stamp)]);
   const asleep = [...rows.filter((r) => !now.has(r.id) && !asleepNow.some((a) => a.id === r.id)), ...asleepNow];
   reg.keep({

@@ -1,1 +1,1 @@
-export * from '../packs/identity/kernel/scope.ts';
+export * from '../packs/surface/kernel/scope.ts';

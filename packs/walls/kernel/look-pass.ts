@@ -6,24 +6,8 @@
 import { sha256Hex, workspaceSecret } from '../../../src/hashes.ts';
 import type { Q } from '../../../src/db.ts';
 import type { Whose } from '../../../src/presence.ts';
-
-/**
- * The slot `walls.pass_store` (docs/kernel-packs.md, "Slots"): a pass is kept in the transient store, which is the
- * surface's (packs/surface/kernel/transient.ts). It fills this when it loads, so walls keeps a pass without
- * importing above itself.
- */
-export interface PassStore {
-  keep: (db: Q, key: string, value: unknown, ms: number) => Promise<void>;
-  kept: <T>(db: Q, key: string) => Promise<T | undefined>;
-}
-let store: PassStore | undefined;
-export const fillPassStore = (filled: PassStore): void => void (store = filled);
-const stored = (): PassStore => {
-  if (!store) throw new Error('No store for look passes is loaded: the walls slot walls.pass_store is filled by surface (src/transient.ts).');
-  return store;
-};
-const keep: PassStore['keep'] = (db, key, value, ms) => stored().keep(db, key, value, ms);
-const kept = <T>(db: Q, key: string) => stored().kept<T>(db, key);
+// A pass is kept in the transient store, the database root's (wave 7: the slot walls.pass_store went with it).
+import { keep, kept } from '../../database/kernel/transient.ts';
 
 /** How long a look pass reads for: one drawing. */
 const LOOK_PASS_MS = 90_000;

@@ -3,7 +3,8 @@
 // open (kernel-context.ts, openKernel), these before any is open. A filling is named in its pack's manifest under
 // `kernel.hooks`, as any other, and is handed a context of its pack's server duty (serverContext): no map.
 //
-// Identity's identity.invited: who tells members' notices (an invitation, a sign-in code). The mailer pack fills it.
+// Identity's identity.invited: who tells members' notices (an invitation, a sign-in code). The walls' walls.mail: who
+// sends what the mail gate lets through (a notification's mail, the operator's alert). The mailer pack fills both.
 // Loaded by the surface's server start (first-start.ts, server-acts.ts): its top-level await fills the slots before
 // the server answers anything.
 
@@ -11,6 +12,7 @@ import { readdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { join, resolve } from 'node:path';
 import { onMemberNotice, type MemberNotices } from '../../identity/kernel/members.ts';
+import { onSendMail, type GateMail } from '../../walls/kernel/notify-mail.ts';
 import { isInternal, type Manifest } from './manifest.ts';
 import { OWN_PACKS } from './pack-folders.ts';
 import { ownManifest } from './root-calls.ts';
@@ -19,6 +21,7 @@ import { serverContext } from './kernel-context.ts';
 /** The server's slots, each with what is done with its one filling. */
 const SLOTS: Record<string, (filled: unknown) => void> = {
   'identity.invited': (filled) => onMemberNotice(filled as MemberNotices),
+  'walls.mail': (filled) => onSendMail(filled as (mail: GateMail) => Promise<void>),
 };
 
 /** No workspace is handed a server slot's filling: it is filled before any opens. */

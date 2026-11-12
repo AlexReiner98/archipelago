@@ -10,7 +10,9 @@ export function start(_ctx: RootContext): RootStarted {
     auth: () => import('./auth.ts'),
     members: () => import('./members.ts'),
     workspaces: () => import('./workspaces.ts'),
-    scope: () => import('./scope.ts'),
+    standing: () => import('./standing.ts'),
+    unscopedRead: () => import('./outbox.ts'),
+    actors: () => import('./actor-checks.ts'),
     policy: () => import('./policy.ts'),
   };
 }

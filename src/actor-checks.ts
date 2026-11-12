@@ -1,1 +1,1 @@
-export * from '../packs/rules/kernel/actor-checks.ts';
+export * from '../packs/identity/kernel/actor-checks.ts';

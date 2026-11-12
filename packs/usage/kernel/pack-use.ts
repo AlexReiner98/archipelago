@@ -5,7 +5,13 @@
 // type_counts and uses_lately, packs/surface/kernel/packreads-service.ts); what is held in memory is root.uses.
 
 import type { KernelContext } from '#pelago/kernel';
-import type { Counted, Touched } from './pack-touches.ts';
+/** How a declaration's use is counted, as the loader reads it from a manifest (packs/loader/kernel/pack-touches.ts). */
+type Counted = { by: 'items' | 'links'; type: string } | { by: 'ruling' | 'view' | 'told'; id: string };
+/** One thing a pack declares, as the loader reads it: the fields this counts by and fills. */
+interface Touched { counts?: Counted; used?: number; said?: string }
+
+/** What the Packs screen asks of a pack's states (answer.pack_use): each with how much of what it touches is used here. */
+export const packUse = async (ctx: KernelContext, input: { states: State[] }) => ({ states: await withUse(ctx, Array.isArray(input?.states) ? input.states : []) });
 import { useKey, type UseKind } from './uses.ts';
 
 /** How far back a use is counted. */

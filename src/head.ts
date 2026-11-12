@@ -1,1 +1,1 @@
-export * from '../packs/write/kernel/head.ts';
+export * from '../packs/loader/kernel/head.ts';

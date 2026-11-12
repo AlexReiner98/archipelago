@@ -5,8 +5,8 @@
 // database before they moved.
 
 import type { RootCall } from '../../loader/kernel/root-calls.ts';
-import { bypassingRls } from '../../walls/kernel/outbox.ts';
-import { keep, kept, keptWith, take } from './transient.ts';
+import { bypassingRls } from '../../identity/kernel/outbox.ts';
+import { keep, kept, keptWith, take } from '../../database/kernel/transient.ts';
 
 /** What a pack asks of the store: keep a value (and bytes) under a key, read one key (with its bytes), take one (read once, by whoever asks first), or read keys and prefixes at once. */
 export type TransientAsk =

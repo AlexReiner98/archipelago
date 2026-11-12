@@ -14,5 +14,6 @@ export function start(_ctx: RootContext): RootStarted {
     islands: () => import('./islands.ts'),
     reach: () => import('./reach.ts'),
     host: () => import('./packhost.ts'),
+    outside: () => import('./outside.ts'),
   };
 }

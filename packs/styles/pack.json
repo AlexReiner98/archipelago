@@ -23,6 +23,9 @@
         "out": "any",
         "run": "styles.ts#pageLook"
       }
+    },
+    "hooks": {
+      "loader.moves": "moves.ts#moves"
     }
   }
 }

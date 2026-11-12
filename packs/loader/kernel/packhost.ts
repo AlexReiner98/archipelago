@@ -9,17 +9,21 @@ import { parts } from './manifest.ts';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
-import { notify } from '../../../src/notify.ts';
 import { mailHeard, type NotificationMail } from '../../../src/notify-mail.ts';
-import { handleRequests, type OutsideRequest } from '../../../src/outside.ts';
+import { handleRequests, type OutsideRequest } from './outside.ts';
 import { launchHeard, type LaunchAsked } from './pack-launch.ts';
 import { launchesAsked, launchesRefused, type LaunchesAsked } from './pack-action-launch.ts';
 import { answerBeyond, holdWorkspace, NOT_BEYOND } from './pack-reach.ts';
 import type { PackFile } from './packs.ts';
 import type { Read } from '../../surface/kernel/packreads.ts';
-import { actorId, type Actor, type Archipelago, type Op, type SourceSpec } from '../../../src/pelago.ts';
+import { actorId } from '../../identity/kernel/actor-checks.ts';
+import type { Actor, Archipelago, Op, SourceSpec } from '../../../src/pelago.ts';
 // Anyone with no login cannot read the workspace's settings: a public page is counted in the default zone.
-import { DEFAULT_ZONE, zoneOf } from '../../../src/timeaxis.ts';
+/** The time zone a pack's call is told days are counted in: the workspace's, or Toronto's (as the query pack's timeaxis counts them). */
+const DEFAULT_ZONE = 'America/Toronto';
+const zoneOf = async (l: Archipelago) => (await l.setting<string>('time_zone')) || DEFAULT_ZONE;
+/** What a pack's call tells the owner, as it: the notifications pack's act.report.notify. */
+const notify = async (l: Archipelago, actor: Actor, n: object) => (await import('./kernel-context.ts')).callAs<{ notification: string }>(l, 'act.report.notify', { ...n, actor });
 
 /**
  * The slot `loader.reads` (docs/kernel-packs.md, "Slots"): the reads API is surface's (packs/surface/kernel/packreads.ts),

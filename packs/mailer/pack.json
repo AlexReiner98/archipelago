@@ -11,7 +11,8 @@
     "internal": true,
     "modules": "kernel/",
     "hooks": {
-      "identity.invited": "member-mail.ts#invited"
+      "identity.invited": "member-mail.ts#invited",
+      "walls.mail": "mail.ts#sender"
     }
   }
 }

@@ -1,1 +1,1 @@
-export * from '../packs/walls/kernel/outbox.ts';
+export * from '../packs/identity/kernel/outbox.ts';

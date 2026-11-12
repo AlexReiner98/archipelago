@@ -4,14 +4,15 @@
 
 import type { Q } from '../../../src/db.ts';
 import { limiter, TOKEN_LIMIT, type Limit } from '../../../src/limit.ts';
+import { bytes, fillUse } from '../../identity/kernel/standing.ts';
 
 /** A session not heard from for this long is not at work: it holds no place among those at once. */
 export const SESSION_AWAKE_MS = 60 * 60_000;
 /** How long a workspace's storage, once measured, is taken as it was: every write asks. */
 const STORAGE_KEEP_MS = 60_000;
 
-/** A number of bytes as a person reads it. */
-export const bytes = (n: number) => (n >= 1e9 ? `${+(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${+(n / 1e6).toFixed(1)} MB` : n >= 1e3 ? `${Math.round(n / 1e3)} kB` : `${n} bytes`);
+/** A number of bytes as a person reads it: the identity root's, where a limit is said. */
+export { bytes };
 
 let measure = async (_id: string): Promise<number> => 0;
 /** Where the server measures how much a workspace stores: it says, when it starts. */
@@ -101,3 +102,6 @@ export function takeRequest(workspace: string, token: string, most: number | und
 
 /** The requests a workspace has made this minute. */
 export const requestsThisMinute = (workspace: string) => byWorkspace.count(workspace);
+
+// The identity slot identity.use: a workspace's limits are held against what is measured here (src/standing.ts).
+fillUse({ storageOf: (workspace) => storageOf(workspace), takeRequest, tokenEach });

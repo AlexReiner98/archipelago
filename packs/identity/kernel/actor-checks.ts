@@ -1,5 +1,12 @@
-// Who may do what, said once: a workspace's admin, or a person and not an agent. A tool marked humanOnly is refused to
-// an agent before it runs (src/tools.ts); a function reached some other way checks for itself, with these.
+// Who is asking, and who may do what, said once: an actor as the log names it, a workspace's admin, or a person and
+// not an agent. A tool marked humanOnly is refused to an agent before it runs (src/tools.ts); a function reached some
+// other way checks for itself, with these. The identity root's (who is asking), so every root above it names an actor
+// the same way.
+
+import type { Actor } from '../../../src/pelago-types.ts';
+
+/** An actor as the log names it: its kind and its name. */
+export const actorId = (actor: Pick<Actor, 'kind' | 'name'>) => `${actor.kind}:${actor.name}`;
 
 /** Refused unless a workspace admin asks: "Only a workspace admin can <what>." */
 export function needAdmin(actor: { admin?: boolean }, what: string): void {

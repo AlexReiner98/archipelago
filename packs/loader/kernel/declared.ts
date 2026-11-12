@@ -2,14 +2,20 @@
 // (reads that write nothing), declared in its pack.json with JSON Schema inputs and run by its handler. The six
 // verbs are declared by the core pack the same way. Checked when the pack loads.
 
-import { REASONS } from '../../../src/attention.ts';
 import { CAPABILITIES } from './capabilities.ts';
-import { LIFTS } from '../../../src/rules.ts';
-import { capabilityOf, DELIVERABLE, unknownEnd } from '../../../src/link-ends.ts';
+import { liftsNamed } from './rule-check.ts';
+import { capabilityOf, DELIVERABLE, unknownEnd } from './link-ends.ts';
 import { isInternal, parts } from './manifest.ts';
 import { ownsId } from './packorder.ts';
 import type { PackFile, ResolvedType } from './packs.ts';
 import { checkServices, KERNEL_SETTINGS, KERNEL_TERMS, openedTo, type Family } from '../../../src/services.ts';
+
+/**
+ * The reasons the attention pack gives (its REASONS, packs/attention/kernel/attention.ts): a pack's own reason joins one
+ * and never takes one's name. A copy, as the loader imports no pack's code; test/declared.test.ts holds the two equal.
+ */
+export const ATTENTION_REASONS = ['waits_on', 'to_confirm', 'holding_up', 'due', 'moved', 'unsettled', 'blocked', 'stale', 'under_way', 'ready'] as const;
+const REASONS = ATTENTION_REASONS;
 
 export interface VerbDef {
   id: string;
@@ -309,7 +315,7 @@ export const KERNEL_OWNS: Record<Family, readonly string[]> = {
   answer: LENS_ANSWERS,
   term: KERNEL_TERMS,
   capability: CAPABILITIES,
-  setting: [...KERNEL_SETTINGS, ...LIFTS],
+  get setting() { return [...KERNEL_SETTINGS, ...liftsNamed()]; },
   piece: Object.keys(PIECES),
   page: PAGES,
   act: Object.entries(KERNEL_VERBS).map(([action, verb]) => `${verb}.${action}`),

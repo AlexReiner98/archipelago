@@ -36,6 +36,8 @@ export interface Opening {
   db: Database;
   /** What it is made from, when it is made from a backup. */
   backup?: Dump;
+  /** Made here just now, empty (Workspaces.create): put on islands as it opens, as every new map is. */
+  made?: boolean;
   /** Nothing on its log and nothing brought in: a new workspace, opened for the first time. */
   begins: boolean;
   config: WorkspacesConfig;
@@ -64,11 +66,16 @@ const duties: Duty[] = [];
 /** What a root pack declares in its kernel/open.ts: the steps it fills, by phase, and what it runs while this server leads. */
 export type RootOpen = { [P in Phase]?: ((o: Opening) => unknown)[] };
 export type RootLeading = ((ws: Workspace) => () => void)[];
+/** What a root does to catch an open workspace up with what other servers changed in it (FOLLOW), and as it closes (CLOSE). */
+export type RootFollow = ((ws: Workspace) => Promise<unknown>)[];
+export type RootClose = ((ws: Workspace) => unknown)[];
 
 /** The packs folder whose roots.json and root packs are read. */
 const PACKS = join(import.meta.dirname, '..', '..');
 let rooted: Promise<{ steps: Step[]; duties: Duty[] }> | undefined;
 let rootDuties: Duty[] = [];
+const rootFollow: RootFollow = [];
+const rootClose: RootClose = [];
 
 /** The roots' fillings, in the order roots.json starts them: each root's kernel/open.ts, read once. */
 function rootFillings(): Promise<{ steps: Step[]; duties: Duty[] }> {
@@ -78,7 +85,9 @@ function rootFillings(): Promise<{ steps: Step[]; duties: Duty[] }> {
     for (const { id } of roots) {
       const file = join(PACKS, id, 'kernel', 'open.ts');
       if (!existsSync(file)) continue;
-      const mod = (await import(pathToFileURL(file).href)) as { OPEN?: RootOpen; LEADING?: RootLeading };
+      const mod = (await import(pathToFileURL(file).href)) as { OPEN?: RootOpen; LEADING?: RootLeading; FOLLOW?: RootFollow; CLOSE?: RootClose };
+      rootFollow.push(...(mod.FOLLOW ?? []));
+      rootClose.push(...(mod.CLOSE ?? []));
       for (const phase of OPEN_PHASES) for (const run of mod.OPEN?.[phase] ?? []) out.steps.push({ phase, pack: id, run });
       for (const start of mod.LEADING ?? []) out.duties.push({ pack: id, start });
     }
@@ -131,6 +140,18 @@ export function timer(pack: string, every_ms: number, run: (ws: Workspace) => un
     };
     return every(every_ms, tick, options.leading);
   });
+}
+
+/** Catch an open workspace up with what other servers changed in it, as each root says (its FOLLOW): a type kept or a pack switched elsewhere. */
+export async function followRoots(ws: Workspace): Promise<void> {
+  await rootFillings();
+  for (const follow of rootFollow) await follow(ws);
+}
+
+/** What each root does as a workspace closes (its CLOSE), before its database is closed: the loader stops its packs' processes. */
+export async function closeRoots(ws: Workspace): Promise<void> {
+  await rootFillings();
+  for (const close of rootClose) await close(ws);
 }
 
 /** What fills each phase, by the pack that fills it: the roots' in their order, then the kernel's own registered here; the manifests' are read at open. */

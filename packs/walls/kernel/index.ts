@@ -13,8 +13,6 @@ export function start(_ctx: RootContext): RootStarted {
     cssCheck: () => import('./css-check.ts'),
     svgFigure: () => import('./svg-figure.ts'),
     publicDocument: () => import('./public-document.ts'),
-    unscopedRead: () => import('./outbox.ts'),
-    outside: () => import('./outside.ts'),
     mailGate: () => import('./notify-mail.ts'),
     drawingBox: () => import('./drawing-box.ts'),
     lookPass: () => import('./look-pass.ts'),
