@@ -11,7 +11,7 @@
 //   button  words the person presses; the press goes back to the part
 //   paint   a surface in its own units that pans and zooms in the host, holding paths and placed text
 //   path    a line or a shape on a paint surface
-// Every look is a name the style gives its value (ui/part-marks.css): a tone, a gap or a size is a word or a step on
+// Every look is a name the style gives its value (packs/walls/page/part-marks.css): a tone, a gap or a size is a word or a step on
 // the style's scale, never a colour or a length. This module reads no page: it is run without a browser in tests.
 
 /** How much one part may say at once: past it, what it sent is refused whole. */

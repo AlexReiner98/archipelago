@@ -1,8 +1,8 @@
-// The host's renderer for parts: checked marks (ui/part-check.js) made into the page, under the workspace's style.
+// The host's renderer for parts: checked marks (packs/walls/page/part-check.js) made into the page, under the workspace's style.
 // A part answers whole each time it speaks; the renderer keeps what is already drawn where it can, matching a mark by
 // its key, else by its kind and place, so a field being typed in keeps its words and its caret. What the person does
 // goes back to the part as an event: { key, name, value }, `edit` and `submit` from an input, `press` from a button.
-// Looks are classes and steps the style gives values to (ui/part-marks.css); the renderer writes no colour or length.
+// Looks are classes and steps the style gives values to (packs/walls/page/part-marks.css); the renderer writes no colour or length.
 // Pan and zoom of a paint surface stay here (ui/part-paint.js): the part is never asked where the reader looks.
 
 import { isChecked } from './part-check.js';

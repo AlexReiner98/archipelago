@@ -172,7 +172,7 @@ A drawing's stylesheet (`css`) is read only inside its own picture: nested under
 
 ## Marks for parts
 
-A part (a pack's piece of the app, run walled in a worker: decision e_xeqhcums) answers with marks of its own, smaller than a drawing's: seven, and nothing richer (`ui/part-check.js`). Each is `[mark, attributes, ...what is in it]`, the attributes left out when there are none.
+A part (a pack's piece of the app, run walled in a worker: decision e_xeqhcums) answers with marks of its own, smaller than a drawing's: seven, and nothing richer (`packs/walls/page/part-check.js`). Each is `[mark, attributes, ...what is in it]`, the attributes left out when there are none.
 
 | Mark | Holds | Says |
 |---|---|---|
@@ -184,7 +184,7 @@ A part (a pack's piece of the app, run walled in a worker: decision e_xeqhcums) 
 | `paint` | paths and placed text | `width` and `height` in its own units, `start`, `pixels` |
 | `path` | nothing | `d` (commands and numbers only), `look` line, fill or dash, `weight` (a step 1 to 4 of the style's borders) |
 
-Any mark may say its `key` and the `item` it stands for, and a box, text, button or path a `tone` (accent, muted, ok, warn, bad, closed). What is not listed is refused whole with where it was, as are a key used twice, a path off a paint surface, and more than the caps in `partLimits`. A tone, a step or a look is a class or a `var()` the style gives its value (`ui/part-marks.css`): a part names no colour and no length.
+Any mark may say its `key` and the `item` it stands for, and a box, text, button or path a `tone` (accent, muted, ok, warn, bad, closed). What is not listed is refused whole with where it was, as are a key used twice, a path off a paint surface, and more than the caps in `partLimits`. A tone, a step or a look is a class or a `var()` the style gives its value (`packs/walls/page/part-marks.css`): a part names no colour and no length.
 
 The host draws only what the check made (`ui/part-render.js`), and each answer whole: it keeps what is drawn by key, else by mark and place, so a field being typed in keeps its words and caret. In the field the person is in, a value the part answers with that the field already sent (an echo, perhaps behind their typing) is let be; one of the part's own (the field cleared) is set. What the person does goes back as `{ key, name, value }`: `edit` and `submit` (Enter) from an input, `press` from a button. A paint surface pans and zooms on the page (`ui/part-paint.js`, on `ui/pan-zoom.js`), never asking the part; with `pixels` a canvas of its size lies under its paths, moved with them, and is handed once to whoever hosts the part (`canvas(key, el)`), to give the part to paint on.
 

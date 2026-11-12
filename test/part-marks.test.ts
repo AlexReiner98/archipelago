@@ -1,4 +1,4 @@
-// What a part may answer with (ui/part-check.js), without a page: each kind checked by its shape, every refusal named
+// What a part may answer with (packs/walls/page/part-check.js), without a page: each kind checked by its shape, every refusal named
 // with where it was, the caps held, and only what the check made marked as checked for the renderer.
 
 import assert from 'node:assert/strict';
@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 // @ts-ignore: a module of the page, plain JavaScript
-import { checkMarks, isChecked, partLimits, MARKS, TONES } from '../ui/part-check.js';
+import { checkMarks, isChecked, partLimits, MARKS, TONES } from '../packs/walls/page/part-check.js';
 
 const refused = (mark: unknown, said: RegExp) => assert.throws(() => checkMarks(mark), (e: Error) => said.test(e.message) && /cannot be drawn/.test(e.message));
 
@@ -84,7 +84,7 @@ test('a part that says too much is refused whole', () => {
 });
 
 test('every look a mark may name has its rule in the stylesheet, reading the style', () => {
-  const css = readFileSync(join(import.meta.dirname, '..', 'ui', 'part-marks.css'), 'utf8');
+  const css = readFileSync(join(import.meta.dirname, '..', 'packs', 'walls', 'page', 'part-marks.css'), 'utf8');
   for (const t of TONES) assert.match(css, new RegExp(`\\.pm-tone-${t} \\{ color: var\\(--`), t);
   for (const [kind, shape] of Object.entries(MARKS) as [string, any][]) {
     assert.match(css, new RegExp(`\\.pm-${kind}\\b`), kind);
