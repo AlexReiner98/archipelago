@@ -1,16 +1,16 @@
 // root.bookkeep, for the sessions pack (docs/kernel-packs.md, "Root services", "System authority"): a session's own
-// record of itself, written as it always was. A service pack's ctx.change is made as `system:<pack>` and judged by the
-// rules; a session's bookkeeping is made as the agent it is for (its hook's actor, the session's own) and applies as
-// it is made, never held. Until the rules can say that (the rule sessions.bookkeeping: a system change that keeps the
-// agent it is made for as its actor, spared every hold), what reaches the log is kept as it is by asking the write
-// path for it here. Each ask is one write the sessions pack made through the map before it moved, on the map the
-// caller's context is of, as the actor it names.
+// record of itself, written as it always was. A service pack's ctx.change is made as `system:<pack>`; a session's
+// bookkeeping is made as the agent it is for (its hook's actor, the session's own), with no authority claimed. It is
+// judged by the rules (decide) as the calling pack's bookkeeping, which that pack's own rule lets through
+// (sessions.bookkeeping, `then: "spare"`), so nothing here skips them. Each ask is one write the sessions pack made
+// through the map before it moved, on the map the caller's context is of, as the actor it names.
 
 import type { RootCall } from '../../../src/root-calls.ts';
 import type { Actor, ChangeInput } from './pelago-types.ts';
 import type { Done } from '../../../src/activity.ts';
 import { openOps } from '../../../src/opseal.ts';
 import { isSealed } from '../../../src/seal.ts';
+import { decide } from '../../../src/rules.ts';
 import type { Light, OpFact, OpStream } from '../../../src/streams.ts';
 
 type Props = Record<string, unknown>;
@@ -46,7 +46,15 @@ const AUDIT = /^audit_cursor:e_\w+$/;
 export async function bookkeep(at: RootCall, ask: BookkeepAsk): Promise<unknown> {
   const map = at.map;
   if (!map) throw new Error('root.bookkeep is asked of a map');
-  if ('apply' in ask) return map.apply(ask.apply.actor, ask.apply.input);
+  if ('apply' in ask) {
+    // Judged by the rules like any change, as the pack's bookkeeping: its own rule (sessions.bookkeeping) lets it
+    // through, and the log names what it spared. Its actor and its authority (none claimed) are as they always were.
+    const { actor, input } = ask.apply;
+    const verdict = await decide(map.db, map.registry, { human: actor.startsWith('human:'), bookkeeping: at.caller }, input.ops, map.policy);
+    if (verdict.outcome !== 'apply') throw new Error(`root.bookkeep: ${at.caller}'s bookkeeping is ${verdict.outcome === 'hold' ? 'held' : 'refused'}: ${[...verdict.refused, ...verdict.held.map((r) => r.say)].join('; ')}`);
+    const spared = [...new Map(verdict.spared.flat().map((r) => [`${r.pack}.${r.rule}`, { rule: r.rule, pack: r.pack }])).values()];
+    return map.apply(actor, input, { rule: { outcome: 'apply', spared } });
+  }
   if ('change' in ask) return map.change(ask.change.actor, ask.change.input);
   if ('operational' in ask) return map.operational(ask.operational.id, ask.operational.set, ask.operational.event);
   if ('claim' in ask) return map.claim(ask.claim.actor, ask.claim.input);

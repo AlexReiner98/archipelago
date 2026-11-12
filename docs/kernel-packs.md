@@ -129,9 +129,16 @@ other; nothing in code skips the rules.
 - A system change never settles a question, never forgets, and never touches
   a root pack's items (`settle_said`, `forget`, `root`).
 - Core's `agent_changes` does not hold it. A pack that wants its own
-  bookkeeping held, or spared another hold, declares the rule (sessions'
-  writes, which today skip the proposal step in code, become the rule
-  `sessions.bookkeeping`).
+  bookkeeping held, or spared another hold, declares the rule. As built
+  (wave 6b, e_rr96yyj3): sessions' writes are the rule
+  `sessions.bookkeeping`, `then: "spare"` with `when: { bookkeeping: true }`
+  (`src/rules.ts`): `root.bookkeep` sends a session's record of itself
+  through `decide` as the sessions pack's bookkeeping, that rule lets it
+  through, and the log's `rule` names it first among what it spared. The
+  actor (the session's agent) and authority (none claimed) are as before
+  (`test/bookkeeping-log.test.ts`). A spare rule matches only its own
+  pack's bookkeeping, nothing lifts it, and it spares refusals as well as
+  holds, as the old path skipped both.
 
 ## Service names
 
@@ -204,7 +211,7 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.drawing` | surface | publish | a drawing's module or service worker by its hash, as the reader may see the map, or whether the packs ship it |
 | `root.public_product` | surface | publish | a product's public page, data or result's picture as anyone reads them, with the headers every public answer carries |
 | `root.transient` | surface | looks, presence, mail, connect | the transient store, kept, read and taken (a key, a key with its bytes, a key read once, keys and prefixes at once) as the whole workspace of the calling map |
-| `root.bookkeep` | write | sessions | a session's own record of itself as it always reached the log (wave 6b, e_5vtbam7d): a change applied as the session's actor past the rules, the operational write, a claim and a give-back, what it vouches for as its own change through the rules, its events on the sessions stream deduplicated under their lock, an audit import with its cursor |
+| `root.bookkeep` | write | sessions | a session's own record of itself as it always reached the log (wave 6b, e_5vtbam7d): a change applied as the session's actor, judged as its bookkeeping and let through by `sessions.bookkeeping` (e_rr96yyj3), the operational write, a claim and a give-back, what it vouches for as its own change through the rules, its events on the sessions stream deduplicated under their lock, an audit import with its cursor |
 | `root.sessions` | surface | sessions | what the sessions pack needs of the whole workspace (wave 6b): the sessions at work, whether there is room for one more, the owner's settings of the reply rules |
 | `root.transient` | surface | looks, presence, mail, sessions | the transient store, kept and read (a key, a key with its bytes, keys and prefixes at once) as the whole workspace of the calling map |
 | `root.look` | surface | looks | the UI's version, a look pass for the calling map's screen (walls), the room for another look this hour (rules) |

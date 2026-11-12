@@ -63,6 +63,7 @@
   "test/backup-tools.test.ts": { "pglite": 6.9, "postgres": 6.4 },
   "test/backup.test.ts": { "pglite": 12.2, "postgres": 12.3 },
   "test/blocking.test.ts": { "pglite": 4.5, "postgres": 1.8 },
+  "test/bookkeeping-log.test.ts": { "pglite": 0, "postgres": 0 },
   "test/bounces.test.ts": { "pglite": 2.6, "postgres": 0.9 },
   "test/bundles.test.ts": { "pglite": 4.2, "postgres": 1.6 },
   "test/canvas-drag.test.ts": { "pglite": 16.2, "postgres": 14 },

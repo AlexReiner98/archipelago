@@ -1,9 +1,8 @@
 // A session's own bookkeeping: what the sessions pack writes of a run as it goes (it began, it was named, it waits, it
-// ended), which no person reviews. Every such write goes through here, the one place it skips the rules, so the rule
-// that will let it through is named here (docs/kernel-packs.md, "System authority": `sessions.bookkeeping`).
+// ended), which no person reviews. Every such write goes through here (docs/kernel-packs.md, "System authority").
 //
-// Until the rules can say it (a rule that spares a pack's own change every hold, and a system change that keeps the
-// agent it is made for as its actor), it is applied as it always was: without consulting policy, as the agent. The
+// It is made as the agent it is for, with no authority claimed, and judged by the rules as this pack's bookkeeping:
+// the pack's rule `bookkeeping` (pack.json, `then: "spare"`) lets it through, and the log names what it spared. The
 // write path does it for the pack, asked through the root service root.bookkeep (packs/write/kernel/root-bookkeep.ts),
 // which packs/roots.json lets the sessions pack alone call: ctx.change would log it as system:sessions.
 
