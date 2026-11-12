@@ -1,5 +1,8 @@
 // The folders workspace packs are read from: the server's own (packsDir), then those PELAGO_PACKS names, so a pack the
 // hosted service keeps to itself is a folder on its machine, never a file of the open repository. One id is one pack.
+// A server pack (reach.server, src/server-packs.ts) is the server's, but it may carry a workspace half beside it: a
+// workspace.json in its folder, a manifest of the same id with no server reach, read here as any workspace pack is, so
+// one subsystem is one pack with both a server process and what it says on a map (task e_jpcsbt48).
 
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -24,6 +27,23 @@ export interface PackFolders<P> {
   where: Map<string, string>;
 }
 
+/** The file a server pack's workspace half is kept in, beside its pack.json. */
+export const WORKSPACE_HALF = 'workspace.json';
+
+/**
+ * A server pack's workspace half, as read from its folder: none when it has none. Its id is the server pack's, and it
+ * asks for no server reach: what it declares is said on a map, and the server's half stays the server's.
+ */
+export function readWorkspaceHalf(folder: string, id: string): { text: string; manifest: Manifest } | undefined {
+  const file = join(folder, WORKSPACE_HALF);
+  if (!existsSync(file)) return undefined;
+  const text = readFileSync(file, 'utf8');
+  const manifest = readManifest(text, `packs/${id}/${WORKSPACE_HALF}`);
+  if (manifest.id !== id) throw new Error(`The workspace half of server pack "${id}" is pack id "${manifest.id}": a half keeps its pack's id`);
+  if (isServerPack(manifest)) throw new Error(`The workspace half of server pack "${id}" asks for server reach: that is its pack.json's alone`);
+  return { text, manifest };
+}
+
 /** Every workspace pack in the folders, in their order. A folder named skip (the workspace's own types) is not read. */
 export function readPackFolders<P extends Manifest>(dirs: string[], skip: string): PackFolders<P> {
   const found = new Map<string, P>(), hashes = new Map<string, string>(), where = new Map<string, string>();
@@ -31,10 +51,15 @@ export function readPackFolders<P extends Manifest>(dirs: string[], skip: string
     for (const name of readdirSync(dir)) {
       const file = join(dir, name, 'pack.json');
       if (name === skip || !existsSync(file)) continue;
-      const text = readFileSync(file, 'utf8');
-      const pack = readManifest(text, `packs/${name}/pack.json`) as P;
-      // A server pack kept beside the workspace packs is the server's (src/server-packs.ts), never a workspace's.
-      if (isServerPack(pack)) continue;
+      let text = readFileSync(file, 'utf8');
+      let pack = readManifest(text, `packs/${name}/pack.json`) as P;
+      // A server pack kept beside the workspace packs is the server's (src/server-packs.ts); what a workspace reads of
+      // it is its workspace half, if it has one.
+      if (isServerPack(pack)) {
+        const half = readWorkspaceHalf(join(dir, name), pack.id);
+        if (!half) continue;
+        ({ text } = half), (pack = half.manifest as P);
+      }
       if (pack.id !== name) throw new Error(`Pack folder "${name}" contains pack id "${pack.id}"`);
       // The same id in two folders is refused, never one quietly taken over by the other.
       if (where.has(pack.id)) throw new Error(`Pack "${pack.id}" is in two pack folders: ${where.get(pack.id)} and ${dir}`);

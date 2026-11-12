@@ -10,10 +10,13 @@
 // (src/server-gates.ts: what a person agrees to before signing in, what a workspace it made may do); hosts it may call, with the secrets the kernel adds
 // (src/server-requests.ts); what a workspace's admin may connect it to (src/server-connect.ts); and schedules. It gets
 // no database, no map, no token and no secret: the kernel holds each secret, sealed, and adds it where it is needed.
+// What it says on a map (instructions, types, rules) is its workspace half, a workspace.json beside its pack.json, read
+// by every workspace's registry as a workspace pack of the same id (src/pack-folders.ts).
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
 import { env } from './env.ts';
+import { readWorkspaceHalf } from './pack-folders.ts';
 import { isServerPack, parts, readManifest, type Manifest, type ReachDef } from './manifest.ts';
 import { checkMoreReach, runsMore, type MoreReach } from './server-reach.ts';
 
@@ -150,6 +153,13 @@ export function checkServerPack(p: Partial<Manifest>, folder: string): string[] 
   }
   const html = (server.entries ?? []).filter((e) => e.answers === 'html').map((e) => e.id);
   for (const e of server.entries ?? []) if (e.answers !== undefined && !['json', 'html'].includes(e.answers)) problems.push(`entry "${e.id}" answers json or html`);
+  if (p.id) {
+    try {
+      readWorkspaceHalf(folder, p.id);
+    } catch (err) {
+      problems.push(`its workspace half is not right: ${(err as Error).message}`);
+    }
+  }
   problems.push(...checkMoreReach(server, folder, names, html, Object.values(server.gates ?? {}).map(String)));
   if ((server.entries?.length || runsMore(server) || webhooks.length || server.connect || schedules.length || Object.keys(server.gates ?? {}).length) && !existsSync(join(folder, 'handler.js'))) problems.push('it has entries or webhooks and no handler.js');
   return problems;

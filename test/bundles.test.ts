@@ -97,5 +97,5 @@ test("a bundle is offered only where the server's list offers all its packs; els
 
 test('a distribution names a bundle: a new map starts with its packs', async () => {
   const l = await mapOf(packsWith());
-  assert.deepEqual((await starting('refinement', () => syncPacks(l))).map((f) => f[1]).sort(), ['pack:canvas', 'pack:core', 'pack:practice', 'pack:refine', 'pack:replays', 'pack:sessions']);
+  assert.deepEqual((await starting('refinement', () => syncPacks(l))).map((f) => f[1]).sort(), ['pack:canvas', 'pack:claude_code', 'pack:core', 'pack:practice', 'pack:refine', 'pack:replays', 'pack:sessions']);
 });
