@@ -1,0 +1,11 @@
+{
+  "id": "waits",
+  "version": "0.1.0",
+  "title": "Waits",
+  "description": "An item closed on a person's word no longer waits on them: the change that closes it takes back its waits_on to that person, and its answer says so.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "placement",
+  "version": "0.1.0",
+  "title": "Placement",
+  "description": "Where a new item goes: on its subject's island and as visible as it, when it lives with what it is about, or on the island of what it is tied to, the one it was given, or the map's lone island that fits. Checks that an item with a subject keeps one.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}
