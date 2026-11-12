@@ -9,7 +9,7 @@
 import { packTool } from '../../../src/packtools.ts';
 import { livesIn } from './packreads-scope.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
-import { resolveRun } from '../../../src/sessions.ts';
+import { resolveRun } from './session-calls.ts';
 import { refuser, scopeWithin } from '../../../src/within.ts';
 
 /** What a tool says of a limited token: each input that names items it acts on (an id, or a list of ids), with what it would do to them. */

@@ -12,16 +12,15 @@ import { PACK_STATE_TOOLS } from '../../../src/packstate.ts';
 import { BACKUP_TOOLS } from '../../../src/backup-tools.ts';
 import { FORMER_NAMES, REPORT_TOOLS } from './report-tool.ts';
 import { TOKEN_TOOLS } from '../../../src/token-tools.ts';
-import { callAs, kernelContext, type KernelContext } from '../../../src/kernel-context.ts';
+import { callAs, ownContext, type KernelContext } from '../../../src/kernel-context.ts';
 import { LOOK_READS } from '../../../src/look-pass.ts';
 import type { Registry } from '../../../src/packs.ts';
 import { packActionByShort, packTool, packTools } from '../../../src/packtools.ts';
 import { withinScope } from '../../../src/scope.ts';
-import { viewsSaid } from '../../../src/askview.ts';
+import { viewsSaid } from './view-words.ts';
 import { actionsOf, listedChange, movedTo, route, surfaceNames, surfaceTools, type Action } from './surface.ts';
 import { packAct } from './surface-slots.ts';
 import { ACT_TOOLS } from './tool-acts.ts';
-import { HOOK_TOOLS, context as hooking } from '../../../src/hook-tool.ts';
 import { WRITE_TOOLS } from './tool-change.ts';
 import { devMode } from './tool-config.ts';
 import { HUMAN_TOOLS } from './tool-human.ts';
@@ -85,12 +84,13 @@ async function step(l: Archipelago, actor: Actor, name: string, input: Record<st
 
 /**
  * The tools the internal packs declare (surface.tools, ./server-fillings.ts), each run on its pack's context of the map
- * it is called on. Filled once, before anything is called: the table is the server's, whatever a workspace runs.
+ * it is called on, whether or not the map has the pack on (an optional pack's too: a session's hook answers on any map).
+ * Filled once, before anything is called: the table is the server's, whatever a workspace runs.
  */
-const PACK_TOOLS: Record<string, Tool> = Object.assign({}, ...(await serverFillings<Record<string, DeclaredTool<KernelContext>>>('surface.tools')).map(({ pack, filled }) => declaredTools(filled, (l) => kernelContext(l, pack))));
+const PACK_TOOLS: Record<string, Tool> = Object.assign({}, ...(await serverFillings<Record<string, DeclaredTool<KernelContext>>>('surface.tools')).map(({ pack, filled }) => declaredTools(filled, (l) => ownContext(l, pack))));
 
 export const TOOLS: Record<string, Tool> = {
-  ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...declaredTools(HOOK_TOOLS, hooking), ...HUMAN_TOOLS,
+  ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...HUMAN_TOOLS,
   ...PACK_STATE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
   ...TOKEN_TOOLS, ...MEMBER_TOOLS, ...WORKSPACE_TOOLS, ...PACK_TOOLS,
 };

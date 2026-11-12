@@ -1,19 +1,3 @@
 [
-  "src/mcp.ts -> src/askview.ts",
-  "src/public.ts -> src/askview.ts",
-  "src/scope.ts -> src/sessions.ts",
-  "src/server-adapter.ts -> src/hook-answers.ts",
-  "src/surface-slots.ts -> src/surface-fillings.ts",
-  "src/surface.ts -> src/askview.ts",
-  "src/tool-acts.ts -> src/sessions.ts",
-  "src/tool-change.ts -> src/sessions.ts",
-  "src/tool-reads.ts -> src/askview.ts",
-  "src/tool-reads.ts -> src/session-turns.ts",
-  "src/tools.ts -> src/askview.ts",
-  "src/tools.ts -> src/hook-tool.ts",
-  "src/view-address.ts -> src/query-flat.ts",
-  "src/workspace-tools.ts -> src/reply-rules.ts",
-  "src/workspace-tools.ts -> src/sessions.ts",
-  "src/workspaces.ts -> src/open-steps.ts",
   "src/workspaces.ts -> src/session-quiet.ts"
 ]

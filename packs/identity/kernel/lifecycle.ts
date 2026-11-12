@@ -8,7 +8,7 @@
 //     LEADING (what it runs while this server leads), read in the order packs/roots.json starts the roots. The
 //     identity root asks no root above it by name: it reads what each declares, as the stub reads their start.
 //   - the kernel's own, registered with onOpen and whileLeading/timer from the module that holds the code, under the
-//     pack it moves to: what a service pack does at the open while its module is still the kernel's (src/open-steps.ts),
+//     pack it moves to: what the kernel still does while this server leads (the quiet sessions timer, src/workspaces.ts),
 //     until its step moves it, with its filling, into the pack.
 //   - an internal pack's, declared in its manifest: `kernel.hooks["open.<phase>"]` and `kernel.timers`, in pack order,
 //     each called with its pack's KernelContext. The loader fills the slot (fillOpen) when it opens a map's packs

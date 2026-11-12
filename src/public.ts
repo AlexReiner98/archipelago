@@ -1,1 +1,1 @@
-export * from '../packs/walls/kernel/public.ts';
+export * from '../packs/surface/kernel/public.ts';

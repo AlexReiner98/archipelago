@@ -1,15 +1,15 @@
 // A session's hooks, called over MCP: report, action hook. A Claude Code plugin from the plugin directory runs no script
 // (only Verified organizations may), so its hooks are mcp_tool hooks that call the map's own tools over the sign-in
 // Claude Code already holds. The tool is declared here with its input as a JSON shape (packs/surface/kernel/
-// tool-input.ts builds its schema) and run on the sessions pack's context, since this pack is a server pack (its
-// adapter runs in the sandbox) and a pack with kernel code may have none: the root service root.hook answers it as
-// POST /hooks/<surface>/<event> does, in the hook's own shape, with what only the server knows (its packs, its setup).
+// tool-input.ts builds its schema), filling the surface's slot surface.tools, and run on this pack's own context of the
+// map it is called on, whether or not the map has sessions on, as a session's hooks always answered: the root service
+// root.hook answers it as POST /hooks/<surface>/<event> does, in the hook's own shape, with what only the server knows
+// (its packs, its setup). The hooks are Claude Code's: the claude_code server pack's adapter translates them.
 
-import { basename, dirname } from 'node:path';
 import type { KernelContext } from '#pelago/kernel';
 
-/** The server pack these hooks are: the one this module is part of, whose adapter (reach.server.adapter) names its surface. */
-const PACK = basename(dirname(import.meta.dirname));
+/** The server pack whose hooks these are: its adapter (reach.server.adapter) names their surface. */
+const PACK = 'claude_code';
 
 /** Who calls the tool, as the surface hands it: what its token writes within, and what it may do. */
 interface Caller { within?: string[]; may?: string }
@@ -38,3 +38,6 @@ export const HOOK_TOOLS: Record<string, Declared> = {
     run: (ctx, actor, input) => ctx.call('root.hook', { ...input, pack: PACK, within: actor.within ?? [], ...(actor.may && { may: actor.may }) }),
   },
 };
+
+/** surface.tools: the hook tool, declared to the surface. */
+export const tools = () => HOOK_TOOLS;

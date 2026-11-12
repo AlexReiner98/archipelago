@@ -91,3 +91,6 @@ export function holds(rule: RuleDef, facts: ReplyFacts, at?: number): boolean {
   });
 }
 
+
+/** surface.replies: what the surface reads of a reply rule for the owner's settings (packs/surface/kernel/workspace-tools.ts). */
+export const replyWords = () => ({ onReply, countsTo, atSetting, isAt, AT_MAX });

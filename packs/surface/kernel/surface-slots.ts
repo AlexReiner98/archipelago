@@ -4,21 +4,21 @@
 // filling.
 //
 // - `surface.act`, `surface.read`: an action's or a read's behaviour, by its name. An internal pack fills one with a
-//   hook whose export is named for it (`"surface.act": "recheck.ts#rechecked"`), called with its KernelContext, the
-//   input and who asked. Until its step moves it into a pack, a kernel module fills one from KERNEL_FILLINGS
-//   (src/surface-fillings.ts), called as the surface's own tools are.
-// - `surface.route`: an HTTP route the server answers, matched by method and path before the server's own.
+//   hook whose export is named for it (`"surface.act": "probe.ts#probe_act"`), called with its KernelContext, the
+//   input and who asked. The surface's own acts (rechecked, ./recheck.ts) are its tools' code, filling nothing.
+// - `surface.route`: an HTTP route the server answers, matched by method and path before the server's own: the
+//   surface's own (the backup file, ./backup-route.ts), which no pack fills.
 // - `surface.reads`: a read of the reads API (`answerRead`, ./packreads.ts) a service answers, by its key
 //   (`"surface.reads": "reads.ts#instructions"`), called with its KernelContext of the map that asks (so it reads as
 //   the asker, under row-level security) and the whole read. The reads API names no service: a filling is asked
 //   where its read was answered before, so a read with several keys is answered as it was.
 //
-// One owner: a name filled twice (by two packs, or by a pack and the kernel) is refused when it is called, naming
+// One owner: a name filled twice (by two packs) is refused when it is called, naming
 // both, as two packs declaring one type are. Swapping who fills one is taking one out and putting the other in.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { hostAt, hostOf } from '../../../src/kernel-context.ts';
-import { KERNEL_FILLINGS } from '../../../src/surface-fillings.ts';
+import { backupFile } from './backup-route.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { actorId } from '../../../src/pelago-types.ts';
 import type { Workspaces } from '../../../src/workspaces.ts';
@@ -47,19 +47,11 @@ export interface RouteFilling {
   serve(req: IncomingMessage, res: ServerResponse, match: RegExpExecArray, host: RouteHost): Promise<unknown>;
 }
 
-/** What a kernel module's filling of surface.reads runs: the map that asks, the whole read, and the internal pack asking, when one is. */
-export type ReadRun = (l: Archipelago, read: any, pack?: string) => Promise<unknown>;
-
-/** The kernel modules that fill each slot, by name: those a pack does not yet hold. */
-export type KernelFillings = { [S in ToolSlot]: Record<string, ToolRun> } & { 'surface.route': Record<string, RouteFilling>; 'surface.reads': Record<string, ReadRun> };
-
 type Found = { by: string; run: ToolRun };
 
-/** Every filling of a tool slot here: the kernel's own, then each internal pack's, in pack order. */
+/** Every filling of a tool slot here: each internal pack's, in pack order. */
 async function fillingsOf(l: Archipelago, slot: ToolSlot, name: string): Promise<Found[]> {
   const out: Found[] = [];
-  const own = KERNEL_FILLINGS[slot][name];
-  if (own) out.push({ by: 'the kernel', run: own });
   const host = hostOf(l);
   for (const f of host ? await host.fillings(l, slot) : []) {
     if (f.ref.slice(f.ref.indexOf('#') + 1) !== name) continue;
@@ -105,14 +97,11 @@ export async function packAct(l: Archipelago, tool: string): Promise<ToolRun | u
 }
 
 /**
- * The answer to a read of the reads API by what fills its key in surface.reads: the kernel's own, or an internal
- * pack's, on any map (one no workspace opened too: a test's, or a person's view of one). Refused when two fill it,
+ * The answer to a read of the reads API by what fills its key in surface.reads: an internal pack's, on any map (one no workspace opened too: a test's, or a person's view of one). Refused when two fill it,
  * and when nothing does.
  */
-export async function answerFilled(l: Archipelago, key: string, read: unknown, pack?: string): Promise<unknown> {
+export async function answerFilled(l: Archipelago, key: string, read: unknown, _pack?: string): Promise<unknown> {
   const found: { by: string; run: () => Promise<unknown> }[] = [];
-  const own = KERNEL_FILLINGS['surface.reads'][key];
-  if (own) found.push({ by: 'the kernel', run: () => own(l, read, pack) });
   for (const f of await hostAt(l).fillings(l, 'surface.reads')) {
     if (f.ref.slice(f.ref.indexOf('#') + 1) === key) found.push({ by: `the ${f.pack} pack`, run: () => f.run(read) });
   }
@@ -121,8 +110,8 @@ export async function answerFilled(l: Archipelago, key: string, read: unknown, p
   return found[0].run();
 }
 
-/** The routes the kernel's modules fill, in order. */
-export const filledRoutes = (): RouteFilling[] => Object.values(KERNEL_FILLINGS['surface.route']);
+/** The surface's own routes answered before the server's, in order. */
+export const filledRoutes = (): RouteFilling[] => [backupFile];
 
 /** Serve a request by the first route filling that matches it: true when one did. */
 export async function serveFilled(req: IncomingMessage, res: ServerResponse, path: string, host: RouteHost): Promise<boolean> {

@@ -12,8 +12,7 @@ import type { Dump } from '../../../src/backup.ts';
 import type { Booted } from '../../../src/boot.ts';
 import { addWorkspace, claimControlValue, controlValue, importControlFiles, listWorkspaces, nameWorkspace, OPERATOR, OPERATOR_RESET, removeWorkspace, setControlValue, takeControlValue } from './control.ts';
 import { openDb, type Database } from '../../../src/db.ts';
-import { closeRoots, followRoots, openPhases, startDuties } from './lifecycle.ts';
-import '../../../src/open-steps.ts'; // what service packs do at a workspace's open, and the clock, held by the kernel
+import { closeRoots, followRoots, openPhases, startDuties, whileLeading } from './lifecycle.ts';
 import { databaseFor, dropDatabaseFor } from '../../../src/pg.ts';
 import type { Archipelago, Policy } from '../../../src/pelago.ts';
 
@@ -22,6 +21,13 @@ export const DEFAULT_WORKSPACE = 'default';
 const FOLLOW_MS = 5_000;
 /** How often the server that leads looks for ended workspaces whose day to be deleted has come. */
 const DELETE_DUE_MS = 3_600_000;
+
+// While this server leads: the look for sessions gone quiet, the kernel's timer of the sessions pack's look
+// (src/session-quiet.ts), until the owner says where it runs (e_nxqn32mb).
+whileLeading('sessions', (ws) => {
+  ws.quiet.start();
+  return () => ws.quiet.stop();
+});
 
 export interface Workspace {
   id: string;
@@ -306,7 +312,7 @@ export class Workspaces {
     this.known.set(id, named);
     if (!backup) {
       // Every new map is on islands, with one to start on (the owner, 10 Nov 2026, e_44rbfwxp), put there as it opens
-      // (open.islands, src/open-steps.ts); one from a backup is as it was.
+      // (open.islands, the loader's); one from a backup is as it was.
       this.made.add(id);
       return await this.get(id).finally(() => this.made.delete(id));
     }

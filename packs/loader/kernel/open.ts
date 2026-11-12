@@ -2,19 +2,21 @@
 // roots). In the packs phase, the types a workspace defines for itself (those kept in a folder before taken in once) and
 // the registry, before the write root makes the map on it. In the types phase, which packs are present, as which
 // manifests, and which the owner turned off (what they made is dormant), the types kept on the map, the type table, and
-// the internal packs' code opened (src/kernel-context.ts), so a pack's manifest fills the phases after it. An open
-// workspace follows what other servers changed in it (FOLLOW), and its packs' processes stop as it closes (CLOSE).
+// the internal packs' code opened (src/kernel-context.ts), so a pack's manifest fills the phases after it. In the islands
+// phase, a new map is put on islands with one to start on (e_44rbfwxp), the island as placement makes it
+// (answer.first_island). An open workspace follows what other servers changed in it (FOLLOW), and its packs' processes stop as it closes (CLOSE).
 
 import { join } from 'node:path';
 import { addLocalType, importLocalPack, localTypes } from '../../identity/kernel/control.ts';
 import type { RootClose, RootFollow, RootOpen } from '../../identity/kernel/lifecycle.ts';
-import { openKernel } from './kernel-context.ts';
+import { callAs, openKernel } from './kernel-context.ts';
 import { packsFor } from './pack-allow.ts';
 import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
-import { followMade, followPacks, islandsOn, packsOff, syncPacks } from './packstate.ts';
+import { followMade, followPacks, islandsOn, packsOff, setIslands, syncPacks } from './packstate.ts';
 import { hostFor } from './packtools.ts';
 import { takeTypeItems } from './type-items.ts';
 import { syncTypes } from './typetable.ts';
+import type { Archipelago } from '../../../src/pelago.ts';
 
 
 export const OPEN: RootOpen = {
@@ -39,6 +41,14 @@ export const OPEN: RootOpen = {
     async (o) => {
       await syncTypes(o.pelago!);
       openKernel(o.pelago!);
+    },
+  ],
+  // Every new map on islands with one to start on (e_44rbfwxp): one create made, and a fresh default map.
+  islands: [
+    async (o) => {
+      if (!(o.made || (o.begins && o.isDefault && o.config.defaultOnIslands))) return;
+      await setIslands(o.pelago!, 'system', true);
+      await o.pelago!.apply('system', await callAs<Parameters<Archipelago['apply']>[1]>(o.pelago!, 'answer.first_island', { name: o.name }));
     },
   ],
 };

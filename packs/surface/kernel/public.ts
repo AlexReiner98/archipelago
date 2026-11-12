@@ -2,10 +2,11 @@
 // here is read through the database as the public role sees it, so what is
 // not public cannot be given away by a mistake in this file: it is not there
 // to be read. What this file adds is restraint in what it passes on of what
-// is there: names, states and what the tests found, and nothing else.
+// is there: names, states and what the tests found, and nothing else. The surface's since wave 7 (out of walls): its
+// proof and changelog are views, asked by name of the query pack (answer.ask_view), which is above the walls.
 
 import type { Entity, Archipelago } from '../../../src/pelago.ts';
-import { askView } from '../../../src/askview.ts';
+import { askView } from './view-words.ts';
 
 /**
  * A public product (public work: a project or a feature), as its page shows it: the proof

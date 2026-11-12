@@ -2,10 +2,21 @@
 // and /hooks/<event> for hooks installed before there were surfaces, the surface whose adapter says so (before). A server
 // pack that translates a surface declares two functions of its handler (reach.server.adapter): in, from the surface's
 // body to the kernel's, and out, from the kernel's neutral answer to the surface's shape. What a session is told stays
-// the kernel's (src/hook-answers.ts); the pack reads no map, and is asked as a gate is: by the kernel, asking for nothing.
+// the sessions pack's (sessionAnswer, its filling of loader.calls, ./own-calls.ts, on its own context of the map, whether
+// or not the map has it on); the adapter reads no map, and is asked as a gate is: by the kernel, asking for nothing.
 
-import { sessionAnswer, type HookBody, type HookCall, type Neutral } from '../../../src/hook-answers.ts';
+import type { HookAsk, HookBody, Neutral } from '../../sessions/kernel/hook-answers.ts';
+import { ownCall } from './own-calls.ts';
+import type { Archipelago } from '../../../src/pelago.ts';
 import type { ServerPacks } from '../../../src/server-host.ts';
+
+/** A hook as the server hands it: the map as the token's person sees it, and what the session is answered from. */
+export interface HookCall extends HookAsk {
+  /** The whole workspace's database, as callers hand it still: no longer read. */
+  whole?: unknown;
+  /** The map as the token's person sees it. */
+  pelago: Archipelago;
+}
 
 /**
  * The adapter of the surface that was before there were surfaces (reach.server.adapter.before), if a pack declares one:
@@ -42,7 +53,8 @@ export async function answerAt(packs: ServerPacks, surface: string | undefined, 
   const inward = await packs.call(adapter.id, 'entry', adapter.in, { event, body: call.body }, undefined, true);
   const kernel = isObject(inward) && typeof inward.event === 'string' ? inward.event : undefined;
   const body = (isObject(inward) && isObject(inward.body) ? inward.body : {}) as HookBody;
-  const neutral: Neutral | undefined = kernel === undefined ? {} : await sessionAnswer(kernel, { ...call, body });
+  const { pelago, whole: _whole, ...ask } = call;
+  const neutral = kernel === undefined ? {} : await ownCall<Neutral | undefined>(pelago, 'sessionAnswer', kernel, { ...ask, body });
   if (!neutral) return undefined;
   const out = await packs.call(adapter.id, 'entry', adapter.out, { event, kernel, answer: neutral }, undefined, true);
   return isObject(out) ? out : {};
