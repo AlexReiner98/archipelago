@@ -20,7 +20,7 @@ import { movesAgain, syncTypes } from '../../../src/typetable.ts';
 
 /** Moves when any file of the web UI is saved (the projector it runs too), so an open page knows to load itself again. */
 const UI_DIR = join(import.meta.dirname, '..', '..', '..', 'ui');
-const uiStamp = () => Math.max(...readdirSync(UI_DIR).map((file) => statSync(join(UI_DIR, file)).mtimeMs), statSync(join(import.meta.dirname, '..', '..', '..', 'src', 'project.ts')).mtimeMs);
+const uiStamp = () => Math.max(...readdirSync(UI_DIR).map((file) => statSync(join(UI_DIR, file)).mtimeMs), statSync(join(import.meta.dirname, '..', '..', 'log', 'kernel', 'project.ts')).mtimeMs);
 
 export const HUMAN_TOOLS: Record<string, Tool> = {
   tail: {

@@ -8,7 +8,7 @@
 
 import type { Q } from '../../../src/db.ts';
 import type { Entry, Fact } from './log.ts';
-import { MOVED } from '../../../src/project.ts';
+import { MOVED } from './project.ts';
 import { openEntries, openSaid } from '../../../src/seal.ts';
 
 /** Entries read in one call at most: a page further behind asks again from where the answer stops (`more`). */

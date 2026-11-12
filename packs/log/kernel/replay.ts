@@ -6,12 +6,12 @@
 
 import type { Entry, Fact } from './log.ts';
 import type { Q } from '../../../src/db.ts';
-import { itemStep, isLink, linkStep, MOVED, runs, type TypesRead } from '../../../src/project.ts';
+import { itemStep, isLink, linkStep, MOVED, runs, type TypesRead } from './project.ts';
 import { joined, regather } from './closure.ts';
 import { declaredTables, projectPacks } from '../../../src/log-project.ts';
 
 // The pure part, one file the page runs too (src/project.ts): kept importable from here, where it always was.
-export { isLink, typesOf, MOVED, type TypesRead } from '../../../src/project.ts';
+export { isLink, typesOf, MOVED, type TypesRead } from './project.ts';
 
 type Props = Record<string, unknown>;
 
