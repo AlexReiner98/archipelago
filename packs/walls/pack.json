@@ -1,0 +1,11 @@
+{
+  "id": "walls",
+  "version": "0.1.0",
+  "title": "Walls",
+  "description": "What may leave the server and what a page may run: the pages' policies, the drawing host, the checks on a figure and a stylesheet, the public forms, calls out to an address someone gave, a pack's requests outside the map, mail a notification sends, and the one unscoped read. Started after identity.",
+  "kernel": {
+    "trust": "root",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}

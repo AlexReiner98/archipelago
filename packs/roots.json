@@ -7,6 +7,10 @@
     {
       "id": "database",
       "hash": "9e99e898b87d65539835d0d9f91198869d1d7c4a83efc2a9e401310d9470944b"
+    },
+    {
+      "id": "walls",
+      "hash": "1ffa5ac28ba5cb1538025c6c1de174f20952c3ea44560eaf7a7d3603023d82c6"
     }
   ]
 }
