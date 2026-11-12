@@ -1,4 +1,4 @@
-// The walls a pack version's parts run behind (ui/draw-parts.js, ui/part-inside.js, ui/part-workers.js), in a real
+// The walls a pack version's parts run behind (the foot of ui/draw-marks.js, partInside in ui/draw-inside.js, partPort in ui/layout.js), in a real
 // browser (skipped where there is no Chrome): one worker for each version, reached by the port the frame hands the
 // page; a part reaches nothing of the page and nothing on the network, cannot see another version, and is stopped
 // when it stops answering. What a drawing may not do is test/layouts.test.ts.
@@ -10,18 +10,18 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-/** A version's index.js with one part, `probe`, whose answer is what `body` returns (input and tools in scope). */
-const version = (body: string) => `export const parts = { async probe(input, tools) { ${body} } };`;
+/** A version with one part, `probe`, whose answer is what `body` returns (input and tools in scope). */
+const version = (body: string) => ({ probe: { 'index.js': `export default async function probe(input, tools) { ${body} }` } });
 
 /** In the page: load each version, mount its probe, and gather what each says until it says something or time runs out. */
-const drive = (versions: Record<string, string>, wait = 200) => `(async () => {
-  const { partPort } = await import('/part-workers.js');
+const drive = (versions: Record<string, object>, wait = 200) => `(async () => {
+  const { partPort } = await import('/layout.js');
   const out = {};
   await Promise.all(Object.entries(${JSON.stringify(versions)}).map(async ([name, code]) => {
     const said = (out[name] = []);
     let stopped;
     try {
-      const port = await partPort(name, { 'index.js': code }, (s) => (stopped = s.type + ': ' + s.message));
+      const port = await partPort(name, code, (s) => (stopped = s.type + ': ' + s.message));
       port.onmessage = (ev) => said.push(ev.data);
       port.postMessage({ type: 'mount', id: 'a', part: 'probe', input: { name } });
       for (let n = 0; n < ${wait} && !said.length && !stopped; n++) await new Promise((r) => setTimeout(r, 25));
@@ -52,7 +52,7 @@ test('in a browser, a pack version runs walled in its own worker and reaches not
         // A part that throws says so.
         throws: version(`throw new Error('no such luck');`),
         // Code that does not load is refused.
-        broken: 'export const parts = {',
+        broken: { probe: { 'index.js': 'export default {' } },
       }),
     );
     assert.equal(await page.evaluate('typeof self.left'), 'undefined', "the page's own globals are untouched");
@@ -67,8 +67,8 @@ test('in a browser, a pack version runs walled in its own worker and reaches not
 
     // A version's parts hear events and updates in order, an unmounted one hears nothing, and a part it lacks is an error.
     const again: any = await page.evaluate(`(async () => {
-      const { partPort } = await import('/part-workers.js');
-      const port = await partPort('events', { 'index.js': ${JSON.stringify(version(`let n = 0; return { marks: n, on: (e) => ++n + e.by, update: (i) => 'now ' + i.x, end: () => {} };`))} });
+      const { partPort } = await import('/layout.js');
+      const port = await partPort('events', ${JSON.stringify(version(`let n = 0; return { marks: n, on: (e) => ++n + e.by, update: (i) => 'now ' + i.x, end: () => {} };`))});
       const said = [];
       port.onmessage = (ev) => said.push(ev.data);
       port.postMessage({ type: 'mount', id: 'a', part: 'probe', input: {} });
@@ -104,9 +104,9 @@ test('in a browser, a part sends an action and hears what came of it, over its o
   const page = await open(`${base}/`);
   try {
     const said: any = await page.evaluate(`(async () => {
-      const { partPort } = await import('/part-workers.js');
+      const { partPort } = await import('/layout.js');
       const code = ${JSON.stringify(version(`setTimeout(async () => tools.marks('came ' + (await tools.act('save', { x: 1 })).status), 0); return { marks: 'asked' };`))};
-      const port = await partPort('acts', { 'index.js': code });
+      const port = await partPort('acts', code);
       const said = [];
       port.onmessage = (ev) => {
         said.push(ev.data);
