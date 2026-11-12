@@ -36,3 +36,6 @@ export async function getPicture(ctx: KernelContext, input: { result: string }) 
   const kept = (await ctx.reads({ picture: input.result })) as { content_type: string; size: number; data: string } | null;
   return kept ? { result: input.result, content_type: kept.content_type, size: kept.size, data: kept.data } : null;
 }
+
+/** act.capture.picture: the tool surface's picture_put, as the actor it names. */
+export const pictureAct = (ctx: KernelContext, input: { actor: Actor; result: string; data: string; content_type: string }) => putPicture(ctx, input.actor, input);

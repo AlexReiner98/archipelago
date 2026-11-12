@@ -56,6 +56,15 @@
           ]
         },
         "run": "query-answers.ts#saved"
+      },
+      "answer.picture_of": {
+        "in": {
+          "id": "id"
+        },
+        "out": {
+          "hash?": "string"
+        },
+        "run": "query-kept.ts#pictureOfAnswer"
       }
     }
   }

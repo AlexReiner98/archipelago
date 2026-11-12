@@ -7,6 +7,28 @@
     "trust": "service",
     "internal": true,
     "modules": "kernel/",
-    "hooks": { "write.follow.rides": "unwait.ts#follow" }
+    "hooks": {
+      "write.follow.rides": "unwait.ts#follow"
+    },
+    "provides": {
+      "answer.waiting_on": {
+        "in": {
+          "items": [
+            "id"
+          ],
+          "authority": "any"
+        },
+        "out": {
+          "person?": "id",
+          "waits": [
+            {
+              "id": "id",
+              "from_id": "id"
+            }
+          ]
+        },
+        "run": "unwait.ts#waitingOn"
+      }
+    }
   }
 }
