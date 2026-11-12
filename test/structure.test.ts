@@ -172,7 +172,7 @@ test('kernel modules import one way', () => {
   const files = srcCode;
   const edges = new Map(files.map((f) => [basename(f), [] as string[]]));
   for (const f of files) {
-    for (const [, spec] of read(f).matchAll(/^import\s+(?!type\b)[^;]*?from\s+'\.\/([^']+\.ts)'/gm)) edges.get(basename(f))!.push(spec);
+    for (const [, spec] of read(f).matchAll(/(?:^|;)[ \t]*import\s+(?!type\b)[^;]*?from\s+'\.\/([^']+\.ts)'/gm)) edges.get(basename(f))!.push(spec);
   }
   // Tarjan's strongly connected components: an edge inside one with more than one module is a cycle.
   const index = new Map<string, number>(), low = new Map<string, number>(), stack: string[] = [], on = new Set<string>();

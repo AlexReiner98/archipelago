@@ -32,7 +32,7 @@ function packOf(path: string): string | undefined {
 
 /** Every value import of a file: static, re-exported or dynamic; `import type` is erased and does not count. */
 const imports = (text: string) =>
-  [...text.matchAll(/^(?:import|export)\s+(?!type\b)[^;]*?from\s+['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/gm)].map((m) => m[1] ?? m[2]);
+  [...text.matchAll(/(?:^|;)[ 	]*(?:import|export)\s+(?!type\b)[^;]*?from\s+['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/gm)].map((m) => m[1] ?? m[2]);
 
 /** The files of each root pack's code: its row's modules wherever they are, and what is under its kernel/. */
 function rootFiles(): [string, string][] {

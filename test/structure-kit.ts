@@ -34,7 +34,7 @@ export const SHIMS = new Map(rawWalk('src').flatMap((f) => { const to = f.endsWi
  * dynamic import is `./kernel-context.ts`. The kernel may import that pack there, and nowhere else.
  */
 const adapts = (f: string, text: string) => {
-  const own = basename(f), targets = [...text.matchAll(/^(?:import|export)\s+(?!type\b)[^;]*?\bfrom\s+'([^']+)'/gm)].map((m) => m[1]);
+  const own = basename(f), targets = [...text.matchAll(/(?:^|;)[ \t]*(?:import|export)\s+(?!type\b)[^;]*?\bfrom\s+'([^']+)'/gm)].map((m) => m[1]);
   const dynamic = [...text.matchAll(/\bimport\s*\(\s*'([^']+)'/g)].map((m) => m[1]);
   const ofOwn = (t: string) => /^\.\.\/packs\/[\w-]+\/kernel\/[^/]+$/.test(t) && basename(t) === own;
   return targets.length > 0 && targets.every(ofOwn) && dynamic.every((t) => t === './kernel-context.ts');
