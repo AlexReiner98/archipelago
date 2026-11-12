@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import pg from 'pg';
 import { pgLeader, type Leader } from '../packs/database/kernel/leader.ts';
 import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
+import { whileLeading } from '../packs/identity/kernel/lifecycle.ts';
 
 const server = process.env.PELAGO_TEST_DATABASE_URL;
 
@@ -22,10 +23,10 @@ const nextChange = (l: Leader) =>
 test('only a leading server runs the clocks, and stops them when it loses the lead', async () => {
   const root = mkdtempSync(join(tmpdir(), 'pelago-leader-'));
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir: join(import.meta.dirname, '..', 'packs') });
-  const ws = await workspaces.get('default');
+  await workspaces.get('default');
   const calls: string[] = [];
-  ws.quiet.start = () => void calls.push('start');
-  ws.quiet.stop = () => void calls.push('stop');
+  // A duty run while this server leads, as the roots' LEADING and a pack's timers are.
+  whileLeading('probe', () => (calls.push('start'), () => void calls.push('stop')));
   await workspaces.lead(true);
   assert.deepEqual(calls.filter((c) => c === 'start'), ['start'], 'the leader starts what runs on a clock');
   calls.length = 0;

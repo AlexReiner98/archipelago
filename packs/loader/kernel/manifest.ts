@@ -139,8 +139,9 @@ export function kernelProblems(k: unknown): string[] {
     // What is filled once at a workspace's open would outlive the switch: an optional pack declares none of it. A check
     // of a rule on its event (rules.<on>, packs/loader/kernel/rule-events.ts) holds nothing of a map: it is filled once
     // for the process, its rules checked whether a map runs the pack or not.
-    // Nor do the server's slots read once for the process from its own folder (loader.calls, surface.tools,
-    // surface.replies): an optional pack's acts and hooks answer on any map, as the kernel's did.
+    // Nor do the server's slots read once for the process from its own folder (loader.calls, loader.leading,
+    // surface.tools, surface.replies): each call is made on the asking map's context (e_5hfp4p7m), and loader.leading's
+    // beat runs a filling only where the map has its pack on (e_nxqn32mb).
     const held = ['provides', 'tables', 'timers'].filter((k) => s[k] !== undefined);
     const points = Object.keys((s.hooks ?? {}) as Raw).filter((p) => !p.startsWith('write.') && !p.startsWith('rules.') && !PROCESS_POINTS.includes(p));
     if (held.length || points.length) problems.push(`an optional pack fills only the write path's points (write.*), read at each change, the rules' checks of its events (rules.*) and the server's slots read once for the process (${PROCESS_POINTS.join(', ')}): not ${[...held.map((k) => `kernel.${k}`), ...points].join(', ')}`);
@@ -152,7 +153,7 @@ export function kernelProblems(k: unknown): string[] {
 }
 
 /** The slots a root reads once for the process, from the server's own folder, whatever a map has on: an optional pack may fill them. */
-export const PROCESS_POINTS: readonly string[] = ['loader.calls', 'surface.tools', 'surface.replies'];
+export const PROCESS_POINTS: readonly string[] = ['loader.calls', 'loader.leading', 'surface.tools', 'surface.replies'];
 
 /** A pack's tier: root, service, or none (plain, in the sandbox). */
 export const tierOf = (m: Pick<Manifest, 'kernel'>): Trust | undefined => m.kernel?.trust;

@@ -4,13 +4,17 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { QuietSessions } from '../src/session-quiet.ts';
+import { flagStaleSessions } from '../packs/sessions/kernel/session-quiet.ts';
+import { beat } from '../packs/loader/kernel/leading.ts';
 import * as queryFlatPack from '../packs/query/kernel/query-flat.ts';
 import * as sessionEventsPack from '../packs/sessions/kernel/session-events.ts';
 import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
 import type { Archipelago } from '../packs/write/kernel/pelago.ts';
 import { agent, fresh, make } from './map.ts';
 import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
+
+/** One look for quiet sessions, as the leader's beat runs it (a failure thrown, not told). */
+const quietLook = (l: Archipelago) => flagStaleSessions(ownContext(l, 'sessions'));
 
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
 
@@ -28,7 +32,7 @@ test('a run quiet past quiet_end_after is ended, says why, and leaves its task\'
   const l = await fresh();
   const { task, run } = await quietFor(l, 25 * 60);
   assert.ok((await beside(l, task)).includes(run), 'drawn beside its task while open');
-  await new QuietSessions(l).tick();
+  await quietLook(l);
   const ended = (await l.entity(run))!;
   assert.equal(ended.is_open, false);
   assert.equal(ended.props.ended_by, 'quiet');
@@ -41,7 +45,7 @@ test('a run quiet past quiet_end_after is ended, says why, and leaves its task\'
 test('a run quiet for less is flagged, not ended', async () => {
   const l = await fresh();
   const { run } = await quietFor(l, 60);
-  await new QuietSessions(l).tick();
+  await quietLook(l);
   const still = (await l.entity(run))!;
   assert.equal(still.is_open, true);
   assert.equal(still.props.stale_flagged, true);
@@ -51,7 +55,7 @@ test('a run heard from again by a raw event is not ended', async () => {
   const l = await fresh();
   const { run } = await quietFor(l, 25 * 60);
   assert.equal((await sessionEventsPack.takeEvents(kernelContext(l, 'sessions'), ({ session_id: 'q1', source: 'claude-code', events: [{ at: ago(1), kind: 'turn.start', turn: 't1', by: 'person' }] }))).kept, 1);
-  await new QuietSessions(l).tick();
+  await quietLook(l);
   const still = (await l.entity(run))!;
   assert.equal(still.is_open, true);
   assert.notEqual(still.props.stale_flagged, true, 'nor flagged: it is not quiet');
@@ -61,6 +65,19 @@ test('the owner\'s style sets how long', async () => {
   const l = await fresh();
   await make(l, [{ op: 'create', ref: 's', type: 'style', title: 'Quicker', props: { numbers: { quiet_end_after: 90 } } }]);
   const { run } = await quietFor(l, 120);
-  await new QuietSessions(l).tick();
+  await quietLook(l);
+  assert.equal((await l.entity(run))!.props.ended_by, 'quiet');
+});
+
+// The leader's beat (the slot loader.leading, e_nxqn32mb): sessions fills it with the quiet look, read at each beat, so
+// it runs on a map that has sessions on and stops the moment the map turns it off.
+test("the leader's beat runs the quiet look where sessions is on, and not where it is off", async () => {
+  const l = await fresh();
+  const { run } = await quietFor(l, 25 * 60);
+  l.registry.turnOff(['sessions']);
+  assert.deepEqual(await beat(l), [], 'sessions off: nothing of it runs');
+  assert.equal((await l.entity(run))!.is_open, true, 'the quiet run is left as it is');
+  l.registry.turnOff([]);
+  assert.deepEqual(await beat(l), ['sessions'], 'sessions on again: its look runs at the next beat');
   assert.equal((await l.entity(run))!.props.ended_by, 'quiet');
 });

@@ -19,19 +19,14 @@ export const rawWalk = (dir: string): string[] =>
 /** A file's text as it is on disk. */
 export const raw = (path: string) => readFileSync(join(ROOT, path), 'utf8');
 
-// Kernel packs after the gather (docs/kernel-packs.md, "Moving in the wave (as built)", and wave 3, "Gather"): every
-// module is read at its own place. The kernel is src/ (the stub and plumbing) and the root packs' kernel/; a service
-// pack's code is a pack's, under rule 4. The lists keyed by a path name the module where it lives
-// (scripts/gather.ts re-keys them). What the kernel still imports of a service pack goes through a shim left in src/
-// until wave 7 cuts it: those shims are listed in test/fixtures/gather-kept.json, with who imports each, and the
-// list only shrinks.
+// Every module is read at its own place (docs/kernel-packs.md, "Where each module goes"). The kernel is src/ (the boot
+// stub, plumbing and the entries run by path) and the root packs' kernel/; a service pack's code is a pack's, under
+// rule 4. The lists keyed by a path name the module where it lives.
 
 /** Every file under a folder. */
 export const walk = rawWalk;
 /** A file's text. */
 export const read = raw;
-/** The shims src/ keeps for wave 7: a kernel caller still imports a service pack's module through each. */
-export const KEPT = new Set(existsSync(join(ROOT, 'test/fixtures/gather-kept.json')) ? Object.keys(JSON.parse(raw('test/fixtures/gather-kept.json')) as Record<string, string[]>) : []);
 /** The pack a path is in, if it is under packs/. */
 export const packOfPath = (path: string) => /^packs\/([\w-]+)\//.exec(path)?.[1];
 /** A relative import's target, as a path from the repository's root. */

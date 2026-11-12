@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { QuietSessions } from '../src/session-quiet.ts';
+import { flagStaleSessions } from '../packs/sessions/kernel/session-quiet.ts';
 import { heldResources } from '../packs/surface/kernel/blocking.ts';
 import { Archipelago, type Op } from '../packs/write/kernel/pelago.ts';
 import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
@@ -11,6 +11,9 @@ import { human, agent, fresh, make } from './map.ts';
 import { searchMap } from '../packs/surface/kernel/search.ts';
 import { getItem, proposals } from '../packs/surface/kernel/map-reads.ts';
 import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
+
+/** One look for quiet sessions, as the leader's beat runs it (a failure thrown, not told). */
+const quietLook = (l: Archipelago) => flagStaleSessions(ownContext(l, 'sessions'));
 
 /** A view asked by its name, as the view tool asks it. */
 const ask = (l: Archipelago, name: string, params: Record<string, unknown> = {}) => askviewPack.askView(kernelContext(l, 'query'), ({ kind: 'human', name: 'test' }) as Parameters<typeof askviewPack.askView>[1], name, params);
@@ -31,9 +34,8 @@ test('an agent can notify the human; a stale session raises one notification', a
   // One that holds nothing is not worth a notice: it ends by itself.
   const idle = (await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ title: 'Idle one' }))).run;
   await silent(idle, 1);
-  const autos = new QuietSessions(l);
-  await autos.tick();
-  await autos.tick();
+  await quietLook(l);
+  await quietLook(l);
   unread = (await VIEWS.notifications.run(kernelContext(l, 'query'), {})) as any[];
   const stale = unread.filter((n) => n.title.includes('gone quiet'));
   assert.equal(stale.length, 1, 'told once, not every pass');
@@ -44,13 +46,13 @@ test('an agent can notify the human; a stale session raises one notification', a
   await sessionsPack.sessionUpdate(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ run }));
   assert.equal(await quiet(), 0, 'withdrawn when the session reports in');
   await silent(run, 1);
-  await autos.tick();
+  await quietLook(l);
   assert.equal(await quiet(), 1, 'told again when it goes quiet again');
   // A day without a word (the house style's quiet_end_after), a session is ended for it: the notice goes, and what it held is given back.
   assert.equal((await l.entity(idle))!.is_open, true, 'an hour is not a day');
   await silent(run, 25);
   await silent(idle, 25);
-  await autos.tick();
+  await quietLook(l);
   const gone = (await l.entity(run))!;
   assert.deepEqual([gone.status, (await l.entity(idle))!.status], ['finished', 'finished']);
   assert.match(gone.body, /Not heard from for over 24 hours: ended for it/);

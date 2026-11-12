@@ -7,6 +7,7 @@
   "kernel": { "trust": "service", "internal": true, "optional": true, "modules": "kernel/", "hooks": {
     "rules.reply_ended": "reply-rules.ts#checkReplyRule",
     "loader.calls": ["sessions.ts#sessionStart", "sessions.ts#sessionUpdate", "sessions.ts#sessionEnd", "sessions.ts#tell", "sessions.ts#recordUsage", "sessions.ts#recordRun", "sessions.ts#importAudit", "sessions.ts#resolveRun", "sessions.ts#closeOffers", "sessions.ts#sessionsAwake", "hook-answers.ts#sessionAnswer"],
+    "loader.leading": "session-quiet.ts#tick",
     "surface.tools": "hook-tool.ts#tools",
     "surface.replies": "reply-rules.ts#replyWords"
   } },

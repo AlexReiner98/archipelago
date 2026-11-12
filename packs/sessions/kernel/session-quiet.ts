@@ -1,8 +1,8 @@
 // Sessions gone quiet: every so often the leader looks for open sessions that have stopped reporting, tells the human
 // once about each that still holds something, and ends one that has said nothing for the house style's
-// quiet_end_after. The look is this pack's, on its context; the timer that runs it while the server leads is the
-// kernel's still (src/session-quiet.ts, started by src/workspaces.ts), since an optional pack has no timers and the
-// end it makes is this pack's own (sessionEnd), which no required pack can ask of an optional one by name.
+// quiet_end_after. The look is this pack's, on its context, and runs as its filling of the loader's slot
+// loader.leading (tick): every 30 seconds in each workspace while the server leads, on a map that has sessions on
+// (the owner, 12 Nov 2026, e_nxqn32mb; packs/loader/kernel/leading.ts). An optional pack has no timers of its own.
 
 import type { KernelContext } from '#pelago/kernel';
 import { sessionEvents } from './session-events.ts';

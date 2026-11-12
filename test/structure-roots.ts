@@ -1,8 +1,7 @@
-// What a root pack's code may import while the kernel moves into packs (docs/kernel-packs.md, "Moving in the wave
-// (as built)"). The contract is read for who owns what: "The root packs" for their order, "Where each module goes" for
-// each module's pack, and the plumbing paragraph. A root module may import plumbing, its own pack, and the roots
-// before it; anything else it imported when the wave began is owed (test/fixtures/root-imports.json, each module at
-// its own place since the gather), and nothing is added to that.
+// What a root pack's code may import (docs/kernel-packs.md, rule 22). The contract is read for who owns what: "The root
+// packs" for their order, "Where each module goes" for each module's pack, and the plumbing paragraph. A root module
+// may import plumbing, its own pack, and the roots before it. What the roots imported above that when the wave began
+// was owed (test/fixtures/root-imports.json); every owed import is cut, the list is empty, and nothing is added to it.
 
 import { posix } from 'node:path';
 import { raw, rawWalk } from './structure-kit.ts';
@@ -32,7 +31,7 @@ function packOf(path: string): string | undefined {
 const imports = (text: string) =>
   [...text.matchAll(/(?:^|;)[ 	]*(?:import|export)\s+(?!type\b)[^;]*?from\s+['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|(?:^|;)[ 	]*import\s+['"]([^'"]+)['"]/gm)].map((m) => m[1] ?? m[2] ?? m[3]);
 
-/** The files of each root pack's code: what is under its kernel/ (since the gather, every module of its row is there). */
+/** The files of each root pack's code: what is under its kernel/, where every module of its row lives. */
 function rootFiles(): [string, string][] {
   const out = new Map<string, string>();
   for (const pack of ROOT_ORDER) for (const f of rawWalk(`packs/${pack}/kernel`)) if (f.endsWith('.ts') && !f.endsWith('.test.ts')) out.set(f, pack);
