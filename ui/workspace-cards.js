@@ -136,8 +136,8 @@ function importer(done) {
 export const card = (title, tip, ...body) => h('section', { class: 'card wide' }, h('header', {}, h('h2', { class: tip ? 'hinted' : '', title: tip ?? '' }, title)), ...body);
 /** A row that never wraps: what does not fit is cut, the whole of it in the tooltip. */
 export const line = (...kids) => h('li', { class: 'one' }, ...kids);
-/** A hidden chooser of a backup file, opened by a menu's entry: the page's own (ui/index.html), taking what it accepts. */
-export const fileInput = (accept) => Object.assign(document.getElementById('file-chooser').content.firstElementChild.cloneNode(), { accept });
+/** A hidden chooser of a backup file, opened by a menu's entry. */
+export const fileInput = (accept) => h('input', { type: 'file', accept, hidden: true });
 
 // Whose workspace this is. "Needs you now" and the other standing questions
 // are asked about the owner, so a new workspace is not much use until one is set.

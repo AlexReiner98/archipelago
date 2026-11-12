@@ -26,11 +26,9 @@ export const screensFor = (typeId) => (pageSchema()?.screens ?? []).filter((s) =
 /** The pieces of those screens, each with the screen it is part of. */
 const piecesFor = (typeId) => screensFor(typeId).flatMap((s) => s.pieces.map((p) => ({ ...p, screen: s })));
 /** Whether an item of this type is read whole, its text with what it brings in, in place of its note. */
-export const readWhole = (typeId) => piecesFor(typeId).some((p) => isPiece(p, PIECES.document));
+export const readWhole = (typeId) => piecesFor(typeId).some((p) => p.piece === 'document');
 /** Whether an item of this type keeps a figure, shown with its note. */
-export const keepsFigure = (typeId) => piecesFor(typeId).some((p) => isPiece(p, PIECES.figure));
-/** Whether a piece a screen declares is the one the kernel draws as `drawn` (an entry of PIECES). */
-const isPiece = (p, drawn) => Object.hasOwn(PIECES, p.piece) && PIECES[p.piece] === drawn;
+export const keepsFigure = (typeId) => piecesFor(typeId).some((p) => p.piece === 'figure');
 /** The actions packs offer on an item of this type, as the schema lists them. */
 export const actionsFor = (typeId) => (pageSchema()?.pack_tools ?? []).filter((t) => t.action && t.on?.some((on) => pageIsA(typeId, on)));
 
@@ -216,7 +214,7 @@ const PIECES = {
     const node = h('div');
     return ctx.e && { node, later: () => findingsPiece(node, ctx.e, section) };
   },
-  // Drawn with the note, by the item's page: each its own entry, which readWhole and keepsFigure ask for.
+  // Drawn with the note: the item's page reads them by name.
   figure: () => null,
   document: () => null,
 };

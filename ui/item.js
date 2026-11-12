@@ -154,7 +154,7 @@ export async function entity(id, here) {
   const draft = draftOf({ base: e, style: looks, editable: writes && !e.archived_at, reading, writing, saved: again, count: countOn(data) });
   // The sheet can open before the canvas under it has drawn: told when it has.
   if (doc && !writing) document.getElementById('sheet').addEventListener('beside', () => draft.open(), { once: true });
-  const note = section('body', 'Note', 0, keepsFigure(e.type) && figureOf(e, 'figure'), h('div', { class: 'item-note' }, draft.note));
+  const note = section('note', 'Note', 0, keepsFigure(e.type) && figureOf(e, 'figure'), h('div', { class: 'note' }, draft.note));
   // A field picked is changed at once; words written in a field wait with the note for its Save. A pick made while
   // words wait leaves the page as it stands, so they are not lost: it is drawn again when they are saved.
   const fieldEdit = writes && !e.archived_at && {

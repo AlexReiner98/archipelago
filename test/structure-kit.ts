@@ -70,8 +70,9 @@ export function ratchet(counted: Record<string, number>, frozen: Record<string, 
   return problems;
 }
 
-export const count = (files: string[], pattern: RegExp) =>
-  Object.fromEntries(files.map((f) => [f, read(f).match(pattern)?.length ?? 0]).filter(([, n]) => (n as number) > 0));
+/** How many times each file says `pattern`, read by `text` (history, for a rule that counts nothing in a released step). */
+export const count = (files: string[], pattern: RegExp, text: (f: string) => string = read) =>
+  Object.fromEntries(files.map((f) => [f, text(f).match(pattern)?.length ?? 0]).filter(([, n]) => (n as number) > 0));
 
 /** A baseline whose every entry names the step on the map that removes it: [count, step]. */
 export type Owed = Record<string, [number, string]>;
