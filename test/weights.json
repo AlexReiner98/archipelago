@@ -20,6 +20,7 @@
   "packs/canvas/map-undrawn.test.ts": { "pglite": 0.2, "postgres": 0.3 },
   "packs/canvas/rails.test.ts": { "pglite": 0.3, "postgres": 0.4 },
   "packs/claude_code/claude-code.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/connect/kernel/connect.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/core/session-states.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/core/turns.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/email/email.test.ts": { "pglite": 0.1, "postgres": 0.1 },

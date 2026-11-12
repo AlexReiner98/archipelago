@@ -6,11 +6,12 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { LISTING } from '../../../src/listing.ts';
-import { workingRules } from '../../../src/working-rules.ts';
 
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
+
+/** What Archipelago is called and how it is described: listing.json, as src/listing.ts reads it. */
+const LISTING = JSON.parse(read('listing.json')) as { name: string; summary: string; not: string; urls: { repository: string } };
 
 /** The client the page's example names: the first the installer sets up (its CLIENTS), so the page names none of its own. */
 const EXAMPLE_CLIENT = /const CLIENTS = \[\s*'([a-z]+)'/.exec(read('scripts/pelago-install.mjs'))![1];
@@ -23,16 +24,17 @@ export const installLines = (origin: string) => ({
 
 /**
  * The installer, with the address it connects to and the files it writes beside the person's sign-in (~/.pelago/bin):
- * the sign-in, and the hook with what it loads, for the clients whose hooks are not a plugin's (Codex, Cursor).
+ * the sign-in, and the hook with what it loads, for the clients whose hooks are not a plugin's (Codex, Cursor), and the
+ * working rules a project is handed (rules: the sessions pack's workingRules, src/working-rules.ts).
  */
-export function installScript(origin: string): string {
+export function installScript(origin: string, rules: string): string {
   const here = (path: string) => read(path).replace(`'http://127.0.0.1:3100'`, JSON.stringify(origin));
   const files = {
     'bin/pelago-login.mjs': here('scripts/pelago-login.mjs'),
     'bin/pelago-hook.mjs': here('scripts/pelago-hook.mjs'),
     'bin/pelago-events.mjs': read('scripts/pelago-events.mjs'),
     'bin/pelago-cursor.mjs': read('scripts/pelago-cursor.mjs'),
-    'pelago.md': workingRules(),
+    'pelago.md': rules,
   };
   return `const ORIGIN = ${JSON.stringify(origin)};\nconst FILES = ${JSON.stringify(files)};\n${read('scripts/pelago-install.mjs')}`;
 }
