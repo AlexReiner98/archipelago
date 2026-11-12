@@ -48,3 +48,14 @@ test('a type, a relation or a pack is given whole on asking, and a name that is 
   assert.deepEqual(kind.types.map((t) => t.id), ['work'], 'a kind by its name before a pack of that name');
   await assert.rejects(callTool(l, agent, 'schema', { type: 'no.such' }), /No type, relation or pack/);
 });
+
+// A reader's page (/read/<id>) asks only which read gives an item whole, not the whole model (task e_jmvm6cqm).
+test('asked for its reads alone, the schema answers only those, the whole one marked', async () => {
+  const l = await map();
+  const said = (await callTool(l, human, 'schema', { reads: true })) as { reads: { name: string; whole?: boolean }[] };
+  assert.deepEqual(Object.keys(said), ['reads']);
+  assert.equal(said.reads.filter((r) => r.whole).length, 1, 'one read gives an item whole');
+  const whole = JSON.stringify(await callTool(l, human, 'schema', {}));
+  assert.ok(JSON.stringify(said).length * 20 < whole.length, 'a small part of the whole schema');
+  assert.deepEqual((JSON.parse(whole) as typeof said).reads, said.reads, 'the same reads the whole schema names');
+});

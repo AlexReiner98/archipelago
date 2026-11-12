@@ -25,7 +25,7 @@ import { WRITE_TOOLS } from './tool-change.ts';
 import { devMode } from './tool-config.ts';
 import { HUMAN_TOOLS } from './tool-human.ts';
 import { READ_TOOLS } from './tool-reads.ts';
-import { toolsSaid } from './tool-said.ts';
+import { readsSaid, toolsSaid } from './tool-said.ts';
 import { declaredTools, type DeclaredTool } from './tool-input.ts';
 import { serverFillings } from './server-fillings.ts';
 
@@ -95,7 +95,8 @@ export const TOOLS: Record<string, Tool> = {
   ...TOKEN_TOOLS, ...MEMBER_TOOLS, ...WORKSPACE_TOOLS, ...PACK_TOOLS,
 };
 // The schema a person reads says what the tools declare (./tool-said.ts): the act that ends a session, the reads.
-TOOLS.schema = { ...READ_TOOLS.schema, run: async (l, actor, input) => toolsSaid(await READ_TOOLS.schema.run(l, actor, input), Object.fromEntries(toolsFor(l.registry))) };
+// Asked for its reads alone (a reader's page, /read/<id>), it answers only those, not the whole model.
+TOOLS.schema = { ...READ_TOOLS.schema, run: async (l, actor, input) => (input.reads ? { reads: readsSaid(Object.fromEntries(toolsFor(l.registry))) } : toolsSaid(await READ_TOOLS.schema.run(l, actor, input), Object.fromEntries(toolsFor(l.registry)))) };
 
 /** The view tool as a registry offers it: described with the lenses its core pack declares, then the kernel's own views. */
 const viewTools = new WeakMap<Registry, Tool>();

@@ -217,7 +217,7 @@ const FULL = z.boolean().optional().describe('true to be given the history whole
 export const READ_TOOLS: Record<string, Tool> = {
   schema: {
     description: 'Describe the map\'s model: every type of item with its statuses and the fields you set, and every link type with its ends. Read this before writing. With type (a type, a link type or a pack): those whole, each field explained; full: true for everything, screens and verbs too. With island: as that island runs it, where it runs a version of its pack (version names it); one that runs the map\'s answers only that.',
-    input: { type: z.string().optional().describe('A type, a link type or a pack, by its id as the brief lists it.'), full: z.boolean().optional(), island: z.string().optional().describe('An island, by its id: the model as it runs there.') },
+    input: { type: z.string().optional().describe('A type, a link type or a pack, by its id as the brief lists it.'), full: z.boolean().optional(), island: z.string().optional().describe('An island, by its id: the model as it runs there.'), reads: z.boolean().optional().describe('true for only the reads query reaches, the one that reads an item whole marked.') },
     run: async (map, actor, input) => {
       // An island that runs a version of its pack is described through that version's registry (src/island-pin.ts).
       const pinned = input.island ? await islandVersion(map, input.island) : undefined;
