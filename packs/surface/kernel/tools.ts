@@ -26,6 +26,7 @@ import { WRITE_TOOLS } from './tool-change.ts';
 import { devMode } from './tool-config.ts';
 import { HUMAN_TOOLS } from './tool-human.ts';
 import { READ_TOOLS } from './tool-reads.ts';
+import { toolsSaid } from './tool-said.ts';
 import { declaredTools, type DeclaredTool } from './tool-input.ts';
 import { serverFillings } from './server-fillings.ts';
 
@@ -48,6 +49,10 @@ export interface Tool {
   quiet?(input: Record<string, unknown>): boolean;
   /** Its answer names the session that called it ({ run }): its first step is already that session's own. */
   begins?: boolean;
+  /** It ends the session it names: the act the page ends one with. */
+  ends?: boolean;
+  /** It reads an item whole, as its reader meets it: the read the page draws such an item by. */
+  whole?: boolean;
   /** For a token limited to some items: the inputs that name the items it acts on, with what it would do to them (src/scope.ts). */
   within?: Record<string, string>;
   run(l: Archipelago, actor: Actor, input: any): Promise<unknown>;
@@ -89,6 +94,8 @@ export const TOOLS: Record<string, Tool> = {
   ...PACK_STATE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
   ...TOKEN_TOOLS, ...MEMBER_TOOLS, ...WORKSPACE_TOOLS, ...PACK_TOOLS,
 };
+// The schema a person reads says what the tools declare (./tool-said.ts): the act that ends a session, the reads.
+TOOLS.schema = { ...READ_TOOLS.schema, run: async (l, actor, input) => toolsSaid(await READ_TOOLS.schema.run(l, actor, input), Object.fromEntries(toolsFor(l.registry))) };
 
 /** The view tool as a registry offers it: described with the lenses its core pack declares, then the kernel's own views. */
 const viewTools = new WeakMap<Registry, Tool>();

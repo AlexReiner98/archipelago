@@ -83,7 +83,7 @@ export async function entity(id, here) {
   const endSession = async () => {
     if (!(await ask({ title: `End "${e.title}"?`, message: 'Anything it holds is released.', action: 'End session', danger: true }))) return;
     try {
-      await api('session_end', { run: id, outcome: 'cancelled', summary: 'Ended from the UI' });
+      await api(state.schema.acts.ends, { run: id, outcome: 'cancelled', summary: 'Ended from the UI' });
     } catch (err) {
       await tell('The session was not ended', err.message);
     }

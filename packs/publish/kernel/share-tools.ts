@@ -45,6 +45,8 @@ export interface ShareTool {
   humanOnly?: boolean;
   /** A read: an agent reaches it through query, by its own name. */
   query?: boolean;
+  /** It reads an item whole, as its reader meets it: the read the page draws such an item by. */
+  whole?: boolean;
   input: Record<string, unknown>;
   says?: Record<string, string>;
   run(ctx: KernelContext, actor: Actor, input: any): Promise<unknown>;
@@ -64,6 +66,7 @@ const WITHIN = 'The item that holds the documents.';
 export const SHARE_TOOLS: Record<string, ShareTool> = {
   document: {
     query: true,
+    whole: true,
     description:
       'A document read whole, as its reader meets it (any other item is read the same way, by its note): its text, and in their places the items it brings in (a line of its note holding only an item’s id), each with its title, state and note. ' +
       'To write one, make an item of type document (or any type a screen reads whole) whose note is the text, and put an item’s id alone on a line where that item belongs; a lens’s id brings in its view, drawn live in the app. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.',

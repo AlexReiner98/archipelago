@@ -41,7 +41,7 @@ import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
 import { LOOK_READS, passWorkspace, readPass } from '../../../src/look-pass.ts'; import { pageMay } from './may.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { configureOutbox } from '../../../src/outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from '../../../src/control-index.ts'; import { isPersonToken, personAt } from '../../../src/person-tokens.ts';
-import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './root-connections.ts'; import { configureHookTool } from './root-hook.ts'; import { setReach } from '../../../src/pack-reach.ts';
+import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './root-connections.ts'; import { configureHookTool } from './root-hook.ts'; import { configureSaid } from './tool-said.ts'; import { setReach } from '../../../src/pack-reach.ts';
 import { pgLeader, soleLeader, whileLeads, type Leader } from '../../../src/leader.ts'; import { drained } from './drain.ts';
 import { clientAddress, trustedProxies } from '../../../src/address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
@@ -105,7 +105,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   void mailing().then((mail) => mail.setBounced(async (email) => onMap<boolean>((await workspaces.get(DEFAULT_WORKSPACE)).pelago, 'surface.bounced', email)), (err: Error) => console.error(`mail: ${err.message}`)); // a bounced address is sent nothing (the mailer's bounces)
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
-  const running = { commit: startedFrom(), started: new Date().toISOString(), roots: options.roots }; configureHookTool(serverPacks, running);
+  const running = { commit: startedFrom(), started: new Date().toISOString(), roots: options.roots }; configureHookTool(serverPacks, running); configureSaid(serverPacks);
 
   // What answers without a token is counted by address: the public pages and the setup script, and GitHub's deliveries.
   const open = limiter(options.limits?.open ?? PUBLIC_LIMIT);
