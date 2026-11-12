@@ -8,6 +8,7 @@ import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, fresh, human, make } from './map.ts';
 import { searchMap } from '../packs/surface/kernel/search.ts';
 import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
+import type { Op } from '../packs/write/kernel/pelago.ts';
 
 const titles = (answer: { items: { title: string }[] }) => answer.items.map((i) => i.title).sort();
 
@@ -268,10 +269,39 @@ test('a walk back along works_on keeps the sessions it reaches under the default
     { op: 'create', ref: 'v', type: 'lens', title: 'A view of it', props: { filter: { find: [`id ${made.p}`] } } },
     { op: 'link', type: 'about', from: 'v', to: made.p },
   ]);
-  const plan = (over: string[], not?: string[]) => queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`id ${made.p}`], ...(not && { not }) }, walk: { over, steps: 2 } }));
+  const plan = (over: string[], not?: string[], sessions?: boolean) => queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`id ${made.p}`], ...(not && { not }) }, walk: { over, steps: 2 }, ...(sessions !== undefined && { sessions }) }));
   assert.deepEqual(titles(await plan(['part_of<', 'works_on<'])), ['A session', 'Flat lens', 'Rework', 'Tags'], 'the session at work on a step is drawn on the plan');
   assert.deepEqual(titles(await plan(['part_of<', 'works_on<', 'about<'])), ['A session', 'Flat lens', 'Rework', 'Tags'], 'a view about it stays out');
-  assert.deepEqual(titles(await plan(['part_of<'])), ['Flat lens', 'Rework', 'Tags'], 'not walked along works_on, none');
+  assert.deepEqual(titles(await plan(['part_of<'], undefined, false)), ['Flat lens', 'Rework', 'Tags'], 'not walked along works_on, and sessions off, none');
   assert.deepEqual(titles(await plan(['part_of<', 'works_on<'], ['kind system'])), ['Flat lens', 'Rework', 'Tags'], 'a Not said is kept to');
   assert.ok(got.r);
+});
+
+test('the sessions running on what a view finds come with it by default: open only, a few, inside the limit (e_s37r8ych)', async () => {
+  const { l, made } = await chain();
+  const runs = Array.from({ length: 10 }, (_, i) => i);
+  await make(l, [
+    ...runs.flatMap((i): Op[] => [{ op: 'create', ref: `r${i}`, type: 'run', title: `Session ${i}` }, { op: 'link', type: 'works_on', from: `r${i}`, to: made.a! }]),
+    { op: 'create', ref: 'e', type: 'run', title: 'Ended session', status: 'finished' },
+    { op: 'link', type: 'works_on', from: 'e', to: made.b! },
+    { op: 'create', ref: 'w', type: 'run', title: 'Elsewhere' },
+    { op: 'link', type: 'works_on', from: 'w', to: made.c! },
+  ]);
+  const read = (more: Record<string, unknown> = {}) => queryFlatPack.flatRead(kernelContext(l, 'query'), { filter: { find: [`in ${made.p}`] }, ...more });
+  const plain = await read();
+  const sessions = plain.items.filter((i) => i.type === 'run');
+  assert.equal(sessions.length, 8, 'eight at most, never a crowd');
+  assert.ok(sessions.every((i) => i.open && 'step' in i && i.step === 1 && i.session), 'each running, reached a step away, with where its session stands');
+  assert.ok(!titles(plain).includes('Ended session'), 'an ended session never comes');
+  assert.ok(!titles(plain).includes('Elsewhere'), 'nor one working on what is not sent');
+  assert.equal(plain.items.filter((i) => i.type === 'run').length + 2, plain.items.length, 'the two steps and their sessions');
+  assert.ok(plain.links.every((r) => r.type !== 'works_on' || r.to === made.a), 'drawn tied to the step it works on');
+  assert.deepEqual(titles(await read({ sessions: false })), ['Flat lens', 'Tags'], 'sessions: false leaves them out');
+  assert.equal((await read({ sessions: false })).lens.sessions, false, 'said back in the lens when off');
+  assert.equal((await read()).lens.sessions, undefined, 'and not said when on');
+  const tight = await read({ limit: 4 });
+  assert.equal(tight.items.length, 4, 'inside the limit');
+  assert.ok(!tight.cut, 'sessions never cut what the lens finds');
+  assert.deepEqual(titles(await read({ filter: { find: [`in ${made.p}`], not: ['kind system'] } })), ['Flat lens', 'Tags'], 'a Not said is kept to');
+  await assert.rejects(read({ sessions: 'yes' }), /sessions must be true or false/);
 });

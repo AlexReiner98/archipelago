@@ -33,6 +33,8 @@ export interface FlatLens {
   limit: number;
   /** A window of time each item is placed in, for a drawing along a time axis; its ends may be said from today. */
   time?: TimeAxis;
+  /** Said only to turn it off: else the sessions running on what is sent come with it (SESSIONS_MOST at most). */
+  sessions?: false;
 }
 
 /** The kernel flag's kind: the app's own configuration. */
@@ -101,7 +103,8 @@ export function readFlat(at: Terms, input: Record<string, unknown>): FlatLens {
   if (!Number.isInteger(steps) || (steps as number) < 0 || (steps as number) > MAX_STEPS) throw new Error(`walk.steps must be a whole number from 0 to ${MAX_STEPS}`);
   const limit = input.limit ?? FLAT_LIMIT;
   if (!Number.isInteger(limit) || (limit as number) < 1 || (limit as number) > LENS_LIMIT) throw new Error(`limit must be a whole number from 1 to ${LENS_LIMIT}`);
-  return { find, only, not, walk: { over, steps: steps as number }, limit: limit as number, ...(input.time !== undefined && { time: readAxis(input.time) }) };
+  if (input.sessions !== undefined && typeof input.sessions !== 'boolean') throw new Error('sessions must be true or false: false leaves out the sessions running on what the lens finds');
+  return { find, only, not, walk: { over, steps: steps as number }, limit: limit as number, ...(input.time !== undefined && { time: readAxis(input.time) }), ...(input.sessions === false && { sessions: false as const }) };
 }
 
 /** Why a lens cannot be read, or nothing: read as the flat lens reads it, and nothing asked of the map. */
@@ -181,7 +184,7 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
   const flat = {
     find: terms.slice(0, f), only: terms.slice(f, f + o), not: terms.slice(f + o, f + o + n),
     said_not: (input.filter as { not?: unknown } | undefined)?.not !== undefined,
-    walk: lens.walk, limit: lens.limit, me,
+    walk: lens.walk, limit: lens.limit, me, sessions: lens.sessions !== false,
     ...(since && { since }), ...(whole && { whole: allFields ? ('all' as const) : true }),
     ...(preview && { preview: { part: preview.part, terms: offered.map((x, i) => ({ raw: x.raw, term: terms[f + o + n + i] })), ids: Array.isArray(preview.ids) ? preview.ids : [] } }),
   };

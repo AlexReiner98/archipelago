@@ -280,7 +280,21 @@ test('a view whose query reads a field asks again when it moves; one made anywhe
   assert.equal(mayMove(isle, [{ id: 'e_bbbbbbbb', field: 'type', op: '+', made: true, island: 'e_iiiiiiii' }]), true);
   assert.equal(mayMove(isle, [{ id: 'e_bbbbbbbb', field: 'type', op: '+', made: true, island: 'e_jjjjjjjj' }]), false);
   const r = reads({ filter: { find: ['id e_aaaaaaaa', 'text replica'], not: ['done'] }, walk: { over: ['depends_on<'], steps: 2 } });
-  assert.deepEqual([[...r.anchors], [...r.fields].sort(), [...r.links], r.unanchored], [['e_aaaaaaaa'], ['body', 'status', 'title'], ['depends_on'], true]);
+  assert.deepEqual([[...r.anchors], [...r.fields].sort(), [...r.links], r.unanchored], [['e_aaaaaaaa'], ['body', 'status', 'title'], ['works_on', 'depends_on'], true]);
+});
+
+test('a view hears a session start work on what it holds, and one it holds end; turned off, neither (e_s37r8ych)', async () => {
+  const { mayMove } = (await pageModules()).membership;
+  const items = new Set(['e_aaaaaaaa', 'e_ssssssss']);
+  const sessions = new Set(['e_ssssssss']);
+  const plan = { lens: { filter: { find: ['id e_aaaaaaaa'] } }, items, sessions };
+  const off = { lens: { filter: { find: ['id e_aaaaaaaa'] }, sessions: false }, items, sessions };
+  const starts = [{ id: 'r_x', field: 'type', op: '+', link: { type: 'works_on', from: 'e_tttttttt', to: 'e_aaaaaaaa' } }];
+  const ends = [{ id: 'e_ssssssss', field: 'status', op: '+' }];
+  assert.equal(mayMove(plan, starts), true, 'a session starting work on an item held');
+  assert.equal(mayMove(plan, ends), true, 'a session held ending');
+  assert.equal(mayMove(plan, [{ id: 'e_aaaaaaaa', field: 'status', op: '+' }]), false, 'not a status of what is no session');
+  assert.deepEqual([mayMove(off, starts), mayMove(off, ends)], [false, false], 'turned off, it hears neither');
 });
 
 test('the tail follows the islands a page names: what lives on them is read, held or not', async () => {
