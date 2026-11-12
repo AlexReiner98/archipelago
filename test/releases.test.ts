@@ -12,6 +12,7 @@ import { Archipelago, type Actor, type Op } from '../packs/write/kernel/pelago.t
 import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
 import { publicPage, publicPicture } from '../packs/surface/kernel/public.ts';
 import { callTool } from '../packs/surface/kernel/tools.ts';
+import { PAGE_VIEWS } from '../packs/publish/kernel/public-route.ts';
 import { human, agent, freshWith, make, packsWith } from './map.ts';
 
 /** What a pack declares for the kernel to keep and show: a picture's type, public work, and writing for a reader. */
@@ -77,14 +78,14 @@ test('public: only a human makes it so, only some kinds can be, and anyone then 
   for (const id of [made.sun, made.areas]) await callTool(l, human, 'picture_put', { result: id, data: png.toString('base64'), content_type: 'image/png' });
 
   // Nothing is public until someone says so.
-  assert.equal(await publicPage(l, made.app), null);
+  assert.equal(await publicPage(l, made.app, PAGE_VIEWS), null);
   assert.equal(await publicPicture(l, made.sun), null);
 
   // An agent cannot say so, even where its other changes are applied as made: it waits for the human.
   const loose = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', link: 'auto' });
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.panel, title: 'The panel' }] })).status, 'applied');
   assert.equal((await loose.change(agent, { reason: 'x', ops: [{ op: 'update', id: made.app, visibility: 'public' }] })).status, 'proposed');
-  assert.equal(await publicPage(l, made.app), null);
+  assert.equal(await publicPage(l, made.app, PAGE_VIEWS), null);
   // And not everything can be: a decision is never anyone's business but the workspace's.
   await assert.rejects(l.change(human, { reason: 'x', ops: [{ op: 'update', id: made.choice, visibility: 'public' }] }), /cannot be public/);
 
@@ -93,7 +94,7 @@ test('public: only a human makes it so, only some kinds can be, and anyone then 
     { op: 'update', id: made.sun, visibility: 'public' },
     { op: 'update', id: made.panel, visibility: 'public' },
   ]);
-  const page = (await publicPage(l, made.app))!;
+  const page = (await publicPage(l, made.app, PAGE_VIEWS))!;
   assert.equal(page.title, 'App');
   assert.ok(!JSON.stringify(page).includes('secret margin'));
   assert.ok((await publicPicture(l, made.sun))!.bytes.equals(png));

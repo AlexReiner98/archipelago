@@ -6,10 +6,17 @@ import type { RootCall } from '../../loader/kernel/root-calls.ts';
 import type { Registry } from '../../loader/kernel/packs.ts';
 import { drawingsBy, layoutsOf } from '../../loader/kernel/layouts.ts';
 import { GUARD, POLICY } from '../../walls/kernel/public-document.ts';
-import { publicPage, publicPicture } from './public.ts';
+import { publicPage, publicPicture, type PageViews } from './public.ts';
 import { drawInside, uiPage } from './ui-files.ts';
 
 const HASH = /^[0-9a-f]{64}$/;
+const VIEW = /^[a-z][a-z0-9_.]*$/;
+/** The views a caller named for a public page, each a view's name or left out. */
+const pageViews = (given: unknown): PageViews => {
+  const g = (given ?? {}) as Record<string, unknown>;
+  const name = (v: unknown) => (typeof v === 'string' && VIEW.test(v) ? v : undefined);
+  return { proof: name(g.proof), changelog: name(g.changelog) };
+};
 const NAME = /^[a-z][a-z0-9_-]*\.js$/;
 /** How many versions of the packs' drawings are read at most: a few per drawing, on any map. */
 const VERSIONS = 200;
@@ -57,9 +64,10 @@ export async function drawing(call: RootCall, input: { hash: string; file?: stri
  * root.public_product: what a product's public page at /p/<workspace>/<id> is made of, read as the public role sees the
  * map: the headers every public answer carries (guard, and policy for the page), and the page with whether there is
  * anything public by that id (no what), its data (data), or one of its results' pictures (picture, extra the result).
- * With no map (a workspace the server does not hold) there is nothing public to find.
+ * With no map (a workspace the server does not hold) there is nothing public to find. The data is read from the views
+ * the asking pack names (`views`: proof, changelog), each asked as anyone.
  */
-export async function publicProduct(call: RootCall, input: { id: string; what?: string; extra?: string; build?: string }) {
+export async function publicProduct(call: RootCall, input: { id: string; what?: string; extra?: string; build?: string; views?: PageViews }) {
   const l = call.map;
   const id = String(input?.id);
   const guard = { ...GUARD };
@@ -67,7 +75,7 @@ export async function publicProduct(call: RootCall, input: { id: string; what?: 
     const found = Boolean(l) && (await l!.forAnyone().db.query(`select 1 from entity where id = $1`, [id])).rows.length > 0;
     return { guard, policy: POLICY, found, html: await uiPage('public.html') };
   }
-  if (input.what === 'data') return { guard, page: l ? await publicPage(l, id, input.build) : null };
+  if (input.what === 'data') return { guard, page: l ? await publicPage(l, id, pageViews(input.views), input.build) : null };
   if (input.what === 'picture') {
     const picture = l && input.extra ? await publicPicture(l, String(input.extra)) : null;
     return { guard, picture: picture ? { content_type: picture.content_type, data: picture.bytes.toString('base64') } : null };

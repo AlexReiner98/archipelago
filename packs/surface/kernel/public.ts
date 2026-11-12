@@ -3,7 +3,14 @@
 // not public cannot be given away by a mistake in this file: it is not there
 // to be read. What this file adds is restraint in what it passes on of what
 // is there: names, states and what the tests found, and nothing else. The surface's since wave 7 (out of walls): its
-// proof and changelog are views, asked by name of the query pack (answer.ask_view), which is above the walls.
+// proof and changelog are views, asked by name of the query pack (answer.ask_view), which is above the walls. Which
+// views those are is said by the pack whose page it is (the publish pack's public route), never named here.
+
+/** The views a product's public page is read from, by their names: what its tests found, and what was shipped. */
+export interface PageViews {
+  proof?: string;
+  changelog?: string;
+}
 
 import type { Entity, Archipelago } from '../../write/kernel/pelago.ts';
 import { askView } from './view-words.ts';
@@ -11,9 +18,9 @@ import { askView } from './view-words.ts';
 /**
  * A public product (public work: a project or a feature), as its page shows it: the proof
  * questions asked of it with their tests and what each found on one build,
- * and its changelog. Null when there is no such public product.
+ * and its changelog, each from the view `views` names (none named, none read). Null when there is no such public product.
  */
-export async function publicPage(l: Archipelago, product: string, build?: string) {
+export async function publicPage(l: Archipelago, product: string, views: PageViews, build?: string) {
   const pub = l.forAnyone();
   const { rows } = await pub.db.query<Entity>(`select id, type, title, status from entity where id = $1 and visibility = 'public' and archived_at is null`, [product]);
   const root = rows[0];
@@ -30,9 +37,9 @@ export async function publicPage(l: Archipelago, product: string, build?: string
     counts?: Record<string, number>; // questions, answered, tests, passed, failed, not_run
     proofs?: { id: string; title: string; total: number; passed: number; failed: number; not_run: number; answered: boolean; tests: { id: string; title: string; status: string; compares: string | null; tolerance: string | null; environment: string | null; result: Found | null; before: Found | null }[] }[];
   };
-  const proven = ((await askView(pub, anyone, 'proof', { build, within: [...under] }).catch(() => ({}))) ?? {}) as Proven;
+  const proven = ((views.proof && (await askView(pub, anyone, views.proof, { build, within: [...under] }).catch(() => ({})))) || {}) as Proven;
   type Logged = { features: { title: string; status: string; at: string; release: { title: string; version: string | null } | null }[] };
-  const log = ((await askView(pub, anyone, 'changelog', { of: root.id, within: [...under] }).catch(() => ({ features: [] }))) ?? { features: [] }) as Logged;
+  const log = ((views.changelog && (await askView(pub, anyone, views.changelog, { of: root.id, within: [...under] }).catch(() => ({ features: [] })))) || { features: [] }) as Logged;
   return {
     title: root.title,
     build: proven.build ?? null,

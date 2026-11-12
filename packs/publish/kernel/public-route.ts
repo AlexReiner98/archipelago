@@ -1,6 +1,7 @@
 // What anyone may open at /p/<workspace>/<id> that the reader pack (packs/reader) does not answer: a product's
 // public page (ui/public.html), its data and its results' pictures. A published document is the reader's; a product's
-// page stays here while it reads software's proof and changelog views, which no act gives a pack (packs/surface/kernel/public.ts).
+// page stays here while it reads software's proof and changelog views, which no act gives a pack (packs/surface/kernel/public.ts):
+// this route names them (PAGE_VIEWS), and the surface asks each as anyone.
 // Everything is read as the public role sees the map (root.public_product, the surface's), so there is nothing here to
 // guard: what is not public is not there to be found.
 
@@ -11,6 +12,8 @@ export interface Reply {
   writeHead(status: number, headers: Record<string, string>): Reply;
   end(body?: string | Buffer): unknown;
 }
+/** The views a product's page is read from: what its tests found, and what it shipped (the software pack's). */
+export const PAGE_VIEWS = { proof: 'proof', changelog: 'changelog' };
 type Product = { guard: Record<string, string>; policy?: string; found?: boolean; html?: string; page?: Record<string, unknown> | null; picture?: { content_type: string; data: string } | null };
 
 /**
@@ -20,7 +23,7 @@ type Product = { guard: Record<string, string>; policy?: string; found?: boolean
 export async function servePublic(ctx: Pick<KernelContext, 'call' | 'workspace'>, res: Reply, match: { workspace: string; id: string; what?: string; extra?: string; build?: string }) {
   const { id, what, extra, build } = match;
   const held = ctx.workspace !== '';
-  const product = await ctx.call<unknown, Product>('root.public_product', { id, ...(what && { what }), ...(extra && { extra }), ...(build && { build }) });
+  const product = await ctx.call<unknown, Product>('root.public_product', { id, views: PAGE_VIEWS, ...(what && { what }), ...(extra && { extra }), ...(build && { build }) });
   const { guard } = product;
   const none = () => res.writeHead(404, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Not found' }));
   if (!what) {

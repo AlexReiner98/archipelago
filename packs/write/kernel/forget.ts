@@ -108,6 +108,9 @@ export async function ownerRows<T>(tx: Q, sql: string, params: unknown[]): Promi
 /** A link's facts found by the item at its far end, as log_fact_link_from finds them by the near one (step 46). */
 export const LINK_TO = `create index if not exists log_fact_link_to on log_fact ((value->>2)) where field = 'link';`;
 
+/** The trigrams of every held change's reason, for mentions to find an item's id or title in them (step 47). */
+export const REASON_WORDS = `create index if not exists proposal_reason_trigrams on proposal using gin (reason gin_trgm_ops) with (fastupdate = off);`;
+
 /** Every link that ever had the item at either end, as the log says. */
 async function linksOf(tx: Q, item: string): Promise<string[]> {
   const { rows } = await tx.query<{ id: string }>(`select distinct id from log_fact where field = 'link' and op = '+' and (value->>1 = $1 or value->>2 = $1) -- index log_fact_link_from, log_fact_link_to`, [item]);
@@ -159,7 +162,7 @@ export async function mentions(q: Q, item: string): Promise<{ id: string; reason
   const plain = [item, ...(found[0]?.title.trim().length > 3 ? [found[0].title.trim()] : [])];
   const words = plain.map((w) => `%${w.replace(/[%_\\]/g, (c) => `\\${c}`)}%`);
   const { rows } = await q.query<{ id: string; reason: string }>(
-    `select id, reason from proposal where reason ilike any($1::text[])`,
+    `select id, reason from proposal where reason ilike any($1::text[]) -- index proposal_reason_trigrams`,
     [words],
   );
   const says = (text: unknown) => typeof text === 'string' && plain.some((w) => text.toLowerCase().includes(w.toLowerCase()));
