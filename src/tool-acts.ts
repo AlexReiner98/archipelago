@@ -4,7 +4,6 @@
 // recorded, a backup taken.
 
 import { z } from 'zod';
-import { askView, canAsk } from './askview.ts';
 import { importAudit } from './audit.ts';
 import { instructionsFor } from './instructions.ts';
 import { takeLook } from './looks.ts';
@@ -19,6 +18,7 @@ import { runNamed, tellStamp, took, watching } from './presence.ts';
 import { inSight } from './seeing.ts';
 import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
 import { point, sessionOpened, sessionTookUp } from './tool-change.ts';
+import { slotted } from './surface-slots.ts';
 import { backupNow, restartNow } from './tool-config.ts';
 import { BRANCH } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
@@ -253,17 +253,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       repo: z.string().describe('The repository: its id, its GitHub name "owner/name", or its title.'),
       summary: z.string().optional().describe('What was checked and what was found.'),
     },
-    run: async (l, actor, input) => {
-      // The re-check is a pack's to say (the recheck view): with no pack here that declares it, there is none.
-      if (!canAsk(l, 'recheck')) throw new Error('No pack here keeps scheduled re-checks: rechecked needs one that declares the recheck view.');
-      const projects = ((await askView(l, actor, 'recheck', { repo: input.repo, limit: 0 })) as { projects: { id: string; title: string; waited: boolean }[] }).projects.filter((p) => p.waited);
-      const at = new Date().toISOString();
-      for (const p of projects) {
-        // Bookkeeping stays out of the project's history; the re-check itself is the event.
-        await l.operational(p.id, { props: { rechecked_at: at } }, { actor: actorId(actor), action: 'recheck.done', reason: input.summary ?? 'Scheduled re-check of the oldest open items' });
-      }
-      return { rechecked: projects.map((p) => ({ id: p.id, title: p.title })), at };
-    },
+    run: slotted('surface.act', 'rechecked'), // what it does is a filling (src/recheck.ts)
   },
   import_audit: {
     description: 'Copy new entries from a connection\'s tool-call log into the activity log, so actions taken in that tool are visible here.',
