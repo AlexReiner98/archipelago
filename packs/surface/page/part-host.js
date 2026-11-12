@@ -1,7 +1,7 @@
 // The host of the page's parts (task e_unrwyyzh, decision e_fxayrhma): where a slot is filled by a pack's part, this
 // draws it. It asks which parts the island draws (the view `parts`, the loader root's root.parts), starts each pack
 // version's worker in the walled frame (partPort, packs/walls/page/layout.js), hands a part the item it stands on and
-// the items of its query, each cut to the fields it reads, checks every answer (packs/walls/page/part-check.js) and
+// the items of its query, each cut to the fields it reads, and the named reads it declares (views), checks every answer (packs/walls/page/part-check.js) and
 // draws it (packs/walls/page/part-render.js), sends what the person does back, and sends a part's actions through the
 // bridge (./part-bridge.js), a change it sends on its own shown as it goes (./part-going.js). Where the island draws
 // anything but the shipped parts, the way back (./way-back.js) stands at the page's foot, out of every part's reach.
@@ -50,14 +50,24 @@ function cut(item, reads) {
   return { id: item.id, type: item.type, ...Object.fromEntries(fields.filter((f) => all[f] !== undefined).map((f) => [f, all[f]])) };
 }
 
-/** What a part is handed: the item it stands on, and its query's items, as the person looking may read them. */
+/** The named reads a part declared, each asked as the person looking, by name: one that fails is handed as null. */
+async function viewsOf(part, item) {
+  const fill = (v) => (typeof v === 'string' ? v.replaceAll('{here}', item?.id ?? '') : v);
+  const asked = await Promise.all(
+    part.views.map((v) => api('view', { name: v.name, params: Object.fromEntries(Object.entries(v.params ?? {}).map(([k, p]) => [k, fill(p)])) }).catch(() => null)),
+  );
+  return Object.fromEntries(part.views.map((v, i) => [v.name, asked[i] ?? null]));
+}
+
+/** What a part is handed: the item it stands on, its query's items and its named reads, as the person looking may read them. */
 async function inputOf(part, item) {
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
-  if (!part.query) return { item: here };
+  const views = part.views?.length ? { views: await viewsOf(part, item) } : {};
+  if (!part.query) return { item: here, ...views };
   const fill = (terms) => terms?.map((t) => t.replaceAll('{here}', item?.id ?? ''));
   const filter = { find: fill(part.query.find), ...(part.query.only && { only: fill(part.query.only) }), ...(part.query.not && { not: fill(part.query.not) }) };
   const answer = await api('view', { name: 'flat', params: { filter, limit: part.query.limit ?? 50 } });
-  return { item: here, items: (answer?.items ?? []).map((i) => cut(i, part.reads)).filter(Boolean), ...(answer?.cut && { more: true }) };
+  return { item: here, items: (answer?.items ?? []).map((i) => cut(i, part.reads)).filter(Boolean), ...(answer?.cut && { more: true }), ...views };
 }
 
 /** A version's worker, started once: its port heard here, each message going to the part mounted under its id. */
