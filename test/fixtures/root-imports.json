@@ -9,7 +9,7 @@
   "src/change-apply.ts -> src/write-hooks.ts",
   "src/change-plan.ts -> src/write-hooks.ts",
   "src/config.ts -> src/pack-allow.ts",
-  "src/config.ts -> src/pelago.ts",
+  "src/config.ts -> packs/identity/kernel/policy.ts",
   "src/db.ts -> src/partitions.ts",
   "src/declared.ts -> src/attention.ts",
   "src/declared.ts -> src/link-ends.ts",
