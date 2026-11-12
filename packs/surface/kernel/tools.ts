@@ -16,6 +16,7 @@ import { callAs, ownContext, type KernelContext } from '../../loader/kernel/kern
 import { LOOK_READS } from '../../walls/kernel/look-pass.ts';
 import type { Registry } from '../../loader/kernel/packs.ts';
 import { packActionByShort, packTool, packTools } from '../../loader/kernel/packtools.ts';
+import { partCall } from '../../loader/kernel/part-calls.ts';
 import { withinScope } from './scope.ts';
 import { viewsSaid } from './view-words.ts';
 import { actionsOf, listedChange, movedTo, route, surfaceNames, surfaceTools, type Action } from './surface.ts';
@@ -143,13 +144,18 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
   const pack = packTool(l.registry, name);
   // An internal pack's action whose code is in-process (packs/surface/kernel/surface-slots.ts, packAct) runs there, not in the sandbox.
   const inProcess = pack && !TOOLS[name] ? await packAct(l, name) : undefined;
+  // A part of the page names itself on its pack's action: checked, then named on the change (packs/loader/kernel/part-calls.ts).
+  const named = pack && !TOOLS[name] && !('part' in pack.input) && input && typeof input === 'object' && 'part' in input ? (input as Record<string, unknown>) : undefined;
+  const { part: partAsked, ...unnamed } = named ?? {};
+  const part = named ? await partCall(l, actor, name, unnamed.island, partAsked) : undefined;
+  if (part && inProcess) throw new Error(`A part may not send this: "${name}" runs inside the server, where its change cannot name the part.`);
   const tool: Tool | undefined = TOOLS[name] ?? surface ?? pack;
   if (!tool) throw new Error(`No tool "${name}". Tools: ${(actor.kind === 'human' ? toolsFor(l.registry) : surfaceFor(l.registry)).map(([t]) => t).join(', ')}`);
   if (tool.devOnly && !devMode()) throw new Error(`"${name}" is available only in dev mode (npm run dev).`);
   if (tool.humanOnly && actor.kind !== 'human') throw new Error(`"${name}" is for humans only.`);
   if (actor.may === 'read' && !MEMBER_READS.has(name)) throw new Error(`This sign-in only reads the map: it cannot call ${name}.`);
   if (actor.may === 'report' && !tool.report) throw new Error(`This token may only report: it cannot call ${name}. Send what was measured with report.`);
-  const parsed = z.strictObject(tool.input).safeParse(routed ? routed.input : (input ?? {}));
+  const parsed = z.strictObject(tool.input).safeParse(routed ? routed.input : named ? unnamed : (input ?? {}));
   if (!parsed.success) throw new Error(`Invalid input for ${name}:\n${z.prettifyError(parsed.error)}`);
   // An agent whose token is within some items is held to them here, whatever the tool; what it writes, where every change is checked.
   const limited = actor.kind === 'agent' && Boolean(actor.within?.length);
@@ -160,7 +166,9 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
       ? await pack.run(l, actor, parsed.data, async (done) => {
           if (done.requests?.length) throw new Error(`This token is limited to some of the map: ${name} asks to act outside the map, which it cannot.`);
         })
-      : await tool.run(l, actor, parsed.data);
+      : part && pack
+        ? await pack.run(l, actor, parsed.data, undefined, part)
+        : await tool.run(l, actor, parsed.data);
   // A step that could not be kept costs the page a step, never the agent its answer.
   // A session that has just started is named by the run its answer gives, so its first step is already its own.
   const begun = tool.begins && typeof (answer as { run?: unknown })?.run === 'string' ? { run: (answer as { run: string }).run } : {};

@@ -4,7 +4,7 @@
 // sets outright has since been set to something else. Rejecting it, or finding it moot, appends an entry with no facts.
 
 import { needHuman } from '../../identity/kernel/actor-checks.ts';
-import type { Actor, Archipelago, Op, Proposal } from './pelago.ts';
+import type { Actor, Archipelago, Op, PartRef, Proposal } from './pelago.ts';
 import { append, entry, factAt, type Decision } from '../../log/kernel/log.ts';
 import { ITEM_COLUMNS } from '../../log/kernel/facts.ts';
 import { projectDecision, stamp } from '../../log/kernel/replay.ts';
@@ -82,7 +82,7 @@ export async function decideProposal(l: Archipelago, actor: Actor, input: { prop
     const held = record?.held_by as { rule: string; pack: string; version?: string } | null | undefined;
     result = await l.apply(
       proposal.actor,
-      { ops, reason: proposal.reason, source: proposal.source ?? undefined, action: (record?.action as string | null) ?? undefined, undoes: (record?.undoes as string | null) ?? undefined, run: (record?.run as string | undefined) ?? undefined },
+      { ops, reason: proposal.reason, source: proposal.source ?? undefined, action: (record?.action as string | null) ?? undefined, undoes: (record?.undoes as string | null) ?? undefined, run: (record?.run as string | undefined) ?? undefined, part: (record?.part as PartRef | undefined) ?? undefined },
       // Held and then applied by a human: it rests on that human, whatever the agent thought it rested on.
       {
         except: input.except, approvedBy: me, revised, authority: { of: 'human', who: me },

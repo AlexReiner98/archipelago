@@ -70,6 +70,7 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
   const problems: string[] = [];
   const seen = new Set<string>(), opened = new Set<string>();
   const actions = new Set(declared(pack).actions.map((a) => a.id));
+  const personal = new Set(declared(pack).actions.filter((a) => a.humanOnly || a.admin).map((a) => a.id));
   const open = slotsOpenTo(pack);
   for (const part of given as PartDef[]) {
     const at = `part "${String(part?.id)}"`;
@@ -98,7 +99,11 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
       }
     }
     if (part.sends !== undefined && !Array.isArray(part.sends)) problems.push(`${at}: sends is a list of its pack's actions`);
-    else for (const a of part.sends ?? []) if (!actions.has(a)) problems.push(`${at} sends "${String(a)}", which is not an action of ${pack.id}: a part sends its own pack's actions alone`);
+    else for (const a of part.sends ?? []) {
+      if (!actions.has(a)) problems.push(`${at} sends "${String(a)}", which is not an action of ${pack.id}: a part sends its own pack's actions alone`);
+      // What only a person or an admin may call is theirs to choose, never a part's to send (packs/loader/kernel/part-calls.ts).
+      else if (personal.has(a)) problems.push(`${at} sends "${a}", which only a person or an admin may call: a part never sends it`);
+    }
     if (typeof part.modules?.['index.js'] !== 'string') problems.push(`${at} needs its modules, entered at index.js`);
     for (const [name, file] of Object.entries(part.modules ?? {})) {
       if (!MODULE.test(name) || typeof file !== 'string' || file.includes('..') || file.startsWith('/')) problems.push(`${at}: "${name}" is not a module's name (a-z, ending .js) with a file in the pack`);

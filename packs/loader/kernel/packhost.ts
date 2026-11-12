@@ -17,7 +17,7 @@ import { answerBeyond, holdWorkspace, NOT_BEYOND } from './pack-reach.ts';
 import type { PackFile } from './packs.ts';
 import type { Read } from '../../surface/kernel/packreads.ts';
 import { actorId } from '../../identity/kernel/actor-checks.ts';
-import type { Actor, Archipelago, Op, SourceSpec } from '../../write/kernel/pelago.ts';
+import type { Actor, Archipelago, Op, PartRef, SourceSpec } from '../../write/kernel/pelago.ts';
 // Anyone with no login cannot read the workspace's settings: a public page is counted in the default zone.
 /** The time zone a pack's call is told days are counted in: the workspace's, or Toronto's (as the query pack's timeaxis counts them). */
 const DEFAULT_ZONE = 'America/Toronto';
@@ -255,9 +255,9 @@ export class PackHost {
   /**
    * Run a handler entry that may write: its ops are applied as one change set naming it, and what it asks of the
    * world outside is made, held or refused. Only an action may act; a webhook or a schedule may only read. A {ref}
-   * in its answer is the id of what its change made.
+   * in its answer is the id of what its change made. `part`: the part of the page that sent it, named on its change.
    */
-  async act(l: Archipelago, actor: Actor, pack: string, name: string, input: unknown, ms?: number, call: 'action' | 'webhook' | 'schedule' | 'event' = 'action', check?: Check) {
+  async act(l: Archipelago, actor: Actor, pack: string, name: string, input: unknown, ms?: number, call: 'action' | 'webhook' | 'schedule' | 'event' = 'action', check?: Check, part?: PartRef) {
     const done = await this.call(l, actor, pack, call, name, input, ms);
     await check?.(done);
     const file = l.registry.packs.find((p) => p.id === pack)!;
@@ -269,7 +269,7 @@ export class PackHost {
     const mailed = done.mail?.length ? await mailHeard(l, pack, call === 'event' ? input : undefined, done.mail) : undefined;
     const launched = done.launch ? await launchHeard(l, pack, call === 'event' ? input : undefined, done.launch) : undefined;
     const launches = done.launches !== undefined ? await launchesAsked(l, file, actor, action, done.launches) : undefined;
-    const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name, pack, ...islandIn(input) }) : undefined;
+    const changed = done.ops?.length ? await l.change(actor, { ops: done.ops, reason: done.reason?.trim() || `${name}`, action: name, pack, ...islandIn(input), ...(part && { part }) }) : undefined;
     const outside = done.requests?.length ? await handleRequests(this, l, actor, file, action, done.requests, (changed as { changeset?: string } | undefined)?.changeset) : undefined;
     const made = (changed as { created?: Record<string, string> } | undefined)?.created ?? {};
     const answer = done.answer === undefined ? null : JSON.parse(JSON.stringify(done.answer).replace(/\{([^{}\s"]+)\}/g, (whole, ref: string) => made[ref] ?? whole));

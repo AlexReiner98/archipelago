@@ -28,6 +28,7 @@ export const SLOW: Record<string, string> = {
   'test/layouts-queued.test.ts': 'browser',
   'test/layouts-sw.test.ts': 'browser',
   'test/part-workers.test.ts': 'browser',
+  'test/part-bridge-page.test.ts': 'browser',
   'test/find-query.test.ts': 'browser',
   'test/first-drawing.test.ts': 'browser',
   'test/kept-views.test.ts': 'browser',
