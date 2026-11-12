@@ -13,7 +13,9 @@
     "node": ">=24"
   },
   "scripts": {
-    "start": "node src/server.ts",
+    "start": "node src/boot.ts",
+    "roots": "node src/boot.ts --pin",
+    "roots:check": "node src/boot.ts --check",
     "dev": "node src/dev.ts",
     "pull": "node src/pull.ts",
     "migrate": "node src/deploy.ts",
