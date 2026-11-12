@@ -6,7 +6,8 @@
 // Only a person launches.
 //
 // The setting is PELAGO_LAUNCH_PACK (or pack, given): "<pack>" or "<pack>:<launcher>". With none named it is the
-// launcher the open core ships, the claude_code pack's; a pack named that is not here turns launching off.
+// launcher a server pack marks its default (the open core ships the claude_code pack's); a pack named that is not here,
+// or none marked when none is named, turns launching off.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { delimiter, dirname, extname, isAbsolute, join, resolve } from 'node:path';
@@ -25,13 +26,19 @@ const SYSTEM_ENV = ['PATH', 'Path', 'PATHEXT', 'SystemRoot', 'SYSTEMROOT', 'wind
 
 export type LaunchConfig = Omit<LauncherConfig, 'via'> & {
   /** The server's packs, the launch setting's pack read from them. Optional until src/server.ts passes them. */
-  packs?: Pick<ServerPacks, 'find' | 'call'>;
-  /** Which pack may launch, and which of its launchers ("<pack>:<launcher>"); left out, PELAGO_LAUNCH_PACK, else DEFAULT_LAUNCH. */
+  packs?: Pick<ServerPacks, 'find' | 'call' | 'packs'>;
+  /** Which pack may launch, and which of its launchers ("<pack>:<launcher>"); left out, PELAGO_LAUNCH_PACK, else defaultLaunch. */
   pack?: string;
 };
 
-/** The launch setting when none is given: the launcher of the server pack the open core ships for it (packs/). */
-export const DEFAULT_LAUNCH = 'claude_code';
+/** The launch setting when none is given: the launcher a server pack marks default (reach.server.launchers[].default), if one does. */
+export function defaultLaunch(packs: Pick<ServerPacks, 'packs'>): string | undefined {
+  for (const p of packs.packs) {
+    const l = p.file.reach.server.launchers?.find((d) => d.default);
+    if (l) return `${p.file.id}:${l.id}`;
+  }
+  return undefined;
+}
 
 /**
  * A command named by its bare name, as a Windows machine finds it without a shell. An npm-installed CLI is there a
@@ -112,8 +119,8 @@ export function packLauncher(packs: Pick<ServerPacks, 'find' | 'call'>, setting:
 /** Set up launching for this server: the launcher of the pack the setting names, or of the one the open core ships. */
 export function configureLaunch(config: LaunchConfig): void {
   const { packs, pack, ...rest } = config;
-  const setting = pack ?? env('LAUNCH_PACK') ?? DEFAULT_LAUNCH;
-  const via = packs ? packLauncher(packs, setting) : 'the server passed no server packs to launch with';
+  const setting = pack ?? env('LAUNCH_PACK') ?? (packs && defaultLaunch(packs));
+  const via = !packs ? 'the server passed no server packs to launch with' : setting ? packLauncher(packs, setting) : 'no launch pack is named, and no server pack marks a launcher its default';
   if (typeof via === 'string') {
     // Named wrong, nothing launches.
     console.error(`Launching is off: ${via}.`);

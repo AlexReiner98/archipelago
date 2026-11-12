@@ -31,17 +31,25 @@ export interface MoreReach {
   /** Files of its files/ folder served as they are, but for the values named in fill: at /x/<pack>/files/<id>. */
   files?: { id: string; file: string; type: (typeof FILE_TYPES)[number]; fill?: (typeof FILLS)[number][] }[];
   /** Agents it may launch: argv with {fill}s, run with no shell; read, a function given each line it prints. */
-  launchers?: { id: string; argv: string[]; read: string }[];
+  launchers?: { id: string; argv: string[]; read: string; /** The one launched when the launch setting names none (src/server-launch.ts). */ default?: true }[];
   /**
    * The stream on a site's workspace its counts are kept in (the acts count.add and count.read, src/pack-counts.ts): a
    * plain word no kernel stream has, one pack's alone, kept by the retention rule a workspace pack gives it.
    */
   counts?: string;
   /** The surface whose hooks it translates (POST /hooks/<surface>/<event>): in and out, functions of its handler. */
-  adapter?: { surface: string; in: string; out: string };
+  adapter?: { surface: string; in: string; out: string; before?: Before };
 }
 
+/**
+ * What a surface was before there were surfaces, said by the one pack whose it was: its hooks are those at /hooks/<event>
+ * (src/server-adapter.ts), actor the name every session's hooks act under on the log, and agent the name an agent acts
+ * under on a server with no tokens when it gives none (src/server.ts).
+ */
+export interface Before { actor: string; agent: string }
+
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
+const ACTOR = /^[a-z][a-z0-9_-]{0,39}$/;
 const FILE = /^[a-z0-9][a-z0-9_.-]{0,60}\.(mjs|js|md|txt|sh|ps1)$/;
 const fills = (s: string) => [...s.matchAll(/\{([a-z_]+)\}/g)].map((m) => m[1]);
 
@@ -74,11 +82,15 @@ export function checkMoreReach(server: MoreReach, folder: string, names: string[
   for (const l of server.launchers ?? []) {
     if (!NAME.test(l.id) || !Array.isArray(l.argv) || !l.argv.length || l.argv.some((a) => typeof a !== 'string')) problems.push(`launcher "${l.id}" needs an id and a command as a list`);
     for (const v of (l.argv ?? []).flatMap(fills)) if (!(LAUNCH_FILLS as readonly string[]).includes(v)) problems.push(`launcher "${l.id}" fills ${LAUNCH_FILLS.join(', ')}, not "${v}"`);
+    if (l.default !== undefined && l.default !== true) problems.push(`launcher "${l.id}" is the default (true), or says nothing`);
     called.push(l.read);
   }
+  if ((server.launchers ?? []).filter((l) => l.default).length > 1) problems.push('one launcher of a pack is its default');
   if (server.adapter) {
     const { surface, in: inward, out } = server.adapter;
     if (!NAME.test(surface ?? '')) problems.push('its adapter names its surface: lowercase letters, digits and underscores');
+    const before = server.adapter.before;
+    if (before !== undefined && (typeof before !== 'object' || before === null || !ACTOR.test(String(before.actor)) || !ACTOR.test(String(before.agent)))) problems.push('its adapter says what it was before there were surfaces as { actor, agent }, names of lowercase letters, digits, - and _');
     called.push(inward, out);
   }
   for (const fn of called.slice(fns.length)) if (!NAME.test(String(fn)) || names.includes(String(fn)) || streams.includes(String(fn))) problems.push(`it names a function of its handler that is no entry, page or stream: "${fn}"`);

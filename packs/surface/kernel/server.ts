@@ -49,7 +49,7 @@ import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, ty
 import { servePublic } from '../../../src/public-route.ts'; import { siteNav } from '../../../src/site.ts'; import { ICON, serveIcon } from '../../../src/icon.ts';
 import { previewOf } from '../../../src/published-preview.ts'; import { lengthsSheet, pageLook } from '../../../src/styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
 import { configureSecrets } from '../../../src/secrets.ts'; import { serveFilled } from './surface-slots.ts';
-import { answerAt, hookAt } from '../../../src/server-adapter.ts'; import { mountOf, serveMounted } from '../../../src/server-mounts.ts';
+import { adapterBefore, answerAt, hookAt } from '../../../src/server-adapter.ts'; import { mountOf, serveMounted } from '../../../src/server-mounts.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
 import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY, SIGNED_IN_READER_POLICY } from '../../../src/page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from '../../../src/draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from '../../../src/workspaces.ts'; import { hasBounced } from '../../../src/bounces.ts'; import { setBounced } from '../../../src/mail.ts';
@@ -137,8 +137,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       return { ws, pelago, actor: () => ({ kind: 'human', name: `${as.actor} (look)`, ...(as.viewer && { person: as.viewer }) }), look: true };
     }
     if (!tokens) {
-      const ws = await workspaces.get(DEFAULT_WORKSPACE);
-      return { ws, pelago: ws.pelago, actor: (label) => (surface === 'human' ? { kind: 'human', name: 'local', admin: true } : { kind: 'agent', name: label || 'claude' }) };
+      // An agent that gives no name acts under the one the surface before surfaces said (reach.server.adapter.before.agent).
+      const ws = await workspaces.get(DEFAULT_WORKSPACE), unnamed = adapterBefore(serverPacks)?.before.agent ?? 'agent';
+      return { ws, pelago: ws.pelago, actor: (label) => (surface === 'human' ? { kind: 'human', name: 'local', admin: true } : { kind: 'agent', name: label || unnamed }) };
     }
     const token = bearer(req.headers.authorization);
     const id = token && workspaceOf(token);

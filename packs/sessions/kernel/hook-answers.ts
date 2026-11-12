@@ -9,7 +9,7 @@ import type { Q } from '../../../src/db.ts';
 import type { Archipelago, May } from '../../../src/pelago.ts';
 import { askOnReply } from './replies.ts';
 import { hookWithin, recordUsage, resolveRun, sessionBegan, sessionHeard, sessionPrompted } from './sessions.ts';
-import { hookSessionEnd, hookSessionStart, sessionIsland } from '../../../src/session-hook.ts';
+import { HOOK_ACTOR, hookSessionEnd, hookSessionStart, sessionIsland } from '../../../src/session-hook.ts';
 import { sessionLabelled, sessionPromptNamed } from './session-name.ts';
 import { addTouched } from './touched.ts';
 import { fileSaid } from './file-said.ts';
@@ -21,7 +21,6 @@ import { seeingLine } from '../../../src/seeing.ts';
 import { keep, kept } from '../../../src/transient.ts';
 import { takeEvents } from './session-events.ts';
 import { instructionsFor } from '../../../src/instructions.ts';
-import { HOOK_ACTOR } from './chat-run.ts';
 
 export interface HookBody {
   session_id?: string;
@@ -123,7 +122,7 @@ export async function sessionAnswer(event: string, call: HookCall): Promise<Neut
   // Said in the server's log, so "did the hook run?" has an answer.
   console.log(`hook ${event} from session ${body.session_id ?? 'unknown'}`);
   // One chat is one session: a prompt takes up a run that was ended while the chat went on, before anything is kept on it.
-  if (event === 'prompt') await sessionPrompted(pelago, body.session_id).catch((err) => console.error(`hook take up: ${(err as Error).message}`));
+  if (event === 'prompt') await sessionPrompted(pelago, body.session_id, HOOK_ACTOR).catch((err) => console.error(`hook take up: ${(err as Error).message}`));
   // The hook counts what the session has used so far; it is recorded before anything else, so an ending session's last tokens reach its work.
   if (event !== 'session-start') await recordUsage(pelago, body.session_id, body.tokens).catch((err) => console.error(`hook usage: ${(err as Error).message}`));
   // And what it touched, so that report, action session_end, asks about those when it ends.
