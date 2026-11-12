@@ -391,7 +391,7 @@ export function serve(booted: Booted): void {
   const rootDir = join(config.dataDir, '..', 'workspaces');
   // Before anything reads a secret: where the key they are sealed with is kept.
   configureSecrets(rootDir, !config.databaseUrl);
-  const workspaces = new Workspaces({ dataDir: config.dataDir, databaseUrl: config.databaseUrl, rootDir, packsDir: config.packsDir, packDirs: config.packDirs, packs: config.packs, workspacePacks: config.workspacePacks, policy: config.policy, backupsDir: config.backup ? config.backup.dir : undefined, defaultOnIslands: true });
+  const workspaces = new Workspaces({ dataDir: config.dataDir, databaseUrl: config.databaseUrl, rootDir, packsDir: config.packsDir, packDirs: config.packDirs, packs: config.packs, workspacePacks: config.workspacePacks, policy: config.policy, backupsDir: config.backup ? config.backup.dir : undefined, defaultOnIslands: true, boot: booted });
   if (config.launch) configureLaunch({ mcpUrl: `http://127.0.0.1:${config.port}/mcp`, dir: join(config.dataDir, '..', 'runs'), auth: config.auth === 'tokens', packs: serverPacksOf(workspaces) });
 
   // One server per data folder, whatever port each is on: two of them writing
