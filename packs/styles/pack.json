@@ -23,6 +23,11 @@
         "out": "any",
         "run": "styles.ts#pageLook"
       }
+    },
+    "hooks": {
+      "surface.icon": "styles.ts#iconOf",
+      "surface.page_style": "styles.ts#pageStyle",
+      "surface.lengths": "styles.ts#lengthsOf"
     }
   }
 }

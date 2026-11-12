@@ -11,7 +11,10 @@
     "internal": true,
     "modules": "kernel/",
     "hooks": {
-      "identity.invited": "member-mail.ts#invited"
+      "identity.invited": "member-mail.ts#invited",
+      "surface.mail": "served.ts#served",
+      "surface.bounced": "bounces.ts#hasBounced",
+      "surface.note_bounced": "bounces.ts#noteBounced"
     }
   }
 }

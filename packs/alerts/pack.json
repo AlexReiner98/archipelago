@@ -24,6 +24,9 @@
         "out": "any",
         "run": "alert.ts#alertAct"
       }
+    },
+    "hooks": {
+      "surface.crash": "alert.ts#crashMailed"
     }
   }
 }

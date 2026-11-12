@@ -92,7 +92,7 @@ let server: ChildProcess | undefined;
 async function start() {
   const env = { ...process.env, PELAGO_PORT: String(PORT), PELAGO_DEV: '1', PELAGO_BACKUP_DIR: backups, PELAGO_IDLE_MINUTES: '0', ...(DB === 'postgres' ? { PELAGO_DATABASE_URL: where, PELAGO_DATA: join(dir, 'data') } : { PELAGO_DATA: where }) };
   const t = performance.now();
-  server = spawn(NODE[0], [...NODE.slice(1), 'src/server.ts'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn(NODE[0], [...NODE.slice(1), 'src/boot.ts'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   const log = createWriteStream(join(dir, 'server.log'), { flags: 'a' });
   server.stdout!.pipe(log);
   server.stderr!.pipe(log);

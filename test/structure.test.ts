@@ -357,7 +357,6 @@ const WHOLE_READS: Record<string, number> = {
   'src/mentions.ts': 1,
   'src/pelago.ts': 1,
   'src/search.ts': 1,
-  'src/server.ts': 1,
   'src/streams.ts': 1,
 };
 

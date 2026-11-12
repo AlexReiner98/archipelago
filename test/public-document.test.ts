@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { publicDocument } from '../src/public-document.ts';
+import { publicDocument } from '../packs/surface/kernel/public-documents.ts';
 import { gist } from '../src/published.ts';
 import { packsWith } from './map.ts';
 import { serve as served } from './serve.ts';

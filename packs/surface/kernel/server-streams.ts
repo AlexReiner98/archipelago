@@ -1,5 +1,5 @@
 // The streams a server pack's page listens on (task e_qsyd4pr4): GET /x/<pack>/<stream>/<workspace>/<id>, server-sent
-// events the kernel holds and writes, with the limits a published page's stream has (src/published-live.ts). A stream
+// events the kernel holds and writes, with the limits a published page's stream has (the publish pack's, surface.published). A stream
 // on "published" is told when that document is published again, and nothing more. Pack code never holds a connection:
 // the kernel answers the route itself, and closes the pack's streams when the pack goes (closeStreams).
 //
@@ -7,8 +7,8 @@
 // published, has no stream, the same 404 as nothing at all.
 
 import type { ServerResponse } from 'node:http';
-import { publicView } from '../../../src/public-view-store.ts';
-import { closePackListeners, listenForPack } from '../../../src/published-live.ts';
+import { published } from './above.ts';
+import { publicView } from './public-views.ts';
 import { json, PRIVATE } from './reply.ts';
 import type { ActPlaces } from './server-acts.ts';
 import type { ServerPackFile } from '../../../src/server-packs.ts';
@@ -28,10 +28,10 @@ export async function serveStream(res: ServerResponse, pack: ServerPackFile, str
   if (declared?.on !== 'published' || !at.workspaces || !(await at.workspaces.has(at.workspace).catch(() => false))) return none();
   const { pelago } = await at.workspaces.get(at.workspace);
   if (!(await publicView(pelago, at.id))) return none();
-  return listenForPack(res, pack.id, at.workspace, at.id, PRIVATE, at.from);
+  return (await published()).listenForPack(res, pack.id, at.workspace, at.id, PRIVATE, at.from);
 }
 
 /** Close the streams a server pack's pages hold open: the pack has gone. */
-export function closeStreams(pack: string): void {
-  closePackListeners(pack);
+export async function closeStreams(pack: string): Promise<void> {
+  (await published()).closePackListeners(pack);
 }

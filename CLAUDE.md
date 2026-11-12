@@ -103,7 +103,7 @@ reply ending) is `docs/agents.md`.
 - **A throwaway server is for what the live one cannot take:** token identity,
   schema changes, launches, and anything that destroys or floods data. Always
   give it its own data folder:
-  `PELAGO_PORT=3199 PELAGO_DATA=<temp folder>/data node src/server.ts`
+  `PELAGO_PORT=3199 PELAGO_DATA=<temp folder>/data node src/boot.ts`
   (add `PELAGO_AUTH=tokens` to test identity). Delete it afterwards. Never
   point a second server at `data/`; the lock refuses it.
 - **Before changing the database schema, take a backup** with `capture` action `backup`

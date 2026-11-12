@@ -10,6 +10,9 @@
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "hooks": {
+      "surface.looks": "served.ts#served"
+    }
   }
 }

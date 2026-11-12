@@ -3,9 +3,10 @@
 // policy, a cache rule) and never leaves these out.
 
 import type { ServerResponse } from 'node:http';
+import { GUARD } from '../../walls/kernel/page-policies.ts';
 
-/** What every answer is sent with. */
-export const GUARD = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' } as const;
+/** What every answer is sent with: the walls' (src/page-policies.ts). */
+export { GUARD };
 /** An answer nobody keeps: what is for one reader, or holds a secret. */
 export const PRIVATE = { ...GUARD, 'cache-control': 'no-store' } as const;
 /** A private answer that no search engine lists either. */

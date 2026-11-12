@@ -53,6 +53,10 @@
         },
         "run": "answers.ts#brief"
       }
+    },
+    "hooks": {
+      "surface.for_reader": "documents.ts#forReader",
+      "surface.sections": "documents.ts#sectionsOf"
     }
   },
   "views": [

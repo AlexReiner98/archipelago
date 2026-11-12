@@ -305,3 +305,6 @@ export function lengthsSheet(packs: Parameters<typeof stylesOf>[0]): string {
   for (const [name, value] of typeVars(type, faces)) lines.push(`  ${name}: ${value};`);
   return `:root {\n${lines.join('\n')}\n}\n`;
 }
+
+/** The page's lengths as a stylesheet, of the packs this map runs (surface.lengths: the server's /layout.css). */
+export const lengthsOf = (ctx: KernelContext) => lengthsSheet(ctx.registry.packs as Parameters<typeof stylesOf>[0]);
