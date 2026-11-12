@@ -1,0 +1,611 @@
+{
+ "types": [
+  {
+   "id": "anatomy.pack",
+   "title": "Pack",
+   "extends": "place",
+   "description": "One pack: a folder with a pack.json, or a pack kept as an item. What it declares is part_of it; what it needs and offers are names.",
+   "fields": {
+    "pack_id": {
+     "type": "string",
+     "shown": true,
+     "description": "Its id, as pack.json says it (core, loader, design)."
+    },
+    "kind": {
+     "type": "enum",
+     "values": [
+      "kernel",
+      "root",
+      "island",
+      "map",
+      "server"
+     ],
+     "shown": true,
+     "description": "kernel is core; root a kernel module in roots.json; island words only; map habits for the whole map; server reaches the server."
+    },
+    "home": {
+     "type": "enum",
+     "values": [
+      "open_core",
+      "hosted",
+      "item"
+     ],
+     "description": "Where it is kept: packs/ of the open core, the hosted repository, or an item on a map."
+    },
+    "version": {
+     "type": "string",
+     "description": "Its version, as pack.json says it."
+    },
+    "path": {
+     "type": "string",
+     "description": "Its folder (packs/loader)."
+    },
+    "trust": {
+     "type": "string",
+     "description": "Its kernel trust (service), when it has kernel code."
+    },
+    "root_order": {
+     "type": "number",
+     "description": "Its place in roots.json, for a root pack: a root imports only the roots before it."
+    },
+    "blob": {
+     "type": "string",
+     "description": "The git blob hash of its pack.json as last synced."
+    }
+   }
+  },
+  {
+   "id": "anatomy.bundle",
+   "title": "Bundle",
+   "extends": "place",
+   "description": "Packs that go on and off together, often an island pack of words and the map pack that acts on them. A pack is part_of its bundle.",
+   "fields": {
+    "bundle_id": {
+     "type": "string",
+     "shown": true,
+     "description": "Its id, as bundle.json says it."
+    }
+   }
+  },
+  {
+   "id": "anatomy.type",
+   "title": "Item type",
+   "extends": "record",
+   "description": "A type a pack declares, part_of that pack. It extends another (extends), and what it grants (has:<capability>) are names.",
+   "fields": {
+    "type_id": {
+     "type": "string",
+     "shown": true,
+     "description": "Its id (task, design.study)."
+    },
+    "statuses": {
+     "type": "string",
+     "description": "Its statuses, open | closed (todo doing | done dropped)."
+    },
+    "adds_fields": {
+     "type": "boolean",
+     "description": "An entry with of: it adds fields to another pack's type rather than declaring one."
+    }
+   }
+  },
+  {
+   "id": "anatomy.link_type",
+   "title": "Link type",
+   "extends": "record",
+   "description": "A link type a pack declares, part_of that pack. Its ends are joins links to item types or names; a root link type extends nothing.",
+   "fields": {
+    "link_id": {
+     "type": "string",
+     "shown": true,
+     "description": "Its id (depends_on, design.rests_on)."
+    },
+    "root": {
+     "type": "boolean",
+     "description": "A root link: core's own, extended by others."
+    }
+   }
+  },
+  {
+   "id": "anatomy.part",
+   "title": "Part",
+   "extends": "record",
+   "description": "Anything else a pack declares, part_of that pack: a rule, view, action, handler, layout, style, instruction, lens, or a server pack's reach.",
+   "fields": {
+    "part": {
+     "type": "enum",
+     "values": [
+      "rule",
+      "view",
+      "action",
+      "handler",
+      "layout",
+      "style",
+      "instruction",
+      "lens",
+      "reach",
+      "gate",
+      "mount",
+      "launcher",
+      "adapter",
+      "stream",
+      "file",
+      "count",
+      "hook"
+     ],
+     "shown": true,
+     "description": "Which key of the manifest it is; hook is one of its kernel hooks (surface.views)."
+    },
+    "part_id": {
+     "type": "string",
+     "shown": true,
+     "description": "Its id as declared (settle_said, core.flat)."
+    },
+    "side": {
+     "type": "enum",
+     "values": [
+      "words",
+      "habits"
+     ],
+     "description": "Words an island pack may hold (types, links, rules, kernel-drawn views, instructions, lenses), or habits only a map pack may."
+    }
+   }
+  },
+  {
+   "id": "anatomy.name",
+   "title": "Name",
+   "extends": "record",
+   "description": "What a pack asks for or offers, never a pack: has:<capability>, type:<id>, event:<kind>, field:<f>@<type>, status:, phase: or service:<family>.<entry>. Whichever active pack declares or provides it provides it.",
+   "fields": {
+    "name": {
+     "type": "string",
+     "shown": true,
+     "description": "The name whole (has:when, type:event, field:due@task)."
+    },
+    "form": {
+     "type": "enum",
+     "values": [
+      "has",
+      "type",
+      "event",
+      "field",
+      "status",
+      "phase",
+      "service",
+      "pack"
+     ],
+     "shown": true,
+     "description": "Its form; service is a service a pack provides in its kernel key (service:answer.flat, service:root.dump), pack the old form, a bare pack id."
+    },
+    "takes": {
+     "type": "string",
+     "description": "For a service: the shape it takes, as its provider declares it (JSON)."
+    },
+    "gives": {
+     "type": "string",
+     "description": "For a service: the shape it answers with (JSON)."
+    }
+   }
+  },
+  {
+   "id": "anatomy.module",
+   "title": "Module",
+   "extends": "place",
+   "description": "A file of code: a pack's module, a page module of ui/, a file of src/ or a script. Part of the pack that owns it; none yet for the page and src. Its note is its header comment.",
+   "fields": {
+    "path": {
+     "type": "string",
+     "shown": true,
+     "description": "Its path from the repository's root."
+    },
+    "lines": {
+     "type": "number",
+     "description": "How many lines it has."
+    },
+    "layer": {
+     "type": "enum",
+     "values": [
+      "root",
+      "pack",
+      "src",
+      "page",
+      "script"
+     ],
+     "shown": true,
+     "description": "Where it sits: a root pack's kernel, another pack's code, src/, the page (ui/), or a script."
+    },
+    "blob": {
+     "type": "string",
+     "description": "The git blob hash of the file as last synced: a sync redoes it only when this moves."
+    },
+    "moves_to": {
+     "type": "string",
+     "description": "The pack it is meant to move into, while its path puts it in none (a page module, src/): a plan a person or agent sets. The sync never sets it; once the file moves, its path says its pack."
+    }
+   }
+  },
+  {
+   "id": "anatomy.version",
+   "title": "Version",
+   "extends": "record",
+   "description": "A version of a pack tried on one island (a pack item with version_of), or a released version of one. version_of its pack, pinned_on the islands that run it.",
+   "fields": {
+    "version": {
+     "type": "string",
+     "shown": true,
+     "description": "Its version (0.2.0)."
+    },
+    "carries_code": {
+     "type": "boolean",
+     "description": "It carries code of its own (a version of a server's pack)."
+    }
+   }
+  },
+  {
+   "id": "anatomy.principle",
+   "title": "Principle",
+   "extends": "aim",
+   "description": "A rule the architecture keeps (one name, one owner; users leave before the provider). It governs what it is about and is kept_in the modules that enforce it.",
+   "fields": {
+    "axis": {
+     "type": "enum",
+     "values": [
+      "parts",
+      "space",
+      "time"
+     ],
+     "shown": true,
+     "description": "What it is about: what a pack holds, where it applies (islands), or when (the log, order)."
+    },
+    "decision": {
+     "type": "string",
+     "description": "The decision on the map that made it (e_...)."
+    },
+    "check": {
+     "type": "string",
+     "description": "The structure test's check that holds it, by its name."
+    },
+    "breaks": {
+     "type": "number",
+     "description": "How many known breaks that check still lists: 0 when the principle holds."
+    }
+   }
+  },
+  {
+   "id": "anatomy.test",
+   "title": "Test",
+   "extends": "record",
+   "description": "A test file. It tests the modules it reads, as test/sets.ts says.",
+   "fields": {
+    "path": {
+     "type": "string",
+     "shown": true,
+     "description": "Its path from the repository's root."
+    },
+    "slow": {
+     "type": "boolean",
+     "description": "In the slow set: left out of the local fast run, run in CI."
+    },
+    "blob": {
+     "type": "string",
+     "description": "The git blob hash of the file as last synced."
+    }
+   }
+  },
+  {
+   "id": "anatomy.store",
+   "title": "Store",
+   "extends": "record",
+   "description": "Where a pack keeps state: a table it declares, an operational stream, or its memory. Part of its pack.",
+   "fields": {
+    "store_id": {
+     "type": "string",
+     "shown": true,
+     "description": "Its name (log_op stream, a table)."
+    },
+    "store": {
+     "type": "enum",
+     "values": [
+      "table",
+      "stream",
+      "memory"
+     ],
+     "shown": true,
+     "description": "Which kind of store."
+    }
+   }
+  },
+  {
+   "id": "anatomy.sync",
+   "title": "Sync",
+   "extends": "record",
+   "description": "Where the island stands against the code: the commits it was last synced to. One per island.",
+   "fields": {
+    "commits": {
+     "type": "string",
+     "shown": true,
+     "description": "Each repository and the commit synced, as repo@sha, one per line."
+    },
+    "full": {
+     "type": "boolean",
+     "description": "The last sync was a full run, every file read."
+    }
+   }
+  }
+ ],
+ "links": [
+  {
+   "id": "anatomy.requires",
+   "title": "requires",
+   "inverse": "is required by",
+   "from": [
+    "anatomy.pack"
+   ],
+   "to": [
+    "anatomy.name"
+   ],
+   "description": "The pack cannot work without this name: while nothing active provides it, the pack waits, saying which."
+  },
+  {
+   "id": "anatomy.uses",
+   "title": "uses",
+   "inverse": "is used by",
+   "from": [
+    "anatomy.pack"
+   ],
+   "to": [
+    "anatomy.name"
+   ],
+   "description": "The pack works with this name while it is provided, and without it otherwise."
+  },
+  {
+   "id": "anatomy.provides",
+   "title": "provides",
+   "inverse": "is provided by",
+   "from": [
+    "anatomy.pack"
+   ],
+   "to": [
+    "anatomy.name"
+   ],
+   "description": "The pack declares what this name asks for, so it provides it. Read off its declarations, never claimed."
+  },
+  {
+   "id": "anatomy.calls",
+   "title": "calls",
+   "inverse": "is called by",
+   "from": [
+    "anatomy.pack"
+   ],
+   "to": [
+    "anatomy.name"
+   ],
+   "description": "The pack calls a service (service:root.dump), as its kernel calls or roots.json list it."
+  },
+  {
+   "id": "anatomy.grants",
+   "title": "grants",
+   "inverse": "is granted by",
+   "from": [
+    "anatomy.type"
+   ],
+   "to": [
+    "anatomy.name"
+   ],
+   "description": "The type declares this capability (has:when), so any pack requiring it may build on it."
+  },
+  {
+   "id": "anatomy.extends",
+   "title": "extends",
+   "inverse": "is extended by",
+   "from": [
+    "anatomy.type",
+    "anatomy.link_type"
+   ],
+   "to": [
+    "anatomy.type",
+    "anatomy.link_type"
+   ],
+   "description": "The type or link type builds on this one: a starter type, or a root link."
+  },
+  {
+   "id": "anatomy.joins",
+   "title": "joins",
+   "inverse": "is joined by",
+   "from": [
+    "anatomy.link_type"
+   ],
+   "to": [
+    "anatomy.type",
+    "anatomy.name"
+   ],
+   "description": "An end of the link type: a type or a capability. Say which end in props.end (from or to); * is left unsaid."
+  },
+  {
+   "id": "anatomy.reads",
+   "title": "reads",
+   "inverse": "is read by",
+   "from": [
+    "anatomy.part",
+    "anatomy.pack"
+   ],
+   "to": [
+    "anatomy.name"
+   ],
+   "description": "What a part reads of a type it does not own (field:, status:, phase:), checked by shape against its provider."
+  },
+  {
+   "id": "anatomy.hears",
+   "title": "hears",
+   "inverse": "is heard by",
+   "from": [
+    "anatomy.part"
+   ],
+   "to": [
+    "anatomy.name"
+   ],
+   "description": "A handler is run on this event (event:item.due)."
+  },
+  {
+   "id": "anatomy.records",
+   "title": "records",
+   "inverse": "is recorded by",
+   "from": [
+    "anatomy.part"
+   ],
+   "to": [
+    "anatomy.name"
+   ],
+   "description": "A handler's answers may log this kind of event (event:...): any other is refused."
+  },
+  {
+   "id": "anatomy.moved_from",
+   "title": "moved from",
+   "inverse": "moved to",
+   "from": [
+    "anatomy.pack"
+   ],
+   "to": [
+    "anatomy.pack"
+   ],
+   "description": "The pack took declarations from this one, keeping their ids, so a map that had it changes nothing."
+  },
+  {
+   "id": "anatomy.version_of",
+   "title": "is a version of",
+   "inverse": "has version",
+   "from": [
+    "anatomy.version"
+   ],
+   "to": [
+    "anatomy.pack"
+   ],
+   "description": "The version stands in for this pack where it is pinned."
+  },
+  {
+   "id": "anatomy.pinned_on",
+   "title": "is pinned on",
+   "inverse": "runs",
+   "from": [
+    "anatomy.version"
+   ],
+   "to": [
+    "*"
+   ],
+   "description": "The island that runs this version in place of the map's (its pack_version)."
+  },
+  {
+   "id": "anatomy.kept_in",
+   "title": "is kept in",
+   "inverse": "keeps",
+   "from": [
+    "anatomy.part",
+    "anatomy.principle",
+    "anatomy.pack",
+    "anatomy.type",
+    "anatomy.link_type",
+    "anatomy.name",
+    "anatomy.store"
+   ],
+   "to": [
+    "anatomy.module"
+   ],
+   "description": "The code that holds or enforces it, or runs a service."
+  },
+  {
+   "id": "anatomy.governs",
+   "title": "governs",
+   "inverse": "is governed by",
+   "from": [
+    "anatomy.principle"
+   ],
+   "to": [
+    "*"
+   ],
+   "description": "What the principle decides about: modules, packs, a kind of part, a name, another principle."
+  },
+  {
+   "id": "anatomy.imports",
+   "title": "imports",
+   "inverse": "is imported by",
+   "from": [
+    "anatomy.module"
+   ],
+   "to": [
+    "anatomy.module"
+   ],
+   "description": "The module imports the other. props.type_only when it imports types alone, which no rule of import order counts."
+  },
+  {
+   "id": "anatomy.tests",
+   "title": "tests",
+   "inverse": "is tested by",
+   "from": [
+    "anatomy.test"
+   ],
+   "to": [
+    "anatomy.module",
+    "anatomy.pack"
+   ],
+   "description": "The test reads it: imports it at any depth, or names its path."
+  }
+ ],
+ "styles": [
+  {
+   "id": "anatomy.of_pack",
+   "type": "lens",
+   "title": "Inside the pack",
+   "on": [
+    "anatomy.pack"
+   ],
+   "props": {
+    "filter": {
+     "find": [
+      "id {here}"
+     ]
+    },
+    "walk": {
+     "over": [
+      "part_of<",
+      "anatomy.requires>",
+      "anatomy.uses>",
+      "anatomy.provides>"
+     ],
+     "steps": 1
+    },
+    "limit": 200,
+    "style": {
+     "shape": "flow"
+    }
+   }
+  },
+  {
+   "id": "anatomy.web",
+   "type": "lens",
+   "title": "How packs lean on each other",
+   "props": {
+    "filter": {
+     "find": [
+      "anatomy.pack",
+      "anatomy.name"
+     ]
+    },
+    "limit": 400,
+    "style": {
+     "shape": "flow"
+    }
+   }
+  },
+  {
+   "id": "anatomy.model_it",
+   "type": "instruction",
+   "title": "Model a pack with the anatomy pack",
+   "body": "On the pack anatomy island, a pack is an anatomy.pack, and everything it declares is part_of it: an anatomy.type, an anatomy.link_type, or an anatomy.part for a rule, view, action, handler, layout, style or reach. What it asks for or offers is an anatomy.name (has:, type:, event:, field:, status:), linked requires, uses or provides: never a link from pack to pack, except moved_from. A rule the architecture keeps is an anatomy.principle that governs what it is about and is kept_in the modules that enforce it. Read pack.json before you write, and keep ids as it says them. Code is modelled from files: each anatomy.module part_of its pack and linked imports to what it imports, each anatomy.test linked tests to what it reads; a sync item says which commits the island stands at.",
+   "props": {
+    "for": [
+     "working_rules"
+    ],
+    "order": 90
+   }
+  }
+ ]
+}

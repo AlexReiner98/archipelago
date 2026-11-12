@@ -29,6 +29,7 @@ const shared = (c) => [
   { label: 'Owner', title: 'What someone owns', next: () => ({ label: 'Owner', groups: [{ label: '', items: [{ label: 'me', title: 'What is mine', pick: () => c.add('owner me') }] }], search: { ...itemSearch(c.add, (id) => `owner ${id}`, c.most, 'actor'), placeholder: 'A person’s name' } }) },
   { label: 'Item', title: 'One item, by its name', next: () => ({ label: 'Item', search: itemSearch(c.add, (id) => `id ${id}`, c.most) }) },
   { label: 'In', title: 'All that is in an item, at any depth', next: () => ({ label: 'In', search: itemSearch(c.add, (id) => `in ${id}`, c.most) }) },
+  { label: 'Island', title: 'All that lives on an island', next: () => ({ label: 'Island', search: { ...itemSearch(c.add, (id) => `island ${id}`, c.most, 'island'), placeholder: 'An island’s name' } }) },
 ].filter(Boolean);
 
 /** Find's kinds. */
