@@ -1,10 +1,9 @@
 // Standing views a pack declares as data (a view with `lens` in its pack.json), each answered by its own read, in
-// the form it has always had: the flat lens (src/query-flat.ts), the hubs and the frontier. Any other answer is the
+// the form it has always had: the flat lens (src/query-flat.ts) and the hubs (the frontier is the runs pack's answer.frontier). Any other answer is the
 // service answer.<name> a pack provides (src/services.ts), asked with the view's params and answering for itself:
 // the graph, the tree and the brief (packs/views), attention (packs/attention).
 
 import type { LENS_ANSWERS, ViewDef } from '../../../src/declared.ts';
-import type { FrontierInput } from '../../../src/frontier.ts';
 import { HUB_AT, hubs } from '../../../src/query-kept.ts';
 import { callAs } from '../../../src/kernel-context.ts';
 import { flatRead } from './query-flat.ts';
@@ -15,14 +14,10 @@ type Reading = (l: Archipelago, def: ViewDef, params: Record<string, unknown>) =
 /** The hubs (src/query-kept.ts), with the size at which an item counts as one where its project does not say. */
 const hubsOf: Reading = async (l, _def, params) => ({ at: HUB_AT, within: params.within ?? null, hubs: await hubs(l, params.within === undefined ? undefined : String(params.within)) });
 
-/** Where a session stands, and what there needs it (src/frontier.ts). */
-const frontierOf: Reading = async (l, _def, params) => (await import('../../../src/frontier.ts')).frontier(l, params as FrontierInput);
-
 // The flat lens stays read here for a view that names it (core.flat); a pack asks for it by name, answer.flat (packs/query, answers.ts).
 const READINGS: Record<(typeof LENS_ANSWERS)[number] | 'flat', Reading> = {
   flat: (l, _def, params) => flatRead(l, params),
   hubs: hubsOf,
-  frontier: frontierOf,
 };
 
 /** Answer a standing view a pack declares as data: read as its answer says, by the kernel or by the pack that provides it. */

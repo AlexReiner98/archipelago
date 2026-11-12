@@ -1,7 +1,7 @@
 // A run that happened where Archipelago cannot watch it, told once it is over (report, action run_report).
 
 import { bookkeep } from './bookkeeping.ts';
-import { livesInFor, placeFor } from './places.ts';
+import { livesInFor, placeFor } from '../../../src/places.ts';
 import { actorId, type Actor, type Archipelago } from '../../../src/pelago.ts';
 import type { StartedBy } from '../../../src/launcher.ts';
 

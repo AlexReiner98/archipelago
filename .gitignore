@@ -2,6 +2,7 @@ node_modules/
 data/
 data-backup-*/
 runs/
+!/packs/runs/
 workspaces/
 data.lock
 /demo/

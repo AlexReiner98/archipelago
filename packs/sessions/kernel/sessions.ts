@@ -5,7 +5,7 @@
 // world, and coordination that waits for approval is no coordination.
 
 import { bookkeep } from './bookkeeping.ts';
-import { livesIn, livesInFor, placeFor } from './places.ts';
+import { livesIn, livesInFor, placeFor } from '../../../src/places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from '../../../src/pelago.ts';
 import { askView, canAsk } from '../../../src/askview.ts'; import { scopeWithin } from '../../../src/within.ts';
 import { cutTitle, mintName, saidTitle, sessionLabelled, sessionTitle } from './session-name.ts';

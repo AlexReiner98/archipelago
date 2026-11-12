@@ -370,6 +370,9 @@ moves with a shim to the pack named.
 | automation_triggers (required; automations stays plain, its handler in the sandbox) | automation-rules, due-on (what its edges met kept under `due_on:<automation>`, `kernel.memory`) |
 | clocks | due (on its context: the reads `clock`, `timed`, `due_of` in `packreads-clocks`, item.due through `root.due`, a watched query's edges through automation_triggers' `act.report.due_on`; its timer is still registered in `src/open-steps.ts`, for the owner's alert on a failed pass, until alerts answers by a service name); duties went: stream and snapshot keeping to log's `LEADING`, the backup timer to backup's server duty (`backupDuty`), the server packs' schedules beside it in `whileLeads` (`src/leader.ts`) |
 | sessions (exists) | sessions, chat-run, hook-answers, replies, reply-rules, reconcile, run-record, session-events, session-measures, session-name, session-parent, session-quiet, session-state, session-turns, sessiontime, touched, stands, spent, audit, working-rules, close-offer, file-said, frontier, frontier-prompt, places |
+| clocks | due, duties |
+| sessions (exists, optional) | sessions, chat-run, hook-answers, replies, reply-rules, reconcile, run-record, session-events, session-name, session-parent, session-quiet, session-turns (the view; its read is runs' answer.turns), touched, stands, audit, working-rules, close-offer, file-said |
+| runs (required; decision e_w4bmpnx3) | frontier, frontier-prompt, session-state, session-measures, sessiontime, spent, places, run-turns (the read of session-turns); as built (wave 6b): on ctx, its SQL in `packreads-runs`, each read named `answer.*` in its manifest (frontier, worked_on, session_states, session_marks, run_spans, spent, session_measures, turns, place_for, lives_in, narrowed) |
 | claude_code (exists) | hook-tool, session-hook |
 | publish | published, published-data, published-frames, published-live, published-pictures, published-preview, public-bake, public-route, public-view, site, share-tools, drawing-files, pictures, pack-counts |
 | mcp_apps | mcp-view |
@@ -385,8 +388,9 @@ moves with a shim to the pack named.
 | monitoring | report (the health tool stays the surface's, `report-tool.ts`, applying what `act.report.reading` says) |
 | devtools | dev, pull |
 
-Frontier goes to sessions, the pack whose types (`run`, `works_on`) it names,
-which ends that part of bug e_j3a8ghe4.
+Frontier goes to runs (decision e_w4bmpnx3, the owner, 12 Nov 2026): a required pack holding the reads of core's
+`run` and `works_on`, which every pack may call, while sessions keeps the behaviour and stays optional. It ends
+that part of bug e_j3a8ghe4. `frontier` left `LENS_ANSWERS` for runs' `answer.frontier` in the same step.
 
 ### Plumbing, kept in `src/`
 
@@ -573,7 +577,7 @@ sessions is optional and an optional pack fills only `write.*`. The query step (
 askview, views and timeaxis into `packs/query/kernel` behind pure shims, still on the map (`l`) and naming the kernel
 at `../../../src/`: what they call is sessions' (optional, so it provides no name), or another pack's that provides
 none, so `view` and `placed` stay kernel fillings until those packs answer by name. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
-reads API's own bounded scan, `packreads-scope`, which places re-exports. `test/packreads-slots.test.ts`
+reads API's own bounded scan, `packreads-scope`; runs' places (wave 6b) keeps its own copy of `livesIn` and `livesInFor` over the registry, and `scopeOf` through the read `within`. `test/packreads-slots.test.ts`
 pins each answer against its service's own functions.
 
 The publish pack (wave 6b, e_pkytyzy7) is on its context, published and public-view with it, behind adapter shims:
