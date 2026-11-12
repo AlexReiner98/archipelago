@@ -1,0 +1,11 @@
+{
+  "id": "lenses",
+  "version": "0.1.0",
+  "title": "Lenses",
+  "description": "The views kept on the map: the lenses, styles and layouts kept and what each is about, the hubs that need views of their own, where a view is seen at work, a type's new name in the views that named the old one, and an agent's view refused when one is kept already.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}
