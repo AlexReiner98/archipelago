@@ -23,6 +23,10 @@
     {
       "id": "walls",
       "hash": "1ffa5ac28ba5cb1538025c6c1de174f20952c3ea44560eaf7a7d3603023d82c6"
+    },
+    {
+      "id": "loader",
+      "hash": "ee14332ecba9324ab190ee116e5b32d39bb9c325c939a5fdfea099e9f7d6f510"
     }
   ]
 }
