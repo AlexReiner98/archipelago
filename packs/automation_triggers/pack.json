@@ -7,7 +7,18 @@
     "trust": "service",
     "internal": true,
     "modules": "kernel/",
-    "hooks": { "write.validate": "validate.ts#validate" },
+    "provides": {
+      "act.report.due_on": {
+        "in": {
+          "now": "number"
+        },
+        "out": "any",
+        "run": "due-on.ts#dueOn"
+      }
+    },
+    "hooks": {
+      "write.validate": "validate.ts#validate"
+    },
     "memory": "due_on:"
   }
 }

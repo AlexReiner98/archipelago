@@ -12,7 +12,7 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Manifest } from '../../../src/manifest.ts';
 import { isLink, type TypesRead } from './project.ts';
-import type { Q } from '../../../src/db.ts';
+import type { Db, Q } from '../../../src/db.ts';
 import type { Fact } from './log.ts';
 import type { KernelContext } from '../../../src/kernel-context.ts';
 import type { Registry } from '../../../src/packs.ts';
@@ -122,6 +122,49 @@ function rowsFor(tx: Q, p: Projector, as: ReturnType<typeof owner>): ProjectRows
       if (rows.length) await tx.query(`insert into ${t} (${cols.join(', ')}) select ${cols.join(', ')} from jsonb_populate_recordset(null::${t}, $1::jsonb) on conflict do nothing`, [JSON.stringify(rows)]);
     },
   };
+}
+
+/** How many items one call of the projectors is handed when their tables are made again whole. */
+const AGAIN = 1000;
+
+/**
+ * The packs' tables made again whole, after a restore, a merge or a rebuild's swap (what names what, first): each
+ * emptied, then every item handed to the projectors as written whole, a page of ids at a time. Run as the tables' owner,
+ * in the transaction given, so in a rebuild's shadow it makes the shadow's.
+ */
+export async function projectAgain(tx: Q, reg: TypesRead, at = new Date().toISOString()): Promise<void> {
+  const projectors = await projectorsOf(reg);
+  if (!projectors.length || !isRegistry(reg)) return;
+  const as = owner(tx);
+  try {
+    await as.become();
+    for (const p of projectors) for (const t of Object.keys(p.tables).filter((t) => NAME.test(t))) await tx.query(`delete from ${t}`);
+  } finally {
+    await as.back();
+  }
+  for (let after = ''; ;) {
+    const { rows } = await tx.query<{ id: string }>(`select id from entity where id > $1 order by id limit ${AGAIN}`, [after]);
+    if (!rows.length) return;
+    await projectPacks(tx, reg, at, rows.map((r): Fact => ['+', r.id, 'body', null]));
+    after = rows.at(-1)!.id;
+  }
+}
+
+/** The setting that asks the next open to make the packs' tables again: left by a restore, which has no registry to run them with. */
+const AGAIN_AT_OPEN = 'log.project_again';
+
+/** Ask the next open of this database to make the packs' tables again whole (a restore, a map made outside the server). */
+export const projectAgainAtOpen = (q: Q): Promise<unknown> =>
+  q.query(`insert into setting (key, value) values ($1, 'true'::jsonb) on conflict (key) do update set value = excluded.value`, [AGAIN_AT_OPEN]);
+
+/** At an open, once the map's packs are read: the packs' tables made again whole if a restore asked it. */
+export async function projectAgainIfAsked(db: Db, reg: TypesRead): Promise<boolean> {
+  if (!(await db.query(`select 1 from setting where key = $1`, [AGAIN_AT_OPEN])).rows.length) return false;
+  await db.transaction(async (tx) => {
+    await projectAgain(tx, reg);
+    await tx.query(`delete from setting where key = $1`, [AGAIN_AT_OPEN]);
+  });
+  return true;
 }
 
 /** log.project: the packs' projectors over facts the root projection has just written, each into its own tables. */

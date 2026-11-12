@@ -39,6 +39,17 @@
           ]
         },
         "run": "root-services.ts#serverPacksShown"
+      },
+      "root.due": {
+        "in": {
+          "target": "id",
+          "reason": "string",
+          "detail": "any"
+        },
+        "out": {
+          "seq": "any"
+        },
+        "run": "due-event.ts#dueOf"
       }
     }
   }

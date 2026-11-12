@@ -1,90 +1,13 @@
-// The clock: the kernel's one duty in time (decision e_esqevwkf, the owner, 11 Nov 2026). Once a minute it finds what
-// came due since its last pass: each occurrence of an item whose type says when it happens (the when capability: a
-// moment, a span's start, or a repeat's hour on each day it falls on, in the workspace's zone). For each it records an
-// item.due event and tells the packs that hear item.due, which do whatever is to be done: the kernel decides nothing
-// and names no pack. Its cursor is kept in the workspace's settings, so a pass after a restart catches up on what came
-// due while it was down, a day at most; the first pass ever starts from now. An automation that watches a query
-// comes due when it starts to match instead (src/due-on.ts), by the same fact. It runs as a timer of the clocks pack,
-// while this server leads (src/lifecycle.ts). A hearer is told the event's seq, and in
-// its detail the item's version (its last position in the fact stream), and the packs it came due under (src/pack-versions.ts), so what it does can name what it answered.
+// Moved to packs/clocks/kernel/due.ts (docs/kernel-packs.md, "Moving a service in the wave"): this shim keeps its
+// callers working until the gather step rewrites them. A pass over a map is handed the clocks pack's context of it,
+// made when it is called (kernelContext); dueBetween reads only the types, which the map has.
 
-import { alertOwner } from './alert.ts';
-import { onPass } from './due-on.ts';
-import { timer } from './lifecycle.ts';
-import { packVersionsFor } from './pack-versions.ts';
-import { hostFor } from './packtools.ts';
-import type { Archipelago, Entity } from './pelago.ts';
-import { spansOf, zoneOf } from './timeaxis.ts';
+import type { Archipelago } from './pelago.ts';
+import * as moved from '../packs/clocks/kernel/due.ts';
 
-const CURSOR = 'due_cursor';
-/** The furthest back a pass looks: what came due while the server was down longer than this is let go. */
-const CATCH_UP_MS = 24 * 3_600_000;
-const EVERY_MS = 60_000;
+export * from '../packs/clocks/kernel/due.ts';
 
-export interface Due {
-  item: string;
-  type: string;
-  title: string;
-  /** The instant the occurrence begins. */
-  at: string;
-  /** Come due by a query starting to match (src/due-on.ts): the edge met, the items that met it, and the value. */
-  edge?: string;
-  matched?: string[];
-  value?: unknown;
-}
+/** The clocks pack's context of a map. */
+const ctx = async (l: Archipelago) => (await import('./kernel-context.ts')).kernelContext(l, 'clocks');
 
-/** The day an instant falls on in a zone, as a date. */
-const dayIn = (at: number, zone: string) => new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
-
-/** The occurrences of these items that begin after `from` and at or before `to`, in a zone, earliest first. */
-export function dueBetween(l: Archipelago, items: Pick<Entity, 'id' | 'type' | 'title' | 'props' | 'created_at' | 'status' | 'is_open'>[], from: number, to: number, zone: string): Due[] {
-  // From the start of the day `from` falls on: a repeat is laid out a whole day at a time.
-  // To a moment past `to`: the axis keeps what begins before its end, and what begins at `to` itself is due.
-  const axis = { from: dayIn(from, zone), to: new Date(to + 1).toISOString(), by: ['when' as const] };
-  const out: Due[] = [];
-  for (const e of items)
-    for (const span of spansOf(l, e, axis, zone)) {
-      const at = Date.parse(span.start);
-      if (at > from && at <= to) out.push({ item: e.id, type: e.type, title: e.title, at: span.start });
-    }
-  return out.sort((a, b) => a.at.localeCompare(b.at));
-}
-
-/** The types whose items happen at a time. */
-const timedTypes = (l: Archipelago) => [...l.registry.types.values()].filter((t) => t.capabilities.when).map((t) => t.id);
-
-/** One pass: what came due since the last, each recorded and told to the packs that hear it. Answers what came due. */
-export async function duePass(l: Archipelago, now = Date.now()): Promise<Due[]> {
-  const last = await l.setting<number>(CURSOR);
-  await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [CURSOR, JSON.stringify(now)]);
-  const host = hostFor(l.registry);
-  const tell = async (event: { action: string; target: string; reason: string; detail: Record<string, unknown> }) => {
-    const version = (await versionsOf(l, [event.target])).get(event.target) ?? null;
-    // The packs it came due under: those its item's island runs (src/island-pin.ts), the map's elsewhere.
-    const told = { ...event, detail: { ...event.detail, version, packs: await packVersionsFor(l, await l.entity(event.target)) } };
-    const seq = await l.log(l.db, { actor: 'agent:pelago', ...told });
-    host.tell(l, 'kernel', { ...told, seq });
-  };
-  const types = timedTypes(l);
-  const due: Due[] = [];
-  if (last !== undefined && types.length && now > last) {
-    const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null`, [types]);
-    due.push(...dueBetween(l, rows, Math.max(last, now - CATCH_UP_MS), now, await zoneOf(l)));
-    for (const d of due) await tell({ action: 'item.due', target: d.item, reason: `"${d.title}" is due`, detail: { type: d.type, at: d.at } });
-  }
-  // What watches a query comes due when it starts to match (src/due-on.ts): asked on every pass, the first included.
-  return [...due, ...(await onPass(l, now, tell))];
-}
-
-/** Each item's version: the position of its last fact in the fact stream, what a hearer acted on. */
-async function versionsOf(l: Archipelago, ids: string[]): Promise<Map<string, number>> {
-  if (!ids.length) return new Map();
-  const { rows } = await l.db.query<{ id: string; pos: number }>(`select id, max(pos)::int as pos from log_fact where stream = 'facts' and id = any($1::text[]) group by id -- index log_fact_history`, [ids]);
-  return new Map(rows.map((r) => [r.id, r.pos]));
-}
-
-// The clock is a timer of the clocks pack (src/lifecycle.ts): run in each workspace while this server leads
-// (src/leader.ts), a failed pass told to the workspace's owner.
-timer('clocks', EVERY_MS, (ws) => duePass(ws.pelago), {
-  failed: (ws, err) => void alertOwner(ws.pelago, { key: 'clock', title: 'The clock failed', body: `A pass over what came due failed: ${err.message}`, from: 'pelago' }),
-});
+export const duePass = async (l: Archipelago, now?: number) => moved.duePass(await ctx(l), now);

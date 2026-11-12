@@ -467,7 +467,8 @@ rewritten; it is dropped whole, by rule, and the drop is in the chain:
 The segments that stand are those asserted and not since retracted;
 `verifySegments` (`src/streams.ts`) hashes each one's entries again. Only
 sealed days are compacted, neighbouring segments that lost entries become one,
-and the server does both once a day for every workspace (`src/duties.ts`).
+and the server does both once a day for every workspace it leads, while it is open (the log root's
+`LEADING`, `packs/log/kernel/open.ts`).
 
 The compacted streams are kept in their own table, `log_op (stream, pos, at,
 head, facts)`: the light header in `head`, the facts inline. Its trigger

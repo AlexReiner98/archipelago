@@ -33,7 +33,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from '../../../src/auth.ts'; import { firstStart } from './first-start.ts';
 import { notify } from '../../../src/notify.ts'; import { alertOnCrash } from '../../../src/alert.ts';
-import { parseBackup, parseVault } from '../../../src/backup.ts'; import { backupAll } from '../../../src/backup-run.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from '../../../src/members.ts'; import { requestWait } from '../../../src/standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from '../../../src/workspace-use.ts';
+import { parseBackup, parseVault } from '../../../src/backup.ts'; import { backupAll, backupDuty } from '../../../src/backup-run.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from '../../../src/members.ts'; import { requestWait } from '../../../src/standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from '../../../src/workspace-use.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from '../../../src/config.ts'; import { env } from '../../../src/env.ts'; import type { Booted } from '../../../src/boot.ts';
 import { SHORT, serveConnect } from '../../../src/connect.ts'; import { challenge, mcpAddress } from '../../../src/oauth.ts'; import { itemAddress } from '../../../src/item-address.ts';
 import { stopAllLaunched } from '../../../src/launcher.ts'; import { configureLaunch } from './server-launch.ts';
@@ -42,8 +42,8 @@ import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from '../../../src
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { configureOutbox } from '../../../src/outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from '../../../src/control-index.ts'; import { isPersonToken, personAt } from '../../../src/person-tokens.ts';
 import { serverPacksOf } from './server-host.ts'; import { configureConnections } from '../../../src/connection-tools.ts'; import { configureHookTool } from '../../../src/hook-tool.ts'; import { setReach } from '../../../src/pack-reach.ts';
-import { pgLeader, soleLeader, type Leader } from '../../../src/leader.ts'; import { drained } from './drain.ts';
-import { serverDuties } from '../../../src/duties.ts'; import { keepCounts } from '../../../src/pack-counts.ts';
+import { pgLeader, soleLeader, whileLeads, type Leader } from '../../../src/leader.ts'; import { drained } from './drain.ts';
+import { keepCounts } from '../../../src/pack-counts.ts';
 import { clientAddress, trustedProxies } from '../../../src/address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
 import { servePublic } from '../../../src/public-route.ts'; import { siteNav } from '../../../src/site.ts'; import { ICON, serveIcon } from '../../../src/icon.ts';
@@ -444,7 +444,7 @@ If that process is not a pelago server, delete ${lock}.`);
     if (config.databaseUrl) console.log(leader.leading ? 'leading: this server runs the clocks' : 'following: another server runs the clocks');
     leader.onChange((on) => void workspaces.lead(on));
     await workspaces.lead(leader.leading);
-    stopDuties = serverDuties(leader, workspaces, serverPacksOf(workspaces), config.backup);
+    stopDuties = whileLeads(leader, [() => backupDuty(workspaces, config.backup), () => serverPacksOf(workspaces).runSchedules()]); // the server's duties: backups (the backup pack) and the server packs' schedules
     if (config.idleMinutes > 0) {
       console.log(`workspaces unused for ${config.idleMinutes} minutes are closed until next needed`);
       idle = setInterval(() => void workspaces.closeIdle(config.idleMinutes * 60_000).then((closed) => closed.length && console.log(`closed idle workspaces: ${closed.join(', ')}`), (err) => console.error('closing idle workspaces failed:', err)), 60_000);

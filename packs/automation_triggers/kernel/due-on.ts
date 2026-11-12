@@ -25,7 +25,8 @@ const PAGES = 10;
 export const acting = (ctx: Pick<KernelContext, 'registry'>): boolean => ctx.registry.packs.some((p) => p.id === ACTS);
 
 type Item = Matched & { type: string; title: string; status?: string | null; props?: Record<string, unknown> | null };
-type Tell = (event: { action: string; target: string; reason: string; detail: Record<string, unknown> }) => Promise<void>;
+/** What the clock records of an edge met, as item.due: the automation, why, and what its hearers are given. */
+export interface Told { target: string; reason: string; detail: Record<string, unknown> }
 
 /** The enabled automations that watch a query, by id, at most AUTOMATIONS: read a page at a time, PAGES at most. */
 async function watching(ctx: KernelContext): Promise<Item[]> {
@@ -39,13 +40,13 @@ async function watching(ctx: KernelContext): Promise<Item[]> {
   return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, AUTOMATIONS);
 }
 
-/** One pass over the automations that watch a query: each edge met told to the clock, which records it as item.due. */
-export async function onPass(ctx: KernelContext, now: number, tell: Tell): Promise<Met[]> {
+/** One pass over the automations that watch a query: each edge met, with what the clock records of it as item.due. */
+export async function onPass(ctx: KernelContext, now: number): Promise<{ met: Met; told: Told }[]> {
   if (!acting(ctx) || !ctx.registry.family('automation').length) return [];
   const autos = await watching(ctx);
   if (!autos.length) return [];
   const pos = (await ctx.reads({ log_head: true })) as number;
-  const out: Met[] = [];
+  const out: { met: Met; told: Told }[] = [];
   for (const auto of autos) {
     const on = auto.props!.on as On;
     if (checkOn(on).length) continue;
@@ -66,9 +67,11 @@ export async function onPass(ctx: KernelContext, now: number, tell: Tell): Promi
     await ctx.reads({ memory: { key: auto.id, value: keep } });
     for (const m of met) {
       const firing: Met = { item: auto.id, type: auto.type, title: auto.title, at: new Date(now).toISOString(), ...m };
-      await tell({ action: 'item.due', target: auto.id, reason: `"${auto.title}" is due: its query ${m.edge === 'first' ? 'matched' : `met ${m.edge}`}`, detail: { type: auto.type, at: firing.at, on: { edge: m.edge, matched: m.matched, ...(m.value !== undefined && { value: m.value }) } } });
-      out.push(firing);
+      out.push({ met: firing, told: { target: auto.id, reason: `"${auto.title}" is due: its query ${m.edge === 'first' ? 'matched' : `met ${m.edge}`}`, detail: { type: auto.type, at: firing.at, on: { edge: m.edge, matched: m.matched, ...(m.value !== undefined && { value: m.value }) } } } });
     }
   }
   return out;
 }
+
+/** act.report.due_on, the service the clock calls on each pass (packs/clocks): what the watched queries met since the last. */
+export const dueOn = (ctx: KernelContext, input: { now: number }): Promise<{ met: Met; told: Told }[]> => onPass(ctx, Number(input?.now));

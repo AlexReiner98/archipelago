@@ -12,11 +12,11 @@ import { NAME, pageOf, paged, READ_LIMIT, shapes, type Page } from './packreads-
 import { confirmQuestions, factsByRun, heldChanges, lastSaid, runsOf } from './packreads-log.ts';
 import type { Pin } from './packreads-pin.ts';
 import { filled, kernelRead, type KernelRead } from './packreads-kernel.ts';
-import { serviceRead, type ServiceRead } from './packreads-service.ts';
+import { serviceRead, type ServiceRead } from './packreads-service.ts'; import { clocksRead, type ClocksRead } from './packreads-clocks.ts';
 import { viewsRead, type ViewsRead } from './packreads-views.ts';
 import { fillReads } from '../../loader/kernel/packhost.ts'; import { trail } from './map-reads.ts';
 
-export type Read = KernelRead & ServiceRead & ViewsRead & {
+export type Read = KernelRead & ServiceRead & ViewsRead & ClocksRead & {
   get?: string;
   /** Items of a type (flavours included): with a status or one of several, fields equal to where's, and a field between two values. */
   items?: { type: string; status?: string | string[]; where?: Record<string, unknown>; between?: { field: string; from?: string; to?: string } };
@@ -90,6 +90,8 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
   if (service !== undefined) return service;
   const views = await viewsRead(l, q);
   if (views !== undefined) return views;
+  const clocks = await clocksRead(l, q, pack);
+  if (clocks !== undefined) return clocks;
   if (q.fields && (!Array.isArray(q.fields) || q.fields.some((f) => !NAME.test(f)))) throw new Error('fields is a list of field names');
   // An item's columns as the asker may read them: anyone with no login reads no note, no owner, no link's id, and of the
   // props only the few public ones, and may not filter by props at all.

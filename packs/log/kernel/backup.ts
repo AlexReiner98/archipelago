@@ -28,7 +28,7 @@ import { indexWorkspace } from '../../../src/control-index.ts';
 import type { Registry } from '../../../src/packs.ts';
 import { regatherAll } from './closure.ts';
 import { recountBytes } from '../../../src/bytes.ts';
-import { mentionedAll } from '../../../src/mentions.ts';
+import { projectAgain, projectAgainAtOpen } from './log-project.ts';
 import { databaseFor } from '../../../src/pg.ts';
 import { analyzeAll, analyzeDue } from '../../../src/stats.ts';
 import { FACT_ACTIONS, factEvents } from '../../../src/eventlog.ts';
@@ -146,7 +146,7 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
     await tx.query(`select setval('event_seq_seq', greatest((select coalesce(max(seq), 0) from log_fact), (select coalesce(max(seq), 0) from log_op where seq is not null), 1)) -- index log_fact_seq, log_op_seq`);
     // What is inside what is a projection of the links just written: made again whole.
     await regatherAll(tx, ['part_of']);
-    await mentionedAll(tx);
+    await projectAgainAtOpen(tx); // what names what: made again by the packs' projectors, once the map's packs are read
     await recountBytes(tx);
     // The types it defined for itself go in its database, where the server looks for them.
     for (const def of (given.local_pack as { types?: { id: string }[] } | null)?.types ?? []) await addLocalType(tx, def);
@@ -290,7 +290,7 @@ export async function mergeOf(call: RootCall, input: { dump: Dump; session_types
       );
       const rels = await restoreRows(tx, entities, JSON.stringify(here(relations.filter((r) => !held(r)))));
       await regatherAll(tx, ['part_of']);
-      await mentionedAll(tx);
+      await projectAgain(tx, l.registry);
       await recountBytes(tx);
       const { rows: props } = await tx.query<{ added: boolean }>(
         `insert into proposal select * from jsonb_populate_recordset(null::proposal, $1::jsonb)

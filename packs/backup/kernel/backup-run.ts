@@ -152,3 +152,35 @@ export function newestBackup(dir: string, workspace = 'default'): Date | undefin
   // The file is named for the moment it was taken, with the colons of the time replaced.
   return newest ? new Date(newest.replace('.json.gz', '').replace(/T(\d\d)-(\d\d)-/, 'T$1:$2:')) : undefined;
 }
+
+/** Where and how often every workspace is backed up (the server's config), or false for never. */
+export type BackupPlan = false | { dir: string; everyHours: number; keep: number; upload?: UploadTarget };
+
+/** How often the server duty asks whether a backup is due. */
+export const ASK_MS = 5 * 60_000;
+
+/**
+ * The server duty's question, asked while this server leads: every workspace backed up if the newest backup is older
+ * than the plan says, going by the newest file, so restarting the server neither skips a backup nor piles them up.
+ * Answers whether it ran. Its context is the server's (serverContext).
+ */
+export async function backupIfDue(ctx: KernelContext, plan: BackupPlan, now = Date.now()): Promise<boolean> {
+  if (!plan) return false;
+  const { dir, everyHours, keep, upload } = plan;
+  const newest = newestBackup(dir);
+  if (newest && now - newest.getTime() < everyHours * 3600_000) return false;
+  for (const r of await backupAll(ctx, dir, keep, upload)) {
+    if (r.error) console.error(`backup of ${r.workspace} FAILED: ${r.error}`);
+    else if (r.copied === false) console.error(`backed up ${r.workspace}: ${r.rows} rows, but the copy off the server FAILED: ${r.copy_error}`);
+    else console.log(`backed up ${r.workspace}: ${r.rows} rows${r.copied ? ', copied off the server' : ''}`);
+  }
+  return true;
+}
+
+/** The server duty: asked at once and every ASK_MS until what it answers is called. A failure is said, never thrown. */
+export function backupDuty(ctx: KernelContext, plan: BackupPlan): () => void {
+  const ask = () => void backupIfDue(ctx, plan).catch((err) => console.error('backup failed:', err));
+  ask();
+  const t = setInterval(ask, ASK_MS).unref();
+  return () => clearInterval(t);
+}
