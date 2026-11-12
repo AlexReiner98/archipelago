@@ -60,7 +60,7 @@ test('the layout chosen in the view band reaches the style read, with its drawin
   assert.equal(retired.drawing.notes, undefined, 'a drawing that reads the start of each note asks for nothing more');
 });
 
-test('what is made for a reader, of any pack, opens as reading: core’s preset is on has:deliverable', async () => {
+test('what is made for a reader, of any pack, opens as reading: canvas’s preset is on has:deliverable', async () => {
   const l = await fresh();
   await make(l, [{ op: 'define_type', type: { id: 'local.report', title: 'Report', description: 'Written for a client.', extends: 'record', deliverable: true } }]);
   const made = await make(l, [
@@ -70,7 +70,7 @@ test('what is made for a reader, of any pack, opens as reading: core’s preset 
   const of = async (id: string) => (await VIEWS.style.run(l, { of: id })) as { style: any; used: { id: string; preset?: string }[] };
   const report = await of(made.r);
   assert.deepEqual([report.style.page.picture, report.style.page.notes, report.style.notes.measure], [false, 'whole', 'reader_measure']);
-  assert.ok(report.used.some((u) => u.preset === 'core.reading'), 'by core’s reading preset');
+  assert.ok(report.used.some((u) => u.preset === 'core.reading'), 'by canvas’s reading preset');
   const task = await of(made.t);
   assert.equal(task.style.page.picture, true, 'not on what is not made for a reader');
   assert.ok(!task.used.some((u) => u.preset === 'core.reading'));

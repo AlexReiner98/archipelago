@@ -48,6 +48,7 @@ test('a map that had core before the move is given practice, once, and is still 
   assert.deepEqual((await syncPacks(now)).filter((f) => /pack:practice$/.test(f[1])), [], 'once');
   const said = (await instructionsFor(now, 'session_start', { fill: { run: 'r' } })).map((s) => s.preset);
   assert.ok(said.includes('practice.draw_answers'), said.join(', '));
+  assert.ok(said.includes('core.bumps'), 'a habit moved keeping core’s id is said under it');
   const rules = now.registry.rules.filter((r) => r.pack === 'practice').map((r) => r.id);
   assert.deepEqual(rules, ['settle_why', 'views_said', 'draw_answers', 'record_findings']);
   assert.ok(!now.registry.rules.some((r) => r.pack === 'core' && rules.includes(r.id ?? '')), 'core declares none of them now');

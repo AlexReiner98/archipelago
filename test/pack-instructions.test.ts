@@ -56,7 +56,7 @@ test('a core-only map is told nothing it lacks: rules, MCP words, tools and the 
   const l = await freshWith(core);
   const start = await hookSessionStart(l, { session_id: 'core-only', cwd: 'C:\\code\\new' });
   assert.deepEqual(lacking(start, lacks), [], 'the session start');
-  assert.match(start, /a finding about the item it concerns/, 'a bump is a finding, in core');
+  assert.doesNotMatch(start, /gets in your way/, 'recording a bump is practice’s habit, not core’s');
   assert.doesNotMatch(start, /repository|as an issue/);
 });
 
