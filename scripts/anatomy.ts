@@ -31,7 +31,10 @@ const CORE = resolve(import.meta.dirname, '..');
 const beside = resolve(git(CORE, ['rev-parse', '--path-format=absolute', '--git-common-dir']).trim(), '..', '..', 'archipelago-hosted');
 const HOSTED = arg('hosted') ? resolve(arg('hosted')!) : beside;
 if (!existsSync(HOSTED)) throw new Error(`No hosted repository at ${HOSTED}: give --hosted its folder. Without it every hosted pack on the island would be archived.`);
-const REPOS: [string, Source['repo'], string][] = [[CORE, 'open_core', 'archipelago'], [HOSTED, 'hosted', 'archipelago-hosted']];
+/** A repository's name on GitHub, owner/name, read off its origin: the push handler finds the pushed one by it. */
+const githubName = (repo: string) => /github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/.exec(git(repo, ['remote', 'get-url', 'origin']).trim())?.[1] ?? repo;
+// The open core first: the sync item's first line is the open core's (packs/anatomy_sync/push.ts, reposOf).
+const REPOS: [string, Source['repo'], string][] = [[CORE, 'open_core', githubName(CORE)], [HOSTED, 'hosted', githubName(HOSTED)]];
 
 /** The files a run reads in a repository at the ref, with their blob hashes, read in one pass of git cat-file. */
 function sources(repo: string, which: Source['repo'], wanted: (path: string) => boolean): Source[] {
@@ -114,7 +117,7 @@ const { ops, counts } = plan(want, island, run);
 if (arg('out')) (await import('node:fs')).writeFileSync(arg('out')!, JSON.stringify(ops, null, 1));
 console.log(`${incremental ? `${changes.length} files changed since the last sync` : 'full run'}; ${run.extractors.map((e) => `${e.extractor.id}${e.only ? ` (${e.only.size})` : ''}`).join(', ') || 'no extractor reached'}; ${files.length} files read (${island.bulk ? 'island read in bulk' : 'island read item by item'}); ${Object.entries(counts).map(([k, n]) => `${k} ${n}`).join(', ')}`);
 
-const reason = `Pack anatomy: the island brought to ${heads.archipelago.slice(0, 8)} and hosted ${heads['archipelago-hosted'].slice(0, 8)}${incremental ? ', from what changed' : ', in full'}`;
+const reason = `Pack anatomy: the island brought to ${REPOS.map(([, , name]) => `${name} ${heads[name].slice(0, 8)}`).join(' and ')}${incremental ? ', from what changed' : ', in full'}`;
 const authority = { of: 'agent', basis: `The code at ${REF}, read by packs/anatomy_sync's extractors (scripts/anatomy.ts).` };
 const send = (why: string, part: Record<string, unknown>[]) => call('change', { ...(RUN && { run: RUN }), authority, reason: why, ops: part });
 if (DRY || !ops.length) console.log(DRY ? `would send ${ops.length} ops` : 'nothing to change');
