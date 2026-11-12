@@ -6,8 +6,13 @@
 // does not hold them by hash (`have`). `refined` says what the island draws otherwise than it ships, so the host shows
 // the way back only where it would change something.
 
+import { createHash } from 'node:crypto';
 import type { RootCall } from './root-calls.ts';
+import { startedFrom } from '../../database/kernel/config.ts';
+import { headPos } from '../../log/kernel/tail.ts';
 import { islandRegistry } from './island-pin.ts';
+import { drewWith, type Drew } from './pack-versions.ts';
+import { registryAt } from './registry-at.ts';
 import type { Registry } from './packs.ts';
 import { partsFor, type Part } from './ui-parts.ts';
 import { refinedOn, shippedParts, type Refined } from './way-back.ts';
@@ -32,17 +37,53 @@ export interface PartsAnswer {
   /** Drawn as they ship: the way back was pressed. */
   shipped?: true;
   refined?: Refined;
+  /** What the page draws with, as recorded (packs/loader/kernel/pack-versions.ts): the look keeps it beside its picture. */
+  drew?: Drew;
+  /** Asked at a past position: the packs' code as it stood then, the owner's versions of parts as they are now. */
+  at?: { pos: number; owners_parts: 'now' };
+}
+
+/** The last set each person's page recorded on each island, by this process: the same set is not recorded again. */
+const recorded = new Map<string, string>();
+const RECORDED_MOST = 5000;
+
+/**
+ * Record what a page drew with, in the observations stream (packs/log/kernel/operational.ts, RECORDS.drew), as the person
+ * asking, about the island or the map, unless it is the set they last recorded there. A map that may not record (a
+ * look's pass, a token that only reads) draws all the same: the record is what is skipped.
+ */
+async function record(l: Archipelago, drew: Drew): Promise<void> {
+  const about = drew.island ?? 'map';
+  const key = `${l.workspace}:${l.viewer ?? ''}:${about}`;
+  const set = createHash('sha256').update(JSON.stringify([drew.host, drew.server, drew.packs, drew.parts])).digest('hex');
+  if (recorded.get(key) === set) return;
+  try {
+    await l.record('observations', l.viewer || 'system', [['+', about, 'drew', drew]]);
+    if (recorded.size >= RECORDED_MOST) recorded.delete(recorded.keys().next().value!);
+    recorded.set(key, set);
+  } catch (err) {
+    console.warn(`${l.workspace}: what a page drew with was not recorded: ${String((err as Error)?.message ?? err).slice(0, 200)}`);
+  }
 }
 
 /** root.parts: the parts a page draws on an island (or the map), or as they ship. */
-export async function parts(call: RootCall, input: { island?: string; have?: string[]; shipped?: boolean }): Promise<PartsAnswer> {
+export async function parts(call: RootCall, input: { island?: string; have?: string[]; shipped?: boolean; host?: string; at?: number }): Promise<PartsAnswer> {
   const l = call.map;
   if (!l) throw new Error('Parts are read of a map: a server duty has none');
   const have = (Array.isArray(input?.have) ? input.have : []).filter((h) => typeof h === 'string' && HASH.test(h)).slice(0, HAVE_MOST);
   const island = typeof input?.island === 'string' ? input.island : undefined;
-  if (input?.shipped) return { parts: shippedParts(l, have), shipped: true };
-  const reg = await islandRegistry(l, island);
+  const head = await headPos(l.db);
+  const at = Number.isInteger(input?.at) && input.at! >= 0 && input.at! < head ? input.at! : undefined;
+  const drawn = async (answer: PartsAnswer): Promise<PartsAnswer> => {
+    const drew = await drewWith(l, { island, host: input?.host, server: startedFrom() ?? null, at: at ?? head, parts: answer.parts });
+    if (at === undefined) await record(l, drew);
+    return { ...answer, drew };
+  };
+  if (input?.shipped) return drawn({ parts: shippedParts(l, have), shipped: true });
+  // At a past position (a look redrawn as it was): the packs' code as the log kept it then (registryAt).
+  const past = at === undefined ? undefined : await registryAt(l.db, l.registry, at);
+  const reg = await islandRegistry(l, island, past?.registry ?? l.registry);
   const kept = await keptParts(l, reg);
-  const refined = island ? await refinedOn(l, island, kept) : undefined;
-  return { parts: partsFor(reg, kept, have), ...(refined && { refined }) };
+  const refined = island && !past ? await refinedOn(l, island, kept) : undefined;
+  return drawn({ parts: partsFor(reg, kept, have), ...(refined && { refined }), ...(past && { at: { pos: at!, owners_parts: 'now' as const } }) });
 }

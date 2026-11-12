@@ -25,10 +25,20 @@ let mounts = 0;
 /** The way back drawn now, and the island it is for. */
 let back;
 
+/** The commit of the host this page loaded with (the server's, as it served these files): named on what the page draws and sends. */
+const host = fetch('/health').then((r) => r.json()).then((x) => (typeof x?.commit === 'string' ? x.commit : undefined), () => undefined);
+/** A look redrawn as it was asks its parts at a past position of the log (`?at=`, packs/look_draw/kernel/looks.ts). */
+const at = (() => { const n = Number(new URLSearchParams(location.search).get('at')); return Number.isInteger(n) && n > 0 ? n : undefined; })();
+/** What the page drew with, as the server recorded it, by island ('' the map): what a look keeps beside its picture. */
+const drew = new Map();
+window.lookDrew = () => [...drew.values()];
+
 /** The parts an island draws (or the map, with no island), or as they ship; each with its modules. */
 async function partsOn(island, shipped) {
-  const answer = await api('view', { name: 'parts', params: { ...(island && { island }), have: [...modules.keys()], ...(shipped && { shipped: true }) } });
-  const parts = (answer?.parts ?? []).map((p) => (p.modules && modules.set(p.hash, p.modules), { ...p, modules: modules.get(p.hash) }));
+  const loaded = await host;
+  const answer = await api('view', { name: 'parts', params: { ...(island && { island }), have: [...modules.keys()], ...(shipped && { shipped: true }), ...(loaded && { host: loaded }), ...(at && { at }) } });
+  if (answer?.drew) drew.set(island ?? '', answer.drew);
+  const parts = (answer?.parts ?? []).map((p) => (p.modules && modules.set(p.hash, p.modules), { ...p, modules: modules.get(p.hash), ...(loaded && { host: loaded }) }));
   return { parts, refined: answer?.refined };
 }
 
