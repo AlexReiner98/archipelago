@@ -12,10 +12,9 @@ import { askPackView, VIEWS } from './views.ts';
 import { scanAround } from './region.ts';
 import { placeAll, readAxis, zoneOf } from './timeaxis.ts';
 import { LENS_LIMIT } from './query-flat.ts';
-
-/** The most items one read gives back. */
-const READ_LIMIT = 500;
-const NAME = /^[a-z][a-z0-9_]*$/;
+import { NAME, pageOf, paged, READ_LIMIT, shapes, type Page } from './packreads-rows.ts';
+import { confirmQuestions, factsByRun, heldChanges, lastSaid, runsOf } from './packreads-log.ts';
+import { pinned, type Pin } from './packreads-pin.ts';
 
 export type Read = {
   get?: string;
@@ -52,6 +51,21 @@ export type Read = {
   writers?: string[];
   view?: string;
   params?: Record<string, unknown>;
+  /** With view: the pack that answers it and the version (or manifest hash) the asking view was made against. A view that
+   *  reads another is refused, saying both, when what answers now is not that one, rather than read a changed answer. */
+  pin?: Pin;
+  /** One page of items, related, scope, facts, runs or held: { rows, next } in place of the list, next the cursor for the page after. */
+  page?: Page;
+  /** Every fact a run's changes wrote, oldest first, a page at a time (values: false leaves their values out). */
+  facts?: { run: string; values?: boolean };
+  /** Who last said each field of these items, when, in which change and on whose authority (values: true adds what). */
+  said?: { ids: string[]; fields?: string[]; values?: boolean };
+  /** The runs of a repository or a folder, newest first, a page at a time; touched: true adds what each touched. */
+  runs?: { repo?: string; folder?: string; open?: boolean; touched?: boolean };
+  /** The changes held for a person that the asker may see, oldest first, a page at a time. */
+  held?: boolean;
+  /** The questions agents settled that the owner has not confirmed. */
+  confirm?: { limit?: number };
   /** What a type is: its statuses, whether a person settles it (a question) and how, and whether it is estimated, so a handler need not know it. */
   type_info?: string;
   /** The live types that declare this field, by id, so a handler can find what carries a field without naming types. */
@@ -70,14 +84,13 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
   if (q.fields && (!Array.isArray(q.fields) || q.fields.some((f) => !NAME.test(f)))) throw new Error('fields is a list of field names');
   // An item's columns as the asker may read them: anyone with no login reads no note, no owner, no link's id, and of the
   // props only the few public ones, and may not filter by props at all.
-  const open = l.props === 'props';
-  const cols = (e: string) => `${e}.id, ${e}.type, ${e}.title, ${e}.status, ${open ? `${e}.owner` : 'null as owner'}, ${e}.is_open, ${e}.visibility, ${e}.created_at, ${e}.updated_at, ${e}.archived_at, ${open ? `${e}.props, ${e}.body` : `pelago_public_props(${e}.id) as props`}`;
-  const family = (types: string[] | undefined) => (types?.length ? types.flatMap((t) => l.registry.family(t)) : null);
-  const typed = <T extends { type: string; props?: Record<string, unknown>; body?: string }>(e: T) => {
-    const { body, props, ...rest } = e;
-    const kept = q.fields ? { props: Object.fromEntries(q.fields.filter((f) => props?.[f] !== undefined).map((f) => [f, props![f]])) } : { ...(props !== undefined && { props }), ...(body !== undefined && { body }) };
-    return { ...rest, ...kept, is: l.registry.type(e.type)?.lineage ?? [e.type] };
-  };
+  const { open, cols, typed, family } = shapes(l, q.fields);
+  // A paged read is one row past the page, from where the last page ended, by its order's key (src/packreads-rows.ts).
+  const page = pageOf(q.page);
+  const size = page ? page.size + 1 : READ_LIMIT;
+  const after = page?.after ?? [null, null];
+  const answer = (rows: (Entity & { page_key?: string; page_id?: string })[]) =>
+    page ? paged(rows as (Entity & { page_key: string; page_id: string })[], page.size, (r) => typed(r as Entity)) : rows.map(({ page_key: _k, page_id: _i, ...r }) => typed(r as Entity));
   if (q.get !== undefined) {
     const { rows } = await l.db.query<Entity>(`select ${cols('entity')} from entity where id = $1`, [q.get]);
     return rows[0] ? typed(rows[0]) : null;
@@ -89,35 +102,43 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     if (!open && (field !== undefined || Object.keys(where ?? {}).length)) throw new Error('Anyone with no login cannot filter by fields.');
     const byProps = open ? `and props @> $3::jsonb and ($4::text is null or $5::text is null or props ->> $4 >= $5) and ($4::text is null or $6::text is null or props ->> $4 <= $6)` : `and $3::jsonb is not null and $4::text is null and $5::text is null and $6::text is null`;
     const { rows } = await l.db.query<Entity>(
-      `select ${cols('entity')} from entity where type = any($1::text[]) and archived_at is null and ($2::text[] is null or status = any($2::text[])) ${byProps}
-       order by created_at limit ${READ_LIMIT}`,
-      [l.registry.family(type), status === undefined ? null : [status].flat(), JSON.stringify(where ?? {}), field ?? null, between?.from ?? null, between?.to ?? null],
+      `select ${cols('entity')}, created_at::text as page_key, id as page_id from entity where type = any($1::text[]) and archived_at is null and ($2::text[] is null or status = any($2::text[])) ${byProps}
+       and ($7::timestamptz is null or (created_at, id) > ($7::timestamptz, $8::text))
+       order by created_at, id limit ${size}`,
+      [l.registry.family(type), status === undefined ? null : [status].flat(), JSON.stringify(where ?? {}), field ?? null, between?.from ?? null, between?.to ?? null, after[0], after[1]],
     );
-    return rows.map(typed);
+    return answer(rows);
   }
   if (q.related !== undefined) {
     const [near, far] = q.direction === 'in' ? ['to_id', 'from_id'] : ['from_id', 'to_id'];
-    const order = q.newest === 'created' ? 'e.created_at desc' : q.newest === 'updated' ? 'e.updated_at desc' : open ? 'r.id' : 'e.id';
+    // Paged, the order is by a time and the item's id, so a cursor can say where a page ended: newest first if asked, else oldest.
+    const at = q.newest === 'updated' ? 'e.updated_at' : 'e.created_at';
+    const desc = page && q.newest ? ' desc' : '';
+    const order = page ? `${at}${desc}, e.id${desc}` : q.newest === 'created' ? 'e.created_at desc' : q.newest === 'updated' ? 'e.updated_at desc' : open ? 'r.id' : 'e.id';
     const { rows } = await l.db.query<Entity & { link: string }>(
-      `select ${cols('e')}, ${open ? 'r.id' : 'null'} as link from relation r join entity e on e.id = r.${far}
+      `select ${cols('e')}, ${open ? 'r.id' : 'null'} as link, ${at}::text as page_key, e.id as page_id from relation r join entity e on e.id = r.${far}
        where r.${near} = $1 and r.type = any($2::text[]) and r.valid_to is null and e.archived_at is null and ($3::text[] is null or e.type = any($3::text[]))
-       order by ${order} limit ${READ_LIMIT}`,
-      [q.related, l.registry.relationFamily(q.relation ?? 'link'), family(q.types)],
+       and ($4::timestamptz is null or (${at}, e.id) ${desc ? '<' : '>'} ($4::timestamptz, $5::text))
+       order by ${order} limit ${size}`,
+      [q.related, l.registry.relationFamily(q.relation ?? 'link'), family(q.types), after[0], after[1]],
     );
-    return rows.map(typed);
+    return answer(rows);
   }
   if (q.trail !== undefined) return (await l.trail(q.trail)).map(({ id, type, title }) => typed({ id, type, title }));
   if (q.scope !== undefined) {
     // Its parts at any depth, along the part_of family as the registry has it. Walked, not read from the closure: a
     // pack's read may run for a public page, whose reader is not given the closure (src/closure.ts).
     const under = q.parts ? `with recursive scope(id) as (select $1::text union select r.from_id from relation r join scope s on r.to_id = s.id where r.type = any($6::text[]) and r.valid_to is null and $2::text[] is not null)` : SCOPE;
+    // Unpaged, all of it as before; paged, newest first by when it changed and its id, a page at a time.
+    const n = q.parts ? 7 : 6;
     const { rows } = await l.db.query<Entity>(
-      `${under} select ${cols('e')} from entity e join scope s on s.id = e.id
+      `${under} select ${cols('e')}, e.updated_at::text as page_key, e.id as page_id from entity e join scope s on s.id = e.id
        where e.archived_at is null and ($3::text[] is null or e.type = any($3::text[])) and ($4::boolean is null or e.is_open = $4) and ($5::timestamptz is null or e.updated_at > $5::timestamptz)
-       order by e.updated_at desc`,
-      [q.scope, livesIn(l), family(q.types), q.open ?? null, q.since ?? null, ...(q.parts ? [l.registry.relationFamily('part_of')] : [])],
+       ${page ? `and ($${n}::timestamptz is null or (e.updated_at, e.id) < ($${n}::timestamptz, $${n + 1}::text))` : ''}
+       order by e.updated_at desc, e.id desc${page ? ` limit ${size}` : ''}`,
+      [q.scope, livesIn(l), family(q.types), q.open ?? null, q.since ?? null, ...(q.parts ? [l.registry.relationFamily('part_of')] : []), ...(page ? after : [])],
     );
-    return rows.map(typed);
+    return answer(rows);
   }
   if (q.parts_of !== undefined) {
     if (!Array.isArray(q.parts_of) || q.parts_of.some((id) => typeof id !== 'string')) throw new Error('parts_of is a list of item ids');
@@ -180,10 +201,16 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     const run = new Map(runs.map((r) => [r.id, r]));
     return rows.filter((r) => run.has(r.run)).map((r) => ({ item: r.item, run: r.run, title: run.get(r.run)!.title, ...(run.get(r.run)!.packs != null && { packs: run.get(r.run)!.packs }) }));
   }
+  if (q.facts !== undefined) return factsByRun(l, { ...q.facts, page: q.page });
+  if (q.said !== undefined) return lastSaid(l, q.said);
+  if (q.runs !== undefined) return runsOf(l, { ...q.runs, fields: q.fields, page: q.page });
+  if (q.held) return heldChanges(l, { page: q.page });
+  if (q.confirm !== undefined) return confirmQuestions(l, q.confirm ?? {});
   if (q.packs) return packVersions(l.registry);
   if (q.view !== undefined) {
     // A kernel view, a lens preset (attention, hubs) or a pack's view, each by its short name (repo_work).
     const view = VIEWS[q.view];
+    if (q.pin !== undefined) pinned(l, q.view, q.pin);
     return view ? view.run(l, q.params ?? {}) : askPackView(l, q.view, q.params ?? {});
   }
   if (q.type_info !== undefined) {
@@ -200,5 +227,5 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, packs, view, type_info, with_field, me, proposed.');
+  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, facts, said, runs, held, confirm, packs, view, type_info, with_field, me, proposed.');
 }
