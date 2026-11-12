@@ -6,7 +6,7 @@
     },
     {
       "id": "database",
-      "hash": "9e99e898b87d65539835d0d9f91198869d1d7c4a83efc2a9e401310d9470944b"
+      "hash": "a5f22f3c14b26c9fdbec8726ed742054257653b63429155398989599af46a8bf"
     },
     {
       "id": "seal",
@@ -15,6 +15,10 @@
     {
       "id": "log",
       "hash": "24ed80e45369d0f4b846edc3db6795279d0017d1cbbcfd9f88bf9e86f6fd352c"
+    },
+    {
+      "id": "identity",
+      "hash": "ebfa21c314605e7b252325e6c1158334e0a7fd6435c2af2734127058726ff6c3"
     }
   ]
 }

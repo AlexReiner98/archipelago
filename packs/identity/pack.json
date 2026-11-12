@@ -1,0 +1,11 @@
+{
+  "id": "identity",
+  "version": "0.1.0",
+  "title": "Identity",
+  "description": "Who is asking: people, members, tokens, sign-ins and the workspaces a server holds, with the server's policy on agents' changes. A root pack, started after the log.",
+  "kernel": {
+    "trust": "root",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}

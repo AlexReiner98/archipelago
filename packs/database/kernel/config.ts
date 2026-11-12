@@ -3,7 +3,8 @@ import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from '../../../src/env.ts';
 import { readOnlyPacks, readWorkspacePacks } from '../../../src/pack-allow.ts';
-import { DEFAULT_AGENT_POLICY, type Policy } from '../../../src/pelago.ts';
+import type { Policy } from '../../../src/pelago.ts';
+import { serverPolicy } from '../../identity/kernel/policy.ts';
 
 export interface Config {
   port: number;
@@ -141,11 +142,11 @@ export function loadConfig(): Config {
   if (!['local', 'off'].includes(wantLaunch)) throw new Error('PELAGO_LAUNCH is local or off.');
   if (wantLaunch === 'local' && !local) throw new Error('Launching on this machine starts Claude Code as the server, so it runs only on a server that listens on this machine alone.');
   const launch = wantLaunch === 'off' ? false : ('local' as const);
-  const unreviewed = Object.fromEntries(Object.keys(DEFAULT_AGENT_POLICY).map((op) => [op, 'auto'])) as Policy;
   return {
     packs: readOnlyPacks(env('ONLY_PACKS')) ?? fromFile.packs,
     workspacePacks: env('WORKSPACE_PACKS') !== undefined ? readWorkspacePacks(env('WORKSPACE_PACKS')) : fromFile.workspacePacks,
-    policy: dev ? { ...unreviewed, ...fromFile.policy } : fromFile.policy,
+    // The policy half is identity's (packs/identity/kernel/policy.ts): dev mode reviews nothing unless the file says.
+    policy: serverPolicy(fromFile.policy, dev),
     auth,
     dev,
     host,
