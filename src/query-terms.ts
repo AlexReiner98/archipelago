@@ -20,7 +20,7 @@ import { heldIds } from './query-held.ts';
 import { movedIds } from './moved.ts';
 import { kernelTypes, SYSTEM } from './head.ts';
 import { ISLAND, onIslands } from './island-items.ts';
-import { callService, hasService } from './services.ts';
+import { hasService } from './services.ts';
 
 export type Term =
   | { sort: 'text'; said: string }
@@ -114,9 +114,15 @@ export async function frontierOf(l: Archipelago): Promise<Map<string, { why: str
   return new Map(f.items.map((i) => [i.id, [...i.reasons].sort((a, b) => rank(a) - rank(b)).map((r) => ({ why: r.why, said: said(r) }))]));
 }
 
-/** The ids a provided term's set holds, as its provider answers them: ids alone, anything else refused. */
+/**
+ * The ids a provided term's set holds, as its provider answers them: ids alone, anything else refused. Asked as the map
+ * that asks (callAs, src/kernel-context.ts), so the provider reads as the viewer does, under their row-level security,
+ * never as the map the names were filled for (bug e_8e5pd7dy). Loaded when asked: kernel-context reaches packreads,
+ * which reaches the query modules.
+ */
 async function servedIds(l: Archipelago, t: Extract<Term, { sort: 'service' }>, me: string | null): Promise<string[]> {
-  const out = await callService<{ ids?: unknown }>(l.registry, `term.${t.word}`, { ...(t.end !== undefined && { end: t.end }), me });
+  const { callAs } = await import('./kernel-context.ts');
+  const out = await callAs<{ ids?: unknown }>(l, `term.${t.word}`, { ...(t.end !== undefined && { end: t.end }), me });
   if (!Array.isArray(out?.ids) || out.ids.some((id) => typeof id !== 'string')) throw new Error(`filter: the term "${sayTerm(t)}" answered no ids: its provider answers { ids }`);
   return out.ids as string[];
 }

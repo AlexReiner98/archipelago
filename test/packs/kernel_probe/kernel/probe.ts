@@ -19,3 +19,12 @@ export async function tick(ctx: KernelContext) {
   const id = done.created?.t;
   return { status: done.status, id, read: id ? await ctx.reads({ get: id }) : undefined };
 }
+
+/**
+ * service:term.probe, asked as "probe <hidden> <shown>": the set holds <shown> only when the provider can read <hidden>.
+ * What the term answers then says whose eyes the provider read with.
+ */
+export async function saw(ctx: KernelContext, input: { end?: string }) {
+  const [hidden, shown] = (input.end ?? '').split(' ');
+  return { ids: shown && (await ctx.reads({ get: hidden })) ? [shown] : [] };
+}
