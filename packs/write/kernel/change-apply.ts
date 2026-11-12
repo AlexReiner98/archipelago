@@ -4,12 +4,12 @@
 import { newId, type Q } from '../../../src/db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts'; import { ownerFollows } from './owner-link.ts';
 import { roomToStore, stillWritable } from '../../../src/standing.ts';
-import { after, followedStill, rewrite, type Followed } from '../../../src/write-hooks.ts';
+import { after, followedStill, rewrite, riders, type Followed } from '../../../src/write-hooks.ts';
 import { typesAfter } from '../../../src/type-items.ts';
 import { KEPT_FIELDS } from '../../../src/operational.ts';
 import { append, type Decision, type Fact } from '../../../src/log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from '../../../src/replay.ts'; import { changedFacts, itemFacts, linkFacts } from '../../../src/facts.ts';
-import { unwaitFollows, whoseWord, type Unwaited } from '../../../src/unwait.ts'; import { asOwner, forgetIn, ownerRows } from './forget.ts';
-import type { Authority, ChangeInput, SourceSpec } from './pelago-types.ts';
+import { asOwner, forgetIn, ownerRows } from './forget.ts';
+import type { Authority, ChangeInput, Op, SourceSpec } from './pelago-types.ts';
 import type { Archipelago } from './pelago.ts';
 import type { Verdict } from '../../../src/rules.ts';
 
@@ -41,16 +41,43 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
   const at = new Map(input.ops.map((op, i) => [op, i + 1]));
   const facts: Fact[] = [];
   const DRY = Symbol('dry');
-  const unwaited: Unwaited[] = [], word = await whoseWord(map, opts.authority);
+  // What rides the change (write.follow.rides: the waits pack's unwait, the placement pack's sources) is asked op by
+  // op in the transaction below, and takes this change's verdict and authority: no rule judges it on its own.
+  const ride = await riders({ map, reg: map.registry });
+  const answers: Record<string, unknown[]> = {};
+  // Whose word the change is: where its authority is a person's, the person the map is read as.
+  const word = opts.authority?.of === 'human' ? (map.viewer || (await map.setting<string>('me')) || null) : null;
 
   await map.db.transaction(async (tx) => {
     // Facts first: each op is planned on the map as the ops before it left it, and its facts projected at once.
     const when = await stamp(tx);
     const said = async (some: Fact[]) => { facts.push(...some); await projectFacts(tx, reg, when, some); };
     const fallback = await map.defaultVisibility(tx);
-    const source = (spec: SourceSpec) => ensureSource(map, tx, spec, said, mint, opts.privateTo);
-    const defaultSource = input.source ? await source(input.source) : null;
-    const sourceOf = async (op: { source?: SourceSpec }) => (op.source ? source(op.source) : defaultSource);
+    // What rides at an op: its ops said where they are asked (a create minted by its ref), the item a source is, and
+    // what the change answers.
+    const rodeIds: Record<string, string> = {};
+    const riding = async (op: Op): Promise<Fact[]> => {
+      if (op.op === 'unlink') return [['-', op.relation, 'link']];
+      if (op.op !== 'create' || !op.ref) return [];
+      const type = map.registry.type(op.type);
+      if (!type) throw new Error(`Change rejected:\n- ${op.type}: no such type`);
+      const problems = map.registry.check(op.type, undefined, op.props ?? {});
+      if (problems.length) throw new Error(`Change rejected:\n- ${op.type}: ${problems.join(`\n- ${op.type}: `)}`);
+      const id = (rodeIds[op.ref] = mint(op.ref, 'e'));
+      const visibility = op.visibility ?? fallback;
+      return itemFacts({ id, type: type.id, title: op.title, body: op.body ?? '', status: op.status ?? type.statuses.open[0], visibility, private_to: privateTo(map, visibility, opts.privateTo), props: op.props ?? {} });
+    };
+    const rides = async (at: number, place: 'source' | 'after', spec?: SourceSpec): Promise<string | null> => {
+      let is: string | null = null;
+      for (const rode of await ride(ops, { q: tx, at, place, ...(spec && { source: spec }), authority: opts.authority ?? null, word, registry: reg })) {
+        for (const op of rode.ops ?? []) await said(await riding(op));
+        if (rode.is) is = rodeIds[rode.is] ?? rode.is;
+        for (const [k, v] of Object.entries(rode.answer ?? {})) (answers[k] ??= []).push(...v);
+      }
+      return is;
+    };
+    const defaultSource = input.source ? await rides(-1, 'source', input.source) : null;
+    const sourceOf = async (op: { source?: SourceSpec }, i: number) => (op.source ? rides(i, 'source', op.source) : defaultSource);
     const resolve = (key: string) => created[key] ?? key;
     // What this change makes has its id from the start, so a title or note in the same change can name it:
     // {ref} becomes the id of the item made under that ref. Braces around anything else are left alone.
@@ -67,7 +94,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
           await said(itemFacts({
             id, type: op.type, title: named(op.title.trim()), body: named(op.body) ?? '', status: op.status ?? type.statuses.open[0],
             visibility, private_to: privateTo(map, visibility, opts.privateTo), owner: op.owner ? resolve(op.owner) : null, confidence: op.confidence ?? 1,
-            source_id: type.columns && !type.columns.source ? null : await sourceOf(op), props: { ...reg.defaults(op.type), ...refsIn(op.props, named) },
+            source_id: type.columns && !type.columns.source ? null : await sourceOf(op, i), props: { ...reg.defaults(op.type), ...refsIn(op.props, named) },
           }));
           await kept(tx, id, op.props);
           break;
@@ -98,7 +125,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
           const to = resolve(op.to);
           const same = await tx.query(`select 1 from relation where type = $1 and from_id = $2 and to_id = $3 and valid_to is null`, [op.type, from, to]);
           if (same.rows.length) break; // already linked
-          await said(linkFacts({ id: mint(`#${at.get(op)}`, 'r'), type: op.type, from_id: from, to_id: to, props: op.props ?? {}, confidence: op.confidence ?? 1, source_id: await sourceOf(op) }));
+          await said(linkFacts({ id: mint(`#${at.get(op)}`, 'r'), type: op.type, from_id: from, to_id: to, props: op.props ?? {}, confidence: op.confidence ?? 1, source_id: await sourceOf(op, i) }));
           break;
         }
         case 'unlink':
@@ -149,7 +176,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
           break; // registered after the transaction
       }
       await said(await ownerFollows(tx, op, resolve, resolve(op.op === 'create' ? (op.ref ?? `#${i + 1}`) : ''), () => mint(`owner#${at.get(op)}`, 'r')));
-      await said(await unwaitFollows(tx, reg, op, word, unwaited, ops));
+      await rides(i, 'after');
     }
     if (opts.dry) throw DRY;
     const rule: Decision = opts.rule ?? { outcome: 'apply', spared: [] };
@@ -161,7 +188,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
   if (opts.dry) return { status: 'dry' as const, changeset, created, warnings, facts, ids };
 
   await after({ map, reg }, { changeset, actor, reason: input.reason, ops }, warnings); // write.after: the types it made, what it supersedes, and what packs do
-  return { status: 'applied' as const, changeset, created, warnings, ...(unwaited.length && { unwaited }) };
+  return { status: 'applied' as const, changeset, created, warnings, ...answers };
 }
 
 /** A prop's value with {ref} replaced by the id it makes, in every string inside it (a lens's filter, a style named in it). */
@@ -184,20 +211,4 @@ async function kept(tx: Q, id: string, props: Props = {}) {
   if (!ours.length) return;
   const set = Object.fromEntries(ours.filter(([, v]) => v !== null && v !== undefined));
   await tx.query(`update entity set props = (props || $2::jsonb) - $3::text[] where id = $1`, [id, JSON.stringify(set), ours.filter(([k]) => !(k in set)).map(([k]) => k)]);
-}
-
-async function ensureSource(map: Archipelago, q: Q, spec: SourceSpec, said: (facts: Fact[]) => Promise<void>, mint: (key: string, prefix: string) => string, to?: string | null): Promise<string | null> {
-  const type = map.registry.type('source');
-  if (!type) return null;
-  const found = await q.query<{ id: string }>(`select id from entity where type = 'source' and props->>'uri' = $1 and archived_at is null -- index entity_source_uri`, [spec.uri]);
-  if (found.rows.length) return found.rows[0].id;
-  const id = mint(`source ${spec.uri}`, 'e');
-  const props: Props = { uri: spec.uri };
-  if (spec.kind) props.kind = spec.kind;
-  const problems = map.registry.check('source', undefined, props);
-  if (problems.length) throw new Error(`Change rejected:\n- source: ${problems.join('\n- source: ')}`);
-  const visibility = await map.defaultVisibility(q);
-  // The source's own facts, before the facts that name it.
-  await said(itemFacts({ id, type: type.id, title: spec.title ?? spec.uri, body: spec.excerpt ?? '', status: 'recorded', visibility, private_to: privateTo(map, visibility, to), props }));
-  return id;
 }

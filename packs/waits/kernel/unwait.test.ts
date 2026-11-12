@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { KernelContext } from '#pelago/kernel';
-import { type Q, type Reg, type Unwaited, unwaitFollows, whoseWord } from './unwait.ts';
+import { follow, type Q, type Reg, type Unwaited, unwaitFollows, whoseWord } from './unwait.ts';
 
 const reg: Reg = { relationFamily: (...r) => r, type: (id) => (id === 'task' ? { statuses: { closed: ['done'] } } : undefined) };
 const q: Q = {
@@ -15,6 +15,17 @@ test("closing an item on a person's word takes back its waits_on to them, but th
   const facts = await unwaitFollows(q, reg, { op: 'update', id: 't1', status: 'done' }, 'p', gone, [{ op: 'unlink', relation: 'r2' }]);
   assert.deepEqual(facts, [['-', 'r1', 'link']]);
   assert.deepEqual(gone, [{ item: 't1', person: 'p', relation: 'r1' }]);
+});
+
+test('as a ride: after a closing op, its unlinks ride the change and the answer names them; elsewhere, nothing', async () => {
+  const ctx = {} as KernelContext;
+  const ops = [{ op: 'update', id: 't1', status: 'done' }];
+  assert.deepEqual(await follow(ctx, ops, { q, at: 0, place: 'after', word: 'p', registry: reg }), {
+    ops: [{ op: 'unlink', relation: 'r1' }, { op: 'unlink', relation: 'r2' }],
+    answer: { unwaited: [{ item: 't1', person: 'p', relation: 'r1' }, { item: 't1', person: 'p', relation: 'r2' }] },
+  });
+  assert.deepEqual(await follow(ctx, ops, { q, at: 0, place: 'source', word: 'p', registry: reg }), {});
+  assert.deepEqual(await follow(ctx, ops, { q, at: 0, place: 'after', word: null, registry: reg }), {});
 });
 
 test('on no word, or short of closing, nothing follows', async () => {

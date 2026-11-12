@@ -2,8 +2,8 @@
 // is, and each filling is named for the pack it moves to in the next wave (docs/kernel-packs.md, "The order of the
 // wave"), which then takes it with its filling and never opens the write path again.
 //
-// Unwait and sources stay inline for now: both act at the level of facts inside the apply loop, and as a
-// write.follow their ops would be judged by the rules, which is the owner's to see first (task e_mhqvdzj6).
+// Unwait and sources left the apply loop for their packs (waits, placement) as fillings of write.follow.rides: what
+// they add rides the change's verdict, judged by no rule on its own (the owner, 12 Nov 2026, e_umv4gdqr).
 
 import { typesApplied } from './type-items.ts'; import { supersede } from './proposals.ts';
 import type { AfterEntry, BuiltIn, Point, WriteEnv } from './write-hooks.ts';

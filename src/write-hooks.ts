@@ -8,7 +8,9 @@
 //                   a stated visibility may narrow, never widen. Checked here, and the change refused naming the pack.
 //   write.validate  ops in, refusals and warnings out: reads only. Run where a change is planned (src/change-plan.ts).
 //   write.follow    ops in, more ops out: judged with the change, and run again before it applies.
-//   log.project     facts in, rows of its own tables out (src/log-project.ts).
+//   write.follow.rides  what rides the change: ops no rule judges, applied in its change set with its verdict and its
+//                   authority (held with it, applied when it is), asked op by op inside the apply's transaction.
+//   log.project    facts in, rows of its own tables out (src/log-project.ts).
 //   write.after     the change set in, nothing out: a failure is a warning, never an error.
 //   write.retype    a type or link type renamed, ops out, made as the pack through change.
 //
@@ -17,11 +19,12 @@
 import { BUILT_IN } from './write-fillings.ts';
 import { islandRegistry } from './island-pin.ts';
 import type { Archipelago } from './pelago.ts';
-import type { Op } from './pelago-types.ts';
+import type { Authority, Op, SourceSpec } from './pelago-types.ts';
+import type { Q } from './db.ts';
 import type { Registry } from './packs.ts';
 
 /** The points the write path opens. */
-export const POINTS = ['write.rewrite', 'write.validate', 'write.follow', 'log.project', 'write.after', 'write.retype'] as const;
+export const POINTS = ['write.rewrite', 'write.validate', 'write.follow', 'write.follow.rides', 'log.project', 'write.after', 'write.retype'] as const;
 export type Point = (typeof POINTS)[number];
 
 /** Who a change is from, as a validator is told: a person, or an agent or a pack's action. */
@@ -160,6 +163,47 @@ export const judged = (ops: Op[], followed: Followed): Op[] => ops.slice(0, ops.
 export async function followedStill(env: WriteEnv, ops: Op[], followed: Followed): Promise<void> {
   const again = await follow(env, judged(ops, followed));
   if (!same(again, followed)) throw rejected([`the map moved while this change was judged: what ${[...new Set([...again, ...followed].map((f) => f.pack))].join(', ')} follows it with is not what was judged. Send it again.`]);
+}
+
+/**
+ * What a filling of write.follow.rides is handed beside the ops, for one op of a change, inside the apply's
+ * transaction: what the ops before it left is what it reads. It is asked where the op names its source (`source`:
+ * what it adds is said before the op's facts, and `is` names the item that source is), and after each op (`after`).
+ * `at` is the op, from 0; -1 is the change's own source, asked before any op.
+ */
+export interface Ride {
+  q: Q;
+  at: number;
+  place: 'source' | 'after';
+  /** The source asked, where place is `source`. */
+  source?: SourceSpec;
+  authority: Authority | null;
+  /** Whose word the change is: where its authority is a person's, the person the map is read as. */
+  word: string | null;
+  /** The types the change applies by, its own type items included. */
+  registry: Registry;
+}
+
+/** What a filling of write.follow.rides answers: ops that ride the change (create with a ref, or unlink), the item a source is, and words for the change's answer. */
+export interface Rode { ops?: Op[]; is?: string; answer?: Record<string, unknown[]> }
+
+const RIDE_OPS = ['create', 'unlink'];
+
+/** write.follow.rides: the fillings, each asked op by op as the change applies; every answer checked against its bounds. */
+export async function riders(env: WriteEnv): Promise<(ops: Op[], ride: Ride) => Promise<Rode[]>> {
+  const all = await fillings(env, 'write.follow.rides');
+  return async (ops, ride) => {
+    const out: Rode[] = [];
+    for (const f of all) {
+      const rode = (await f.run(structuredClone(ops), ride)) as Rode | undefined;
+      if (rode === undefined) continue;
+      const bad = !rode || typeof rode !== 'object' || (rode.ops !== undefined && (!Array.isArray(rode.ops) || rode.ops.some((o) => !o || !RIDE_OPS.includes((o as { op?: string }).op ?? '') || (o.op === 'create' && !o.ref))))
+        || (rode.is !== undefined && typeof rode.is !== 'string') || (rode.answer !== undefined && Object.values(rode.answer ?? {}).some((v) => !Array.isArray(v)));
+      if (bad) throw rejected([`the ${f.pack} pack's ride answered something other than ops that ride (create with a ref, unlink), the item a source is, and lists for the answer`]);
+      out.push(rode);
+    }
+    return out;
+  };
 }
 
 /** write.after: each filling run once the change set is on the log; a failure is said as a warning, never an error, as the change has applied. */
