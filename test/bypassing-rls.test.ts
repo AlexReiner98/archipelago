@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { read, walk } from './structure-kit.ts'; // a module moved into a pack is counted at its shim's path
+import { read, walk } from './structure-kit.ts'; // every module is counted at its own place
 
 const files = ['src', 'ui', 'packs'].flatMap(walk).filter((f) => /\.(ts|js|mjs)$/.test(f));
 const count = (pattern: RegExp) =>

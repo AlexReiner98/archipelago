@@ -1,11 +1,11 @@
 // What a root pack's code may import while the kernel moves into packs (docs/kernel-packs.md, "Moving in the wave
 // (as built)"). The contract is read for who owns what: "The root packs" for their order, "Where each module goes" for
 // each module's pack, and the plumbing paragraph. A root module may import plumbing, its own pack, and the roots
-// before it, at their new place or through their shims; anything else it imported when the wave began is owed
-// (test/fixtures/root-imports.json), and nothing is added to that.
+// before it; anything else it imported when the wave began is owed (test/fixtures/root-imports.json, each module at
+// its own place since the gather), and nothing is added to that.
 
 import { posix } from 'node:path';
-import { MOVED, raw, rawWalk, SHIMS } from './structure-kit.ts';
+import { raw, rawWalk } from './structure-kit.ts';
 
 const CONTRACT = raw('docs/kernel-packs.md').replace(/\r\n/g, '\n');
 /** A section by its heading: the whole heading line, or up to its first comma ("### Plumbing, kept in `src/`"). */
@@ -22,11 +22,9 @@ export const PACK_OF = new Map<string, string>([
 ]);
 
 const rank = (pack: string) => ROOT_ORDER.indexOf(pack);
-/** A path under src/ or a pack's kernel/, as the module it is: its old path while the wave lasts. */
-const known = (path: string) => MOVED.get(path) ?? path;
-/** Which pack a module is in: where it was moved to, or where the contract sends it. */
+/** Which pack a module is in: where it lives, or where the contract sends one still in src/. */
 function packOf(path: string): string | undefined {
-  const at = /^packs\/([\w-]+)\/kernel\//.exec(SHIMS.get(path) ?? path)?.[1];
+  const at = /^packs\/([\w-]+)\/kernel\//.exec(path)?.[1];
   return at ?? (path.startsWith('src/') ? PACK_OF.get(posix.basename(path, '.ts')) : undefined);
 }
 
@@ -40,7 +38,7 @@ function rootFiles(): [string, string][] {
   for (const [m, pack] of PACK_OF) {
     if (rank(pack) < 0) continue;
     const path = `src/${m}.ts`;
-    if (SHIMS.has(path) || rawWalk('src').includes(path)) out.set(SHIMS.get(path) ?? path, pack);
+    if (rawWalk('src').includes(path)) out.set(path, pack);
   }
   for (const pack of ROOT_ORDER) for (const f of rawWalk(`packs/${pack}/kernel`)) if (f.endsWith('.ts') && !f.endsWith('.test.ts')) out.set(f, pack);
   return [...out];
@@ -52,10 +50,10 @@ export function rootImports(): string[] {
   for (const [file, pack] of rootFiles()) {
     for (const spec of imports(raw(file))) {
       if (!spec.startsWith('.')) continue; // node: and the four dependencies
-      const to = known(posix.normalize(posix.join(posix.dirname(file), spec)));
+      const to = posix.normalize(posix.join(posix.dirname(file), spec));
       const of = packOf(to);
       if (of === 'plumbing' || of === pack || (of !== undefined && rank(of) >= 0 && rank(of) < rank(pack))) continue;
-      found.push(`${known(file)} -> ${to}`);
+      found.push(`${file} -> ${to}`);
     }
   }
   return [...new Set(found)].sort();
