@@ -2,11 +2,15 @@
   "roots": [
     {
       "id": "core",
-      "hash": "f2418e63ace48968474564dd78ca9ff07b1075f70e5398e2e65405d9837e2884"
+      "hash": "14b7308e9ba8dd00b371b57ecd62535d5b48ae9ef41e3b4973ab8f58af2fc12f"
     },
     {
       "id": "database",
       "hash": "9e99e898b87d65539835d0d9f91198869d1d7c4a83efc2a9e401310d9470944b"
+    },
+    {
+      "id": "rules",
+      "hash": "721fc025dbb28915a5a4384bf5cc51baa7a1f13c5d361fd075610edbc6440096"
     }
   ]
 }

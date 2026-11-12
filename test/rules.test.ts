@@ -115,3 +115,18 @@ test('a drawing asks in data: inside the types its style writes it applies, anyt
   await assert.rejects(asked([{ op: 'create', type: 'shop.order', title: 'Oil' }], agent), /sent by the page/);
   assert.equal((await change(l, human, [{ op: 'update', id: task, title: 'Count it all' }])).status, 'applied', 'the person, not through a drawing, waits for nobody');
 });
+
+test("core's rule root: no change names a root pack, whoever sends it, and no setting lifts it", async () => {
+  const { judge } = await import('../src/rules.ts');
+  const reg = (await map()).registry;
+  const refused = (who: { human: boolean }, w: { op: string; type?: string; props?: Record<string, unknown> }) => judge(reg.rules, reg, who, w, []).refusers.map((r) => r.rule);
+  for (const who of [{ human: true }, { human: false }]) {
+    assert.deepEqual(refused(who, { op: 'create', type: 'pack', props: { name: 'database' } }), ['root'], "a pack item with a root pack's id");
+    assert.deepEqual(refused(who, { op: 'create', type: 'pack', props: { version_of: 'rules' } }), ['root'], 'a version of a root pack, so no island runs one and none carries code');
+    assert.deepEqual(refused(who, { op: 'create', type: 'pack', props: { version_of: 'core' } }), ['root'], 'core is a root pack');
+    assert.deepEqual(refused(who, { op: 'pack_off', props: { pack: 'database' } }), ['root_off'], 'turning one off');
+    assert.deepEqual(refused(who, { op: 'create', type: 'pack', props: { name: 'shop' } }), [], 'any other pack');
+    assert.deepEqual(refused(who, { op: 'pack_off', props: { pack: 'shop' } }), []);
+  }
+  assert.ok(reg.rules.filter((r) => r.id?.startsWith('root')).every((r) => !r.lifted), 'no setting lifts it');
+});

@@ -968,6 +968,25 @@
       "say": "Forgetting \"{title}\" is the owner's: it is for good, and cannot be undone."
     },
     {
+      "id": "root",
+      "when": {
+        "op": ["create", "update", "restore"],
+        "type": "pack",
+        "root": ["name", "version_of"]
+      },
+      "then": "refuse",
+      "say": "\"{title}\" names a root pack: a root pack is the server's own code, changed only in a pull request the owner approves, never on a map."
+    },
+    {
+      "id": "root_off",
+      "when": {
+        "op": "pack_off",
+        "root": ["pack"]
+      },
+      "then": "refuse",
+      "say": "A root pack is the server's own code: it is never taken out of a map."
+    },
+    {
       "id": "asked",
       "when": { "actor": "agent", "asked": true },
       "then": "hold",
