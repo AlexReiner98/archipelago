@@ -1,0 +1,11 @@
+{
+  "id": "seal",
+  "version": "0.1.0",
+  "title": "Seal",
+  "description": "Keys, and what forget destroys of them: each item's key in the vault, the sealing of free text on the log and in the operational streams, the server's secrets and the seal of a backup. Started after database.",
+  "kernel": {
+    "trust": "root",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}
