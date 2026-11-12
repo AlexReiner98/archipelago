@@ -43,12 +43,7 @@ export function setBounced(check: ((email: string) => Promise<boolean>) | undefi
 /** An address on its own, from "Name <address>" or a bare address. */
 export const addressOf = (from: string) => /<([^>]+)>/.exec(from)?.[1] ?? from.trim();
 
-const EMAIL = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/;
-/** An email address as it is kept and compared: trimmed and in lower case. Undefined when it is not one. */
-export function normalEmail(email: unknown): string | undefined {
-  const e = typeof email === 'string' ? email.trim().toLowerCase() : '';
-  return EMAIL.test(e) && e.length <= 254 ? e : undefined;
-}
+export { normalEmail } from './email-address.ts';
 
 /** Whether this server sends mail, or only writes it to its log. */
 export const mailConfigured = () => Boolean(mailer || env('MAIL_FROM'));

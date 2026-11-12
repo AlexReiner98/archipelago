@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { needAdmin } from './actor-checks.ts';
 import { createToken } from './auth.ts';
 import type { Q } from './db.ts';
-import { mailConfigured, normalEmail, sendMail } from './mail.ts';
+import { normalEmail } from './email-address.ts';
 import { configureStanding, limitOf, stillWritable, type Limits, type Standing } from './standing.ts';
 import { indexMember } from './control-index.ts';
 import { wholeMap } from './outbox.ts';
@@ -51,6 +51,25 @@ export const itemLink = (workspace: string) => `${site.origin}/i/${workspace}/{i
 export const renameWorkspace = (workspace: string, name: string) => site.rename(workspace, name);
 /** Which workspaces each address belongs to is kept beside the workspaces too, so a sign-in opens only those (src/control-index.ts). */
 const noted = indexMember;
+
+/**
+ * What members tells the people it is about: an invitation issued, or the sign-in codes asked for. Members only raises
+ * it; the mail side (src/member-mail.ts) says how it reads and sends it, and whether it sends at all.
+ */
+export type MemberNotice =
+  | { kind: 'invite_issued'; to: string; replyTo?: string; by: string; workspace: string; signIn: string }
+  | { kind: 'sign_in_code'; to: string; codes: string[]; minutes: number; days: number };
+export interface MemberNotices {
+  /** Whether a notice reaches anyone: a workspace is made only where its owner can be sent a code. */
+  sends: () => boolean;
+  /** Tell it. Throws when it did not go. */
+  send: (notice: MemberNotice) => Promise<void>;
+}
+let notices: MemberNotices = { sends: () => false, send: async (n) => void console.log(`member notice not sent (no mail side loaded): ${n.kind}`) };
+/** Who tells members' notices: the mail side, when it is loaded. */
+export function onMemberNotice(given: MemberNotices) {
+  notices = given;
+}
 
 // A workspace's limits are the server's, not its map's: the server pack that made it says them (src/standing.ts).
 export { limitOf };
@@ -95,7 +114,7 @@ export async function admitMember(whole: Archipelago, email: string, admin: bool
  * someone can always sign in to it by email (the owner, 8 Nov 2026). Every way a workspace is made asks here first.
  */
 export function ownerEmail(given: unknown): string {
-  if (!mailConfigured()) throw new Error('This server sends no mail (set PELAGO_MAIL_FROM): a workspace is made only where its owner can sign in by email.');
+  if (!notices.sends()) throw new Error('This server sends no mail (set PELAGO_MAIL_FROM): a workspace is made only where its owner can sign in by email.');
   const email = normalEmail(given);
   if (!email) throw new Error("A workspace is made with its owner's email address (email), so they can sign in to it.");
   return email;
@@ -213,17 +232,7 @@ export async function requestSignIn(workspaces: { id: string; name: string; db: 
   // An address in no workspace is sent nothing: anyone can type one, and mail its owner never asked for is marked as
   // spam, which costs every mail after it. The page offers Start a workspace after asking, the same for everyone.
   if (!links.length) return;
-  await sendMail({
-    to: email,
-    subject: 'Your Archipelago sign-in code',
-    text: [
-      'Hello,',
-      `Here is the code you asked for to sign in to Archipelago. Type it on the page where you asked. It works once, for the next ${LINK_MINUTES} minutes, and keeps that browser signed in for ${SIGNED_IN_DAYS} days.`,
-      links.join('\n'),
-      'If you did not ask to sign in, you can ignore this email: nobody can sign in without the code.',
-      '- Archipelago',
-    ].join('\n\n'),
-  });
+  await notices.send({ kind: 'sign_in_code', to: email, codes: links, minutes: LINK_MINUTES, days: SIGNED_IN_DAYS });
 }
 
 
@@ -269,19 +278,8 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
       const { rows: theirs } = actor.person ? await whole.db.query<{ email: string }>(`select email from member where person_id = $1 and removed_at is null limit 1`, [actor.person]) : { rows: [] };
       const replyTo = theirs[0]?.email ?? normalEmail(inviter?.props?.email);
       try {
-        await sendMail({
-          to: email,
-          ...(replyTo && { replyTo }),
-          subject: `${by} invited you to ${name} on Archipelago`,
-          text: [
-            'Hello,',
-            `${by} has invited you to ${name} on Archipelago, where its people and their AI agents keep track of their work together.`,
-            // No sign-in link (see requestSignIn): they ask for a code at the sign-in page, which is mailed to them.
-            `To accept, ${signInBy(email)}`,
-            `You are getting this because ${by} added ${email} to ${name}. If you were not expecting it, you can ignore this email.${replyTo ? ` Reply to it to reach ${by}.` : ''}`,
-            '- Archipelago',
-          ].join('\n\n'),
-        });
+        // No sign-in link (see requestSignIn): they ask for a code at the sign-in page, which is mailed to them.
+        await notices.send({ kind: 'invite_issued', to: email, ...(replyTo && { replyTo }), by, workspace: name, signIn: signInBy(email) });
         return { email, person, invited: true };
       } catch (err) {
         return { email, person, invited: false, error: (err as Error).message };
