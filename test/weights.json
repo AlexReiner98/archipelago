@@ -37,6 +37,7 @@
   "packs/reader/visit.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/refine/replay.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/runs/kernel/runs.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/sessions/kernel/context.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/refine/snags.test.ts": { "pglite": 0, "postgres": 0 },
   "test/activity.test.ts": { "pglite": 5, "postgres": 2.3 },
   "test/addresses.test.ts": { "pglite": 6.7, "postgres": 4.1 },
