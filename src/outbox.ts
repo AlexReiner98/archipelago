@@ -15,8 +15,11 @@ export function configureOutbox(next: Lookup): void {
 /** Another workspace's whole map on this server, or undefined if there is no such workspace. */
 export const otherMap = async (workspace: string): Promise<Archipelago | undefined> => (workspace ? lookup?.(workspace) : undefined);
 
-/** The whole of a map, not one person's view of it, for the few things an admin does to all of it. */
-export async function wholeMap(l: Archipelago): Promise<Archipelago> {
+/**
+ * The whole of a map with row-level security bypassed: not one person's view of it, for the few things the system does to
+ * all of it. Every caller is listed in test/bypassing-rls.test.ts, and a new one is a reviewed change.
+ */
+export async function bypassingRls(l: Archipelago): Promise<Archipelago> {
   if (l.viewer === undefined) return l;
   const whole = await lookup?.(l.workspace);
   if (!whole) throw new Error('This server cannot reach the whole workspace.');

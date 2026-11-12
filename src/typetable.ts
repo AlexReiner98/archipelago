@@ -65,15 +65,15 @@ interface Moves {
 
 /** Have the migrations asked again on the next sync: what a merge brought in may be in the shapes from before them. */
 export async function movesAgain(l: Archipelago): Promise<void> {
-  await wholeMap(l).db.query(`delete from setting where key = $1`, [MOVES]);
+  await bypassingRls(l).db.query(`delete from setting where key = $1`, [MOVES]);
 }
 
-/** The map whole: the type table is the system's own, kept as the server keeps it whoever's act changed the types. */
-const wholeMap = (l: Archipelago) => (l.db.whole ? new Archipelago(l.db.whole, l.registry, l.policy, l.workspace) : l);
+/** The map whole, row-level security bypassed (listed in test/bypassing-rls.test.ts): the type table is the system's own, kept as the server keeps it whoever's act changed the types. */
+const bypassingRls = (l: Archipelago) => (l.db.whole ? new Archipelago(l.db.whole, l.registry, l.policy, l.workspace) : l);
 
 /** Bring the table in line with the packs, and the registry in line with the table. Returns what it changed. */
 export async function syncTypes(given: Archipelago): Promise<{ activated: string[]; dormant: string[]; changed: Record<string, string[]>; moved: Record<string, number> }> {
-  const l = wholeMap(given);
+  const l = bypassingRls(given);
   const reg = l.registry;
   const { rows } = await l.db.query<Row>(`select id, what, pack, state, def from type_def`);
   const kept = new Map(rows.map((r) => [r.id, r]));

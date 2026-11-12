@@ -4,7 +4,7 @@
 import { z } from 'zod';
 import { bodyAfter } from './ops.ts';
 import { pictureOf } from './query-kept.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { type Focus, point as setFocus, took } from './presence.ts';
 import { op, source, TITLE_MAX } from './tool-ops.ts';
@@ -21,7 +21,7 @@ import { logged } from './logged.ts';
 // Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
 export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string, pane?: string, run?: string, focus?: boolean, watch?: boolean): Promise<Focus> {
   const next = { at: Date.now(), hash, actor: actor.name, note };
-  const { db } = await wholeMap(l);
+  const { db } = await bypassingRls(l);
   await setFocus(db, l, next);
   await took(db, l, { kind, actor: actor.name, did: note, hash, ...(pane && { pane }), ...(run && { run }), ...(focus && { focus }), ...(watch && { watch }) }, true);
   return next;
@@ -29,13 +29,13 @@ export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change
 
 /** A session began: the owner's page opens it a tab of its own, on what it is working on. A show cannot ask for this. */
 export async function sessionOpened(l: Archipelago, actor: Actor, run: string, task?: string, takes?: string): Promise<void> {
-  const { db } = await wholeMap(l);
+  const { db } = await bypassingRls(l);
   await took(db, l, { kind: 'show', actor: actor.name, hash: `e/${task ?? run}`, opens: true, canvas: true, run, ...(takes && { takes }) }, true);
 }
 
 /** A session took up a task: the canvas of its tab moves to it. Nobody asked to read its page, so none opens. */
 export async function sessionTookUp(l: Archipelago, actor: Actor, run: string, task: string): Promise<void> {
-  const { db } = await wholeMap(l);
+  const { db } = await bypassingRls(l);
   await took(db, l, { kind: 'show', actor: actor.name, hash: `e/${task}`, canvas: true, run }, true);
 }
 
@@ -81,7 +81,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       const who = `${l.workspace}:${actor.token ?? ''}`;
       let input = given;
       if (retry) {
-        const kept = await keptFor<Refused>((await wholeMap(l)).db, `refused:${retry}`);
+        const kept = await keptFor<Refused>((await bypassingRls(l)).db, `refused:${retry}`);
         if (!kept || kept.who !== who) throw new Error(`No refused change is kept as "${retry}": one is kept for ${REFUSED_MINUTES} minutes. Send the change whole.`);
         const ops = [...kept.input.ops];
         for (const fix of fixes ?? []) {
@@ -151,12 +151,12 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         if (actor.kind !== 'agent' || !message.startsWith('Change rejected')) throw err;
         // A refused change is kept, so that what is wrong with one op is all that has to be sent again.
         const name = retry ?? `k_${Math.random().toString(36).slice(2, 10)}`;
-        await keep((await wholeMap(l)).db, `refused:${name}`, { who, input } satisfies Refused, REFUSED_MINUTES * 60_000);
+        await keep((await bypassingRls(l)).db, `refused:${name}`, { who, input } satisfies Refused, REFUSED_MINUTES * 60_000);
         throw new Error(
           `${message}\nNothing was changed. The change is kept for ${REFUSED_MINUTES} minutes as "${name}": to correct it, send change with only retry: "${name}" and fixes: [{ at: <the op’s number>, op: <the whole op as it should be> }]. Every other op is sent as it was.`,
         );
       }
-      if (retry) await take((await wholeMap(l)).db, `refused:${retry}`);
+      if (retry) await take((await bypassingRls(l)).db, `refused:${retry}`);
       // A held change that sets again all an older one of the same proposer asked says so, so that one can be withdrawn.
       const covers = result.status === 'proposed' ? covering(await l.proposals()).get(result.proposal) : undefined;
       if (covers && result.status === 'proposed') result = { ...result, covers, note: `${result.note} It covers ${covers.join(', ')}, held before it: withdraw those (revise, action withdraw).` };

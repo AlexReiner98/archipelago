@@ -15,7 +15,7 @@ import { FORMER_NAMES, REPORT_TOOLS } from './report.ts';
 import { TOKEN_TOOLS } from './token-tools.ts';
 import { ASK_TOOLS } from './token-ask.ts';
 import { CONNECTION_TOOLS } from './connection-tools.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import { LOOK_READS } from './looks.ts';
 import type { Registry } from './packs.ts';
 import { packActionByShort, packTool, packTools } from './packtools.ts';
@@ -68,7 +68,7 @@ async function step(l: Archipelago, actor: Actor, name: string, input: Record<st
           : name.replaceAll('_', ' ');
   const kind = name === 'view' || name === 'search' ? name : READS.has(name) ? 'read' : 'other';
   const run = typeof input.run === 'string' && /^e_[a-z0-9]{8}$/.test(input.run) ? input.run : undefined;
-  await took((await wholeMap(l)).db, l, { kind, actor: actor.name, did, hash: id ? `e/${id}` : name === 'view' && input.name === 'flat' ? 'graph?lens' : undefined, ...(run && { run }) });
+  await took((await bypassingRls(l)).db, l, { kind, actor: actor.name, did, hash: id ? `e/${id}` : name === 'view' && input.name === 'flat' ? 'graph?lens' : undefined, ...(run && { run }) });
 }
 
 export const TOOLS: Record<string, Tool> = {

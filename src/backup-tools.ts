@@ -8,7 +8,7 @@ import { gzipSync } from 'node:zlib';
 import { dump, localPackOf } from './backup.ts';
 import { dumpVault, rewrap } from './vault.ts';
 import type { Q } from './db.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import { actorId, type Actor } from './pelago.ts';
 import { mayDo } from './rules.ts';
 import type { Tool } from './tools.ts';
@@ -61,7 +61,7 @@ export const BACKUP_TOOLS: Record<string, Tool> = {
       'Everything is in it, private items included, so an agent may call this only when the owner allows it in Settings. To rehearse a change on it: node src/backup.ts restore <file> <new data folder>, then a throwaway server on that folder.',
     input: {},
     run: async (l, actor) => {
-      const whole = await wholeMap(l);
+      const whole = await bypassingRls(l);
       if (!(await actsForAdmin(whole.db, actor))) throw new Error('Only a workspace admin can download its backup.');
       await mayDo(l.db, l.registry, actor.kind === 'human', 'backup_download');
       const taken = await dump(whole.db, { id: l.workspace, name: l.workspace }, localPackOf(whole.registry));

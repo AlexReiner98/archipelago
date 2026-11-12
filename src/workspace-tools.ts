@@ -7,7 +7,7 @@ import { limitOf, renameWorkspace } from './members.ts';
 import { looksThisHour } from './looks.ts';
 import { sessionsAwake } from './sessions.ts';
 import { requestsThisMinute, storageOf } from './workspace-use.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import { actorId, type Archipelago } from './pelago.ts';
 import { askedLately } from './replies.ts';
 import { atSetting, AT_MAX, countsTo, isAt, onReply } from './reply-rules.ts';
@@ -34,14 +34,14 @@ const settings = async (l: Archipelago) => {
 };
 
 /** Whether the owner has turned the sandbox off for drawings here: read whole, since every member's page draws by it (ui/style-code.js). */
-const drawingsOpen = async (l: Archipelago) => (await (await wholeMap(l)).setting(DRAWINGS_OPEN)) === true;
+const drawingsOpen = async (l: Archipelago) => (await (await bypassingRls(l)).setting(DRAWINGS_OPEN)) === true;
 
 /**
  * Each rule on a reply's end, for the owner's switch: what it says, the setting that turns it off, how often it asked
  * this week, and for one that counts, what it counts and the number it asks at (the owner's, or its pack's).
  */
 async function replyRules(l: Archipelago, lifted: Record<string, boolean>, set: Map<string, number>) {
-  const asked = await askedLately((await wholeMap(l)).db, l);
+  const asked = await askedLately((await bypassingRls(l)).db, l);
   return l.registry.rules.filter(onReply).map((r) => {
     const rule = `${r.pack}.${r.id ?? ''}`;
     const counts = countsTo(r);
@@ -51,7 +51,7 @@ async function replyRules(l: Archipelago, lifted: Record<string, boolean>, set: 
 
 /** How much of what its limits cap the workspace uses now (src/standing.ts), each said as the Limits card shows it. */
 async function limitUse(l: Archipelago, limits: Limits) {
-  const { db } = await wholeMap(l);
+  const { db } = await bypassingRls(l);
   const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from member where removed_at is null`);
   return useOf(limits, { members: rows[0].n, storage: await storageOf(l.workspace), requests: requestsThisMinute(l.workspace), sessions: await sessionsAwake(l), looks: looksThisHour(l.workspace) });
 }

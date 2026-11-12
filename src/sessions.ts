@@ -8,7 +8,7 @@ import { livesIn, livesInFor, placeFor } from './places.ts';
 import { actorId, type Actor, type Entity, type Archipelago, type Op } from './pelago.ts';
 import { askView, canAsk } from './askview.ts'; import { scopeWithin } from './within.ts';
 import { cutTitle, mintName, saidTitle, sessionLabelled, sessionTitle } from './session-name.ts';
-import { roomForSession, workspaceName } from './standing.ts'; import { wholeMap } from './outbox.ts'; import { took } from './presence.ts';
+import { roomForSession, workspaceName } from './standing.ts'; import { bypassingRls } from './outbox.ts'; import { took } from './presence.ts';
 import { packVersionsFor } from './pack-versions.ts'; import { VIEWS } from './views.ts'; import { keepTouched } from './touched.ts'; import { unreconciled } from './reconcile.ts';
 import { hookRunHere, isChat, resolveRun, sessionsAwake, takeUp } from './chat-run.ts'; import { parentOps, parentRun } from './session-parent.ts';
 export { resolveRun, sessionPrompted, sessionsAwake } from './chat-run.ts';
@@ -448,6 +448,6 @@ export async function sessionEnd(
   await heard(l, run, `Session "${run.title}" ended`);
   // The owner's page closes its tab (ui/tab-life.js); a page that missed this finds it ended when it next reads the sessions.
   // One that stays, waiting, lets its tab go until it next shows something.
-  await took((await wholeMap(l)).db, l, { kind: 'other', actor: actorId(actor), did: stays ? 'waiting' : (input.reason ?? 'ended'), ...(stays ? { rests: true } : { ends: true }), run: run.id }, true).catch((err) => console.error(`session_end ${run.id}: the owner's page could not be told: ${(err as Error).message}`));
+  await took((await bypassingRls(l)).db, l, { kind: 'other', actor: actorId(actor), did: stays ? 'waiting' : (input.reason ?? 'ended'), ...(stays ? { rests: true } : { ends: true }), run: run.id }, true).catch((err) => console.error(`session_end ${run.id}: the owner's page could not be told: ${(err as Error).message}`));
   return { run: run.id, status: stays ? 'waiting' : outcome, released: held.length, note: stays ? 'Kept. The session stays open, under its name, until its chat ends.' : undefined };
 }

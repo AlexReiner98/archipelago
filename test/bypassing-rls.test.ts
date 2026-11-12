@@ -1,0 +1,58 @@
+// Who may read a map with row-level security bypassed. bypassingRls (src/outbox.ts) hands back the whole map, not the
+// viewer's, and a Db's `whole` is the same database without the viewer's role; each skips the policies src/db.ts sets.
+// Every file that reaches past them is listed here with how many times, as it stood on 12 Nov 2026 (bug e_qeyv9c3u):
+// a new caller, or another call in a listed file, is a change someone reviews by adding it here. An entry may only
+// shrink, as the lists in test/structure.test.ts do: when a call goes, lower its number in the same commit.
+
+import assert from 'node:assert/strict';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { test } from 'node:test';
+
+const ROOT = join(import.meta.dirname, '..');
+const walk = (dir: string): string[] =>
+  readdirSync(join(ROOT, dir)).flatMap((name) => {
+    const path = `${dir}/${name}`;
+    return statSync(join(ROOT, path)).isDirectory() ? walk(path) : [path];
+  });
+const files = ['src', 'ui', 'packs'].flatMap(walk).filter((f) => /\.(ts|js|mjs)$/.test(f));
+const count = (pattern: RegExp) =>
+  Object.fromEntries(files.map((f) => [f, readFileSync(join(ROOT, f), 'utf8').match(pattern)?.length ?? 0]).filter(([, n]) => (n as number) > 0));
+
+/** Calls of bypassingRls, each file's count. */
+const CALLERS: Record<string, number> = {
+  'src/backup-tools.ts': 1,
+  'src/chat-run.ts': 1,
+  'src/hook-tool.ts': 1,
+  'src/members.ts': 4,
+  'src/notify-mail.ts': 2,
+  'src/notify.ts': 1,
+  'src/pack-launch.ts': 1,
+  'src/session-name.ts': 2,
+  'src/session-quiet.ts': 1,
+  'src/sessions.ts': 1,
+  'src/token-ask.ts': 2,
+  'src/token-tools.ts': 1,
+  'src/tool-acts.ts': 2,
+  'src/tool-change.ts': 6,
+  'src/tool-human.ts': 4,
+  'src/tool-reads.ts': 4,
+  'src/tools.ts': 1,
+  'src/touched.ts': 3,
+  'src/typetable.ts': 2,
+  'src/usage.ts': 1,
+  'src/workspace-tools.ts': 3,
+};
+
+/** Reads of a Db's `whole`: src/db.ts carries it through, and the type table's own bypassingRls takes it. */
+const WHOLE_DB: Record<string, number> = { 'src/db.ts': 1, 'src/typetable.ts': 2 };
+
+const over = (counted: Record<string, number>, frozen: Record<string, number>) => [
+  ...Object.entries(counted).filter(([f, n]) => n > (frozen[f] ?? 0)).map(([f, n]) => `${f}: ${n}, over ${frozen[f] ?? 0}`),
+  ...Object.entries(frozen).filter(([f, n]) => (counted[f] ?? 0) < n).map(([f, n]) => `${f}: ${counted[f] ?? 0} now: lower its entry from ${n}`),
+];
+
+test('every read past row-level security is listed', () => {
+  assert.deepEqual(over(count(/(?<!function )\bbypassingRls\(/g), CALLERS), [], 'Read as the viewer (l.db) where you can; a new bypassingRls caller is added to CALLERS for review.');
+  assert.deepEqual(over(count(/\bdb\.whole\b/g), WHOLE_DB), [], 'Reach the whole map through bypassingRls, listed in CALLERS, not through a Db\'s whole.');
+});

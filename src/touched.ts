@@ -5,7 +5,7 @@
 // end, which items its calls to the map named (scripts/pelago-hook.mjs reads them from the session's transcript).
 
 import type { Q } from './db.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import type { Archipelago } from './pelago.ts';
 import { keep, kept, keptAll } from './transient.ts';
 
@@ -27,18 +27,18 @@ export async function addTouched(db: Q, run: string, said: unknown): Promise<str
 
 /** The items a run touched, in the order it first touched them. */
 export async function touchedBy(l: Archipelago, run: string): Promise<string[]> {
-  return (await kept<string[]>((await wholeMap(l)).db, key(run))) ?? [];
+  return (await kept<string[]>((await bypassingRls(l)).db, key(run))) ?? [];
 }
 
 /** The items each of some runs touched, read at once, in the order the runs are given: one read, not one a run. */
 export async function touchedByAll(l: Archipelago, runs: string[]): Promise<string[]> {
-  const sets = await keptAll<string[]>((await wholeMap(l)).db, runs.map(key));
+  const sets = await keptAll<string[]>((await bypassingRls(l)).db, runs.map(key));
   return runs.flatMap((run) => sets.get(key(run)) ?? []);
 }
 
 /** A run has ended: its set is kept a week from now. */
 export async function keepTouched(l: Archipelago, run: string): Promise<void> {
-  const { db } = await wholeMap(l);
+  const { db } = await bypassingRls(l);
   const had = await kept<string[]>(db, key(run));
   if (had) await keep(db, key(run), had, TOUCHED_MS);
 }
