@@ -9,10 +9,10 @@ import { join } from 'node:path';
 import { migrations } from '../packs/database/kernel/migrate.ts';
 import { read, ROOT, rootPacks, target } from './structure-kit.ts';
 
-/** The latest step main has released (a0438797, 11 Nov 2026). Raise it when a newer step reaches main, with its key below. */
-export const RELEASED = 44;
+/** The latest step main has released (e4df2e8f, 12 Nov 2026). Raise it when a newer step reaches main, with its key below. */
+export const RELEASED = 47;
 /** The released steps' SQL, hashed: a step at or below RELEASED that changes changes this, and the structure test says so. */
-export const RELEASED_KEY = 'e71d292b7e55';
+export const RELEASED_KEY = '112d481a2f33';
 export const releasedKey = async () =>
   createHash('sha256').update((await migrations()).filter((m) => m.version <= RELEASED).map((m) => `${m.version}\n${m.sql}\n${m.server ?? ''}`).join('\n')).digest('hex').slice(0, 12);
 
