@@ -1,0 +1,11 @@
+{
+  "id": "query",
+  "version": "0.1.0",
+  "title": "Query",
+  "description": "The query engine: how a lens is read and answered. So far the parts that read no map: a lens's steps, an item's altitude, and what changed summed up for an agent.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}

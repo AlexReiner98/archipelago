@@ -12,7 +12,8 @@ import { readManifest, tierOf } from '../src/manifest.ts';
 import { PackHost } from '../src/packhost.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
 import { readEvents } from '../src/eventlog.ts';
-import { freshWith, human, PACKS, packsWith } from './map.ts';
+import { flatRead } from '../src/query-flat.ts';
+import { freshWith, human, make, PACKS, packsWith } from './map.ts';
 
 const dir = packsWith('kernel_probe');
 const probe = (reg: Registry) => reg.found.find((p) => p.id === 'kernel_probe')!;
@@ -99,4 +100,16 @@ test("an internal pack's code never runs in the sandbox", async () => {
   const sandbox = new PackHost((p) => l.registry.folderOf(p));
   await assert.rejects(sandbox.call(l, human, 'kernel_probe', 'action', 'x', {}), /runs in the server's process/);
   sandbox.stop();
+});
+
+test('a term a pack provides is answered as the viewer who asks, under their row-level security (bug e_8e5pd7dy)', async () => {
+  const l = await freshWith(new Registry(dir), { create: 'auto', update: 'auto', link: 'auto' });
+  openKernel(l);
+  const { bo } = await make(l, [{ op: 'create', ref: 'bo', type: 'person', title: 'Bo', visibility: 'shared' }]);
+  const { shown } = await make(l, [{ op: 'create', ref: 'shown', type: 'task', title: 'Shown', visibility: 'shared' }]);
+  const mine = (await l.as(bo).change({ kind: 'human', name: 'bo', person: bo }, { reason: 'Mine', ops: [{ op: 'create', ref: 'p', type: 'task', title: 'Bo private', visibility: 'private' }] })) as { created: Record<string, string> };
+  const hidden = mine.created.p;
+  const asked = async (who: string) => ((await flatRead(l.as(who), { filter: { find: ['type task'], only: [`probe ${hidden} ${shown}`] } })) as { items: { id: string }[] }).items.map((i) => i.id);
+  assert.deepEqual(await asked(bo), [shown], 'Bo sees his own item, and so does the term asked for him');
+  assert.deepEqual(await asked('e_someone'), [], "asked for someone else, the provider cannot read Bo's private item either");
 });
