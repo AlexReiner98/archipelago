@@ -18,7 +18,7 @@ import { KERNEL_PACKS, needOf } from './packorder.ts';
 export const ISLANDS = 'islands';
 
 /** The keys that are not a pack's on an island map: what it uses of other packs, tools, code, looks and reach. */
-const NOT_ISLAND = ['uses', 'actions', 'handlers', 'layouts', 'reach', 'shared'];
+const NOT_ISLAND = ['uses', 'actions', 'handlers', 'layouts', 'parts', 'reach', 'shared'];
 /** The keys a pack file may have on an island map: what it is, what it requires, its vocabulary, views and instructions. */
 export const ISLAND_KEYS: readonly string[] = MANIFEST_KEYS.filter((k) => !NOT_ISLAND.includes(k));
 

@@ -1,5 +1,5 @@
 // The pack manifest (Rule 8 of the target model): what a pack declares, in one small shape. A pack declares its
-// types, links, rules, views, actions, handlers (code run on an event, a schedule or a webhook), drawings and styles,
+// types, links, rules, views, actions, handlers (code run on an event, a schedule or a webhook), drawings, parts of the page and styles,
 // the reach it asks for (hosts, secrets, webhooks, what it reads through and server
 // reach), and what it requires and what it uses if present. A server pack is a pack that asks for server
 // reach: no other kind of pack.
@@ -12,6 +12,7 @@ import { FAMILIES } from './services.ts';
 import type { FieldDef, RelationDef, TypeDef } from './packs.ts';
 import type { RuleDef } from '../../rules/kernel/rules.ts';
 import type { ServerHost, ServerReach } from './server-packs.ts';
+import type { PartDef } from './ui-parts.ts';
 
 /** Fields a pack adds to a type another pack declares: an entry of its types with `of` in place of an id. */
 export interface TypeAdd {
@@ -62,6 +63,8 @@ export interface Manifest {
   actions?: ActionEntry[];
   handlers?: HandlerDef[];
   layouts?: LayoutDef[];
+  /** The parts of the page it draws: the slot each fills, the fields it reads, the actions it sends, its code (packs/loader/kernel/ui-parts.ts). */
+  parts?: PartDef[];
   styles?: StyleDef[];
   reach?: ReachDef;
   /** The shared set every pack on an island map may build on, by type id: the kernel's pack alone declares it (packs/loader/kernel/islands.ts). */
@@ -174,7 +177,7 @@ export const kernelRefused = (packs: Iterable<Manifest>, own: (id: string) => bo
   [...packs].filter((p) => p.kernel !== undefined && !own(p.id)).map((p) => [p.id, "carries kernel code, which only the server's own packs may"]);
 
 /** The keys of a manifest, and of its reach. */
-export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'styles', 'reach', 'shared', 'moved_from', 'kernel'] as const;
+export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'parts', 'styles', 'reach', 'shared', 'moved_from', 'kernel'] as const;
 export const REACH_KEYS = ['hosts', 'items', 'secrets', 'webhooks', 'via', 'server', 'launch'] as const;
 export const SERVER_KEYS = ['acts', 'entries', 'pages', 'connect', 'aliases', 'gates', 'mounts', 'streams', 'files', 'launchers', 'adapter', 'counts'] as const;
 
@@ -341,5 +344,7 @@ export function withoutAbsent(m: Manifest, active: (pack: string) => boolean, de
   });
   const named = (x: string | string[] | undefined) => (x === undefined ? [] : Array.isArray(x) ? x : [x]);
   const rules = (m.rules ?? []).filter((r) => ![...named(r.when?.type), ...named(r.type)].some(gone));
-  return { ...m, types, links, views, actions, styles, rules };
+  // A part that reads a type of a pack that is gone, or fills a slot only such a pack opens, is left out.
+  const parts = m.parts?.filter((p) => !absent.includes(`slot:${p.slot}`) && !Object.keys(p.reads ?? {}).some((t) => gone(t) || absent.includes(`type:${t}`)));
+  return { ...m, types, links, views, actions, styles, rules, ...(parts && { parts }) };
 }

@@ -150,8 +150,8 @@ kept hand places is retired: nothing appends to it, and since 11 Nov 2026
 node, a dashed wire, a badge. In the code: `ui/ghosts.js`.
 
 **pack.** A folder under `packs/` with a `pack.json`, its manifest of
-seventeen keys (`docs/packs.md`): the types, links, rules, views, actions,
-handlers, drawings and styles of one way of working, and what it may reach.
+nineteen keys (`docs/packs.md`): the types, links, rules, views, actions,
+handlers, drawings, parts and styles of one way of working, and what it may reach.
 Which packs a workspace has is a fact in its log. In the code:
 `packs/loader/kernel/manifest.ts` reads a manifest, `packs/loader/kernel/packs.ts` loads them. Replaces
 *type pack*; a pack whose reach includes `server` is still a pack.
@@ -165,6 +165,14 @@ alone. In the code: `packKind` in `packs/loader/kernel/islands.ts`, kind `island
 layouts, views, actions, handlers, uses or reach to the whole map, each
 through the gate it already has. A pack that would be both is refused, told
 to split. In the code: `packKind` in `packs/loader/kernel/islands.ts`, kind `map`.
+
+**part.** A part of the app's page a map pack draws: the slot it fills, the
+fields it reads, the actions it sends and its code, walled in a worker and
+answering with marks. In the code: `packs/loader/kernel/ui-parts.ts`.
+
+**slot.** A place on the page a part fills, owned by one: the host's frame
+(bar, canvas, sheet, find, home) and the pieces and pages it still draws, or
+the pack whose part opens it. In the code: `packs/loader/kernel/slots.ts`.
 
 **change.** A set of ops (create, update, link, unlink, archive, restore,
 merge, define_type, forget) sent with a reason and an authority, applied

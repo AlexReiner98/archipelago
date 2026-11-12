@@ -269,6 +269,22 @@
       }
     },
     {
+      "id": "part",
+      "extends": "system",
+      "title": "Part",
+      "description": "A part of the app's page, as code: what a map pack draws in one slot (the canvas, the sheet, a piece of a screen), walled in a worker and answering with marks the host checks before it draws them. A pack declares its parts in its manifest (parts); one kept here with a part's id (preset) is the owner's version of it, its code over the pack's module by module; retired, the pack's part is not drawn. Its pack, slot and fields say what it is, so a map of the code reads them. Written by an agent, its code waits for the human.",
+      "statuses": { "open": ["working", "kept"], "closed": ["retired"], "phases": { "working": "under_way", "kept": "standing", "retired": "ended" } },
+      "fields": {
+        "pack": { "type": "string", "description": "The pack whose part it is, by id." },
+        "slot": { "type": "string", "description": "The slot it fills: the host's (bar, canvas, sheet, find, home, piece.<name>, page.<name>), or one a pack's part opens (<pack>.<name>)." },
+        "reads": { "type": "json", "description": "The fields it reads, by type, as { \"<type>\": [\"<field>\", ...] }: what the host hands it of an item, and no more." },
+        "sends": { "type": "json", "description": "The actions it may send, as a list: its pack's own, each sent as a change on the authority of the person looking." },
+        "opens": { "type": "json", "description": "The slots it draws for other parts to fill, as a list: one pack owns each." },
+        "code": { "type": "json", "large": true, "code": true, "description": "The owner's version of a part a pack ships (with preset, the part's id): its modules by name, each a JavaScript module's text, standing in for the pack's module of that name. It runs in a worker inside a sandboxed frame and answers with marks the page checks before it draws them. Written by an agent, it waits for the human to approve it." },
+        "preset": { "type": "string", "description": "The id of the pack's part this is the owner's version of (a part in a pack's parts).", "system": true }
+      }
+    },
+    {
       "id": "island",
       "extends": "system",
       "title": "Island",

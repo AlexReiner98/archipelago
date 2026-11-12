@@ -8,7 +8,7 @@ design, the canvas's look and the rest) is the hosted service's, kept in
 `archipelago-hosted` and read from a folder `PELAGO_PACKS` names (decision
 e_8jd82drh, 9 Nov 2026). A pack's tests live beside it and reach the kernel
 only through `#pelago/test`. The manifest says what the pack declares, in
-seventeen keys and no others (Rule 8 of the target model; `packs/loader/kernel/manifest.ts`
+nineteen keys and no others (Rule 8 of the target model; `packs/loader/kernel/manifest.ts`
 reads it, `test/structure.test.ts` refuses any other key).
 
 ## The keys
@@ -25,6 +25,7 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `actions` | What people and agents can do through it, each under a verb. Core's six verbs are its actions marked `kernel`. |
 | `handlers` | Code run by itself: `{ event, records }`, `{ schedule, every_minutes, at_start }` or `{ webhook, records }`: `records` names the kinds of event its answers may log (a `log` entry of another kind is refused). An event is one another pack records, or the kernel's: `notification.made`, whose hearer may answer one `mail` about that notification, sent by the kernel to the person it is for at the address they sign in with, never one the pack names (`packs/walls/kernel/notify-mail.ts`; the `email` pack). `{ event: "item.due" }` hears the kernel's clock: each occurrence of an item whose type has `when` (a moment, or a repeat's hour on its days, in the workspace's zone), with the item as `target`, the event's `seq`, and its `type`, `at` and `version` (the item's last position in the fact stream) in `detail` (`packs/clocks/kernel/due.ts`). A `log` entry names a notification of the same answer by its `ref` as `{ref}`, filled with its id, and may say what is recorded `otherwise`, should it not be made (`{error}` the reason; the `automations` pack's firing fact). |
 | `layouts`, `styles` | The code views are drawn by, and the presets of the map's own configuration: how things look, and (an entry with `type: "instruction"`, its words in `body`) what agents are told (`packs/agents/kernel/instructions.ts`), and (an entry with `type: "lens"`, its props a flat query and a style: `filter`, `walk`, `limit`, `style`) a view the pack ships, listed in the bar's picker and on Home until the owner saves their own version of it (`props.preset`); one `on` types, its query naming the item as `{here}`, is a view of each such item (a project's roadmap, an event's gate), offered on that item's page and drawn on the canvas (decision e_2mndpgdj: what a pack shows of an item is a view, not a screen). A style preset on nothing is used on every page; with `over: "workspace"` it lies over the workspace's own style; with `over: "chosen"` (a theme) only once the owner keeps a version of it. |
+| `parts` | The parts of the app's page it draws, a map pack's alone: each `{ id, title, slot, reads, sends, opens, modules }` (below, Parts and slots). |
 | `reach` | What it may reach beyond the map: `hosts`, `secrets`, `webhooks`, `via`, and `server`; an internal pack also `items`, the addresses the map's own items keep (a type and its field: connect's check of each connection). |
 | `shared` | Core's alone: the shared set, the type ids every pack on an island map may build on (below). |
 | `moved_from` | The packs it took declarations from, keeping their ids (below, In time): it may name a rule, view, style, action or layout `<pack>.<name>` for each, as well as its own. The kernel's packs it never needs to name. |
@@ -120,6 +121,40 @@ pack (`pack` in the entry's header, with its manifest and the action), and
 core's rule `pack_reach` refuses one that writes outside its reach. What a
 pack names of a pack it uses (fields added to its types, links to them,
 screens and actions on them) is registered only while that pack is active.
+
+## Parts and slots
+
+The app's page is packs (decision e_fxayrhma): a small host in the root packs
+draws the frame, and every other part of it is a **part** a map pack declares
+(`packs/loader/kernel/ui-parts.ts`), walled in a worker per pack version and
+answering with marks the host checks.
+
+| Field | What it says | Checked when the pack loads |
+|---|---|---|
+| `id`, `title` | The part, `<pack>.<name>`. | Its pack's name. |
+| `slot` | The slot it fills. | The host's, one its pack's parts open, or one it asks for as `slot:<name>`. |
+| `reads` | The fields it reads, by type: `{ "task": ["title", "status"] }`. | Each field is on the type, and the type is its pack's, core's, or asked for (`type:` or `field:` in requires or uses). |
+| `sends` | The actions it may send. | Each its own pack's. |
+| `opens` | The slots it draws for others to fill. | Named `<pack>.<name>`, or a piece or page the host no longer draws. |
+| `modules` | Its code, files of the pack entered at `index.js`, as a layout's. | The files are there. |
+
+**A slot has one owner** (`packs/loader/kernel/slots.ts`). The host owns its
+frame (`bar`, `canvas`, `sheet`, `find`, `home`) and each piece and page it
+still draws (`piece.<name>`, `page.<name>`, from `PIECES` and `PAGES`): the
+step that moves one into a pack's part takes it off the host's list and the
+part opens it. Any other slot is opened by one pack's part, and `slot:<name>`
+is provided by that pack (core for the host's); a second pack opening it
+waits, as one declaring a taken type does (`packs/loader/kernel/packorder.ts`).
+
+**Its code is the version's its island pins.** A part's modules are read
+from its pack's folder as the registry has it (`folderOf`): on an island
+pinning a version with code of its own, that version's (`pack-code.ts`).
+Each goes to the page by the hash of its modules (`partsFor`, `partsBy`), so
+a module is fetched once and kept. The owner's version of a part is an item
+of core's `part` type naming it as `preset`, its `code` over the pack's
+modules; its pack, slot and fields are on the item for the code map to read.
+A part is a map pack's: an island pack, a pack kept as an item and a
+version's manifest hold none.
 
 ## On an island map
 
