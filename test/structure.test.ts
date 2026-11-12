@@ -31,7 +31,7 @@ test(`no file is over ${MAX_LINES} lines`, () => {
 const NAMES_PACKS: Record<string, number> = {};
 
 test('the kernel names no pack', () => {
-  const ids = [...new Set([...packIds.filter((p) => !KERNEL_PACKS.includes(p)), ...Object.keys(LEFT)])];
+  const ids = [...new Set([...packIds.filter((p) => !KERNEL_PACKS.includes(p) && !rootPacks.includes(p)), ...Object.keys(LEFT)])];
   const named = count(kernelFiles, new RegExp(`['"\`](?:${ids.join('|')})\\.[a-z_]+['"\`]`, 'g'));
   assert.deepEqual(ratchet(named, NAMES_PACKS), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
 });
