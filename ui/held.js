@@ -5,8 +5,8 @@ import { api, ask, h, may, tell } from './base.js';
 import { canvasAt, savedCanvases } from './canvases.js';
 import { gist, loadSchema, relations, typeTitle } from './words.js';
 
-/** The kept canvas that draws what held changes touch (core.held, packs/core/pack.json). */
-export const HELD_CANVAS = 'core.held';
+/** The kept view that draws what held changes touch: the one whose query finds what is held, and only that (a pack ships it). */
+export const heldCanvas = (kept) => kept.find((x) => { const find = x.props?.filter?.find; return find?.length === 1 && find[0] === 'held'; });
 
 /** What a held change does, in a few words: the one thing it does, when it does one; else why it was asked for. */
 export function said(p, names) {
@@ -44,7 +44,7 @@ export async function heldPiece(host, title) {
   if (!host.isConnected) return;
   // What waits for a word is for whoever may give it.
   if (!pending.length || !may('write')) return host.remove();
-  const canvas = kept.find((x) => x.id === HELD_CANVAS);
+  const canvas = heldCanvas(kept);
   const n = pending.length;
   host.replaceChildren(
     h(
