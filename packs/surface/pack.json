@@ -77,6 +77,11 @@
         "in": "any",
         "out": "any",
         "run": "root-looks.ts#lookOf"
+      },
+      "root.sessions": {
+        "in": "any",
+        "out": "any",
+        "run": "root-sessions.ts#sessionRoom"
       }
     }
   }

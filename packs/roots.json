@@ -34,11 +34,11 @@
     },
     {
       "id": "write",
-      "hash": "31c75527a58932684e3d1ffd5190764772ebe3ddda1fc8c862d6cd0e347cb461"
+      "hash": "e375a2652fc65da0e696f4fa630071d1433c39978fba5b368046ee25965b8392"
     },
     {
       "id": "surface",
-      "hash": "b5bbd2c16ef1f32550eb0cb9996f9b200a7e723d591eeb734055ab644a20b449"
+      "hash": "c2cf66c43ad01deb2cbb22ff2360990bedf9477c7a1318dd7e5f79b6e0bda311"
     }
   ],
   "calls": {
@@ -87,13 +87,20 @@
     "root.transient": [
       "look_draw",
       "mailer",
-      "presence"
+      "presence",
+      "sessions"
     ],
     "root.look": [
       "look_draw"
     ],
     "root.observe": [
       "connect"
+    ],
+    "root.bookkeep": [
+      "sessions"
+    ],
+    "root.sessions": [
+      "sessions"
     ]
   }
 }

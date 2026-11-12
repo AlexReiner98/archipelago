@@ -4,7 +4,7 @@
 // recorded, a backup taken.
 
 import { z } from 'zod';
-import { importAudit } from '../../../src/audit.ts';
+import { importAudit } from '../../../src/sessions.ts';
 import { instructionsFor } from '../../../src/instructions.ts';
 import { takeLook } from '../../../src/looks.ts';
 import { toConfirm } from '../../../src/confirm.ts';

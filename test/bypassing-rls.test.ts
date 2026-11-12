@@ -15,17 +15,13 @@ const count = (pattern: RegExp) =>
 /** Calls of bypassingRls, each file's count. */
 const CALLERS: Record<string, number> = {
   'src/backup-tools.ts': 1,
-  'src/chat-run.ts': 1,
-  'src/hook-tool.ts': 1,
   'src/members.ts': 4,
   'src/notify-mail.ts': 2,
   'src/notify.ts': 1,
   'src/pack-launch.ts': 1,
   'packs/surface/kernel/root-looks.ts': 1, // root.look: a look pass is kept in the whole workspace's transient store, as passFor's callers kept it
+  'packs/surface/kernel/root-sessions.ts': 1, // root.sessions: the sessions at work and the reply rules' settings, the whole workspace's, as src/chat-run.ts and the hook's whole database read them (wave 6b: those six bypasses in sessions' modules went)
   'packs/surface/kernel/root-transient.ts': 1, // root.transient: the store only the whole database reaches, for the packs roots.json lets keep there
-  'src/session-name.ts': 2,
-  'src/session-quiet.ts': 1,
-  'src/sessions.ts': 1,
   'src/token-ask.ts': 2,
   'src/token-tools.ts': 1,
   'src/tool-acts.ts': 2,
@@ -33,7 +29,6 @@ const CALLERS: Record<string, number> = {
   'src/tool-human.ts': 4,
   'src/tool-reads.ts': 4,
   'src/tools.ts': 1,
-  'src/touched.ts': 3,
   'src/typetable.ts': 2,
   'src/workspace-tools.ts': 4, // root.counters, the usage view's whole count (was src/usage.ts's)
 };

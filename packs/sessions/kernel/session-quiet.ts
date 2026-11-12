@@ -5,11 +5,10 @@
 
 import type { Archipelago } from '../../../src/pelago.ts';
 import { notify } from '../../../src/notify.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
 import { took } from '../../../src/presence.ts';
 import { alertOwner } from '../../../src/alert.ts';
 import { sessionEvents } from './session-events.ts';
-import { sessionEnd } from './sessions.ts';
+import { sessionEnd, sessionsContext } from './sessions.ts';
 import { keptOf } from '../../../src/query-kept.ts';
 import { styleFor } from '../../../src/styles.ts';
 import { VIEWS } from '../../../src/views.ts';
@@ -61,7 +60,7 @@ export class QuietSessions {
     const hours = Math.round(endAfter / 60);
     for (const run of stale) {
       // A heartbeat sets last_seen; a hook's raw events do not, and are a word from it too.
-      const events = await sessionEvents(this.l, run.id);
+      const events = await sessionEvents(await sessionsContext(this.l), run.id);
       const heard = Math.max(Date.parse(run.last_seen), ...events.map((e) => Date.parse(e.at)).filter(Number.isFinite));
       if (Date.now() - heard <= view.stale_after_minutes * 60_000) continue;
       // Nothing for that long: its window was shut, or its machine was. It is ended for it, as its end hook
@@ -74,7 +73,7 @@ export class QuietSessions {
       if (entity?.props.stale_flagged) continue;
       await this.l.operational(run.id, { props: { stale_flagged: true } }, { actor: 'agent:pelago', action: 'run.stale', reason: `No report for over ${view.stale_after_minutes} minutes` });
       // Its tab on the owner's page goes until it next shows something (ui/tab-life.js); not while a turn is under way.
-      if (!run.busy) await took((await bypassingRls(this.l)).db, this.l, { kind: 'other', actor: 'agent:pelago', did: 'quiet', rests: true, run: run.id }, true).catch(() => {});
+      if (!run.busy) await took(this.l.db, this.l, { kind: 'other', actor: 'agent:pelago', did: 'quiet', rests: true, run: run.id }, true).catch(() => {});
       // Worth a person's attention only when it keeps something from everyone else: the rest end by themselves.
       if (!run.holds.length || !this.l.registry.type('notification')) continue;
       await notify(

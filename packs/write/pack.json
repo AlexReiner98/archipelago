@@ -19,6 +19,11 @@
           "status": "string"
         },
         "run": "root-services.ts#observe"
+      },
+      "root.bookkeep": {
+        "in": "any",
+        "out": "any",
+        "run": "root-bookkeep.ts#bookkeep"
       }
     }
   }

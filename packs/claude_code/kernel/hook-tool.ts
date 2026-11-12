@@ -48,9 +48,7 @@ export const HOOK_TOOLS: Record<string, Tool> = {
       const surface = packs.packs.find((p) => p.file.id === PACK)?.file.reach.server.adapter?.surface;
       if (!surface) return {};
       const { answerAt } = await import('../../../src/server-adapter.ts');
-      const { resolveRun } = await import('../../../src/chat-run.ts');
-      const { bypassingRls } = await import('../../../src/outbox.ts');
-      const { db } = await bypassingRls(l);
+      const { resolveRun } = await import('../../../src/sessions.ts');
       // A plugin keeps no files in the project, so none can be behind: it says it has the server's own.
       const setup = (await import('../../../src/server-files.ts')).setupVersion();
       const body = {
@@ -62,7 +60,7 @@ export const HOOK_TOOLS: Record<string, Tool> = {
         ...(input.stop_hook_active !== undefined && { stop_hook_active: input.stop_hook_active === true || input.stop_hook_active === 'true' }),
       };
       const answer = async (event: string, said: object) =>
-        ((await answerAt(packs, surface, event, { whole: db, pelago: l, within: actor.within ?? [], may: actor.may, body: said, running, origin: packs.origin ?? '' })) ?? {}) as Told;
+        ((await answerAt(packs, surface, event, { pelago: l, within: actor.within ?? [], may: actor.may, body: said, running, origin: packs.origin ?? '' })) ?? {}) as Told;
       if (input.event === 'prompt' && !(await resolveRun(l, input.session_id))) return joined('UserPromptSubmit', await rules(), await answer('session-start', { ...body, source: 'startup' }), await answer('prompt', body));
       if (input.event === 'session-start') return joined('SessionStart', await rules(), await answer('session-start', body));
       return answer(input.event, body);
