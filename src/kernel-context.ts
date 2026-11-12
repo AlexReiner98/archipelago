@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url';
 import { isInternal, type Manifest, type ModuleRef } from './manifest.ts';
 import { answerRead, type Read } from './packreads.ts';
 import { guardedFetch } from './outbound.ts';
-import { callService, fillServices } from './services.ts'; import { fillWritePoints } from './write-hooks.ts';
+import { callService, fillServices } from './services.ts'; import { fillWritePoints, type WriteSlot } from './write-hooks.ts';
 import type { Archipelago } from './pelago.ts';
 import type { ChangeInput } from './pelago-types.ts';
 import type { Registry } from './packs.ts';
@@ -153,6 +153,12 @@ const hostFor = (l: Archipelago): KernelHost => {
   const host = hostOf(l) ?? loose.get(l.registry) ?? new KernelHost((p) => l.registry.folderOf(p));
   if (!hostOf(l)) loose.set(l.registry, host);
   return host;
+};
+
+/** The write path's slot for a map no workspace opened (src/write-hooks.ts): its internal packs' fillings, from a loose host. */
+export const looseWriteSlot: WriteSlot = {
+  fillings: (map, point) => hostFor(map).fillings(map, point),
+  change: (map, pack, input) => kernelContext(map, pack).change(input),
 };
 
 /** A service name, answered as the map that asks it (KernelHost.answer): what a kernel caller uses, a lens preset's answer among them. */

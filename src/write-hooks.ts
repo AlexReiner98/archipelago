@@ -57,6 +57,13 @@ const slots = new WeakMap<object, WriteSlot>();
 /** At a workspace's open: the internal packs' fillings of the write path's points, for its registry. */
 export const fillWritePoints = (registry: object, slot: WriteSlot): void => void slots.set(registry, slot);
 
+/**
+ * The slot of a map's registry: the one its open filled, else, for a map no loader opened (a test's, a registry read
+ * at a past version), its internal packs' fillings from a loose host, as their code runs for it anywhere else. The
+ * import is dynamic: the loader's context imports this module.
+ */
+const slotOf = async (map: Archipelago): Promise<WriteSlot> => slots.get(map.registry) ?? (await import('./kernel-context.ts')).looseWriteSlot;
+
 /** The packs' fields a rewrite may set, by the manifest's `kernel.fills` (none, until a pack says). */
 const fillsOf = (map: Archipelago, pack: string): string[] => {
   const k = map.registry.packs.find((p) => p.id === pack)?.kernel as { fills?: unknown } | undefined;
@@ -66,7 +73,7 @@ const fillsOf = (map: Archipelago, pack: string): string[] => {
 /** Every filling of a point, the write path's own first, then the packs', in order. */
 async function fillings(env: WriteEnv, point: Point): Promise<Filling[]> {
   const own = (BUILT_IN[point] ?? []).map((b): Filling => ({ pack: b.pack, fills: b.fills ?? [], run: (...args) => (b.run as (e: WriteEnv, ...a: unknown[]) => Promise<unknown>)(env, ...args) }));
-  const packs = (await slots.get(env.map.registry)?.fillings(env.map, point) ?? []).map((f): Filling => ({ pack: f.pack, fills: fillsOf(env.map, f.pack), run: f.run }));
+  const packs = (await (await slotOf(env.map)).fillings(env.map, point)).map((f): Filling => ({ pack: f.pack, fills: fillsOf(env.map, f.pack), run: f.run }));
   return [...own, ...packs];
 }
 
@@ -159,10 +166,10 @@ export async function after(env: WriteEnv, entry: AfterEntry, warnings: string[]
 
 /** write.retype: what each pack does once a type or link type is renamed, made as that pack through change. */
 export async function retyped(map: Archipelago, from: string, to: string, what: 'entity' | 'relation'): Promise<void> {
-  const slot = slots.get(map.registry);
-  for (const f of (await slot?.fillings(map, 'write.retype')) ?? []) {
+  const slot = await slotOf(map);
+  for (const f of await slot.fillings(map, 'write.retype')) {
     const ops = (await f.run(from, to, what)) as Op[] | undefined;
     if (!Array.isArray(ops) || !ops.length) continue;
-    await slot!.change(map, f.pack, { reason: `Every ${from} is a ${to} now: what the ${f.pack} pack keeps of it follows.`, basis: 'its retype', ops });
+    await slot.change(map, f.pack, { reason: `Every ${from} is a ${to} now: what the ${f.pack} pack keeps of it follows.`, basis: 'its retype', ops });
   }
 }

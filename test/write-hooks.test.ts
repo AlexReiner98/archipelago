@@ -94,9 +94,9 @@ test('a pack hears a retype, and what it answers is made as the pack, through ch
   assert.equal((await l.db.query(`select 1 from entity where title = 'Retyped ghost to task'`)).rows.length, 1);
 });
 
-test("a map no loader opened has only the write path's own fillings, and the projectors", async () => {
+test("a map no loader opened hears the internal packs' fillings too, from a loose host", async () => {
   const l = await freshWith(new Registry(dir), AUTO);
-  assert.equal((await change(l, [task('Forbidden')])).status, 'applied', "the probe's validator is not heard");
+  await assert.rejects(change(l, [task('Forbidden')]), /"Forbidden" is not a title here/, "the probe's validator is heard");
 });
 
 test('mentions are the mentions pack: what names an item is projected by its log.project', async () => {

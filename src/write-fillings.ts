@@ -6,7 +6,6 @@
 // write.follow their ops would be judged by the rules, which is the owner's to see first (task e_mhqvdzj6).
 
 import { placeOnIslands } from './island-place.ts'; import { placeWithSubject } from './subject.ts';
-import { noTwins } from './view-twins.ts';
 import { checkUpdated, checkWritten } from './automation-rules.ts'; import { islandRegistry } from './island-pin.ts';
 import { typesApplied } from './type-items.ts'; import { supersede } from './proposals.ts';
 import type { Op } from './pelago-types.ts';
@@ -18,23 +17,6 @@ const placing = (place: (env: WriteEnv, ops: Op[]) => Promise<void>) => async (e
   await place(env, out);
   return out;
 };
-
-/** A check that throws "Change rejected" with its reasons, as a validator: the reasons, as refusals. */
-const refusing = (check: (env: WriteEnv, ops: Op[]) => Promise<void>) => async (env: WriteEnv, ops: Op[]): Promise<Checked> => {
-  try {
-    await check(env, ops);
-    return { refusals: [] };
-  } catch (err) {
-    const said = (err as Error).message;
-    if (!said.startsWith('Change rejected:\n')) throw err;
-    return { refusals: said.split('\n').slice(1).map((l) => l.replace(/^- /, '')) };
-  }
-};
-
-/** A view an agent makes that is one kept already is refused (src/view-twins.ts): not a person's, nor a pack action's. */
-const twins = refusing(async (env, ops) => {
-  if (env.who && !env.who.human && !env.who.pack) await noTwins(env.map, ops);
-});
 
 /** An automation's trigger and conditions, checked as written (src/automation-rules.ts), by the version its island runs. */
 async function automations(env: WriteEnv, ops: Op[]): Promise<Checked> {
@@ -60,7 +42,6 @@ export const BUILT_IN: { [P in Point]?: BuiltIn[] } = {
     { pack: 'placement', fills: ['island'], run: placing((env, ops) => placeOnIslands(env.map, env.reg, ops, env.island)) },
   ],
   'write.validate': [
-    { pack: 'lenses', run: twins },
     { pack: 'automations', run: automations },
   ],
   'write.after': [
