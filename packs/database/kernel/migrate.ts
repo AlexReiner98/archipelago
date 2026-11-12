@@ -6,29 +6,15 @@
 // During a switch the old app and the new one run on the same database, so every step must suit both: add a column
 // or a table in one step, use it in the next release, remove what is unused in a later one. Never rename or drop
 // something the app before still reads. A step, once released, is never edited: add another.
+//
+// Each root declares its own parts of the steps in its kernel/steps.ts (STEPS), and what it does to a database each
+// time it is opened, once the steps are in (OPENED); they are read in the order packs/roots.json starts the roots
+// (src/root-fills.ts), when a database is first opened. A step is numbered once for all the roots: its parts, where
+// more than one root has one, are joined in the order each names (`part`), so its SQL is what it was when released.
 
 import { createHash } from 'node:crypto';
 import type { Database } from './db.ts';
-import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, HOLDS_OFF_READ, ITEM_HIDDEN, LINK_SNAPSHOT, MEMBER, ORDERED, SCHEMA, SETTING_READ_OPEN, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
-import { ADOPT_APP, CONTROL, PACK_STORE } from '../../../src/control.ts';
-import { PUBLIC_DOCUMENT, PUBLIC_VIEW, PUBLISHED, PUBLISHED_PATH, PUBLISHED_TO_PUBLIC_VIEW, PUBLIC_VIEW_SHOWS, SHARE_PUBLISHABLE, SHARE_WORKSPACE_GONE } from './public-schema.ts';
-import { TRANSIENT } from '../../../src/transient.ts';
-import { ITEM_KIND } from '../../../src/head.ts';
-import { ISLAND_INDEX } from '../../../src/island-items.ts';
-import { SEARCH_ANY, SEARCH_INDEX } from '../../../src/search.ts';
-import { LOG } from '../../../src/log.ts';
-import { ACTIVITY, ACTIVITY_STREAM, EVENT_GONE, OP_ABOUT, PRE_LOG_ACTIVITY } from '../../../src/activity-steps.ts';
-import { carryEventTable } from '../../../src/activity.ts';
-import { VAULT } from '../../../src/vault.ts';
-import { FORGET, FORGET_STORES } from '../../../src/forget.ts';
-import { OPLOG, OPLOG_GUARDED, OPLOG_SERVER } from '../../../src/oplog.ts';
-import { PARTITION } from '../../../src/partitions.ts';
-import { SNAPSHOT } from '../../../src/snapshot.ts';
-import { CLOSURE } from '../../../src/closure.ts';
-import { MENTIONS } from './mentions.ts';
-import { ITEM_BYTES } from '../../../src/bytes.ts';
-import { ACTIVE_HOLDS_BY_KEY, READ_INDEXES, ROW_POLICIES } from './read-indexes.ts';
-import { GUESTS_GONE, MEMBER_READ_ONLY, VAULT_KEY_POLICY } from './member-schema.ts';
+import { rootFills } from './root-fills.ts';
 
 interface Migration {
   version: number;
@@ -44,61 +30,58 @@ interface Migration {
   before?: (db: Database) => Promise<unknown>;
 }
 
-export const MIGRATIONS: Migration[] = [
-  // What every database had before steps were numbered, written so it can run again over it: a database made then
-  // takes it as its first step without harm.
-  { version: 1, name: 'the schema before versions', sql: `create extension if not exists pg_trgm;\n${SCHEMA}\n${VISIBILITY}` },
-  { version: 2, name: 'writes in order on a server', sql: '', server: ORDERED },
-  { version: 3, name: 'what one request leaves for the next', sql: TRANSIENT },
-  { version: 4, name: 'what the server kept on its disk', sql: CONTROL },
-  { version: 5, name: 'a token is within some items, and may report, propose or change', sql: TOKEN_SCOPE },
-  { version: 6, name: 'members sign in by their email address', sql: MEMBER },
-  { version: 7, name: 'a document shared with another workspace', sql: WORKSPACE_SHARE },
-  { version: 8, name: 'what a server pack keeps', sql: PACK_STORE },
-  { version: 9, name: 'a public document, read by anyone', sql: PUBLIC_DOCUMENT },
-  { version: 10, name: 'a document as it was published', sql: PUBLISHED },
-  { version: 11, name: 'a published document at an address word', sql: PUBLISHED_PATH },
-  { version: 12, name: 'an agent reads whether it may publish', sql: AGENT_PUBLISH_READ },
-  { version: 13, name: 'the GitHub App as a server pack', sql: ADOPT_APP },
-  { version: 14, name: 'an agent reads whether it may change the code drawings run', sql: AGENT_CODE_READ },
-  { version: 15, name: 'an item keeps its kind in its row', sql: ITEM_KIND },
-  { version: 16, name: 'a held change keeps the rule that held it', sql: HELD_BY },
-  { version: 17, name: 'titles and notes indexed for search', sql: SEARCH_INDEX },
-  { version: 18, name: 'the log: change sets appended, hash-chained', sql: LOG },
-  { version: 19, name: 'the activity log read from the log', sql: ACTIVITY },
-  { version: 20, name: 'per-item keys in a vault, and forgetting', sql: VAULT + FORGET },
-  { version: 21, name: 'the compacted streams, in segments', sql: OPLOG, server: OPLOG_SERVER },
-  { version: 22, name: 'the log cut by year', sql: PARTITION },
-  { version: 23, name: 'snapshots of the projections, and room to rebuild them', sql: SNAPSHOT },
-  { version: 24, name: 'the compacted streams sealed, guarded by row, and reached by a forget', sql: OPLOG_GUARDED },
-  { version: 25, name: 'what is inside what, what names what, the indexes reads are bounded by, and visibility asked row by row', sql: CLOSURE + MENTIONS + READ_INDEXES + ROW_POLICIES + ACTIVE_HOLDS_BY_KEY },
-  { version: 26, name: 'a document shared with another workspace may be published there', sql: SHARE_PUBLISHABLE },
-  { version: 27, name: 'the activity from before the log began, gone', sql: PRE_LOG_ACTIVITY },
-  { version: 28, name: 'what each item adds to the log, in bytes', sql: ITEM_BYTES },
-  { version: 29, name: 'a token a person granted a client by signing in', sql: TOKEN_GRANT },
-  { version: 30, name: 'search finds an item with any of the words', sql: SEARCH_ANY },
-  { version: 31, name: 'an agent reads whether holds are off', sql: HOLDS_OFF_READ },
-  { version: 32, name: 'what lives on an island', sql: ISLAND_INDEX },
-  { version: 33, name: 'what was done outside change sets, in the activity stream', sql: ACTIVITY_STREAM },
-  { version: 34, name: 'the event table, carried into the activity stream and gone', sql: EVENT_GONE + FORGET_STORES, before: carryEventTable },
-  { version: 35, name: 'a get says hidden, not missing', sql: ITEM_HIDDEN },
-  { version: 36, name: 'a view shared with a guest, read live and nothing else', sql: VAULT_KEY_POLICY },
-  { version: 37, name: 'a link keeps its view frozen, read by a short token', sql: LINK_SNAPSHOT },
-  { version: 38, name: 'what the compacted streams say about an item, found by its index under the row policy', sql: OP_ABOUT },
-  { version: 39, name: 'shares made out to another workspace, gone', sql: SHARE_WORKSPACE_GONE },
-  { version: 40, name: 'a view or an item made public, frozen as it was shared', sql: PUBLIC_VIEW },
-  { version: 41, name: 'what is published, made its public view', sql: PUBLISHED_TO_PUBLIC_VIEW },
-  { version: 42, name: 'a member who only reads', sql: MEMBER_READ_ONLY },
-  { version: 43, name: 'guests, gone', sql: GUESTS_GONE },
-  { version: 44, name: 'what a public view shows, indexed', sql: PUBLIC_VIEW_SHOWS },
-  { version: 45, name: 'a member reads the settings packs open to members', sql: SETTING_READ_OPEN },
-];
+/** A root's part of a numbered step, as its kernel/steps.ts declares it: the part that comes first names the step. */
+export interface StepPart {
+  version: number;
+  /** The step's name: given by its first part, and only there. */
+  name?: string;
+  /** Where the part goes in its step, from 0, when the step has parts of more than one root. */
+  part?: number;
+  sql: string;
+  server?: string;
+  before?: (db: Database) => Promise<unknown>;
+}
 
-export const LATEST = MIGRATIONS.at(-1)!.version;
+/** Every root's parts made into the steps, in order; refused when a step is missing, unnamed or named twice. */
+export function joinSteps(parts: { root: string; value: StepPart }[]): Migration[] {
+  const by = new Map<number, { root: string; value: StepPart }[]>();
+  for (const p of parts) by.set(p.value.version, [...(by.get(p.value.version) ?? []), p]);
+  const versions = [...by.keys()].sort((a, b) => a - b);
+  return versions.map((version, i) => {
+    if (version !== i + 1) throw new Error(`The schema's steps skip from ${i} to ${version}: every step is numbered once, from 1`);
+    const ps = by.get(version)!.sort((a, b) => (a.value.part ?? 0) - (b.value.part ?? 0));
+    const named = ps.filter((p) => p.value.name !== undefined);
+    if (named.length !== 1 || named[0] !== ps[0]) throw new Error(`Step ${version} is named by ${named.map((p) => p.root).join(', ') || 'no root'}: its first part names it, and only that`);
+    const at = ps.map((p) => p.value.part ?? 0);
+    if (new Set(at).size !== at.length) throw new Error(`Step ${version} has two parts at one place (${ps.map((p) => p.root).join(', ')})`);
+    const server = ps.filter((p) => p.value.server !== undefined);
+    const before = ps.flatMap((p) => p.value.before ?? []);
+    return {
+      version,
+      name: ps[0].value.name!,
+      sql: ps.map((p) => p.value.sql).join(''),
+      ...(server.length ? { server: server.map((p) => p.value.server).join('') } : {}),
+      ...(before.length ? { before: async (db: Database) => { for (const run of before) await run(db); } } : {}),
+    };
+  });
+}
+
+let steps: Promise<Migration[]> | undefined;
+/** The steps, read from the roots once. The same array each time: a test may add a step to it. */
+export const migrations = (): Promise<Migration[]> => (steps ??= rootFills<StepPart[]>('steps.ts', 'STEPS').then((fills) => joinSteps(fills.flatMap(({ root, value }) => value.map((v) => ({ root, value: v }))))));
+
+/** The step the newest database is at. */
+export const latest = async () => (await migrations()).at(-1)!.version;
 
 /** A name for the schema the steps make on each driver: a database made from them once can be copied for another. */
-export const schemaKey = (server: boolean) =>
-  createHash('sha256').update(MIGRATIONS.map((m) => m.sql + (server ? (m.server ?? '') : '')).join('\n')).digest('hex').slice(0, 12);
+export const schemaKey = async (server: boolean) =>
+  createHash('sha256').update((await migrations()).map((m) => m.sql + (server ? (m.server ?? '') : '')).join('\n')).digest('hex').slice(0, 12);
+
+/** Bring a database to the latest step, then what each root does to a database each time it is opened (OPENED). */
+export async function prepare(db: Database, server: boolean): Promise<void> {
+  await migrate(db, server);
+  for (const { value } of await rootFills<((db: Database) => Promise<unknown>)[]>('steps.ts', 'OPENED')) for (const run of value) await run(db);
+}
 
 /** The step a database is at: 0 when it has no record of steps. */
 export async function versionOf(db: Database): Promise<number> {
@@ -112,9 +95,10 @@ export async function versionOf(db: Database): Promise<number> {
  * (the new app migrated it, and this is the old one, still serving) is left as it is.
  */
 export async function migrate(db: Database, server: boolean): Promise<{ from: number; to: number }> {
+  const all = await migrations();
   const from = await versionOf(db);
   if (from === 0) await db.exec(`create table if not exists schema_version (version int primary key, name text not null, applied_at timestamptz not null default now())`);
-  for (const m of MIGRATIONS.filter((m) => m.version > from)) {
+  for (const m of all.filter((m) => m.version > from)) {
     const sql = m.sql + (server && m.server ? `\n${m.server}` : '');
     try {
       await m.before?.(db);
@@ -124,27 +108,27 @@ export async function migrate(db: Database, server: boolean): Promise<{ from: nu
       throw new Error(`Migration ${m.version} (${m.name}) failed: ${(err as Error).message}`, { cause: err });
     }
   }
-  if (from > 0) await remake(db, server, from);
-  return { from, to: Math.max(from, LATEST) };
+  if (from > 0) await remake(db, server, from, all);
+  return { from, to: Math.max(from, all.at(-1)!.version) };
 }
 
 /** The tables each step makes and no later step drops: what a database recorded as past that step must have. */
-const MADE = MIGRATIONS.map((m) => {
-  const later = MIGRATIONS.filter((n) => n.version > m.version).map((n) => n.sql + (n.server ?? '')).join('\n');
-  const made = [...m.sql.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(\w+)/gi)].map((t) => t[1].toLowerCase());
-  return { m, tables: [...new Set(made)].filter((t) => !new RegExp(`drop\\s+table\\s+(?:if\\s+exists\\s+)?${t}\\b`, 'i').test(later)) };
+const made = (all: Migration[]) => all.map((m) => {
+  const later = all.filter((n) => n.version > m.version).map((n) => n.sql + (n.server ?? '')).join('\n');
+  const tables = [...m.sql.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(\w+)/gi)].map((t) => t[1].toLowerCase());
+  return { m, tables: [...new Set(tables)].filter((t) => !new RegExp(`drop\\s+table\\s+(?:if\\s+exists\\s+)?${t}\\b`, 'i').test(later)) };
 }).filter((s) => s.tables.length);
 
 /**
  * A step recorded as applied whose tables are not there is run again (its record kept): a local map once said it was
  * past step 6 and had no member table, so every backup of it failed. One query when nothing is missing.
  */
-async function remake(db: Database, server: boolean, at: number) {
-  const steps = MADE.filter((s) => s.m.version <= at);
-  const names = [...new Set(steps.flatMap((s) => s.tables))];
+async function remake(db: Database, server: boolean, at: number, all: Migration[]) {
+  const recorded = made(all).filter((s) => s.m.version <= at);
+  const names = [...new Set(recorded.flatMap((s) => s.tables))];
   const { rows } = await db.query<{ name: string }>(`select n as name from unnest($1::text[]) n where to_regclass(n) is null`, [names]);
   const missing = new Set(rows.map((r) => r.name));
-  for (const { m, tables } of steps.filter((s) => s.tables.some((t) => missing.has(t)))) {
+  for (const { m, tables } of recorded.filter((s) => s.tables.some((t) => missing.has(t)))) {
     console.error(`Schema step ${m.version} (${m.name}) is recorded, but ${tables.filter((t) => missing.has(t)).join(', ')} is missing: running it again.`);
     const sql = m.sql + (server && m.server ? `\n${m.server}` : '');
     try {
@@ -155,3 +139,4 @@ async function remake(db: Database, server: boolean, at: number) {
     }
   }
 }
+

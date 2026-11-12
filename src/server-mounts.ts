@@ -1,1 +1,1 @@
-export * from '../packs/loader/kernel/server-mounts.ts';
+export * from '../packs/surface/kernel/server-mounts.ts';

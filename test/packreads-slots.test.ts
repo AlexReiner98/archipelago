@@ -60,7 +60,7 @@ test('a run read with what it touched answers as the touched store', async () =>
   const l = await fresh();
   const { task } = await make(l, [{ op: 'create', ref: 'task', type: 'task', title: 'Probe' }]);
   const a = await sessionStart(l, agent, { cwd: 'C:\\code\\Apex', session_id: 'p1' });
-  await addTouched(l.db, a.run, [task, 'e_notthere']);
+  await addTouched(l, a.run, [task, 'e_notthere']);
   assert.deepEqual(await touchedBy(l, a.run), [task, 'e_notthere']);
   const runs = (await answerRead(l, { runs: { folder: 'C:\\code\\Apex', touched: true } })) as { rows: { id: string; touched: string[] }[] };
   assert.deepEqual(runs.rows.map((r) => [r.id, r.touched]), [[a.run, [task]]]);

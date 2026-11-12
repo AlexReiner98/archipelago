@@ -264,10 +264,10 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 /* An item a public view shows: a mark, and one behind it (changed since shared) offers to share it again. */
 #sheet .sheet-marks .public-mark { white-space: nowrap; }
 #sheet .sheet-marks .public-mark.behind, #sheet .sheet-marks details.public-mark > summary { color: var(--accent); font-size: inherit; }
-#sheet .note { margin-bottom: var(--space-10); }
-#sheet .note > .fields { padding: 0; margin: 0 0 var(--space-8); }
+#sheet .note, #sheet .item-note { margin-bottom: var(--space-10); }
+#sheet .note > .fields, #sheet .item-note > .fields { padding: 0; margin: 0 0 var(--space-8); }
 #sheet .draft-read { cursor: text; }
-#sheet .draft-read .body-text, #sheet .note.doc .body-text { padding-left: 0; padding-right: 0; }
+#sheet .draft-read .body-text, #sheet .note.doc .body-text, #sheet .item-note.doc .body-text { padding-left: 0; padding-right: 0; }
 #sheet .page-section > img.figure { margin-left: 0; margin-right: 0; }
 /* An image never runs wider than the sheet: a wide one scales down with its proportions, a small one keeps its size. */
 #sheet img { max-width: 100%; height: auto; }
@@ -353,7 +353,7 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .page-section { margin: 0 0 var(--space-10); }
 #sheet .page-section > h2 { display: flex; align-items: baseline; gap: var(--space-5); margin: 0 0 var(--space-5); padding-bottom: var(--space-3); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-2); color: var(--muted); font-family: var(--type-region-family); font-weight: var(--type-region-weight); font-style: var(--type-region-style); text-transform: var(--type-region-case); letter-spacing: var(--type-region-track); }
 #sheet .page-section > h2 .n { font-weight: normal; }
-#sheet .page-section .note { margin: 0; }
+#sheet .page-section .note, #sheet .page-section .item-note { margin: 0; }
 #sheet .page-rows { display: grid; grid-template-columns: var(--label-col) minmax(0, 1fr); gap: var(--space-3) var(--space-8); margin: 0; }
 #sheet .page-rows dt { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #sheet .page-rows dd { margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

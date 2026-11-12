@@ -3,8 +3,9 @@
 // its stands field, by operational and in no stream, as its heartbeat is (the newest is all that matters). It reads
 // one key of them itself, branch, to tell two sessions in one folder apart (src/chat-run.ts).
 
-import type { Archipelago } from '../../../src/pelago.ts';
-import { resolveRun } from './sessions.ts';
+import type { KernelContext } from '#pelago/kernel';
+import { operational } from './bookkeeping.ts';
+import { resolveRun } from './chat-run.ts';
 
 export type Stands = Record<string, string | number | boolean>;
 
@@ -21,10 +22,10 @@ export function standsOf(v: unknown): Stands | undefined {
 }
 
 /** Keep where a session stands on its run, when the hook said it and it has moved since it was last kept. */
-export async function keepStands(l: Archipelago, session: string | undefined, sent: unknown): Promise<void> {
+export async function keepStands(ctx: KernelContext, session: string | undefined, sent: unknown): Promise<void> {
   const stands = standsOf(sent);
   if (!stands || !session) return;
-  const run = await resolveRun(l, session, true);
+  const run = await resolveRun(ctx, session, true);
   if (!run || JSON.stringify(standsOf(run.props.stands)) === JSON.stringify(stands)) return;
-  await l.operational(run.id, { props: { stands } });
+  await operational(ctx, run.id, { props: { stands } });
 }

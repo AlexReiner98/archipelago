@@ -52,7 +52,37 @@
           "text": "string"
         },
         "run": "answers.ts#brief"
+      },
+      "answer.time_lanes": {
+        "in": {
+          "items": [
+            {
+              "id": "id",
+              "type": "string",
+              "title": "string",
+              "owner": "any"
+            }
+          ],
+          "spans": "any",
+          "me": "any"
+        },
+        "out": {
+          "lane": "any",
+          "stream": "any",
+          "filed": "any",
+          "lanes": [
+            "any"
+          ],
+          "streams": [
+            "any"
+          ]
+        },
+        "run": "query-answers.ts#timeLanes"
       }
+    },
+    "hooks": {
+      "surface.for_reader": "documents.ts#forReader",
+      "surface.sections": "documents.ts#sectionsOf"
     }
   },
   "views": [

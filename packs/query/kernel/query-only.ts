@@ -3,14 +3,12 @@
 // no owner · over estimate · changed since|before <7d|date> · made since|before <7d|date> · by owner · by agent.
 // A since and a before together are a range: made since 2026-10-13 and made before 2026-10-14 is what was made that day.
 //
-// Most are a condition on the item's row. Blocked is what attention means by it (src/blocking.ts: depends on
+// Most are a condition on the item's row, read by the reads API (flat). Blocked is what attention means by it (depends on
 // something open, waits on someone, needs a resource unavailable or held); by owner and by agent read the authority
 // the log keeps on the change that last set the item's status (docs/log.md). Those two are checked on the ids a read
 // found, never over the map.
 
-import { blockGraph } from '../../../src/blocking.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
-import { dayStart, zoneOf } from './timeaxis.ts';
+import { dayStart } from './timeaxis.ts';
 
 export type Word =
   | { word: 'done' | 'blocked' | 'no owner' | 'over estimate' | 'by owner' | 'by agent' }
@@ -49,50 +47,11 @@ export function readWord(term: string, now = Date.now()): Word | undefined {
   return { word, at };
 }
 
-/** A narrowing condition on an item (as e), with its parameter when it takes one (`$?` in the condition). */
-export type Narrowing = { cond: string; param?: unknown };
-
-/** The words that are a condition on the row, each with what it reads; `me` is who is asking. */
-export async function wordConditions(l: Archipelago, words: Word[], me: string | null): Promise<Narrowing[]> {
-  const out: Narrowing[] = [];
-  const zone = words.some((w) => 'at' in w && typeof w.at === 'string') ? await zoneOf(l) : null;
-  const instant = (at: Date | string) => (typeof at === 'string' ? new Date(dayStart(at, zone!)) : at).toISOString();
-  for (const w of words) {
-    if (w.word === 'done') out.push({ cond: 'not e.is_open' });
-    else if (w.word === 'no owner') out.push({ cond: 'e.owner is null' });
-    else if (w.word === 'over estimate')
-      out.push({ cond: "case when jsonb_typeof(e.props->'tokens_used') = 'number' and jsonb_typeof(e.props->'tokens_estimated') = 'number' then (e.props->>'tokens_used')::numeric > (e.props->>'tokens_estimated')::numeric else false end" });
-    else if (w.word === 'status') out.push({ cond: 'e.status = $?', param: w.status });
-    else if ('at' in w) {
-      const [field, way] = w.word.split(' ');
-      out.push({ cond: `e.${field === 'made' ? 'created_at' : 'updated_at'} ${way === 'since' ? '>=' : '<'} $?::timestamptz`, param: instant(w.at) });
-    }
-  }
-  return out;
-}
-
 /** Whether any word is checked on what a read found rather than in it: then a read finds more, for these to keep. */
 export const checkedAfter = (words: Word[]) => words.some((w) => w.word === 'blocked' || w.word === 'by owner' || w.word === 'by agent');
 
-/** Of the ids found, those the checked words hold of: blocked, as attention says it; by owner or by agent, as the log says. */
-export async function holding(l: Archipelago, words: Word[], ids: string[]): Promise<string[]> {
-  let kept = ids;
-  if (kept.length && words.some((w) => w.word === 'blocked')) {
-    const graph = await blockGraph(l, kept);
-    kept = kept.filter((id) => graph.isBlocked(id));
-  }
-  const by = words.filter((w) => w.word === 'by owner' || w.word === 'by agent').map((w) => (w.word === 'by owner' ? 'human' : 'agent'));
-  if (kept.length && by.length) {
-    // The change that last set each one's status, and on whose authority (none, for the system's own).
-    const { rows } = await l.db.query<{ id: string; of: string | null }>(
-      `select distinct on (f.id) f.id, le.head->'authority'->>'of' as of
-         from log_fact f join log_entry le on le.stream = f.stream and le.at = f.at and le.pos = f.pos
-        where f.stream = 'facts' and f.id = any($1::text[]) and f.field = 'status' and f.op = '+'
-        order by f.id, f.pos desc`,
-      [kept],
-    );
-    const of = new Map(rows.map((r) => [r.id, r.of]));
-    kept = kept.filter((id) => by.every((b) => of.get(id) === b));
-  }
-  return kept;
-}
+/** A word with its time as an instant: a date said is the start of its day in the workspace's zone (the reads API reads instants). */
+export const atInstant = (w: Word, zone: string | null): Word => ('at' in w && typeof w.at === 'string' ? { ...w, at: new Date(dayStart(w.at, zone!)) } : w);
+
+/** Whether any word says a day, so the workspace's zone is read to work it out. */
+export const saysDay = (words: Word[]) => words.some((w) => 'at' in w && typeof w.at === 'string');

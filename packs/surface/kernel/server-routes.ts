@@ -5,13 +5,13 @@
 // GET is where a person comes back to from another site: it answers where to send them on; one that answers html makes
 // a page per request, sent under the reader's policy with every header the kernel's. Every request is counted by
 // address, as the other open routes are.
-// A drawing's modules by hash (GET /drawing/<hash>/<module>.js, src/drawing-files.ts) are served here too.
+// A drawing's modules by hash (GET /drawing/<hash>/<module>.js, read as root.drawing reads them) are served here too.
 
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
-import { alertOwner } from '../../../src/alert.ts';
-import { drawingFile, drawingPath, drawingWorker, shippedDrawing } from '../../../src/drawing-files.ts';
+import { callAs } from '../../loader/kernel/kernel-context.ts';
+import { drawing } from './publish-services.ts';
 import type { Archipelago } from '../../../src/pelago.ts';
 import { signedWith } from '../../../src/hashes.ts';
 import { json as reply, PRIVATE as GUARD, GUARD as OPEN } from './reply.ts';
@@ -48,10 +48,10 @@ export const PAGE_MOST = 2_000_000;
 /** The longest a made page may be kept by a browser or a cache, in seconds. */
 const CACHE_MOST = 86_400;
 
-/** Tell the owner of the server, on the default map and by mail, that a webhook refused a delivery or failed on it (src/alert.ts). */
+/** Tell the owner of the server, on the default map and by mail, that a webhook refused a delivery or failed on it (the alerts pack's act.report.alert). */
 async function tellOwner(workspaces: ActPlaces, pack: string, hook: string, what: 'refused' | 'failed', detail: string): Promise<void> {
   const title = what === 'refused' ? `The ${pack} pack's webhook "${hook}" refused a delivery` : `The ${pack} pack's webhook "${hook}" failed`;
-  await alertOwner((await workspaces.get('default')).pelago, { key: `hook/${pack}/${hook}/${what}`, title, body: detail, level: what === 'failed' ? 'urgent' : 'warning', from: `pack:${pack}` });
+  await callAs((await workspaces.get('default')).pelago, 'act.report.alert', { key: `hook/${pack}/${hook}/${what}`, title, body: detail, level: what === 'failed' ? 'urgent' : 'warning', from: `pack:${pack}` });
 }
 
 export async function serveServerPack(req: IncomingMessage, res: ServerResponse, path: string, at: ServerRoutes): Promise<unknown> {
@@ -131,6 +131,12 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
   }
 }
 
+/** Whether a path is one the drawing route answers: /drawing/<hash>/<module>.js. */
+export const drawingPath = (path: string): { hash: string; name: string } | undefined => {
+  const [, first, hash = '', name = '', extra] = path.split('/');
+  return first === 'drawing' && extra === undefined && /^[0-9a-f]{64}$/.test(hash) && /^[a-z][a-z0-9_-]*\.js$/.test(name) ? { hash, name } : undefined;
+};
+
 /** What GET /drawing/<hash>/<module>.js is handed: the map it reads, as the person asking sees it. */
 export interface DrawingRoutes {
   /** True, and the request answered, when its address has asked too often. */
@@ -139,19 +145,19 @@ export interface DrawingRoutes {
 }
 
 /**
- * One module of a drawing, by its hash (src/drawing-files.ts): kept for good, since a hash is its content, and given
+ * One module of a drawing, by its hash (root.drawing, ./publish-services.ts): kept for good, since a hash is its content, and given
  * nothing to run with. Its service worker (sw.js, a pack's drawing's alone) is asked again each time, since it holds a
  * kernel file, and may import from this origin. What is not there is a 404 with nothing in it.
  */
 export async function serveDrawingFile(res: ServerResponse, path: string, at: DrawingRoutes): Promise<unknown> {
   const asked = drawingPath(path);
   if (!asked) return res.writeHead(404, { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }).end();
-  const reader = await at.reader();
+  const reader = { caller: 'surface', map: await at.reader() };
   // A pack's own drawing is served from what the packs ship, and a service worker installing it asks for every module at
   // once: only a read of the map (a drawing kept there, or a guess) is counted against the open limit.
-  if (!(await shippedDrawing(reader, asked.hash)) && at.tooOften()) return;
+  if ((await drawing(reader, { hash: asked.hash })) !== true && at.tooOften()) return;
   const worker = asked.name === 'sw.js';
-  const text = worker ? await drawingWorker(reader, asked.hash) : await drawingFile(reader, asked.hash, asked.name);
+  const text = (await drawing(reader, worker ? { hash: asked.hash, worker: true } : { hash: asked.hash, file: asked.name })) as string | null;
   if (text === null) return res.writeHead(404, { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }).end();
   return res
     .writeHead(200, {

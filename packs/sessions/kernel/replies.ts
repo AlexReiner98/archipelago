@@ -6,18 +6,18 @@ import type { Archipelago, Entity } from '../../../src/pelago.ts';
 import { tellStamp } from '../../../src/presence.ts';
 import { atSetting, countsTo, holds, isAt, onReply, replyFacts } from './reply-rules.ts';
 import type { Rule } from '../../../src/rules.ts';
-import { tell } from './sessions.ts';
-import { keep, kept } from '../../../src/transient.ts';
+import { sessionsContext, tell } from './sessions.ts';
+import type { KernelContext } from '#pelago/kernel';
 import { used } from '../../../src/uses.ts';
 
 /** How long a turn's asking is remembered: past it, the turn is long over. */
 const ASKED_MS = 86_400_000;
 
-/** Which reply rules the owner has turned off here, and the number each rule that counts is set to count to. */
-async function liftedHere(whole: Q, rules: Rule[]): Promise<{ off: Set<string>; at: Map<string, number> }> {
+/** Which reply rules the owner has turned off here, and the number each rule that counts is set to count to: the owner's settings, read as the whole workspace (root.sessions). */
+async function liftedHere(ctx: KernelContext, rules: Rule[]): Promise<{ off: Set<string>; at: Map<string, number> }> {
   const names = rules.flatMap((r) => [r.lifted!, atSetting(r)]);
   if (!names.length) return { off: new Set(), at: new Map() };
-  const { rows } = await whole.query<{ key: string; value: unknown }>(`select key, value from setting where key = any($1::text[])`, [names]);
+  const rows = (await ctx.call('root.sessions', { settings: names })) as { key: string; value: unknown }[];
   return { off: new Set(rows.filter((r) => r.value === true).map((r) => r.key)), at: new Map(rows.filter((r) => isAt(r.value)).map((r) => [r.key, r.value as number])) };
 }
 
@@ -42,18 +42,20 @@ export async function askedLately(whole: Q, l: Archipelago): Promise<Map<string,
  * The answer to a reply's end: the rules whose when holds and that have not asked this turn ask, once: their reasons,
  * one a line, each kept as a beat of the run's story. Undefined when none does.
  */
-export async function askOnReply(whole: Q, l: Archipelago, run: Entity | undefined, body: { session_id?: string; turn?: unknown; reply?: unknown; stop_hook_active?: unknown }) {
+export async function askOnReply(l: Archipelago, run: Entity | undefined, body: { session_id?: string; turn?: unknown; reply?: unknown; stop_hook_active?: unknown }) {
   const facts = replyFacts(body.reply);
   const turn = typeof body.turn === 'string' && body.turn ? body.turn : undefined;
   if (body.stop_hook_active === true || !facts || !turn || !run?.is_open) return undefined;
   const rules = l.registry.rules.filter(onReply);
-  const { off, at } = await liftedHere(whole, rules);
+  const ctx = await sessionsContext(l);
+  const { off, at } = await liftedHere(ctx, rules);
   const asking: Rule[] = [];
   for (const rule of rules) {
     if (off.has(rule.lifted!) || !holds(rule, facts, at.get(atSetting(rule)))) continue;
     const key = `asked:${run.id}:${turn}:${rule.pack}.${rule.id ?? ''}`;
-    if (await kept(whole, key)) continue;
-    await keep(whole, key, true, ASKED_MS);
+    // Kept in the whole workspace's transient store (root.transient), so another server asked next knows it asked.
+    if (await ctx.call('root.transient', { kept: key })) continue;
+    await ctx.call('root.transient', { keep: { key, value: true, ms: ASKED_MS } });
     asking.push(rule);
   }
   if (!asking.length) return undefined;
@@ -63,6 +65,6 @@ export async function askOnReply(whole: Q, l: Archipelago, run: Entity | undefin
       console.error(`reply rule ${rule.id}: not kept in the story (${(err as Error).message})`),
     );
   }
-  await tellStamp(whole, l);
+  await tellStamp(l.db, l);
   return asking.map((r) => r.say).join('\n');
 }

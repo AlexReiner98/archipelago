@@ -78,6 +78,8 @@ function projectorContext(reg: Registry, pack: Manifest, at: string): KernelCont
     reads: none('reads the map'),
     registry: reg,
     call: none('calls a service'),
+    provided: none('reads the names of a family'),
+    island: none('reads an island'),
     change: none('makes a change'),
     move: none('moves what it keeps'),
     record: none('records on a stream'),

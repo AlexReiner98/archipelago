@@ -5,7 +5,11 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { createToken, verifyToken } from '../src/auth.ts';
 import { openDb, type Database } from '../src/db.ts';
-import { LATEST, MIGRATIONS, versionOf } from '../src/migrate.ts';
+import { latest, migrations, versionOf } from '../src/migrate.ts';
+
+// Each root's parts of the steps, read from the roots (src/migrate.ts): the same array migrate runs.
+const MIGRATIONS = await migrations();
+const LATEST = await latest();
 
 const folder = () => mkdtempSync(join(tmpdir(), 'pelago-migrate-'));
 const steps = async (db: Database) => (await db.query<{ version: number; applied_at: Date }>(`select version, applied_at from schema_version order by version`)).rows;

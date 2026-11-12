@@ -4,13 +4,13 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { parseBackup, parseVault, readable } from '../../../src/backup.ts'; import { merge } from '../../../src/backup-run.ts';
+import { parseBackup, parseVault, readable } from '../../../src/backup.ts';
+import { callAs } from '../../loader/kernel/kernel-context.ts';
 import { launch } from '../../../src/launcher.ts';
 import { bypassingRls } from '../../../src/outbox.ts';
 import type { TypeDef } from '../../../src/packs.ts';
 import { actorId } from '../../../src/pelago.ts';
-import { looked, presence } from '../../../src/presence.ts';
-import { seen as standsAt } from '../../../src/seeing.ts';
+import { whose } from './tool-change.ts';
 import { backupNow, needAdmin } from './tool-config.ts';
 import { op } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
@@ -40,9 +40,9 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
         .describe('The page asking, whether a show can land in it, and where it stands (its address after "#/"): an agent’s show says how many pages can take it, and an agent is told what the owner is looking at, and whether its show lands in the tab in sight (lands: the sessions whose shows go there).'),
     },
     run: async (l, _actor, { after, seq, ids = [], islands = [], page, was }) => {
-      if (page) await looked((await bypassingRls(l)).db, l, { page: page.page, on: page.on });
-      if (page?.where !== undefined) await standsAt((await bypassingRls(l)).db, l, page.page, page.where, page.tab, page.lands);
-      const [queue, { told, ...seen }, pos] = await Promise.all([l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending' -- index proposal_status`), presence((await bypassingRls(l)).db, l), headPos(l.db)]);
+      // The page says it is open and where it stands, and is given what its screen shows (the presence pack's act.report.screen).
+      const screen = callAs<{ told: number } & Record<string, unknown>>(l, 'act.report.screen', { whose: whose(l), ...(page && { page }) });
+      const [queue, { told, ...seen }, pos] = await Promise.all([l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending' -- index proposal_status`), screen, headPos(l.db)]);
       const stand = { queue: `${queue.rows[0].n}.${told}`, ...seen, ui: uiStamp() };
       const events = await eventsAfter(l.db, { seq, ids });
       const then = was === undefined ? {} : { was: await factsUpTo(l.db, { pos: was, ids }) };
@@ -90,7 +90,8 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       const their = theirs && mine && theirs !== mine ? file.tables.entity?.find((e) => e.id === theirs) : undefined;
       const my = their ? await whole.entity(mine!) : undefined;
       const owners = their && my && !my.archived_at ? { here: { id: my.id, title: my.title }, file: { id: theirs!, title: their.title as string }, made_one: false } : undefined;
-      const report = await merge(whole, file, { sessionTypes: whole.registry.family('run'), apply: input.apply });
+      // Merged by the backup pack, on the whole map (act.capture.backup_merge).
+      const report = await callAs<{ events: { first_seq: number; last_seq: number }; entities: unknown; relations: unknown } & Record<string, unknown>>(whole, 'act.capture.backup_merge', { dump: file, session_types: whole.registry.family('run'), apply: input.apply });
       // What the file brought may be in the shapes from before the migrations a workspace runs once: they run again.
       if (input.apply) (await movesAgain(whole), await syncTypes(whole));
       if (input.apply && named.length) await typesTaken(whole);

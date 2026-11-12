@@ -82,3 +82,6 @@ export function alertOnCrash(ctx: () => Promise<Pick<KernelContext, 'call'>>, wh
   process.on('uncaughtException', crash('uncaught exception'));
   process.on('unhandledRejection', crash('unhandled rejection'));
 }
+
+/** The crash mail the surface's server asks for at its start (surface.crash, packs/surface/kernel/above.ts): its server duty's context, made then. */
+export const crashMailed = (ctx: Pick<KernelContext, 'call'>, where: string) => alertOnCrash(async () => ctx, where);

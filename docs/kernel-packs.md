@@ -74,6 +74,9 @@ trusted).
   prefix a service pack's memory (the read `memory`) is kept under, in place of
   its own `pack:<id>:`: a prefix the code it took over kept there already, so
   nothing is migrated. Lower-case, ending in a colon, never `pack:`.
+- **`families`** (wave 6b, the query step): the families whose every name a service pack may call (`ctx.call`)
+  and list (`ctx.provided`) beside the names it requires or uses: the query pack's `answer` (a view names its
+  answer) and `term` (a lens names its term).
 - **`modules`**: its code, TypeScript under the pack's folder
   (`packs/<id>/kernel/`), loaded with `import()` by the loader. Never a file
   a pack item or a version carries: `pack_code` stays the sandbox's alone.
@@ -190,7 +193,8 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.counters` | surface | usage | a workspace's limits, its use of each and what that use is made of |
 | `root.server_packs` | loader | connect | the server packs the server's folders hold, each as the owner is shown it, and those left out with why (wave 6b: the `server_packs` tool, wired at `src/server-pack-tools.ts`) |
 | `root.observe` | write | connect | what a check of a connection saw: kept as an observation by who asked for the check, and the status with a line in the activity when it changed (wave 6b, e_gc8stacv: `check_connections`) |
-| `root.uses` | surface | usage | the uses stream's counts held in memory: added to, or read (the kernel's callers name a workspace, so `src/uses.ts` counts with `serverContext`) |
+| `root.uses` | surface | usage, query | the uses stream's counts held in memory: added to, or read (the kernel's callers name a workspace, so `src/uses.ts` counts with `serverContext`; the query pack counts a view asked) |
+| `root.pack_view` | loader | query | what a plain pack's view answers, run in the sandbox as the actor who asked, on the island's version of the pack its params name (wave 6b, the query step) |
 | `root.due` | loader | clocks | an item came due: item.due recorded on the map's activity stream as the kernel's and told to the sandboxed packs that hear it; its seq |
 | `root.publish` | database | publish | publishing's writes, each with its event: the published and public_view rows (publish, unpublish, share, unshare), and an item made public or shared again as the one publishing |
 | `root.may` | rules | publish | whether this kind of actor may publish or take down here (core's agent_publish, agent_unpublish) |
@@ -200,6 +204,9 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.drawing` | surface | publish | a drawing's module or service worker by its hash, as the reader may see the map, or whether the packs ship it |
 | `root.public_product` | surface | publish | a product's public page, data or result's picture as anyone reads them, with the headers every public answer carries |
 | `root.transient` | surface | looks, presence, mail, connect | the transient store, kept, read and taken (a key, a key with its bytes, a key read once, keys and prefixes at once) as the whole workspace of the calling map |
+| `root.bookkeep` | write | sessions | a session's own record of itself as it always reached the log (wave 6b, e_5vtbam7d): a change applied as the session's actor past the rules, the operational write, a claim and a give-back, what it vouches for as its own change through the rules, its events on the sessions stream deduplicated under their lock, an audit import with its cursor |
+| `root.sessions` | surface | sessions | what the sessions pack needs of the whole workspace (wave 6b): the sessions at work, whether there is room for one more, the owner's settings of the reply rules |
+| `root.transient` | surface | looks, presence, mail, sessions | the transient store, kept and read (a key, a key with its bytes, keys and prefixes at once) as the whole workspace of the calling map |
 | `root.look` | surface | looks | the UI's version, a look pass for the calling map's screen (walls), the room for another look this hour (rules) |
 | `root.notify` | write | notifications | a notification made on the calling map as its sender, past the rules, private, for the sender's person or the owner; told to the packs that hear notification.made |
 | `root.mail` | walls | alerts | a mail to the server's operator at PELAGO_ALERT_TO and no one else, with or without a map (a crash), through the mail gate |
@@ -266,7 +273,12 @@ are slots of the write and log packs; the others:
 | `loader.reads` | loader | surface | `packhost.ts` and `kernel-context.ts` importing `packreads.ts` (the sandbox's reads, and a kernel pack's `ctx.reads`, which names the pack asking); the surface root's `open.ts` loads it before any workspace opens |
 | `identity.invited` | identity | mail (`member-mail.ts#invited`, in `kernel.hooks`), filled when the server starts (`packs/loader/kernel/server-slots.ts`, loaded by the surface's server start) | `members.ts` importing `mail.ts` |
 | `open.<phase>` | identity (`src/lifecycle.ts`) | each root, by its `kernel/open.ts` (`OPEN`, and `LEADING` for what runs while the server leads), read in roots.json's order; an internal pack by `kernel.hooks`; what a service module still does there, `src/open-steps.ts` until its pack takes it | the fixed order in `Workspaces.load` |
+| `database.steps` | database (`src/migrate.ts`, read by `src/root-fills.ts`) | each root, by its `kernel/steps.ts`: `STEPS`, its parts of the numbered steps, and `OPENED`, what it does at every open of a database; read in roots.json's order when a database is first opened (wave 7, e_kgc2x7wu) | `migrate.ts` importing sixteen modules' schema steps, `db.ts` importing `partitions.ts` |
+| `log.restored`, `log.restored_to` | log (`src/backup.ts`) | identity, by its `kernel/fills.ts`: `RESTORED`, a backup's local types; `RESTORED_TO`, a workspace restored onto a server listed and indexed | `backup.ts` importing `control.ts` and `control-index.ts` |
+| `log.past` | log (`src/rebuild.ts`, `asOf`) | loader, by its `kernel/fills.ts`: `PAST`, the registry at a position | `rebuild.ts` importing `packs.ts` and `registry-at.ts` |
 | `surface.read`, `surface.act`, `surface.route` | surface | any | the closed tables in `tool-reads.ts`, `tool-acts.ts`, `server.ts` |
+| `surface.reads` | surface | agents (`instructions`), usage (`told`), query (`view`, `placed`, wave 6b). `events` is the reads API's own since wave 6 (`packreads-views`), eventlog being the log root's | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
+| `surface.serve` | surface | publish (`published`, `public`, `preview`, `site_nav`, `bake`, `counts_since`), styles (`icon`, `page_style`, `lengths`), mailer (`mail`, `bounced`, `note_bounced`), connect (`connect`, `token_asked`, `token_polled`), backup (`backup`), look_draw (`looks`), alerts (`crash`), views (`for_reader`, `sections`): each `surface.<name>` in `kernel.hooks`, asked on a map or for the server (`packs/surface/kernel/above.ts`, wave 7) | the server's imports of those packs' modules (`server.ts`, `server-acts.ts`, `server-published.ts`, `server-streams.ts`, `server-mounts.ts`), and `public-document.ts` importing `documents.ts` |
 | `surface.reads` | surface | agents (`instructions`), usage (`told`); the kernel until their packs hold their modules: views and askview (`view`), timeaxis (`placed`). `events` is the reads API's own since wave 6 (`packreads-views`), eventlog being the log root's | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
 
 This is also the fix for bug e_wpww27fm (trusted modules import services):
@@ -309,14 +321,14 @@ Started in this order; each needs only those above it in the table.
 | # | Pack | Holds | Interface |
 |---|---|---|---|
 | 0 | core | words: starter types, shared set, core's rules | none: data |
-| 1 | database | storage, row-level security, the shared lock | `open(ws)`, `scoped(viewer)`, `anyone()`, `asOwner(tx, sql)` (roots only), `definer(name)`, `tables(pack, spec)`, `migrate()`, `leading()` |
+| 1 | database | storage, row-level security, the shared lock | `open(ws)`, `scoped(viewer)`, `anyone()`, `asOwner(tx, sql)` (roots only), `definer(name)`, `tables(pack, spec)`, `migrate()`, `leading()`; slot `database.steps` |
 | 2 | seal | keys, and what forget destroys of them | `seal(id, text)`, `openSaid(id, bytes)`, `destroyKey(id)`, `secret(key)`, `setSecret(key, v)`, `opseal` |
-| 3 | log | the record, its streams and projections, its copies | `append`, `head`, `read(cursor)`, `record(stream)`, `projectFacts`, `rebuild`, `snapshot`, `tail`, `dump`, `restore`; slots `log.project`, `log.appended`; `root.dump`, `root.merge` |
+| 3 | log | the record, its streams and projections, its copies | `append`, `head`, `read(cursor)`, `record(stream)`, `projectFacts`, `rebuild`, `snapshot`, `tail`, `dump`, `restore`; slots `log.project`, `log.appended`, `log.restored`, `log.restored_to`, `log.past`; `root.dump` |
 | 4 | identity | who is asking: people, tokens, workspaces | `who(request)`, tokens, members' core, `workspaces` (list, create, delete, operator), `scope`, `policy`; slot `identity.invited`; `root.workspaces`, `root.token` |
 | 5 | walls | what may leave the server and what a page may run | `fetch(pack, url)` by reach, `pagePolicy`, `drawHost`, `cssCheck`, `svgFigure`, `scrub` (the public form), `publicDocument`, `unscopedRead` (the renamed `wholeMap`, its callers listed), `mailGate`, `drawingBox` (a drawing's first frame in a walled process), `lookPass`; slot `walls.pass_store`; `root.mail` |
 | 6 | loader | packs, versions, islands, the sandbox, the in-process tier | `Registry`, pack states, pins, island guards, `reach`, `host` (sandbox), `context(pack)` (the `KernelContext`), `call(service)`, `fillings(point)`; slot `loader.reads` |
 | 7 | rules | who decides what applies | `decide(who, ops, runs)`, `judge`, `mayDo`, `authorityOf`, actor checks, `standing` (still writable, room to store), private deps, layout changes; slot `rules.reply_ended` |
-| 8 | write | the one write path and the shape of an item | `change`, `apply`, `plan`, proposals (decide, withdraw, undo), merge, forget, ops, head, fields, link ends, owner link, within; points `write.*`; `root.notify` |
+| 8 | write | the one write path and the shape of an item | `change`, `apply`, `plan`, proposals (decide, withdraw, undo), merge, forget, ops, head, fields, link ends, owner link, within; points `write.*`; `root.notify`, `root.merge` |
 | 9 | surface | the ten verbs, who may call them, the HTTP host | tools, MCP, CLI, the hook host, the server's routes and gates, the kernel reads (`get`, `search`, `schema`, `events`, `proposals`), the reads API (`packreads`, as `answerRead`); slots `surface.*`; `root.counters`, `root.connections` |
 
 The `Archipelago` class (`src/pelago.ts`) is taken apart on the way: change
@@ -351,23 +363,27 @@ moves with a shim to the pack named.
 
 | Pack | Modules |
 |---|---|
-| database | db, pg, schema, member-schema, migrate, read-indexes, public-schema, public-view-store, stats, config (policy half to identity), deploy, move, leader, mentions (step 25's table of what names what, kept as released) |
+| database | db, pg, schema, member-schema, migrate, read-indexes, public-schema, public-view-store, stats, config (policy half to identity), leader, mentions (step 25's table of what names what, kept as released) |
 | seal | seal, opseal, vault, secrets, backup-seal |
-| log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore, and the root services root.dump and root.merge; the rest to backup), backup-log, bytes (the counts; its log.appended filling to usage), eventlog (wave 6: backup's dump and the surface's reads read events with a database or a transaction) |
-| identity | auth, oauth, oauth-clients, passwords, person-tokens, token-tools, members (invite half to mail), control, control-index, scope, workspaces (tenancy; the load order becomes the stub's `open` phases), sign-in (wave 6b, e_wuqn82rf: passwords, codes and links traded for a token, out of connect, what it asks above itself handed in) |
+| log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, move (wave 7, e_kgc2x7wu: a replay of the log between drivers, out of database), backup (dump and restore, and the root service root.dump; root.merge to write since wave 7; the rest to backup), backup-log, bytes (the counts; its log.appended filling to usage), eventlog (wave 6: backup's dump and the surface's reads read events with a database or a transaction) |
+| identity | auth, oauth, oauth-clients, passwords, person-tokens, token-tools, members (invite half to mail), control, control-index, deploy (wave 7, e_kgc2x7wu: migrates the databases the workspaces list names, out of database), scope, workspaces (tenancy; the load order becomes the stub's `open` phases), sign-in (wave 6b, e_wuqn82rf: passwords, codes and links traded for a token, out of connect, what it asks above itself handed in) |
 | walls | page-policies, draw-host, svg-figure, css-check, public, public-document, outbound, outbox, address, outside, notify-mail, drawing-box, drawing-runner, look-pass |
-| loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts, due-event (root.due) |
+| loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts, due-event (root.due) |
 | rules | rules (reply rules to sessions), actor-checks, authority, private-deps, layout-changes, standing |
 | write | pelago (reads to surface), change-apply, change-plan (automation checks to automations), ops, head, fields, link-ends, owner-link, within, pelago-types, proposals, withdraw, undo, merge, forget |
+| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing, packreads (and the slot surface.reads), packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, packreads-scope (the scope half of sessions' places, which it re-exports), packreads-flat and packreads-query (wave 6b: the query pack's reads), region, blocking, launcher (wave 6b, e_wuqn82rf, from launch: the run writes handed in by tool-acts, the brief the agents pack's `answer.launch_brief`), connect-routes (wave 6b: the open routes under /connect/, /x/ and OAuth, out of connect; what is above the surface handed in by the server) |
+| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing, packreads (and the slot surface.reads), packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, packreads-scope (the scope half of sessions' places, which it re-exports), region, blocking, plan-note (wave 7: only the change tool reads it, so it is the surface's, not views'), launcher (wave 6b, e_wuqn82rf, from launch: the run writes handed in by tool-acts, the brief the agents pack's `answer.launch_brief`), connect-routes (wave 6b: the open routes under /connect/, /x/ and OAuth, out of connect; what is above the surface handed in by the server) |
+| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing, packreads (and the slot surface.reads), packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, packreads-scope (the scope half of sessions' places, which it re-exports), region, blocking, launcher (wave 6b, e_wuqn82rf, from launch: the run writes handed in by tool-acts, the brief the agents pack's `answer.launch_brief`), connect-routes (wave 6b: the open routes under /connect/, /x/ and OAuth, out of connect; what is above the surface handed in by the server), server-mounts (wave 7: the addresses a server pack takes, served by the surface, out of loader), icon (wave 7: the icon's HTTP answer, out of looks), public-views (wave 7: the public views' reads, out of public-view-store, which keeps the write), public-documents (wave 7: a public document's reads, out of public-document, which keeps which types may be public), above (wave 7: what the server asks of the packs above it, `surface.serve`) |
+| write | pelago (reads to surface), change-apply, change-plan (automation checks to automations), ops, head, fields, link-ends, owner-link, within, pelago-types, proposals, withdraw, undo, merge, forget, backup-merge (wave 7: root.merge, out of backup, writing through restoreRows) |
 | surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing, packreads (and the slot surface.reads), packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, packreads-scope (the scope half of sessions' places, which it re-exports), region, blocking, launcher (wave 6b, e_wuqn82rf, from launch: the run writes handed in by tool-acts, the brief the agents pack's `answer.launch_brief`), connect-routes (wave 6b: the open routes under /connect/, /x/ and OAuth, out of connect; what is above the surface handed in by the server) |
 
 ### Service
 
 | Pack | Modules |
 |---|---|
-| query | query-flat, query-terms, query-steps, query-only, query-held, query-presets, askview, views, altitude, timeaxis, summary |
+| query | query-flat, query-terms, query-steps, query-only, query-presets, askview, views, altitude, timeaxis, summary (query-held to the reads API, packreads-flat) |
 | lenses | query-kept, query-saved, saved-views, view-life, view-twins, query-names |
-| views | view-graph, view-tree, inside, brief, moved, timelanes, documents, plan-note |
+| views | view-graph, view-tree, inside, brief, moved, timelanes, documents |
 | attention | attention, bounds, confirm |
 | findings (exists) | findings |
 | styles | styles, style-move, layout-move, screens, colours |
@@ -379,7 +395,7 @@ moves with a shim to the pack named.
 | clocks | due (on its context: the reads `clock`, `timed`, `due_of` in `packreads-clocks`, item.due through `root.due`, a watched query's edges through automation_triggers' `act.report.due_on`; its timer is the pack's `kernel.timers`, `due.ts#tick`, a failed pass told to the owner by alerts' `act.report.alert`, wave 6b); duties went: stream and snapshot keeping to log's `LEADING`, the backup timer to backup's server duty (`backupDuty`), the server packs' schedules beside it in `whileLeads` (`src/leader.ts`) |
 | sessions (exists) | sessions, chat-run, hook-answers, replies, reply-rules, reconcile, run-record, session-events, session-measures, session-name, session-parent, session-quiet, session-state, session-turns, sessiontime, touched, stands, spent, audit, working-rules, close-offer, file-said, frontier, frontier-prompt, places |
 | clocks | due, duties |
-| sessions (exists, optional) | sessions, chat-run, hook-answers, replies, reply-rules, reconcile, run-record, session-events, session-name, session-parent, session-quiet, session-turns (the view; its read is runs' answer.turns), touched, stands, audit, working-rules, close-offer, file-said |
+| sessions (exists, optional) | sessions, chat-run, hook-answers, replies, reply-rules, reconcile, run-record, session-events, session-name, session-parent, session-quiet, session-turns (the view; its read is runs' answer.turns), touched, stands, audit, working-rules, close-offer, file-said; as built (wave 6b, e_5vtbam7d): chat-run, session-parent, run-record, stands, touched, reconcile, file-said, audit, session-events, close-offer, session-name, bookkeeping and session-life (sessions' logic) import nothing of the kernel, their SQL in `packreads-sessions`, their writes through `root.bookkeep`, `root.sessions` and `root.transient`; sessions (the map-facing calls: presence's took and VIEWS.story), hook-answers, replies, session-quiet, session-turns and working-rules still do, each for a pack that names no service yet or for no map at all |
 | runs (required; decision e_w4bmpnx3) | frontier, frontier-prompt, session-state, session-measures, sessiontime, spent, places, run-turns (the read of session-turns); as built (wave 6b): on ctx, its SQL in `packreads-runs`, each read named `answer.*` in its manifest (frontier, worked_on, session_states, session_marks, run_spans, spent, session_measures, turns, place_for, lives_in, narrowed) |
 | claude_code (exists) | hook-tool, session-hook |
 | publish | published, published-data, published-frames, published-live, published-pictures, published-preview, public-bake, public-route, public-view, site, share-tools, drawing-files, pictures, pack-counts |
@@ -389,7 +405,7 @@ moves with a shim to the pack named.
 | notifications | notify (as built, wave 6b: on its context, made by `root.notify`; others notify by `act.report.notify`) |
 | mail (`packs/mailer`) | mail, smtp, bounces, member-mail |
 | alerts | alert (as built, wave 6b: on its context, mailing through `root.mail`, a crash as a server duty; others alert by `act.report.alert`) |
-| looks | chrome, look-draw, icon, looks (`passFor` stays in walls) |
+| looks | chrome, look-draw, looks (`passFor` stays in walls) |
 | connect | install, connect (the install pages' and a token ask's words; their routes the surface's, sign-in identity's, wave 6b), token-ask, connection-tools, server-pack-tools, check-connections (as built, wave 6b: install, server-pack-tools and check-connections import nothing of the kernel, through `root.server_packs` and `root.observe`; connect, token-ask and connection-tools still do) |
 | launch | launcher (the token stays in identity) |
 | connect | install, connect, token-ask, connection-tools, server-pack-tools (as built, wave 6b: install, server-pack-tools, token-ask and connection-tools import nothing of the kernel, through `root.server_packs`, `root.transient`, `root.token` and `root.connections`; connect and check-connections still do) |
@@ -581,14 +597,13 @@ surface's slot `surface.reads`, by the read's key, asked where the read was answ
 read with several keys answers as it did): an internal pack names it in its manifest
 (`"hooks": { "surface.reads": "reads.ts#instructions" }`, agents) and is handed its context of the
 map that asks, any map, opened or not (`hostAt`, `src/kernel-context.ts`); a module still in
-`src/` fills it from `KERNEL_FILLINGS` (`src/surface-fillings.ts`, through
-`src/service-reads.ts`), until its pack holds it: `view` (with its pin) and `placed`; `events` left in wave 6, answered by
+`src/` filled it from `KERNEL_FILLINGS` (`src/surface-fillings.ts`) until its pack held it, and none is left: `view` (with its pin) and `placed` are the query pack's since wave 6b; `events` left in wave 6, answered by
 the reads API from the log root's eventlog (`packreads-views`). As built (wave 6): `told` is the usage pack's (`reads.ts#told`), and what a run touched
 is the reads API's own, read from the transient store in `runsOf` (`src/packreads-log.ts`), since
 sessions is optional and an optional pack fills only `write.*`. The query step (wave 6, e_5euvh74f) moved query-flat, query-terms, query-only, query-held, query-presets,
 askview, views and timeaxis into `packs/query/kernel` behind pure shims, still on the map (`l`) and naming the kernel
 at `../../../src/`: what they call is sessions' (optional, so it provides no name), or another pack's that provides
-none, so `view` and `placed` stay kernel fillings until those packs answer by name. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
+none, so `view` and `placed` stayed kernel fillings. As built (wave 6b, e_xdcwzbcg): the query pack is on its context behind adapter shims. What it called is a name its pack provides (runs' frontier, worked_on, session_states, session_marks, run_spans, spent, session_measures, lives_in; attention's `answer.moved`; views' `answer.time_lanes`; lenses' `answer.hubs_of` and `answer.saved_views`; usage's `answer.usage`; styles' `answer.page_style`; agents' `answer.instructions`, whose `for` is session_start unless said), a root's (`root.uses`, `root.pack_view`), or a read: the flat lens's SQL is `packreads-flat` (`flat`, `flat_ends`, `flat_pos`: the seeds, the narrowing and the walk, held changes, Only's words), the operational views' `packreads-query` (`changed`, `open_runs`, `notifications`, `placed_rows`, `time_zone`). A read that names an island is the context's `island`. query-held went into `packreads-flat`. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
 reads API's own bounded scan, `packreads-scope`; runs' places (wave 6b) keeps its own copy of `livesIn` and `livesInFor` over the registry, and `scopeOf` through the read `within`. `test/packreads-slots.test.ts`
 pins each answer against its service's own functions.
 
@@ -606,6 +621,16 @@ field is for in `says`, by its path (`"authority.of"`). The surface builds the z
 registered (`declaredTools`, `packs/surface/kernel/tool-input.ts`), handing each run the pack's context its adapter
 makes; `test/pack-tool-inputs.test.ts` pins every such tool's schemas against what they were in zod.
 
+The surface's acts (wave 7, e_ybqc4nee: `tool-acts`, `tool-change`, `tool-human`) keep their words and ask what is
+above them by service name, with `callAs` as the map that asks: the owner's screen is the presence pack's
+(`act.report.point`, `act.report.took`, `act.report.screen`, `answer.sight`, each told `whose` screen: the workspace
+and the person the map is read as), a look look_draw's (`answer.look`), a picture publish's (`act.capture.picture`),
+a notification notifications' (`act.report.notify`), what a session is told agents' (`answer.instructions`) and where
+it stands runs' (`answer.frontier`), what the owner is to confirm attention's (`answer.to_confirm`), what no longer
+waits on them waits' (`answer.waiting_on`), where a change is seen lenses' (`answer.picture_of`), and a backup merged
+backup's (`act.capture.backup_merge`, on the whole map). A refused change is kept in the transient store through
+`root-transient.ts` as the surface's own. What is left of them is sessions' (audit, sessions, close-offer).
+
 ### Answers
 
 - A lens answer the kernel answered itself (`READINGS`, `src/query-presets.ts`)
@@ -619,7 +644,7 @@ makes; `test/pack-tool-inputs.test.ts` pins every such tool's schemas against wh
   the provider is handed a context of the map that asks, a person's view under
   their row-level security. `callService` runs the provider as the map the
   names were filled for at open: never use it for a read. The lens terms
-  (`term.*`, `src/query-terms.ts`) still call it.
+  (`term.*`) are the query pack's `ctx.call`, the family open to it (`kernel.families`).
 
 ### The shim
 

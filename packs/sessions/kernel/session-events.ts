@@ -3,12 +3,9 @@
 // and the rest are appended in order to the sessions stream as `event` facts on the run, sealed with the run's key as
 // every value about an item is there (src/opseal.ts). Turns, states and a session's line are worked out from them.
 
-import type { Q } from '../../../src/db.ts';
-import { actorId, type Archipelago } from '../../../src/pelago.ts';
-import { openOps } from '../../../src/opseal.ts';
-import { isSealed } from '../../../src/seal.ts';
-import type { Light, OpFact } from '../../../src/streams.ts';
-import { resolveRun } from './sessions.ts';
+import type { KernelContext } from '#pelago/kernel';
+import { actorId } from './types.ts';
+import { resolveRun } from './chat-run.ts';
 
 /** One event as the vocabulary has it: when, what kind, the source's turn when it knows one, and its kind's fields. */
 export interface SessionEvent {
@@ -77,26 +74,14 @@ export function checkEvent(raw: unknown, source?: string): { event: SessionEvent
 }
 
 /** What makes two events the same one: an adapter may send an event again. */
-const sameness = (e: Pick<SessionEvent, 'at' | 'kind' | 'turn'>) => `${e.at}\u0000${e.kind}\u0000${e.turn ?? ''}`;
+const SAME = ['at', 'kind', 'turn'];
 
-type Row = { stream: Light['stream']; pos: number; at: Date; head: Omit<Light, 'stream' | 'pos' | 'at' | 'facts'>; facts: OpFact[] };
-
-/** A run's events, read in its transaction or not: from the run's start, so the read is bounded by the stream's time. */
-async function eventsOf(q: Q, run: string, since: string | Date): Promise<SessionEvent[]> {
-  const { rows } = await q.query<Row>(
-    `select stream, pos::int as pos, at, head, facts from log_op where stream = 'sessions' and at >= $1 and facts @> $2::jsonb order by at, pos`,
-    [new Date(since).toISOString(), JSON.stringify([['+', run, EVENT_FIELD]])],
-  );
-  const opened = await openOps(q, rows.map((r): Light => ({ ...r.head, stream: r.stream, pos: r.pos, at: new Date(r.at).toISOString(), facts: r.facts })));
-  // An event whose key is gone (its run forgotten) reads as a digest, and is no event any more.
-  const out = opened.flatMap((e) => e.facts.filter((f) => f[0] === '+' && f[1] === run && f[2] === EVENT_FIELD && !isSealed(f[3]) && typeof (f[3] as SessionEvent)?.kind === 'string').map((f) => f[3] as SessionEvent));
-  return out.sort((a, b) => Date.parse(a.at) - Date.parse(b.at)); // stable: what came at the same time stays in the order it was sent
-}
-
-/** A run's events in order, by when they happened, as the source's clock had it; [] for a run there is none of. */
-export async function sessionEvents(l: Archipelago, run: string): Promise<SessionEvent[]> {
-  const found = await l.entity(run);
-  return found ? eventsOf(l.db, run, found.created_at) : [];
+/** A run's events in order, by when they happened, as the source's clock had it; [] for a run there is none of. Read from the run's start, so the read is bounded by the stream's time. */
+export async function sessionEvents(ctx: KernelContext, run: string): Promise<SessionEvent[]> {
+  const [found] = (await ctx.reads({ ids: [run] })) as { created_at: string | Date }[];
+  if (!found) return [];
+  const events = (await ctx.reads({ run_events: { runs: [run], since: new Date(found.created_at).toISOString() } })) as Record<string, SessionEvent[]>;
+  return events[run] ?? [];
 }
 
 export interface EventsBody {
@@ -109,8 +94,8 @@ export interface EventsBody {
  * Take a batch of events for the run a session id names: each checked, those the run has already (or the batch has
  * twice) dropped, the rest appended in the order sent, in one entry. What was refused is said, by its place in the batch.
  */
-export async function takeEvents(l: Archipelago, body: EventsBody) {
-  const run = body.session_id ? await resolveRun(l, body.session_id) : undefined;
+export async function takeEvents(ctx: KernelContext, body: EventsBody) {
+  const run = body.session_id ? await resolveRun(ctx, body.session_id) : undefined;
   if (!run) return { run: null, kept: 0, problem: 'No run has this session id: start the session first.' };
   const source = typeof body.source === 'string' && /^[a-z][a-z0-9-]{0,39}$/.test(body.source) ? body.source : undefined;
   if (!source) return { run: run.id, kept: 0, problem: 'source names the adapter, like claude-code.' };
@@ -122,13 +107,7 @@ export async function takeEvents(l: Archipelago, body: EventsBody) {
     if ('problem' in checked) refused.push({ at: i, problem: checked.problem });
     else good.push(checked.event);
   });
-  const kept = await l.db.transaction(async (tx) => {
-    // One batch of a run at a time, so two sent together cannot both keep the same event.
-    await tx.query(`select pg_advisory_xact_lock(hashtext('pelago.session_events'), hashtext($1))`, [run.id]);
-    const had = new Set((await eventsOf(tx, run.id, run.created_at)).map(sameness));
-    const fresh = good.filter((e) => !had.has(sameness(e)) && (had.add(sameness(e)), true));
-    await l.record('sessions', actorId({ kind: 'agent', name: source }), fresh.map((e): OpFact => ['+', run.id, EVENT_FIELD, e]), undefined, tx);
-    return fresh.length;
-  });
+  // One batch of a run at a time, those it has already dropped, in one entry: the write path's, under its lock (root.bookkeep).
+  const kept = (await ctx.call('root.bookkeep', { events: { run: run.id, since: new Date(run.created_at).toISOString(), actor: actorId({ kind: 'agent', name: source }), field: EVENT_FIELD, values: good, same: SAME } })) as number;
   return { run: run.id, kept, dropped: good.length - kept, ...(refused.length && { refused }) };
 }

@@ -42,6 +42,42 @@
           "props": "any"
         },
         "run": "query-names.ts#renamed"
+      },
+      "answer.hubs_of": {
+        "in": {
+          "within?": "string"
+        },
+        "out": {
+          "at": "number",
+          "hubs": [
+            "any"
+          ]
+        },
+        "run": "query-answers.ts#hubsOf"
+      },
+      "answer.saved_views": {
+        "in": {
+          "limit?": "number"
+        },
+        "out": {
+          "pictures": [
+            "any"
+          ],
+          "more": "number",
+          "ended?": [
+            "id"
+          ]
+        },
+        "run": "query-answers.ts#saved"
+      },
+      "answer.picture_of": {
+        "in": {
+          "id": "id"
+        },
+        "out": {
+          "hash?": "string"
+        },
+        "run": "query-kept.ts#pictureOfAnswer"
       }
     }
   }

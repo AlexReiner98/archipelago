@@ -12,7 +12,10 @@
     "modules": "kernel/",
     "hooks": {
       "identity.invited": "member-mail.ts#invited",
-      "walls.mail": "mail.ts#sender"
+      "walls.mail": "mail.ts#sender",
+      "surface.mail": "served.ts#served",
+      "surface.bounced": "bounces.ts#hasBounced",
+      "surface.note_bounced": "bounces.ts#noteBounced"
     }
   }
 }

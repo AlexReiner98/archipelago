@@ -118,3 +118,6 @@ export function forReader(ctx: Typed, doc: Given, via?: string, elsewhere: Map<s
   const named = [...elsewhere].filter(([id]) => parts.some((part) => ('text' in part ? part.text : 'section' in part ? part.section.body : '').includes(id)));
   return { type: doc.type, title: doc.title, status: doc.status, fields: shownOf(ctx, doc.type, doc.props), updated_at: doc.updated_at, parts, ...(named.length && { links: Object.fromEntries(named) }) };
 }
+
+/** The ids a document's note brings in, asked by the surface where it reads a document for anyone (surface.sections). */
+export const sectionsOf = (_ctx: Typed, body: string) => sectionIds(body);

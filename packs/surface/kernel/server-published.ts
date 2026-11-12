@@ -1,26 +1,23 @@
 // What a server pack may read of what a person made public (task e_uc8m8jwa, public views since e_79erzrcx): a public
 // view as it was frozen, the one at a site's path, its pictures and drawings, every public view. Each act goes through
-// the security-definer reads alone (src/public-schema.ts, by way of src/public-view-store.ts), as anyone: the pack is
+// the security-definer reads alone (src/public-schema.ts, by way of ./public-views.ts), as anyone: the pack is
 // handed only what is public, never the map. Sharing, publishing and taking down stay the kernel's.
 //
 // Every answer is JSON: a document as its page's /data gives it (packs/reader), its look beside it and each
 // drawing's code left at its hash; a picture's bytes as base64 with their content type. What is not public, or not
 // there, is null, so a pack cannot tell a private item from one that never was.
 
-import type { Part } from '../../../src/documents.ts';
-import { layoutCode, pageData, publicPath } from '../../../src/published-data.ts';
-import { PATH } from '../../../src/published.ts';
-import { bake } from '../../../src/public-bake.ts';
-import { publicView, publicViewAt, publicViewPicture, publicViews } from '../../../src/public-view-store.ts';
+import { onMap, published } from './above.ts';
+import { callAs } from '../../loader/kernel/kernel-context.ts';
+import { PATH, publicPath, publicView, publicViewAt, publicViewPicture, publicViews } from './public-views.ts';
 import type { ActPlaces } from './server-acts.ts';
 import type { ServerAct, ServerPackFile } from '../../../src/server-packs.ts';
-import { pageLook } from '../../../src/styles.ts';
 
 const WORKSPACE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const ID = /^e_[a-z0-9]{8}$/;
 const HASH = /^[0-9a-f]{64}$/;
 
-type Doc = { title: string; parts: Part[] } & Record<string, unknown>;
+type Doc = { title: string; parts: unknown[] } & Record<string, unknown>;
 
 const word = (v: unknown, shape: RegExp, what: string) => {
   if (typeof v !== 'string' || !shape.test(v)) throw new Error(`${what} is needed, as ${String(shape)}.`);
@@ -45,7 +42,7 @@ export async function publishedAct(at: ActPlaces, pack: ServerPackFile, act: Ser
       const doc = l && ((act === 'public.read' ? await publicView(l, key) : await publicViewAt(l, key)) as Doc | null);
       if (!l || !doc) return null;
       const id = String(doc.id);
-      return pageData({ ...doc, id, ...(await pageLook(l, { ...doc, id })) }, publicPath(workspace, id));
+      return (await published()).pageData({ ...doc, id, ...(await callAs<Record<string, unknown>>(l, 'page.look', { ...doc, id })) }, publicPath(workspace, id));
     }
     case 'public.picture': {
       const id = word(input.id, ID, 'An id');
@@ -57,14 +54,14 @@ export async function publishedAct(at: ActPlaces, pack: ServerPackFile, act: Ser
       const id = word(input.id, ID, 'An id');
       const hash = word(input.hash, HASH, 'A hash');
       const doc = l && ((await publicView(l, id)) as Doc | null);
-      return (doc && layoutCode(doc, hash)) ?? null;
+      return (doc && (await published()).layoutCode(doc, hash)) ?? null;
     }
     case 'public.list':
       return l ? publicViews(l) : [];
     case 'public.baked': {
-      // The public view at a path, its rails picture run with this server's code (src/public-bake.ts); null when it has none.
+      // The public view at a path, its rails picture run with this server's code (the publish pack's, surface.bake); null when it has none.
       const doc = l && ((await publicViewAt(l, word(input.path, PATH, 'A path'))) as Doc | null);
-      return l && doc ? bake(l, doc) : null;
+      return l && doc ? onMap(l, 'surface.bake', doc) : null;
     }
     default:
       throw new Error(`The act "${act}" is not one of the public acts.`);

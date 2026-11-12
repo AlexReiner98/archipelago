@@ -17,9 +17,11 @@ import { viewsRead, type ViewsRead } from './packreads-views.ts';
 import { presenceRead, type PresenceRead } from './packreads-presence.ts';
 import { publishRead, type PublishRead } from './packreads-publish.ts';
 import { runsRead, type RunsRead } from './packreads-runs.ts';
+import { sessionsRead, type SessionsRead } from './packreads-sessions.ts';
+import { queryRead, type QueryRead } from './packreads-query.ts';
 import { fillReads } from '../../loader/kernel/packhost.ts'; import { trail } from './map-reads.ts';
 
-export type Read = KernelRead & ServiceRead & ViewsRead & ClocksRead & PublishRead & PresenceRead & RunsRead & {
+export type Read = KernelRead & ServiceRead & ViewsRead & ClocksRead & PublishRead & PresenceRead & RunsRead & QueryRead & SessionsRead & {
   get?: string;
   /** Items of a type (flavours included): with a status or one of several, fields equal to where's, and a field between two values. */
   items?: { type: string; status?: string | string[]; where?: Record<string, unknown>; between?: { field: string; from?: string; to?: string } };
@@ -101,6 +103,10 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
   if (presence !== undefined) return presence;
   const runs = await runsRead(l, q);
   if (runs !== undefined) return runs;
+  const query = await queryRead(l, q);
+  if (query !== undefined) return query;
+  const sessions = await sessionsRead(l, q);
+  if (sessions !== undefined) return sessions;
   if (q.fields && (!Array.isArray(q.fields) || q.fields.some((f) => !NAME.test(f)))) throw new Error('fields is a list of field names');
   // An item's columns as the asker may read them: anyone with no login reads no note, no owner, no link's id, and of the
   // props only the few public ones, and may not filter by props at all.
@@ -230,5 +236,5 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, facts, said, runs, held, confirm, packs, view, type_info, with_field, me, proposed, ids, links, history, tops, within, blocks, holds, region, kinds, instructions, view_lives, in_projects, mentioned, marked, owner, link, log_head, memory, islands_off, public_views, public_view_at, public_document, published_row, entities, publishable, published_others, draft_paths, held_documents, published_doc, shared, picture, counts, corrections, run_of, runs_lately, runs_made, run_rows, run_works, run_links, run_tasks, run_signs, run_open, run_names, run_events, events_in, worked_on, part_around, run_items, hubs_among, places_of, search_map, steps_near, settling.');
+  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, facts, said, runs, held, confirm, packs, view, type_info, with_field, me, proposed, ids, links, history, tops, within, blocks, holds, region, kinds, instructions, view_lives, in_projects, mentioned, marked, owner, link, log_head, memory, islands_off, public_views, public_view_at, public_document, published_row, entities, publishable, published_others, draft_paths, held_documents, published_doc, shared, picture, counts, corrections, run_of, runs_lately, runs_made, run_rows, run_works, run_links, run_tasks, run_signs, run_open, run_names, run_events, events_in, worked_on, part_around, run_items, hubs_among, places_of, search_map, steps_near, settling, flat, flat_ends, flat_pos, changed, open_runs, notifications, placed_rows, time_zone.');
 }

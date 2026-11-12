@@ -11,6 +11,22 @@
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "act.capture.backup_merge": {
+        "in": {
+          "dump": "any",
+          "session_types?": [
+            "string"
+          ],
+          "apply?": "boolean"
+        },
+        "out": "any",
+        "run": "backup-run.ts#mergeAct"
+      }
+    },
+    "hooks": {
+      "surface.backup": "served.ts#served"
+    }
   }
 }

@@ -54,7 +54,7 @@ export async function viewAddress(l: Archipelago, asked: ViewAsked): Promise<str
   if (input.lens || input.style) {
     // Read as the flat lens reads it, so a lens the canvas could not draw is refused here and not on a screen.
     const wanted = (input.lens ?? {}) as { limit?: unknown };
-    const lens = Object.keys(wanted).length ? readFlat(l, wanted) : undefined;
+    const lens = Object.keys(wanted).length ? await readFlat(l, wanted) : undefined;
     for (const term of lens?.find ?? []) {
       const [, id] = /^(?:id|in) (e_[a-z0-9]{8})$/.exec(term) ?? [];
       if (id && !(await l.entity(id))) throw new Error(`No item "${id}"`);

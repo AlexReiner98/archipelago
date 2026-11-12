@@ -6,27 +6,27 @@
     },
     {
       "id": "database",
-      "hash": "42f2391d015a45e7379d60f6f3874fb7536c5a02c890831536ab9543b606c40f"
+      "hash": "e07838e0628bccf734c04b89685b1a23f479549c7e904b08dff7807ae6f7b035"
     },
     {
       "id": "seal",
-      "hash": "3c571a877ee3307df41085564594ff6f5ea5c2c1e32c1bc39527fe111b256fc6"
+      "hash": "1ec2b2ad6bda6dd079038ed93a6a2f86cb51c6f41bea9cd9c0c4025685940793"
     },
     {
       "id": "log",
-      "hash": "0fa9aeca2feab7292c3b4e4b989e7ea180b74122b15f2b09c59f22e6cc203971"
+      "hash": "df3c42b470301a338cc149f7fbb657ab0fac2786ac135ab4de116362665b1d5f"
     },
     {
       "id": "identity",
-      "hash": "8a07df2cc400ea2059a142ca59ecc0b78ba84a951560b7a5f5b51ace1dc1108f"
+      "hash": "5b37f47b424cbcd85cb0f8722a75c9f8a023ae7784707f4c5a466c0f32b91ff9"
     },
     {
       "id": "walls",
-      "hash": "32a4ab4f1c6d9dbe1a31c71716e475e07abf1e96fd6b1e67f96e354a0c149763"
+      "hash": "f82b4d0b4bd8bf88ac3e6b2486d5610db6b3c5b12ea06f63ae56b9baa707783b"
     },
     {
       "id": "loader",
-      "hash": "4800eeb34d8898c3fa233cf513bdca5a0ba22021d67a676632a4ab58f275f9eb"
+      "hash": "468b786cbc7be1486e8765bc7dfe616e2fe8cade6edefc3cbcc0e766b850663c"
     },
     {
       "id": "rules",
@@ -34,11 +34,11 @@
     },
     {
       "id": "write",
-      "hash": "83390c37fc75ef6f9df6cbb553fffdad13a4537c820d16890419d5a16fc84222"
+      "hash": "103b96e34099185b0ed02c2a8a96c1839355c4e712d039359e87fbf9c9fe7537"
     },
     {
       "id": "surface",
-      "hash": "1ad9fd4e2b3e6b62c08abfd97f3eb8bbd7c54fb261d79070f65bdbcd3737b033"
+      "hash": "415d3afb6b648b0d1d04fc19126ff0be0e20209fdb6a2745c26a959d899bce91"
     }
   ],
   "calls": {
@@ -55,7 +55,8 @@
       "usage"
     ],
     "root.uses": [
-      "usage"
+      "usage",
+      "query"
     ],
     "root.server_packs": [
       "connect"
@@ -88,7 +89,8 @@
       "connect",
       "look_draw",
       "mailer",
-      "presence"
+      "presence",
+      "sessions"
     ],
     "root.look": [
       "look_draw"
@@ -107,6 +109,15 @@
     ],
     "root.connections": [
       "connect"
+    ],
+    "root.pack_view": [
+      "query"
+    ],
+    "root.bookkeep": [
+      "sessions"
+    ],
+    "root.sessions": [
+      "sessions"
     ]
   }
 }

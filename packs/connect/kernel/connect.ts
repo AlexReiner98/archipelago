@@ -7,10 +7,10 @@
 // an address may ask, who is signed in); this answers each with its words. Sign-in is identity's (the owner, 12 Nov
 // 2026, e_wuqn82rf).
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { KernelContext } from '#pelago/kernel';
 import { workingRules } from '../../../src/working-rules.ts';
 import { installPage, installPs1, installScript, installSh, llmsTxt } from './install.ts';
-import { askForToken, pollForToken } from '../../../src/token-ask.ts';
+import { askForToken, pollForToken } from './token-ask.ts';
 
 /** The one command, with no secret in it, that sets a project up or brings its files up to date. */
 export const setupCommand = (origin: string) => `node -e "fetch('${origin}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"`;
@@ -32,9 +32,9 @@ export function installed(path: string, origin: string): { type: string; text: s
 }
 
 /** A system's request for its token (POST /connect/request), answered with what it shows and polls with. */
-export async function asked(l: Archipelago, body: unknown, origin: string, workspace: string): Promise<{ status: number; body: unknown }> {
+export async function asked(ctx: KernelContext, body: unknown, origin: string, workspace: string): Promise<{ status: number; body: unknown }> {
   try {
-    const ask = await askForToken(l, body);
+    const ask = await askForToken(ctx, body);
     return {
       status: 200,
       body: {
@@ -51,7 +51,7 @@ export async function asked(l: Archipelago, body: unknown, origin: string, works
 }
 
 /** A system's poll for its token (POST /connect/poll/<workspace>/<id>, its secret as the bearer). */
-export async function polled(l: Archipelago, workspace: string, id: string, secret: string): Promise<{ status: number; body: unknown }> {
-  const answer = await pollForToken(l, id, secret);
+export async function polled(ctx: KernelContext, workspace: string, id: string, secret: string): Promise<{ status: number; body: unknown }> {
+  const answer = await pollForToken(ctx, id, secret);
   return { status: answer.state === 'gone' ? 410 : 200, body: answer };
 }

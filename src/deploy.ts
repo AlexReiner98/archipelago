@@ -1,1 +1,1 @@
-export * from '../packs/database/kernel/deploy.ts';
+export * from '../packs/identity/kernel/deploy.ts';

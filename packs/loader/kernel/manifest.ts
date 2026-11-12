@@ -8,6 +8,7 @@
 
 import type { ActionDef, LayoutDef, HearDef, HostDef, ReasonDef, ScheduleDef, ScreenDef, StyleDef, TreeDef, VerbDef, ViaDef, ViewDef, WebhookDef } from './declared.ts';
 import { isName, KERNEL_PACKS, NAME_FORMS } from './packorder.ts';
+import { FAMILIES } from './services.ts';
 import type { FieldDef, RelationDef, TypeDef } from './packs.ts';
 import type { RuleDef } from '../../../src/rules.ts';
 import type { ServerHost, ServerReach } from './server-packs.ts';
@@ -106,14 +107,19 @@ export interface KernelSpec {
    * `pack:<id>:`: a prefix the code it took over already kept there, so nothing is migrated (decision e_a8dh8fg3).
    */
   memory?: string;
+  /**
+   * The families whose every name it may call (`term`: any lens term a pack provides), beside the names it requires or
+   * uses: for a pack that calls a name it reads from what is asked (a lens's term, a preset's answer). Only a service pack.
+   */
+  families?: string[];
 }
-export const KERNEL_KEYS: readonly string[] = 'trust internal modules provides calls hooks fills tables timers optional memory'.split(' ');
+export const KERNEL_KEYS: readonly string[] = 'trust internal modules provides calls hooks fills tables timers optional memory families'.split(' ');
 const MODULE_REF = /^[\w./-]+\.ts#[A-Za-z_$][\w$]*$/;
 
 /** Problems with a manifest's `kernel`, as sentences. Where a pack may carry it is the registry's (kernelRefused). */
 export function kernelProblems(k: unknown): string[] {
   if (k === undefined) return [];
-  if (typeof k !== 'object' || k === null || Array.isArray(k)) return ['kernel is an object: { trust, internal, modules?, provides?, calls?, hooks?, fills?, tables?, timers?, optional?, memory? }'];
+  if (typeof k !== 'object' || k === null || Array.isArray(k)) return ['kernel is an object: { trust, internal, modules?, provides?, calls?, hooks?, fills?, tables?, timers?, optional?, memory?, families? }'];
   const s = k as Raw, problems: string[] = [];
   for (const key of Object.keys(s)) if (!(KERNEL_KEYS as readonly string[]).includes(key)) problems.push(`"kernel.${key}" is not a key of a manifest: in kernel, one of ${KERNEL_KEYS.join(', ')}`);
   if (s.trust !== 'root' && s.trust !== 'service') problems.push('kernel.trust is root or service');
@@ -139,6 +145,7 @@ export function kernelProblems(k: unknown): string[] {
   }
   if (s.memory !== undefined && (typeof s.memory !== 'string' || !/^[a-z][a-z0-9_]*:$/.test(s.memory) || s.memory.startsWith('pack:'))) problems.push('kernel.memory is a settings prefix of lower-case letters, digits and _, ending in a colon, such as "due_on:", and never pack:');
   if (s.memory !== undefined && s.trust !== 'service') problems.push("kernel.memory is a service pack's");
+  if (s.families !== undefined && (s.trust !== 'service' || !Array.isArray(s.families) || s.families.some((f) => !(FAMILIES as readonly unknown[]).includes(f)))) problems.push(`kernel.families is a service pack's list of families whose every name it may call, each one of ${FAMILIES.join(', ')}`);
   return problems;
 }
 

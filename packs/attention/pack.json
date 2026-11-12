@@ -36,6 +36,28 @@
           ]
         },
         "run": "attention.ts#answer"
+      },
+      "answer.moved": {
+        "in": {},
+        "out": {
+          "ids": [
+            "id"
+          ]
+        },
+        "run": "query-answers.ts#moved"
+      },
+      "answer.to_confirm": {
+        "in": {
+          "limit?": "number"
+        },
+        "out": {
+          "count": "number",
+          "upto": "number",
+          "questions": [
+            "any"
+          ]
+        },
+        "run": "confirm.ts#toConfirm"
       }
     }
   },

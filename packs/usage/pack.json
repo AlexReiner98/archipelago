@@ -37,6 +37,13 @@
         },
         "out": "any",
         "run": "uses.ts#usedAct"
+      },
+      "answer.usage": {
+        "in": {
+          "admin?": "boolean"
+        },
+        "out": "any",
+        "run": "query-answers.ts#usageOf"
       }
     }
   }

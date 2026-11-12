@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Actor } from '../src/pelago.ts';
 import { answerRead } from '../src/packreads.ts';
-import { publicView } from '../src/public-view-store.ts';
+import { publicView } from '../packs/surface/kernel/public-views.ts';
 import { callTool } from '../src/tools.ts';
 import { fresh, make } from './map.ts';
 

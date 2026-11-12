@@ -28,13 +28,16 @@ export function tokenRow(t, { me, personName, then, fail }) {
   );
 }
 
+/** What a token made for Claude Code's setup is named unless the person names it: the actor its hooks act as (the claude_code pack's adapter.before.actor). */
+const SETUP_NAME = 'claude-code';
+
 /**
  * What is connected, first: a row each, or a line saying none is. Connect an agent opens the steps under it
  * (ui/connect-agent.js). The older way in, folded: a token, for Claude Code's hooks or a client that cannot sign in.
  */
 export function tokensCard({ tokens, row, then, fail, say, workspace, connect }) {
   // Named on the button and in the box that shows the token: one browser may be signed in to two workspaces.
-  const name = h('input', { type: 'text', placeholder: 'Name (claude-code)', style: 'flex: 1 1 0; min-width: 0' });
+  const name = h('input', { type: 'text', placeholder: `Name (${SETUP_NAME})`, style: 'flex: 1 1 0; min-width: 0' });
   // A new agent token ends by itself unless it is said not to. One within an item is made on that item's page.
   const life = h('select', { title: 'When the token stops working by itself' }, [[90, '90 days'], [30, '30 days'], [365, 'A year'], [0, 'Never expires']].map(([days, label]) => h('option', { value: days }, label)));
   const token = (fallback, everywhere) => ({ kind: 'agent', name: name.value.trim() || fallback, ...(Number(life.value) > 0 && { expires_days: Number(life.value) }), ...(everywhere && { everywhere: true }) });
@@ -53,11 +56,11 @@ export function tokensCard({ tokens, row, then, fail, say, workspace, connect })
         { class: 'toolbar', style: 'padding: var(--space-6) 0; flex-wrap: nowrap' },
         name,
         life,
-        h('button', { class: 'gist cut', style: 'flex: 0 1 auto', title: `Claude Code setup: a command that sets up Claude Code in a project, with sessions on the map of ${workspace.name} (${workspace.id})`, onclick: () => make('claude-code', (made) => connectBox(made, workspace)) }, `Set up in ${workspace.name}`),
+        h('button', { class: 'gist cut', style: 'flex: 0 1 auto', title: `Claude Code setup: a command that sets up Claude Code in a project, with sessions on the map of ${workspace.name} (${workspace.id})`, onclick: () => make(SETUP_NAME, (made) => connectBox(made, workspace)) }, `Set up in ${workspace.name}`),
         menu('⋯', [
           [`Token only, for ${workspace.name}`, () => make('agent', (made) => secretBox(`Token for ${made.name}, in ${workspace.name}`, made.token, workspace))],
           // One token for every workspace you are a member of: a call names its workspace, else it acts here.
-          ['Set up for all my workspaces', () => make('claude-code', (made) => connectBox(made, null), true)],
+          ['Set up for all my workspaces', () => make(SETUP_NAME, (made) => connectBox(made, null), true)],
         ]),
       ),
     ),

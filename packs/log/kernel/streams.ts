@@ -137,7 +137,7 @@ export async function seal(db: Db, ws: string, now = new Date()): Promise<Segmen
     const covered = (stream: string, d: string) => standing.some((s) => s.stream === stream && s.days[0] <= d && d <= s.days[1]);
     const { rows } = await tx.query<{ stream: OpStream; day: string; from: number; to: number }>(
       `select stream, to_char(at at time zone 'UTC', 'YYYY-MM-DD') as day, min(pos)::int as "from", max(pos)::int as "to"
-       from log_op where at < date_trunc('day', $1::timestamptz at time zone 'UTC') at time zone 'UTC' group by 1, 2 order by 1, 2`,
+       from log_op where at < date_trunc('day', $1::timestamptz at time zone 'UTC') at time zone 'UTC' group by 1, 2 order by 1, 2 -- index log_op_at`,
       [now.toISOString()],
     );
     const sealed: Segment[] = [];

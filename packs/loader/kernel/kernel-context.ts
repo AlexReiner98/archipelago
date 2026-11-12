@@ -14,7 +14,8 @@ import { isInternal, type Manifest, type ModuleRef } from './manifest.ts';
 import { readsAnswer } from './packhost.ts';
 import type { Read } from '../../../src/packreads.ts';
 import { guardedFetch } from '../../../src/outbound.ts';
-import { fillServices, serviceOf } from './services.ts';
+import { fillServices, serviceName, serviceOf, servicesOf, type Family } from './services.ts';
+import { islandRegistry } from './island-pin.ts';
 import { callRoot, declares, isRootName, ownManifest, type RootCall } from './root-calls.ts';
 import { fillOpen } from '../../identity/kernel/lifecycle.ts';
 import type { Archipelago } from '../../../src/pelago.ts';
@@ -30,7 +31,7 @@ export interface SystemAuthority { of: 'system'; basis: string }
 export type SystemChange = Omit<ChangeInput, 'authority' | 'pack' | 'hold' | 'drawing' | 'run'> & { basis?: string };
 
 /** What the registry tells a pack: read only. */
-export type RegistryRead = Readonly<Pick<Registry, 'types' | 'relations' | 'rules' | 'packs' | 'trees' | 'type' | 'isA' | 'family' | 'relationFamily' | 'ancestry' | 'having' | 'capacity'>>;
+export type RegistryRead = Readonly<Pick<Registry, 'types' | 'relations' | 'rules' | 'packs' | 'trees' | 'type' | 'isA' | 'family' | 'relationFamily' | 'ancestry' | 'having' | 'capacity' | 'canonical' | 'hashes'>>;
 
 /** The one thing a kernel pack's function is handed (docs/kernel-packs.md). */
 export interface KernelContext {
@@ -39,8 +40,12 @@ export interface KernelContext {
   /** The reads a sandboxed pack has (src/packreads.ts, through the loader's slot loader.reads), answered in-process under row-level security. */
   reads: (read: Read) => Promise<unknown>;
   registry: RegistryRead;
-  /** A service name this pack requires or uses, answered by the one active pack that provides it. */
+  /** A service name this pack requires or uses (or of a family its manifest's kernel.families opens), answered by the one active pack that provides it. */
   call<I, O>(name: string, input: I): Promise<O>;
+  /** The entries of a family filled here (`term`: the lens terms packs provide), of a family the pack may call whole (kernel.families). */
+  provided(family: string): string[];
+  /** This pack's context of the map read as an island runs: through the version of its pack the island names, if any; this one when it names none. */
+  island(id: string): Promise<KernelContext>;
   /** A change, as `system:<pack>` on its own authority, through the rules. */
   change(input: SystemChange): Promise<Awaited<ReturnType<Archipelago['change']>>>;
   /**
@@ -115,7 +120,7 @@ export class KernelHost {
   /** A service name called by a pack: only one it requires or uses, answered by its one active provider. */
   async call<O>(l: Archipelago, from: Manifest, name: string, input: unknown): Promise<O> {
     const want = `service:${name}`;
-    if (![...(from.requires ?? []), ...(from.uses ?? [])].includes(want)) throw new Error(`The ${from.id} pack calls ${want}, which it neither requires nor uses`);
+    if (![...(from.requires ?? []), ...(from.uses ?? [])].includes(want) && !opens(from, serviceName(name)?.family)) throw new Error(`The ${from.id} pack calls ${want}, which it neither requires nor uses`);
     // A root service: only a pack packs/roots.json names for it, answered by its root (src/root-calls.ts).
     if (isRootName(name)) return callRoot<O>(from.id, name, input, { map: l });
     return this.answer<O>(l, name, input);
@@ -145,6 +150,9 @@ export class KernelHost {
     })));
   }
 }
+
+/** Whether a pack's manifest opens a whole family to it (kernel.families). */
+const opens = (pack: Manifest, family: Family | undefined) => family !== undefined && (pack.kernel?.families ?? []).includes(family);
 
 /** The kernel host of each opened workspace's registry. */
 const hosts = new WeakMap<object, KernelHost>();
@@ -210,6 +218,13 @@ export function contextFor(l: Archipelago, pack: Manifest, host: KernelHost): Ke
     reads: (read) => readsAnswer(l, read, id),
     registry: l.registry,
     call: <I, O>(name: string, input: I) => host.call<O>(l, pack, name, input),
+    provided: (family) => (opens(pack, family as Family) ? servicesOf(l.registry, family as Family).map((n) => n.slice(family.length + 1)) : refuse(`reads the names of ${family}, a family its manifest does not open (kernel.families)`)),
+    island: async (island) => {
+      const reg = await islandRegistry(l, island);
+      if (reg === l.registry) return contextFor(l, pack, host);
+      const read = l.readIn(reg);
+      return contextFor(read, read.registry.packs.find((p) => p.id === id) ?? pack, hostFor(read));
+    },
     change: ({ basis, ...input }) => {
       const authority = systemAuthority(id, basis);
       // Until the actor kind `system` and core's rule system_reach are in the rules (wave 2), a service pack's change is
@@ -255,6 +270,8 @@ export function serverContext(pack: string, workspaces: NonNullable<RootCall['wo
     workspace: '',
     reads: none('read'),
     registry: new Proxy({}, { get: none('read the types of') }) as RegistryRead,
+    provided: none('read the names of'),
+    island: none('read an island of'),
     call: async <I, O>(name: string, input: I) => {
       if (!isRootName(name)) throw new Error(`The ${pack} pack's server duty calls only root services, not service:${name}`);
       if (!declares(manifest, name)) throw new Error(`The ${pack} pack calls service:${name}, which it neither requires nor uses`);

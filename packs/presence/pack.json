@@ -9,6 +9,72 @@
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "act.report.point": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "focus": "any",
+          "step": "any"
+        },
+        "out": "any",
+        "run": "acts.ts#pointAct"
+      },
+      "act.report.took": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "step": "any",
+          "told?": "boolean"
+        },
+        "out": "any",
+        "run": "acts.ts#tookAct"
+      },
+      "answer.sight": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "actor": "string",
+          "run?": "id",
+          "focus?": "boolean"
+        },
+        "out": {
+          "pages": {
+            "open": "number",
+            "following": "number"
+          },
+          "sight": {
+            "looking": "boolean",
+            "where": "string"
+          }
+        },
+        "run": "acts.ts#sightAnswer"
+      },
+      "act.report.screen": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "page?": "any"
+        },
+        "out": {
+          "focus?": "any",
+          "steps": [
+            "any"
+          ],
+          "told": "number",
+          "listening": "number"
+        },
+        "run": "acts.ts#screenAct"
+      }
+    }
   }
 }

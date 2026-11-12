@@ -192,7 +192,7 @@ export async function beforeTheLog(tx: Q, kept: string[]): Promise<Rows> {
 
 const ITEM = ['type', 'kind', 'title', 'body', 'status', 'is_open', 'owner', 'visibility', 'confidence', 'source_id', 'private_to', 'created_at', 'updated_at', 'archived_at'];
 const LINK = ['type', 'from_id', 'to_id', 'props', 'confidence', 'source_id', 'valid_from', 'valid_to'];
-const QUEUE = ['ts', 'actor', 'reason', 'source', 'ops', 'warnings', 'status', 'decided_by', 'decided_at', 'note', 'private_to', 'held_by'];
+const QUEUE = 'ts actor reason source ops warnings status decided_by decided_at note private_to held_by'.split(' ');
 /** What the fact stream never said (a claim's holds link, kept in its own stream) is not the rebuild's to take away. */
 const SAID = (alias: string) => `exists (select 1 from log_fact f where f.id = ${alias}.id)`;
 

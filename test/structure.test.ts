@@ -42,10 +42,10 @@ test('the kernel names no pack', () => {
 const NAMES_PACK_TYPES: Record<string, number> = {
   'src/altitude.ts': 1, 'src/capabilities.ts': 2, 'src/declared.ts': 3,
   'src/look-pass.ts': 1,
-  'src/manifest.ts': 1, 'src/outside.ts': 1, 'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2, 'src/pg.ts': 1,
-  'src/public-document.ts': 1, 'src/public.ts': 2, 'src/replay.ts': 1, 'src/rules.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2,
-  'src/session-hook.ts': 1, 'src/surface.ts': 2, 'src/tail.ts': 1, 'src/tool-reads.ts': 1, 'src/ui-files.ts': 1,
-  'ui/canvas.js': 1, 'ui/doc.js': 5, 'ui/draft.js': 2, 'ui/item-doc.js': 1, 'ui/item.js': 2, 'ui/screens.js': 1, 'ui/workspace-cards.js': 1,
+  'src/manifest.ts': 1, 'src/outside.ts': 1, 'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2,
+  'src/public-document.ts': 1, 'src/public.ts': 2, 'src/rules.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2,
+  'src/session-hook.ts': 1, 'src/surface.ts': 2, 'src/tool-reads.ts': 1, 'src/ui-files.ts': 1,
+  'ui/doc.js': 1, 'ui/item-doc.js': 1,
 };
 
 // Core's words until 11 Nov 2026 (people and calendar packs, e_wrdg6udh); `event` is also the kernel's for a log event.
@@ -67,7 +67,7 @@ const SESSIONS = 'e_xzwgetrg Sessions behaviour into its pack', VIEWS = 'e_8f8m2
 // A surface is a pack that adapts a client's hooks or launches one (reach.server adapter or launchers), and the kernel
 // names none of it: not `claude_code`, `claude-code`, `claude-headless`, nor the client `claude`.
 const NAMES_SURFACES: Owed = {
-  'ui/agents-card.js': [2, VIEWS], 'ui/connect-agent.js': [4, VIEWS], 'ui/words.js': [1, VIEWS],
+  'ui/agents-card.js': [1, VIEWS],
 };
 test('the kernel names no surface', () => {
   const vendors = packIds.filter((p) => !KERNEL_PACKS.includes(p) && existsSync(join(ROOT, 'packs', p, 'pack.json'))).flatMap((p) => {
@@ -81,7 +81,7 @@ test('the kernel names no surface', () => {
 
 // The sessions' actions, named here until the sessions pack declares them (e_xzwgetrg): the kernel switches on none.
 const NAMES_SESSION_ACTS: Owed = {
-  'src/views.ts': [1, SESSIONS], 'ui/item.js': [1, VIEWS],
+  'ui/item.js': [1, VIEWS],
 };
 test("the kernel names no session's action", () => {
   const named = count(kernelFiles, /['"`]session_(?:start|update|end)['"`]/g);
@@ -353,12 +353,10 @@ test('every pack file is in the manifest shape, and every old key is mapped', as
 // (`-- index <name>`), one the schema makes (src/read-indexes.ts has those made for it). What already broke it on 24 Oct is listed, and may only shrink.
 const WHOLE_READS: Record<string, number> = {
   'src/forget.ts': 2,
-  'src/log.ts': 2,
+  'src/log.ts': 1,
   'src/mentions.ts': 1,
   'src/pelago.ts': 1,
   'src/search.ts': 1,
-  'src/server.ts': 1,
-  'src/streams.ts': 1,
 };
 
 /** The tables that grow with the map. */

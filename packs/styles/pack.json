@@ -22,10 +22,25 @@
         "in": "any",
         "out": "any",
         "run": "styles.ts#pageLook"
+      },
+      "answer.page_style": {
+        "in": {
+          "of?": "any",
+          "style?": "any",
+          "view?": "any",
+          "have?": "any",
+          "try?": "any",
+          "shape?": "any"
+        },
+        "out": "any",
+        "run": "query-answers.ts#pageStyleOf"
       }
     },
     "hooks": {
-      "loader.moves": "moves.ts#moves"
+      "loader.moves": "moves.ts#moves",
+      "surface.icon": "styles.ts#iconOf",
+      "surface.page_style": "styles.ts#pageStyle",
+      "surface.lengths": "styles.ts#lengthsOf"
     }
   }
 }

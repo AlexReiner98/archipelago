@@ -10,6 +10,24 @@
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "answer.look": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "actor": "string",
+          "hash": "string",
+          "size?": "any"
+        },
+        "out": "any",
+        "run": "looks.ts#lookAnswer"
+      }
+    },
+    "hooks": {
+      "surface.looks": "served.ts#served"
+    }
   }
 }

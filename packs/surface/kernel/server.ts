@@ -32,30 +32,26 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from '../../../src/auth.ts'; import { firstStart } from './first-start.ts';
-import { notify } from '../../../src/notify.ts'; import { alertOnCrash } from '../../../src/alert.ts';
-import { parseBackup, parseVault } from '../../../src/backup.ts'; import { backupAll, backupDuty } from '../../../src/backup-run.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from '../../../src/members.ts'; import { requestWait } from '../../../src/standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from '../../../src/workspace-use.ts';
+import { dutyOf, mailing, onMap, onServer, openRoutes, published, type Backups, type Walked } from './above.ts'; import { callAs } from '../../loader/kernel/kernel-context.ts';
+import { parseBackup, parseVault } from '../../../src/backup.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from '../../../src/members.ts'; import { requestWait } from '../../../src/standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from '../../../src/workspace-use.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from '../../../src/config.ts'; import { env } from '../../../src/env.ts'; import type { Booted } from '../../../src/boot.ts';
-import { SHORT, serveConnect } from './connect-routes.ts'; import { asked, installed, polled } from '../../../src/connect.ts'; import { challenge, mcpAddress } from '../../../src/oauth.ts'; import { itemAddress } from '../../../src/item-address.ts';
+import { SHORT, serveConnect } from './connect-routes.ts'; import { challenge, mcpAddress } from '../../../src/oauth.ts'; import { itemAddress } from '../../../src/item-address.ts';
 import { stopAllLaunched } from '../../../src/launcher.ts'; import { configureLaunch } from './server-launch.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
-import { setLookOrigin } from '../../../src/looks.ts'; import { LOOK_READS, passWorkspace, readPass } from '../../../src/look-pass.ts'; import { pageMay } from './may.ts';
+import { LOOK_READS, passWorkspace, readPass } from '../../../src/look-pass.ts'; import { pageMay } from './may.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { configureOutbox } from '../../../src/outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from '../../../src/control-index.ts'; import { isPersonToken, personAt } from '../../../src/person-tokens.ts';
 import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './root-connections.ts'; import { configureHookTool } from '../../../src/hook-tool.ts'; import { setReach } from '../../../src/pack-reach.ts';
 import { pgLeader, soleLeader, whileLeads, type Leader } from '../../../src/leader.ts'; import { drained } from './drain.ts';
-import { keepCounts } from '../../../src/pack-counts.ts';
 import { clientAddress, trustedProxies } from '../../../src/address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
-import { servePublic } from '../../../src/public-route.ts'; import { siteNav } from '../../../src/site.ts'; import { ICON, serveIcon } from '../../../src/icon.ts';
-import { previewOf } from '../../../src/published-preview.ts'; import { iconOf, lengthsSheet, pageLook, pageStyle } from '../../../src/styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
+import { ICON, serveIcon } from './icon.ts';
+import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
 import { configureSecrets } from '../../../src/secrets.ts'; import { serveFilled } from './surface-slots.ts';
-import { adapterBefore, answerAt, hookAt } from '../../../src/server-adapter.ts'; import { mountOf, serveMounted } from '../../../src/server-mounts.ts';
+import { adapterBefore, answerAt, hookAt } from '../../loader/kernel/server-adapter.ts'; import { mountOf, serveMounted } from './server-mounts.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
 import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY, SIGNED_IN_READER_POLICY } from '../../../src/page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from '../../../src/draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
-import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from '../../../src/workspaces.ts'; import { BOUNCED_DAYS, failedFor, fromRelay, hasBounced, noteBounced } from '../../../src/bounces.ts'; import { normalEmail, setBounced } from '../../../src/mail.ts';
-
-/** What the open routes answer with that is above the surface (./connect-routes.ts): the mail pack's, the styles pack's and the connect pack's. */
-const ABOVE = { email: normalEmail, pageStyle: (l: Archipelago) => pageStyle(l, {}, false), bounces: { fromRelay, failedFor, noteBounced, days: BOUNCED_DAYS }, connect: { installed, asked, polled } };
+import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from '../../../src/workspaces.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
 const BODY_MAX = 32_000_000; /** What a route open to anyone takes: a form's worth, or a webhook's delivery. */ const OPEN_BODY_MAX = 64_000, HOOK_BODY_MAX = 1_000_000;
@@ -95,7 +91,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   // which is what stops another web page from reaching it through the browser.
   // The server's own Chrome may reach it by another name, from a container beside it (src/looks.ts).
   const lookAt = new URL(process.env.PELAGO_LOOK_ORIGIN ?? `http://127.0.0.1:${port}`);
-  setLookOrigin(lookAt.origin);
+  void onServer<{ setOrigin(url: string): void }>('surface.looks').then((looks) => looks.setOrigin(lookAt.origin), (err: Error) => console.error(`looks: ${err.message}`));
   const [named, sites] = [options.publicHosts ?? [], options.sites ?? {}], hosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...named, lookAt.host];
   const origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...named.map((name) => `https://${name}`), lookAt.origin];
   const tokens = options.auth === 'tokens', drawing = drawHosts(port, origins, options.draw); // where the page frames its drawings (src/draw-host.ts)
@@ -105,7 +101,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   serverPacks.origin = named[0] ? `https://${named[0]}` : origins[0];
   configureConnections(serverPacks);
   setReach({ hold: (id) => workspaces.hold(id), connection: async (id, pack) => { const c = await serverPacks.connectionOf(pack, id); return c ? { id: c.id, account: c.account } : null; }, via: (id, pack, host, path) => serverPacks.lent(pack, host, id, path) });
-  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => dueForDeletion(serverPacks, await workspaces.control(), now); slowTokensAt(options.limits?.token); setBounced(async (email) => hasBounced((await workspaces.get(DEFAULT_WORKSPACE)).pelago, email)); // a bounced address is sent nothing (src/bounces.ts)
+  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => dueForDeletion(serverPacks, await workspaces.control(), now); slowTokensAt(options.limits?.token);
+  void mailing().then((mail) => mail.setBounced(async (email) => onMap<boolean>((await workspaces.get(DEFAULT_WORKSPACE)).pelago, 'surface.bounced', email)), (err: Error) => console.error(`mail: ${err.message}`)); // a bounced address is sent nothing (the mailer's bounces)
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
   const running = { commit: startedFrom(), started: new Date().toISOString(), roots: options.roots }; configureHookTool(serverPacks, running);
@@ -179,7 +176,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
     } else if (((await asked()) || id) !== id) throw deny(); // its own workspace alone, asked once it is known good
     const slow = await requestWait(ws.id, token, askedAs(identity.actor)); if (slow.wait) throw new Refused(429, slow.refusal!, slow.wait);
     if (identity.newPlace)
-      await notify(ws.pelago, { kind: 'agent', name: 'pelago' }, {
+      await callAs(ws.pelago, 'act.report.notify', {
+        actor: { kind: 'agent', name: 'pelago' },
         title: `The token "${identity.actor.name}" was used from a new place`,
         body: `It was used from ${identity.newPlace}, where it had not been used before. A machine that has moved networks does this. If it is not one of yours, revoke the token in Settings: whoever has it can act as that ${identity.actor.kind}.`,
         level: 'warning',
@@ -216,17 +214,22 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // A domain that serves a workspace's public site: its pages by the reader pack (packs/reader), its icon; the rest as on any name.
       const mount = req.method === 'GET' ? mountOf(url.pathname, site) : undefined; // an address a server pack took from the kernel's list (src/server-mounts.ts)
       if (mount && (await serveMounted(req, res, mount, url.pathname, { packs: serverPacks, site, tokens, workspaces, named, sites, host, from: addressOf(req), tooOften: () => tooOften(req, res, open) }))) return;
-      if (req.method === 'GET' && ICON.test(url.pathname)) return tooOften(req, res, open) || serveIcon(res, await iconOf((await workspaces.get(site ?? DEFAULT_WORKSPACE)).pelago));
+      if (req.method === 'GET' && ICON.test(url.pathname)) return tooOften(req, res, open) || serveIcon(res, await onMap<Buffer | null>((await workspaces.get(site ?? DEFAULT_WORKSPACE)).pelago, 'surface.icon'));
       // The routes the packs above the surface fill (src/surface-slots.ts, surface.route): each counts its own requests.
       if (await serveFilled(req, res, url.pathname, { workspaces, tooOften: (limit) => tooOften(req, res, { open, deliveries, signIn }[limit]) })) return;
       // What a project needs to work with this server, and a running system's request for its token: no token needed.
       // A server pack answers at the addresses it had before it was a pack, too (a GitHub App set up then still sends there).
       const packPath = (req.method === 'GET' && Object.hasOwn(SHORT, url.pathname) ? SHORT[url.pathname] : serverPacks.aliased(url.pathname)) ?? url.pathname;
-      if (/^\/(connect|x|oauth|\.well-known)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : /^\/connect\/(sign-in|code|join|password|password\/set)$/.test(packPath) ? signIn : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX), person: () => resolve(req, res, 'human'), from: addressOf(req), ...ABOVE });
+      if (/^\/(connect|x|oauth|\.well-known)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : /^\/connect\/(sign-in|code|join|password|password\/set)$/.test(packPath) ? signIn : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX), person: () => resolve(req, res, 'human'), from: addressOf(req), ...(await openRoutes()) });
 
-      // A product's public page, which the reader pack passed on: open to anyone, on any name this server has (src/public-route.ts).
+      // A product's public page, which the reader pack passed on: open to anyone, on any name this server has (the publish
+      // pack's, surface.public): on the map it names when the server holds it, else with none.
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture|drawing|live)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;
-      if (pub) return tooOften(req, res, open) || (await servePublic(res, { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined }, { workspaces }));
+      if (pub) {
+        if (tooOften(req, res, open)) return;
+        const match = { workspace: pub[1], id: pub[2], what: pub[3], extra: pub[4], build: url.searchParams.get('build') ?? undefined };
+        return (await workspaces.has(match.workspace)) ? await onMap((await workspaces.get(match.workspace)).pelago, 'surface.public', res, match) : await onServer('surface.public', workspaces as Walked, res, match);
+      }
       // A document read by someone signed in, to print or save as a PDF: the same page a link opens, which reads the
       // document with the reader's own token. The page holds nothing; what it shows is what that token may see.
       if (req.method === 'GET' && /^\/read\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
@@ -235,7 +238,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         return res.end(await uiPage('doc.html'));
       }
       // A document's preview, for someone signed in: the published page, drawn from what publishing would freeze now
-      // (src/published-preview.ts), its site's other pages each led to by their own preview.
+      // (the publish pack's, surface.preview), its site's other pages each led to by their own preview.
       if (req.method === 'GET' && /^\/preview\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
         res.writeHead(200, { ...UNLISTED, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PREVIEW_POLICY });
         return res.end(markPage(await uiPage('doc.html'), { unsandboxed: options.unsandboxed }));
@@ -245,7 +248,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         if (!local(req)) return send(res, 403, { error: 'A preview is read by the pelago UI.' });
         const { ws, pelago } = await resolve(req, res, 'human');
         try {
-          return send(res, 200, { result: await previewOf(pelago, preview[1], () => siteNav(workspaces, ws.id, (page) => `/preview/${page.id}`)) });
+          const nav = async () => onMap<Record<string, unknown>>((await workspaces.get(ws.id)).pelago, 'surface.site_nav', (await workspaces.list()).find((w) => w.id === ws.id)?.name ?? ws.id, (page: { id: string }) => `/preview/${page.id}`);
+          return send(res, 200, { result: await onMap(pelago, 'surface.preview', preview[1], nav) });
         } catch (err) {
           if (err instanceof Refused) throw err;
           return send(res, 400, { error: (err as Error).message });
@@ -269,7 +273,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           ...((file === 'draw.js' || file === 'draw-marks.js' || file === 'three.module.min.js') && { 'access-control-allow-origin': '*' }),
         });
         const html = page && (frame?.html ?? (await uiPage(file))), drawOrigin = file === 'index.html' && !options.unsandboxed && !(process.env.PELAGO_LOOK_ORIGIN && host === lookAt.host) ? drawing.originFor(host) : undefined; // a Chrome beside the server may not reach the drawing host: it draws sandboxed
-        return res.end(html && (options.unsandboxed || open || drawOrigin) ? markPage(html, { open, unsandboxed: options.unsandboxed, drawOrigin }) : file === 'layout.css' ? lengthsSheet((await workspaces.get(DEFAULT_WORKSPACE)).pelago.registry.packs) : html || served!.body);
+        return res.end(html && (options.unsandboxed || open || drawOrigin) ? markPage(html, { open, unsandboxed: options.unsandboxed, drawOrigin }) : file === 'layout.css' ? await onMap<string>((await workspaces.get(DEFAULT_WORKSPACE)).pelago, 'surface.lengths') : html || served!.body);
       }
 
       if (req.method === 'GET' && url.pathname === '/whoami') {
@@ -356,7 +360,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
             if (admin) await admitMember(ws.pelago, admin, true);
             const owner = await ownerToken(ws, 'owner');
             if (!from) return send(res, 200, { result: owner });
-            const { rows } = await ws.pelago.db.query<{ entities: number; events: number }>(`select (select count(*)::int from entity) as entities, (select count(*)::int from log_op where stream = 'activity') as events`);
+            const { rows } = await ws.pelago.db.query<{ entities: number; events: number }>(`select (select count(*)::int from entity) as entities, (select count(*)::int from log_op where stream = 'activity') as events -- index entity_type, log_op_pos`);
             return send(res, 200, { result: { ...owner, restored: { from: from.workspace, taken: from.taken, ...rows[0] } } });
           } catch (err) {
             return send(res, 400, { error: (err as Error).message });
@@ -385,12 +389,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   });
 }
 
-// Started through the boot stub (src/boot.ts), which checks and starts the root packs first; run directly, this goes through it too.
-// `node src/server.ts` runs its shim, which is then the main module: this one answers for it.
-if (import.meta.main || join(process.argv[1] ?? '.') === join(import.meta.dirname, '..', '..', '..', 'src', 'server.ts')) {
-  try { serve(await (await import('../../../src/boot.ts')).boot()); } catch (err) { console.error((err as Error).message); process.exit(1); }
-}
-
+// Started through the boot stub (src/boot.ts, `npm start`), which checks and starts the root packs first and hands this
+// what it booted: the stub is the entry point, never this module.
 export function serve(booted: Booted): void {
   const config = loadConfig();
   const rootDir = join(config.dataDir, '..', 'workspaces');
@@ -447,7 +447,8 @@ If that process is not a pelago server, delete ${lock}.`);
     if (config.databaseUrl) console.log(leader.leading ? 'leading: this server runs the clocks' : 'following: another server runs the clocks');
     leader.onChange((on) => void workspaces.lead(on));
     await workspaces.lead(leader.leading);
-    stopDuties = whileLeads(leader, [() => backupDuty(workspaces, config.backup), () => serverPacksOf(workspaces).runSchedules()]); // the server's duties: backups (the backup pack) and the server packs' schedules
+    const backups = () => onServer<Backups>('surface.backup', workspaces as Walked);
+    stopDuties = whileLeads(leader, [() => dutyOf(async () => (await backups()).duty(config.backup)), () => serverPacksOf(workspaces).runSchedules()]); // the server's duties: backups (the backup pack) and the server packs' schedules
     if (config.idleMinutes > 0) {
       console.log(`workspaces unused for ${config.idleMinutes} minutes are closed until next needed`);
       idle = setInterval(() => void workspaces.closeIdle(config.idleMinutes * 60_000).then((closed) => closed.length && console.log(`closed idle workspaces: ${closed.join(', ')}`), (err) => console.error('closing idle workspaces failed:', err)), 60_000);
@@ -455,7 +456,7 @@ If that process is not a pelago server, delete ${lock}.`);
     if (config.backup) {
       const { dir, everyHours, keep, upload } = config.backup;
       console.log(`backups: every ${everyHours} hours to ${dir}, keeping ${keep}${upload ? ', each copied off the server' : ' (NOT copied off the server)'}`);
-      configureBackup(() => backupAll(workspaces, dir, keep, upload));
+      configureBackup(async () => (await backups()).all(dir, keep, upload));
     }
     if (config.auth !== 'tokens') return;
     await firstStart(workspaces, main, join(config.dataDir, '..')); // the two everything is made from, given once (src/first-start.ts)
@@ -463,21 +464,21 @@ If that process is not a pelago server, delete ${lock}.`);
   let idle: ReturnType<typeof setInterval> | undefined;
   let leader: Leader | undefined;
   let stopDuties = () => {};
-  const stopCounts = keepCounts((id) => workspaces.get(id)); // what packs counted (count.add), written down each minute and on the way down
+  const counting = published().then((p) => p.counts.keepCounts((id) => workspaces.get(id) as Promise<never>), (err: Error) => (console.error(`counts: ${err.message}`), async () => {})); // what packs counted (count.add), written down each minute and on the way down
   const stop = async (code = 0) => {
     stopDuties();
     clearInterval(idle);
     await leader?.stop();
     stopAllLaunched();
     await drained(server, config.dev ? 1_000 : undefined); // the requests in hand answered before their databases close (src/drain.ts)
-    await stopCounts();
+    await (await counting)();
     await workspaces.closeAll();
     await booted.stop(); // the root packs, in reverse order
     rmSync(lock, { force: true });
     process.exit(code);
   };
   process.on('SIGINT', () => stop());
-  process.on('SIGTERM', () => stop()); alertOnCrash(hostname()); // a crash is mailed to the owner on the way down (src/alert.ts)
+  process.on('SIGTERM', () => stop()); void onServer('surface.crash', undefined, hostname()).catch((err: Error) => console.error(`alerts: ${err.message}`)); // a crash is mailed to the owner on the way down (the alerts pack's)
   // Leave time for the answer to the restart call to be sent, then hand over to scripts/dev.ts.
   if (config.dev) configureRestart(() => void setTimeout(() => stop(RESTART_EXIT), 200));
 }
