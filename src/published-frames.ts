@@ -1,5 +1,6 @@
-// A published picture's first frame, kept with it: at publish the server runs the picture's drawing once and keeps
-// the scene it opens on, so a reader's page mounts it with the page's text, before the sandbox has started. Only a
+// A published picture's first frame, kept with it: at publish the server runs the picture's drawing once, in a
+// sandboxed process of its own (src/drawing-box.ts), and keeps the scene it opens on, so a reader's page mounts it
+// with the page's text, before the sandbox has started. Only a
 // drawing whose code is the pack's own is run here (its hash is the pack's): a version changed on the map is code
 // anyone who may change the map wrote, and runs only in the reader's sandbox. The page checks these marks as it
 // checks any drawing's (ui/marks.js), and the sandbox takes the picture over once it answers.
@@ -7,7 +8,7 @@
 // Text is measured by a width table of the house style's typeface (src/text-widths.ts), not by a canvas: a reader
 // whose fonts differ sees names fit a little otherwise until the drawing lays them out with their own.
 
-import { pathToFileURL } from 'node:url';
+import { drawOnce } from './drawing-box.ts';
 import { packLayout } from './layouts.ts';
 import type { Archipelago } from './pelago.ts';
 import { OTHER, WIDTHS } from './text-widths.ts';
@@ -24,11 +25,8 @@ export async function openingScene(entry: string, frozen: Frozen, types: Record<
   // and the style held still, without its code.
   const { style = {}, first: _first, ...answer } = frozen;
   const { drawing: _drawing, code: _code, ...fields } = { ...style, noLit: true, still: true } as Record<string, unknown>;
-  const { picture } = await import(pathToFileURL(entry).href);
-  const drawn = picture({ answer: plain(answer), style: plain(fields), types, fields: words.fields ?? {}, relations: words.relations ?? {}, reduced: false }, { measure, patch: () => {}, open: () => {}, frame: () => new Promise(() => {}) });
-  // What plays after the first frame is the reader's: stopped before it starts.
-  drawn?.end?.();
-  return drawn?.scene ? plain(drawn.scene) : null;
+  // The drawing's code runs only in its own process, with no network, no files but its own and no process to start.
+  return drawOnce(entry, { answer: plain(answer), style: plain(fields), types, fields: words.fields ?? {}, relations: words.relations ?? {}, reduced: false });
 }
 
 /** The scene the pack's drawing at `entry` opens `frozen` on, given the words the page would give it; null when it cannot be had. */
