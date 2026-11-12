@@ -51,7 +51,7 @@ import { previewOf } from './published-preview.ts'; import { lengthsSheet, pageL
 import { configureSecrets } from './secrets.ts'; import { serveBackupFile } from './backup-tools.ts';
 import { answerAt, hookAt } from './server-adapter.ts'; import { mountOf, serveMounted } from './server-mounts.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
-import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY } from './page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from './draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
+import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY, SIGNED_IN_READER_POLICY } from './page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from './draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
 import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from './workspaces.ts'; import { hasBounced } from './bounces.ts'; import { setBounced } from './mail.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
@@ -230,7 +230,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // document with the reader's own token. The page holds nothing; what it shows is what that token may see.
       if (req.method === 'GET' && /^\/read\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
         // Framed by this server's own page alone, to read a private document on the canvas (ui/reader-frame.js).
-        res.writeHead(200, { ...PRIVATE, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'" });
+        res.writeHead(200, { ...PRIVATE, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': SIGNED_IN_READER_POLICY });
         return res.end(await uiPage('doc.html'));
       }
       // A document's preview, for someone signed in: the published page, drawn from what publishing would freeze now
