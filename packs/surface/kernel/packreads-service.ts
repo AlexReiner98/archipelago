@@ -10,8 +10,8 @@ import { opEntries, type OpStream } from '../../log/kernel/streams.ts';
 import { isCountStream } from '../../log/kernel/retention.ts';
 import { publicViewAt, publicViews } from '../../database/kernel/public-view-store.ts';
 import { draftDocument, publicDocument } from '../../walls/kernel/public-document.ts';
-import { islandsOff } from './islands.ts';
-import { LOCAL_PACK } from './packs.ts';
+import { islandsOff } from '../../loader/kernel/islands.ts';
+import { LOCAL_PACK } from '../../loader/kernel/packs.ts';
 
 export type ServiceRead = {
   /** One open link by its id, or null: what an unlink takes away, read alone rather than every link of its kind. */

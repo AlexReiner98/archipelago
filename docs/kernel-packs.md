@@ -182,6 +182,7 @@ are slots of the write and log packs; the others:
 |---|---|---|---|
 | `log.appended` | log | usage | `bytes` called inside `log.append` |
 | `rules.reply_ended` | rules | sessions | `rules.ts` importing `reply-rules.ts` |
+| `loader.reads` | loader | surface | `packhost.ts` importing `packreads.ts` (the sandbox's reads) |
 | `identity.invited` | identity | mail | `members.ts` importing `mail.ts` |
 | `open.<phase>` | the stub | any | the fixed order in `Workspaces.load` |
 | `surface.read`, `surface.act`, `surface.route` | surface | any | the closed tables in `tool-reads.ts`, `tool-acts.ts`, `server.ts` |
@@ -231,10 +232,10 @@ Started in this order; each needs only those above it in the table.
 | 3 | log | the record, its streams and projections, its copies | `append`, `head`, `read(cursor)`, `record(stream)`, `projectFacts`, `rebuild`, `snapshot`, `tail`, `dump`, `restore`; slots `log.project`, `log.appended` |
 | 4 | identity | who is asking: people, tokens, workspaces | `who(request)`, tokens, members' core, `workspaces` (list, create, delete, operator), `scope`, `policy`; slot `identity.invited` |
 | 5 | walls | what may leave the server and what a page may run | `fetch(pack, url)` by reach, `pagePolicy`, `drawHost`, `cssCheck`, `svgFigure`, `scrub` (the public form), `publicDocument`, `unscopedRead` (the renamed `wholeMap`, its callers listed), `mailGate` |
-| 6 | loader | packs, versions, islands, the sandbox, the in-process tier | `Registry`, pack states, pins, island guards, `reach`, `host` (sandbox), `context(pack)` (the `KernelContext`), `call(service)`, `fillings(point)`, `packreads` |
+| 6 | loader | packs, versions, islands, the sandbox, the in-process tier | `Registry`, pack states, pins, island guards, `reach`, `host` (sandbox), `context(pack)` (the `KernelContext`), `call(service)`, `fillings(point)`; slot `loader.reads` |
 | 7 | rules | who decides what applies | `decide(who, ops, runs)`, `judge`, `mayDo`, `authorityOf`, actor checks, `standing` (still writable, room to store), private deps, layout changes; slot `rules.reply_ended` |
 | 8 | write | the one write path and the shape of an item | `change`, `apply`, `plan`, proposals (decide, withdraw, undo), merge, forget, ops, head, fields, link ends, owner link, within; points `write.*` |
-| 9 | surface | the ten verbs, who may call them, the HTTP host | tools, MCP, CLI, the hook host, the server's routes and gates, the kernel reads (`get`, `search`, `schema`, `events`, `proposals`); slots `surface.*` |
+| 9 | surface | the ten verbs, who may call them, the HTTP host | tools, MCP, CLI, the hook host, the server's routes and gates, the kernel reads (`get`, `search`, `schema`, `events`, `proposals`), the reads API (`packreads`, as `answerRead`); slots `surface.*` |
 
 The `Archipelago` class (`src/pelago.ts`) is taken apart on the way: change
 and apply go to write, `search`, `get`, `trail` and `events` to surface,
@@ -257,16 +258,16 @@ moves with a shim to the pack named.
 | log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore; the rest to backup), backup-log |
 | identity | auth, oauth, oauth-clients, passwords, person-tokens, token-tools, members (invite half to mail), control, control-index, scope, workspaces (tenancy; the load order becomes the stub's `open` phases) |
 | walls | page-policies, draw-host, svg-figure, css-check, public, public-document, outbound, outbox, address, outside, notify-mail |
-| loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packreads, packreads-kernel, packreads-log, packreads-pin, packreads-rows, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts |
+| loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts |
 | rules | rules (reply rules to sessions), actor-checks, authority, private-deps, layout-changes, standing |
 | write | pelago (reads to surface), change-apply, change-plan (automation checks to automations), ops, head, fields, link-ends, owner-link, within, pelago-types, proposals, withdraw, undo, merge, forget |
-| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools, search, transient, view-address, listing |
+| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools, search, transient, view-address, listing, packreads, packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, region, blocking |
 
 ### Service
 
 | Pack | Modules |
 |---|---|
-| query | query-flat, query-terms, query-steps, query-only, query-held, query-presets, askview, views, region, blocking, altitude, timeaxis, summary |
+| query | query-flat, query-terms, query-steps, query-only, query-held, query-presets, askview, views, altitude, timeaxis, summary |
 | lenses | query-kept, query-saved, saved-views, view-life, view-twins, query-names |
 | views | view-graph, view-tree, inside, brief, eventlog, moved, timelanes, documents, plan-note |
 | attention | attention, bounds, confirm |
@@ -461,6 +462,14 @@ newest; `limit`), `history` (an item's facts, opened, or its last position),
 database's own reckoning is the behaviour (a date against `current_date`, a
 `numeric`), the module's SQL moves into the read as it was (`bounds`, and
 `confirm`, now `settledUnconfirmed` in `src/packreads-log.ts`).
+
+The reads API is surface's (decision e_yesqkpdg, the owner, 12 Nov 2026): `packreads` and its parts
+live in `packs/surface/kernel/`, with `region` and `blocking`, the bounded scans they answer, and
+keep their shims in `src/`. The loader's sandbox asks it through the slot `loader.reads`
+(`fillReads`, `src/packhost.ts`), filled when `packreads` loads. `askview` and `views` stay in
+query: in surface they would owe their imports of attention, usage, sessions, styles and agents
+for the few they cut. What the reads import of service packs (places, touched, instructions,
+uses, eventlog, views, timeaxis, query-flat) stays owed in `test/fixtures/root-imports.json`.
 
 ### Answers
 

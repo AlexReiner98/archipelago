@@ -5,17 +5,17 @@
 // under row-level security, as every read of packreads.ts is. What reads the whole map is not here.
 
 import { ACTIVE_HOLDS, type Archipelago } from '../../../src/pelago.ts';
-import { blockGraph, heldResources } from '../../../src/blocking.ts';
+import { blockGraph, heldResources } from './blocking.ts';
 import { openSaid } from '../../../src/seal.ts';
 import { scopeOf } from '../../../src/places.ts';
-import { scanAround, scanKinds, type Around } from '../../../src/region.ts';
+import { scanAround, scanKinds, type Around } from './region.ts';
 import { instructionsFor } from '../../../src/instructions.ts';
 import { shapes } from './packreads-rows.ts';
 import { notKernel } from '../../../src/head.ts';
-import { islandRegistry } from './island-pin.ts';
-import { presetsOf } from './declared.ts';
+import { islandRegistry } from '../../loader/kernel/island-pin.ts';
+import { presetsOf } from '../../loader/kernel/declared.ts';
 import { asOf } from '../../../src/rebuild.ts';
-import { layoutFor } from './layouts.ts';
+import { layoutFor } from '../../loader/kernel/layouts.ts';
 import { used } from '../../../src/uses.ts';
 
 export type KernelRead = {

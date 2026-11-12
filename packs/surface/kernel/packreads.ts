@@ -5,11 +5,11 @@
 
 import { livesIn, livesInFor, SCOPE } from '../../../src/places.ts';
 import type { Archipelago, Entity } from '../../../src/pelago.ts';
-import { blockGraph } from '../../../src/blocking.ts';
-import { packVersions } from './pack-versions.ts';
+import { blockGraph } from './blocking.ts';
+import { packVersions } from '../../loader/kernel/pack-versions.ts';
 import { readEvents } from '../../../src/eventlog.ts';
 import { askPackView, VIEWS } from '../../../src/views.ts';
-import { scanAround } from '../../../src/region.ts';
+import { scanAround } from './region.ts';
 import { placeAll, readAxis, zoneOf } from '../../../src/timeaxis.ts';
 import { LENS_LIMIT } from '../../../src/query-flat.ts';
 import { NAME, pageOf, paged, READ_LIMIT, shapes, type Page } from './packreads-rows.ts';
@@ -17,6 +17,7 @@ import { confirmQuestions, factsByRun, heldChanges, lastSaid, runsOf } from './p
 import { pinned, type Pin } from './packreads-pin.ts';
 import { kernelRead, type KernelRead } from './packreads-kernel.ts';
 import { serviceRead, type ServiceRead } from './packreads-service.ts';
+import { fillReads } from '../../loader/kernel/packhost.ts';
 
 export type Read = KernelRead & ServiceRead & {
   get?: string;
@@ -81,6 +82,9 @@ export type Read = KernelRead & ServiceRead & {
   /** The packs in force here, each with its version and its manifest's hash (src/pack-versions.ts). */
   packs?: boolean;
 };
+
+// The loader's sandbox asks its packs' reads of this (the slot loader.reads, src/packhost.ts).
+fillReads((l, read) => answerRead(l, read));
 
 /** The answer to a read, as the map asks it; `pack` is the internal pack asking, when one is (its own memory is read by it alone). */
 export async function answerRead(l: Archipelago, q: Read, pack?: string): Promise<unknown> {
