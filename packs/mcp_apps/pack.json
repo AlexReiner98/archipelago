@@ -1,0 +1,11 @@
+{
+  "id": "mcp_apps",
+  "version": "0.1.0",
+  "title": "Views in a chat",
+  "description": "A view drawn inline in a chat through the MCP Apps extension: the one page the draw tool names, its policy, and the resource a request's server offers it as.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}
