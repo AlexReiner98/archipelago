@@ -50,7 +50,7 @@ export const mayLeave = async () => !unsaved() || Boolean(await ask({ title: 'Le
 
 /**
  * The title, the note and the bar that saves them. `base` is the item as the sheet opened it ({ id, type, title, body,
- * updated_at }), or a new item's type and any title it starts with. `note`: false where the note is not written here
+ * updated_at }), or a new item's type and any title it starts with. With note false, the note is not written here
  * (a document, read whole). `reading`: what the note reads as, where it is not the note itself (a document, with the
  * sections it brings in). `writing`: the note opens as words to write, not as it reads (read beside it already, the
  * pages). `call`: the map it is written on, this one unless said. `saved(id)` is told when the change is made. `count`:
@@ -245,7 +245,7 @@ export function newItem(host, { type, title = '', style, types, choices }) {
         draft.title,
         h('div', { class: 'sheet-marks' }, h('select', { class: 'mark-type', title: 'What kind of item it is', onchange: (ev) => ((title = draft.title.textContent), moveKept(chosen, ev.target.value), draw(ev.target.value)) }, choices.map((t) => h('option', { value: t.id, selected: t.id === chosen }, t.label))), h('span', { class: 'muted' }, 'new, tied to nothing yet')),
       ),
-      h('section', { class: 'note' }, draft.note),
+      h('section', { class: 'item-note' }, draft.note),
       draft.bar,
     );
   };

@@ -161,6 +161,15 @@ function invoiceHead(d) {
   );
 }
 
+/**
+ * The heads a style may give a page (page.head), by name: each draws the page's heading and says its title, and the
+ * page's body wears the head's name as a class (ui/doc.css). A page whose style names none has the plain heading.
+ */
+const HEADS = {
+  invoice: { draw: invoiceHead, title: (d) => (d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title) },
+};
+const headOf = (d) => (Object.hasOwn(HEADS, d.head ?? '') ? HEADS[d.head] : null);
+
 
 /** Whether a page ends with a way to start a map of one's own: read with no login, and the style gives it words. */
 const startsOwn = (d) => !own && !preview && !d.site?.host && typeof d.start === 'string' && Boolean(d.start);
@@ -199,7 +208,8 @@ function draw(d) {
   if (d.carry) carryOn = d.carry;
   applyTheme(d);
   pageSheet.replaceSync(pageCss(d.page_css));
-  document.title = d.head === 'invoice' && d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title;
+  const head = headOf(d);
+  document.title = head ? head.title(d) : d.title;
   const titles = new Map(d.parts.filter((p) => p.section).map((p) => [p.section.id, p.section.title]));
   away = new Map(Object.entries(d.links ?? {}));
   paths = d.paths ?? {};
@@ -247,7 +257,7 @@ function draw(d) {
   // The page's parts, lists and all, laid out in one flat row as the page takes them.
   const kids = [
     d.site && siteHead(d.site),
-    d.head === 'invoice' ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at, 'long')}` : `Updated ${day(d.updated_at, 'long')}`)),
+    head ? head.draw(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at, 'long')}` : `Updated ${day(d.updated_at, 'long')}`)),
     parts(),
     // A site's pages each end with what its footer page says (src/site.ts).
     d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, titles, 3)),
@@ -256,7 +266,7 @@ function draw(d) {
     ((!published && !d.site) || startsOwn(d)) && h('footer', { class: 'muted' }, !published && !d.site && h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF'), startsOwn(d) && startLink(d.start)),
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
-  document.body.classList.toggle('invoice', d.head === 'invoice');
+  for (const name of Object.keys(HEADS)) document.body.classList.toggle(name, HEADS[name] === head);
   // Its pictures, with the text: a drawing's first frame is kept with the picture, and the drawing takes it over once started.
   // On a public view, a part of a picture opens in a sheet, read only (ui/doc-sheet.js), as it was frozen.
   const onItem = published || d.site ? (id) => openItem(id, frozenItem(d), (text) => blocks(text, titles, 3)) : null;

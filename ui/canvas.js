@@ -15,6 +15,8 @@ import { FOCUS, addressOf, flatView } from './query.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
 
+/** The levels a type may stand at (four, highest first: src/altitude.ts) other than a project's: the map's own, and those under a project. */
+const UNDER_OR_OVER = ['workspace', 'stream', 'step'];
 /**
  * Home: what agents' recent work reaches that needs attention now (the frontier, the same answer a session starts
  * with: decision e_gsxbzvxe), whatever waits on the viewer, and open projects (what stands at a project's altitude),
@@ -22,7 +24,7 @@ import { unfollow } from './replica.js';
  * taken from an item.
  */
 export const home = () => ({
-  filter: { find: ['frontier', 'waits_on me', ...(state.schema?.types ?? []).filter((t) => !t.dormant && t.altitude === 'project').map((t) => `type ${t.id}`)], not: ['done', 'kind system'] },
+  filter: { find: ['frontier', 'waits_on me', ...(state.schema?.types ?? []).filter((t) => !t.dormant && t.altitude && !UNDER_OR_OVER.includes(t.altitude)).map((t) => `type ${t.id}`)], not: ['done', 'kind system'] },
   limit: numberOf(state.style, 'home_limit'),
 });
 /** The canvas an item's address opens when no lens is asked: the item and what it holds, depends on and waits on. */
