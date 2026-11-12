@@ -27,7 +27,7 @@ export const TOKEN_TOOLS: Record<string, Tool> = {
     humanOnly: true,
     input: {
       kind: z.enum(['human', 'agent']),
-      name: z.string().min(1).describe('Who or what will use it, e.g. "claude-code". Recorded against everything done with it.'),
+      name: z.string().min(1).describe('Who or what will use it, e.g. "nightly-builder". Recorded against everything done with it.'),
       entity: z.string().optional().describe('Id of the person this token is, or acts for. Defaults to you.'),
       admin: z.boolean().optional(),
       expires_days: z.number().int().positive().optional(),

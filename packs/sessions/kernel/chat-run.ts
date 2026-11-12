@@ -26,18 +26,15 @@ export async function resolveRun(l: Archipelago, key: string, openOnly = false):
  */
 export const isChat = (run: Entity) => Boolean(run.props.session_id && run.props.surface) && !/-headless$/.test(String(run.props.surface)) && !String(run.props.surface).startsWith('pack:');
 
-/** The actor a session's hooks act as, whatever surface it is in: named claude-code since before there were surfaces, as the log keeps it. */
-export const HOOK_ACTOR: Actor = { kind: 'agent', name: 'claude-code' };
-
 export async function takeUp(l: Archipelago, actor: Actor, run: Entity): Promise<void> {
   if (!run.is_open) await roomForSession(l.workspace, () => sessionsAwake(l));
   await bookkeep(l, actorId(actor), { ops: [{ op: 'update', id: run.id, status: 'running' }], reason: 'Session taken up again' });
 }
 
-/** The chat goes on: a prompt to a session that was ended, or that had said where its work stands, takes it up under its name. */
-export async function sessionPrompted(l: Archipelago, sessionId: string | undefined): Promise<void> {
+/** The chat goes on: a prompt to a session that was ended, or that had said where its work stands, takes it up under its name, as the actor its hooks act as. */
+export async function sessionPrompted(l: Archipelago, sessionId: string | undefined, actor: Actor): Promise<void> {
   const run = sessionId ? await resolveRun(l, sessionId) : undefined;
-  if (run && isChat(run) && (!run.is_open || run.status === 'waiting')) await takeUp(l, HOOK_ACTOR, run);
+  if (run && isChat(run) && (!run.is_open || run.status === 'waiting')) await takeUp(l, actor, run);
 }
 
 /** How long after its hook registered a chat a call to register it again is taken to be the same chat. */

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { resolveRun, sessionEnd, sessionPrompted, sessionStart, sessionUpdate, tell } from '../src/sessions.ts';
-import { hookSessionEnd, hookSessionStart } from '../src/session-hook.ts';
+import { HOOK_ACTOR, hookSessionEnd, hookSessionStart } from '../src/session-hook.ts';
 import { callTool } from '../src/tools.ts';
 import { bypassingRls } from '../src/outbox.ts';
 import { presence } from '../src/presence.ts';
@@ -79,7 +79,7 @@ test('one chat is one session: its agent saying it is done keeps it open, and on
   assert.equal((await l.entity(run))!.is_open, true, 'still there to follow');
   assert.deepEqual(((await VIEWS.sessions.run(l, {})) as any).open.map((r: any) => r.id), [run]);
 
-  await sessionPrompted(l, 'chat');
+  await sessionPrompted(l, 'chat', HOOK_ACTOR);
   assert.equal((await l.entity(run))!.status, 'running', 'the next message puts it back to work');
   await sessionUpdate(l, agent, { run, note: 'Going on' });
 
@@ -90,7 +90,7 @@ test('one chat is one session: its agent saying it is done keeps it open, and on
   assert.match(closed.body, /finished: All done$/, 'what the session said stands as its last word');
 
   // Ended for it after going quiet, the same chat comes back under its own name.
-  await sessionPrompted(l, 'chat');
+  await sessionPrompted(l, 'chat', HOOK_ACTOR);
   const back = (await l.entity(run))!;
   assert.deepEqual([back.status, back.is_open, back.props.name], ['running', true, name]);
 });
@@ -115,12 +115,12 @@ test('a run with no chat is ended by its agent, and a person ends a chat’s run
   const { run } = await sessionStart(l, agent, { title: 'No chat' });
   await callTool(l, agent, 'session_end', { run, summary: 'Done' });
   assert.equal((await l.entity(run))!.is_open, false);
-  await sessionPrompted(l, undefined);
+  await sessionPrompted(l, undefined, HOOK_ACTOR);
 
   const headless = await sessionStart(l, agent, { session_id: 'head', surface: 'claude-headless' });
   await callTool(l, agent, 'session_end', { run: headless.run, summary: 'Done' });
   assert.equal((await l.entity(headless.run))!.is_open, false, 'a launched run is not a chat');
-  await sessionPrompted(l, 'head');
+  await sessionPrompted(l, 'head', HOOK_ACTOR);
   assert.equal((await l.entity(headless.run))!.is_open, false);
 
   const chat = await sessionStart(l, agent, { session_id: 'mine', surface: 'claude-code' });
